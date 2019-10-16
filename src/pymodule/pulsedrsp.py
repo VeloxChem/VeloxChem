@@ -118,7 +118,7 @@ class PulsedResponse:
 
         # Convert frequency range to a zero padded and a truncated list
         # of frequncies
-        self.zero_pad_freqs, truncated_freqs = self.verify_freqs(freq_range)
+        self.zero_padded_freqs, truncated_freqs = self.verify_freqs(freq_range)
         self.end_w = truncated_freqs[-1]
 
         # TODO Override of number of pulses - set to 1
@@ -234,6 +234,14 @@ class PulsedResponse:
         results = self.rsp_driver.compute(molecule, ao_basis, scf_tensors)
         results['pulse_settings'] = self.pulse_settings
 
+        # Loop over all directions
+        for xyz1 in ['x', 'y', 'z']:
+            for xyz2 in ['x', 'y', 'z']:
+                # Convert response function to polarizability
+                # by multiplication with -1
+                for freq in self.truncated_freqs:
+                    results['properties'][(xyz1, xyz2, freq)] *= -1
+
         if self.rank == mpi_master():
             self.ostream.print_info(
                 "Exiting CPP Solver returning to Pulsed Linear Response")
@@ -303,13 +311,12 @@ class PulsedResponse:
 
         :return:
             The h5 file saved contains the following datasets:
-                - truncated_freqs : The calculated truncated_freqs
                 - amplitudes  : The pulse amplitudes for the calculated
                                 truncated_freqs
                 - zero_padded : Is the dataset zero padded or not
                 - 'xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'
                    =>  Amplitudes for all directions
-                - zero_padded_frequencies : The zero padded frequency list
+                - zero_padded_freqs       : The zero padded frequency list
                 - zero_padded_amplitudes  : The pulse amplitudes for the
                                             calculated frequencies zero
                                             padded to match th
@@ -330,7 +337,7 @@ class PulsedResponse:
         try:
             with h5py.File(fname, 'w') as hf:
                 hf.create_dataset('frequencies',
-                                  data=self.zero_pad_freqs,
+                                  data=self.zero_padded_freqs,
                                   compression="gzip")
                 hf.create_dataset('amplitudes',
                                   data=self.zero_padded_amplitudes,
@@ -342,16 +349,16 @@ class PulsedResponse:
                 # Loop over all directions
                 for xyz1 in ['x', 'y', 'z']:
                     for xyz2 in ['x', 'y', 'z']:
-                        amplitudes = []
-                        # Add all amplitudes for the give direction
-                        for freq in self.zero_pad_freqs:
-                            amplitudes.append(
+                        polarizability = []
+                        # Add all polarizability for the give direction
+                        for freq in self.zero_padded_freqs:
+                            polarizability.append(
                                 self.results['properties_zeropad'][(xyz1,
                                                                     xyz2,
                                                                     freq)])
 
                         hf.create_dataset("{}{}".format(xyz1, xyz2),
-                                          data=np.array(amplitudes),
+                                          data=np.array(polarizability),
                                           compression="gzip")
 
         except Exception as e:
@@ -389,7 +396,7 @@ class PulsedResponse:
         zero_padded_results = {}
         for xyz1 in ['x', 'y', 'z']:
             for xyz2 in ['x', 'y', 'z']:
-                for freq in self.zero_pad_freqs:
+                for freq in self.zero_padded_freqs:
                     if (xyz1, xyz2, freq) not in results['properties']:
                         zero_padded_results[(xyz1, xyz2,
                                              freq)] = complex(0.0, 0.0)
@@ -408,7 +415,7 @@ class PulsedResponse:
         prepended_zeros = int(self.truncated_freqs[0]/dw) + 1  # for zero
 
         # Find the number of zeros truncated at the end
-        appended_zeros = (len(self.zero_pad_freqs) - len(self.amplitudes)
+        appended_zeros = (len(self.zero_padded_freqs) - len(self.amplitudes)
                           - prepended_zeros)
 
         # Assemble the array of amplitudes that matches the frequency array
