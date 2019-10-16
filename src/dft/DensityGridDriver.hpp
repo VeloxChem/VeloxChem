@@ -75,6 +75,20 @@ class CDensityGridDriver
                               const CMolecularBasis&  basis,
                               const CMolecularGrid&   molecularGrid,
                               const xcfun             xcFunctional);
+    
+    /**
+     Creates density grid on each MPI node within domain of MPI communicator.
+     Density grid points are generated using only CPUs.
+     
+     @param densityGrid the density grid object.
+     @param aoDensityMatrix the AO density matrices.
+     @param gtoContainer the GTOs container.
+     @param molecularGrid the distributed molecular grid.
+     */
+    void _genRestrictedDensityForLDA(      CDensityGrid&     densityGrid,
+                                     const CAODensityMatrix& aoDensityMatrix,
+                                     const CGtoContainer*    gtoContainer,
+                                     const CMolecularGrid&   molecularGrid);
 
     /**
      Generates batch of density grid points.
@@ -174,6 +188,28 @@ class CDensityGridDriver
                                   const int32_t              ketComponents,
                                   const int32_t              gridOffset,
                                   const xcfun                xcFunctional) const;
+    
+    /**
+     Gets number of rows in grid points matrix.
+     
+     @return the number of grid rows.
+     */
+    int32_t _getNumberOfGridRows() const;
+    
+    /**
+     Distributes specific density values into density grid.
+
+     @param densityGrid the density grid.
+     @param iDensityMatrix the identifier of density matrix.
+     @param densityValues the density values matrix.
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
+    void _distDensityValues(      CDensityGrid& densityGrid,
+                            const int32_t       iDensityMatrix,
+                            const CDenseMatrix& densityValues,
+                            const int32_t       gridOffset,
+                            const int32_t       nGridPoints) const;
 
    public:
     /**

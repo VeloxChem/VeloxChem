@@ -11,8 +11,66 @@
 #include "GtoFuncForLDA.hpp"
 #include "GtoFuncForGGA.hpp"
 #include "AngularMomentum.hpp"
+#include "OMPTasks.hpp"
 
 namespace gtorec {  // gtorec namespace
+    
+    void
+    computeGtosMatrixForLDA(      CDenseMatrix&   gtoMatrix,
+                            const CGtoContainer*  gtoContainer,
+                            const CMolecularGrid& molecularGrid,
+                            const int32_t         gridOffset,
+                            const int32_t         nGridPoints)
+    {
+        // set up OMP tasks
+        
+        COMPTasks omptaks(3);
+        
+        omptaks.set(nGridPoints);
+        
+        auto ntasks = omptaks.getNumberOfTasks();
+        
+        auto tbsizes = omptaks.getTaskSizes();
+        
+        auto tbpositions = omptaks.getTaskPositions();
+        
+        // set up pointer to molecular grid weigths
+        
+        auto mgx = molecularGrid.getCoordinatesX();
+        
+        auto mgy = molecularGrid.getCoordinatesY();
+        
+        auto mgz = molecularGrid.getCoordinatesZ();
+        
+        // set up GTOs data
+        
+        auto pgaos = gtoMatrix.values();
+        
+        // generate density on grid points
+        
+        #pragma omp parallel shared(pgaos, tbsizes, tbpositions, ntasks, mgx, mgy, mgz)
+        {
+            #pragma omp single nowait
+            {
+                for (int32_t i = 0; i < ntasks; i++)
+                {
+                    // set up task parameters
+                    
+                    auto tbsize = tbsizes[i];
+                    
+                    auto tbposition = tbpositions[i];
+                    
+                    // generate task
+                    
+                    #pragma omp task firstprivate(tbsize, tbposition)
+                    {
+                        gtorec::computeGtosValuesForLDA(pgaos, gtoContainer, mgx, mgy, mgz,
+                                                        gridOffset, tbposition, tbsize);
+                    }
+                }
+            }
+        }
+    }
     
     void
     computeGtosValuesForLDA(      double*        gtoMatrix,

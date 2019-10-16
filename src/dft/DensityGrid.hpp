@@ -80,7 +80,8 @@ public:
      @param densityValues the 2D memory block object with density values data.
      @param gridType the type of density grid.
      */
-    CDensityGrid(const CMemBlock2D<double>& densityValues, const dengrid gridType);
+    CDensityGrid(const CMemBlock2D<double>& densityValues,
+                 const dengrid              gridType);
     
     /**
      Creates a density grid object.
@@ -90,7 +91,10 @@ public:
      @param xcFuncType the type of exchange-correlation functional.
      @param gridType the type of density grid.
      */
-    CDensityGrid(const int32_t nGridPoints, const int32_t nDensityMatrices, const xcfun xcFuncType, const dengrid gridType);
+    CDensityGrid(const int32_t nGridPoints,
+                 const int32_t nDensityMatrices,
+                 const xcfun   xcFuncType,
+                 const dengrid gridType);
     
     /**
      Creates a density grid object by copying other density grid object.

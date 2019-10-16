@@ -109,11 +109,56 @@ TEST_F(CDenseLinearAlgebraTest, MultABtWithAddition)
 
     CDenseMatrix matc({1.0, 4.0, 2.0, 6.0, 8.0, 1.0, 2.0, 5.0}, 4, 2);
 
-    denblas::multABt(matc, 2.0, mata, matb);
+    denblas::multABt(matc, 2.0, 1.0, mata, matb);
 
     CDenseMatrix refc({57.0, 18.0, 18.0, -18.0, 99.2, 53.2, 52.0, 21.0}, 4, 2);
 
     ASSERT_EQ(matc, refc);
+}
+
+TEST_F(CDenseLinearAlgebraTest, MultABtWithAdditionForPointerForm)
+{
+    CDenseMatrix mata({2.0, 3.0, 4.0, -3.0, 3.0, 1.0, 6.0, 2.3, 7.0, 1.0, 2.0, 4.0}, 4, 3);
+    
+    CDenseMatrix matb({1.0, 2.0, 5.0, 2.0, -3.0, 3.0}, 2, 3);
+    
+    CDenseMatrix matc({1.0, 4.0, 2.0, 6.0, 8.0, 1.0, 2.0, 5.0}, 4, 2);
+    
+    denblas::multABt(matc.values(), 2.0, 1.0, mata, matb);
+    
+    CDenseMatrix refc({57.0, 18.0, 18.0, -18.0, 99.2, 53.2, 52.0, 21.0}, 4, 2);
+    
+    ASSERT_EQ(matc, refc);
+}
+
+TEST_F(CDenseLinearAlgebraTest, MultAtBWithAdditionForPointerForm)
+{
+    CDenseMatrix mata({2.0, 3.0, 4.0, -3.0, 3.0, 1.0, 6.0, 2.3, 7.0, 1.0, 2.0, 4.0}, 4, 3);
+    
+    CDenseMatrix matb({1.0, 2.0, 5.0, 2.0, -3.0, 3.0, 1.0, -1.0}, 4, 2);
+    
+    CDenseMatrix matc({2.0, 1.0, 3.0, 4.0, 5.0, 6.0}, 3, 2);
+    
+    denblas::multAtB(matc.values(), 1.0, 1.0, mata, matb);
+    
+    CDenseMatrix refab({-28.0, 16.0, 16.1, 20.9, -3.0, 33.0}, 3, 2);
+    
+    ASSERT_EQ(matc, refab);
+}
+
+TEST_F(CDenseLinearAlgebraTest, MultABWithAdditionForPointerForm)
+{
+    CDenseMatrix mata({2.0, 3.0, 4.0, -3.0, 3.0, 1.0, 6.0, 2.3, 7.0, 1.0, 2.0, 4.0}, 4, 3);
+    
+    CDenseMatrix matb({1.0, 2.0, 5.0, 2.0, 4.0, -3.0, 3.0, 1.0, -1.0, 2.0, 3.0, 0.5, 7.8, 1.0, 2.1}, 3, 5);
+    
+    CDenseMatrix matc({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}, 4, 5);
+    
+    denblas::multAB(matc.values(), 1.0, 1.0, mata, matb);
+    
+    CDenseMatrix refab({6.0, 16.0, 45.2, 6.0, 23.4, -8.0, 4.5, -3.2, -7.0, -2.9, 21.1, 23.4, 87.9, 17.7, 44.3, 8.0, 11.0, 39.2, 5.0, 17.4}, 4, 5);
+    
+    ASSERT_EQ(matc, refab);
 }
 
 TEST_F(CDenseLinearAlgebraTest, Dot)

@@ -32,7 +32,10 @@ CDensityGrid::CDensityGrid(const CMemBlock2D<double>& densityValues, const dengr
     
 }
 
-CDensityGrid::CDensityGrid(const int32_t nGridPoints, const int32_t nDensityMatrices, const xcfun xcFuncType, const dengrid gridType)
+CDensityGrid::CDensityGrid(const int32_t nGridPoints,
+                           const int32_t nDensityMatrices,
+                           const xcfun   xcFuncType,
+                           const dengrid gridType)
 {
     _gridType = gridType;
     

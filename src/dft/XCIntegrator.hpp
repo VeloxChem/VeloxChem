@@ -339,24 +339,9 @@ class CXCIntegrator
     /**
      Gets number of rows in grid points matrix.
 
-     @return the number of rows.
+     @return the number of grid rows.
      */
     int32_t _getNumberOfGridRows() const;
-    
-    /**
-     Computes GTOs values matrix for given block of grid points.
-
-     @param gtoMatrix the GTOs values matrix.
-     @param gtoContainer the container of GTOs blocks.
-     @param molecularGrid the molecular grid.
-     @param gridOffset the offset in molecular grid.
-     @param nGridPoints the number of grid points. 
-     */
-    void _compGtosMatrixForLDA(      CDenseMatrix&   gtoMatrix,
-                               const CGtoContainer*  gtoContainer,
-                               const CMolecularGrid& molecularGrid,
-                               const int32_t         gridOffset,
-                               const int32_t         nGridPoints) const;
     
     /**
      Computes XC contribution scaled GTOs matrix for spin-restricted LDA case.

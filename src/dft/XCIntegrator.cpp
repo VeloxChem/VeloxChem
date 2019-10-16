@@ -356,6 +356,10 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
     
     auto nrows = _getNumberOfGridRows();
     
+    // set up number of AOs
+    
+    auto naos = gtoContainer->getNumberOfAtomicOrbitals();
+    
     // determine number of AO grid blocks
     
     auto nblocks = molecularGrid.getNumberOfGridPoints() / nrows;
@@ -370,17 +374,17 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
     {
         // allocate AOs grid matrices for bra and ket
         
-        CDenseMatrix bmat(nrows, gtoContainer->getNumberOfAtomicOrbitals());
+        CDenseMatrix bmat(nrows, naos);
         
-        CDenseMatrix kmat(nrows, gtoContainer->getNumberOfAtomicOrbitals());
+        CDenseMatrix kmat(nrows, naos);
         
         for (int32_t i = 0; i < nblocks; i++)
         {
-            _compGtosMatrixForLDA(bmat, gtoContainer, molecularGrid, igpnt, nrows);
+            gtorec::computeGtosMatrixForLDA(bmat, gtoContainer, molecularGrid, igpnt, nrows);
             
             _compRestrictedVXCMatrixForLDA(kmat, bmat, xcGradientGrid, molecularGrid.getWeights(), igpnt, nrows);
             
-            denblas::multAtB(ksmat, 1.0, bmat, kmat);
+            denblas::multAtB(ksmat, 1.0, 1.0, bmat, kmat);
             
             igpnt += nrows;
         }
@@ -394,15 +398,15 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
     {
         // allocate AOs grid matrices for bra and ket
         
-        CDenseMatrix bmat(nrows, gtoContainer->getNumberOfAtomicOrbitals());
+        CDenseMatrix bmat(nrows, naos);
         
-        CDenseMatrix kmat(nrows, gtoContainer->getNumberOfAtomicOrbitals());
+        CDenseMatrix kmat(nrows, naos);
         
-        _compGtosMatrixForLDA(bmat, gtoContainer, molecularGrid, igpnt, nrows);
+        gtorec::computeGtosMatrixForLDA(bmat, gtoContainer, molecularGrid, igpnt, nrows);
         
         _compRestrictedVXCMatrixForLDA(kmat, bmat, xcGradientGrid, molecularGrid.getWeights(), igpnt, nrows);
         
-        denblas::multAtB(ksmat, 1.0, bmat, kmat);
+        denblas::multAtB(ksmat, 1.0, 1.0, bmat, kmat);
     }
     
     // compute exchange-correlation energy and number of electrons
@@ -1198,62 +1202,6 @@ CXCIntegrator::_getNumberOfGridRows() const
     // FIX ME: add basis size dependence if needed
     
     return 10000;
-}
-
-void
-CXCIntegrator::_compGtosMatrixForLDA(      CDenseMatrix&   gtoMatrix,
-                                     const CGtoContainer*  gtoContainer,
-                                     const CMolecularGrid& molecularGrid,
-                                     const int32_t         gridOffset,
-                                     const int32_t         nGridPoints) const
-{
-    // set up OMP tasks
-    
-    COMPTasks omptaks(3);
-    
-    omptaks.set(nGridPoints);
-    
-    auto ntasks = omptaks.getNumberOfTasks();
-    
-    auto tbsizes = omptaks.getTaskSizes();
-    
-    auto tbpositions = omptaks.getTaskPositions();
-    
-    // set up pointer to molecular grid weigths
-    
-    auto mgx = molecularGrid.getCoordinatesX();
-    
-    auto mgy = molecularGrid.getCoordinatesY();
-    
-    auto mgz = molecularGrid.getCoordinatesZ();
-    
-    // set up GTOs data
-    
-    auto pgaos = gtoMatrix.values();
-    
-    // generate density on grid points
-    
-    #pragma omp parallel shared(pgaos, tbsizes, tbpositions, ntasks, mgx, mgy, mgz)
-    {
-        #pragma omp single nowait
-        {
-            for (int32_t i = 0; i < ntasks; i++)
-            {
-                // set up task parameters
-                
-                auto tbsize = tbsizes[i];
-                
-                auto tbposition = tbpositions[i];
-                
-                // generate task
-                
-                #pragma omp task firstprivate(tbsize, tbposition)
-                {
-                    gtorec::computeGtosValuesForLDA(pgaos, gtoContainer, mgx, mgy, mgz, gridOffset, tbposition, tbsize);
-                }
-            }
-        }
-    }
 }
 
 void

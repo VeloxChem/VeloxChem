@@ -15,8 +15,25 @@
 #include "GtoContainer.hpp"
 #include "MemBlock2D.hpp"
 #include "XCFuncType.hpp"
+#include "DenseMatrix.hpp"
+#include "MolecularGrid.hpp"
 
 namespace gtorec {  // gtorec namespace
+    
+    /**
+     Computes GTOs values matrix for given block of grid points.
+     
+     @param gtoMatrix the GTOs values matrix.
+     @param gtoContainer the container of GTOs blocks.
+     @param molecularGrid the molecular grid.
+     @param gridOffset the offset in molecular grid.
+     @param nGridPoints the number of grid points.
+     */
+    void computeGtosMatrixForLDA(      CDenseMatrix&   gtoMatrix,
+                                 const CGtoContainer*  gtoContainer,
+                                 const CMolecularGrid& molecularGrid,
+                                 const int32_t         gridOffset,
+                                 const int32_t         nGridPoints);
     
     /**
      Computes GTOs values for batch of grid points.
