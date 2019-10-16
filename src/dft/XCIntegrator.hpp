@@ -358,31 +358,6 @@ class CXCIntegrator
                                const int32_t         gridOffset,
                                const int32_t         nGridPoints) const;
     
-    
-    /**
-     Computes GTOs values for batch of grid points.
-
-     @param gtoMatrix the pointer to GTOs values matrix.
-     @param nRows the number of rows in GTOs values matrix.
-     @param nColumns the number of columns in GTOs values matrix.
-     @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
-     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
-     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
-     @param gridOffset the offset of grid points batch in molecular grid.
-     @param gridBlockPosition the position of grid block in GTOs values grid. 
-     @param nGridPoints the number of grid points in grid points batch.
-     */
-    void _compGtosValuesForLDA(      double*        gtoMatrix,
-                               const int32_t        nRows,
-                               const int32_t        nColumns,
-                               const CGtoContainer* gtoContainer,
-                               const double*        gridCoordinatesX,
-                               const double*        gridCoordinatesY,
-                               const double*        gridCoordinatesZ,
-                               const int32_t        gridOffset,
-                               const int32_t        gridBlockPosition,
-                               const int32_t        nGridPoints) const;
-    
     /**
      Computes XC contribution scaled GTOs matrix for spin-restricted LDA case.
 

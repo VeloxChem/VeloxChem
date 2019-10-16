@@ -269,6 +269,11 @@ class OutputStream:
         self.print_separator()
         self.print_blank()
 
+        if 'OMP_NUM_THREADS' in os.environ:
+            self.print_info('Using {} OpenMP threads per compute node.'.format(
+                os.environ['OMP_NUM_THREADS']))
+            self.print_blank()
+
         return start_time
 
     def print_finish_header(self, start_time):
