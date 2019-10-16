@@ -12,12 +12,32 @@
 #include <cstdint>
 
 #include "GtoBlock.hpp"
+#include "GtoContainer.hpp"
 #include "MemBlock2D.hpp"
 #include "XCFuncType.hpp"
 
 namespace gtorec {  // gtorec namespace
     
-   
+    /**
+     Computes GTOs values for batch of grid points.
+     
+     @param gtoMatrix the pointer to GTOs values matrix.
+     @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
+     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
+     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param gridBlockPosition the position of grid block in GTOs values grid.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
+    void computeGtosValuesForLDA(      double*        gtoMatrix,
+                                 const CGtoContainer* gtoContainer,
+                                 const double*        gridCoordinatesX,
+                                 const double*        gridCoordinatesY,
+                                 const double*        gridCoordinatesZ,
+                                 const int32_t        gridOffset,
+                                 const int32_t        gridBlockPosition,
+                                 const int32_t        nGridPoints);
+    
     /**
      Computes contracted GTOs values at grid points for specific type of functional.
      
@@ -43,6 +63,8 @@ namespace gtorec {  // gtorec namespace
                                 const CGtoBlock&           gtoBlock,
                                 const int32_t              iContrGto,
                                 const xcfun                xcFunctional);
+
+    
     
 }  // namespace gtorec
 
