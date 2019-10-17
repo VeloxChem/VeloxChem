@@ -24,7 +24,7 @@ namespace gtorec {  // gtorec namespace
     {
         // set up OMP tasks
         
-        COMPTasks omptaks(3);
+        COMPTasks omptaks(5);
         
         omptaks.set(nGridPoints);
         

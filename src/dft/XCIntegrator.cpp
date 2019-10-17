@@ -354,7 +354,7 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
     
     // set number of rows in grid block matrix
     
-    auto nrows = _getNumberOfGridRows();
+    auto nrows = _getNumberOfGridRows(gtoContainer);
     
     // set up number of AOs
     
@@ -1197,9 +1197,11 @@ CXCIntegrator::_distRestrictedVXCValues(      CAOKohnShamMatrix* aoKohnShamMatri
 }
 
 int32_t
-CXCIntegrator::_getNumberOfGridRows() const
+CXCIntegrator::_getNumberOfGridRows(const CGtoContainer* gtoContainer) const
 {
-    // FIX ME: add basis size dependence if needed
+    auto naos = gtoContainer->getNumberOfAtomicOrbitals();
+    
+    if (naos < 10000) return 80000000 / gtoContainer->getNumberOfAtomicOrbitals();
     
     return 10000;
 }

@@ -338,10 +338,11 @@ class CXCIntegrator
     
     /**
      Gets number of rows in grid points matrix.
-
+     
+     @param gtoContainer the GTOs container.
      @return the number of grid rows.
      */
-    int32_t _getNumberOfGridRows() const;
+    int32_t _getNumberOfGridRows(const CGtoContainer* gtoContainer) const;
     
     /**
      Computes XC contribution scaled GTOs matrix for spin-restricted LDA case.

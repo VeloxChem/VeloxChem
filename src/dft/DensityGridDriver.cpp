@@ -161,7 +161,7 @@ CDensityGridDriver::_genRestrictedDensityForLDA(      CDensityGrid&     densityG
     
     // set number of rows in grid block matrix
     
-    auto nrows = _getNumberOfGridRows();
+    auto nrows = _getNumberOfGridRows(gtoContainer);
     
     // set up number of AOs
     
@@ -185,8 +185,6 @@ CDensityGridDriver::_genRestrictedDensityForLDA(      CDensityGrid&     densityG
         
         CDenseMatrix xmat(naos, nrows);
         
-        CDenseMatrix dmat(nrows, nrows);
-        
         for (int32_t i = 0; i < nblocks; i++)
         {
             // compute GTOs values on grid
@@ -199,11 +197,7 @@ CDensityGridDriver::_genRestrictedDensityForLDA(      CDensityGrid&     densityG
                 
                 denblas::multABt(xmat.values(), 1.0, 0.0, aoDensityMatrix.getReferenceToDensity(j), vmat);
                 
-                denblas::multAB(dmat.values(), 1.0, 0.0, vmat, xmat);
-                
-                // distribute density values on grid
-                
-                _distDensityValues(densityGrid, j, dmat, igpnt, nrows);
+                _distDensityValues(densityGrid, j, xmat, vmat, igpnt, nrows);
             }
             
             igpnt += nrows;
@@ -222,8 +216,6 @@ CDensityGridDriver::_genRestrictedDensityForLDA(      CDensityGrid&     densityG
         
         CDenseMatrix xmat(naos, nrows);
         
-        CDenseMatrix dmat(nrows, nrows);
-        
         // compute GTOs values on grid
         
         gtorec::computeGtosMatrixForLDA(vmat, gtoContainer, molecularGrid, igpnt, nrows);
@@ -234,11 +226,7 @@ CDensityGridDriver::_genRestrictedDensityForLDA(      CDensityGrid&     densityG
             
             denblas::multABt(xmat.values(), 1.0, 0.0, aoDensityMatrix.getReferenceToDensity(i), vmat);
             
-            denblas::multAB(dmat.values(), 1.0, 0.0, vmat, xmat);
-            
-            // distribute density values on grid
-            
-            _distDensityValues(densityGrid, i, dmat, igpnt, nrows);
+            _distDensityValues(densityGrid, i, xmat, vmat, igpnt, nrows);
         }
     }
     
@@ -531,33 +519,104 @@ CDensityGridDriver::_addGtosPairContribution(      CDensityGrid*        densityG
 }
 
 int32_t
-CDensityGridDriver::_getNumberOfGridRows() const
+CDensityGridDriver::_getNumberOfGridRows(const CGtoContainer* gtoContainer) const
 {
-    // FIX ME: add basis size dependence if needed
+    auto naos = gtoContainer->getNumberOfAtomicOrbitals();
     
-    return 10000;
+    if (naos < 10000) return 80000000 / gtoContainer->getNumberOfAtomicOrbitals();
+    
+    return 10000; 
 }
 
 void
 CDensityGridDriver::_distDensityValues(      CDensityGrid& densityGrid,
                                        const int32_t       iDensityMatrix,
                                        const CDenseMatrix& densityValues,
+                                       const CDenseMatrix& gtoMatrix,
                                        const int32_t       gridOffset,
                                        const int32_t       nGridPoints) const
 {
+    // set up OMP tasks
+    
+    COMPTasks omptaks(5);
+    
+    omptaks.set(nGridPoints);
+    
+    auto ntasks = omptaks.getNumberOfTasks();
+    
+    auto tbsizes = omptaks.getTaskSizes();
+    
+    auto tbpositions = omptaks.getTaskPositions();
+    
     // set up pointer to specific alpha density grid
     
     auto rhoa = densityGrid.alphaDensity(iDensityMatrix);
     
-    // compute alpha density matrix grid
+    // set up pointer to partially computed density on grid
     
     auto dmata = densityValues.values();
     
-    // distribute density values
+    // set up pointer to GTOs values on grid
     
+    auto gaos = gtoMatrix.values();
+    
+    // set up number of AOs
+    
+    auto naos = gtoMatrix.getNumberOfColumns();
+    
+    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, rhoa, dmata, gaos, naos)
+    {
+        #pragma omp single nowait
+        {
+            for (int32_t i = 0; i < ntasks; i++)
+            {
+                // set up task parameters
+                
+                auto tbsize = tbsizes[i];
+                
+                auto tbposition = tbpositions[i];
+                
+                // generate task
+                
+                #pragma omp task firstprivate(tbsize, tbposition)
+                {
+                    _contractDensityValues(rhoa, dmata, gaos, gridOffset, tbposition, tbsize, nGridPoints, naos);
+                }
+            }
+        }
+    }
+    
+    
+//    // distribute density values
+//
+//    for (int32_t i = 0; i < nGridPoints; i++)
+//    {
+//        rhoa[gridOffset + i] = dmata[i * nGridPoints + i];
+//    }
+}
+
+void
+CDensityGridDriver::_contractDensityValues(      double* densityMatrix,
+                                           const double* densityValues,
+                                           const double* gtoValues,
+                                           const int32_t gridOffset,
+                                           const int32_t gridBlockPosition,
+                                           const int32_t nGridPoints,
+                                           const int32_t tGridPoints,
+                                           const int32_t nAtomicOrbitals) const
+{
     for (int32_t i = 0; i < nGridPoints; i++)
     {
-        rhoa[gridOffset + i] = dmata[i * nGridPoints + i];
+        auto goff = gridBlockPosition + i;
+        
+        double dval = 0.0;
+        
+        for (int32_t j = 0; j < nAtomicOrbitals; j++)
+        {
+            dval += densityValues[j * tGridPoints + goff] * gtoValues[goff *  nAtomicOrbitals + j];
+        }
+        
+        densityMatrix[gridOffset + goff]  = dval;
     }
 }
 

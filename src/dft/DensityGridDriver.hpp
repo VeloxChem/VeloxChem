@@ -192,24 +192,48 @@ class CDensityGridDriver
     /**
      Gets number of rows in grid points matrix.
      
+     @param gtoContainer the GTOs container.
      @return the number of grid rows.
      */
-    int32_t _getNumberOfGridRows() const;
+    int32_t _getNumberOfGridRows(const CGtoContainer* gtoContainer) const;
     
     /**
-     Distributes specific density values into density grid.
+     Distributes electron density values into density grid.
 
      @param densityGrid the density grid.
-     @param iDensityMatrix the identifier of density matrix.
-     @param densityValues the density values matrix.
-     @param gridOffset the offset of grid points batch in molecular grid.
-     @param nGridPoints the number of grid points in grid points batch.
+     @param iDensityMatrix the identifier of density matrix in density grid.
+     @param densityValues the partially contracted density values grid.
+     @param gtoMatrix the GTO values pn grid.
+     @param gridOffset the offset of grid points batch in density grid.
+     @param nGridPoints the number of grid pointsd in grid points batch.
      */
     void _distDensityValues(      CDensityGrid& densityGrid,
                             const int32_t       iDensityMatrix,
                             const CDenseMatrix& densityValues,
+                            const CDenseMatrix& gtoMatrix,
                             const int32_t       gridOffset,
-                            const int32_t       nGridPoints) const;
+                            const int32_t       nGridPoints) const; 
+    /**
+     Contracts and distributes specific electron density values into density
+     grid.
+
+     @param densityMatrix the pointer to density grid values.
+     @param densityValues the pointer to partially computed density values.
+     @param gtoValues the pointer to GTOS values on grid.
+     @param gridOffset the offset of grids batch in density grid.
+     @param gridBlockPosition the block position in grids batch.
+     @param nGridPoints the number of grid points in grid block.
+     @param tGridPoints the total number of grid points in density grid batch.
+     @param nAtomicOrbitals the number of atomic orbitals.
+     */
+    void _contractDensityValues(      double* densityMatrix,
+                                const double* densityValues,
+                                const double* gtoValues,
+                                const int32_t gridOffset,
+                                const int32_t gridBlockPosition,
+                                const int32_t nGridPoints,
+                                const int32_t tGridPoints,
+                                const int32_t nAtomicOrbitals) const;
 
    public:
     /**
