@@ -6,22 +6,38 @@
 #  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 #  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
 
-# NOTE: setup for monkey.theochem.kth.se
+# Automatically generated settings
 
 USE_MPI := true
 USE_GPU := false
 USE_MKL := true
 
-# C++ compiler & linker
+MATH_INC := -I/opt/intel/compilers_and_libraries_2019.0.117/linux/mkl/include
+MATH_LIB := -L/opt/intel/compilers_and_libraries_2019.0.117/linux/mkl/lib/intel64
+MATH_LIB += -Wl,-rpath,/opt/intel/compilers_and_libraries_2019.0.117/linux/mkl/lib/intel64
+MATH_LIB += -lmkl_rt -lmkl_gnu_thread
+MATH_LIB += -lgomp -lpthread -lm -ldl
+
+PYTHON := python3
+PYTHON_USER_INC := 
 
 CXX := mpicxx
 
-# Compiler flags for generic intel CPUs
+CXX_REL_FLG := -fopenmp
+CXX_DEB_FLG := -fopenmp
 
-CXX_REL_FLG := -std=c++11 -O3 -fopenmp -Wall
-CXX_DEB_FLG := -std=c++11 -O3 -fopenmp -Wall -g
+MACLIBS := 
 
-# Generic preprocessor flags
+LTOFLAG := -fno-lto
+
+# Generic settings
+
+# Compiler flags
+
+CXX_REL_FLG += -std=c++11 -O3 -Wall
+CXX_DEB_FLG += -std=c++11 -O3 -Wall -g
+
+# Preprocessor flags
 
 CPP_REL_FLG := -DVLX_ALIGN=64
 CPP_DEB_FLG := -DVLX_ALIGN=64 -DVAR_DEBUG=1
@@ -46,62 +62,35 @@ endif
 
 # Math library
 
-ifeq ($(USE_MKL),true)
+LIB_LIST := $(MATH_LIB)
 
-  MATH_INC := -I$(MKLROOT)/include
+# Extra flag for MacOS
 
-  LIB_LIST := -L$(MKLROOT)/lib/intel64 -Wl,-rpath,$(MKLROOT)/lib/intel64 -lmkl_rt
-  LIB_LIST += -lmkl_gnu_thread -lgomp -lpthread -lm -ldl
+LIB_LIST += $(MACLIBS)
 
-else
-
-  MATH_ROOT := /home/lixin/software/openblas
-  MATH_INC := -I$(MATH_ROOT)/include
-
-  LIB_LIST := -L$(MATH_ROOT)/lib -Wl,-rpath,$(MATH_ROOT)/lib -lopenblas
-  LIB_LIST += -lgomp -lpthread -lm -ldl
-
-endif
-
-# Google Test root directory
-
-GST_ROOT := /home/lixin/software/googletest/googletest
-
-GST_LIB := $(GST_ROOT)/lib/libgtest.a
-
-# CUDA compiler & linker
-
-CUDA_ROOT := /usr/local/cuda
-NVCC := $(CUDA_ROOT)/bin/nvcc
+# Cuda flags
 
 ifeq ($(USE_GPU),true)
-  NVCC_REL_FLG := -std=c++11 -O3 --compiler-options "-fopenmp" --compiler-options "-Wall"
-  NVCC_DEB_FLG := -std=c++11 -O3 --compiler-options "-fopenmp" --compiler-options "-Wall" --compiler-options "-g"
-
-  NVCC_REL_FLG += --compiler-options "-fPIC"
-  NVCC_DEB_FLG += --compiler-options "-fPIC"
-
-  ifdef CUDA_ROOT
-    LIB_LIST += -L$(CUDA_ROOT)/lib64
-  endif
-
-  LIB_LIST += -lcuda -lcudart
+  NVCC_REL_FLG += -std=c++11 -O3 --compiler-options "-Wall"
+  NVCC_DEB_FLG += -std=c++11 -O3 --compiler-options "-Wall" --compiler-options "-g"
+  LIB_LIST += $(CUDA_LIB)
 endif
 
 # Python interface
 
-PYTHON := python3
-PYBIND11_ROOT := /home/lixin/software/pybind11
-
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
 PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
-PYTHON_INC += -I$(PYBIND11_ROOT)/include
-
-PYTHON_LD  := $(shell $(PYTHON)-config --ldflags)
+PYTHON_INC += -I$(PYTHON_USER_INC) $(shell $(PYTHON) -m pybind11 --includes)
+PYTHON_LD  := $(shell $(PYTHON)-config --ldflags) $(LTOFLAG)
 
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC)
+
+ifeq ($(USE_GPU),true)
+  NVCC_REL_FLG += --compiler-options "-fPIC" $(PYTHON_INC)
+  NVCC_DEB_FLG += --compiler-options "-fPIC" $(PYTHON_INC)
+endif
 
 # Native shell commands
 
