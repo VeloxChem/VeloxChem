@@ -25,6 +25,7 @@
 #include "DensityGrid.hpp"
 #include "GtoContainer.hpp"
 #include "AOFockMatrix.hpp"
+#include "MemBlock.hpp"
 
 /**
  Class CXCIntegrator implements exchange-correlation functional and it's derrivatives integraion.
@@ -71,8 +72,7 @@ class CXCIntegrator
                                      const xcfun              xcFunctional) const;
     
     /**
-     Computes exchange-correlation contribution to Kohn-Sham matrix from restricted density
-     using matrix x matrix scheme.
+     Computes exchange-correlation contribution to Kohn-Sham matrix for spin-restricted LDA case.
      
      @param aoKohnShamMatrix the Kohn-Sham matrix.
      @param gtoContainer the container of GTOs blocks.
@@ -85,6 +85,55 @@ class CXCIntegrator
                                            const CXCGradientGrid&   xcGradientGrid,
                                            const CDensityGrid&      densityGrid,
                                            const CMolecularGrid&    molecularGrid) const;
+    
+    /**
+     Computes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
+     for spin-restricted LDA case.
+
+     @param aoKohnShamMatrix the pointer to Kohn-Sham matrix.
+     @param gtoContainer the container of GTOs blocks.
+     @param xcGradientGrid the exchange-correlation functional grid.
+     @param densityGrid the density grid.
+     @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
+     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
+     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
+     @param gridWeights the pointer to grid weights.
+     @param gridOffset the grid offset.
+     @param nGridPoints the number of grid points.
+     */
+    void _compRestrictedBatchForLDA(      CAOKohnShamMatrix* aoKohnShamMatrix,
+                                    const CGtoContainer*     gtoContainer,
+                                    const CXCGradientGrid*   xcGradientGrid,
+                                    const CDensityGrid*      densityGrid,
+                                    const double*            gridCoordinatesX,
+                                    const double*            gridCoordinatesY,
+                                    const double*            gridCoordinatesZ,
+                                    const double*            gridWeights,
+                                    const int32_t            gridOffset,
+                                    const int32_t            nGridPoints) const;
+    
+    
+    /**
+     Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
+     for spin-restricted LDA case.
+
+     @param aoKohnShamMatrix the pointer to Kohn-Sham matrix.
+     @param xcBuffer the exchange-correlation buffer.
+     @param xcGradient the pointer to exchange-correlation gradient grid.
+     @param gtoValues the pointer to GTOS values on grid.
+     @param gridWeights the pointer to grid weights.
+     @param gridOffset the offset of grids batch in density grid.
+     @param gridBlockPosition the block position in grids batch.
+     @param nGridPoints the number of grid points in grid block.
+     */
+    void _distRestrictedBatchForLDA(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+                                          CMemBlock<double>&   xcBuffer,
+                                    const double*              xcGradient,
+                                    const CMemBlock2D<double>& gtoValues,
+                                    const double*              gridWeights,
+                                    const int32_t              gridOffset,
+                                    const int32_t              gridBlockPosition,
+                                    const int32_t              nGridPoints) const;
     
     /**
      Computes exchange-correlation contribution to Kohn-Sham matrix from restricted density
@@ -139,7 +188,7 @@ class CXCIntegrator
             points.
      @param gridWeights the pointer to grid weights.
      @param gridOffset the grid offset.
-     @param nGridPoints the number of grid points,
+     @param nGridPoints the number of grid points.
      @param xcFunctional the exchange-correlation functional type.
      */
     void _compRestrictedVXCForBatchOfGridPoints(      CAOKohnShamMatrix* aoKohnShamMatrix,
@@ -415,6 +464,13 @@ class CXCIntegrator
     std::tuple<double, double> _compEnergyAndDensity(const CXCGradientGrid& xcGradientGrid,
                                                      const CDensityGrid&    densityGrid,
                                                      const CMolecularGrid&  molecularGrid) const;
+    
+    /**
+     Gets size of block in grid batch.
+     
+     @return the size of block in grid batch.
+     */
+    int32_t _getSizeOfBlock() const;
    
 public:
     
