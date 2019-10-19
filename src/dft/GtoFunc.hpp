@@ -21,6 +21,26 @@
 namespace gtorec {  // gtorec namespace
     
     /**
+     Computes GTOs values for batch of grid points.
+     
+     @param gtoValues the GTOs values buffer.
+     @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
+     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
+     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param gridBlockPosition the position of grid block in GTOs values grid.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
+    void computeGtosValuesForLDA(      CMemBlock2D<double>& gtoValues,
+                                 const CGtoContainer*       gtoContainer,
+                                 const double*              gridCoordinatesX,
+                                 const double*              gridCoordinatesY,
+                                 const double*              gridCoordinatesZ,
+                                 const int32_t              gridOffset,
+                                 const int32_t              gridBlockPosition,
+                                 const int32_t              nGridPoints);
+    
+    /**
      Computes GTOs values matrix for given block of grid points.
      
      @param gtoMatrix the GTOs values matrix.
@@ -30,6 +50,27 @@ namespace gtorec {  // gtorec namespace
      @param nGridPoints the number of grid points.
      */
     void computeGtosMatrixForLDA(      CDenseMatrix&   gtoMatrix,
+                                 const CGtoContainer*  gtoContainer,
+                                 const CMolecularGrid& molecularGrid,
+                                 const int32_t         gridOffset,
+                                 const int32_t         nGridPoints);
+    
+    /**
+     Computes GTOs values matrix for given block of grid points.
+     
+     @param gtoMatrix the GTOs values matrix.
+     @param gtoMatrixX the GTOs gradient along X coordinate values matrix.
+     @param gtoMatrixY the GTOs gradient along Y coordinate values matrix.
+     @param gtoMatrixZ the GTOs gradient along Z coordinate values matrix.
+     @param gtoContainer the container of GTOs blocks.
+     @param molecularGrid the molecular grid.
+     @param gridOffset the offset in molecular grid.
+     @param nGridPoints the number of grid points.
+     */
+    void computeGtosMatrixForGGA(      CDenseMatrix&   gtoMatrix,
+                                       CDenseMatrix&   gtoMatrixX,
+                                       CDenseMatrix&   gtoMatrixY,
+                                       CDenseMatrix&   gtoMatrixZ,
                                  const CGtoContainer*  gtoContainer,
                                  const CMolecularGrid& molecularGrid,
                                  const int32_t         gridOffset,
@@ -47,6 +88,32 @@ namespace gtorec {  // gtorec namespace
      @param nGridPoints the number of grid points in grid points batch.
      */
     void computeGtosValuesForLDA(      double*        gtoMatrix,
+                                 const CGtoContainer* gtoContainer,
+                                 const double*        gridCoordinatesX,
+                                 const double*        gridCoordinatesY,
+                                 const double*        gridCoordinatesZ,
+                                 const int32_t        gridOffset,
+                                 const int32_t        gridBlockPosition,
+                                 const int32_t        nGridPoints);
+    
+    /**
+     Computes GTOs values for batch of grid points.
+     
+     @param gtoMatrix the pointer to GTOs values matrix.
+     @param gtoMatrixX the pointer to GTOs gradient along X coordinate values matrix.
+     @param gtoMatrixY the pointer to GTOs gradient along Y coordinate values matrix.
+     @param gtoMatrixZ the pointer to GTOs gradient along Z coordinate values matrix.
+     @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
+     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
+     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param gridBlockPosition the position of grid block in GTOs values grid.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
+    void computeGtosValuesForGGA(      double*        gtoMatrix,
+                                       double*        gtoMatrixX,
+                                       double*        gtoMatrixY,
+                                       double*        gtoMatrixZ,
                                  const CGtoContainer* gtoContainer,
                                  const double*        gridCoordinatesX,
                                  const double*        gridCoordinatesY,

@@ -79,14 +79,28 @@ class CXCIntegrator
      @param xcGradientGrid the exchange-correlation functional gradient grid.
      @param densityGrid the density grid.
      @param molecularGrid the molecular grid.
-     @param xcFunctional the exchange-correlation functional type.
      */
-    void _compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnShamMatrix,
-                                       const CGtoContainer*     gtoContainer,
-                                       const CXCGradientGrid&   xcGradientGrid,
-                                       const CDensityGrid&      densityGrid,
-                                       const CMolecularGrid&    molecularGrid,
-                                       const xcfun              xcFunctional) const;
+    void _compRestrictedContributionForLDA(      CAOKohnShamMatrix& aoKohnShamMatrix,
+                                           const CGtoContainer*     gtoContainer,
+                                           const CXCGradientGrid&   xcGradientGrid,
+                                           const CDensityGrid&      densityGrid,
+                                           const CMolecularGrid&    molecularGrid) const;
+    
+    /**
+     Computes exchange-correlation contribution to Kohn-Sham matrix from restricted density
+     using matrix x matrix scheme.
+     
+     @param aoKohnShamMatrix the Kohn-Sham matrix.
+     @param gtoContainer the container of GTOs blocks.
+     @param xcGradientGrid the exchange-correlation functional gradient grid.
+     @param densityGrid the density grid.
+     @param molecularGrid the molecular grid.
+     */
+    void _compRestrictedContributionForGGA(      CAOKohnShamMatrix& aoKohnShamMatrix,
+                                           const CGtoContainer*     gtoContainer,
+                                           const CXCGradientGrid&   xcGradientGrid,
+                                           const CDensityGrid&      densityGrid,
+                                           const CMolecularGrid&    molecularGrid) const;
     
     /**
      Computes exchange-correlation contribution to perturbed Kohn-Sham matrix from restricted density.
@@ -361,6 +375,34 @@ class CXCIntegrator
                                         const int32_t          gridOffset,
                                         const int32_t          nGridPoints) const;
     
+    /**
+     Computes XC contribution scaled GTOs matrix for spin-restricted GGA case.
+     
+     @param ketGtoMatrix the XC contribution scaled GTOs matrix.
+     @param ketGtoMatrixX the XC gradient X contribution scaled GTOs matrix.
+     @param ketGtoMatrixY the XC gradient Y contribution scaled GTOs matrix.
+     @param ketGtoMatrixZ the XC gradient Z contribution scaled GTOs matrix.
+     @param braGtoMatrix the GTOs matrix.
+     @param braGtoMatrixX the gradient X GTOs matrix.
+     @param braGtoMatrixY the gradient Y GTOs matrix.
+     @param braGtoMatrixZ the gradient Z GTOs matrix.
+     @param xcGradientGrid the exchange-correlation functional gradient grid.
+     @param gridWeights the pointer to grid weights.
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
+    void _compRestrictedVXCMatrixForGGA(      CDenseMatrix&    ketGtoMatrix,
+                                              CDenseMatrix&    ketGtoMatrixX,
+                                              CDenseMatrix&    ketGtoMatrixY,
+                                              CDenseMatrix&    ketGtoMatrixZ,
+                                        const CDenseMatrix&    braGtoMatrix,
+                                        const CDenseMatrix&    braGtoMatrixX,
+                                        const CDenseMatrix&    braGtoMatrixY,
+                                        const CDenseMatrix&    braGtoMatrixZ,
+                                        const CXCGradientGrid& xcGradientGrid,
+                                        const double*          gridWeights,
+                                        const int32_t          gridOffset,
+                                        const int32_t          nGridPoints) const;
     
     /**
      Computes exchange-correlation energy and number of electrons for given density grid.

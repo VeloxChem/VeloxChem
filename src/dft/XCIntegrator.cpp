@@ -162,7 +162,15 @@ CXCIntegrator::integrate_m3(const CAODensityMatrix& aoDensityMatrix,
             
             ksmat = CAOKohnShamMatrix(aoDensityMatrix.getNumberOfRows(0), aoDensityMatrix.getNumberOfColumns(0), true);
             
-            _compRestrictedContributionM3(ksmat, gtovec, vxcgrid, dgrid, mgrid, fvxc.getFunctionalType());
+            if (fvxc.getFunctionalType() == xcfun::lda)
+            {
+                _compRestrictedContributionForLDA(ksmat, gtovec, vxcgrid, dgrid, mgrid);
+            }
+            
+            if (fvxc.getFunctionalType() == xcfun::gga)
+            {
+                _compRestrictedContributionForGGA(ksmat, gtovec, vxcgrid, dgrid, mgrid);
+            }
         }
         
         // delete GTOs container
@@ -337,12 +345,11 @@ CXCIntegrator::_compRestrictedContribution(      CAOKohnShamMatrix& aoKohnShamMa
 }
 
 void
-CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnShamMatrix,
-                                             const CGtoContainer*     gtoContainer,
-                                             const CXCGradientGrid&   xcGradientGrid,
-                                             const CDensityGrid&      densityGrid,
-                                             const CMolecularGrid&    molecularGrid,
-                                             const xcfun              xcFunctional) const
+CXCIntegrator::_compRestrictedContributionForLDA(      CAOKohnShamMatrix& aoKohnShamMatrix,
+                                                 const CGtoContainer*     gtoContainer,
+                                                 const CXCGradientGrid&   xcGradientGrid,
+                                                 const CDensityGrid&      densityGrid,
+                                                 const CMolecularGrid&    molecularGrid) const
 {
     // initialize Kohn-Sham matrix to zero
     
@@ -407,6 +414,87 @@ CXCIntegrator::_compRestrictedContributionM3(      CAOKohnShamMatrix& aoKohnSham
         _compRestrictedVXCMatrixForLDA(kmat, bmat, xcGradientGrid, molecularGrid.getWeights(), igpnt, nrows);
         
         denblas::multAtB(ksmat, 1.0, 1.0, bmat, kmat);
+    }
+    
+    // compute exchange-correlation energy and number of electrons
+    
+    auto xcdat = _compEnergyAndDensity(xcGradientGrid, densityGrid, molecularGrid);
+    
+    aoKohnShamMatrix.setExchangeCorrelationEnergy(std::get<0>(xcdat));
+    
+    aoKohnShamMatrix.setNumberOfElectrons(std::get<1>(xcdat));
+}
+
+void
+CXCIntegrator::_compRestrictedContributionForGGA(      CAOKohnShamMatrix& aoKohnShamMatrix,
+                                                 const CGtoContainer*     gtoContainer,
+                                                 const CXCGradientGrid&   xcGradientGrid,
+                                                 const CDensityGrid&      densityGrid,
+                                                 const CMolecularGrid&    molecularGrid) const
+{
+    // initialize Kohn-Sham matrix to zero
+    
+    aoKohnShamMatrix.zero();
+    
+    // set up pointer to Kohn-Sham matrix
+    
+    auto ksmat = aoKohnShamMatrix.getKohnSham();
+    
+    // set number of rows in grid block matrix
+    
+    auto nrows = _getNumberOfGridRows(gtoContainer);
+    
+    // set up number of AOs
+    
+    auto naos = gtoContainer->getNumberOfAtomicOrbitals();
+    
+    // determine number of AO grid blocks
+    
+    auto nblocks = molecularGrid.getNumberOfGridPoints() / nrows;
+    
+    // set up current grid point
+    
+    int32_t igpnt = 0;
+    
+    // loop over grid points blocks
+    
+    if (nblocks > 0)
+    {
+        // allocate AOs grid matrices for bra and ket
+        
+        CDenseMatrix bmat(nrows, naos), bmatx(nrows, naos), bmaty(nrows, naos), bmatz(nrows, naos);
+        
+        CDenseMatrix kmat(nrows, naos), kmatx(nrows, naos), kmaty(nrows, naos), kmatz(nrows, naos);
+        
+        for (int32_t i = 0; i < nblocks; i++)
+        {
+            gtorec::computeGtosMatrixForGGA(bmat, bmatx, bmaty, bmatz, gtoContainer, molecularGrid, igpnt, nrows);
+            
+            //_compRestrictedVXCMatrixForLDA(kmat, bmat, xcGradientGrid, molecularGrid.getWeights(), igpnt, nrows);
+            
+            //denblas::multAtB(ksmat, 1.0, 1.0, bmat, kmat);
+            
+            igpnt += nrows;
+        }
+    }
+    
+    // comopute remaining grid points block
+    
+    nrows = molecularGrid.getNumberOfGridPoints() % nrows;
+    
+    if (nrows > 0)
+    {
+        // allocate AOs grid matrices for bra and ket
+        
+        CDenseMatrix bmat(nrows, naos), bmatx(nrows, naos), bmaty(nrows, naos), bmatz(nrows, naos);
+        
+        CDenseMatrix kmat(nrows, naos), kmatx(nrows, naos), kmaty(nrows, naos), kmatz(nrows, naos);
+        
+        gtorec::computeGtosMatrixForGGA(bmat, bmatx, bmaty, bmatz, gtoContainer, molecularGrid, igpnt, nrows);
+        
+        //_compRestrictedVXCMatrixForLDA(kmat, bmat, xcGradientGrid, molecularGrid.getWeights(), igpnt, nrows);
+        
+        //denblas::multAtB(ksmat, 1.0, 1.0, bmat, kmat);
     }
     
     // compute exchange-correlation energy and number of electrons
@@ -1240,6 +1328,59 @@ CXCIntegrator::_compRestrictedVXCMatrixForLDA(      CDenseMatrix&    ketGtoMatri
             kvxc[ioff + j] = fact * bgao[ioff + j];
         }
     }
+}
+
+void
+CXCIntegrator::_compRestrictedVXCMatrixForGGA(      CDenseMatrix&    ketGtoMatrix,
+                                                    CDenseMatrix&    ketGtoMatrixX,
+                                                    CDenseMatrix&    ketGtoMatrixY,
+                                                    CDenseMatrix&    ketGtoMatrixZ,
+                                              const CDenseMatrix&    braGtoMatrix,
+                                              const CDenseMatrix&    braGtoMatrixX,
+                                              const CDenseMatrix&    braGtoMatrixY,
+                                              const CDenseMatrix&    braGtoMatrixZ,
+                                              const CXCGradientGrid& xcGradientGrid,
+                                              const double*          gridWeights,
+                                              const int32_t          gridOffset,
+                                              const int32_t          nGridPoints) const
+{
+    // set up pointers to exchange-correlation scaled GTOs matrices
+    
+    auto kvxc = ketGtoMatrix.values();
+    
+    auto kvxcx = ketGtoMatrixX.values();
+    
+    auto kvxcy = ketGtoMatrixY.values();
+    
+    auto kvxcz = ketGtoMatrixZ.values();
+    
+    // set up pointers to GTOs matrices
+    
+    auto bgao = braGtoMatrix.values();
+    
+    auto bgaox = braGtoMatrixX.values();
+    
+    auto bgaoy = braGtoMatrixY.values();
+    
+    auto bgaoz = braGtoMatrixZ.values();
+    
+    // set up pointer to gradient of XC functional
+    
+    auto grhoa = xcGradientGrid.xcGradientValues(xcvars::rhoa);
+    
+    auto ggrada = xcGradientGrid.xcGradientValues(xcvars::grada);
+    
+    auto ggradab = xcGradientGrid.xcGradientValues(xcvars::gradab);
+    
+    // set up pointers to density gradient norms
+    
+    //auto ngrada = densityGrid->alphaDensityGradient(0);
+    
+    //auto grada_x = densityGrid->alphaDensityGradientX(0);
+    
+    //auto grada_y = densityGrid->alphaDensityGradientY(0);
+    
+    //auto grada_z = densityGrid->alphaDensityGradientZ(0);
 }
 
 std::tuple<double, double>
