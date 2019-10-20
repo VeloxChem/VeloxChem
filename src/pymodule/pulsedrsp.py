@@ -486,9 +486,9 @@ class PulsedResponse:
 
         return ((F0 * delta_t) / (2. * (2. * np.pi)**0.5) *
                 (np.exp(-(delta_t**2 * (w - w_carrier)**2) / 2.0) *
-                 np.exp(1.j * (w - w_carrier) * t0 - 1.j * cep) +
+                 np.exp(1.j * (w - w_carrier) * t0 + 1.j * cep) +
                  np.exp(-(delta_t**2 * (w + w_carrier)**2) / 2.0) *
-                 np.exp(1.j * (w + w_carrier) * t0 + 1.j * cep)))
+                 np.exp(1.j * (w + w_carrier) * t0 - 1.j * cep)))
 
     def print_footer(self):
         """ A footer to be printed after finalizing the calculation.
