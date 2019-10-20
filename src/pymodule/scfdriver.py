@@ -197,6 +197,7 @@ class ScfDriver:
         self.potfile = None
         self.pe_summary = ''
 
+        self.use_split_comm = False
         self.split_comm_ratio = None
 
         self.timing = False
@@ -248,6 +249,10 @@ class ScfDriver:
                 self.pe = True
             self.potfile = method_dict['potfile']
 
+        if 'use_split_comm' in method_dict:
+            key = method_dict['use_split_comm'].lower()
+            self.use_split_comm = True if key == 'yes' else False
+
         if 'timing' in scf_dict:
             key = scf_dict['timing'].lower()
             self.timing = True if key in ['yes', 'y'] else False
@@ -280,6 +285,7 @@ class ScfDriver:
         if self.dft:
             assert_msg_critical(self.xcfun is not None,
                                 'SCF driver: undefined XC functional')
+
         # initial guess
         if self.restart:
             self.den_guess = DensityGuess("RESTART", self.checkpoint_file)
@@ -472,11 +478,6 @@ class ScfDriver:
                                         " {:.1e}.".format(self.eri_thresh))
                 self.ostream.print_blank()
 
-        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-
-        qq_data = eri_drv.compute(get_qq_scheme(self.qq_type), self.eri_thresh,
-                                  molecule, ao_basis)
-
         den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
                                           ovl_mat)
 
@@ -486,7 +487,7 @@ class ScfDriver:
 
         fock_mat = AOFockMatrix(den_mat)
 
-        if self.dft and not self.first_step:
+        if self.dft:
             self.update_fock_type(fock_mat)
 
         if self.rank == mpi_master():
@@ -494,10 +495,24 @@ class ScfDriver:
 
         self.split_comm_ratio = None
 
+        if self.use_split_comm:
+            self.use_split_comm = ((self.dft or
+                                    (self.pe and not self.first_step)) and
+                                   self.nodes >= 8)
+
+        if not self.use_split_comm:
+            eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+            qq_data = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                      self.eri_thresh, molecule, ao_basis)
+        else:
+            qq_data = None
+
+        e_grad = None
+
         for i in self.get_scf_range():
 
             vxc_mat, e_pe, V_pe = self.comp_2e_fock(fock_mat, den_mat, molecule,
-                                                    ao_basis, qq_data)
+                                                    ao_basis, qq_data, e_grad)
 
             e_ee, e_kin, e_en = self.comp_energy(fock_mat, vxc_mat, e_pe,
                                                  kin_mat, npot_mat, den_mat)
@@ -540,9 +555,6 @@ class ScfDriver:
             den_mat = self.gen_new_density(molecule)
 
             den_mat.broadcast(self.rank, self.comm)
-
-            if self.qq_dyn:
-                qq_data.set_threshold(self.get_dyn_threshold(e_grad))
 
             if self.is_converged:
                 break
@@ -701,7 +713,13 @@ class ScfDriver:
             else:
                 self.skip_iter = True
 
-    def comp_2e_fock(self, fock_mat, den_mat, molecule, basis, screening):
+    def comp_2e_fock(self,
+                     fock_mat,
+                     den_mat,
+                     molecule,
+                     basis,
+                     screening,
+                     e_grad=None):
         """
         Computes Fock/Kohn-Sham matrix (only 2e part).
 
@@ -715,22 +733,30 @@ class ScfDriver:
             The basis set.
         :param screening:
             The screening container object.
+        :param e_grad:
+            The electronic gradient.
 
         :return:
             The AO Kohn-Sham (Vxc) matrix.
         """
 
-        if (self.dft or self.pe) and self.nodes >= 9999:
+        if self.use_split_comm:
             vxc_mat, e_pe, V_pe = self.comp_2e_fock_split_comm(
-                fock_mat, den_mat, molecule, basis, screening)
+                fock_mat, den_mat, molecule, basis, screening, e_grad)
+
         else:
             vxc_mat, e_pe, V_pe = self.comp_2e_fock_single_comm(
-                fock_mat, den_mat, molecule, basis, screening)
+                fock_mat, den_mat, molecule, basis, screening, e_grad)
 
         return vxc_mat, e_pe, V_pe
 
-    def comp_2e_fock_single_comm(self, fock_mat, den_mat, molecule, basis,
-                                 screening):
+    def comp_2e_fock_single_comm(self,
+                                 fock_mat,
+                                 den_mat,
+                                 molecule,
+                                 basis,
+                                 screening,
+                                 e_grad=None):
         """
         Computes Fock/Kohn-Sham matrix on single communicator.
 
@@ -744,10 +770,15 @@ class ScfDriver:
             The basis set.
         :param screening:
             The screening container object.
+        :param e_grad:
+            The electronic gradient.
 
         :return:
             The AO Kohn-Sham (Vxc) matrix.
         """
+
+        if self.qq_dyn and e_grad is not None:
+            screening.set_threshold(self.get_dyn_threshold(e_grad))
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         xc_drv = XCIntegrator(self.comm)
@@ -762,7 +793,7 @@ class ScfDriver:
             self.timing_dict['fock_2e'].append(tm.time() - eri_t0)
             vxc_t0 = tm.time()
 
-        if self.dft and not self.first_step:
+        if self.dft:
             if not self.xcfun.is_hybrid():
                 fock_mat.scale(2.0, 0)
 
@@ -792,8 +823,13 @@ class ScfDriver:
 
         return vxc_mat, e_pe, V_pe
 
-    def comp_2e_fock_split_comm(self, fock_mat, den_mat, molecule, basis,
-                                screening):
+    def comp_2e_fock_split_comm(self,
+                                fock_mat,
+                                den_mat,
+                                molecule,
+                                basis,
+                                screening,
+                                e_grad=None):
         """
         Computes Fock/Kohn-Sham matrix on split communicators.
 
@@ -807,6 +843,8 @@ class ScfDriver:
             The basis set.
         :param screening:
             The screening container object.
+        :param e_grad:
+            The electronic gradient.
 
         :return:
             The AO Kohn-Sham (Vxc) matrix.
@@ -814,14 +852,14 @@ class ScfDriver:
 
         if self.split_comm_ratio is None:
             self.split_comm_ratio = [0.5, 0.25, 0.25]
-            if not (self.dft and not self.first_step):
+            if not self.dft:
                 self.split_comm_ratio[0] += self.split_comm_ratio[1]
                 self.split_comm_ratio[1] = 0.0
             if not (self.pe and not self.first_step):
                 self.split_comm_ratio[0] += self.split_comm_ratio[2]
                 self.split_comm_ratio[2] = 0.0
 
-        if self.dft and not self.first_step:
+        if self.dft:
             dft_nodes = int(float(self.nodes) * self.split_comm_ratio[1] + 0.5)
             dft_nodes = max(1, dft_nodes)
         else:
@@ -851,27 +889,31 @@ class ScfDriver:
         local_comm = subcomms.local_comm
         cross_comm = subcomms.cross_comm
 
-        # calculate Fock on ERI nodes
-        if eri_comm:
-            t0 = tm.time()
-            eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
-            eri_drv.compute(fock_mat, den_mat, molecule, basis, screening)
-            fock_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
-                                local_comm)
-            if self.dft and (not self.xcfun.is_hybrid()):
-                fock_mat.scale(2.0, 0)
-            dt = tm.time() - t0
-
         # reset molecular grid for DFT and V_es for PE
         if self.rank != mpi_master():
             self.molgrid = MolecularGrid()
             self.V_es = np.zeros(0)
-        if self.dft and not self.first_step:
+        if self.dft:
             if local_comm.Get_rank() == mpi_master():
                 self.molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
         if self.pe and not self.first_step:
             if local_comm.Get_rank() == mpi_master():
                 self.V_es = cross_comm.bcast(self.V_es, root=mpi_master())
+
+        # calculate Fock on ERI nodes
+        if eri_comm:
+            t0 = tm.time()
+            eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
+            local_screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                              self.eri_thresh, molecule, basis)
+            if self.qq_dyn and e_grad is not None:
+                local_screening.set_threshold(self.get_dyn_threshold(e_grad))
+            eri_drv.compute(fock_mat, den_mat, molecule, basis, local_screening)
+            fock_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
+                                local_comm)
+            if self.dft and (not self.xcfun.is_hybrid()):
+                fock_mat.scale(2.0, 0)
+            dt = tm.time() - t0
 
         # calculate Vxc on DFT nodes
         if dft_comm:
@@ -887,12 +929,6 @@ class ScfDriver:
         else:
             vxc_mat = AOKohnShamMatrix()
 
-        # collect Vxc to master node
-        if self.dft and not self.first_step:
-            if local_comm.Get_rank() == mpi_master():
-                vxc_mat.collect(cross_comm.Get_rank(), cross_comm.Get_size(),
-                                cross_comm, 1)
-
         # calculate e_pe and V_pe on PE nodes
         if pe_comm:
             from .polembed import PolEmbed
@@ -906,6 +942,12 @@ class ScfDriver:
         else:
             e_pe, V_pe = 0.0, None
             self.pe_summary = ''
+
+        # collect Vxc to master node
+        if self.dft:
+            if local_comm.Get_rank() == mpi_master():
+                vxc_mat.collect(cross_comm.Get_rank(), cross_comm.Get_size(),
+                                cross_comm, 1)
 
         # collect PE results to master node
         if self.pe and not self.first_step:
@@ -964,7 +1006,7 @@ class ScfDriver:
             e_ee = fock_mat.get_energy(0, den_mat, 0)
             e_kin = 2.0 * kin_mat.get_energy(den_mat, 0)
             e_en = -2.0 * npot_mat.get_energy(den_mat, 0)
-            if self.dft and not self.first_step:
+            if self.dft:
                 e_ee += vxc_mat.get_energy()
             if self.pe and not self.first_step:
                 e_ee += e_pe
@@ -995,7 +1037,7 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             fock_mat.add_hcore(kin_mat, npot_mat, 0)
-            if self.dft and not self.first_step:
+            if self.dft:
                 fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
             if self.pe and not self.first_step:
                 fock_mat.add_matrix(DenseMatrix(pe_mat), 0)
@@ -1280,6 +1322,7 @@ class ScfDriver:
 
         if self.first_step:
             self.ostream.print_info("Starting Reduced Basis SCF calculation...")
+
         else:
             self.ostream.print_blank()
             if self.dft:
