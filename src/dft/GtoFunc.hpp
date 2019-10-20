@@ -41,6 +41,32 @@ namespace gtorec {  // gtorec namespace
                                  const int32_t              nGridPoints);
     
     /**
+     Computes GTOs values for batch of grid points.
+     
+     @param gtoValues the GTOs values buffer.
+     @param gtoValuesX the GTOs gradient along X axis values buffer.
+     @param gtoValuesY the GTOs gradient along Y axis values buffer.
+     @param gtoValuesZ the GTOs gradient along Z axis values buffer.
+     @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
+     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
+     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param gridBlockPosition the position of grid block in GTOs values grid.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
+    void computeGtosValuesForGGA(      CMemBlock2D<double>& gtoValues,
+                                       CMemBlock2D<double>& gtoValuesX,
+                                       CMemBlock2D<double>& gtoValuesY,
+                                       CMemBlock2D<double>& gtoValuesZ,
+                                 const CGtoContainer*       gtoContainer,
+                                 const double*              gridCoordinatesX,
+                                 const double*              gridCoordinatesY,
+                                 const double*              gridCoordinatesZ,
+                                 const int32_t              gridOffset,
+                                 const int32_t              gridBlockPosition,
+                                 const int32_t              nGridPoints);
+    
+    /**
      Computes GTOs values matrix for given block of grid points.
      
      @param gtoMatrix the GTOs values matrix.
