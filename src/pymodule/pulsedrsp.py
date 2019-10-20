@@ -234,15 +234,15 @@ class PulsedResponse:
         results = self.rsp_driver.compute(molecule, ao_basis, scf_tensors)
         results['pulse_settings'] = self.pulse_settings
 
-        # Loop over all directions
-        for xyz1 in ['x', 'y', 'z']:
-            for xyz2 in ['x', 'y', 'z']:
-                # Convert response function to polarizability
-                # by multiplication with -1
-                for freq in self.truncated_freqs:
-                    results['properties'][(xyz1, xyz2, freq)] *= -1
-
         if self.rank == mpi_master():
+            # Loop over all directions
+            for xyz1 in ['x', 'y', 'z']:
+                for xyz2 in ['x', 'y', 'z']:
+                    # Convert response function to polarizability
+                    # by multiplication with -1
+                    for freq in self.truncated_freqs:
+                        results['properties'][(xyz1, xyz2, freq)] *= -1
+
             self.ostream.print_info(
                 "Exiting CPP Solver returning to Pulsed Linear Response")
 
