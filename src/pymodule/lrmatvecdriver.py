@@ -822,7 +822,7 @@ def construct_ed_sd_half(orb_ene, nocc, norb):
 
 
 def write_rsp_hdf5(fname, arrays, labels, e_nuc, nuclear_charges, basis_set,
-                   dft_func_label, ostream):
+                   dft_func_label, potfile_text, ostream):
     """
     Writes response vectors to checkpoint file. Nuclear charges and basis
     set can also be written to the checkpoint file.
@@ -841,6 +841,8 @@ def write_rsp_hdf5(fname, arrays, labels, e_nuc, nuclear_charges, basis_set,
         Name of the AO basis set.
     :param dft_func_label:
         Name of the density functional.
+    :param potfile_text:
+        Text in the potential file.
     :param ostream:
         The output stream.
     """
@@ -871,6 +873,10 @@ def write_rsp_hdf5(fname, arrays, labels, e_nuc, nuclear_charges, basis_set,
                       data=np.string_([dft_func_label]),
                       compression='gzip')
 
+    hf.create_dataset('potfile_text',
+                      data=np.string_([potfile_text]),
+                      compression='gzip')
+
     hf.close()
 
     checkpoint_text = 'Checkpoint written to file: '
@@ -880,7 +886,7 @@ def write_rsp_hdf5(fname, arrays, labels, e_nuc, nuclear_charges, basis_set,
 
 
 def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set,
-                  dft_func_label, ostream):
+                  dft_func_label, potfile_text, ostream):
     """
     Reads response vectors from checkpoint file. Nuclear charges and basis
     set will be used to validate the checkpoint file.
@@ -897,6 +903,8 @@ def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set,
         Name of the AO basis set.
     :param dft_func_label:
         Name of the density functional.
+    :param potfile_text:
+        Text in the potential file.
     :param ostream:
         The output stream.
 
@@ -936,10 +944,15 @@ def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set,
         h5_func_label = hf.get('dft_func_label')[0].decode('utf-8')
         match_dft_func = (h5_func_label.upper() == dft_func_label.upper())
 
+    match_potfile = False
+    if 'potfile_text' in hf:
+        h5_potfile_text = hf.get('potfile_text')[0].decode('utf-8')
+        match_potfile = (h5_potfile_text == potfile_text)
+
     arrays = [None] * len(labels)
 
     if (match_nuclear_repulsion and match_nuclear_charges and
-            match_basis_set and match_dft_func):
+            match_basis_set and match_dft_func and match_potfile):
         for i in range(len(labels)):
             if labels[i] in hf.keys():
                 arrays[i] = np.array(hf.get(labels[i]))

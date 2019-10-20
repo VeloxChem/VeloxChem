@@ -1,5 +1,6 @@
 import numpy as np
 import time as tm
+import os
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import GridDriver
@@ -231,7 +232,6 @@ class LinearResponseSolver:
             import cProfile
             import pstats
             import io
-            import os
             pr = cProfile.Profile()
             pr.enable()
 
@@ -286,6 +286,12 @@ class LinearResponseSolver:
         else:
             dft_func_label = 'HF'
 
+        if self.pe:
+            with open(self.potfile, 'r') as f_pot:
+                potfile_text = os.linesep.join(f_pot.readlines())
+        else:
+            potfile_text = ''
+
         # set up polarizable embedding
         if self.pe:
             from .polembed import PolEmbed
@@ -334,7 +340,7 @@ class LinearResponseSolver:
                     self.checkpoint_file, rsp_vector_labels,
                     molecule.nuclear_repulsion_energy(),
                     molecule.elem_ids_to_numpy(), basis.get_label(),
-                    dft_func_label, self.ostream)
+                    dft_func_label, potfile_text, self.ostream)
                 self.restart = (bger is not None and bung is not None and
                                 e2bger is not None and e2bung is not None)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
@@ -503,7 +509,7 @@ class LinearResponseSolver:
                                    molecule.nuclear_repulsion_energy(),
                                    molecule.elem_ids_to_numpy(),
                                    basis.get_label(), dft_func_label,
-                                   self.ostream)
+                                   potfile_text, self.ostream)
                     self.checkpoint_time = tm.time()
 
             if self.timing:

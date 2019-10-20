@@ -1,6 +1,7 @@
 import numpy as np
 import time as tm
 import math
+import os
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
@@ -239,6 +240,12 @@ class TDAExciDriver:
         else:
             dft_func_label = 'HF'
 
+        if self.pe:
+            with open(self.potfile, 'r') as f_pot:
+                potfile_text = os.linesep.join(f_pot.readlines())
+        else:
+            potfile_text = ''
+
         # generate potential for polarizable embedding
 
         if self.pe:
@@ -274,7 +281,7 @@ class TDAExciDriver:
                     self.checkpoint_file, ['TDA_trials', 'TDA_sigmas'],
                     molecule.nuclear_repulsion_energy(),
                     molecule.elem_ids_to_numpy(), basis.get_label(),
-                    dft_func_label, self.ostream)
+                    dft_func_label, potfile_text, self.ostream)
                 self.restart = (rst_trial_mat is not None and
                                 rst_sig_mat is not None)
                 if rst_trial_mat is not None:
@@ -335,7 +342,7 @@ class TDAExciDriver:
                                        molecule.nuclear_repulsion_energy(),
                                        molecule.elem_ids_to_numpy(),
                                        basis.get_label(), dft_func_label,
-                                       self.ostream)
+                                       potfile_text, self.ostream)
                         self.checkpoint_time = tm.time()
 
             # check convergence
