@@ -587,7 +587,7 @@ class ComplexResponse:
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                     self.eri_thresh, molecule, basis)
 
-        e2x_drv = LinearResponseMatrixVectorDriver(self.comm)
+        e2x_drv = LinearResponseMatrixVectorDriver(self.comm, self.qq_type)
 
         if self.rank == mpi_master():
             nocc = molecule.number_of_alpha_electrons()

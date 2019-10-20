@@ -249,7 +249,7 @@ class ScfDriver:
                 self.pe = True
             self.potfile = method_dict['potfile']
 
-        if 'use_split_comm' in method_dict:
+        if 'use_split_comm' in scf_dict:
             key = method_dict['use_split_comm'].lower()
             self.use_split_comm = True if key == 'yes' else False
 

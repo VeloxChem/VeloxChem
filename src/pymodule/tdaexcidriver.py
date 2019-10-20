@@ -260,7 +260,7 @@ class TDAExciDriver:
 
         # initialize E2X driver for response Fock build
 
-        e2x_drv = LinearResponseMatrixVectorDriver(self.comm)
+        e2x_drv = LinearResponseMatrixVectorDriver(self.comm, self.qq_type)
 
         # set up trial excitation vectors on master node
 

@@ -307,7 +307,7 @@ class LinearResponseSolver:
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                     self.eri_thresh, molecule, basis)
 
-        e2x_drv = LinearResponseMatrixVectorDriver(self.comm)
+        e2x_drv = LinearResponseMatrixVectorDriver(self.comm, self.qq_type)
 
         a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
                         scf_tensors, self.rank, self.comm)

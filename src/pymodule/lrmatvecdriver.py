@@ -18,8 +18,9 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import szblock
-from .errorhandler import assert_msg_critical
 from .subcommunicators import SubCommunicators
+from .errorhandler import assert_msg_critical
+from .qqscheme import get_qq_scheme
 
 
 class LinearResponseMatrixVectorDriver:
@@ -32,9 +33,11 @@ class LinearResponseMatrixVectorDriver:
         The MPI rank.
     :param nodes:
         Number of MPI processes.
+    :param qq_type:
+        The electron repulsion integrals screening scheme.
     """
 
-    def __init__(self, comm):
+    def __init__(self, comm, qq_type='QQ_DEN'):
         """
         Initializes linear response matrix vector driver to default setup.
 
@@ -46,6 +49,8 @@ class LinearResponseMatrixVectorDriver:
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
+
+        self.qq_type = qq_type
 
         self.split_comm_ratio = None
 
@@ -324,7 +329,9 @@ class LinearResponseMatrixVectorDriver:
         if eri_comm:
             t0 = tm.time()
             eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
-            eri_drv.compute(fock, dens, molecule, basis, screening)
+            local_screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                              self.eri_thresh, molecule, basis)
+            eri_drv.compute(fock, dens, molecule, basis, local_screening)
             if dft:
                 if not xcfun.is_hybrid():
                     for ifock in range(fock.number_of_fock_matrices()):
