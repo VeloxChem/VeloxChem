@@ -142,13 +142,23 @@ class PolEmbed:
         end = sum(counts[:self.rank + 1])
 
         ef_driver = ElectricFieldIntegralsDriver(local_comm)
-        ret = ef_driver.compute(self.molecule, self.basis,
-                                moments[start:end, :],
-                                self.polarizable_coords[start:end, :])
+        if start < end:
+            ret = ef_driver.compute(self.molecule, self.basis,
+                                    moments[start:end, :],
+                                    self.polarizable_coords[start:end, :])
+            V_size = ret.x_to_numpy().shape[0]
+        else:
+            V_size = 0
+
+        if self.polarizable_coords.shape[0] < self.nodes:
+            V_size = cross_comm.bcast(V_size, root=mpi_master())
 
         if local_comm.Get_rank() == mpi_master():
-            V_ind = -1.0 * (ret.x_to_numpy() + ret.y_to_numpy() +
-                            ret.z_to_numpy())
+            if start < end:
+                V_ind = -1.0 * (ret.x_to_numpy() + ret.y_to_numpy() +
+                                ret.z_to_numpy())
+            else:
+                V_ind = np.zeros((V_size, V_size))
             V_ind = cross_comm.reduce(V_ind, root=mpi_master())
         else:
             V_ind = np.zeros(0)
