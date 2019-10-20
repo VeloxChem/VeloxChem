@@ -403,6 +403,8 @@ class ExcitonModelDriver:
         dimer_indices = None
         dimer_index_A = 0
 
+        potfile_text = ''
+
         # read checkpoint file
         if self.restart:
             if self.rank == mpi_master():
@@ -411,7 +413,7 @@ class ExcitonModelDriver:
                      self.checkpoint_file, rsp_vector_labels,
                      molecule.nuclear_repulsion_energy(),
                      molecule.elem_ids_to_numpy(), basis.get_label(),
-                     dft_func_label, self.ostream)
+                     dft_func_label, potfile_text, self.ostream)
                 read_success = (dimer_indices is not None and
                                 num_states is not None and H is not None and
                                 tdip is not None and vdip is not None and
@@ -920,7 +922,7 @@ class ExcitonModelDriver:
                                    molecule.nuclear_repulsion_energy(),
                                    molecule.elem_ids_to_numpy(),
                                    basis.get_label(), dft_func_label,
-                                   self.ostream)
+                                   potfile_text, self.ostream)
 
         if self.rank == mpi_master():
             self.print_banner('Summary')
