@@ -8,14 +8,6 @@ Conda
 
 $ conda -c veloxchem install veloxchem
 
-Python packaging index
-^^^^^^^^^^^^^^^^^^^^^^
-
-::
-
-$ pip install veloxchem
-
-
 From source
 ^^^^^^^^^^^
 
