@@ -92,6 +92,10 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
             {
                 _compRestrictedContributionForGGA(ksmat, gtovec, vxcgrid, dgrid, mgrid);
             }
+            
+            // symmetrize Kohn-Sham matrix
+            
+            ksmat.symmetrize();
         }
         
         // delete GTOs container
@@ -517,7 +521,7 @@ CXCIntegrator::_distRestrictedBatchForLDA(      CAOKohnShamMatrix*   aoKohnShamM
         {
             auto bgaos = gtoValues.data(j);
             
-            for (int32_t k = j ; k < naos; k++)
+            for (int32_t k = j; k < naos; k++)
             {
                 auto kgaos = gtoValues.data(k);
                 
@@ -544,13 +548,11 @@ CXCIntegrator::_distRestrictedBatchForLDA(      CAOKohnShamMatrix*   aoKohnShamM
             
             for (int32_t j = curao; j < (curao + bufdim); j++)
             {
-                for (int32_t k = j ; k < naos; k++)
+                for (int32_t k = j; k < naos; k++)
                 {
-                    auto fvxc = xcBuffer.at(idx);
+                    auto fvxc = (j == k) ? 0.5 * xcBuffer.at(idx) : xcBuffer.at(idx);
                 
                     ksmat[j * naos + k] += fvxc;
-                    
-                    if (j != k) ksmat[k * naos + j] += fvxc;
                     
                     idx++;
                 }
@@ -601,57 +603,17 @@ CXCIntegrator::_distRestrictedBatchForLDA(      CAOKohnShamMatrix*   aoKohnShamM
             
             for (int32_t i = curao; i < naos; i++)
             {
-                for (int32_t j = i ; j < naos; j++)
+                for (int32_t j = i; j < naos; j++)
                 {
-                    auto fvxc = xcBuffer.at(idx);
+                    auto fvxc = (i == j) ? 0.5 * xcBuffer.at(idx) : xcBuffer.at(idx);
                     
                     ksmat[i * naos + j] += fvxc;
-                    
-                    if (i != j) ksmat[j * naos + i] += fvxc;
                     
                     idx++;
                 }
             }
         }
     }
-    
-    
-//    // set up
-//
-//    for (int32_t i = 0; i < naos; i++)
-//    {
-//        auto bgaos = gtoValues.data(i);
-//
-//        for (int32_t j = i; j < naos; j++)
-//        {
-//            auto kgaos = gtoValues.data(j);
-//
-//            double fvxc = 0.0;
-//
-//            auto koff = gridOffset + gridBlockPosition;
-//
-//            for (int32_t k = 0; k < nGridPoints; k++)
-//            {
-//                fvxc += bgaos[k] * kgaos[k] * gridWeights[koff + k] * xcGradient[koff + k];
-//            }
-//
-//            xcBuffer.at(j) = fvxc;
-//        }
-//
-//        #pragma omp critical
-//        {
-//            ksmat[i * naos + i] += xcBuffer.at(i);
-//
-//            for (int32_t j = i + 1; j < naos; j++)
-//            {
-//                auto fvxc = xcBuffer.at(j);
-//
-//                ksmat[i * naos + j] += fvxc;
-//
-//                ksmat[j * naos + i] += fvxc;
-//            }
-//        }
-//    }
 }
 
 void
@@ -765,13 +727,11 @@ CXCIntegrator::_distRestrictedBatchForGGA(      CAOKohnShamMatrix*   aoKohnShamM
             
             for (int32_t j = curao; j < (curao + bufdim); j++)
             {
-                for (int32_t k = j ; k < naos; k++)
+                for (int32_t k = j; k < naos; k++)
                 {
-                    auto fvxc = xcBuffer.at(idx);
+                    auto fvxc = (j == k) ? 0.5 * xcBuffer.at(idx) : xcBuffer.at(idx);
                     
                     ksmat[j * naos + k] += fvxc;
-                    
-                    if (j != k) ksmat[k * naos + j] += fvxc;
                     
                     idx++;
                 }
@@ -850,78 +810,15 @@ CXCIntegrator::_distRestrictedBatchForGGA(      CAOKohnShamMatrix*   aoKohnShamM
             {
                 for (int32_t j = i ; j < naos; j++)
                 {
-                    auto fvxc = xcBuffer.at(idx);
+                    auto fvxc = (i == j ) ? 0.5 * xcBuffer.at(idx) : xcBuffer.at(idx);
                     
                     ksmat[i * naos + j] += fvxc;
-                    
-                    if (i != j) ksmat[j * naos + i] += fvxc;
                     
                     idx++;
                 }
             }
         }
     }
-    
-//    for (int32_t i = 0; i < naos; i++)
-//    {
-//        auto bgaos = gtoValues.data(i);
-//
-//        auto bgaox = gtoValuesX.data(i);
-//
-//        auto bgaoy = gtoValuesY.data(i);
-//
-//        auto bgaoz = gtoValuesZ.data(i);
-//
-//        for (int32_t j = i; j < naos; j++)
-//        {
-//            auto kgaos = gtoValues.data(j);
-//
-//            auto kgaox = gtoValuesX.data(j);
-//
-//            auto kgaoy = gtoValuesY.data(j);
-//
-//            auto kgaoz = gtoValuesZ.data(j);
-//
-//            double fvxc = 0.0;
-//
-//            auto koff = gridOffset + gridBlockPosition;
-//
-//            for (int32_t k = 0; k < nGridPoints; k++)
-//            {
-//                double w = gridWeights[koff + k];
-//
-//                double gx = gradax[koff + k];
-//
-//                double gy = graday[koff + k];
-//
-//                double gz = gradaz[koff + k];
-//
-//                fvxc += w * bgaos[k] * kgaos[k] * grhoa[koff + k];
-//
-//                double fgrd = w * (ggrada[koff + k] / ngrada[koff + k] + ggradab[koff + k]);
-//
-//                fvxc += fgrd * bgaos[k] * (gx * kgaox[k] + gy * kgaoy[k] + gz * kgaoz[k]);
-//
-//                fvxc += fgrd * kgaos[k] * (gx * bgaox[k] + gy * bgaoy[k] + gz * bgaoz[k]);
-//            }
-//
-//            xcBuffer.at(j) = fvxc;
-//        }
-//
-//        #pragma omp critical
-//        {
-//            ksmat[i * naos + i] += xcBuffer.at(i);
-//
-//            for (int32_t j = i + 1; j < naos; j++)
-//            {
-//                auto fvxc = xcBuffer.at(j);
-//
-//                ksmat[i * naos + j] += fvxc;
-//
-//                ksmat[j * naos + i] += fvxc;
-//            }
-//        }
-//    }
 }
 
 void
