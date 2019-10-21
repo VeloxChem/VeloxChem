@@ -344,6 +344,13 @@ class CXCIntegrator
      @return the size of block in grid batch.
      */
     int32_t _getSizeOfBlock() const;
+    
+    /**
+     Gets number of atomic orbitals included into accumulation buffer.
+
+     @return the number of atomic orbitals.
+     */
+    int32_t _getNumberOfAOsInBuffer() const;
    
 public:
     

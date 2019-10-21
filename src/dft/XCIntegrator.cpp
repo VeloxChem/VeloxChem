@@ -362,7 +362,9 @@ CXCIntegrator::_compRestrictedBatchForLDA(      CAOKohnShamMatrix* aoKohnShamMat
     
     // allocate XC contribution buffer
     
-    CMemBlock<double> vxcbuf(naos);
+    auto bufdim = _getNumberOfAOsInBuffer();
+    
+    CMemBlock<double> vxcbuf(bufdim * naos);
     
     // set up current grid point
     
@@ -424,7 +426,9 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
     
     // allocate XC contribution buffer
     
-    CMemBlock<double> vxcbuf(naos);
+    auto bufdim = _getNumberOfAOsInBuffer();
+    
+    CMemBlock<double> vxcbuf(bufdim * naos);
     
     // set up current grid point
     
@@ -491,44 +495,163 @@ CXCIntegrator::_distRestrictedBatchForLDA(      CAOKohnShamMatrix*   aoKohnShamM
     
     auto ksmat = aoKohnShamMatrix->getKohnSham();
     
-    // loop over AOs
+    // set up AOs blocks
     
     auto naos = aoKohnShamMatrix->getNumberOfRows();
     
-    for (int32_t i = 0; i < naos; i++)
+    auto bufdim = _getNumberOfAOsInBuffer();
+    
+    auto nblock = naos / bufdim;
+    
+    // loop over AOs blocks
+    
+    int32_t curao = 0;
+    
+    for (int32_t i = 0; i < nblock; i++)
     {
-        auto bgaos = gtoValues.data(i);
+        // compute block of Kohn-Sham matrix elements
         
-        for (int32_t j = i; j < naos; j++)
+        int32_t idx = 0;
+        
+        for (int32_t j = curao; j < (curao + bufdim); j++)
         {
-            auto kgaos = gtoValues.data(j);
+            auto bgaos = gtoValues.data(j);
             
-            double fvxc = 0.0;
-            
-            auto koff = gridOffset + gridBlockPosition;
-            
-            for (int32_t k = 0; k < nGridPoints; k++)
+            for (int32_t k = j ; k < naos; k++)
             {
-                fvxc += bgaos[k] * kgaos[k] * gridWeights[koff + k] * xcGradient[koff + k];
+                auto kgaos = gtoValues.data(k);
+                
+                double fvxc = 0.0;
+                
+                auto loff = gridOffset + gridBlockPosition;
+                
+                for (int32_t l = 0; l < nGridPoints; l++)
+                {
+                    fvxc += bgaos[l] * kgaos[l] * gridWeights[loff + l] * xcGradient[loff + l];
+                }
+                
+                xcBuffer.at(idx) = fvxc;
+                
+                idx++;
             }
-            
-            xcBuffer.at(j) = fvxc;
         }
+        
+        // distribute block of Kohn-Sham matrix elements
         
         #pragma omp critical
         {
-            ksmat[i * naos + i] += xcBuffer.at(i);
-                
-            for (int32_t j = i + 1; j < naos; j++)
+            idx = 0;
+            
+            for (int32_t j = curao; j < (curao + bufdim); j++)
             {
-                auto fvxc = xcBuffer.at(j);
+                for (int32_t k = j ; k < naos; k++)
+                {
+                    auto fvxc = xcBuffer.at(idx);
                 
-                ksmat[i * naos + j] += fvxc;
+                    ksmat[j * naos + k] += fvxc;
+                    
+                    if (j != k) ksmat[k * naos + j] += fvxc;
+                    
+                    idx++;
+                }
+            }
+        }
+        
+        // update AOs counter
+        
+        curao += bufdim;
+    }
+    
+    // loop over last block
+    
+    if (naos % bufdim != 0)
+    {
+        // compute last block of Kohn-Sham matrix elements
+        
+        int32_t idx = 0;
+        
+        for (int32_t i = curao; i < naos; i++)
+        {
+            auto bgaos = gtoValues.data(i);
+            
+            for (int32_t j = i; j < naos; j++)
+            {
+                auto kgaos = gtoValues.data(j);
                 
-                ksmat[j * naos + i] += fvxc;
+                double fvxc = 0.0;
+                
+                auto koff = gridOffset + gridBlockPosition;
+                
+                for (int32_t k = 0; k < nGridPoints; k++)
+                {
+                    fvxc += bgaos[k] * kgaos[k] * gridWeights[koff + k] * xcGradient[koff + k];
+                }
+                
+                xcBuffer.at(idx) = fvxc;
+                
+                idx++;
+            }
+        }
+        
+        // distribute last block of Kohn-Sham matrix elements
+        
+        #pragma omp critical
+        {
+            idx = 0;
+            
+            for (int32_t i = curao; i < naos; i++)
+            {
+                for (int32_t j = i ; j < naos; j++)
+                {
+                    auto fvxc = xcBuffer.at(idx);
+                    
+                    ksmat[i * naos + j] += fvxc;
+                    
+                    if (i != j) ksmat[j * naos + i] += fvxc;
+                    
+                    idx++;
+                }
             }
         }
     }
+    
+    
+//    // set up
+//
+//    for (int32_t i = 0; i < naos; i++)
+//    {
+//        auto bgaos = gtoValues.data(i);
+//
+//        for (int32_t j = i; j < naos; j++)
+//        {
+//            auto kgaos = gtoValues.data(j);
+//
+//            double fvxc = 0.0;
+//
+//            auto koff = gridOffset + gridBlockPosition;
+//
+//            for (int32_t k = 0; k < nGridPoints; k++)
+//            {
+//                fvxc += bgaos[k] * kgaos[k] * gridWeights[koff + k] * xcGradient[koff + k];
+//            }
+//
+//            xcBuffer.at(j) = fvxc;
+//        }
+//
+//        #pragma omp critical
+//        {
+//            ksmat[i * naos + i] += xcBuffer.at(i);
+//
+//            for (int32_t j = i + 1; j < naos; j++)
+//            {
+//                auto fvxc = xcBuffer.at(j);
+//
+//                ksmat[i * naos + j] += fvxc;
+//
+//                ksmat[j * naos + i] += fvxc;
+//            }
+//        }
+//    }
 }
 
 void
@@ -1186,3 +1309,8 @@ CXCIntegrator::_getSizeOfBlock() const
     return 500;
 }
 
+int32_t
+CXCIntegrator::_getNumberOfAOsInBuffer() const
+{
+    return 5;
+}
