@@ -67,7 +67,8 @@ class LinearResponseMatrixVectorDriver:
                       gs_density=None,
                       pe=False,
                       V_es=None,
-                      potfile=None):
+                      potfile=None,
+                      timing_dict=None):
         """
         Computes the E2 b matrix vector product.
 
@@ -147,7 +148,7 @@ class LinearResponseMatrixVectorDriver:
         fock = AOFockMatrix(dens)
 
         self.comp_lr_fock(fock, dens, molecule, basis, screening, dft, xcfun,
-                          molgrid, gs_density, pe, V_es, potfile)
+                          molgrid, gs_density, pe, V_es, potfile, timing_dict)
 
         if self.rank == mpi_master():
             if vecs_ger is not None:
@@ -179,8 +180,20 @@ class LinearResponseMatrixVectorDriver:
         else:
             return None, None
 
-    def comp_lr_fock(self, fock, dens, molecule, basis, screening, dft, xcfun,
-                     molgrid, gs_density, pe, V_es, potfile):
+    def comp_lr_fock(self,
+                     fock,
+                     dens,
+                     molecule,
+                     basis,
+                     screening,
+                     dft,
+                     xcfun,
+                     molgrid,
+                     gs_density,
+                     pe,
+                     V_es,
+                     potfile,
+                     timing_dict=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -232,10 +245,14 @@ class LinearResponseMatrixVectorDriver:
                                          V_es, potfile)
 
         else:
+            t0 = tm.time()
             eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
             eri_drv.compute(fock, dens, molecule, basis, screening)
+            if timing_dict is not None:
+                timing_dict['ERI'] = tm.time() - t0
 
             if dft:
+                t0 = tm.time()
                 if not xcfun.is_hybrid():
                     for ifock in range(fock.number_of_fock_matrices()):
                         fock.scale(2.0, ifock)
@@ -243,9 +260,12 @@ class LinearResponseMatrixVectorDriver:
                 molgrid.distribute(self.rank, self.nodes, self.comm)
                 xc_drv.integrate(fock, dens, gs_density, molecule, basis,
                                  molgrid, xcfun.get_func_label())
+                if timing_dict is not None:
+                    timing_dict['DFT'] = tm.time() - t0
 
             if pe:
                 from .polembed import PolEmbed
+                t0 = tm.time()
                 pe_drv = PolEmbed(molecule, basis, self.comm, potfile)
                 pe_drv.V_es = V_es.copy()
                 for ifock in range(fock.number_of_fock_matrices()):
@@ -253,6 +273,8 @@ class LinearResponseMatrixVectorDriver:
                     e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
                     if self.rank == mpi_master():
                         fock.add_matrix(DenseMatrix(V_pe), ifock)
+                if timing_dict is not None:
+                    timing_dict['PE'] = tm.time() - t0
 
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
@@ -357,7 +379,6 @@ class LinearResponseMatrixVectorDriver:
                                local_comm)
             xc_drv.integrate(fock, dens, gs_density, molecule, basis, molgrid,
                              xcfun.get_func_label())
-        if dft_comm:
             dt = tm.time() - t0
 
         # calculate e_pe and V_pe on PE nodes

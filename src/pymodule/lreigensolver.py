@@ -136,6 +136,7 @@ class LinearResponseEigenSolver:
         self.checkpoint_time = None
 
         self.timing = False
+        self.timing_dict = None
         self.profiling = False
 
     def update_settings(self, rsp_dict, method_dict={}):
@@ -224,6 +225,9 @@ class LinearResponseEigenSolver:
                 'reduced_space': [0.0],
                 'ortho_norm': [0.0],
                 'fock_build': [0.0],
+                'fock_eri': [0.0],
+                'fock_dft': [0.0],
+                'fock_pe': [0.0],
             }
             timing_t0 = tm.time()
 
@@ -339,12 +343,10 @@ class LinearResponseEigenSolver:
                 if bung is None or not bung.any():
                     bung = np.zeros((bger.shape[0], 0))
 
-            e2bger, e2bung = e2x_drv.e2n_half_size(bger, bung, scf_tensors,
-                                                   screening, molecule, basis,
-                                                   self.dft, self.xcfun,
-                                                   self.molgrid,
-                                                   self.gs_density, self.pe,
-                                                   self.V_es, self.potfile)
+            e2bger, e2bung = e2x_drv.e2n_half_size(
+                bger, bung, scf_tensors, screening, molecule, basis, self.dft,
+                self.xcfun, self.molgrid, self.gs_density, self.pe, self.V_es,
+                self.potfile, self.timing_dict)
 
         excitations = [None] * self.nstates
         exresiduals = [None] * self.nstates
@@ -353,6 +355,11 @@ class LinearResponseEigenSolver:
 
         if self.timing:
             self.timing_dict['fock_build'][0] += tm.time() - timing_t0
+            self.timing_dict['fock_eri'][0] += self.timing_dict['ERI']
+            if self.dft:
+                self.timing_dict['fock_dft'][0] += self.timing_dict['DFT']
+            if self.pe:
+                self.timing_dict['fock_pe'][0] += self.timing_dict['PE']
             timing_t0 = tm.time()
 
         # start iterations
@@ -362,6 +369,9 @@ class LinearResponseEigenSolver:
                 self.timing_dict['reduced_space'].append(0.0)
                 self.timing_dict['ortho_norm'].append(0.0)
                 self.timing_dict['fock_build'].append(0.0)
+                self.timing_dict['fock_eri'].append(0.0)
+                self.timing_dict['fock_dft'].append(0.0)
+                self.timing_dict['fock_pe'].append(0.0)
 
             if self.rank == mpi_master():
                 self.cur_iter = iteration
@@ -487,7 +497,8 @@ class LinearResponseEigenSolver:
             new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
                 molecule, basis, self.dft, self.xcfun, self.molgrid,
-                self.gs_density, self.pe, self.V_es, self.potfile)
+                self.gs_density, self.pe, self.V_es, self.potfile,
+                self.timing_dict)
 
             if self.rank == mpi_master():
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
@@ -506,6 +517,11 @@ class LinearResponseEigenSolver:
             if self.timing:
                 tid = iteration + 1
                 self.timing_dict['fock_build'][tid] += tm.time() - timing_t0
+                self.timing_dict['fock_eri'][tid] += self.timing_dict['ERI']
+                if self.dft:
+                    self.timing_dict['fock_dft'][tid] += self.timing_dict['DFT']
+                if self.pe:
+                    self.timing_dict['fock_pe'][tid] += self.timing_dict['PE']
                 timing_t0 = tm.time()
 
         # converged?
@@ -902,6 +918,11 @@ class LinearResponseEigenSolver:
 
         valstr = '{:<15s} {:>15s} {:>15s} {:>15s}'.format(
             '', 'ReducedSpace', 'Orthonorm.', 'FockBuild')
+        valstr += ' {:>10s}'.format('FockERI')
+        if self.dft:
+            valstr += ' {:>10s}'.format('FockDFT')
+        if self.pe:
+            valstr += ' {:>10s}'.format('FockPE')
         self.ostream.print_header(valstr.ljust(width))
 
         for i, (a, b, c) in enumerate(
@@ -913,6 +934,11 @@ class LinearResponseEigenSolver:
             else:
                 title = 'Iteration {:<5d}'.format(i)
             valstr = '{:<15s} {:15.3f} {:15.3f} {:15.3f}'.format(title, a, b, c)
+            valstr += ' {:10.2f}'.format(self.timing_dict['fock_eri'][i])
+            if self.dft:
+                valstr += ' {:10.2f}'.format(self.timing_dict['fock_dft'][i])
+            if self.pe:
+                valstr += ' {:10.2f}'.format(self.timing_dict['fock_pe'][i])
             self.ostream.print_header(valstr.ljust(width))
 
         valstr = '---------'
@@ -922,6 +948,11 @@ class LinearResponseEigenSolver:
             'Sum', sum(self.timing_dict['reduced_space']),
             sum(self.timing_dict['ortho_norm']),
             sum(self.timing_dict['fock_build']))
+        valstr += ' {:10.2f}'.format(sum(self.timing_dict['fock_eri']))
+        if self.dft:
+            valstr += ' {:10.2f}'.format(sum(self.timing_dict['fock_dft']))
+        if self.pe:
+            valstr += ' {:10.2f}'.format(sum(self.timing_dict['fock_pe']))
         self.ostream.print_header(valstr.ljust(width))
 
         self.ostream.print_blank()
