@@ -16,6 +16,7 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb
+from .molecularbasis import MolecularBasis
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
@@ -250,7 +251,7 @@ class ScfDriver:
             self.potfile = method_dict['potfile']
 
         if 'use_split_comm' in scf_dict:
-            key = method_dict['use_split_comm'].lower()
+            key = scf_dict['use_split_comm'].lower()
             self.use_split_comm = True if key == 'yes' else False
 
         if 'timing' in scf_dict:
@@ -260,7 +261,7 @@ class ScfDriver:
             key = scf_dict['profiling'].lower()
             self.profiling = True if key in ['yes', 'y'] else False
 
-    def compute(self, molecule, ao_basis, min_basis):
+    def compute(self, molecule, ao_basis, min_basis=None):
         """
         Performs SCF calculation using molecular data.
 
@@ -271,6 +272,9 @@ class ScfDriver:
         :param min_basis:
             The minimal AO basis set.
         """
+
+        if min_basis is None:
+            min_basis = MolecularBasis.read(molecule, "MIN-CC-PVDZ")
 
         # set up timing data
         if self.timing:
