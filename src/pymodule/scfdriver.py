@@ -274,7 +274,9 @@ class ScfDriver:
         """
 
         if min_basis is None:
-            min_basis = MolecularBasis.read(molecule, "MIN-CC-PVDZ")
+            if self.rank == mpi_master():
+                min_basis = MolecularBasis.read(molecule, 'MIN-CC-PVDZ')
+            min_basis.broadcast(self.rank, self.comm)
 
         # set up timing data
         if self.timing:
