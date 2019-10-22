@@ -4,9 +4,17 @@ Install
 
 Conda
 ^^^^^
+
+It is recommended to install veloxchem in a separate conda environment, e.g. 
 ::
 
-$ conda -c veloxchem install veloxchem
+    $ conda create -n vlx
+    $ conda activate vlx
+    (vlx) $ conda -c conda-forge install veloxchem
+
+Conda binary distributions have been generated with 
+ 
+* Ubuntu 18.04 LTS.
 
 From source
 ^^^^^^^^^^^
