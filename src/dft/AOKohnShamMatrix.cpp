@@ -41,6 +41,7 @@ CAOKohnShamMatrix::CAOKohnShamMatrix(const std::vector<CDenseMatrix>& xcMatrices
 
 CAOKohnShamMatrix::CAOKohnShamMatrix(const int32_t nRows,
                                      const int32_t nColumns,
+                                     const int32_t nMatrices, 
                                      const bool    xcRestricted)
 {
     _xcRestricted = xcRestricted;
@@ -49,9 +50,21 @@ CAOKohnShamMatrix::CAOKohnShamMatrix(const int32_t nRows,
     
     _xcEnergy = 0.0;
     
-    _xcMatrices.push_back(CDenseMatrix(nRows, nColumns));
+    for (int32_t i = 0; i < nMatrices; i++)
+    {
+        _xcMatrices.push_back(CDenseMatrix(nRows, nColumns));
     
-    if (!_xcRestricted) _xcMatrices.push_back(CDenseMatrix(nRows, nColumns));
+        if (!_xcRestricted) _xcMatrices.push_back(CDenseMatrix(nRows, nColumns));
+    }
+}
+
+CAOKohnShamMatrix::CAOKohnShamMatrix(const int32_t nRows,
+                                     const int32_t nColumns,
+                                     const bool    xcRestricted)
+
+    : CAOKohnShamMatrix(nRows, nColumns, 1, xcRestricted)
+{
+    
 }
 
 CAOKohnShamMatrix::CAOKohnShamMatrix(const CAOKohnShamMatrix& source)
@@ -345,6 +358,12 @@ CAOKohnShamMatrix::getNumberOfElements() const
     return 0;
 }
 
+int32_t
+CAOKohnShamMatrix::getNumberOfMatrices() const
+{
+    return static_cast<int32_t>(_xcMatrices.size());
+}
+
 const double*
 CAOKohnShamMatrix::getKohnSham(const bool beta) const
 {
@@ -404,6 +423,34 @@ CAOKohnShamMatrix::getReferenceToKohnSham(const bool beta) const
     {
         return _xcMatrices[1];
     }
+}
+
+const double*
+CAOKohnShamMatrix::getMatrix(const int32_t iMatrix) const
+{
+    if (iMatrix < getNumberOfMatrices())
+    {
+        return _xcMatrices[iMatrix].values();
+    }
+    
+    return nullptr;
+}
+
+double*
+CAOKohnShamMatrix::getMatrix(const int32_t iMatrix)
+{
+    if (iMatrix < getNumberOfMatrices())
+    {
+        return _xcMatrices[iMatrix].values();
+    }
+    
+    return nullptr;
+}
+
+const CDenseMatrix&
+CAOKohnShamMatrix::getReferenceToMatrix(const int32_t iMatrix) const
+{
+    return _xcMatrices[iMatrix]; 
 }
 
 std::string

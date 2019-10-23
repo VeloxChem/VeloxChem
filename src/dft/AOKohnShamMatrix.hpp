@@ -69,6 +69,19 @@ public:
     
     @param nRows the number of rows in exchange-correlation matrices.
     @param nColumns the numner of columns in exchange-correlation matrices.
+    @param nMatrices the number of exchange-correlation matrices.
+    @param xcRestricted the flag indicating restricted on unrestricted form of Kohn-Sham matrix.
+    */
+    CAOKohnShamMatrix(const int32_t nRows,
+                      const int32_t nColumns,
+                      const int32_t nMatrices,
+                      const bool    xcRestricted);
+    
+    /**
+    Creates a AO Kohn-Sham matrix object.
+    
+    @param nRows the number of rows in exchange-correlation matrices.
+    @param nColumns the numner of columns in exchange-correlation matrices.
     @param xcRestricted the flag indicating restricted on unrestricted form of Kohn-Sham matrix.
     */
     CAOKohnShamMatrix(const int32_t nRows,
@@ -214,11 +227,18 @@ public:
     int32_t getNumberOfColumns() const;
     
     /**
-     Gets number of elements in Kohn.Sham matrix.
+     Gets number of elements in Kohn-Sham matrix.
      
      @return the number of elements.
      */
     int32_t getNumberOfElements() const;
+    
+    /**
+     Gets number of matrices in Kohn-Sham matrix.
+
+     @return the number of matrices.
+     */
+    int32_t getNumberOfMatrices() const;
     
     /**
      Gets constant pointer to first element of Kohn-Sham matrix.
@@ -243,6 +263,30 @@ public:
      @return the constant reference to Kohn-Sham matrix.
      */
     const CDenseMatrix& getReferenceToKohnSham(const bool beta=false) const;
+    
+    /**
+     Gets constant pointer to first element of specific matrix in Kohn-Sham matrix.
+
+     @param iMatrix the index of matrix.
+     @return the pointer to first element of requested matrix.
+     */
+    const double* getMatrix(const int32_t iMatrix) const;
+    
+    /**
+     Gets pointer to first element of specific matrix in Kohn-Sham matrix.
+     
+     @param iMatrix the index of matrix.
+     @return the pointer to first element of requested matrix.
+     */
+    double* getMatrix(const int32_t iMatrix);
+    
+    /**
+     Gets reference to specific matrix in Kohn-Sham matrix.
+
+     @param iMatrix the index of matrix.
+     @return the reference to requested matrix.
+     */
+    const CDenseMatrix& getReferenceToMatrix(const int32_t iMatrix) const;
     
     /**
      Gets string representation of Kohn-Sham matrix object.

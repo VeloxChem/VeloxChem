@@ -15,7 +15,7 @@ TEST_F(CAOKohnShamMatrixTest, DefaultConstructor)
 {
     CAOKohnShamMatrix fmata;
     
-    CAOKohnShamMatrix fmatb({}, true, 0.0, 0.0);
+    CAOKohnShamMatrix fmatb(std::vector<CDenseMatrix>(), true, 0.0, 0.0);
     
     ASSERT_EQ(fmata, fmatb);
 }
@@ -200,6 +200,17 @@ TEST_F(CAOKohnShamMatrixTest, GetNumberOfElements)
     ASSERT_EQ(9, fmata.getNumberOfElements());
 }
 
+TEST_F(CAOKohnShamMatrixTest, GetNumberOfMatrices)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CAOKohnShamMatrix fmata({ma, mb}, true, 1.0, 2.0);
+    
+    ASSERT_EQ(2, fmata.getNumberOfMatrices());
+}
+
 TEST_F(CAOKohnShamMatrixTest, GetKohnShamConstant)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
@@ -255,4 +266,53 @@ TEST_F(CAOKohnShamMatrixTest, GetReferenceToKohnSham)
     ASSERT_EQ(ma, fmata.getReferenceToKohnSham(false));
     
     ASSERT_EQ(mb, fmata.getReferenceToKohnSham(true));
+}
+
+TEST_F(CAOKohnShamMatrixTest, GetMatrixConstant)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    const CAOKohnShamMatrix fmata({ma, mb}, false, 1.0, 3.0);
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0},
+                     fmata.getMatrix(0));
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, fmata.getMatrix(1));
+}
+
+TEST_F(CAOKohnShamMatrixTest, GetMatrix)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    CAOKohnShamMatrix fmata({ma, mb},false, 1.0, 2.0);
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0},
+                     fmata.getMatrix(0));
+    
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, fmata.getMatrix(1));
+    
+    auto pdat = fmata.getMatrix(0);
+    
+    pdat[2] = 2.0;  pdat[5] = 0.0;
+    
+    CDenseMatrix mc({1.0, -1.0, 2.0, -2.0, 5.0, 0.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    ASSERT_EQ(fmata, CAOKohnShamMatrix({mc, mb}, false, 1.0, 2.0));
+}
+
+TEST_F(CAOKohnShamMatrixTest, GetReferenceToMatrix)
+{
+    CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    
+    CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 5.0, 4.0}, 3, 2);
+    
+    const CAOKohnShamMatrix fmata({ma, mb}, false, 1.0, 2.0);
+    
+    ASSERT_EQ(ma, fmata.getReferenceToMatrix(0));
+    
+    ASSERT_EQ(mb, fmata.getReferenceToMatrix(1));
 }
