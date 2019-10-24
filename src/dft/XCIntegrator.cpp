@@ -1445,7 +1445,7 @@ CXCIntegrator::_distRestrictedBatchForGGA(      CAOKohnShamMatrix*   aoKohnShamM
                         
                         // GTOs values
                         
-                        auto a0 = bgaos[m] * bgaos[m];
+                        auto a0 = bgaos[m] * kgaos[m];
                         
                         auto ax = bgaox[m] * kgaos[m] + bgaos[m] * kgaox[m];
                         
@@ -1604,7 +1604,7 @@ CXCIntegrator::_distRestrictedBatchForGGA(      CAOKohnShamMatrix*   aoKohnShamM
                         
                         // GTOs values
                         
-                        auto a0 = bgaos[l] * bgaos[l];
+                        auto a0 = bgaos[l] * kgaos[l];
                         
                         auto ax = bgaox[l] * kgaos[l] + bgaos[l] * kgaox[l];
                         
