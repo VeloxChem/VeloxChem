@@ -449,9 +449,9 @@ class LinearResponseEigenSolver:
                     ws.append(w)
 
                 # write to output
-                self.ostream.print_info('{:d} gerade trial vectors'.format(
+                self.ostream.print_info('{:d} gerade trial vectors in reduced space'.format(
                     bger.shape[1]))
-                self.ostream.print_info('{:d} ungerade trial vectors'.format(
+                self.ostream.print_info('{:d} ungerade trial vectors in reduced space'.format(
                     bung.shape[1]))
                 self.ostream.print_blank()
 

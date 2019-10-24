@@ -847,9 +847,9 @@ class ComplexResponse:
                 # write to output
 
                 self.ostream.print_info(
-                    '{:d} gerade trial vectors'.format(n_ger))
+                    '{:d} gerade trial vectors in reduced space'.format(n_ger))
                 self.ostream.print_info(
-                    '{:d} ungerade trial vectors'.format(n_ung))
+                    '{:d} ungerade trial vectors in reduced space'.format(n_ung))
                 self.ostream.print_blank()
 
                 self.print_iteration(relative_residual_norm, nvs)
