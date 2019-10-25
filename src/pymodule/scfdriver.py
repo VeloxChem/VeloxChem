@@ -493,7 +493,7 @@ class ScfDriver:
 
         fock_mat = AOFockMatrix(den_mat)
 
-        if self.dft:
+        if self.dft and not self.first_step:
             self.update_fock_type(fock_mat)
 
         if self.rank == mpi_master():
@@ -502,9 +502,7 @@ class ScfDriver:
         self.split_comm_ratio = None
 
         if self.use_split_comm:
-            self.use_split_comm = ((self.dft or
-                                    (self.pe and not self.first_step)) and
-                                   self.nodes >= 8)
+            self.use_split_comm = ((self.dft or self.pe) and self.nodes >= 8)
 
         if not self.use_split_comm:
             eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
@@ -799,7 +797,7 @@ class ScfDriver:
             self.timing_dict['fock_2e'].append(tm.time() - eri_t0)
             vxc_t0 = tm.time()
 
-        if self.dft:
+        if self.dft and not self.first_step:
             if not self.xcfun.is_hybrid():
                 fock_mat.scale(2.0, 0)
 
@@ -1012,7 +1010,7 @@ class ScfDriver:
             e_ee = fock_mat.get_energy(0, den_mat, 0)
             e_kin = 2.0 * kin_mat.get_energy(den_mat, 0)
             e_en = -2.0 * npot_mat.get_energy(den_mat, 0)
-            if self.dft:
+            if self.dft and not self.first_step:
                 e_ee += vxc_mat.get_energy()
             if self.pe and not self.first_step:
                 e_ee += e_pe
@@ -1043,7 +1041,7 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             fock_mat.add_hcore(kin_mat, npot_mat, 0)
-            if self.dft:
+            if self.dft and not self.first_step:
                 fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
             if self.pe and not self.first_step:
                 fock_mat.add_matrix(DenseMatrix(pe_mat), 0)
