@@ -436,18 +436,19 @@ class ExcitonModelDriver:
             dimer_indices = self.comm.bcast(dimer_indices, root=mpi_master())
             dimer_index_A = dimer_indices[0]
 
-            self.H = H.copy()
-            self.trans_dipoles = tdip.copy()
-            self.velo_trans_dipoles = vdip.copy()
-            self.magn_trans_dipoles = mdip.copy()
+            if self.rank == mpi_master():
+                self.H = H.copy()
+                self.trans_dipoles = tdip.copy()
+                self.velo_trans_dipoles = vdip.copy()
+                self.magn_trans_dipoles = mdip.copy()
 
-            for info_string in state_info:
-                info = info_string.decode('utf-8').split()
-                state_id = int(info[0])
-                if len(info) > 1:
-                    self.state_info[state_id]['type'] = info[1]
-                    self.state_info[state_id]['frag'] = info[2]
-                    self.state_info[state_id]['name'] = info[3]
+                for info_string in state_info:
+                    info = info_string.decode('utf-8').split()
+                    state_id = int(info[0])
+                    if len(info) > 1:
+                        self.state_info[state_id]['type'] = info[1]
+                        self.state_info[state_id]['frag'] = info[2]
+                        self.state_info[state_id]['name'] = info[3]
 
         for ind_A in range(dimer_index_A, nfragments):
             monomer_a = molecule.get_sub_molecule(start_indices[ind_A],
