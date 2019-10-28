@@ -896,7 +896,8 @@ class ExcitonModelDriver:
                                     valstr += '  {:20.12f}'.format(coupling)
                                     self.ostream.print_header(valstr.ljust(92))
 
-                        self.ostream.print_blank()
+                        if self.ct_nocc * self.ct_nvir > 0:
+                            self.ostream.print_blank()
 
                 valstr = '*** Time used in dimer calculation:'
                 valstr += ' {:.2f} sec'.format(tm.time() - dimer_start_time)
