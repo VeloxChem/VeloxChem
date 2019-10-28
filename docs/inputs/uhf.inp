@@ -1,5 +1,5 @@
 @jobs
-task: hf
+task: scf
 @end
 
 @method settings

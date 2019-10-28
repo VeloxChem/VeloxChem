@@ -42,6 +42,8 @@ links:
 	ln -sf ../../mocks/veloxchemlib.py $(VLX_SOURCE)/veloxchem
 
 log:
+	mkdir -p api
+	touch api/log.rst
 	echo "Change log\n==========\n::\n" > api/log.rst
 
 	git log --date=short --pretty=format:'    %h %cd %s' >> api/log.rst
