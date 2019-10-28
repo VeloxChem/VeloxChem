@@ -335,8 +335,8 @@ class ScfDriver:
 
         if self.pe:
             from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, ao_basis, self.comm, self.potfile)
-            self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
+            self.pe_drv = PolEmbed(molecule, ao_basis, self.comm, self.potfile)
+            self.V_es = self.pe_drv.compute_multipole_potential_integrals()
 
             pot_info = "Reading polarizable embedding potential: {}".format(
                 self.potfile)
@@ -496,22 +496,30 @@ class ScfDriver:
         if self.dft and not self.first_step:
             self.update_fock_type(fock_mat)
 
-        if self.rank == mpi_master():
-            self.print_scf_title()
-
-        self.split_comm_ratio = None
-
         if self.use_split_comm:
             self.use_split_comm = ((self.dft or self.pe) and self.nodes >= 8)
 
-        if not self.use_split_comm:
+        if self.use_split_comm and not self.first_step:
+            qq_data = None
+            if not self.first_step:
+                valstr = 'ERI'
+                if self.dft:
+                    valstr += '/DFT'
+                if self.pe:
+                    valstr += '/PE'
+                self.ostream.print_info(
+                    'Using sub-communicators for {}.'.format(valstr))
+        else:
             eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
             qq_data = eri_drv.compute(get_qq_scheme(self.qq_type),
                                       self.eri_thresh, molecule, ao_basis)
-        else:
-            qq_data = None
+
+        self.split_comm_ratio = None
 
         e_grad = None
+
+        if self.rank == mpi_master():
+            self.print_scf_title()
 
         for i in self.get_scf_range():
 
@@ -598,10 +606,9 @@ class ScfDriver:
         if self.rank == mpi_master():
             self.print_scf_finish(start_time)
 
-        if self.rank == mpi_master():
-            if not self.first_step:
-                assert_msg_critical(self.is_converged,
-                                    'ScfDriver.compute: failed to converge')
+        if self.rank == mpi_master() and not self.first_step:
+            assert_msg_critical(self.is_converged,
+                                'ScfDriver.compute: failed to converge')
 
     def comp_one_ints(self, molecule, basis):
         """
@@ -744,7 +751,7 @@ class ScfDriver:
             The AO Kohn-Sham (Vxc) matrix.
         """
 
-        if self.use_split_comm:
+        if self.use_split_comm and not self.first_step:
             vxc_mat, e_pe, V_pe = self.comp_2e_fock_split_comm(
                 fock_mat, den_mat, molecule, basis, screening, e_grad)
 
@@ -813,12 +820,10 @@ class ScfDriver:
             pe_t0 = tm.time()
 
         if self.pe and not self.first_step:
-            from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
-            pe_drv.V_es = self.V_es.copy()
+            self.pe_drv.V_es = self.V_es.copy()
             dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
-            e_pe, V_pe = pe_drv.get_pe_contribution(dm)
-            self.pe_summary = pe_drv.cppe_state.summary_string
+            e_pe, V_pe = self.pe_drv.get_pe_contribution(dm)
+            self.pe_summary = self.pe_drv.cppe_state.summary_string
         else:
             e_pe, V_pe = 0.0, None
 
@@ -855,13 +860,14 @@ class ScfDriver:
         """
 
         if self.split_comm_ratio is None:
-            self.split_comm_ratio = [0.5, 0.25, 0.25]
-            if not self.dft:
-                self.split_comm_ratio[0] += self.split_comm_ratio[1]
-                self.split_comm_ratio[1] = 0.0
-            if not (self.pe and not self.first_step):
-                self.split_comm_ratio[0] += self.split_comm_ratio[2]
-                self.split_comm_ratio[2] = 0.0
+            if self.dft and self.pe:
+                self.split_comm_ratio = [0.34, 0.33, 0.33]
+            elif self.dft:
+                self.split_comm_ratio = [0.5, 0.5, 0.0]
+            elif self.pe:
+                self.split_comm_ratio = [0.5, 0.0, 0.5]
+            else:
+                self.split_comm_ratio = [1.0, 0.0, 0.0]
 
         if self.dft:
             dft_nodes = int(float(self.nodes) * self.split_comm_ratio[1] + 0.5)
@@ -869,7 +875,7 @@ class ScfDriver:
         else:
             dft_nodes = 0
 
-        if self.pe and not self.first_step:
+        if self.pe:
             pe_nodes = int(float(self.nodes) * self.split_comm_ratio[2] + 0.5)
             pe_nodes = max(1, pe_nodes)
         else:
@@ -877,9 +883,9 @@ class ScfDriver:
 
         eri_nodes = max(1, self.nodes - dft_nodes - pe_nodes)
 
-        if eri_nodes >= dft_nodes and eri_nodes >= pe_nodes:
+        if eri_nodes == max(eri_nodes, dft_nodes, pe_nodes):
             eri_nodes = self.nodes - dft_nodes - pe_nodes
-        elif dft_nodes >= eri_nodes and dft_nodes >= pe_nodes:
+        elif dft_nodes == max(eri_nodes, dft_nodes, pe_nodes):
             dft_nodes = self.nodes - eri_nodes - pe_nodes
         else:
             pe_nodes = self.nodes - eri_nodes - dft_nodes
@@ -900,13 +906,14 @@ class ScfDriver:
         if self.dft:
             if local_comm.Get_rank() == mpi_master():
                 self.molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
-        if self.pe and not self.first_step:
+        if self.pe:
             if local_comm.Get_rank() == mpi_master():
                 self.V_es = cross_comm.bcast(self.V_es, root=mpi_master())
 
+        t0 = tm.time()
+
         # calculate Fock on ERI nodes
         if eri_comm:
-            t0 = tm.time()
             eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
             local_screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                               self.eri_thresh, molecule, basis)
@@ -917,11 +924,9 @@ class ScfDriver:
                                 local_comm)
             if self.dft and (not self.xcfun.is_hybrid()):
                 fock_mat.scale(2.0, 0)
-            dt = tm.time() - t0
 
         # calculate Vxc on DFT nodes
         if dft_comm:
-            t0 = tm.time()
             xc_drv = XCIntegrator(local_comm)
             self.molgrid.distribute(local_comm.Get_rank(),
                                     local_comm.Get_size(), local_comm)
@@ -929,23 +934,22 @@ class ScfDriver:
                                        self.xcfun.get_func_label())
             vxc_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
                                local_comm)
-            dt = tm.time() - t0
         else:
             vxc_mat = AOKohnShamMatrix()
 
         # calculate e_pe and V_pe on PE nodes
         if pe_comm:
             from .polembed import PolEmbed
-            t0 = tm.time()
-            pe_drv = PolEmbed(molecule, basis, local_comm, self.potfile)
-            pe_drv.V_es = self.V_es.copy()
+            self.pe_drv = PolEmbed(molecule, basis, local_comm, self.potfile)
+            self.pe_drv.V_es = self.V_es.copy()
             dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
-            e_pe, V_pe = pe_drv.get_pe_contribution(dm)
-            self.pe_summary = pe_drv.cppe_state.summary_string
-            dt = tm.time() - t0
+            e_pe, V_pe = self.pe_drv.get_pe_contribution(dm)
+            self.pe_summary = self.pe_drv.cppe_state.summary_string
         else:
             e_pe, V_pe = 0.0, None
             self.pe_summary = ''
+
+        dt = tm.time() - t0
 
         # collect Vxc to master node
         if self.dft:
@@ -954,7 +958,7 @@ class ScfDriver:
                                 cross_comm, 1)
 
         # collect PE results to master node
-        if self.pe and not self.first_step:
+        if self.pe:
             pe_root = 2 if self.dft else 1
             if local_comm.Get_rank() == mpi_master():
                 e_pe = cross_comm.bcast(e_pe, root=pe_root)
@@ -962,11 +966,18 @@ class ScfDriver:
                 self.pe_summary = cross_comm.bcast(self.pe_summary,
                                                    root=pe_root)
 
-        dt = self.comm.gather(dt, root=mpi_master())
+        if local_comm.Get_rank() == mpi_master():
+            dt = cross_comm.gather(dt, root=mpi_master())
+
         if self.rank == mpi_master():
-            time_eri = sum(dt[:eri_nodes])
-            time_dft = sum(dt[eri_nodes:eri_nodes + dft_nodes])
-            time_pe = sum(dt[eri_nodes + dft_nodes:])
+            time_eri = dt[0] * eri_nodes
+            time_dft = 0.0
+            if self.dft:
+                time_dft = dt[1] * dft_nodes
+            time_pe = 0.0
+            if self.pe:
+                pe_root = 2 if self.dft else 1
+                time_pe = dt[pe_root] * pe_nodes
             time_sum = time_eri + time_dft + time_pe
             self.split_comm_ratio = [
                 time_eri / time_sum,
@@ -1350,7 +1361,7 @@ class ScfDriver:
         """
 
         if self.first_step:
-            valstr = "...done. SCF energy: "
+            valstr = "...done. SCF energy in reduced basis set: "
             valstr += "{:.12f}".format(self.old_energy)
             valstr += " au. Time: "
             valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
