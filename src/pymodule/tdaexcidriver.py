@@ -332,11 +332,20 @@ class TDAExciDriver:
                 trial_vecs = self.convert_to_trial_vectors(
                     mol_orbs, molecule, zvecs)
 
+            # check convergence
+
+            self.check_convergence(i)
+
+            # write checkpoint file
+
+            if self.rank == mpi_master():
+
                 if i >= n_restart_iterations:
                     trials = self.solver.trial_matrices
                     sigmas = self.solver.sigma_matrices
 
-                    if tm.time() - self.checkpoint_time > 900.0:
+                    if (tm.time() - self.checkpoint_time > 900.0 or
+                            self.is_converged):
                         write_rsp_hdf5(self.checkpoint_file, [trials, sigmas],
                                        ['TDA_trials', 'TDA_sigmas'],
                                        molecule.nuclear_repulsion_energy(),
@@ -345,9 +354,7 @@ class TDAExciDriver:
                                        potfile_text, self.ostream)
                         self.checkpoint_time = tm.time()
 
-            # check convergence
-
-            self.check_convergence(i)
+            # finish TDA after convergence
 
             if self.is_converged:
                 break
