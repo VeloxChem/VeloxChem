@@ -37,8 +37,6 @@ class TDAExciDriver:
 
     :param nstates:
         The number of excited states determined by driver.
-    :param triplet:
-        The triplet excited states flag.
     :param eri_thresh:
         The electron repulsion integrals screening threshold.
     :param qq_type:
@@ -93,7 +91,6 @@ class TDAExciDriver:
 
         # excited states information
         self.nstates = 3
-        self.triplet = False
 
         # ERI settings
         self.eri_thresh = 1.0e-15
@@ -143,8 +140,6 @@ class TDAExciDriver:
 
         if 'nstates' in rsp_dict:
             self.nstates = int(rsp_dict['nstates'])
-        if 'spin' in rsp_dict:
-            self.triplet = (rsp_dict['spin'][0].upper() == 'T')
 
         if 'eri_thresh' in rsp_dict:
             self.eri_thresh = float(rsp_dict['eri_thresh'])
@@ -578,8 +573,6 @@ class TDAExciDriver:
         sigma_vecs = []
         for fockind in range(fock.number_of_fock_matrices()):
             # 2e contribution
-            #prefactor = -1.0 if self.triplet else 1.0
-            #mat = prefactor * fock.to_numpy(fockind)
             mat = fock.to_numpy(fockind)
             mat = np.matmul(mo_occ.T, np.matmul(mat, mo_vir))
             # 1e contribution
@@ -687,9 +680,6 @@ class TDAExciDriver:
             trans_dipole = np.array(
                 [np.vdot(trans_dens, dipole_ints[d]) for d in range(3)])
 
-            # if self.triplet:
-            #     trans_dipole = np.zeros(3)
-
             transition_dipoles.append(trans_dipole)
 
         return transition_dipoles
@@ -724,9 +714,6 @@ class TDAExciDriver:
             trans_dipole = -1.0 / eigvals[s] * np.array(
                 [np.vdot(trans_dens, linmom_ints[d]) for d in range(3)])
 
-            # if self.triplet:
-            #     trans_dipole = np.zeros(3)
-
             transition_dipoles.append(trans_dipole)
 
         return transition_dipoles
@@ -757,9 +744,6 @@ class TDAExciDriver:
 
             trans_dipole = 0.5 * np.array(
                 [np.vdot(trans_dens, angmom_ints[d]) for d in range(3)])
-
-            # if self.triplet:
-            #     trans_dipole = np.zeros(3)
 
             transition_dipoles.append(trans_dipole)
 

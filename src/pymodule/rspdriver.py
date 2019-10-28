@@ -32,7 +32,6 @@ class ResponseDriver:
         # default calculation type
         self.prop_type = 'generic'
         self.tamm_dancoff = False
-        self.triplet = False
         self.rsp_dict = {}
         self.method_dict = {}
 
@@ -63,10 +62,6 @@ class ResponseDriver:
         if 'tamm_dancoff' in rsp_dict:
             key = rsp_dict['tamm_dancoff'].lower()
             self.tamm_dancoff = True if key in ['yes', 'y'] else False
-
-        # if 'spin' in rsp_dict:
-        #     key = rsp_dict['spin'].lower()
-        #     self.triplet = True if key[0] == 't' else False
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -135,10 +130,7 @@ class ResponseDriver:
             return 'Polarizability'
 
         if self.prop_type == 'absorption':
-            if not self.triplet:
-                return 'Singlet Excited States'
-            else:
-                return 'Triplet Excited States'
+            return 'Singlet Excited States'
 
         if self.prop_type == 'linear absorption cross-section':
             return 'Linear Absorption Cross-Section'

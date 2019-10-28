@@ -36,8 +36,6 @@ class Absorption(ResponseProperty):
             rsp_dict['nstates'] = '3'
         if 'tamm_dancoff' not in rsp_dict:
             rsp_dict['tamm_dancoff'] = 'no'
-        if 'spin' not in rsp_dict:
-            rsp_dict['spin'] = 'singlet'
 
         super().__init__(rsp_dict, method_dict)
 
@@ -62,7 +60,7 @@ class Absorption(ResponseProperty):
             The output stream.
         """
 
-        spin_str = 'T' if self.rsp_dict['spin'][0].upper() == 'T' else 'S'
+        spin_str = 'S'
 
         self.print_transition_dipoles(
             ostream, spin_str,
