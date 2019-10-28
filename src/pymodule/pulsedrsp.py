@@ -267,17 +267,17 @@ class PulsedResponse:
 
     def write_ascii(self, fname):
         """
-        Writes the Pulsed response vectors to the specified
-        output file in ASCII format.
+        Writes the Pulsed response vectors to the specified output file in
+        ASCII format.
 
         :param fname:
             Name of the checkpoint file.
 
         :return:
-            The ASCII file saved contains the the amplitudes for all frequencies
-            for each of the following directions
+            The ASCII file saved contains the the amplitudes for all
+            frequencies for each of the following directions:
                 - 'xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'
-                   =>  Amplitudes for all directions
+                    =>  Amplitudes for all directions
         """
 
         if not fname:
@@ -311,16 +311,17 @@ class PulsedResponse:
 
         :return:
             The h5 file saved contains the following datasets:
-                - amplitudes  : The pulse amplitudes for the calculated
-                                truncated_freqs
-                - zero_padded : Is the dataset zero padded or not
+                - amplitudes
+                    The pulse amplitudes for the calculated truncated_freqs
+                - zero_padded
+                    Is the dataset zero padded or not
                 - 'xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'
-                   =>  Amplitudes for all directions
-                - zero_padded_freqs       : The zero padded frequency list
-                - zero_padded_amplitudes  : The pulse amplitudes for the
-                                            calculated frequencies zero
-                                            padded to match th
-                                            zero padded frequencies.
+                    =>  Amplitudes for all directions
+                - zero_padded_freqs
+                    The zero padded frequency list
+                - zero_padded_amplitudes
+                    The pulse amplitudes for the calculated frequencies zero
+                    padded to match th zero padded frequencies.
         """
 
         if not fname:
