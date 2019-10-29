@@ -51,14 +51,8 @@ class ComplexResponse:
         The accuracy level of DFT grid.
     :param xcfun:
         The XC functional.
-    :param molgrid:
-        The molecular grid.
-    :param gs_density:
-        The ground state density matrix.
     :param pe:
         The flag for running polarizable embedding calculation.
-    :param V_es:
-        The polarizable embedding matrix.
     :param potfile:
         The name of the potential file for polarizable embedding.
     :param max_iter:
@@ -117,12 +111,11 @@ class ComplexResponse:
         self.dft = False
         self.grid_level = 4
         self.xcfun = XCFunctional()
-        self.molgrid = MolecularGrid()
-        self.gs_density = AODensityMatrix()
 
         self.pe = False
-        self.V_es = None
         self.potfile = None
+
+        self.use_split_comm = False
 
         self.max_iter = 150
         self.conv_thresh = 1.0e-4
@@ -214,6 +207,10 @@ class ComplexResponse:
             if 'pe' not in method_dict:
                 self.pe = True
             self.potfile = method_dict['potfile']
+
+        if 'use_split_comm' in method_dict:
+            key = method_dict['use_split_comm'].lower()
+            self.use_split_comm = True if key == 'yes' else False
 
     def decomp_trials(self, vecs):
         """
@@ -535,47 +532,6 @@ class ComplexResponse:
         self.start_time = tm.time()
         self.checkpoint_time = self.start_time
 
-        # generate integration grid
-        if self.dft:
-            grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(self.grid_level)
-
-            grid_t0 = tm.time()
-            self.molgrid = grid_drv.generate(molecule)
-            n_grid_points = self.molgrid.number_of_points()
-            self.ostream.print_info(
-                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
-                format(n_grid_points,
-                       tm.time() - grid_t0))
-            self.ostream.print_blank()
-
-            if self.rank == mpi_master():
-                self.gs_density = AODensityMatrix([scf_tensors['D'][0]],
-                                                  denmat.rest)
-            self.gs_density.broadcast(self.rank, self.comm)
-
-        if self.dft:
-            dft_func_label = self.xcfun.get_func_label().upper()
-        else:
-            dft_func_label = 'HF'
-
-        if self.pe:
-            with open(self.potfile, 'r') as f_pot:
-                potfile_text = os.linesep.join(f_pot.readlines())
-        else:
-            potfile_text = ''
-
-        # set up polarizable embedding
-        if self.pe:
-            from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
-            self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
-
-            pot_info = "Reading polarizable embedding potential: {}".format(
-                self.potfile)
-            self.ostream.print_info(pot_info)
-            self.ostream.print_blank()
-
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
@@ -583,11 +539,73 @@ class ComplexResponse:
             nalpha == nbeta,
             'ComplexResponseSolver: not implemented for unrestricted case')
 
-        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                    self.eri_thresh, molecule, basis)
+        # generate integration grid
+        if self.dft:
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(self.grid_level)
 
-        e2x_drv = LinearResponseMatrixVectorDriver(self.comm, self.qq_type)
+            grid_t0 = tm.time()
+            molgrid = grid_drv.generate(molecule)
+            n_grid_points = molgrid.number_of_points()
+            self.ostream.print_info(
+                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
+                format(n_grid_points,
+                       tm.time() - grid_t0))
+            self.ostream.print_blank()
+
+            if self.rank == mpi_master():
+                gs_density = AODensityMatrix([scf_tensors['D'][0]], denmat.rest)
+            else:
+                gs_density = AODensityMatrix()
+            gs_density.broadcast(self.rank, self.comm)
+
+            dft_func_label = self.xcfun.get_func_label().upper()
+        else:
+            molgrid = MolecularGrid()
+            gs_density = AODensityMatrix()
+            dft_func_label = 'HF'
+
+        # set up polarizable embedding
+        if self.pe:
+            from .polembed import PolEmbed
+            pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
+            V_es = pe_drv.compute_multipole_potential_integrals()
+
+            pot_info = "Reading polarizable embedding potential: {}".format(
+                self.potfile)
+            self.ostream.print_info(pot_info)
+            self.ostream.print_blank()
+
+            with open(self.potfile, 'r') as f_pot:
+                potfile_text = os.linesep.join(f_pot.readlines())
+        else:
+            pe_drv = None
+            V_es = None
+            potfile_text = ''
+
+        # generate screening for ERI
+
+        if self.use_split_comm:
+            self.use_split_comm = ((self.dft or self.pe) and self.nodes >= 8)
+
+        if self.use_split_comm:
+            screening = None
+            valstr = 'ERI'
+            if self.dft:
+                valstr += '/DFT'
+            if self.pe:
+                valstr += '/PE'
+            self.ostream.print_info(
+                'Using sub-communicators for {}.'.format(valstr))
+            self.ostream.print_blank()
+        else:
+            eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+            screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                        self.eri_thresh, molecule, basis)
+
+        e2x_drv = LinearResponseMatrixVectorDriver(self.comm, self.qq_type,
+                                                   self.eri_thresh,
+                                                   self.use_split_comm)
 
         if self.rank == mpi_master():
             nocc = molecule.number_of_alpha_electrons()
@@ -666,9 +684,8 @@ class ComplexResponse:
             e2bger, e2bung = e2x_drv.e2n_half_size(bger, bung, scf_tensors,
                                                    screening, molecule, basis,
                                                    self.dft, self.xcfun,
-                                                   self.molgrid,
-                                                   self.gs_density, self.pe,
-                                                   self.V_es, self.potfile)
+                                                   molgrid, gs_density, self.pe,
+                                                   self.potfile, V_es, pe_drv)
 
         solutions = {}
         residuals = {}
@@ -849,7 +866,8 @@ class ComplexResponse:
                 self.ostream.print_info(
                     '{:d} gerade trial vectors in reduced space'.format(n_ger))
                 self.ostream.print_info(
-                    '{:d} ungerade trial vectors in reduced space'.format(n_ung))
+                    '{:d} ungerade trial vectors in reduced space'.format(
+                        n_ung))
                 self.ostream.print_blank()
 
                 self.print_iteration(relative_residual_norm, nvs)
@@ -898,8 +916,8 @@ class ComplexResponse:
 
             new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
-                molecule, basis, self.dft, self.xcfun, self.molgrid,
-                self.gs_density, self.pe, self.V_es, self.potfile)
+                molecule, basis, self.dft, self.xcfun, molgrid, gs_density,
+                self.pe, self.potfile, V_es, pe_drv)
 
             if self.rank == mpi_master():
 

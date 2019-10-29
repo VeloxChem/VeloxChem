@@ -35,14 +35,24 @@ class LinearResponseMatrixVectorDriver:
         Number of MPI processes.
     :param qq_type:
         The electron repulsion integrals screening scheme.
+    :param eri_thresh:
+        The electron repulsion integrals screening threshold.
     """
 
-    def __init__(self, comm, qq_type='QQ_DEN'):
+    def __init__(self,
+                 comm,
+                 qq_type='QQ_DEN',
+                 eri_thresh=1.0e-15,
+                 use_split_comm=False):
         """
         Initializes linear response matrix vector driver to default setup.
 
         :param comm:
             The MPI communicator.
+        :param qq_type:
+            The electron repulsion integrals screening scheme.
+        :param eri_thresh:
+            The electron repulsion integrals screening threshold.
         """
 
         # mpi information
@@ -51,7 +61,9 @@ class LinearResponseMatrixVectorDriver:
         self.nodes = self.comm.Get_size()
 
         self.qq_type = qq_type
+        self.eri_thresh = eri_thresh
 
+        self.use_split_comm = use_split_comm
         self.split_comm_ratio = None
 
     def e2n_half_size(self,
@@ -66,8 +78,9 @@ class LinearResponseMatrixVectorDriver:
                       molgrid=None,
                       gs_density=None,
                       pe=False,
-                      V_es=None,
                       potfile=None,
+                      V_es=None,
+                      pe_drv=None,
                       timing_dict=None):
         """
         Computes the E2 b matrix vector product.
@@ -94,10 +107,12 @@ class LinearResponseMatrixVectorDriver:
             The ground state density matrix.
         :param pe:
             The flag for running polarizable embedding calculation.
-        :param V_es:
-            The polarizable embedding matrix.
         :param potfile:
             The name of the potential file for polarizable embedding.
+        :param V_es:
+            The polarizable embedding matrix.
+        :param pe_drv:
+            The polarizable embedding driver.
 
         :return:
             The gerade and ungerade E2 b matrix vector product in half-size.
@@ -148,7 +163,8 @@ class LinearResponseMatrixVectorDriver:
         fock = AOFockMatrix(dens)
 
         self.comp_lr_fock(fock, dens, molecule, basis, screening, dft, xcfun,
-                          molgrid, gs_density, pe, V_es, potfile, timing_dict)
+                          molgrid, gs_density, pe, potfile, V_es, pe_drv,
+                          timing_dict)
 
         if self.rank == mpi_master():
             if vecs_ger is not None:
@@ -191,8 +207,9 @@ class LinearResponseMatrixVectorDriver:
                      molgrid,
                      gs_density,
                      pe,
-                     V_es,
                      potfile,
+                     V_es,
+                     pe_drv,
                      timing_dict=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
@@ -217,10 +234,12 @@ class LinearResponseMatrixVectorDriver:
             The ground state density matrix.
         :param pe:
             The flag for running polarizable embedding calculation.
-        :param V_es:
-            The polarizable embedding matrix.
         :param potfile:
             The name of the potential file for polarizable embedding.
+        :param V_es:
+            The polarizable embedding matrix.
+        :param pe_drv:
+            The polarizable embedding driver.
         """
 
         # set flags for Fock matrices
@@ -239,10 +258,10 @@ class LinearResponseMatrixVectorDriver:
 
         # calculate Fock on subcommunicators
 
-        if (dft or pe) and self.nodes >= 9999:
+        if self.use_split_comm:
             self.comp_lr_fock_split_comm(fock, dens, molecule, basis, screening,
                                          dft, xcfun, molgrid, gs_density, pe,
-                                         V_es, potfile)
+                                         potfile, V_es, pe_drv)
 
         else:
             t0 = tm.time()
@@ -264,9 +283,7 @@ class LinearResponseMatrixVectorDriver:
                     timing_dict['DFT'] = tm.time() - t0
 
             if pe:
-                from .polembed import PolEmbed
                 t0 = tm.time()
-                pe_drv = PolEmbed(molecule, basis, self.comm, potfile)
                 pe_drv.V_es = V_es.copy()
                 for ifock in range(fock.number_of_fock_matrices()):
                     dm = dens.alpha_to_numpy(ifock) + dens.beta_to_numpy(ifock)
@@ -279,8 +296,8 @@ class LinearResponseMatrixVectorDriver:
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
     def comp_lr_fock_split_comm(self, fock, dens, molecule, basis, screening,
-                                dft, xcfun, molgrid, gs_density, pe, V_es,
-                                potfile):
+                                dft, xcfun, molgrid, gs_density, pe, potfile,
+                                V_es, pe_drv):
         """
         Computes linear response Fock/Fxc matrix on split communicators.
 
@@ -304,18 +321,23 @@ class LinearResponseMatrixVectorDriver:
             The ground state density matrix.
         :param pe:
             The flag for running polarizable embedding calculation.
-        :param V_es:
-            The polarizable embedding matrix.
         :param potfile:
             The name of the potential file for polarizable embedding.
+        :param V_es:
+            The polarizable embedding matrix.
+        :param pe_drv:
+            The polarizable embedding driver.
         """
 
         if self.split_comm_ratio is None:
-            self.split_comm_ratio = [0.5, 0.25, 0.25]
-            if not dft:
-                self.split_comm_ratio = [0.5, 0.0, 0.5]
-            if not pe:
+            if dft and pe:
+                self.split_comm_ratio = [0.34, 0.33, 0.33]
+            elif dft:
                 self.split_comm_ratio = [0.5, 0.5, 0.0]
+            elif pe:
+                self.split_comm_ratio = [0.5, 0.0, 0.5]
+            else:
+                self.split_comm_ratio = [1.0, 0.0, 0.0]
 
         if dft:
             dft_nodes = int(float(self.nodes) * self.split_comm_ratio[1] + 0.5)
@@ -331,9 +353,9 @@ class LinearResponseMatrixVectorDriver:
 
         eri_nodes = max(1, self.nodes - dft_nodes - pe_nodes)
 
-        if eri_nodes >= dft_nodes and eri_nodes >= pe_nodes:
+        if eri_nodes == max(eri_nodes, dft_nodes, pe_nodes):
             eri_nodes = self.nodes - dft_nodes - pe_nodes
-        elif dft_nodes >= eri_nodes and dft_nodes >= pe_nodes:
+        elif dft_nodes == max(eri_nodes, dft_nodes, pe_nodes):
             dft_nodes = self.nodes - eri_nodes - pe_nodes
         else:
             pe_nodes = self.nodes - eri_nodes - dft_nodes
@@ -343,22 +365,16 @@ class LinearResponseMatrixVectorDriver:
         dft_comm = (node_grps[self.rank] == 1)
         pe_comm = (node_grps[self.rank] == 2)
 
+        if self.rank == mpi_master():
+            print()
+            print('Nodes: {} {} {}'.format(eri_nodes, dft_nodes, pe_nodes))
+            print('Node num: {}'.format(self.nodes))
+            print('Node group: {}'.format(str(node_grps)))
+            print()
+
         subcomms = SubCommunicators(self.comm, node_grps)
         local_comm = subcomms.local_comm
         cross_comm = subcomms.cross_comm
-
-        # calculate Fock on ERI nodes
-        if eri_comm:
-            t0 = tm.time()
-            eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
-            local_screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                              self.eri_thresh, molecule, basis)
-            eri_drv.compute(fock, dens, molecule, basis, local_screening)
-            if dft:
-                if not xcfun.is_hybrid():
-                    for ifock in range(fock.number_of_fock_matrices()):
-                        fock.scale(2.0, ifock)
-            dt = tm.time() - t0
 
         # reset molecular grid for DFT and V_es for PE
         if self.rank != mpi_master():
@@ -371,20 +387,29 @@ class LinearResponseMatrixVectorDriver:
             if local_comm.Get_rank() == mpi_master():
                 V_es = cross_comm.bcast(V_es, root=mpi_master())
 
+        t0 = tm.time()
+
+        # calculate Fock on ERI nodes
+        if eri_comm:
+            eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
+            local_screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                              self.eri_thresh, molecule, basis)
+            eri_drv.compute(fock, dens, molecule, basis, local_screening)
+            if dft and not xcfun.is_hybrid():
+                for ifock in range(fock.number_of_fock_matrices()):
+                    fock.scale(2.0, ifock)
+
         # calculate Fxc on DFT nodes
         if dft_comm:
-            t0 = tm.time()
             xc_drv = XCIntegrator(local_comm)
             molgrid.distribute(local_comm.Get_rank(), local_comm.Get_size(),
                                local_comm)
             xc_drv.integrate(fock, dens, gs_density, molecule, basis, molgrid,
                              xcfun.get_func_label())
-            dt = tm.time() - t0
 
         # calculate e_pe and V_pe on PE nodes
         if pe_comm:
             from .polembed import PolEmbed
-            t0 = tm.time()
             pe_drv = PolEmbed(molecule, basis, local_comm, potfile)
             pe_drv.V_es = V_es.copy()
             for ifock in range(fock.number_of_fock_matrices()):
@@ -392,16 +417,24 @@ class LinearResponseMatrixVectorDriver:
                 e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
                 if local_comm.Get_rank() == mpi_master():
                     fock.add_matrix(DenseMatrix(V_pe), ifock)
-            dt = tm.time() - t0
+
+        dt = tm.time() - t0
 
         # collect Fock on master node
         fock.reduce_sum(self.rank, self.nodes, self.comm)
 
-        dt = self.comm.gather(dt, root=mpi_master())
+        if local_comm.Get_rank() == mpi_master():
+            dt = cross_comm.gather(dt, root=mpi_master())
+
         if self.rank == mpi_master():
-            time_eri = sum(dt[:eri_nodes])
-            time_dft = sum(dt[eri_nodes:eri_nodes + dft_nodes])
-            time_pe = sum(dt[eri_nodes + dft_nodes:])
+            time_eri = dt[0] * eri_nodes
+            time_dft = 0.0
+            if dft:
+                time_dft = dt[1] * dft_nodes
+            time_pe = 0.0
+            if pe:
+                pe_root = 2 if dft else 1
+                time_pe = dt[pe_root] * pe_nodes
             time_sum = time_eri + time_dft + time_pe
             self.split_comm_ratio = [
                 time_eri / time_sum,

@@ -43,14 +43,8 @@ class LinearResponseEigenSolver:
         The accuracy level of DFT grid.
     :param xcfun:
         The XC functional.
-    :param molgrid:
-        The molecular grid.
-    :param gs_density:
-        The ground state density matrix.
     :param pe:
         The flag for running polarizable embedding calculation.
-    :param V_es:
-        The polarizable embedding matrix.
     :param potfile:
         The name of the potential file for polarizable embedding.
     :param conv_thresh:
@@ -106,13 +100,12 @@ class LinearResponseEigenSolver:
         self.dft = False
         self.grid_level = 4
         self.xcfun = XCFunctional()
-        self.molgrid = MolecularGrid()
-        self.gs_density = AODensityMatrix()
 
         # polarizable embedding
         self.pe = False
-        self.V_es = None
         self.potfile = None
+
+        self.use_split_comm = False
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -197,6 +190,10 @@ class LinearResponseEigenSolver:
                 self.pe = True
             self.potfile = method_dict['potfile']
 
+        if 'use_split_comm' in method_dict:
+            key = method_dict['use_split_comm'].lower()
+            self.use_split_comm = True if key == 'yes' else False
+
     def compute(self, molecule, basis, scf_tensors):
         """
         Performs linear response calculation for a molecule and a basis set.
@@ -257,8 +254,8 @@ class LinearResponseEigenSolver:
             grid_drv.set_level(self.grid_level)
 
             grid_t0 = tm.time()
-            self.molgrid = grid_drv.generate(molecule)
-            n_grid_points = self.molgrid.number_of_points()
+            molgrid = grid_drv.generate(molecule)
+            n_grid_points = molgrid.number_of_points()
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
                 format(n_grid_points,
@@ -266,37 +263,58 @@ class LinearResponseEigenSolver:
             self.ostream.print_blank()
 
             if self.rank == mpi_master():
-                self.gs_density = AODensityMatrix([scf_tensors['D'][0]],
-                                                  denmat.rest)
-            self.gs_density.broadcast(self.rank, self.comm)
+                gs_density = AODensityMatrix([scf_tensors['D'][0]], denmat.rest)
+            else:
+                gs_density = AODensityMatrix()
+            gs_density.broadcast(self.rank, self.comm)
 
-        if self.dft:
             dft_func_label = self.xcfun.get_func_label().upper()
         else:
+            molgrid = MolecularGrid()
+            gs_density = AODensityMatrix()
             dft_func_label = 'HF'
-
-        if self.pe:
-            with open(self.potfile, 'r') as f_pot:
-                potfile_text = os.linesep.join(f_pot.readlines())
-        else:
-            potfile_text = ''
 
         # set up polarizable embedding
         if self.pe:
             from .polembed import PolEmbed
             pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
-            self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
+            V_es = pe_drv.compute_multipole_potential_integrals()
 
             pot_info = "Reading polarizable embedding potential: {}".format(
                 self.potfile)
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
 
-        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                    self.eri_thresh, molecule, basis)
+            with open(self.potfile, 'r') as f_pot:
+                potfile_text = os.linesep.join(f_pot.readlines())
+        else:
+            pe_drv = None
+            V_es = None
+            potfile_text = ''
 
-        e2x_drv = LinearResponseMatrixVectorDriver(self.comm, self.qq_type)
+        # generate screening for ERI
+
+        if self.use_split_comm:
+            self.use_split_comm = ((self.dft or self.pe) and self.nodes >= 8)
+
+        if self.use_split_comm:
+            screening = None
+            valstr = 'ERI'
+            if self.dft:
+                valstr += '/DFT'
+            if self.pe:
+                valstr += '/PE'
+            self.ostream.print_info(
+                'Using sub-communicators for {}.'.format(valstr))
+            self.ostream.print_blank()
+        else:
+            eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+            screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                        self.eri_thresh, molecule, basis)
+
+        e2x_drv = LinearResponseMatrixVectorDriver(self.comm, self.qq_type,
+                                                   self.eri_thresh,
+                                                   self.use_split_comm)
 
         rsp_vector_labels = [
             'LR_eigen_bger_half_size',
@@ -343,10 +361,12 @@ class LinearResponseEigenSolver:
                 if bung is None or not bung.any():
                     bung = np.zeros((bger.shape[0], 0))
 
-            e2bger, e2bung = e2x_drv.e2n_half_size(
-                bger, bung, scf_tensors, screening, molecule, basis, self.dft,
-                self.xcfun, self.molgrid, self.gs_density, self.pe, self.V_es,
-                self.potfile, self.timing_dict)
+            e2bger, e2bung = e2x_drv.e2n_half_size(bger, bung, scf_tensors,
+                                                   screening, molecule, basis,
+                                                   self.dft, self.xcfun,
+                                                   molgrid, gs_density, self.pe,
+                                                   self.potfile, V_es, pe_drv,
+                                                   self.timing_dict)
 
         excitations = [None] * self.nstates
         exresiduals = [None] * self.nstates
@@ -449,10 +469,12 @@ class LinearResponseEigenSolver:
                     ws.append(w)
 
                 # write to output
-                self.ostream.print_info('{:d} gerade trial vectors in reduced space'.format(
-                    bger.shape[1]))
-                self.ostream.print_info('{:d} ungerade trial vectors in reduced space'.format(
-                    bung.shape[1]))
+                self.ostream.print_info(
+                    '{:d} gerade trial vectors in reduced space'.format(
+                        bger.shape[1]))
+                self.ostream.print_info(
+                    '{:d} ungerade trial vectors in reduced space'.format(
+                        bung.shape[1]))
                 self.ostream.print_blank()
 
                 self.print_iteration(relative_residual_norm, converged, ws)
@@ -496,9 +518,8 @@ class LinearResponseEigenSolver:
 
             new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
-                molecule, basis, self.dft, self.xcfun, self.molgrid,
-                self.gs_density, self.pe, self.V_es, self.potfile,
-                self.timing_dict)
+                molecule, basis, self.dft, self.xcfun, molgrid, gs_density,
+                self.pe, self.potfile, V_es, pe_drv, self.timing_dict)
 
             if self.rank == mpi_master():
                 e2bger = np.append(e2bger, new_e2bger, axis=1)

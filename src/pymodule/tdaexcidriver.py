@@ -47,12 +47,8 @@ class TDAExciDriver:
         The accuracy level of DFT grid.
     :param xcfun:
         The XC functional.
-    :param molgrid:
-        The molecular grid.
     :param pe:
         The flag for running polarizable embedding calculation.
-    :param V_es:
-        The polarizable embedding matrix.
     :param potfile:
         The name of the potential file for polarizable embedding.
     :param conv_thresh:
@@ -100,11 +96,9 @@ class TDAExciDriver:
         self.dft = False
         self.grid_level = 4
         self.xcfun = XCFunctional()
-        self.molgrid = MolecularGrid()
 
         # polarizable embedding
         self.pe = False
-        self.V_es = None
         self.potfile = None
 
         # solver setup
@@ -126,6 +120,8 @@ class TDAExciDriver:
         self.restart = True
         self.checkpoint_file = None
         self.checkpoint_time = None
+
+        self.use_split_comm = False
 
     def update_settings(self, rsp_dict, method_dict={}):
         """
@@ -177,6 +173,10 @@ class TDAExciDriver:
                 self.pe = True
             self.potfile = method_dict['potfile']
 
+        if 'use_split_comm' in method_dict:
+            key = method_dict['use_split_comm'].lower()
+            self.use_split_comm = True if key == 'yes' else False
+
     def compute(self, molecule, basis, scf_tensors):
         """
         Performs TDA excited states calculation using molecular data.
@@ -209,11 +209,13 @@ class TDAExciDriver:
         start_time = tm.time()
         self.checkpoint_time = start_time
 
-        # generate screening for ERI
+        # sanity check
 
-        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                    self.eri_thresh, molecule, basis)
+        nalpha = molecule.number_of_alpha_electrons()
+        nbeta = molecule.number_of_beta_electrons()
+        assert_msg_critical(
+            nalpha == nbeta,
+            'TDAExciDriver: not implemented for unrestricted case')
 
         # generate molecular grid for DFT
 
@@ -222,40 +224,63 @@ class TDAExciDriver:
             grid_drv.set_level(self.grid_level)
 
             grid_t0 = tm.time()
-            self.molgrid = grid_drv.generate(molecule)
-            n_grid_points = self.molgrid.number_of_points()
+            molgrid = grid_drv.generate(molecule)
+            n_grid_points = molgrid.number_of_points()
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
                 format(n_grid_points,
                        tm.time() - grid_t0))
             self.ostream.print_blank()
 
-        if self.dft:
             dft_func_label = self.xcfun.get_func_label().upper()
         else:
+            molgrid = MolecularGrid()
             dft_func_label = 'HF'
-
-        if self.pe:
-            with open(self.potfile, 'r') as f_pot:
-                potfile_text = os.linesep.join(f_pot.readlines())
-        else:
-            potfile_text = ''
 
         # generate potential for polarizable embedding
 
         if self.pe:
             from .polembed import PolEmbed
             pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
-            self.V_es = pe_drv.compute_multipole_potential_integrals().copy()
+            V_es = pe_drv.compute_multipole_potential_integrals()
 
             pot_info = "Reading polarizable embedding potential: {}".format(
                 self.potfile)
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
 
+            with open(self.potfile, 'r') as f_pot:
+                potfile_text = os.linesep.join(f_pot.readlines())
+        else:
+            pe_drv = None
+            V_es = None
+            potfile_text = ''
+
+        # generate screening for ERI
+
+        if self.use_split_comm:
+            self.use_split_comm = ((self.dft or self.pe) and self.nodes >= 8)
+
+        if self.use_split_comm:
+            screening = None
+            valstr = 'ERI'
+            if self.dft:
+                valstr += '/DFT'
+            if self.pe:
+                valstr += '/PE'
+            self.ostream.print_info(
+                'Using sub-communicators for {}.'.format(valstr))
+            self.ostream.print_blank()
+        else:
+            eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+            screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                        self.eri_thresh, molecule, basis)
+
         # initialize E2X driver for response Fock build
 
-        e2x_drv = LinearResponseMatrixVectorDriver(self.comm, self.qq_type)
+        e2x_drv = LinearResponseMatrixVectorDriver(self.comm, self.qq_type,
+                                                   self.eri_thresh,
+                                                   self.use_split_comm)
 
         # set up trial excitation vectors on master node
 
@@ -299,8 +324,8 @@ class TDAExciDriver:
                     trial_vecs, scf_tensors, molecule)
 
                 e2x_drv.comp_lr_fock(fock, tdens, molecule, basis, screening,
-                                     self.dft, self.xcfun, self.molgrid, gsdens,
-                                     self.pe, self.V_es, self.potfile)
+                                     self.dft, self.xcfun, molgrid, gsdens,
+                                     self.pe, self.potfile, V_es, pe_drv)
 
             # solve eigenvalues problem on master node
 
