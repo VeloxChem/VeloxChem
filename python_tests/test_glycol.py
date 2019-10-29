@@ -10,7 +10,7 @@ from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.mpitask import MpiTask
 
 
-class TestECD(unittest.TestCase):
+class TestGlycol(unittest.TestCase):
 
     def test_glycol_ecd(self):
 

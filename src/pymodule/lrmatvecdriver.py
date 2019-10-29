@@ -365,13 +365,6 @@ class LinearResponseMatrixVectorDriver:
         dft_comm = (node_grps[self.rank] == 1)
         pe_comm = (node_grps[self.rank] == 2)
 
-        if self.rank == mpi_master():
-            print()
-            print('Nodes: {} {} {}'.format(eri_nodes, dft_nodes, pe_nodes))
-            print('Node num: {}'.format(self.nodes))
-            print('Node group: {}'.format(str(node_grps)))
-            print()
-
         subcomms = SubCommunicators(self.comm, node_grps)
         local_comm = subcomms.local_comm
         cross_comm = subcomms.cross_comm

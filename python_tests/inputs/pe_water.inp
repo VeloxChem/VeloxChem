@@ -1,11 +1,9 @@
 @jobs
-task: hf
+task: scf
 @end
 
 @method settings
-xcfun: bhandhlyp
 basis: aug-cc-pvdz
-potfile: pe_water.pot
 @end
 
 @molecule

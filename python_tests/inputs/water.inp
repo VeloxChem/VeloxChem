@@ -1,10 +1,9 @@
 @jobs
-task: hf
+task: scf
 @end
 
 @method settings
 basis: aug-cc-pvdz
-basis path: ../../basis
 @end
 
 @molecule

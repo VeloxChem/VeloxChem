@@ -1,10 +1,9 @@
 @jobs
-task: hf
+task: scf
 @end
 
 @method settings
 basis: def2-svp
-basis path: ../basis
 @end
 
 @molecule
