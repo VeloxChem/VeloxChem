@@ -250,8 +250,8 @@ class ScfDriver:
                 self.pe = True
             self.potfile = method_dict['potfile']
 
-        if 'use_split_comm' in scf_dict:
-            key = scf_dict['use_split_comm'].lower()
+        if 'use_split_comm' in method_dict:
+            key = method_dict['use_split_comm'].lower()
             self.use_split_comm = True if key == 'yes' else False
 
         if 'timing' in scf_dict:
@@ -332,7 +332,6 @@ class ScfDriver:
             self.ostream.print_blank()
 
         # set up polarizable embedding
-
         if self.pe:
             from .polembed import PolEmbed
             self.pe_drv = PolEmbed(molecule, ao_basis, self.comm, self.potfile)
