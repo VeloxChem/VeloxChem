@@ -152,6 +152,11 @@ def main():
         else:
             rsp_dict = {}
 
+        if 'eri_thresh' not in rsp_dict:
+            rsp_dict['eri_thresh'] = scf_drv.eri_thresh
+        if 'qq_type' not in rsp_dict:
+            rsp_dict['qq_type'] = scf_drv.qq_type
+
         assert_msg_critical('property' in rsp_dict,
                             'input file: response property not found')
         prop_type = rsp_dict['property'].lower()
