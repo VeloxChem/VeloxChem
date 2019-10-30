@@ -16,6 +16,7 @@
 
 #include "MemBlock.hpp"
 #include "MpiFunc.hpp"
+#include "NumaPolicy.hpp"
 
 /**
  Class CDenseMatrix stores dense matrix in coordinate format (zero-based
@@ -54,7 +55,9 @@ class CDenseMatrix
      @param nRows the number of rows in matrix.
      @param nColumns the number of columns in matrix.
      */
-    CDenseMatrix(const std::vector<double>& values, const int32_t nRows, const int32_t nColumns);
+    CDenseMatrix(const std::vector<double>& values,
+                 const int32_t              nRows,
+                 const int32_t              nColumns);
 
     /**
      Creates an empty dense matrix object with specific number of rows and
@@ -63,7 +66,20 @@ class CDenseMatrix
      @param nRows the number of rows in matrix.
      @param nColumns the number of columns in matrix.
      */
-    CDenseMatrix(const int32_t nRows, const int32_t nColumns);
+    CDenseMatrix(const int32_t nRows,
+                 const int32_t nColumns);
+    
+    /**
+     Creates an empty dense matrix object with specific number of rows and
+     columns with specific NUMA policy.
+     
+     @param nRows the number of rows in matrix.
+     @param nColumns the number of columns in matrix.
+     @param numaPolicy - the numa policy for data initialization.
+     */
+    CDenseMatrix(const int32_t nRows,
+                 const int32_t nColumns,
+                 const numa    numaPolicy);
 
     /**
      Creates an empty square dense matrix object with specific number of rows.

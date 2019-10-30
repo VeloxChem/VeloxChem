@@ -1,10 +1,10 @@
 //
-//  RecursionBlock.hpp
-//  VeloxChemMP
+//                             VELOXCHEM
+//      ---------------------------------------------------
+//                     An Electronic Structure Code
 //
-//  Created by Zilvinas Rinkevicius on 2019-05-15.
-//  Copyright © 2019 Zilvinas Rinkevicius. All rights reserved.
-//
+//  Copyright © 2019 by VeloxChem developers. All rights reserved.
+//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef RecursionBlock_hpp
 #define RecursionBlock_hpp

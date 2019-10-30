@@ -5689,8 +5689,8 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestJKForHeAtom)
 
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mhe, mbas);
 
-    CAOFockMatrix fock(dmat);
-
+    CAOFockMatrix fock({CDenseMatrix(nrows, ncols)}, {fockmat::restjk}, {1.0}, {0});
+    
     eridrv.compute(fock, dmat, mhe, mbas, qqdata);
 
     ASSERT_EQ(fock.getNumberOfRows(0), nrows);
@@ -5738,7 +5738,7 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeRestJKForHeAnionWithSPD)
     
     auto qqdata = eridrv.compute(ericut::qq, 1.0e-16, mhe, mbas);
     
-    CAOFockMatrix fock(dmat);
+    CAOFockMatrix fock({CDenseMatrix(nrows, ncols)}, {fockmat::restjk}, {1.0}, {0});
     
     eridrv.compute(fock, dmat, mhe, mbas, qqdata);
     
