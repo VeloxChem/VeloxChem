@@ -50,7 +50,7 @@ CAOFockMatrix::CAOFockMatrix(const CAODensityMatrix& aoDensityMatrix)
         
         if (dmtyp == denmat::rest)
         {
-            _fockMatrices.push_back(CDenseMatrix(nrow, ncol, numa::parallel));
+            _fockMatrices.push_back(CDenseMatrix(nrow, ncol));
             
             _fockTypes.push_back(fockmat::restjk);
             
@@ -63,7 +63,7 @@ CAOFockMatrix::CAOFockMatrix(const CAODensityMatrix& aoDensityMatrix)
         
         if (dmtyp == denmat::rmoij)
         {
-            _fockMatrices.push_back(CDenseMatrix(nrow, ncol, numa::parallel));
+            _fockMatrices.push_back(CDenseMatrix(nrow, ncol));
             
             _fockTypes.push_back(fockmat::rgenk);
             
@@ -76,7 +76,7 @@ CAOFockMatrix::CAOFockMatrix(const CAODensityMatrix& aoDensityMatrix)
         
         if (dmtyp == denmat::rgen)
         {
-            _fockMatrices.push_back(CDenseMatrix(nrow, ncol, numa::parallel));
+            _fockMatrices.push_back(CDenseMatrix(nrow, ncol));
             
             _fockTypes.push_back(fockmat::rgenjk);
             
@@ -89,9 +89,9 @@ CAOFockMatrix::CAOFockMatrix(const CAODensityMatrix& aoDensityMatrix)
         
         if (dmtyp == denmat::unrest)
         {
-            _fockMatrices.push_back(CDenseMatrix(nrow, ncol, numa::parallel));
+            _fockMatrices.push_back(CDenseMatrix(nrow, ncol));
             
-            _fockMatrices.push_back(CDenseMatrix(nrow, ncol, numa::parallel));
+            _fockMatrices.push_back(CDenseMatrix(nrow, ncol));
             
             _fockTypes.push_back(fockmat::unrestjk);
             
