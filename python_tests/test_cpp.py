@@ -24,6 +24,9 @@ class TestCPP(unittest.TestCase):
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+        #   ------------------------------------------------------------------
+        #   No    A-oper    B-oper   Frequency       Real part       Imag part
+        #   ------------------------------------------------------------------
         raw_data = """
              1   XDIPLEN   XDIPLEN    0.000000        7.251351        0.000000
              2   YDIPLEN   YDIPLEN    0.000000        8.724135       -0.000000
@@ -78,6 +81,9 @@ class TestCPP(unittest.TestCase):
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+        #   ------------------------------------------------------------------
+        #   No    A-oper    B-oper   Frequency       Real part       Imag part
+        #   ------------------------------------------------------------------
         raw_data = """
              1   XDIPLEN   XDIPLEN    0.000000        8.768177        0.000000
              2   YDIPLEN   YDIPLEN    0.000000        9.695669       -0.000000
@@ -141,6 +147,9 @@ class TestCPP(unittest.TestCase):
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+        #   ------------------------------------------------------------------
+        #   No    A-oper    B-oper   Frequency       Real part       Imag part
+        #   ------------------------------------------------------------------
         raw_data = """
              1   XDIPLEN   XDIPLEN    0.000000        8.746878        0.000000
              2   YDIPLEN   YDIPLEN    0.000000        7.609015        0.000000
@@ -205,6 +214,9 @@ class TestCPP(unittest.TestCase):
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+        #   ------------------------------------------------------------------
+        #   No    A-oper    B-oper   Frequency       Real part       Imag part
+        #   ------------------------------------------------------------------
         raw_data = """
              1   XDIPLEN   XDIPLEN    0.000000        9.714674        0.000000
              2   YDIPLEN   YDIPLEN    0.000000        9.121690       -0.000000

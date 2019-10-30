@@ -278,9 +278,11 @@ class TDAExciDriver:
 
         # initialize E2X driver for response Fock build
 
-        e2x_drv = LinearResponseMatrixVectorDriver(self.comm, self.qq_type,
-                                                   self.eri_thresh,
+        e2x_drv = LinearResponseMatrixVectorDriver(self.comm,
                                                    self.use_split_comm)
+        e2x_drv.update_settings(self.eri_thresh, self.qq_type, self.dft,
+                                self.xcfun, self.pe, self.potfile)
+        timing_dict = {}
 
         # set up trial excitation vectors on master node
 
@@ -324,8 +326,7 @@ class TDAExciDriver:
                     trial_vecs, scf_tensors, molecule)
 
                 e2x_drv.comp_lr_fock(fock, tdens, molecule, basis, screening,
-                                     self.dft, self.xcfun, molgrid, gsdens,
-                                     self.pe, self.potfile, V_es, pe_drv)
+                                     molgrid, gsdens, V_es, pe_drv, timing_dict)
 
             # solve eigenvalues problem on master node
 

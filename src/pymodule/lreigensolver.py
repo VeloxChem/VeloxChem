@@ -312,9 +312,11 @@ class LinearResponseEigenSolver:
             screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                         self.eri_thresh, molecule, basis)
 
-        e2x_drv = LinearResponseMatrixVectorDriver(self.comm, self.qq_type,
-                                                   self.eri_thresh,
+        e2x_drv = LinearResponseMatrixVectorDriver(self.comm,
                                                    self.use_split_comm)
+        e2x_drv.update_settings(self.eri_thresh, self.qq_type, self.dft,
+                                self.xcfun, self.pe, self.potfile)
+        timing_dict = {}
 
         rsp_vector_labels = [
             'LR_eigen_bger_half_size',
@@ -363,10 +365,8 @@ class LinearResponseEigenSolver:
 
             e2bger, e2bung = e2x_drv.e2n_half_size(bger, bung, scf_tensors,
                                                    screening, molecule, basis,
-                                                   self.dft, self.xcfun,
-                                                   molgrid, gs_density, self.pe,
-                                                   self.potfile, V_es, pe_drv,
-                                                   self.timing_dict)
+                                                   molgrid, gs_density, V_es,
+                                                   pe_drv, timing_dict)
 
         excitations = [None] * self.nstates
         exresiduals = [None] * self.nstates
@@ -375,11 +375,11 @@ class LinearResponseEigenSolver:
 
         if self.timing:
             self.timing_dict['fock_build'][0] += tm.time() - timing_t0
-            self.timing_dict['fock_eri'][0] += self.timing_dict['ERI']
+            self.timing_dict['fock_eri'][0] += timing_dict['ERI']
             if self.dft:
-                self.timing_dict['fock_dft'][0] += self.timing_dict['DFT']
+                self.timing_dict['fock_dft'][0] += timing_dict['DFT']
             if self.pe:
-                self.timing_dict['fock_pe'][0] += self.timing_dict['PE']
+                self.timing_dict['fock_pe'][0] += timing_dict['PE']
             timing_t0 = tm.time()
 
         # start iterations
@@ -518,8 +518,8 @@ class LinearResponseEigenSolver:
 
             new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
-                molecule, basis, self.dft, self.xcfun, molgrid, gs_density,
-                self.pe, self.potfile, V_es, pe_drv, self.timing_dict)
+                molecule, basis, molgrid, gs_density, V_es, pe_drv,
+                timing_dict)
 
             if self.rank == mpi_master():
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
@@ -538,11 +538,11 @@ class LinearResponseEigenSolver:
             if self.timing:
                 tid = iteration + 1
                 self.timing_dict['fock_build'][tid] += tm.time() - timing_t0
-                self.timing_dict['fock_eri'][tid] += self.timing_dict['ERI']
+                self.timing_dict['fock_eri'][tid] += timing_dict['ERI']
                 if self.dft:
-                    self.timing_dict['fock_dft'][tid] += self.timing_dict['DFT']
+                    self.timing_dict['fock_dft'][tid] += timing_dict['DFT']
                 if self.pe:
-                    self.timing_dict['fock_pe'][tid] += self.timing_dict['PE']
+                    self.timing_dict['fock_pe'][tid] += timing_dict['PE']
                 timing_t0 = tm.time()
 
         # converged?

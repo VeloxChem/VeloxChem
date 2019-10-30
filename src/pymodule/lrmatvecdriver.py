@@ -33,26 +33,26 @@ class LinearResponseMatrixVectorDriver:
         The MPI rank.
     :param nodes:
         Number of MPI processes.
-    :param qq_type:
-        The electron repulsion integrals screening scheme.
     :param eri_thresh:
         The electron repulsion integrals screening threshold.
+    :param qq_type:
+        The electron repulsion integrals screening scheme.
+    :param dft:
+        The flag for running DFT.
+    :param xcfun:
+        The XC functional.
+    :param pe:
+        The flag for running polarizable embedding calculation.
+    :param potfile:
+        The name of the potential file for polarizable embedding.
     """
 
-    def __init__(self,
-                 comm,
-                 qq_type='QQ_DEN',
-                 eri_thresh=1.0e-15,
-                 use_split_comm=False):
+    def __init__(self, comm, use_split_comm=False):
         """
         Initializes linear response matrix vector driver to default setup.
 
         :param comm:
             The MPI communicator.
-        :param qq_type:
-            The electron repulsion integrals screening scheme.
-        :param eri_thresh:
-            The electron repulsion integrals screening threshold.
         """
 
         # mpi information
@@ -60,28 +60,43 @@ class LinearResponseMatrixVectorDriver:
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-        self.qq_type = qq_type
-        self.eri_thresh = eri_thresh
-
         self.use_split_comm = use_split_comm
         self.split_comm_ratio = None
 
-    def e2n_half_size(self,
-                      vecs_ger,
-                      vecs_ung,
-                      tensors,
-                      screening,
-                      molecule,
-                      basis,
-                      dft=False,
-                      xcfun=None,
-                      molgrid=None,
-                      gs_density=None,
-                      pe=False,
-                      potfile=None,
-                      V_es=None,
-                      pe_drv=None,
-                      timing_dict=None):
+        self.eri_thresh = 1.0e-15
+        self.qq_type = 'QQ_DEN'
+        self.dft = False
+        self.xcfun = None
+        self.pe = False
+        self.potfile = None
+
+    def update_settings(self, eri_thresh, qq_type, dft, xcfun, pe, potfile):
+        """
+        Updates settings in linear response matrix-vector solver.
+
+        :param eri_thresh:
+            The electron repulsion integrals screening threshold.
+        :param qq_type:
+            The electron repulsion integrals screening scheme.
+        :param dft:
+            The flag for running DFT.
+        :param xcfun:
+            The XC functional.
+        :param pe:
+            The flag for running polarizable embedding calculation.
+        :param potfile:
+            The name of the potential file for polarizable embedding.
+        """
+
+        self.eri_thresh = eri_thresh
+        self.qq_type = qq_type
+        self.dft = dft
+        self.xcfun = xcfun
+        self.pe = pe
+        self.potfile = potfile
+
+    def e2n_half_size(self, vecs_ger, vecs_ung, tensors, screening, molecule,
+                      basis, molgrid, gs_density, V_es, pe_drv, timing_dict):
         """
         Computes the E2 b matrix vector product.
 
@@ -97,18 +112,10 @@ class LinearResponseMatrixVectorDriver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param dft:
-            The DFT flag if true compute XC contribution, if false otherwise.
-        :param xcfun:
-            The exchange correlation functional.
         :param molgrid:
             The molecular grid for XC contributtion computation.
         :param gs_density:
             The ground state density matrix.
-        :param pe:
-            The flag for running polarizable embedding calculation.
-        :param potfile:
-            The name of the potential file for polarizable embedding.
         :param V_es:
             The polarizable embedding matrix.
         :param pe_drv:
@@ -162,9 +169,8 @@ class LinearResponseMatrixVectorDriver:
 
         fock = AOFockMatrix(dens)
 
-        self.comp_lr_fock(fock, dens, molecule, basis, screening, dft, xcfun,
-                          molgrid, gs_density, pe, potfile, V_es, pe_drv,
-                          timing_dict)
+        self.comp_lr_fock(fock, dens, molecule, basis, screening, molgrid,
+                          gs_density, V_es, pe_drv, timing_dict)
 
         if self.rank == mpi_master():
             if vecs_ger is not None:
@@ -196,21 +202,8 @@ class LinearResponseMatrixVectorDriver:
         else:
             return None, None
 
-    def comp_lr_fock(self,
-                     fock,
-                     dens,
-                     molecule,
-                     basis,
-                     screening,
-                     dft,
-                     xcfun,
-                     molgrid,
-                     gs_density,
-                     pe,
-                     potfile,
-                     V_es,
-                     pe_drv,
-                     timing_dict=None):
+    def comp_lr_fock(self, fock, dens, molecule, basis, screening, molgrid,
+                     gs_density, V_es, pe_drv, timing_dict):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -224,18 +217,10 @@ class LinearResponseMatrixVectorDriver:
             The basis set.
         :param screening:
             The screening container object.
-        :param dft:
-            The DFT flag if true compute XC contribution, if false otherwise.
-        :param xcfun:
-            The exchange correlation functional.
         :param molgrid:
             The molecular grid for XC contributtion computation.
         :param gs_density:
             The ground state density matrix.
-        :param pe:
-            The flag for running polarizable embedding calculation.
-        :param potfile:
-            The name of the potential file for polarizable embedding.
         :param V_es:
             The polarizable embedding matrix.
         :param pe_drv:
@@ -245,10 +230,10 @@ class LinearResponseMatrixVectorDriver:
         # set flags for Fock matrices
 
         fock_flag = fockmat.rgenjk
-        if dft:
-            if xcfun.is_hybrid():
+        if self.dft:
+            if self.xcfun.is_hybrid():
                 fock_flag = fockmat.rgenjkx
-                fact_xc = xcfun.get_frac_exact_exchange()
+                fact_xc = self.xcfun.get_frac_exact_exchange()
                 for i in range(fock.number_of_fock_matrices()):
                     fock.set_scale_factor(fact_xc, i)
             else:
@@ -260,8 +245,7 @@ class LinearResponseMatrixVectorDriver:
 
         if self.use_split_comm:
             self.comp_lr_fock_split_comm(fock, dens, molecule, basis, screening,
-                                         dft, xcfun, molgrid, gs_density, pe,
-                                         potfile, V_es, pe_drv)
+                                         molgrid, gs_density, V_es, pe_drv)
 
         else:
             t0 = tm.time()
@@ -270,19 +254,19 @@ class LinearResponseMatrixVectorDriver:
             if timing_dict is not None:
                 timing_dict['ERI'] = tm.time() - t0
 
-            if dft:
+            if self.dft:
                 t0 = tm.time()
-                if not xcfun.is_hybrid():
+                if not self.xcfun.is_hybrid():
                     for ifock in range(fock.number_of_fock_matrices()):
                         fock.scale(2.0, ifock)
                 xc_drv = XCIntegrator(self.comm)
                 molgrid.distribute(self.rank, self.nodes, self.comm)
                 xc_drv.integrate(fock, dens, gs_density, molecule, basis,
-                                 molgrid, xcfun.get_func_label())
+                                 molgrid, self.xcfun.get_func_label())
                 if timing_dict is not None:
                     timing_dict['DFT'] = tm.time() - t0
 
-            if pe:
+            if self.pe:
                 t0 = tm.time()
                 pe_drv.V_es = V_es.copy()
                 for ifock in range(fock.number_of_fock_matrices()):
@@ -296,8 +280,7 @@ class LinearResponseMatrixVectorDriver:
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
     def comp_lr_fock_split_comm(self, fock, dens, molecule, basis, screening,
-                                dft, xcfun, molgrid, gs_density, pe, potfile,
-                                V_es, pe_drv):
+                                molgrid, gs_density, V_es, pe_drv):
         """
         Computes linear response Fock/Fxc matrix on split communicators.
 
@@ -311,18 +294,10 @@ class LinearResponseMatrixVectorDriver:
             The basis set.
         :param screening:
             The screening container object.
-        :param dft:
-            The DFT flag if true compute XC contribution, if false otherwise.
-        :param xcfun:
-            The exchange correlation functional.
         :param molgrid:
             The molecular grid for XC contributtion computation.
         :param gs_density:
             The ground state density matrix.
-        :param pe:
-            The flag for running polarizable embedding calculation.
-        :param potfile:
-            The name of the potential file for polarizable embedding.
         :param V_es:
             The polarizable embedding matrix.
         :param pe_drv:
@@ -330,22 +305,22 @@ class LinearResponseMatrixVectorDriver:
         """
 
         if self.split_comm_ratio is None:
-            if dft and pe:
+            if self.dft and self.pe:
                 self.split_comm_ratio = [0.34, 0.33, 0.33]
-            elif dft:
+            elif self.dft:
                 self.split_comm_ratio = [0.5, 0.5, 0.0]
-            elif pe:
+            elif self.pe:
                 self.split_comm_ratio = [0.5, 0.0, 0.5]
             else:
                 self.split_comm_ratio = [1.0, 0.0, 0.0]
 
-        if dft:
+        if self.dft:
             dft_nodes = int(float(self.nodes) * self.split_comm_ratio[1] + 0.5)
             dft_nodes = max(1, dft_nodes)
         else:
             dft_nodes = 0
 
-        if pe:
+        if self.pe:
             pe_nodes = int(float(self.nodes) * self.split_comm_ratio[2] + 0.5)
             pe_nodes = max(1, pe_nodes)
         else:
@@ -373,10 +348,10 @@ class LinearResponseMatrixVectorDriver:
         if self.rank != mpi_master():
             molgrid = MolecularGrid()
             V_es = np.zeros(0)
-        if dft:
+        if self.dft:
             if local_comm.Get_rank() == mpi_master():
                 molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
-        if pe:
+        if self.pe:
             if local_comm.Get_rank() == mpi_master():
                 V_es = cross_comm.bcast(V_es, root=mpi_master())
 
@@ -388,7 +363,7 @@ class LinearResponseMatrixVectorDriver:
             local_screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                               self.eri_thresh, molecule, basis)
             eri_drv.compute(fock, dens, molecule, basis, local_screening)
-            if dft and not xcfun.is_hybrid():
+            if self.dft and not self.xcfun.is_hybrid():
                 for ifock in range(fock.number_of_fock_matrices()):
                     fock.scale(2.0, ifock)
 
@@ -398,12 +373,12 @@ class LinearResponseMatrixVectorDriver:
             molgrid.distribute(local_comm.Get_rank(), local_comm.Get_size(),
                                local_comm)
             xc_drv.integrate(fock, dens, gs_density, molecule, basis, molgrid,
-                             xcfun.get_func_label())
+                             self.xcfun.get_func_label())
 
         # calculate e_pe and V_pe on PE nodes
         if pe_comm:
             from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, local_comm, potfile)
+            pe_drv = PolEmbed(molecule, basis, local_comm, self.potfile)
             pe_drv.V_es = V_es.copy()
             for ifock in range(fock.number_of_fock_matrices()):
                 dm = dens.alpha_to_numpy(ifock) + dens.beta_to_numpy(ifock)
@@ -422,11 +397,11 @@ class LinearResponseMatrixVectorDriver:
         if self.rank == mpi_master():
             time_eri = dt[0] * eri_nodes
             time_dft = 0.0
-            if dft:
+            if self.dft:
                 time_dft = dt[1] * dft_nodes
             time_pe = 0.0
-            if pe:
-                pe_root = 2 if dft else 1
+            if self.pe:
+                pe_root = 2 if self.dft else 1
                 time_pe = dt[pe_root] * pe_nodes
             time_sum = time_eri + time_dft + time_pe
             self.split_comm_ratio = [

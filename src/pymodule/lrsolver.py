@@ -323,9 +323,11 @@ class LinearResponseSolver:
             screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                         self.eri_thresh, molecule, basis)
 
-        e2x_drv = LinearResponseMatrixVectorDriver(self.comm, self.qq_type,
-                                                   self.eri_thresh,
+        e2x_drv = LinearResponseMatrixVectorDriver(self.comm,
                                                    self.use_split_comm)
+        e2x_drv.update_settings(self.eri_thresh, self.qq_type, self.dft,
+                                self.xcfun, self.pe, self.potfile)
+        timing_dict = {}
 
         a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
                         scf_tensors, self.rank, self.comm)
@@ -386,9 +388,8 @@ class LinearResponseSolver:
 
             e2bger, e2bung = e2x_drv.e2n_half_size(bger, bung, scf_tensors,
                                                    screening, molecule, basis,
-                                                   self.dft, self.xcfun,
-                                                   molgrid, gs_density, self.pe,
-                                                   self.potfile, V_es, pe_drv)
+                                                   molgrid, gs_density, V_es,
+                                                   pe_drv, timing_dict)
 
         solutions = {}
         residuals = {}
@@ -513,8 +514,7 @@ class LinearResponseSolver:
 
             new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
-                molecule, basis, self.dft, self.xcfun, molgrid, gs_density,
-                self.pe, self.potfile, V_es, pe_drv)
+                molecule, basis, molgrid, gs_density, V_es, pe_drv, timing_dict)
 
             if self.rank == mpi_master():
                 e2bger = np.append(e2bger, new_e2bger, axis=1)
