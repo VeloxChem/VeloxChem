@@ -642,6 +642,14 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
                                           const int32_t            gridOffset,
                                           const int32_t            nGridPoints) const
 {
+    // set up local copy of density grid
+    
+    auto dengrid = *densityGrid;
+    
+    // set up local copy of exchange-correlation gradient
+    
+    auto xcgrad = *xcGradientGrid;
+    
     // set up number of AOs
     
     auto naos = gtoContainer->getNumberOfAtomicOrbitals();
@@ -679,7 +687,7 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
             gtorec::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY,
                                             gridCoordinatesZ, gridOffset, igpnt, blockdim);
             
-            _distRestrictedBatchForGGA(aoKohnShamMatrix, vxcbuf, xcGradientGrid, densityGrid, gaos, gaox, gaoy, gaoz,
+            _distRestrictedBatchForGGA(aoKohnShamMatrix, vxcbuf, xcgrad, dengrid, gaos, gaox, gaoy, gaoz,
                                        gridWeights, gridOffset, igpnt, blockdim);
             
             igpnt += blockdim;
@@ -703,7 +711,7 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
         gtorec::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
                                         gridOffset, igpnt, blockdim);
         
-        _distRestrictedBatchForGGA(aoKohnShamMatrix, vxcbuf, xcGradientGrid, densityGrid, gaos, gaox, gaoy, gaoz,
+        _distRestrictedBatchForGGA(aoKohnShamMatrix, vxcbuf, xcgrad, dengrid, gaos, gaox, gaoy, gaoz,
                                    gridWeights, gridOffset, igpnt, blockdim);
     }
 }
@@ -1077,8 +1085,8 @@ CXCIntegrator::_distRestrictedBatchForLDA(      CAOKohnShamMatrix*   aoKohnShamM
 void
 CXCIntegrator::_distRestrictedBatchForGGA(      CAOKohnShamMatrix*   aoKohnShamMatrix,
                                                 CMemBlock<double>&   xcBuffer,
-                                          const CXCGradientGrid*     xcGradientGrid,
-                                          const CDensityGrid*        densityGrid,
+                                          const CXCGradientGrid&     xcGradientGrid,
+                                          const CDensityGrid&        densityGrid,
                                           const CMemBlock2D<double>& gtoValues,
                                           const CMemBlock2D<double>& gtoValuesX,
                                           const CMemBlock2D<double>& gtoValuesY,
@@ -1094,21 +1102,21 @@ CXCIntegrator::_distRestrictedBatchForGGA(      CAOKohnShamMatrix*   aoKohnShamM
     
     // set up pointers to gradient data
     
-    auto grhoa = xcGradientGrid->xcGradientValues(xcvars::rhoa);
+    auto grhoa = xcGradientGrid.xcGradientValues(xcvars::rhoa);
     
-    auto ggrada = xcGradientGrid->xcGradientValues(xcvars::grada);
+    auto ggrada = xcGradientGrid.xcGradientValues(xcvars::grada);
     
-    auto ggradab = xcGradientGrid->xcGradientValues(xcvars::gradab);
+    auto ggradab = xcGradientGrid.xcGradientValues(xcvars::gradab);
     
     // set up pointers to density gradient norms
     
-    auto ngrada = densityGrid->alphaDensityGradient(0);
+    auto ngrada = densityGrid.alphaDensityGradient(0);
     
-    auto gradax = densityGrid->alphaDensityGradientX(0);
+    auto gradax = densityGrid.alphaDensityGradientX(0);
     
-    auto graday = densityGrid->alphaDensityGradientY(0);
+    auto graday = densityGrid.alphaDensityGradientY(0);
     
-    auto gradaz = densityGrid->alphaDensityGradientZ(0);
+    auto gradaz = densityGrid.alphaDensityGradientZ(0);
     
     // set up AOs blocks
     

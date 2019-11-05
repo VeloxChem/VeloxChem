@@ -276,8 +276,8 @@ class CXCIntegrator
 
      @param aoKohnShamMatrix the pointer to Kohn-Sham matrix.
      @param xcBuffer the exchange-correlation buffer.
-     @param xcGradientGrid the pointer to exchange-correlation gradient grid.
-     @param densityGrid the pointer to density grid.
+     @param xcGradientGrid theexchange-correlation gradient grid.
+     @param densityGrid the density grid.
      @param gtoValues the pointer to GTOS values on grid.
      @param gtoValuesX the GTOs gradient along X axis values buffer.
      @param gtoValuesY the GTOs gradient along Y axis values buffer.
@@ -289,8 +289,8 @@ class CXCIntegrator
      */
     void _distRestrictedBatchForGGA(      CAOKohnShamMatrix*   aoKohnShamMatrix,
                                           CMemBlock<double>&   xcBuffer,
-                                    const CXCGradientGrid*     xcGradientGrid,
-                                    const CDensityGrid*        densityGrid,
+                                    const CXCGradientGrid&     xcGradientGrid,
+                                    const CDensityGrid&        densityGrid,
                                     const CMemBlock2D<double>& gtoValues,
                                     const CMemBlock2D<double>& gtoValuesX,
                                     const CMemBlock2D<double>& gtoValuesY,
