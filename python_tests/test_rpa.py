@@ -10,9 +10,9 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 
 
-class TestTDA(unittest.TestCase):
+class TestRPA(unittest.TestCase):
 
-    def test_tda_hf(self):
+    def test_rpa_hf(self):
 
         inpfile = os.path.join('inputs', 'water.inp')
         if not os.path.isfile(inpfile):
@@ -40,20 +40,20 @@ class TestTDA(unittest.TestCase):
         ref_exc_ene = [float(line.split()[1]) for line in lines]
         ref_osc_str = [float(line.split()[3]) for line in lines]
 
-        tda_solver = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
-        tda_solver.update_settings({'nstates': 5},
+        rpa_solver = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
+        rpa_solver.update_settings({'nstates': 5},
                                    task.input_dict['method_settings'])
-        tda_results = tda_solver.compute(task.molecule, task.ao_basis,
+        rpa_results = rpa_solver.compute(task.molecule, task.ao_basis,
                                          scf_drv.scf_tensors)
 
         if task.mpi_rank == mpi_master():
-            exc_ene = tda_results['eigenvalues'] * hartree_in_ev()
-            osc_str = tda_results['oscillator_strengths']
+            exc_ene = rpa_results['eigenvalues'] * hartree_in_ev()
+            osc_str = rpa_results['oscillator_strengths']
 
             self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
             self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
 
-    def test_tda_dft(self):
+    def test_rpa_dft(self):
 
         inpfile = os.path.join('inputs', 'water.inp')
         if not os.path.isfile(inpfile):
@@ -82,20 +82,20 @@ class TestTDA(unittest.TestCase):
         ref_exc_ene = [float(line.split()[1]) for line in lines]
         ref_osc_str = [float(line.split()[3]) for line in lines]
 
-        tda_solver = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
-        tda_solver.update_settings({'nstates': 5},
+        rpa_solver = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
+        rpa_solver.update_settings({'nstates': 5},
                                    task.input_dict['method_settings'])
-        tda_results = tda_solver.compute(task.molecule, task.ao_basis,
+        rpa_results = rpa_solver.compute(task.molecule, task.ao_basis,
                                          scf_drv.scf_tensors)
 
         if task.mpi_rank == mpi_master():
-            exc_ene = tda_results['eigenvalues'] * hartree_in_ev()
-            osc_str = tda_results['oscillator_strengths']
+            exc_ene = rpa_results['eigenvalues'] * hartree_in_ev()
+            osc_str = rpa_results['oscillator_strengths']
 
             self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
             self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
 
-    def test_tda_hf_pe(self):
+    def test_rpa_hf_pe(self):
 
         try:
             import cppe
@@ -134,22 +134,22 @@ class TestTDA(unittest.TestCase):
         ref_osc_str = [float(line.split()[3]) for line in lines]
         ref_rot_str = [float(line.split()[4]) for line in lines]
 
-        tda_solver = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
-        tda_solver.update_settings({'nstates': 5},
+        rpa_solver = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
+        rpa_solver.update_settings({'nstates': 5},
                                    task.input_dict['method_settings'])
-        tda_results = tda_solver.compute(task.molecule, task.ao_basis,
+        rpa_results = rpa_solver.compute(task.molecule, task.ao_basis,
                                          scf_drv.scf_tensors)
 
         if task.mpi_rank == mpi_master():
-            exc_ene = tda_results['eigenvalues'] * hartree_in_ev()
-            osc_str = tda_results['oscillator_strengths']
-            rot_str = tda_results['rotatory_strengths']
+            exc_ene = rpa_results['eigenvalues'] * hartree_in_ev()
+            osc_str = rpa_results['oscillator_strengths']
+            rot_str = rpa_results['rotatory_strengths']
 
             self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
             self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
             self.assertTrue(np.max(np.abs(rot_str - ref_rot_str)) < 1.0e-2)
 
-    def test_tda_dft_pe(self):
+    def test_rpa_dft_pe(self):
 
         try:
             import cppe
@@ -189,16 +189,16 @@ class TestTDA(unittest.TestCase):
         ref_osc_str = [float(line.split()[3]) for line in lines]
         ref_rot_str = [float(line.split()[4]) for line in lines]
 
-        tda_solver = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
-        tda_solver.update_settings({'nstates': 5},
+        rpa_solver = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
+        rpa_solver.update_settings({'nstates': 5},
                                    task.input_dict['method_settings'])
-        tda_results = tda_solver.compute(task.molecule, task.ao_basis,
+        rpa_results = rpa_solver.compute(task.molecule, task.ao_basis,
                                          scf_drv.scf_tensors)
 
         if task.mpi_rank == mpi_master():
-            exc_ene = tda_results['eigenvalues'] * hartree_in_ev()
-            osc_str = tda_results['oscillator_strengths']
-            rot_str = tda_results['rotatory_strengths']
+            exc_ene = rpa_results['eigenvalues'] * hartree_in_ev()
+            osc_str = rpa_results['oscillator_strengths']
+            rot_str = rpa_results['rotatory_strengths']
 
             self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
             self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
