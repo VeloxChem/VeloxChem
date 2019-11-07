@@ -74,7 +74,7 @@ TEST_F(CAngularMomentumTest, To_CartesianComponentsForPair)
     ASSERT_EQ(90, angmom::to_CartesianComponents(2, 4));
 }
 
-TEST_F(CAngularMomentumTest, )
+TEST_F(CAngularMomentumTest, GetStringOfAngularMomentum)
 {
     ASSERT_EQ(std::string("s  "), angmom::getStringOfAngularMomentum(0, 0));
 
