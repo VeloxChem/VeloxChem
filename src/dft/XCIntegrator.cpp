@@ -313,6 +313,17 @@ CXCIntegrator::_compRestrictedBatchForLDAWithNL(      CAOKohnShamMatrix* aoKohnS
     gtorec::computeGtoValuesOnGrid(bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, 0,
                                    braGtoBlock, iBraContrGto, xcfun::lda);
     
+    // determine GTO values screening pattern
+    
+    auto gpids = _getScreeningPattern(bspherbuff);
+    
+    if ((nGridPoints - gpids.size()) > 0)
+    {
+        std::cout << "Total: " << nGridPoints << " Reduced: ";
+        
+        std::cout << nGridPoints - gpids.size() << std::endl;
+    }
+    
     // set up pointer to gradient data
     
     auto grhoa = xcGradientGrid->xcGradientValues(xcvars::rhoa);
@@ -459,7 +470,7 @@ CXCIntegrator::_isSignificantShellPair(const CGtoBlock&      braGtoBlock,
         }
     }
     
-    if (std::fabs(bkovl / std::sqrt(bovl * kovl)) > _thresholdOfDensity) return true; 
+    if (std::fabs(bkovl / std::sqrt(bovl * kovl)) > _thresholdOfDensity) return true;
     
     return false;
 }
@@ -2929,4 +2940,52 @@ CXCIntegrator::_addSubMatrix(      CAOKohnShamMatrix* aoKohnShamMatrix,
             ksmat[ioff + koff + j] += bkmat[i * kdim + j];
         }
     }
+}
+
+CMemBlock<int32_t>
+CXCIntegrator::_getScreeningPattern(const CMemBlock2D<double>& gtoValues) const
+{
+    auto ndim = gtoValues.size(0);
+    
+    // determine max values vector
+    
+    CMemBlock<double> maxvals(ndim);
+    
+    auto mvalsptr = maxvals.data();
+    
+    mathfunc::copy(mvalsptr, 0, gtoValues.data(0), 0, ndim);
+    
+    for (int32_t i = 0; i < ndim; i++) mvalsptr[i] = std::fabs(mvalsptr[i]);
+    
+    for (int32_t i = 1; i < gtoValues.blocks(); i++)
+    {
+        auto curvals = gtoValues.data(i);
+        
+        for (int32_t j = 0; j < ndim; j++)
+        {
+            auto fval = std::fabs(curvals[j]);
+            
+            if (fval > mvalsptr[j]) mvalsptr[j] = fval;
+        }
+    }
+    
+    // determine screening pattern
+    
+    CMemBlock<int32_t> patids(ndim);
+    
+    int32_t npoints = 0;
+    
+    for (int32_t i = 0; i < ndim; i++)
+    {
+        if (mvalsptr[i] > _thresholdOfDensity)
+        {
+            patids.at(npoints) = i;
+            
+            npoints++;
+        }
+    }
+    
+    if (npoints > 0) return patids.slice(0, npoints);
+    
+    return CMemBlock<int32_t>();
 }

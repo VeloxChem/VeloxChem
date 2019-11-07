@@ -667,6 +667,14 @@ class CXCIntegrator
                        const CDenseMatrix&      subMatrix,
                        const CGtoBlock&         braGtoBlock,
                        const CGtoBlock&         ketGtoBlock) const;
+    
+    /**
+     Generates screening pattern for GTO values on grid.
+
+     @param gtoValues the GTO values on grid.
+     @return the screening pattern.
+     */
+    CMemBlock<int32_t> _getScreeningPattern(const CMemBlock2D<double>& gtoValues) const;
    
 public:
     
