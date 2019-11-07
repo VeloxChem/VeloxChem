@@ -286,27 +286,21 @@ CXCIntegrator::_compRestrictedBatchForLDAWithNL(      CAOKohnShamMatrix* aoKohnS
     
     auto kang = ketGtoBlock.getAngularMomentum();
     
-    // set up Cartesian GTOs buffers for bra and ket sides
-    
-    auto nvcomp = xcfun_components(xcfun::lda);
-    
     auto bncart = angmom::to_CartesianComponents(bang);
     
     auto kncart = angmom::to_CartesianComponents(kang);
-    
-    auto bcartbuff = (bang > 0) ? CMemBlock2D<double>(nGridPoints, nvcomp * bncart) : CMemBlock2D<double>();
-    
-    auto kcartbuff = (kang > 0) ? CMemBlock2D<double>(nGridPoints, nvcomp * kncart) : CMemBlock2D<double>();
-    
-    // set up spherical GTOs buffers for bra and ket sides
     
     auto bnspher = angmom::to_SphericalComponents(bang);
     
     auto knspher = angmom::to_SphericalComponents(kang);
     
-    CMemBlock2D<double> bspherbuff(nGridPoints, nvcomp * bnspher);
+    // set up GTOs buffers for bra side
     
-    CMemBlock2D<double> kspherbuff(nGridPoints, nvcomp * knspher);
+    auto nvcomp = xcfun_components(xcfun::lda);
+    
+    auto bcartbuff = (bang > 0) ? CMemBlock2D<double>(nGridPoints, nvcomp * bncart) : CMemBlock2D<double>();
+    
+    CMemBlock2D<double> bspherbuff(nGridPoints, nvcomp * bnspher);
     
     // compute GTO values on grid for bra side
     
@@ -317,16 +311,33 @@ CXCIntegrator::_compRestrictedBatchForLDAWithNL(      CAOKohnShamMatrix* aoKohnS
     
     auto gpids = _getScreeningPattern(bspherbuff);
     
-    if ((nGridPoints - gpids.size()) > 0)
-    {
-        std::cout << "Total: " << nGridPoints << " Reduced: ";
-        
-        std::cout << nGridPoints - gpids.size() << std::endl;
-    }
+    // set up significant grid points
+    
+    auto redgrid = _getReducedGrid(gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridWeights, gpids);
+    
+    // compress GTO values on bra size
+    
+    auto bredbuff = _getReducedGtoValues(bspherbuff, gpids);
+    
+    // compress gradient
+    
+    auto redgrad = _getReducedRestrictedGradient(xcGradientGrid, gpids);
+    
+    // set up GTOs buffers for ket side
+    
+    auto ngdim = gpids.size();
+    
+    auto kcartbuff = (kang > 0) ? CMemBlock2D<double>(ngdim, nvcomp * kncart) : CMemBlock2D<double>();
+    
+    CMemBlock2D<double> kspherbuff(ngdim, nvcomp * knspher);
     
     // set up pointer to gradient data
     
-    auto grhoa = xcGradientGrid->xcGradientValues(xcvars::rhoa);
+    auto grhoa = redgrad.data();
+    
+    // set up pointer to grid weights
+    
+    auto gw = redgrid.data(3);
     
     // set up Kohn-Sham matrix data
     
@@ -344,12 +355,12 @@ CXCIntegrator::_compRestrictedBatchForLDAWithNL(      CAOKohnShamMatrix* aoKohnS
         {
             // compute GTO values on grid for ket side
         
-            gtorec::computeGtoValuesOnGrid(kspherbuff, kcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, 0,
+            gtorec::computeGtoValuesOnGrid(kspherbuff, kcartbuff, redgrid.data(0), redgrid.data(1), redgrid.data(2), 0,
                                            ketGtoBlock, i, xcfun::lda);
         
             for (int32_t j = 0; j < bnspher; j++)
             {
-                auto bgaos = bspherbuff.data(j);
+                auto bgaos = bredbuff.data(j);
             
                 auto bidx = (braGtoBlock.getIdentifiers(j))[iBraContrGto];
             
@@ -361,10 +372,10 @@ CXCIntegrator::_compRestrictedBatchForLDAWithNL(      CAOKohnShamMatrix* aoKohnS
                 
                     double fval = 0.0;
                 
-                    #pragma omp simd reduction(+:fval) aligned(bgaos, kgaos, gridWeights, grhoa: VLX_ALIGN)
-                    for (int32_t l = 0; l < nGridPoints; l++)
+                    #pragma omp simd reduction(+:fval) aligned(bgaos, kgaos, gw, grhoa: VLX_ALIGN)
+                    for (int32_t l = 0; l < ngdim; l++)
                     {
-                        fval += bgaos[l] * kgaos[l] * gridWeights[l] * grhoa[l];
+                        fval += bgaos[l] * kgaos[l] * gw[l] * grhoa[l];
                     }
                 
                     ksmat[bidx * ncols + kidx] = fval;
@@ -2988,4 +2999,90 @@ CXCIntegrator::_getScreeningPattern(const CMemBlock2D<double>& gtoValues) const
     if (npoints > 0) return patids.slice(0, npoints);
     
     return CMemBlock<int32_t>();
+}
+
+CMemBlock2D<double>
+CXCIntegrator::_getReducedGrid(const double*             gridCoordinatesX,
+                               const double*             gridCoordinatesY,
+                               const double*             gridCoordinatesZ,
+                               const double*             gridWeights,
+                               const CMemBlock<int32_t>& screeningPattern) const
+{
+    auto ndim = screeningPattern.size();
+    
+    CMemBlock2D<double> mgrid(ndim, 4);
+    
+    // set up pointers to molecular grid
+    
+    auto mx = mgrid.data(0);
+    
+    auto my = mgrid.data(1);
+    
+    auto mz = mgrid.data(2);
+    
+    auto mw = mgrid.data(3);
+    
+    for (int32_t i = 0; i < ndim; i++)
+    {
+        auto idx = screeningPattern.at(i);
+        
+        mx[i] = gridCoordinatesX[idx];
+        
+        my[i] = gridCoordinatesY[idx];
+        
+        mz[i] = gridCoordinatesZ[idx];
+        
+        mw[i] = gridWeights[idx];
+    }
+    
+    return mgrid;
+}
+
+CMemBlock2D<double>
+CXCIntegrator::_getReducedGtoValues(const CMemBlock2D<double>& gtoValues,
+                                    const CMemBlock<int32_t>&  screeningPattern) const
+{
+    auto ndim = screeningPattern.size();
+    
+    auto nblk = gtoValues.blocks();
+    
+    CMemBlock2D<double> gvals(ndim, nblk);
+    
+    auto pids = screeningPattern.data();
+    
+    for (int32_t i = 0; i < nblk; i++)
+    {
+        auto curvals = gtoValues.data(i);
+        
+        auto redvals = gvals.data(i);
+        
+        for (int32_t j = 0; j < ndim; j++)
+        {
+            redvals[j] = curvals[pids[j]];
+        }
+    }
+    
+    return gvals;
+}
+
+CMemBlock<double>
+CXCIntegrator::_getReducedRestrictedGradient(const CXCGradientGrid*    xcGradientGrid,
+                                             const CMemBlock<int32_t>& screeningPattern) const
+{
+    auto ndim = screeningPattern.size();
+    
+    CMemBlock<double> ggrid(ndim);
+    
+    auto redgrad = ggrid.data();
+    
+    auto curgrad = xcGradientGrid->xcGradientValues(xcvars::rhoa);
+    
+    auto pids = screeningPattern.data();
+    
+    for (int32_t i = 0; i < ndim; i++)
+    {
+        redgrad[i] = curgrad[pids[i]]; 
+    }
+    
+    return ggrid;
 }

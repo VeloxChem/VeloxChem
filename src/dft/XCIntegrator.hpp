@@ -675,6 +675,43 @@ class CXCIntegrator
      @return the screening pattern.
      */
     CMemBlock<int32_t> _getScreeningPattern(const CMemBlock2D<double>& gtoValues) const;
+    
+    
+    /**
+     Creates reduced integration grid with given screening pattern.
+
+     @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
+     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
+     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
+     @param gridWeights the pointer to grid weights.
+     @param screeningPattern the screening pattern.
+     @return the reduced integration grid.
+     */
+    CMemBlock2D<double> _getReducedGrid(const double*             gridCoordinatesX,
+                                        const double*             gridCoordinatesY,
+                                        const double*             gridCoordinatesZ,
+                                        const double*             gridWeights,
+                                        const CMemBlock<int32_t>& screeningPattern) const;
+    
+    /**
+     Cretaes reduces GTO values on grid with given screening pattern.
+
+     @param gtoValues the GTO values on grid.
+     @param screeningPattern the screening pattern.
+     @return the reduced GTO values on grid.
+     */
+    CMemBlock2D<double> _getReducedGtoValues(const CMemBlock2D<double>& gtoValues,
+                                             const CMemBlock<int32_t>&  screeningPattern) const;
+    
+    /**
+     Cretaes reduces spin restricted gradient grid with given screening pattern.
+
+     @param xcGradientGrid the exchange-correlation functional gradient grid.
+     @param screeningPattern the screening pattern.
+     @return the redduced exchange-correlation functional gradient grid.
+     */
+    CMemBlock<double> _getReducedRestrictedGradient(const CXCGradientGrid*    xcGradientGrid,
+                                                    const CMemBlock<int32_t>& screeningPattern) const;
    
 public:
     
