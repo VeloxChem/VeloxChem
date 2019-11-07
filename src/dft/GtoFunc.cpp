@@ -169,6 +169,87 @@ namespace gtorec {  // gtorec namespace
     }
     
     void
+    computeGtosValuesForGGA(      CMemBlock2D<double>& gtoValues,
+                                  CMemBlock2D<double>& gtoValuesX,
+                                  CMemBlock2D<double>& gtoValuesY,
+                                  CMemBlock2D<double>& gtoValuesZ,
+                            const CGtoBlock&           gtoBlock,
+                            const double*              gridCoordinatesX,
+                            const double*              gridCoordinatesY,
+                            const double*              gridCoordinatesZ,
+                            const int32_t              gridOffset,
+                            const int32_t              gridBlockPosition,
+                            const int32_t              nGridPoints)
+    {
+        // angular momentum data for bra and ket
+        
+        auto bang = gtoBlock.getAngularMomentum();
+        
+        // set up Cartesian GTOs buffer
+        
+        auto nvcomp = xcfun_components(xcfun::gga);
+        
+        auto bncart = angmom::to_CartesianComponents(bang);
+        
+        auto bcartbuff = (bang > 0) ? CMemBlock2D<double>(nGridPoints, nvcomp * bncart) : CMemBlock2D<double>();
+        
+        // set up spherical GTOs buffer
+        
+        auto bnspher = angmom::to_SphericalComponents(bang);
+        
+        CMemBlock2D<double> bspherbuff(nGridPoints, nvcomp * bnspher);
+        
+        // set up offset of GTOs buffer
+        
+        auto boff = (gtoBlock.getIdentifiers(0))[0];
+        
+        // loop over contracted GTOs
+        
+        for (int32_t i = 0; i < gtoBlock.getNumberOfContrGtos(); i++)
+        {
+            // compute i-th GTO values on batch of grid points
+            
+            gtorec::computeGtoValuesOnGrid(bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
+                                           gridBlockPosition + gridOffset, gtoBlock, i, xcfun::gga);
+            
+            // distribute i-th GTO values on batch of grid points
+            
+            for (int32_t j = 0; j < bnspher; j++)
+            {
+                auto bgaos = bspherbuff.data(4 * j);
+                
+                auto bgaox = bspherbuff.data(4 * j + 1);
+                
+                auto bgaoy = bspherbuff.data(4 * j + 2);
+                
+                auto bgaoz = bspherbuff.data(4 * j + 3);
+                
+                auto idx = (gtoBlock.getIdentifiers(j))[i] - boff;
+                
+                auto gvals = gtoValues.data(idx);
+                
+                auto gvalx = gtoValuesX.data(idx);
+                
+                auto gvaly = gtoValuesY.data(idx);
+                
+                auto gvalz = gtoValuesZ.data(idx);
+                
+                #pragma omp simd aligned(bgaos, bgaox, bgaoy, bgaoz, gvals, gvalx, gvaly, gvalz: VLX_ALIGN)
+                for (int32_t k = 0; k < nGridPoints; k++)
+                {
+                    gvals[k] = bgaos[k];
+                    
+                    gvalx[k] = bgaox[k];
+                    
+                    gvaly[k] = bgaoy[k];
+                    
+                    gvalz[k] = bgaoz[k];
+                }
+            }
+        }
+    }
+    
+    void
     computeGtosMatrixForLDA(      CDenseMatrix&   gtoMatrix,
                             const CGtoContainer*  gtoContainer,
                             const CMolecularGrid& molecularGrid,
