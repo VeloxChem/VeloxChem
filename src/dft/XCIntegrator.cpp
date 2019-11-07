@@ -36,6 +36,7 @@ CXCIntegrator::~CXCIntegrator()
 
 CAOKohnShamMatrix
 CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
+                         const COverlapMatrix&   overlapMatrix, 
                          const CMolecule&        molecule,
                          const CMolecularBasis&  basis,
                          const CMolecularGrid&   molecularGrid,

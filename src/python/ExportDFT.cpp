@@ -205,6 +205,7 @@ export_dft(py::module& m)
     py::class_<CXCIntegrator, std::shared_ptr<CXCIntegrator>>(m, "XCIntegrator")
         .def(py::init(&CXCIntegrator_create))
         .def("integrate", (CAOKohnShamMatrix (CXCIntegrator::*)(const CAODensityMatrix&,
+                                                                const COverlapMatrix& 
                                                                 const CMolecule&,
                                                                 const CMolecularBasis&,
                                                                 const CMolecularGrid&,

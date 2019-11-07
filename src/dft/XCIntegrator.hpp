@@ -26,6 +26,7 @@
 #include "GtoContainer.hpp"
 #include "AOFockMatrix.hpp"
 #include "MemBlock.hpp"
+#include "OverlapMatrix.hpp"
 
 /**
  Class CXCIntegrator implements exchange-correlation functional and it's derrivatives integraion.
@@ -671,6 +672,7 @@ public:
      Integrates exchnage-correlation functional contribution to zero order Kohn-Sham matrix.
 
      @param aoDensityMatrix the AO density matrix object.
+     @param overlapMatrix the AO overlap matrix. 
      @param molecule the molecule.
      @param basis the molecular basis.
      @param molecularGrid the molecular grid.
@@ -678,6 +680,7 @@ public:
      @return the AO Kohn-Sham matrix.
      */
     CAOKohnShamMatrix integrate(const CAODensityMatrix& aoDensityMatrix,
+                                const COverlapMatrix&   overlapMatrix,
                                 const CMolecule&        molecule,
                                 const CMolecularBasis&  basis,
                                 const CMolecularGrid&   molecularGrid,

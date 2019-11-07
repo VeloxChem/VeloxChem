@@ -15,6 +15,7 @@
 #include "MolecularBasisSetter.hpp"
 #include "AODensityMatrixSetter.hpp"
 #include "DenseLinearAlgebra.hpp"
+#include "OverlapIntegralsDriver.hpp"
 
 
 
@@ -32,9 +33,13 @@ TEST_F(CXCIntegratorTest, IntegrateKohnSham)
     
     auto dmat = vlxden::getRestDensityMatrixForH2O();
     
+    COverlapIntegralsDriver ovl_drv(MPI_COMM_WORLD);
+    
+    auto ovlmat = ovl_drv.compute(mh2o, mbas);
+    
     CXCIntegrator xcdrv(MPI_COMM_WORLD);
     
-    auto ksmat = xcdrv.integrate(dmat, mh2o, mbas, mgrid, std::string("LYP"));
+    auto ksmat = xcdrv.integrate(dmat, ovlmat, mh2o, mbas, mgrid, std::string("LYP"));
     
     ASSERT_NEAR(ksmat.getNumberOfElectrons(), 10.0, 1.0e-6);
 }
