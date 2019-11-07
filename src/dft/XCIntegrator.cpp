@@ -251,6 +251,14 @@ CXCIntegrator::_compRestrictedContributionForLDAWithNL(      CAOKohnShamMatrix& 
             }
         }
     }
+    
+    // compute exchange-correlation energy and number of electrons
+    
+    auto xcdat = _compEnergyAndDensity(xcGradientGrid, densityGrid, molecularGrid);
+    
+    aoKohnShamMatrix.setExchangeCorrelationEnergy(std::get<0>(xcdat));
+    
+    aoKohnShamMatrix.setNumberOfElectrons(std::get<1>(xcdat));
 }
 
 void
