@@ -8,6 +8,8 @@
 
 #include "XCIntegrator.hpp"
 
+#include <cmath>
+
 #include "MpiFunc.hpp"
 #include "DensityGridDriver.hpp"
 #include "FunctionalParser.hpp"
@@ -16,6 +18,7 @@
 #include "AngularMomentum.hpp"
 #include "GtoFunc.hpp"
 #include "DenseLinearAlgebra.hpp"
+#include "MathConst.hpp"
 
 
 CXCIntegrator::CXCIntegrator(MPI_Comm comm)
@@ -368,7 +371,97 @@ CXCIntegrator::_isSignificantShellPair(const CGtoBlock&      braGtoBlock,
                                        const CGtoBlock&      ketGtoBlock,
                                        const int32_t         iKetContrGto) const
 {
-    return true; 
+    // get pi constant
+    
+    auto fpi = mathconst::getPiValue();
+    
+    // set up GTO data for bra
+    
+    auto bstart = (braGtoBlock.getStartPositions())[iBraContrGto];
+    
+    auto bend = (braGtoBlock.getEndPositions())[iBraContrGto];
+    
+    auto bexps = braGtoBlock.getExponents();
+    
+    auto bnorms = braGtoBlock.getNormFactors();
+    
+    auto brx = braGtoBlock.getCoordinatesX();
+    
+    auto bry = braGtoBlock.getCoordinatesY();
+    
+    auto brz = braGtoBlock.getCoordinatesZ();
+    
+    // compute zero order overlap for bra
+    
+    double bovl = 0.0;
+    
+    for (int32_t i = bstart; i < bend; i++)
+    {
+        bovl += bnorms[i] * bnorms[i] * std::pow(0.5 * fpi / bexps[i], 1.5);
+        
+        for (int32_t j = i + 1; j < bend; j++)
+        {
+            bovl += 2.0 * bnorms[i] * bnorms[j] * std::pow(fpi / (bexps[i] + bexps[j]), 1.5);
+        }
+    }
+    
+    // set up GTO data for ket
+    
+    auto kstart = (ketGtoBlock.getStartPositions())[iKetContrGto];
+    
+    auto kend = (ketGtoBlock.getEndPositions())[iKetContrGto];
+    
+    auto kexps = ketGtoBlock.getExponents();
+    
+    auto knorms = ketGtoBlock.getNormFactors();
+    
+    auto krx = ketGtoBlock.getCoordinatesX();
+    
+    auto kry = ketGtoBlock.getCoordinatesY();
+    
+    auto krz = ketGtoBlock.getCoordinatesZ();
+    
+    // compute zero order overlap for ket
+    
+    double kovl = 0.0;
+    
+    for (int32_t i = kstart; i < kend; i++)
+    {
+        kovl += knorms[i] * knorms[i] * std::pow(0.5 * fpi / kexps[i], 1.5);
+        
+        for (int32_t j = i + 1; j < kend; j++)
+        {
+            kovl += 2.0 * knorms[i] * knorms[j] * std::pow(fpi / (kexps[i] + kexps[j]), 1.5);
+        }
+    }
+    
+    // compute zero order bra/ket overlap
+    
+    double bkovl = 0.0;
+    
+    for (int32_t i = bstart; i < bend; i++)
+    {
+        for (int32_t j = kstart; j < kend; j++)
+        {
+            auto fab = 1.0 / (bexps[i] + kexps[j]);
+            
+            auto rabx = brx[i] - krx[j];
+            
+            auto raby = bry[i] - kry[j];
+            
+            auto rabz = brz[i] - krz[j];
+            
+            auto r2ab = rabx * rabx + raby * raby + rabz * rabz;
+            
+            auto fact = bnorms[i] * knorms[j] * std::pow(fpi * fab, 1.5);
+            
+            bkovl += fact * std::exp(-bexps[i] * kexps[j] * fab * r2ab);
+        }
+    }
+    
+    if (std::fabs(bkovl / std::sqrt(bovl * kovl)) > _thresholdOfDensity) return true; 
+    
+    return false;
 }
 
 void
