@@ -343,9 +343,9 @@ CXCIntegrator::_compRestrictedBatchForLDAWithNL(      CAOKohnShamMatrix* aoKohnS
                     fval += bgaos[l] * kgaos[l] * gridWeights[l] * grhoa[l];
                 }
                 
-                if (symbk && (bidx == kidx)) fval *= 0.5;
-                
                 ksmat[bidx * ncols + kidx] = fval;
+                    
+                ksmat[kidx * ncols + bidx] = fval;
             }
         }
     }
