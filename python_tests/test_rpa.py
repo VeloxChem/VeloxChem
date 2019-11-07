@@ -95,6 +95,48 @@ class TestRPA(unittest.TestCase):
             self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
             self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
 
+    def test_rpa_dft_slda(self):
+
+        inpfile = os.path.join('inputs', 'water.inp')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+
+        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task.input_dict['method_settings']['xcfun'] = 'slda'
+
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.update_settings(task.input_dict['scf'],
+                                task.input_dict['method_settings'])
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        #  State Frequency   Oscillator Strength    Rotatory  Strength
+        #          (eV)      Velocity     Length    Velocity    Length
+        #  -----------------------------------------------------------
+        raw_data = """
+            1     6.7693     0.0555     0.0551    -0.0000     0.0000
+            2     8.2202     0.0000     0.0000     0.0000    -0.0000
+            3     8.8886     0.0823     0.0851    -0.0000    -0.0000
+            4    10.1292     0.0014     0.0002     0.0000     0.0000
+            5    10.3354     0.0099     0.0106     0.0000     0.0000
+        """
+        lines = raw_data.split(os.linesep)[1:-1]
+
+        ref_exc_ene = [float(line.split()[1]) for line in lines]
+        ref_osc_str = [float(line.split()[3]) for line in lines]
+
+        rpa_solver = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
+        rpa_solver.update_settings({'nstates': 5},
+                                   task.input_dict['method_settings'])
+        rpa_results = rpa_solver.compute(task.molecule, task.ao_basis,
+                                         scf_drv.scf_tensors)
+
+        if task.mpi_rank == mpi_master():
+            exc_ene = rpa_results['eigenvalues'] * hartree_in_ev()
+            osc_str = rpa_results['oscillator_strengths']
+
+            self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
+            self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
+
     def test_rpa_hf_pe(self):
 
         try:

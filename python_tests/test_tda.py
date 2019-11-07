@@ -95,6 +95,48 @@ class TestTDA(unittest.TestCase):
             self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
             self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
 
+    def test_tda_dft_slda(self):
+
+        inpfile = os.path.join('inputs', 'water.inp')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+
+        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task.input_dict['method_settings']['xcfun'] = 'slda'
+
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.update_settings(task.input_dict['scf'],
+                                task.input_dict['method_settings'])
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        #  State Frequency   Oscillator Strength    Rotatory  Strength
+        #          (eV)      Velocity     Length    Velocity    Length
+        #  -----------------------------------------------------------
+        raw_data = """
+            1     6.7828     0.0588     0.0561    -0.0000     0.0000
+            2     8.2221     0.0000     0.0000     0.0000     0.0000
+            3     8.9101     0.0603     0.0901    -0.0000    -0.0000
+            4    10.1323     0.0014     0.0003     0.0000     0.0000
+            5    10.3444     0.0036     0.0115    -0.0000    -0.0000
+        """
+        lines = raw_data.split(os.linesep)[1:-1]
+
+        ref_exc_ene = [float(line.split()[1]) for line in lines]
+        ref_osc_str = [float(line.split()[3]) for line in lines]
+
+        tda_solver = TDAExciDriver(task.mpi_comm, task.ostream)
+        tda_solver.update_settings({'nstates': 5},
+                                   task.input_dict['method_settings'])
+        tda_results = tda_solver.compute(task.molecule, task.ao_basis,
+                                         scf_drv.scf_tensors)
+
+        if task.mpi_rank == mpi_master():
+            exc_ene = tda_results['eigenvalues'] * hartree_in_ev()
+            osc_str = tda_results['oscillator_strengths']
+
+            self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
+            self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
+
     def test_tda_hf_pe(self):
 
         try:

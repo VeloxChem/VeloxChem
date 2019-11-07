@@ -90,6 +90,46 @@ class TestLR(unittest.TestCase):
             ])
             self.assertTrue(np.max(np.abs(prop - ref_prop)) < 1.0e-4)
 
+    def test_lr_dft_slda(self):
+
+        inpfile = os.path.join('inputs', 'water.inp')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+
+        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task.input_dict['method_settings']['xcfun'] = 'slda'
+
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.update_settings(task.input_dict['scf'],
+                                task.input_dict['method_settings'])
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        raw_data = """
+              9.287658     -1.1997346E-16 -9.5824875E-16
+            -2.9828750E-16   9.980757      1.3461724E-12
+            -7.1713889E-16  2.2342396E-13   9.449695
+              9.433758     -1.2002012E-16 -1.0006654E-15
+            -3.0817669E-16   10.04701      1.3973664E-12
+            -7.3819715E-16  2.2624766E-13   9.541279
+              9.940174     -1.1900461E-16 -1.1523585E-15
+            -3.4263886E-16   10.25285      1.5697014E-12
+            -8.0798267E-16  2.3530467E-13   9.836690
+        """
+        ref_prop = np.array([float(x) for x in raw_data.split()])
+
+        lr_solver = LinearResponseSolver(task.mpi_comm, task.ostream)
+        lr_solver.update_settings({'frequencies': '0-0.15(0.05)'},
+                                  task.input_dict['method_settings'])
+        lr_results = lr_solver.compute(task.molecule, task.ao_basis,
+                                       scf_drv.scf_tensors)
+
+        if task.mpi_rank == mpi_master():
+            prop = np.array([
+                -lr_results[(a, b, w)] for w in [0.0, 0.05, 0.1] for a in 'xyz'
+                for b in 'xyz'
+            ])
+            self.assertTrue(np.max(np.abs(prop - ref_prop)) < 1.0e-4)
+
     def test_lr_hf_pe(self):
 
         try:

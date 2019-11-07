@@ -124,6 +124,63 @@ class TestCPP(unittest.TestCase):
             self.assertTrue(np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4)
             self.assertTrue(np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4)
 
+    def test_cpp_dft_slda(self):
+
+        inpfile = os.path.join('inputs', 'water.inp')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+
+        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task.input_dict['method_settings']['xcfun'] = 'slda'
+
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.update_settings(task.input_dict['scf'],
+                                task.input_dict['method_settings'])
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        #   ------------------------------------------------------------------
+        #   No    A-oper    B-oper   Frequency       Real part       Imag part
+        #   ------------------------------------------------------------------
+        raw_data = """
+             1   XDIPLEN   XDIPLEN    0.000000        9.286484        0.000000
+             2   YDIPLEN   YDIPLEN    0.000000        9.980211        0.000000
+             3   ZDIPLEN   ZDIPLEN    0.000000        9.448947       -0.000000
+             4   XDIPLEN   YDIPLEN    0.000000       -0.000000       -0.000000
+             5   XDIPLEN   ZDIPLEN    0.000000        0.000000       -0.000000
+             6   YDIPLEN   ZDIPLEN    0.000000        0.000000       -0.000000
+             7   XDIPLEN   XDIPLEN    0.050000        9.432332        0.027519
+             8   YDIPLEN   YDIPLEN    0.050000       10.046436        0.012177
+             9   ZDIPLEN   ZDIPLEN    0.050000        9.540451        0.016980
+            10   XDIPLEN   YDIPLEN    0.050000       -0.000000        0.000000
+            11   XDIPLEN   ZDIPLEN    0.050000        0.000000        0.000000
+            12   YDIPLEN   ZDIPLEN    0.050000        0.000000        0.000000
+            13   XDIPLEN   XDIPLEN    0.100000        9.937587        0.068826
+            14   YDIPLEN   YDIPLEN    0.100000       10.252178        0.025677
+            15   ZDIPLEN   ZDIPLEN    0.100000        9.835558        0.037937
+            16   XDIPLEN   YDIPLEN    0.100000       -0.000000        0.000000
+            17   XDIPLEN   ZDIPLEN    0.100000        0.000000        0.000000
+            18   YDIPLEN   ZDIPLEN    0.100000        0.000000        0.000000
+        """
+        lines = raw_data.split(os.linesep)[1:-1]
+
+        ref_prop_real = [float(line.split()[4]) for line in lines]
+        ref_prop_imag = [float(line.split()[5]) for line in lines]
+
+        cpp_solver = ComplexResponse(task.mpi_comm, task.ostream)
+        cpp_solver.update_settings({'frequencies': '0-0.15(0.05)'},
+                                   task.input_dict['method_settings'])
+        cpp_results = cpp_solver.compute(task.molecule, task.ao_basis,
+                                         scf_drv.scf_tensors)
+
+        if task.mpi_rank == mpi_master():
+            prop = np.array([
+                -cpp_results['properties'][(a, b, w)]
+                for w in [0.0, 0.05, 0.1]
+                for (a, b) in ['xx', 'yy', 'zz', 'xy', 'xz', 'yz']
+            ])
+            self.assertTrue(np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4)
+            self.assertTrue(np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4)
+
     def test_cpp_hf_pe(self):
 
         try:
