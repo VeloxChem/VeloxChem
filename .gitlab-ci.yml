@@ -10,7 +10,7 @@ before_script:
   - set +e && source /opt/intel/bin/compilervars.sh intel64 && set -e
   - export PATH=/opt/intel/intelpython3/bin:$PATH
   - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/intelpython3/lib
-  - export OMP_NUM_THREADS=10
+  - export OMP_NUM_THREADS=6
   - export PYTHONPATH=$PYTHONPATH:/home/xinli/software/cppe/build/stage/lib
   - export GTESTROOT=/home/xinli/software/googletest/googletest
   - export GTESTLIB=/home/xinli/software/googletest/googletest/lib/libgtest.a
@@ -28,7 +28,7 @@ velxochem_build:
   stage: build
   script:
     - python3 config/generate_setup.py
-    - make -j 10 -C src release && make -j 10 -C unit_tests release
+    - make -j 6 -C src release && make -j 6 -C unit_tests release
 
 veloxchem_test:
   tags:
@@ -36,6 +36,6 @@ veloxchem_test:
   stage: test
   script:
     - python3 config/generate_setup.py
-    - make -j 10 -C src release && make -j 10 -C unit_tests release
+    - make -j 6 -C src release && make -j 6 -C unit_tests release
     - export PYTHONPATH=$(pwd)/build/python:$PYTHONPATH
-    - ./build/bin/UnitTestVeloxChemMP.x && python3 -m pytest -v --cov=veloxchem
+    - ./build/bin/UnitTestVeloxChemMP.x && python3 -m pytest -v --cov=veloxchem python_tests/
