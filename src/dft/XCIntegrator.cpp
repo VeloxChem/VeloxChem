@@ -199,6 +199,7 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
 
 void
 CXCIntegrator::_compRestrictedContributionForLDAWithNL(      CAOKohnShamMatrix& aoKohnShamMatrix,
+                                                       const COverlapMatrix&    overlapMatrix, 
                                                        const CGtoContainer*     gtoContainer,
                                                        const CXCGradientGrid&   xcGradientGrid,
                                                        const CDensityGrid&      densityGrid,
@@ -226,7 +227,11 @@ CXCIntegrator::_compRestrictedContributionForLDAWithNL(      CAOKohnShamMatrix& 
     
     auto ksmatprt = &aoKohnShamMatrix;
     
-    #pragma omp parallel shared(mgx, mgy, mgz, mgw, xcgridptr, ksmatprt, gpoints)
+    // set up pointer to overlap matrix
+    
+    auto ovlptr = &overlapMatrix;
+    
+    #pragma omp parallel shared(mgx, mgy, mgz, mgw, xcgridptr, ksmatprt, ovlptr, gpoints)
     {
         #pragma omp single nowait
         {
@@ -244,7 +249,7 @@ CXCIntegrator::_compRestrictedContributionForLDAWithNL(      CAOKohnShamMatrix& 
                     {
                         #pragma omp task firstprivate(k)
                         {
-                            _compRestrictedBatchForLDAWithNL(ksmatprt, bgtos, k, kgtos, xcgridptr,
+                            _compRestrictedBatchForLDAWithNL(ksmatprt, ovlptr, bgtos, k, kgtos, xcgridptr,
                                                              mgx, mgy, mgz, mgw, gpoints);
                         }
                     }
@@ -264,6 +269,7 @@ CXCIntegrator::_compRestrictedContributionForLDAWithNL(      CAOKohnShamMatrix& 
 
 void
 CXCIntegrator::_compRestrictedBatchForLDAWithNL(      CAOKohnShamMatrix* aoKohnShamMatrix,
+                                                const COverlapMatrix*    overlapMatrix,
                                                 const CGtoBlock&         braGtoBlock,
                                                 const int32_t            iBraContrGto,
                                                 const CGtoBlock&         ketGtoBlock,
@@ -327,37 +333,76 @@ CXCIntegrator::_compRestrictedBatchForLDAWithNL(      CAOKohnShamMatrix* aoKohnS
     
     for (int32_t i = istart; i < ketGtoBlock.getNumberOfContrGtos(); i++)
     {
-        // compute GTO values on grid for ket side
-        
-        gtorec::computeGtoValuesOnGrid(kspherbuff, kcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, 0,
-                                       ketGtoBlock, i, xcfun::lda);
-        
-        for (int32_t j = 0; j < bnspher; j++)
+        if (_isSignificantShellPair(overlapMatrix, braGtoBlock, iBraContrGto, ketGtoBlock, i))
         {
-            auto bgaos = bspherbuff.data(j);
-            
-            auto bidx = (braGtoBlock.getIdentifiers(j))[iBraContrGto];
-            
-            for (int32_t k = 0; k < knspher; k++)
+            // compute GTO values on grid for ket side
+        
+            gtorec::computeGtoValuesOnGrid(kspherbuff, kcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, 0,
+                                           ketGtoBlock, i, xcfun::lda);
+        
+            for (int32_t j = 0; j < bnspher; j++)
             {
-                auto kgaos = kspherbuff.data(k);
-                
-                auto kidx = (ketGtoBlock.getIdentifiers(k))[i];
-                
-                double fval = 0.0;
-                
-                #pragma omp simd reduction(+:fval) aligned(bgaos, kgaos, gridWeights, grhoa: VLX_ALIGN)
-                for (int32_t l = 0; l < nGridPoints; l++)
+                auto bgaos = bspherbuff.data(j);
+            
+                auto bidx = (braGtoBlock.getIdentifiers(j))[iBraContrGto];
+            
+                for (int32_t k = 0; k < knspher; k++)
                 {
-                    fval += bgaos[l] * kgaos[l] * gridWeights[l] * grhoa[l];
-                }
+                    auto kgaos = kspherbuff.data(k);
                 
-                ksmat[bidx * ncols + kidx] = fval;
+                    auto kidx = (ketGtoBlock.getIdentifiers(k))[i];
+                
+                    double fval = 0.0;
+                
+                    #pragma omp simd reduction(+:fval) aligned(bgaos, kgaos, gridWeights, grhoa: VLX_ALIGN)
+                    for (int32_t l = 0; l < nGridPoints; l++)
+                    {
+                        fval += bgaos[l] * kgaos[l] * gridWeights[l] * grhoa[l];
+                    }
+                
+                    ksmat[bidx * ncols + kidx] = fval;
                     
-                ksmat[kidx * ncols + bidx] = fval;
+                    ksmat[kidx * ncols + bidx] = fval;
+                }
             }
         }
     }
+}
+
+bool
+CXCIntegrator::_isSignificantShellPair(const COverlapMatrix* overlapMatrix,
+                                       const CGtoBlock&      braGtoBlock,
+                                       const int32_t         iBraContrGto,
+                                       const CGtoBlock&      ketGtoBlock,
+                                       const int32_t         iKetContrGto) const
+{
+    // set data to overlap matrix
+    
+    auto ncols = overlapMatrix->getNumberOfColumns();
+    
+    auto ovlmat = overlapMatrix->values();
+    
+    // set up angular momentum of bra and ket sides
+    
+    auto bcomps = angmom::to_SphericalComponents(braGtoBlock.getAngularMomentum());
+    
+    auto kcomps = angmom::to_SphericalComponents(ketGtoBlock.getAngularMomentum());
+    
+    // loop over shell pair components
+    
+    for (int32_t i = 0; i < bcomps; i++)
+    {
+        auto bidx = (braGtoBlock.getIdentifiers(i))[iBraContrGto];
+        
+        for (int32_t j = 0; j < kcomps; j++)
+        {
+            auto kidx = (ketGtoBlock.getIdentifiers(j))[iKetContrGto];
+            
+            if (ovlmat[bidx * ncols + kidx] > _thresholdOfDensity) return true;
+        }
+    }
+    
+    return false;
 }
 
 void

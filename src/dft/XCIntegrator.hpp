@@ -59,12 +59,14 @@ class CXCIntegrator
      Computes exchange-correlation contribution to Kohn-Sham matrix for spin-restricted LDA case.
      
      @param aoKohnShamMatrix the Kohn-Sham matrix.
+     @param overlapMatrix the AO overlap matrix.
      @param gtoContainer the container of GTOs blocks.
      @param xcGradientGrid the exchange-correlation functional gradient grid.
      @param densityGrid the density grid.
      @param molecularGrid the molecular grid.
      */
     void _compRestrictedContributionForLDAWithNL(      CAOKohnShamMatrix& aoKohnShamMatrix,
+                                                 const COverlapMatrix&    overlapMatrix,
                                                  const CGtoContainer*     gtoContainer,
                                                  const CXCGradientGrid&   xcGradientGrid,
                                                  const CDensityGrid&      densityGrid,
@@ -76,6 +78,7 @@ class CXCIntegrator
      for spin-restricted LDA case.
      
      @param aoKohnShamMatrix the pointer to Kohn-Sham matrix.
+     @param overlapMatrix the pointer to overlap matrix.
      @param braGtoBlock the GTOs block on bra side.
      @param iBraContrGto the index of contracted GTO on bra side.
      @param ketGtoBlock the GTOs block on ket side.
@@ -87,6 +90,7 @@ class CXCIntegrator
      @param nGridPoints the number of grid points.
      */
     void _compRestrictedBatchForLDAWithNL(      CAOKohnShamMatrix* aoKohnShamMatrix,
+                                          const COverlapMatrix*    overlapMatrix,
                                           const CGtoBlock&         braGtoBlock,
                                           const int32_t            iBraContrGto,
                                           const CGtoBlock&         ketGtoBlock,
@@ -96,6 +100,22 @@ class CXCIntegrator
                                           const double*            gridCoordinatesZ,
                                           const double*            gridWeights,
                                           const int32_t            nGridPoints) const;
+    
+    /**
+     Checks if shell pair has significant contribution to Kohn-Sham matrix using AO overlap matrix metric.
+
+     @param overlapMatrix the pointer to AO overlap matrix,
+     @param braGtoBlock the GTOs block on bra side.
+     @param iBraContrGto the index of contracted GTO on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iKetContrGto the index of contracted GTO on ket side.
+     @return true if shell pair is significant, false otherwise.
+     */
+    bool _isSignificantShellPair(const COverlapMatrix* overlapMatrix,
+                                 const CGtoBlock&      braGtoBlock,
+                                 const int32_t         iBraContrGto,
+                                 const CGtoBlock&      ketGtoBlock,
+                                 const int32_t         iKetContrGto) const;
     
     /**
      Computes exchange-correlation contribution to Kohn-Sham matrix for spin-restricted LDA case.
