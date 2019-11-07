@@ -478,9 +478,6 @@ class ExcitonModelDriver:
                     self.ostream.flush()
 
                 # 1e integrals
-                ovl_drv = OverlapIntegralsDriver(self.comm)
-                ovl_mat = ovl_drv.compute(dimer, basis)
-
                 kin_drv = KineticEnergyIntegralsDriver(self.comm)
                 kin_mat = kin_drv.compute(dimer, basis)
 
@@ -606,7 +603,7 @@ class ExcitonModelDriver:
                         fock_mat.scale(2.0, 0)
 
                     xc_drv = XCIntegrator(self.comm)
-                    vxc_mat = xc_drv.integrate(dens_mat, ovl_mat, dimer, basis,
+                    vxc_mat = xc_drv.integrate(dens_mat, dimer, basis,
                                                dimer_molgrid, self.xcfun_label)
                     vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
 

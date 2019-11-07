@@ -522,7 +522,7 @@ class ScfDriver:
 
         for i in self.get_scf_range():
 
-            vxc_mat, e_pe, V_pe = self.comp_2e_fock(fock_mat, den_mat, ovl_mat, molecule,
+            vxc_mat, e_pe, V_pe = self.comp_2e_fock(fock_mat, den_mat, molecule,
                                                     ao_basis, qq_data, e_grad)
 
             e_ee, e_kin, e_en = self.comp_energy(fock_mat, vxc_mat, e_pe,
@@ -726,7 +726,6 @@ class ScfDriver:
     def comp_2e_fock(self,
                      fock_mat,
                      den_mat,
-                     ovl_mat,
                      molecule,
                      basis,
                      screening,
@@ -738,8 +737,6 @@ class ScfDriver:
             The AO Fock matrix (only 2e-part).
         :param den_mat:
             The AO density matrix.
-        :param ovl_mat:
-            The AO overlap matrix.
         :param molecule:
             The molecule.
         :param basis:
@@ -755,18 +752,17 @@ class ScfDriver:
 
         if self.use_split_comm and not self.first_step:
             vxc_mat, e_pe, V_pe = self.comp_2e_fock_split_comm(
-                fock_mat, den_mat, ovl_mat, molecule, basis, screening, e_grad)
+                fock_mat, den_mat, molecule, basis, screening, e_grad)
 
         else:
             vxc_mat, e_pe, V_pe = self.comp_2e_fock_single_comm(
-                fock_mat, den_mat, ovl_mat, molecule, basis, screening, e_grad)
+                fock_mat, den_mat, molecule, basis, screening, e_grad)
 
         return vxc_mat, e_pe, V_pe
 
     def comp_2e_fock_single_comm(self,
                                  fock_mat,
                                  den_mat,
-                                 ovl_mat,
                                  molecule,
                                  basis,
                                  screening,
@@ -778,8 +774,6 @@ class ScfDriver:
             The AO Fock matrix (only 2e-part).
         :param den_mat:
             The AO density matrix.
-        :param ovl_mat:
-            The AO overlap matrix.
         :param molecule:
             The molecule.
         :param basis:
@@ -814,7 +808,7 @@ class ScfDriver:
                 fock_mat.scale(2.0, 0)
 
             self.molgrid.distribute(self.rank, self.nodes, self.comm)
-            vxc_mat = xc_drv.integrate(den_mat, ovl_mat, molecule, basis, self.molgrid,
+            vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self.molgrid,
                                        self.xcfun.get_func_label())
             vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
         else:
@@ -840,7 +834,6 @@ class ScfDriver:
     def comp_2e_fock_split_comm(self,
                                 fock_mat,
                                 den_mat,
-                                ovl_mat,
                                 molecule,
                                 basis,
                                 screening,
@@ -852,8 +845,6 @@ class ScfDriver:
             The AO Fock matrix (only 2e-part).
         :param den_mat:
             The AO density matrix.
-        :param ovl_mat:
-            The AO overlap matrix.
         :param molecule:
             The molecule.
         :param basis:

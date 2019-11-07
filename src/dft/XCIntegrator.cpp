@@ -36,7 +36,6 @@ CXCIntegrator::~CXCIntegrator()
 
 CAOKohnShamMatrix
 CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
-                         const COverlapMatrix&   overlapMatrix, 
                          const CMolecule&        molecule,
                          const CMolecularBasis&  basis,
                          const CMolecularGrid&   molecularGrid,
@@ -199,7 +198,6 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
 
 void
 CXCIntegrator::_compRestrictedContributionForLDAWithNL(      CAOKohnShamMatrix& aoKohnShamMatrix,
-                                                       const COverlapMatrix&    overlapMatrix, 
                                                        const CGtoContainer*     gtoContainer,
                                                        const CXCGradientGrid&   xcGradientGrid,
                                                        const CDensityGrid&      densityGrid,
@@ -227,11 +225,7 @@ CXCIntegrator::_compRestrictedContributionForLDAWithNL(      CAOKohnShamMatrix& 
     
     auto ksmatprt = &aoKohnShamMatrix;
     
-    // set up pointer to overlap matrix
-    
-    auto ovlptr = &overlapMatrix;
-    
-    #pragma omp parallel shared(mgx, mgy, mgz, mgw, xcgridptr, ksmatprt, ovlptr, gpoints)
+    #pragma omp parallel shared(mgx, mgy, mgz, mgw, xcgridptr, ksmatprt, gpoints)
     {
         #pragma omp single nowait
         {
@@ -249,7 +243,7 @@ CXCIntegrator::_compRestrictedContributionForLDAWithNL(      CAOKohnShamMatrix& 
                     {
                         #pragma omp task firstprivate(k)
                         {
-                            _compRestrictedBatchForLDAWithNL(ksmatprt, ovlptr, bgtos, k, kgtos, xcgridptr,
+                            _compRestrictedBatchForLDAWithNL(ksmatprt, bgtos, k, kgtos, xcgridptr,
                                                              mgx, mgy, mgz, mgw, gpoints);
                         }
                     }
@@ -269,7 +263,6 @@ CXCIntegrator::_compRestrictedContributionForLDAWithNL(      CAOKohnShamMatrix& 
 
 void
 CXCIntegrator::_compRestrictedBatchForLDAWithNL(      CAOKohnShamMatrix* aoKohnShamMatrix,
-                                                const COverlapMatrix*    overlapMatrix,
                                                 const CGtoBlock&         braGtoBlock,
                                                 const int32_t            iBraContrGto,
                                                 const CGtoBlock&         ketGtoBlock,
@@ -333,7 +326,7 @@ CXCIntegrator::_compRestrictedBatchForLDAWithNL(      CAOKohnShamMatrix* aoKohnS
     
     for (int32_t i = istart; i < ketGtoBlock.getNumberOfContrGtos(); i++)
     {
-        if (_isSignificantShellPair(overlapMatrix, braGtoBlock, iBraContrGto, ketGtoBlock, i))
+        if (_isSignificantShellPair(braGtoBlock, iBraContrGto, ketGtoBlock, i))
         {
             // compute GTO values on grid for ket side
         
@@ -370,39 +363,12 @@ CXCIntegrator::_compRestrictedBatchForLDAWithNL(      CAOKohnShamMatrix* aoKohnS
 }
 
 bool
-CXCIntegrator::_isSignificantShellPair(const COverlapMatrix* overlapMatrix,
-                                       const CGtoBlock&      braGtoBlock,
+CXCIntegrator::_isSignificantShellPair(const CGtoBlock&      braGtoBlock,
                                        const int32_t         iBraContrGto,
                                        const CGtoBlock&      ketGtoBlock,
                                        const int32_t         iKetContrGto) const
 {
-    // set data to overlap matrix
-    
-    auto ncols = overlapMatrix->getNumberOfColumns();
-    
-    auto ovlmat = overlapMatrix->values();
-    
-    // set up angular momentum of bra and ket sides
-    
-    auto bcomps = angmom::to_SphericalComponents(braGtoBlock.getAngularMomentum());
-    
-    auto kcomps = angmom::to_SphericalComponents(ketGtoBlock.getAngularMomentum());
-    
-    // loop over shell pair components
-    
-    for (int32_t i = 0; i < bcomps; i++)
-    {
-        auto bidx = (braGtoBlock.getIdentifiers(i))[iBraContrGto];
-        
-        for (int32_t j = 0; j < kcomps; j++)
-        {
-            auto kidx = (ketGtoBlock.getIdentifiers(j))[iKetContrGto];
-            
-            if (ovlmat[bidx * ncols + kidx] > _thresholdOfDensity) return true;
-        }
-    }
-    
-    return false;
+    return true; 
 }
 
 void
