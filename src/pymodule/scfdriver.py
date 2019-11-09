@@ -220,6 +220,8 @@ class ScfDriver:
             self.max_iter = int(scf_dict['max_iter'])
         if 'conv_thresh' in scf_dict:
             self.conv_thresh = float(scf_dict['conv_thresh'])
+        if 'diis_thresh' in scf_dict:
+            self.diis_thresh = float(scf_dict['diis_thresh'])
         if 'qq_type' in scf_dict:
             self.qq_type = scf_dict['qq_type'].upper()
         if 'eri_thresh' in scf_dict:
@@ -364,6 +366,8 @@ class ScfDriver:
 
             # second step
             self.first_step = False
+
+            self.diis_thresh = 1000.0
 
             self.conv_thresh = old_thresh
 
