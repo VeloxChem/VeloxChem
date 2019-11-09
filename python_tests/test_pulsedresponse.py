@@ -1,8 +1,8 @@
 from mpi4py import MPI
 import numpy as np
-import os
 import unittest
 import h5py
+import os
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -107,6 +107,16 @@ class TestComplexResponse(unittest.TestCase):
                                               scf_tensors)
 
         task.finish()
+
+    @classmethod
+    def tearDownClass(cls):
+
+        h5_file = '{}.h5'.format(cls.h5fname)
+        txt_file = '{}.txt'.format(cls.h5fname)
+        if os.path.isfile(h5_file):
+            os.remove(h5_file)
+        if os.path.isfile(txt_file):
+            os.remove(txt_file)
 
     def test_center_freq_peak(self):
 

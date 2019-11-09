@@ -17,6 +17,7 @@ class TestSCF(unittest.TestCase):
             inpfile = os.path.join('python_tests', inpfile)
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task.input_dict['scf']['checkpoint_file'] = None
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
@@ -37,6 +38,7 @@ class TestSCF(unittest.TestCase):
             inpfile = os.path.join('python_tests', inpfile)
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task.input_dict['scf']['checkpoint_file'] = None
         task.input_dict['method_settings']['xcfun'] = 'b3lyp'
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
@@ -58,6 +60,7 @@ class TestSCF(unittest.TestCase):
             inpfile = os.path.join('python_tests', inpfile)
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task.input_dict['scf']['checkpoint_file'] = None
         task.input_dict['method_settings']['xcfun'] = 'slda'
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
@@ -88,6 +91,7 @@ class TestSCF(unittest.TestCase):
             potfile = os.path.join('python_tests', potfile)
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task.input_dict['scf']['checkpoint_file'] = None
         task.input_dict['method_settings']['potfile'] = potfile
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
@@ -118,6 +122,7 @@ class TestSCF(unittest.TestCase):
             potfile = os.path.join('python_tests', potfile)
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task.input_dict['scf']['checkpoint_file'] = None
         task.input_dict['method_settings']['xcfun'] = 'b3lyp'
         task.input_dict['method_settings']['potfile'] = potfile
 

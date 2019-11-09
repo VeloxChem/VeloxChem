@@ -125,6 +125,7 @@ class TestExciton(unittest.TestCase):
             inpfile = os.path.join('python_tests', inpfile)
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task.input_dict['exciton']['checkpoint_file'] = None
         exciton_dict = task.input_dict['exciton']
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
@@ -144,6 +145,14 @@ class TestExciton(unittest.TestCase):
 
             eigval_diff = np.max(np.abs(eigvals - ref_eigvals))
             self.assertTrue(eigval_diff < threshold)
+
+            for ind in range(len(exciton_drv.monomers)):
+                scf_h5 = 'monomer_{:d}.scf.h5'.format(ind + 1)
+                rsp_h5 = 'monomer_{:d}.rsp.h5'.format(ind + 1)
+                if os.path.isfile(scf_h5):
+                    os.remove(scf_h5)
+                if os.path.isfile(rsp_h5):
+                    os.remove(rsp_h5)
 
     def test_exciton_model_rhf(self):
 
