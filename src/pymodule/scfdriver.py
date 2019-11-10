@@ -13,6 +13,7 @@ from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import AOKohnShamMatrix
 from .veloxchemlib import DenseMatrix
+from .veloxchemlib import NuclearPotentialMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb
@@ -639,8 +640,11 @@ class ScfDriver:
 
         t2 = tm.time()
 
-        npot_drv = NuclearPotentialIntegralsDriver(self.comm)
-        npot_mat = npot_drv.compute(molecule, basis)
+        if molecule.number_of_atoms() >= self.nodes and self.nodes > 1:
+            npot_mat = self.comp_npot_mat_split_comm(molecule, basis)
+        else:
+            npot_drv = NuclearPotentialIntegralsDriver(self.comm)
+            npot_mat = npot_drv.compute(molecule, basis)
 
         t3 = tm.time()
 
@@ -661,6 +665,47 @@ class ScfDriver:
             self.ostream.flush()
 
         return ovl_mat, kin_mat, npot_mat
+
+    def comp_npot_mat_split_comm(self, molecule, basis):
+        """
+        Computes one-electron nuclear potential integral on split
+        communicators.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+
+        :return:
+            The one-electron nuclear potential matrix.
+        """
+
+        node_grps = [p for p in range(self.nodes)]
+        subcomm = SubCommunicators(self.comm, node_grps)
+        local_comm = subcomm.local_comm
+        cross_comm = subcomm.cross_comm
+
+        ave, res = divmod(molecule.number_of_atoms(), self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
+
+        charges = molecule.elem_ids_to_numpy()[start:end].astype(float)
+        coords = np.vstack(
+            (molecule.x_to_numpy()[start:end], molecule.y_to_numpy()[start:end],
+             molecule.z_to_numpy()[start:end])).T
+
+        npot_drv = NuclearPotentialIntegralsDriver(local_comm)
+        npot_mat = npot_drv.compute(molecule, basis, charges, coords).to_numpy()
+
+        if local_comm.Get_rank() == mpi_master():
+            npot_mat = cross_comm.reduce(npot_mat, root=mpi_master())
+
+        if self.rank == mpi_master():
+            return NuclearPotentialMatrix(npot_mat)
+        else:
+            return NuclearPotentialMatrix()
 
     def comp_guess_density(self, molecule, ao_basis, min_basis, ovl_mat):
         """
