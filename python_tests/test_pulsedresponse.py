@@ -113,10 +113,12 @@ class TestComplexResponse(unittest.TestCase):
 
         h5_file = '{}.h5'.format(cls.h5fname)
         txt_file = '{}.txt'.format(cls.h5fname)
-        if os.path.isfile(h5_file):
-            os.remove(h5_file)
-        if os.path.isfile(txt_file):
-            os.remove(txt_file)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            if os.path.isfile(h5_file):
+                os.remove(h5_file)
+            if os.path.isfile(txt_file):
+                os.remove(txt_file)
 
     def test_center_freq_peak(self):
 
