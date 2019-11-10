@@ -11,19 +11,58 @@ from veloxchem.cppsolver import ComplexResponse
 
 class TestCPP(unittest.TestCase):
 
+    def run_cpp(self, inpfile, potfile, xcfun_label, data_lines):
+
+        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task.input_dict['scf']['checkpoint_file'] = None
+
+        if potfile is not None:
+            task.input_dict['method_settings']['potfile'] = potfile
+            try:
+                import cppe
+            except ImportError:
+                return
+
+        if xcfun_label is not None:
+            task.input_dict['method_settings']['xcfun'] = xcfun_label
+
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.update_settings(task.input_dict['scf'],
+                                task.input_dict['method_settings'])
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        ref_freqs = []
+        for line in data_lines:
+            if float(line.split()[3]) not in ref_freqs:
+                ref_freqs.append(float(line.split()[3]))
+        ref_freqs_str = [str(x) for x in ref_freqs]
+        ref_prop_real = [float(line.split()[4]) for line in data_lines]
+        ref_prop_imag = [float(line.split()[5]) for line in data_lines]
+
+        cpp_solver = ComplexResponse(task.mpi_comm, task.ostream)
+        cpp_solver.update_settings({'frequencies': ','.join(ref_freqs_str)},
+                                   task.input_dict['method_settings'])
+        cpp_results = cpp_solver.compute(task.molecule, task.ao_basis,
+                                         scf_drv.scf_tensors)
+
+        if task.mpi_rank == mpi_master():
+            prop = np.array([
+                -cpp_results['properties'][(a, b, w)]
+                for w in ref_freqs
+                for (a, b) in ['xx', 'yy', 'zz', 'xy', 'xz', 'yz']
+            ])
+            self.assertTrue(np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4)
+            self.assertTrue(np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4)
+
     def test_cpp_hf(self):
 
         inpfile = os.path.join('inputs', 'water.inp')
         if not os.path.isfile(inpfile):
             inpfile = os.path.join('python_tests', inpfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
+        potfile = None
 
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = None
 
         #   ------------------------------------------------------------------
         #   No    A-oper    B-oper   Frequency       Real part       Imag part
@@ -48,25 +87,9 @@ class TestCPP(unittest.TestCase):
             17   XDIPLEN   ZDIPLEN    0.100000        0.000000        0.000000
             18   YDIPLEN   ZDIPLEN    0.100000       -0.000001       -0.000000
         """
-        lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.split(os.linesep)[1:-1]
 
-        ref_prop_real = [float(line.split()[4]) for line in lines]
-        ref_prop_imag = [float(line.split()[5]) for line in lines]
-
-        cpp_solver = ComplexResponse(task.mpi_comm, task.ostream)
-        cpp_solver.update_settings({'frequencies': '0-0.15(0.05)'},
-                                   task.input_dict['method_settings'])
-        cpp_results = cpp_solver.compute(task.molecule, task.ao_basis,
-                                         scf_drv.scf_tensors)
-
-        if task.mpi_rank == mpi_master():
-            prop = np.array([
-                -cpp_results['properties'][(a, b, w)]
-                for w in [0.0, 0.05, 0.1]
-                for (a, b) in ['xx', 'yy', 'zz', 'xy', 'xz', 'yz']
-            ])
-            self.assertTrue(np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4)
-            self.assertTrue(np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4)
+        self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
     def test_cpp_dft(self):
 
@@ -74,14 +97,9 @@ class TestCPP(unittest.TestCase):
         if not os.path.isfile(inpfile):
             inpfile = os.path.join('python_tests', inpfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['xcfun'] = 'b3lyp'
+        potfile = None
 
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = 'b3lyp'
 
         #   ------------------------------------------------------------------
         #   No    A-oper    B-oper   Frequency       Real part       Imag part
@@ -106,25 +124,9 @@ class TestCPP(unittest.TestCase):
             17   XDIPLEN   ZDIPLEN    0.100000        0.000000        0.000000
             18   YDIPLEN   ZDIPLEN    0.100000       -0.000000       -0.000000
         """
-        lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.split(os.linesep)[1:-1]
 
-        ref_prop_real = [float(line.split()[4]) for line in lines]
-        ref_prop_imag = [float(line.split()[5]) for line in lines]
-
-        cpp_solver = ComplexResponse(task.mpi_comm, task.ostream)
-        cpp_solver.update_settings({'frequencies': '0-0.15(0.05)'},
-                                   task.input_dict['method_settings'])
-        cpp_results = cpp_solver.compute(task.molecule, task.ao_basis,
-                                         scf_drv.scf_tensors)
-
-        if task.mpi_rank == mpi_master():
-            prop = np.array([
-                -cpp_results['properties'][(a, b, w)]
-                for w in [0.0, 0.05, 0.1]
-                for (a, b) in ['xx', 'yy', 'zz', 'xy', 'xz', 'yz']
-            ])
-            self.assertTrue(np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4)
-            self.assertTrue(np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4)
+        self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
     def test_cpp_dft_slda(self):
 
@@ -132,14 +134,9 @@ class TestCPP(unittest.TestCase):
         if not os.path.isfile(inpfile):
             inpfile = os.path.join('python_tests', inpfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['xcfun'] = 'slda'
+        potfile = None
 
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = 'slda'
 
         #   ------------------------------------------------------------------
         #   No    A-oper    B-oper   Frequency       Real part       Imag part
@@ -164,32 +161,11 @@ class TestCPP(unittest.TestCase):
             17   XDIPLEN   ZDIPLEN    0.100000        0.000000        0.000000
             18   YDIPLEN   ZDIPLEN    0.100000        0.000000        0.000000
         """
-        lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.split(os.linesep)[1:-1]
 
-        ref_prop_real = [float(line.split()[4]) for line in lines]
-        ref_prop_imag = [float(line.split()[5]) for line in lines]
-
-        cpp_solver = ComplexResponse(task.mpi_comm, task.ostream)
-        cpp_solver.update_settings({'frequencies': '0-0.15(0.05)'},
-                                   task.input_dict['method_settings'])
-        cpp_results = cpp_solver.compute(task.molecule, task.ao_basis,
-                                         scf_drv.scf_tensors)
-
-        if task.mpi_rank == mpi_master():
-            prop = np.array([
-                -cpp_results['properties'][(a, b, w)]
-                for w in [0.0, 0.05, 0.1]
-                for (a, b) in ['xx', 'yy', 'zz', 'xy', 'xz', 'yz']
-            ])
-            self.assertTrue(np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4)
-            self.assertTrue(np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4)
+        self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
     def test_cpp_hf_pe(self):
-
-        try:
-            import cppe
-        except ImportError:
-            return
 
         inpfile = os.path.join('inputs', 'pe_water.inp')
         if not os.path.isfile(inpfile):
@@ -199,14 +175,7 @@ class TestCPP(unittest.TestCase):
         if not os.path.isfile(potfile):
             potfile = os.path.join('python_tests', potfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['potfile'] = potfile
-
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = None
 
         #   ------------------------------------------------------------------
         #   No    A-oper    B-oper   Frequency       Real part       Imag part
@@ -231,32 +200,11 @@ class TestCPP(unittest.TestCase):
             17   XDIPLEN   ZDIPLEN    0.100000        0.269121        0.001838
             18   YDIPLEN   ZDIPLEN    0.100000        0.284970        0.001107
         """
-        lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.split(os.linesep)[1:-1]
 
-        ref_prop_real = [float(line.split()[4]) for line in lines]
-        ref_prop_imag = [float(line.split()[5]) for line in lines]
-
-        cpp_solver = ComplexResponse(task.mpi_comm, task.ostream)
-        cpp_solver.update_settings({'frequencies': '0-0.15(0.05)'},
-                                   task.input_dict['method_settings'])
-        cpp_results = cpp_solver.compute(task.molecule, task.ao_basis,
-                                         scf_drv.scf_tensors)
-
-        if task.mpi_rank == mpi_master():
-            prop = np.array([
-                -cpp_results['properties'][(a, b, w)]
-                for w in [0.0, 0.05, 0.1]
-                for (a, b) in ['xx', 'yy', 'zz', 'xy', 'xz', 'yz']
-            ])
-            self.assertTrue(np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4)
-            self.assertTrue(np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4)
+        self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
     def test_cpp_dft_pe(self):
-
-        try:
-            import cppe
-        except ImportError:
-            return
 
         inpfile = os.path.join('inputs', 'pe_water.inp')
         if not os.path.isfile(inpfile):
@@ -266,15 +214,7 @@ class TestCPP(unittest.TestCase):
         if not os.path.isfile(potfile):
             potfile = os.path.join('python_tests', potfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['xcfun'] = 'b3lyp'
-        task.input_dict['method_settings']['potfile'] = potfile
-
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = 'b3lyp'
 
         #   ------------------------------------------------------------------
         #   No    A-oper    B-oper   Frequency       Real part       Imag part
@@ -299,25 +239,9 @@ class TestCPP(unittest.TestCase):
             17   XDIPLEN   ZDIPLEN    0.100000        0.361531        0.003442
             18   YDIPLEN   ZDIPLEN    0.100000        0.301579        0.000664
         """
-        lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.split(os.linesep)[1:-1]
 
-        ref_prop_real = [float(line.split()[4]) for line in lines]
-        ref_prop_imag = [float(line.split()[5]) for line in lines]
-
-        cpp_solver = ComplexResponse(task.mpi_comm, task.ostream)
-        cpp_solver.update_settings({'frequencies': '0-0.15(0.05)'},
-                                   task.input_dict['method_settings'])
-        cpp_results = cpp_solver.compute(task.molecule, task.ao_basis,
-                                         scf_drv.scf_tensors)
-
-        if task.mpi_rank == mpi_master():
-            prop = np.array([
-                -cpp_results['properties'][(a, b, w)]
-                for w in [0.0, 0.05, 0.1]
-                for (a, b) in ['xx', 'yy', 'zz', 'xy', 'xz', 'yz']
-            ])
-            self.assertTrue(np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4)
-            self.assertTrue(np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4)
+        self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
 
 if __name__ == "__main__":

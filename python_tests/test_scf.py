@@ -10,26 +10,45 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 class TestSCF(unittest.TestCase):
 
-    def test_scf_hf(self):
-
-        inpfile = os.path.join('inputs', 'water.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+    def run_scf(self, inpfile, potfile, xcfun_label, ref_e_scf):
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
+
+        if potfile is not None:
+            task.input_dict['method_settings']['potfile'] = potfile
+            try:
+                import cppe
+            except ImportError:
+                return
+
+        if xcfun_label is not None:
+            task.input_dict['method_settings']['xcfun'] = xcfun_label
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+        if task.mpi_rank == mpi_master():
+            e_scf = scf_drv.get_scf_energy()
+            tol = 1.0e-5 if xcfun_label is not None else 1.0e-6
+            self.assertTrue(np.max(np.abs(e_scf - ref_e_scf)) < tol)
+
+    def test_scf_hf(self):
+
+        inpfile = os.path.join('inputs', 'water.inp')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+
+        potfile = None
+
+        xcfun_label = None
+
         #    Final HF energy:             -76.041697549811
         ref_e_scf = -76.041697549811
 
-        if task.mpi_rank == mpi_master():
-            e_scf = scf_drv.get_scf_energy()
-            self.assertTrue(np.max(np.abs(e_scf - ref_e_scf)) < 1.0e-6)
+        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
 
     def test_scf_dft(self):
 
@@ -37,21 +56,14 @@ class TestSCF(unittest.TestCase):
         if not os.path.isfile(inpfile):
             inpfile = os.path.join('python_tests', inpfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['xcfun'] = 'b3lyp'
+        potfile = None
 
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = 'b3lyp'
 
         #    Final DFT energy:            -76.443545741524
         ref_e_scf = -76.443545741524
 
-        if task.mpi_rank == mpi_master():
-            e_scf = scf_drv.get_scf_energy()
-            self.assertTrue(np.max(np.abs(e_scf - ref_e_scf)) < 1.0e-5)
+        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
 
     def test_scf_dft_slda(self):
 
@@ -59,28 +71,16 @@ class TestSCF(unittest.TestCase):
         if not os.path.isfile(inpfile):
             inpfile = os.path.join('python_tests', inpfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['xcfun'] = 'slda'
+        potfile = None
 
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = 'slda'
 
         #    Final DFT energy:            -76.074208234637
         ref_e_scf = -76.074208234637
 
-        if task.mpi_rank == mpi_master():
-            e_scf = scf_drv.get_scf_energy()
-            self.assertTrue(np.max(np.abs(e_scf - ref_e_scf)) < 1.0e-5)
+        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
 
     def test_scf_hf_pe(self):
-
-        try:
-            import cppe
-        except ImportError:
-            return
 
         inpfile = os.path.join('inputs', 'pe_water.inp')
         if not os.path.isfile(inpfile):
@@ -90,28 +90,14 @@ class TestSCF(unittest.TestCase):
         if not os.path.isfile(potfile):
             potfile = os.path.join('python_tests', potfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['potfile'] = potfile
-
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = None
 
         #    Final HF energy:             -76.067159426565
         ref_e_scf = -76.067159426565
 
-        if task.mpi_rank == mpi_master():
-            e_scf = scf_drv.get_scf_energy()
-            self.assertTrue(np.max(np.abs(e_scf - ref_e_scf)) < 1.0e-6)
+        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
 
     def test_scf_dft_pe(self):
-
-        try:
-            import cppe
-        except ImportError:
-            return
 
         inpfile = os.path.join('inputs', 'pe_water.inp')
         if not os.path.isfile(inpfile):
@@ -121,22 +107,12 @@ class TestSCF(unittest.TestCase):
         if not os.path.isfile(potfile):
             potfile = os.path.join('python_tests', potfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['xcfun'] = 'b3lyp'
-        task.input_dict['method_settings']['potfile'] = potfile
-
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = 'b3lyp'
 
         #    Final DFT energy:            -76.468733754150
         ref_e_scf = -76.468733754150
 
-        if task.mpi_rank == mpi_master():
-            e_scf = scf_drv.get_scf_energy()
-            self.assertTrue(np.max(np.abs(e_scf - ref_e_scf)) < 1.0e-5)
+        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
 
 
 if __name__ == "__main__":

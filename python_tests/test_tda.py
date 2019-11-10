@@ -12,19 +12,54 @@ from veloxchem.tdaexcidriver import TDAExciDriver
 
 class TestTDA(unittest.TestCase):
 
+    def run_tda(self, inpfile, potfile, xcfun_label, data_lines):
+
+        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task.input_dict['scf']['checkpoint_file'] = None
+
+        if potfile is not None:
+            task.input_dict['method_settings']['potfile'] = potfile
+            try:
+                import cppe
+            except ImportError:
+                return
+
+        if xcfun_label is not None:
+            task.input_dict['method_settings']['xcfun'] = xcfun_label
+
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.update_settings(task.input_dict['scf'],
+                                task.input_dict['method_settings'])
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        ref_exc_ene = [float(line.split()[1]) for line in data_lines]
+        ref_osc_str = [float(line.split()[3]) for line in data_lines]
+        ref_rot_str = [float(line.split()[4]) for line in data_lines]
+
+        tda_solver = TDAExciDriver(task.mpi_comm, task.ostream)
+        tda_solver.update_settings({'nstates': len(ref_exc_ene)},
+                                   task.input_dict['method_settings'])
+        tda_results = tda_solver.compute(task.molecule, task.ao_basis,
+                                         scf_drv.scf_tensors)
+
+        if task.mpi_rank == mpi_master():
+            exc_ene = tda_results['eigenvalues'] * hartree_in_ev()
+            osc_str = tda_results['oscillator_strengths']
+            rot_str = tda_results['rotatory_strengths']
+
+            self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
+            self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
+            self.assertTrue(np.max(np.abs(rot_str - ref_rot_str)) < 1.0e-2)
+
     def test_tda_hf(self):
 
         inpfile = os.path.join('inputs', 'water.inp')
         if not os.path.isfile(inpfile):
             inpfile = os.path.join('python_tests', inpfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
+        potfile = None
 
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = None
 
         #  State Frequency   Oscillator Strength    Rotatory  Strength
         #          (eV)      Velocity     Length    Velocity    Length
@@ -36,23 +71,9 @@ class TestTDA(unittest.TestCase):
             4    12.1889     0.0014     0.0045    -0.0000    -0.0000
             5    12.8274     0.0117     0.0250     0.0000     0.0000
         """
-        lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.split(os.linesep)[1:-1]
 
-        ref_exc_ene = [float(line.split()[1]) for line in lines]
-        ref_osc_str = [float(line.split()[3]) for line in lines]
-
-        tda_solver = TDAExciDriver(task.mpi_comm, task.ostream)
-        tda_solver.update_settings({'nstates': 5},
-                                   task.input_dict['method_settings'])
-        tda_results = tda_solver.compute(task.molecule, task.ao_basis,
-                                         scf_drv.scf_tensors)
-
-        if task.mpi_rank == mpi_master():
-            exc_ene = tda_results['eigenvalues'] * hartree_in_ev()
-            osc_str = tda_results['oscillator_strengths']
-
-            self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
-            self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
+        self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
     def test_tda_dft(self):
 
@@ -60,14 +81,9 @@ class TestTDA(unittest.TestCase):
         if not os.path.isfile(inpfile):
             inpfile = os.path.join('python_tests', inpfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['xcfun'] = 'b3lyp'
+        potfile = None
 
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = 'b3lyp'
 
         #  State Frequency   Oscillator Strength    Rotatory  Strength
         #          (eV)      Velocity     Length    Velocity    Length
@@ -79,23 +95,9 @@ class TestTDA(unittest.TestCase):
             4    10.3003     0.0005     0.0000    -0.0000    -0.0000
             5    10.6270     0.0044     0.0127    -0.0000    -0.0000
         """
-        lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.split(os.linesep)[1:-1]
 
-        ref_exc_ene = [float(line.split()[1]) for line in lines]
-        ref_osc_str = [float(line.split()[3]) for line in lines]
-
-        tda_solver = TDAExciDriver(task.mpi_comm, task.ostream)
-        tda_solver.update_settings({'nstates': 5},
-                                   task.input_dict['method_settings'])
-        tda_results = tda_solver.compute(task.molecule, task.ao_basis,
-                                         scf_drv.scf_tensors)
-
-        if task.mpi_rank == mpi_master():
-            exc_ene = tda_results['eigenvalues'] * hartree_in_ev()
-            osc_str = tda_results['oscillator_strengths']
-
-            self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
-            self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
+        self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
     def test_tda_dft_slda(self):
 
@@ -103,14 +105,9 @@ class TestTDA(unittest.TestCase):
         if not os.path.isfile(inpfile):
             inpfile = os.path.join('python_tests', inpfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['xcfun'] = 'slda'
+        potfile = None
 
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = 'slda'
 
         #  State Frequency   Oscillator Strength    Rotatory  Strength
         #          (eV)      Velocity     Length    Velocity    Length
@@ -122,30 +119,11 @@ class TestTDA(unittest.TestCase):
             4    10.1323     0.0014     0.0003     0.0000     0.0000
             5    10.3444     0.0036     0.0115    -0.0000    -0.0000
         """
-        lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.split(os.linesep)[1:-1]
 
-        ref_exc_ene = [float(line.split()[1]) for line in lines]
-        ref_osc_str = [float(line.split()[3]) for line in lines]
-
-        tda_solver = TDAExciDriver(task.mpi_comm, task.ostream)
-        tda_solver.update_settings({'nstates': 5},
-                                   task.input_dict['method_settings'])
-        tda_results = tda_solver.compute(task.molecule, task.ao_basis,
-                                         scf_drv.scf_tensors)
-
-        if task.mpi_rank == mpi_master():
-            exc_ene = tda_results['eigenvalues'] * hartree_in_ev()
-            osc_str = tda_results['oscillator_strengths']
-
-            self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
-            self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
+        self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
     def test_tda_hf_pe(self):
-
-        try:
-            import cppe
-        except ImportError:
-            return
 
         inpfile = os.path.join('inputs', 'pe_water.inp')
         if not os.path.isfile(inpfile):
@@ -155,14 +133,7 @@ class TestTDA(unittest.TestCase):
         if not os.path.isfile(potfile):
             potfile = os.path.join('python_tests', potfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['potfile'] = potfile
-
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = None
 
         #  State Frequency   Oscillator Strength    Rotatory  Strength
         #          (eV)      Velocity     Length    Velocity    Length
@@ -174,33 +145,11 @@ class TestTDA(unittest.TestCase):
             4    11.9792     0.0004     0.0013     0.0916     0.1963
             5    12.8941     0.0007     0.0006     0.0132    -0.4366
         """
-        lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.split(os.linesep)[1:-1]
 
-        ref_exc_ene = [float(line.split()[1]) for line in lines]
-        ref_osc_str = [float(line.split()[3]) for line in lines]
-        ref_rot_str = [float(line.split()[4]) for line in lines]
-
-        tda_solver = TDAExciDriver(task.mpi_comm, task.ostream)
-        tda_solver.update_settings({'nstates': 5},
-                                   task.input_dict['method_settings'])
-        tda_results = tda_solver.compute(task.molecule, task.ao_basis,
-                                         scf_drv.scf_tensors)
-
-        if task.mpi_rank == mpi_master():
-            exc_ene = tda_results['eigenvalues'] * hartree_in_ev()
-            osc_str = tda_results['oscillator_strengths']
-            rot_str = tda_results['rotatory_strengths']
-
-            self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
-            self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
-            self.assertTrue(np.max(np.abs(rot_str - ref_rot_str)) < 1.0e-2)
+        self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
     def test_tda_dft_pe(self):
-
-        try:
-            import cppe
-        except ImportError:
-            return
 
         inpfile = os.path.join('inputs', 'pe_water.inp')
         if not os.path.isfile(inpfile):
@@ -210,15 +159,7 @@ class TestTDA(unittest.TestCase):
         if not os.path.isfile(potfile):
             potfile = os.path.join('python_tests', potfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['xcfun'] = 'b3lyp'
-        task.input_dict['method_settings']['potfile'] = potfile
-
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = 'b3lyp'
 
         #  State Frequency   Oscillator Strength    Rotatory  Strength
         #          (eV)      Velocity     Length    Velocity    Length
@@ -230,26 +171,9 @@ class TestTDA(unittest.TestCase):
             4    10.1845     0.0003     0.0003    -0.1075    -0.2451
             5    11.0440     0.0076     0.0029     0.1461    -0.5130
         """
-        lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.split(os.linesep)[1:-1]
 
-        ref_exc_ene = [float(line.split()[1]) for line in lines]
-        ref_osc_str = [float(line.split()[3]) for line in lines]
-        ref_rot_str = [float(line.split()[4]) for line in lines]
-
-        tda_solver = TDAExciDriver(task.mpi_comm, task.ostream)
-        tda_solver.update_settings({'nstates': 5},
-                                   task.input_dict['method_settings'])
-        tda_results = tda_solver.compute(task.molecule, task.ao_basis,
-                                         scf_drv.scf_tensors)
-
-        if task.mpi_rank == mpi_master():
-            exc_ene = tda_results['eigenvalues'] * hartree_in_ev()
-            osc_str = tda_results['oscillator_strengths']
-            rot_str = tda_results['rotatory_strengths']
-
-            self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
-            self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
-            self.assertTrue(np.max(np.abs(rot_str - ref_rot_str)) < 1.0e-2)
+        self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
 
 if __name__ == "__main__":

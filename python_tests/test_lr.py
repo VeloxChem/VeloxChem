@@ -11,19 +11,52 @@ from veloxchem.lrsolver import LinearResponseSolver
 
 class TestLR(unittest.TestCase):
 
+    def run_lr(self, inpfile, potfile, xcfun_label, raw_data):
+
+        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task.input_dict['scf']['checkpoint_file'] = None
+
+        if potfile is not None:
+            task.input_dict['method_settings']['potfile'] = potfile
+            try:
+                import cppe
+            except ImportError:
+                return
+
+        if xcfun_label is not None:
+            task.input_dict['method_settings']['xcfun'] = xcfun_label
+
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.update_settings(task.input_dict['scf'],
+                                task.input_dict['method_settings'])
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        ref_freqs = [0.0, 0.05, 0.1]
+        ref_freqs_str = [str(x) for x in ref_freqs]
+        ref_prop = np.array([float(x) for x in raw_data.split()])
+
+        lr_solver = LinearResponseSolver(task.mpi_comm, task.ostream)
+        lr_solver.update_settings({'frequencies': ','.join(ref_freqs_str)},
+                                  task.input_dict['method_settings'])
+        lr_results = lr_solver.compute(task.molecule, task.ao_basis,
+                                       scf_drv.scf_tensors)
+
+        if task.mpi_rank == mpi_master():
+            prop = np.array([
+                -lr_results[(a, b, w)] for w in ref_freqs for a in 'xyz'
+                for b in 'xyz'
+            ])
+            self.assertTrue(np.max(np.abs(prop - ref_prop)) < 1.0e-4)
+
     def test_lr_hf(self):
 
         inpfile = os.path.join('inputs', 'water.inp')
         if not os.path.isfile(inpfile):
             inpfile = os.path.join('python_tests', inpfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
+        potfile = None
 
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = None
 
         raw_data = """
               7.251835     -5.5859894e-17 -2.0733213e-17
@@ -36,20 +69,8 @@ class TestLR(unittest.TestCase):
             -6.2009897e-17   8.912738      2.7738668e-13
             -5.0236787e-17  2.0685122e-13   8.084815
         """
-        ref_prop = np.array([float(x) for x in raw_data.split()])
 
-        lr_solver = LinearResponseSolver(task.mpi_comm, task.ostream)
-        lr_solver.update_settings({'frequencies': '0-0.15(0.05)'},
-                                  task.input_dict['method_settings'])
-        lr_results = lr_solver.compute(task.molecule, task.ao_basis,
-                                       scf_drv.scf_tensors)
-
-        if task.mpi_rank == mpi_master():
-            prop = np.array([
-                -lr_results[(a, b, w)] for w in [0.0, 0.05, 0.1] for a in 'xyz'
-                for b in 'xyz'
-            ])
-            self.assertTrue(np.max(np.abs(prop - ref_prop)) < 1.0e-4)
+        self.run_lr(inpfile, potfile, xcfun_label, raw_data)
 
     def test_lr_dft(self):
 
@@ -57,14 +78,9 @@ class TestLR(unittest.TestCase):
         if not os.path.isfile(inpfile):
             inpfile = os.path.join('python_tests', inpfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['xcfun'] = 'b3lyp'
+        potfile = None
 
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = 'b3lyp'
 
         raw_data = """
               8.769176      1.4902375e-17 -2.2723900e-16
@@ -77,20 +93,8 @@ class TestLR(unittest.TestCase):
             -7.4493096e-17   9.948384      5.1184715e-14
             -1.9911308e-16  1.7908630e-13   9.407202
         """
-        ref_prop = np.array([float(x) for x in raw_data.split()])
 
-        lr_solver = LinearResponseSolver(task.mpi_comm, task.ostream)
-        lr_solver.update_settings({'frequencies': '0-0.15(0.05)'},
-                                  task.input_dict['method_settings'])
-        lr_results = lr_solver.compute(task.molecule, task.ao_basis,
-                                       scf_drv.scf_tensors)
-
-        if task.mpi_rank == mpi_master():
-            prop = np.array([
-                -lr_results[(a, b, w)] for w in [0.0, 0.05, 0.1] for a in 'xyz'
-                for b in 'xyz'
-            ])
-            self.assertTrue(np.max(np.abs(prop - ref_prop)) < 1.0e-4)
+        self.run_lr(inpfile, potfile, xcfun_label, raw_data)
 
     def test_lr_dft_slda(self):
 
@@ -98,14 +102,9 @@ class TestLR(unittest.TestCase):
         if not os.path.isfile(inpfile):
             inpfile = os.path.join('python_tests', inpfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['xcfun'] = 'slda'
+        potfile = None
 
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = 'slda'
 
         raw_data = """
               9.287658     -1.1997346E-16 -9.5824875E-16
@@ -118,27 +117,10 @@ class TestLR(unittest.TestCase):
             -3.4263886E-16   10.25285      1.5697014E-12
             -8.0798267E-16  2.3530467E-13   9.836690
         """
-        ref_prop = np.array([float(x) for x in raw_data.split()])
 
-        lr_solver = LinearResponseSolver(task.mpi_comm, task.ostream)
-        lr_solver.update_settings({'frequencies': '0-0.15(0.05)'},
-                                  task.input_dict['method_settings'])
-        lr_results = lr_solver.compute(task.molecule, task.ao_basis,
-                                       scf_drv.scf_tensors)
-
-        if task.mpi_rank == mpi_master():
-            prop = np.array([
-                -lr_results[(a, b, w)] for w in [0.0, 0.05, 0.1] for a in 'xyz'
-                for b in 'xyz'
-            ])
-            self.assertTrue(np.max(np.abs(prop - ref_prop)) < 1.0e-4)
+        self.run_lr(inpfile, potfile, xcfun_label, raw_data)
 
     def test_lr_hf_pe(self):
-
-        try:
-            import cppe
-        except ImportError:
-            return
 
         inpfile = os.path.join('inputs', 'pe_water.inp')
         if not os.path.isfile(inpfile):
@@ -148,14 +130,7 @@ class TestLR(unittest.TestCase):
         if not os.path.isfile(potfile):
             potfile = os.path.join('python_tests', potfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['potfile'] = potfile
-
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = None
 
         raw_data = """
              8.747257      0.3740598      0.2502176
@@ -168,27 +143,10 @@ class TestLR(unittest.TestCase):
             0.3645603       7.863375      0.2849957
             0.2691720      0.2849872       8.317053
         """
-        ref_prop = np.array([float(x) for x in raw_data.split()])
 
-        lr_solver = LinearResponseSolver(task.mpi_comm, task.ostream)
-        lr_solver.update_settings({'frequencies': '0-0.15(0.05)'},
-                                  task.input_dict['method_settings'])
-        lr_results = lr_solver.compute(task.molecule, task.ao_basis,
-                                       scf_drv.scf_tensors)
-
-        if task.mpi_rank == mpi_master():
-            prop = np.array([
-                -lr_results[(a, b, w)] for w in [0.0, 0.05, 0.1] for a in 'xyz'
-                for b in 'xyz'
-            ])
-            self.assertTrue(np.max(np.abs(prop - ref_prop)) < 1.0e-4)
+        self.run_lr(inpfile, potfile, xcfun_label, raw_data)
 
     def test_lr_dft_pe(self):
-
-        try:
-            import cppe
-        except ImportError:
-            return
 
         inpfile = os.path.join('inputs', 'pe_water.inp')
         if not os.path.isfile(inpfile):
@@ -198,15 +156,7 @@ class TestLR(unittest.TestCase):
         if not os.path.isfile(potfile):
             potfile = os.path.join('python_tests', potfile)
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['method_settings']['xcfun'] = 'b3lyp'
-        task.input_dict['method_settings']['potfile'] = potfile
-
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        xcfun_label = 'b3lyp'
 
         raw_data = """
              9.715185      0.2695542      0.3272248
@@ -219,20 +169,8 @@ class TestLR(unittest.TestCase):
             0.2174766       9.642433      0.3015763
             0.3616332      0.3015831       9.639443
         """
-        ref_prop = np.array([float(x) for x in raw_data.split()])
 
-        lr_solver = LinearResponseSolver(task.mpi_comm, task.ostream)
-        lr_solver.update_settings({'frequencies': '0-0.15(0.05)'},
-                                  task.input_dict['method_settings'])
-        lr_results = lr_solver.compute(task.molecule, task.ao_basis,
-                                       scf_drv.scf_tensors)
-
-        if task.mpi_rank == mpi_master():
-            prop = np.array([
-                -lr_results[(a, b, w)] for w in [0.0, 0.05, 0.1] for a in 'xyz'
-                for b in 'xyz'
-            ])
-            self.assertTrue(np.max(np.abs(prop - ref_prop)) < 1.0e-4)
+        self.run_lr(inpfile, potfile, xcfun_label, raw_data)
 
 
 if __name__ == "__main__":
