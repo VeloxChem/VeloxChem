@@ -8,12 +8,10 @@ from .veloxchemlib import CudaDevices
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
-from .mointsdriver import MOIntegralsDriver
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
-from .cppsolver import ComplexResponse
 from .pulsedrsp import PulsedResponse
 from .mp2driver import Mp2Driver
 from .excitondriver import ExcitonModelDriver
@@ -38,7 +36,7 @@ def main():
             print(os.linesep.join(info_txt), file=sys.stdout)
         sys.exit(0)
 
-    # set up MPI task
+    # MPI task
 
     task = MpiTask(sys.argv[1:], MPI.COMM_WORLD)
     task_type = task.input_dict['jobs']['task'].lower()
@@ -48,7 +46,7 @@ def main():
     else:
         method_dict = {}
 
-    # initialize CUDA capable devices
+    # CUDA capable devices
 
     gpu_devs = CudaDevices()
     if task.mpi_rank == mpi_master():
@@ -68,7 +66,7 @@ def main():
         exciton_drv.update_settings(exciton_dict, method_dict)
         exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-    # Hartree-Fock
+    # Self-consistent field
 
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'scf', 'wavefunction', 'wave function', 'mp2',
@@ -93,19 +91,9 @@ def main():
         scf_drv.update_settings(scf_dict, method_dict)
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        # molecular orbitals
         mol_orbs = scf_drv.mol_orbs
         density = scf_drv.density
         scf_tensors = scf_drv.scf_tensors
-
-        # tranform integrals to MO basis
-        if 'ao2mo' in scf_dict and scf_drv.restricted:
-
-            moints_drv = MOIntegralsDriver(task.mpi_comm, task.ostream)
-
-            grps = [p for p in range(task.mpi_comm.Get_size())]
-            moints = moints_drv.compute(task.molecule, task.ao_basis, mol_orbs,
-                                        scf_dict['ao2mo'].upper(), grps)
 
     # Response
 
@@ -115,7 +103,6 @@ def main():
         else:
             rsp_dict = {}
 
-        # inherit ERI settings from SCF
         if 'eri_thresh' not in rsp_dict:
             rsp_dict['eri_thresh'] = scf_drv.eri_thresh
         if 'qq_type' not in rsp_dict:
@@ -184,6 +171,6 @@ def main():
         vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
                           density)
 
-    # all done, print finish header to output stream
+    # All done
 
     task.finish()

@@ -518,8 +518,7 @@ class LinearResponseEigenSolver:
 
             new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
-                molecule, basis, molgrid, gs_density, V_es, pe_drv,
-                timing_dict)
+                molecule, basis, molgrid, gs_density, V_es, pe_drv, timing_dict)
 
             if self.rank == mpi_master():
                 e2bger = np.append(e2bger, new_e2bger, axis=1)

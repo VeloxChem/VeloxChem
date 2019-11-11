@@ -2,7 +2,6 @@ import numpy as np
 import time as tm
 import math
 
-from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver

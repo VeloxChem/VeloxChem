@@ -354,8 +354,7 @@ class PulsedResponse:
                         # Add all polarizability for the give direction
                         for freq in self.zero_padded_freqs:
                             polarizability.append(
-                                self.results['properties_zeropad'][(xyz1,
-                                                                    xyz2,
+                                self.results['properties_zeropad'][(xyz1, xyz2,
                                                                     freq)])
 
                         hf.create_dataset("{}{}".format(xyz1, xyz2),
@@ -413,18 +412,18 @@ class PulsedResponse:
         dw = self.truncated_freqs[1] - self.truncated_freqs[0]
 
         # Find the number of zeros before the truncated pulse
-        prepended_zeros = int(self.truncated_freqs[0]/dw) + 1  # for zero
+        prepended_zeros = int(self.truncated_freqs[0] / dw) + 1  # for zero
 
         # Find the number of zeros truncated at the end
-        appended_zeros = (len(self.zero_padded_freqs) - len(self.amplitudes)
-                          - prepended_zeros)
+        appended_zeros = (len(self.zero_padded_freqs) - len(self.amplitudes) -
+                          prepended_zeros)
 
         # Assemble the array of amplitudes that matches the frequency array
         pre_zeros = [0 for x in range(prepended_zeros)]
         app_zeros = [0 for x in range(appended_zeros)]
-        self.zero_padded_amplitudes = np.array(pre_zeros
-                                               + self.amplitudes.tolist()
-                                               + app_zeros)
+        self.zero_padded_amplitudes = np.array(pre_zeros +
+                                               self.amplitudes.tolist() +
+                                               app_zeros)
 
         return results
 
