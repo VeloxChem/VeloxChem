@@ -46,7 +46,6 @@ from .mp2driver import Mp2Driver
 from .visualizationdriver import VisualizationDriver
 from .excitondriver import ExcitonModelDriver
 from .rspdriver import ResponseDriver
-from .adconedriver import AdcOneDriver
 from .tdaexcidriver import TDAExciDriver
 from .blockdavidson import BlockDavidsonSolver
 from .lreigensolver import LinearResponseEigenSolver

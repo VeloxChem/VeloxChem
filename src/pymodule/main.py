@@ -16,7 +16,6 @@ from .rspabsorption import Absorption
 from .cppsolver import ComplexResponse
 from .pulsedrsp import PulsedResponse
 from .mp2driver import Mp2Driver
-from .adconedriver import AdcOneDriver
 from .excitondriver import ExcitonModelDriver
 from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
@@ -35,15 +34,14 @@ def main():
             '    python3 -m veloxchem input_file [output_file]',
             '',
         ]
-        print(os.linesep.join(info_txt), file=sys.stdout)
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            print(os.linesep.join(info_txt), file=sys.stdout)
         sys.exit(0)
 
     # set up MPI task
 
     task = MpiTask(sys.argv[1:], MPI.COMM_WORLD)
-
-    task_types = task.input_dict['jobs']['task'].lower().split(',')
-    task_types = [x.strip() for x in task_types]
+    task_type = task.input_dict['jobs']['task'].lower()
 
     if 'method_settings' in task.input_dict:
         method_dict = task.input_dict['method_settings']
@@ -60,8 +58,7 @@ def main():
 
     # Exciton model
 
-    if 'exciton' in task_types:
-
+    if task_type == 'exciton':
         if 'exciton' in task.input_dict:
             exciton_dict = task.input_dict['exciton']
         else:
@@ -73,19 +70,14 @@ def main():
 
     # Hartree-Fock
 
-    run_scf = True in [
-        x in [
-            'hf', 'rhf', 'uhf', 'scf', 'wavefunction', 'wave function', 'mp2',
-            'visualization', 'response', 'cpp', 'adc1'
-        ] for x in task_types
+    run_scf = task_type in [
+        'hf', 'rhf', 'uhf', 'scf', 'wavefunction', 'wave function', 'mp2',
+        'response', 'visualization'
     ]
 
-    run_unrestricted = 'uhf' in task_types
+    run_unrestricted = (task_type == 'uhf')
 
     if run_scf:
-
-        # initialize scf driver and run scf
-
         if 'scf' in task.input_dict:
             scf_dict = task.input_dict['scf']
         else:
@@ -102,7 +94,6 @@ def main():
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         # molecular orbitals
-
         mol_orbs = scf_drv.mol_orbs
         density = scf_drv.density
         scf_tensors = scf_drv.scf_tensors
@@ -116,42 +107,15 @@ def main():
             moints = moints_drv.compute(task.molecule, task.ao_basis, mol_orbs,
                                         scf_dict['ao2mo'].upper(), grps)
 
-            # sketch for transforming MO integrals batches to antisymmetrized
-            # integrals
-            # Indexing scheme: occupied orbitals from 0..nocc
-            #                  virtual orbitals from nocc..ntot
-            #
-            # Select here external indexes space (one need to generalize this)
-            # if  mintstype == "OVOV":
-            #     bra_idx = (0, nocc)
-            #     ket_idx = (nocc, nocc + nvirt)
-            # Assuming we add to tensor ten[i,j,k,l]
-            # for idx, pair in enumerate(moints.get_gen_pairs()):
-            #
-            #   i = pair.first()
-            #   j = pair.second()
-            #
-            #   fxy = moints.xy_to_numpy()
-            #   fyx = moints.yx_to_numpy()
-            #
-            #    for k in bra_idx:
-            #        for l in ket_idx:
-            #           # aaaa, bbbb blocks
-            #           ten_aaaa[i,j,k,l] = fxy[k,l] - fyx[l,k]
-            #           # abab, baba
-            #           ten_abab[i,j,k,l] = fxy[k,l]
-            #           # abba, baba
-            #           ten_abba[i,j,k,l] = -fyx[l,k]
-
     # Response
 
-    if 'response' in task_types and scf_drv.restricted:
-
+    if task_type == 'response' and scf_drv.restricted:
         if 'response' in task.input_dict:
             rsp_dict = task.input_dict['response']
         else:
             rsp_dict = {}
 
+        # inherit ERI settings from SCF
         if 'eri_thresh' not in rsp_dict:
             rsp_dict['eri_thresh'] = scf_drv.eri_thresh
         if 'qq_type' not in rsp_dict:
@@ -183,21 +147,6 @@ def main():
         if task.mpi_rank == mpi_master():
             rsp_prop.print_property(task.ostream)
 
-    # Complex Response
-
-    if 'cpp' in task_types and scf_drv.restricted:
-
-        if 'cpp' in task.input_dict:
-            cpp_dict = task.input_dict['cpp']
-        else:
-            cpp_dict = {}
-
-        cpp_drv = ComplexResponse(task.mpi_comm, task.ostream)
-        cpp_drv.update_settings(cpp_dict, method_dict)
-        results = cpp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
-        if task.mpi_rank == mpi_master():
-            cpp_drv.print_properties(results['properties'])
-
     # Pulsed Linear Response Theory
 
     if 'pulses' in task.input_dict and scf_drv.restricted:
@@ -208,23 +157,9 @@ def main():
         pulsed_response.update_settings(prt_dict, cpp_dict)
         pulsed_response.compute(task.molecule, task.ao_basis, scf_tensors)
 
-    # ADC(1)
-
-    if 'adc1' in task_types and scf_drv.restricted:
-
-        if 'adc' in task.input_dict:
-            adc_dict = task.input_dict['adc']
-        else:
-            adc_dict = {}
-
-        adc1_drv = AdcOneDriver(task.mpi_comm, task.ostream)
-        adc1_drv.update_settings(adc_dict)
-        adc1_drv.compute(task.molecule, task.ao_basis, scf_tensors)
-
     # MP2 perturbation theory
 
-    if 'mp2' in task_types and scf_drv.restricted:
-
+    if task_type == 'mp2' and scf_drv.restricted:
         if 'mp2' in task.input_dict:
             mp2_dict = task.input_dict['mp2']
         else:
@@ -236,8 +171,7 @@ def main():
 
     # Cube file
 
-    if 'visualization' in task_types:
-
+    if task_type == 'visualization':
         if 'visualization' in task.input_dict:
             cube_dict = task.input_dict['visualization']
         else:
