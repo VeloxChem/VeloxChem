@@ -148,7 +148,17 @@ CNuclearPotentialMatrix_from_numpy(const py::array_t<double>& arr)
     return std::shared_ptr<CNuclearPotentialMatrix>(new CNuclearPotentialMatrix(*mp));
 }
 
-// Helper function for exporting CNuclearPotentialMatrix.compute
+// Helper function for reduce_sum CNuclearPotentialMatrix object
+
+static void
+CNuclearPotentialMatrix_reduce_sum(CNuclearPotentialMatrix& self, int32_t rank, int32_t nodes, py::object py_comm)
+{
+    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+    self.reduce_sum(rank, nodes, *comm_ptr);
+}
+
+// Helper function for exporting CNuclearPotentialIntegralsDriver.compute
 
 static CNuclearPotentialMatrix
 CNuclearPotentialIntegralsDriver_compute(CNuclearPotentialIntegralsDriver&              self,
@@ -444,6 +454,7 @@ export_oneints(py::module& m)
         .def(py::init(&CNuclearPotentialMatrix_from_numpy))
         .def("__str__", &CNuclearPotentialMatrix_str)
         .def("to_numpy", &CNuclearPotentialMatrix_to_numpy)
+        .def("reduce_sum", &CNuclearPotentialMatrix_reduce_sum)
         .def("get_energy", &CNuclearPotentialMatrix::getNuclearPotentialEnergy)
         .def(py::self == py::self);
 

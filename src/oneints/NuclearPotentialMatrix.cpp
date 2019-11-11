@@ -70,6 +70,16 @@ CNuclearPotentialMatrix::operator!=(const CNuclearPotentialMatrix& other) const
     return !(*this == other);
 }
 
+void
+CNuclearPotentialMatrix::reduce_sum(int32_t  rank,
+                                    int32_t  nodes,
+                                    MPI_Comm comm)
+{
+    _matrix.reduce_sum(rank, nodes, comm);
+
+    MPI_Barrier(comm);
+}
+
 std::string
 CNuclearPotentialMatrix::getString() const
 {

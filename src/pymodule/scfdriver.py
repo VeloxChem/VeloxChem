@@ -13,7 +13,6 @@ from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import AOKohnShamMatrix
 from .veloxchemlib import DenseMatrix
-from .veloxchemlib import NuclearPotentialMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb
@@ -697,15 +696,13 @@ class ScfDriver:
              molecule.z_to_numpy()[start:end])).T
 
         npot_drv = NuclearPotentialIntegralsDriver(local_comm)
-        npot_mat = npot_drv.compute(molecule, basis, charges, coords).to_numpy()
+        npot_mat = npot_drv.compute(molecule, basis, charges, coords)
 
         if local_comm.Get_rank() == mpi_master():
-            npot_mat = cross_comm.reduce(npot_mat, root=mpi_master())
+            npot_mat.reduce_sum(cross_comm.Get_rank(), cross_comm.Get_size(),
+                                cross_comm)
 
-        if self.rank == mpi_master():
-            return NuclearPotentialMatrix(npot_mat)
-        else:
-            return NuclearPotentialMatrix()
+        return npot_mat
 
     def comp_guess_density(self, molecule, ao_basis, min_basis, ovl_mat):
         """

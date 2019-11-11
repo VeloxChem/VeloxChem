@@ -98,6 +98,19 @@ class CNuclearPotentialMatrix
     bool operator!=(const CNuclearPotentialMatrix& other) const;
 
     /**
+     Reduces nuclear potential matrix object from all MPI process within domain
+     of MPI communicator into nuclear potential matrix object on master node by
+     summing them.
+
+     @param rank the rank of MPI process.
+     @param nodes the number of MPI processes in MPI communicator.
+     @param comm the MPI communicator.
+     */
+    void reduce_sum(int32_t  rank,
+                    int32_t  nodes,
+                    MPI_Comm comm);
+
+    /**
      Gets string representation of nuclear potential matrix.
 
      @return a string for printing the nuclear potential matrix.
