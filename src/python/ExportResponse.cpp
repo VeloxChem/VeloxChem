@@ -17,7 +17,6 @@
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "ScreeningContainer.hpp"
-#include "TDASigmaVectorDriver.hpp"
 
 namespace py = pybind11;
 
@@ -85,16 +84,6 @@ CExcitationVector_ket_indexes_to_numpy(const CExcitationVector& self)
     return vlx_general::pointer_to_numpy(self.getKetIndexes(), self.getNumberOfExcitations());
 }
 
-// Helper function for CTDASigmaVectorDriver constructor
-
-static std::shared_ptr<CTDASigmaVectorDriver>
-CTDASigmaVectorDriver_create(py::object py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    return std::shared_ptr<CTDASigmaVectorDriver>(new CTDASigmaVectorDriver(*comm_ptr));
-}
-
 // Exports classes/functions in src/response to python
 
 void
@@ -130,12 +119,6 @@ export_response(py::module& m)
         .def("zvector_to_numpy", &CExcitationVector_zvector_to_numpy)
         .def("yvector_to_numpy", &CExcitationVector_yvector_to_numpy)
         .def("diagonal_to_numpy", &CExcitationVector_diagonal_to_numpy);
-
-    // CTDASigmaVectorDriver class
-
-    py::class_<CTDASigmaVectorDriver, std::shared_ptr<CTDASigmaVectorDriver>>(m, "TDASigmaVectorDriver")
-        .def(py::init(&CTDASigmaVectorDriver_create))
-        .def("compute", &CTDASigmaVectorDriver::compute);
 }
 
 }  // namespace vlx_response
