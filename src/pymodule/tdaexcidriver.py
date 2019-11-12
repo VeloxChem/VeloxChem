@@ -35,56 +35,37 @@ class TDAExciDriver:
     Implements TDA excited states computation schheme for Hartree-Fock/Kohn-Sham
     level of theory.
 
-    :param nstates:
-        The number of excited states determined by driver.
-    :param eri_thresh:
-        The electron repulsion integrals screening threshold.
-    :param qq_type:
-        The electron repulsion integrals screening scheme.
-    :param dft:
-        The flag for running DFT.
-    :param grid_level:
-        The accuracy level of DFT grid.
-    :param xcfun:
-        The XC functional.
-    :param pe:
-        The flag for running polarizable embedding calculation.
-    :param potfile:
-        The name of the potential file for polarizable embedding.
-    :param use_split_comm:
-        The flag for using split communicators.
-    :param conv_thresh:
-        The excited states convergence threshold.
-    :param max_iter:
-        The maximum number of excited states driver iterations.
-    :param cur_iter:
-        The current number of excited states driver iterations.
-    :param solver:
-        The eigenvalues solver.
-    :param is_converged:
-        The flag for excited states convergence.
-    :param rank:
-        The rank of MPI process.
-    :param nodes:
-        The number of MPI processes.
+    :param comm:
+        The MPI communicator.
     :param ostream:
         The output stream.
-    :param restart:
-        The flag for restarting from checkpoint file.
-    :param checkpoint_file:
-        The name of checkpoint file.
-    :param checkpoint_time:
-        The timer of checkpoint file.
+
+    Instance variables
+        - nstates: The number of excited states determined by driver.
+        - eri_thresh: The electron repulsion integrals screening threshold.
+        - qq_type: The electron repulsion integrals screening scheme.
+        - dft: The flag for running DFT.
+        - grid_level: The accuracy level of DFT grid.
+        - xcfun: The XC functional.
+        - pe: The flag for running polarizable embedding calculation.
+        - potfile: The name of the potential file for polarizable embedding.
+        - use_split_comm: The flag for using split communicators.
+        - conv_thresh: The excited states convergence threshold.
+        - max_iter: The maximum number of excited states driver iterations.
+        - cur_iter: The current number of excited states driver iterations.
+        - solver: The eigenvalues solver.
+        - is_converged: The flag for excited states convergence.
+        - rank: The rank of MPI process.
+        - nodes: The number of MPI processes.
+        - ostream: The output stream.
+        - restart: The flag for restarting from checkpoint file.
+        - checkpoint_file: The name of checkpoint file.
+        - checkpoint_time: The timer of checkpoint file.
     """
 
     def __init__(self, comm, ostream):
         """
         Initializes TDA excited states computation drived to default setup.
-
-        :param comm:
-            The MPI communicator.
-        :param ostream:
-            The output stream.
         """
 
         # excited states information

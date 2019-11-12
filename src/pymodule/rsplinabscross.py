@@ -13,18 +13,16 @@ class LinearAbsorptionCrossSection(ResponseProperty):
         The dictionary of response input.
     :param method_dict:
         The dictionary of method settings.
-    :param rsp_property:
-        The dictionary of response property.
+
+    Instance variables
+        - rsp_dict: The dictionary of response input.
+        - method_dict: The dictionary of method settings.
+        - rsp_property: The dictionary of response property.
     """
 
     def __init__(self, rsp_dict, method_dict={}):
         """
         Initializes the linear absorption cross-section property.
-
-        :param rsp_dict:
-            The dictionary of response input.
-        :param method_dict:
-            The dictionary of method settings.
         """
 
         rsp_dict = dict(rsp_dict)

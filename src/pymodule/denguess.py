@@ -13,9 +13,9 @@ class DensityGuess:
     Implements initial density guess generator with set of different methods
     for generation of initial density.
 
-    _guess_type
+    :param guess_type:
         The type of initial guess.
-    _checkpoint_file
+    :param checkpoint_file:
         The name of checkpoint file.
     """
 
@@ -23,11 +23,6 @@ class DensityGuess:
         """
         Initializes initial guess generator by setting initial guess type.
         Default for initial guess type is a superposition of atomic densities.
-
-        :param guess_type:
-            The type of initial guess.
-        :param checkpoint_file:
-            The name of checkpoint file.
         """
 
         self._guess_type = guess_type
@@ -37,12 +32,14 @@ class DensityGuess:
         """
         Converts object to it's informal string.
         """
+
         return self._guess_type
 
     def __repr__(self):
         """
         Converts object to it's formal string.
         """
+
         return self._guess_type
 
     @property
@@ -50,6 +47,7 @@ class DensityGuess:
         """
         Getter function for protected guess_type attribute.
         """
+
         return self._guess_type
 
     @guess_type.setter
@@ -57,6 +55,7 @@ class DensityGuess:
         """
         Setter function for protected guess_type attribute.
         """
+
         self._guess_type = value
 
     def validate_checkpoint(self, rank, comm, nuclear_charges, basis_set):

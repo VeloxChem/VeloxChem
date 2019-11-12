@@ -13,34 +13,26 @@ class MpiTask:
     """
     Implements the MPI task.
 
+    :param fname_list:
+        List of the intput/output filenames.
     :param mpi_comm:
         The MPI communicator.
-    :param mpi_rank:
-        The MPI rank.
-    :param mpi_size:
-        Number of MPI processes.
-    :param molecule:
-        The molecule.
-    :param ao_basis:
-        The AO basis set.
-    :param min_basis:
-        The minimal AO basis set for generating initial guess.
-    :param ostream:
-        The output stream.
-    :param input_dict:
-        The input dictionary.
-    :param start_time:
-        The start time of the task.
+
+    Instance variable
+        - mpi_comm: The MPI communicator.
+        - mpi_rank: The MPI rank.
+        - mpi_size: Number of MPI processes.
+        - molecule: The molecule.
+        - ao_basis: The AO basis set.
+        - min_basis: The minimal AO basis set for generating initial guess.
+        - ostream: The output stream.
+        - input_dict: The input dictionary.
+        - start_time: The start time of the task.
     """
 
     def __init__(self, fname_list, mpi_comm):
         """
         Initializes the MPI task.
-
-        :param fname_list:
-            List of the intput/output filenames.
-        :param mpi_comm:
-            The MPI communicator.
         """
 
         # mpi settings

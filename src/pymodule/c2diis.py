@@ -6,8 +6,8 @@ class CTwoDiis:
     Implements direct inversion of the iterative subspace in C2 form proposed
     by H. Seller.
 
-    :param error_vectors:
-        The list of error vectors.
+    Instance variables
+        - error_vectors: The list of error vectors.
     """
 
     def __init__(self):

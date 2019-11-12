@@ -28,72 +28,47 @@ class LinearResponseSolver:
     """
     Implements linear response solver.
 
-    :param a_operator:
-        The A operator.
-    :param a_components:
-        Cartesian components of the A operator.
-    :param b_operator:
-        The B operator.
-    :param b_components:
-        Cartesian components of the B operator.
-    :param frequencies:
-        The frequencies.
-    :param eri_thresh:
-        The electron repulsion integrals screening threshold.
-    :param qq_type:
-        The electron repulsion integrals screening scheme.
-    :param dft:
-        The flag for running DFT.
-    :param grid_level:
-        The accuracy level of DFT grid.
-    :param xcfun:
-        The XC functional.
-    :param pe:
-        The flag for running polarizable embedding calculation.
-    :param potfile:
-        The name of the potential file for polarizable embedding.
-    :param use_split_comm:
-        The flag for using split communicators.
-    :param conv_thresh:
-        The convergence threshold for the solver.
-    :param max_iter:
-        The maximum number of solver iterations.
-    :param cur_iter:
-        Index of the current iteration.
-    :param small_thresh:
-        The norm threshold for a vector to be considered a zero vector.
-    :param lindep_thresh:
-        The threshold for removing linear dependence in the trial vectors.
-    :param is_converged:
-        The flag for convergence.
     :param comm:
         The MPI communicator.
-    :param rank:
-        The MPI rank.
-    :param nodes:
-        Number of MPI processes.
     :param ostream:
         The output stream.
-    :param restart:
-        The flag for restarting from checkpoint file.
-    :param checkpoint_file:
-        The name of checkpoint file.
-    :param checkpoint_time:
-        The timer of checkpoint file.
-    :param timing:
-        The flag for printing timing information.
-    :param profiling:
-        The flag for printing profiling information.
+
+    Instance variables
+        - a_operator: The A operator.
+        - a_components: Cartesian components of the A operator.
+        - b_operator: The B operator.
+        - b_components: Cartesian components of the B operator.
+        - frequencies: The frequencies.
+        - eri_thresh: The electron repulsion integrals screening threshold.
+        - qq_type: The electron repulsion integrals screening scheme.
+        - dft: The flag for running DFT.
+        - grid_level: The accuracy level of DFT grid.
+        - xcfun: The XC functional.
+        - pe: The flag for running polarizable embedding calculation.
+        - potfile: The name of the potential file for polarizable embedding.
+        - use_split_comm: The flag for using split communicators.
+        - conv_thresh: The convergence threshold for the solver.
+        - max_iter: The maximum number of solver iterations.
+        - cur_iter: Index of the current iteration.
+        - small_thresh: The norm threshold for a vector to be considered a zero
+          vector.
+        - lindep_thresh: The threshold for removing linear dependence in the
+          trial vectors.
+        - is_converged: The flag for convergence.
+        - comm: The MPI communicator.
+        - rank: The MPI rank.
+        - nodes: Number of MPI processes.
+        - ostream: The output stream.
+        - restart: The flag for restarting from checkpoint file.
+        - checkpoint_file: The name of checkpoint file.
+        - checkpoint_time: The timer of checkpoint file.
+        - timing: The flag for printing timing information.
+        - profiling: The flag for printing profiling information.
     """
 
     def __init__(self, comm, ostream):
         """
         Initializes linear response solver to default setup.
-
-        :param comm:
-            The MPI communicator.
-        :param ostream:
-            The output stream.
         """
 
         # operators and frequencies

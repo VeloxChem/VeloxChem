@@ -11,12 +11,12 @@ class BlockDavidsonSolver:
     problems i.e. A * X = e X. Reference: SIAM J. Sci. Comput. 15 (1994),
     62-76.
 
-    :param neigenpairs:
-        The number of eigenpairs of A matrix determined by solver.
-    :param sigma_matrices:
-        The sigma vectors A * X in matrix format {A * X_0, A * X_1,...}.
-    :param trial_matrices:
-        The trial vectors in matrix format {X_0, X_1,...}.
+    Instance variables
+        - neigenpairs: The number of eigenpairs of A matrix determined by
+          solver.
+        - sigma_matrices: The sigma vectors A * X in matrix format {A * X_0, A
+          * X_1,...}.
+        - trial_matrices: The trial vectors in matrix format {X_0, X_1,...}.
     """
 
     def __init__(self):

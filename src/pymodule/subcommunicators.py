@@ -6,20 +6,20 @@ class SubCommunicators:
     """
     Implements the MPI subcommunicator.
 
-    :param local_comm:
-        The local subcommunicator.
-    :param cross_comm:
-        The cross subcommunicator consisting of the local master nodes.
+    :param global_comm:
+        The global communicator.
+    :param grps:
+        The color group for creating MPI subcommunicators.
+
+    Instance variables
+        - local_comm: The local subcommunicator.
+        - cross_comm: The cross subcommunicator consisting of the local master
+          nodes.
     """
 
     def __init__(self, global_comm, grps):
         """
         Initializes the MPI subcommunicator.
-
-        :param global_comm:
-            The global communicator.
-        :param grps:
-            The color group for creating MPI subcommunicators.
         """
 
         global_rank = global_comm.Get_rank()

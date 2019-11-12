@@ -13,44 +13,38 @@ class PulsedResponse:
 
     :param comm:
         The MPI communicator.
-    :param rank:
-        The MPI rank.
-    :param nodes:
-        The number of MPI processes.
     :param ostream:
         The output stream.
-    :param field_cutoff_ratio:
-        Float - Ratio between the smallest field amplitude to be included in
-        the calculation wrt. the maximum field amplitude.
-        Frequencies with associated field amplitudes smaller than this
-        ratio will NOT be included in the calculation.
-    :param envelope:
-        String - Envelope of the of pulse - available arguments: ['gaussian', ]
-    :param number_pulses:
-        Integer - The number of different pulse settings to expect 'N'.
-        Currently limited to one.
-    :param pulse_widths:
-        List of floats (len(N)) - pulse widths in [au].
-    :param carrier_frequencies:
-        List of floats (len(N)) - carrier frequencies in [au].
-    :param field_max:
-        List of floats (len(N)) - pulse amplitudes in [au].
-    :param centers:
-        List of floats (len(N)) - time centers for the pulses in [au].
-    :param pol_dir:
-        string - polarization directions, arguments given in combinations of
-        x, y and z - e.g.: 'x' for [1 0 0], yz for [0 1 1].
-    :param frequency_range:
-        List of frequencies to map solution to.
-        Given as range: 'start-end(df)' in [au],
-        e.g. 0.2-0.4(0.007) for 0.2 -> 0.4 au in steps of 0.007 au.
-        Zero-padding will be applied if range does not start at 0.
-    :param CEP:
-        List of floats (len(N)) - carrier envelope phases in [radians].
-    :param h5file:
-        String - optional - name of requested h5 formatted result file.
-    :param ascii:
-        String - optional - name of requested ASCII formatted file.
+
+    Instance variable
+        - comm: The MPI communicator.
+        - rank: The MPI rank.
+        - nodes: The number of MPI processes.
+        - ostream: The output stream.
+        - field_cutoff_ratio: Float - Ratio between the smallest field
+          amplitude to be included in the calculation wrt. the maximum field
+          amplitude.  Frequencies with associated field amplitudes smaller than
+          this ratio will NOT be included in the calculation.
+        - envelope: String - Envelope of the of pulse - available arguments:
+          ['gaussian', ]
+        - number_pulses: Integer - The number of different pulse settings to
+          expect 'N'.  Currently limited to one.
+        - pulse_widths: List of floats (len(N)) - pulse widths in [au].
+        - carrier_frequencies: List of floats (len(N)) - carrier frequencies in
+          [au].
+        - field_max: List of floats (len(N)) - pulse amplitudes in [au].
+        - centers: List of floats (len(N)) - time centers for the pulses in
+          [au].
+        - pol_dir: string - polarization directions, arguments given in
+          combinations of x, y and z - e.g.: 'x' for [1 0 0], yz for [0 1 1].
+        - frequency_range: List of frequencies to map solution to.  Given as
+          range: 'start-end(df)' in [au], e.g. 0.2-0.4(0.007) for 0.2 -> 0.4 au
+          in steps of 0.007 au.  Zero-padding will be applied if range does not
+          start at 0.
+        - CEP: List of floats (len(N)) - carrier envelope phases in [radians].
+        - h5file: String - optional - name of requested h5 formatted result
+          file.
+        - ascii: String - optional - name of requested ASCII formatted file.
     """
 
     def __init__(self, comm, ostream):

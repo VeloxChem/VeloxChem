@@ -29,34 +29,24 @@ class LinearResponseMatrixVectorDriver:
 
     :param comm:
         The MPI communicator.
-    :param rank:
-        The MPI rank.
-    :param nodes:
-        Number of MPI processes.
-    :param use_split_comm:
-        The flag for using split communicators.
-    :param split_comm_ratio:
-        The list of ratios for split communicators.
-    :param eri_thresh:
-        The electron repulsion integrals screening threshold.
-    :param qq_type:
-        The electron repulsion integrals screening scheme.
-    :param dft:
-        The flag for running DFT.
-    :param xcfun:
-        The XC functional.
-    :param pe:
-        The flag for running polarizable embedding calculation.
-    :param potfile:
-        The name of the potential file for polarizable embedding.
+
+    Instance variables
+        - comm: The MPI communicator.
+        - rank: The MPI rank.
+        - nodes: Number of MPI processes.
+        - use_split_comm: The flag for using split communicators.
+        - split_comm_ratio: The list of ratios for split communicators.
+        - eri_thresh: The electron repulsion integrals screening threshold.
+        - qq_type: The electron repulsion integrals screening scheme.
+        - dft: The flag for running DFT.
+        - xcfun: The XC functional.
+        - pe: The flag for running polarizable embedding calculation.
+        - potfile: The name of the potential file for polarizable embedding.
     """
 
     def __init__(self, comm, use_split_comm=False):
         """
         Initializes linear response matrix vector driver to default setup.
-
-        :param comm:
-            The MPI communicator.
         """
 
         # mpi information

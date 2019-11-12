@@ -19,32 +19,25 @@ class MOIntegralsDriver:
     """
     Implements MO integrals driver.
 
-    :param qq_type:
-        The electron repulsion integrals screening scheme.
-    :param eri_thresh:
-        The electron repulsion integrals screening threshold.
-    :param num_matrices:
-        Number of Fock matrices to be computed.
-    :param batch_size:
-        Batch size for computing Fock matrices.
     :param comm:
         The MPI communicator.
-    :param rank:
-        The MPI rank.
-    :param nodes:
-        Number of MPI processes.
     :param ostream:
         The output stream.
+
+    Instance variable
+        - qq_type: The electron repulsion integrals screening scheme.
+        - eri_thresh: The electron repulsion integrals screening threshold.
+        - num_matrices: Number of Fock matrices to be computed.
+        - batch_size: Batch size for computing Fock matrices.
+        - comm: The MPI communicator.
+        - rank: The MPI rank.
+        - nodes: Number of MPI processes.
+        - ostream: The output stream.
     """
 
     def __init__(self, comm, ostream):
         """
         Initializes MO integrals driver  to default setup.
-
-        :param comm:
-            The MPI communicator.
-        :param ostream:
-            The output stream.
         """
 
         # screening scheme

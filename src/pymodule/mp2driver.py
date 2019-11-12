@@ -9,29 +9,24 @@ class Mp2Driver:
     """
     Implements MP2 driver.
 
-    :param e_mp2:
-        The MP2 correlation energy.
     :param comm:
         The MPI communicator.
-    :param rank:
-        The MPI rank.
-    :param nodes:
-        Number of MPI processes.
     :param ostream:
         The output stream.
-    :param conventional:
-        The flag for using conventional (in-memory) AO-to-MO integral
-        transformation.
+
+    Instance variable
+        - e_mp2: The MP2 correlation energy.
+        - comm: The MPI communicator.
+        - rank: The MPI rank.
+        - nodes: Number of MPI processes.
+        - ostream: The output stream.
+        - conventional: The flag for using conventional (in-memory) AO-to-MO
+          integral transformation.
     """
 
     def __init__(self, comm, ostream):
         """
         Initializes MP2 driver.
-
-        :param comm:
-            The MPI communicator.
-        :param ostream:
-            The output stream.
         """
 
         self.e_mp2 = None

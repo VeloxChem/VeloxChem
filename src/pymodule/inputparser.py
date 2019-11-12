@@ -12,26 +12,22 @@ class InputParser:
     input files into a format, which passes the needed information to the rest
     of the program.
 
-    :param input_dict:
-        The input dictionary.
-    :param success_monitor:
-        The monitor for successful parsing.
     :param filename:
         The name of the input file.
-    :param is_basis_set:
-        The flag for parsing a basis set file.
-    :param basis_set_name:
-        The name of the basis set.
+    :param outname:
+        The name of the output file.
+
+    Instance variables
+        - input_dict: The input dictionary.
+        - success_monitor: The monitor for successful parsing.
+        - filename: The name of the input file.
+        - is_basis_set: The flag for parsing a basis set file.
+        - basis_set_name: The name of the basis set.
     """
 
     def __init__(self, filename, outname=None):
         """
         Initializes the parser and parses the input file.
-
-        :param filename:
-            The name of the input file.
-        :param outname:
-            The name of the output file.
         """
 
         self.input_dict = {}

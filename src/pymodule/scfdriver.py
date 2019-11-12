@@ -32,103 +32,65 @@ class ScfDriver:
     Implements SCF method with C2-DIIS and two-level C2-DIIS convergence
     accelerators.
 
-    :param den_guess:
-        The initial density guess driver.
-    :param acc_type:
-        The type of SCF convergence accelerator.
-    :param max_err_vecs:
-        The maximum number of error vectors.
-    :param max_iter:
-        The maximum number of SCF iterations.
-    :param first_step:
-        The flag for first step in two-level C2-DIIS convergence acceleration.
-    :param qq_type:
-        The electron repulsion integrals screening scheme.
-    :param qq_dyn:
-        The flag for enabling dynamic thresholds in electron repulsion
-        integrals screening scheme.
-    :param conv_thresh:
-        The SCF convergence threshold.
-    :param eri_thresh:
-        The electron repulsion integrals screening threshold.
-    :param ovl_thresh:
-        The atomic orbitals linear dependency threshold.
-    :param diis_thresh:
-        The C2-DIIS switch on threshold.
-    :param use_level_shift:
-        The flag for usage of level shifting in SCF iterations.
-    :param iter_data:
-        The list of SCF iteration data (electronic energy, electronic energy
-        change, gradient, density change).
-    :param is_converged:
-        The flag for SCF convergence.
-    :param skip_iter:
-        The flag for SCF iteration data storage.
-    :param old_energy:
-        The electronic energy of previous SCF iteration.
-    :param num_iter:
-        The current number of SCF iterations.
-    :param fock_matrices:
-        The list of stored Fock/Kohn-Sham matrices.
-    :param den_matrices:
-        The list of stored density matrices.
-    :param density:
-        The current density matrix.
-    :param mol_orbs:
-        The current molecular orbitals.
-    :param nuc_energy:
-        The nuclear repulsion energy of molecule.
     :param comm:
         The MPI communicator.
-    :param rank:
-        The rank of MPI process.
-    :param nodes:
-        The number of MPI processes.
-    :param restart:
-        The flag for restarting from checkpoint file.
-    :param checkpoint_file:
-        The name of checkpoint file.
-    :param checkpoint_time:
-        The timer of checkpoint file.
-    :param ref_mol_orbs:
-        The reference molecular orbitals read from checkpoint file.
-    :param restricted:
-        The flag for restricted SCF.
-    :param dft:
-        The flag for running DFT.
-    :param grid_level:
-        The accuracy level of DFT grid.
-    :param xcfun:
-        The XC functional.
-    :param molgrid:
-        The molecular grid.
-    :param pe:
-        The flag for running polarizable embedding calculation.
-    :param V_es:
-        The polarizable embedding matrix.
-    :param potfile:
-        The name of the potential file for polarizable embedding.
-    :param pe_summary:
-        The summary string for polarizable embedding.
-    :param use_split_comm:
-        The flag for using split communicators.
-    :param split_comm_ratio:
-        The list of ratios for split communicators.
-    :param timing:
-        The flag for printing timing information.
-    :param profiling:
-        The flag for printing profiling information.
+    :param ostream:
+        The output stream.
+
+    Instance variables
+        - den_guess: The initial density guess driver.
+        - acc_type: The type of SCF convergence accelerator.
+        - max_err_vecs: The maximum number of error vectors.
+        - max_iter: The maximum number of SCF iterations.
+        - first_step: The flag for first step in two-level C2-DIIS convergence
+          acceleration.
+        - qq_type: The electron repulsion integrals screening scheme.
+        - qq_dyn: The flag for enabling dynamic thresholds in electron
+          repulsion integrals screening scheme.
+        - conv_thresh: The SCF convergence threshold.
+        - eri_thresh: The electron repulsion integrals screening threshold.
+        - ovl_thresh: The atomic orbitals linear dependency threshold.
+        - diis_thresh: The C2-DIIS switch on threshold.
+        - use_level_shift: The flag for usage of level shifting in SCF
+          iterations.
+        - iter_data: The list of SCF iteration data (electronic energy,
+          electronic energy change, gradient, density change).
+        - is_converged: The flag for SCF convergence.
+        - skip_iter: The flag for SCF iteration data storage.
+        - old_energy: The electronic energy of previous SCF iteration.
+        - num_iter: The current number of SCF iterations.
+        - fock_matrices: The list of stored Fock/Kohn-Sham matrices.
+        - den_matrices: The list of stored density matrices.
+        - density: The current density matrix.
+        - mol_orbs: The current molecular orbitals.
+        - nuc_energy: The nuclear repulsion energy of molecule.
+        - comm: The MPI communicator.
+        - rank: The rank of MPI process.
+        - nodes: The number of MPI processes.
+        - restart: The flag for restarting from checkpoint file.
+        - checkpoint_file: The name of checkpoint file.
+        - checkpoint_time: The timer of checkpoint file.
+        - ref_mol_orbs: The reference molecular orbitals read from checkpoint
+          file.
+        - restricted: The flag for restricted SCF.
+        - dft: The flag for running DFT.
+        - grid_level: The accuracy level of DFT grid.
+        - xcfun: The XC functional.
+        - molgrid: The molecular grid.
+        - pe: The flag for running polarizable embedding calculation.
+        - V_es: The polarizable embedding matrix.
+        - potfile: The name of the potential file for polarizable embedding.
+        - pe_summary: The summary string for polarizable embedding.
+        - use_split_comm: The flag for using split communicators.
+        - split_comm_ratio: The list of ratios for split communicators.
+        - timing: The flag for printing timing information.
+        - profiling: The flag for printing profiling information.
     """
 
     def __init__(self, comm, ostream):
         """
         Initializes SCF driver to default setup (convergence threshold, initial
         guess, etc).
-
-        :param comm:
-            The MPI communicator.
-        :param ostream:
-            The output stream.
         """
 
         # scf accelerator

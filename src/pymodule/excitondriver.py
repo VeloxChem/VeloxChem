@@ -32,70 +32,47 @@ class ExcitonModelDriver:
     """
     Implements the exciton model.
 
-    :param H:
-        The exciton model Hamiltonian matrix.
-    :param trans_dipoles:
-        The diabatic electric transition dipole moments in length form.
-    :param velo_trans_dipoles:
-        The diabatic electric transition dipole moments in velocity form.
-    :param magn_trans_dipoles:
-        The diabatic magnetic transition dipole moments.
-    :param center_of_mass:
-        The center of mass of the whole system.
-    :param state_info:
-        Information of the diabatic excited states.
-    :param monomers:
-        The monomer dictionaries.
-    :param natoms:
-        The list containing number of atoms in each monomer.
-    :param qq_type:
-        The electron repulsion integrals screening scheme.
-    :param eri_thresh:
-        The electron repulsion integrals screening threshold.
-    :param dft:
-        The flag for running DFT.
-    :param grid_level:
-        The accuracy level of DFT grid.
-    :param xcfun_label:
-        The name of XC functional.
-    :param scf_conv_thresh:
-        The convergence threshold for the SCF driver.
-    :param scf_max_iter:
-        The maximum number of SCF iterations.
-    :param nstates:
-        The number of locally excited states for each monomer.
-    :param ct_nocc:
-        The number of occupied orbitals to be involved in charge-transfer
-        excited states.
-    :param ct_nvir:
-        The number of virtual orbitals to be involved in charge-transfer
-        excited states.
-    :param tda_conv_thresh:
-        The convergence threshold for the TDA driver.
-    :param tda_max_iter:
-        The maximum number of TDA iterations.
     :param comm:
         The MPI communicator.
-    :param rank:
-        The MPI rank.
-    :param nodes:
-        Number of MPI processes.
     :param ostream:
         The output stream.
-    :param restart:
-        The flag for restarting from checkpoint file.
-    :param checkpoint_file:
-        Name of the exciton model checkpoint file.
+
+    Instance variables
+        - H: The exciton model Hamiltonian matrix.
+        - trans_dipoles: The diabatic electric transition dipole moments in
+          length form.
+        - velo_trans_dipoles: The diabatic electric transition dipole moments
+          in velocity form.
+        - magn_trans_dipoles: The diabatic magnetic transition dipole moments.
+        - center_of_mass: The center of mass of the whole system.
+        - state_info: Information of the diabatic excited states.
+        - monomers: The monomer dictionaries.
+        - natoms: The list containing number of atoms in each monomer.
+        - qq_type: The electron repulsion integrals screening scheme.
+        - eri_thresh: The electron repulsion integrals screening threshold.
+        - dft: The flag for running DFT.
+        - grid_level: The accuracy level of DFT grid.
+        - xcfun_label: The name of XC functional.
+        - scf_conv_thresh: The convergence threshold for the SCF driver.
+        - scf_max_iter: The maximum number of SCF iterations.
+        - nstates: The number of locally excited states for each monomer.
+        - ct_nocc: The number of occupied orbitals to be involved in
+          charge-transfer excited states.
+        - ct_nvir: The number of virtual orbitals to be involved in
+          charge-transfer excited states.
+        - tda_conv_thresh: The convergence threshold for the TDA driver.
+        - tda_max_iter: The maximum number of TDA iterations.
+        - comm: The MPI communicator.
+        - rank: The MPI rank.
+        - nodes: Number of MPI processes.
+        - ostream: The output stream.
+        - restart: The flag for restarting from checkpoint file.
+        - checkpoint_file: Name of the exciton model checkpoint file.
     """
 
     def __init__(self, comm, ostream):
         """
         Initializes exciton model driver to default setup.
-
-        :param comm:
-            The MPI communicator.
-        :param ostream:
-            The output stream.
         """
 
         self.H = None

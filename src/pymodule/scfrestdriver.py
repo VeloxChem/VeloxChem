@@ -12,6 +12,11 @@ class ScfRestrictedDriver(ScfDriver):
     """
     Implements spin restricted closed shell SCF method with C2-DIIS and
     two-level C2-DIIS convergence accelerators.
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
     """
 
     def __init__(self, comm, ostream):
@@ -19,11 +24,6 @@ class ScfRestrictedDriver(ScfDriver):
         Initializes spin restricted closed shell SCF driver to default setup
         (convergence threshold, initial guess, etc) by calling base class
         constructor.
-
-        :param comm:
-            The MPI communicator.
-        :param ostream:
-            The output stream.
         """
 
         super().__init__(comm, ostream)

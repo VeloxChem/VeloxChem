@@ -9,24 +9,24 @@ class ResponseDriver:
     Implements response driver for molecular property calculations using
     conventional Hartree-Fock/Kohn-Sham response theory.
 
-    :param rank:
-        The rank of MPI process.
-    :param nodes:
-        The number of MPI processes.
-    :param rsp_dict:
-        The dictionary of response input.
-    :param method_dict:
-        The dictionary of method settings.
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
+
+    Instance variables
+        - prop_type: The type of the property to be calculated.
+        - tamm_dancoff: The flag for using Tamm-Dancoff approximation.
+        - rsp_dict: The dictionary of response input.
+        - method_dict: The dictionary of method settings.
+        - comm: The MPI communicator.
+        - rank: The rank of MPI process.
+        - nodes: The number of MPI processes.
     """
 
     def __init__(self, comm, ostream):
         """
         Initializes response driver to default setup.
-
-        :param comm:
-            The MPI communicator.
-        :param ostream:
-            The output stream.
         """
 
         # default calculation type

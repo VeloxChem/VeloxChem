@@ -9,24 +9,21 @@ class OutputStream:
     """
     Implements the output stream.
 
+    :param filename:
+        Name of the output file (or sys.stdout).
     :param width:
         Width of the output.
-    :param buffer_lines:
-        The buffered lines of output.
-    :param stream:
-        The stream to which output is printed.
-    :param state:
-        The flag for writing to the stream.
+
+    Instance variables
+        - width: Width of the output.
+        - buffer_lines: The buffered lines of output.
+        - stream: The stream to which output is printed.
+        - state: The flag for writing to the stream.
     """
 
     def __init__(self, filename=None, width=122):
         """
         Initializes the output stream.
-
-        :param filename:
-            Name of the output file (or sys.stdout).
-        :param width:
-            Width of the output.
         """
 
         self.width = width

@@ -22,34 +22,26 @@ class PolEmbed:
         The AO basis set.
     :param comm:
         The MPI communicator.
-    :param rank:
-        The rank of MPI process.
-    :param nodes:
-        The number of MPI processes.
-    :param V_es:
-        The multipole contribution to Fock matrix.
-    :param options:
-        The CPPE options object.
-    :param cppe_state:
-        The CPPE state object.
-    :param polarizable_coords:
-        The coordinates of the polarizable sites.
+    :param potfile:
+        The name of the potential file for polarizable embedding.
+    :param iso_pol:
+        The flag for using isotropic polarizability.
+
+    Instance variables
+        - molecule: The molecule.
+        - basis: The AO basis set.
+        - comm: The MPI communicator.
+        - rank: The rank of MPI process.
+        - nodes: The number of MPI processes.
+        - V_es: The multipole contribution to Fock matrix.
+        - options: The CPPE options object.
+        - cppe_state: The CPPE state object.
+        - polarizable_coords: The coordinates of the polarizable sites.
     """
 
     def __init__(self, molecule, basis, comm, potfile, iso_pol=True):
         """
         Initializes interface to the CPPE library.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param comm:
-            The MPI communicator.
-        :param potfile:
-            The name of the potential file for polarizable embedding.
-        :param iso_pol:
-            The flag for using isotropic polarizability.
         """
 
         self.molecule = molecule

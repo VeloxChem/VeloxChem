@@ -6,21 +6,18 @@ class ResponseProperty:
     Implements the base class for response property/spectroscopy.
 
     :param rsp_dict:
-        The dictionary of response input.
-    :param method_dict:
-        The dictionary of method settings.
-    :param rsp_driver:
-        The response driver.
-    :param rsp_property:
-        The dictionary of response property.
+        The input dictionary that defines the property/spectroscopy.
+
+    Instance variables
+        - rsp_dict: The dictionary of response input.
+        - method_dict: The dictionary of method settings.
+        - rsp_driver: The response driver.
+        - rsp_property: The dictionary of response property.
     """
 
     def __init__(self, rsp_dict, method_dict={}):
         """
         Initializes response property/spectroscopy.
-
-        :param rsp_dict:
-            The input dictionary that defines the property/spectroscopy.
         """
 
         self.rsp_dict = rsp_dict
