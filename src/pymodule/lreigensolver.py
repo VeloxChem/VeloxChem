@@ -47,6 +47,8 @@ class LinearResponseEigenSolver:
         The flag for running polarizable embedding calculation.
     :param potfile:
         The name of the potential file for polarizable embedding.
+    :param use_split_comm:
+        The flag for using split communicators.
     :param conv_thresh:
         The convergence threshold for the solver.
     :param max_iter:
@@ -105,6 +107,7 @@ class LinearResponseEigenSolver:
         self.pe = False
         self.potfile = None
 
+        # split communicators
         self.use_split_comm = False
 
         # solver setup

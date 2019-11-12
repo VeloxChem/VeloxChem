@@ -110,6 +110,10 @@ class ScfDriver:
         The name of the potential file for polarizable embedding.
     :param pe_summary:
         The summary string for polarizable embedding.
+    :param use_split_comm:
+        The flag for using split communicators.
+    :param split_comm_ratio:
+        The list of ratios for split communicators.
     :param timing:
         The flag for printing timing information.
     :param profiling:
@@ -193,14 +197,17 @@ class ScfDriver:
         self.xcfun = None
         self.molgrid = None
 
+        # polarizable embedding
         self.pe = False
         self.V_es = None
         self.potfile = None
         self.pe_summary = ''
 
+        # split communicators
         self.use_split_comm = False
         self.split_comm_ratio = None
 
+        # timing and profiling
         self.timing = False
         self.profiling = False
 
@@ -1261,7 +1268,7 @@ class ScfDriver:
     def add_iter_data(self, e_ee, e_kin, e_en, e_grad, diff_den):
         """
         Adds SCF iteration data (electronic energy, electronic energy change,
-        electronic gradient, density difference) to SCF iterations list
+        electronic gradient, density difference) to SCF iterations list.
 
         :param e_ee:
             The electronic energy.
@@ -1311,9 +1318,6 @@ class ScfDriver:
     def print_scf_energy(self):
         """
         Prints SCF energy information to output stream.
-
-        :param molecule:
-            The molecule.
         """
 
         valstr = self.get_scf_type() + ':'
@@ -1606,6 +1610,8 @@ class ScfDriver:
 
         :param molecule:
             The molecule.
+        :param s2:
+            The expectation value of S**2.
         """
 
         self.ostream.print_blank()

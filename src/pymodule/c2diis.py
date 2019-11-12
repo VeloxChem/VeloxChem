@@ -91,7 +91,7 @@ class CTwoDiis:
     def compute_weights(self):
         """
         Computes C2-DIIS weights from error vectors using H. Sellers method
-        (Int. J. Quantum Chem., vol. 45, pp. 31-41, 1993.)
+        (Int. J. Quantum Chem., vol. 45, pp. 31-41, 1993).
 
         :return:
             The array of C2-DIIS weights with smallest residual error.

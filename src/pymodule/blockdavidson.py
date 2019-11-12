@@ -8,20 +8,20 @@ from .lrmatvecdriver import normalize
 class BlockDavidsonSolver:
     """
     Implements block Davidson solver for symmetric eigenvalues/eigenvectors
-    problems i.e. A * X = e X.
-    Reference: SIAM J. Sci. Comput. 15 (1994), 62-76.
+    problems i.e. A * X = e X. Reference: SIAM J. Sci. Comput. 15 (1994),
+    62-76.
+
+    :param neigenpairs:
+        The number of eigenpairs of A matrix determined by solver.
+    :param sigma_matrices:
+        The sigma vectors A * X in matrix format {A * X_0, A * X_1,...}.
+    :param trial_matrices:
+        The trial vectors in matrix format {X_0, X_1,...}.
     """
 
     def __init__(self):
         """
         Initializes block Davidson sover to default setup.
-
-        :param neigenpairs:
-            The number of eigenpairs of A matrix determined by solver.
-        :param sigma_matrices:
-            The sigma vectors A * X in matrix format {A * X_0, A * X_1,...}.
-        :param trial_matrices:
-            The trial vectors in matrix format {X_0, X_1,...}.
         """
 
         # excited states information
@@ -85,7 +85,7 @@ class BlockDavidsonSolver:
         requested eigenpairs of symmetric A matrix.
 
         :param conv_thresh:
-            The approximate diagonal of symmetric A matrix as column matrix.
+            The convergence threshold for the solver.
 
         :return:
             The true if residual norms are converged for all eigenpairs,
@@ -175,8 +175,8 @@ class BlockDavidsonSolver:
 
     def project_trial_vectors(self, tvecs):
         """
-        Projects out trial vector components already present in reduced space
-        expansion and renormalizes resulting trial vectors.
+        Projects out trial vector components already present in reduced
+        space expansion and renormalizes resulting trial vectors.
 
         :param tvecs:
             The trial vectors.

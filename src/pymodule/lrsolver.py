@@ -29,13 +29,13 @@ class LinearResponseSolver:
     Implements linear response solver.
 
     :param a_operator:
-        The A operator
+        The A operator.
     :param a_components:
-        Cartesian components of the A operator
+        Cartesian components of the A operator.
     :param b_operator:
-        The B operator
+        The B operator.
     :param b_components:
-        Cartesian components of the B operator
+        Cartesian components of the B operator.
     :param frequencies:
         The frequencies.
     :param eri_thresh:
@@ -52,6 +52,8 @@ class LinearResponseSolver:
         The flag for running polarizable embedding calculation.
     :param potfile:
         The name of the potential file for polarizable embedding.
+    :param use_split_comm:
+        The flag for using split communicators.
     :param conv_thresh:
         The convergence threshold for the solver.
     :param max_iter:
@@ -114,6 +116,7 @@ class LinearResponseSolver:
         self.pe = False
         self.potfile = None
 
+        # split communicators
         self.use_split_comm = False
 
         # solver setup

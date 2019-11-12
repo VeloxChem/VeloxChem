@@ -30,13 +30,13 @@ class ComplexResponse:
     Implements the complex linear response solver.
 
     :param a_operator:
-        The A operator
+        The A operator.
     :param a_components:
-        Cartesian components of the A operator
+        Cartesian components of the A operator.
     :param b_operator:
-        The B operator
+        The B operator.
     :param b_components:
-        Cartesian components of the B operator
+        Cartesian components of the B operator.
     :param frequencies:
         The frequencies.
     :param damping:
@@ -55,6 +55,8 @@ class ComplexResponse:
         The flag for running polarizable embedding calculation.
     :param potfile:
         The name of the potential file for polarizable embedding.
+    :param use_split_comm:
+        The flag for using split communicators.
     :param max_iter:
         The maximum number of solver iterations.
     :param conv_thresh:

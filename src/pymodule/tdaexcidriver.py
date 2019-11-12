@@ -51,6 +51,8 @@ class TDAExciDriver:
         The flag for running polarizable embedding calculation.
     :param potfile:
         The name of the potential file for polarizable embedding.
+    :param use_split_comm:
+        The flag for using split communicators.
     :param conv_thresh:
         The excited states convergence threshold.
     :param max_iter:
@@ -101,6 +103,9 @@ class TDAExciDriver:
         self.pe = False
         self.potfile = None
 
+        # split communicators
+        self.use_split_comm = False
+
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
@@ -120,8 +125,6 @@ class TDAExciDriver:
         self.restart = True
         self.checkpoint_file = None
         self.checkpoint_time = None
-
-        self.use_split_comm = False
 
     def update_settings(self, rsp_dict, method_dict={}):
         """
@@ -492,7 +495,7 @@ class TDAExciDriver:
             The Z vectors as std::vector<CExcitationVector>.
 
         :return:
-            The 2D numpy array.
+            The 2D Numpy array.
         """
 
         nvecs = len(trial_vecs)
@@ -517,8 +520,8 @@ class TDAExciDriver:
             The molecular orbitals.
         :param molecule:
             The molecule.
-        :param trial_vecs:
-            The Z vectors as 2D numpy array.
+        :param zvecs:
+            The Z vectors as 2D Numpy array.
 
         :return:
             The Z vectors as std::vector<CExcitationVector>.
@@ -537,6 +540,21 @@ class TDAExciDriver:
         return trial_vecs
 
     def get_densities(self, trial_vecs, tensors, molecule):
+        """
+        Computes the ground-state and transition densities, and initializes the
+        Fock matrix.
+
+        :param trial_vecs:
+            The Z vectors as std::vector<CExcitationVector>.
+        :param tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param molecule:
+            The molecule.
+
+        :return:
+            The initialized Fock matrix, the transition density matrix, and the
+            ground-state density matrix.
+        """
 
         # form transition densities
 
@@ -588,6 +606,21 @@ class TDAExciDriver:
         return fock, tdens, gsdens
 
     def get_sigmas(self, fock, tensors, molecule, trial_mat):
+        """
+        Computes the sigma vectors.
+
+        :param fock:
+            The Fock matrix.
+        :param tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param molecule:
+            The molecule.
+        :param trial_mat:
+            The trial vectors as 2D Numpy array.
+
+        :return:
+            The sigma vectors as 2D Numpy array.
+        """
 
         nocc = molecule.number_of_alpha_electrons()
         norb = tensors['C'].shape[1]

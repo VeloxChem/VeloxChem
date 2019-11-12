@@ -35,7 +35,6 @@ api: clean links log
 	PYTHONPATH=$(PYTHONPATH) sphinx-apidoc -o api $(VLX_SOURCE) $(VLX_EXCLUDE)
 	echo "   log" >> api/modules.rst
 
-
 links:
 	mkdir -p $(VLX_SOURCE)/veloxchem
 	for f in ../src/pymodule/*py; do ln -sf ../../$$f $(VLX_SOURCE)/veloxchem; done
@@ -45,8 +44,8 @@ log:
 	mkdir -p api
 	touch api/log.rst
 	echo "Change log\n==========\n::\n" > api/log.rst
-
 	git log --date=short --pretty=format:'    %h %cd %s' >> api/log.rst
+
 serve:
 	python3 -c 'import webbrowser; webbrowser.open_new_tab("http://localhost:5000")' && python3 server.py
 

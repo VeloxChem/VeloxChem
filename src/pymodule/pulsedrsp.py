@@ -27,16 +27,16 @@ class PulsedResponse:
     :param envelope:
         String - Envelope of the of pulse - available arguments: ['gaussian', ]
     :param number_pulses:
-        Integer - The number of different pulse settings to expect 'N'
+        Integer - The number of different pulse settings to expect 'N'.
         Currently limited to one.
     :param pulse_widths:
-        List of floats (len(N)) - pulse widths in [au]
+        List of floats (len(N)) - pulse widths in [au].
     :param carrier_frequencies:
-        List of floats (len(N)) - carrier frequencies in [au]
+        List of floats (len(N)) - carrier frequencies in [au].
     :param field_max:
-        List of floats (len(N)) - pulse amplitudes in [au]
+        List of floats (len(N)) - pulse amplitudes in [au].
     :param centers:
-        List of floats (len(N)) - time centers for the pulses in [au]
+        List of floats (len(N)) - time centers for the pulses in [au].
     :param pol_dir:
         string - polarization directions, arguments given in combinations of
         x, y and z - e.g.: 'x' for [1 0 0], yz for [0 1 1].
@@ -46,11 +46,11 @@ class PulsedResponse:
         e.g. 0.2-0.4(0.007) for 0.2 -> 0.4 au in steps of 0.007 au.
         Zero-padding will be applied if range does not start at 0.
     :param CEP:
-        List of floats (len(N)) - carrier envelope phases in [radians]
+        List of floats (len(N)) - carrier envelope phases in [radians].
     :param h5file:
-        String - optional - name of requested h5 formatted result file
+        String - optional - name of requested h5 formatted result file.
     :param ascii:
-        String - optional - name of requested ASCII formatted file
+        String - optional - name of requested ASCII formatted file.
     """
 
     def __init__(self, comm, ostream):
@@ -220,7 +220,7 @@ class PulsedResponse:
 
         :return:
             A dictionary containing properties, solutions and kappas
-            and possibly zeropadded properties if requested (self.zero_pad)
+            and possibly zeropadded properties if requested (self.zero_pad).
         """
 
         # Start ny printing a pulsed response header
@@ -383,11 +383,11 @@ class PulsedResponse:
 
         :param results:
             A dictionary containing properties, solutions and kappas
-            (the results dict from .compute())
+            (the results dict from .compute()).
 
         :return:
             A dictionary containing properties, solutions and kappas
-            and zeropadded properties
+            and zeropadded properties.
         """
 
         # Use the original frequencies to zero pad the results if necessary
@@ -434,11 +434,11 @@ class PulsedResponse:
         zero frequency
 
         :param frequencies:
-            List of frequencies
+            List of frequencies.
 
         :return:
-            numpy array of zero-padded frequencies
-            numpy array of truncated frequencies
+            Numpy array of zero-padded frequencies and
+            numpy array of truncated frequencies.
         """
         if isinstance(frequencies, list):
             frequencies = np.array(frequencies)
@@ -468,20 +468,20 @@ class PulsedResponse:
         Gaussian pulse from frequency domain input.
 
         :param w:
-            np.array - list of frequencies
+            np.array - list of frequencies.
         :param F0:
-            float - pulse amplitude in [au]
+            float - pulse amplitude in [au].
         :param t0:
-            float - time center for pulse in [au]
+            float - time center for pulse in [au].
         :param delta_t:
-            float - pulse width in [au]
+            float - pulse width in [au].
         :param w_carrier:
-            float - carrier frequency in [au]
+            float - carrier frequency in [au].
         :param cep:
-            float - carrier envelope phases in [radians]
+            float - carrier envelope phases in [radians].
 
         :return:
-            numpy array of the pulse amplitude in the frequency domain
+            Numpy array of the pulse amplitude in the frequency domain.
         """
 
         return ((F0 * delta_t) / (2. * (2. * np.pi)**0.5) *
@@ -491,7 +491,8 @@ class PulsedResponse:
                  np.exp(1.j * (w + w_carrier) * t0 - 1.j * cep)))
 
     def print_footer(self):
-        """ A footer to be printed after finalizing the calculation.
+        """
+        A footer to be printed after finalizing the calculation.
         """
 
         # PRT footer
@@ -502,8 +503,8 @@ class PulsedResponse:
 
     def print_header(self):
         """
-        Prints Pulsed Lionear Response calculation setup
-        details to output stream.
+        Prints Pulsed Lionear Response calculation setup details to output
+        stream.
         """
 
         # Print string width (global norm)

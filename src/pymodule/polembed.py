@@ -13,8 +13,45 @@ from .veloxchemlib import mpi_master
 
 
 class PolEmbed:
+    """
+    Implements interface to the CPPE library.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The AO basis set.
+    :param comm:
+        The MPI communicator.
+    :param rank:
+        The rank of MPI process.
+    :param nodes:
+        The number of MPI processes.
+    :param V_es:
+        The multipole contribution to Fock matrix.
+    :param options:
+        The CPPE options object.
+    :param cppe_state:
+        The CPPE state object.
+    :param polarizable_coords:
+        The coordinates of the polarizable sites.
+    """
 
     def __init__(self, molecule, basis, comm, potfile, iso_pol=True):
+        """
+        Initializes interface to the CPPE library.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param comm:
+            The MPI communicator.
+        :param potfile:
+            The name of the potential file for polarizable embedding.
+        :param iso_pol:
+            The flag for using isotropic polarizability.
+        """
+
         self.molecule = molecule
         self.basis = basis
         self.comm = comm
@@ -49,9 +86,28 @@ class PolEmbed:
             self.polarizable_coords = coords
 
     def print_callback(self, output):
+        """
+        Handles the output from the CPPE library.
+
+        :param output:
+            The output from the CPPE library.
+        """
+
         self.output += output
 
     def get_pe_contribution(self, dm, elec_only=False):
+        """
+        Computes contributions from polarizable embedding.
+
+        :param dm:
+            The density matrix.
+        :param elec_only:
+            The flag for computing electronic contribution only.
+
+        :return:
+            The polarizable embedding contributions to energy and Fock matrix.
+        """
+
         if self.V_es is None:
             self.V_es = self.compute_multipole_potential_integrals()
 
@@ -89,6 +145,13 @@ class PolEmbed:
             return 0.0, None
 
     def compute_multipole_potential_integrals(self):
+        """
+        Computes contribution from multipoles.
+
+        :return:
+            The multipole contribution to Fock matrix.
+        """
+
         sites = []
         dipole_sites = []
         charges = []
@@ -129,6 +192,15 @@ class PolEmbed:
         return V_es
 
     def compute_induction_operator(self, moments):
+        """
+        Computes contribution from induction operator.
+
+        :param moments:
+            The induced moments.
+
+        :return:
+            The induction contribution to Fock matrix.
+        """
 
         node_grps = [p for p in range(self.nodes)]
         subcomm = SubCommunicators(self.comm, node_grps)
@@ -166,6 +238,15 @@ class PolEmbed:
         return V_ind
 
     def compute_electric_field_value(self, dm):
+        """
+        Computes electric field at the polarizable sites.
+
+        :param dm:
+            The density matrix.
+
+        :return:
+            The electric field.
+        """
 
         node_grps = [p for p in range(self.nodes)]
         subcomm = SubCommunicators(self.comm, node_grps)

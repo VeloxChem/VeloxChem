@@ -33,6 +33,10 @@ class LinearResponseMatrixVectorDriver:
         The MPI rank.
     :param nodes:
         Number of MPI processes.
+    :param use_split_comm:
+        The flag for using split communicators.
+    :param split_comm_ratio:
+        The list of ratios for split communicators.
     :param eri_thresh:
         The electron repulsion integrals screening threshold.
     :param qq_type:
@@ -60,9 +64,11 @@ class LinearResponseMatrixVectorDriver:
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
+        # split communicators
         self.use_split_comm = use_split_comm
         self.split_comm_ratio = None
 
+        # ERI/DFT/PE settings
         self.eri_thresh = 1.0e-15
         self.qq_type = 'QQ_DEN'
         self.dft = False
