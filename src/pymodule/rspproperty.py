@@ -7,6 +7,8 @@ class ResponseProperty:
 
     :param rsp_dict:
         The input dictionary that defines the property/spectroscopy.
+    :param method_dict:
+        The dictionary of method settings.
 
     Instance variables
         - rsp_dict: The dictionary of response input.

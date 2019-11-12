@@ -29,6 +29,8 @@ class LinearResponseMatrixVectorDriver:
 
     :param comm:
         The MPI communicator.
+    :param use_split_comm:
+        The flag for using split communicators.
 
     Instance variables
         - comm: The MPI communicator.
