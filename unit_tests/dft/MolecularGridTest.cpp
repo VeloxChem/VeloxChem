@@ -185,3 +185,27 @@ TEST_F(CMolecularGridTest, GetWeights)
     
     ASSERT_EQ(mgrida, CMolecularGrid(CMemBlock2D<double>({1.0, 2.0, 3.0, 6.0, 2.0, 4.0, 5.0, 2.0}, 2, 4)));
 }
+
+TEST_F(CMolecularGridTest, GetSpatialExtent)
+{
+    CMemBlock2D<double> mblock({ 1.0, 2.0, 1.0, 3.0,
+                                -6.0, 2.0, 2.0, 4.0,
+                                 5.0, 0.0, 9.0, 3.0,
+                                 2.0, 4.0, 5.0, 2.0,}, 4, 4);
+    
+    CMolecularGrid mgrida(mblock);
+    
+    auto rext = mgrida.getSpatialExtent();
+    
+    ASSERT_NEAR( 1.0, rext[0], 1.0e-13);
+    
+    ASSERT_NEAR(-6.0, rext[1], 1.0e-13);
+    
+    ASSERT_NEAR( 0.0, rext[2], 1.0e-13);
+    
+    ASSERT_NEAR( 3.0, rext[3], 1.0e-13);
+    
+    ASSERT_NEAR( 4.0, rext[4], 1.0e-13);
+    
+    ASSERT_NEAR( 9.0, rext[5], 1.0e-13);
+}

@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <ostream>
+#include <array>
 
 #include "MemBlock2D.hpp"
 
@@ -206,6 +207,13 @@ class CMolecularGrid
      @param fileName the name of text file.
      */
     void write_raw_grid(const std::string fileName) const;
+    
+    /**
+     Gets spatial extent of molecular grid.
+
+     @return the spatial extent (min x, min y, min z, max x, max y, max z).
+     */
+    std::array<double, 6> getSpatialExtent() const;
 
     /**
      Converts molecular grid object to text and insert it into output text

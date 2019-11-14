@@ -316,6 +316,56 @@ CMolecularGrid::write_raw_grid(const std::string fileName) const
     std::fclose(f);
 }
 
+std::array<double, 6>
+CMolecularGrid::getSpatialExtent() const
+{
+    // initialize min, max coordinates
+    
+    double xmin = 0.0, ymin = 0.0, zmin = 0.0;
+    
+    double xmax = 0.0, ymax = 0.0, zmax = 0.0;
+    
+    auto ngpoints = getNumberOfGridPoints();
+    
+    if (ngpoints > 0)
+    {
+        // set up pointers to grid data
+        
+        auto rx = getCoordinatesX();
+        
+        auto ry = getCoordinatesY();
+        
+        auto rz = getCoordinatesZ();
+        
+        // update min, max coordinates
+        
+        xmin = rx[0]; xmax = rx[0];
+        
+        ymin = ry[0]; ymax = ry[0];
+        
+        zmin = rz[0]; zmax = rz[0];
+        
+        for (int32_t i = 0; i < ngpoints; i++)
+        {
+            if (xmin > rx[i]) xmin = rx[i];
+            
+            if (ymin > ry[i]) ymin = ry[i];
+            
+            if (zmin > rz[i]) zmin = rz[i];
+            
+            if (xmax < rx[i]) xmax = rx[i];
+            
+            if (ymax < ry[i]) ymax = ry[i];
+            
+            if (zmax < rz[i]) zmax = rz[i];
+        }
+    }
+    
+    std::array<double, 6> rext = {xmin, ymin, zmin, xmax, ymax, zmax};
+    
+    return rext;
+}
+
 std::ostream&
 operator<<(std::ostream& output, const CMolecularGrid& source)
 {
