@@ -632,8 +632,7 @@ class ExcitonModelDriver:
                             'frag': 'A',
                             'type': 'LE',
                             'index': excitation_id[ind_A, ind_A] + sA,
-                            'name': '{}e({}){}g'.format(ind_A + 1, sA + 1,
-                                                        ind_B + 1),
+                            'name': '{}e({})'.format(ind_A + 1, sA + 1),
                         })
 
                     for sB in range(self.nstates):
@@ -645,8 +644,7 @@ class ExcitonModelDriver:
                             'frag': 'B',
                             'type': 'LE',
                             'index': excitation_id[ind_B, ind_B] + sB,
-                            'name': '{}g{}e({})'.format(ind_A + 1, ind_B + 1,
-                                                        sB + 1),
+                            'name': '{}e({})'.format(ind_B + 1, sB + 1),
                         })
 
                     #          vir.A     vir.B                vir.A     vir.B
@@ -949,12 +947,8 @@ class ExcitonModelDriver:
                 for k in range(eigvecs.shape[0]):
                     composition = eigvecs[k, s]**2
                     if (composition > 0.1):
-                        state_type = '{}({})'.format(
+                        valstr = '{:<7s} {:<15s} {:>6.1f}%'.format(
                             self.state_info[k]['type'],
-                            self.state_info[k]['frag'],
-                        )
-                        valstr = '{:<10s} {:<15s} {:>6.1f}%'.format(
-                            state_type,
                             self.state_info[k]['name'],
                             composition * 100,
                         )
