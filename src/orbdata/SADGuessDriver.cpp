@@ -12,6 +12,7 @@
 #include "DenseDiagonalizer.hpp"
 #include "DenseLinearAlgebra.hpp"
 #include "DensityMatrixType.hpp"
+#include "PartialCharges.hpp"
 #include "ErrorHandler.hpp"
 #include "StringFormat.hpp"
 
@@ -86,8 +87,14 @@ CSADGuessDriver::_getOcc4s4p(double occ) const
 }
 
 std::vector<std::vector<double>>
-CSADGuessDriver::_buildQocc() const
+CSADGuessDriver::_buildQocc(const double num_electrons) const
 {
+    double nelec = num_electrons;
+
+    if (nelec > 0.5) nelec = 0.5;
+
+    if (nelec < -0.5) nelec = -0.5;
+
     std::vector<std::vector<double>> qocc;
 
     // dummy atom
@@ -96,93 +103,114 @@ CSADGuessDriver::_buildQocc() const
 
     // H,He
 
-    qocc.push_back(_getOcc1s(0.5));
+    qocc.push_back(_getOcc1s(0.5 + nelec));
 
-    qocc.push_back(_getOcc1s(1.0));
+    qocc.push_back(_getOcc1s(1.0 + nelec));
 
     // Li,Be
 
-    qocc.push_back(_getOcc2s(0.5));
+    qocc.push_back(_getOcc2s(0.5 + nelec));
 
-    qocc.push_back(_getOcc2s(1.0));
+    qocc.push_back(_getOcc2s(1.0 + nelec));
 
     // B,C,N,O,F,Ne
 
-    qocc.push_back(_getOcc2s2p(0.375));
+    qocc.push_back(_getOcc2s2p(0.375 + nelec / 4.0));
 
-    qocc.push_back(_getOcc2s2p(0.500));
+    qocc.push_back(_getOcc2s2p(0.500 + nelec / 4.0));
 
-    qocc.push_back(_getOcc2s2p(0.625));
+    qocc.push_back(_getOcc2s2p(0.625 + nelec / 4.0));
 
-    qocc.push_back(_getOcc2s2p(0.750));
+    qocc.push_back(_getOcc2s2p(0.750 + nelec / 4.0));
 
-    qocc.push_back(_getOcc2s2p(0.875));
+    qocc.push_back(_getOcc2s2p(0.875 + nelec / 4.0));
 
-    qocc.push_back(_getOcc2s2p(1.000));
+    qocc.push_back(_getOcc2s2p(1.000 + nelec / 4.0));
 
     // Na,Mg
 
-    qocc.push_back(_getOcc3s(0.5));
+    qocc.push_back(_getOcc3s(0.5 + nelec));
 
-    qocc.push_back(_getOcc3s(1.0));
+    qocc.push_back(_getOcc3s(1.0 + nelec));
 
     // Al,Si,P,S,Cl,Ar
 
-    qocc.push_back(_getOcc3s3p(0.375));
+    qocc.push_back(_getOcc3s3p(0.375 + nelec / 4.0));
 
-    qocc.push_back(_getOcc3s3p(0.500));
+    qocc.push_back(_getOcc3s3p(0.500 + nelec / 4.0));
 
-    qocc.push_back(_getOcc3s3p(0.625));
+    qocc.push_back(_getOcc3s3p(0.625 + nelec / 4.0));
 
-    qocc.push_back(_getOcc3s3p(0.750));
+    qocc.push_back(_getOcc3s3p(0.750 + nelec / 4.0));
 
-    qocc.push_back(_getOcc3s3p(0.875));
+    qocc.push_back(_getOcc3s3p(0.875 + nelec / 4.0));
 
-    qocc.push_back(_getOcc3s3p(1.000));
+    qocc.push_back(_getOcc3s3p(1.000 + nelec / 4.0));
 
     // K,Ca
 
-    qocc.push_back(_getOcc4s(0.5));
+    qocc.push_back(_getOcc4s(0.5 + nelec));
 
-    qocc.push_back(_getOcc4s(1.0));
+    qocc.push_back(_getOcc4s(1.0 + nelec));
 
     // Sc,Ti,V,Cr,Mn,Fe,Co,Ni,Cu,Zn
 
-    qocc.push_back(_getOcc3d(0.1));
+    qocc.push_back(_getOcc3d(0.1 + nelec / 5.0));
 
-    qocc.push_back(_getOcc3d(0.2));
+    qocc.push_back(_getOcc3d(0.2 + nelec / 5.0));
 
-    qocc.push_back(_getOcc3d(0.3));
+    qocc.push_back(_getOcc3d(0.3 + nelec / 5.0));
 
-    qocc.push_back(_getOcc3d(0.4));
+    qocc.push_back(_getOcc3d(0.4 + nelec / 5.0));
 
-    qocc.push_back(_getOcc3d(0.5));
+    qocc.push_back(_getOcc3d(0.5 + nelec / 5.0));
 
-    qocc.push_back(_getOcc3d(0.6));
+    qocc.push_back(_getOcc3d(0.6 + nelec / 5.0));
 
-    qocc.push_back(_getOcc3d(0.7));
+    qocc.push_back(_getOcc3d(0.7 + nelec / 5.0));
 
-    qocc.push_back(_getOcc3d(0.8));
+    qocc.push_back(_getOcc3d(0.8 + nelec / 5.0));
 
-    qocc.push_back(_getOcc3d(0.9));
+    qocc.push_back(_getOcc3d(0.9 + nelec / 5.0));
 
-    qocc.push_back(_getOcc3d(1.0));
+    qocc.push_back(_getOcc3d(1.0 + nelec / 5.0));
 
     // Ga,Ge,As,Se,Br,Kr
 
-    qocc.push_back(_getOcc4s4p(0.375));
+    qocc.push_back(_getOcc4s4p(0.375 + nelec / 4.0));
 
-    qocc.push_back(_getOcc4s4p(0.500));
+    qocc.push_back(_getOcc4s4p(0.500 + nelec / 4.0));
 
-    qocc.push_back(_getOcc4s4p(0.625));
+    qocc.push_back(_getOcc4s4p(0.625 + nelec / 4.0));
 
-    qocc.push_back(_getOcc4s4p(0.750));
+    qocc.push_back(_getOcc4s4p(0.750 + nelec / 4.0));
 
-    qocc.push_back(_getOcc4s4p(0.875));
+    qocc.push_back(_getOcc4s4p(0.875 + nelec / 4.0));
 
-    qocc.push_back(_getOcc4s4p(1.000));
+    qocc.push_back(_getOcc4s4p(1.000 + nelec / 4.0));
 
     return qocc;
+}
+
+std::vector<std::vector<double>>
+CSADGuessDriver::_getOccupationNumbers(const CMolecule& molecule, const double nelec) const
+{
+    std::vector<std::vector<double>> occnumbers;
+
+    auto natoms = molecule.getNumberOfAtoms();
+
+    auto partialcharges = parchg::getPartialCharges(molecule, -nelec * 2.0);
+
+    auto idselem = molecule.getIdsElemental();
+
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        auto occ = _buildQocc(-partialcharges[i] / 2.0);
+
+        occnumbers.push_back(occ[idselem[i]]);
+    }
+
+    return occnumbers;
 }
 
 std::vector<std::vector<int32_t>>
@@ -287,11 +315,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     errors::assertMsgCritical(count_ao_2 == S22.getNumberOfRows(), err_bas_size);
 
-    // occupation numbers
-
-    auto qocc = _buildQocc();
-
-    // take care of electrons from net charge and/or multiplicity
+    // number of excessive electrons
 
     double charge = molecule.getCharge();
 
@@ -301,9 +325,11 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     double beta_elec = 0.5 * (-charge - mult_1);
 
-    alpha_elec /= static_cast<double>(nao_1);
+    // occupation numbers
 
-    beta_elec /= static_cast<double>(nao_1);
+    auto alpha_occ = _getOccupationNumbers(molecule, alpha_elec);
+
+    auto beta_occ = _getOccupationNumbers(molecule, beta_elec);
 
     // C_SAD matrix
 
@@ -338,7 +364,9 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
         std::string err_ao_size("SADGuessDriver - Mismatch between basis set & occupation number");
 
-        errors::assertMsgCritical(qocc[idelem].size() == aoinds_1.size(), err_ao_size);
+        errors::assertMsgCritical(alpha_occ[atomidx].size() == aoinds_1.size(), err_ao_size);
+
+        errors::assertMsgCritical(beta_occ[atomidx].size() == aoinds_1.size(), err_ao_size);
 
         // atomic block of AOs
 
@@ -423,7 +451,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
             {
                 csad_alpha.values()[aoinds_2[j] * nao_1 + aoinds_1[i]] =
 
-                    mat_c2.values()[j * naodim_1 + i] * sqrt(qocc[idelem][i] + alpha_elec);
+                    mat_c2.values()[j * naodim_1 + i] * sqrt(alpha_occ[atomidx][i]);
             }
         }
 
@@ -437,7 +465,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
                 {
                     csad_beta.values()[aoinds_2[j] * nao_1 + aoinds_1[i]] =
 
-                        mat_c2.values()[j * naodim_1 + i] * sqrt(qocc[idelem][i] + beta_elec);
+                        mat_c2.values()[j * naodim_1 + i] * sqrt(beta_occ[atomidx][i]);
                 }
             }
         }

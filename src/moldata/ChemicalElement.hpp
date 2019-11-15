@@ -394,11 +394,6 @@ class CChemicalElement
      */
     void _selectLanthanumAtom();
 
-    // void _selectCeriumAtom():
-    //
-    // Sets chemical element properties to properties of cerium most abudant
-    // isotope.
-
     /**
      Sets chemical element properties to properties of cerium most abudant
      isotope.

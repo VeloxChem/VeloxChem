@@ -11,8 +11,6 @@
 
 #include <vector>
 
-#include "Molecule.hpp"
-
 namespace vdwradii {  // vdwradii namespace
 
 /**

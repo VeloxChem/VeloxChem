@@ -109,10 +109,21 @@ class CSADGuessDriver
     /**
      Sets occupation numbers.
 
+     @param nelec the number of excessive alpha or beta electrons.
      @return a vector of vector with the first dimension for nuclear charge and
              the second dimension for occupation numbers.
      */
-    std::vector<std::vector<double>> _buildQocc() const;
+    std::vector<std::vector<double>> _buildQocc(const double nelec) const;
+
+    /**
+     Gets occupation numbers for a given molecule.
+
+     @param molecule the molecule.
+     @param nelec the number of excessive alpha or beta electrons.
+     @return a vector of vector with the first dimension for atom index and the
+             second dimension for occupation numbers.
+     */
+    std::vector<std::vector<double>> _getOccupationNumbers(const CMolecule& molecule, const double nelec) const;
 
     /**
      Computes SAD initial guess.
