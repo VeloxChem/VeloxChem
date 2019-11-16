@@ -504,7 +504,7 @@ def plot_pulsed_response(args, is_this_a_test=False):
             xfreqs *= hartree_to_ev
 
     # -------------------------------------------
-    # 	Time-domain plot
+    #  Time-domain plot
     # -------------------------------------------
     # Initialize figure and axes
     fig1 = plt.figure(1, figsize=(10, 5))
@@ -557,7 +557,7 @@ def plot_pulsed_response(args, is_this_a_test=False):
                 frameon=True)
 
     # -------------------------------------------
-    # 	Frequency-domain plot
+    #  Frequency-domain plot
     # -------------------------------------------
     # Initialize axes
     ax22 = ax21.twinx()

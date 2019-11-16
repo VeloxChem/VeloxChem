@@ -163,7 +163,7 @@ getHardness()
     return std::vector<double>({
 
         // dummy
-		0.000,
+        0.000,
 
         // H-B
         0.443,

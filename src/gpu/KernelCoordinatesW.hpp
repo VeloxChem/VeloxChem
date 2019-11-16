@@ -32,8 +32,8 @@ namespace gpu {
      */
     void launchKernelForCoordinatesW(      double* wCoordinatesData,
                                      const size_t  pitchOfCoordinatesData,
-				                     const double* osFactorsData,
-				                     const size_t  pitchOfFactorsData,
+                                     const double* osFactorsData,
+                                     const size_t  pitchOfFactorsData,
                                      const double* braGtoPairsData,
                                      const size_t  pitchOfBraGtoPairsData,
                                      const double* ketGtoPairsData,
