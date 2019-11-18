@@ -107,15 +107,6 @@ class CSADGuessDriver
     std::vector<double> _getOcc4s4p(double occ) const;
 
     /**
-     Sets occupation numbers.
-
-     @param nelec the number of excessive alpha or beta electrons.
-     @return a vector of vector with the first dimension for nuclear charge and
-             the second dimension for occupation numbers.
-     */
-    std::vector<std::vector<double>> _buildQocc(const double nelec) const;
-
-    /**
      Gets occupation numbers for a given molecule.
 
      @param molecule the molecule.
@@ -183,6 +174,15 @@ class CSADGuessDriver
              second dimension for atomic orbitals.
      */
     std::vector<std::vector<int32_t>> getAOIndicesOfAtoms(const CMolecule& molecule, const CMolecularBasis& basis) const;
+
+    /**
+     Computes occupation numbers.
+
+     @param nelec the number of excessive alpha or beta electrons.
+     @return a vector of vector with the first dimension for nuclear charge and
+             the second dimension for occupation numbers.
+     */
+    std::vector<std::vector<double>> buildQocc(const double nelec) const;
 };
 
 #endif /* SADGuessDriver_hpp */

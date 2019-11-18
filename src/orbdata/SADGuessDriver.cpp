@@ -87,7 +87,7 @@ CSADGuessDriver::_getOcc4s4p(double occ) const
 }
 
 std::vector<std::vector<double>>
-CSADGuessDriver::_buildQocc(const double num_electrons) const
+CSADGuessDriver::buildQocc(const double num_electrons) const
 {
     double nelec = num_electrons;
 
@@ -205,7 +205,7 @@ CSADGuessDriver::_getOccupationNumbers(const CMolecule& molecule, const double n
 
     for (int32_t i = 0; i < natoms; i++)
     {
-        auto occ = _buildQocc(-partialcharges[i] / 2.0);
+        auto occ = buildQocc(-partialcharges[i] / 2.0);
 
         occnumbers.push_back(occ[idselem[i]]);
     }
