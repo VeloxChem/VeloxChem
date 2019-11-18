@@ -107,16 +107,6 @@ class CSADGuessDriver
     std::vector<double> _getOcc4s4p(double occ) const;
 
     /**
-     Gets occupation numbers for a given molecule.
-
-     @param molecule the molecule.
-     @param nelec the number of excessive alpha or beta electrons.
-     @return a vector of vector with the first dimension for atom index and the
-             second dimension for occupation numbers.
-     */
-    std::vector<std::vector<double>> _getOccupationNumbers(const CMolecule& molecule, const double nelec) const;
-
-    /**
      Computes SAD initial guess.
 
      @param molecule the molecule.
@@ -170,19 +160,27 @@ class CSADGuessDriver
 
      @param molecule the molecule.
      @param basis the molecular basis set.
-     @return a vector of vector with the first dimension for atoms and the
-             second dimension for atomic orbitals.
+     @return a vector of vector containing the atomic orbital indicies for each atom in the molecule.
      */
     std::vector<std::vector<int32_t>> getAOIndicesOfAtoms(const CMolecule& molecule, const CMolecularBasis& basis) const;
 
     /**
-     Computes occupation numbers.
+     Computes occupation numbers for a given element.
 
+     @param elem_id the element id (nuclear charge).
      @param nelec the number of excessive alpha or beta electrons.
-     @return a vector of vector with the first dimension for nuclear charge and
-             the second dimension for occupation numbers.
+     @return a vector of occupation numbers.
      */
-    std::vector<std::vector<double>> buildQocc(const double nelec) const;
+    std::vector<double> getOccupationNumbersForElement(const int32_t elem_id, const double nelec) const;
+
+    /**
+     Computes occupation numbers for a given molecule.
+
+     @param molecule the molecule.
+     @param nelec the number of excessive alpha or beta electrons.
+     @return a vector of vector containing the occupation numbers for each atom in the molecule.
+     */
+    std::vector<std::vector<double>> getOccupationNumbersForMolecule(const CMolecule& molecule, const double nelec) const;
 };
 
 #endif /* SADGuessDriver_hpp */

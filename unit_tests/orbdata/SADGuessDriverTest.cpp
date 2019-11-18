@@ -119,15 +119,13 @@ TEST_F(CSADGuessDriverTest, OccupationNumbers)
 
     CSADGuessDriver saddrv(MPI_COMM_WORLD);
 
-    auto qocc = saddrv.buildQocc(0.0);
-
-    ASSERT_EQ(refocc.size(), qocc.size());
-
-    for (int32_t i = 0; i < qocc.size(); i++)
+    for (int32_t i = 0; i < refocc.size(); i++)
     {
-        ASSERT_EQ(refocc[i].size(), qocc[i].size());
+        auto qocc = saddrv.getOccupationNumbersForElement(i, 0.0);
 
-        vlxtest::compare(refocc[i], qocc[i].data());
+        ASSERT_EQ(refocc[i].size(), qocc.size());
+
+        vlxtest::compare(refocc[i], qocc.data());
     }
 }
 

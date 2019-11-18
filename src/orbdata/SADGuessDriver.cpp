@@ -86,114 +86,113 @@ CSADGuessDriver::_getOcc4s4p(double occ) const
     return std::vector<double>({1.0, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0});
 }
 
-std::vector<std::vector<double>>
-CSADGuessDriver::buildQocc(const double num_electrons) const
+std::vector<double>
+CSADGuessDriver::getOccupationNumbersForElement(const int32_t elem_id, const double num_electrons) const
 {
-    double nelec = num_electrons;
+    double nelec = std::min(std::max(-0.5, num_electrons), 0.5);
 
-    if (nelec > 0.5) nelec = 0.5;
+    switch (elem_id)
+    {
+        // dummy atom
 
-    if (nelec < -0.5) nelec = -0.5;
+        case 0: return std::vector<double>();
 
-    std::vector<std::vector<double>> qocc;
+        // H,He
 
-    // dummy atom
+        case 1: return _getOcc1s(0.5 + nelec);
 
-    qocc.push_back(std::vector<double>());
+        case 2: return _getOcc1s(1.0 + nelec);
 
-    // H,He
+        // Li,Be
 
-    qocc.push_back(_getOcc1s(0.5 + nelec));
+        case 3: return _getOcc2s(0.5 + nelec);
 
-    qocc.push_back(_getOcc1s(1.0 + nelec));
+        case 4: return _getOcc2s(1.0 + nelec);
 
-    // Li,Be
+        // B,C,N,O,F,Ne
 
-    qocc.push_back(_getOcc2s(0.5 + nelec));
+        case 5: return _getOcc2s2p(0.375 + nelec / 4.0);
 
-    qocc.push_back(_getOcc2s(1.0 + nelec));
+        case 6: return _getOcc2s2p(0.500 + nelec / 4.0);
 
-    // B,C,N,O,F,Ne
+        case 7: return _getOcc2s2p(0.625 + nelec / 4.0);
 
-    qocc.push_back(_getOcc2s2p(0.375 + nelec / 4.0));
+        case 8: return _getOcc2s2p(0.750 + nelec / 4.0);
 
-    qocc.push_back(_getOcc2s2p(0.500 + nelec / 4.0));
+        case 9: return _getOcc2s2p(0.875 + nelec / 4.0);
 
-    qocc.push_back(_getOcc2s2p(0.625 + nelec / 4.0));
+        case 10: return _getOcc2s2p(1.000 + nelec / 4.0);
 
-    qocc.push_back(_getOcc2s2p(0.750 + nelec / 4.0));
+        // Na,Mg
 
-    qocc.push_back(_getOcc2s2p(0.875 + nelec / 4.0));
+        case 11: return _getOcc3s(0.5 + nelec);
 
-    qocc.push_back(_getOcc2s2p(1.000 + nelec / 4.0));
+        case 12: return _getOcc3s(1.0 + nelec);
 
-    // Na,Mg
+        // Al,Si,P,S,Cl,Ar
 
-    qocc.push_back(_getOcc3s(0.5 + nelec));
+        case 13: return _getOcc3s3p(0.375 + nelec / 4.0);
 
-    qocc.push_back(_getOcc3s(1.0 + nelec));
+        case 14: return _getOcc3s3p(0.500 + nelec / 4.0);
 
-    // Al,Si,P,S,Cl,Ar
+        case 15: return _getOcc3s3p(0.625 + nelec / 4.0);
 
-    qocc.push_back(_getOcc3s3p(0.375 + nelec / 4.0));
+        case 16: return _getOcc3s3p(0.750 + nelec / 4.0);
 
-    qocc.push_back(_getOcc3s3p(0.500 + nelec / 4.0));
+        case 17: return _getOcc3s3p(0.875 + nelec / 4.0);
 
-    qocc.push_back(_getOcc3s3p(0.625 + nelec / 4.0));
+        case 18: return _getOcc3s3p(1.000 + nelec / 4.0);
 
-    qocc.push_back(_getOcc3s3p(0.750 + nelec / 4.0));
+        // K,Ca
 
-    qocc.push_back(_getOcc3s3p(0.875 + nelec / 4.0));
+        case 19: return _getOcc4s(0.5 + nelec);
 
-    qocc.push_back(_getOcc3s3p(1.000 + nelec / 4.0));
+        case 20: return _getOcc4s(1.0 + nelec);
 
-    // K,Ca
+        // Sc,Ti,V,Cr,Mn,Fe,Co,Ni,Cu,Zn
 
-    qocc.push_back(_getOcc4s(0.5 + nelec));
+        case 21: return _getOcc3d(0.1 + nelec / 5.0);
 
-    qocc.push_back(_getOcc4s(1.0 + nelec));
+        case 22: return _getOcc3d(0.2 + nelec / 5.0);
 
-    // Sc,Ti,V,Cr,Mn,Fe,Co,Ni,Cu,Zn
+        case 23: return _getOcc3d(0.3 + nelec / 5.0);
 
-    qocc.push_back(_getOcc3d(0.1 + nelec / 5.0));
+        case 24: return _getOcc3d(0.4 + nelec / 5.0);
 
-    qocc.push_back(_getOcc3d(0.2 + nelec / 5.0));
+        case 25: return _getOcc3d(0.5 + nelec / 5.0);
 
-    qocc.push_back(_getOcc3d(0.3 + nelec / 5.0));
+        case 26: return _getOcc3d(0.6 + nelec / 5.0);
 
-    qocc.push_back(_getOcc3d(0.4 + nelec / 5.0));
+        case 27: return _getOcc3d(0.7 + nelec / 5.0);
 
-    qocc.push_back(_getOcc3d(0.5 + nelec / 5.0));
+        case 28: return _getOcc3d(0.8 + nelec / 5.0);
 
-    qocc.push_back(_getOcc3d(0.6 + nelec / 5.0));
+        case 29: return _getOcc3d(0.9 + nelec / 5.0);
 
-    qocc.push_back(_getOcc3d(0.7 + nelec / 5.0));
+        case 30: return _getOcc3d(1.0 + nelec / 5.0);
 
-    qocc.push_back(_getOcc3d(0.8 + nelec / 5.0));
+        // Ga,Ge,As,Se,Br,Kr
 
-    qocc.push_back(_getOcc3d(0.9 + nelec / 5.0));
+        case 31: return _getOcc4s4p(0.375 + nelec / 4.0);
 
-    qocc.push_back(_getOcc3d(1.0 + nelec / 5.0));
+        case 32: return _getOcc4s4p(0.500 + nelec / 4.0);
 
-    // Ga,Ge,As,Se,Br,Kr
+        case 33: return _getOcc4s4p(0.625 + nelec / 4.0);
 
-    qocc.push_back(_getOcc4s4p(0.375 + nelec / 4.0));
+        case 34: return _getOcc4s4p(0.750 + nelec / 4.0);
 
-    qocc.push_back(_getOcc4s4p(0.500 + nelec / 4.0));
+        case 35: return _getOcc4s4p(0.875 + nelec / 4.0);
 
-    qocc.push_back(_getOcc4s4p(0.625 + nelec / 4.0));
+        case 36: return _getOcc4s4p(1.000 + nelec / 4.0);
 
-    qocc.push_back(_getOcc4s4p(0.750 + nelec / 4.0));
+        // other elements: not implemented
 
-    qocc.push_back(_getOcc4s4p(0.875 + nelec / 4.0));
-
-    qocc.push_back(_getOcc4s4p(1.000 + nelec / 4.0));
-
-    return qocc;
+        default: return std::vector<double>();
+    }
 }
 
 std::vector<std::vector<double>>
-CSADGuessDriver::_getOccupationNumbers(const CMolecule& molecule, const double nelec) const
+CSADGuessDriver::getOccupationNumbersForMolecule(const CMolecule& molecule, const double nelec) const
 {
     std::vector<std::vector<double>> occnumbers;
 
@@ -205,9 +204,9 @@ CSADGuessDriver::_getOccupationNumbers(const CMolecule& molecule, const double n
 
     for (int32_t i = 0; i < natoms; i++)
     {
-        auto occ = buildQocc(-partialcharges[i] / 2.0);
+        auto occ = getOccupationNumbersForElement(idselem[i], -partialcharges[i] / 2.0);
 
-        occnumbers.push_back(occ[idselem[i]]);
+        occnumbers.push_back(occ);
     }
 
     return occnumbers;
@@ -327,9 +326,9 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     // occupation numbers
 
-    auto alpha_occ = _getOccupationNumbers(molecule, alpha_elec);
+    auto alpha_occ = getOccupationNumbersForMolecule(molecule, alpha_elec);
 
-    auto beta_occ = _getOccupationNumbers(molecule, beta_elec);
+    auto beta_occ = getOccupationNumbersForMolecule(molecule, beta_elec);
 
     // C_SAD matrix
 
