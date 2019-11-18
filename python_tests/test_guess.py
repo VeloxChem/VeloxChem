@@ -9,7 +9,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 
 
-class TestSolvers(unittest.TestCase):
+class TestInitialGuess(unittest.TestCase):
 
     def test_sad_guess(self):
 
