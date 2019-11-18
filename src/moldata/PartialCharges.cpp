@@ -6,12 +6,12 @@
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#include "PartialCharges.hpp"
-#include "Molecule.hpp"
+#include "DenseDiagonalizer.hpp"
 #include "DenseMatrix.hpp"
 #include "DenseLinearAlgebra.hpp"
-#include "DenseDiagonalizer.hpp"
 #include "ErrorHandler.hpp"
+#include "Molecule.hpp"
+#include "PartialCharges.hpp"
 
 namespace parchg {  // parchg namespace
 
