@@ -17,5 +17,6 @@ __pycache__
 venv*
 htmlcov
 .coverage
+.vscode
 Makefile.setup
 veloxchem.egg-info
