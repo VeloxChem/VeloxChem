@@ -730,13 +730,10 @@ class ScfDriver:
 
         self.use_level_shift = False
 
-        if i == 0:
-            self.skip_iter = True
+        if e_grad < self.diis_thresh:
+            self.skip_iter = False
         else:
-            if e_grad < self.diis_thresh:
-                self.skip_iter = False
-            else:
-                self.skip_iter = True
+            self.skip_iter = True
 
     def comp_2e_fock(self,
                      fock_mat,
