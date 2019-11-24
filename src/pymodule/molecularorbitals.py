@@ -261,14 +261,14 @@ def _MolecularOrbitals_read_hdf5(fname):
     orbs_type = molorb.rest
 
     assert_msg_critical(
-        'alpha_orbitals' in hf.keys() and 'alpha_energies' in hf.keys(),
+        'alpha_orbitals' in hf and 'alpha_energies' in hf,
         'MolecularOrbitals.read_hdf5: alpha orbitals/energies not found')
 
-    if 'beta_orbitals' in hf.keys() or 'beta_energies' in hf.keys():
+    if 'beta_orbitals' in hf or 'beta_energies' in hf:
         orbs_type = molorb.unrest
 
         assert_msg_critical(
-            'beta_orbitals' in hf.keys() and 'beta_energies' in hf.keys(),
+            'beta_orbitals' in hf and 'beta_energies' in hf,
             'MolecularOrbitals.read_hdf5: beta orbitals/energies not found')
 
     orbs = []
@@ -287,7 +287,8 @@ def _MolecularOrbitals_read_hdf5(fname):
 
 
 @staticmethod
-def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set):
+def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set,
+                                  restricted):
     """
     Checks if the hdf5 file matches the given nuclear charges and basis set.
 
@@ -297,6 +298,8 @@ def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set):
         The nuclear charges.
     :param basis_set:
         Name of the basis set.
+    :param restricted:
+        The flag for restricted molecular orbitals.
 
     :return:
         Whether the hdf5 file matches the given nuclear charges and basis set.
@@ -316,9 +319,12 @@ def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set):
         h5_basis_set = hf.get('basis_set')[0].decode('utf-8')
         match_basis_set = (h5_basis_set.upper() == basis_set.upper())
 
+    h5_restricted = ('beta_orbitals' not in hf and 'beta_energies' not in hf)
+    match_restricted = (h5_restricted == restricted)
+
     hf.close()
 
-    return (match_nuclear_charges and match_basis_set)
+    return (match_nuclear_charges and match_basis_set and match_restricted)
 
 
 MolecularOrbitals.print_orbitals = _MolecularOrbitals_print_orbitals

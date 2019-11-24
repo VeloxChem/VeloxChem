@@ -268,7 +268,7 @@ class ScfDriver:
             self.den_guess = DensityGuess("RESTART", self.checkpoint_file)
             self.restart = self.den_guess.validate_checkpoint(
                 self.rank, self.comm, molecule.elem_ids_to_numpy(),
-                ao_basis.get_label())
+                ao_basis.get_label(), self.restricted)
 
         if self.restart:
             self.acc_type = "DIIS"

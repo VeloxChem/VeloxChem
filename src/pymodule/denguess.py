@@ -58,7 +58,8 @@ class DensityGuess:
 
         self._guess_type = value
 
-    def validate_checkpoint(self, rank, comm, nuclear_charges, basis_set):
+    def validate_checkpoint(self, rank, comm, nuclear_charges, basis_set,
+                            restricted):
         """
         Validates the checkpoint file by checking nuclear charges and basis set.
 
@@ -70,6 +71,8 @@ class DensityGuess:
             Numpy array of the nuclear charges.
         :param basis_set:
             Name of the AO basis.
+        :param restricted:
+            The flag for restricted molecular orbitals.
 
         :return:
             Validity of the checkpoint file.
@@ -78,7 +81,8 @@ class DensityGuess:
         if (self._checkpoint_file and isinstance(self._checkpoint_file, str) and
                 rank == mpi_master() and isfile(self._checkpoint_file)):
             valid = MolecularOrbitals.match_hdf5(self._checkpoint_file,
-                                                 nuclear_charges, basis_set)
+                                                 nuclear_charges, basis_set,
+                                                 restricted)
         else:
             valid = False
 

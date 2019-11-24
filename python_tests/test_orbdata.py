@@ -149,14 +149,14 @@ class TestOrbData(unittest.TestCase):
             dummy = MolecularOrbitals.read_hdf5(h5file)
             self.assertEqual(orb_rest, dummy)
             self.assertTrue(
-                MolecularOrbitals.match_hdf5(h5file, nuc_chg, "sto-3g"))
+                MolecularOrbitals.match_hdf5(h5file, nuc_chg, "sto-3g", True))
 
             nuc_chg = np.array([1, 1, 8], dtype=np.int32)
             orb_unrest.write_hdf5(h5file, nuc_chg, 'cc-pvdz')
             dummy = MolecularOrbitals.read_hdf5(h5file)
             self.assertEqual(orb_unrest, dummy)
             self.assertTrue(
-                MolecularOrbitals.match_hdf5(h5file, nuc_chg, "cc-pvdz"))
+                MolecularOrbitals.match_hdf5(h5file, nuc_chg, "cc-pvdz", False))
 
     def test_rest_density(self):
 
