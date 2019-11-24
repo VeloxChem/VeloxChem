@@ -137,17 +137,13 @@ class ScfRestrictedDriver(ScfDriver):
         if self.rank == mpi_master():
 
             if len(self.fock_matrices) == 1:
-
                 return np.copy(self.fock_matrices[0])
 
             if len(self.fock_matrices) > 1:
-
                 acc_diis = CTwoDiis()
-
                 acc_diis.compute_error_vectors(self.fock_matrices,
                                                self.den_matrices, ovl_mat,
                                                oao_mat)
-
                 weights = acc_diis.compute_weights()
 
                 return self.get_scaled_fock(weights)
@@ -171,7 +167,6 @@ class ScfRestrictedDriver(ScfDriver):
         effmat = np.zeros(self.fock_matrices[0].shape, dtype=float)
 
         for w, fmat in zip(weights, self.fock_matrices):
-
             effmat = effmat + w * fmat
 
         return effmat
@@ -192,15 +187,11 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-
             tmat = oao_mat.to_numpy()
-
             fmo = np.matmul(tmat.T, np.matmul(fock_mat, tmat))
 
             eigs, evecs = np.linalg.eigh(fmo)
-
             orb_coefs = np.matmul(tmat, evecs)
-
             orb_coefs, eigs = self.delete_mos(orb_coefs, eigs)
 
             return MolecularOrbitals([orb_coefs], [eigs], molorb.rest)

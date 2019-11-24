@@ -143,7 +143,6 @@ class CTwoDiis:
         norm_vecs = []
 
         for i in range(len(sum_vecs)):
-
             if abs(sum_vecs[i]) > 1.0e-6:
                 norm_vecs.append(bvectors[:, i] / sum_vecs[i])
 
@@ -165,7 +164,6 @@ class CTwoDiis:
         wmin = weights[0]
 
         for w in weights:
-
             evec = np.zeros(self.error_vectors[0].shape, dtype=float)
 
             for f, v in zip(w, self.error_vectors):

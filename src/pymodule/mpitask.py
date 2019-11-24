@@ -142,5 +142,5 @@ class MpiTask:
         Finalizes the MPI task.
         """
 
-        if (self.mpi_rank == mpi_master()):
+        if self.mpi_rank == mpi_master():
             self.ostream.print_finish_header(self.start_time)

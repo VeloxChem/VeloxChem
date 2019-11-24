@@ -330,18 +330,14 @@ class ScfDriver:
             self.max_iter = 5
 
             val_basis = ao_basis.get_valence_basis()
-
             self.comp_diis(molecule, val_basis, min_basis)
 
             # second step
             self.first_step = False
 
             self.diis_thresh = 1000.0
-
             self.conv_thresh = old_thresh
-
             self.max_iter = old_max_iter
-
             self.den_guess.guess_type = "PRCMO"
 
             self.comp_diis(molecule, ao_basis, val_basis)
