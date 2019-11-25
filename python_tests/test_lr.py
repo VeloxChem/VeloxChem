@@ -43,7 +43,7 @@ class TestLR(unittest.TestCase):
 
         if task.mpi_rank == mpi_master():
             prop = np.array([
-                -lr_results['properties'][(a, b, w)] for w in ref_freqs
+                -lr_results['response_functions'][(a, b, w)] for w in ref_freqs
                 for a in 'xyz' for b in 'xyz'
             ])
             self.assertTrue(np.max(np.abs(prop - ref_prop)) < 1.0e-4)

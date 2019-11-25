@@ -46,17 +46,16 @@ class LinearAbsorptionCrossSection(ResponseProperty):
 
     def get_property(self, key):
         """
-        Gets component of response property.
+        Gets response functions or solutions.
 
         :param key:
-            The tuple of A component, B component, and frequency.
+            The keyword 'response_functions' or 'solutions'.
 
         :return:
-            The component of response property.
+            The response functions or solutions.
         """
 
-        # key example: ('x', 'y', 0.1)
-        return self.rsp_property['properties'][key]
+        return self.rsp_property[key]
 
     def print_property(self, ostream):
         """
@@ -68,22 +67,22 @@ class LinearAbsorptionCrossSection(ResponseProperty):
 
         width = 92
 
-        title = 'Response Properties'
+        title = 'Response Functions at Given Frequencies'
         ostream.print_header(title.ljust(width))
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
         for w in parse_frequencies(self.rsp_dict['frequencies']):
-            title = '{:<8s} {:<8s} {:>10s} {:>15s} {:>16s}'.format(
+            title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
                 'Dipole', 'Dipole', 'Frequency', 'Real', 'Imaginary')
             ostream.print_header(title.ljust(width))
             ostream.print_header(('-' * len(title)).ljust(width))
 
             for a in self.rsp_dict['a_components']:
                 for b in self.rsp_dict['b_components']:
-                    prop = -self.rsp_property['properties'][(a, b, w)]
-                    ops_label = '{:<8s} {:<8s} {:10.4f}'.format(
-                        a.upper(), b.upper(), w)
+                    prop = self.rsp_property['response_functions'][(a, b, w)]
+                    ops_label = '<<{:>3s}  ;  {:<3s}>> {:10.4f}'.format(
+                        a.lower(), b.lower(), w)
                     output = '{:<15s} {:15.8f} {:15.8f}j'.format(
                         ops_label, prop.real, prop.imag)
                     ostream.print_header(output.ljust(width))
@@ -118,9 +117,9 @@ class LinearAbsorptionCrossSection(ResponseProperty):
             if w == 0.0:
                 continue
 
-            axx = -self.rsp_property['properties'][('x', 'x', w)].imag
-            ayy = -self.rsp_property['properties'][('y', 'y', w)].imag
-            azz = -self.rsp_property['properties'][('z', 'z', w)].imag
+            axx = -self.rsp_property['response_functions'][('x', 'x', w)].imag
+            ayy = -self.rsp_property['response_functions'][('y', 'y', w)].imag
+            azz = -self.rsp_property['response_functions'][('z', 'z', w)].imag
 
             alpha_bar = (axx + ayy + azz) / 3.0
             sigma = 4.0 * math.pi * w * alpha_bar / 137.035999

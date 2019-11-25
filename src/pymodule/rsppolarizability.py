@@ -43,17 +43,16 @@ class Polarizability(ResponseProperty):
 
     def get_property(self, key):
         """
-        Gets component of polarizability.
+        Gets response functions or solutions.
 
         :param key:
-            The tuple of A component, B component, and frequency.
+            The keyword 'response_functions' or 'solutions'.
 
         :return:
-            The component of polarizability.
+            The response functions or solutions.
         """
 
-        # key example: ('x', 'y', 0.1)
-        return self.rsp_property['properties'][key]
+        return self.rsp_property[key]
 
     def print_property(self, ostream):
         """
@@ -78,7 +77,7 @@ class Polarizability(ResponseProperty):
             for a in self.rsp_dict['a_components']:
                 valstr = '{:<5s}'.format(a.upper())
                 for b in self.rsp_dict['b_components']:
-                    prop = -self.rsp_property['properties'][(a, b, w)]
+                    prop = -self.rsp_property['response_functions'][(a, b, w)]
                     valstr += '{:15.8f}'.format(prop)
                 ostream.print_header(valstr.ljust(width))
 

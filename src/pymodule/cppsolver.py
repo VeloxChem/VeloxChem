@@ -484,7 +484,7 @@ class ComplexResponse:
             computed for the B operator.
 
         :return:
-            A dictionary containing properties, solutions, and kappas.
+            A dictionary containing response functions, solutions, and kappas.
         """
 
         if self.profiling:
@@ -941,13 +941,13 @@ class ComplexResponse:
 
             if self.rank == mpi_master():
                 va = {op: v for op, v in zip(self.a_components, a_rhs)}
-                props = {}
+                rsp_funcs = {}
                 for aop in self.a_components:
                     for bop, w in solutions:
-                        props[(aop, bop,
-                               w)] = -np.dot(va[aop], solutions[(bop, w)])
+                        rsp_funcs[(aop, bop,
+                                   w)] = -np.dot(va[aop], solutions[(bop, w)])
                 return {
-                    'properties': props,
+                    'response_functions': rsp_funcs,
                     'solutions': solutions,
                     'kappas': kappas
                 }
@@ -1065,28 +1065,6 @@ class ComplexResponse:
         output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
         self.ostream.print_header(output_conv.ljust(width))
         self.ostream.print_blank()
-
-    def print_properties(self, props):
-        """
-        Prints properties.
-
-        :param props:
-            The dictionary of properties.
-        """
-
-        width = 92
-        for w in self.frequencies:
-            w_str = '{}, {}, w={:.4f}'.format(self.a_operator, self.b_operator,
-                                              w)
-            self.ostream.print_header(w_str.ljust(width))
-            self.ostream.print_header(('-' * len(w_str)).ljust(width))
-            for a in self.a_components:
-                for b in self.b_components:
-                    ops_label = '<<{};{}>>_{:.4f}'.format(a, b, w)
-                    output_alpha = '{:<15s} {:15.8f} {:15.8f}j'.format(
-                        ops_label, props[(a, b, w)].real, props[(a, b, w)].imag)
-                    self.ostream.print_header(output_alpha.ljust(width))
-            self.ostream.print_blank()
 
     def print_timing(self):
         """

@@ -229,13 +229,16 @@ class PulsedResponse:
         results['pulse_settings'] = self.pulse_settings
 
         if self.rank == mpi_master():
+            results['properties'] = {}
             # Loop over all directions
             for xyz1 in ['x', 'y', 'z']:
                 for xyz2 in ['x', 'y', 'z']:
                     # Convert response function to polarizability
                     # by multiplication with -1
                     for freq in self.truncated_freqs:
-                        results['properties'][(xyz1, xyz2, freq)] *= -1
+                        results['properties'][(
+                            xyz1, xyz2, freq
+                        )] = -results['response_functions'][(xyz1, xyz2, freq)]
 
             self.ostream.print_info(
                 "Exiting CPP Solver returning to Pulsed Linear Response")

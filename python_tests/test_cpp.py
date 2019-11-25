@@ -47,7 +47,7 @@ class TestCPP(unittest.TestCase):
 
         if task.mpi_rank == mpi_master():
             prop = np.array([
-                -cpp_results['properties'][(a, b, w)]
+                -cpp_results['response_functions'][(a, b, w)]
                 for w in ref_freqs
                 for (a, b) in ['xx', 'yy', 'zz', 'xy', 'xz', 'yz']
             ])

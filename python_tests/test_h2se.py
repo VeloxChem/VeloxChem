@@ -137,7 +137,8 @@ class TestH2Se(unittest.TestCase):
             'conv_thresh': '1.0e-4',
         })
 
-        lr_prop = lr_solver.compute(task.molecule, task.ao_basis, scf_tensors)
+        lr_results = lr_solver.compute(task.molecule, task.ao_basis,
+                                       scf_tensors)
 
         if task.mpi_rank == mpi_master():
 
@@ -162,7 +163,7 @@ class TestH2Se(unittest.TestCase):
                 ('z', 'z', 0.1): 24.27442,
             }
 
-            for key, val in lr_prop['properties'].items():
+            for key, val in lr_results['response_functions'].items():
                 ref = -ref_polar[key]
                 diff = abs(val - ref)
                 self.assertTrue(diff < 1.0e-5)

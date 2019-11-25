@@ -204,7 +204,7 @@ class LinearResponseSolver:
             computed for the B operator.
 
         :return:
-            A dictionary containing properties, solutions, and kappas.
+            A dictionary containing response functions, solutions, and kappas.
         """
 
         if self.profiling:
@@ -546,20 +546,20 @@ class LinearResponseSolver:
                 for line in s.getvalue().split(os.linesep):
                     self.ostream.print_info(line)
 
-        # calculate properties
+        # calculate response functions
         if not nonlinear_flag:
             a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
                             scf_tensors, self.rank, self.comm)
 
             if self.rank == mpi_master():
                 va = {op: v for op, v in zip(self.a_components, a_rhs)}
-                props = {}
+                rsp_funcs = {}
                 for aop in self.a_components:
                     for bop, w in solutions:
-                        props[(aop, bop,
-                               w)] = -np.dot(va[aop], solutions[(bop, w)])
+                        rsp_funcs[(aop, bop,
+                                   w)] = -np.dot(va[aop], solutions[(bop, w)])
                 return {
-                    'properties': props,
+                    'response_functions': rsp_funcs,
                     'solutions': solutions,
                     'kappas': kappas
                 }
