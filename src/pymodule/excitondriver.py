@@ -48,6 +48,7 @@ class ExcitonModelDriver:
         - state_info: Information of the diabatic excited states.
         - monomers: The monomer dictionaries.
         - natoms: The list containing number of atoms in each monomer.
+        - charges: The list containing net charges of each monomer.
         - qq_type: The electron repulsion integrals screening scheme.
         - eri_thresh: The electron repulsion integrals screening threshold.
         - dft: The flag for running DFT.
@@ -136,9 +137,21 @@ class ExcitonModelDriver:
         fragments = exciton_dict['fragments'].split(',')
         atoms_per_fragment = exciton_dict['atoms_per_fragment'].split(',')
 
+        if 'charges' in exciton_dict:
+            charges = exciton_dict['charges'].split(',')
+        else:
+            charges = ['0.0'] * len(fragments)
+
+        assert_msg_critical(
+            len(fragments) == len(atoms_per_fragment) and
+            len(fragments) == len(charges),
+            'ExcitonModel: mismatch in fragment input')
+
         self.natoms = []
-        for n, x in zip(fragments, atoms_per_fragment):
+        self.charges = []
+        for n, x, q in zip(fragments, atoms_per_fragment, charges):
             self.natoms += [int(x)] * int(n)
+            self.charges += [float(q)] * int(n)
 
         if 'nstates' in exciton_dict:
             self.nstates = int(exciton_dict['nstates'])
@@ -265,8 +278,27 @@ class ExcitonModelDriver:
             # monomer molecule
             monomer = molecule.get_sub_molecule(start_indices[ind],
                                                 self.natoms[ind])
+            monomer.set_charge(self.charges[ind])
+            monomer.check_multiplicity()
+
             if self.rank == mpi_master():
                 self.ostream.print_block(monomer.get_string())
+
+                valstr = 'Molecular charge            : {:.0f}'.format(
+                    monomer.get_charge())
+                self.ostream.print_header(valstr.ljust(70))
+                valstr = 'Spin multiplicity           : {:d}'.format(
+                    monomer.get_multiplicity())
+                self.ostream.print_header(valstr.ljust(70))
+                valstr = 'Number of alpha electrons   : {:d}'.format(
+                    monomer.number_of_alpha_electrons())
+                self.ostream.print_header(valstr.ljust(70))
+                valstr = 'Number of beta  electrons   : {:d}'.format(
+                    monomer.number_of_beta_electrons())
+                self.ostream.print_header(valstr.ljust(70))
+                self.ostream.print_blank()
+                self.ostream.print_blank()
+
                 self.ostream.print_block(
                     basis.get_string('Atomic Basis', monomer))
                 self.ostream.flush()
@@ -430,6 +462,8 @@ class ExcitonModelDriver:
         for ind_A in range(dimer_index_A, nfragments):
             monomer_a = molecule.get_sub_molecule(start_indices[ind_A],
                                                   self.natoms[ind_A])
+            monomer_a.set_charge(self.charges[ind_A])
+            monomer_a.check_multiplicity()
 
             if self.restart and ind_A == dimer_index_A:
                 dimer_index_B = dimer_indices[1] + 1
@@ -439,6 +473,8 @@ class ExcitonModelDriver:
             for ind_B in range(dimer_index_B, nfragments):
                 monomer_b = molecule.get_sub_molecule(start_indices[ind_B],
                                                       self.natoms[ind_B])
+                monomer_b.set_charge(self.charges[ind_B])
+                monomer_b.check_multiplicity()
 
                 dimer_start_time = tm.time()
 
@@ -447,8 +483,26 @@ class ExcitonModelDriver:
 
                 # dimer molecule
                 dimer = Molecule(monomer_a, monomer_b)
+                dimer.check_multiplicity()
+
                 if self.rank == mpi_master():
                     self.ostream.print_block(dimer.get_string())
+
+                    valstr = 'Molecular charge            : {:.0f}'.format(
+                        dimer.get_charge())
+                    self.ostream.print_header(valstr.ljust(70))
+                    valstr = 'Spin multiplicity           : {:d}'.format(
+                        dimer.get_multiplicity())
+                    self.ostream.print_header(valstr.ljust(70))
+                    valstr = 'Number of alpha electrons   : {:d}'.format(
+                        dimer.number_of_alpha_electrons())
+                    self.ostream.print_header(valstr.ljust(70))
+                    valstr = 'Number of beta  electrons   : {:d}'.format(
+                        dimer.number_of_beta_electrons())
+                    self.ostream.print_header(valstr.ljust(70))
+                    self.ostream.print_blank()
+                    self.ostream.print_blank()
+
                     self.ostream.print_block(
                         basis.get_string('Atomic Basis', dimer))
                     self.ostream.flush()
@@ -594,6 +648,13 @@ class ExcitonModelDriver:
                     dimer_energy += np.sum(dens * (hcore + fock))
                     if self.dft:
                         dimer_energy += vxc_mat.get_energy()
+
+                    self.ostream.print_blank()
+
+                    valstr = 'Excitonic Couplings'
+                    self.ostream.print_header(valstr)
+                    self.ostream.print_header('=' * (len(valstr) + 2))
+                    self.ostream.print_blank()
 
                     valstr = 'Dimer Energy:{:20.10f} au'.format(dimer_energy)
                     self.ostream.print_header(valstr.ljust(92))
