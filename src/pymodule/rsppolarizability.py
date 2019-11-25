@@ -53,7 +53,7 @@ class Polarizability(ResponseProperty):
         """
 
         # key example: ('x', 'y', 0.1)
-        return self.rsp_property[key]
+        return self.rsp_property['properties'][key]
 
     def print_property(self, ostream):
         """
@@ -78,7 +78,7 @@ class Polarizability(ResponseProperty):
             for a in self.rsp_dict['a_components']:
                 valstr = '{:<5s}'.format(a.upper())
                 for b in self.rsp_dict['b_components']:
-                    prop = -self.rsp_property[(a, b, w)]
+                    prop = -self.rsp_property['properties'][(a, b, w)]
                     valstr += '{:15.8f}'.format(prop)
                 ostream.print_header(valstr.ljust(width))
 

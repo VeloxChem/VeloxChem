@@ -162,7 +162,7 @@ class TestH2Se(unittest.TestCase):
                 ('z', 'z', 0.1): 24.27442,
             }
 
-            for key, val in lr_prop.items():
+            for key, val in lr_prop['properties'].items():
                 ref = -ref_polar[key]
                 diff = abs(val - ref)
                 self.assertTrue(diff < 1.0e-5)

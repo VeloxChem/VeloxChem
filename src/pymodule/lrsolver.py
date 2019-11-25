@@ -15,6 +15,7 @@ from .lrmatvecdriver import remove_linear_dependence_half
 from .lrmatvecdriver import orthogonalize_gram_schmidt_half
 from .lrmatvecdriver import normalize_half
 from .lrmatvecdriver import construct_ed_sd_half
+from .lrmatvecdriver import lrvec2mat
 from .lrmatvecdriver import get_rhs
 from .lrmatvecdriver import read_rsp_hdf5
 from .lrmatvecdriver import write_rsp_hdf5
@@ -188,7 +189,7 @@ class LinearResponseSolver:
             key = method_dict['use_split_comm'].lower()
             self.use_split_comm = True if key == 'yes' else False
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, scf_tensors, v1=None):
         """
         Performs linear response calculation for a molecule and a basis set.
 
@@ -198,9 +199,12 @@ class LinearResponseSolver:
             The AO basis set.
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
+        :param v1:
+            The gradients on the right-hand side. If not provided, v1 will be
+            computed for the B operator.
 
         :return:
-            A dictionary containing properties.
+            A dictionary containing properties, solutions, and kappas.
         """
 
         if self.profiling:
@@ -307,14 +311,18 @@ class LinearResponseSolver:
                                 self.xcfun, self.pe, self.potfile)
         timing_dict = {}
 
-        a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
-                        scf_tensors, self.rank, self.comm)
-        b_rhs = get_rhs(self.b_operator, self.b_components, molecule, basis,
-                        scf_tensors, self.rank, self.comm)
+        if not v1:
+            nonlinear_flag = False
+            b_rhs = get_rhs(self.b_operator, self.b_components, molecule, basis,
+                            scf_tensors, self.rank, self.comm)
+            if self.rank == mpi_master():
+                v1 = {(op, w): v for op, v in zip(self.b_components, b_rhs)
+                      for w in self.frequencies}
+        else:
+            nonlinear_flag = True
 
         if self.rank == mpi_master():
-            V1 = {op: v for op, v in zip(self.b_components, b_rhs)}
-            op_freq_keys = [(op, w) for op in V1 for w in self.frequencies]
+            op_freq_keys = list(v1.keys())
             precond = {
                 w: self.get_precond(ea, nocc, norb, w) for w in self.frequencies
             }
@@ -347,7 +355,7 @@ class LinearResponseSolver:
         if not self.restart:
             if self.rank == mpi_master():
 
-                igs = self.initial_guess(self.frequencies, V1, precond)
+                igs = self.initial_guess(v1, self.frequencies, precond)
                 bger, bung = self.setup_trials(igs)
 
                 if self.timing:
@@ -371,6 +379,7 @@ class LinearResponseSolver:
 
         solutions = {}
         residuals = {}
+        kappas = {}
         relative_residual_norm = {}
         converged = {}
 
@@ -398,7 +407,7 @@ class LinearResponseSolver:
 
                 # next solution
                 for op, freq in op_freq_keys:
-                    v = V1[op]
+                    v = v1[(op, freq)]
 
                     gradger, gradung = self.decomp_grad(v)
 
@@ -427,6 +436,9 @@ class LinearResponseSolver:
                     x_ung_full = np.hstack((x_ung, -x_ung))
 
                     solutions[(op, freq)] = x_ger_full + x_ung_full
+
+                    kappas[(op, freq)] = lrvec2mat(x_ger_full + x_ung_full,
+                                                   nocc, norb)
 
                     r_ger = np.matmul(e2bger, c_ger) - freq * 2.0 * np.matmul(
                         bung, c_ung) - gradger
@@ -535,15 +547,28 @@ class LinearResponseSolver:
                     self.ostream.print_info(line)
 
         # calculate properties
-        if self.rank == mpi_master():
-            v1 = {op: v for op, v in zip(self.a_components, a_rhs)}
-            lrs = {}
-            for aop in self.a_components:
-                for bop, w in solutions:
-                    lrs[(aop, bop, w)] = -np.dot(v1[aop], solutions[(bop, w)])
-            return lrs
+        if not nonlinear_flag:
+            a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
+                            scf_tensors, self.rank, self.comm)
+
+            if self.rank == mpi_master():
+                va = {op: v for op, v in zip(self.a_components, a_rhs)}
+                props = {}
+                for aop in self.a_components:
+                    for bop, w in solutions:
+                        props[(aop, bop,
+                               w)] = -np.dot(va[aop], solutions[(bop, w)])
+                return {
+                    'properties': props,
+                    'solutions': solutions,
+                    'kappas': kappas
+                }
+
         else:
-            return None
+            if self.rank == mpi_master():
+                return {'solutions': solutions, 'kappas': kappas}
+
+        return {}
 
     def print_header(self):
         """
@@ -645,15 +670,15 @@ class LinearResponseSolver:
         self.is_converged = self.comm.bcast(self.is_converged,
                                             root=mpi_master())
 
-    def initial_guess(self, freqs, V1, precond):
+    def initial_guess(self, v1, freqs, precond):
         """
         Creating initial guess for the linear response solver.
 
+        :param v1:
+            The dictionary containing (operator, frequency) as keys and
+            right-hand sides as values.
         :param freq:
             The frequencies.
-        :param V1:
-            The dictionary containing operator components (key) and right-hand
-            sides (values).
         :param precond:
             The preconditioner.
 
@@ -662,17 +687,17 @@ class LinearResponseSolver:
         """
 
         ig = {}
-        for op, grad in V1.items():
+        for (op, w), grad in v1.items():
             gradger, gradung = self.decomp_grad(grad)
 
             grad = np.array([gradger, gradung]).flatten()
             gn = np.linalg.norm(grad) * np.sqrt(2.0)
 
-            for w in freqs:
-                if gn < self.small_thresh:
-                    ig[(op, w)] = np.zeros(grad.shape[0])
-                else:
-                    ig[(op, w)] = self.preconditioning(precond[w], grad)
+            if gn < self.small_thresh:
+                ig[(op, w)] = np.zeros(grad.shape[0])
+            else:
+                ig[(op, w)] = self.preconditioning(precond[w], grad)
+
         return ig
 
     def decomp_grad(self, grad):
