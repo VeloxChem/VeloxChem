@@ -12,8 +12,8 @@
 #include "DenseDiagonalizer.hpp"
 #include "DenseLinearAlgebra.hpp"
 #include "DensityMatrixType.hpp"
-#include "PartialCharges.hpp"
 #include "ErrorHandler.hpp"
+#include "PartialCharges.hpp"
 #include "StringFormat.hpp"
 
 CSADGuessDriver::CSADGuessDriver(MPI_Comm comm)
@@ -93,101 +93,139 @@ CSADGuessDriver::getOccupationNumbersForElement(const int32_t elem_id, const dou
 
     switch (elem_id)
     {
-        // dummy atom
+            // dummy atom
 
-        case 0: return std::vector<double>();
+        case 0:
+            return std::vector<double>();
 
-        // H,He
+            // H,He
 
-        case 1: return _getOcc1s(0.5 + nelec);
+        case 1:
+            return _getOcc1s(0.5 + nelec);
 
-        case 2: return _getOcc1s(1.0 + nelec);
+        case 2:
+            return _getOcc1s(1.0 + nelec);
 
-        // Li,Be
+            // Li,Be
 
-        case 3: return _getOcc2s(0.5 + nelec);
+        case 3:
+            return _getOcc2s(0.5 + nelec);
 
-        case 4: return _getOcc2s(1.0 + nelec);
+        case 4:
+            return _getOcc2s(1.0 + nelec);
 
-        // B,C,N,O,F,Ne
+            // B,C,N,O,F,Ne
 
-        case 5: return _getOcc2s2p(0.375 + nelec / 4.0);
+        case 5:
+            return _getOcc2s2p(0.375 + nelec / 4.0);
 
-        case 6: return _getOcc2s2p(0.500 + nelec / 4.0);
+        case 6:
+            return _getOcc2s2p(0.500 + nelec / 4.0);
 
-        case 7: return _getOcc2s2p(0.625 + nelec / 4.0);
+        case 7:
+            return _getOcc2s2p(0.625 + nelec / 4.0);
 
-        case 8: return _getOcc2s2p(0.750 + nelec / 4.0);
+        case 8:
+            return _getOcc2s2p(0.750 + nelec / 4.0);
 
-        case 9: return _getOcc2s2p(0.875 + nelec / 4.0);
+        case 9:
+            return _getOcc2s2p(0.875 + nelec / 4.0);
 
-        case 10: return _getOcc2s2p(1.000 + nelec / 4.0);
+        case 10:
+            return _getOcc2s2p(1.000 + nelec / 4.0);
 
-        // Na,Mg
+            // Na,Mg
 
-        case 11: return _getOcc3s(0.5 + nelec);
+        case 11:
+            return _getOcc3s(0.5 + nelec);
 
-        case 12: return _getOcc3s(1.0 + nelec);
+        case 12:
+            return _getOcc3s(1.0 + nelec);
 
-        // Al,Si,P,S,Cl,Ar
+            // Al,Si,P,S,Cl,Ar
 
-        case 13: return _getOcc3s3p(0.375 + nelec / 4.0);
+        case 13:
+            return _getOcc3s3p(0.375 + nelec / 4.0);
 
-        case 14: return _getOcc3s3p(0.500 + nelec / 4.0);
+        case 14:
+            return _getOcc3s3p(0.500 + nelec / 4.0);
 
-        case 15: return _getOcc3s3p(0.625 + nelec / 4.0);
+        case 15:
+            return _getOcc3s3p(0.625 + nelec / 4.0);
 
-        case 16: return _getOcc3s3p(0.750 + nelec / 4.0);
+        case 16:
+            return _getOcc3s3p(0.750 + nelec / 4.0);
 
-        case 17: return _getOcc3s3p(0.875 + nelec / 4.0);
+        case 17:
+            return _getOcc3s3p(0.875 + nelec / 4.0);
 
-        case 18: return _getOcc3s3p(1.000 + nelec / 4.0);
+        case 18:
+            return _getOcc3s3p(1.000 + nelec / 4.0);
 
-        // K,Ca
+            // K,Ca
 
-        case 19: return _getOcc4s(0.5 + nelec);
+        case 19:
+            return _getOcc4s(0.5 + nelec);
 
-        case 20: return _getOcc4s(1.0 + nelec);
+        case 20:
+            return _getOcc4s(1.0 + nelec);
 
-        // Sc,Ti,V,Cr,Mn,Fe,Co,Ni,Cu,Zn
+            // Sc,Ti,V,Cr,Mn,Fe,Co,Ni,Cu,Zn
 
-        case 21: return _getOcc3d(0.1 + nelec / 5.0);
+        case 21:
+            return _getOcc3d(0.1 + nelec / 5.0);
 
-        case 22: return _getOcc3d(0.2 + nelec / 5.0);
+        case 22:
+            return _getOcc3d(0.2 + nelec / 5.0);
 
-        case 23: return _getOcc3d(0.3 + nelec / 5.0);
+        case 23:
+            return _getOcc3d(0.3 + nelec / 5.0);
 
-        case 24: return _getOcc3d(0.4 + nelec / 5.0);
+        case 24:
+            return _getOcc3d(0.4 + nelec / 5.0);
 
-        case 25: return _getOcc3d(0.5 + nelec / 5.0);
+        case 25:
+            return _getOcc3d(0.5 + nelec / 5.0);
 
-        case 26: return _getOcc3d(0.6 + nelec / 5.0);
+        case 26:
+            return _getOcc3d(0.6 + nelec / 5.0);
 
-        case 27: return _getOcc3d(0.7 + nelec / 5.0);
+        case 27:
+            return _getOcc3d(0.7 + nelec / 5.0);
 
-        case 28: return _getOcc3d(0.8 + nelec / 5.0);
+        case 28:
+            return _getOcc3d(0.8 + nelec / 5.0);
 
-        case 29: return _getOcc3d(0.9 + nelec / 5.0);
+        case 29:
+            return _getOcc3d(0.9 + nelec / 5.0);
 
-        case 30: return _getOcc3d(1.0 + nelec / 5.0);
+        case 30:
+            return _getOcc3d(1.0 + nelec / 5.0);
 
-        // Ga,Ge,As,Se,Br,Kr
+            // Ga,Ge,As,Se,Br,Kr
 
-        case 31: return _getOcc4s4p(0.375 + nelec / 4.0);
+        case 31:
+            return _getOcc4s4p(0.375 + nelec / 4.0);
 
-        case 32: return _getOcc4s4p(0.500 + nelec / 4.0);
+        case 32:
+            return _getOcc4s4p(0.500 + nelec / 4.0);
 
-        case 33: return _getOcc4s4p(0.625 + nelec / 4.0);
+        case 33:
+            return _getOcc4s4p(0.625 + nelec / 4.0);
 
-        case 34: return _getOcc4s4p(0.750 + nelec / 4.0);
+        case 34:
+            return _getOcc4s4p(0.750 + nelec / 4.0);
 
-        case 35: return _getOcc4s4p(0.875 + nelec / 4.0);
+        case 35:
+            return _getOcc4s4p(0.875 + nelec / 4.0);
 
-        case 36: return _getOcc4s4p(1.000 + nelec / 4.0);
+        case 36:
+            return _getOcc4s4p(1.000 + nelec / 4.0);
 
-        // other elements: not implemented
+            // other elements: not implemented
 
-        default: return std::vector<double>();
+        default:
+            return std::vector<double>();
     }
 }
 

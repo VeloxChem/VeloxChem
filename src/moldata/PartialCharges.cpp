@@ -6,12 +6,13 @@
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
+#include "PartialCharges.hpp"
+
 #include "DenseDiagonalizer.hpp"
-#include "DenseMatrix.hpp"
 #include "DenseLinearAlgebra.hpp"
+#include "DenseMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "Molecule.hpp"
-#include "PartialCharges.hpp"
 
 namespace parchg {  // parchg namespace
 
@@ -51,9 +52,7 @@ getPartialCharges(const CMolecule& molecule, double netcharge)
     {
         for (int32_t j = i + 1; j < natoms; j++)
         {
-            double rij = std::sqrt((rx[i] - rx[j]) * (rx[i] - rx[j]) +
-                                   (ry[i] - ry[j]) * (ry[i] - ry[j]) +
-                                   (rz[i] - rz[j]) * (rz[i] - rz[j]));
+            double rij = std::sqrt((rx[i] - rx[j]) * (rx[i] - rx[j]) + (ry[i] - ry[j]) * (ry[i] - ry[j]) + (rz[i] - rz[j]) * (rz[i] - rz[j]));
 
             matrix.values()[i * (natoms + 1) + j] = 1.0 / rij;
 
@@ -107,8 +106,8 @@ getElectronegativity()
         // H-B
         -0.096,
         -0.242,
-         0.003,
-         0.125,
+        0.003,
+        0.125,
         -0.141,
 
         // C-Ne
@@ -119,8 +118,8 @@ getElectronegativity()
         -0.398,
 
         // Na-P
-         0.005,
-         0.099,
+        0.005,
+        0.099,
         -0.086,
         -0.096,
         -0.099,
@@ -129,22 +128,22 @@ getElectronegativity()
         -0.106,
         -0.105,
         -0.092,
-         0.010,
-         0.058,
+        0.010,
+        0.058,
 
         // Sc-Mn
         -0.029,
         -0.062,
-         0.018,
-         0.063,
+        0.018,
+        0.063,
         -0.106,
 
         // Fe-Zn
         -0.020,
         -0.003,
-         0.015,
-         0.065,
-         0.054,
+        0.015,
+        0.065,
+        0.054,
 
         // Ga-Br
         -0.093,

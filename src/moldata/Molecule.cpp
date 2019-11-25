@@ -6,12 +6,13 @@
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
+#include "Molecule.hpp"
+
 #include <cmath>
 #include <sstream>
 
 #include "Codata.hpp"
 #include "MathFunc.hpp"
-#include "Molecule.hpp"
 #include "StringFormat.hpp"
 
 CMolecule::CMolecule()

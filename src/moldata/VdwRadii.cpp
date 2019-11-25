@@ -6,10 +6,11 @@
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
+#include "VdwRadii.hpp"
+
 #include <cstring>
 
 #include "Codata.hpp"
-#include "VdwRadii.hpp"
 
 namespace vdwradii {  // vdwradii namespace
 

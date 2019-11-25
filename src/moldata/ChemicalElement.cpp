@@ -6,9 +6,9 @@
 //  Copyright © 2019 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
-#include <cmath>
-
 #include "ChemicalElement.hpp"
+
+#include <cmath>
 
 CChemicalElement::CChemicalElement()
 
