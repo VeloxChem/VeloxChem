@@ -657,7 +657,7 @@ class ExcitonModelDriver:
                     self.ostream.print_blank()
 
                     valstr = 'Dimer Energy:{:20.10f} au'.format(dimer_energy)
-                    self.ostream.print_header(valstr.ljust(92))
+                    self.ostream.print_header(valstr.ljust(72))
                     self.ostream.print_blank()
                     self.ostream.flush()
 
@@ -842,7 +842,7 @@ class ExcitonModelDriver:
                             if not (svec['type'] == 'CT' and
                                     cvec['type'] == 'CT' and
                                     svec['index'] > cvec['index']):
-                                self.ostream.print_header(valstr.ljust(92))
+                                self.ostream.print_header(valstr.ljust(72))
 
                         self.ostream.print_blank()
 
@@ -863,7 +863,7 @@ class ExcitonModelDriver:
                         valstr += '  {:>26s}'.format(svec['name'])
 
                         valstr += '  {:20.12f}'.format(energy)
-                        self.ostream.print_header(valstr.ljust(92))
+                        self.ostream.print_header(valstr.ljust(72))
 
                         # CT transition dipole
                         tdens = math.sqrt(2.0) * np.matmul(
@@ -905,7 +905,7 @@ class ExcitonModelDriver:
                                     valstr += '  {:>15s}  {:>15s}'.format(
                                         name_CA, name_CB)
                                     valstr += '  {:20.12f}'.format(coupling)
-                                    self.ostream.print_header(valstr.ljust(92))
+                                    self.ostream.print_header(valstr.ljust(72))
 
                         # A(i)->C(a) vs B(j)->C(a): -f_ij
                         for vC in range(self.ct_nvir):
@@ -930,14 +930,14 @@ class ExcitonModelDriver:
                                     valstr += '  {:>15s}  {:>15s}'.format(
                                         name_AC, name_BC)
                                     valstr += '  {:20.12f}'.format(coupling)
-                                    self.ostream.print_header(valstr.ljust(92))
+                                    self.ostream.print_header(valstr.ljust(72))
 
                         if self.ct_nocc * self.ct_nvir > 0:
                             self.ostream.print_blank()
 
                 valstr = '*** Time used in dimer calculation:'
                 valstr += ' {:.2f} sec'.format(tm.time() - dimer_start_time)
-                self.ostream.print_block(valstr.ljust(92))
+                self.ostream.print_block(valstr.ljust(72))
                 self.ostream.print_blank()
 
                 state_info_list = [
@@ -977,7 +977,7 @@ class ExcitonModelDriver:
                 adia_magn_trans_dipoles[s, :] *= 0.5
 
             valstr = 'Adiabatic excited states:'
-            self.ostream.print_header(valstr.ljust(92))
+            self.ostream.print_header(valstr.ljust(80))
             self.ostream.print_blank()
 
             osc_str = []
@@ -997,23 +997,23 @@ class ExcitonModelDriver:
             self.print_ecd('Electronic Circular Dichroism', rot_str)
 
             valstr = 'Characters of excited states:'
-            self.ostream.print_header(valstr.ljust(92))
+            self.ostream.print_header(valstr.ljust(80))
             self.ostream.print_blank()
 
             for s in range(eigvecs.shape[1]):
                 valstr = 'Excited state {}:'.format(s + 1)
-                self.ostream.print_header(valstr.ljust(92))
-                self.ostream.print_header(('-' * len(valstr)).ljust(92))
+                self.ostream.print_header(valstr.ljust(80))
+                self.ostream.print_header(('-' * len(valstr)).ljust(80))
 
                 for k in range(eigvecs.shape[0]):
                     composition = eigvecs[k, s]**2
-                    if (composition > 0.1):
+                    if (composition > 0.05):
                         valstr = '{:<7s} {:<15s} {:>6.1f}%'.format(
                             self.state_info[k]['type'],
                             self.state_info[k]['name'],
                             composition * 100,
                         )
-                        self.ostream.print_header(valstr.ljust(92))
+                        self.ostream.print_header(valstr.ljust(80))
                 self.ostream.print_blank()
 
             self.ostream.flush()
@@ -1049,18 +1049,18 @@ class ExcitonModelDriver:
         num_frags = len(self.natoms)
 
         valstr = 'Total number of atoms:        {}'.format(num_atoms)
-        self.ostream.print_header(valstr.ljust(72))
+        self.ostream.print_header(valstr.ljust(54))
         valstr = 'Total number of monomers:     {}'.format(num_frags)
-        self.ostream.print_header(valstr.ljust(72))
+        self.ostream.print_header(valstr.ljust(54))
         valstr = 'Total number of LE states:    {}'.format(num_LE)
-        self.ostream.print_header(valstr.ljust(72))
+        self.ostream.print_header(valstr.ljust(54))
         valstr = 'Total number of CT states:    {}'.format(num_CT)
-        self.ostream.print_header(valstr.ljust(72))
+        self.ostream.print_header(valstr.ljust(54))
         self.ostream.print_blank()
 
         for i, n in enumerate(self.natoms):
             valstr = 'Monomer  {}  has  {}  atoms'.format(i + 1, n)
-            self.ostream.print_header(valstr.ljust(72))
+            self.ostream.print_header(valstr.ljust(54))
         self.ostream.print_blank()
 
     def print_absorption(self, title, eigvals, osc_str):
@@ -1076,14 +1076,14 @@ class ExcitonModelDriver:
         """
 
         valstr = title
-        self.ostream.print_header(valstr.ljust(92))
-        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        self.ostream.print_header(valstr.ljust(80))
+        self.ostream.print_header(('-' * len(valstr)).ljust(80))
         for s, (e, f) in enumerate(zip(eigvals, osc_str)):
             valstr = 'Excited State {:>5s}: '.format('S' + str(s + 1))
             valstr += '{:15.8f} a.u. '.format(e)
             valstr += '{:12.5f} eV'.format(e * hartree_in_ev())
             valstr += '    Osc.Str. {:9.4f}'.format(f)
-            self.ostream.print_header(valstr.ljust(92))
+            self.ostream.print_header(valstr.ljust(80))
         self.ostream.print_blank()
 
     def print_ecd(self, title, rot_str):
@@ -1097,11 +1097,11 @@ class ExcitonModelDriver:
         """
 
         valstr = title
-        self.ostream.print_header(valstr.ljust(92))
-        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        self.ostream.print_header(valstr.ljust(80))
+        self.ostream.print_header(('-' * len(valstr)).ljust(80))
         for s, R in enumerate(rot_str):
             valstr = 'Excited State {:>5s}: '.format('S' + str(s + 1))
             valstr += '    Rot.Str. {:11.4f}'.format(R)
             valstr += '    [10**(-40) (esu**2)*(cm**2)]'
-            self.ostream.print_header(valstr.ljust(92))
+            self.ostream.print_header(valstr.ljust(80))
         self.ostream.print_blank()
