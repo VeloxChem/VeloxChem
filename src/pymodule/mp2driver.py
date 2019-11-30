@@ -204,6 +204,7 @@ class Mp2Driver:
             valstr += 'will be processed on master node.'
             self.ostream.print_header(valstr.ljust(80))
             self.ostream.print_blank()
+            self.ostream.flush()
 
             mo_ints_start = displ[cross_rank]
             mo_ints_end = mo_ints_start + count[cross_rank]
@@ -265,6 +266,7 @@ class Mp2Driver:
                     tm.time() - batch_t0)
                 self.ostream.print_header(valstr.ljust(80))
                 self.ostream.print_blank()
+                self.ostream.flush()
 
         if local_master:
             e_mp2 = cross_comm.reduce(e_mp2, root=mpi_master())
@@ -275,6 +277,7 @@ class Mp2Driver:
                 self.e_mp2)
             self.ostream.print_header(mp2_str.ljust(80))
             self.ostream.print_blank()
+            self.ostream.flush()
 
     def print_header(self, num_matrices):
         """
