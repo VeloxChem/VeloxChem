@@ -54,6 +54,8 @@ def find_mkl_avx(is_linux, is_macos):
     print('*** Checking avx... ', end='')
     if is_linux:
         avx = find_avx_linux()
+        if check_pdc_beskow():
+            avx = 'avx2'
     elif is_macos:
         avx = find_avx_macos()
     print(avx)
@@ -74,6 +76,13 @@ def check_ubuntu():
                     if 'ubuntu' in line.lower():
                         return True
     return False
+
+
+def check_pdc_beskow():
+    is_pdc = ('SNIC_SITE' in os.environ and os.environ['SNIC_SITE'] == 'pdc')
+    is_beskow = ('SNIC_RESOURCE' in os.environ and
+                 os.environ['SNIC_RESOURCE'] == 'beskow')
+    return (is_pdc and is_beskow)
 
 
 def check_dir(dirname, label):
@@ -185,6 +194,8 @@ def generate_setup(template_file, setup_file):
 
     if use_intel:
         cxx_flags = '-xHost -qopenmp'
+        if check_pdc_beskow():
+            cxx_flags = '-qopenmp'
         omp_flag = '-liomp5'
     elif use_gnu:
         cxx_flags = '-fopenmp'
