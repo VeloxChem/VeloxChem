@@ -1,6 +1,7 @@
 from .cppsolver import ComplexResponse
 from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
+from .c6solver import C6Solver
 from .tdaexcidriver import TDAExciDriver
 
 
@@ -109,6 +110,7 @@ class ResponseDriver:
 
         if (self.rsp_dict['response'] == 'linear' and
                 self.rsp_dict['residue'] == 'none' and
+                self.rsp_dict['onlystatic'] == 'no' and
                 self.rsp_dict['complex'] == 'yes'):
 
             clr_solver = ComplexResponse(self.comm, self.ostream)
@@ -116,6 +118,19 @@ class ResponseDriver:
             clr_solver.update_settings(self.rsp_dict, self.method_dict)
 
             return clr_solver.compute(molecule, ao_basis, scf_tensors)
+
+        # C6 linear response solver
+
+        if (self.rsp_dict['response'] == 'linear' and
+                self.rsp_dict['residue'] == 'none' and
+                self.rsp_dict['onlystatic'] == 'yes' and
+                self.rsp_dict['complex'] == 'yes'):
+
+            c6_solver = C6Solver(self.comm, self.ostream)
+
+            c6_solver.update_settings(self.rsp_dict, self.method_dict)
+
+            return c6_solver.compute(molecule, ao_basis, scf_tensors)
 
     def prop_str(self):
         """
@@ -137,5 +152,8 @@ class ResponseDriver:
 
         if self.prop_type == 'circular dichroism spectrum':
             return 'Circular Dichroism Spectrum'
+
+        if self.prop_type == 'c6':
+            return 'C6 values'
 
         return 'Undefined'
