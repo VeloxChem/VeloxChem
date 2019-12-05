@@ -154,6 +154,6 @@ class ResponseDriver:
             return 'Circular Dichroism Spectrum'
 
         if self.prop_type == 'c6':
-            return 'C6 values'
+            return 'C6 value'
 
         return 'Undefined'

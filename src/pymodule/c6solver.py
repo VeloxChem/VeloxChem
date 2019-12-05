@@ -40,7 +40,6 @@ class C6Solver:
         - b_operator: The B operator.
         - b_components: Cartesian components of the B operator.
         - imagfrequencies: The imaginary frequencies.
-        (- damping: The damping parameter.)
         - qq_type: The electron repulsion integrals screening scheme.
         - eri_thresh: The electron repulsion integrals screening threshold.
         - dft: The flag for running DFT.
@@ -78,8 +77,8 @@ class C6Solver:
         self.b_operator = 'dipole'
         self.b_components = 'xyz'
 
-        self.imagfrequencies = (0.0,0.002,0.005,)
-        #self.damping = 0.004556335294880438
+        self.n_points = 12
+        self.imagfrequencies = [0.3*(1-t)/(1+t) for t in np.polynomial.legendre.leggauss(self.n_points)][0]
 
         self.qq_type = 'QQ_DEN'
         self.eri_thresh = 1.0e-15
@@ -124,21 +123,11 @@ class C6Solver:
             The dictionary of method rsp_dict.
         """
 
-        #if 'a_operator' in rsp_dict:
-        #    self.a_operator = rsp_dict['a_operator'].lower()
-        #if 'a_components' in rsp_dict:
-        #    self.a_components = rsp_dict['a_components'].lower()
-        #if 'b_operator' in rsp_dict:
-        #    self.b_operator = rsp_dict['b_operator'].lower()
-        #if 'b_components' in rsp_dict:
-        #    self.b_components = rsp_dict['b_components'].lower()
-
-        #if 'frequencies' in rsp_dict:
-        #    self.frequencies = parse_frequencies(rsp_dict['frequencies'])
-        if 'imagfrequencies' in rsp_dict:
-            self.imagfrequencies = parse_frequencies(rsp_dict['imagfrequencies'])
-        #if 'damping' in rsp_dict:
-        #    self.damping = float(rsp_dict['damping'])
+        if 'n_points' in rsp_dict:
+            self.n_points = int(rsp_dict['n_points'])
+            self.imagfrequencies = [0.3*(1-t)/(1+t) for t in np.polynomial.legendre.leggauss(self.n_points)][0]
+        #if 'imagfrequencies' in rsp_dict:
+        #    self.imagfrequencies = parse_frequencies(rsp_dict['imagfrequencies'])
 
         if 'lindep_thresh' in rsp_dict:
             self.lindep_thresh = float(rsp_dict['lindep_thresh'])
@@ -849,8 +838,8 @@ class C6Solver:
                 rsp_funcs = {}
                 for aop in self.a_components:
                     for bop, iw in solutions:
-                        rsp_funcs[(aop, bop,
-                                   iw)] = -np.dot(va[aop], solutions[(bop, iw)])
+                        rsp_funcs[(aop, bop, iw)] = -np.dot(va[aop],
+                                                    solutions[(bop, iw)])
                 return {
                     'response_functions': rsp_funcs,
                     'solutions': solutions,
@@ -921,15 +910,14 @@ class C6Solver:
         """
 
         self.ostream.print_blank()
-        self.ostream.print_header("Complex Response Driver Setup")
+        self.ostream.print_header("C6 Value Response Driver Setup")
         self.ostream.print_header(31 * "=")
         self.ostream.print_blank()
 
         width = 60
 
-        #cur_str = "Damping Parameter (gamma)       : {:.6e}".format(
-        #    self.damping)
-        #self.ostream.print_header(cur_str.ljust(width))
+        cur_str = "Number of integration points    : " + str(self.n_points)
+        self.ostream.print_header(cur_str.ljust(width))
 
         cur_str = "Max. Number of Iterations       : " + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(width))
