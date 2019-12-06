@@ -94,7 +94,9 @@ class C6(ResponseProperty):
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
-        imagfreqs = [0.3*(1-t)/(1+t) for t in np.polynomial.legendre.leggauss(int(self.rsp_dict['n_points']))][0]
+        iw0 = 0.3
+        imagfreqs = [iw0*(1-t)/(1+t) for t in np.polynomial.legendre.leggauss(int(self.rsp_dict['n_points']))][0]
+        points = np.polynomial.legendre.leggauss(int(self.rsp_dict['n_points']))[0]
         weights = np.polynomial.legendre.leggauss(int(self.rsp_dict['n_points']))[1]
         integral = 0
 
@@ -104,13 +106,15 @@ class C6(ResponseProperty):
             Gyy = self.rsp_property['response_functions'][('y', 'y', imagfreqs[iw])].real
             Gzz = self.rsp_property['response_functions'][('z', 'z', imagfreqs[iw])].real
 
-            alpha = (Gxx + Gyy + Gzz) / 3.0
+            alpha = -(Gxx + Gyy + Gzz) / 3.0
+            point = points[iw]
             weight = weights[iw]
-            integral += alpha**2 * weight
+            derivative = iw0 * 2 / (1 + point)**2
+            integral += alpha * alpha * weight * derivative
 
         c6 = 3 * integral / math.pi
 
-        output = 'C_6 value :    {:10.6f}'.format(c6)
+        output = 'homomolecular C_6 value :    {:10.6f}'.format(c6)
         ostream.print_header(output.ljust(width))
 
         ostream.print_blank()
