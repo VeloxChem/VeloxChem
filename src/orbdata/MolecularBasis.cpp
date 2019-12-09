@@ -9,6 +9,7 @@
 #include "MolecularBasis.hpp"
 
 #include <sstream>
+#include <array>
 
 #include "AngularMomentum.hpp"
 #include "ChemicalElement.hpp"
@@ -397,6 +398,91 @@ CMolecularBasis::getAOBasisMap(const CMolecule& molecule) const
     }
 
     return strmap;
+}
+
+CMemBlock2D<int32_t>
+CMolecularBasis::getIndexMapForDalton(const CMolecule &molecule) const
+{
+    // allocates index map
+    
+    auto natoms = molecule.getNumberOfAtoms();
+    
+    CMemBlock2D<int32_t> idsmap(getDimensionsOfBasis(molecule), 2);
+    
+    // set up pointers to index map
+    
+    auto vlxidx = idsmap.data(0);
+    
+    auto dalidx = idsmap.data(1);
+    
+    // set up pointer to chemical element data
+    
+    auto idselm = molecule.getIdsElemental();
+    
+    // indexing map for p-functions
+    
+    std::array<int32_t, 3> pord({2, 0, 1});
+    
+    // loop over atoms
+    
+    int32_t curgto = 0;
+    
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        auto atmbas = getAtomBasis(idselm[i]);
+        
+        for (int32_t j = 0; j <= atmbas.getMaxAngularMomentum(); j++)
+        {
+            auto gtopos = getPartialDimensionsOfBasis(molecule, j);
+            
+            auto blkpos = getPositionInAngularBlock(molecule, i, j);
+            
+            auto ngtos = getNumberOfBasisFunctions(molecule, j); 
+            
+            for (int32_t k = 0; k < atmbas.getNumberOfBasisFunctions(j); k++)
+            {
+                for (int32_t l = 0; l < angmom::to_SphericalComponents(j); l++)
+                {
+                    dalidx[curgto] = curgto;
+                    
+                    if (j == 1)
+                    {
+                        vlxidx[curgto] = gtopos + ngtos * pord[l] + blkpos + k;
+                    }
+                    else
+                    {
+                        vlxidx[curgto] = gtopos + ngtos * l + blkpos + k;
+                    }
+                    
+                    curgto++;
+                }
+            }
+        }
+    }
+    
+    return idsmap;
+}
+
+int32_t
+CMolecularBasis::getPositionInAngularBlock(const CMolecule& molecule,
+                                           const int32_t    iAtom,
+                                           const int32_t    angularMomentum) const
+{
+    if ((iAtom < molecule.getNumberOfAtoms()) && (angularMomentum <= getMaxAngularMomentum()))
+    {
+        auto idselm = molecule.getIdsElemental();
+        
+        int32_t bfpos = 0;
+        
+        for (int32_t i = 0; i < iAtom; i++)
+        {
+            bfpos += getNumberOfBasisFunctions(idselm[i], angularMomentum);
+        }
+        
+        return bfpos; 
+    }
+
+    return -1;
 }
 
 std::string

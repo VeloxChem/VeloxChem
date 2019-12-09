@@ -385,3 +385,49 @@ TEST_F(CMolecularBasisTest, GetAOBasisMap)
 
     ASSERT_EQ(std::string("   2 H   1p+1"), strmap[13]);
 }
+
+TEST_F(CMolecularBasisTest, GetIndexMapForDalton)
+{
+    CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    auto idsmap = ambas.getIndexMapForDalton(lih);
+    
+    ASSERT_EQ(2, idsmap.blocks());
+    
+    ASSERT_EQ(14, idsmap.size(0));
+    
+    ASSERT_EQ(14, idsmap.size(1));
+    
+    vlxtest::compare({0, 1, 2, 11, 5, 8, 12, 6, 9, 3, 4, 13, 7, 10}, idsmap.data(0));
+    
+    vlxtest::compare({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}, idsmap.data(1));
+    
+    std::cout << idsmap << std::endl; 
+}
+
+TEST_F(CMolecularBasisTest, GetPositionInAngularBlock)
+{
+    CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();
+    
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    ASSERT_EQ( 0, ambas.getPositionInAngularBlock(lih, 0, 0));
+    
+    ASSERT_EQ( 3, ambas.getPositionInAngularBlock(lih, 1, 0));
+    
+    ASSERT_EQ(-1, ambas.getPositionInAngularBlock(lih, 2, 0));
+    
+    ASSERT_EQ( 0, ambas.getPositionInAngularBlock(lih, 0, 1));
+    
+    ASSERT_EQ( 2, ambas.getPositionInAngularBlock(lih, 1, 1));
+    
+    ASSERT_EQ(-1, ambas.getPositionInAngularBlock(lih, 2, 1));
+    
+    ASSERT_EQ(-1, ambas.getPositionInAngularBlock(lih, 0, 2));
+    
+    ASSERT_EQ(-1, ambas.getPositionInAngularBlock(lih, 1, 2));
+    
+    ASSERT_EQ(-1, ambas.getPositionInAngularBlock(lih, 2, 2));
+}
