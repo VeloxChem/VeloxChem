@@ -23,6 +23,7 @@
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "ExportOrbData.hpp"
+#include "GtoTransform.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularOrbitals.hpp"
 #include "MolecularOrbitalsType.hpp"
@@ -292,6 +293,10 @@ export_orbdata(py::module& m)
     // exposing functions
 
     m.def("get_dimer_ao_indices", &aoindices::getDimerAOIndices);
+
+    m.def("ao_matrix_to_veloxchem", &gtotra::to_veloxchem);
+
+    m.def("ao_matrix_to_dalton", &gtotra::to_dalton);
 }
 
 }  // namespace vlx_orbdata

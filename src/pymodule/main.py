@@ -73,6 +73,9 @@ def main():
         'response', 'visualization'
     ]
 
+    if task_type == 'visualization' and 'visualization' in task.input_dict:
+        run_scf = 'read_dalton' not in task.input_dict['visualization']['cubes']
+
     run_unrestricted = (task_type == 'uhf')
 
     if run_scf:
@@ -164,8 +167,12 @@ def main():
         else:
             cube_dict = {}
 
-        mol_orbs.broadcast(task.mpi_rank, task.mpi_comm)
-        density.broadcast(task.mpi_rank, task.mpi_comm)
+        if 'read_dalton' not in task.input_dict['visualization']['cubes']:
+            mol_orbs.broadcast(task.mpi_rank, task.mpi_comm)
+            density.broadcast(task.mpi_rank, task.mpi_comm)
+        else:
+            mol_orbs = None
+            density = None
 
         vis_drv = VisualizationDriver(task.mpi_comm)
         vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
