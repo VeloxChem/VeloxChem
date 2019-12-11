@@ -1,7 +1,6 @@
 import numpy as np
-import math
+from math import pi
 
-from .veloxchemlib import hartree_in_ev
 from .rspproperty import ResponseProperty
 
 
@@ -42,6 +41,8 @@ class C6(ResponseProperty):
 
         if 'n_points' not in rsp_dict:
             rsp_dict['n_points'] = '9'
+        if 'w0' not in rsp_dict:
+            rsp_dict['w0'] = '0.3'
 
         super().__init__(rsp_dict, method_dict)
 
@@ -50,10 +51,10 @@ class C6(ResponseProperty):
         Gets excitation energies, CI vectors, or oscillator stengths.
 
         :param key:
-            The keyword to the absorption property.
+            The keyword to the C6 property.
 
         :return:
-            The absorption property.
+            The C6 property.
         """
 
         return self.rsp_property[key]
@@ -73,7 +74,14 @@ class C6(ResponseProperty):
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
-        for iw in [0.3*(1-t)/(1+t) for t in np.polynomial.legendre.leggauss(int(self.rsp_dict['n_points']))][0]:
+        w0 = float(self.rsp_dict['w0'])
+        points = np.polynomial.legendre.leggauss(
+            int(self.rsp_dict['n_points']))[0]
+        weights = np.polynomial.legendre.leggauss(
+            int(self.rsp_dict['n_points']))[1]
+        imagfreqs = [w0*(1-t)/(1+t) for t in points]
+
+        for iw in imagfreqs:
             title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
                 'Dipole', 'Dipole', 'Frequency', 'Real', 'Imaginary')
             ostream.print_header(title.ljust(width))
@@ -94,27 +102,49 @@ class C6(ResponseProperty):
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
-        iw0 = 0.3
-        imagfreqs = [iw0*(1-t)/(1+t) for t in np.polynomial.legendre.leggauss(int(self.rsp_dict['n_points']))][0]
-        points = np.polynomial.legendre.leggauss(int(self.rsp_dict['n_points']))[0]
-        weights = np.polynomial.legendre.leggauss(int(self.rsp_dict['n_points']))[1]
+        title = 'Reference: '
+        title += 'Amos et al., '
+        title += 'J. Chem. Phys. 89, 2186 (1985).'
+        ostream.print_header(title.ljust(width))
+        ostream.print_blank()
+
+        # Gauss-Legendre quadrature for the integral in the Casimir-Polder 
+        # relation using integration by substitution.
+
         integral = 0
 
         for iw in range(len(imagfreqs)):
 
-            Gxx = self.rsp_property['response_functions'][('x', 'x', imagfreqs[iw])].real
-            Gyy = self.rsp_property['response_functions'][('y', 'y', imagfreqs[iw])].real
-            Gzz = self.rsp_property['response_functions'][('z', 'z', imagfreqs[iw])].real
+            Gxx = self.rsp_property['response_functions'][(
+                'x', 'x', imagfreqs[iw])].real
+            Gyy = self.rsp_property['response_functions'][(
+                'y', 'y', imagfreqs[iw])].real
+            Gzz = self.rsp_property['response_functions'][(
+                'z', 'z', imagfreqs[iw])].real
 
             alpha = -(Gxx + Gyy + Gzz) / 3.0
             point = points[iw]
             weight = weights[iw]
-            derivative = iw0 * 2 / (1 + point)**2
+            derivative = w0 * 2 / (1 + point)**2
             integral += alpha * alpha * weight * derivative
 
-        c6 = 3 * integral / math.pi
+        # Casimir-Polder relation
 
-        output = 'homomolecular C_6 value :    {:10.6f}'.format(c6)
+        c6 = 3 * integral / pi
+
+        # Static polarizability
+
+        Gxx_i0 = self.rsp_property['response_functions'][('x', 'x', 0.0)].real
+        Gyy_i0 = self.rsp_property['response_functions'][('y', 'y', 0.0)].real
+        Gzz_i0 = self.rsp_property['response_functions'][('z', 'z', 0.0)].real
+
+        alpha_i0 = -(Gxx_i0 + Gyy_i0 + Gzz_i0) / 3.0
+
+        output = 'Homomolecular C_6 value        :    {:10.6f} a.u.'.format(c6)
+        ostream.print_header(output.ljust(width))
+        ostream.print_blank()
+        output = 'Static polarizability alpha(0) :    {:10.6f} a.u.'.format(
+            alpha_i0)
         ostream.print_header(output.ljust(width))
 
         ostream.print_blank()

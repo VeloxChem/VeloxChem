@@ -39,7 +39,8 @@ class C6Solver:
         - a_components: Cartesian components of the A operator.
         - b_operator: The B operator.
         - b_components: Cartesian components of the B operator.
-        - imagfrequencies: The imaginary frequencies.
+        - n_points: The number of integration points.
+        - w0: The transformation function prefactor.
         - qq_type: The electron repulsion integrals screening scheme.
         - eri_thresh: The electron repulsion integrals screening threshold.
         - dft: The flag for running DFT.
@@ -77,8 +78,8 @@ class C6Solver:
         self.b_operator = 'dipole'
         self.b_components = 'xyz'
 
-        self.n_points = 12
-        self.imagfrequencies = [0.3*(1-t)/(1+t) for t in np.polynomial.legendre.leggauss(self.n_points)][0]
+        self.n_points = 9
+        self.w0 = 0.3
 
         self.qq_type = 'QQ_DEN'
         self.eri_thresh = 1.0e-15
@@ -98,7 +99,7 @@ class C6Solver:
         self.cur_iter = 0
         self.is_converged = False
         self.small_thresh = 1.0e-10
-        self.lindep_thresh = 1.0e-6
+        self.lindep_thresh = 1.0e-10
 
         self.comm = comm
         self.rank = self.comm.Get_rank()
@@ -125,9 +126,8 @@ class C6Solver:
 
         if 'n_points' in rsp_dict:
             self.n_points = int(rsp_dict['n_points'])
-            self.imagfrequencies = [0.3*(1-t)/(1+t) for t in np.polynomial.legendre.leggauss(self.n_points)][0]
-        #if 'imagfrequencies' in rsp_dict:
-        #    self.imagfrequencies = parse_frequencies(rsp_dict['imagfrequencies'])
+        if 'w0' in rsp_dict:
+            self.w0 = float(rsp_dict['w0'])
 
         if 'lindep_thresh' in rsp_dict:
             self.lindep_thresh = float(rsp_dict['lindep_thresh'])
@@ -181,14 +181,14 @@ class C6Solver:
 
     def decomp_trials(self, vecs):
         """
-        Decomposes trial vectors into their 4 respective parts (real gerade,
-        real ungerade, imaginary gerade, and imaginary ungerad).
+        Decomposes trial vectors into their 2 respective non-zero parts (real
+        ungerade and imaginary gerade).
 
         :param vecs:
             The trial vectors.
 
         :return:
-            A tuple containing respective parts of the trial vectors.
+            A tuple containing respective non-zero parts of the trial vectors.
         """
 
         half_rows = vecs.shape[0] // 2
@@ -353,14 +353,14 @@ class C6Solver:
         """
 
         trials = []
-        for (op, w) in vectors:
-            if res_norm is None or res_norm[(op, w)] > self.conv_thresh:
-                vec = np.array(vectors[(op, w)])
+        for (op, iw) in vectors:
+            if res_norm is None or res_norm[(op, iw)] > self.conv_thresh:
+                vec = np.array(vectors[(op, iw)])
 
                 # preconditioning trials:
 
                 if pre is not None:
-                    v = self.preconditioning(pre[w], vec)
+                    v = self.preconditioning(pre[iw], vec)
                 else:
                     v = vec
                 if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
@@ -368,14 +368,9 @@ class C6Solver:
 
         new_trials = np.array(trials).T
 
-        # decomposing the full space trial vectors...
+        # decomposing the full space trial vectors
 
-        new_realung, new_imagger = self.decomp_trials(new_trials)
-
-        # ...and assembling gerade and ungerade subspaces
-
-        new_ger = new_imagger
-        new_ung = new_realung
+        new_ung, new_ger = self.decomp_trials(new_trials)
 
         # orthogonalizing new trial vectors against existing ones
 
@@ -403,7 +398,7 @@ class C6Solver:
 
         return new_ger, new_ung
 
-    def compute(self, molecule, basis, scf_tensors, v1=None):
+    def compute(self, molecule, basis, scf_tensors):
         """
         Solves for the response vector iteratively while checking the residuals
         for convergence.
@@ -414,12 +409,9 @@ class C6Solver:
             The AO basis.
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
-        :param v1:
-            The gradients on the right-hand side. If not provided, v1 will be
-            computed for the B operator.
 
         :return:
-            A dictionary containing response functions, solutions, and kappas.
+            A dictionary containing response functions and solutions.
         """
 
         if self.profiling:
@@ -448,7 +440,7 @@ class C6Solver:
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'ComplexResponseSolver: not implemented for unrestricted case')
+            'C6Solver: not implemented for unrestricted case')
 
         # generate integration grid
         if self.dft:
@@ -527,28 +519,23 @@ class C6Solver:
         else:
             nocc = None
 
-        nonlinear_flag = False
-
-        if not v1:
-            b_rhs = get_complex_rhs(self.b_operator, self.b_components,
-                                    molecule, basis, scf_tensors, self.rank,
-                                    self.comm)
-            if self.rank == mpi_master():
-                v1 = {(op, iw): v for op, v in zip(self.b_components, b_rhs)
-                      for iw in self.imagfrequencies}
-        else:
-            nonlinear_flag = True
-
+        b_rhs = get_complex_rhs(self.b_operator, self.b_components,
+                                molecule, basis, scf_tensors, self.rank,
+                                self.comm)
         if self.rank == mpi_master():
-            #d = self.damping
-            imagfreqs = [op_imagfreq[1] for op_imagfreq in v1]
+            imagfreqs = [self.w0 * (1-t)/(1+t) for t in 
+                         np.polynomial.legendre.leggauss(self.n_points)][0]
+            imagfreqs = np.append(imagfreqs, 0.0)
+            v1 = {(op, iw): v for op, v in zip(self.b_components, b_rhs)
+                  for iw in imagfreqs}
+
             op_imagfreq_keys = list(v1.keys())
 
             # creating the preconditioner matrix
 
             precond = {
-                iw: self.get_precond(orb_ene, nocc, norb, iw) for iw in imagfreqs
-            }
+                iw: self.get_precond(
+                orb_ene, nocc, norb, iw) for iw in imagfreqs}
 
         bger = None
         bung = None
@@ -581,7 +568,7 @@ class C6Solver:
 
                 assert_msg_critical(
                     bger.any() or bung.any(),
-                    'ComplexResponseSolver: trial vectors are empty')
+                    'C6Solver: trial vectors are empty')
 
                 if not bger.any():
                     bger = np.zeros((bung.shape[0], 0))
@@ -602,7 +589,6 @@ class C6Solver:
         solutions = {}
         residuals = {}
         relative_residual_norm = {}
-        kappas = {}
 
         if self.timing:
             self.timing_dict['fock_build'][0] += tm.time() - timing_t0
@@ -650,21 +636,10 @@ class C6Solver:
 
                         mat = np.zeros((size, size))
 
-                        # filling E2gg
-
                         mat[n_ung:n_ung + n_ger, n_ung:n_ung +
                             n_ger] = -e2gg[:, :]
-
-                        # filling E2uu
-
                         mat[:n_ung, :n_ung] = e2uu[:, :]
-
-                        # filling S2ug
-
                         mat[:n_ung, n_ung:n_ung + n_ger] = iw * s2ug[:, :]
-
-                        # filling S2ug.T (interchanging of row and col)
-
                         mat[n_ung:n_ung + n_ger, :n_ung] = iw * s2ug.T[:, :]
 
                         # solving matrix equation
@@ -691,9 +666,6 @@ class C6Solver:
                         x = x_real + 1j * x_imag
 
                         solutions[(op, iw)] = x
-
-                        kappas[(op, iw)] = (lrvec2mat(x.real, nocc, norb) +
-                                           1j * lrvec2mat(x.imag, nocc, norb))
 
                         # composing E2 and S2 matrices projected onto solution
                         # subspace
@@ -768,7 +740,7 @@ class C6Solver:
 
                 assert_msg_critical(
                     new_trials_ger.any() or new_trials_ung.any(),
-                    'ComplexResponseSolver: unable to add new trial vectors')
+                    'C6Solver: unable to add new trial vectors')
 
                 if not new_trials_ger.any():
                     new_trials_ger = np.zeros((new_trials_ung.shape[0], 0))
@@ -813,7 +785,7 @@ class C6Solver:
             self.print_convergence()
 
             assert_msg_critical(self.is_converged,
-                                'ComplexResponseSolver: failed to converge')
+                                'C6Solver: failed to converge')
 
             if self.timing:
                 self.print_timing()
@@ -828,27 +800,21 @@ class C6Solver:
                 for line in s.getvalue().split(os.linesep):
                     self.ostream.print_info(line)
 
-        if not nonlinear_flag:
-            a_rhs = get_complex_rhs(self.a_operator, self.a_components,
-                                    molecule, basis, scf_tensors, self.rank,
-                                    self.comm)
+        a_rhs = get_complex_rhs(self.a_operator, self.a_components,
+                                molecule, basis, scf_tensors, self.rank,
+                                self.comm)
 
-            if self.rank == mpi_master():
-                va = {op: v for op, v in zip(self.a_components, a_rhs)}
-                rsp_funcs = {}
-                for aop in self.a_components:
-                    for bop, iw in solutions:
-                        rsp_funcs[(aop, bop, iw)] = -np.dot(va[aop],
-                                                    solutions[(bop, iw)])
-                return {
-                    'response_functions': rsp_funcs,
-                    'solutions': solutions,
-                    'kappas': kappas
-                }
-
-        else:
-            if self.rank == mpi_master():
-                return {'solutions': solutions, 'kappas': kappas}
+        if self.rank == mpi_master():
+            va = {op: v for op, v in zip(self.a_components, a_rhs)}
+            rsp_funcs = {}
+            for aop in self.a_components:
+                for bop, iw in solutions:
+                    rsp_funcs[(aop, bop, iw)] = -np.dot(va[aop],
+                                                solutions[(bop, iw)])
+            return {
+                'response_functions': rsp_funcs,
+                'solutions': solutions,
+            }
 
         return {}
 
@@ -875,8 +841,8 @@ class C6Solver:
         :param relative_residual_norm:
             Relative residual norms.
         :param nvs:
-            A list of tuples containing operator component, imaginary frequency,
-            and property.
+            A list of tuples containing operator component, imaginary
+            frequency, and property.
         """
 
         width = 92
@@ -906,7 +872,7 @@ class C6Solver:
 
     def print_header(self):
         """
-        Prints complex linear response solver setup header to output stream.
+        Prints C6 solver setup header to output stream.
         """
 
         self.ostream.print_blank()
@@ -961,7 +927,7 @@ class C6Solver:
 
     def print_timing(self):
         """
-        Prints timing for the complex response solver.
+        Prints timing for the C6 solver.
         """
 
         width = 92

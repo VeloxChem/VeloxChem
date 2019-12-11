@@ -191,7 +191,7 @@ class ComplexResponse:
     def decomp_trials(self, vecs):
         """
         Decomposes trial vectors into their 4 respective parts (real gerade,
-        real ungerade, imaginary gerade, and imaginary ungerad).
+        real ungerade, imaginary gerade, and imaginary ungerade).
 
         :param vecs:
             The trial vectors.
