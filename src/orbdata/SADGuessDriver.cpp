@@ -33,6 +33,8 @@ CSADGuessDriver::~CSADGuessDriver()
 std::vector<double>
 CSADGuessDriver::_getOcc1s(double occ) const
 {
+    occ = std::min(std::max(0.0, occ), 1.0);
+
     //                           1s
     return std::vector<double>({occ});
 }
@@ -40,6 +42,8 @@ CSADGuessDriver::_getOcc1s(double occ) const
 std::vector<double>
 CSADGuessDriver::_getOcc2s(double occ) const
 {
+    occ = std::min(std::max(0.0, occ), 1.0);
+
     //                           1s   2s
     return std::vector<double>({1.0, occ});
 }
@@ -47,6 +51,8 @@ CSADGuessDriver::_getOcc2s(double occ) const
 std::vector<double>
 CSADGuessDriver::_getOcc2s2p(double occ) const
 {
+    occ = std::min(std::max(0.0, occ), 1.0);
+
     //                           1s   2s   2p-1 2p0  2p+1
     return std::vector<double>({1.0, occ, occ, occ, occ});
 }
@@ -54,6 +60,8 @@ CSADGuessDriver::_getOcc2s2p(double occ) const
 std::vector<double>
 CSADGuessDriver::_getOcc3s(double occ) const
 {
+    occ = std::min(std::max(0.0, occ), 1.0);
+
     //                           1s   2s   3s   2p-1 2p0  2p+1
     return std::vector<double>({1.0, 1.0, occ, 1.0, 1.0, 1.0});
 }
@@ -61,6 +69,8 @@ CSADGuessDriver::_getOcc3s(double occ) const
 std::vector<double>
 CSADGuessDriver::_getOcc3s3p(double occ) const
 {
+    occ = std::min(std::max(0.0, occ), 1.0);
+
     //                           1s   2s   3s   2p-1 3p-1 2p0  3p0  2p+1 3p+1
     return std::vector<double>({1.0, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ});
 }
@@ -68,6 +78,8 @@ CSADGuessDriver::_getOcc3s3p(double occ) const
 std::vector<double>
 CSADGuessDriver::_getOcc4s(double occ) const
 {
+    occ = std::min(std::max(0.0, occ), 1.0);
+
     //                           1s   2s   3s   4s   2p-1 3p-1 2p0  3p0  2p+1 3p+1
     return std::vector<double>({1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
 }
@@ -75,6 +87,8 @@ CSADGuessDriver::_getOcc4s(double occ) const
 std::vector<double>
 CSADGuessDriver::_getOcc3d(double occ) const
 {
+    occ = std::min(std::max(0.0, occ), 1.0);
+
     //                           1s   2s   3s   4s  2p-1 3p-1 2p0  3p0  2p+1 3p+1 3d-2 3d-1 3d0  3d+1 3d+2
     return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, occ, occ, occ, occ});
 }
@@ -82,15 +96,15 @@ CSADGuessDriver::_getOcc3d(double occ) const
 std::vector<double>
 CSADGuessDriver::_getOcc4s4p(double occ) const
 {
+    occ = std::min(std::max(0.0, occ), 1.0);
+
     //                           1s   2s   3s   4s  2p-1 3p-1 4p-1 2p0  3p0  4p0  2p+1 3p+1 4p+1 3d-2 3d-1 3d0  3d+1 3d+2
     return std::vector<double>({1.0, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0});
 }
 
 std::vector<double>
-CSADGuessDriver::getOccupationNumbersForElement(const int32_t elem_id, const double num_electrons) const
+CSADGuessDriver::getOccupationNumbersForElement(const int32_t elem_id, const double nelec) const
 {
-    double nelec = std::min(std::max(-0.5, num_electrons), 0.5);
-
     switch (elem_id)
     {
             // dummy atom
@@ -381,10 +395,6 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
     #pragma omp parallel for schedule(dynamic)
     for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
     {
-        // elemental index (nuclear charge) for this atom
-
-        const int32_t idelem = molecule.getIdsElemental()[atomidx];
-
         // AO indices for this atom
 
         const std::vector<int32_t>& aoinds_1 = aoinds_atoms_1[atomidx];
