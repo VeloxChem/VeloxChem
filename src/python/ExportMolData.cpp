@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 
+#include "CoordinationNumber.hpp"
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
 #include "ErrorHandler.hpp"
@@ -184,6 +185,16 @@ CMolecule_z_to_numpy(const CMolecule& self)
     return vlx_general::pointer_to_numpy(self.getCoordinatesZ(), self.getNumberOfAtoms());
 }
 
+// Helper function for getting coodination number for molecule
+
+static py::array_t<double>
+CMolecule_coordination_numbers(const CMolecule& self)
+{
+    auto cn = coordnum::getCoordinationNumber(self);
+
+    return vlx_general::pointer_to_numpy(cn.data(), static_cast<int32_t>(cn.size()));
+}
+
 // Helper function for getting VDW radii for molecule
 
 static py::array_t<double>
@@ -303,6 +314,7 @@ export_moldata(py::module& m)
         .def("x_to_numpy", &CMolecule_x_to_numpy)
         .def("y_to_numpy", &CMolecule_y_to_numpy)
         .def("z_to_numpy", &CMolecule_z_to_numpy)
+        .def("coordination_numbers", &CMolecule_coordination_numbers)
         .def("vdw_radii_to_numpy", &CMolecule_vdw_radii_to_numpy)
         .def("elem_ids_to_numpy", &CMolecule_elem_ids_to_numpy)
         .def("masses_to_numpy", &CMolecule_masses_to_numpy)
