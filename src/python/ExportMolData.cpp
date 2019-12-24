@@ -22,6 +22,7 @@
 #include "ExportGeneral.hpp"
 #include "ExportMolData.hpp"
 #include "Molecule.hpp"
+#include "PartialCharges.hpp"
 #include "StringFormat.hpp"
 #include "VdwRadii.hpp"
 
@@ -195,6 +196,16 @@ CMolecule_coordination_numbers(const CMolecule& self)
     return vlx_general::pointer_to_numpy(cn.data(), static_cast<int32_t>(cn.size()));
 }
 
+// Helper function for getting partial charges for molecule
+
+static py::array_t<double>
+CMolecule_partial_charges(const CMolecule& self)
+{
+    auto chg = parchg::getPartialCharges(self, self.getCharge());
+
+    return vlx_general::pointer_to_numpy(chg.data(), static_cast<int32_t>(chg.size()));
+}
+
 // Helper function for getting VDW radii for molecule
 
 static py::array_t<double>
@@ -315,6 +326,7 @@ export_moldata(py::module& m)
         .def("y_to_numpy", &CMolecule_y_to_numpy)
         .def("z_to_numpy", &CMolecule_z_to_numpy)
         .def("coordination_numbers", &CMolecule_coordination_numbers)
+        .def("partial_charges", &CMolecule_partial_charges)
         .def("vdw_radii_to_numpy", &CMolecule_vdw_radii_to_numpy)
         .def("elem_ids_to_numpy", &CMolecule_elem_ids_to_numpy)
         .def("masses_to_numpy", &CMolecule_masses_to_numpy)
