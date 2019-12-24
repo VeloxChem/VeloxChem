@@ -21,7 +21,8 @@ getCovalentRadius()
     // Reference: dftd4 (v2.4.0)
 
     std::vector<double> cn({
-        0.0,  0.32, 0.46,                                // H,He
+        0.0,                                             // dummy atom
+        0.32, 0.46,                                      // H,He
         1.20, 0.94, 0.77, 0.75, 0.71, 0.63, 0.64, 0.67,  // Li-Ne
         1.40, 1.25, 1.13, 1.04, 1.10, 1.02, 0.99, 0.96,  // Na-Ar
         1.76, 1.54,                                      // K,Ca
@@ -43,7 +44,7 @@ getCovalentRadius()
         1.49, 1.51, 1.51, 1.48, 1.50, 1.56, 1.58,        // Cm-No
         1.45, 1.41, 1.34, 1.29, 1.27,                    // Lr-
         1.21, 1.16, 1.15, 1.09, 1.22,                    // -Cn
-        1.36, 1.43, 1.46, 1.58, 1.48, 1.57,              // Nh-Og
+        1.36, 1.43, 1.46, 1.58, 1.48, 1.57               // Nh-Og
     });
 
     for (size_t i = 0; i < cn.size(); i++)
@@ -126,13 +127,13 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr)
 
             double rco = k2 * (covalent_radius[ids_elem[j]] + covalent_radius[ids_elem[i]]);
 
-            double cn_val = 0.5 * (1.0 + std::erf(-kn * (r - rco) / rco));
+            double arg = kn * (r - rco) / rco;
+
+            double cn_val = 0.5 * (1.0 + std::erf(-arg));
 
             cn[i] += cn_val;
 
             cn[j] += cn_val;
-
-            double arg = kn * (r - rco) / rco;
 
             double dcn_val = -kn / sqrtpi / rco * std::exp(-arg * arg);
 
@@ -140,13 +141,17 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr)
             {
                 for (int32_t d = 0; d < 3; d++)
                 {
-                    dcndr.values()[(d * natoms + i) * natoms + i] += dcn_val * rij[d] / r;
+                    int32_t di = d * natoms + i;
 
-                    dcndr.values()[(d * natoms + j) * natoms + j] -= dcn_val * rij[d] / r;
+                    int32_t dj = d * natoms + j;
 
-                    dcndr.values()[(d * natoms + i) * natoms + j] += dcn_val * rij[d] / r;
+                    dcndr.values()[di * natoms + i] += dcn_val * rij[d] / r;
 
-                    dcndr.values()[(d * natoms + j) * natoms + i] -= dcn_val * rij[d] / r;
+                    dcndr.values()[dj * natoms + j] -= dcn_val * rij[d] / r;
+
+                    dcndr.values()[di * natoms + j] += dcn_val * rij[d] / r;
+
+                    dcndr.values()[dj * natoms + i] -= dcn_val * rij[d] / r;
                 }
             }
         }
@@ -162,17 +167,150 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr)
 
         if (dcndr.getNumberOfElements() > 0)
         {
-            for (int32_t d = 0; d < 3; d++)
+            for (int32_t dj = 0; dj < 3 * natoms; dj++)
             {
-                for (int32_t j = 0; j < natoms; j++)
-                {
-                    dcndr.values()[(d * natoms + j) * natoms + i] *= dcnpdcn;
-                }
+                dcndr.values()[dj * natoms + i] *= dcnpdcn;
             }
         }
     }
 
     return cn;
+}
+
+std::vector<double>
+getPaulingElectronegativity()
+{
+    // Reference: dftd4 (v2.4.0)
+
+    return std::vector<double>({
+        0.0,                                                         // dummy atom
+        2.20, 3.00,                                                  // H,He
+        0.98, 1.57, 2.04, 2.55, 3.04, 3.44, 3.98, 4.50,              // Li-Ne
+        0.93, 1.31, 1.61, 1.90, 2.19, 2.58, 3.16, 3.50,              // Na-Ar
+        0.82, 1.00,                                                  // K,Ca
+        1.36, 1.54, 1.63, 1.66, 1.55, 1.83, 1.88, 1.91, 1.90, 1.65,  // Sc-Zn
+        1.81, 2.01, 2.18, 2.55, 2.96, 3.00,                          // Ga-Kr
+        0.82, 0.95,                                                  // Rb,Sr
+        1.22, 1.33, 1.60, 2.16, 1.90, 2.20, 2.28, 2.20, 1.93, 1.69,  // Y-Cd
+        1.78, 1.96, 2.05, 2.10, 2.66, 2.60,                          // In-Xe
+        0.79, 0.89,                                                  // Cs,Ba
+        1.10, 1.12, 1.13, 1.14, 1.15, 1.17, 1.18,                    // La-Eu
+        1.20, 1.21, 1.22, 1.23, 1.24, 1.25, 1.26,                    // Gd-Yb
+        1.27, 1.30, 1.50, 2.36, 1.90, 2.20, 2.20, 2.28, 2.54, 2.00,  // Lu-Hg
+        1.62, 2.33, 2.02, 2.00, 2.20, 2.20,                          // Tl-Rn
+        1.50, 1.50,                                                  // Fr,Ra
+        1.50, 1.50, 1.50, 1.50, 1.50, 1.50, 1.50,                    // Ac-Am
+        1.50, 1.50, 1.50, 1.50, 1.50, 1.50, 1.50,                    // Cm-No
+        1.50, 1.50, 1.50, 1.50, 1.50, 1.50, 1.50, 1.50, 1.50, 1.50,  // Rf-Cn
+        1.50, 1.50, 1.50, 1.50, 1.50, 1.50                           // Nh-Og
+    });
+}
+
+std::vector<double>
+getCovalentCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcovcndr)
+{
+    // Reference: dftd4 (v2.4.0)
+
+    // prepare parameters
+
+    const double k2 = 4.0 / 3.0;
+
+    const double k4 = 4.10451;
+
+    const double k5 = 19.08857;
+
+    const double k6 = 2.0 * std::pow(11.28174, 2);
+
+    const double kn = 7.50;
+
+    const double cn_thr = 1600.0;
+
+    const double sqrtpi = std::sqrt(mathconst::getPiValue());
+
+    auto covalent_radius = getCovalentRadius();
+
+    auto pauling_en = getPaulingElectronegativity();
+
+    // get molecular information
+
+    auto natoms = molecule.getNumberOfAtoms();
+
+    auto ids_elem = molecule.getIdsElemental();
+
+    auto xcoord = molecule.getCoordinatesX();
+
+    auto ycoord = molecule.getCoordinatesY();
+
+    auto zcoord = molecule.getCoordinatesZ();
+
+    // compute covalent coordination numbers
+
+    std::vector<double> covcn(natoms, 0.0);
+
+    if (dcovcndr.getNumberOfElements() > 0)
+    {
+        std::string err_size("CovalentCoordinationNumber - Mismatch in dcovcndr matrix size");
+
+        errors::assertMsgCritical(dcovcndr.getNumberOfRows() == 3 * natoms, err_size);
+
+        errors::assertMsgCritical(dcovcndr.getNumberOfColumns() == natoms, err_size);
+    }
+
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        for (int32_t j = 0; j < i; j++)
+        {
+            std::vector<double> rij(3);
+
+            rij[0] = xcoord[j] - xcoord[i];
+
+            rij[1] = ycoord[j] - ycoord[i];
+
+            rij[2] = zcoord[j] - zcoord[i];
+
+            double r2 = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
+
+            if (r2 > cn_thr) continue;
+
+            double r = std::sqrt(r2);
+
+            double rco = k2 * (covalent_radius[ids_elem[j]] + covalent_radius[ids_elem[i]]);
+
+            double diff_en = std::fabs(pauling_en[ids_elem[i]] - pauling_en[ids_elem[j]]);
+
+            double den = k4 * std::exp(-std::pow(diff_en + k5, 2) / k6);
+
+            double arg = kn * (r - rco) / rco;
+
+            double covcn_val = den * 0.5 * (1.0 + std::erf(-arg));
+
+            covcn[i] += covcn_val;
+
+            covcn[j] += covcn_val;
+
+            double dcovcn_val = -den * kn / sqrtpi / rco * std::exp(-arg * arg);
+
+            if (dcovcndr.getNumberOfElements() > 0)
+            {
+                for (int32_t d = 0; d < 3; d++)
+                {
+                    int32_t di = d * natoms + i;
+
+                    int32_t dj = d * natoms + j;
+
+                    dcovcndr.values()[di * natoms + i] -= dcovcn_val * rij[d] / r;
+
+                    dcovcndr.values()[dj * natoms + j] += dcovcn_val * rij[d] / r;
+
+                    dcovcndr.values()[di * natoms + j] -= dcovcn_val * rij[d] / r;
+
+                    dcovcndr.values()[dj * natoms + i] += dcovcn_val * rij[d] / r;
+                }
+            }
+        }
+    }
+
+    return covcn;
 }
 
 }  // namespace coordnum
