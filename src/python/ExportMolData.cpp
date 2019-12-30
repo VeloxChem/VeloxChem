@@ -18,6 +18,7 @@
 #include "CoordinationNumber.hpp"
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
+#include "DispersionModel.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMolData.hpp"
@@ -342,6 +343,14 @@ export_moldata(py::module& m)
         .def("set_atom_type", (bool (CChemicalElement::*)(const int32_t)) & CChemicalElement::setAtomType)
         .def("get_name", &CChemicalElement::getName)
         .def(py::self == py::self);
+
+    // CDispersionModel class
+
+    py::class_<CDispersionModel, std::shared_ptr<CDispersionModel>>(m, "DispersionModel")
+        .def(py::init<>())
+        .def("compute", &CDispersionModel::compute)
+        .def("get_energy", &CDispersionModel::getEnergy)
+        .def("get_gradient", &CDispersionModel::getGradient);
 }
 
 }  // namespace vlx_moldata

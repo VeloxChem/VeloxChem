@@ -4,6 +4,7 @@ import unittest
 import os
 
 from veloxchem.veloxchemlib import ChemicalElement
+from veloxchem.veloxchemlib import DispersionModel
 from veloxchem.veloxchemlib import bohr_in_angstroms
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
@@ -187,6 +188,75 @@ class TestMolData(unittest.TestCase):
         self.assertEqual("Br", elem2.get_name())
 
         self.assertEqual(elem, elem2)
+
+    def test_dispersion_model(self):
+
+        ref_energies = {
+            'b3lyp': (-0.2421986012033e-02, 0.4584078631740e-06),
+            'blyp': (-0.3504378057810e-02, 0.9461341515956e-06),
+            'hf': (-0.6671313029358e-02, 0.5473122492978e-05),
+        }
+
+        ref_gradient = {}
+
+        ref_gradient['b3lyp'] = np.array([
+            [-0.1299360785248e-03, 0.2173451050590e-03, -0.3709704540840e-05],
+            [0.3994969804870e-05, -0.4278600323727e-04, -0.3004853785695e-05],
+            [0.2248231831000e-04, 0.4826552264307e-04, -0.4026908304668e-04],
+            [0.2585427033048e-04, 0.3687322138623e-04, 0.3605346888461e-04],
+            [0.3668558637179e-04, -0.1301671081015e-03, 0.5463254511935e-05],
+            [-0.3229412701673e-05, 0.4922085484071e-05, 0.5884251321327e-05],
+            [0.1936253825266e-04, -0.5468305617267e-04, 0.4693862097277e-05],
+            [0.1839250629302e-04, -0.6545014186048e-04, 0.3934710919238e-05],
+            [0.6393301863664e-05, -0.1431962520046e-04, -0.9045906361170e-05],
+        ])
+
+        ref_gradient['blyp'] = np.array([
+            [-0.1920479181714e-03, 0.2729735760896e-03, -0.2511659875033e-05],
+            [0.9234017559838e-05, -0.7983770503499e-04, -0.4956308627117e-05],
+            [0.4283192296416e-04, 0.6348404201255e-04, -0.6717298399052e-04],
+            [0.4829075493265e-04, 0.4755520001250e-04, 0.6235137755103e-04],
+            [0.4290323248918e-04, -0.1543006045860e-03, 0.6640266553842e-05],
+            [-0.4698918137746e-05, 0.8662903487663e-05, 0.7308871341866e-05],
+            [0.2376967810450e-04, -0.6486040126786e-04, 0.5846333490862e-05],
+            [0.2249172537731e-04, -0.7949176018520e-04, 0.4807049578003e-05],
+            [0.7225504881460e-05, -0.1418525052826e-04, -0.1231294602293e-04],
+        ])
+
+        ref_gradient['hf'] = np.array([
+            [-0.3686765721713e-03, 0.3397769090112e-03, 0.4534616906695e-05],
+            [0.3281830111142e-04, -0.2014976035809e-03, -0.1052292444208e-04],
+            [0.1161479269369e-03, 0.9219122684571e-04, -0.1528315355729e-03],
+            [0.1280011820621e-03, 0.6531340670539e-04, 0.1479566767179e-03],
+            [0.4036674113369e-04, -0.1594768392328e-03, 0.1040317973416e-04],
+            [0.4515452238650e-05, -0.5312330663685e-05, -0.6266158009138e-05],
+            [0.4492572018223e-05, -0.5927187807585e-04, -0.3729549690795e-05],
+            [0.3911077473617e-04, -0.6105721802557e-04, 0.2269617645742e-05],
+            [0.3223621934107e-05, -0.1066567298349e-04, 0.8186076710362e-05],
+        ])
+
+        inpfile = os.path.join('inputs', 'dimer.inp')
+        if not os.path.isfile(inpfile):
+            inpfile = os.path.join('python_tests', inpfile)
+
+        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        molecule = task.molecule
+
+        disp = DispersionModel()
+        for xc_label in ref_energies:
+            disp.compute(molecule, xc_label)
+
+            e_disp = disp.get_energy()
+            e_ref = sum(ref_energies[xc_label])
+            self.assertTrue(abs(e_disp - e_ref) < 1.0e-13)
+            self.assertTrue(abs(e_disp - e_ref) / abs(e_ref) < 1.0e-10)
+
+            g_disp = disp.get_gradient().to_numpy()
+            g_ref = ref_gradient[xc_label]
+            max_diff = np.max(np.abs(g_disp - g_ref))
+            max_rel_diff = np.max(np.abs(g_disp - g_ref) / np.abs(g_ref))
+            self.assertTrue(max_diff < 1.0e-13)
+            self.assertTrue(max_rel_diff < 1.0e-10)
 
 
 if __name__ == "__main__":

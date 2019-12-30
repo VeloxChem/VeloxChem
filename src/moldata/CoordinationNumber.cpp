@@ -49,7 +49,8 @@ getCovalentRadius()
 
     for (size_t i = 0; i < cn.size(); i++)
     {
-        cn[i] /= units::getBohrValueInAngstroms();
+        // use dftd4 conversion factor
+        cn[i] /= 0.52917726;
     }
 
     return cn;
@@ -161,8 +162,6 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr)
 
     for (int32_t i = 0; i < natoms; i++)
     {
-        cn[i] = std::log(1.0 + std::exp(cnmax)) - std::log(1.0 + std::exp(cnmax - cn[i]));
-
         double dcnpdcn = std::exp(cnmax) / (std::exp(cnmax) + std::exp(cn[i]));
 
         if (dcndr.getNumberOfElements() > 0)
@@ -172,6 +171,11 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr)
                 dcndr.values()[dj * natoms + i] *= dcnpdcn;
             }
         }
+    }
+
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        cn[i] = std::log(1.0 + std::exp(cnmax)) - std::log(1.0 + std::exp(cnmax - cn[i]));
     }
 
     return cn;
