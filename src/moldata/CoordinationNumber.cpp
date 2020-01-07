@@ -112,13 +112,7 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr)
     {
         for (int32_t j = 0; j < i; j++)
         {
-            std::vector<double> rij(3);
-
-            rij[0] = xcoord[j] - xcoord[i];
-
-            rij[1] = ycoord[j] - ycoord[i];
-
-            rij[2] = zcoord[j] - zcoord[i];
+            std::vector<double> rij({xcoord[j] - xcoord[i], ycoord[j] - ycoord[i], zcoord[j] - zcoord[i]});
 
             double r2 = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
@@ -264,13 +258,7 @@ getCovalentCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcovcndr)
     {
         for (int32_t j = 0; j < i; j++)
         {
-            std::vector<double> rij(3);
-
-            rij[0] = xcoord[j] - xcoord[i];
-
-            rij[1] = ycoord[j] - ycoord[i];
-
-            rij[2] = zcoord[j] - zcoord[i];
+            std::vector<double> rij({xcoord[j] - xcoord[i], ycoord[j] - ycoord[i], zcoord[j] - zcoord[i]});
 
             double r2 = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 

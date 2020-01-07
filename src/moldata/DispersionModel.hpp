@@ -178,7 +178,7 @@ class CDispersionModel
      @param molecule the molecule.
      @param xcLabel the label of the density functional.
      @param gradient the derivative matrix of dimension (3,N).
-     @return the dispersion energy.
+     @return the two-body contribution to the dispersion energy.
      */
     double _compTwoBodyContribution(const CMolecule& molecule, const std::string& xcLabel, CDenseMatrix& gradient);
 
@@ -209,7 +209,6 @@ class CDispersionModel
 
      @param molecule the molecule.
      @param xcLabel the label of the density functional.
-     @return the dispersion energy.
      */
     void compute(const CMolecule& molecule, const std::string& xcLabel);
 

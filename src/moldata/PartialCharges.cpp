@@ -205,13 +205,7 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
         for (int32_t j = 0; j < i; j++)
         {
-            std::vector<double> rij(3);
-
-            rij[0] = xcoord[i] - xcoord[j];
-
-            rij[1] = ycoord[i] - ycoord[j];
-
-            rij[2] = zcoord[i] - zcoord[j];
+            std::vector<double> rij({xcoord[i] - xcoord[j], ycoord[i] - ycoord[j], zcoord[i] - zcoord[j]});
 
             double r2 = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
