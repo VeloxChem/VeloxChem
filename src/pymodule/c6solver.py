@@ -22,7 +22,6 @@ from .lrmatvecdriver import write_rsp_hdf5
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
-from .inputparser import parse_frequencies
 
 
 class C6Solver:
@@ -70,7 +69,7 @@ class C6Solver:
 
     def __init__(self, comm, ostream):
         """
-        Initializes complex linear response solver to default setup.
+        Initializes C6 solver to default setup.
         """
 
         self.a_operator = 'dipole'
@@ -94,7 +93,7 @@ class C6Solver:
         self.use_split_comm = False
 
         self.max_iter = 150
-        self.conv_thresh = 1.0e-4
+        self.conv_thresh = 1.0e-3
 
         self.cur_iter = 0
         self.is_converged = False
@@ -116,7 +115,7 @@ class C6Solver:
 
     def update_settings(self, rsp_dict, method_dict={}):
         """
-        Updates response and method settings in complex liner response solver.
+        Updates response and method settings in C6 solver.
 
         :param rsp_dict:
             The dictionary of response dict.
@@ -861,9 +860,9 @@ class C6Solver:
         self.ostream.print_blank()
 
         for op, imagfreq, nv in nvs:
-            ops_label = '<<{};{}>>_i{:.4f}'.format(op, op, imagfreq)
+            ops_label = '<<{};{}>>_{:.4f}j'.format(op, op, imagfreq)
             rel_res = relative_residual_norm[(op, imagfreq)]
-            output_iter = '{:<15s}: {:15.8f} {:15.8f}j   '.format(
+            output_iter = '{:<17s}: {:15.8f} {:15.8f}j   '.format(
                 ops_label, -nv.real, -nv.imag)
             output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
             self.ostream.print_header(output_iter.ljust(width))

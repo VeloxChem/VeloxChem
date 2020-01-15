@@ -31,6 +31,7 @@ class LinearAbsorptionCrossSection(ResponseProperty):
         rsp_dict['property'] = 'linear absorption cross-section'
         rsp_dict['response'] = 'linear'
         rsp_dict['residue'] = 'none'
+        rsp_dict['onlystatic'] = 'no'
         rsp_dict['complex'] = 'yes'
 
         rsp_dict['a_operator'] = 'dipole'

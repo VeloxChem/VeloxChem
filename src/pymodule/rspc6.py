@@ -6,7 +6,7 @@ from .rspproperty import ResponseProperty
 
 class C6(ResponseProperty):
     """
-    Implements the absorption property.
+    Implements the C6 property.
 
     :param rsp_dict:
         The dictionary of response input.
@@ -59,6 +59,49 @@ class C6(ResponseProperty):
 
         return self.rsp_property[key]
 
+    def integrate(self, rsp_property, imagfreqs, points, weights, w0):
+        """
+        Calculates the C6 value with a Gauss-Legendre quadrature for the
+        integral in the Casimir-Polder relation using integration by
+        substitution.
+
+        :param imagfreqs:
+            The list of imaginary frequencies.
+        :param points:
+            The list of integration points.
+        :param weights:
+            The list of weights for integration points.
+        :param w0:
+            A constant conversion factor.
+
+        :return:
+            The C6 value.
+        """
+
+        integral = 0
+
+        for iw in range(len(imagfreqs)):
+
+            Gxx = rsp_property['response_functions'][(
+                'x', 'x', imagfreqs[iw])].real
+            Gyy = rsp_property['response_functions'][(
+                'y', 'y', imagfreqs[iw])].real
+            Gzz = rsp_property['response_functions'][(
+                'z', 'z', imagfreqs[iw])].real
+
+            alpha = -(Gxx + Gyy + Gzz) / 3.0
+            point = points[iw]
+            weight = weights[iw]
+            derivative = w0 * 2 / (1 + point)**2
+            integral += alpha * alpha * weight * derivative
+
+        # Casimir-Polder relation
+
+        c6 = 3 * integral / pi
+
+        return c6
+        
+
     def print_property(self, ostream):
         """
         Prints response property to output stream.
@@ -80,8 +123,9 @@ class C6(ResponseProperty):
         weights = np.polynomial.legendre.leggauss(
             int(self.rsp_dict['n_points']))[1]
         imagfreqs = [w0*(1-t)/(1+t) for t in points]
+        printfreqs = np.append(imagfreqs, 0.0)
 
-        for iw in imagfreqs:
+        for iw in printfreqs:
             title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
                 'Dipole', 'Dipole', 'Frequency', 'Real', 'Imaginary')
             ostream.print_header(title.ljust(width))
@@ -108,29 +152,7 @@ class C6(ResponseProperty):
         ostream.print_header(title.ljust(width))
         ostream.print_blank()
 
-        # Gauss-Legendre quadrature for the integral in the Casimir-Polder 
-        # relation using integration by substitution.
-
-        integral = 0
-
-        for iw in range(len(imagfreqs)):
-
-            Gxx = self.rsp_property['response_functions'][(
-                'x', 'x', imagfreqs[iw])].real
-            Gyy = self.rsp_property['response_functions'][(
-                'y', 'y', imagfreqs[iw])].real
-            Gzz = self.rsp_property['response_functions'][(
-                'z', 'z', imagfreqs[iw])].real
-
-            alpha = -(Gxx + Gyy + Gzz) / 3.0
-            point = points[iw]
-            weight = weights[iw]
-            derivative = w0 * 2 / (1 + point)**2
-            integral += alpha * alpha * weight * derivative
-
-        # Casimir-Polder relation
-
-        c6 = 3 * integral / pi
+        c6 = self.integrate(self.rsp_property, imagfreqs, points, weights, w0)
 
         # Static polarizability
 

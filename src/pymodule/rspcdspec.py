@@ -29,6 +29,7 @@ class CircularDichroismSpectrum(ResponseProperty):
         rsp_dict['property'] = 'circular dichroism spectrum'
         rsp_dict['response'] = 'linear'
         rsp_dict['residue'] = 'none'
+        rsp_dict['onlystatic'] = 'no'
         rsp_dict['complex'] = 'yes'
 
         rsp_dict['a_operator'] = 'angular momentum'
