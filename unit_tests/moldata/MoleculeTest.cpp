@@ -9,8 +9,11 @@
 #include "MoleculeTest.hpp"
 
 #include "CheckFunctions.hpp"
+#include "CoordinationNumber.hpp"
+#include "DispersionModel.hpp"
 #include "Molecule.hpp"
 #include "MoleculeSetter.hpp"
+#include "PartialCharges.hpp"
 
 TEST_F(CMoleculeTest, DefaultConstructor)
 {
@@ -250,4 +253,52 @@ TEST_F(CMoleculeTest, CombineMolecule)
     CMolecule h2o_dimer(h2o_1, h2o_2);
 
     ASSERT_EQ(h2o_dimer, dimer);
+}
+
+TEST_F(CMoleculeTest, GetCoordinationNumber)
+{
+    CMolecule mol = vlxmol::getMoleculeNH3CH4();
+
+    std::vector<double> refcn({2.984, 0.996, 0.996, 0.996, 3.966, 0.995, 0.995, 0.995, 0.995});
+
+    auto cn = coordnum::getCoordinationNumber(mol);
+
+    vlxtest::compare(refcn, cn.data(), 1.0e-3);
+}
+
+TEST_F(CMoleculeTest, GetPartialCharges)
+{
+    CMolecule mol = vlxmol::getMoleculeNH3CH4();
+
+    std::vector<double> refchg({-0.835, 0.257, 0.255, 0.255, -0.320, 0.093, 0.097, 0.103, 0.094});
+
+    auto chg = parchg::getPartialCharges(mol, 0.0);
+
+    vlxtest::compare(refchg, chg.data(), 1.0e-3);
+}
+
+TEST_F(CMoleculeTest, DispersionModel)
+{
+    CMolecule mol = vlxmol::getMoleculeNH3CH4();
+
+    CDispersionModel disp;
+
+    disp.compute(mol, "B3LYP");
+
+    auto e = disp.getEnergy();
+
+    auto g = disp.getGradient();
+
+    double refEnergy = -0.00242153;
+
+    std::vector<double> refGradient({-0.1299360785248e-03, 0.2173451050590e-03, -0.3709704540840e-05, 0.3994969804870e-05,  -0.4278600323727e-04,
+                                     -0.3004853785695e-05, 0.2248231831000e-04, 0.4826552264307e-04,  -0.4026908304668e-04, 0.2585427033048e-04,
+                                     0.3687322138623e-04,  0.3605346888461e-04, 0.3668558637179e-04,  -0.1301671081015e-03, 0.5463254511935e-05,
+                                     -0.3229412701673e-05, 0.4922085484071e-05, 0.5884251321327e-05,  0.1936253825266e-04,  -0.5468305617267e-04,
+                                     0.4693862097277e-05,  0.1839250629302e-04, -0.6545014186048e-04, 0.3934710919238e-05,  0.6393301863664e-05,
+                                     -0.1431962520046e-04, -0.9045906361170e-05});
+
+    ASSERT_NEAR(refEnergy, e, 1.0e-8);
+
+    vlxtest::compare(refGradient, g.values());
 }
