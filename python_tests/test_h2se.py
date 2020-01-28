@@ -94,7 +94,7 @@ class TestH2Se(unittest.TestCase):
 
             for td, ref_td in zip(trans_dipoles, ref_trans_dipoles):
                 prefac = 1.0 if np.dot(td, ref_td) >= 0.0 else -1.0
-                self.assertTrue(np.max(np.abs(td - ref_td * prefac)) < 1.0e-4)
+                self.assertTrue(np.max(np.abs(td - ref_td * prefac)) < 2.0e-4)
 
         # RPA
         lreig = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
@@ -126,7 +126,7 @@ class TestH2Se(unittest.TestCase):
 
             for td, ref_td in zip(trans_dipoles, ref_trans_dipoles):
                 prefac = 1.0 if np.dot(td, ref_td) >= 0.0 else -1.0
-                self.assertTrue(np.max(np.abs(td - ref_td * prefac)) < 1.0e-4)
+                self.assertTrue(np.max(np.abs(td - ref_td * prefac)) < 2.0e-4)
 
         # polarizability
         lr_solver = LinearResponseSolver(task.mpi_comm, task.ostream)

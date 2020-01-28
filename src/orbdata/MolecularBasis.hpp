@@ -263,6 +263,27 @@ class CMolecularBasis
      @return the string map of basis functions.
      */
     std::vector<std::string> getAOBasisMap(const CMolecule& molecule) const;
+    
+    /**
+     Creates indexes map between VeloxChem and Dalton molecular basis sets.
+     NOTE: basis set definitions in both programs "MUST" follow angular order. 
+     
+     @param molecule the molecule.
+     @return the indexes map (VeloxChem Order :: Dalton Order).
+     */
+    CMemBlock2D<int32_t> getIndexMapForDalton(const CMolecule& molecule) const;
+    
+    
+    /**
+     Gets position of atomic basis 
+
+     @param molecule the molecule.
+     @param angularMomentum the angular momentum.
+     @return the position of AOs angular block in molecular basis.
+     */
+    int32_t getPositionInAngularBlock(const CMolecule& molecule,
+                                      const int32_t    iAtom,
+                                      const int32_t    angularMomentum) const;
 
     /**
      Prints AO basis information to output stream for selected molecule.

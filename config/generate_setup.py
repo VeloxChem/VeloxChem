@@ -54,6 +54,8 @@ def find_mkl_avx(is_linux, is_macos):
     print('*** Checking avx... ', end='')
     if is_linux:
         avx = find_avx_linux()
+        if check_pdc_beskow():
+            avx = 'avx2'
     elif is_macos:
         avx = find_avx_macos()
     print(avx)
@@ -74,6 +76,13 @@ def check_ubuntu():
                     if 'ubuntu' in line.lower():
                         return True
     return False
+
+
+def check_pdc_beskow():
+    is_pdc = ('SNIC_SITE' in os.environ and os.environ['SNIC_SITE'] == 'pdc')
+    is_beskow = ('SNIC_RESOURCE' in os.environ and
+                 os.environ['SNIC_RESOURCE'] == 'beskow')
+    return (is_pdc and is_beskow)
 
 
 def check_dir(dirname, label):
@@ -156,35 +165,14 @@ def generate_setup(template_file, setup_file):
 
     # cuda information
 
-    print('*** Checking cuda compiler... ', end='')
-
-    nvcc, nvcc_path = find_exe(['nvcc'])
-
-    print(nvcc)
-
-    use_gpu = (nvcc is not None)
-
-    if use_gpu:
-        nvcc_version = get_command_output(['nvcc', '--version'])
-        nvcc_version = nvcc_version.lower().split('release')[1]
-        nvcc_version = nvcc_version.split('.')[0]
-        if int(nvcc_version) < 6:
-            use_gpu = False
-            print('*** Disabling cuda because cuda version ({}) is too old.'.
-                  format(nvcc_version.split()[0]))
-
-    if use_gpu:
-        cuda_root = os.path.split(nvcc_path)[0]
-        cuda_dir = os.path.join(cuda_root, 'lib64')
-        if not os.path.isdir(cuda_dir):
-            cuda_dir = os.path.join(cuda_root, 'lib')
-        check_dir(cuda_dir, 'cuda lib')
-        cuda_lib = '-L{} -lcuda -lcudart'.format(cuda_dir)
+    use_gpu = False
 
     # cxx and omp flags
 
     if use_intel:
         cxx_flags = '-xHost -qopenmp'
+        if check_pdc_beskow():
+            cxx_flags = '-qopenmp'
         omp_flag = '-liomp5'
     elif use_gnu:
         cxx_flags = '-fopenmp'
@@ -192,8 +180,6 @@ def generate_setup(template_file, setup_file):
     elif use_clang:
         cxx_flags = '-Xpreprocessor -fopenmp'
         omp_flag = '-lomp'
-
-    nvcc_flags = '--compiler-options \"-fopenmp\"'
 
     # math library
 
@@ -336,13 +322,6 @@ def generate_setup(template_file, setup_file):
                 print('CXX_REL_FLG :=', cxx_flags, file=f_mkfile)
                 print('CXX_DEB_FLG :=', cxx_flags, file=f_mkfile)
                 print('', file=f_mkfile)
-
-                if use_gpu:
-                    print('NVCC :=', nvcc, file=f_mkfile)
-                    print('NVCC_REL_FLG :=', nvcc_flags, file=f_mkfile)
-                    print('NVCC_DEB_FLG :=', nvcc_flags, file=f_mkfile)
-                    print('CUDA_LIB :=', cuda_lib, file=f_mkfile)
-                    print('', file=f_mkfile)
 
                 print('MACLIBS :=', maclibs, file=f_mkfile)
                 print('', file=f_mkfile)

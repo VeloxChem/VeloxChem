@@ -13,6 +13,7 @@ from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import SADGuessDriver
+from .veloxchemlib import DenseMatrix
 from .veloxchemlib import TwoIndexes
 from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import ExcitationVector
@@ -21,6 +22,8 @@ from .veloxchemlib import CudaDevices
 # C++ functions
 from .veloxchemlib import mpi_master
 from .veloxchemlib import mpi_initialized
+from .veloxchemlib import ao_matrix_to_veloxchem
+from .veloxchemlib import ao_matrix_to_dalton
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import mathconst_pi

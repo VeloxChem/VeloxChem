@@ -115,9 +115,9 @@ class CVisualizationDriver
      @param grid the cubic grid.
      @param molecule the molecule.
      @param basis the basis set for the molecule.
-     @param molorb the molecular orbitals of the molecule.
-     @param moidx the index of the molecular orbital (0-based).
-     @param mospin the spin of the molecular orbital ('a' or 'b').
+     @param density the AO density matrix.
+     @param denidx the index of the density matrix (0-based).
+     @param denspin the spin of the density matrix ('a' or 'b').
      */
     void compute(CCubicGrid&             grid,
                  const CMolecule&        molecule,

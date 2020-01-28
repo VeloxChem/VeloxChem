@@ -1,9 +1,14 @@
 import numpy as np
+import h5py
 import re
 
 from .veloxchemlib import VisualizationDriver
 from .veloxchemlib import CubicGrid
+from .veloxchemlib import DenseMatrix
 from .veloxchemlib import mpi_master
+from .veloxchemlib import ao_matrix_to_veloxchem
+from .veloxchemlib import denmat
+from .aodensitymatrix import AODensityMatrix
 from .errorhandler import assert_msg_critical
 
 
@@ -161,7 +166,6 @@ def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
                             'VisualizationDriver: failed to read cube inputs')
 
         cube_type = m.group(1).strip().lower()
-        cube_value = m.group(2).strip().lower()
 
         if cube_type in ['mo', 'amo', 'bmo']:
 
@@ -175,6 +179,7 @@ def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
             homo = nelec - 1
             lumo = nelec
 
+            cube_value = m.group(2).strip().lower()
             cube_value = cube_value.replace('homo', str(homo))
             cube_value = cube_value.replace('lumo', str(lumo))
             orb_id = eval(cube_value)
@@ -186,9 +191,27 @@ def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
 
         elif cube_type == 'density':
 
+            cube_value = m.group(2).strip().lower()
             spin = cube_value
 
             self.compute(cubic_grid, molecule, basis, density, 0, spin)
+
+            if self.get_rank() == mpi_master():
+                self.write_data(fname, cubic_grid, molecule, 'density', 0, spin)
+
+        elif cube_type == 'read_dalton':
+
+            cube_value = m.group(2).strip()
+
+            hf = h5py.File(cube_value, 'r')
+            dal_dens = DenseMatrix(np.array(hf.get('DALTON_AO_MATRIX')))
+            vlx_dens = ao_matrix_to_veloxchem(dal_dens, basis,
+                                              molecule).to_numpy()
+            read_density = AODensityMatrix([vlx_dens], denmat.rest)
+            hf.close()
+
+            spin = 'alpha'
+            self.compute(cubic_grid, molecule, basis, read_density, 0, spin)
 
             if self.get_rank() == mpi_master():
                 self.write_data(fname, cubic_grid, molecule, 'density', 0, spin)
