@@ -12,6 +12,7 @@ from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
+from .rspc6 import C6
 from .pulsedrsp import PulsedResponse
 from .mp2driver import Mp2Driver
 from .excitondriver import ExcitonModelDriver
@@ -129,6 +130,8 @@ def main():
                 'ecd (cpp)'
         ]:
             rsp_prop = CircularDichroismSpectrum(rsp_dict, method_dict)
+        elif prop_type == 'c6':
+            rsp_prop = C6(rsp_dict, method_dict)
         else:
             assert_msg_critical(False, 'input file: invalid response property')
 
