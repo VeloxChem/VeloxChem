@@ -9,6 +9,7 @@
 #ifndef DispersionData_hpp
 #define DispersionData_hpp
 
+#include <cstdint>
 #include <vector>
 
 namespace dispdata {  // dispdata namespace
