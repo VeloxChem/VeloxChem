@@ -42,6 +42,8 @@ assert_msg_critical = Mock()
 get_dimer_ao_indices = Mock()
 to_angular_momentum = Mock()
 parse_xc_func = Mock()
+ao_matrix_to_veloxchem = Mock()
+ao_matrix_to_dalton = Mock()
 
 Molecule = Mock()
 MolecularBasis = Mock()
