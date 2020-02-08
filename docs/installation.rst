@@ -19,20 +19,25 @@ Conda binary distributions have been generated with
 From source
 ^^^^^^^^^^^
 
-Ubuntu (Intel CPU)
+Get the source code
++++++++++++++++++++
+
+The source code can be downloaded from `this page <https://veloxchem.org/download>`__.
+
+Debian based Linux
 ++++++++++++++++++
 
 .. code-block:: bash
 
-    # Install MKL
+    # Install MKL from
     # https://software.intel.com/en-us/articles/installing-intel-free-libs-and-python-apt-repo
 
-    wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
-    apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
-
-    sudo sh -c 'echo deb https://apt.repos.intel.com/mkl all main > /etc/apt/sources.list.d/intel-mkl.list'
-    sudo apt-get update
-    sudo apt-get install intel-mkl-2018.2-046
+    # For example:
+    # wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
+    # apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
+    # sudo sh -c 'echo deb https://apt.repos.intel.com/mkl all main > /etc/apt/sources.list.d/intel-mkl.list'
+    # sudo apt-get update
+    # sudo apt-get install intel-mkl-2018.2-046
 
     # Install MPICH and Python
 
@@ -45,17 +50,16 @@ Ubuntu (Intel CPU)
 
     # Install VeloxChem
 
-    git clone https://gitlab.com/rinkevic/VeloxChemMP.git
-    cd VeloxChemMP
+    cd VeloxChem
     python3 config/generate_setup.py
     python3 setup.py install
 
-MacOS (Intel CPU)
-+++++++++++++++++
+MacOS
++++++
 
 .. code-block:: bash
 
-    # Install MKL
+    # Install MKL from
     # https://software.intel.com/en-us/mkl
 
     # Install libomp, MPICH and Python
@@ -71,7 +75,6 @@ MacOS (Intel CPU)
 
     # Install VeloxChem
 
-    git clone https://gitlab.com/rinkevic/VeloxChemMP.git
-    cd VeloxChemMP
+    cd VeloxChem
     python3 config/generate_setup.py
     python3 setup.py install
