@@ -8,6 +8,7 @@ Sample input
    :maxdepth: 2
 
    inputs/scf.rst
+   inputs/pe.rst
    inputs/rsp.rst
    inputs/mp2.rst
    inputs/cube.rst
