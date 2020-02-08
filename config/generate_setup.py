@@ -307,7 +307,11 @@ def generate_setup(template_file, setup_file):
                 print(math_lib, file=f_mkfile)
                 print('', file=f_mkfile)
 
-                print('PYTHON :=', 'python3', file=f_mkfile)
+                print('PYTHON :=', 'python{}.{}'.format(
+                    sys.version_info[0], sys.version_info[1],
+                    ),
+                    file=f_mkfile
+                )
                 python_version = 'python{}.{}{}'.format(sys.version_info[0],
                                                         sys.version_info[1],
                                                         sys.abiflags)
