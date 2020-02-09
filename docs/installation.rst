@@ -156,3 +156,26 @@ Windows
 
 Soon to come!
 
+The CPPE library for polarizable embedding
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you are interested in using the CPPE library for polarizable embedding,
+please install it according to the instructions below. Note that cmake is
+needed to build the CPPE library.
+
+.. code-block:: bash
+
+    # Build CPPE
+    git clone https://github.com/maxscheurer/cppe
+    cd cppe; mkdir build; cd build
+    cmake -DENABLE_PYTHON_INTERFACE=ON ..
+    make
+
+    # Set up python path
+    export PYTHONPATH=<path-to-your-cppe>/build/stage/lib:$PYTHONPATH
+
+    # Make sure that cppe can be imported
+    python3 -c 'import cppe'
+
+You can read more about the CPPE library on `this page
+<https://github.com/maxscheurer/cppe>`__.
