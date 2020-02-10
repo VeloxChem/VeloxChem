@@ -1,11 +1,16 @@
 import io
+import sys
 import textwrap
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-from veloxchem.mpitask import MpiTask
+import pytest
 from mpi4py import MPI
 
+from veloxchem import main
+from veloxchem.mpitask import MpiTask
 
+
+@pytest.mark.skip('not ready')
 def test_loprop_main(tmpdir):
     inp = textwrap.dedent(
         """
@@ -30,7 +35,9 @@ def test_loprop_main(tmpdir):
     )
     out = io.StringIO()
 
-    with open(tmpdir/'water.inp', 'w'):
+    input_file = tmpdir/'water.inp'
+    with open(input_file, 'w') as f:
+        f.write(inp)
 
     task = MagicMock()  # MpiTask((inp, out), MPI.COMM_WORLD)
     molecule = MagicMock()  # task.molecule
@@ -38,8 +45,8 @@ def test_loprop_main(tmpdir):
     comm = MagicMock()  # task.mpi_comm
     rank = MagicMock()  # task.mpi_rank
 
-
     with patch('veloxchem.LoPropDriver') as mock_prop:
+        sys.argv[1:] = [input_file]
         main()
 
     assert mock_prop.called
