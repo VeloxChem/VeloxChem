@@ -35,9 +35,6 @@ def test_read_file(mock_parse):
                 basis: cc-pvdz
                 @end
 
-                @BASIS_SET foo
-                ...
-
                 @molecule
                 charge: 0
                 multiplicity: 1
@@ -56,8 +53,6 @@ def test_read_file(mock_parse):
         ip.read_file()
 
     mocked_open.assert_called_once_with('foo.inp', 'r')
-    assert ip.is_basis_set
-    assert ip.basis_set_name == 'foo'
     assert ip.content == textwrap.dedent(
         """\
         @jobs
@@ -66,7 +61,6 @@ def test_read_file(mock_parse):
         @method settings
         basis: cc-pvdz
         @end
-        ...
         @molecule
         charge: 0
         multiplicity: 1
