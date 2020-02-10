@@ -39,7 +39,7 @@ Debian based Linux
     # sudo apt-get update
     # sudo apt-get install intel-mkl-2018.2-046
 
-    # Install MPICH (or OpenMPI) and Python
+    # Install MPICH and Python
 
     sudo apt-get install mpich python3 python3-dev python3-pip
 
@@ -67,8 +67,7 @@ RPM based Linux
     # sudo rpm --import https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
     # sudo yum install intel-mkl-2018.2-046
 
-    # Install MPICH (or OpenMPI) and Python
-    # Note: need to manually link MPI executables
+    # Install MPICH and Python (need to manually link MPI executables)
 
     sudo yum install mpich-3.2-devel python3-devel
     sudo ln -s /usr/lib64/mpich-3.2/bin/mpirun /usr/bin/mpirun
@@ -86,8 +85,8 @@ RPM based Linux
     python3 config/generate_setup.py
     python3 setup.py install
 
-PowerLinux
-++++++++++
+Power8
+++++++
 
 .. code-block:: bash
 
@@ -100,7 +99,7 @@ PowerLinux
     make PREFIX=<path-to-your-openblas> install
     export OPENBLASROOT=<path-to-your-openblas>
 
-    # Install MPICH (or OpenMPI)
+    # Install MPICH
 
     wget http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz
     tar xf mpich-3.2.1.tar.gz
@@ -115,7 +114,6 @@ PowerLinux
 
     # For example:
     # wget https://repo.anaconda.com/archive/Anaconda3-2019.10-Linux-ppc64le.sh
-    # bash Anaconda3-2019.10-Linux-ppc64le.sh
 
     # Install numpy, h5py, pybind11, pytest and mpi4py
 
@@ -179,3 +177,5 @@ needed to build the CPPE library.
     # Make sure that cppe can be imported
     python3 -c 'import cppe'
 
+You can read more about the CPPE library on `this page
+<https://github.com/maxscheurer/cppe>`__.
