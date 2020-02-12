@@ -6,11 +6,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from mpi4py import MPI
 
-from veloxchem import main
+from veloxchem.main import main
 from veloxchem.mpitask import MpiTask
 
 
-@pytest.mark.skip('not ready')
+# @pytest.mark.skip('not ready')
 def test_loprop_main(tmpdir):
     inp = textwrap.dedent(
         """
@@ -35,7 +35,7 @@ def test_loprop_main(tmpdir):
     )
     out = io.StringIO()
 
-    input_file = tmpdir/'water.inp'
+    input_file = f'{tmpdir/"water.inp"}'
     with open(input_file, 'w') as f:
         f.write(inp)
 
@@ -45,7 +45,7 @@ def test_loprop_main(tmpdir):
     comm = MagicMock()  # task.mpi_comm
     rank = MagicMock()  # task.mpi_rank
 
-    with patch('veloxchem.LoPropDriver') as mock_prop:
+    with patch('veloxchem.main.LoPropDriver', autospec=True) as mock_prop:
         sys.argv[1:] = [input_file]
         main()
 
