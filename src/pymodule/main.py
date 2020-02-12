@@ -17,6 +17,7 @@ from .mp2driver import Mp2Driver
 from .excitondriver import ExcitonModelDriver
 from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
+from .loprop import LoPropDriver
 
 
 def main():
@@ -175,7 +176,7 @@ def main():
     # LoProp
 
     if task_type == 'loprop':
-        pass
+        LoPropDriver()
 
     # All done
 

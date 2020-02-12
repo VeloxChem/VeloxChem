@@ -3,15 +3,13 @@ import sys
 import textwrap
 from unittest.mock import MagicMock, patch
 
-import pytest
-from mpi4py import MPI
+# from mpi4py import MPI
 
 from veloxchem.main import main
-from veloxchem.mpitask import MpiTask
+# from veloxchem.mpitask import MpiTask
 
 
-# @pytest.mark.skip('not ready')
-def test_loprop_main(tmpdir):
+def test_loprop_called_from_main(tmpdir):
     inp = textwrap.dedent(
         """
         @jobs
