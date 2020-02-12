@@ -67,7 +67,6 @@ from .c6solver import C6Solver
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
-from .main import main
 
 # Environment variable: basis set path
 import os
