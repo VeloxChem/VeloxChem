@@ -12,6 +12,7 @@ class MyBuildPy(SetuptoolsBuildPy):
 
     def run(self):
         self.check_setup_file()
+        self.write_vlx_script()
         self.make_veloxchem()
         SetuptoolsBuildPy.run(self)
 
@@ -34,6 +35,15 @@ class MyBuildPy(SetuptoolsBuildPy):
             template_file = os.path.join('config', 'Setup.template')
             print('*** Generating Makefile.setup...')
             generate_setup(template_file, setup_file)
+
+    def write_vlx_script(self):
+        vlx_file = os.path.join('src', 'vlx')
+        with open(vlx_file, 'w', encoding='utf-8') as f_vlx:
+            print('#!/usr/bin/env python{}.{}'.format(sys.version_info[0],
+                                                      sys.version_info[1]),
+                  file=f_vlx)
+            print('from veloxchem.main import main', file=f_vlx)
+            print('main()', file=f_vlx)
 
 
 class MyInstall(SetuptoolsInstall):
