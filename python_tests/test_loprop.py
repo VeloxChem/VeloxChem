@@ -60,7 +60,7 @@ def test_loprop_called_from_main(mock_mpi, sample, tmpdir):
 def test_overlap_called(mock_ovldrv, mock_mpi, mock_h5py):
 
     task = mock_mpi()
-    task.input_dict = {'loprop': {'checkpoint': 'water.loprop.h5'}}
+    task.input_dict = {'loprop': {'checkpoint_file': 'water.loprop.h5'}}
     lpd = LoPropDriver(task)
     lpd.save_overlap()
 
