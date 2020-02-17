@@ -1,7 +1,6 @@
-import io
 import sys
 import textwrap
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -38,19 +37,23 @@ def sample():
 
 @patch('veloxchem.main.MpiTask')
 def test_loprop_called_from_main(mock_mpi, sample, tmpdir):
-    # out = io.StringIO()
+    """
+    Verify that LoPropDriver is called from main, loprop task in input
+    """
 
+    # given
     task = mock_mpi()
     task.input_dict = {'jobs': {'task': 'loprop'}}
     input_file = f'{tmpdir/"water.inp"}'
     with open(input_file, 'w') as f:
         f.write(sample)
+    sys.argv[1:] = [input_file]
 
+    # when
     with patch('veloxchem.main.LoPropDriver', autospec=True) as mock_prop:
-        sys.argv[1:] = [input_file]
-        task = mock_mpi()
         main()
 
+    # then
     mock_prop.assert_called_with(task)
     mock_prop(task).compute.assert_called()
 
@@ -59,24 +62,36 @@ def test_loprop_called_from_main(mock_mpi, sample, tmpdir):
 @patch('veloxchem.loprop.MpiTask')
 @patch('veloxchem.loprop.OverlapIntegralsDriver')
 def test_overlap_called(mock_ovldrv, mock_mpi, mock_h5py):
+    """
+    Verify that veloxchem overlap driver from loprop module
+    """
 
+    # given
     task = mock_mpi()
     task.input_dict = {'loprop': {'checkpoint_file': 'water.loprop.h5'}}
+
+    # when
     lpd = LoPropDriver(task)
     lpd.save_overlap()
 
+    # then
     mock_ovldrv.assert_called_with(task.mpi_comm)
     mock_ovldrv().compute.assert_called_with(task.molecule, task.ao_basis)
-
     mock_h5py.File.assert_called_with('water.loprop.h5', 'w')
 
 
 def test_input_dict(sample, tmpdir):
+    """
+    Verify that input parser sets a loprop key
+    """
+    # given
     input_file = f'{tmpdir/"water.inp"}'
     with open(input_file, 'w') as f:
         f.write(sample)
 
+    # when
     ip = InputParser(input_file)
 
+    # then
     assert ip.input_dict['jobs']['task'] == 'loprop'
     assert 'loprop' in ip.input_dict
