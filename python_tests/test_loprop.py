@@ -52,6 +52,7 @@ def test_loprop_called_from_main(mock_mpi, sample, tmpdir):
         main()
 
     mock_prop.assert_called_with(task)
+    mock_prop(task).compute.assert_called()
 
 
 @patch('veloxchem.loprop.h5py')
@@ -64,10 +65,10 @@ def test_overlap_called(mock_ovldrv, mock_mpi, mock_h5py):
     lpd = LoPropDriver(task)
     lpd.save_overlap()
 
-    mock_ovldrv.assert_called_with(task.comm)
-    mock_ovldrv().compute.assert_called_with(task.molecule, task.basis)
+    mock_ovldrv.assert_called_with(task.mpi_comm)
+    mock_ovldrv().compute.assert_called_with(task.molecule, task.ao_basis)
 
-    mock_h5py.File.assert_called_with('water.loprop.h5', 'a')
+    mock_h5py.File.assert_called_with('water.loprop.h5', 'w')
 
 
 def test_input_dict(sample, tmpdir):
