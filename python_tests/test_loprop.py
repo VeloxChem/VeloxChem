@@ -1,6 +1,6 @@
 import sys
 import textwrap
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -59,14 +59,15 @@ def test_loprop_called_from_main(mock_mpi, sample, tmpdir):
 
 
 @patch('veloxchem.loprop.h5py')
-@patch('veloxchem.loprop.MpiTask')
 @patch('veloxchem.loprop.OverlapIntegralsDriver')
-def test_overlap_called(mock_ovldrv, mock_mpi, mock_h5py):
+@patch('veloxchem.loprop.ao_matrix_to_dalton')
+def test_overlap_called(mock_to_dalton, mock_ovldrv, mock_h5py):
     """
     Verify that veloxchem overlap driver from loprop module
     """
 
     # given
+    mock_mpi = MagicMock()
     task = mock_mpi()
     task.input_dict = {'loprop': {'checkpoint_file': 'water.loprop.h5'}}
 
@@ -78,6 +79,7 @@ def test_overlap_called(mock_ovldrv, mock_mpi, mock_h5py):
     mock_ovldrv.assert_called_with(task.mpi_comm)
     mock_ovldrv().compute.assert_called_with(task.molecule, task.ao_basis)
     mock_h5py.File.assert_called_with('water.loprop.h5', 'w')
+    mock_to_dalton.assert_called
 
 
 def test_input_dict(sample, tmpdir):
