@@ -176,7 +176,7 @@ def main():
     # LoProp
 
     if task_type == 'loprop':
-        LoPropDriver()
+        loprop_driver = LoPropDriver(task)
 
     # All done
 

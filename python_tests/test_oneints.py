@@ -56,6 +56,7 @@ class TestOneInts(unittest.TestCase):
         outfile = inpfile.replace('.inp', '.out')
 
         task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
+        breakpoint()
 
         molecule = task.molecule
         basis = task.ao_basis

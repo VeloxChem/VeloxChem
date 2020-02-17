@@ -3,13 +3,15 @@ import sys
 import textwrap
 from unittest.mock import MagicMock, patch
 
-# from mpi4py import MPI
+import pytest
 
 from veloxchem.main import main
-# from veloxchem.mpitask import MpiTask
+from veloxchem.inputparser import InputParser
+from veloxchem.loprop import LoPropDriver
 
 
-def test_loprop_called_from_main(tmpdir):
+@pytest.fixture
+def sample():
     inp = textwrap.dedent(
         """
         @jobs
@@ -31,20 +33,48 @@ def test_loprop_called_from_main(tmpdir):
         @end
         """
     )
-    out = io.StringIO()
+    return inp
 
+
+@patch('veloxchem.main.MpiTask')
+def test_loprop_called_from_main(mock_mpi, sample, tmpdir):
+    # out = io.StringIO()
+
+    task = mock_mpi()
+    task.input_dict = {'jobs': {'task': 'loprop'}}
     input_file = f'{tmpdir/"water.inp"}'
     with open(input_file, 'w') as f:
-        f.write(inp)
-
-    task = MagicMock()  # MpiTask((inp, out), MPI.COMM_WORLD)
-    molecule = MagicMock()  # task.molecule
-    basis = MagicMock()  # task.ao_basis
-    comm = MagicMock()  # task.mpi_comm
-    rank = MagicMock()  # task.mpi_rank
+        f.write(sample)
 
     with patch('veloxchem.main.LoPropDriver', autospec=True) as mock_prop:
         sys.argv[1:] = [input_file]
+        task = mock_mpi()
         main()
 
-    assert mock_prop.called
+    mock_prop.assert_called_with(task)
+
+
+@patch('veloxchem.loprop.h5py')
+@patch('veloxchem.loprop.MpiTask')
+@patch('veloxchem.loprop.OverlapIntegralsDriver')
+def test_overlap_called(mock_ovldrv, mock_mpi, mock_h5py):
+
+    task = mock_mpi()
+    lpd = LoPropDriver(task)
+    lpd.save_overlap()
+
+    mock_ovldrv.assert_called_with(task.comm)
+    mock_ovldrv().compute.assert_called_with(task.molecule, task.basis)
+
+    mock_h5py.File.assert_called_with('foo.h5', 'a')
+
+
+def test_input_dict(sample, tmpdir):
+    input_file = f'{tmpdir/"water.inp"}'
+    with open(input_file, 'w') as f:
+        f.write(sample)
+
+    ip = InputParser(input_file)
+
+    assert ip.input_dict['jobs']['task'] == 'loprop'
+    # assert 'loprop' in ip.input_dict
