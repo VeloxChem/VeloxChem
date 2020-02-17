@@ -60,13 +60,14 @@ def test_loprop_called_from_main(mock_mpi, sample, tmpdir):
 def test_overlap_called(mock_ovldrv, mock_mpi, mock_h5py):
 
     task = mock_mpi()
+    task.input_dict = {'loprop': {'checkpoint': 'water.loprop.h5'}}
     lpd = LoPropDriver(task)
     lpd.save_overlap()
 
     mock_ovldrv.assert_called_with(task.comm)
     mock_ovldrv().compute.assert_called_with(task.molecule, task.basis)
 
-    mock_h5py.File.assert_called_with('foo.h5', 'a')
+    mock_h5py.File.assert_called_with('water.loprop.h5', 'a')
 
 
 def test_input_dict(sample, tmpdir):
@@ -77,4 +78,4 @@ def test_input_dict(sample, tmpdir):
     ip = InputParser(input_file)
 
     assert ip.input_dict['jobs']['task'] == 'loprop'
-    # assert 'loprop' in ip.input_dict
+    assert 'loprop' in ip.input_dict

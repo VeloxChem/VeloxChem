@@ -226,6 +226,7 @@ class InputParser:
             frsp = fname + '.rsp.h5'
             fcpp = fname + '.cpp.h5'
             fexciton = fname + '.exciton.h5'
+            floprop = fname + '.loprop.h5'
 
             if 'scf' not in self.input_dict:
                 self.input_dict['scf'] = {}
@@ -242,6 +243,10 @@ class InputParser:
             if 'exciton' not in self.input_dict:
                 self.input_dict['exciton'] = {}
             self.input_dict['exciton']['checkpoint_file'] = fexciton
+
+            if 'loprop' not in self.input_dict:
+                self.input_dict['loprop'] = {}
+            self.input_dict['loprop']['checkpoint_file'] = floprop
 
 
 def parse_frequencies(input_frequencies):
