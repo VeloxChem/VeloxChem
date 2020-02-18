@@ -381,10 +381,6 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
     #pragma omp parallel for schedule(dynamic)
     for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
     {
-        // elemental index (nuclear charge) for this atom
-
-        const int32_t idelem = molecule.getIdsElemental()[atomidx];
-
         // AO indices for this atom
 
         const std::vector<int32_t>& aoinds_1 = aoinds_atoms_1[atomidx];
