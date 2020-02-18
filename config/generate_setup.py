@@ -186,9 +186,10 @@ def generate_setup(template_file, setup_file):
     print('*** Checking math library... ', end='')
 
     use_mkl = 'MKLROOT' in os.environ
-    use_openblas = not use_mkl and 'OPENBLASROOT' in os.environ
+    use_openblas = 'OPENBLASROOT' in os.environ
+    use_craylibsci = 'CRAY_LIBSCI_VERSION' in os.environ
 
-    if not (use_mkl or use_openblas):
+    if not (use_mkl or use_openblas or use_craylibsci):
         print()
         print('*** Error: Unable to find math library!')
         print('***        Please make sure that you have set MKLROOT or')
@@ -229,7 +230,7 @@ def generate_setup(template_file, setup_file):
 
     # openblas flags
 
-    if use_openblas:
+    elif use_openblas:
         print('OpenBLAS')
 
         openblas_inc = os.path.join(os.environ['OPENBLASROOT'], 'include')
@@ -243,6 +244,15 @@ def generate_setup(template_file, setup_file):
         math_lib += os.linesep + 'MATH_LIB += -Wl,-rpath,{}'.format(
             openblas_dir)
         math_lib += os.linesep + 'MATH_LIB += -lopenblas {} {}'.format(
+            omp_flag, '-lpthread -lm -ldl')
+
+    # cray-libsci flags
+
+    elif use_craylibsci:
+        print('Cray LibSci')
+
+        math_lib = 'MATH_INC := '
+        math_lib += os.linesep + 'MATH_LIB := {} {}'.format(
             omp_flag, '-lpthread -lm -ldl')
 
     # extra flags for mac
@@ -307,11 +317,10 @@ def generate_setup(template_file, setup_file):
                 print(math_lib, file=f_mkfile)
                 print('', file=f_mkfile)
 
-                print('PYTHON :=', 'python{}.{}'.format(
-                    sys.version_info[0], sys.version_info[1],
-                    ),
-                    file=f_mkfile
-                )
+                print('PYTHON :=',
+                      'python{}.{}'.format(sys.version_info[0],
+                                           sys.version_info[1]),
+                      file=f_mkfile)
                 python_version = 'python{}.{}{}'.format(sys.version_info[0],
                                                         sys.version_info[1],
                                                         sys.abiflags)
