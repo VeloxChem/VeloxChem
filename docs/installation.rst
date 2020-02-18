@@ -128,6 +128,46 @@ PowerLinux
     python3 config/generate_setup.py
     python3 setup.py install
 
+Arm (Isambard Cray XC50 system)
++++++++++++++++++++++++++++++++
+
+.. code-block:: bash
+
+    # Load cray modules
+
+    module swap PrgEnv-cray PrgEnv-gnu
+    module load cray-hdf5
+    module load cray-python/3.6.5.7
+
+    # Install python modules
+
+    python3 -m pip install pybind11 --user
+    python3 -m pip install h5py --user
+
+    # Manually install mpi4py
+
+    # 1. Download mpi4py-3.0.3.tar.gz from https://pypi.org/project/mpi4py/#files
+    # 2. tar xf mpi4py-3.0.3.tar.gz && cd mpi4py-3.0.3
+    # 3. Add the following lines to mpi.cfg
+    # [cray]
+    # mpicc         = cc
+    # mpicxx        = CC
+    # extra_compile_args   = -shared
+    # extra_link_args      = -Wl,-rpath,/opt/cray/pe/mpt/7.7.9/gni/mpich-gnu/8.2/lib
+    python setup.py build --mpi=cray
+    python setup.py install --prefix=<path-to-your-mpi4py>
+    export PYTHONPATH=<path-to-your-mpi4py>/lib/python3.6/site-packages:$PYTHONPATH
+
+    # Setup compiler wrapper
+
+    export CXX=CC
+
+    # Install VeloxChem
+
+    cd VeloxChem
+    python3 config/generate_setup.py
+    python3 setup.py install
+
 MacOS
 +++++
 
