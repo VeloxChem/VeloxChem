@@ -119,7 +119,7 @@ TEST_F(CSADGuessDriverTest, OccupationNumbers)
 
     CSADGuessDriver saddrv(MPI_COMM_WORLD);
 
-    for (int32_t i = 0; i < refocc.size(); i++)
+    for (int32_t i = 0; i < static_cast<int32_t>(refocc.size()); i++)
     {
         auto qocc = saddrv.getOccupationNumbersForElement(i, 0.0);
 
