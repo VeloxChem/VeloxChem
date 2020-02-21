@@ -63,7 +63,7 @@ def main():
 
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'scf', 'wavefunction', 'wave function', 'mp2',
-        'response', 'visualization'
+        'response', 'visualization', 'loprop'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -176,6 +176,7 @@ def main():
     # LoProp
 
     if task_type == 'loprop':
+        task.input_dict['loprop']['density'] = density
         loprop_driver = LoPropDriver(task)
         loprop_driver.compute()
 
