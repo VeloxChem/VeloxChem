@@ -19,7 +19,7 @@ def sample():
         @end
 
         @method settings
-        basis: cc-pvdz
+        basis: def2-svp
         @end
 
         @molecule
@@ -156,7 +156,6 @@ def test_input_dict(sample, tmpdir):
     assert 'loprop' in ip.input_dict
 
 
-@pytest.mark.skip('not there yet')
 class TestIntegrations:
 
     @patch.object(LoPropDriver, 'get_cpa')
@@ -177,7 +176,7 @@ class TestIntegrations:
             @end
 
             @method settings
-            basis: cc-pvdz
+            basis: def2-svp
             @end
 
             @molecule
@@ -203,10 +202,11 @@ class TestIntegrations:
             """
             AU
             3 0 0 1
-            1     0.000     0.000     0.000    -0.666
-            1     0.000     1.400     1.100     0.333
-            1     0.000    -1.400     1.100     0.333
+            1     0.000     0.000     0.000     0.060
+            1     0.000     1.400     1.100    -0.030
+            1     0.000    -1.400     1.100    -0.030
             """
+
         )
 
         assert expected in std.out
