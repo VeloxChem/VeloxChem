@@ -1,3 +1,4 @@
+from collections import Counter
 import os
 
 import h5py
@@ -10,6 +11,8 @@ from .veloxchemlib import (
     ao_matrix_to_dalton,
     DenseMatrix,
 )
+
+from .inputparser import InputParser
 
 
 class LoPropDriver:
@@ -84,7 +87,32 @@ class LoPropDriver:
                 f[f'occupied_per_atom/{i}'] = occ
 
     def get_cpa(self):
-        ...
+        elements = self.task.molecule.elem_ids_to_numpy()
+        """
+        bp = InputParser(current basis)
+        for e in elements
+            get e:th entry in bp.input_dict as e
+                 given 3s 2p 1d dict sum up 3 + 2*3 + 1 * 5
+        """
+
+        basis = self.task.ao_basis.get_label()
+        basis_file = f'basis/{basis}'
+        bp = InputParser(basis_file)
+        basis = bp.get_dict()
+        keys = list(basis.keys())
+
+        cpa = []
+        for e in elements:
+            k = keys[e - 1]
+            atoms_data = basis[k]
+            count_per_angmom = count_contracted(atoms_data)
+            cpa.append(count_contracted_on_atom(count_per_angmom))
+
+        return cpa
+
+    def count_contracted(self):
+        return 1
+
 
     def get_opa(self):
         ...
@@ -93,3 +121,30 @@ class LoPropDriver:
         with h5py.File(self.checkpoint, 'r') as f:
             r = f['nuclear_coordinates'][...]
         return r
+
+
+def count_contracted(atombasis: list) -> dict:
+    """
+    Given atomic block in basis filei format return dict
+    which maps angular momentum to number of contracted
+    >>> count_contracted('S: 1 1\n1.0 1.9\n')
+    {'S': 1}
+    """
+    c = Counter(
+        line[0]
+        for line in atombasis
+        if line and line[0] in "SPDFGHI"
+    )
+    return dict(c)
+
+
+def count_contracted_on_atom(atombasis: dict) -> int:
+    """
+    Returns total contracted given angular momentum count
+    >>> count_contracted_on_atom({'S': 1})
+    1
+    >>> count_contracted_no_atom({'S': 2, 'P': 1})
+    5
+    """
+    multiplicity = dict(S=1, P=3, D=5, F=7, G=9, H=11, I=13)
+    return sum(multiplicity[k]*v for k, v in atombasis.items())

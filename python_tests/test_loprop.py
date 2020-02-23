@@ -4,10 +4,16 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 import numpy.testing as npt
+from mpi4py import MPI
 
 from veloxchem.main import main
+from veloxchem.mpitask import MpiTask
 from veloxchem.inputparser import InputParser
-from veloxchem.loprop import LoPropDriver
+from veloxchem.loprop import (
+    LoPropDriver,
+    count_contracted,
+    count_contracted_on_atom,
+)
 
 
 @pytest.fixture
@@ -79,7 +85,9 @@ def test_scf_called_from_main(mock_mpi, mock_scf, mock_uscf, sample, tmpdir):
 
     # when
     with patch('veloxchem.main.LoPropDriver', autospec=True):
-        with patch('veloxchem.main.ScfRestrictedDriver', autospec=True) as mock_scf:
+        with patch(
+            'veloxchem.main.ScfRestrictedDriver', autospec=True
+        ) as mock_scf:
             main()
 
     # then
@@ -154,6 +162,87 @@ def test_input_dict(sample, tmpdir):
     # then
     assert ip.input_dict['jobs']['task'] == 'loprop'
     assert 'loprop' in ip.input_dict
+
+
+def test_cpa(sample, tmpdir):
+    """
+    Verify count of orbitals per atom
+    """
+    # given
+    input_file = f'{tmpdir/"water.inp"}'
+    with open(input_file, 'w') as f:
+        f.write(sample)
+
+    # when
+    task = MpiTask([input_file], MPI.COMM_WORLD)
+    loprop_driver = LoPropDriver(task)
+
+    # then
+
+    assert loprop_driver.get_cpa() == [14, 5, 5]
+
+
+@pytest.mark.parametrize(
+    'input, expected',
+    [
+        (
+            textwrap.dedent(
+                """
+                @ATOMBASIS H
+                S 3  1
+                1.301070100000e+01  1.968215800000e-02
+                1.962257200000e+00  1.379652400000e-01
+                4.445379600000e-01  4.783193500000e-01
+                S 1  1
+                1.219496200000e-01  1.000000000000e+00
+                P 1  1
+                8.000000000000e-01  1.000000000000e+00
+                @END
+                """
+            ),
+            {'S': 2, 'P': 1}
+        ),
+        (
+            textwrap.dedent(
+                """
+                @ATOMBASIS O
+                S 5  1
+                2.266176778500e+03 -5.343180992600e-03
+                3.408701019100e+02 -3.989003923000e-02
+                7.736313516700e+01 -1.785391198500e-01
+                2.147964494000e+01 -4.642768495900e-01
+                6.658943312400e+00 -4.430974517200e-01
+                S 1  1
+                8.097597566800e-01  1.000000000000e+00
+                S 1  1
+                2.553077223400e-01  1.000000000000e+00
+                P 3  1
+                1.772150431700e+01  4.339457319300e-02
+                3.863550544000e+00  2.309412076500e-01
+                1.048092088300e+00  5.137531106400e-01
+                P 1  1
+                2.764154441100e-01  1.000000000000e+00
+                D 1  1
+                1.200000000000e+00  1.000000000000e+00
+                @END
+                """
+            ),
+            {'S': 3, 'P': 2, 'D': 1}
+        ),
+    ],
+    ids=['H:2S1P', 'O:3S2P1D']
+)
+def test_count_contracted(input, expected):
+    assert count_contracted(input.split('\n')) == expected
+
+@pytest.mark.parametrize(
+    'input, expected',
+    [
+        ({'S': 2, 'P': 1}, 5),
+    ]
+)
+def test_count_contracted_on_atom(input, expected):
+    assert count_contracted_on_atom(input) == expected
 
 
 class TestIntegrations:
