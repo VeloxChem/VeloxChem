@@ -199,6 +199,7 @@ def test_opa(sample, tmpdir):
     # then
     assert loprop_driver.get_opa() == [[0, 1, 3, 4, 5], [0], [0]]
 
+
 @pytest.mark.parametrize(
     'input, expected',
     [
@@ -252,6 +253,7 @@ def test_opa(sample, tmpdir):
 def test_count_contracted(input, expected):
     assert count_contracted(input.split('\n')) == expected
 
+
 @pytest.mark.parametrize(
     'input, expected',
     [
@@ -264,15 +266,7 @@ def test_count_contracted_on_atom(input, expected):
 
 class TestIntegrations:
 
-    @patch.object(LoPropDriver, 'get_opa')
-    @patch.object(LoPropDriver, 'get_coordinates')
-    def test_h2o_only_charges(self, get_coor, get_opa, capsys, tmpdir):
-        get_opa.return_value = ((0, 1, 3, 4, 5), (0,), (0,))
-        get_coor.return_value = (
-            (0.0,  0.0,  0.0),
-            (0.0,  1.4,  1.1),
-            (0.0, -1.4,  1.1),
-            )
+    def test_h2o_only_charges(self, capsys, tmpdir):
         inp = textwrap.dedent(
             """
             @jobs
