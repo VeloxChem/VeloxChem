@@ -1,12 +1,12 @@
 #
-#                      V.E.L.O.X. C.H.E.M. MP
+#                             VELOXCHEM
 #      ---------------------------------------------------
-#           An Electronic Structure Code for Nanoscale
+#                     An Electronic Structure Code
 #
-#  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
-#  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+#  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
 
-# Makefile for internal Velox Chem MP library
+# Makefile for internal VeloxChem library
 
 LOCAL_LIB := dftfuncs.a
 LOCAL_SCR := $(wildcard *.cpp)

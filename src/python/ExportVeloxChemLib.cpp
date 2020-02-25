@@ -3,14 +3,13 @@
 //      ---------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
-//  Copyright © 2019 by VeloxChem developers. All rights reserved.
+//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 
 #include <pybind11/pybind11.h>
 
 #include "ExportDFT.hpp"
 #include "ExportGeneral.hpp"
-#include "ExportGpu.hpp"
 #include "ExportMath.hpp"
 #include "ExportMolData.hpp"
 #include "ExportOneInts.hpp"
@@ -32,8 +31,6 @@ PYBIND11_MODULE(veloxchemlib, m)
     vlx_twoints::export_twoints(m);
 
     vlx_math::export_math(m);
-
-    vlx_gpu::export_gpu(m);
 
     vlx_visualization::export_visualization(m);
 

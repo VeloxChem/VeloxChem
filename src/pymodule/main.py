@@ -4,7 +4,6 @@ import os
 
 from .veloxchemlib import mpi_initialized
 from .veloxchemlib import mpi_master
-from .veloxchemlib import CudaDevices
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -46,14 +45,6 @@ def main():
         method_dict = task.input_dict['method_settings']
     else:
         method_dict = {}
-
-    # CUDA capable devices
-
-    gpu_devs = CudaDevices()
-    if task.mpi_rank == mpi_master():
-        if gpu_devs.get_number_devices() > 0:
-            task.ostream.print_blank()
-            task.ostream.print_block(str(gpu_devs))
 
     # Exciton model
 

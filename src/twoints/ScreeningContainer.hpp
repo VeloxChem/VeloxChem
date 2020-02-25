@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
-//  Copyright © 2019 by VeloxChem developers. All rights reserved.
+//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 
 #ifndef ScreeningContainer_hpp
 #define ScreeningContainer_hpp

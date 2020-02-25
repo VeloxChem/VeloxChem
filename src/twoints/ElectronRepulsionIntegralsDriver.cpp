@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2019 by VeloxChem developers. All rights reserved.
-//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
+//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 
 #include "ElectronRepulsionIntegralsDriver.hpp"
 
@@ -69,9 +69,6 @@
 #include "ElectronRepulsionBRRRecFuncForFXYY.hpp"
 #include "ElectronRepulsionBRRRecFuncForGGYY.hpp"
 
-#include "DeviceFunc.hpp"
-#include "TwoIntsFuncGPU.hpp"
-
 CElectronRepulsionIntegralsDriver::CElectronRepulsionIntegralsDriver(MPI_Comm comm)
 {
     _locRank  = mpi::rank(comm);
@@ -91,8 +88,7 @@ CElectronRepulsionIntegralsDriver::compute(      CAOFockMatrix&       aoFockMatr
                                            const CAODensityMatrix&    aoDensityMatrix,
                                            const CMolecule&           molecule,
                                            const CMolecularBasis&     aoBasis,
-                                           const CScreeningContainer& screeningContainer,
-                                           const CCudaDevices&        cudaDevices) const
+                                           const CScreeningContainer& screeningContainer) const
 {
     // generate GTOs pairs blocks for AO basis on bra side
     
@@ -102,24 +98,12 @@ CElectronRepulsionIntegralsDriver::compute(      CAOFockMatrix&       aoFockMatr
     
     aoFockMatrix.zero(); 
     
-    if (cudaDevices.getNumberOfDevices() > 0)
-    {
-        // compute integrals on GPUs
-        
-        auto bbpairs = bgtopairs.split(_locNodes, cudaDevices);
-        
-        _compElectronRepulsionIntegralsOnGPU(aoFockMatrix, aoDensityMatrix, &bbpairs,
-                                             &bbpairs, &screeningContainer, cudaDevices);
-    }
-    else
-    {
-        // compute integrals on CPUs
-        
-        auto bbpairs = bgtopairs.split(_locNodes);
-        
-        _compElectronRepulsionIntegrals(aoFockMatrix, aoDensityMatrix, &bbpairs,
-                                        &bbpairs, &screeningContainer);
-    }
+    // compute integrals on CPUs
+    
+    auto bbpairs = bgtopairs.split(_locNodes);
+    
+    _compElectronRepulsionIntegrals(aoFockMatrix, aoDensityMatrix, &bbpairs,
+                                    &bbpairs, &screeningContainer);
     
     aoFockMatrix.symmetrize(); 
 }
@@ -682,184 +666,6 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocks(     
     // deallocate recursion buffers
     
     vrrmap.destroyBuffer(pbuffer);
-}
-
-void
-CElectronRepulsionIntegralsDriver::_compElectronRepulsionForGtoPairsBlocksOnGPU(      CTwoIntsDistribution&   distPattern,
-                                                                                const CCauchySchwarzScreener& intsScreener,
-                                                                                const CGtoPairsBlock&         braGtoPairsBlock,
-                                                                                const CGtoPairsBlock&         ketGtoPairsBlock,
-                                                                                const CCudaDevices*           cudaDevices) const
-{
-    // copy GTOs pairs blocks for bra and ket sides
-    
-    auto brapairs = braGtoPairsBlock;
-    
-    auto ketpairs = ketGtoPairsBlock;
-    
-    // determine symmetry of bra and ket sides
-    
-    bool symbk = (brapairs == ketpairs);
-    
-    // set up angular momentum for four centers
-    
-    auto anga = brapairs.getBraAngularMomentum();
-    
-    auto angb = brapairs.getKetAngularMomentum();
-    
-    auto angc = ketpairs.getBraAngularMomentum();
-    
-    auto angd = ketpairs.getKetAngularMomentum();
-    
-    // set up spherical angular momentum for bra and ket sides
-    
-    CSphericalMomentum amom(anga);
-    
-    CSphericalMomentum bmom(angb);
-    
-    CSphericalMomentum cmom(angc);
-    
-    CSphericalMomentum dmom(angd);
-    
-    // allocate prefactors used in Obara-Saika recursion on device
-    
-    auto pdim = ketpairs.getNumberOfScreenedPrimPairs();
-    
-    auto pmax = brapairs.getMaxContractionDepth();
-    
-    double* ptr_rpq = nullptr; size_t pitch_rpq = 0;
-    
-    cudaDevices->allocate(&ptr_rpq, &pitch_rpq, pdim, 3 * pmax);
-    
-    double* ptr_rfacts = nullptr; size_t pitch_rfacts = 0;
-    
-    cudaDevices->allocate(&ptr_rfacts, &pitch_rfacts, pdim, 4 *  pmax);
-    
-    double* ptr_rw = nullptr; size_t pitch_rw = 0;
-    
-    cudaDevices->allocate(&ptr_rw, &pitch_rw, pdim, 3 * pmax);
-    
-    double* ptr_rwp = nullptr; size_t pitch_rwp = 0;
-    
-    cudaDevices->allocate(&ptr_rwp, &pitch_rwp, pdim, 3 * pmax);
-    
-    double* ptr_rwq = nullptr; size_t pitch_rwq = 0;
-    
-    cudaDevices->allocate(&ptr_rwq, &pitch_rwq, pdim, 3 * pmax);
-    
-    // allocate bra and ket GTO pairs primitive factors on device
-    
-    auto bpfacts = brapairs.getPairFactors();
-    
-    auto kpfacts = ketpairs.getPairFactors();
-    
-    double* ptr_bpfacts = nullptr; size_t pitch_bpfacts = 0;
-    
-    cudaDevices->allocate(&ptr_bpfacts, &pitch_bpfacts, bpfacts.size(0), bpfacts.blocks());
-    
-    double* ptr_kpfacts = nullptr; size_t pitch_kpfacts = 0;
-    
-    cudaDevices->allocate(&ptr_kpfacts, &pitch_kpfacts, kpfacts.size(0), kpfacts.blocks());
-    
-    // allocate vertical recursion buffer on device
-    
-    double* ptr_pbuffer = nullptr; size_t pitch_pbuffer = 0;
-    
-    cudaDevices->allocate(&ptr_pbuffer, &pitch_pbuffer, pdim,
-                          _getBufferDimensionsForVerticalRecursion(anga + angb, angc + angd, pmax));
-    
-    // copy bra pair factors to device
-    
-    cudaDevices->copyToDevice(ptr_bpfacts, pitch_bpfacts, bpfacts);
-    
-    cudaDevices->copyToDevice(ptr_kpfacts, pitch_kpfacts, kpfacts);
-    
-    //printf("Pair factors: bra %zu ket %zu\n", pitch_bpfacts, pitch_kpfacts);
-    
-    // set up horizontal recursion buffer for ket side
-    
-    auto cdim = ketpairs.getNumberOfScreenedContrPairs();
-    
-    // set up integrals screening
-    
-    //bool useqq = !intsScreener.isEmpty();
-    
-    auto qqpairs = ketpairs;
-    
-    auto ddpairs = ketpairs;
-    
-    CMemBlock<int32_t> qqvec(cdim);
-    
-    CMemBlock<int32_t> qqidx(cdim);
-    
-    CMemBlock<double> distpq(cdim);
-    
-    CMemBlock<double> qqden(cdim);
-    
-    // loop over contracted GTOs ob bra side
-    
-    for (int32_t i = 0; i < brapairs.getNumberOfScreenedContrPairs(); i++)
-    {
-        // determine GTOs pairs  effective dimensions on ket side
-        
-        auto nqpdim = (symbk) ? ketpairs.getNumberOfPrimPairs(i) : pdim;
-        
-        //auto nqcdim = (symbk) ? i + 1 : cdim;
-        
-        // compute distances: R(PQ) = P - Q
-            
-        twointsgpu::compDistancesPQ(ptr_rpq, pitch_rpq, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts, pitch_kpfacts,
-                                    brapairs, nqpdim, i, cudaDevices);
-            
-        // compute Obara-Saika recursion factors
-            
-        twointsgpu::compFactorsForElectronRepulsion(ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts, ptr_kpfacts,
-                                                    pitch_kpfacts, brapairs, ketpairs, nqpdim, i, cudaDevices);
-            
-        // compute coordinates of center W
-            
-        twointsgpu::compCoordinatesW(ptr_rw, pitch_rw, ptr_rfacts, pitch_rfacts, ptr_bpfacts, pitch_bpfacts,
-                                     ptr_kpfacts, pitch_kpfacts, brapairs, nqpdim, i, cudaDevices);
-            
-        // compute distances: R(WP) = W - P
-            
-        twointsgpu::compDistancesWP(ptr_rwp, pitch_rwp, ptr_rw, pitch_rw, ptr_bpfacts, pitch_bpfacts, brapairs,
-                                    nqpdim, i, cudaDevices);
-            
-        // compute distances: R(WQ) = W - Q;
-            
-        twointsgpu::compDistancesWQ(ptr_rwq, pitch_rwq, ptr_rw, pitch_rw, ptr_kpfacts, pitch_kpfacts, brapairs,
-                                    ketpairs, nqpdim, i, cudaDevices);
-            
-        // compute primitive electron repulsion integrals
-            
-        twointsgpu::compPrimElectronRepulsionIntsOnGPU(ptr_pbuffer, pitch_pbuffer, ptr_rfacts, pitch_rfacts,
-                                                       ptr_rpq, pitch_rpq, ptr_rwp, pitch_rwp, ptr_rwq, pitch_rwq,
-                                                       ptr_bpfacts, pitch_bpfacts, ptr_kpfacts, pitch_kpfacts,
-                                                       brapairs, ketpairs, nqpdim, i, cudaDevices);
-    }
-    
-    // deallocate prefactors used in Obara-Saika recursion on device
-    
-    cudaDevices->free(ptr_rpq);
-    
-    cudaDevices->free(ptr_rfacts);
-    
-    cudaDevices->free(ptr_rw);
-    
-    cudaDevices->free(ptr_rwp);
-    
-    cudaDevices->free(ptr_rwq);
-    
-    // deallocate primitive GTOs pairs factors on device
-    
-    cudaDevices->free(ptr_bpfacts);
-    
-    cudaDevices->free(ptr_kpfacts);
-    
-    // deallocate vertical recursion buffer
-    
-    cudaDevices->free(ptr_pbuffer);
 }
 
 CRecursionMap
@@ -1458,77 +1264,6 @@ CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegrals(      CAOFock
 
 
 void
-CElectronRepulsionIntegralsDriver::_compElectronRepulsionIntegralsOnGPU(      CAOFockMatrix&       aoFockMatrix,
-                                                                        const CAODensityMatrix&    aoDensityMatrix,
-                                                                        const CGtoPairsContainer*  braGtoPairsContainer,
-                                                                        const CGtoPairsContainer*  ketGtoPairsContainer,
-                                                                        const CScreeningContainer* screeningContainer,
-                                                                        const CCudaDevices&        cudaDevices) const
-{
-    // set up number of GPUs
-    
-    auto ndevs = cudaDevices.getNumberOfDevices();
-    
-    // set up pointers to AO Fock and AO density matrices
-    
-    auto pfock = &aoFockMatrix;
-    
-    auto pden = &aoDensityMatrix;
-    
-    // set pointer to CUDA devices
-    
-    auto pdevs = &cudaDevices;
-    
-    // set up GTOS pairs grid for GPUs
-    
-    auto gpupatt = _setTasksGridForGPU(braGtoPairsContainer, ketGtoPairsContainer);
-
-    auto pbraidx = gpupatt.data(0);
-    
-    auto pketidx = gpupatt.data(1);
-    
-    auto pbkidx = gpupatt.data(2);
-    
-    auto nblocks = gpupatt.size(0);
-    
-    #pragma omp parallel num_threads(ndevs) shared(pfock, pden, pdevs, ndevs, pbraidx, pketidx, pbkidx, nblocks)
-    {
-        // set up OMP data
-        
-        int32_t tid = omp_get_thread_num();
-        
-        pdevs->setCudaDevice(tid);
-        
-        // loop over integral blocks
-        
-        for (int32_t i = 0; i < nblocks; i++)
-        {
-            if ((i % ndevs) == tid)
-            {
-                auto bpairs = braGtoPairsContainer->getGtoPairsBlock(pbraidx[i]);
-                
-                auto kpairs = ketGtoPairsContainer->getGtoPairsBlock(pketidx[i]);
-                
-                auto qqdat = screeningContainer->getScreener(pbkidx[i]);
-                
-                //printf("tid: %i dev: %i (i,j): (%i,%i) idx: %i\n", tid, i % ndevs, pbraidx[i], pketidx[i], pbkidx[i]);
-                
-                CTwoIntsDistribution distpat(pfock, pden);
-                
-                distpat.setFockContainer(bpairs, kpairs);
-                
-                _compElectronRepulsionForGtoPairsBlocksOnGPU(distpat, qqdat, bpairs, kpairs, pdevs);
-                
-                // accumulate AO Fock matrix
-                
-                #pragma omp critical (fockacc)
-                distpat.accumulate();
-            }
-        }
-    }
-}
-
-void
 CElectronRepulsionIntegralsDriver::_compMaxQValuesForGtoPairsBlock(      double*         qValuesBuffer,
                                                                    const CGtoPairsBlock& gtoPairsBlock) const
 {
@@ -1615,60 +1350,4 @@ CElectronRepulsionIntegralsDriver::_setTasksGrid(const int32_t nBraGtoPairsBlock
     }
     
     return tgrid;
-}
-
-CMemBlock2D<int32_t>
-CElectronRepulsionIntegralsDriver::_setTasksGridForGPU(const CGtoPairsContainer* braGtoPairsContainer,
-                                                       const CGtoPairsContainer* ketGtoPairsContainer) const
-{
-    // determine number of GTOs pairs blocks in bra/ket sides
-    
-    auto nbra = braGtoPairsContainer->getNumberOfGtoPairsBlocks();
-    
-    auto nket = ketGtoPairsContainer->getNumberOfGtoPairsBlocks();
-    
-    // determine symmetry of bra/ket GTOs pairs containers
-    
-    auto symbk = ((*braGtoPairsContainer) == (*ketGtoPairsContainer));
-    
-    // initialize tasks grid for each MPI process
-    
-    auto nodpatt = _setTasksGrid(nbra, nket, symbk);
-    
-    auto ptgrid = nodpatt.data();
-    
-    // loop over pairs of GTOs blocks
-    
-    int32_t idx = 0;
-    
-    std::vector<int32_t> brapos;
-    
-    std::vector<int32_t> ketpos;
-    
-    std::vector<int32_t> bkidx;
-    
-    for (int32_t i = (nbra - 1); i >= 0; i--)
-    {
-        auto joff = (symbk) ? i : 0;
-        
-        for (int32_t j = (nket - 1); j >= joff; j--)
-        {
-            if (ptgrid[idx] == 1)
-            {
-                brapos.push_back(i);
-                
-                ketpos.push_back(j);
-                
-                bkidx.push_back(idx);
-            }
-            
-            idx++;
-        }
-    }
-    
-    brapos.insert(brapos.end(), ketpos.begin(), ketpos.end());
-    
-    brapos.insert(brapos.end(), bkidx.begin(), bkidx.end());
-    
-    return CMemBlock2D<int32_t>(brapos, idx, 3);
 }

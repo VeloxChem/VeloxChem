@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2019 by VeloxChem developers. All rights reserved.
-//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
+//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 
 #ifndef GtoPairsContainer_hpp
 #define GtoPairsContainer_hpp
@@ -12,7 +12,6 @@
 #include <vector>
 
 #include "GtoPairsBlock.hpp"
-#include "CudaDevices.hpp"
 
 /**
  Class CGtoPairsContainer stores vector of GTOs pairs block objects and provides
@@ -108,11 +107,9 @@ class CGtoPairsContainer
      object.
 
      @param nodes the number of MPI processes.
-     @param cudaDevices the CUDA compute capable devices.
      @return the GTOs pairs container object.
      */
-    CGtoPairsContainer split(const int32_t       nodes,
-                             const CCudaDevices& cudaDevices = CCudaDevices()) const;
+    CGtoPairsContainer split(const int32_t nodes) const;
 
     /**
      Gets numnber of GTOs pairs block objects in GTOs pairs container.
