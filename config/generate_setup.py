@@ -163,10 +163,6 @@ def generate_setup(template_file, setup_file):
         print('***        Only Intel, GNU, and Clang compilers are supported.')
         sys.exit(1)
 
-    # cuda information
-
-    use_gpu = False
-
     # cxx and omp flags
 
     if use_intel:
@@ -306,8 +302,6 @@ def generate_setup(template_file, setup_file):
                 print('', file=f_mkfile)
 
                 print('USE_MPI := true', file=f_mkfile)
-                print('USE_GPU := {}'.format('true' if use_gpu else 'false'),
-                      file=f_mkfile)
                 print('USE_MKL := {}'.format('true' if use_mkl else 'false'),
                       file=f_mkfile)
                 print('', file=f_mkfile)

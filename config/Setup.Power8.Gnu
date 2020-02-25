@@ -9,7 +9,6 @@
 # Automatically generated settings
 
 USE_MPI := true
-USE_GPU := true
 USE_MKL := false
 
 MATH_INC := -I/home/user/software/openblas/0.3.4/include
@@ -24,11 +23,6 @@ CXX := mpicxx
 
 CXX_REL_FLG := -fopenmp
 CXX_DEB_FLG := -fopenmp
-
-NVCC := nvcc
-NVCC_REL_FLG := --compiler-options "-fopenmp"
-NVCC_DEB_FLG := --compiler-options "-fopenmp"
-CUDA_LIB := -L/usr/local/cuda-10.1/lib64 -lcuda -lcudart
 
 MACLIBS := 
 
@@ -54,11 +48,6 @@ else
   CPP_DEB_FLG += -DENABLE_MPI=0
 endif
 
-ifeq ($(USE_GPU),true)
-  CPP_REL_FLG += -DENABLE_GPU
-  CPP_DEB_FLG += -DENABLE_GPU
-endif
-
 ifeq ($(USE_MKL),true)
   CPP_REL_FLG += -DENABLE_MKL
   CPP_DEB_FLG += -DENABLE_MKL
@@ -72,14 +61,6 @@ LIB_LIST := $(MATH_LIB)
 
 LIB_LIST += $(MACLIBS)
 
-# Cuda flags
-
-ifeq ($(USE_GPU),true)
-  NVCC_REL_FLG += -std=c++11 -O3 --compiler-options "-Wall"
-  NVCC_DEB_FLG += -std=c++11 -O3 --compiler-options "-Wall" --compiler-options "-g"
-  LIB_LIST += $(CUDA_LIB)
-endif
-
 # Python interface
 
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
@@ -90,11 +71,6 @@ PYTHON_LD  := $(shell $(PYTHON)-config --ldflags) $(LTOFLAG)
 
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC)
-
-ifeq ($(USE_GPU),true)
-  NVCC_REL_FLG += --compiler-options "-fPIC" $(PYTHON_INC)
-  NVCC_DEB_FLG += --compiler-options "-fPIC" $(PYTHON_INC)
-endif
 
 # Native shell commands
 
