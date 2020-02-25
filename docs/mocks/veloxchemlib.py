@@ -22,7 +22,6 @@ MOIntsBatch = Mock()
 ExcitationVector = Mock()
 DenseMatrix = Mock()
 AOKohnShamMatrix = Mock()
-CudaDevices = Mock()
 
 mpi_master = Mock()
 mpi_initialized = Mock()

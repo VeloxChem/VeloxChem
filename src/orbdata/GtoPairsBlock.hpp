@@ -3,8 +3,8 @@
 //      ---------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2019 by VeloxChem developers. All rights reserved.
-//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
+//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 #ifndef GtoPairsBlock_hpp
 #define GtoPairsBlock_hpp
 
@@ -13,7 +13,6 @@
 
 #include "GtoBlock.hpp"
 #include "MemBlock2D.hpp"
-#include "CudaDevices.hpp"
 
 /**
  Class CGtoPairsBlock stores data about basis function pairs and provides set of
@@ -83,13 +82,6 @@ class CGtoPairsBlock
      */
     int32_t _getBlockDimensions() const;
     
-    /**
-     Determines recommended dimensions of GTOs pairs block for GPU compute code.
-     
-     @return the number of GTOs pairs.
-     */
-    int32_t _getBlockDimensionsForGPU() const;
-
    public:
     /**
      Creates an empty GTOs pairs block object.
@@ -187,11 +179,9 @@ class CGtoPairsBlock
      Creates vector of GTOs pairs objects by splitting GTOs pairs object.
 
      @param nodes the number of MPI ranks.
-     @param cudaDevices the CUDA compute capable devices.
      @return the vector of GTOs pairs objects.
      */
-    std::vector<CGtoPairsBlock> split(const int32_t       nodes,
-                                      const CCudaDevices& cudaDevices = CCudaDevices()) const;
+    std::vector<CGtoPairsBlock> split(const int32_t nodes) const;
 
     /**
      Creates GTOs pairs object consisting from specific GTOs pairs object.

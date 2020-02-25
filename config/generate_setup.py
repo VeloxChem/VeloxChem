@@ -294,8 +294,6 @@ def generate_setup(template_file, setup_file):
         gtest_root = None
         gtest_lib = None
 
-    # TODO: add GPU detection
-
     # print Makefile.setup
 
     with open(template_file, 'r', encoding='utf-8') as f_temp:
