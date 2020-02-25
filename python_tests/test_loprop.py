@@ -182,6 +182,23 @@ def test_cpa(sample, tmpdir):
     assert loprop_driver.get_cpa() == [14, 5, 5]
 
 
+def test_opa(sample, tmpdir):
+    """
+    Verify list of atomic orbitals considered occupied
+    """
+
+    # given
+    input_file = f'{tmpdir/"water.inp"}'
+    with open(input_file, 'w') as f:
+        f.write(sample)
+
+    # when
+    task = MpiTask([input_file], MPI.COMM_WORLD)
+    loprop_driver = LoPropDriver(task)
+
+    # then
+    assert loprop_driver.get_opa() == [[0, 1, 3, 4, 5], [0], [0]]
+
 @pytest.mark.parametrize(
     'input, expected',
     [
