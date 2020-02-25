@@ -57,6 +57,7 @@ class ComplexResponse:
           vector.
         - lindep_thresh: The threshold for removing linear dependence in the
           trial vectors.
+        - nonlinear: The flag for returning kappa values.
         - comm: The MPI communicator.
         - rank: The MPI rank.
         - nodes: Number of MPI processes.
@@ -100,6 +101,7 @@ class ComplexResponse:
         self.is_converged = False
         self.small_thresh = 1.0e-10
         self.lindep_thresh = 1.0e-6
+        self.nonlinear = False
 
         self.comm = comm
         self.rank = self.comm.Get_rank()
@@ -140,6 +142,9 @@ class ComplexResponse:
 
         if 'lindep_thresh' in rsp_dict:
             self.lindep_thresh = float(rsp_dict['lindep_thresh'])
+        if 'response' in rsp_dict:
+            key = rsp_dict['response'].lower()
+            self.nonlinear = True if key == 'nonlinear' else False
 
         if 'conv_thresh' in rsp_dict:
             self.conv_thresh = float(rsp_dict['conv_thresh'])
@@ -418,17 +423,16 @@ class ComplexResponse:
 
         trials = []
         for (op, w) in vectors:
-            if res_norm is None or res_norm[(op, w)] > self.conv_thresh:
-                vec = np.array(vectors[(op, w)])
+            vec = np.array(vectors[(op, w)])
 
-                # preconditioning trials:
+            # preconditioning trials:
 
-                if pre is not None:
-                    v = self.preconditioning(pre[w], vec)
-                else:
-                    v = vec
-                if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
-                    trials.append(v)
+            if pre is not None:
+                v = self.preconditioning(pre[w], vec)
+            else:
+                v = vec
+            if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
+                trials.append(v)
 
         new_trials = np.array(trials).T
 
@@ -484,7 +488,9 @@ class ComplexResponse:
             computed for the B operator.
 
         :return:
-            A dictionary containing response functions, solutions, and kappas.
+            A dictionary containing response functions, solutions and a
+            dictionarry containing solutions and kappa values when called from
+            a non-linear response module.
         """
 
         if self.profiling:
@@ -592,8 +598,6 @@ class ComplexResponse:
         else:
             nocc = None
 
-        nonlinear_flag = False
-
         if not v1:
             b_rhs = get_complex_rhs(self.b_operator, self.b_components,
                                     molecule, basis, scf_tensors, self.rank,
@@ -602,7 +606,7 @@ class ComplexResponse:
                 v1 = {(op, w): v for op, v in zip(self.b_components, b_rhs)
                       for w in self.frequencies}
         else:
-            nonlinear_flag = True
+            self.nonlinear = True
 
         if self.rank == mpi_master():
             d = self.damping
@@ -667,7 +671,6 @@ class ComplexResponse:
         solutions = {}
         residuals = {}
         relative_residual_norm = {}
-        kappas = {}
 
         if self.timing:
             self.timing_dict['fock_build'][0] += tm.time() - timing_t0
@@ -682,7 +685,7 @@ class ComplexResponse:
                 self.timing_dict['fock_build'].append(0.0)
 
             if self.rank == mpi_master():
-                nvs = []
+                xvs = []
 
                 n_ger = bger.shape[1]
                 n_ung = bung.shape[1]
@@ -787,11 +790,6 @@ class ComplexResponse:
                         x_imag = x_imagung_full + x_imagger_full
                         x = x_real + 1j * x_imag
 
-                        solutions[(op, w)] = x
-
-                        kappas[(op, w)] = (lrvec2mat(x.real, nocc, norb) +
-                                           1j * lrvec2mat(x.imag, nocc, norb))
-
                         # composing E2 and S2 matrices projected onto solution
                         # subspace
 
@@ -818,25 +816,26 @@ class ComplexResponse:
 
                         # composing total half-sized residual
 
-                        residuals[(op, w)] = np.array(
-                            [r_realger, r_realung, r_imagung,
-                             r_imagger]).flatten()
-
-                        r = residuals[(op, w)]
-                        n = solutions[(op, w)]
+                        r = np.array([r_realger, r_realung, r_imagung,
+                                      r_imagger]).flatten()
 
                         # calculating relative residual norm
                         # for convergence check
 
-                        nv = np.matmul(n, grad)
-                        nvs.append((op, w, nv))
+                        xv = np.matmul(x, grad)
+                        xvs.append((op, w, xv))
 
                         rn = np.sqrt(2.0) * np.linalg.norm(r)
-                        nn = np.linalg.norm(n)
-                        if nn != 0:
-                            relative_residual_norm[(op, w)] = rn / nn
+                        xn = np.linalg.norm(x)
+                        if xn != 0:
+                            relative_residual_norm[(op, w)] = rn / xn
                         else:
                             relative_residual_norm[(op, w)] = 0
+
+                        if relative_residual_norm[(op, w)] < self.conv_thresh:
+                            solutions[(op, w)] = x
+                        else:
+                            residuals[(op, w)] = r
 
                 # write to output
 
@@ -847,7 +846,7 @@ class ComplexResponse:
                         n_ung))
                 self.ostream.print_blank()
 
-                self.print_iteration(relative_residual_norm, nvs)
+                self.print_iteration(relative_residual_norm, xvs)
 
             if self.timing:
                 tid = iteration + 1
@@ -871,6 +870,8 @@ class ComplexResponse:
                     bger=bger,
                     bung=bung,
                     res_norm=relative_residual_norm)
+
+                residuals.clear()
 
                 assert_msg_critical(
                     new_trials_ger.any() or new_trials_ung.any(),
@@ -934,7 +935,7 @@ class ComplexResponse:
                 for line in s.getvalue().split(os.linesep):
                     self.ostream.print_info(line)
 
-        if not nonlinear_flag:
+        if not self.nonlinear:
             a_rhs = get_complex_rhs(self.a_operator, self.a_components,
                                     molecule, basis, scf_tensors, self.rank,
                                     self.comm)
@@ -948,12 +949,17 @@ class ComplexResponse:
                                    w)] = -np.dot(va[aop], solutions[(bop, w)])
                 return {
                     'response_functions': rsp_funcs,
-                    'solutions': solutions,
-                    'kappas': kappas
+                    'solutions': solutions
                 }
 
         else:
             if self.rank == mpi_master():
+                kappas = {}
+                for op, w in solutions:
+                    kappas[(op, w)] = (lrvec2mat(solutions[(op, w)].real,
+                                                 nocc, norb) +
+                                      1j * lrvec2mat(solutions[(op, w)].imag,
+                                                     nocc, norb))
                 return {'solutions': solutions, 'kappas': kappas}
 
         return {}
@@ -974,13 +980,13 @@ class ComplexResponse:
         self.is_converged = self.comm.bcast(self.is_converged,
                                             root=mpi_master())
 
-    def print_iteration(self, relative_residual_norm, nvs):
+    def print_iteration(self, relative_residual_norm, xvs):
         """
         Prints information of the iteration.
 
         :param relative_residual_norm:
             Relative residual norms.
-        :param nvs:
+        :param xvs:
             A list of tuples containing operator component, frequency, and
             property.
         """
@@ -1000,11 +1006,11 @@ class ComplexResponse:
         self.ostream.print_header(output_header.ljust(width))
         self.ostream.print_blank()
 
-        for op, freq, nv in nvs:
+        for op, freq, xv in xvs:
             ops_label = '<<{};{}>>_{:.4f}'.format(op, op, freq)
             rel_res = relative_residual_norm[(op, freq)]
             output_iter = '{:<15s}: {:15.8f} {:15.8f}j   '.format(
-                ops_label, -nv.real, -nv.imag)
+                ops_label, -xv.real, -xv.imag)
             output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
             self.ostream.print_header(output_iter.ljust(width))
         self.ostream.print_blank()

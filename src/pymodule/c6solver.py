@@ -353,17 +353,16 @@ class C6Solver:
 
         trials = []
         for (op, iw) in vectors:
-            if res_norm is None or res_norm[(op, iw)] > self.conv_thresh:
-                vec = np.array(vectors[(op, iw)])
+            vec = np.array(vectors[(op, iw)])
 
-                # preconditioning trials:
+            # preconditioning trials:
 
-                if pre is not None:
-                    v = self.preconditioning(pre[iw], vec)
-                else:
-                    v = vec
-                if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
-                    trials.append(v)
+            if pre is not None:
+                v = self.preconditioning(pre[iw], vec)
+            else:
+                v = vec
+            if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
+                trials.append(v)
 
         new_trials = np.array(trials).T
 
@@ -602,7 +601,7 @@ class C6Solver:
                 self.timing_dict['fock_build'].append(0.0)
 
             if self.rank == mpi_master():
-                nvs = []
+                xvs = []
 
                 n_ger = bger.shape[1]
                 n_ung = bung.shape[1]
@@ -664,8 +663,6 @@ class C6Solver:
                         x_imag = x_imagger_full
                         x = x_real + 1j * x_imag
 
-                        solutions[(op, iw)] = x
-
                         # composing E2 and S2 matrices projected onto solution
                         # subspace
 
@@ -684,24 +681,25 @@ class C6Solver:
 
                         # composing total half-sized residual
 
-                        residuals[(op, iw)] = np.array(
-                            [r_realung, r_imagger]).flatten()
-
-                        r = residuals[(op, iw)]
-                        n = solutions[(op, iw)]
+                        r = np.array([r_realung, r_imagger]).flatten()
 
                         # calculating relative residual norm
                         # for convergence check
 
-                        nv = np.matmul(n, grad)
-                        nvs.append((op, iw, nv))
+                        xv = np.matmul(x, grad)
+                        xvs.append((op, iw, xv))
 
                         rn = np.sqrt(2.0) * np.linalg.norm(r)
-                        nn = np.linalg.norm(n)
-                        if nn != 0:
-                            relative_residual_norm[(op, iw)] = rn / nn
+                        xn = np.linalg.norm(x)
+                        if xn != 0:
+                            relative_residual_norm[(op, iw)] = rn / xn
                         else:
                             relative_residual_norm[(op, iw)] = 0
+
+                        if relative_residual_norm[(op, iw)] < self.conv_thresh:
+                            solutions[(op, iw)] = x
+                        else:
+                            residuals[(op, iw)] = r
 
                 # write to output
 
@@ -712,7 +710,7 @@ class C6Solver:
                         n_ung))
                 self.ostream.print_blank()
 
-                self.print_iteration(relative_residual_norm, nvs)
+                self.print_iteration(relative_residual_norm, xvs)
 
             if self.timing:
                 tid = iteration + 1
@@ -736,6 +734,8 @@ class C6Solver:
                     bger=bger,
                     bung=bung,
                     res_norm=relative_residual_norm)
+
+                residuals.clear()
 
                 assert_msg_critical(
                     new_trials_ger.any() or new_trials_ung.any(),
@@ -833,13 +833,13 @@ class C6Solver:
         self.is_converged = self.comm.bcast(self.is_converged,
                                             root=mpi_master())
 
-    def print_iteration(self, relative_residual_norm, nvs):
+    def print_iteration(self, relative_residual_norm, xvs):
         """
         Prints information of the iteration.
 
         :param relative_residual_norm:
             Relative residual norms.
-        :param nvs:
+        :param xvs:
             A list of tuples containing operator component, imaginary
             frequency, and property.
         """
@@ -859,11 +859,11 @@ class C6Solver:
         self.ostream.print_header(output_header.ljust(width))
         self.ostream.print_blank()
 
-        for op, imagfreq, nv in nvs:
+        for op, imagfreq, xv in xvs:
             ops_label = '<<{};{}>>_{:.4f}j'.format(op, op, imagfreq)
             rel_res = relative_residual_norm[(op, imagfreq)]
             output_iter = '{:<17s}: {:15.8f} {:15.8f}j   '.format(
-                ops_label, -nv.real, -nv.imag)
+                ops_label, -xv.real, -xv.imag)
             output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
             self.ostream.print_header(output_iter.ljust(width))
         self.ostream.print_blank()
