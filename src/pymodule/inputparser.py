@@ -39,6 +39,7 @@ class InputParser:
         self.basis_set_name = ''
 
         self.parse()
+        self.consistency_checks()
 
     # defining main functions
 
@@ -248,6 +249,28 @@ class InputParser:
                 self.input_dict['loprop'] = {}
             self.input_dict['loprop']['checkpoint_file'] = floprop
 
+    def consistency_checks(self):
+
+        if self.is_basis_set:
+            return
+
+        if self.input_dict['jobs']['task'] == 'loprop':
+            self.verify_options('loprop')
+
+    def verify_options(self, group):
+        for option, values in self.input_dict[group].items():
+            if not verify_options[group][option](values):
+                raise InputError
+            
+
+verify_options = {
+    'loprop': {
+        'checkpoint_file': lambda v: True,
+        'localize': lambda v: v in ['charges'],
+    }
+}
+
+
 
 def parse_frequencies(input_frequencies):
     """
@@ -282,3 +305,7 @@ def parse_frequencies(input_frequencies):
         elif w:
             frequencies.append(float(w))
     return frequencies
+
+
+class InputError(Exception):
+    pass

@@ -151,6 +151,17 @@ class LoPropDriver:
             r = f['nuclear_coordinates'][...]
         return r
 
+    @classmethod
+    def verify_input(settings):
+        """
+        Verify input consistent with supported definitions
+        """
+        if 'localize' in settings:
+            valid_options = ['charges']
+            undefined = set(settings['localize']) ^ set(valid_options)
+            if undefined:
+                raise NotImplementedError(str(undefined))
+
 
 def count_contracted(atombasis: list) -> dict:
     """

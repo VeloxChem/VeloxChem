@@ -8,7 +8,7 @@ from mpi4py import MPI
 
 from veloxchem.main import main
 from veloxchem.mpitask import MpiTask
-from veloxchem.inputparser import InputParser
+from veloxchem.inputparser import InputParser, InputError
 from veloxchem.loprop import (
     LoPropDriver,
     count_contracted,
@@ -162,6 +162,55 @@ def test_input_dict(sample, tmpdir):
     # then
     assert ip.input_dict['jobs']['task'] == 'loprop'
     assert 'loprop' in ip.input_dict
+
+
+def test_input_settings(tmpdir):
+    """
+    Verify loprop options
+    """
+    input_file = f'{tmpdir/"water.inp"}'
+    input_content = textwrap.dedent(
+        """
+        @jobs
+        task: 'loprop'
+        @end
+
+        @loprop
+        localize: charges
+        @end
+        """
+    )
+    with open(input_file, 'w') as f:
+        f.write(input_content)
+
+    # when
+    ip = InputParser(input_file)
+    assert ip.input_dict['loprop']['localize'] == 'charges'
+
+
+def test_wrong_input(tmpdir):
+    """
+    Verify loprop options
+    """
+    input_file = f'{tmpdir/"water.inp"}'
+    input_content = textwrap.dedent(
+        """
+        @jobs
+        task: loprop
+        @end
+
+        @loprop
+        localize: notimplemented
+        @end
+        """
+    )
+    with open(input_file, 'w') as f:
+        f.write(input_content)
+
+    # when
+    with pytest.raises(InputError) as nie:
+        InputParser(input_file)
+
 
 
 def test_cpa(sample, tmpdir):
