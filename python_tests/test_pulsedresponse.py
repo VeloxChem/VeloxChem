@@ -195,7 +195,7 @@ class TestComplexResponse(unittest.TestCase):
     def test_pulsed_response(self):
 
         expected_keys = [
-            'properties', 'solutions', 'kappas', 'pulse_settings',
+            'properties', 'solutions', 'pulse_settings',
             'properties_zeropad'
         ]
 

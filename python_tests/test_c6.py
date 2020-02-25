@@ -63,8 +63,9 @@ class TestC6(unittest.TestCase):
             self.assertTrue(np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4)
 
             points, weights = np.polynomial.legendre.leggauss(ref_n_points)
-            c6_value = C6.integrate(self, c6_results, freqs[:-1], points,
+            c6_value = C6.integrate(self, c6_results, prop_freqs[1:][::-1], points,
                                     weights, 0.3)
+            print(c6_value, ref_c6_value, prop_freqs[1:])
             self.assertTrue(np.abs(c6_value - ref_c6_value) < 1.0e-4)
 
     def test_c6_hf(self):
