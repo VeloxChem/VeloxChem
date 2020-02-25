@@ -102,11 +102,16 @@ class LoPropDriver:
         keys = list(basis.keys())
 
         cpa = []
+        opa = []
         for e in elements:
             k = keys[e - 1]
             atoms_data = basis[k]
             count_per_angmom = count_contracted(atoms_data)
             cpa.append(count_contracted_on_atom(count_per_angmom))
+            if e <= 2:
+                opa.append([1])
+            elif e<= 10:
+                opa.
 
         return cpa
 
@@ -115,7 +120,11 @@ class LoPropDriver:
 
 
     def get_opa(self):
-        ...
+        """
+        Returns list of occupied for case of single atom
+        i.e. first row 1s, second row 1s, 2s, 2p, whole shell
+        """
+        d = count_contracted
 
     def get_coordinates(self):
         with h5py.File(self.checkpoint, 'r') as f:

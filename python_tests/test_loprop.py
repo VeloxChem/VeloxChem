@@ -247,11 +247,9 @@ def test_count_contracted_on_atom(input, expected):
 
 class TestIntegrations:
 
-    @patch.object(LoPropDriver, 'get_cpa')
     @patch.object(LoPropDriver, 'get_opa')
     @patch.object(LoPropDriver, 'get_coordinates')
-    def test_h2o_only_charges(self, get_coor, get_opa, get_cpa, capsys, tmpdir):
-        get_cpa.return_value = (14, 5, 5)
+    def test_h2o_only_charges(self, get_coor, get_opa, capsys, tmpdir):
         get_opa.return_value = ((0, 1, 3, 4, 5), (0,), (0,))
         get_coor.return_value = (
             (0.0,  0.0,  0.0),
