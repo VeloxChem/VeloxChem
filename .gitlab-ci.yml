@@ -35,7 +35,8 @@ veloxchem_test:
     - vlx-test
   stage: test
   script:
-    - python3 config/generate_setup.py
+    - mkdir -p build/python && cp -r src/pymodule build/python/veloxchem
+    - mkdir -p build/bin && cp src/vlx build/bin/
     - python3 -m venv venv && ./venv/bin/python3 -m pip install -r requirements-dev.txt
     - export PYTHONPATH=$(pwd)/build/python:$PYTHONPATH
     - ./build/bin/UnitTestVeloxChem.x && python3 -m pytest -v --cov=veloxchem python_tests/
