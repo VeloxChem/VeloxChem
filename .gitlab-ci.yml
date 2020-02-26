@@ -38,5 +38,6 @@ veloxchem_test:
     - mkdir -p build/python && cp -r src/pymodule build/python/veloxchem
     - mkdir -p build/bin && cp src/vlx build/bin/
     - python3 -m venv venv && ./venv/bin/python3 -m pip install -r requirements-dev.txt
+    - . venv/bin/activate && ./venv/bin/python3 setup.py install
     - export PYTHONPATH=$(pwd)/build/python:$PYTHONPATH
-    - ./build/bin/UnitTestVeloxChem.x && python3 -m pytest -v --cov=veloxchem python_tests/
+    - ./build/bin/UnitTestVeloxChem.x && ./venv/bin/python3 -m pytest -v --cov=veloxchem python_tests/
