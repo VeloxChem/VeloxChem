@@ -1,7 +1,7 @@
 import os
 import sys
 import textwrap
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch, MagicMock
 
 import pytest
 import numpy.testing as npt

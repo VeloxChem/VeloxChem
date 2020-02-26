@@ -32,10 +32,13 @@ class LoPropDriver:
         self.save_orbital_info()
         self.save_density()
         self.save_coordinates()
+        self.update_settings()
 
         molfrag = MolFrag(self.tmpdir, **self.settings)
 
-        pot_output = molfrag.output_potential_file(0, 0, 0)
+        pot_output = molfrag.output_potential_file(
+            self.settings['max_l'], 0, 0
+        )
         self.task.ostream.print_line(pot_output)
 
     def save_overlap(self):
@@ -151,16 +154,11 @@ class LoPropDriver:
             r = f['nuclear_coordinates'][...]
         return r
 
-    @classmethod
-    def verify_input(settings):
-        """
-        Verify input consistent with supported definitions
-        """
-        if 'localize' in settings:
-            valid_options = ['charges']
-            undefined = set(settings['localize']) ^ set(valid_options)
-            if undefined:
-                raise NotImplementedError(str(undefined))
+    def update_settings(self):
+        #
+        # Default: always charges
+        #
+        self.settings['max_l'] = 0
 
 
 def count_contracted(atombasis: list) -> dict:
