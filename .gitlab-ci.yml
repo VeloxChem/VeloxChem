@@ -36,6 +36,6 @@ veloxchem_test:
   stage: test
   script:
     - python3 config/generate_setup.py
-    - make -j 6 -C src release && make -j 6 -C unit_tests release
+    - python3 -m venv venv && ./venv/bin/python3 -m pip install .
     - export PYTHONPATH=$(pwd)/build/python:$PYTHONPATH
     - ./build/bin/UnitTestVeloxChem.x && python3 -m pytest -v --cov=veloxchem python_tests/
