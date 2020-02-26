@@ -254,22 +254,19 @@ class InputParser:
         if self.is_basis_set:
             return
 
-        if self.input_dict['jobs']['task'] == 'loprop':
-            self.verify_options('loprop')
+        self.verify_options('loprop')
 
     def verify_options(self, group):
-        for option, values in self.input_dict[group].items():
-            if not verify_options[group][option](values):
-                raise InputError
-            
+        """
+        Detect input errors for selected input group
 
-verify_options = {
-    'loprop': {
-        'checkpoint_file': lambda v: True,
-        'localize': lambda v: v in ['charges'],
-    }
-}
-
+        Checks and messages defined by `verifiers` dict
+        """
+        if group in self.input_dict:
+            for option, value in self.input_dict[group].items():
+                verify, msg = verifyers[group][option]
+                if not verify(value):
+                    raise InputError(msg.format(value))
 
 
 def parse_frequencies(input_frequencies):
@@ -309,3 +306,11 @@ def parse_frequencies(input_frequencies):
 
 class InputError(Exception):
     pass
+
+
+verifyers = {
+    'loprop': {
+        'checkpoint_file': (lambda v: True, 'Always OK'),
+        'localize': (lambda v: v in ['charges'], 'localize: {} illegal value')
+    }
+}

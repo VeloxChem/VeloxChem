@@ -1,6 +1,7 @@
+import os
 import sys
 import textwrap
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, mock_open
 
 import pytest
 import numpy.testing as npt
@@ -13,6 +14,7 @@ from veloxchem.loprop import (
     LoPropDriver,
     count_contracted,
     count_contracted_on_atom,
+    get_basis_file,
 )
 
 
@@ -210,7 +212,7 @@ def test_wrong_input(tmpdir):
     # when
     with pytest.raises(InputError) as nie:
         InputParser(input_file)
-
+    assert nie.value.args == ('localize: notimplemented illegal value',)
 
 
 def test_cpa(sample, tmpdir):
@@ -311,6 +313,27 @@ def test_count_contracted(input, expected):
 )
 def test_count_contracted_on_atom(input, expected):
     assert count_contracted_on_atom(input) == expected
+
+
+def test_get_local_basis_file():
+    basis = 'STO-3G'
+
+    with patch('veloxchem.loprop.os.path') as mock_path:
+        mock_path.exists.return_value = True
+        mock_path.abspath.return_value = '/somepath/STO-3G'
+        full_path = get_basis_file(basis)
+
+    assert full_path == '/somepath/STO-3G'
+
+
+def test_get_lib_basis_file():
+
+    with patch('veloxchem.loprop.os.path.exists') as mock_exists:
+        with patch.dict(os.environ, {'VLXBASISPATH': '/vlxlib'}):
+            mock_exists.side_effect = [False, True]
+            full_path = get_basis_file('STO-3G')
+
+    assert full_path == '/vlxlib/STO-3G'
 
 
 class TestIntegrations:

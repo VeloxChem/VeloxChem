@@ -96,7 +96,7 @@ class LoPropDriver:
         """
 
         basis = self.task.ao_basis.get_label()
-        basis_file = f'basis/{basis}'
+        basis_file = get_basis_file(basis)
         bp = InputParser(basis_file)
         basis = bp.get_dict()
         keys = list(basis.keys())
@@ -121,7 +121,7 @@ class LoPropDriver:
         elements = self.task.molecule.elem_ids_to_numpy()
 
         basis = self.task.ao_basis.get_label()
-        basis_file = f'basis/{basis}'
+        basis_file = get_basis_file(basis)
         bp = InputParser(basis_file)
         basis = bp.get_dict()
         keys = list(basis.keys())
@@ -188,3 +188,12 @@ def count_contracted_on_atom(atombasis: dict) -> int:
     """
     multiplicity = dict(S=1, P=3, D=5, F=7, G=9, H=11, I=13)
     return sum(multiplicity[k]*v for k, v in atombasis.items())
+
+
+def get_basis_file(basis):
+    local_name = basis
+    lib_member = os.path.join(os.environ['VLXBASISPATH'], basis)
+    if os.path.exists(local_name):
+        return os.path.abspath(local_name)
+    elif os.path.exists(lib_member):
+        return lib_member
