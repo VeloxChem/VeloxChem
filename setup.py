@@ -84,6 +84,7 @@ setup(
         'mpi4py>=3.0',
         'numpy>=1.13',
         'h5py>=2.8',
+        'loprop>=0.2.3',
     ],
     tests_require=[
         'pytest>=5.1.2',
