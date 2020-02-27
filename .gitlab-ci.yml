@@ -19,7 +19,6 @@ after_script:
   - echo "Done!"
 
 stages:
-  - build
   - test
 
 velxochem_build:
@@ -38,6 +37,7 @@ veloxchem_test:
     - mkdir -p build/python && cp -r src/pymodule build/python/veloxchem
     - mkdir -p build/bin && cp src/vlx build/bin/
     - python3 -m venv venv && ./venv/bin/python3 -m pip install -r requirements-dev.txt
+    - python3 -c "import sys; print(f'cd venv/bin; ln -s python3{sys.version_info.minor} python3')" | bash
     - . venv/bin/activate && ./venv/bin/python3 setup.py install
     - export PYTHONPATH=$(pwd)/build/python:$PYTHONPATH
     - ./build/bin/UnitTestVeloxChem.x && ./venv/bin/python3 -m pytest -v --cov=veloxchem python_tests/
