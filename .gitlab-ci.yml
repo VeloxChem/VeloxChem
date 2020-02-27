@@ -14,6 +14,7 @@ before_script:
   - export PYTHONPATH=$PYTHONPATH:/home/xinli/software/cppe/build/stage/lib
   - export GTESTROOT=/home/xinli/software/googletest/googletest
   - export GTESTLIB=/home/xinli/software/googletest/googletest/lib/libgtest.a
+  - export MPICC=$I_MPI_ROOT/intel64/mpi/mpiicc
 
 after_script:
   - echo "Done!"
@@ -35,10 +36,14 @@ veloxchem_test:
     - vlx-test
   stage: test
   script:
+    - python3.6 -m venv --without-pip venv
+    - source venv/bin/activate
+    - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+    - python3 get-pip.py
     - mkdir -p build/python && cp -r src/pymodule build/python/veloxchem
     - mkdir -p build/bin && cp src/vlx build/bin/
-    - python3 -m venv venv && ./venv/bin/python3 -m pip install -r requirements-dev.txt
-    - python3 -c "import sys; print(f'cd venv/bin; ln -s python3{sys.version_info.minor} python3')" | bash
-    - . venv/bin/activate && ./venv/bin/python3 setup.py install
-    - export PYTHONPATH=$(pwd)/build/python:$PYTHONPATH
-    - ./build/bin/UnitTestVeloxChem.x && ./venv/bin/python3 -m pytest -v --cov=veloxchem python_tests/
+    - pip install -r requirements-dev.txt
+    - python3 setup.py install
+    - python3 -m pytest -v --cov=veloxchem python_tests/
+    - make -C units_test -j && ./build/bin/UnitTestVeloxChem.x 
+
