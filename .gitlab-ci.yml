@@ -45,5 +45,5 @@ veloxchem_test:
     - pip install -r requirements-dev.txt
     - python3 setup.py install
     - python3 -m pytest -v --cov=veloxchem python_tests/
-    - make -C units_test -j && ./build/bin/UnitTestVeloxChem.x 
+    - make -C unit_tests -j && ./build/bin/UnitTestVeloxChem.x 
 
