@@ -67,7 +67,7 @@ setup(
         'veloxchem',
     ],
     package_dir={
-        'veloxchem': os.path.join('build', 'python', 'veloxchem'),
+        'veloxchem': os.path.join('src', 'pymodule')
     },
     package_data={
         'veloxchem': [
