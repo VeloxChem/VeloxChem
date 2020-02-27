@@ -56,6 +56,7 @@ debug: $(VLX_LIBS)
 	@echo ====== Moving $(VLX_TARGET) and copying $(PYVLX_MAIN)...
 	mkdir -p ../build/python/veloxchem
 	$(CP) $(VLX_TARGET) $(CURDIR)/pymodule
+	$(CP) -r $(VLX_BAS) $(CURDIR)/pymodule
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
@@ -73,6 +74,7 @@ release: $(VLX_LIBS)
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
+	$(CP) -r $(VLX_BAS) $(CURDIR)/pymodule
 	mkdir -p ../build/bin
 	$(CP) $(PYVLX_MAIN) $(CURDIR)/../build/bin
 
