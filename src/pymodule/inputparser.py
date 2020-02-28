@@ -39,6 +39,7 @@ class InputParser:
         self.basis_set_name = ''
 
         self.parse()
+        self.consistency_checks()
 
     # defining main functions
 
@@ -226,6 +227,7 @@ class InputParser:
             frsp = fname + '.rsp.h5'
             fcpp = fname + '.cpp.h5'
             fexciton = fname + '.exciton.h5'
+            floprop = fname + '.loprop.h5'
 
             if 'scf' not in self.input_dict:
                 self.input_dict['scf'] = {}
@@ -242,6 +244,29 @@ class InputParser:
             if 'exciton' not in self.input_dict:
                 self.input_dict['exciton'] = {}
             self.input_dict['exciton']['checkpoint_file'] = fexciton
+
+            if 'loprop' not in self.input_dict:
+                self.input_dict['loprop'] = {}
+            self.input_dict['loprop']['checkpoint_file'] = floprop
+
+    def consistency_checks(self):
+
+        if self.is_basis_set:
+            return
+
+        self.verify_options('loprop')
+
+    def verify_options(self, group):
+        """
+        Detect input errors for selected input group
+
+        Checks and messages defined by `verifiers` dict
+        """
+        if group in self.input_dict:
+            for option, value in self.input_dict[group].items():
+                verify, msg = verifyers[group][option]
+                if not verify(value):
+                    raise InputError(msg.format(value))
 
 
 def parse_frequencies(input_frequencies):
@@ -277,3 +302,15 @@ def parse_frequencies(input_frequencies):
         elif w:
             frequencies.append(float(w))
     return frequencies
+
+
+class InputError(Exception):
+    pass
+
+
+verifyers = {
+    'loprop': {
+        'checkpoint_file': (lambda v: True, 'Always OK'),
+        'localize': (lambda v: v in ['charges'], 'localize: {} illegal value')
+    }
+}

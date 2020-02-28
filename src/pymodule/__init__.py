@@ -61,6 +61,7 @@ from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .cppsolver import ComplexResponse
 from .c6solver import C6Solver
+from .loprop import LoPropDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical

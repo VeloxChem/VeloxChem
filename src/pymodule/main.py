@@ -17,6 +17,7 @@ from .mp2driver import Mp2Driver
 from .excitondriver import ExcitonModelDriver
 from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
+from .loprop import LoPropDriver
 
 
 def main():
@@ -62,7 +63,7 @@ def main():
 
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'scf', 'wavefunction', 'wave function', 'mp2',
-        'response', 'visualization'
+        'response', 'visualization', 'loprop'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -171,6 +172,13 @@ def main():
         vis_drv = VisualizationDriver(task.mpi_comm)
         vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
                           density)
+
+    # LoProp
+
+    if task_type == 'loprop':
+        task.input_dict['loprop']['density'] = density
+        loprop_driver = LoPropDriver(task)
+        loprop_driver.compute()
 
     # All done
 
