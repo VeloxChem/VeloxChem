@@ -7,6 +7,7 @@ import subprocess
 import sys
 import os
 import shutil
+import site
 
 
 class MyBuildPy(SetuptoolsBuildPy):
