@@ -568,7 +568,7 @@ class LinearResponseSolver:
         else:
             if self.rank == mpi_master():
                 kappas = {}
-                for (op, freq), x in solutions:
+                for (op, freq), x in solutions.items():
                     kappas[(op, freq)] = lrvec2mat(x, nocc, norb)
                 return {
                     'solutions': solutions,
