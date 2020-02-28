@@ -58,6 +58,10 @@ class MyInstall(SetuptoolsInstall):
                 raise IOError(
                     'Unable to create package dir {}'.format(package_dir))
         SetuptoolsInstall.run(self)
+        shutil.copytree(
+            'basis',
+            os.path.join(site.getsitepackages()[0], 'veloxchem', 'basis')
+        )
 
 
 setup(
