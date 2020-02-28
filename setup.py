@@ -6,6 +6,7 @@ import multiprocessing
 import subprocess
 import sys
 import os
+import shutil
 
 
 class MyBuildPy(SetuptoolsBuildPy):
