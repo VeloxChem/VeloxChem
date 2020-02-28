@@ -204,7 +204,9 @@ class LinearResponseSolver:
             computed for the B operator.
 
         :return:
-            A dictionary containing response functions, solutions, and kappas.
+            A dictionary containing response functions, solutions and a
+            dictionarry containing solutions and kappa values when called from
+            a non-linear response module.
         """
 
         if self.profiling:
@@ -379,9 +381,7 @@ class LinearResponseSolver:
 
         solutions = {}
         residuals = {}
-        kappas = {}
         relative_residual_norm = {}
-        converged = {}
 
         if self.timing:
             self.timing_dict['new_trials'][0] += tm.time() - timing_t0
@@ -396,7 +396,7 @@ class LinearResponseSolver:
 
             if self.rank == mpi_master():
                 self.cur_iter = iteration
-                nvs = []
+                xvs = []
 
                 n_ger = bger.shape[1]
                 n_ung = bung.shape[1]
@@ -405,8 +405,11 @@ class LinearResponseSolver:
                 e2uu = np.matmul(bung.T, e2bung) * 2.0
                 s2ug = np.matmul(bung.T, bger) * 4.0
 
-                # next solution
                 for op, freq in op_freq_keys:
+                    if (iteration > 0) and (relative_residual_norm[(op, freq)] <
+                                            self.conv_thresh):
+                        continue
+
                     v = v1[(op, freq)]
 
                     gradger, gradung = self.decomp_grad(v)
@@ -435,29 +438,26 @@ class LinearResponseSolver:
                     x_ger_full = np.hstack((x_ger, x_ger))
                     x_ung_full = np.hstack((x_ung, -x_ung))
 
-                    solutions[(op, freq)] = x_ger_full + x_ung_full
-
-                    kappas[(op, freq)] = lrvec2mat(x_ger_full + x_ung_full,
-                                                   nocc, norb)
+                    x = x_ger_full + x_ung_full
 
                     r_ger = np.matmul(e2bger, c_ger) - freq * 2.0 * np.matmul(
                         bung, c_ung) - gradger
                     r_ung = np.matmul(e2bung, c_ung) - freq * 2.0 * np.matmul(
                         bger, c_ger) - gradung
 
-                    residuals[(op, freq)] = np.array([r_ger, r_ung]).flatten()
+                    r = np.array([r_ger, r_ung]).flatten()
 
-                    r = residuals[(op, freq)]
-                    n = solutions[(op, freq)]
-
-                    nv = np.dot(n, v)
-                    nvs.append((op, freq, nv))
+                    xv = np.dot(x, v)
+                    xvs.append((op, freq, xv))
 
                     rn = np.linalg.norm(r) * np.sqrt(2.0)
-                    nn = np.linalg.norm(n)
-                    relative_residual_norm[(op, freq)] = rn / nn
+                    xn = np.linalg.norm(x)
+                    relative_residual_norm[(op, freq)] = rn / xn
 
-                    converged[(op, freq)] = (rn / nn < self.conv_thresh)
+                    if relative_residual_norm[(op, freq)] < self.conv_thresh:
+                        solutions[(op, freq)] = x
+                    else:
+                        residuals[(op, freq)] = r
 
                 # write to output
                 self.ostream.print_info(
@@ -467,7 +467,7 @@ class LinearResponseSolver:
                         n_ung))
                 self.ostream.print_blank()
 
-                self.print_iteration(relative_residual_norm, converged, nvs)
+                self.print_iteration(relative_residual_norm, xvs)
 
             if self.timing:
                 tid = iteration + 1
@@ -483,7 +483,9 @@ class LinearResponseSolver:
             # update trial vectors
             if self.rank == mpi_master():
                 new_trials_ger, new_trials_ung = self.setup_trials(
-                    residuals, converged, precond, bger, bung)
+                    residuals, precond, bger, bung)
+
+                residuals.clear()
 
                 assert_msg_critical(
                     new_trials_ger.any() or new_trials_ung.any(),
@@ -561,12 +563,17 @@ class LinearResponseSolver:
                 return {
                     'response_functions': rsp_funcs,
                     'solutions': solutions,
-                    'kappas': kappas
                 }
 
         else:
             if self.rank == mpi_master():
-                return {'solutions': solutions, 'kappas': kappas}
+                kappas = {}
+                for (op, freq), x in solutions:
+                    kappas[(op, freq)] = lrvec2mat(x, nocc, norb)
+                return {
+                    'solutions': solutions,
+                    'kappas': kappas,
+                }
 
         return {}
 
@@ -606,15 +613,13 @@ class LinearResponseSolver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def print_iteration(self, relative_residual_norm, converged, nvs):
+    def print_iteration(self, relative_residual_norm, xvs):
         """
         Prints information of the iteration.
 
         :param relative_residual_norm:
             Relative residual norms.
-        :param converge:
-            Flags for converged vectors.
-        :param nvs:
+        :param xvs:
             A list of tuples containing operator component, frequency, and
             property.
         """
@@ -627,13 +632,11 @@ class LinearResponseSolver:
             min(relative_residual_norm.values()))
         self.ostream.print_header(output_header.ljust(width))
         self.ostream.print_blank()
-        for op, freq, nv in nvs:
+        for op, freq, xv in xvs:
             ops_label = '<<{};{}>>_{:.4f}'.format(op, op, freq)
             rel_res = relative_residual_norm[(op, freq)]
-            output_iter = '{:<15s}: {:15.8f} '.format(ops_label, -nv)
+            output_iter = '{:<15s}: {:15.8f} '.format(ops_label, -xv)
             output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
-            if converged[(op, freq)]:
-                output_iter += '   converged'
             self.ostream.print_header(output_iter.ljust(width))
         self.ostream.print_blank()
         self.ostream.flush()
@@ -788,7 +791,6 @@ class LinearResponseSolver:
 
     def setup_trials(self,
                      vectors,
-                     converged={},
                      precond=None,
                      bger=None,
                      bung=None,
@@ -798,8 +800,6 @@ class LinearResponseSolver:
 
         :param vectors:
             The set of vectors.
-        :param converged:
-            The flags for converged vectors.
         :param precond:
             The preconditioner.
         :param bger:
@@ -816,9 +816,6 @@ class LinearResponseSolver:
         trials = []
 
         for (op, freq) in vectors:
-            if converged and converged[(op, freq)]:
-                continue
-
             vec = vectors[(op, freq)]
 
             if precond is not None:
