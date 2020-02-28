@@ -18,4 +18,4 @@ Running
 
 ::
 
-    $ python -m veloxchem water.inp water.out
+    $ python3 -m veloxchem water.inp water.out

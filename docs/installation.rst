@@ -1,28 +1,17 @@
 Install
 =======
 
-
-Conda
-^^^^^
-
-It is recommended to install veloxchem in a separate conda environment, e.g. 
-::
-
-    $ conda create -n vlx
-    $ conda activate vlx
-    (vlx) $ conda -c conda-forge install veloxchem
-
-Conda binary distributions have been generated with 
- 
-* Ubuntu 18.04 LTS.
-
 From source
 ^^^^^^^^^^^
 
 Get the source code
 +++++++++++++++++++
 
-The source code can be downloaded from `this page <https://veloxchem.org/download>`__.
+The source code can be downloaded from this repository
+
+.. code-block:: bash
+
+    https://gitlab.com/veloxchem/veloxchem
 
 Debian based Linux
 ++++++++++++++++++
@@ -43,9 +32,9 @@ Debian based Linux
 
     sudo apt-get install mpich python3 python3-dev python3-pip
 
-    # Install numpy, h5py, pybind11, pytest and mpi4py
+    # Install python modules
 
-    sudo pip3 install numpy h5py pybind11 pytest
+    sudo pip3 install numpy h5py pybind11 pytest loprop
     sudo pip3 install --no-binary=mpi4py mpi4py
 
     # Install VeloxChem
@@ -75,9 +64,9 @@ RPM based Linux
     sudo ln -s /usr/lib64/mpich-3.2/bin/mpicxx /usr/bin/mpicxx
     sudo ln -s /usr/lib64/mpich-3.2/bin/mpicc /usr/bin/mpicc
 
-    # Install numpy, h5py, pybind11, pytest and mpi4py
+    # Install python modules
 
-    sudo pip3 install numpy h5py pybind11 pytest
+    sudo pip3 install numpy h5py pybind11 pytest loprop
     sudo pip3 install --no-binary=mpi4py mpi4py
 
     # Install VeloxChem
@@ -117,9 +106,9 @@ PowerLinux
     # wget https://repo.anaconda.com/archive/Anaconda3-2019.10-Linux-ppc64le.sh
     # bash Anaconda3-2019.10-Linux-ppc64le.sh
 
-    # Install numpy, h5py, pybind11, pytest and mpi4py
+    # Install python modules
 
-    pip install numpy h5py pybind11 pytest
+    pip install numpy h5py pybind11 pytest loprop
     pip install --no-binary=mpi4py mpi4py
 
     # Install VeloxChem
@@ -143,6 +132,7 @@ Arm (Isambard Cray XC50 system)
 
     python3 -m pip install pybind11 --user
     python3 -m pip install h5py --user
+    python3 -m pip install loprop --user
 
     # Manually install mpi4py
 
@@ -154,8 +144,8 @@ Arm (Isambard Cray XC50 system)
     # mpicxx        = CC
     # extra_compile_args   = -shared
     # extra_link_args      = -Wl,-rpath,/opt/cray/pe/mpt/7.7.9/gni/mpich-gnu/8.2/lib
-    python setup.py build --mpi=cray
-    python setup.py install --prefix=<path-to-your-mpi4py>
+    python3 setup.py build --mpi=cray
+    python3 setup.py install --prefix=<path-to-your-mpi4py>
     export PYTHONPATH=<path-to-your-mpi4py>/lib/python3.6/site-packages:$PYTHONPATH
 
     # Setup compiler wrapper
@@ -182,9 +172,9 @@ MacOS
     brew install mpich
     brew install python
 
-    # Install numpy, h5py, pybind11, pytest and mpi4py
+    # Install python modules
 
-    pip3 install numpy h5py pybind11 pytest
+    pip3 install numpy h5py pybind11 pytest loprop
     pip3 install --no-binary=mpi4py mpi4py
 
     # Install VeloxChem

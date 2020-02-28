@@ -36,9 +36,7 @@ class LoPropDriver:
 
         molfrag = MolFrag(self.tmpdir, **self.settings)
 
-        pot_output = molfrag.output_potential_file(
-            self.settings['max_l'], 0, 0
-        )
+        pot_output = molfrag.output_potential_file(self.settings['max_l'], 0, 0)
         self.task.ostream.print_line(pot_output)
 
     def save_overlap(self):
@@ -50,11 +48,7 @@ class LoPropDriver:
         ovldrv = OverlapIntegralsDriver(task.mpi_comm)
         S = ovldrv.compute(molecule, basis).to_numpy()
 
-        S = ao_matrix_to_dalton(
-            DenseMatrix(S),
-            task.ao_basis,
-            task.molecule
-        )
+        S = ao_matrix_to_dalton(DenseMatrix(S), task.ao_basis, task.molecule)
 
         with h5py.File(self.checkpoint, 'w') as f:
             f['ao_overlap_matrix'] = S.to_numpy()
@@ -140,7 +134,7 @@ class LoPropDriver:
             opa[-1].append(0)
 
             # For Li-Ne: + 2s 2p
-            if e>= 3:
+            if e >= 3:
                 opa[-1].append(1)
                 offset_p = count_per_angmom['S']
                 opa[-1].append(offset_p + 0)
@@ -168,11 +162,7 @@ def count_contracted(atombasis: list) -> dict:
     >>> count_contracted('S: 1 1\n1.0 1.9\n')
     {'S': 1}
     """
-    c = Counter(
-        line[0]
-        for line in atombasis
-        if line and line[0] in "SPDFGHI"
-    )
+    c = Counter(line[0] for line in atombasis if line and line[0] in "SPDFGHI")
     return dict(c)
 
 
@@ -185,7 +175,7 @@ def count_contracted_on_atom(atombasis: dict) -> int:
     5
     """
     multiplicity = dict(S=1, P=3, D=5, F=7, G=9, H=11, I=13)
-    return sum(multiplicity[k]*v for k, v in atombasis.items())
+    return sum(multiplicity[k] * v for k, v in atombasis.items())
 
 
 def get_basis_file(basis):
