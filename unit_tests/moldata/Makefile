@@ -1,5 +1,5 @@
 #
-#                             VELOXCHEM
+#                           VELOXCHEM 1.0-RC
 #      ---------------------------------------------------
 #                     An Electronic Structure Code
 #

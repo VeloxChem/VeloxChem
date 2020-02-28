@@ -1,5 +1,5 @@
 #
-#                             VELOXCHEM
+#                           VELOXCHEM 1.0-RC
 #      ---------------------------------------------------
 #                     An Electronic Structure Code
 #
@@ -55,7 +55,6 @@ debug: $(VLX_LIBS)
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
 	@echo ====== Moving $(VLX_TARGET) and copying $(PYVLX_MAIN)...
 	mkdir -p ../build/python/veloxchem
-	$(CP) $(VLX_TARGET) $(CURDIR)/pymodule
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
@@ -69,7 +68,6 @@ release: $(VLX_LIBS)
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
 	@echo ====== Moving $(VLX_TARGET) and copying $(PYVLX_MAIN)...
 	mkdir -p ../build/python/veloxchem
-	$(CP) $(VLX_TARGET) $(CURDIR)/pymodule
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem

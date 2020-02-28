@@ -6,8 +6,6 @@ import multiprocessing
 import subprocess
 import sys
 import os
-import shutil
-import site
 
 
 class MyBuildPy(SetuptoolsBuildPy):
@@ -60,20 +58,16 @@ class MyInstall(SetuptoolsInstall):
                 raise IOError(
                     'Unable to create package dir {}'.format(package_dir))
         SetuptoolsInstall.run(self)
-        shutil.copytree(
-            'basis',
-            os.path.join(site.getsitepackages()[0], 'veloxchem', 'basis')
-        )
 
 
 setup(
     name='veloxchem',
-    version='0.0',
+    version='1.0-rc',
     packages=[
         'veloxchem',
     ],
     package_dir={
-        'veloxchem': os.path.join('src', 'pymodule')
+        'veloxchem': os.path.join('build', 'python', 'veloxchem'),
     },
     package_data={
         'veloxchem': [
