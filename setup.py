@@ -6,6 +6,8 @@ import multiprocessing
 import subprocess
 import sys
 import os
+import site
+import shutil
 
 
 class MyBuildPy(SetuptoolsBuildPy):
@@ -20,7 +22,7 @@ class MyBuildPy(SetuptoolsBuildPy):
         self.update_vlx_script('python3')
 
     def make_veloxchem(self):
-        cmd = 'make -C src -j '
+        cmd = 'make -C src -s -j '
         if 'OMP_NUM_THREADS' in os.environ:
             cmd += os.environ['OMP_NUM_THREADS']
         else:
@@ -50,13 +52,6 @@ class MyBuildPy(SetuptoolsBuildPy):
 class MyInstall(SetuptoolsInstall):
 
     def run(self):
-        package_dir = os.path.join('build', 'python', 'veloxchem')
-        if not os.path.isdir(package_dir):
-            try:
-                os.makedirs(package_dir)
-            except IOError:
-                raise IOError(
-                    'Unable to create package dir {}'.format(package_dir))
         SetuptoolsInstall.run(self)
 
 
@@ -67,7 +62,7 @@ setup(
         'veloxchem',
     ],
     package_dir={
-        'veloxchem': os.path.join('build', 'python', 'veloxchem'),
+        'veloxchem': os.path.join('src', 'pymodule'),
     },
     package_data={
         'veloxchem': [
@@ -76,7 +71,7 @@ setup(
         ],
     },
     scripts=[
-        os.path.join('build', 'bin', 'vlx'),
+        os.path.join('src', 'vlx'),
     ],
     python_requires='>=3.5',
     install_requires=[

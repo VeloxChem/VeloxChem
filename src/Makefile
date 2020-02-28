@@ -13,7 +13,7 @@ include Makefile.setup
 # Set TARGET and linker flags for VeloxChem shared library
 
 VLX_BAS := ../basis
-VLX_TARGET := veloxchemlib.so
+VLX_TARGET := ../build/lib/veloxchem/veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
 PYVLX_MAIN := vlx
 
@@ -50,16 +50,11 @@ VLX_LIBS_LIST = $(foreach d,$(VLX_LIBS_DIR),$(addprefix -L$d -l,$d))
 
 # Debug
 debug: $(VLX_LIBS)
+	mkdir -p $(CURDIR)/../build/lib/veloxchem
+	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/lib/veloxchem
 	@echo ====== Linking debug version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
-	@echo ====== Moving $(VLX_TARGET) and copying $(PYVLX_MAIN)...
-	mkdir -p ../build/python/veloxchem
-	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
-	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
-	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
-	mkdir -p ../build/bin
-	$(CP) $(PYVLX_MAIN) $(CURDIR)/../build/bin
 
 # Release
 release: $(VLX_LIBS)

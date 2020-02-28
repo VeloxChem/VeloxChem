@@ -1,0 +1,4 @@
+recursive-include config *.py *.template
+recursive-include src *.py *.cpp *.hpp *.tab Makefile vlx
+recursive-include basis *
+include requirements.txt
