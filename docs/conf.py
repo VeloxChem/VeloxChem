@@ -18,11 +18,11 @@
 # -- Project information -----------------------------------------------------
 
 project = 'VeloxChem'
-copyright = '2019, VeloxChem'
+copyright = '2020, VeloxChem'
 author = 'Zilvinas Rinkevicius, Xin Li, Olav Vahtras, Patrick Norman'
 
 # The full version, including alpha/beta/rc tags
-release = '1.0'
+release = '1.0rc1'
 
 
 # -- General configuration ---------------------------------------------------
