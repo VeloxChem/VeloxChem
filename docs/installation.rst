@@ -183,10 +183,27 @@ MacOS
     python3 config/generate_setup.py
     python3 setup.py install
 
+
 Windows
 +++++++
 
 Soon to come!
+
+
+Binaries
+^^^^^^^^
+
+Docker
+++++++
+
+A docker image with pre-compiled veloxchem based on ubuntu:18.04 is available
+on `Docker Hub <https://hub.docker.com/r/veloxchem/veloxchem>`_.
+
+.. code-block:: bash
+
+    $ docker run -it veloxchem/veloxchem:1.0rc1
+    # root@fcc794d899c7:/veloxchem# which vlx
+    /usr/local/bin/vlx
 
 The CPPE library for polarizable embedding
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
