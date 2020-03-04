@@ -58,16 +58,11 @@ debug: $(VLX_LIBS)
 
 # Release
 release: $(VLX_LIBS)
-	@echo ====== Linking release version of $(VLX_TARGET)...
+	mkdir -p $(CURDIR)/../build/lib/veloxchem
+	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/lib/veloxchem
+	@echo ====== Linking debug version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
-	@echo ====== Moving $(VLX_TARGET) and copying $(PYVLX_MAIN)...
-	mkdir -p ../build/python/veloxchem
-	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
-	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
-	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
-	mkdir -p ../build/bin
-	$(CP) $(PYVLX_MAIN) $(CURDIR)/../build/bin
 
 # Clean up
 clean:
