@@ -2,9 +2,9 @@ from .rspproperty import ResponseProperty
 from .inputparser import parse_frequencies
 
 
-class Polarizability(ResponseProperty):
+class CustomProperty(ResponseProperty):
     """
-    Implements the polarizability property.
+    Implements a custom, user-defined  property.
 
     :param rsp_dict:
         The dictionary of response input.
@@ -19,24 +19,27 @@ class Polarizability(ResponseProperty):
 
     def __init__(self, rsp_dict, method_dict={}):
         """
-        Initializes the polarizability property.
+        Initializes a custom, user-defined  property.
         """
 
         rsp_dict = dict(rsp_dict)
         method_dict = dict(method_dict)
 
-        rsp_dict['property'] = 'polarizability'
-        rsp_dict['response'] = 'linear'
+        rsp_dict['property'] = 'custom'
+        if 'response' not in rsp_dict:
+            rsp_dict['response'] = 'linear'
         rsp_dict['residue'] = 'none'
         rsp_dict['onlystatic'] = 'no'
         if 'complex' not in rsp_dict:
             rsp_dict['complex'] = 'no'
 
-        rsp_dict['a_operator'] = 'dipole'
+        if 'a_operator' not in rsp_dict:
+            rsp_dict['a_operator'] = 'dipole'
         if 'a_components' not in rsp_dict:
             rsp_dict['a_components'] = 'xyz'
 
-        rsp_dict['b_operator'] = 'dipole'
+        if 'b_operator' not in rsp_dict:
+            rsp_dict['b_operator'] = 'dipole'
         if 'b_components' not in rsp_dict:
             rsp_dict['b_components'] = 'xyz'
 
@@ -60,7 +63,7 @@ class Polarizability(ResponseProperty):
 
     def print_property(self, ostream):
         """
-        Prints polarizability to output stream.
+        Prints custom property to output stream.
 
         :param ostream:
             The output stream.
@@ -69,7 +72,7 @@ class Polarizability(ResponseProperty):
         width = 92
 
         for w in parse_frequencies(self.rsp_dict['frequencies']):
-            w_str = 'Polarizability (w={:.4f})'.format(w)
+            w_str = 'Response Function (w={:.4f})'.format(w)
             ostream.print_header(w_str.ljust(width))
             ostream.print_header(('-' * len(w_str)).ljust(width))
 

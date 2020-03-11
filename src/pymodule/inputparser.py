@@ -225,29 +225,28 @@ class InputParser:
                 fname = '.'.join(fname.split('.')[:-1])
             fchkp = fname + '.scf.h5'
             frsp = fname + '.rsp.h5'
-            fcpp = fname + '.cpp.h5'
             fexciton = fname + '.exciton.h5'
             floprop = fname + '.loprop.h5'
 
             if 'scf' not in self.input_dict:
                 self.input_dict['scf'] = {}
-            self.input_dict['scf']['checkpoint_file'] = fchkp
+            if 'checkpoint_file' not in self.input_dict['scf']:
+                self.input_dict['scf']['checkpoint_file'] = fchkp
 
             if 'response' not in self.input_dict:
                 self.input_dict['response'] = {}
-            self.input_dict['response']['checkpoint_file'] = frsp
-
-            if 'cpp' not in self.input_dict:
-                self.input_dict['cpp'] = {}
-            self.input_dict['cpp']['checkpoint_file'] = fcpp
+            if 'checkpoint_file' not in self.input_dict['response']:
+                self.input_dict['response']['checkpoint_file'] = frsp
 
             if 'exciton' not in self.input_dict:
                 self.input_dict['exciton'] = {}
-            self.input_dict['exciton']['checkpoint_file'] = fexciton
+            if 'checkpoint_file' not in self.input_dict['exciton']:
+                self.input_dict['exciton']['checkpoint_file'] = fexciton
 
             if 'loprop' not in self.input_dict:
                 self.input_dict['loprop'] = {}
-            self.input_dict['loprop']['checkpoint_file'] = floprop
+            if 'checkpoint_file' not in self.input_dict['loprop']:
+                self.input_dict['loprop']['checkpoint_file'] = floprop
 
     def consistency_checks(self):
 

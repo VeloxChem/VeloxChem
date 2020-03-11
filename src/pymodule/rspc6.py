@@ -6,7 +6,7 @@ from .rspproperty import ResponseProperty
 
 class C6(ResponseProperty):
     """
-    Implements the C6 property.
+    Implements the C6 dispersion coefficient  property.
 
     :param rsp_dict:
         The dictionary of response input.
@@ -21,7 +21,7 @@ class C6(ResponseProperty):
 
     def __init__(self, rsp_dict, method_dict={}):
         """
-        Initializes the absorption property.
+        Initializes the C6 dispersion coefficient property.
         """
 
         rsp_dict = dict(rsp_dict)
