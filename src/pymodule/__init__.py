@@ -52,15 +52,17 @@ from .tdaexcidriver import TDAExciDriver
 from .blockdavidson import BlockDavidsonSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .lrsolver import LinearResponseSolver
+from .cppsolver import ComplexResponse
+from .c6solver import C6Solver
 from .rspproperty import ResponseProperty
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
+from .rspc6 import C6
+from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
-from .cppsolver import ComplexResponse
-from .c6solver import C6Solver
 from .loprop import LoPropDriver
 
 # Python functions

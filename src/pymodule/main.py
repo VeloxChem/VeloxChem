@@ -12,6 +12,7 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .rspc6 import C6
+from .rspcustomproperty import CustomProperty
 from .pulsedrsp import PulsedResponse
 from .mp2driver import Mp2Driver
 from .excitondriver import ExcitonModelDriver
@@ -104,11 +105,11 @@ def main():
         if 'qq_type' not in rsp_dict:
             rsp_dict['qq_type'] = scf_drv.qq_type
 
-        assert_msg_critical('property' in rsp_dict,
-                            'input file: response property not found')
+        if 'property' not in rsp_dict:
+            rsp_dict['property'] = 'custom'
         prop_type = rsp_dict['property'].lower()
 
-        if prop_type == 'polarizability':
+        if prop_type in ['polarizability', 'dipole polarizability']:
             rsp_prop = Polarizability(rsp_dict, method_dict)
         elif prop_type in ['absorption', 'uv-vis', 'ecd']:
             rsp_prop = Absorption(rsp_dict, method_dict)
@@ -124,6 +125,8 @@ def main():
             rsp_prop = CircularDichroismSpectrum(rsp_dict, method_dict)
         elif prop_type == 'c6':
             rsp_prop = C6(rsp_dict, method_dict)
+        elif prop_type == 'custom':
+            rsp_prop = CustomProperty(rsp_dict, method_dict)
         else:
             assert_msg_critical(False, 'input file: invalid response property')
 

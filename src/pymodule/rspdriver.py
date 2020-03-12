@@ -154,6 +154,9 @@ class ResponseDriver:
             return 'Circular Dichroism Spectrum'
 
         if self.prop_type == 'c6':
-            return 'C6 value'
+            return 'C6 Dispersion Coefficient'
+
+        if self.prop_type == 'custom':
+            return 'Custom Response Property'
 
         return 'Undefined'

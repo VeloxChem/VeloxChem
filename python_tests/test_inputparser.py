@@ -190,7 +190,6 @@ def test_convert_dict(mock_parse, grouped, todict):
         'scf': {'checkpoint_file': 'foo.scf.h5'},
         'response': {'checkpoint_file': 'foo.rsp.h5'},
         'exciton': {'checkpoint_file': 'foo.exciton.h5'},
-        'cpp': {'checkpoint_file': 'foo.cpp.h5'},
         'loprop': {'checkpoint_file': 'foo.loprop.h5'},
         **todict,
     }
@@ -225,7 +224,6 @@ def test_convert_dict_with_output_file(mock_parse, grouped, todict):
         'scf': {'checkpoint_file': 'foo.scf.h5'},
         'response': {'checkpoint_file': 'foo.rsp.h5'},
         'exciton': {'checkpoint_file': 'foo.exciton.h5'},
-        'cpp': {'checkpoint_file': 'foo.cpp.h5'},
         'loprop': {'checkpoint_file': 'foo.loprop.h5'},
         **todict,
     }
@@ -270,7 +268,6 @@ def test_full_input(tmpdir):
             'scf': {'checkpoint_file': str(tmpdir/'h2o.scf.h5')},
             'response': {'checkpoint_file': str(tmpdir/'h2o.rsp.h5')},
             'exciton': {'checkpoint_file': str(tmpdir/'h2o.exciton.h5')},
-            'cpp': {'checkpoint_file': str(tmpdir/'h2o.cpp.h5')},
             'loprop': {'checkpoint_file': str(tmpdir/'h2o.loprop.h5')},
         }
 
