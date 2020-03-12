@@ -313,7 +313,12 @@ class LinearResponseSolver:
                                 self.xcfun, self.pe, self.potfile)
         timing_dict = {}
 
-        if not v1:
+        valid_v1 = False
+        if self.rank == mpi_master():
+            valid_v1 = (v1 is not None)
+        valid_v1 = self.comm.bcast(valid_v1, root=mpi_master())
+
+        if not valid_v1:
             nonlinear_flag = False
             b_rhs = get_rhs(self.b_operator, self.b_components, molecule, basis,
                             scf_tensors, self.rank, self.comm)

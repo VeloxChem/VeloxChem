@@ -598,7 +598,12 @@ class ComplexResponse:
         else:
             nocc = None
 
-        if not v1:
+        valid_v1 = False
+        if self.rank == mpi_master():
+            valid_v1 = (v1 is not None)
+        valid_v1 = self.comm.bcast(valid_v1, root=mpi_master())
+
+        if not valid_v1:
             b_rhs = get_complex_rhs(self.b_operator, self.b_components,
                                     molecule, basis, scf_tensors, self.rank,
                                     self.comm)
@@ -731,11 +736,11 @@ class ComplexResponse:
 
                         # filling E2uu
 
-                        mat[n_ger:n_ger + n_ung, n_ger:n_ger +
-                            n_ung] = e2uu[:, :]
+                        mat[n_ger:n_ger + n_ung,
+                            n_ger:n_ger + n_ung] = e2uu[:, :]
 
-                        mat[n_ger + n_ung:size - n_ger, n_ger + n_ung:size -
-                            n_ger] = -e2uu[:, :]
+                        mat[n_ger + n_ung:size - n_ger,
+                            n_ger + n_ung:size - n_ger] = -e2uu[:, :]
 
                         # filling S2ug
 
@@ -745,21 +750,21 @@ class ComplexResponse:
 
                         mat[n_ger:n_ger + n_ung, size - n_ger:] = d * s2ug[:, :]
 
-                        mat[n_ger + n_ung:size - n_ger, size -
-                            n_ger:] = w * s2ug[:, :]
+                        mat[n_ger + n_ung:size - n_ger,
+                            size - n_ger:] = w * s2ug[:, :]
 
                         # filling S2ug.T (interchanging of row and col)
 
                         mat[:n_ger, n_ger:n_ger + n_ung] = -w * s2ug.T[:, :]
 
-                        mat[:n_ger, n_ger + n_ung:size -
-                            n_ger] = d * s2ug.T[:, :]
+                        mat[:n_ger,
+                            n_ger + n_ung:size - n_ger] = d * s2ug.T[:, :]
 
-                        mat[size - n_ger:, n_ger:n_ger +
-                            n_ung] = d * s2ug.T[:, :]
+                        mat[size - n_ger:,
+                            n_ger:n_ger + n_ung] = d * s2ug.T[:, :]
 
-                        mat[size - n_ger:, n_ger + n_ung:size -
-                            n_ger] = w * s2ug.T[:, :]
+                        mat[size - n_ger:,
+                            n_ger + n_ung:size - n_ger] = w * s2ug.T[:, :]
 
                         # solving matrix equation
 
@@ -816,8 +821,9 @@ class ComplexResponse:
 
                         # composing total half-sized residual
 
-                        r = np.array([r_realger, r_realung, r_imagung,
-                                      r_imagger]).flatten()
+                        r = np.array(
+                            [r_realger, r_realung, r_imagung,
+                             r_imagger]).flatten()
 
                         # calculating relative residual norm
                         # for convergence check
@@ -947,19 +953,15 @@ class ComplexResponse:
                     for bop, w in solutions:
                         rsp_funcs[(aop, bop,
                                    w)] = -np.dot(va[aop], solutions[(bop, w)])
-                return {
-                    'response_functions': rsp_funcs,
-                    'solutions': solutions
-                }
+                return {'response_functions': rsp_funcs, 'solutions': solutions}
 
         else:
             if self.rank == mpi_master():
                 kappas = {}
                 for op, w in solutions:
-                    kappas[(op, w)] = (lrvec2mat(solutions[(op, w)].real,
-                                                 nocc, norb) +
-                                      1j * lrvec2mat(solutions[(op, w)].imag,
-                                                     nocc, norb))
+                    kappas[(op, w)] = (
+                        lrvec2mat(solutions[(op, w)].real, nocc, norb) +
+                        1j * lrvec2mat(solutions[(op, w)].imag, nocc, norb))
                 return {'solutions': solutions, 'kappas': kappas}
 
         return {}
