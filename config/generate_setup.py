@@ -5,6 +5,7 @@ import platform
 import site
 import sys
 import os
+import re
 
 
 def find_exe(executables):
@@ -156,7 +157,8 @@ def generate_setup(template_file, setup_file):
 
     use_intel = (cxxname == 'icpc')
     use_gnu = cxxname in ['g++', 'x86_64-conda_cos6-linux-gnu-c++']
-    use_clang = cxxname in ['clang++', 'Crayclang']
+    use_clang = cxxname in ['clang++', 'Crayclang'] or \
+	re.match(r'x86_64-apple-.*-clang\+\+', cxxname)
 
     if not (use_intel or use_gnu or use_clang):
         print('*** Error: Unrecognized c++ compiler!')
