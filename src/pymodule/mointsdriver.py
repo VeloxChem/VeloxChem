@@ -74,11 +74,11 @@ class MOIntegralsDriver:
             The computed MO integrals.
         """
 
-        self.ostream.print_blank()
-        self.ostream.print_header("Conventional AO->MO Integral Transformation")
-        self.ostream.print_header(45 * "=")
-        self.ostream.print_blank()
-        self.ostream.flush()
+        # self.ostream.print_blank()
+        # self.ostream.print_header("Conventional AO->MO Integral Transformation")
+        # self.ostream.print_header(45 * "=")
+        # self.ostream.print_blank()
+        # self.ostream.flush()
 
         mo = mol_orbs.alpha_to_numpy()
         nocc = molecule.number_of_alpha_electrons()
@@ -99,9 +99,9 @@ class MOIntegralsDriver:
         eri_drv.compute_in_mem(molecule, basis, pqrs)
         t1 = tm.time()
         eri_info = 'Time spent in AO integrals: {:.2f} sec'.format(t1 - t0)
-        self.ostream.print_info(eri_info)
-        self.ostream.print_blank()
-        self.ostream.flush()
+        # self.ostream.print_info(eri_info)
+        # self.ostream.print_blank()
+        # self.ostream.flush()
 
         # Note that we calculate the integrals in physicists' notation
 
@@ -117,9 +117,9 @@ class MOIntegralsDriver:
         t1 = tm.time()
         mo_eri_info = 'Time spent in AO->MO transformation: {:.2f} sec'.format(
             t1 - t0)
-        self.ostream.print_info(mo_eri_info)
-        self.ostream.print_blank()
-        self.ostream.flush()
+        # self.ostream.print_info(mo_eri_info)
+        # self.ostream.print_blank()
+        # self.ostream.flush()
 
         return tuvw.swapaxes(1, 2)
 
