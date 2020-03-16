@@ -68,7 +68,14 @@ class LinearResponseMatrixVectorDriver:
         self.pe = False
         self.potfile = None
 
-    def update_settings(self, eri_thresh, qq_type, dft, xcfun, pe, potfile):
+    def update_settings(self,
+                        eri_thresh,
+                        qq_type,
+                        dft,
+                        xcfun,
+                        pe,
+                        potfile,
+                        batch_size=None):
         """
         Updates settings in linear response matrix-vector solver.
 
@@ -84,6 +91,8 @@ class LinearResponseMatrixVectorDriver:
             The flag for running polarizable embedding calculation.
         :param potfile:
             The name of the potential file for polarizable embedding.
+        :param batch_size:
+            The batch size for computation of Fock matrices.
         """
 
         self.eri_thresh = eri_thresh
@@ -92,6 +101,7 @@ class LinearResponseMatrixVectorDriver:
         self.xcfun = xcfun
         self.pe = pe
         self.potfile = potfile
+        self.batch_size = batch_size
 
     def e2n_half_size(self, vecs_ger, vecs_ung, tensors, screening, molecule,
                       basis, molgrid, gs_density, V_es, pe_drv, timing_dict):
@@ -160,15 +170,35 @@ class LinearResponseMatrixVectorDriver:
 
                 dks.append(dak)
                 kns.append(kn)
-            dens = AODensityMatrix(dks, denmat.rest)
-        else:
-            dens = AODensityMatrix()
-        dens.broadcast(self.rank, self.comm)
 
-        fock = AOFockMatrix(dens)
+        num_batches = 0
+        if self.rank == mpi_master():
+            batch_size = self.batch_size
+            if batch_size is None:
+                batch_size = len(dks)
+            num_batches = len(dks) // batch_size
+            if len(dks) % batch_size != 0:
+                num_batches += 1
+        num_batches = self.comm.bcast(num_batches, root=mpi_master())
 
-        self.comp_lr_fock(fock, dens, molecule, basis, screening, molgrid,
-                          gs_density, V_es, pe_drv, timing_dict)
+        faks = []
+        for batch_ind in range(num_batches):
+            if self.rank == mpi_master():
+                batch_start = batch_size * batch_ind
+                batch_end = min(batch_start + batch_size, len(dks))
+                dens = AODensityMatrix(dks[batch_start:batch_end], denmat.rest)
+            else:
+                dens = AODensityMatrix()
+            dens.broadcast(self.rank, self.comm)
+
+            fock = AOFockMatrix(dens)
+
+            self.comp_lr_fock(fock, dens, molecule, basis, screening, molgrid,
+                              gs_density, V_es, pe_drv, timing_dict)
+
+            if self.rank == mpi_master():
+                for ifock in range(fock.number_of_fock_matrices()):
+                    faks.append(fock.alpha_to_numpy(ifock).T)
 
         if self.rank == mpi_master():
             if vecs_ger is not None:
@@ -179,7 +209,8 @@ class LinearResponseMatrixVectorDriver:
 
             for col, kn in enumerate(kns):
 
-                fak = fock.alpha_to_numpy(col).T
+                fak = faks[col]
+                # fak = fock.alpha_to_numpy(col).T
                 # fbk = fock.beta_to_numpy(col).T
 
                 kfa = np.linalg.multi_dot([S, kn, fa])

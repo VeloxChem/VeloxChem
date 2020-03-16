@@ -43,6 +43,7 @@ class ComplexResponse:
         - damping: The damping parameter.
         - qq_type: The electron repulsion integrals screening scheme.
         - eri_thresh: The electron repulsion integrals screening threshold.
+        - batch_size: The batch size for computation of Fock matrices.
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.
@@ -84,6 +85,7 @@ class ComplexResponse:
 
         self.qq_type = 'QQ_DEN'
         self.eri_thresh = 1.0e-15
+        self.batch_size = None
 
         self.dft = False
         self.grid_level = 4
@@ -155,6 +157,8 @@ class ComplexResponse:
             self.eri_thresh = float(rsp_dict['eri_thresh'])
         if 'qq_type' in rsp_dict:
             self.qq_type = rsp_dict['qq_type'].upper()
+        if 'batch_size' in rsp_dict:
+            self.batch_size = int(rsp_dict['batch_size'])
 
         if 'restart' in rsp_dict:
             key = rsp_dict['restart'].lower()
@@ -588,7 +592,8 @@ class ComplexResponse:
         e2x_drv = LinearResponseMatrixVectorDriver(self.comm,
                                                    self.use_split_comm)
         e2x_drv.update_settings(self.eri_thresh, self.qq_type, self.dft,
-                                self.xcfun, self.pe, self.potfile)
+                                self.xcfun, self.pe, self.potfile,
+                                self.batch_size)
         timing_dict = {}
 
         if self.rank == mpi_master():
@@ -1046,6 +1051,10 @@ class ComplexResponse:
         cur_str = "ERI Screening Threshold         : " + \
             "{:.1e}".format(self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(width))
+        if self.batch_size is not None:
+            cur_str = "Batch Size of Fock Matrices     : " + \
+                "{:d}".format(self.batch_size)
+            self.ostream.print_header(cur_str.ljust(width))
 
         if self.dft:
             cur_str = "Exchange-Correlation Functional : "
