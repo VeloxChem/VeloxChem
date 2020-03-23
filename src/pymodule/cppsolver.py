@@ -23,6 +23,8 @@ from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .inputparser import parse_frequencies
+from .memprofiler import object_size
+from .memprofiler import avail_mem
 
 
 class ComplexResponse:
@@ -68,6 +70,8 @@ class ComplexResponse:
         - checkpoint_time: The timer of checkpoint file.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
+        - mem_profiling: The flag for printing the memory profiling
+          information.
     """
 
     def __init__(self, comm, ostream):
@@ -117,6 +121,7 @@ class ComplexResponse:
 
         self.timing = False
         self.profiling = False
+        self.mem_profiling = True
 
     def update_settings(self, rsp_dict, method_dict={}):
         """
@@ -172,6 +177,9 @@ class ComplexResponse:
         if 'profiling' in rsp_dict:
             key = rsp_dict['profiling'].lower()
             self.profiling = True if key in ['yes', 'y'] else False
+        if 'memory_profiling' in rsp_dict:
+            key = rsp_dict['memory_profiling'].lower()
+            self.mem_profiling = False if key in ['no', 'n'] else True
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
@@ -856,6 +864,20 @@ class ComplexResponse:
                     '{:d} ungerade trial vectors in reduced space'.format(
                         n_ung))
                 self.ostream.print_blank()
+
+                if self.mem_profiling:
+                    usedmem, usedmem_unit = object_size(
+                        [bger, bung, e2bung, e2bger, precond, solutions,
+                         residuals, relative_residual_norm, ])
+                    availmem, availmem_unit = avail_mem()
+
+                    self.ostream.print_info(
+                        '{:.2f} {} of memory used for subspace procedure'
+                            .format(usedmem, usedmem_unit))
+                    self.ostream.print_info(
+                        '{:.2f} {} of memory available for the solver'.format(
+                            availmem, availmem_unit))
+                    self.ostream.print_blank()
 
                 self.print_iteration(relative_residual_norm, xvs)
 
