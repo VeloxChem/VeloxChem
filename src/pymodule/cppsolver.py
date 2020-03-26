@@ -866,17 +866,17 @@ class ComplexResponse:
                 self.ostream.print_blank()
 
                 if self.mem_profiling:
-                    usedmem, usedmem_unit = object_size(
-                        [bger, bung, e2bung, e2bger, precond, solutions,
-                         residuals, relative_residual_norm, ])
-                    availmem, availmem_unit = avail_mem()
+                    usedmem = object_size([
+                        bger, bung, e2bung, e2bger, precond, solutions,
+                        residuals, relative_residual_norm
+                    ])
 
                     self.ostream.print_info(
-                        '{:.2f} {} of memory used for subspace procedure'
-                            .format(usedmem, usedmem_unit))
+                        '{:s} of memory used for subspace procedure'.format(
+                            usedmem))
                     self.ostream.print_info(
-                        '{:.2f} {} of memory available for the solver'.format(
-                            availmem, availmem_unit))
+                        '{:s} of memory available for the solver'.format(
+                            avail_mem()))
                     self.ostream.print_blank()
 
                 self.print_iteration(relative_residual_norm, xvs)

@@ -2,6 +2,7 @@ from sys import getsizeof
 from itertools import chain
 from psutil import virtual_memory
 
+
 def object_size(obj):
     """
     Returns the approximate memory footprint of an object or list of objects
@@ -14,15 +15,16 @@ def object_size(obj):
         The object or list of objects.
     """
 
-    units = ['bytes', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB']
+    def dict_handler(d):
+        return chain.from_iterable(d.items())
 
-    dict_handler = lambda d: chain.from_iterable(d.items())
-    all_handlers = {tuple: iter,
-                    list: iter,
-                    dict: dict_handler,
-                    set: iter,
-                    frozenset: iter,
-                   }
+    all_handlers = {
+        tuple: iter,
+        list: iter,
+        dict: dict_handler,
+        set: iter,
+        frozenset: iter,
+    }
     seen = set()
     default_size = getsizeof(0)
 
@@ -40,14 +42,15 @@ def object_size(obj):
 
     size = sizeof(obj)
 
-    unit_indx = 0
-    unit = units[unit_indx]
-    while size >= 1000:
-        size = size / 1000
-        unit_indx += 1
-        unit = units[unit_indx]
+    units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB']
 
-    return size, unit
+    unit_indx = 0
+    while size >= 1024:
+        size /= 1024
+        unit_indx += 1
+    unit = units[unit_indx]
+
+    return '{:.2f} {:s}'.format(size, unit)
 
 
 def avail_mem():
@@ -55,16 +58,14 @@ def avail_mem():
     Returns the available system memory along with the units of the value.
     """
 
-    units = ['bytes', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB']
+    mem = virtual_memory().available
 
-    virtmem = virtual_memory().available
+    units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB']
 
     unit_indx = 0
-    unit = units[unit_indx]
-    while virtmem >= 1000:
-        virtmem = virtmem / 1000
+    while mem >= 1024:
+        mem /= 1024
         unit_indx += 1
-        unit = units[unit_indx]
+    unit = units[unit_indx]
 
-    return virtmem, unit
-
+    return '{:.2f} {:s}'.format(mem, unit)
