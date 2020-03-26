@@ -34,7 +34,7 @@ Debian based Linux
 
     # Install python modules
 
-    sudo pip3 install numpy h5py pybind11 pytest loprop
+    sudo pip3 install numpy h5py pybind11 pytest loprop psutil
     sudo pip3 install --no-binary=mpi4py mpi4py
 
     # Install VeloxChem
@@ -66,7 +66,7 @@ RPM based Linux
 
     # Install python modules
 
-    sudo pip3 install numpy h5py pybind11 pytest loprop
+    sudo pip3 install numpy h5py pybind11 pytest loprop psutil
     sudo pip3 install --no-binary=mpi4py mpi4py
 
     # Install VeloxChem
@@ -108,7 +108,7 @@ PowerLinux
 
     # Install python modules
 
-    pip install numpy h5py pybind11 pytest loprop
+    pip install numpy h5py pybind11 pytest loprop psutil
     pip install --no-binary=mpi4py mpi4py
 
     # Install VeloxChem
@@ -132,7 +132,7 @@ Arm (Isambard Cray XC50 system)
 
     python3 -m pip install pybind11 --user
     python3 -m pip install h5py --user
-    python3 -m pip install loprop --user
+    python3 -m pip install loprop psutil --user
 
     # Manually install mpi4py
 
@@ -174,7 +174,7 @@ MacOS
 
     # Install python modules
 
-    pip3 install numpy h5py pybind11 pytest loprop
+    pip3 install numpy h5py pybind11 pytest loprop psutil
     pip3 install --no-binary=mpi4py mpi4py
 
     # Install VeloxChem
