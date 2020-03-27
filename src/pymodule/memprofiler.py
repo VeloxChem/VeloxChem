@@ -3,16 +3,17 @@ from itertools import chain
 from psutil import virtual_memory
 
 
-def object_size(obj):
+def object_size(obj, flag=None):
     """
     Returns the approximate memory footprint of an object or list of objects
-    and all of its contents along with the units of the value.
-
-    Automatically finds the contents of the following builtin containers and
-    their subclasses:  tuple, list, dict, set and frozenset.
+    and all of its contents along with the units of the value. Automatically
+    finds the contents of the following builtin containers and their
+    subclasses:  tuple, list, dict, set and frozenset.
 
     :param obj:
-        The object or list of objects.
+        The object.
+    :param flag:
+        The flag for printing memory size in bytes.
     """
 
     def dict_handler(d):
@@ -40,32 +41,39 @@ def object_size(obj):
                 break
         return s
 
-    size = sizeof(obj)
-
-    units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB']
-
-    unit_indx = 0
-    while size >= 1024:
-        size /= 1024
-        unit_indx += 1
-    unit = units[unit_indx]
-
-    return '{:.2f} {:s}'.format(size, unit)
+    if flag == 'bytes':
+        return sizeof(obj)
+    else:
+        return mem_string(sizeof(obj))
 
 
-def avail_mem():
+def avail_mem(flag=None):
     """
-    Returns the available system memory along with the units of the value.
+    Returns the available system memory.
+
+    :param flag:
+        The flag for printing memory size in bytes.
     """
 
-    mem = virtual_memory().available
+    if flag == 'bytes':
+        return virtual_memory().available
+    else:
+        return mem_string(virtual_memory().available)
 
-    units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB']
 
-    unit_indx = 0
-    while mem >= 1024:
-        mem /= 1024
-        unit_indx += 1
-    unit = units[unit_indx]
+def mem_string(memsize):
+    """
+    Prints memory size in readable format.
 
-    return '{:.2f} {:s}'.format(mem, unit)
+    :param memsize:
+        The memory size.
+    """
+
+    units = ['bytes', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB']
+
+    unit_index = 0
+    while memsize >= 1000 and unit_index < len(units) - 1:
+        memsize /= 1000
+        unit_index += 1
+
+    return '{:.2f} {:s}'.format(float(memsize), units[unit_index])

@@ -1,5 +1,6 @@
 import numpy as np
 import time as tm
+import tracemalloc
 import os
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
@@ -25,6 +26,7 @@ from .qqscheme import get_qq_type
 from .inputparser import parse_frequencies
 from .memprofiler import object_size
 from .memprofiler import avail_mem
+from .memprofiler import mem_string
 
 
 class ComplexResponse:
@@ -72,6 +74,8 @@ class ComplexResponse:
         - profiling: The flag for printing profiling information.
         - mem_profiling: The flag for printing the memory profiling
           information.
+        - mem_tracing: The flag for tracing memory allocation using
+          tracemalloc.
     """
 
     def __init__(self, comm, ostream):
@@ -122,6 +126,7 @@ class ComplexResponse:
         self.timing = False
         self.profiling = False
         self.mem_profiling = True
+        self.mem_tracing = False
 
     def update_settings(self, rsp_dict, method_dict={}):
         """
@@ -180,6 +185,9 @@ class ComplexResponse:
         if 'memory_profiling' in rsp_dict:
             key = rsp_dict['memory_profiling'].lower()
             self.mem_profiling = False if key in ['no', 'n'] else True
+        if 'memory_tracing' in rsp_dict:
+            key = rsp_dict['memory_tracing'].lower()
+            self.mem_tracing = True if key in ['yes', 'y'] else False
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
@@ -504,6 +512,9 @@ class ComplexResponse:
             dictionarry containing solutions and kappa values when called from
             a non-linear response module.
         """
+
+        if self.mem_tracing:
+            tracemalloc.start(self.max_iter)
 
         if self.profiling:
             import cProfile
@@ -865,20 +876,6 @@ class ComplexResponse:
                         n_ung))
                 self.ostream.print_blank()
 
-                if self.mem_profiling:
-                    usedmem = object_size([
-                        bger, bung, e2bung, e2bger, precond, solutions,
-                        residuals, relative_residual_norm
-                    ])
-
-                    self.ostream.print_info(
-                        '{:s} of memory used for subspace procedure'.format(
-                            usedmem))
-                    self.ostream.print_info(
-                        '{:s} of memory available for the solver'.format(
-                            avail_mem()))
-                    self.ostream.print_blank()
-
                 self.print_iteration(relative_residual_norm, xvs)
 
             if self.timing:
@@ -947,6 +944,32 @@ class ComplexResponse:
                 tid = iteration + 1
                 self.timing_dict['fock_build'][tid] += tm.time() - timing_t0
                 timing_t0 = tm.time()
+
+            if self.rank == mpi_master() and self.mem_tracing:
+                mem_curr = tracemalloc.take_snapshot()
+                cur_stats = mem_curr.statistics('lineno')
+                self.ostream.print_info('[ Tracemalloc ]')
+                for index, stat in enumerate(cur_stats[:15]):
+                    frame = stat.traceback[0]
+                    filename = os.sep.join(frame.filename.split(os.sep)[-2:])
+                    text = '#{:<3d} ...{:s}:{:d}:'.format(
+                        index + 1, filename, frame.lineno)
+                    self.ostream.print_info('{:<45s} {:s}'.format(
+                        text, mem_string(stat.size)))
+                self.ostream.print_blank()
+
+            if self.rank == mpi_master() and self.mem_profiling:
+                usedmem = object_size([
+                    bger, bung, e2bung, e2bger, precond, solutions, residuals,
+                    relative_residual_norm
+                ])
+                self.ostream.print_info(
+                    '{:s} of memory used for subspace procedure'.format(
+                        usedmem))
+                self.ostream.print_info(
+                    '{:s} of memory available for the solver'.format(
+                        avail_mem()))
+                self.ostream.print_blank()
 
         # converged?
         if self.rank == mpi_master():
