@@ -1,6 +1,5 @@
 import numpy as np
 import time as tm
-import tracemalloc
 import os
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
@@ -514,6 +513,7 @@ class ComplexResponse:
         """
 
         if self.mem_tracing:
+            import tracemalloc
             tracemalloc.start(self.max_iter)
 
         if self.profiling:
@@ -876,6 +876,33 @@ class ComplexResponse:
                         n_ung))
                 self.ostream.print_blank()
 
+                if self.mem_profiling:
+                    usedmem = object_size([
+                        bger, bung, e2bung, e2bger, precond, solutions,
+                        residuals, relative_residual_norm
+                    ])
+                    self.ostream.print_info(
+                        '{:s} of memory used for subspace procedure'.format(
+                            usedmem))
+                    self.ostream.print_info(
+                        '{:s} of memory available for the solver'.format(
+                            avail_mem()))
+                    self.ostream.print_blank()
+
+                if self.mem_tracing:
+                    mem_curr = tracemalloc.take_snapshot()
+                    cur_stats = mem_curr.statistics('lineno')
+                    self.ostream.print_info('[ Tracemalloc ]')
+                    for index, stat in enumerate(cur_stats[:10]):
+                        frame = stat.traceback[0]
+                        filename = os.sep.join(
+                            frame.filename.split(os.sep)[-2:])
+                        text = '#{:<3d} ...{:s}:{:d}:'.format(
+                            index + 1, filename, frame.lineno)
+                        self.ostream.print_info('{:<45s} {:s}'.format(
+                            text, mem_string(stat.size)))
+                    self.ostream.print_blank()
+
                 self.print_iteration(relative_residual_norm, xvs)
 
             if self.timing:
@@ -944,32 +971,6 @@ class ComplexResponse:
                 tid = iteration + 1
                 self.timing_dict['fock_build'][tid] += tm.time() - timing_t0
                 timing_t0 = tm.time()
-
-            if self.rank == mpi_master() and self.mem_tracing:
-                mem_curr = tracemalloc.take_snapshot()
-                cur_stats = mem_curr.statistics('lineno')
-                self.ostream.print_info('[ Tracemalloc ]')
-                for index, stat in enumerate(cur_stats[:15]):
-                    frame = stat.traceback[0]
-                    filename = os.sep.join(frame.filename.split(os.sep)[-2:])
-                    text = '#{:<3d} ...{:s}:{:d}:'.format(
-                        index + 1, filename, frame.lineno)
-                    self.ostream.print_info('{:<45s} {:s}'.format(
-                        text, mem_string(stat.size)))
-                self.ostream.print_blank()
-
-            if self.rank == mpi_master() and self.mem_profiling:
-                usedmem = object_size([
-                    bger, bung, e2bung, e2bger, precond, solutions, residuals,
-                    relative_residual_norm
-                ])
-                self.ostream.print_info(
-                    '{:s} of memory used for subspace procedure'.format(
-                        usedmem))
-                self.ostream.print_info(
-                    '{:s} of memory available for the solver'.format(
-                        avail_mem()))
-                self.ostream.print_blank()
 
         # converged?
         if self.rank == mpi_master():
