@@ -23,7 +23,7 @@ from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .inputparser import parse_frequencies
-from .memprofiler import object_size
+from .memprofiler import sizeof_numpy_arrays
 from .memprofiler import avail_mem
 from .memprofiler import mem_string
 
@@ -877,9 +877,9 @@ class ComplexResponse:
                 self.ostream.print_blank()
 
                 if self.mem_profiling:
-                    usedmem = object_size([
+                    usedmem = sizeof_numpy_arrays([
                         bger, bung, e2bung, e2bger, precond, solutions,
-                        residuals, relative_residual_norm
+                        residuals
                     ])
                     self.ostream.print_info(
                         '{:s} of memory used for subspace procedure'.format(

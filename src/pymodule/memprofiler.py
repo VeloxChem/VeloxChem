@@ -1,50 +1,51 @@
+import numpy as np
 from sys import getsizeof
-from itertools import chain
 from psutil import virtual_memory
 
+from .errorhandler import assert_msg_critical
 
-def object_size(obj, flag=None):
+
+def sizeof_numpy_arrays(objs, flag=None):
     """
-    Returns the approximate memory footprint of an object or list of objects
-    and all of its contents along with the units of the value. Automatically
-    finds the contents of the following builtin containers and their
-    subclasses:  tuple, list, dict, set and frozenset.
+    Gets the size of containers of numpy arrays.
 
-    :param obj:
-        The object.
+    :param objs:
+        The list of container objects.
     :param flag:
         The flag for printing memory size in bytes.
     """
 
-    def dict_handler(d):
-        return chain.from_iterable(d.items())
+    memsize = getsizeof(objs)
 
-    all_handlers = {
-        tuple: iter,
-        list: iter,
-        dict: dict_handler,
-        set: iter,
-        frozenset: iter,
-    }
-    seen = set()
-    default_size = getsizeof(0)
+    for obj in objs:
 
-    def sizeof(o):
-        if id(o) in seen:
-            return 0
-        seen.add(id(o))
-        s = getsizeof(o, default_size)
+        if isinstance(obj, (list, tuple, set)):
+            for x in obj:
+                assert_msg_critical(
+                    isinstance(x, np.ndarray),
+                    'sizeof_numpy_nparrays: incorrect type of object ' +
+                    str(type(x)))
+                memsize += getsizeof(x)
 
-        for typ, handler in all_handlers.items():
-            if isinstance(o, typ):
-                s += sum(map(sizeof, handler(o)))
-                break
-        return s
+        elif isinstance(obj, dict):
+            for key, x in obj.items():
+                assert_msg_critical(
+                    isinstance(x, np.ndarray),
+                    'sizeof_numpy_arrays: incorrect type of object ' +
+                    str(type(x)))
+                memsize += getsizeof(x)
+
+        else:
+            assert_msg_critical(
+                isinstance(obj, np.ndarray),
+                'sizeof_numpy_arrays: incorrect type of object ' +
+                str(type(obj)))
+            memsize += getsizeof(obj)
 
     if flag == 'bytes':
-        return sizeof(obj)
+        return memsize
     else:
-        return mem_string(sizeof(obj))
+        return mem_string(memsize)
 
 
 def avail_mem(flag=None):
