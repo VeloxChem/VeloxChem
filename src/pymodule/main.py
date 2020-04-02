@@ -92,6 +92,9 @@ def main():
         density = scf_drv.density
         scf_tensors = scf_drv.scf_tensors
 
+        if not scf_drv.is_converged:
+            return
+
     # Response
 
     if task_type == 'response' and scf_drv.restricted:

@@ -348,6 +348,12 @@ class ScfDriver:
         self.fock_matrices_beta.clear()
         self.den_matrices_beta.clear()
 
+        if not self.is_converged:
+            self.ostream.print_header(
+                '*** Warning: SCF is not converged!'.ljust(92))
+            self.ostream.print_blank()
+            return
+
         if self.rank == mpi_master():
             self.print_scf_energy()
             if self.restricted:
@@ -573,10 +579,6 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self.print_scf_finish(start_time)
-
-        if self.rank == mpi_master() and not self.first_step:
-            assert_msg_critical(self.is_converged,
-                                'ScfDriver.compute: failed to converge')
 
     def comp_one_ints(self, molecule, basis):
         """
