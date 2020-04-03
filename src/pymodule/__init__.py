@@ -29,6 +29,8 @@ from .veloxchemlib import mathconst_pi
 
 # C++ enums
 from .veloxchemlib import denmat
+from .veloxchemlib import fockmat
+from .veloxchemlib import szblock
 from .veloxchemlib import ericut
 from .veloxchemlib import molorb
 from .veloxchemlib import moints
