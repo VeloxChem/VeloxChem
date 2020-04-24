@@ -9,6 +9,7 @@ from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import denmat
 from .veloxchemlib import parse_xc_func
+from .memoryprofiler import MemoryProfiler
 from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence_half
@@ -23,9 +24,6 @@ from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .inputparser import parse_frequencies
-from .memprofiler import sizeof_numpy_arrays
-from .memprofiler import avail_mem
-from .memprofiler import mem_string
 
 
 class ComplexResponse:
@@ -71,9 +69,8 @@ class ComplexResponse:
         - checkpoint_time: The timer of checkpoint file.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
-        - mem_profiling: The flag for printing the memory profiling
-          information.
-        - mem_tracing: The flag for tracing memory allocation using
+        - memory_profiling: The flag for printing memory usage.
+        - memory_tracing: The flag for tracing memory allocation using
           tracemalloc.
     """
 
@@ -124,8 +121,8 @@ class ComplexResponse:
 
         self.timing = False
         self.profiling = False
-        self.mem_profiling = True
-        self.mem_tracing = False
+        self.memory_profiling = False
+        self.memory_tracing = False
 
     def update_settings(self, rsp_dict, method_dict={}):
         """
@@ -183,10 +180,10 @@ class ComplexResponse:
             self.profiling = True if key in ['yes', 'y'] else False
         if 'memory_profiling' in rsp_dict:
             key = rsp_dict['memory_profiling'].lower()
-            self.mem_profiling = False if key in ['no', 'n'] else True
+            self.memory_profiling = True if key in ['yes', 'y'] else False
         if 'memory_tracing' in rsp_dict:
             key = rsp_dict['memory_tracing'].lower()
-            self.mem_tracing = True if key in ['yes', 'y'] else False
+            self.memory_tracing = True if key in ['yes', 'y'] else False
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
@@ -512,7 +509,9 @@ class ComplexResponse:
             a non-linear response module.
         """
 
-        if self.mem_tracing:
+        memprof = MemoryProfiler('CPP solver')
+
+        if self.memory_tracing:
             import tracemalloc
             tracemalloc.start(self.max_iter)
 
@@ -697,13 +696,16 @@ class ComplexResponse:
                                                    molgrid, gs_density, V_es,
                                                    pe_drv, timing_dict)
 
-        solutions = {}
-        residuals = {}
-        relative_residual_norm = {}
-
         if self.timing:
             self.timing_dict['fock_build'][0] += tm.time() - timing_t0
             timing_t0 = tm.time()
+
+        if self.memory_profiling:
+            memprof.check_memory_system('Initial guess')
+
+        solutions = {}
+        residuals = {}
+        relative_residual_norm = {}
 
         for iteration in range(self.max_iter):
             self.cur_iter = iteration
@@ -876,20 +878,22 @@ class ComplexResponse:
                         n_ung))
                 self.ostream.print_blank()
 
-                if self.mem_profiling:
-                    usedmem = sizeof_numpy_arrays([
-                        bger, bung, e2bung, e2bger, precond, solutions,
-                        residuals
-                    ])
-                    self.ostream.print_info(
-                        '{:s} of memory used for subspace procedure'.format(
-                            usedmem))
-                    self.ostream.print_info(
-                        '{:s} of memory available for the solver'.format(
-                            avail_mem()))
-                    self.ostream.print_blank()
+                mem_usage = memprof.get_memory_object(
+                    [bger, bung, e2bung, e2bger, precond, solutions, residuals])
+                mem_avail = memprof.get_available_memory()
 
-                if self.mem_tracing:
+                self.ostream.print_info(
+                    '{:s} of memory used for subspace procedure'.format(
+                        mem_usage))
+                self.ostream.print_info(
+                    '{:s} of memory available for the solver'.format(mem_avail))
+                self.ostream.print_blank()
+
+                if self.memory_profiling:
+                    memprof.check_memory_system(
+                        'Iteration {:d} subspace'.format(iteration + 1))
+
+                if self.memory_tracing:
                     mem_curr = tracemalloc.take_snapshot()
                     cur_stats = mem_curr.statistics('lineno')
                     self.ostream.print_info('[ Tracemalloc ]')
@@ -900,7 +904,7 @@ class ComplexResponse:
                         text = '#{:<3d} ...{:s}:{:d}:'.format(
                             index + 1, filename, frame.lineno)
                         self.ostream.print_info('{:<45s} {:s}'.format(
-                            text, mem_string(stat.size)))
+                            text, memprof.memory_string(stat.size)))
                     self.ostream.print_blank()
 
                 self.print_iteration(relative_residual_norm, xvs)
@@ -972,6 +976,10 @@ class ComplexResponse:
                 self.timing_dict['fock_build'][tid] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
+            if self.memory_profiling:
+                memprof.check_memory_system(
+                    'Iteration {:d} sigma build'.format(iteration + 1))
+
         # converged?
         if self.rank == mpi_master():
             self.print_convergence()
@@ -991,6 +999,11 @@ class ComplexResponse:
             if self.rank == mpi_master():
                 for line in s.getvalue().split(os.linesep):
                     self.ostream.print_info(line)
+
+        if self.memory_profiling:
+            memprof.check_memory_system('End of CPP solver')
+            if self.rank == mpi_master():
+                memprof.print_memory_usage(self.ostream)
 
         if not self.nonlinear:
             a_rhs = get_complex_rhs(self.a_operator, self.a_components,
