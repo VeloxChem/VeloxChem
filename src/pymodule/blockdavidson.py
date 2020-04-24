@@ -88,8 +88,8 @@ class BlockDavidsonSolver:
             The convergence threshold for the solver.
 
         :return:
-            The true if residual norms are converged for all eigenpairs,
-            false otherwise.
+            True if residual norms are converged for all eigenpairs, False
+            otherwise.
         """
 
         for rval in self.residual_norms:

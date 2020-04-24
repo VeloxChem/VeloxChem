@@ -984,9 +984,6 @@ class ComplexResponse:
         if self.rank == mpi_master():
             self.print_convergence()
 
-            assert_msg_critical(self.is_converged,
-                                'ComplexResponseSolver: failed to converge')
-
             if self.timing:
                 self.print_timing()
 
@@ -1010,7 +1007,7 @@ class ComplexResponse:
                                     molecule, basis, scf_tensors, self.rank,
                                     self.comm)
 
-            if self.rank == mpi_master():
+            if self.rank == mpi_master() and self.is_converged:
                 va = {op: v for op, v in zip(self.a_components, a_rhs)}
                 rsp_funcs = {}
                 for aop in self.a_components:
@@ -1018,17 +1015,19 @@ class ComplexResponse:
                         rsp_funcs[(aop, bop,
                                    w)] = -np.dot(va[aop], solutions[(bop, w)])
                 return {'response_functions': rsp_funcs, 'solutions': solutions}
+            else:
+                return {}
 
         else:
-            if self.rank == mpi_master():
+            if self.rank == mpi_master() and self.is_converged:
                 kappas = {}
                 for op, w in solutions:
                     kappas[(op, w)] = (
                         lrvec2mat(solutions[(op, w)].real, nocc, norb) +
                         1j * lrvec2mat(solutions[(op, w)].imag, nocc, norb))
                 return {'solutions': solutions, 'kappas': kappas}
-
-        return {}
+            else:
+                return {}
 
     def check_convergence(self, relative_residual_norm):
         """
@@ -1088,38 +1087,38 @@ class ComplexResponse:
         """
 
         self.ostream.print_blank()
-        self.ostream.print_header("Complex Response Driver Setup")
-        self.ostream.print_header(31 * "=")
+        self.ostream.print_header('Complex Response Driver Setup')
+        self.ostream.print_header(31 * '=')
         self.ostream.print_blank()
 
         width = 60
 
-        cur_str = "Damping Parameter (gamma)       : {:.6e}".format(
+        cur_str = 'Damping Parameter (gamma)       : {:.6e}'.format(
             self.damping)
         self.ostream.print_header(cur_str.ljust(width))
 
-        cur_str = "Max. Number of Iterations       : " + str(self.max_iter)
+        cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(width))
-        cur_str = "Convergence Threshold           : " + \
-            "{:.1e}".format(self.conv_thresh)
+        cur_str = 'Convergence Threshold           : ' + \
+            '{:.1e}'.format(self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(width))
 
-        cur_str = "ERI Screening Scheme            : " + get_qq_type(
+        cur_str = 'ERI Screening Scheme            : ' + get_qq_type(
             self.qq_type)
         self.ostream.print_header(cur_str.ljust(width))
-        cur_str = "ERI Screening Threshold         : " + \
-            "{:.1e}".format(self.eri_thresh)
+        cur_str = 'ERI Screening Threshold         : ' + \
+            '{:.1e}'.format(self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(width))
         if self.batch_size is not None:
-            cur_str = "Batch Size of Fock Matrices     : " + \
-                "{:d}".format(self.batch_size)
+            cur_str = 'Batch Size of Fock Matrices     : ' + \
+                '{:d}'.format(self.batch_size)
             self.ostream.print_header(cur_str.ljust(width))
 
         if self.dft:
-            cur_str = "Exchange-Correlation Functional : "
+            cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(width))
-            cur_str = "Molecular Grid Level            : " + str(
+            cur_str = 'Molecular Grid Level            : ' + str(
                 self.grid_level)
             self.ostream.print_header(cur_str.ljust(width))
 

@@ -190,8 +190,8 @@ class TDAExciDriver:
 
         # set start time
 
-        start_time = tm.time()
-        self.checkpoint_time = start_time
+        self.start_time = tm.time()
+        self.checkpoint_time = self.start_time
 
         # sanity check
 
@@ -364,9 +364,9 @@ class TDAExciDriver:
             if self.is_converged:
                 break
 
+        # converged?
         if self.rank == mpi_master():
-            assert_msg_critical(self.is_converged,
-                                'TDA driver: failed to converge')
+            self.print_convergence()
 
         # compute 1e dipole integrals
 
@@ -376,9 +376,7 @@ class TDAExciDriver:
 
         # print converged excited states
 
-        if self.rank == mpi_master():
-            self.print_excited_states(start_time)
-
+        if self.rank == mpi_master() and self.is_converged:
             nocc = molecule.number_of_alpha_electrons()
             mo_occ = scf_tensors['C'][:, :nocc]
             mo_vir = scf_tensors['C'][:, nocc:]
@@ -839,33 +837,33 @@ class TDAExciDriver:
         """
 
         self.ostream.print_blank()
-        self.ostream.print_header("TDA Driver Setup")
-        self.ostream.print_header(18 * "=")
+        self.ostream.print_header('TDA Driver Setup')
+        self.ostream.print_header(18 * '=')
         self.ostream.print_blank()
 
         str_width = 60
 
-        cur_str = "Number of States                : " + str(self.nstates)
+        cur_str = 'Number of States                : ' + str(self.nstates)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = "Max. Number of Iterations       : " + str(self.max_iter)
+        cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Convergence Threshold           : " + \
-            "{:.1e}".format(self.conv_thresh)
+        cur_str = 'Convergence Threshold           : ' + \
+            '{:.1e}'.format(self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = "ERI Screening Scheme            : " + get_qq_type(
+        cur_str = 'ERI Screening Scheme            : ' + get_qq_type(
             self.qq_type)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "ERI Screening Threshold         : " + \
-            "{:.1e}".format(self.eri_thresh)
+        cur_str = 'ERI Screening Threshold         : ' + \
+            '{:.1e}'.format(self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.dft:
-            cur_str = "Exchange-Correlation Functional : "
+            cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = "Molecular Grid Level            : " + str(
+            cur_str = 'Molecular Grid Level            : ' + str(
                 self.grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
@@ -882,11 +880,11 @@ class TDAExciDriver:
 
         # iteration header
 
-        exec_str = " *** Iteration: " + (str(iteration + 1)).rjust(3)
-        exec_str += " * Reduced Space: "
+        exec_str = ' *** Iteration: ' + (str(iteration + 1)).rjust(3)
+        exec_str += ' * Reduced Space: '
         exec_str += (str(self.solver.reduced_space_size())).rjust(4)
         rmax, rmin = self.solver.max_min_residual_norms()
-        exec_str += " * Residues (Max,Min): {:.2e} and {:.2e}".format(
+        exec_str += ' * Residues (Max,Min): {:.2e} and {:.2e}'.format(
             rmax, rmin)
         self.ostream.print_header(exec_str)
         self.ostream.print_blank()
@@ -895,28 +893,25 @@ class TDAExciDriver:
 
         reigs, rnorms = self.solver.get_eigenvalues()
         for i in range(reigs.shape[0]):
-            exec_str = "State {:2d}: {:5.8f} ".format(i + 1, reigs[i])
-            exec_str += "au Residual Norm: {:3.8f}".format(rnorms[i])
+            exec_str = 'State {:2d}: {:5.8f} '.format(i + 1, reigs[i])
+            exec_str += 'au Residual Norm: {:3.8f}'.format(rnorms[i])
             self.ostream.print_header(exec_str.ljust(84))
 
         # flush output stream
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def print_excited_states(self, start_time):
+    def print_convergence(self):
         """
-        Prints excited states information to output stream.
-
-        :param start_time:
-            The start time of SCF calculation.
+        Prints convergence information.
         """
 
-        valstr = "*** {:d} excited states ".format(self.nstates)
+        valstr = '*** {:d} excited states '.format(self.nstates)
         if self.is_converged:
-            valstr += "converged"
+            valstr += 'converged'
         else:
-            valstr += "NOT converged"
-        valstr += " in {:d} iterations. ".format(self.cur_iter + 1)
-        valstr += "Time: {:.2f}".format(tm.time() - start_time) + " sec."
+            valstr += 'NOT converged'
+        valstr += ' in {:d} iterations. '.format(self.cur_iter + 1)
+        valstr += 'Time: {:.2f}'.format(tm.time() - self.start_time) + ' sec.'
         self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_blank()

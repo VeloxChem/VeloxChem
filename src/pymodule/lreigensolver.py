@@ -530,10 +530,6 @@ class LinearResponseEigenSolver:
         if self.rank == mpi_master():
             self.print_convergence()
 
-            assert_msg_critical(
-                self.is_converged,
-                'LinearResponseEigenSolver.compute: failed to converge')
-
             if self.timing:
                 self.print_timing()
 
@@ -554,7 +550,7 @@ class LinearResponseEigenSolver:
         angmom_rhs = get_rhs('angular_momentum', 'xyz', molecule, basis,
                              scf_tensors, self.rank, self.comm)
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and self.is_converged:
             V_dipole = {op: V for op, V in zip('xyz', dipole_rhs)}
             V_linmom = {op: V for op, V in zip('xyz', linmom_rhs)}
             V_angmom = {op: V for op, V in zip('xyz', angmom_rhs)}
@@ -616,33 +612,33 @@ class LinearResponseEigenSolver:
         """
 
         self.ostream.print_blank()
-        self.ostream.print_header("Linear Response EigenSolver Setup")
-        self.ostream.print_header(35 * "=")
+        self.ostream.print_header('Linear Response EigenSolver Setup')
+        self.ostream.print_header(35 * '=')
         self.ostream.print_blank()
 
         str_width = 60
 
-        cur_str = "Number of States                : " + str(self.nstates)
+        cur_str = 'Number of States                : ' + str(self.nstates)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = "Max. Number of Iterations       : " + str(self.max_iter)
+        cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Convergence Threshold           : " + \
-            "{:.1e}".format(self.conv_thresh)
+        cur_str = 'Convergence Threshold           : ' + \
+            '{:.1e}'.format(self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = "ERI Screening Scheme            : " + get_qq_type(
+        cur_str = 'ERI Screening Scheme            : ' + get_qq_type(
             self.qq_type)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "ERI Screening Threshold         : " + \
-            "{:.1e}".format(self.eri_thresh)
+        cur_str = 'ERI Screening Threshold         : ' + \
+            '{:.1e}'.format(self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.dft:
-            cur_str = "Exchange-Correlation Functional : "
+            cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = "Molecular Grid Level            : " + str(
+            cur_str = 'Molecular Grid Level            : ' + str(
                 self.grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
@@ -682,7 +678,7 @@ class LinearResponseEigenSolver:
 
     def print_convergence(self):
         """
-        Prints information after convergence.
+        Prints convergence information.
         """
 
         width = 92

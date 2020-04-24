@@ -135,6 +135,9 @@ def main():
 
         rsp_prop.init_driver(task.mpi_comm, task.ostream)
         rsp_prop.compute(task.molecule, task.ao_basis, scf_tensors)
+        if not rsp_prop.converged():
+            return
+
         if task.mpi_rank == mpi_master():
             rsp_prop.print_property(task.ostream)
 

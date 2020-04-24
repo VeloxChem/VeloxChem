@@ -23,6 +23,8 @@ class ResponseDriver:
         - comm: The MPI communicator.
         - rank: The rank of MPI process.
         - nodes: The number of MPI processes.
+        - ostream: The output stream.
+        - is_converged: The flag for convergence.
     """
 
     def __init__(self, comm, ostream):
@@ -43,6 +45,9 @@ class ResponseDriver:
 
         # output stream
         self.ostream = ostream
+
+        # convergence
+        self.is_converged = False
 
     def update_settings(self, rsp_dict, method_dict={}):
         """
@@ -92,7 +97,11 @@ class ResponseDriver:
 
             solver.update_settings(self.rsp_dict, self.method_dict)
 
-            return solver.compute(molecule, ao_basis, scf_tensors)
+            result = solver.compute(molecule, ao_basis, scf_tensors)
+
+            self.is_converged = solver.is_converged
+
+            return result
 
         # Linear response solver
 
@@ -104,7 +113,11 @@ class ResponseDriver:
 
             solver.update_settings(self.rsp_dict, self.method_dict)
 
-            return solver.compute(molecule, ao_basis, scf_tensors)
+            result = solver.compute(molecule, ao_basis, scf_tensors)
+
+            self.is_converged = solver.is_converged
+
+            return result
 
         # Complex linear response solver
 
@@ -117,7 +130,11 @@ class ResponseDriver:
 
             clr_solver.update_settings(self.rsp_dict, self.method_dict)
 
-            return clr_solver.compute(molecule, ao_basis, scf_tensors)
+            clr_result = clr_solver.compute(molecule, ao_basis, scf_tensors)
+
+            self.is_converged = clr_solver.is_converged
+
+            return clr_result
 
         # C6 linear response solver
 
@@ -130,7 +147,11 @@ class ResponseDriver:
 
             c6_solver.update_settings(self.rsp_dict, self.method_dict)
 
-            return c6_solver.compute(molecule, ao_basis, scf_tensors)
+            c6_result = c6_solver.compute(molecule, ao_basis, scf_tensors)
+
+            self.is_converged = c6_solver.is_converged
+
+            return c6_result
 
     def prop_str(self):
         """

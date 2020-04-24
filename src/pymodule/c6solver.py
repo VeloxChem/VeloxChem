@@ -783,9 +783,6 @@ class C6Solver:
         if self.rank == mpi_master():
             self.print_convergence()
 
-            assert_msg_critical(self.is_converged,
-                                'C6Solver: failed to converge')
-
             if self.timing:
                 self.print_timing()
 
@@ -803,7 +800,7 @@ class C6Solver:
                                 molecule, basis, scf_tensors, self.rank,
                                 self.comm)
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and self.is_converged:
             va = {op: v for op, v in zip(self.a_components, a_rhs)}
             rsp_funcs = {}
             for aop in self.a_components:
@@ -814,8 +811,8 @@ class C6Solver:
                 'response_functions': rsp_funcs,
                 'solutions': solutions,
             }
-
-        return {}
+        else:
+            return {}
 
     def check_convergence(self, relative_residual_norm):
         """
@@ -875,33 +872,33 @@ class C6Solver:
         """
 
         self.ostream.print_blank()
-        self.ostream.print_header("C6 Value Response Driver Setup")
-        self.ostream.print_header(31 * "=")
+        self.ostream.print_header('C6 Value Response Driver Setup')
+        self.ostream.print_header(32 * '=')
         self.ostream.print_blank()
 
         width = 60
 
-        cur_str = "Number of integration points    : " + str(self.n_points)
+        cur_str = 'Number of integration points    : ' + str(self.n_points)
         self.ostream.print_header(cur_str.ljust(width))
 
-        cur_str = "Max. Number of Iterations       : " + str(self.max_iter)
+        cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(width))
-        cur_str = "Convergence Threshold           : " + \
-            "{:.1e}".format(self.conv_thresh)
+        cur_str = 'Convergence Threshold           : ' + \
+            '{:.1e}'.format(self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(width))
 
-        cur_str = "ERI Screening Scheme            : " + get_qq_type(
+        cur_str = 'ERI Screening Scheme            : ' + get_qq_type(
             self.qq_type)
         self.ostream.print_header(cur_str.ljust(width))
-        cur_str = "ERI Screening Threshold         : " + \
-            "{:.1e}".format(self.eri_thresh)
+        cur_str = 'ERI Screening Threshold         : ' + \
+            '{:.1e}'.format(self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(width))
 
         if self.dft:
-            cur_str = "Exchange-Correlation Functional : "
+            cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(width))
-            cur_str = "Molecular Grid Level            : " + str(
+            cur_str = 'Molecular Grid Level            : ' + str(
                 self.grid_level)
             self.ostream.print_header(cur_str.ljust(width))
 

@@ -536,10 +536,6 @@ class LinearResponseSolver:
         if self.rank == mpi_master():
             self.print_convergence()
 
-            assert_msg_critical(
-                self.is_converged,
-                'LinearResponseSolver.compute: failed to converge')
-
             if self.timing:
                 self.print_timing()
 
@@ -558,7 +554,7 @@ class LinearResponseSolver:
             a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
                             scf_tensors, self.rank, self.comm)
 
-            if self.rank == mpi_master():
+            if self.rank == mpi_master() and self.is_converged:
                 va = {op: v for op, v in zip(self.a_components, a_rhs)}
                 rsp_funcs = {}
                 for aop in self.a_components:
@@ -569,9 +565,11 @@ class LinearResponseSolver:
                     'response_functions': rsp_funcs,
                     'solutions': solutions,
                 }
+            else:
+                return {}
 
         else:
-            if self.rank == mpi_master():
+            if self.rank == mpi_master() and self.is_converged:
                 kappas = {}
                 for (op, freq), x in solutions.items():
                     kappas[(op, freq)] = lrvec2mat(x, nocc, norb)
@@ -579,8 +577,8 @@ class LinearResponseSolver:
                     'solutions': solutions,
                     'kappas': kappas,
                 }
-
-        return {}
+            else:
+                return {}
 
     def print_header(self):
         """
@@ -588,30 +586,30 @@ class LinearResponseSolver:
         """
 
         self.ostream.print_blank()
-        self.ostream.print_header("Linear Response Solver Setup")
-        self.ostream.print_header(30 * "=")
+        self.ostream.print_header('Linear Response Solver Setup')
+        self.ostream.print_header(30 * '=')
         self.ostream.print_blank()
 
         str_width = 60
 
-        cur_str = "Max. Number of Iterations       : " + str(self.max_iter)
+        cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Convergence Threshold           : " + \
-            "{:.1e}".format(self.conv_thresh)
+        cur_str = 'Convergence Threshold           : ' + \
+            '{:.1e}'.format(self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = "ERI Screening Scheme            : " + get_qq_type(
+        cur_str = 'ERI Screening Scheme            : ' + get_qq_type(
             self.qq_type)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "ERI Screening Threshold         : " + \
-            "{:.1e}".format(self.eri_thresh)
+        cur_str = 'ERI Screening Threshold         : ' + \
+            '{:.1e}'.format(self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.dft:
-            cur_str = "Exchange-Correlation Functional : "
+            cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = "Molecular Grid Level            : " + str(
+            cur_str = 'Molecular Grid Level            : ' + str(
                 self.grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
