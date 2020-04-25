@@ -420,6 +420,10 @@ class LinearResponseSolver:
             self.cur_iter = iteration
 
             for op, freq in op_freq_keys:
+                if (iteration > 0 and
+                        relative_residual_norm[(op, freq)] < self.conv_thresh):
+                    continue
+
                 if self.rank == mpi_master():
                     v = v1[(op, freq)]
                     gradger, gradung = self.decomp_grad(v)
@@ -480,6 +484,9 @@ class LinearResponseSolver:
                     else:
                         residuals[(op, freq)] = r
 
+            relative_residual_norm = self.comm.bcast(relative_residual_norm,
+                                                     root=mpi_master())
+
             # write to output
             if self.rank == mpi_master():
                 self.ostream.print_info(
@@ -506,9 +513,9 @@ class LinearResponseSolver:
             new_trials_ger, new_trials_ung = self.setup_trials(
                 residuals, precond, dist_bger, dist_bung)
 
-            if self.rank == mpi_master():
-                residuals.clear()
+            residuals.clear()
 
+            if self.rank == mpi_master():
                 assert_msg_critical(
                     new_trials_ger.any() or new_trials_ung.any(),
                     'LinearResponseSolver: unable to add new trial vector')
