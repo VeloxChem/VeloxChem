@@ -133,7 +133,7 @@ class DistributedArray:
             full_shape_0 = sum([m.shape[0] for m in seg_mat])
 
             if array.ndim == 1:
-                return np.array(seg_mat).reshape(full_shape_0)
+                return np.hstack(seg_mat).reshape(full_shape_0)
 
             elif array.ndim == 2:
                 return np.vstack(seg_mat).reshape(full_shape_0, array.shape[1])
