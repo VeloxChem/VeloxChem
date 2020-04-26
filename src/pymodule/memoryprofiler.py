@@ -1,3 +1,4 @@
+import numpy as np
 import time as tm
 import psutil
 import sys
@@ -123,6 +124,30 @@ class MemoryProfiler:
         """
 
         return self.memory_string(self.comp_memory_object(obj))
+
+    def get_memory_dictionary(self, d):
+        """
+        Gets memory usage of a dictionary.
+
+        :param d:
+            The dictionary.
+        :return:
+            Memory usage of the dictionary and the list of memory usage of each
+            item.
+        """
+
+        mem_usage = 0.0
+        mem_detail = []
+
+        for key, obj in d.items():
+            flag = ''
+            if isinstance(obj, np.ndarray) and not obj.flags.owndata:
+                flag = '  (not accurate)'
+            mem_obj = self.comp_memory_object(obj)
+            mem_usage += mem_obj
+            mem_detail.append((key, self.memory_string(mem_obj) + flag))
+
+        return self.memory_string(mem_usage), mem_detail
 
     def get_available_memory(self):
         """

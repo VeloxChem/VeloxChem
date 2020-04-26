@@ -508,13 +508,23 @@ class LinearResponseSolver:
                         n_ung))
                 self.ostream.print_blank()
 
-                mem_usage = memprof.get_memory_object(
-                    [bger, bung, e2bung, e2bger, precond, solutions, residuals])
+                mem_usage, mem_detail = memprof.get_memory_dictionary({
+                    'dist_bger': dist_bger.array(),
+                    'dist_bung': dist_bung.array(),
+                    'dist_e2bung': dist_e2bung.array(),
+                    'dist_e2bger': dist_e2bger.array(),
+                    'precond': precond,
+                    'solutions': solutions,
+                    'residuals': residuals,
+                })
                 mem_avail = memprof.get_available_memory()
 
                 self.ostream.print_info(
                     '{:s} of memory used for subspace procedure'.format(
                         mem_usage))
+                if self.memory_profiling:
+                    for m in mem_detail:
+                        self.ostream.print_info('  {:<15s} {:s}'.format(*m))
                 self.ostream.print_info(
                     '{:s} of memory available for the solver'.format(mem_avail))
                 self.ostream.print_blank()

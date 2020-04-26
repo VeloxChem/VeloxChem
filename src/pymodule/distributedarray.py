@@ -53,6 +53,16 @@ class DistributedArray:
         self.comm = comm
         self.data = comm.scatter(array_list, root=mpi_master())
 
+    def array(self):
+        """
+        Returns the numpy array stored in the object.
+
+        :return:
+            The numpy array.
+        """
+
+        return self.data
+
     def shape(self, axis):
         """
         Returns the shape of the distributed array along axis.
