@@ -11,6 +11,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .distributedarray import DistributedArray
 from .aodensitymatrix import AODensityMatrix
+from .memoryprofiler import MemoryProfiler
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence_half
 from .lrmatvecdriver import orthogonalize_gram_schmidt_half
@@ -66,6 +67,7 @@ class LinearResponseSolver:
         - checkpoint_time: The timer of checkpoint file.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
+        - memory_profiling: The flag for printing memory usage.
     """
 
     def __init__(self, comm, ostream):
@@ -119,6 +121,7 @@ class LinearResponseSolver:
 
         self.timing = False
         self.profiling = False
+        self.memory_profiling = False
 
     def update_settings(self, rsp_dict, method_dict={}):
         """
@@ -166,6 +169,10 @@ class LinearResponseSolver:
             key = rsp_dict['profiling'].lower()
             self.profiling = True if key in ['yes', 'y'] else False
 
+        if 'memory_profiling' in rsp_dict:
+            key = rsp_dict['memory_profiling'].lower()
+            self.memory_profiling = True if key in ['yes', 'y'] else False
+
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
             self.dft = True if key == 'yes' else False
@@ -209,6 +216,8 @@ class LinearResponseSolver:
             dictionarry containing solutions and kappa values when called from
             a non-linear response module.
         """
+
+        memprof = MemoryProfiler('LR solver')
 
         if self.profiling:
             import cProfile
@@ -389,6 +398,13 @@ class LinearResponseSolver:
                                                    molgrid, gs_density, V_es,
                                                    pe_drv, timing_dict)
 
+        if self.timing:
+            self.timing_dict['new_trials'][0] += tm.time() - timing_t0
+            timing_t0 = tm.time()
+
+        if self.memory_profiling:
+            memprof.check_memory_system('Initial guess')
+
         dist_bger = DistributedArray(bger, self.comm)
         dist_bung = DistributedArray(bung, self.comm)
         dist_e2bger = DistributedArray(e2bger, self.comm)
@@ -397,10 +413,6 @@ class LinearResponseSolver:
         solutions = {}
         residuals = {}
         relative_residual_norm = {}
-
-        if self.timing:
-            self.timing_dict['new_trials'][0] += tm.time() - timing_t0
-            timing_t0 = tm.time()
 
         # start iterations
         for iteration in range(self.max_iter):
@@ -496,6 +508,21 @@ class LinearResponseSolver:
                         n_ung))
                 self.ostream.print_blank()
 
+                mem_usage = memprof.get_memory_object(
+                    [bger, bung, e2bung, e2bger, precond, solutions, residuals])
+                mem_avail = memprof.get_available_memory()
+
+                self.ostream.print_info(
+                    '{:s} of memory used for subspace procedure'.format(
+                        mem_usage))
+                self.ostream.print_info(
+                    '{:s} of memory available for the solver'.format(mem_avail))
+                self.ostream.print_blank()
+
+                if self.memory_profiling:
+                    memprof.check_memory_system(
+                        'Iteration {:d} subspace'.format(iteration + 1))
+
                 self.print_iteration(relative_residual_norm, xvs)
 
             if self.timing:
@@ -564,6 +591,10 @@ class LinearResponseSolver:
                 self.timing_dict['new_trials'][tid] += tm.time() - timing_t0
                 timing_t0 = tm.time()
 
+            if self.memory_profiling:
+                memprof.check_memory_system(
+                    'Iteration {:d} sigma build'.format(iteration + 1))
+
         # converged?
         if self.rank == mpi_master():
             self.print_convergence()
@@ -580,6 +611,11 @@ class LinearResponseSolver:
             if self.rank == mpi_master():
                 for line in s.getvalue().split(os.linesep):
                     self.ostream.print_info(line)
+
+        if self.memory_profiling:
+            memprof.check_memory_system('End of LR solver')
+            if self.rank == mpi_master():
+                memprof.print_memory_usage(self.ostream)
 
         # calculate response functions
         if not nonlinear_flag:
