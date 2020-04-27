@@ -364,10 +364,6 @@ class LinearResponseSolver:
             'LR_e2bung_half_size',
         ]
 
-        bger, bung = None, None
-        e2bger, e2bung = None, None
-        new_trials_ger, new_trials_ung = None, None
-
         # check validity of checkpoint file
         if self.restart:
             if self.rank == mpi_master():
@@ -408,6 +404,8 @@ class LinearResponseSolver:
                     bger = np.zeros((bung.shape[0], 0))
                 if bung is None or not bung.any():
                     bung = np.zeros((bger.shape[0], 0))
+            else:
+                bger, bung = None, None
 
             e2bger, e2bung = e2x_drv.e2n_half_size(bger, bung, scf_tensors,
                                                    screening, molecule, basis,
@@ -417,8 +415,12 @@ class LinearResponseSolver:
             dist_bger = DistributedArray(bger, self.comm)
             dist_bung = DistributedArray(bung, self.comm)
 
+            bger, bung = None, None
+
             dist_e2bger = DistributedArray(e2bger, self.comm)
             dist_e2bung = DistributedArray(e2bung, self.comm)
+
+            e2bger, e2bung = None, None
 
         if self.timing:
             self.timing_dict['new_trials'][0] += tm.time() - timing_t0
@@ -579,12 +581,6 @@ class LinearResponseSolver:
                 if new_trials_ung is None or not new_trials_ung.any():
                     new_trials_ung = np.zeros((new_trials_ger.shape[0], 0))
 
-            dist_new_trials_ger = DistributedArray(new_trials_ger, self.comm)
-            dist_new_trials_ung = DistributedArray(new_trials_ung, self.comm)
-
-            dist_bger.append(dist_new_trials_ger, axis=1)
-            dist_bung.append(dist_new_trials_ung, axis=1)
-
             if self.timing:
                 tid = iteration + 1
                 self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
@@ -594,11 +590,17 @@ class LinearResponseSolver:
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
                 molecule, basis, molgrid, gs_density, V_es, pe_drv, timing_dict)
 
-            dist_new_e2bger = DistributedArray(new_e2bger, self.comm)
-            dist_new_e2bung = DistributedArray(new_e2bung, self.comm)
+            dist_bger.append(DistributedArray(new_trials_ger, self.comm),
+                             axis=1)
+            dist_bung.append(DistributedArray(new_trials_ung, self.comm),
+                             axis=1)
 
-            dist_e2bger.append(dist_new_e2bger, axis=1)
-            dist_e2bung.append(dist_new_e2bung, axis=1)
+            new_trials_ger, new_trials_ung = None, None
+
+            dist_e2bger.append(DistributedArray(new_e2bger, self.comm), axis=1)
+            dist_e2bung.append(DistributedArray(new_e2bung, self.comm), axis=1)
+
+            new_e2bger, new_e2bung = None, None
 
             # write to checkpoint file
             if tm.time() - self.checkpoint_time >= self.checkpoint_interval:
