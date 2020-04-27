@@ -1025,3 +1025,80 @@ def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set,
         ostream.print_blank()
 
     return tuple(arrays)
+
+
+def check_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set,
+                   dft_func_label, potfile_text, ostream):
+    """
+    Checks validity of the checkpoint file. Nuclear charges and basis
+    set will be used to validate the checkpoint file.
+
+    :param fname:
+        Name of the checkpoint file.
+    :param labels:
+        The list of labels for trial vecotrs and transformed vectors.
+    :param e_nuc:
+        Nuclear repulsion energy.
+    :param nuclear_charges:
+        Nuclear charges of the molecule.
+    :param basis_set:
+        Name of the AO basis set.
+    :param dft_func_label:
+        Name of the density functional.
+    :param potfile_text:
+        Text in the potential file.
+    :param ostream:
+        The output stream.
+
+    :return:
+        True if the checkpoint file is valid, False otherwise.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str) and isfile(fname))
+
+    if not valid_checkpoint:
+        return False
+
+    hf = h5py.File(fname, 'r')
+
+    match_labels = True
+    for label in labels:
+        if label not in hf.keys():
+            match_labels = False
+            break
+
+    match_nuclear_repulsion = False
+    if 'nuclear_repulsion' in hf:
+        h5_e_nuc = np.array(hf.get('nuclear_repulsion'))[0]
+        if h5_e_nuc > 0.0 and e_nuc > 0.0:
+            match_nuclear_repulsion = (abs(1.0 - h5_e_nuc / e_nuc) < 1.0e-13)
+        else:
+            match_nuclear_repulsion = (h5_e_nuc == e_nuc)
+
+    match_nuclear_charges = False
+    if 'nuclear_charges' in hf:
+        h5_nuclear_charges = np.array(hf.get('nuclear_charges'))
+        if h5_nuclear_charges.shape == nuclear_charges.shape:
+            match_nuclear_charges = (
+                h5_nuclear_charges == nuclear_charges).all()
+
+    match_basis_set = False
+    if 'basis_set' in hf:
+        h5_basis_set = hf.get('basis_set')[0].decode('utf-8')
+        match_basis_set = (h5_basis_set.upper() == basis_set.upper())
+
+    match_dft_func = False
+    if 'dft_func_label' in hf:
+        h5_func_label = hf.get('dft_func_label')[0].decode('utf-8')
+        match_dft_func = (h5_func_label.upper() == dft_func_label.upper())
+
+    match_potfile = False
+    if 'potfile_text' in hf:
+        h5_potfile_text = hf.get('potfile_text')[0].decode('utf-8')
+        match_potfile = (h5_potfile_text == potfile_text)
+
+    hf.close()
+
+    return (match_labels and match_nuclear_repulsion and
+            match_nuclear_charges and match_basis_set and match_dft_func and
+            match_potfile)

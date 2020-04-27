@@ -19,7 +19,7 @@ from .lrmatvecdriver import normalize_half
 from .lrmatvecdriver import construct_ed_sd_half
 from .lrmatvecdriver import lrvec2mat
 from .lrmatvecdriver import get_rhs
-from .lrmatvecdriver import read_rsp_hdf5
+from .lrmatvecdriver import check_rsp_hdf5
 from .lrmatvecdriver import write_rsp_hdf5
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
@@ -118,6 +118,7 @@ class LinearResponseSolver:
         self.restart = True
         self.checkpoint_file = None
         self.checkpoint_time = None
+        self.checkpoint_interval = 4.0 * 3600
 
         self.timing = False
         self.profiling = False
@@ -161,6 +162,14 @@ class LinearResponseSolver:
             self.restart = True if key == 'yes' else False
         if 'checkpoint_file' in rsp_dict:
             self.checkpoint_file = rsp_dict['checkpoint_file']
+        if 'checkpoint_interval' in rsp_dict:
+            if 'h' in rsp_dict['checkpoint_interval'].lower():
+                try:
+                    n_hours = float(
+                        rsp_dict['checkpoint_interval'].lower().split('h')[0])
+                    self.checkpoint_interval = max(0, n_hours) * 3600
+                except ValueError:
+                    pass
 
         if 'timing' in rsp_dict:
             key = rsp_dict['timing'].lower()
@@ -355,27 +364,34 @@ class LinearResponseSolver:
             'LR_e2bung_half_size',
         ]
 
-        bger = None
-        bung = None
-        new_trials_ger = None
-        new_trials_ung = None
+        bger, bung = None, None
+        e2bger, e2bung = None, None
+        new_trials_ger, new_trials_ung = None, None
 
-        # read initial guess from restart file
+        # check validity of checkpoint file
         if self.restart:
             if self.rank == mpi_master():
-                bger, bung, e2bger, e2bung = read_rsp_hdf5(
+                self.restart = check_rsp_hdf5(
                     self.checkpoint_file, rsp_vector_labels,
                     molecule.nuclear_repulsion_energy(),
                     molecule.elem_ids_to_numpy(), basis.get_label(),
                     dft_func_label, potfile_text, self.ostream)
-                self.restart = (bger is not None and bung is not None and
-                                e2bger is not None and e2bung is not None)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
-        # generate initial guess from scratch
-        if not self.restart:
-            if self.rank == mpi_master():
+        # read initial guess from restart file
+        if self.restart:
+            dist_bger = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'LR_bger_half_size', self.comm)
+            dist_bung = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'LR_bung_half_size', self.comm)
+            dist_e2bger = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'LR_e2bger_half_size', self.comm)
+            dist_e2bung = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'LR_e2bung_half_size', self.comm)
 
+        # generate initial guess from scratch
+        else:
+            if self.rank == mpi_master():
                 igs = self.initial_guess(v1, self.frequencies, precond)
                 bger, bung = self.setup_trials(igs)
 
@@ -398,17 +414,18 @@ class LinearResponseSolver:
                                                    molgrid, gs_density, V_es,
                                                    pe_drv, timing_dict)
 
+            dist_bger = DistributedArray(bger, self.comm)
+            dist_bung = DistributedArray(bung, self.comm)
+
+            dist_e2bger = DistributedArray(e2bger, self.comm)
+            dist_e2bung = DistributedArray(e2bung, self.comm)
+
         if self.timing:
             self.timing_dict['new_trials'][0] += tm.time() - timing_t0
             timing_t0 = tm.time()
 
         if self.memory_profiling:
             memprof.check_memory_system('Initial guess')
-
-        dist_bger = DistributedArray(bger, self.comm)
-        dist_bung = DistributedArray(bung, self.comm)
-        dist_e2bger = DistributedArray(e2bger, self.comm)
-        dist_e2bung = DistributedArray(e2bung, self.comm)
 
         solutions = {}
         residuals = {}
@@ -511,8 +528,8 @@ class LinearResponseSolver:
                 mem_usage, mem_detail = memprof.get_memory_dictionary({
                     'dist_bger': dist_bger.array(),
                     'dist_bung': dist_bung.array(),
-                    'dist_e2bung': dist_e2bung.array(),
                     'dist_e2bger': dist_e2bger.array(),
+                    'dist_e2bung': dist_e2bung.array(),
                     'precond': precond,
                     'solutions': solutions,
                     'residuals': residuals,
@@ -583,18 +600,30 @@ class LinearResponseSolver:
             dist_e2bger.append(dist_new_e2bger, axis=1)
             dist_e2bung.append(dist_new_e2bung, axis=1)
 
-            # TODO: take care of parallel writing of checkpoint
+            # write to checkpoint file
+            if tm.time() - self.checkpoint_time >= self.checkpoint_interval:
+                if self.rank == mpi_master():
+                    write_rsp_hdf5(self.checkpoint_file, [], [],
+                                   molecule.nuclear_repulsion_energy(),
+                                   molecule.elem_ids_to_numpy(),
+                                   basis.get_label(), dft_func_label,
+                                   potfile_text, self.ostream)
 
-            # if self.rank == mpi_master():
-            #     if tm.time() - self.checkpoint_time > 900.0:
-            #         write_rsp_hdf5(self.checkpoint_file,
-            #                        [bger, bung, e2bger, e2bung],
-            #                        rsp_vector_labels,
-            #                        molecule.nuclear_repulsion_energy(),
-            #                        molecule.elem_ids_to_numpy(),
-            #                        basis.get_label(), dft_func_label,
-            #                        potfile_text, self.ostream)
-            #         self.checkpoint_time = tm.time()
+                dt = 0.0
+                dt += dist_bger.append_to_hdf5_file(self.checkpoint_file,
+                                                    'LR_bger_half_size')
+                dt += dist_bung.append_to_hdf5_file(self.checkpoint_file,
+                                                    'LR_bung_half_size')
+                dt += dist_e2bger.append_to_hdf5_file(self.checkpoint_file,
+                                                      'LR_e2bger_half_size')
+                dt += dist_e2bung.append_to_hdf5_file(self.checkpoint_file,
+                                                      'LR_e2bung_half_size')
+                dt_text = 'Time spent in writing to checkpoint file: '
+                dt_text += '{:.2f} sec'.format(dt)
+                self.ostream.print_info(dt_text)
+                self.ostream.print_blank()
+
+                self.checkpoint_time = tm.time()
 
             if self.timing:
                 tid = iteration + 1

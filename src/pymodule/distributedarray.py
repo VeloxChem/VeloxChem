@@ -1,5 +1,7 @@
 from mpi4py import MPI
 import numpy as np
+import time as tm
+import h5py
 
 from .veloxchemlib import mpi_master
 
@@ -12,46 +14,48 @@ class DistributedArray:
         The numpy array stored on the master node.
     :param comm:
         The communicator.
-    :param counts:
-        The number of elements on each node.
-    :param displacements:
-        The displacement of element on each node.
+    :param distribute:
+        The flag for distributing the array via scatter.
 
     Instance variable
         - comm: The communicator.
-        - data: The distributed array segment.
+        - rank: The MPI rank.
+        - nodes: Number of MPI processes.
+        - data: The numpy array stored in the distributed array.
     """
 
-    def __init__(self, array, comm, counts=None, displacements=None):
+    def __init__(self, array, comm, distribute=True):
         """
         Initializes distributed array.
         """
 
-        if comm.Get_rank() == mpi_master():
-            n_elems = array.shape[0]
-            n_ranks = comm.Get_size()
+        self.comm = comm
+        self.rank = comm.Get_rank()
+        self.nodes = comm.Get_size()
 
-            if counts is None or displacements is None:
-                ave, res = divmod(n_elems, n_ranks)
-                counts = [ave + 1 if p < res else ave for p in range(n_ranks)]
-                displacements = [sum(counts[:p]) for p in range(n_ranks)]
+        if self.rank == mpi_master() and distribute:
+            ave, res = divmod(array.shape[0], self.nodes)
+            counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+            displacements = [sum(counts[:p]) for p in range(self.nodes)]
 
             if array.ndim == 1:
                 array_list = [
                     array[displacements[p]:displacements[p] + counts[p]]
-                    for p in range(n_ranks)
+                    for p in range(self.nodes)
                 ]
 
             elif array.ndim == 2:
                 array_list = [
                     array[displacements[p]:displacements[p] + counts[p], :]
-                    for p in range(n_ranks)
+                    for p in range(self.nodes)
                 ]
         else:
             array_list = None
 
-        self.comm = comm
-        self.data = comm.scatter(array_list, root=mpi_master())
+        if distribute:
+            self.data = comm.scatter(array_list, root=mpi_master())
+        else:
+            self.data = array.copy()
 
     def array(self):
         """
@@ -139,7 +143,7 @@ class DistributedArray:
 
         seg_mat = self.comm.gather(seg_mat, root=mpi_master())
 
-        if self.comm.Get_rank() == mpi_master():
+        if self.rank == mpi_master():
             full_shape_0 = sum([m.shape[0] for m in seg_mat])
 
             if array.ndim == 1:
@@ -162,3 +166,86 @@ class DistributedArray:
         """
 
         self.data = np.append(self.data, dist_array.data, axis=axis)
+
+    @classmethod
+    def read_from_hdf5_file(cls, fname, label, comm):
+        """
+        Reads an array from checkpoint file and returns a distributed array.
+
+        :param fname:
+            The name of the checkpoint file.
+        :param label:
+            The label for the array.
+        :param comm:
+            The communicator.
+
+        :return:
+            The distributed array.
+        """
+
+        rank = comm.Get_rank()
+        nodes = comm.Get_size()
+
+        if rank == mpi_master():
+            hf = h5py.File(fname, 'r')
+
+            dset = hf[label]
+
+            ave, res = divmod(dset.shape[0], nodes)
+            counts = [ave + 1 if p < res else ave for p in range(nodes)]
+            displacements = [sum(counts[:p]) for p in range(nodes)]
+
+            data = np.array(dset[displacements[0]:displacements[0] + counts[0]])
+
+            for i in range(1, nodes):
+                send_data = np.array(dset[displacements[i]:displacements[i] +
+                                          counts[i]])
+                req = comm.isend(send_data, dest=i, tag=i)
+                req.wait()
+
+            hf.close()
+        else:
+            req = comm.irecv(source=mpi_master(), tag=rank)
+            data = req.wait()
+
+        return cls(data, comm, distribute=False)
+
+    def append_to_hdf5_file(self, fname, label):
+        """
+        Appends an array to checkpoint file.
+
+        :param fname:
+            The name of the checkpoint file.
+        :param label:
+            The label for the array.
+
+        :return:
+            The time spent in writing to checkpoint file.
+        """
+
+        counts = self.comm.gather(self.data.shape[0], root=mpi_master())
+        if self.rank == mpi_master():
+            displacements = [sum(counts[:p]) for p in range(self.nodes)]
+
+        t0 = tm.time()
+
+        if self.rank == mpi_master():
+            hf = h5py.File(fname, 'a')
+
+            dset = hf.create_dataset(label, (sum(counts), self.data.shape[1]),
+                                     dtype=self.data.dtype,
+                                     compression='gzip')
+
+            dset[displacements[0]:displacements[0] + counts[0]] = self.data[:]
+
+            for i in range(1, self.nodes):
+                req = self.comm.irecv(source=i, tag=i)
+                data = req.wait()
+                dset[displacements[i]:displacements[i] + counts[i]] = data[:]
+
+            hf.close()
+        else:
+            req = self.comm.isend(self.data, dest=mpi_master(), tag=self.rank)
+            req.wait()
+
+        return tm.time() - t0
