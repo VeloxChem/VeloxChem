@@ -9,9 +9,9 @@ from .veloxchemlib import XCFunctional
 from .veloxchemlib import denmat
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
+from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .aodensitymatrix import AODensityMatrix
-from .memoryprofiler import MemoryProfiler
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence_half
 from .lrmatvecdriver import orthogonalize_gram_schmidt_half
@@ -68,6 +68,7 @@ class LinearResponseSolver:
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
+        - memory_tracing: The flag for tracing memory allocation using
     """
 
     def __init__(self, comm, ostream):
@@ -123,6 +124,7 @@ class LinearResponseSolver:
         self.timing = False
         self.profiling = False
         self.memory_profiling = False
+        self.memory_tracing = False
 
     def update_settings(self, rsp_dict, method_dict={}):
         """
@@ -181,6 +183,9 @@ class LinearResponseSolver:
         if 'memory_profiling' in rsp_dict:
             key = rsp_dict['memory_profiling'].lower()
             self.memory_profiling = True if key in ['yes', 'y'] else False
+        if 'memory_tracing' in rsp_dict:
+            key = rsp_dict['memory_tracing'].lower()
+            self.memory_tracing = True if key in ['yes', 'y'] else False
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
@@ -226,21 +231,12 @@ class LinearResponseSolver:
             a non-linear response module.
         """
 
-        memprof = MemoryProfiler('LR solver')
-
-        if self.profiling:
-            import cProfile
-            import pstats
-            import io
-            pr = cProfile.Profile()
-            pr.enable()
-
-        if self.timing:
-            self.timing_dict = {
-                'reduced_space': [0.0],
-                'new_trials': [0.0],
-            }
-            timing_t0 = tm.time()
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
 
         if self.rank == mpi_master():
             self.print_header()
@@ -391,11 +387,6 @@ class LinearResponseSolver:
                 igs = self.initial_guess(v1, self.frequencies, precond)
                 bger, bung = self.setup_trials(igs)
 
-                if self.timing:
-                    elapsed_time = tm.time() - timing_t0
-                    self.timing_dict['reduced_space'][0] += elapsed_time
-                    timing_t0 = tm.time()
-
                 assert_msg_critical(
                     bger.any() or bung.any(),
                     'LinearResponseSolver.compute: trial vector is empty')
@@ -422,12 +413,7 @@ class LinearResponseSolver:
 
             e2bger, e2bung = None, None
 
-        if self.timing:
-            self.timing_dict['new_trials'][0] += tm.time() - timing_t0
-            timing_t0 = tm.time()
-
-        if self.memory_profiling:
-            memprof.check_memory_system('Initial guess')
+        profiler.check_memory_usage('Initial guess')
 
         solutions = {}
         residuals = {}
@@ -436,9 +422,7 @@ class LinearResponseSolver:
         # start iterations
         for iteration in range(self.max_iter):
 
-            if self.timing:
-                self.timing_dict['reduced_space'].append(0.0)
-                self.timing_dict['new_trials'].append(0.0)
+            profiler.start_timer(iteration, 'ReducedSpace')
 
             n_ger = dist_bger.shape(1)
             n_ung = dist_bung.shape(1)
@@ -527,7 +511,7 @@ class LinearResponseSolver:
                         n_ung))
                 self.ostream.print_blank()
 
-                mem_usage, mem_detail = memprof.get_memory_dictionary({
+                mem_usage, mem_detail = profiler.get_memory_dictionary({
                     'dist_bger': dist_bger.array(),
                     'dist_bung': dist_bung.array(),
                     'dist_e2bger': dist_e2bger.array(),
@@ -536,7 +520,7 @@ class LinearResponseSolver:
                     'solutions': solutions,
                     'residuals': residuals,
                 })
-                mem_avail = memprof.get_available_memory()
+                mem_avail = profiler.get_available_memory()
 
                 self.ostream.print_info(
                     '{:s} of memory used for subspace procedure'.format(
@@ -548,22 +532,22 @@ class LinearResponseSolver:
                     '{:s} of memory available for the solver'.format(mem_avail))
                 self.ostream.print_blank()
 
-                if self.memory_profiling:
-                    memprof.check_memory_system(
-                        'Iteration {:d} subspace'.format(iteration + 1))
+                profiler.check_memory_usage(
+                    'Iteration {:d} subspace'.format(iteration + 1))
+
+                profiler.print_memory_tracing(self.ostream)
 
                 self.print_iteration(relative_residual_norm, xvs)
 
-            if self.timing:
-                tid = iteration + 1
-                self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
-                timing_t0 = tm.time()
+            profiler.stop_timer(iteration, 'ReducedSpace')
 
             # check convergence
             self.check_convergence(relative_residual_norm)
 
             if self.is_converged:
                 break
+
+            profiler.start_timer(iteration, 'Orthonorm.')
 
             # update trial vectors
             new_trials_ger, new_trials_ung = self.setup_trials(
@@ -581,10 +565,8 @@ class LinearResponseSolver:
                 if new_trials_ung is None or not new_trials_ung.any():
                     new_trials_ung = np.zeros((new_trials_ger.shape[0], 0))
 
-            if self.timing:
-                tid = iteration + 1
-                self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
-                timing_t0 = tm.time()
+            profiler.stop_timer(iteration, 'Orthonorm.')
+            profiler.start_timer(iteration, 'FockBuild')
 
             new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
@@ -627,36 +609,20 @@ class LinearResponseSolver:
 
                 self.checkpoint_time = tm.time()
 
-            if self.timing:
-                tid = iteration + 1
-                self.timing_dict['new_trials'][tid] += tm.time() - timing_t0
-                timing_t0 = tm.time()
+            profiler.stop_timer(iteration, 'FockBuild')
 
-            if self.memory_profiling:
-                memprof.check_memory_system(
-                    'Iteration {:d} sigma build'.format(iteration + 1))
+            profiler.check_memory_usage(
+                'Iteration {:d} sigma build'.format(iteration + 1))
 
         # converged?
         if self.rank == mpi_master():
             self.print_convergence()
 
-            if self.timing:
-                self.print_timing()
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
 
-        if self.profiling:
-            pr.disable()
-            s = io.StringIO()
-            sortby = 'cumulative'
-            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-            ps.print_stats(20)
-            if self.rank == mpi_master():
-                for line in s.getvalue().split(os.linesep):
-                    self.ostream.print_info(line)
-
-        if self.memory_profiling:
-            memprof.check_memory_system('End of LR solver')
-            if self.rank == mpi_master():
-                memprof.print_memory_usage(self.ostream)
+        profiler.check_memory_usage('End of LR solver')
+        profiler.print_memory_usage(self.ostream)
 
         # calculate response functions
         if not nonlinear_flag:
@@ -767,6 +733,7 @@ class LinearResponseSolver:
         output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
         output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
         self.ostream.print_header(output_conv.ljust(width))
+        self.ostream.print_blank()
         self.ostream.print_blank()
 
     def check_convergence(self, relative_residual_norm):
@@ -1000,38 +967,3 @@ class LinearResponseSolver:
             ung = vecs[half_rows:, :]
 
         return ger, ung
-
-    def print_timing(self):
-        """
-        Prints timing for the linear response eigensolver.
-        """
-
-        width = 92
-
-        valstr = 'Timing (in sec):'
-        self.ostream.print_header(valstr.ljust(width))
-        self.ostream.print_header(('-' * len(valstr)).ljust(width))
-
-        valstr = '{:<15s} {:>15s} {:>18s}'.format('', 'ReducedSpace',
-                                                  'NewTrialVectors')
-        self.ostream.print_header(valstr.ljust(width))
-
-        for i, (a, b) in enumerate(
-                zip(self.timing_dict['reduced_space'],
-                    self.timing_dict['new_trials'])):
-            if i == 0:
-                title = 'Initial guess'
-            else:
-                title = 'Iteration {:<5d}'.format(i)
-            valstr = '{:<15s} {:15.3f} {:18.3f}'.format(title, a, b)
-            self.ostream.print_header(valstr.ljust(width))
-
-        valstr = '---------'
-        self.ostream.print_header(valstr.ljust(width))
-
-        valstr = '{:<15s} {:15.3f} {:18.3f}'.format(
-            'Sum', sum(self.timing_dict['reduced_space']),
-            sum(self.timing_dict['new_trials']))
-        self.ostream.print_header(valstr.ljust(width))
-
-        self.ostream.print_blank()

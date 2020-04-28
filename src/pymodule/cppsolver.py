@@ -9,7 +9,7 @@ from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import denmat
 from .veloxchemlib import parse_xc_func
-from .memoryprofiler import MemoryProfiler
+from .profiler import Profiler
 from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence_half
@@ -509,26 +509,12 @@ class ComplexResponse:
             a non-linear response module.
         """
 
-        memprof = MemoryProfiler('CPP solver')
-
-        if self.memory_tracing:
-            import tracemalloc
-            tracemalloc.start(self.max_iter)
-
-        if self.profiling:
-            import cProfile
-            import pstats
-            import io
-            pr = cProfile.Profile()
-            pr.enable()
-
-        if self.timing:
-            self.timing_dict = {
-                'reduced_space': [0.0],
-                'ortho_norm': [0.0],
-                'fock_build': [0.0],
-            }
-            timing_t0 = tm.time()
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
 
         if self.rank == mpi_master():
             self.print_header()
@@ -685,23 +671,14 @@ class ComplexResponse:
                 if not bung.any():
                     bung = np.zeros((bger.shape[0], 0))
 
-                # creating sigma and rho linear transformations
-
-            if self.timing:
-                self.timing_dict['ortho_norm'][0] += tm.time() - timing_t0
-                timing_t0 = tm.time()
+            # computing sigma vectors
 
             e2bger, e2bung = e2x_drv.e2n_half_size(bger, bung, scf_tensors,
                                                    screening, molecule, basis,
                                                    molgrid, gs_density, V_es,
                                                    pe_drv, timing_dict)
 
-        if self.timing:
-            self.timing_dict['fock_build'][0] += tm.time() - timing_t0
-            timing_t0 = tm.time()
-
-        if self.memory_profiling:
-            memprof.check_memory_system('Initial guess')
+        profiler.check_memory_usage('Initial guess')
 
         solutions = {}
         residuals = {}
@@ -710,10 +687,7 @@ class ComplexResponse:
         for iteration in range(self.max_iter):
             self.cur_iter = iteration
 
-            if self.timing:
-                self.timing_dict['reduced_space'].append(0.0)
-                self.timing_dict['ortho_norm'].append(0.0)
-                self.timing_dict['fock_build'].append(0.0)
+            profiler.start_timer(iteration, 'ReducedSpace')
 
             if self.rank == mpi_master():
                 xvs = []
@@ -878,41 +852,35 @@ class ComplexResponse:
                         n_ung))
                 self.ostream.print_blank()
 
-                mem_usage = memprof.get_memory_object(
-                    [bger, bung, e2bung, e2bger, precond, solutions, residuals])
-                mem_avail = memprof.get_available_memory()
+                mem_usage, mem_detail = profiler.get_memory_dictionary({
+                    'bger': bger,
+                    'bung': bung,
+                    'e2bger': e2bger,
+                    'e2bung': e2bung,
+                    'precond': precond,
+                    'solutions': solutions,
+                    'residuals': residuals,
+                })
+                mem_avail = profiler.get_available_memory()
 
                 self.ostream.print_info(
                     '{:s} of memory used for subspace procedure'.format(
                         mem_usage))
+                if self.memory_profiling:
+                    for m in mem_detail:
+                        self.ostream.print_info('  {:<15s} {:s}'.format(*m))
                 self.ostream.print_info(
                     '{:s} of memory available for the solver'.format(mem_avail))
                 self.ostream.print_blank()
 
-                if self.memory_profiling:
-                    memprof.check_memory_system(
+                profiler.check_memory_usage(
                         'Iteration {:d} subspace'.format(iteration + 1))
 
-                if self.memory_tracing:
-                    mem_curr = tracemalloc.take_snapshot()
-                    cur_stats = mem_curr.statistics('lineno')
-                    self.ostream.print_info('[ Tracemalloc ]')
-                    for index, stat in enumerate(cur_stats[:10]):
-                        frame = stat.traceback[0]
-                        filename = os.sep.join(
-                            frame.filename.split(os.sep)[-2:])
-                        text = '#{:<3d} ...{:s}:{:d}:'.format(
-                            index + 1, filename, frame.lineno)
-                        self.ostream.print_info('{:<45s} {:s}'.format(
-                            text, memprof.memory_string(stat.size)))
-                    self.ostream.print_blank()
+                profiler.print_memory_tracing(self.ostream)
 
                 self.print_iteration(relative_residual_norm, xvs)
 
-            if self.timing:
-                tid = iteration + 1
-                self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
-                timing_t0 = tm.time()
+            profiler.stop_timer(iteration, 'ReducedSpace')
 
             # check convergence
 
@@ -920,6 +888,8 @@ class ComplexResponse:
 
             if self.is_converged:
                 break
+
+            profiler.start_timer(iteration, 'Orthonorm.')
 
             # spawning new trial vectors from residuals
 
@@ -948,10 +918,8 @@ class ComplexResponse:
                 bger = np.append(bger, new_trials_ger, axis=1)
                 bung = np.append(bung, new_trials_ung, axis=1)
 
-            if self.timing:
-                tid = iteration + 1
-                self.timing_dict['ortho_norm'][tid] += tm.time() - timing_t0
-                timing_t0 = tm.time()
+            profiler.stop_timer(iteration, 'Orthonorm.')
+            profiler.start_timer(iteration, 'FockBuild')
 
             new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
@@ -971,36 +939,20 @@ class ComplexResponse:
                         dft_func_label, potfile_text, self.ostream)
                     self.checkpoint_time = tm.time()
 
-            if self.timing:
-                tid = iteration + 1
-                self.timing_dict['fock_build'][tid] += tm.time() - timing_t0
-                timing_t0 = tm.time()
+            profiler.stop_timer(iteration, 'FockBuild')
 
-            if self.memory_profiling:
-                memprof.check_memory_system(
+            profiler.check_memory_usage(
                     'Iteration {:d} sigma build'.format(iteration + 1))
 
         # converged?
         if self.rank == mpi_master():
             self.print_convergence()
 
-            if self.timing:
-                self.print_timing()
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
 
-        if self.profiling:
-            pr.disable()
-            s = io.StringIO()
-            sortby = 'cumulative'
-            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-            ps.print_stats(20)
-            if self.rank == mpi_master():
-                for line in s.getvalue().split(os.linesep):
-                    self.ostream.print_info(line)
-
-        if self.memory_profiling:
-            memprof.check_memory_system('End of CPP solver')
-            if self.rank == mpi_master():
-                memprof.print_memory_usage(self.ostream)
+        profiler.check_memory_usage('End of CPP solver')
+        profiler.print_memory_usage(self.ostream)
 
         if not self.nonlinear:
             a_rhs = get_complex_rhs(self.a_operator, self.a_components,
@@ -1140,40 +1092,4 @@ class ComplexResponse:
         output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
         self.ostream.print_header(output_conv.ljust(width))
         self.ostream.print_blank()
-
-    def print_timing(self):
-        """
-        Prints timing for the complex response solver.
-        """
-
-        width = 92
-
-        valstr = 'Timing (in sec):'
-        self.ostream.print_header(valstr.ljust(width))
-        self.ostream.print_header(('-' * len(valstr)).ljust(width))
-
-        valstr = '{:<15s} {:>15s} {:>15s} {:>15s}'.format(
-            '', 'ReducedSpace', 'Orthonorm.', 'FockBuild')
-        self.ostream.print_header(valstr.ljust(width))
-
-        for i, (a, b, c) in enumerate(
-                zip(self.timing_dict['reduced_space'],
-                    self.timing_dict['ortho_norm'],
-                    self.timing_dict['fock_build'])):
-            if i == 0:
-                title = 'Initial guess'
-            else:
-                title = 'Iteration {:<5d}'.format(i)
-            valstr = '{:<15s} {:15.3f} {:15.3f} {:15.3f}'.format(title, a, b, c)
-            self.ostream.print_header(valstr.ljust(width))
-
-        valstr = '---------'
-        self.ostream.print_header(valstr.ljust(width))
-
-        valstr = '{:<15s} {:15.3f} {:15.3f} {:15.3f}'.format(
-            'Sum', sum(self.timing_dict['reduced_space']),
-            sum(self.timing_dict['ortho_norm']),
-            sum(self.timing_dict['fock_build']))
-        self.ostream.print_header(valstr.ljust(width))
-
         self.ostream.print_blank()
