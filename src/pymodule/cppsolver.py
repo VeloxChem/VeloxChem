@@ -10,6 +10,7 @@ from .veloxchemlib import XCFunctional
 from .veloxchemlib import denmat
 from .veloxchemlib import parse_xc_func
 from .profiler import Profiler
+from .distributedarray import DistributedArray
 from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence_half
@@ -18,7 +19,7 @@ from .lrmatvecdriver import normalize_half
 from .lrmatvecdriver import construct_ed_sd_half
 from .lrmatvecdriver import lrvec2mat
 from .lrmatvecdriver import get_complex_rhs
-from .lrmatvecdriver import read_rsp_hdf5
+from .lrmatvecdriver import check_rsp_hdf5
 from .lrmatvecdriver import write_rsp_hdf5
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
@@ -118,6 +119,7 @@ class ComplexResponse:
         self.restart = True
         self.checkpoint_file = None
         self.checkpoint_time = None
+        self.checkpoint_interval = 4.0 * 3600
 
         self.timing = False
         self.profiling = False
@@ -171,6 +173,14 @@ class ComplexResponse:
             self.restart = True if key == 'yes' else False
         if 'checkpoint_file' in rsp_dict:
             self.checkpoint_file = rsp_dict['checkpoint_file']
+        if 'checkpoint_interval' in rsp_dict:
+            if 'h' in rsp_dict['checkpoint_interval'].lower():
+                try:
+                    n_hours = float(
+                        rsp_dict['checkpoint_interval'].lower().split('h')[0])
+                    self.checkpoint_interval = max(0, n_hours) * 3600
+                except ValueError:
+                    pass
 
         if 'timing' in rsp_dict:
             key = rsp_dict['timing'].lower()
@@ -374,7 +384,7 @@ class ComplexResponse:
 
         return v_out
 
-    def initial_guess(self, v1, d, freqs, precond):
+    def initial_guess(self, v1, d, precond):
         """
         Creating initial guess (un-orthonormalized trials) out of gradients.
 
@@ -383,8 +393,6 @@ class ComplexResponse:
             right-hand sides as values.
         :param d:
             The damping parameter.
-        :param freqs:
-            The frequencies.
         :param precond:
             The preconditioner matrices.
 
@@ -410,10 +418,9 @@ class ComplexResponse:
 
     def setup_trials(self,
                      vectors,
-                     pre=None,
-                     bger=None,
-                     bung=None,
-                     res_norm=None,
+                     precond=None,
+                     dist_bger=None,
+                     dist_bung=None,
                      renormalize=True):
         """
         Computes orthonormalized trial vectors. Takes set of vectors,
@@ -422,12 +429,12 @@ class ComplexResponse:
 
         :param vectors:
             The set of vectors.
-        :param pre:
+        :param precond:
             The preconditioner matrix.
-        :param bger:
-            The gerade subspace.
-        :param bung:
-            The ungerade subspace.
+        :param dist_bger:
+            The distributed gerade subspace.
+        :param dist_bung:
+            The distributed ungerade subspace.
         :param res_norm:
             The relative residual norm.
         :param renormalize:
@@ -437,50 +444,59 @@ class ComplexResponse:
             The orthonormalized gerade and ungerade trial vectors.
         """
 
-        trials = []
-        for (op, w) in vectors:
-            vec = np.array(vectors[(op, w)])
+        if self.rank == mpi_master():
+            trials = []
+            for (op, w) in vectors:
+                vec = np.array(vectors[(op, w)])
 
-            # preconditioning trials:
+                # preconditioning trials:
 
-            if pre is not None:
-                v = self.preconditioning(pre[w], vec)
-            else:
-                v = vec
-            if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
-                trials.append(v)
+                if precond is not None:
+                    v = self.preconditioning(precond[w], vec)
+                else:
+                    v = vec
+                if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
+                    trials.append(v)
 
-        new_trials = np.array(trials).T
+            new_trials = np.array(trials).T
 
-        # decomposing the full space trial vectors...
+            # decomposing the full space trial vectors...
 
-        new_realger, new_realung, new_imagung, new_imagger = self.decomp_trials(
-            new_trials)
+            new_realger, new_realung, new_imagung, new_imagger = self.decomp_trials(
+                new_trials)
 
-        # ...and assembling gerade and ungerade subspaces
+            # ...and assembling gerade and ungerade subspaces
 
-        new_ger = self.assemble_subsp(new_realger, new_imagger)
-        new_ung = self.assemble_subsp(new_realung, new_imagung)
+            new_ger = self.assemble_subsp(new_realger, new_imagger)
+            new_ung = self.assemble_subsp(new_realung, new_imagung)
+
+        else:
+            new_ger, new_ung = None, None
 
         # orthogonalizing new trial vectors against existing ones
 
-        if bger is not None and bger.any():
-            new_ger = new_ger - 2.0 * np.matmul(bger, np.matmul(
-                bger.T, new_ger))
+        if dist_bger is not None:
+            # t = t - (b (b.T t))
+            dist_new_ger = DistributedArray(new_ger, self.comm)
+            bT_new_ger = dist_bger.matmul_AtB_allreduce(dist_new_ger, 2.0)
+            new_ger_proj = dist_bger.matmul_AB(bT_new_ger)
+            if self.rank == mpi_master():
+                new_ger -= new_ger_proj
 
-        if bung is not None and bung.any():
-            new_ung = new_ung - 2.0 * np.matmul(bung, np.matmul(
-                bung.T, new_ung))
+        if dist_bung is not None:
+            # t = t - (b (b.T t))
+            dist_new_ung = DistributedArray(new_ung, self.comm)
+            bT_new_ung = dist_bung.matmul_AtB_allreduce(dist_new_ung, 2.0)
+            new_ung_proj = dist_bung.matmul_AB(bT_new_ung)
+            if self.rank == mpi_master():
+                new_ung -= new_ung_proj
 
         # orthonormalizing new trial vectors
 
-        if new_ger.any() and renormalize:
-
+        if self.rank == mpi_master() and renormalize:
             new_ger = remove_linear_dependence_half(new_ger, self.lindep_thresh)
             new_ger = orthogonalize_gram_schmidt_half(new_ger)
             new_ger = normalize_half(new_ger)
-
-        if new_ung.any() and renormalize:
 
             new_ung = remove_linear_dependence_half(new_ung, self.lindep_thresh)
             new_ung = orthogonalize_gram_schmidt_half(new_ung)
@@ -623,60 +639,80 @@ class ComplexResponse:
             self.nonlinear = True
 
         if self.rank == mpi_master():
-            d = self.damping
-            freqs = [op_freq[1] for op_freq in v1]
             op_freq_keys = list(v1.keys())
+        else:
+            op_freq_keys = None
+        op_freq_keys = self.comm.bcast(op_freq_keys, root=mpi_master())
 
-            # creating the preconditioner matrix
-
+        # creating the preconditioner matrix
+        d = self.damping
+        if self.rank == mpi_master():
+            freqs = set([w for (op, w) in op_freq_keys])
             precond = {
                 w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs
             }
+        else:
+            precond = None
 
-        bger = None
-        bung = None
-        new_trials_ger = None
-        new_trials_ung = None
+        rsp_vector_labels = [
+            'CLR_bger_half_size',
+            'CLR_bung_half_size',
+            'CLR_e2bger_half_size',
+            'CLR_e2bung_half_size',
+        ]
 
-        # read initial guess from restart file
-
+        # check validity of checkpoint file
         if self.restart:
             if self.rank == mpi_master():
-                bger, bung, e2bger, e2bung = read_rsp_hdf5(
-                    self.checkpoint_file,
-                    ['CLR_bger', 'CLR_bung', 'CLR_e2bger', 'CLR_e2bung'],
+                self.restart = check_rsp_hdf5(
+                    self.checkpoint_file, rsp_vector_labels,
                     molecule.nuclear_repulsion_energy(),
                     molecule.elem_ids_to_numpy(), basis.get_label(),
                     dft_func_label, potfile_text, self.ostream)
-                self.restart = (bger is not None and bung is not None and
-                                e2bger is not None and e2bung is not None)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
+        # read initial guess from restart file
+        if self.restart:
+            dist_bger = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'CLR_bger_half_size', self.comm)
+            dist_bung = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'CLR_bung_half_size', self.comm)
+            dist_e2bger = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'CLR_e2bger_half_size', self.comm)
+            dist_e2bung = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'CLR_e2bung_half_size', self.comm)
+
         # generate initial guess from scratch
-
-        if not self.restart:
+        else:
             if self.rank == mpi_master():
-
-                # spawning initial trial vectors
-
-                igs = self.initial_guess(v1, d, freqs, precond)
+                igs = self.initial_guess(v1, d, precond)
                 bger, bung = self.setup_trials(igs)
 
                 assert_msg_critical(
                     bger.any() or bung.any(),
                     'ComplexResponseSolver: trial vectors are empty')
 
-                if not bger.any():
+                if bger is None or not bger.any():
                     bger = np.zeros((bung.shape[0], 0))
-                if not bung.any():
+                if bung is None or not bung.any():
                     bung = np.zeros((bger.shape[0], 0))
-
-            # computing sigma vectors
+            else:
+                bger, bung = None, None
 
             e2bger, e2bung = e2x_drv.e2n_half_size(bger, bung, scf_tensors,
                                                    screening, molecule, basis,
                                                    molgrid, gs_density, V_es,
                                                    pe_drv, timing_dict)
+
+            dist_bger = DistributedArray(bger, self.comm)
+            dist_bung = DistributedArray(bung, self.comm)
+
+            bger, bung = None, None
+
+            dist_e2bger = DistributedArray(e2bger, self.comm)
+            dist_e2bung = DistributedArray(e2bung, self.comm)
+
+            e2bger, e2bung = None, None
 
         profiler.check_memory_usage('Initial guess')
 
@@ -684,37 +720,56 @@ class ComplexResponse:
         residuals = {}
         relative_residual_norm = {}
 
+        # start iterations
         for iteration in range(self.max_iter):
-            self.cur_iter = iteration
 
             profiler.start_timer(iteration, 'ReducedSpace')
 
-            if self.rank == mpi_master():
-                xvs = []
+            xvs = []
+            self.cur_iter = iteration
 
-                n_ger = bger.shape[1]
-                n_ung = bung.shape[1]
+            n_ger = dist_bger.shape(1)
+            n_ung = dist_bung.shape(1)
 
-                e2gg = 2.0 * np.matmul(bger.T, e2bger)
-                e2uu = 2.0 * np.matmul(bung.T, e2bung)
-                s2ug = 4.0 * np.matmul(bung.T, bger)
+            e2gg = dist_bger.matmul_AtB(dist_e2bger, 2.0)
+            e2uu = dist_bung.matmul_AtB(dist_e2bung, 2.0)
+            s2ug = dist_bung.matmul_AtB(dist_bger, 4.0)
 
-                for op, w in op_freq_keys:
-                    if iteration == 0 or (relative_residual_norm[(op, w)] >
-                                          self.conv_thresh):
+            for op, w in op_freq_keys:
+                if (iteration == 0 or
+                        relative_residual_norm[(op, w)] > self.conv_thresh):
+
+                    if self.rank == mpi_master():
                         grad = v1[(op, w)]
                         gradger, gradung = self.decomp_grad(grad)
+                        gradger_real = gradger.real
+                        gradger_imag = gradger.imag
+                        gradung_real = gradung.real
+                        gradung_imag = gradung.imag
+                    else:
+                        gradger_real, gradger_imag = None, None
+                        gradung_real, gradung_imag = None, None
+                    dist_grad_realger = DistributedArray(
+                        gradger_real, self.comm)
+                    dist_grad_imagger = DistributedArray(
+                        gradger_imag, self.comm)
+                    dist_grad_realung = DistributedArray(
+                        gradung_real, self.comm)
+                    dist_grad_imagung = DistributedArray(
+                        gradung_imag, self.comm)
 
-                        # projections onto gerade and ungerade subspaces:
+                    # projections onto gerade and ungerade subspaces:
 
-                        g_realger = 2.0 * np.matmul(bger.T, gradger.real)
-                        g_imagger = 2.0 * np.matmul(bger.T, gradger.imag)
-                        g_realung = 2.0 * np.matmul(bung.T, gradung.real)
-                        g_imagung = 2.0 * np.matmul(bung.T, gradung.imag)
+                    g_realger = dist_bger.matmul_AtB(dist_grad_realger, 2.0)
+                    g_imagger = dist_bger.matmul_AtB(dist_grad_imagger, 2.0)
+                    g_realung = dist_bung.matmul_AtB(dist_grad_realung, 2.0)
+                    g_imagung = dist_bung.matmul_AtB(dist_grad_imagung, 2.0)
 
-                        # creating gradient and matrix for linear equation
+                    # creating gradient and matrix for linear equation
 
-                        size = 2 * (n_ger + n_ung)
+                    size = 2 * (n_ger + n_ung)
+
+                    if self.rank == mpi_master():
 
                         # gradient
 
@@ -769,22 +824,27 @@ class ComplexResponse:
                         # solving matrix equation
 
                         c = np.linalg.solve(mat, g)
+                    else:
+                        c = None
+                    c = self.comm.bcast(c, root=mpi_master())
 
-                        # extracting the 4 components of c...
+                    # extracting the 4 components of c...
 
-                        c_realger = c[:n_ger]
-                        c_realung = c[n_ger:n_ger + n_ung]
-                        c_imagung = c[n_ger + n_ung:size - n_ger]
-                        c_imagger = c[size - n_ger:]
+                    c_realger = c[:n_ger]
+                    c_realung = c[n_ger:n_ger + n_ung]
+                    c_imagung = c[n_ger + n_ung:size - n_ger]
+                    c_imagger = c[size - n_ger:]
 
-                        # ...and projecting them onto respective subspace
+                    # ...and projecting them onto respective subspace
 
-                        x_realger = np.matmul(bger, c_realger)
-                        x_realung = np.matmul(bung, c_realung)
-                        x_imagung = np.matmul(bung, c_imagung)
-                        x_imagger = np.matmul(bger, c_imagger)
+                    x_realger = dist_bger.matmul_AB(c_realger)
+                    x_realung = dist_bung.matmul_AB(c_realung)
+                    x_imagger = dist_bger.matmul_AB(c_imagger)
+                    x_imagung = dist_bung.matmul_AB(c_imagung)
 
-                        # composing full size response vector
+                    # composing full size response vector
+
+                    if self.rank == mpi_master():
 
                         x_realger_full = np.hstack((x_realger, x_realger))
                         x_realung_full = np.hstack((x_realung, -x_realung))
@@ -795,20 +855,22 @@ class ComplexResponse:
                         x_imag = x_imagung_full + x_imagger_full
                         x = x_real + 1j * x_imag
 
-                        # composing E2 and S2 matrices projected onto solution
-                        # subspace
+                    # composing E2 and S2 matrices projected onto
+                    # solution subspace
 
-                        e2realger = np.matmul(e2bger, c_realger)
-                        e2imagger = np.matmul(e2bger, c_imagger)
-                        s2realger = 2.0 * np.matmul(bger, c_realger)
-                        s2imagger = 2.0 * np.matmul(bger, c_imagger)
+                    e2realger = dist_e2bger.matmul_AB(c_realger)
+                    e2imagger = dist_e2bger.matmul_AB(c_imagger)
+                    s2realger = dist_bger.matmul_AB(c_realger, 2.0)
+                    s2imagger = dist_bger.matmul_AB(c_imagger, 2.0)
 
-                        e2realung = np.matmul(e2bung, c_realung)
-                        e2imagung = np.matmul(e2bung, c_imagung)
-                        s2realung = 2.0 * np.matmul(bung, c_realung)
-                        s2imagung = 2.0 * np.matmul(bung, c_imagung)
+                    e2realung = dist_e2bung.matmul_AB(c_realung)
+                    e2imagung = dist_e2bung.matmul_AB(c_imagung)
+                    s2realung = dist_bung.matmul_AB(c_realung, 2.0)
+                    s2imagung = dist_bung.matmul_AB(c_imagung, 2.0)
 
-                        # calculating the residual components
+                    # calculating the residual components
+
+                    if self.rank == mpi_master():
 
                         r_realger = (e2realger - w * s2realung + d * s2imagung -
                                      gradger.real)
@@ -843,7 +905,11 @@ class ComplexResponse:
                         else:
                             residuals[(op, w)] = r
 
-                # write to output
+            relative_residual_norm = self.comm.bcast(relative_residual_norm,
+                                                     root=mpi_master())
+
+            # write to output
+            if self.rank == mpi_master():
 
                 self.ostream.print_info(
                     '{:d} gerade trial vectors in reduced space'.format(n_ger))
@@ -853,10 +919,10 @@ class ComplexResponse:
                 self.ostream.print_blank()
 
                 mem_usage, mem_detail = profiler.get_memory_dictionary({
-                    'bger': bger,
-                    'bung': bung,
-                    'e2bger': e2bger,
-                    'e2bung': e2bung,
+                    'dist_bger': dist_bger.array(),
+                    'dist_bung': dist_bung.array(),
+                    'dist_e2bger': dist_e2bger.array(),
+                    'dist_e2bung': dist_e2bung.array(),
                     'precond': precond,
                     'solutions': solutions,
                     'residuals': residuals,
@@ -874,7 +940,7 @@ class ComplexResponse:
                 self.ostream.print_blank()
 
                 profiler.check_memory_usage(
-                        'Iteration {:d} subspace'.format(iteration + 1))
+                    'Iteration {:d} subspace'.format(iteration + 1))
 
                 profiler.print_memory_tracing(self.ostream)
 
@@ -891,32 +957,24 @@ class ComplexResponse:
 
             profiler.start_timer(iteration, 'Orthonorm.')
 
-            # spawning new trial vectors from residuals
+            # update trial vectors
+            new_trials_ger, new_trials_ung = self.setup_trials(
+                residuals, precond, dist_bger, dist_bung)
+
+            residuals.clear()
 
             if self.rank == mpi_master():
-
-                new_trials_ger, new_trials_ung = self.setup_trials(
-                    residuals,
-                    pre=precond,
-                    bger=bger,
-                    bung=bung,
-                    res_norm=relative_residual_norm)
-
-                residuals.clear()
 
                 assert_msg_critical(
                     new_trials_ger.any() or new_trials_ung.any(),
                     'ComplexResponseSolver: unable to add new trial vectors')
 
-                if not new_trials_ger.any():
+                if new_trials_ger is None or not new_trials_ger.any():
                     new_trials_ger = np.zeros((new_trials_ung.shape[0], 0))
-                if not new_trials_ung.any():
+                if new_trials_ung is None or not new_trials_ung.any():
                     new_trials_ung = np.zeros((new_trials_ger.shape[0], 0))
 
                 # creating new sigma and rho linear transformations
-
-                bger = np.append(bger, new_trials_ger, axis=1)
-                bung = np.append(bung, new_trials_ung, axis=1)
 
             profiler.stop_timer(iteration, 'Orthonorm.')
             profiler.start_timer(iteration, 'FockBuild')
@@ -925,24 +983,47 @@ class ComplexResponse:
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
                 molecule, basis, molgrid, gs_density, V_es, pe_drv, timing_dict)
 
-            if self.rank == mpi_master():
+            dist_bger.append(DistributedArray(new_trials_ger, self.comm),
+                             axis=1)
+            dist_bung.append(DistributedArray(new_trials_ung, self.comm),
+                             axis=1)
 
-                e2bger = np.append(e2bger, new_e2bger, axis=1)
-                e2bung = np.append(e2bung, new_e2bung, axis=1)
+            new_trials_ger, new_trials_ung = None, None
 
-                if tm.time() - self.checkpoint_time > 900.0:
-                    write_rsp_hdf5(
-                        self.checkpoint_file, [bger, bung, e2bger, e2bung],
-                        ['CLR_bger', 'CLR_bung', 'CLR_e2bger', 'CLR_e2bung'],
-                        molecule.nuclear_repulsion_energy(),
-                        molecule.elem_ids_to_numpy(), basis.get_label(),
-                        dft_func_label, potfile_text, self.ostream)
-                    self.checkpoint_time = tm.time()
+            dist_e2bger.append(DistributedArray(new_e2bger, self.comm), axis=1)
+            dist_e2bung.append(DistributedArray(new_e2bung, self.comm), axis=1)
+
+            new_e2bger, new_e2bung = None, None
+
+            # write to checkpoint file
+            if tm.time() - self.checkpoint_time >= self.checkpoint_interval:
+                if self.rank == mpi_master():
+                    write_rsp_hdf5(self.checkpoint_file, [], [],
+                                   molecule.nuclear_repulsion_energy(),
+                                   molecule.elem_ids_to_numpy(),
+                                   basis.get_label(), dft_func_label,
+                                   potfile_text, self.ostream)
+
+                dt = 0.0
+                dt += dist_bger.append_to_hdf5_file(self.checkpoint_file,
+                                                    'CLR_bger_half_size')
+                dt += dist_bung.append_to_hdf5_file(self.checkpoint_file,
+                                                    'CLR_bung_half_size')
+                dt += dist_e2bger.append_to_hdf5_file(self.checkpoint_file,
+                                                      'CLR_e2bger_half_size')
+                dt += dist_e2bung.append_to_hdf5_file(self.checkpoint_file,
+                                                      'CLR_e2bung_half_size')
+                dt_text = 'Time spent in writing to checkpoint file: '
+                dt_text += '{:.2f} sec'.format(dt)
+                self.ostream.print_info(dt_text)
+                self.ostream.print_blank()
+
+                self.checkpoint_time = tm.time()
 
             profiler.stop_timer(iteration, 'FockBuild')
 
             profiler.check_memory_usage(
-                    'Iteration {:d} sigma build'.format(iteration + 1))
+                'Iteration {:d} sigma build'.format(iteration + 1))
 
         # converged?
         if self.rank == mpi_master():

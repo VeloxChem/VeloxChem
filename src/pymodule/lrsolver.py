@@ -345,13 +345,15 @@ class LinearResponseSolver:
 
         if self.rank == mpi_master():
             op_freq_keys = list(v1.keys())
-            precond = {
-                w: self.get_precond(ea, nocc, norb, w) for w in self.frequencies
-            }
         else:
             op_freq_keys = None
-            precond = None
         op_freq_keys = self.comm.bcast(op_freq_keys, root=mpi_master())
+
+        if self.rank == mpi_master():
+            freqs = set([w for (op, w) in op_freq_keys])
+            precond = {w: self.get_precond(ea, nocc, norb, w) for w in freqs}
+        else:
+            precond = None
 
         rsp_vector_labels = [
             'LR_bger_half_size',
@@ -384,7 +386,7 @@ class LinearResponseSolver:
         # generate initial guess from scratch
         else:
             if self.rank == mpi_master():
-                igs = self.initial_guess(v1, self.frequencies, precond)
+                igs = self.initial_guess(v1, precond)
                 bger, bung = self.setup_trials(igs)
 
                 assert_msg_critical(
@@ -752,15 +754,13 @@ class LinearResponseSolver:
         self.is_converged = self.comm.bcast(self.is_converged,
                                             root=mpi_master())
 
-    def initial_guess(self, v1, freqs, precond):
+    def initial_guess(self, v1, precond):
         """
         Creating initial guess for the linear response solver.
 
         :param v1:
             The dictionary containing (operator, frequency) as keys and
             right-hand sides as values.
-        :param freq:
-            The frequencies.
         :param precond:
             The preconditioner.
 
@@ -881,10 +881,10 @@ class LinearResponseSolver:
             The set of vectors.
         :param precond:
             The preconditioner.
-        :param bger:
-            The gerade subspace.
-        :param bung:
-            The ungerade subspace.
+        :param dist_bger:
+            The distributed gerade subspace.
+        :param dist_bung:
+            The distributed ungerade subspace.
         :param renormalize:
             The flag for normalization.
 
@@ -915,7 +915,7 @@ class LinearResponseSolver:
             new_ger, new_ung = None, None
 
         if dist_bger is not None:
-            # t = t - (V (V.T t))
+            # t = t - (b (b.T t))
             dist_new_ger = DistributedArray(new_ger, self.comm)
             bT_new_ger = dist_bger.matmul_AtB_allreduce(dist_new_ger, 2.0)
             new_ger_proj = dist_bger.matmul_AB(bT_new_ger)
@@ -923,7 +923,7 @@ class LinearResponseSolver:
                 new_ger -= new_ger_proj
 
         if dist_bung is not None:
-            # t = t - (V (V.T t))
+            # t = t - (b (b.T t))
             dist_new_ung = DistributedArray(new_ung, self.comm)
             bT_new_ung = dist_bung.matmul_AtB_allreduce(dist_new_ung, 2.0)
             new_ung_proj = dist_bung.matmul_AB(bT_new_ung)

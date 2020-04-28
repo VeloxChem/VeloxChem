@@ -200,13 +200,11 @@ class DistributedArray:
             for i in range(1, nodes):
                 send_data = np.array(dset[displacements[i]:displacements[i] +
                                           counts[i]])
-                req = comm.isend(send_data, dest=i, tag=i)
-                req.wait()
+                comm.send(send_data, dest=i, tag=i)
 
             hf.close()
         else:
-            req = comm.irecv(source=mpi_master(), tag=rank)
-            data = req.wait()
+            data = comm.recv(source=mpi_master(), tag=rank)
 
         return cls(data, comm, distribute=False)
 
@@ -239,13 +237,11 @@ class DistributedArray:
             dset[displacements[0]:displacements[0] + counts[0]] = self.data[:]
 
             for i in range(1, self.nodes):
-                req = self.comm.irecv(source=i, tag=i)
-                data = req.wait()
+                data = self.comm.recv(source=i, tag=i)
                 dset[displacements[i]:displacements[i] + counts[i]] = data[:]
 
             hf.close()
         else:
-            req = self.comm.isend(self.data, dest=mpi_master(), tag=self.rank)
-            req.wait()
+            self.comm.send(self.data, dest=mpi_master(), tag=self.rank)
 
         return tm.time() - t0
