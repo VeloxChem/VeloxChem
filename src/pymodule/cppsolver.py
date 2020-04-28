@@ -231,27 +231,28 @@ class ComplexResponse:
             A tuple containing respective parts of the trial vectors.
         """
 
-        quarter_rows = vecs.shape[0] // 4
-        half_rows = 2 * quarter_rows
+        quarter = vecs.shape[0] // 4
+        quarter_2 = quarter * 2
+        quarter_3 = quarter * 3
 
-        if len(vecs.shape) != 1:
-            realger = []
-            realung = []
-            imagger = []
-            imagung = []
-            for vec in range(len(vecs[0, :])):
-                realger.append(vecs[:quarter_rows, vec])
-                realung.append(vecs[quarter_rows:half_rows, vec])
-                imagung.append(vecs[half_rows:-quarter_rows, vec])
-                imagger.append(vecs[-quarter_rows:, vec])
+        if vecs.ndim == 2:
+            return (
+                vecs[:quarter, :],
+                vecs[quarter:quarter_2, :],
+                vecs[quarter_2:quarter_3, :],
+                vecs[quarter_3:, :],
+            )
+
+        elif vecs.ndim == 1:
+            return (
+                vecs[:quarter],
+                vecs[quarter:quarter_2],
+                vecs[quarter_2:quarter_3],
+                vecs[quarter_3:],
+            )
+
         else:
-            realger = vecs[:quarter_rows]
-            realung = vecs[quarter_rows:half_rows]
-            imagung = vecs[half_rows:-quarter_rows]
-            imagger = vecs[-quarter_rows:]
-
-        return np.array(realger).T, np.array(realung).T, np.array(
-            imagung).T, np.array(imagger).T
+            return (None, None, None, None)
 
     def assemble_subsp(self, realvec, imagvec):
         """
@@ -269,14 +270,15 @@ class ComplexResponse:
         """
 
         space = []
-        if len(realvec.shape) != 1:
-            for vec in range(len(realvec[0, :])):
+
+        if realvec.ndim == 2:
+            for vec in range(realvec.shape[1]):
                 if np.linalg.norm(realvec[:, vec]) > self.small_thresh:
                     space.append(realvec[:, vec])
                 if np.linalg.norm(imagvec[:, vec]) > self.small_thresh:
                     space.append(imagvec[:, vec])
 
-        else:
+        elif realvec.ndim == 1:
             if np.linalg.norm(realvec) > self.small_thresh:
                 space.append(realvec)
             if np.linalg.norm(imagvec) > self.small_thresh:
@@ -295,8 +297,7 @@ class ComplexResponse:
             A tuple containing gerade and ungerade parts of vectors.
         """
 
-        assert_msg_critical(
-            len(grad.shape) == 1, 'decomp_grad: Expecting a 1D array')
+        assert_msg_critical(grad.ndim == 1, 'decomp_grad: Expecting a 1D array')
 
         assert_msg_critical(grad.shape[0] % 2 == 0,
                             'decomp_grad: size of array should be even')
@@ -354,9 +355,7 @@ class ComplexResponse:
         pc_diag = p_diag * c_diag
         pd_diag = p_diag * d_diag
 
-        precond = np.array([pa_diag, pb_diag, pc_diag, pd_diag])
-
-        return precond
+        return (pa_diag, pb_diag, pc_diag, pd_diag)
 
     def preconditioning(self, precond, v_in):
         """
@@ -371,7 +370,7 @@ class ComplexResponse:
             The trail vectors after preconditioning.
         """
 
-        pa, pb, pc, pd = precond[0], precond[1], precond[2], precond[3]
+        pa, pb, pc, pd = precond
 
         v_in_rg, v_in_ru, v_in_iu, v_in_ig = self.decomp_trials(v_in)
 
@@ -380,9 +379,7 @@ class ComplexResponse:
         v_out_iu = pc * v_in_rg + pd * v_in_ru - pa * v_in_iu - pb * v_in_ig
         v_out_ig = pd * v_in_rg + pc * v_in_ru - pb * v_in_iu - pa * v_in_ig
 
-        v_out = np.array([v_out_rg, v_out_ru, v_out_iu, v_out_ig]).flatten()
-
-        return v_out
+        return np.hstack((v_out_rg, v_out_ru, v_out_iu, v_out_ig))
 
     def initial_guess(self, v1, d, precond):
         """
@@ -404,9 +401,8 @@ class ComplexResponse:
         for (op, w), grad in v1.items():
             gradger, gradung = self.decomp_grad(grad)
 
-            grad = np.array(
-                [gradger.real, gradung.real, -gradung.imag,
-                 -gradger.imag]).flatten()
+            grad = np.hstack(
+                (gradger.real, gradung.real, -gradung.imag, -gradger.imag))
             gn = np.sqrt(2.0) * np.linalg.norm(grad)
 
             if gn < self.small_thresh:
@@ -462,8 +458,8 @@ class ComplexResponse:
 
             # decomposing the full space trial vectors...
 
-            new_realger, new_realung, new_imagung, new_imagger = self.decomp_trials(
-                new_trials)
+            (new_realger, new_realung, new_imagung,
+             new_imagger) = self.decomp_trials(new_trials)
 
             # ...and assembling gerade and ungerade subspaces
 
@@ -883,9 +879,8 @@ class ComplexResponse:
 
                         # composing total half-sized residual
 
-                        r = np.array(
-                            [r_realger, r_realung, r_imagung,
-                             r_imagger]).flatten()
+                        r = np.hstack(
+                            (r_realger, r_realung, r_imagung, r_imagger))
 
                         # calculating relative residual norm
                         # for convergence check
@@ -898,7 +893,7 @@ class ComplexResponse:
                         if xn != 0:
                             relative_residual_norm[(op, w)] = rn / xn
                         else:
-                            relative_residual_norm[(op, w)] = 0
+                            relative_residual_norm[(op, w)] = rn
 
                         if relative_residual_norm[(op, w)] < self.conv_thresh:
                             solutions[(op, w)] = x

@@ -694,7 +694,7 @@ class C6Solver:
                         if xn != 0:
                             relative_residual_norm[(op, iw)] = rn / xn
                         else:
-                            relative_residual_norm[(op, iw)] = 0
+                            relative_residual_norm[(op, iw)] = rn
 
                         if relative_residual_norm[(op, iw)] < self.conv_thresh:
                             solutions[(op, iw)] = x

@@ -487,14 +487,17 @@ class LinearResponseSolver:
 
                     r_ger = e2x_ger - freq * s2x_ung - gradger
                     r_ung = e2x_ung - freq * s2x_ger - gradung
-                    r = np.array([r_ger, r_ung]).flatten()
+                    r = np.hstack((r_ger, r_ung))
 
                     xv = np.dot(x, v)
                     xvs.append((op, freq, xv))
 
                     rn = np.linalg.norm(r) * np.sqrt(2.0)
                     xn = np.linalg.norm(x)
-                    relative_residual_norm[(op, freq)] = rn / xn
+                    if xn != 0:
+                        relative_residual_norm[(op, freq)] = rn / xn
+                    else:
+                        relative_residual_norm[(op, freq)] = rn
 
                     if relative_residual_norm[(op, freq)] < self.conv_thresh:
                         solutions[(op, freq)] = x
@@ -772,7 +775,7 @@ class LinearResponseSolver:
         for (op, w), grad in v1.items():
             gradger, gradung = self.decomp_grad(grad)
 
-            grad = np.array([gradger, gradung]).flatten()
+            grad = np.hstack((gradger, gradung))
             gn = np.linalg.norm(grad) * np.sqrt(2.0)
 
             if gn < self.small_thresh:
@@ -793,8 +796,7 @@ class LinearResponseSolver:
             A tuple containing gerade and ungerade parts of gradient.
         """
 
-        assert_msg_critical(
-            len(grad.shape) == 1, 'decomp_grad: Expecting a 1D array')
+        assert_msg_critical(grad.ndim == 1, 'decomp_grad: Expecting a 1D array')
 
         assert_msg_critical(grad.shape[0] % 2 == 0,
                             'decomp_grad: size of array should be even')
@@ -840,9 +842,7 @@ class LinearResponseSolver:
         pa_diag = ediag / (ediag_sq - w_sq * sdiag_sq)
         pb_diag = (w * sdiag) / (ediag_sq - w_sq * sdiag_sq)
 
-        precond = np.array([pa_diag, pb_diag])
-
-        return precond
+        return (pa_diag, pb_diag)
 
     def preconditioning(self, precond, v_in):
         """
@@ -857,16 +857,14 @@ class LinearResponseSolver:
             The trail vectors after preconditioning.
         """
 
-        pa, pb = precond[0], precond[1]
+        pa, pb = precond
 
         v_in_rg, v_in_ru = self.decomp_trials(v_in)
 
         v_out_rg = pa * v_in_rg + pb * v_in_ru
         v_out_ru = pb * v_in_rg + pa * v_in_ru
 
-        v_out = np.array([v_out_rg, v_out_ru]).flatten()
-
-        return v_out
+        return np.hstack((v_out_rg, v_out_ru))
 
     def setup_trials(self,
                      vectors,
@@ -958,11 +956,11 @@ class LinearResponseSolver:
         ger, ung = None, None
         half_rows = vecs.shape[0] // 2
 
-        if len(vecs.shape) == 1:
+        if vecs.ndim == 1:
             ger = vecs[:half_rows]
             ung = vecs[half_rows:]
 
-        elif len(vecs.shape) == 2:
+        elif vecs.ndim == 2:
             ger = vecs[:half_rows, :]
             ung = vecs[half_rows:, :]
 
