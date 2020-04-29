@@ -137,6 +137,20 @@ class Profiler:
             t0 = self.timing_list[iteration][label]
             self.timing_list[iteration][label] = tm.time() - t0
 
+    def update_timer(self, iteration, timing_dict):
+        """
+        Updates the timer with a dictionary of timing information.
+
+        :param iteration:
+            The iteration.
+        :param timing_dict:
+            The dictionary containing timing information.
+        """
+
+        if self.timing:
+            for key, val in timing_dict.items():
+                self.timing_list[iteration][key] = val
+
     def print_timing(self, ostream):
         """
         Prints timing.
@@ -154,18 +168,18 @@ class Profiler:
 
             keys = list(self.timing_list[0].keys())
 
-            valstr = '{:<15s}'.format('')
+            valstr = '{:<18s}'.format('')
             for key in keys:
-                valstr += ' {:>15s}'.format(key)
+                valstr += ' {:>12s}'.format(key)
             ostream.print_header(valstr.ljust(width))
 
             for i, d in enumerate(self.timing_list):
-                valstr = '{:<15s}'.format('Iteration {:d}'.format(i + 1))
+                valstr = '{:<18s}'.format('Iteration {:d}'.format(i + 1))
                 for key in keys:
                     if key in d:
-                        valstr += ' {:15.2f}'.format(d[key])
+                        valstr += ' {:12.2f}'.format(d[key])
                     else:
-                        valstr += ' {:15s}'.format('')
+                        valstr += ' {:12s}'.format('')
                 ostream.print_header(valstr.ljust(width))
 
             ostream.print_blank()

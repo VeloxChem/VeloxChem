@@ -13,6 +13,7 @@ from .veloxchemlib import szblock
 from .veloxchemlib import denmat
 from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import parse_xc_func
+from .profiler import Profiler
 from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence_half
@@ -63,6 +64,8 @@ class LinearResponseEigenSolver:
         - checkpoint_time: The timer of checkpoint file.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
+        - memory_profiling: The flag for printing memory usage.
+        - memory_tracing: The flag for tracing memory allocation using
     """
 
     def __init__(self, comm, ostream):
@@ -111,8 +114,9 @@ class LinearResponseEigenSolver:
         self.checkpoint_time = None
 
         self.timing = False
-        self.timing_dict = None
         self.profiling = False
+        self.memory_profiling = False
+        self.memory_tracing = False
 
     def update_settings(self, rsp_dict, method_dict={}):
         """
@@ -151,6 +155,13 @@ class LinearResponseEigenSolver:
         if 'profiling' in rsp_dict:
             key = rsp_dict['profiling'].lower()
             self.profiling = True if key in ['yes', 'y'] else False
+
+        if 'memory_profiling' in rsp_dict:
+            key = rsp_dict['memory_profiling'].lower()
+            self.memory_profiling = True if key in ['yes', 'y'] else False
+        if 'memory_tracing' in rsp_dict:
+            key = rsp_dict['memory_tracing'].lower()
+            self.memory_tracing = True if key in ['yes', 'y'] else False
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
@@ -192,23 +203,12 @@ class LinearResponseEigenSolver:
             dipole moments, oscillator strengths and rotatory strengths.
         """
 
-        if self.profiling:
-            import cProfile
-            import pstats
-            import io
-            pr = cProfile.Profile()
-            pr.enable()
-
-        if self.timing:
-            self.timing_dict = {
-                'reduced_space': [0.0],
-                'ortho_norm': [0.0],
-                'fock_build': [0.0],
-                'fock_eri': [0.0],
-                'fock_dft': [0.0],
-                'fock_pe': [0.0],
-            }
-            timing_t0 = tm.time()
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
 
         if self.rank == mpi_master():
             self.print_header()
@@ -331,11 +331,6 @@ class LinearResponseEigenSolver:
                 igs = self.initial_excitations(self.nstates, ea, nocc, norb)
                 bger, bung = self.setup_trials(igs)
 
-                if self.timing:
-                    elapsed_time = tm.time() - timing_t0
-                    self.timing_dict['ortho_norm'][0] += elapsed_time
-                    timing_t0 = tm.time()
-
                 assert_msg_critical(
                     bger.any() or bung.any(),
                     'LinearResponseEigenSolver: trial vector is empty')
@@ -350,30 +345,17 @@ class LinearResponseEigenSolver:
                                                    molgrid, gs_density, V_es,
                                                    pe_drv, timing_dict)
 
+        profiler.check_memory_usage('Initial guess')
+
         excitations = [None] * self.nstates
         exresiduals = [None] * self.nstates
         relative_residual_norm = {}
         converged = {}
 
-        if self.timing:
-            self.timing_dict['fock_build'][0] += tm.time() - timing_t0
-            self.timing_dict['fock_eri'][0] += timing_dict['ERI']
-            if self.dft:
-                self.timing_dict['fock_dft'][0] += timing_dict['DFT']
-            if self.pe:
-                self.timing_dict['fock_pe'][0] += timing_dict['PE']
-            timing_t0 = tm.time()
-
         # start iterations
         for iteration in range(self.max_iter):
 
-            if self.timing:
-                self.timing_dict['reduced_space'].append(0.0)
-                self.timing_dict['ortho_norm'].append(0.0)
-                self.timing_dict['fock_build'].append(0.0)
-                self.timing_dict['fock_eri'].append(0.0)
-                self.timing_dict['fock_dft'].append(0.0)
-                self.timing_dict['fock_pe'].append(0.0)
+            profiler.start_timer(iteration, 'ReducedSpace')
 
             if self.rank == mpi_master():
                 self.cur_iter = iteration
@@ -430,7 +412,7 @@ class LinearResponseEigenSolver:
                     r_ung = np.matmul(e2bung,
                                       c_ung) - w * 2.0 * np.matmul(bger, c_ger)
 
-                    r = np.array([r_ger, r_ung]).flatten()
+                    r = np.hstack((r_ger, r_ung))
 
                     x_ger = np.matmul(bger, c_ger)
                     x_ung = np.matmul(bung, c_ung)
@@ -445,7 +427,10 @@ class LinearResponseEigenSolver:
 
                     rn = np.linalg.norm(r) * np.sqrt(2.0)
                     xn = np.linalg.norm(X)
-                    relative_residual_norm[k] = rn / xn
+                    if xn != 0:
+                        relative_residual_norm[k] = rn / xn
+                    else:
+                        relative_residual_norm[k] = rn
 
                     converged[k] = (rn / xn < self.conv_thresh)
                     ws.append(w)
@@ -459,18 +444,42 @@ class LinearResponseEigenSolver:
                         bung.shape[1]))
                 self.ostream.print_blank()
 
+                mem_usage, mem_detail = profiler.get_memory_dictionary({
+                    'bger': bger,
+                    'bung': bung,
+                    'e2bger': e2bger,
+                    'e2bung': e2bung,
+                    'excitations': excitations,
+                    'exresiduals': exresiduals,
+                })
+                mem_avail = profiler.get_available_memory()
+
+                self.ostream.print_info(
+                    '{:s} of memory used for subspace procedure'.format(
+                        mem_usage))
+                if self.memory_profiling:
+                    for m in mem_detail:
+                        self.ostream.print_info('  {:<15s} {:s}'.format(*m))
+                self.ostream.print_info(
+                    '{:s} of memory available for the solver'.format(mem_avail))
+                self.ostream.print_blank()
+
+                profiler.check_memory_usage(
+                    'Iteration {:d} subspace'.format(iteration + 1))
+
+                profiler.print_memory_tracing(self.ostream)
+
                 self.print_iteration(relative_residual_norm, converged, ws)
 
-            if self.timing:
-                tid = iteration + 1
-                self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
-                timing_t0 = tm.time()
+            profiler.stop_timer(iteration, 'ReducedSpace')
 
             # check convergence
             self.check_convergence(relative_residual_norm)
 
             if self.is_converged:
                 break
+
+            profiler.start_timer(iteration, 'Orthonorm.')
 
             # update trial vectors
             if self.rank == mpi_master():
@@ -493,10 +502,8 @@ class LinearResponseEigenSolver:
                 bger = np.append(bger, new_trials_ger, axis=1)
                 bung = np.append(bung, new_trials_ung, axis=1)
 
-            if self.timing:
-                tid = iteration + 1
-                self.timing_dict['ortho_norm'][tid] += tm.time() - timing_t0
-                timing_t0 = tm.time()
+            profiler.stop_timer(iteration, 'Orthonorm.')
+            profiler.start_timer(iteration, 'FockBuild')
 
             new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
@@ -516,33 +523,23 @@ class LinearResponseEigenSolver:
                                    potfile_text, self.ostream)
                     self.checkpoint_time = tm.time()
 
-            if self.timing:
-                tid = iteration + 1
-                self.timing_dict['fock_build'][tid] += tm.time() - timing_t0
-                self.timing_dict['fock_eri'][tid] += timing_dict['ERI']
-                if self.dft:
-                    self.timing_dict['fock_dft'][tid] += timing_dict['DFT']
-                if self.pe:
-                    self.timing_dict['fock_pe'][tid] += timing_dict['PE']
-                timing_t0 = tm.time()
+            profiler.stop_timer(iteration, 'FockBuild')
+            profiler.update_timer(iteration, timing_dict)
+
+            profiler.check_memory_usage(
+                'Iteration {:d} sigma build'.format(iteration + 1))
 
         # converged?
         if self.rank == mpi_master():
             self.print_convergence()
 
-            if self.timing:
-                self.print_timing()
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
 
-        if self.profiling:
-            pr.disable()
-            s = io.StringIO()
-            sortby = 'cumulative'
-            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-            ps.print_stats(20)
-            if self.rank == mpi_master():
-                for line in s.getvalue().split(os.linesep):
-                    self.ostream.print_info(line)
+        profiler.check_memory_usage('End of LR eigensolver')
+        profiler.print_memory_usage(self.ostream)
 
+        # calculate properties
         dipole_rhs = get_rhs('dipole', 'xyz', molecule, basis, scf_tensors,
                              self.rank, self.comm)
         linmom_rhs = get_rhs('linear_momentum', 'xyz', molecule, basis,
@@ -748,7 +745,7 @@ class LinearResponseEigenSolver:
             Xn_ger = 0.5 * (Xn + Xn_T)[:n_exc]
             Xn_ung = 0.5 * (Xn - Xn_T)[:n_exc]
 
-            final.append((w[(i, a)], np.array([Xn_ger, Xn_ung]).flatten()))
+            final.append((w[(i, a)], np.hstack((Xn_ger, Xn_ung))))
         return final
 
     def setup_trials(self,
@@ -848,9 +845,7 @@ class LinearResponseEigenSolver:
         pa_diag = ediag / (ediag_sq - w_sq * sdiag_sq)
         pb_diag = (w * sdiag) / (ediag_sq - w_sq * sdiag_sq)
 
-        precond = np.array([pa_diag, pb_diag])
-
-        return precond
+        return (pa_diag, pb_diag)
 
     def preconditioning(self, precond, v_in):
         """
@@ -865,16 +860,14 @@ class LinearResponseEigenSolver:
             The trail vectors after preconditioning.
         """
 
-        pa, pb = precond[0], precond[1]
+        pa, pb = precond
 
         v_in_rg, v_in_ru = self.decomp_trials(v_in)
 
         v_out_rg = pa * v_in_rg + pb * v_in_ru
         v_out_ru = pb * v_in_rg + pa * v_in_ru
 
-        v_out = np.array([v_out_rg, v_out_ru]).flatten()
-
-        return v_out
+        return np.hstack((v_out_rg, v_out_ru))
 
     def decomp_trials(self, vecs):
         """
@@ -893,64 +886,12 @@ class LinearResponseEigenSolver:
         ger, ung = None, None
         half_rows = vecs.shape[0] // 2
 
-        if len(vecs.shape) == 1:
+        if vecs.ndim == 1:
             ger = vecs[:half_rows]
             ung = vecs[half_rows:]
 
-        elif len(vecs.shape) == 2:
+        elif vecs.ndim == 2:
             ger = vecs[:half_rows, :]
             ung = vecs[half_rows:, :]
 
         return ger, ung
-
-    def print_timing(self):
-        """
-        Prints timing for the linear response eigensolver.
-        """
-
-        width = 92
-
-        valstr = 'Timing (in sec):'
-        self.ostream.print_header(valstr.ljust(width))
-        self.ostream.print_header(('-' * len(valstr)).ljust(width))
-
-        valstr = '{:<15s} {:>15s} {:>15s} {:>15s}'.format(
-            '', 'ReducedSpace', 'Orthonorm.', 'FockBuild')
-        valstr += ' {:>10s}'.format('FockERI')
-        if self.dft:
-            valstr += ' {:>10s}'.format('FockDFT')
-        if self.pe:
-            valstr += ' {:>10s}'.format('FockPE')
-        self.ostream.print_header(valstr.ljust(width))
-
-        for i, (a, b, c) in enumerate(
-                zip(self.timing_dict['reduced_space'],
-                    self.timing_dict['ortho_norm'],
-                    self.timing_dict['fock_build'])):
-            if i == 0:
-                title = 'Initial guess'
-            else:
-                title = 'Iteration {:<5d}'.format(i)
-            valstr = '{:<15s} {:15.3f} {:15.3f} {:15.3f}'.format(title, a, b, c)
-            valstr += ' {:10.2f}'.format(self.timing_dict['fock_eri'][i])
-            if self.dft:
-                valstr += ' {:10.2f}'.format(self.timing_dict['fock_dft'][i])
-            if self.pe:
-                valstr += ' {:10.2f}'.format(self.timing_dict['fock_pe'][i])
-            self.ostream.print_header(valstr.ljust(width))
-
-        valstr = '---------'
-        self.ostream.print_header(valstr.ljust(width))
-
-        valstr = '{:<15s} {:15.3f} {:15.3f} {:15.3f}'.format(
-            'Sum', sum(self.timing_dict['reduced_space']),
-            sum(self.timing_dict['ortho_norm']),
-            sum(self.timing_dict['fock_build']))
-        valstr += ' {:10.2f}'.format(sum(self.timing_dict['fock_eri']))
-        if self.dft:
-            valstr += ' {:10.2f}'.format(sum(self.timing_dict['fock_dft']))
-        if self.pe:
-            valstr += ' {:10.2f}'.format(sum(self.timing_dict['fock_pe']))
-        self.ostream.print_header(valstr.ljust(width))
-
-        self.ostream.print_blank()
