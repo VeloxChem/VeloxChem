@@ -429,9 +429,9 @@ class LinearResponseSolver:
             n_ger = dist_bger.shape(1)
             n_ung = dist_bung.shape(1)
 
-            e2gg_from_dist = dist_bger.matmul_AtB(dist_e2bger, 2.0)
-            e2uu_from_dist = dist_bung.matmul_AtB(dist_e2bung, 2.0)
-            s2ug_from_dist = dist_bung.matmul_AtB(dist_bger, 4.0)
+            e2gg = dist_bger.matmul_AtB(dist_e2bger, 2.0)
+            e2uu = dist_bung.matmul_AtB(dist_e2bung, 2.0)
+            s2ug = dist_bung.matmul_AtB(dist_bger, 4.0)
 
             xvs = []
             self.cur_iter = iteration
@@ -454,10 +454,10 @@ class LinearResponseSolver:
 
                 if self.rank == mpi_master():
                     mat = np.zeros((n_ger + n_ung, n_ger + n_ung))
-                    mat[:n_ger, :n_ger] = e2gg_from_dist[:, :]
-                    mat[:n_ger, n_ger:] = -freq * s2ug_from_dist.T[:, :]
-                    mat[n_ger:, :n_ger] = -freq * s2ug_from_dist[:, :]
-                    mat[n_ger:, n_ger:] = e2uu_from_dist[:, :]
+                    mat[:n_ger, :n_ger] = e2gg[:, :]
+                    mat[:n_ger, n_ger:] = -freq * s2ug.T[:, :]
+                    mat[n_ger:, :n_ger] = -freq * s2ug[:, :]
+                    mat[n_ger:, n_ger:] = e2uu[:, :]
 
                     g = np.zeros(n_ger + n_ung)
                     g[:n_ger] = g_ger[:]
@@ -477,10 +477,10 @@ class LinearResponseSolver:
                 e2x_ger = dist_e2bger.matmul_AB(c_ger)
                 e2x_ung = dist_e2bung.matmul_AB(c_ung)
 
-                s2x_ger = dist_bger.matmul_AB(c_ger, 2.0)
-                s2x_ung = dist_bung.matmul_AB(c_ung, 2.0)
-
                 if self.rank == mpi_master():
+                    s2x_ger = 2.0 * x_ger
+                    s2x_ung = 2.0 * x_ung
+
                     x_ger_full = np.hstack((x_ger, x_ger))
                     x_ung_full = np.hstack((x_ung, -x_ung))
                     x = x_ger_full + x_ung_full

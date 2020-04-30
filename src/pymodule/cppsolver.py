@@ -856,17 +856,17 @@ class ComplexResponse:
 
                     e2realger = dist_e2bger.matmul_AB(c_realger)
                     e2imagger = dist_e2bger.matmul_AB(c_imagger)
-                    s2realger = dist_bger.matmul_AB(c_realger, 2.0)
-                    s2imagger = dist_bger.matmul_AB(c_imagger, 2.0)
-
                     e2realung = dist_e2bung.matmul_AB(c_realung)
                     e2imagung = dist_e2bung.matmul_AB(c_imagung)
-                    s2realung = dist_bung.matmul_AB(c_realung, 2.0)
-                    s2imagung = dist_bung.matmul_AB(c_imagung, 2.0)
 
                     # calculating the residual components
 
                     if self.rank == mpi_master():
+
+                        s2realger = 2.0 * x_realger
+                        s2imagger = 2.0 * x_imagger
+                        s2realung = 2.0 * x_realung
+                        s2imagung = 2.0 * x_imagung
 
                         r_realger = (e2realger - w * s2realung + d * s2imagung -
                                      gradger.real)

@@ -14,6 +14,7 @@ from .veloxchemlib import denmat
 from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import parse_xc_func
 from .profiler import Profiler
+from .distributedarray import DistributedArray
 from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence_half
@@ -21,7 +22,7 @@ from .lrmatvecdriver import orthogonalize_gram_schmidt_half
 from .lrmatvecdriver import normalize_half
 from .lrmatvecdriver import construct_ed_sd_half
 from .lrmatvecdriver import get_rhs
-from .lrmatvecdriver import read_rsp_hdf5
+from .lrmatvecdriver import check_rsp_hdf5
 from .lrmatvecdriver import write_rsp_hdf5
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
@@ -112,6 +113,7 @@ class LinearResponseEigenSolver:
         self.restart = True
         self.checkpoint_file = None
         self.checkpoint_time = None
+        self.checkpoint_interval = 4.0 * 3600
 
         self.timing = False
         self.profiling = False
@@ -148,6 +150,14 @@ class LinearResponseEigenSolver:
             self.restart = True if key == 'yes' else False
         if 'checkpoint_file' in rsp_dict:
             self.checkpoint_file = rsp_dict['checkpoint_file']
+        if 'checkpoint_interval' in rsp_dict:
+            if 'h' in rsp_dict['checkpoint_interval'].lower():
+                try:
+                    n_hours = float(
+                        rsp_dict['checkpoint_interval'].lower().split('h')[0])
+                    self.checkpoint_interval = max(0, n_hours) * 3600
+                except ValueError:
+                    pass
 
         if 'timing' in rsp_dict:
             key = rsp_dict['timing'].lower()
@@ -305,29 +315,33 @@ class LinearResponseEigenSolver:
             'LR_eigen_bung_half_size',
             'LR_eigen_e2bger_half_size',
             'LR_eigen_e2bung_half_size',
+            'LR_eigen_nstates_{}'.format(self.nstates),
         ]
-
-        bger = None
-        bung = None
-        new_trials_ger = None
-        new_trials_ung = None
 
         # read initial guess from restart file
         if self.restart:
             if self.rank == mpi_master():
-                bger, bung, e2bger, e2bung = read_rsp_hdf5(
+                self.restart = check_rsp_hdf5(
                     self.checkpoint_file, rsp_vector_labels,
                     molecule.nuclear_repulsion_energy(),
                     molecule.elem_ids_to_numpy(), basis.get_label(),
                     dft_func_label, potfile_text, self.ostream)
-                self.restart = (bger is not None and bung is not None and
-                                e2bger is not None and e2bung is not None)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
-        # generate initial guess from scratch
-        if not self.restart:
-            if self.rank == mpi_master():
+        # read initial guess from restart file
+        if self.restart:
+            dist_bger = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'LR_eigen_bger_half_size', self.comm)
+            dist_bung = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'LR_eigen_bung_half_size', self.comm)
+            dist_e2bger = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'LR_eigen_e2bger_half_size', self.comm)
+            dist_e2bung = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'LR_eigen_e2bung_half_size', self.comm)
 
+        # generate initial guess from scratch
+        else:
+            if self.rank == mpi_master():
                 igs = self.initial_excitations(self.nstates, ea, nocc, norb)
                 bger, bung = self.setup_trials(igs)
 
@@ -339,11 +353,23 @@ class LinearResponseEigenSolver:
                     bger = np.zeros((bung.shape[0], 0))
                 if bung is None or not bung.any():
                     bung = np.zeros((bger.shape[0], 0))
+            else:
+                bger, bung = None, None
 
             e2bger, e2bung = e2x_drv.e2n_half_size(bger, bung, scf_tensors,
                                                    screening, molecule, basis,
                                                    molgrid, gs_density, V_es,
                                                    pe_drv, timing_dict)
+
+            dist_bger = DistributedArray(bger, self.comm)
+            dist_bung = DistributedArray(bung, self.comm)
+
+            bger, bung = None, None
+
+            dist_e2bger = DistributedArray(e2bger, self.comm)
+            dist_e2bung = DistributedArray(e2bung, self.comm)
+
+            e2bger, e2bung = None, None
 
         profiler.check_memory_usage('Initial guess')
 
@@ -357,13 +383,13 @@ class LinearResponseEigenSolver:
 
             profiler.start_timer(iteration, 'ReducedSpace')
 
-            if self.rank == mpi_master():
-                self.cur_iter = iteration
-                ws = []
+            self.cur_iter = iteration
 
-                e2gg = np.matmul(bger.T, e2bger) * 2.0
-                e2uu = np.matmul(bung.T, e2bung) * 2.0
-                s2ug = np.matmul(bung.T, bger) * 4.0
+            e2gg = dist_bger.matmul_AtB(dist_e2bger, 2.0)
+            e2uu = dist_bung.matmul_AtB(dist_e2bung, 2.0)
+            s2ug = dist_bung.matmul_AtB(dist_bger, 4.0)
+
+            if self.rank == mpi_master():
 
                 # Equations:
                 # E[2] X_g - w S[2] X_u = 0
@@ -389,37 +415,44 @@ class LinearResponseEigenSolver:
                 evecs = evecs[:, p]
 
                 wn = 1.0 / np.sqrt(evals[:self.nstates])
-                Xn_ger = np.matmul(tmat, evecs[:, :self.nstates])
-                Xn_ung = wn * np.linalg.multi_dot([e2uu_inv, s2ug, Xn_ger])
+                c_ger = np.matmul(tmat, evecs[:, :self.nstates])
+                c_ung = wn * np.linalg.multi_dot([e2uu_inv, s2ug, c_ger])
 
                 for k in range(self.nstates):
-                    x_ger = Xn_ger[:, k]
-                    x_ung = Xn_ung[:, k]
+                    c_ger_k = c_ger[:, k]
+                    c_ung_k = c_ung[:, k]
                     norm = np.sqrt(
-                        np.linalg.multi_dot([x_ung.T, s2ug, x_ger]) +
-                        np.linalg.multi_dot([x_ger.T, s2ug.T, x_ung]))
-                    Xn_ger[:, k] /= norm
-                    Xn_ung[:, k] /= norm
+                        np.linalg.multi_dot([c_ung_k.T, s2ug, c_ger_k]) +
+                        np.linalg.multi_dot([c_ger_k.T, s2ug.T, c_ung_k]))
+                    c_ger[:, k] /= norm
+                    c_ung[:, k] /= norm
+            else:
+                c_ger = None
+                c_ung = None
+            c_ger = self.comm.bcast(c_ger, root=mpi_master())
+            c_ung = self.comm.bcast(c_ung, root=mpi_master())
 
-                for k in range(self.nstates):
+            for k in range(self.nstates):
+
+                x_ger = dist_bger.matmul_AB(c_ger[:, k])
+                x_ung = dist_bung.matmul_AB(c_ung[:, k])
+
+                e2x_ger = dist_e2bger.matmul_AB(c_ger[:, k])
+                e2x_ung = dist_e2bung.matmul_AB(c_ung[:, k])
+
+                if self.rank == mpi_master():
 
                     w = wn[k]
-                    c_ger = Xn_ger[:, k]
-                    c_ung = Xn_ung[:, k]
 
-                    r_ger = np.matmul(e2bger,
-                                      c_ger) - w * 2.0 * np.matmul(bung, c_ung)
-                    r_ung = np.matmul(e2bung,
-                                      c_ung) - w * 2.0 * np.matmul(bger, c_ger)
+                    s2x_ger = 2.0 * x_ger
+                    s2x_ung = 2.0 * x_ung
 
+                    r_ger = e2x_ger - w * s2x_ung
+                    r_ung = e2x_ung - w * s2x_ger
                     r = np.hstack((r_ger, r_ung))
-
-                    x_ger = np.matmul(bger, c_ger)
-                    x_ung = np.matmul(bung, c_ung)
 
                     x_ger_full = np.hstack((x_ger, x_ger))
                     x_ung_full = np.hstack((x_ung, -x_ung))
-
                     X = x_ger_full + x_ung_full
 
                     exresiduals[k] = (w, r)
@@ -433,24 +466,22 @@ class LinearResponseEigenSolver:
                         relative_residual_norm[k] = rn
 
                     converged[k] = (rn / xn < self.conv_thresh)
-                    ws.append(w)
 
-                # write to output
+            # write to output
+            if self.rank == mpi_master():
                 self.ostream.print_info(
                     '{:d} gerade trial vectors in reduced space'.format(
-                        bger.shape[1]))
+                        dist_bger.shape(1)))
                 self.ostream.print_info(
                     '{:d} ungerade trial vectors in reduced space'.format(
-                        bung.shape[1]))
+                        dist_bung.shape(1)))
                 self.ostream.print_blank()
 
                 mem_usage, mem_detail = profiler.get_memory_dictionary({
-                    'bger': bger,
-                    'bung': bung,
-                    'e2bger': e2bger,
-                    'e2bung': e2bung,
-                    'excitations': excitations,
-                    'exresiduals': exresiduals,
+                    'dist_bger': dist_bger.array(),
+                    'dist_bung': dist_bung.array(),
+                    'dist_e2bger': dist_e2bger.array(),
+                    'dist_e2bung': dist_e2bung.array(),
                 })
                 mem_avail = profiler.get_available_memory()
 
@@ -469,7 +500,7 @@ class LinearResponseEigenSolver:
 
                 profiler.print_memory_tracing(self.ostream)
 
-                self.print_iteration(relative_residual_norm, converged, ws)
+                self.print_iteration(relative_residual_norm, converged, wn)
 
             profiler.stop_timer(iteration, 'ReducedSpace')
 
@@ -486,10 +517,13 @@ class LinearResponseEigenSolver:
                 precond = [
                     self.get_precond(ea, nocc, norb, w) for w, x in excitations
                 ]
+            else:
+                precond = None
 
-                new_trials_ger, new_trials_ung = self.setup_trials(
-                    exresiduals, converged, precond, bger, bung)
+            new_trials_ger, new_trials_ung = self.setup_trials(
+                exresiduals, converged, precond, dist_bger, dist_bung)
 
+            if self.rank == mpi_master():
                 assert_msg_critical(
                     new_trials_ger.any() or new_trials_ung.any(),
                     'LinearResponseEigenSolver: unable to add new trial vector')
@@ -499,9 +533,6 @@ class LinearResponseEigenSolver:
                 if new_trials_ung is None or not new_trials_ung.any():
                     new_trials_ung = np.zeros((new_trials_ger.shape[0], 0))
 
-                bger = np.append(bger, new_trials_ger, axis=1)
-                bung = np.append(bung, new_trials_ung, axis=1)
-
             profiler.stop_timer(iteration, 'Orthonorm.')
             profiler.start_timer(iteration, 'FockBuild')
 
@@ -509,19 +540,45 @@ class LinearResponseEigenSolver:
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
                 molecule, basis, molgrid, gs_density, V_es, pe_drv, timing_dict)
 
-            if self.rank == mpi_master():
-                e2bger = np.append(e2bger, new_e2bger, axis=1)
-                e2bung = np.append(e2bung, new_e2bung, axis=1)
+            dist_bger.append(DistributedArray(new_trials_ger, self.comm),
+                             axis=1)
+            dist_bung.append(DistributedArray(new_trials_ung, self.comm),
+                             axis=1)
 
-                if tm.time() - self.checkpoint_time > 900.0:
+            new_trials_ger, new_trials_ung = None, None
+
+            dist_e2bger.append(DistributedArray(new_e2bger, self.comm), axis=1)
+            dist_e2bung.append(DistributedArray(new_e2bung, self.comm), axis=1)
+
+            new_e2bger, new_e2bung = None, None
+
+            # write to checkpoint file
+            if tm.time() - self.checkpoint_time >= self.checkpoint_interval:
+                if self.rank == mpi_master():
                     write_rsp_hdf5(self.checkpoint_file,
-                                   [bger, bung, e2bger, e2bung],
-                                   rsp_vector_labels,
+                                   [np.array([self.nstates])],
+                                   ['LR_eigen_nstates_{}'.format(self.nstates)],
                                    molecule.nuclear_repulsion_energy(),
                                    molecule.elem_ids_to_numpy(),
                                    basis.get_label(), dft_func_label,
                                    potfile_text, self.ostream)
                     self.checkpoint_time = tm.time()
+
+                dt = 0.0
+                dt += dist_bger.append_to_hdf5_file(self.checkpoint_file,
+                                                    'LR_eigen_bger_half_size')
+                dt += dist_bung.append_to_hdf5_file(self.checkpoint_file,
+                                                    'LR_eigen_bung_half_size')
+                dt += dist_e2bger.append_to_hdf5_file(
+                    self.checkpoint_file, 'LR_eigen_e2bger_half_size')
+                dt += dist_e2bung.append_to_hdf5_file(
+                    self.checkpoint_file, 'LR_eigen_e2bung_half_size')
+                dt_text = 'Time spent in writing to checkpoint file: '
+                dt_text += '{:.2f} sec'.format(dt)
+                self.ostream.print_info(dt_text)
+                self.ostream.print_blank()
+
+                self.checkpoint_time = tm.time()
 
             profiler.stop_timer(iteration, 'FockBuild')
             profiler.update_timer(iteration, timing_dict)
@@ -752,8 +809,8 @@ class LinearResponseEigenSolver:
                      excitations,
                      converged={},
                      precond=None,
-                     bger=None,
-                     bung=None,
+                     dist_bger=None,
+                     dist_bung=None,
                      renormalize=True):
         """
         Computes orthonormalized trial vectors.
@@ -764,10 +821,10 @@ class LinearResponseEigenSolver:
             The flags of converged excitations.
         :param precond:
             The preconditioner.
-        :param bger:
-            The gerade subspace.
-        :param bung:
-            The ungerade subspace.
+        :param dist_bger:
+            The distributed gerade subspace.
+        :param dist_bung:
+            The distributed ungerade subspace.
         :param renormalize:
             The flag for normalization.
 
@@ -775,40 +832,50 @@ class LinearResponseEigenSolver:
             The orthonormalized gerade and ungerade trial vectors.
         """
 
-        trials = []
+        if self.rank == mpi_master():
+            trials = []
 
-        for k, (w, X) in enumerate(excitations):
-            if converged and converged[k]:
-                continue
+            for k, (w, X) in enumerate(excitations):
+                if converged and converged[k]:
+                    continue
 
-            if precond is not None:
-                v = self.preconditioning(precond[k], X)
-            else:
-                v = X
+                if precond is not None:
+                    v = self.preconditioning(precond[k], X)
+                else:
+                    v = X
 
-            if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
-                trials.append(v)
+                if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
+                    trials.append(v)
 
-        new_trials = np.array(trials).T
+            new_trials = np.array(trials).T
 
-        # decomposing the full space trial vectors...
+            # decomposing the full space trial vectors...
 
-        new_ger, new_ung = self.decomp_trials(new_trials)
+            new_ger, new_ung = self.decomp_trials(new_trials)
+        else:
+            new_ger, new_ung = None, None
 
-        if bger is not None and bger.any():
-            new_ger_proj = np.matmul(bger, 2.0 * np.matmul(bger.T, new_ger))
-            new_ger = new_ger - new_ger_proj
+        if dist_bger is not None:
+            # t = t - (b (b.T t))
+            dist_new_ger = DistributedArray(new_ger, self.comm)
+            bT_new_ger = dist_bger.matmul_AtB_allreduce(dist_new_ger, 2.0)
+            new_ger_proj = dist_bger.matmul_AB(bT_new_ger)
+            if self.rank == mpi_master():
+                new_ger -= new_ger_proj
 
-        if bung is not None and bung.any():
-            new_ung_proj = np.matmul(bung, 2.0 * np.matmul(bung.T, new_ung))
-            new_ung = new_ung - new_ung_proj
+        if dist_bung is not None:
+            # t = t - (b (b.T t))
+            dist_new_ung = DistributedArray(new_ung, self.comm)
+            bT_new_ung = dist_bung.matmul_AtB_allreduce(dist_new_ung, 2.0)
+            new_ung_proj = dist_bung.matmul_AB(bT_new_ung)
+            if self.rank == mpi_master():
+                new_ung -= new_ung_proj
 
-        if new_ger.any() and renormalize:
+        if self.rank == mpi_master() and renormalize:
             new_ger = remove_linear_dependence_half(new_ger, self.lindep_thresh)
             new_ger = orthogonalize_gram_schmidt_half(new_ger)
             new_ger = normalize_half(new_ger)
 
-        if new_ung.any() and renormalize:
             new_ung = remove_linear_dependence_half(new_ung, self.lindep_thresh)
             new_ung = orthogonalize_gram_schmidt_half(new_ung)
             new_ung = normalize_half(new_ung)
