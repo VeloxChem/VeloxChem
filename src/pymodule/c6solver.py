@@ -9,15 +9,16 @@ from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import denmat
 from .veloxchemlib import parse_xc_func
+from .profiler import Profiler
+from .distributedarray import DistributedArray
 from .aodensitymatrix import AODensityMatrix
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence_half
 from .lrmatvecdriver import orthogonalize_gram_schmidt_half
 from .lrmatvecdriver import normalize_half
 from .lrmatvecdriver import construct_ed_sd_half
-from .lrmatvecdriver import lrvec2mat
 from .lrmatvecdriver import get_complex_rhs
-from .lrmatvecdriver import read_rsp_hdf5
+from .lrmatvecdriver import check_rsp_hdf5
 from .lrmatvecdriver import write_rsp_hdf5
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
@@ -65,6 +66,9 @@ class C6Solver:
         - checkpoint_time: The timer of checkpoint file.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
+        - memory_profiling: The flag for printing memory usage.
+        - memory_tracing: The flag for tracing memory allocation using
+          tracemalloc.
     """
 
     def __init__(self, comm, ostream):
@@ -109,9 +113,12 @@ class C6Solver:
         self.restart = True
         self.checkpoint_file = None
         self.checkpoint_time = None
+        self.checkpoint_interval = 4.0 * 3600
 
         self.timing = False
         self.profiling = False
+        self.memory_profiling = False
+        self.memory_tracing = False
 
     def update_settings(self, rsp_dict, method_dict={}):
         """
@@ -146,6 +153,14 @@ class C6Solver:
             self.restart = True if key == 'yes' else False
         if 'checkpoint_file' in rsp_dict:
             self.checkpoint_file = rsp_dict['checkpoint_file']
+        if 'checkpoint_interval' in rsp_dict:
+            if 'h' in rsp_dict['checkpoint_interval'].lower():
+                try:
+                    n_hours = float(
+                        rsp_dict['checkpoint_interval'].lower().split('h')[0])
+                    self.checkpoint_interval = max(0, n_hours) * 3600
+                except ValueError:
+                    pass
 
         if 'timing' in rsp_dict:
             key = rsp_dict['timing'].lower()
@@ -153,6 +168,12 @@ class C6Solver:
         if 'profiling' in rsp_dict:
             key = rsp_dict['profiling'].lower()
             self.profiling = True if key in ['yes', 'y'] else False
+        if 'memory_profiling' in rsp_dict:
+            key = rsp_dict['memory_profiling'].lower()
+            self.memory_profiling = True if key in ['yes', 'y'] else False
+        if 'memory_tracing' in rsp_dict:
+            key = rsp_dict['memory_tracing'].lower()
+            self.memory_tracing = True if key in ['yes', 'y'] else False
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
@@ -190,19 +211,18 @@ class C6Solver:
             A tuple containing respective non-zero parts of the trial vectors.
         """
 
+        realung, imagger = None, None
         half_rows = vecs.shape[0] // 2
 
-        if len(vecs.shape) != 1:
-            realung = []
-            imagger = []
-            for vec in range(len(vecs[0, :])):
-                realung.append(vecs[:half_rows, vec])
-                imagger.append(vecs[half_rows:, vec])
-        else:
+        if vecs.ndim == 1:
             realung = vecs[:half_rows]
             imagger = vecs[half_rows:]
 
-        return np.array(realung).T, np.array(imagger).T
+        elif vecs.ndim == 2:
+            realung = vecs[:half_rows, :]
+            imagger = vecs[half_rows:, :]
+
+        return realung, imagger
 
     def decomp_grad(self, grad):
         """
@@ -215,8 +235,7 @@ class C6Solver:
             A tuple containing gerade and ungerade parts of vectors.
         """
 
-        assert_msg_critical(
-            len(grad.shape) == 1, 'decomp_grad: Expecting a 1D array')
+        assert_msg_critical(grad.ndim == 1, 'decomp_grad: Expecting a 1D array')
 
         assert_msg_critical(grad.shape[0] % 2 == 0,
                             'decomp_grad: size of array should be even')
@@ -265,9 +284,7 @@ class C6Solver:
         pa_diag = p_diag * a_diag
         pc_diag = p_diag * c_diag
 
-        precond = np.array([pa_diag, pc_diag])
-
-        return precond
+        return (pa_diag, pc_diag)
 
     def preconditioning(self, precond, v_in):
         """
@@ -282,16 +299,14 @@ class C6Solver:
             The trail vectors after preconditioning.
         """
 
-        pa, pc = precond[0], precond[1]
+        pa, pc = precond
 
         v_in_ru, v_in_ig = self.decomp_trials(v_in)
 
         v_out_ru = pa * v_in_ru + pc * v_in_ig
         v_out_ig = pc * v_in_ru - pa * v_in_ig
 
-        v_out = np.array([v_out_ru, v_out_ig]).flatten()
-
-        return v_out
+        return np.hstack((v_out_ru, v_out_ig))
 
     def initial_guess(self, v1, precond):
         """
@@ -311,8 +326,7 @@ class C6Solver:
         for (op, iw), grad in v1.items():
             gradger, gradung = self.decomp_grad(grad)
 
-            grad = np.array(
-                [gradung.real, -gradger.imag]).flatten()
+            grad = np.hstack((gradung.real, -gradger.imag))
             gn = np.sqrt(2.0) * np.linalg.norm(grad)
 
             if gn < self.small_thresh:
@@ -324,10 +338,9 @@ class C6Solver:
 
     def setup_trials(self,
                      vectors,
-                     pre=None,
-                     bger=None,
-                     bung=None,
-                     res_norm=None,
+                     precond=None,
+                     dist_bger=None,
+                     dist_bung=None,
                      renormalize=True):
         """
         Computes orthonormalized trial vectors. Takes set of vectors,
@@ -336,14 +349,12 @@ class C6Solver:
 
         :param vectors:
             The set of vectors.
-        :param pre:
+        :param precond:
             The preconditioner matrix.
-        :param bger:
-            The gerade subspace.
-        :param bung:
-            The ungerade subspace.
-        :param res_norm:
-            The relative residual norm.
+        :param dist_bger:
+            The distributed gerade subspace.
+        :param dist_bung:
+            The distributed ungerade subspace.
         :param renormalize:
             The flag for normalization.
 
@@ -351,44 +362,52 @@ class C6Solver:
             The orthonormalized gerade and ungerade trial vectors.
         """
 
-        trials = []
-        for (op, iw) in vectors:
-            vec = np.array(vectors[(op, iw)])
+        if self.rank == mpi_master():
+            trials = []
+            for (op, iw) in vectors:
+                vec = np.array(vectors[(op, iw)])
 
-            # preconditioning trials:
+                # preconditioning trials:
 
-            if pre is not None:
-                v = self.preconditioning(pre[iw], vec)
-            else:
-                v = vec
-            if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
-                trials.append(v)
+                if precond is not None:
+                    v = self.preconditioning(precond[iw], vec)
+                else:
+                    v = vec
+                if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
+                    trials.append(v)
 
-        new_trials = np.array(trials).T
+            new_trials = np.array(trials).T
 
-        # decomposing the full space trial vectors
+            # decomposing the full space trial vectors
 
-        new_ung, new_ger = self.decomp_trials(new_trials)
+            new_ung, new_ger = self.decomp_trials(new_trials)
+        else:
+            new_ung, new_ger = None, None
 
         # orthogonalizing new trial vectors against existing ones
 
-        if bger is not None and bger.any():
-            new_ger = new_ger - 2.0 * np.matmul(bger, np.matmul(
-                bger.T, new_ger))
+        if dist_bger is not None:
+            # t = t - (b (b.T t))
+            dist_new_ger = DistributedArray(new_ger, self.comm)
+            bT_new_ger = dist_bger.matmul_AtB_allreduce(dist_new_ger, 2.0)
+            new_ger_proj = dist_bger.matmul_AB(bT_new_ger)
+            if self.rank == mpi_master():
+                new_ger -= new_ger_proj
 
-        if bung is not None and bung.any():
-            new_ung = new_ung - 2.0 * np.matmul(bung, np.matmul(
-                bung.T, new_ung))
+        if dist_bung is not None:
+            # t = t - (b (b.T t))
+            dist_new_ung = DistributedArray(new_ung, self.comm)
+            bT_new_ung = dist_bung.matmul_AtB_allreduce(dist_new_ung, 2.0)
+            new_ung_proj = dist_bung.matmul_AB(bT_new_ung)
+            if self.rank == mpi_master():
+                new_ung -= new_ung_proj
 
         # orthonormalizing new trial vectors
 
-        if new_ger.any() and renormalize:
-
+        if self.rank == mpi_master() and renormalize:
             new_ger = remove_linear_dependence_half(new_ger, self.lindep_thresh)
             new_ger = orthogonalize_gram_schmidt_half(new_ger)
             new_ger = normalize_half(new_ger)
-
-        if new_ung.any() and renormalize:
 
             new_ung = remove_linear_dependence_half(new_ung, self.lindep_thresh)
             new_ung = orthogonalize_gram_schmidt_half(new_ung)
@@ -412,20 +431,12 @@ class C6Solver:
             A dictionary containing response functions and solutions.
         """
 
-        if self.profiling:
-            import cProfile
-            import pstats
-            import io
-            pr = cProfile.Profile()
-            pr.enable()
-
-        if self.timing:
-            self.timing_dict = {
-                'reduced_space': [0.0],
-                'ortho_norm': [0.0],
-                'fock_build': [0.0],
-            }
-            timing_t0 = tm.time()
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
 
         if self.rank == mpi_master():
             self.print_header()
@@ -436,9 +447,8 @@ class C6Solver:
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'C6Solver: not implemented for unrestricted case')
+        assert_msg_critical(nalpha == nbeta,
+                            'C6Solver: not implemented for unrestricted case')
 
         # generate integration grid
         if self.dft:
@@ -517,112 +527,135 @@ class C6Solver:
         else:
             nocc = None
 
-        b_rhs = get_complex_rhs(self.b_operator, self.b_components,
-                                molecule, basis, scf_tensors, self.rank,
-                                self.comm)
+        b_rhs = get_complex_rhs(self.b_operator, self.b_components, molecule,
+                                basis, scf_tensors, self.rank, self.comm)
         if self.rank == mpi_master():
-            imagfreqs = [self.w0 * (1-t)/(1+t) for t in 
-                         np.polynomial.legendre.leggauss(self.n_points)][0]
+            imagfreqs = [
+                self.w0 * (1 - t) / (1 + t)
+                for t in np.polynomial.legendre.leggauss(self.n_points)
+            ][0]
             imagfreqs = np.append(imagfreqs, 0.0)
             v1 = {(op, iw): v for op, v in zip(self.b_components, b_rhs)
                   for iw in imagfreqs}
 
+        if self.rank == mpi_master():
             op_imagfreq_keys = list(v1.keys())
+        else:
+            op_imagfreq_keys = None
+        op_imagfreq_keys = self.comm.bcast(op_imagfreq_keys, root=mpi_master())
 
-            # creating the preconditioner matrix
-
+        # creating the preconditioner matrix
+        if self.rank == mpi_master():
             precond = {
-                iw: self.get_precond(
-                orb_ene, nocc, norb, iw) for iw in imagfreqs}
+                iw: self.get_precond(orb_ene, nocc, norb, iw)
+                for iw in imagfreqs
+            }
+        else:
+            precond = None
 
-        bger = None
-        bung = None
-        new_trials_ger = None
-        new_trials_ung = None
+        rsp_vector_labels = [
+            'C6_bger_half_size',
+            'C6_bung_half_size',
+            'C6_e2bger_half_size',
+            'C6_e2bung_half_size',
+        ]
 
         # read initial guess from restart file
 
         if self.restart:
             if self.rank == mpi_master():
-                bger, bung, e2bger, e2bung = read_rsp_hdf5(
-                    self.checkpoint_file,
-                    ['CLR_bger', 'CLR_bung', 'CLR_e2bger', 'CLR_e2bung'],
+                self.restart = check_rsp_hdf5(
+                    self.checkpoint_file, rsp_vector_labels,
                     molecule.nuclear_repulsion_energy(),
                     molecule.elem_ids_to_numpy(), basis.get_label(),
                     dft_func_label, potfile_text, self.ostream)
-                self.restart = (bger is not None and bung is not None and
-                                e2bger is not None and e2bung is not None)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
+        # read initial guess from restart file
+        if self.restart:
+            dist_bger = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'C6_bger_half_size', self.comm)
+            dist_bung = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'C6_bung_half_size', self.comm)
+            dist_e2bger = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'C6_e2bger_half_size', self.comm)
+            dist_e2bung = DistributedArray.read_from_hdf5_file(
+                self.checkpoint_file, 'C6_e2bung_half_size', self.comm)
+
         # generate initial guess from scratch
-
-        if not self.restart:
+        else:
             if self.rank == mpi_master():
-
-                # spawning initial trial vectors
-
                 igs = self.initial_guess(v1, precond)
                 bger, bung = self.setup_trials(igs)
 
-                assert_msg_critical(
-                    bger.any() or bung.any(),
-                    'C6Solver: trial vectors are empty')
+                assert_msg_critical(bger.any() or bung.any(),
+                                    'C6Solver: trial vectors are empty')
 
-                if not bger.any():
+                if bger is None or not bger.any():
                     bger = np.zeros((bung.shape[0], 0))
-                if not bung.any():
+                if bung is None or not bung.any():
                     bung = np.zeros((bger.shape[0], 0))
-
-                # creating sigma and rho linear transformations
-
-            if self.timing:
-                self.timing_dict['ortho_norm'][0] += tm.time() - timing_t0
-                timing_t0 = tm.time()
+            else:
+                bger, bung = None, None
 
             e2bger, e2bung = e2x_drv.e2n_half_size(bger, bung, scf_tensors,
                                                    screening, molecule, basis,
                                                    molgrid, gs_density, V_es,
                                                    pe_drv, timing_dict)
 
+            dist_bger = DistributedArray(bger, self.comm)
+            dist_bung = DistributedArray(bung, self.comm)
+
+            bger, bung = None, None
+
+            dist_e2bger = DistributedArray(e2bger, self.comm)
+            dist_e2bung = DistributedArray(e2bung, self.comm)
+
+            e2bger, e2bung = None, None
+
+        profiler.check_memory_usage('Initial guess')
+
         solutions = {}
         residuals = {}
         relative_residual_norm = {}
 
-        if self.timing:
-            self.timing_dict['fock_build'][0] += tm.time() - timing_t0
-            timing_t0 = tm.time()
-
+        # start iterations
         for iteration in range(self.max_iter):
+
+            profiler.start_timer(iteration, 'ReducedSpace')
+
+            xvs = []
             self.cur_iter = iteration
 
-            if self.timing:
-                self.timing_dict['reduced_space'].append(0.0)
-                self.timing_dict['ortho_norm'].append(0.0)
-                self.timing_dict['fock_build'].append(0.0)
+            n_ger = dist_bger.shape(1)
+            n_ung = dist_bung.shape(1)
 
-            if self.rank == mpi_master():
-                xvs = []
+            e2gg = dist_bger.matmul_AtB(dist_e2bger, 2.0)
+            e2uu = dist_bung.matmul_AtB(dist_e2bung, 2.0)
+            s2ug = dist_bung.matmul_AtB(dist_bger, 4.0)
 
-                n_ger = bger.shape[1]
-                n_ung = bung.shape[1]
+            for op, iw in op_imagfreq_keys:
+                if (iteration == 0 or
+                        relative_residual_norm[(op, iw)] > self.conv_thresh):
 
-                e2gg = 2.0 * np.matmul(bger.T, e2bger)
-                e2uu = 2.0 * np.matmul(bung.T, e2bung)
-                s2ug = 4.0 * np.matmul(bung.T, bger)
-
-                for op, iw in op_imagfreq_keys:
-                    if iteration == 0 or (relative_residual_norm[(op, iw)] >
-                                          self.conv_thresh):
+                    if self.rank == mpi_master():
                         grad = v1[(op, iw)]
                         gradger, gradung = self.decomp_grad(grad)
+                        gradung_real = gradung.real
+                    else:
+                        gradung_real = None
+                    dist_grad_realung = DistributedArray(
+                        gradung_real, self.comm)
 
-                        # projections onto gerade and ungerade subspaces:
+                    # projections onto gerade and ungerade subspaces:
 
-                        g_realung = 2.0 * np.matmul(bung.T, gradung.real)
+                    g_realung = dist_bung.matmul_AtB(dist_grad_realung, 2.0)
 
-                        # creating gradient and matrix for linear equation
+                    # creating gradient and matrix for linear equation
 
-                        size = n_ger + n_ung
+                    size = n_ger + n_ung
+
+                    if self.rank == mpi_master():
 
                         # gradient
 
@@ -634,8 +667,8 @@ class C6Solver:
 
                         mat = np.zeros((size, size))
 
-                        mat[n_ung:n_ung + n_ger, n_ung:n_ung +
-                            n_ger] = -e2gg[:, :]
+                        mat[n_ung:n_ung + n_ger,
+                            n_ung:n_ung + n_ger] = -e2gg[:, :]
                         mat[:n_ung, :n_ung] = e2uu[:, :]
                         mat[:n_ung, n_ung:n_ung + n_ger] = iw * s2ug[:, :]
                         mat[n_ung:n_ung + n_ger, :n_ung] = iw * s2ug.T[:, :]
@@ -643,18 +676,23 @@ class C6Solver:
                         # solving matrix equation
 
                         c = np.linalg.solve(mat, g)
+                    else:
+                        c = None
+                    c = self.comm.bcast(c, root=mpi_master())
 
-                        # extracting the 2 components of c...
+                    # extracting the 2 components of c...
 
-                        c_realung = c[:n_ung]
-                        c_imagger = c[n_ung:n_ung + n_ger]
+                    c_realung = c[:n_ung]
+                    c_imagger = c[n_ung:n_ung + n_ger]
 
-                        # ...and projecting them onto respective subspace
+                    # ...and projecting them onto respective subspace
 
-                        x_realung = np.matmul(bung, c_realung)
-                        x_imagger = np.matmul(bger, c_imagger)
+                    x_realung = dist_bung.matmul_AB(c_realung)
+                    x_imagger = dist_bger.matmul_AB(c_imagger)
 
-                        # composing full size response vector
+                    # composing full size response vector
+
+                    if self.rank == mpi_master():
 
                         x_realung_full = np.hstack((x_realung, -x_realung))
                         x_imagger_full = np.hstack((x_imagger, x_imagger))
@@ -663,25 +701,24 @@ class C6Solver:
                         x_imag = x_imagger_full
                         x = x_real + 1j * x_imag
 
-                        # composing E2 and S2 matrices projected onto solution
-                        # subspace
+                    # composing E2 matrices projected onto solution subspace
 
-                        e2imagger = np.matmul(e2bger, c_imagger)
-                        s2imagger = 2.0 * np.matmul(bger, c_imagger)
+                    e2imagger = dist_e2bger.matmul_AB(c_imagger)
+                    e2realung = dist_e2bung.matmul_AB(c_realung)
 
-                        e2realung = np.matmul(e2bung, c_realung)
-                        s2realung = 2.0 * np.matmul(bung, c_realung)
+                    # calculating the residual components
 
-                        # calculating the residual components
+                    if self.rank == mpi_master():
 
-                        r_realung = (e2realung + iw * s2imagger -
-                                     gradung.real)
-                        r_imagger = (-e2imagger +
-                                     iw * s2realung + gradger.imag)
+                        s2imagger = 2.0 * x_imagger
+                        s2realung = 2.0 * x_realung
+
+                        r_realung = (e2realung + iw * s2imagger - gradung.real)
+                        r_imagger = (-e2imagger + iw * s2realung + gradger.imag)
 
                         # composing total half-sized residual
 
-                        r = np.array([r_realung, r_imagger]).flatten()
+                        r = np.hstack((r_realung, r_imagger))
 
                         # calculating relative residual norm
                         # for convergence check
@@ -701,7 +738,11 @@ class C6Solver:
                         else:
                             residuals[(op, iw)] = r
 
-                # write to output
+            relative_residual_norm = self.comm.bcast(relative_residual_norm,
+                                                     root=mpi_master())
+
+            # write to output
+            if self.rank == mpi_master():
 
                 self.ostream.print_info(
                     '{:d} gerade trial vectors in reduced space'.format(n_ger))
@@ -710,12 +751,35 @@ class C6Solver:
                         n_ung))
                 self.ostream.print_blank()
 
+                mem_usage, mem_detail = profiler.get_memory_dictionary({
+                    'dist_bger': dist_bger.array(),
+                    'dist_bung': dist_bung.array(),
+                    'dist_e2bger': dist_e2bger.array(),
+                    'dist_e2bung': dist_e2bung.array(),
+                    'precond': precond,
+                    'solutions': solutions,
+                    'residuals': residuals,
+                })
+                mem_avail = profiler.get_available_memory()
+
+                self.ostream.print_info(
+                    '{:s} of memory used for subspace procedure'.format(
+                        mem_usage))
+                if self.memory_profiling:
+                    for m in mem_detail:
+                        self.ostream.print_info('  {:<15s} {:s}'.format(*m))
+                self.ostream.print_info(
+                    '{:s} of memory available for the solver'.format(mem_avail))
+                self.ostream.print_blank()
+
+                profiler.check_memory_usage(
+                    'Iteration {:d} subspace'.format(iteration + 1))
+
+                profiler.print_memory_tracing(self.ostream)
+
                 self.print_iteration(relative_residual_norm, xvs)
 
-            if self.timing:
-                tid = iteration + 1
-                self.timing_dict['reduced_space'][tid] += tm.time() - timing_t0
-                timing_t0 = tm.time()
+            profiler.stop_timer(iteration, 'ReducedSpace')
 
             # check convergence
 
@@ -724,89 +788,99 @@ class C6Solver:
             if self.is_converged:
                 break
 
+            profiler.start_timer(iteration, 'Orthonorm.')
+
             # spawning new trial vectors from residuals
 
+            new_trials_ger, new_trials_ung = self.setup_trials(
+                residuals, precond, dist_bger, dist_bung)
+
+            residuals.clear()
+
             if self.rank == mpi_master():
-
-                new_trials_ger, new_trials_ung = self.setup_trials(
-                    residuals,
-                    pre=precond,
-                    bger=bger,
-                    bung=bung,
-                    res_norm=relative_residual_norm)
-
-                residuals.clear()
 
                 assert_msg_critical(
                     new_trials_ger.any() or new_trials_ung.any(),
                     'C6Solver: unable to add new trial vectors')
 
-                if not new_trials_ger.any():
+                if new_trials_ger is None or not new_trials_ger.any():
                     new_trials_ger = np.zeros((new_trials_ung.shape[0], 0))
-                if not new_trials_ung.any():
+                if new_trials_ung is None or not new_trials_ung.any():
                     new_trials_ung = np.zeros((new_trials_ger.shape[0], 0))
 
-                # creating new sigma and rho linear transformations
+            profiler.stop_timer(iteration, 'Orthonorm.')
+            profiler.start_timer(iteration, 'FockBuild')
 
-                bger = np.append(bger, new_trials_ger, axis=1)
-                bung = np.append(bung, new_trials_ung, axis=1)
-
-            if self.timing:
-                tid = iteration + 1
-                self.timing_dict['ortho_norm'][tid] += tm.time() - timing_t0
-                timing_t0 = tm.time()
+            # creating new sigma and rho linear transformations
 
             new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
                 molecule, basis, molgrid, gs_density, V_es, pe_drv, timing_dict)
 
-            if self.rank == mpi_master():
+            dist_bger.append(DistributedArray(new_trials_ger, self.comm),
+                             axis=1)
+            dist_bung.append(DistributedArray(new_trials_ung, self.comm),
+                             axis=1)
 
-                e2bger = np.append(e2bger, new_e2bger, axis=1)
-                e2bung = np.append(e2bung, new_e2bung, axis=1)
+            new_trials_ger, new_trials_ung = None, None
 
-                if tm.time() - self.checkpoint_time > 900.0:
-                    write_rsp_hdf5(
-                        self.checkpoint_file, [bger, bung, e2bger, e2bung],
-                        ['CLR_bger', 'CLR_bung', 'CLR_e2bger', 'CLR_e2bung'],
-                        molecule.nuclear_repulsion_energy(),
-                        molecule.elem_ids_to_numpy(), basis.get_label(),
-                        dft_func_label, potfile_text, self.ostream)
+            dist_e2bger.append(DistributedArray(new_e2bger, self.comm), axis=1)
+            dist_e2bung.append(DistributedArray(new_e2bung, self.comm), axis=1)
+
+            new_e2bger, new_e2bung = None, None
+
+            # write to checkpoint file
+            if tm.time() - self.checkpoint_time >= self.checkpoint_interval:
+                if self.rank == mpi_master():
+                    write_rsp_hdf5(self.checkpoint_file, [], [],
+                                   molecule.nuclear_repulsion_energy(),
+                                   molecule.elem_ids_to_numpy(),
+                                   basis.get_label(), dft_func_label,
+                                   potfile_text, self.ostream)
                     self.checkpoint_time = tm.time()
 
-            if self.timing:
-                tid = iteration + 1
-                self.timing_dict['fock_build'][tid] += tm.time() - timing_t0
-                timing_t0 = tm.time()
+                dt = 0.0
+                dt += dist_bger.append_to_hdf5_file(self.checkpoint_file,
+                                                    'C6_bger_half_size')
+                dt += dist_bung.append_to_hdf5_file(self.checkpoint_file,
+                                                    'C6_bung_half_size')
+                dt += dist_e2bger.append_to_hdf5_file(self.checkpoint_file,
+                                                      'C6_e2bger_half_size')
+                dt += dist_e2bung.append_to_hdf5_file(self.checkpoint_file,
+                                                      'C6_e2bung_half_size')
+                dt_text = 'Time spent in writing to checkpoint file: '
+                dt_text += '{:.2f} sec'.format(dt)
+                self.ostream.print_info(dt_text)
+                self.ostream.print_blank()
+
+                self.checkpoint_time = tm.time()
+
+            profiler.stop_timer(iteration, 'FockBuild')
+            profiler.update_timer(iteration, timing_dict)
+
+            profiler.check_memory_usage(
+                'Iteration {:d} sigma build'.format(iteration + 1))
 
         # converged?
         if self.rank == mpi_master():
             self.print_convergence()
 
-            if self.timing:
-                self.print_timing()
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
 
-        if self.profiling:
-            pr.disable()
-            s = io.StringIO()
-            sortby = 'cumulative'
-            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-            ps.print_stats(20)
-            if self.rank == mpi_master():
-                for line in s.getvalue().split(os.linesep):
-                    self.ostream.print_info(line)
+        profiler.check_memory_usage('End of CPP solver')
+        profiler.print_memory_usage(self.ostream)
 
-        a_rhs = get_complex_rhs(self.a_operator, self.a_components,
-                                molecule, basis, scf_tensors, self.rank,
-                                self.comm)
+        a_rhs = get_complex_rhs(self.a_operator, self.a_components, molecule,
+                                basis, scf_tensors, self.rank, self.comm)
 
         if self.rank == mpi_master() and self.is_converged:
             va = {op: v for op, v in zip(self.a_components, a_rhs)}
             rsp_funcs = {}
             for aop in self.a_components:
                 for bop, iw in solutions:
-                    rsp_funcs[(aop, bop, iw)] = -np.dot(va[aop],
-                                                solutions[(bop, iw)])
+                    rsp_funcs[(aop, bop,
+                               iw)] = -np.dot(va[aop], solutions[(bop, iw)])
             return {
                 'response_functions': rsp_funcs,
                 'solutions': solutions,

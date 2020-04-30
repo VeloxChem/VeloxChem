@@ -431,8 +431,6 @@ class ComplexResponse:
             The distributed gerade subspace.
         :param dist_bung:
             The distributed ungerade subspace.
-        :param res_norm:
-            The relative residual norm.
         :param renormalize:
             The flag for normalization.
 
@@ -851,8 +849,7 @@ class ComplexResponse:
                         x_imag = x_imagung_full + x_imagger_full
                         x = x_real + 1j * x_imag
 
-                    # composing E2 and S2 matrices projected onto
-                    # solution subspace
+                    # composing E2 matrices projected onto solution subspace
 
                     e2realger = dist_e2bger.matmul_AB(c_realger)
                     e2imagger = dist_e2bger.matmul_AB(c_imagger)
@@ -952,7 +949,8 @@ class ComplexResponse:
 
             profiler.start_timer(iteration, 'Orthonorm.')
 
-            # update trial vectors
+            # spawning new trial vectors from residuals
+
             new_trials_ger, new_trials_ung = self.setup_trials(
                 residuals, precond, dist_bger, dist_bung)
 
@@ -969,10 +967,10 @@ class ComplexResponse:
                 if new_trials_ung is None or not new_trials_ung.any():
                     new_trials_ung = np.zeros((new_trials_ger.shape[0], 0))
 
-                # creating new sigma and rho linear transformations
-
             profiler.stop_timer(iteration, 'Orthonorm.')
             profiler.start_timer(iteration, 'FockBuild')
+
+            # creating new sigma and rho linear transformations
 
             new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
                 new_trials_ger, new_trials_ung, scf_tensors, screening,
