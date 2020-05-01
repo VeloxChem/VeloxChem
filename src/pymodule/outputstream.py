@@ -30,30 +30,31 @@ class OutputStream:
         self.buffer_lines = []
 
         # filename is...
-        #   None or empty:  stream is None
-        #   sys.stdout:     stream is sys.stdout
-        #   string:         stream is file handle
+        #   None:        stream is None
+        #   sys.stdout:  stream is sys.stdout
+        #   string:      stream is file handle
 
         if filename is None:
             self.stream = None
             self.state = False
 
-        elif not filename or filename == '-':
-            errio = "OutputStream: invalid argument"
-            assert_msg_critical(False, errio)
-
         elif filename is sys.stdout:
             self.stream = sys.stdout
             self.state = True
 
-        else:
+        elif isinstance(filename, str) and filename:
             try:
                 self.stream = open(filename, 'w')
+                self.state = True
             except OSError:
-                errio = "OutputStream: cannot open output file "
-                errio += "{}".format(filename)
-                assert_msg_critical(False, errio)
-            self.state = True
+                self.state = False
+            errio = 'OutputStream: cannot open output file {}'.format(filename)
+            assert_msg_critical(self.state, errio)
+
+        else:
+            self.state = False
+            errio = 'OutputStream: invalid argument {}'.format(filename)
+            assert_msg_critical(self.state, errio)
 
     def __del__(self):
         """
@@ -251,17 +252,17 @@ class OutputStream:
         start_time = tm.time()
 
         self.print_separator()
-        self.print_title("")
-        self.print_title("VELOXCHEM 1.0-RC")
-        self.print_title("AN ELECTRONIC STRUCTURE CODE")
-        self.print_title("")
-        self.print_title("Copyright (C) 2018-2020 VeloxChem developers.")
-        self.print_title("All rights reserved.")
+        self.print_title('')
+        self.print_title('VELOXCHEM 1.0-RC')
+        self.print_title('AN ELECTRONIC STRUCTURE CODE')
+        self.print_title('')
+        self.print_title('Copyright (C) 2018-2020 VeloxChem developers.')
+        self.print_title('All rights reserved.')
         self.print_separator()
-        exec_str = "VeloxChem execution started"
+        exec_str = 'VeloxChem execution started'
         if num_nodes > 1:
-            exec_str += " on " + str(num_nodes) + " compute nodes"
-        exec_str += " at " + tm.asctime(tm.localtime(start_time)) + "."
+            exec_str += ' on ' + str(num_nodes) + ' compute nodes'
+        exec_str += ' at ' + tm.asctime(tm.localtime(start_time)) + '.'
         self.print_title(exec_str)
         self.print_separator()
         self.print_blank()
@@ -287,12 +288,12 @@ class OutputStream:
         end_time = tm.time()
 
         self.print_separator()
-        exec_str = "VeloxChem execution completed at "
-        exec_str += tm.asctime(tm.localtime(end_time)) + "."
+        exec_str = 'VeloxChem execution completed at '
+        exec_str += tm.asctime(tm.localtime(end_time)) + '.'
         self.print_title(exec_str)
         self.print_separator()
-        exec_str = "Total execution time is "
-        exec_str += "{:.2f}".format(end_time - start_time) + " sec."
+        exec_str = 'Total execution time is '
+        exec_str += '{:.2f}'.format(end_time - start_time) + ' sec.'
         self.print_title(exec_str)
         self.print_separator()
         self.flush()

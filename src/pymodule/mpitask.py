@@ -1,5 +1,5 @@
-from os.path import isfile
 import sys
+import os
 
 from .veloxchemlib import mpi_master
 from .inputparser import InputParser
@@ -36,7 +36,6 @@ class MpiTask:
         """
 
         # mpi settings
-
         self.mpi_comm = mpi_comm
         self.mpi_rank = self.mpi_comm.Get_rank()
         self.mpi_size = self.mpi_comm.Get_size()
@@ -45,26 +44,25 @@ class MpiTask:
         output_fname = None
 
         if self.mpi_rank == mpi_master():
-
             assert_msg_critical(
-                len(fname_list) >= 1, "MpiTask: Need input file name")
+                len(fname_list) > 0, 'MpiTask: Need input file name')
 
             input_fname = fname_list[0]
-
             output_fname = sys.stdout
-            if len(fname_list) >= 2:
-                output_fname = fname_list[1]
-                if isinstance(output_fname, str):
-                    if not fname_list[1].split():
+
+            if len(fname_list) > 1:
+                if fname_list[1].strip().split():
+                    output_fname = fname_list[1].strip()
+                    if ('\0' in output_fname or output_fname == '-'):
                         output_fname = sys.stdout
 
             assert_msg_critical(
-                isfile(input_fname),
-                "MpiTask: input file {} does not exist".format(input_fname))
+                os.path.isfile(input_fname),
+                'MpiTask: input file {} does not exist'.format(input_fname))
 
             assert_msg_critical(
                 input_fname != output_fname,
-                "MpiTask: input/output file cannot be the same")
+                'MpiTask: input/output file cannot be the same')
 
         # initialize molecule, basis set and output stream
 
@@ -82,21 +80,21 @@ class MpiTask:
             self.start_time = self.ostream.print_start_header(self.mpi_size)
 
             self.ostream.print_info(
-                "Reading input file {}...".format(input_fname))
+                'Reading input file {}...'.format(input_fname))
 
             # read input file
 
             self.input_dict = InputParser(input_fname, output_fname).get_dict()
 
-            self.ostream.print_info("Found {} control groups.".format(
+            self.ostream.print_info('Found {} control groups.'.format(
                 len(self.input_dict)))
-            self.ostream.print_info("...done.")
+            self.ostream.print_info('...done.')
             self.ostream.print_blank()
 
             # create molecule
 
-            self.ostream.print_info("Parsing @molecule group...")
-            self.ostream.print_info("...done.")
+            self.ostream.print_info('Parsing @molecule group...')
+            self.ostream.print_info('...done.')
             self.ostream.print_blank()
 
             self.molecule = Molecule.from_dict(self.input_dict['molecule'])
@@ -105,24 +103,24 @@ class MpiTask:
 
             # create basis set
 
-            self.ostream.print_info("Parsing @method settings group...")
-            self.ostream.print_info("...done.")
+            self.ostream.print_info('Parsing @method settings group...')
+            self.ostream.print_info('...done.')
             self.ostream.print_blank()
 
             basis_path = '.'
-            if "basis_path" in self.input_dict["method_settings"]:
-                basis_path = self.input_dict["method_settings"]["basis_path"]
+            if 'basis_path' in self.input_dict['method_settings']:
+                basis_path = self.input_dict['method_settings']['basis_path']
 
-            basis_name = self.input_dict["method_settings"]["basis"].upper()
+            basis_name = self.input_dict['method_settings']['basis'].upper()
 
             self.ao_basis = MolecularBasis.read(self.molecule, basis_name,
                                                 basis_path, self.ostream)
 
-            self.min_basis = MolecularBasis.read(self.molecule, "MIN-CC-PVDZ",
+            self.min_basis = MolecularBasis.read(self.molecule, 'MIN-CC-PVDZ',
                                                  basis_path)
 
             self.ostream.print_block(
-                self.ao_basis.get_string("Atomic Basis", self.molecule))
+                self.ao_basis.get_string('Atomic Basis', self.molecule))
 
             self.ostream.flush()
 
