@@ -16,6 +16,7 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb
+from .profiler import Profiler
 from .molecularbasis import MolecularBasis
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
@@ -86,6 +87,8 @@ class ScfDriver:
         - split_comm_ratio: The list of ratios for split communicators.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
+        - memory_profiling: The flag for printing memory usage.
+        - memory_tracing: The flag for tracing memory allocation using
     """
 
     def __init__(self, comm, ostream):
@@ -173,6 +176,8 @@ class ScfDriver:
         # timing and profiling
         self.timing = False
         self.profiling = False
+        self.memory_profiling = False
+        self.memory_tracing = False
 
     def update_settings(self, scf_dict, method_dict={}):
         """
@@ -233,6 +238,13 @@ class ScfDriver:
             key = scf_dict['profiling'].lower()
             self.profiling = True if key in ['yes', 'y'] else False
 
+        if 'memory_profiling' in scf_dict:
+            key = scf_dict['memory_profiling'].lower()
+            self.memory_profiling = True if key in ['yes', 'y'] else False
+        if 'memory_tracing' in scf_dict:
+            key = scf_dict['memory_tracing'].lower()
+            self.memory_tracing = True if key in ['yes', 'y'] else False
+
     def compute(self, molecule, ao_basis, min_basis=None):
         """
         Performs SCF calculation using molecular data.
@@ -250,14 +262,7 @@ class ScfDriver:
                 min_basis = MolecularBasis.read(molecule, 'MIN-CC-PVDZ')
             min_basis.broadcast(self.rank, self.comm)
 
-        # set up timing data
-        if self.timing:
-            self.timing_dict = {
-                'fock_2e': [],
-                'dft_vxc': [],
-                'fock_diag': [],
-                'pol_embed': []
-            }
+        self.timing_dict = {}
 
         # check dft setup
         if self.dft:
@@ -374,9 +379,6 @@ class ScfDriver:
                 self.ostream.print_info(checkpoint_text)
                 self.ostream.print_blank()
 
-            if self.timing:
-                self.print_timing()
-
     def write_checkpoint(self, nuclear_charges, basis_set):
         """
         Writes molecular orbitals to checkpoint file.
@@ -404,12 +406,12 @@ class ScfDriver:
             The minimal AO basis set.
         """
 
-        if self.profiling and not self.first_step:
-            import cProfile
-            import pstats
-            import io
-            pr = cProfile.Profile()
-            pr.enable()
+        profiler = Profiler({
+            'timing': self.timing and not self.first_step,
+            'profiling': self.profiling and not self.first_step,
+            'memory_profiling': self.memory_profiling and not self.first_step,
+            'memory_tracing': self.memory_tracing and not self.first_step,
+        })
 
         start_time = tm.time()
         self.checkpoint_time = start_time
@@ -489,6 +491,8 @@ class ScfDriver:
             qq_data = eri_drv.compute(get_qq_scheme(self.qq_type),
                                       self.eri_thresh, molecule, ao_basis)
 
+        profiler.check_memory_usage('Initial guess')
+
         self.split_comm_ratio = None
 
         e_grad = None
@@ -502,6 +506,8 @@ class ScfDriver:
                                                 ao_basis)
 
         for i in self.get_scf_range():
+
+            profiler.start_timer(i, 'FockBuild')
 
             vxc_mat, e_pe, V_pe = self.comp_2e_fock(fock_mat, den_mat, molecule,
                                                     ao_basis, qq_data, e_grad)
@@ -525,8 +531,8 @@ class ScfDriver:
 
             self.store_diis_data(i, fock_mat, den_mat)
 
-            if self.timing and not self.first_step:
-                diag_t0 = tm.time()
+            profiler.stop_timer(i, 'FockBuild')
+            profiler.start_timer(i, 'FockDiag')
 
             eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
@@ -534,14 +540,17 @@ class ScfDriver:
 
             self.update_mol_orbs_phase()
 
-            if self.timing and not self.first_step:
-                self.timing_dict['fock_diag'].append(tm.time() - diag_t0)
-
             self.density = AODensityMatrix(den_mat)
 
             den_mat = self.gen_new_density(molecule)
 
             den_mat.broadcast(self.rank, self.comm)
+
+            profiler.stop_timer(i, 'FockDiag')
+            if (self.dft or self.pe) and not self.first_step:
+                profiler.update_timer(i, self.timing_dict)
+
+            profiler.check_memory_usage('Iteration {:d}'.format(i + 1))
 
             if self.is_converged:
                 break
@@ -552,16 +561,14 @@ class ScfDriver:
         self.write_checkpoint(molecule.elem_ids_to_numpy(),
                               ao_basis.get_label())
 
-        if self.profiling and not self.first_step:
-            pr.disable()
-            s = io.StringIO()
-            sortby = 'cumulative'
-            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-            ps.print_stats(20)
-            if self.rank == mpi_master():
-                self.ostream.print_blank()
-                for line in s.getvalue().split(os.linesep):
-                    self.ostream.print_info(line)
+        if self.timing and not self.first_step:
+            self.ostream.print_blank()
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
+
+        profiler.check_memory_usage('End of SCF')
+        profiler.print_memory_usage(self.ostream)
+        profiler.print_memory_tracing(self.ostream)
 
         if self.rank == mpi_master():
             self.scf_tensors = {
@@ -830,7 +837,7 @@ class ScfDriver:
         fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
         if self.timing and not self.first_step:
-            self.timing_dict['fock_2e'].append(tm.time() - eri_t0)
+            self.timing_dict['ERI'] = tm.time() - eri_t0
             vxc_t0 = tm.time()
 
         if self.dft and not self.first_step:
@@ -845,7 +852,8 @@ class ScfDriver:
             vxc_mat = None
 
         if self.timing and not self.first_step:
-            self.timing_dict['dft_vxc'].append(tm.time() - vxc_t0)
+            if self.dft:
+                self.timing_dict['DFT'] = tm.time() - vxc_t0
             pe_t0 = tm.time()
 
         if self.pe and not self.first_step:
@@ -857,7 +865,8 @@ class ScfDriver:
             e_pe, V_pe = 0.0, None
 
         if self.timing and not self.first_step:
-            self.timing_dict['pol_embed'].append(tm.time() - pe_t0)
+            if self.pe:
+                self.timing_dict['PE'] = tm.time() - pe_t0
 
         return vxc_mat, e_pe, V_pe
 
@@ -1640,36 +1649,3 @@ class ScfDriver:
         grad = self.iter_data[-1][2]
         valstr = "Gradient Norm                      :{:20.10f} au".format(grad)
         self.ostream.print_header(valstr.ljust(92))
-
-    def print_timing(self):
-        """
-        Prints timing breakdown for the scf driver.
-        """
-
-        width = 92
-
-        valstr = 'Timing (in sec):'
-        self.ostream.print_header(valstr.ljust(width))
-        self.ostream.print_header(('-' * len(valstr)).ljust(width))
-
-        valstr = '{:<15s} {:>15s}'.format('', 'Fock 2E Part')
-        if self.dft:
-            valstr += ' {:>15s}'.format('XC Part')
-        if self.pe:
-            valstr += ' {:>15s}'.format('PE Part')
-        valstr += ' {:>15s}'.format('Diag. Part')
-        self.ostream.print_header(valstr.ljust(width))
-
-        for i in range(len(self.timing_dict['fock_2e'])):
-
-            title = 'Iteration {:<5d}'.format(i)
-            valstr = '{:<15s} {:15.3f}'.format(title,
-                                               self.timing_dict['fock_2e'][i])
-            if self.dft:
-                valstr += ' {:15.3f}'.format(self.timing_dict['dft_vxc'][i])
-            if self.pe:
-                valstr += ' {:15.3f}'.format(self.timing_dict['pol_embed'][i])
-            valstr += ' {:15.3f}'.format(self.timing_dict['fock_diag'][i])
-            self.ostream.print_header(valstr.ljust(width))
-
-        self.ostream.print_blank()

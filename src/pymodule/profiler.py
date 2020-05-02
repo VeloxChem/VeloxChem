@@ -72,9 +72,9 @@ class Profiler:
             ostream.print_info('')
 
             for line in s.getvalue().split(os.linesep):
-                if os.sep in line:
-                    text = line.split(os.sep)[0]
-                    fname, lineno = line.split()[-1].split(':')
+                if os.sep in line[20:]:
+                    text = line.split(os.sep, 1)[0]
+                    fname, lineno = line.split(os.sep, 1)[1].split(':')
                     if 'numpy' in fname or 'h5py' in fname:
                         fname = os.sep.join(fname.split(os.sep)[-3:])
                     else:

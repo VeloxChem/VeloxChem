@@ -856,7 +856,8 @@ class C6Solver:
                 self.checkpoint_time = tm.time()
 
             profiler.stop_timer(iteration, 'FockBuild')
-            profiler.update_timer(iteration, timing_dict)
+            if self.dft or self.pe:
+                profiler.update_timer(iteration, timing_dict)
 
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
@@ -868,7 +869,7 @@ class C6Solver:
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
 
-        profiler.check_memory_usage('End of CPP solver')
+        profiler.check_memory_usage('End of C6 solver')
         profiler.print_memory_usage(self.ostream)
 
         a_rhs = get_complex_rhs(self.a_operator, self.a_components, molecule,

@@ -581,7 +581,8 @@ class LinearResponseEigenSolver:
                 self.checkpoint_time = tm.time()
 
             profiler.stop_timer(iteration, 'FockBuild')
-            profiler.update_timer(iteration, timing_dict)
+            if self.dft or self.pe:
+                profiler.update_timer(iteration, timing_dict)
 
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
