@@ -21,6 +21,7 @@ from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
 from .subcommunicators import SubCommunicators
+from .signalhandler import SignalHandler
 from .denguess import DensityGuess
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
@@ -495,6 +496,11 @@ class ScfDriver:
         if self.rank == mpi_master():
             self.print_scf_title()
 
+        if not self.first_step:
+            signal_handler = SignalHandler()
+            signal_handler.add_sigterm_function(self.graceful_exit, molecule,
+                                                ao_basis)
+
         for i in self.get_scf_range():
 
             vxc_mat, e_pe, V_pe = self.comp_2e_fock(fock_mat, den_mat, molecule,
@@ -531,11 +537,6 @@ class ScfDriver:
             if self.timing and not self.first_step:
                 self.timing_dict['fock_diag'].append(tm.time() - diag_t0)
 
-            if tm.time() - self.checkpoint_time > 900.0:
-                self.write_checkpoint(molecule.elem_ids_to_numpy(),
-                                      ao_basis.get_label())
-                self.checkpoint_time = tm.time()
-
             self.density = AODensityMatrix(den_mat)
 
             den_mat = self.gen_new_density(molecule)
@@ -544,6 +545,9 @@ class ScfDriver:
 
             if self.is_converged:
                 break
+
+        if not self.first_step:
+            signal_handler.remove_sigterm_function()
 
         self.write_checkpoint(molecule.elem_ids_to_numpy(),
                               ao_basis.get_label())
@@ -579,6 +583,22 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self.print_scf_finish(start_time)
+
+    def graceful_exit(self, molecule, basis):
+
+        self.ostream.print_info('')
+        self.ostream.print_info('Preparing for a graceful termination...')
+        self.ostream.print_info('Writing to checkpoint file {} ...'.format(
+            self.checkpoint_file))
+        self.ostream.flush()
+
+        self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
+
+        self.ostream.print_info('...done. Exiting program.')
+        self.ostream.print_info('')
+        self.ostream.flush()
+
+        return 0
 
     def comp_one_ints(self, molecule, basis):
         """
