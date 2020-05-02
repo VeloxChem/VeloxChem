@@ -593,16 +593,19 @@ class ScfDriver:
 
     def graceful_exit(self, molecule, basis):
 
-        self.ostream.print_info('')
+        self.ostream.print_blank()
         self.ostream.print_info('Preparing for a graceful termination...')
+        self.ostream.print_blank()
         self.ostream.print_info('Writing to checkpoint file {} ...'.format(
             self.checkpoint_file))
         self.ostream.flush()
 
         self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
 
-        self.ostream.print_info('...done. Exiting program.')
-        self.ostream.print_info('')
+        self.ostream.print_info('...done.')
+        self.ostream.print_blank()
+        self.ostream.print_info('Exiting program.')
+        self.ostream.print_blank()
         self.ostream.flush()
 
         return 0
