@@ -71,7 +71,6 @@ class ScfDriver:
         - nodes: The number of MPI processes.
         - restart: The flag for restarting from checkpoint file.
         - checkpoint_file: The name of checkpoint file.
-        - checkpoint_time: The timer of checkpoint file.
         - ref_mol_orbs: The reference molecular orbitals read from checkpoint
           file.
         - restricted: The flag for restricted SCF.
@@ -151,8 +150,10 @@ class ScfDriver:
         # restart information
         self.restart = True
         self.checkpoint_file = None
-        self.checkpoint_time = None
         self.ref_mol_orbs = None
+
+        self.program_start_time = None
+        self.maximum_hours = None
 
         # restricted?
         self.restricted = True
@@ -207,6 +208,11 @@ class ScfDriver:
         if 'checkpoint_file' in scf_dict:
             self.checkpoint_file = scf_dict['checkpoint_file']
 
+        if 'program_start_time' in scf_dict:
+            self.program_start_time = scf_dict['program_start_time']
+        if 'maximum_hours' in scf_dict:
+            self.maximum_hours = scf_dict['maximum_hours']
+
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
             self.dft = True if key == 'yes' else False
@@ -256,6 +262,8 @@ class ScfDriver:
         :param min_basis:
             The minimal AO basis set.
         """
+
+        self.scf_start_time = tm.time()
 
         if min_basis is None:
             if self.rank == mpi_master():
@@ -413,8 +421,7 @@ class ScfDriver:
             'memory_tracing': self.memory_tracing and not self.first_step,
         })
 
-        start_time = tm.time()
-        self.checkpoint_time = start_time
+        diis_start_time = tm.time()
 
         self.fock_matrices.clear()
         self.den_matrices.clear()
@@ -540,6 +547,16 @@ class ScfDriver:
 
             self.update_mol_orbs_phase()
 
+            if self.maximum_hours is not None:
+                remaining_hours = (self.maximum_hours -
+                                   (tm.time() - self.program_start_time) / 3600)
+                if self.maximum_hours < 10.0:
+                    if remaining_hours < 0.1 * self.maximum_hours:
+                        signal_handler.raise_signal('SIGTERM')
+                else:
+                    if remaining_hours < 1.0:
+                        signal_handler.raise_signal('SIGTERM')
+
             self.density = AODensityMatrix(den_mat)
 
             den_mat = self.gen_new_density(molecule)
@@ -589,7 +606,7 @@ class ScfDriver:
             }
 
         if self.rank == mpi_master():
-            self.print_scf_finish(start_time)
+            self.print_scf_finish(diis_start_time)
 
     def graceful_exit(self, molecule, basis):
 

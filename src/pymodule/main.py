@@ -1,4 +1,5 @@
 from mpi4py import MPI
+import time as tm
 import sys
 import os
 
@@ -17,11 +18,14 @@ from .pulsedrsp import PulsedResponse
 from .mp2driver import Mp2Driver
 from .excitondriver import ExcitonModelDriver
 from .visualizationdriver import VisualizationDriver
-from .errorhandler import assert_msg_critical
 from .loprop import LoPropDriver
+from .errorhandler import assert_msg_critical
+from .slurminfo import get_slurm_maximum_hours
 
 
 def main():
+
+    program_start_time = tm.time()
 
     assert_msg_critical(mpi_initialized(), "MPI: Initialized")
 
@@ -48,6 +52,16 @@ def main():
     else:
         method_dict = {}
 
+    # Timelimit in hours
+
+    if 'maximum_hours' in task.input_dict['jobs']:
+        try:
+            maximum_hours = float(task.input_dict['jobs']['maximum_hours'])
+        except ValueError:
+            maximum_hours = None
+    else:
+        maximum_hours = get_slurm_maximum_hours()
+
     # Exciton model
 
     if task_type == 'exciton':
@@ -55,6 +69,9 @@ def main():
             exciton_dict = task.input_dict['exciton']
         else:
             exciton_dict = {}
+
+        exciton_dict['program_start_time'] = program_start_time
+        exciton_dict['maximum_hours'] = maximum_hours
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
         exciton_drv.update_settings(exciton_dict, method_dict)
@@ -77,6 +94,9 @@ def main():
             scf_dict = task.input_dict['scf']
         else:
             scf_dict = {}
+
+        scf_dict['program_start_time'] = program_start_time
+        scf_dict['maximum_hours'] = maximum_hours
 
         nalpha = task.molecule.number_of_alpha_electrons()
         nbeta = task.molecule.number_of_beta_electrons()
@@ -102,6 +122,9 @@ def main():
             rsp_dict = task.input_dict['response']
         else:
             rsp_dict = {}
+
+        rsp_dict['program_start_time'] = program_start_time
+        rsp_dict['maximum_hours'] = maximum_hours
 
         if 'eri_thresh' not in rsp_dict:
             rsp_dict['eri_thresh'] = scf_drv.eri_thresh
