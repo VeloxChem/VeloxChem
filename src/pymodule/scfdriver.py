@@ -609,11 +609,22 @@ class ScfDriver:
             self.print_scf_finish(diis_start_time)
 
     def graceful_exit(self, molecule, basis):
+        """
+        Gracefully exits SCF driver.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+
+        :return:
+            The return code.
+        """
 
         self.ostream.print_blank()
         self.ostream.print_info('Preparing for a graceful termination...')
         self.ostream.print_blank()
-        self.ostream.print_info('Writing to checkpoint file {} ...'.format(
+        self.ostream.print_info('Writing checkpoint file {} ...'.format(
             self.checkpoint_file))
         self.ostream.flush()
 

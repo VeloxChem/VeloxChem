@@ -4,6 +4,9 @@ import re
 
 
 def get_slurm_job_id():
+    """
+    Gets SLURM job ID as a string.
+    """
 
     if 'SLURM_JOB_ID' in os.environ:
         return os.environ['SLURM_JOB_ID']
@@ -16,6 +19,15 @@ def get_slurm_job_id():
 
 
 def executable_in_path(executable):
+    """
+    Checks if the executable is in PATH.
+
+    :param executable:
+        The executable.
+
+    :return:
+        True if the executable is in PATH, False otherwise.
+    """
 
     for path in os.environ['PATH'].split(os.pathsep):
         fname = os.path.join(path, executable)
@@ -26,6 +38,15 @@ def executable_in_path(executable):
 
 
 def get_command_output(command):
+    """
+    Gets the output of a command.
+
+    :param command:
+        The command as a list of strings.
+
+    :return:
+        The output as a string.
+    """
 
     try:
         output = subprocess.check_output(command).decode('utf-8')
@@ -36,6 +57,12 @@ def get_command_output(command):
 
 
 def get_slurm_maximum_hours():
+    """
+    Gets SLURM timelimit in hours.
+
+    :return:
+        The SLURM timelimit in hours (None if not a SLURM job).
+    """
 
     job_id = get_slurm_job_id()
 
