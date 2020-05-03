@@ -903,12 +903,16 @@ def write_rsp_hdf5(fname, arrays, labels, e_nuc, nuclear_charges, basis_set,
         Text in the potential file.
     :param ostream:
         The output stream.
+
+    :return:
+        True if checkpoint file is written. False if checkpoint file is not
+        valid.
     """
 
     valid_checkpoint = (fname and isinstance(fname, str))
 
     if not valid_checkpoint:
-        return
+        return False
 
     hf = h5py.File(fname, 'w')
 
@@ -941,6 +945,8 @@ def write_rsp_hdf5(fname, arrays, labels, e_nuc, nuclear_charges, basis_set,
     checkpoint_text += fname
     ostream.print_info(checkpoint_text)
     ostream.print_blank()
+
+    return True
 
 
 def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set,
@@ -1024,7 +1030,7 @@ def read_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set,
         ostream.print_info(checkpoint_text)
         ostream.print_blank()
 
-    return tuple(arrays)
+    return arrays
 
 
 def check_rsp_hdf5(fname, labels, e_nuc, nuclear_charges, basis_set,

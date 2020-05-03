@@ -12,6 +12,7 @@ from .veloxchemlib import parse_xc_func
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .aodensitymatrix import AODensityMatrix
+from .signalhandler import SignalHandler
 from .lrmatvecdriver import LinearResponseMatrixVectorDriver
 from .lrmatvecdriver import remove_linear_dependence_half
 from .lrmatvecdriver import orthogonalize_gram_schmidt_half
@@ -64,7 +65,6 @@ class LinearResponseSolver:
         - ostream: The output stream.
         - restart: The flag for restarting from checkpoint file.
         - checkpoint_file: The name of checkpoint file.
-        - checkpoint_time: The timer of checkpoint file.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
@@ -118,8 +118,9 @@ class LinearResponseSolver:
         # restart information
         self.restart = True
         self.checkpoint_file = None
-        self.checkpoint_time = None
-        self.checkpoint_interval = 4.0 * 3600
+
+        self.program_start_time = None
+        self.maximum_hours = None
 
         self.timing = False
         self.profiling = False
@@ -164,14 +165,11 @@ class LinearResponseSolver:
             self.restart = True if key == 'yes' else False
         if 'checkpoint_file' in rsp_dict:
             self.checkpoint_file = rsp_dict['checkpoint_file']
-        if 'checkpoint_interval' in rsp_dict:
-            if 'h' in rsp_dict['checkpoint_interval'].lower():
-                try:
-                    n_hours = float(
-                        rsp_dict['checkpoint_interval'].lower().split('h')[0])
-                    self.checkpoint_interval = max(0, n_hours) * 3600
-                except ValueError:
-                    pass
+
+        if 'program_start_time' in rsp_dict:
+            self.program_start_time = rsp_dict['program_start_time']
+        if 'maximum_hours' in rsp_dict:
+            self.maximum_hours = rsp_dict['maximum_hours']
 
         if 'timing' in rsp_dict:
             key = rsp_dict['timing'].lower()
@@ -242,7 +240,6 @@ class LinearResponseSolver:
             self.print_header()
 
         self.start_time = tm.time()
-        self.checkpoint_time = self.start_time
 
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
@@ -374,14 +371,15 @@ class LinearResponseSolver:
 
         # read initial guess from restart file
         if self.restart:
-            dist_bger = DistributedArray.read_from_hdf5_file(
-                self.checkpoint_file, 'LR_bger_half_size', self.comm)
-            dist_bung = DistributedArray.read_from_hdf5_file(
-                self.checkpoint_file, 'LR_bung_half_size', self.comm)
-            dist_e2bger = DistributedArray.read_from_hdf5_file(
-                self.checkpoint_file, 'LR_e2bger_half_size', self.comm)
-            dist_e2bung = DistributedArray.read_from_hdf5_file(
-                self.checkpoint_file, 'LR_e2bung_half_size', self.comm)
+            dist_bger, dist_bung, dist_e2bger, dist_e2bung = [
+                DistributedArray.read_from_hdf5_file(self.checkpoint_file,
+                                                     label, self.comm)
+                for label in rsp_vector_labels
+            ]
+            checkpoint_text = 'Restarting from checkpoint file: '
+            checkpoint_text += self.checkpoint_file
+            self.ostream.print_info(checkpoint_text)
+            self.ostream.print_blank()
 
         # generate initial guess from scratch
         else:
@@ -420,6 +418,11 @@ class LinearResponseSolver:
         solutions = {}
         residuals = {}
         relative_residual_norm = {}
+
+        signal_handler = SignalHandler()
+        signal_handler.add_sigterm_function(
+            self.graceful_exit, molecule, basis, dft_func_label, potfile_text,
+            [dist_bger, dist_bung, dist_e2bger, dist_e2bung], rsp_vector_labels)
 
         # start iterations
         for iteration in range(self.max_iter):
@@ -589,30 +592,15 @@ class LinearResponseSolver:
 
             new_e2bger, new_e2bung = None, None
 
-            # write to checkpoint file
-            if tm.time() - self.checkpoint_time >= self.checkpoint_interval:
-                if self.rank == mpi_master():
-                    write_rsp_hdf5(self.checkpoint_file, [], [],
-                                   molecule.nuclear_repulsion_energy(),
-                                   molecule.elem_ids_to_numpy(),
-                                   basis.get_label(), dft_func_label,
-                                   potfile_text, self.ostream)
-
-                dt = 0.0
-                dt += dist_bger.append_to_hdf5_file(self.checkpoint_file,
-                                                    'LR_bger_half_size')
-                dt += dist_bung.append_to_hdf5_file(self.checkpoint_file,
-                                                    'LR_bung_half_size')
-                dt += dist_e2bger.append_to_hdf5_file(self.checkpoint_file,
-                                                      'LR_e2bger_half_size')
-                dt += dist_e2bung.append_to_hdf5_file(self.checkpoint_file,
-                                                      'LR_e2bung_half_size')
-                dt_text = 'Time spent in writing to checkpoint file: '
-                dt_text += '{:.2f} sec'.format(dt)
-                self.ostream.print_info(dt_text)
-                self.ostream.print_blank()
-
-                self.checkpoint_time = tm.time()
+            if self.maximum_hours is not None:
+                remaining_hours = (self.maximum_hours -
+                                   (tm.time() - self.program_start_time) / 3600)
+                if self.maximum_hours < 10.0:
+                    if remaining_hours < 0.1 * self.maximum_hours:
+                        signal_handler.raise_signal('SIGTERM')
+                else:
+                    if remaining_hours < 1.0:
+                        signal_handler.raise_signal('SIGTERM')
 
             profiler.stop_timer(iteration, 'FockBuild')
             if self.dft or self.pe:
@@ -620,6 +608,12 @@ class LinearResponseSolver:
 
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
+
+        signal_handler.remove_sigterm_function()
+
+        self.write_checkpoint(molecule, basis, dft_func_label, potfile_text,
+                              [dist_bger, dist_bung, dist_e2bger, dist_e2bung],
+                              rsp_vector_labels)
 
         # converged?
         if self.rank == mpi_master():
@@ -661,6 +655,80 @@ class LinearResponseSolver:
                 }
             else:
                 return {}
+
+    def write_checkpoint(self, molecule, basis, dft_func_label, potfile_text,
+                         dist_arrays, labels):
+        """
+        Writes checkpoint file.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param dft_func_label:
+            The name of the density functional.
+        :param potfile_text:
+            The text in the potential file.
+        :param dist_arrays:
+            The list of distributed arrays.
+        :param labels:
+            The list of labels.
+        """
+
+        if self.checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            success = write_rsp_hdf5(self.checkpoint_file, [], [],
+                                     molecule.nuclear_repulsion_energy(),
+                                     molecule.elem_ids_to_numpy(),
+                                     basis.get_label(), dft_func_label,
+                                     potfile_text, self.ostream)
+        else:
+            success = False
+        success = self.comm.bcast(success, root=mpi_master())
+
+        if success:
+            for dist_array, label in zip(dist_arrays, labels):
+                dist_array.append_to_hdf5_file(self.checkpoint_file, label)
+
+    def graceful_exit(self, molecule, basis, dft_func_label, potfile_text,
+                      dist_arrays, labels):
+        """
+        Gracefully exits SCF driver.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param dft_func_label:
+            The name of the density functional.
+        :param potfile_text:
+            The text in the potential file.
+        :param dist_arrays:
+            The list of distributed arrays.
+        :param labels:
+            The list of labels.
+
+        :return:
+            The return code.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_info('Preparing for a graceful termination...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        self.write_checkpoint(molecule, basis, dft_func_label, potfile_text,
+                              dist_arrays, labels)
+
+        self.ostream.print_info('...done.')
+        self.ostream.print_blank()
+        self.ostream.print_info('Exiting program.')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        return 0
 
     def print_header(self):
         """
