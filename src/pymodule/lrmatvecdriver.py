@@ -2,7 +2,9 @@ from os.path import isfile
 import numpy as np
 import time as tm
 import itertools
+import psutil
 import h5py
+import os
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
@@ -177,15 +179,29 @@ class LinearResponseMatrixVectorDriver:
 
         num_batches = 0
         if self.rank == mpi_master():
+            # compute maximum batch size from available memory
+            avail_mem = psutil.virtual_memory().available
+            mem_per_mat = mo.shape[0]**2 * 8
+            nthreads = int(os.environ['OMP_NUM_THREADS'])
+            max_batch_size = int(avail_mem / mem_per_mat / (0.625 * nthreads))
+            max_batch_size = max(1, min(100, max_batch_size))
+
+            # set batch size
             batch_size = self.batch_size
             if batch_size is None:
                 batch_size = len(dks)
+            batch_size = min(batch_size, max_batch_size)
+
+            # get number of batches
             num_batches = len(dks) // batch_size
             if len(dks) % batch_size != 0:
                 num_batches += 1
         num_batches = self.comm.bcast(num_batches, root=mpi_master())
 
-        self.ostream.print_info('Processing Fock builds... ')
+        if self.rank == mpi_master():
+            batch_str = 'Processing Fock builds...'
+            batch_str += ' (batch size: {:d})'.format(batch_size)
+            self.ostream.print_info(batch_str)
 
         faks = []
         for batch_ind in range(num_batches):
