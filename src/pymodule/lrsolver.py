@@ -320,7 +320,8 @@ class LinearResponseSolver:
                                         self.eri_thresh, molecule, basis)
 
         e2x_drv = LinearResponseMatrixVectorDriver(self.comm,
-                                                   self.use_split_comm)
+                                                   self.use_split_comm,
+                                                   self.ostream)
         e2x_drv.update_settings(self.eri_thresh, self.qq_type, self.dft,
                                 self.xcfun, self.pe, self.potfile)
         timing_dict = {}

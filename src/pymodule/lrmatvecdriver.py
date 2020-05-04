@@ -19,6 +19,7 @@ from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import szblock
 from .subcommunicators import SubCommunicators
+from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 
@@ -46,7 +47,7 @@ class LinearResponseMatrixVectorDriver:
         - potfile: The name of the potential file for polarizable embedding.
     """
 
-    def __init__(self, comm, use_split_comm=False):
+    def __init__(self, comm, use_split_comm=False, ostream=OutputStream()):
         """
         Initializes linear response matrix vector driver to default setup.
         """
@@ -59,6 +60,9 @@ class LinearResponseMatrixVectorDriver:
         # split communicators
         self.use_split_comm = use_split_comm
         self.split_comm_ratio = None
+
+        # output stream
+        self.ostream = ostream
 
         # ERI/DFT/PE settings
         self.eri_thresh = 1.0e-15
@@ -181,8 +185,15 @@ class LinearResponseMatrixVectorDriver:
                 num_batches += 1
         num_batches = self.comm.bcast(num_batches, root=mpi_master())
 
+        self.ostream.print_info('Processing Fock builds... ')
+
         faks = []
         for batch_ind in range(num_batches):
+
+            self.ostream.print_info('  batch {}/{}'.format(
+                batch_ind + 1, num_batches))
+            self.ostream.flush()
+
             if self.rank == mpi_master():
                 batch_start = batch_size * batch_ind
                 batch_end = min(batch_start + batch_size, len(dks))
@@ -199,6 +210,8 @@ class LinearResponseMatrixVectorDriver:
             if self.rank == mpi_master():
                 for ifock in range(fock.number_of_fock_matrices()):
                     faks.append(fock.alpha_to_numpy(ifock).T)
+
+        self.ostream.print_blank()
 
         if self.rank == mpi_master():
             if vecs_ger is not None:
