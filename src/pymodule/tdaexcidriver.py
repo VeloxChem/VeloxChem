@@ -19,6 +19,8 @@ from .linearsolver import LinearSolver
 from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
 from .errorhandler import assert_msg_critical
+from .checkpoint import read_rsp_hdf5
+from .checkpoint import write_rsp_hdf5
 
 
 class TDAExciDriver(LinearSolver):
@@ -137,7 +139,7 @@ class TDAExciDriver(LinearSolver):
 
         if self.restart:
             if self.rank == mpi_master():
-                rst_trial_mat, rst_sig_mat = self.read_rsp_hdf5(
+                rst_trial_mat, rst_sig_mat = read_rsp_hdf5(
                     self.checkpoint_file, ['TDA_trials', 'TDA_sigmas'],
                     molecule, basis, dft_dict, pe_dict, self.ostream)
                 self.restart = (rst_trial_mat is not None and
@@ -213,9 +215,9 @@ class TDAExciDriver(LinearSolver):
             if (self.rank == mpi_master() and i >= n_restart_iterations):
                 trials = self.solver.trial_matrices
                 sigmas = self.solver.sigma_matrices
-                self.write_rsp_hdf5(self.checkpoint_file, [trials, sigmas],
-                                    ['TDA_trials', 'TDA_sigmas'], molecule,
-                                    basis, dft_dict, pe_dict, self.ostream)
+                write_rsp_hdf5(self.checkpoint_file, [trials, sigmas],
+                               ['TDA_trials', 'TDA_sigmas'], molecule, basis,
+                               dft_dict, pe_dict, self.ostream)
 
             # finish TDA after convergence
 

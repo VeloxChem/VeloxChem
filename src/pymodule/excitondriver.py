@@ -22,9 +22,10 @@ from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .rspabsorption import Absorption
-from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
+from .checkpoint import read_rsp_hdf5
+from .checkpoint import write_rsp_hdf5
 
 
 class ExcitonModelDriver:
@@ -417,10 +418,11 @@ class ExcitonModelDriver:
         if self.restart:
             if self.rank == mpi_master():
                 (dimer_indices, num_states, H, tdip, vdip, mdip,
-                 state_info) = LinearSolver.read_rsp_hdf5(
-                     self.checkpoint_file, rsp_vector_labels, molecule, basis,
-                     {'dft_func_label': dft_func_label},
-                     {'potfile_text': potfile_text}, self.ostream)
+                 state_info) = read_rsp_hdf5(self.checkpoint_file,
+                                             rsp_vector_labels, molecule, basis,
+                                             {'dft_func_label': dft_func_label},
+                                             {'potfile_text': potfile_text},
+                                             self.ostream)
                 read_success = (dimer_indices is not None and
                                 num_states is not None and H is not None and
                                 tdip is not None and vdip is not None and
@@ -953,11 +955,10 @@ class ExcitonModelDriver:
                 ]
 
                 if self.rank == mpi_master():
-                    LinearSolver.write_rsp_hdf5(
-                        self.checkpoint_file, rsp_vector_list,
-                        rsp_vector_labels, molecule, basis,
-                        {'dft_func_label': dft_func_label},
-                        {'potfile_text': potfile_text}, self.ostream)
+                    write_rsp_hdf5(self.checkpoint_file, rsp_vector_list,
+                                   rsp_vector_labels, molecule, basis,
+                                   {'dft_func_label': dft_func_label},
+                                   {'potfile_text': potfile_text}, self.ostream)
 
         if self.rank == mpi_master():
             self.print_banner('Summary')

@@ -11,6 +11,7 @@ from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
+from .checkpoint import check_rsp_hdf5
 
 
 class LinearResponseEigenSolver(LinearSolver):
@@ -112,9 +113,9 @@ class LinearResponseEigenSolver(LinearSolver):
         # read initial guess from restart file
         if self.restart:
             if self.rank == mpi_master():
-                self.restart = self.check_rsp_hdf5(self.checkpoint_file,
-                                                   rsp_vector_labels, molecule,
-                                                   basis, dft_dict, pe_dict)
+                self.restart = check_rsp_hdf5(self.checkpoint_file,
+                                              rsp_vector_labels, molecule,
+                                              basis, dft_dict, pe_dict)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
