@@ -1,6 +1,4 @@
 import signal
-import sys
-import os
 
 
 class SignalHandler:
@@ -10,7 +8,6 @@ class SignalHandler:
     Instance variable
         - func: The exit function.
         - args: The arguments for the exit function.
-        - terminated: The flag for termination.
         - original_sigterm_handler: The original SIGTERM handler.
     """
 
@@ -22,7 +19,6 @@ class SignalHandler:
         self.func = None
         self.args = None
 
-        self.terminated = False
         self.original_sigterm_handler = signal.getsignal(signal.SIGTERM)
 
     def sigterm_handler(self, signum, frame):
@@ -35,32 +31,8 @@ class SignalHandler:
             The frame parameter as in the handler function.
         """
 
-        if self.terminated:
-            return
-
-        if not self.terminated:
-            self.terminated = True
-
         if self.func is not None:
-            if self.args is not None:
-                sys.exit(self.func(*self.args))
-            else:
-                sys.exit(self.func())
-        else:
-            sys.exit(1)
-
-    def raise_signal(self, sigstr):
-        """
-        Raises a signal.
-
-        :param sigstr:
-            The string for the signal.
-        """
-
-        if sigstr == 'SIGTERM':
-            # available in Python 3.8
-            # signal.raise_signal(signal.SIGTERM)
-            os.kill(os.getpid(), signal.SIGTERM)
+            self.func(*self.args)
 
     def add_sigterm_function(self, func, *args):
         """

@@ -2,6 +2,7 @@ import numpy as np
 import time as tm
 import itertools
 import psutil
+import sys
 import os
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
@@ -688,7 +689,7 @@ class LinearSolver:
     def graceful_exit(self, molecule, basis, dft_dict, pe_dict, dist_arrays,
                       labels):
         """
-        Gracefully exits linear solver.
+        Gracefully exits the program.
 
         :param molecule:
             The molecule.
@@ -721,7 +722,7 @@ class LinearSolver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        return 0
+        sys.exit(0)
 
     def need_graceful_exit(self):
         """

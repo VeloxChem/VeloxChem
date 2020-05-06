@@ -389,7 +389,10 @@ class LinearResponseSolver(LinearSolver):
             new_e2bger, new_e2bung = None, None
 
             if self.need_graceful_exit():
-                signal_handler.raise_signal('SIGTERM')
+                self.graceful_exit(
+                    molecule, basis, dft_dict, pe_dict,
+                    [dist_bger, dist_bung, dist_e2bger, dist_e2bung],
+                    rsp_vector_labels)
 
             profiler.stop_timer(iteration, 'FockBuild')
             if self.dft or self.pe:

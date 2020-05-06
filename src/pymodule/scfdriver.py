@@ -2,6 +2,7 @@ from collections import deque
 import numpy as np
 import time as tm
 import math
+import sys
 import os
 
 from .veloxchemlib import OverlapIntegralsDriver
@@ -263,6 +264,13 @@ class ScfDriver:
             The minimal AO basis set.
         """
 
+        profiler = Profiler({
+            'timing': self.timing and not self.first_step,
+            'profiling': self.profiling and not self.first_step,
+            'memory_profiling': self.memory_profiling and not self.first_step,
+            'memory_tracing': self.memory_tracing and not self.first_step,
+        })
+
         self.scf_start_time = tm.time()
 
         if min_basis is None:
@@ -331,7 +339,7 @@ class ScfDriver:
 
         # C2-DIIS method
         if self.acc_type == "DIIS":
-            self.comp_diis(molecule, ao_basis, min_basis)
+            self.comp_diis(molecule, ao_basis, min_basis, profiler)
 
         # two level C2-DIIS method
         if self.acc_type == "L2_DIIS":
@@ -346,7 +354,7 @@ class ScfDriver:
             self.max_iter = 5
 
             val_basis = ao_basis.get_valence_basis()
-            self.comp_diis(molecule, val_basis, min_basis)
+            self.comp_diis(molecule, val_basis, min_basis, profiler)
 
             # second step
             self.first_step = False
@@ -356,7 +364,7 @@ class ScfDriver:
             self.max_iter = old_max_iter
             self.den_guess.guess_type = "PRCMO"
 
-            self.comp_diis(molecule, ao_basis, val_basis)
+            self.comp_diis(molecule, ao_basis, val_basis, profiler)
 
         self.fock_matrices.clear()
         self.den_matrices.clear()
@@ -389,6 +397,13 @@ class ScfDriver:
                 self.ostream.print_info(checkpoint_text)
                 self.ostream.print_blank()
 
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
+
+        profiler.check_memory_usage('End of SCF')
+        profiler.print_memory_usage(self.ostream)
+        profiler.print_memory_tracing(self.ostream)
+
     def write_checkpoint(self, nuclear_charges, basis_set):
         """
         Writes molecular orbitals to checkpoint file.
@@ -404,7 +419,7 @@ class ScfDriver:
                 self.mol_orbs.write_hdf5(self.checkpoint_file, nuclear_charges,
                                          basis_set)
 
-    def comp_diis(self, molecule, ao_basis, min_basis):
+    def comp_diis(self, molecule, ao_basis, min_basis, profiler):
         """
         Performs SCF calculation with C2-DIIS acceleration.
 
@@ -414,14 +429,9 @@ class ScfDriver:
             The AO basis set.
         :param min_basis:
             The minimal AO basis set.
+        :param profiler:
+            The profiler.
         """
-
-        profiler = Profiler({
-            'timing': self.timing and not self.first_step,
-            'profiling': self.profiling and not self.first_step,
-            'memory_profiling': self.memory_profiling and not self.first_step,
-            'memory_tracing': self.memory_tracing and not self.first_step,
-        })
 
         diis_start_time = tm.time()
 
@@ -549,15 +559,8 @@ class ScfDriver:
 
             self.update_mol_orbs_phase()
 
-            if self.maximum_hours is not None:
-                remaining_hours = (self.maximum_hours -
-                                   (tm.time() - self.program_start_time) / 3600)
-                if self.maximum_hours < 10.0:
-                    if remaining_hours < 0.1 * self.maximum_hours:
-                        signal_handler.raise_signal('SIGTERM')
-                else:
-                    if remaining_hours < 1.0:
-                        signal_handler.raise_signal('SIGTERM')
+            if self.need_graceful_exit():
+                self.graceful_exit(molecule, ao_basis)
 
             self.density = AODensityMatrix(den_mat)
 
@@ -580,15 +583,6 @@ class ScfDriver:
         self.write_checkpoint(molecule.elem_ids_to_numpy(),
                               ao_basis.get_label())
 
-        if self.timing and not self.first_step:
-            self.ostream.print_blank()
-        profiler.print_timing(self.ostream)
-        profiler.print_profiling_summary(self.ostream)
-
-        profiler.check_memory_usage('End of SCF')
-        profiler.print_memory_usage(self.ostream)
-        profiler.print_memory_tracing(self.ostream)
-
         if self.rank == mpi_master():
             self.scf_tensors = {
                 'C': self.mol_orbs.alpha_to_numpy(),
@@ -610,9 +604,28 @@ class ScfDriver:
         if self.rank == mpi_master():
             self.print_scf_finish(diis_start_time)
 
+    def need_graceful_exit(self):
+        """
+        Checks if a graceful exit is needed.
+
+        :return:
+            True if a graceful exit is needed, False otherwise.
+        """
+
+        if self.maximum_hours is not None:
+            remaining_hours = (self.maximum_hours -
+                               (tm.time() - self.program_start_time) / 3600)
+            if self.maximum_hours < 10.0:
+                if remaining_hours < 0.1 * self.maximum_hours:
+                    return True
+            else:
+                if remaining_hours < 1.0:
+                    return True
+        return False
+
     def graceful_exit(self, molecule, basis):
         """
-        Gracefully exits SCF driver.
+        Gracefully exits the program.
 
         :param molecule:
             The molecule.
@@ -638,7 +651,7 @@ class ScfDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        return 0
+        sys.exit(0)
 
     def comp_one_ints(self, molecule, basis):
         """
