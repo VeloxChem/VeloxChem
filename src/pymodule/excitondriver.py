@@ -22,10 +22,9 @@ from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .rspabsorption import Absorption
+from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
-from .lrmatvecdriver import read_rsp_hdf5
-from .lrmatvecdriver import write_rsp_hdf5
 
 
 class ExcitonModelDriver:
@@ -418,11 +417,10 @@ class ExcitonModelDriver:
         if self.restart:
             if self.rank == mpi_master():
                 (dimer_indices, num_states, H, tdip, vdip, mdip,
-                 state_info) = read_rsp_hdf5(
-                     self.checkpoint_file, rsp_vector_labels,
-                     molecule.nuclear_repulsion_energy(),
-                     molecule.elem_ids_to_numpy(), basis.get_label(),
-                     dft_func_label, potfile_text, self.ostream)
+                 state_info) = LinearSolver.read_rsp_hdf5(
+                     self.checkpoint_file, rsp_vector_labels, molecule, basis,
+                     {'dft_func_label': dft_func_label},
+                     {'potfile_text': potfile_text}, self.ostream)
                 read_success = (dimer_indices is not None and
                                 num_states is not None and H is not None and
                                 tdip is not None and vdip is not None and
@@ -590,8 +588,8 @@ class ExcitonModelDriver:
 
                     for row in range(nao_A):
                         mo[ao_inds_A[row], :nocc_A] = CA[row, :nocc_A]
-                        mo[ao_inds_A[row], nocc:nocc +
-                           nvir_A] = CA[row, nocc_A:]
+                        mo[ao_inds_A[row], nocc:nocc + nvir_A] = CA[row,
+                                                                    nocc_A:]
 
                     for row in range(nao_B):
                         mo[ao_inds_B[row], nocc_A:nocc] = CB[row, :nocc_B]
@@ -916,8 +914,8 @@ class ExcitonModelDriver:
                                     ctAC += excitation_id[ind_A, ind_C]
                                     ctBC += excitation_id[ind_B, ind_C]
 
-                                    coupling = -fock_occ[nocc_A - 1 - oA, nocc -
-                                                         1 - oB]
+                                    coupling = -fock_occ[nocc_A - 1 - oA,
+                                                         nocc - 1 - oB]
 
                                     self.H[ctAC, ctBC] = coupling
                                     self.H[ctBC, ctAC] = coupling
@@ -955,12 +953,11 @@ class ExcitonModelDriver:
                 ]
 
                 if self.rank == mpi_master():
-                    write_rsp_hdf5(self.checkpoint_file, rsp_vector_list,
-                                   rsp_vector_labels,
-                                   molecule.nuclear_repulsion_energy(),
-                                   molecule.elem_ids_to_numpy(),
-                                   basis.get_label(), dft_func_label,
-                                   potfile_text, self.ostream)
+                    LinearSolver.write_rsp_hdf5(
+                        self.checkpoint_file, rsp_vector_list,
+                        rsp_vector_labels, molecule, basis,
+                        {'dft_func_label': dft_func_label},
+                        {'potfile_text': potfile_text}, self.ostream)
 
         if self.rank == mpi_master():
             self.print_banner('Summary')

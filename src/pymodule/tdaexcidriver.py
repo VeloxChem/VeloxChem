@@ -1,36 +1,27 @@
 import numpy as np
 import time as tm
 import math
-import os
 
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
-from .veloxchemlib import GridDriver
-from .veloxchemlib import MolecularGrid
-from .veloxchemlib import XCFunctional
 from .veloxchemlib import mpi_master
+from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import szblock
 from .veloxchemlib import molorb
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
-from .veloxchemlib import rotatory_strength_in_cgs
-from .veloxchemlib import parse_xc_func
+from .profiler import Profiler
+from .linearsolver import LinearSolver
 from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
-from .lrmatvecdriver import LinearResponseMatrixVectorDriver
-from .qqscheme import get_qq_scheme
-from .qqscheme import get_qq_type
-from .lrmatvecdriver import read_rsp_hdf5
-from .lrmatvecdriver import write_rsp_hdf5
 from .errorhandler import assert_msg_critical
 
 
-class TDAExciDriver:
+class TDAExciDriver(LinearSolver):
     """
     Implements TDA excited states computation schheme for Hartree-Fock/Kohn-Sham
     level of theory.
@@ -42,25 +33,7 @@ class TDAExciDriver:
 
     Instance variables
         - nstates: The number of excited states determined by driver.
-        - eri_thresh: The electron repulsion integrals screening threshold.
-        - qq_type: The electron repulsion integrals screening scheme.
-        - dft: The flag for running DFT.
-        - grid_level: The accuracy level of DFT grid.
-        - xcfun: The XC functional.
-        - pe: The flag for running polarizable embedding calculation.
-        - potfile: The name of the potential file for polarizable embedding.
-        - use_split_comm: The flag for using split communicators.
-        - conv_thresh: The excited states convergence threshold.
-        - max_iter: The maximum number of excited states driver iterations.
-        - cur_iter: The current number of excited states driver iterations.
         - solver: The eigenvalues solver.
-        - is_converged: The flag for excited states convergence.
-        - rank: The rank of MPI process.
-        - nodes: The number of MPI processes.
-        - ostream: The output stream.
-        - restart: The flag for restarting from checkpoint file.
-        - checkpoint_file: The name of checkpoint file.
-        - checkpoint_time: The timer of checkpoint file.
     """
 
     def __init__(self, comm, ostream):
@@ -68,44 +41,13 @@ class TDAExciDriver:
         Initializes TDA excited states computation drived to default setup.
         """
 
+        super().__init__(comm, ostream)
+
         # excited states information
         self.nstates = 3
 
-        # ERI settings
-        self.eri_thresh = 1.0e-15
-        self.qq_type = 'QQ_DEN'
-
-        # dft
-        self.dft = False
-        self.grid_level = 4
-        self.xcfun = XCFunctional()
-
-        # polarizable embedding
-        self.pe = False
-        self.potfile = None
-
-        # split communicators
-        self.use_split_comm = False
-
         # solver setup
-        self.conv_thresh = 1.0e-4
-        self.max_iter = 50
-        self.cur_iter = 0
         self.solver = None
-        self.is_converged = None
-
-        # mpi information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
-
-        # output stream
-        self.ostream = ostream
-
-        # restart information
-        self.restart = True
-        self.checkpoint_file = None
-        self.checkpoint_time = None
 
     def update_settings(self, rsp_dict, method_dict={}):
         """
@@ -118,48 +60,10 @@ class TDAExciDriver:
             The dictionary of method settings.
         """
 
+        super().update_settings(rsp_dict, method_dict)
+
         if 'nstates' in rsp_dict:
             self.nstates = int(rsp_dict['nstates'])
-
-        if 'eri_thresh' in rsp_dict:
-            self.eri_thresh = float(rsp_dict['eri_thresh'])
-        if 'qq_type' in rsp_dict:
-            self.qq_type = rsp_dict['qq_type'].upper()
-
-        if 'conv_thresh' in rsp_dict:
-            self.conv_thresh = float(rsp_dict['conv_thresh'])
-        if 'max_iter' in rsp_dict:
-            self.max_iter = int(rsp_dict['max_iter'])
-
-        if 'restart' in rsp_dict:
-            key = rsp_dict['restart'].lower()
-            self.restart = True if key == 'yes' else False
-        if 'checkpoint_file' in rsp_dict:
-            self.checkpoint_file = rsp_dict['checkpoint_file']
-
-        if 'dft' in method_dict:
-            key = method_dict['dft'].lower()
-            self.dft = True if key == 'yes' else False
-        if 'grid_level' in method_dict:
-            self.grid_level = int(method_dict['grid_level'])
-        if 'xcfun' in method_dict:
-            if 'dft' not in method_dict:
-                self.dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Undefined XC functional')
-
-        if 'pe' in method_dict:
-            key = method_dict['pe'].lower()
-            self.pe = True if key == 'yes' else False
-        if 'potfile' in method_dict:
-            if 'pe' not in method_dict:
-                self.pe = True
-            self.potfile = method_dict['potfile']
-
-        if 'use_split_comm' in method_dict:
-            key = method_dict['use_split_comm'].lower()
-            self.use_split_comm = True if key == 'yes' else False
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -177,21 +81,19 @@ class TDAExciDriver:
             dipole moments, oscillator strengths and rotatory strengths.
         """
 
-        # prepare molecular orbitals
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
 
         if self.rank == mpi_master():
-            mol_orbs = MolecularOrbitals([scf_tensors['C']], [scf_tensors['E']],
-                                         molorb.rest)
-        else:
-            mol_orbs = MolecularOrbitals()
-
-        if self.rank == mpi_master():
-            self.print_header()
+            self.print_header('TDA Driver', nstates=self.nstates)
 
         # set start time
 
         self.start_time = tm.time()
-        self.checkpoint_time = self.start_time
 
         # sanity check
 
@@ -201,71 +103,23 @@ class TDAExciDriver:
             nalpha == nbeta,
             'TDAExciDriver: not implemented for unrestricted case')
 
-        # generate molecular grid for DFT
+        # prepare molecular orbitals
 
-        if self.dft:
-            grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(self.grid_level)
-
-            grid_t0 = tm.time()
-            molgrid = grid_drv.generate(molecule)
-            n_grid_points = molgrid.number_of_points()
-            self.ostream.print_info(
-                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
-                format(n_grid_points,
-                       tm.time() - grid_t0))
-            self.ostream.print_blank()
-
-            dft_func_label = self.xcfun.get_func_label().upper()
+        if self.rank == mpi_master():
+            mol_orbs = MolecularOrbitals([scf_tensors['C']], [scf_tensors['E']],
+                                         molorb.rest)
         else:
-            molgrid = MolecularGrid()
-            dft_func_label = 'HF'
+            mol_orbs = MolecularOrbitals()
 
-        # generate potential for polarizable embedding
+        # ERI information
+        eri_dict = self.init_eri(molecule, basis)
 
-        if self.pe:
-            from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
-            V_es = pe_drv.compute_multipole_potential_integrals()
+        # DFT information
+        dft_dict = self.init_dft(molecule, scf_tensors)
 
-            pot_info = "Reading polarizable embedding potential: {}".format(
-                self.potfile)
-            self.ostream.print_info(pot_info)
-            self.ostream.print_blank()
+        # PE information
+        pe_dict = self.init_pe(molecule, basis)
 
-            with open(self.potfile, 'r') as f_pot:
-                potfile_text = os.linesep.join(f_pot.readlines())
-        else:
-            pe_drv = None
-            V_es = None
-            potfile_text = ''
-
-        # generate screening for ERI
-
-        if self.use_split_comm:
-            self.use_split_comm = ((self.dft or self.pe) and self.nodes >= 8)
-
-        if self.use_split_comm:
-            screening = None
-            valstr = 'ERI'
-            if self.dft:
-                valstr += '/DFT'
-            if self.pe:
-                valstr += '/PE'
-            self.ostream.print_info(
-                'Using sub-communicators for {}.'.format(valstr))
-            self.ostream.print_blank()
-        else:
-            eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-            screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                        self.eri_thresh, molecule, basis)
-
-        # initialize E2X driver for response Fock build
-
-        e2x_drv = LinearResponseMatrixVectorDriver(self.comm,
-                                                   self.use_split_comm)
-        e2x_drv.update_settings(self.eri_thresh, self.qq_type, self.dft,
-                                self.xcfun, self.pe, self.potfile)
         timing_dict = {}
 
         # set up trial excitation vectors on master node
@@ -283,11 +137,9 @@ class TDAExciDriver:
 
         if self.restart:
             if self.rank == mpi_master():
-                rst_trial_mat, rst_sig_mat = read_rsp_hdf5(
+                rst_trial_mat, rst_sig_mat = self.read_rsp_hdf5(
                     self.checkpoint_file, ['TDA_trials', 'TDA_sigmas'],
-                    molecule.nuclear_repulsion_energy(),
-                    molecule.elem_ids_to_numpy(), basis.get_label(),
-                    dft_func_label, potfile_text, self.ostream)
+                    molecule, basis, dft_dict, pe_dict, self.ostream)
                 self.restart = (rst_trial_mat is not None and
                                 rst_sig_mat is not None)
                 if rst_trial_mat is not None:
@@ -299,9 +151,13 @@ class TDAExciDriver:
             if n_restart_vectors % self.nstates != 0:
                 n_restart_iterations += 1
 
+        profiler.check_memory_usage('Initial guess')
+
         # start TDA iteration
 
         for i in range(self.max_iter):
+
+            profiler.start_timer(i, 'FockBuild')
 
             # perform linear transformation of trial vectors
 
@@ -309,8 +165,11 @@ class TDAExciDriver:
                 fock, tdens, gsdens = self.get_densities(
                     trial_vecs, scf_tensors, molecule)
 
-                e2x_drv.comp_lr_fock(fock, tdens, molecule, basis, screening,
-                                     molgrid, gsdens, V_es, pe_drv, timing_dict)
+                self.comp_lr_fock(fock, tdens, molecule, basis, eri_dict,
+                                  dft_dict, pe_dict, timing_dict)
+
+            profiler.stop_timer(i, 'FockBuild')
+            profiler.start_timer(i, 'ReducedSpace')
 
             # solve eigenvalues problem on master node
 
@@ -337,27 +196,26 @@ class TDAExciDriver:
                 trial_vecs = self.convert_to_trial_vectors(
                     mol_orbs, molecule, zvecs)
 
+            profiler.stop_timer(i, 'ReducedSpace')
+            if self.dft or self.pe:
+                profiler.update_timer(i, timing_dict)
+
+            profiler.check_memory_usage('Iteration {:d}'.format(i + 1))
+
+            profiler.print_memory_tracing(self.ostream)
+
             # check convergence
 
             self.check_convergence(i)
 
             # write checkpoint file
 
-            if self.rank == mpi_master():
-
-                if i >= n_restart_iterations:
-                    trials = self.solver.trial_matrices
-                    sigmas = self.solver.sigma_matrices
-
-                    if (tm.time() - self.checkpoint_time > 900.0 or
-                            self.is_converged):
-                        write_rsp_hdf5(self.checkpoint_file, [trials, sigmas],
-                                       ['TDA_trials', 'TDA_sigmas'],
-                                       molecule.nuclear_repulsion_energy(),
-                                       molecule.elem_ids_to_numpy(),
-                                       basis.get_label(), dft_func_label,
-                                       potfile_text, self.ostream)
-                        self.checkpoint_time = tm.time()
+            if (self.rank == mpi_master() and i >= n_restart_iterations):
+                trials = self.solver.trial_matrices
+                sigmas = self.solver.sigma_matrices
+                self.write_rsp_hdf5(self.checkpoint_file, [trials, sigmas],
+                                    ['TDA_trials', 'TDA_sigmas'], molecule,
+                                    basis, dft_dict, pe_dict, self.ostream)
 
             # finish TDA after convergence
 
@@ -366,7 +224,13 @@ class TDAExciDriver:
 
         # converged?
         if self.rank == mpi_master():
-            self.print_convergence()
+            self.print_convergence('{:d} excited states'.format(self.nstates))
+
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
+
+        profiler.check_memory_usage('End of TDA driver')
+        profiler.print_memory_usage(self.ostream)
 
         # compute 1e dipole integrals
 
@@ -831,45 +695,6 @@ class TDAExciDriver:
 
         return rotatory_strengths
 
-    def print_header(self):
-        """
-        Prints TDA driver setup header to output stream.
-        """
-
-        self.ostream.print_blank()
-        self.ostream.print_header('TDA Driver Setup')
-        self.ostream.print_header(18 * '=')
-        self.ostream.print_blank()
-
-        str_width = 60
-
-        cur_str = 'Number of States                : ' + str(self.nstates)
-        self.ostream.print_header(cur_str.ljust(str_width))
-
-        cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
-        self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Convergence Threshold           : ' + \
-            '{:.1e}'.format(self.conv_thresh)
-        self.ostream.print_header(cur_str.ljust(str_width))
-
-        cur_str = 'ERI Screening Scheme            : ' + get_qq_type(
-            self.qq_type)
-        self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'ERI Screening Threshold         : ' + \
-            '{:.1e}'.format(self.eri_thresh)
-        self.ostream.print_header(cur_str.ljust(str_width))
-
-        if self.dft:
-            cur_str = 'Exchange-Correlation Functional : '
-            cur_str += self.xcfun.get_func_label().upper()
-            self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'Molecular Grid Level            : ' + str(
-                self.grid_level)
-            self.ostream.print_header(cur_str.ljust(str_width))
-
-        self.ostream.print_blank()
-        self.ostream.flush()
-
     def print_iter_data(self, iteration):
         """
         Prints excited states solver iteration data to output stream.
@@ -900,18 +725,3 @@ class TDAExciDriver:
         # flush output stream
         self.ostream.print_blank()
         self.ostream.flush()
-
-    def print_convergence(self):
-        """
-        Prints convergence information.
-        """
-
-        valstr = '*** {:d} excited states '.format(self.nstates)
-        if self.is_converged:
-            valstr += 'converged'
-        else:
-            valstr += 'NOT converged'
-        valstr += ' in {:d} iterations. '.format(self.cur_iter + 1)
-        valstr += 'Time: {:.2f}'.format(tm.time() - self.start_time) + ' sec.'
-        self.ostream.print_header(valstr.ljust(92))
-        self.ostream.print_blank()

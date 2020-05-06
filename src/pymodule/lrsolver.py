@@ -1,34 +1,16 @@
 import numpy as np
 import time as tm
-import os
 
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import GridDriver
-from .veloxchemlib import MolecularGrid
-from .veloxchemlib import XCFunctional
-from .veloxchemlib import denmat
 from .veloxchemlib import mpi_master
-from .veloxchemlib import parse_xc_func
 from .profiler import Profiler
 from .distributedarray import DistributedArray
-from .aodensitymatrix import AODensityMatrix
 from .signalhandler import SignalHandler
-from .lrmatvecdriver import LinearResponseMatrixVectorDriver
-from .lrmatvecdriver import remove_linear_dependence_half
-from .lrmatvecdriver import orthogonalize_gram_schmidt_half
-from .lrmatvecdriver import normalize_half
-from .lrmatvecdriver import construct_ed_sd_half
-from .lrmatvecdriver import lrvec2mat
-from .lrmatvecdriver import get_rhs
-from .lrmatvecdriver import check_rsp_hdf5
-from .lrmatvecdriver import write_rsp_hdf5
-from .qqscheme import get_qq_scheme
-from .qqscheme import get_qq_type
+from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_frequencies
 
 
-class LinearResponseSolver:
+class LinearResponseSolver(LinearSolver):
     """
     Implements linear response solver.
 
@@ -43,32 +25,6 @@ class LinearResponseSolver:
         - b_operator: The B operator.
         - b_components: Cartesian components of the B operator.
         - frequencies: The frequencies.
-        - eri_thresh: The electron repulsion integrals screening threshold.
-        - qq_type: The electron repulsion integrals screening scheme.
-        - dft: The flag for running DFT.
-        - grid_level: The accuracy level of DFT grid.
-        - xcfun: The XC functional.
-        - pe: The flag for running polarizable embedding calculation.
-        - potfile: The name of the potential file for polarizable embedding.
-        - use_split_comm: The flag for using split communicators.
-        - conv_thresh: The convergence threshold for the solver.
-        - max_iter: The maximum number of solver iterations.
-        - cur_iter: Index of the current iteration.
-        - small_thresh: The norm threshold for a vector to be considered a zero
-          vector.
-        - lindep_thresh: The threshold for removing linear dependence in the
-          trial vectors.
-        - is_converged: The flag for convergence.
-        - comm: The MPI communicator.
-        - rank: The MPI rank.
-        - nodes: Number of MPI processes.
-        - ostream: The output stream.
-        - restart: The flag for restarting from checkpoint file.
-        - checkpoint_file: The name of checkpoint file.
-        - timing: The flag for printing timing information.
-        - profiling: The flag for printing profiling information.
-        - memory_profiling: The flag for printing memory usage.
-        - memory_tracing: The flag for tracing memory allocation using
     """
 
     def __init__(self, comm, ostream):
@@ -76,56 +32,14 @@ class LinearResponseSolver:
         Initializes linear response solver to default setup.
         """
 
+        super().__init__(comm, ostream)
+
         # operators and frequencies
         self.a_operator = 'dipole'
         self.a_components = 'xyz'
         self.b_operator = 'dipole'
         self.b_components = 'xyz'
         self.frequencies = (0,)
-
-        # ERI settings
-        self.eri_thresh = 1.0e-15
-        self.qq_type = 'QQ_DEN'
-
-        # dft
-        self.dft = False
-        self.grid_level = 4
-        self.xcfun = XCFunctional()
-
-        # polarizable embedding
-        self.pe = False
-        self.potfile = None
-
-        # split communicators
-        self.use_split_comm = False
-
-        # solver setup
-        self.conv_thresh = 1.0e-4
-        self.max_iter = 50
-        self.cur_iter = 0
-        self.small_thresh = 1.0e-10
-        self.lindep_thresh = 1.0e-6
-        self.is_converged = False
-
-        # mpi information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
-
-        # output stream
-        self.ostream = ostream
-
-        # restart information
-        self.restart = True
-        self.checkpoint_file = None
-
-        self.program_start_time = None
-        self.maximum_hours = None
-
-        self.timing = False
-        self.profiling = False
-        self.memory_profiling = False
-        self.memory_tracing = False
 
     def update_settings(self, rsp_dict, method_dict={}):
         """
@@ -137,6 +51,8 @@ class LinearResponseSolver:
             The dictionary of method rsp_dict.
         """
 
+        super().update_settings(rsp_dict, method_dict)
+
         if 'a_operator' in rsp_dict:
             self.a_operator = rsp_dict['a_operator'].lower()
         if 'a_components' in rsp_dict:
@@ -147,67 +63,6 @@ class LinearResponseSolver:
             self.b_components = rsp_dict['b_components'].lower()
         if 'frequencies' in rsp_dict:
             self.frequencies = parse_frequencies(rsp_dict['frequencies'])
-
-        if 'eri_thresh' in rsp_dict:
-            self.eri_thresh = float(rsp_dict['eri_thresh'])
-        if 'qq_type' in rsp_dict:
-            self.qq_type = rsp_dict['qq_type']
-
-        if 'conv_thresh' in rsp_dict:
-            self.conv_thresh = float(rsp_dict['conv_thresh'])
-        if 'max_iter' in rsp_dict:
-            self.max_iter = int(rsp_dict['max_iter'])
-        if 'lindep_thresh' in rsp_dict:
-            self.lindep_thresh = float(rsp_dict['lindep_thresh'])
-
-        if 'restart' in rsp_dict:
-            key = rsp_dict['restart'].lower()
-            self.restart = True if key == 'yes' else False
-        if 'checkpoint_file' in rsp_dict:
-            self.checkpoint_file = rsp_dict['checkpoint_file']
-
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
-
-        if 'timing' in rsp_dict:
-            key = rsp_dict['timing'].lower()
-            self.timing = True if key in ['yes', 'y'] else False
-        if 'profiling' in rsp_dict:
-            key = rsp_dict['profiling'].lower()
-            self.profiling = True if key in ['yes', 'y'] else False
-
-        if 'memory_profiling' in rsp_dict:
-            key = rsp_dict['memory_profiling'].lower()
-            self.memory_profiling = True if key in ['yes', 'y'] else False
-        if 'memory_tracing' in rsp_dict:
-            key = rsp_dict['memory_tracing'].lower()
-            self.memory_tracing = True if key in ['yes', 'y'] else False
-
-        if 'dft' in method_dict:
-            key = method_dict['dft'].lower()
-            self.dft = True if key == 'yes' else False
-        if 'grid_level' in method_dict:
-            self.grid_level = int(method_dict['grid_level'])
-        if 'xcfun' in method_dict:
-            if 'dft' not in method_dict:
-                self.dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Undefined XC functional')
-
-        if 'pe' in method_dict:
-            key = method_dict['pe'].lower()
-            self.pe = True if key == 'yes' else False
-        if 'potfile' in method_dict:
-            if 'pe' not in method_dict:
-                self.pe = True
-            self.potfile = method_dict['potfile']
-
-        if 'use_split_comm' in method_dict:
-            key = method_dict['use_split_comm'].lower()
-            self.use_split_comm = True if key == 'yes' else False
 
     def compute(self, molecule, basis, scf_tensors, v1=None):
         """
@@ -237,7 +92,7 @@ class LinearResponseSolver:
         })
 
         if self.rank == mpi_master():
-            self.print_header()
+            self.print_header('Linear Response Solver')
 
         self.start_time = tm.time()
 
@@ -248,84 +103,23 @@ class LinearResponseSolver:
             nalpha == nbeta,
             'LinearResponseSolver: not implemented for unrestricted case')
 
-        # make preparations
         if self.rank == mpi_master():
-            mo = scf_tensors['C']
-            ea = scf_tensors['E']
             nocc = nalpha
-            norb = mo.shape[1]
+            norb = scf_tensors['C'].shape[1]
+            orb_ene = scf_tensors['E']
 
-        # generate integration grid
-        if self.dft:
-            grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(self.grid_level)
+        # ERI information
+        eri_dict = self.init_eri(molecule, basis)
 
-            grid_t0 = tm.time()
-            molgrid = grid_drv.generate(molecule)
-            n_grid_points = molgrid.number_of_points()
-            self.ostream.print_info(
-                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
-                format(n_grid_points,
-                       tm.time() - grid_t0))
-            self.ostream.print_blank()
+        # DFT information
+        dft_dict = self.init_dft(molecule, scf_tensors)
 
-            if self.rank == mpi_master():
-                gs_density = AODensityMatrix([scf_tensors['D'][0]], denmat.rest)
-            else:
-                gs_density = AODensityMatrix()
-            gs_density.broadcast(self.rank, self.comm)
+        # PE information
+        pe_dict = self.init_pe(molecule, basis)
 
-            dft_func_label = self.xcfun.get_func_label().upper()
-        else:
-            molgrid = MolecularGrid()
-            gs_density = AODensityMatrix()
-            dft_func_label = 'HF'
-
-        # set up polarizable embedding
-        if self.pe:
-            from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
-            V_es = pe_drv.compute_multipole_potential_integrals()
-
-            pot_info = "Reading polarizable embedding potential: {}".format(
-                self.potfile)
-            self.ostream.print_info(pot_info)
-            self.ostream.print_blank()
-
-            with open(self.potfile, 'r') as f_pot:
-                potfile_text = os.linesep.join(f_pot.readlines())
-        else:
-            pe_drv = None
-            V_es = None
-            potfile_text = ''
-
-        # generate screening for ERI
-
-        if self.use_split_comm:
-            self.use_split_comm = ((self.dft or self.pe) and self.nodes >= 8)
-
-        if self.use_split_comm:
-            screening = None
-            valstr = 'ERI'
-            if self.dft:
-                valstr += '/DFT'
-            if self.pe:
-                valstr += '/PE'
-            self.ostream.print_info(
-                'Using sub-communicators for {}.'.format(valstr))
-            self.ostream.print_blank()
-        else:
-            eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-            screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                        self.eri_thresh, molecule, basis)
-
-        e2x_drv = LinearResponseMatrixVectorDriver(self.comm,
-                                                   self.use_split_comm,
-                                                   self.ostream)
-        e2x_drv.update_settings(self.eri_thresh, self.qq_type, self.dft,
-                                self.xcfun, self.pe, self.potfile)
         timing_dict = {}
 
+        # right-hand side (gradient)
         valid_v1 = False
         if self.rank == mpi_master():
             valid_v1 = (v1 is not None)
@@ -333,14 +127,15 @@ class LinearResponseSolver:
 
         if not valid_v1:
             nonlinear_flag = False
-            b_rhs = get_rhs(self.b_operator, self.b_components, molecule, basis,
-                            scf_tensors, self.rank, self.comm)
+            b_rhs = self.get_rhs(self.b_operator, self.b_components, molecule,
+                                 basis, scf_tensors)
             if self.rank == mpi_master():
                 v1 = {(op, w): v for op, v in zip(self.b_components, b_rhs)
                       for w in self.frequencies}
         else:
             nonlinear_flag = True
 
+        # operators, frequencies and preconditioners
         if self.rank == mpi_master():
             op_freq_keys = list(v1.keys())
         else:
@@ -349,7 +144,9 @@ class LinearResponseSolver:
 
         if self.rank == mpi_master():
             freqs = set([w for (op, w) in op_freq_keys])
-            precond = {w: self.get_precond(ea, nocc, norb, w) for w in freqs}
+            precond = {
+                w: self.get_precond(orb_ene, nocc, norb, w) for w in freqs
+            }
         else:
             precond = None
 
@@ -363,11 +160,9 @@ class LinearResponseSolver:
         # check validity of checkpoint file
         if self.restart:
             if self.rank == mpi_master():
-                self.restart = check_rsp_hdf5(
-                    self.checkpoint_file, rsp_vector_labels,
-                    molecule.nuclear_repulsion_energy(),
-                    molecule.elem_ids_to_numpy(), basis.get_label(),
-                    dft_func_label, potfile_text, self.ostream)
+                self.restart = self.check_rsp_hdf5(self.checkpoint_file,
+                                                   rsp_vector_labels, molecule,
+                                                   basis, dft_dict, pe_dict)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
@@ -399,10 +194,9 @@ class LinearResponseSolver:
             else:
                 bger, bung = None, None
 
-            e2bger, e2bung = e2x_drv.e2n_half_size(bger, bung, scf_tensors,
-                                                   screening, molecule, basis,
-                                                   molgrid, gs_density, V_es,
-                                                   pe_drv, timing_dict)
+            e2bger, e2bung = self.e2n_half_size(bger, bung, molecule, basis,
+                                                scf_tensors, eri_dict, dft_dict,
+                                                pe_dict, timing_dict)
 
             dist_bger = DistributedArray(bger, self.comm)
             dist_bung = DistributedArray(bung, self.comm)
@@ -422,7 +216,7 @@ class LinearResponseSolver:
 
         signal_handler = SignalHandler()
         signal_handler.add_sigterm_function(
-            self.graceful_exit, molecule, basis, dft_func_label, potfile_text,
+            self.graceful_exit, molecule, basis, dft_dict, pe_dict,
             [dist_bger, dist_bung, dist_e2bger, dist_e2bung], rsp_vector_labels)
 
         # start iterations
@@ -577,9 +371,9 @@ class LinearResponseSolver:
             profiler.stop_timer(iteration, 'Orthonorm.')
             profiler.start_timer(iteration, 'FockBuild')
 
-            new_e2bger, new_e2bung = e2x_drv.e2n_half_size(
-                new_trials_ger, new_trials_ung, scf_tensors, screening,
-                molecule, basis, molgrid, gs_density, V_es, pe_drv, timing_dict)
+            new_e2bger, new_e2bung = self.e2n_half_size(
+                new_trials_ger, new_trials_ung, molecule, basis, scf_tensors,
+                eri_dict, dft_dict, pe_dict, timing_dict)
 
             dist_bger.append(DistributedArray(new_trials_ger, self.comm),
                              axis=1)
@@ -593,15 +387,8 @@ class LinearResponseSolver:
 
             new_e2bger, new_e2bung = None, None
 
-            if self.maximum_hours is not None:
-                remaining_hours = (self.maximum_hours -
-                                   (tm.time() - self.program_start_time) / 3600)
-                if self.maximum_hours < 10.0:
-                    if remaining_hours < 0.1 * self.maximum_hours:
-                        signal_handler.raise_signal('SIGTERM')
-                else:
-                    if remaining_hours < 1.0:
-                        signal_handler.raise_signal('SIGTERM')
+            if self.need_graceful_exit():
+                signal_handler.raise_signal('SIGTERM')
 
             profiler.stop_timer(iteration, 'FockBuild')
             if self.dft or self.pe:
@@ -612,13 +399,13 @@ class LinearResponseSolver:
 
         signal_handler.remove_sigterm_function()
 
-        self.write_checkpoint(molecule, basis, dft_func_label, potfile_text,
+        self.write_checkpoint(molecule, basis, dft_dict, pe_dict,
                               [dist_bger, dist_bung, dist_e2bger, dist_e2bung],
                               rsp_vector_labels)
 
         # converged?
         if self.rank == mpi_master():
-            self.print_convergence()
+            self.print_convergence('Linear response')
 
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
@@ -628,8 +415,8 @@ class LinearResponseSolver:
 
         # calculate response functions
         if not nonlinear_flag:
-            a_rhs = get_rhs(self.a_operator, self.a_components, molecule, basis,
-                            scf_tensors, self.rank, self.comm)
+            a_rhs = self.get_rhs(self.a_operator, self.a_components, molecule,
+                                 basis, scf_tensors)
 
             if self.rank == mpi_master() and self.is_converged:
                 va = {op: v for op, v in zip(self.a_components, a_rhs)}
@@ -649,123 +436,13 @@ class LinearResponseSolver:
             if self.rank == mpi_master() and self.is_converged:
                 kappas = {}
                 for (op, freq), x in solutions.items():
-                    kappas[(op, freq)] = lrvec2mat(x, nocc, norb)
+                    kappas[(op, freq)] = self.lrvec2mat(x, nocc, norb)
                 return {
                     'solutions': solutions,
                     'kappas': kappas,
                 }
             else:
                 return {}
-
-    def write_checkpoint(self, molecule, basis, dft_func_label, potfile_text,
-                         dist_arrays, labels):
-        """
-        Writes checkpoint file.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The basis set.
-        :param dft_func_label:
-            The name of the density functional.
-        :param potfile_text:
-            The text in the potential file.
-        :param dist_arrays:
-            The list of distributed arrays.
-        :param labels:
-            The list of labels.
-        """
-
-        if self.checkpoint_file is None:
-            return
-
-        if self.rank == mpi_master():
-            success = write_rsp_hdf5(self.checkpoint_file, [], [],
-                                     molecule.nuclear_repulsion_energy(),
-                                     molecule.elem_ids_to_numpy(),
-                                     basis.get_label(), dft_func_label,
-                                     potfile_text, self.ostream)
-        else:
-            success = False
-        success = self.comm.bcast(success, root=mpi_master())
-
-        if success:
-            for dist_array, label in zip(dist_arrays, labels):
-                dist_array.append_to_hdf5_file(self.checkpoint_file, label)
-
-    def graceful_exit(self, molecule, basis, dft_func_label, potfile_text,
-                      dist_arrays, labels):
-        """
-        Gracefully exits SCF driver.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The basis set.
-        :param dft_func_label:
-            The name of the density functional.
-        :param potfile_text:
-            The text in the potential file.
-        :param dist_arrays:
-            The list of distributed arrays.
-        :param labels:
-            The list of labels.
-
-        :return:
-            The return code.
-        """
-
-        self.ostream.print_blank()
-        self.ostream.print_info('Preparing for a graceful termination...')
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-        self.write_checkpoint(molecule, basis, dft_func_label, potfile_text,
-                              dist_arrays, labels)
-
-        self.ostream.print_info('...done.')
-        self.ostream.print_blank()
-        self.ostream.print_info('Exiting program.')
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-        return 0
-
-    def print_header(self):
-        """
-        Prints linear response solver setup header to output stream.
-        """
-
-        self.ostream.print_blank()
-        self.ostream.print_header('Linear Response Solver Setup')
-        self.ostream.print_header(30 * '=')
-        self.ostream.print_blank()
-
-        str_width = 60
-
-        cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
-        self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Convergence Threshold           : ' + \
-            '{:.1e}'.format(self.conv_thresh)
-        self.ostream.print_header(cur_str.ljust(str_width))
-
-        cur_str = 'ERI Screening Scheme            : ' + get_qq_type(
-            self.qq_type)
-        self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'ERI Screening Threshold         : ' + \
-            '{:.1e}'.format(self.eri_thresh)
-        self.ostream.print_header(cur_str.ljust(str_width))
-
-        if self.dft:
-            cur_str = 'Exchange-Correlation Functional : '
-            cur_str += self.xcfun.get_func_label().upper()
-            self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'Molecular Grid Level            : ' + str(
-                self.grid_level)
-            self.ostream.print_header(cur_str.ljust(str_width))
-
-        self.ostream.print_blank()
-        self.ostream.flush()
 
     def print_iteration(self, relative_residual_norm, xvs):
         """
@@ -795,39 +472,6 @@ class LinearResponseSolver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def print_convergence(self):
-        """
-        Prints information after convergence.
-        """
-
-        width = 92
-        output_conv = '*** '
-        if self.is_converged:
-            output_conv += 'Linear response converged'
-        else:
-            output_conv += 'Linear response NOT converged'
-        output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
-        output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
-        self.ostream.print_header(output_conv.ljust(width))
-        self.ostream.print_blank()
-        self.ostream.print_blank()
-
-    def check_convergence(self, relative_residual_norm):
-        """
-        Checks convergence.
-
-        :param relative_residual_norm:
-            Relative residual norms.
-        """
-
-        if self.rank == mpi_master():
-            max_residual = max(relative_residual_norm.values())
-            if max_residual < self.conv_thresh:
-                self.is_converged = True
-
-        self.is_converged = self.comm.bcast(self.is_converged,
-                                            root=mpi_master())
-
     def initial_guess(self, v1, precond):
         """
         Creating initial guess for the linear response solver.
@@ -856,33 +500,6 @@ class LinearResponseSolver:
 
         return ig
 
-    def decomp_grad(self, grad):
-        """
-        Decomposes gradient into gerade and ungerade parts.
-
-        :param grad:
-            The gradient.
-
-        :return:
-            A tuple containing gerade and ungerade parts of gradient.
-        """
-
-        assert_msg_critical(grad.ndim == 1, 'decomp_grad: Expecting a 1D array')
-
-        assert_msg_critical(grad.shape[0] % 2 == 0,
-                            'decomp_grad: size of array should be even')
-
-        half_size = grad.shape[0] // 2
-
-        grad_T = np.zeros(grad.shape)
-        grad_T[:half_size] = grad[half_size:]
-        grad_T[half_size:] = grad[:half_size]
-
-        ger = 0.5 * (grad + grad_T)[:half_size]
-        ung = 0.5 * (grad - grad_T)[:half_size]
-
-        return ger.T, ung.T
-
     def get_precond(self, orb_ene, nocc, norb, w):
         """
         Constructs the preconditioner matrix.
@@ -902,7 +519,7 @@ class LinearResponseSolver:
 
         # spawning needed components
 
-        ediag, sdiag = construct_ed_sd_half(orb_ene, nocc, norb)
+        ediag, sdiag = self.construct_ed_sd_half(orb_ene, nocc, norb)
 
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2
@@ -937,28 +554,17 @@ class LinearResponseSolver:
 
         return np.hstack((v_out_rg, v_out_ru))
 
-    def setup_trials(self,
-                     vectors,
-                     precond=None,
-                     dist_bger=None,
-                     dist_bung=None,
-                     renormalize=True):
+    def precond_trials(self, vectors, precond=None):
         """
-        Computes orthonormalized trial vectors.
+        Applies preconditioner to trial vectors.
 
         :param vectors:
             The set of vectors.
         :param precond:
             The preconditioner.
-        :param dist_bger:
-            The distributed gerade subspace.
-        :param dist_bung:
-            The distributed ungerade subspace.
-        :param renormalize:
-            The flag for normalization.
 
         :return:
-            The orthonormalized gerade and ungerade trial vectors.
+            The preconditioned gerade and ungerade trial vectors.
         """
 
         if self.rank == mpi_master():
@@ -982,31 +588,6 @@ class LinearResponseSolver:
             new_ger, new_ung = self.decomp_trials(new_trials)
         else:
             new_ger, new_ung = None, None
-
-        if dist_bger is not None:
-            # t = t - (b (b.T t))
-            dist_new_ger = DistributedArray(new_ger, self.comm)
-            bT_new_ger = dist_bger.matmul_AtB_allreduce(dist_new_ger, 2.0)
-            new_ger_proj = dist_bger.matmul_AB(bT_new_ger)
-            if self.rank == mpi_master():
-                new_ger -= new_ger_proj
-
-        if dist_bung is not None:
-            # t = t - (b (b.T t))
-            dist_new_ung = DistributedArray(new_ung, self.comm)
-            bT_new_ung = dist_bung.matmul_AtB_allreduce(dist_new_ung, 2.0)
-            new_ung_proj = dist_bung.matmul_AB(bT_new_ung)
-            if self.rank == mpi_master():
-                new_ung -= new_ung_proj
-
-        if self.rank == mpi_master() and renormalize:
-            new_ger = remove_linear_dependence_half(new_ger, self.lindep_thresh)
-            new_ger = orthogonalize_gram_schmidt_half(new_ger)
-            new_ger = normalize_half(new_ger)
-
-            new_ung = remove_linear_dependence_half(new_ung, self.lindep_thresh)
-            new_ung = orthogonalize_gram_schmidt_half(new_ung)
-            new_ung = normalize_half(new_ung)
 
         return new_ger, new_ung
 
