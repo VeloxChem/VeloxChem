@@ -526,6 +526,8 @@ class ScfDriver:
 
         for i in self.get_scf_range():
 
+            iter_start_time = tm.time()
+
             profiler.start_timer(i, 'FockBuild')
 
             vxc_mat, e_pe, V_pe = self.comp_2e_fock(fock_mat, den_mat, molecule,
@@ -559,9 +561,6 @@ class ScfDriver:
 
             self.update_mol_orbs_phase()
 
-            if self.need_graceful_exit():
-                self.graceful_exit(molecule, ao_basis)
-
             self.density = AODensityMatrix(den_mat)
 
             den_mat = self.gen_new_density(molecule)
@@ -573,6 +572,11 @@ class ScfDriver:
                 profiler.update_timer(i, self.timing_dict)
 
             profiler.check_memory_usage('Iteration {:d}'.format(i + 1))
+
+            iter_in_hours = (tm.time() - iter_start_time) / 3600
+
+            if self.need_graceful_exit(iter_in_hours):
+                self.graceful_exit(molecule, ao_basis)
 
             if self.is_converged:
                 break
@@ -604,9 +608,12 @@ class ScfDriver:
         if self.rank == mpi_master():
             self.print_scf_finish(diis_start_time)
 
-    def need_graceful_exit(self):
+    def need_graceful_exit(self, iter_in_hours):
         """
         Checks if a graceful exit is needed.
+
+        :param iter_in_hours:
+            The time spent in one iteration (in hours).
 
         :return:
             True if a graceful exit is needed, False otherwise.
@@ -615,12 +622,10 @@ class ScfDriver:
         if self.maximum_hours is not None:
             remaining_hours = (self.maximum_hours -
                                (tm.time() - self.program_start_time) / 3600)
-            if self.maximum_hours < 10.0:
-                if remaining_hours < 0.1 * self.maximum_hours:
-                    return True
-            else:
-                if remaining_hours < 1.0:
-                    return True
+            # exit gracefully when the remaining time is not sufficient to
+            # complete the next iteration (plus 25% to be on the safe side).
+            if remaining_hours < iter_in_hours * 1.25:
+                return True
         return False
 
     def graceful_exit(self, molecule, basis):

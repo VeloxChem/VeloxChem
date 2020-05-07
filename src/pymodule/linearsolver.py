@@ -724,9 +724,12 @@ class LinearSolver:
 
         sys.exit(0)
 
-    def need_graceful_exit(self):
+    def need_graceful_exit(self, next_iter_in_hours):
         """
         Checks if a graceful exit is needed.
+
+        :param: next_iter_in_hours:
+            The predicted time for the next iteration in hours.
 
         :return:
             True if a graceful exit is needed, False otherwise.
@@ -735,12 +738,10 @@ class LinearSolver:
         if self.maximum_hours is not None:
             remaining_hours = (self.maximum_hours -
                                (tm.time() - self.program_start_time) / 3600)
-            if self.maximum_hours < 10.0:
-                if remaining_hours < 0.1 * self.maximum_hours:
-                    return True
-            else:
-                if remaining_hours < 1.0:
-                    return True
+            # exit gracefully when the remaining time is not sufficient to
+            # complete the next iteration (plus 25% to be on the safe side).
+            if remaining_hours < next_iter_in_hours * 1.25:
+                return True
         return False
 
     def print_header(self, title, nstates=None, n_points=None):

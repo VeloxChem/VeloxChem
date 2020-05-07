@@ -220,8 +220,12 @@ class LinearResponseSolver(LinearSolver):
             self.graceful_exit, molecule, basis, dft_dict, pe_dict,
             [dist_bger, dist_bung, dist_e2bger, dist_e2bung], rsp_vector_labels)
 
+        iter_per_trail_in_hours = None
+
         # start iterations
         for iteration in range(self.max_iter):
+
+            iter_start_time = tm.time()
 
             profiler.start_timer(iteration, 'ReducedSpace')
 
@@ -359,6 +363,8 @@ class LinearResponseSolver(LinearSolver):
 
             residuals.clear()
 
+            profiler.stop_timer(iteration, 'Orthonorm.')
+
             if self.rank == mpi_master():
                 assert_msg_critical(
                     new_trials_ger.any() or new_trials_ung.any(),
@@ -369,7 +375,19 @@ class LinearResponseSolver(LinearSolver):
                 if new_trials_ung is None or not new_trials_ung.any():
                     new_trials_ung = np.zeros((new_trials_ger.shape[0], 0))
 
-            profiler.stop_timer(iteration, 'Orthonorm.')
+                n_new_trials = new_trials_ger.shape[1] + new_trials_ung.shape[1]
+            else:
+                n_new_trials = None
+            n_new_trials = self.comm.bcast(n_new_trials, root=mpi_master())
+
+            if iter_per_trail_in_hours is not None:
+                next_iter_in_hours = iter_per_trail_in_hours * n_new_trials
+                if self.need_graceful_exit(next_iter_in_hours):
+                    self.graceful_exit(
+                        molecule, basis, dft_dict, pe_dict,
+                        [dist_bger, dist_bung, dist_e2bger, dist_e2bung],
+                        rsp_vector_labels)
+
             profiler.start_timer(iteration, 'FockBuild')
 
             new_e2bger, new_e2bung = self.e2n_half_size(
@@ -388,11 +406,8 @@ class LinearResponseSolver(LinearSolver):
 
             new_e2bger, new_e2bung = None, None
 
-            if self.need_graceful_exit():
-                self.graceful_exit(
-                    molecule, basis, dft_dict, pe_dict,
-                    [dist_bger, dist_bung, dist_e2bger, dist_e2bung],
-                    rsp_vector_labels)
+            iter_in_hours = (tm.time() - iter_start_time) / 3600
+            iter_per_trail_in_hours = iter_in_hours / n_new_trials
 
             profiler.stop_timer(iteration, 'FockBuild')
             if self.dft or self.pe:
