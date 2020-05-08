@@ -24,15 +24,45 @@ class Profiler:
         - pr: The Profile object.
     """
 
-    def __init__(self, settings):
+    def __init__(self, settings=None):
         """
         Initializes multifunctional profiler.
+
+        :param settings:
+            The dictionary containing profiler settings.
         """
 
-        self.timing = settings['timing']
-        self.profiling = settings['profiling']
-        self.memory_profiling = settings['memory_profiling']
-        self.memory_tracing = settings['memory_tracing']
+        self.timing = False
+        self.profiling = False
+        self.memory_profiling = False
+        self.memory_tracing = False
+
+        self.start_time = None
+        self.start_avail_mem = None
+
+        self.timing_list = None
+        self.memory_usage = None
+        self.pr = None
+
+        if settings is not None:
+            self.begin(settings)
+
+    def begin(self, settings):
+        """
+        Starts the multifunctional profiler.
+
+        :param settings:
+            The dictionary containing profiler settings.
+        """
+
+        if 'timing' in settings:
+            self.timing = settings['timing']
+        if 'profiling' in settings:
+            self.profiling = settings['profiling']
+        if 'memory_profiling' in settings:
+            self.memory_profiling = settings['memory_profiling']
+        if 'memory_tracing' in settings:
+            self.memory_tracing = settings['memory_tracing']
 
         self.start_time = tm.time()
         self.start_avail_mem = psutil.virtual_memory().available
@@ -48,6 +78,21 @@ class Profiler:
         if self.memory_tracing:
             import tracemalloc
             tracemalloc.start()
+
+    def end(self, ostream, scf_flag=False):
+        """
+        Stops the profiler and print the output.
+
+        :param ostream:
+            The output stream.
+        :param scf_flag:
+            The flag for SCF.
+        """
+
+        self.print_timing(ostream, scf_flag)
+        self.print_profiling_summary(ostream)
+        self.print_memory_usage(ostream, scf_flag)
+        self.print_memory_tracing(ostream)
 
     def print_profiling_summary(self, ostream):
         """
@@ -151,12 +196,14 @@ class Profiler:
             for key, val in timing_dict.items():
                 self.timing_list[iteration][key] = val
 
-    def print_timing(self, ostream):
+    def print_timing(self, ostream, scf_flag=False):
         """
         Prints timing.
 
         :param ostream:
             The output stream.
+        :param scf:
+            The flag for SCF.
         """
 
         if self.timing:
@@ -174,7 +221,10 @@ class Profiler:
             ostream.print_header(valstr.ljust(width))
 
             for i, d in enumerate(self.timing_list):
-                valstr = '{:<18s}'.format('Iteration {:d}'.format(i + 1))
+                if scf_flag and i == 0:
+                    continue
+                index = i if scf_flag else i + 1
+                valstr = '{:<18s}'.format('Iteration {:d}'.format(index))
                 for key in keys:
                     if key in d:
                         valstr += ' {:12.2f}'.format(d[key])
@@ -199,12 +249,14 @@ class Profiler:
             self.memory_usage.append(
                 (tm.time() - self.start_time, used_mem, remark))
 
-    def print_memory_usage(self, ostream):
+    def print_memory_usage(self, ostream, scf_flag=False):
         """
         Prints memory usage.
 
         :param ostream:
             The output stream.
+        :param scf_flag:
+            The flag for SCF.
         """
 
         if self.memory_profiling:
@@ -218,6 +270,8 @@ class Profiler:
             ostream.print_header(mem_str.ljust(92))
 
             for dt, mem, remark in self.memory_usage:
+                if scf_flag and remark.lower() == 'iteration 0':
+                    continue
                 mem_str = '{:.2f} sec'.format(dt).ljust(20)
                 mem_str += ' {:20s}'.format(self.memory_to_string(mem))
                 mem_str += ' {:s}'.format(remark)

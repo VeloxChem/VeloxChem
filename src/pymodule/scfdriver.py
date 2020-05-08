@@ -264,12 +264,7 @@ class ScfDriver:
             The minimal AO basis set.
         """
 
-        profiler = Profiler({
-            'timing': self.timing and not self.first_step,
-            'profiling': self.profiling and not self.first_step,
-            'memory_profiling': self.memory_profiling and not self.first_step,
-            'memory_tracing': self.memory_tracing and not self.first_step,
-        })
+        profiler = Profiler()
 
         self.scf_start_time = tm.time()
 
@@ -372,6 +367,8 @@ class ScfDriver:
         self.fock_matrices_beta.clear()
         self.den_matrices_beta.clear()
 
+        profiler.end(self.ostream, scf_flag=True)
+
         if not self.is_converged:
             self.ostream.print_header(
                 '*** Warning: SCF is not converged!'.ljust(92))
@@ -389,21 +386,6 @@ class ScfDriver:
             self.mol_orbs.print_orbitals(molecule, ao_basis, False,
                                          self.ostream)
 
-            if (self.checkpoint_file and
-                    isinstance(self.checkpoint_file, str) and
-                    os.path.isfile(self.checkpoint_file)):
-                checkpoint_text = "Checkpoint written to file: "
-                checkpoint_text += self.checkpoint_file
-                self.ostream.print_info(checkpoint_text)
-                self.ostream.print_blank()
-
-        profiler.print_timing(self.ostream)
-        profiler.print_profiling_summary(self.ostream)
-
-        profiler.check_memory_usage('End of SCF')
-        profiler.print_memory_usage(self.ostream)
-        profiler.print_memory_tracing(self.ostream)
-
     def write_checkpoint(self, nuclear_charges, basis_set):
         """
         Writes molecular orbitals to checkpoint file.
@@ -418,6 +400,10 @@ class ScfDriver:
             if self.checkpoint_file and isinstance(self.checkpoint_file, str):
                 self.mol_orbs.write_hdf5(self.checkpoint_file, nuclear_charges,
                                          basis_set)
+                self.ostream.print_blank()
+                checkpoint_text = "Checkpoint written to file: "
+                checkpoint_text += self.checkpoint_file
+                self.ostream.print_info(checkpoint_text)
 
     def comp_diis(self, molecule, ao_basis, min_basis, profiler):
         """
@@ -432,6 +418,14 @@ class ScfDriver:
         :param profiler:
             The profiler.
         """
+
+        if not self.first_step:
+            profiler.begin({
+                'timing': self.timing,
+                'profiling': self.profiling,
+                'memory_profiling': self.memory_profiling,
+                'memory_tracing': self.memory_tracing,
+            })
 
         diis_start_time = tm.time()
 
@@ -571,7 +565,7 @@ class ScfDriver:
             if (self.dft or self.pe) and not self.first_step:
                 profiler.update_timer(i, self.timing_dict)
 
-            profiler.check_memory_usage('Iteration {:d}'.format(i + 1))
+            profiler.check_memory_usage('Iteration {:d}'.format(i))
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
 
@@ -608,6 +602,8 @@ class ScfDriver:
         if self.rank == mpi_master():
             self.print_scf_finish(diis_start_time)
 
+        profiler.check_memory_usage('End of SCF')
+
     def need_graceful_exit(self, iter_in_hours):
         """
         Checks if a graceful exit is needed.
@@ -643,13 +639,11 @@ class ScfDriver:
 
         self.ostream.print_blank()
         self.ostream.print_info('Preparing for a graceful termination...')
-        self.ostream.print_blank()
-        self.ostream.print_info('Writing checkpoint file {} ...'.format(
-            self.checkpoint_file))
         self.ostream.flush()
 
         self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
 
+        self.ostream.print_blank()
         self.ostream.print_info('...done.')
         self.ostream.print_blank()
         self.ostream.print_info('Exiting program.')
