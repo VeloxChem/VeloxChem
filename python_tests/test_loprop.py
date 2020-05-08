@@ -54,7 +54,10 @@ def test_loprop_called_from_main(mock_mpi, mock_scf, mock_uscf, sample, tmpdir):
 
     # given
     task = mock_mpi()
-    task.input_dict = {'jobs': {'task': 'loprop'}, 'loprop': {}}
+    task.input_dict = {
+        'jobs': {'task': 'loprop', 'maximum_hours': 1},
+        'loprop': {}
+    }
     input_file = f'{tmpdir/"water.inp"}'
     with open(input_file, 'w') as f:
         f.write(sample)
@@ -79,7 +82,10 @@ def test_scf_called_from_main(mock_mpi, mock_scf, mock_uscf, sample, tmpdir):
 
     # given
     task = mock_mpi()
-    task.input_dict = {'jobs': {'task': 'loprop'}, 'loprop': {}}
+    task.input_dict = {
+        'jobs': {'task': 'loprop', 'maximum_hours': 1},
+        'loprop': {}
+    }
     input_file = f'{tmpdir/"water.inp"}'
     with open(input_file, 'w') as f:
         f.write(sample)
@@ -343,6 +349,7 @@ class TestIntegrations:
             """
             @jobs
             task: loprop
+            maximum_hours: 1
             @end
 
             @method settings
