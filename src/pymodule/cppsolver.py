@@ -350,7 +350,7 @@ class ComplexResponse(LinearSolver):
                 v1 = {(op, w): v for op, v in zip(self.b_components, b_rhs)
                       for w in self.frequencies}
         else:
-            nonlinear_flag = False
+            nonlinear_flag = True
 
         # operators, frequencies and preconditioners
         if self.rank == mpi_master():
