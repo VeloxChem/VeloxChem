@@ -164,8 +164,9 @@ class Profiler:
         """
 
         if self.timing:
-            if iteration == len(self.timing_list):
-                self.timing_list.append({})
+            if iteration >= len(self.timing_list):
+                num = iteration - len(self.timing_list) + 1
+                self.timing_list += [{}] * num
             self.timing_list[iteration][label] = tm.time()
 
     def stop_timer(self, iteration, label):

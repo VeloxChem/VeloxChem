@@ -520,12 +520,22 @@ class ScfDriver:
 
         for i in self.get_scf_range():
 
+            # set the current number of SCF iterations
+            # (note the extra SCF cycle when starting from scratch)
+            if self.restart:
+                self.num_iter = i + 1
+            else:
+                self.num_iter = i
+
             iter_start_time = tm.time()
 
-            profiler.start_timer(i, 'FockBuild')
+            profiler.start_timer(self.num_iter, 'FockBuild')
 
             vxc_mat, e_pe, V_pe = self.comp_2e_fock(fock_mat, den_mat, molecule,
                                                     ao_basis, qq_data, e_grad)
+
+            profiler.stop_timer(self.num_iter, 'FockBuild')
+            profiler.start_timer(self.num_iter, 'FockDiag')
 
             e_ee, e_kin, e_en = self.comp_energy(fock_mat, vxc_mat, e_pe,
                                                  kin_mat, npot_mat, den_mat)
@@ -534,7 +544,7 @@ class ScfDriver:
 
             e_grad = self.comp_gradient(fock_mat, ovl_mat, den_mat, oao_mat)
 
-            self.set_skip_iter_flag(i, e_grad)
+            self.set_skip_iter_flag(e_grad)
 
             diff_den = self.comp_density_change(den_mat, self.density)
 
@@ -545,9 +555,6 @@ class ScfDriver:
             self.print_iter_data(i)
 
             self.store_diis_data(i, fock_mat, den_mat)
-
-            profiler.stop_timer(i, 'FockBuild')
-            profiler.start_timer(i, 'FockDiag')
 
             eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
@@ -561,11 +568,11 @@ class ScfDriver:
 
             den_mat.broadcast(self.rank, self.comm)
 
-            profiler.stop_timer(i, 'FockDiag')
+            profiler.stop_timer(self.num_iter, 'FockDiag')
             if (self.dft or self.pe) and not self.first_step:
-                profiler.update_timer(i, self.timing_dict)
+                profiler.update_timer(self.num_iter, self.timing_dict)
 
-            profiler.check_memory_usage('Iteration {:d}'.format(i))
+            profiler.check_memory_usage('Iteration {:d}'.format(self.num_iter))
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
 
@@ -785,18 +792,13 @@ class ScfDriver:
 
         return AODensityMatrix()
 
-    def set_skip_iter_flag(self, i, e_grad):
+    def set_skip_iter_flag(self, e_grad):
         """
-        Sets SCF iteration skiping flag based on iteration number and C2-DIIS
-        switch on threshold.
+        Sets SCF iteration skiping flag based on C2-DIIS switch on threshold.
 
-        :param i:
-            The number of current SCF iteration.
         :param e_grad:
             The electronic gradient at current SCF iteration.
         """
-
-        self.num_iter = i
 
         self.use_level_shift = False
 
@@ -1329,7 +1331,7 @@ class ScfDriver:
 
         self.is_converged = False
 
-        if len(self.iter_data) > 1:
+        if self.num_iter > 0:
 
             e_elec, de_elec, e_grad, diff_den = self.iter_data[-1]
 
@@ -1477,20 +1479,20 @@ class ScfDriver:
                 return
 
             # DIIS or second step in two level DIIS
-            if i > 0:
+            if self.num_iter > 0:
 
-                if len(self.iter_data) > 0:
+                if self.iter_data:
                     te, diff_te, e_grad, diff_den = self.iter_data[-1]
 
-                if i == 1:
+                if self.num_iter == 1:
                     diff_te = 0.0
                     diff_den = 0.0
 
-                exec_str = " " + (str(i)).rjust(3) + 4 * " "
-                exec_str += ("{:7.12f}".format(te)).center(27) + 3 * " "
-                exec_str += ("{:5.10f}".format(diff_te)).center(17) + 3 * " "
-                exec_str += ("{:5.8f}".format(e_grad)).center(15) + 3 * " "
-                exec_str += ("{:5.8f}".format(diff_den)).center(15) + " "
+                exec_str = ' ' + (str(self.num_iter)).rjust(3) + 4 * ' '
+                exec_str += ('{:7.12f}'.format(te)).center(27) + 3 * ' '
+                exec_str += ('{:5.10f}'.format(diff_te)).center(17) + 3 * ' '
+                exec_str += ('{:5.8f}'.format(e_grad)).center(15) + 3 * ' '
+                exec_str += ('{:5.8f}'.format(diff_den)).center(15) + ' '
 
                 self.ostream.print_header(exec_str)
                 self.ostream.flush()
