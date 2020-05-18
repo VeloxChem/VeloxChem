@@ -1,6 +1,7 @@
 import numpy as np
 import time as tm
 import itertools
+import ctypes
 import psutil
 import sys
 import os
@@ -356,16 +357,15 @@ class LinearSolver:
         if self.rank == mpi_master():
             # compute maximum batch size from available memory
             avail_mem = psutil.virtual_memory().available
-            mem_per_mat = mo.shape[0]**2 * 8
+            mem_per_mat = mo.shape[0]**2 * ctypes.sizeof(ctypes.c_double)
             nthreads = int(os.environ['OMP_NUM_THREADS'])
             max_batch_size = int(avail_mem / mem_per_mat / (0.625 * nthreads))
-            max_batch_size = max(1, min(100, max_batch_size))
+            max_batch_size = max(1, max_batch_size)
 
             # set batch size
             batch_size = self.batch_size
             if batch_size is None:
-                batch_size = len(dks)
-            batch_size = min(batch_size, max_batch_size)
+                batch_size = min(100, len(dks), max_batch_size)
 
             # get number of batches
             num_batches = len(dks) // batch_size
