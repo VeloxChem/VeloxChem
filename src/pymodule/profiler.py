@@ -321,6 +321,30 @@ class Profiler:
 
         return self.memory_to_string(self.comp_memory_object(obj))
 
+    def print_memory_subspace(self, d, ostream):
+        """
+        Prints memory usage in subspace solver.
+
+        :param d:
+            The dictionary containing the data used in subspace.
+        :param ostream:
+            The output stream.
+        """
+
+        mem_usage, mem_detail = self.get_memory_dictionary(d)
+        mem_avail = self.get_available_memory()
+
+        ostream.print_info(
+            '{:s} of memory used for subspace procedure on the master node'.
+            format(mem_usage))
+        if self.memory_profiling:
+            for m in mem_detail:
+                ostream.print_info('  {:<15s} {:s}'.format(*m))
+        ostream.print_info(
+            '{:s} of memory available for the solver on the master node'.format(
+                mem_avail))
+        ostream.print_blank()
+
     def get_memory_dictionary(self, d):
         """
         Gets memory usage of a dictionary.
