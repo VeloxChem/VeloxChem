@@ -103,6 +103,8 @@ class MpiTask:
             self.molecule = Molecule.from_dict(self.input_dict['molecule'])
 
             self.ostream.print_block(self.molecule.get_string())
+            self.ostream.print_block(self.molecule.more_info())
+            self.ostream.print_blank()
 
             # create basis set
 
