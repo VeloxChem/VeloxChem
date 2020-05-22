@@ -98,7 +98,7 @@ def check_file(filename, label):
         sys.exit(1)
 
 
-def generate_setup(template_file, setup_file):
+def generate_setup(template_file, setup_file, user_flag=None):
 
     # OS information
 
@@ -126,7 +126,10 @@ def generate_setup(template_file, setup_file):
     if 'CXX' in os.environ:
         cxx, cxx_path = find_exe([os.environ['CXX']])
     else:
-        cxx, cxx_path = find_exe(['mpiicpc', 'mpicxx', 'mpiCXX'])
+        if isinstance(user_flag, str) and user_flag.lower() == 'gnu':
+            cxx, cxx_path = find_exe(['mpicxx', 'mpiicpc', 'mpiCXX'])
+        else:
+            cxx, cxx_path = find_exe(['mpiicpc', 'mpicxx', 'mpiCXX'])
 
     print(cxx)
 
@@ -241,8 +244,11 @@ def generate_setup(template_file, setup_file):
         math_lib += os.linesep + 'MATH_LIB := -L{}'.format(openblas_dir)
         math_lib += os.linesep + 'MATH_LIB += -Wl,-rpath,{}'.format(
             openblas_dir)
-        math_lib += os.linesep + 'MATH_LIB += -lopenblas {} {}'.format(
-            omp_flag, '-lpthread -lm -ldl')
+        openblas_flag = '-lopenblas'
+        if use_intel:
+            openblas_flag += ' -lifcore'
+        math_lib += os.linesep + 'MATH_LIB += {} {} {}'.format(
+            openblas_flag, omp_flag, '-lpthread -lm -ldl')
 
     # cray-libsci flags
 
@@ -361,4 +367,8 @@ if __name__ == '__main__':
         print('*** Error: Cannot find template file {}'.format(template_file))
         sys.exit(1)
 
-    generate_setup(template_file, setup_file)
+    user_flag = None
+    if len(sys.argv) > 1:
+        user_flag = sys.argv[1]
+
+    generate_setup(template_file, setup_file, user_flag)
