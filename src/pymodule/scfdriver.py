@@ -591,8 +591,10 @@ class ScfDriver:
         if not self.first_step:
             signal_handler.remove_sigterm_function()
 
-        self.write_checkpoint(molecule.elem_ids_to_numpy(),
-                              ao_basis.get_label())
+        # do not overwrite converged checkpoint file
+        if not (self.restart and self.num_iter == 1):
+            self.write_checkpoint(molecule.elem_ids_to_numpy(),
+                                  ao_basis.get_label())
 
         if self.rank == mpi_master():
             self.scf_tensors = {
