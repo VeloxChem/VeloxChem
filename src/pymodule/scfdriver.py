@@ -542,13 +542,19 @@ class ScfDriver:
 
             self.comp_full_fock(fock_mat, vxc_mat, V_pe, kin_mat, npot_mat)
 
-            e_grad = self.comp_gradient(fock_mat, ovl_mat, den_mat, oao_mat)
+            e_grad, max_grad = self.comp_gradient(fock_mat, ovl_mat, den_mat,
+                                                  oao_mat)
 
             self.set_skip_iter_flag(e_grad)
 
             diff_den = self.comp_density_change(den_mat, self.density)
 
-            self.add_iter_data(e_ee, e_kin, e_en, e_grad, diff_den)
+            self.add_iter_data({
+                'energy': e_ee + e_kin + e_en + self.nuc_energy,
+                'gradient_norm': e_grad,
+                'max_gradient': max_grad,
+                'diff_density': diff_den,
+            })
 
             self.check_convergence()
 
@@ -1298,30 +1304,22 @@ class ScfDriver:
 
         return nteri
 
-    def add_iter_data(self, e_ee, e_kin, e_en, e_grad, diff_den):
+    def add_iter_data(self, d):
         """
         Adds SCF iteration data (electronic energy, electronic energy change,
         electronic gradient, density difference) to SCF iterations list.
 
-        :param e_ee:
-            The electronic energy.
-        :param e_kin:
-            The kinetic energy.
-        :param e_en:
-            The nuclear potential energy.
-        :param e_grad:
-            The electronic energy gradient.
-        :param diff_den:
-            The density change with respect to previous SCF iteration.
+        :param d:
+            The dictionary containing SCF iteration data.
         """
 
-        e_elec = e_ee + e_kin + e_en + self.nuc_energy
+        e_dict = dict(d)
 
-        de_elec = e_elec - self.old_energy
+        e_dict['diff_energy'] = e_dict['energy'] - self.old_energy
 
-        self.iter_data.append((e_elec, de_elec, e_grad, diff_den))
+        self.iter_data.append(e_dict)
 
-        self.old_energy = e_elec
+        self.old_energy = e_dict['energy']
 
     def check_convergence(self):
         """
@@ -1333,7 +1331,7 @@ class ScfDriver:
 
         if self.num_iter > 0:
 
-            e_elec, de_elec, e_grad, diff_den = self.iter_data[-1]
+            e_grad = self.iter_data[-1]['gradient_norm']
 
             if e_grad < self.conv_thresh:
                 self.is_converged = True
@@ -1418,21 +1416,21 @@ class ScfDriver:
         """
 
         if self.first_step:
-            self.ostream.print_info("Starting Reduced Basis SCF calculation...")
+            self.ostream.print_info('Starting Reduced Basis SCF calculation...')
 
         else:
             self.ostream.print_blank()
             if self.dft:
-                self.ostream.print_header(
-                    "Iter. |     Kohn-Sham Energy, au    | "
-                    "Energy Change, au |  Gradient Norm  | "
-                    "Density Change |")
+                valstr = '{} | {} | {} | {} | {} | {}'.format(
+                    'Iter.', '   Kohn-Sham Energy', 'Energy Change',
+                    'Gradient Norm', 'Max. Gradient', 'Density Change')
+                self.ostream.print_header(valstr)
             else:
-                self.ostream.print_header(
-                    "Iter. |   Hartree-Fock Energy, au   | "
-                    "Energy Change, au |  Gradient Norm  | "
-                    "Density Change |")
-            self.ostream.print_header(92 * "-")
+                valstr = '{} | {} | {} | {} | {} | {}'.format(
+                    'Iter.', 'Hartree-Fock Energy', 'Energy Change',
+                    'Gradient Norm', 'Max. Gradient', 'Density Change')
+                self.ostream.print_header(valstr)
+            self.ostream.print_header(92 * '-')
 
     def print_scf_finish(self, start_time):
         """
@@ -1482,19 +1480,22 @@ class ScfDriver:
             if self.num_iter > 0:
 
                 if self.iter_data:
-                    te, diff_te, e_grad, diff_den = self.iter_data[-1]
+                    te = self.iter_data[-1]['energy']
+                    diff_te = self.iter_data[-1]['diff_energy']
+                    e_grad = self.iter_data[-1]['gradient_norm']
+                    max_grad = self.iter_data[-1]['max_gradient']
+                    diff_den = self.iter_data[-1]['diff_density']
 
                 if self.num_iter == 1:
                     diff_te = 0.0
                     diff_den = 0.0
 
-                exec_str = ' ' + (str(self.num_iter)).rjust(3) + 4 * ' '
-                exec_str += ('{:7.12f}'.format(te)).center(27) + 3 * ' '
-                exec_str += ('{:5.10f}'.format(diff_te)).center(17) + 3 * ' '
-                exec_str += ('{:5.8f}'.format(e_grad)).center(15) + 3 * ' '
-                exec_str += ('{:5.8f}'.format(diff_den)).center(15) + ' '
+                valstr = ' {:3d}   {:20.12f} {:15.10f} '.format(
+                    self.num_iter, te, diff_te)
+                valstr += '{:15.8f} {:15.8f} {:15.8f} '.format(
+                    e_grad, max_grad, diff_den)
 
-                self.ostream.print_header(exec_str)
+                self.ostream.print_header(valstr)
                 self.ostream.flush()
 
     def get_scf_energy(self):
@@ -1677,7 +1678,7 @@ class ScfDriver:
 
         enuc = self.nuc_energy
 
-        etot = self.iter_data[-1][0]
+        etot = self.iter_data[-1]['energy']
 
         e_el = etot - enuc
 
@@ -1693,6 +1694,6 @@ class ScfDriver:
         self.ostream.print_header(
             "------------------------------------".ljust(92))
 
-        grad = self.iter_data[-1][2]
+        grad = self.iter_data[-1]['gradient_norm']
         valstr = "Gradient Norm                      :{:20.10f} au".format(grad)
         self.ostream.print_header(valstr.ljust(92))

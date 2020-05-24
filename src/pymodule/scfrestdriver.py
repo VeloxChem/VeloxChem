@@ -57,14 +57,17 @@ class ScfRestrictedDriver(ScfDriver):
 
             fds = np.matmul(fmat, np.matmul(dmat, smat))
 
-            e_grad = 2.0 * np.linalg.norm(
-                np.matmul(tmat.T, np.matmul(fds - fds.T, tmat)))
+            e_mat = np.matmul(tmat.T, np.matmul(fds - fds.T, tmat))
+            e_grad = 2.0 * np.linalg.norm(e_mat)
+            max_grad = np.max(np.abs(e_mat))
         else:
             e_grad = 0.0
+            max_grad = 0.0
 
         e_grad = self.comm.bcast(e_grad, root=mpi_master())
+        max_grad = self.comm.bcast(max_grad, root=mpi_master())
 
-        return e_grad
+        return e_grad, max_grad
 
     def comp_density_change(self, den_mat, old_den_mat):
         """

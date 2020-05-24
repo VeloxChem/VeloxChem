@@ -60,19 +60,19 @@ class ScfUnrestrictedDriver(ScfDriver):
             fds_a = np.matmul(fmat_a, np.matmul(dmat_a, smat))
             fds_b = np.matmul(fmat_b, np.matmul(dmat_b, smat))
 
-            e_grad_a = np.linalg.norm(
-                np.matmul(tmat.T, np.matmul(fds_a - fds_a.T, tmat)))
+            e_mat_a = np.matmul(tmat.T, np.matmul(fds_a - fds_a.T, tmat))
+            e_mat_b = np.matmul(tmat.T, np.matmul(fds_b - fds_b.T, tmat))
 
-            e_grad_b = np.linalg.norm(
-                np.matmul(tmat.T, np.matmul(fds_b - fds_b.T, tmat)))
-
-            e_grad = e_grad_a + e_grad_b
+            e_grad = np.linalg.norm(e_mat_a) + np.linalg.norm(e_mat_b)
+            max_grad = max(np.max(np.abs(e_mat_a)), np.max(np.abs(e_mat_b)))
         else:
             e_grad = 0.0
+            max_grad = 0.0
 
         e_grad = self.comm.bcast(e_grad, root=mpi_master())
+        max_grad = self.comm.bcast(max_grad, root=mpi_master())
 
-        return e_grad
+        return e_grad, max_grad
 
     def comp_density_change(self, den_mat, old_den_mat):
         """
