@@ -82,12 +82,12 @@ class C6(ResponseProperty):
 
         for iw in range(len(imagfreqs)):
 
-            Gxx = rsp_property['response_functions'][(
-                'x', 'x', imagfreqs[iw])].real
-            Gyy = rsp_property['response_functions'][(
-                'y', 'y', imagfreqs[iw])].real
-            Gzz = rsp_property['response_functions'][(
-                'z', 'z', imagfreqs[iw])].real
+            Gxx = rsp_property['response_functions'][('x', 'x',
+                                                      imagfreqs[iw])].real
+            Gyy = rsp_property['response_functions'][('y', 'y',
+                                                      imagfreqs[iw])].real
+            Gzz = rsp_property['response_functions'][('z', 'z',
+                                                      imagfreqs[iw])].real
 
             alpha = -(Gxx + Gyy + Gzz) / 3.0
             point = points[iw]
@@ -100,7 +100,6 @@ class C6(ResponseProperty):
         c6 = 3 * integral / pi
 
         return c6
-        
 
     def print_property(self, ostream):
         """
@@ -118,11 +117,11 @@ class C6(ResponseProperty):
         ostream.print_blank()
 
         w0 = float(self.rsp_dict['w0'])
-        points = np.polynomial.legendre.leggauss(
-            int(self.rsp_dict['n_points']))[0]
-        weights = np.polynomial.legendre.leggauss(
-            int(self.rsp_dict['n_points']))[1]
-        imagfreqs = [w0*(1-t)/(1+t) for t in points]
+        points = np.polynomial.legendre.leggauss(int(
+            self.rsp_dict['n_points']))[0]
+        weights = np.polynomial.legendre.leggauss(int(
+            self.rsp_dict['n_points']))[1]
+        imagfreqs = [w0 * (1 - t) / (1 + t) for t in points]
         printfreqs = np.append(imagfreqs, 0.0)
 
         for iw in printfreqs:
