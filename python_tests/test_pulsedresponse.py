@@ -194,10 +194,7 @@ class TestComplexResponse(unittest.TestCase):
 
     def test_pulsed_response(self):
 
-        expected_keys = [
-            'properties', 'solutions', 'pulse_settings',
-            'properties_zeropad'
-        ]
+        expected_keys = ['properties', 'pulse_settings', 'properties_zeropad']
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 

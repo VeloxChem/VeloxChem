@@ -1,6 +1,7 @@
 from mpi4py import MPI
 import numpy as np
 import time as tm
+import ctypes
 import h5py
 
 from .veloxchemlib import mpi_master
@@ -57,6 +58,17 @@ class DistributedArray:
         else:
             self.data = array.copy()
 
+    def __sizeof__(self):
+        """
+        Estimates the size of the distributed array, regardless whether it owns
+        the data or not.
+
+        :return:
+            The esitmated size of the distributed array.
+        """
+
+        return self.data.size * ctypes.sizeof(ctypes.c_double)
+
     def array(self):
         """
         Returns the numpy array stored in the object.
@@ -78,6 +90,65 @@ class DistributedArray:
         """
 
         return self.data.shape[axis]
+
+    def norm(self, axis=None):
+        """
+        Returns the norm of the distributed array along axis.
+
+        :param axis:
+            The axis.
+        :return:
+            The norm along axis.
+        """
+
+        n2 = np.linalg.norm(self.data, axis=axis)**2
+        n2 = self.comm.allreduce(n2, op=MPI.SUM)
+        return np.sqrt(n2)
+
+    def dot(self, i, dist_array, j):
+        """
+        Returns the dot product between a column vector in self and a column
+        vector in a distributed array.
+
+        :param i:
+            The column index in self.
+        :param dist_array:
+            The distributed array.
+        :param j:
+            The column index in dist_array.
+        :return:
+            The dot product.
+        """
+
+        if self.data.ndim == 2 and dist_array.data.ndim == 2:
+            dot_prod = np.dot(self.data[:, i], dist_array.data[:, j])
+            dot_prod = self.comm.allreduce(dot_prod, op=MPI.SUM)
+            return dot_prod
+        else:
+            return None
+
+    def get_full_vector(self, col=None):
+        """
+        Gets a full column vector from a distributed array.
+
+        :param: col:
+            The column index (used only when self.data.ndim is 2).
+        :return:
+            The full vector on the master node, None on other nodes.
+        """
+
+        data = None
+
+        if self.data.ndim == 1:
+            data = self.comm.gather(self.data, root=mpi_master())
+        elif self.data.ndim == 2 and col is not None:
+            data = self.comm.gather(self.data[:, col], root=mpi_master())
+
+        if self.rank == mpi_master():
+            full_shape_0 = sum([m.shape[0] for m in data])
+            return np.hstack(data).reshape(full_shape_0)
+        else:
+            return None
 
     def matmul_AtB(self, dist_array, factor=None):
         """
@@ -155,6 +226,26 @@ class DistributedArray:
         else:
             return None
 
+    def matmul_AB_no_gather(self, array, factor=None):
+        """
+        Computes matrix-matrix multiplication between self and a numpy array
+        that is available on all nodes.
+
+        :param array:
+            The numpy array.
+        :param factor:
+            The factor to be multiplied to the result.
+        :return:
+            A distributed array.
+        """
+
+        seg_mat = np.matmul(self.data, array)
+
+        if factor is not None:
+            seg_mat *= factor
+
+        return DistributedArray(seg_mat, self.comm, distribute=False)
+
     def append(self, dist_array, axis=None):
         """
         Appends a distributed array to self.
@@ -221,7 +312,7 @@ class DistributedArray:
             The time spent in writing to checkpoint file.
         """
 
-        counts = self.comm.gather(self.data.shape[0], root=mpi_master())
+        counts = self.comm.gather(self.shape(0), root=mpi_master())
         if self.rank == mpi_master():
             displacements = [sum(counts[:p]) for p in range(self.nodes)]
 
@@ -230,7 +321,7 @@ class DistributedArray:
         if self.rank == mpi_master():
             hf = h5py.File(fname, 'a')
 
-            dset = hf.create_dataset(label, (sum(counts), self.data.shape[1]),
+            dset = hf.create_dataset(label, (sum(counts), self.shape(1)),
                                      dtype=self.data.dtype,
                                      compression='gzip')
 

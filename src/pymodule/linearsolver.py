@@ -71,6 +71,10 @@ class LinearSolver:
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation.
+        - dist_bger: The distributed gerade trial vectors.
+        - dist_bung: The distributed ungerade trial vectors.
+        - dist_e2bger: The distributed gerade sigma vectors.
+        - dist_e2bung: The distributed ungerade sigma vectors.
     """
 
     def __init__(self, comm, ostream):
@@ -125,6 +129,11 @@ class LinearSolver:
         self.profiling = False
         self.memory_profiling = False
         self.memory_tracing = False
+
+        self.dist_bger = None
+        self.dist_bung = None
+        self.dist_e2bger = None
+        self.dist_e2bung = None
 
     def update_settings(self, rsp_dict, method_dict={}):
         """
@@ -200,6 +209,17 @@ class LinearSolver:
             self.memory_tracing = True if key in ['yes', 'y'] else False
 
     def init_eri(self, molecule, basis):
+        """
+        Initializes ERI.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+
+        :return:
+            The dictionary of ERI information.
+        """
 
         if self.use_split_comm:
             self.use_split_comm = ((self.dft or self.pe) and self.nodes >= 8)
@@ -224,6 +244,17 @@ class LinearSolver:
         }
 
     def init_dft(self, molecule, scf_tensors):
+        """
+        Initializes DFT.
+
+        :param molecule:
+            The molecule.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+
+        :return:
+            The dictionary of DFT information.
+        """
 
         # generate integration grid
         if self.dft:
@@ -258,6 +289,17 @@ class LinearSolver:
         }
 
     def init_pe(self, molecule, basis):
+        """
+        Initializes polarizable embedding.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+
+        :return:
+            The dictionary of polarizable embedding information.
+        """
 
         # set up polarizable embedding
         if self.pe:
@@ -283,7 +325,83 @@ class LinearSolver:
             'potfile_text': potfile_text,
         }
 
+    def read_vectors(self, rsp_vector_labels):
+        """
+        Reads vectors from checkpoint file.
+
+        :param rsp_vector_labels:
+            The list of labels of response vectors.
+        """
+
+        self.dist_bger, self.dist_bung, self.dist_e2bger, self.dist_e2bung = [
+            DistributedArray.read_from_hdf5_file(self.checkpoint_file, label,
+                                                 self.comm)
+            for label in rsp_vector_labels
+        ]
+        checkpoint_text = 'Restarting from checkpoint file: '
+        checkpoint_text += self.checkpoint_file
+        self.ostream.print_info(checkpoint_text)
+        self.ostream.print_blank()
+
+    def append_vectors(self, bger, bung, e2bger, e2bung):
+        """
+        Appends distributed vectors.
+
+        :param bger:
+            The distributed gerade trial vectors.
+        :param bung:
+            The distributed ungerade trial vectors.
+        :param e2bger:
+            The distributed gerade sigma vectors.
+        :param e2bung:
+            The distributed ungerade sigma vectors.
+        """
+
+        if self.dist_bger is None:
+            self.dist_bger = DistributedArray(bger.data,
+                                              self.comm,
+                                              distribute=False)
+        else:
+            self.dist_bger.append(bger, axis=1)
+
+        if self.dist_bung is None:
+            self.dist_bung = DistributedArray(bung.data,
+                                              self.comm,
+                                              distribute=False)
+        else:
+            self.dist_bung.append(bung, axis=1)
+
+        if self.dist_e2bger is None:
+            self.dist_e2bger = DistributedArray(e2bger.data,
+                                                self.comm,
+                                                distribute=False)
+        else:
+            self.dist_e2bger.append(e2bger, axis=1)
+
+        if self.dist_e2bung is None:
+            self.dist_e2bung = DistributedArray(e2bung.data,
+                                                self.comm,
+                                                distribute=False)
+        else:
+            self.dist_e2bung.append(e2bung, axis=1)
+
     def compute(self, molecule, basis, scf_tensors, v1=None):
+        """
+        Solves for the linear equations.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param v1:
+            The gradients on the right-hand side. If not provided, v1 will be
+            computed for the B operator.
+
+        :return:
+            A dictionary containing response functions, solutions, etc.
+        """
 
         return None
 
@@ -315,10 +433,22 @@ class LinearSolver:
             The gerade and ungerade E2 b matrix vector product in half-size.
         """
 
+        n_ger = vecs_ger.shape(1)
+        n_ung = vecs_ung.shape(1)
+        n_total = n_ger + n_ung
+
+        # prepare molecular orbitals
+
         if self.rank == mpi_master():
             assert_msg_critical(
-                vecs_ger.ndim == 2 and vecs_ung.ndim == 2,
-                'LinearResponse.e2n_half_size: invalid shape of trial vectors')
+                vecs_ger.data.ndim == 2 and vecs_ung.data.ndim == 2,
+                'LinearResponse.e2n_half_size: '
+                'invalid shape of trial vectors')
+
+            assert_msg_critical(
+                vecs_ger.shape(0) == vecs_ung.shape(0),
+                'LinearResponse.e2n_half_size: '
+                'inconsistent shape of trial vectors')
 
             mo = scf_tensors['C']
             S = scf_tensors['S']
@@ -328,32 +458,10 @@ class LinearSolver:
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            dks = []
-            kns = []
-
-            n_ger = vecs_ger.shape[1] if vecs_ger is not None else 0
-            n_ung = vecs_ung.shape[1] if vecs_ung is not None else 0
-
-            for col in range(n_ger + n_ung):
-                if col < n_ger:
-                    # full-size gerade trial vector
-                    vec = np.hstack((vecs_ger[:, col], vecs_ger[:, col]))
-                else:
-                    # full-size ungerade trial vector
-                    vec = np.hstack(
-                        (vecs_ung[:, col - n_ger], -vecs_ung[:, col - n_ger]))
-
-                kN = self.lrvec2mat(vec, nocc, norb).T
-                kn = np.linalg.multi_dot([mo, kN, mo.T])
-
-                dak = np.linalg.multi_dot([kn.T, S, da])
-                dak -= np.linalg.multi_dot([da, S, kn.T])
-                # dbk = kn.T @ S @ db - db @ S @ kn.T
-
-                dks.append(dak)
-                kns.append(kn)
+        # determine number of batches
 
         num_batches = 0
+        batch_size = None
         if self.rank == mpi_master():
             # compute maximum batch size from available memory
             avail_mem = psutil.virtual_memory().available
@@ -365,33 +473,69 @@ class LinearSolver:
             # set batch size
             batch_size = self.batch_size
             if batch_size is None:
-                batch_size = min(100, len(dks), max_batch_size)
+                batch_size = min(100, n_total, max_batch_size)
 
             # get number of batches
-            num_batches = len(dks) // batch_size
-            if len(dks) % batch_size != 0:
+            num_batches = n_total // batch_size
+            if n_total % batch_size != 0:
                 num_batches += 1
+        batch_size = self.comm.bcast(batch_size, root=mpi_master())
         num_batches = self.comm.bcast(num_batches, root=mpi_master())
+
+        # go through batches
 
         if self.rank == mpi_master():
             batch_str = 'Processing Fock builds...'
             batch_str += ' (batch size: {:d})'.format(batch_size)
             self.ostream.print_info(batch_str)
 
-        faks = []
         for batch_ind in range(num_batches):
 
             self.ostream.print_info('  batch {}/{}'.format(
                 batch_ind + 1, num_batches))
             self.ostream.flush()
 
+            # form density matrices
+
+            batch_start = batch_size * batch_ind
+            batch_end = min(batch_start + batch_size, n_total)
+
             if self.rank == mpi_master():
-                batch_start = batch_size * batch_ind
-                batch_end = min(batch_start + batch_size, len(dks))
-                dens = AODensityMatrix(dks[batch_start:batch_end], denmat.rest)
+                dks = []
+                kns = []
+
+            for col in range(batch_start, batch_end):
+                if col < n_ger:
+                    v_ger = vecs_ger.get_full_vector(col)
+                    if self.rank == mpi_master():
+                        # full-size gerade trial vector
+                        vec = np.hstack((v_ger, v_ger))
+                else:
+                    v_ung = vecs_ung.get_full_vector(col - n_ger)
+                    if self.rank == mpi_master():
+                        # full-size ungerade trial vector
+                        vec = np.hstack((v_ung, -v_ung))
+
+                if self.rank == mpi_master():
+                    half_size = vec.shape[0] // 2
+
+                    kN = self.lrvec2mat(vec, nocc, norb).T
+                    kn = np.linalg.multi_dot([mo, kN, mo.T])
+
+                    dak = np.linalg.multi_dot([kn.T, S, da])
+                    dak -= np.linalg.multi_dot([da, S, kn.T])
+                    # dbk = kn.T @ S @ db - db @ S @ kn.T
+
+                    dks.append(dak)
+                    kns.append(kn)
+
+            if self.rank == mpi_master():
+                dens = AODensityMatrix(dks, denmat.rest)
             else:
                 dens = AODensityMatrix()
             dens.broadcast(self.rank, self.comm)
+
+            # form Fock matrices
 
             fock = AOFockMatrix(dens)
 
@@ -399,41 +543,46 @@ class LinearSolver:
                               pe_dict, timing_dict)
 
             if self.rank == mpi_master():
+                faks = []
                 for ifock in range(fock.number_of_fock_matrices()):
                     faks.append(fock.alpha_to_numpy(ifock).T)
 
-        self.ostream.print_blank()
+                gv = np.zeros((half_size, n_total))
 
-        if self.rank == mpi_master():
-            if vecs_ger is not None:
-                half_size = vecs_ger.shape[0]
+                for col, kn in enumerate(kns):
+
+                    fak = faks[col]
+                    # fak = fock.alpha_to_numpy(col).T
+                    # fbk = fock.beta_to_numpy(col).T
+
+                    kfa = np.linalg.multi_dot([S, kn, fa])
+                    kfa -= np.linalg.multi_dot([fa, kn, S])
+                    # kfb = S @ kn @ fb - fb @ kn @ S
+
+                    fat = fak + kfa
+                    fbt = fat
+                    # fbt = fbk + kfb
+
+                    gao = np.matmul(S,
+                                    np.matmul(da, fat.T) + np.matmul(db, fbt.T))
+                    gao -= np.matmul(
+                        np.matmul(fat.T, da) + np.matmul(fbt.T, db), S)
+
+                    gmo = np.linalg.multi_dot([mo.T, gao, mo])
+
+                    gv[:, col] = -self.lrmat2vec(gmo, nocc, norb)[:half_size]
+
+                e2_ger = gv[:, :n_ger]
+                e2_ung = gv[:, n_ger:]
             else:
-                half_size = vecs_ung.shape[0]
-            gv = np.zeros((half_size, n_ger + n_ung))
+                e2_ger = None
+                e2_ung = None
+            vecs_e2_ger = DistributedArray(e2_ger, self.comm)
+            vecs_e2_ung = DistributedArray(e2_ung, self.comm)
 
-            for col, kn in enumerate(kns):
+            self.append_vectors(vecs_ger, vecs_ung, vecs_e2_ger, vecs_e2_ung)
 
-                fak = faks[col]
-                # fak = fock.alpha_to_numpy(col).T
-                # fbk = fock.beta_to_numpy(col).T
-
-                kfa = np.linalg.multi_dot([S, kn, fa])
-                kfa -= np.linalg.multi_dot([fa, kn, S])
-                # kfb = S @ kn @ fb - fb @ kn @ S
-
-                fat = fak + kfa
-                fbt = fat
-                # fbt = fbk + kfb
-
-                gao = np.matmul(S, np.matmul(da, fat.T) + np.matmul(db, fbt.T))
-                gao -= np.matmul(np.matmul(fat.T, da) + np.matmul(fbt.T, db), S)
-
-                gmo = np.linalg.multi_dot([mo.T, gao, mo])
-
-                gv[:, col] = -self.lrmat2vec(gmo, nocc, norb)[:half_size]
-            return gv[:, :n_ger], gv[:, n_ger:]
-        else:
-            return None, None
+        self.ostream.print_blank()
 
     def comp_lr_fock(self, fock, dens, molecule, basis, eri_dict, dft_dict,
                      pe_dict, timing_dict):
@@ -653,8 +802,7 @@ class LinearSolver:
         self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
                                                 root=mpi_master())
 
-    def write_checkpoint(self, molecule, basis, dft_dict, pe_dict, dist_arrays,
-                         labels):
+    def write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
         Writes checkpoint file.
 
@@ -666,8 +814,6 @@ class LinearSolver:
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
-        :param dist_arrays:
-            The list of distributed arrays.
         :param labels:
             The list of labels.
         """
@@ -683,11 +829,14 @@ class LinearSolver:
         success = self.comm.bcast(success, root=mpi_master())
 
         if success:
+            dist_arrays = [
+                self.dist_bger, self.dist_bung, self.dist_e2bger,
+                self.dist_e2bung
+            ]
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
 
-    def graceful_exit(self, molecule, basis, dft_dict, pe_dict, dist_arrays,
-                      labels):
+    def graceful_exit(self, molecule, basis, dft_dict, pe_dict, labels):
         """
         Gracefully exits the program.
 
@@ -699,8 +848,6 @@ class LinearSolver:
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
-        :param dist_arrays:
-            The list of distributed arrays.
         :param labels:
             The list of labels.
 
@@ -713,8 +860,7 @@ class LinearSolver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        self.write_checkpoint(molecule, basis, dft_dict, pe_dict, dist_arrays,
-                              labels)
+        self.write_checkpoint(molecule, basis, dft_dict, pe_dict, labels)
 
         self.ostream.print_info('...done.')
         self.ostream.print_blank()
@@ -877,7 +1023,7 @@ class LinearSolver:
 
         return None
 
-    def precond_trials(self, vectors, precond=None):
+    def precond_trials(self, vectors, precond):
         """
         Applies preconditioner to trial vectors.
 
@@ -894,7 +1040,7 @@ class LinearSolver:
 
     def setup_trials(self,
                      vectors,
-                     precond=None,
+                     precond,
                      dist_bger=None,
                      dist_bung=None,
                      renormalize=True):
@@ -916,49 +1062,47 @@ class LinearSolver:
             The orthonormalized gerade and ungerade trial vectors.
         """
 
-        new_ger, new_ung = self.precond_trials(vectors, precond)
+        dist_new_ger, dist_new_ung = self.precond_trials(vectors, precond)
 
         if dist_bger is not None:
             # t = t - (b (b.T t))
-            dist_new_ger = DistributedArray(new_ger, self.comm)
             bT_new_ger = dist_bger.matmul_AtB_allreduce(dist_new_ger, 2.0)
-            new_ger_proj = dist_bger.matmul_AB(bT_new_ger)
-            if self.rank == mpi_master():
-                new_ger -= new_ger_proj
+            dist_new_ger_proj = dist_bger.matmul_AB_no_gather(bT_new_ger)
+            dist_new_ger.data -= dist_new_ger_proj.data
 
         if dist_bung is not None:
             # t = t - (b (b.T t))
-            dist_new_ung = DistributedArray(new_ung, self.comm)
             bT_new_ung = dist_bung.matmul_AtB_allreduce(dist_new_ung, 2.0)
-            new_ung_proj = dist_bung.matmul_AB(bT_new_ung)
-            if self.rank == mpi_master():
-                new_ung -= new_ung_proj
+            dist_new_ung_proj = dist_bung.matmul_AB_no_gather(bT_new_ung)
+            dist_new_ung.data -= dist_new_ung_proj.data
 
-        if self.rank == mpi_master() and renormalize:
-            new_ger = self.remove_linear_dependence_half(
-                new_ger, self.lindep_thresh)
-            new_ger = self.orthogonalize_gram_schmidt_half(new_ger)
-            new_ger = self.normalize_half(new_ger)
+        if renormalize:
+            if dist_new_ger.data.ndim > 0 and dist_new_ger.shape(0) > 0:
+                dist_new_ger = self.remove_linear_dependence_half_distributed(
+                    dist_new_ger, self.lindep_thresh)
+                dist_new_ger = self.orthogonalize_gram_schmidt_half_distributed(
+                    dist_new_ger)
+                dist_new_ger = self.normalize_half_distributed(dist_new_ger)
 
-            new_ung = self.remove_linear_dependence_half(
-                new_ung, self.lindep_thresh)
-            new_ung = self.orthogonalize_gram_schmidt_half(new_ung)
-            new_ung = self.normalize_half(new_ung)
+            if dist_new_ung.data.ndim > 0 and dist_new_ung.shape(0) > 0:
+                dist_new_ung = self.remove_linear_dependence_half_distributed(
+                    dist_new_ung, self.lindep_thresh)
+                dist_new_ung = self.orthogonalize_gram_schmidt_half_distributed(
+                    dist_new_ung)
+                dist_new_ung = self.normalize_half_distributed(dist_new_ung)
 
-        return new_ger, new_ung
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                dist_new_ger.data.size > 0 or dist_new_ung.data.size > 0,
+                'LinearSolver: trial vectors are empty')
 
-    def decomp_trials(self, vecs):
-        """
-        Decomposes trial vectors into gerade and ungerade parts.
+        if dist_new_ger.data.size == 0:
+            dist_new_ger.data = np.zeros((dist_new_ung.shape(0), 0))
 
-        :param vecs:
-            The trial vectors.
+        if dist_new_ung.data.size == 0:
+            dist_new_ung.data = np.zeros((dist_new_ger.shape(0), 0))
 
-        :return:
-            A tuple containing gerade and ungerade parts of the trial vectors.
-        """
-
-        return None, None
+        return dist_new_ger, dist_new_ung
 
     def get_rhs(self, operator, components, molecule, basis, scf_tensors):
         """
@@ -1228,6 +1372,33 @@ class LinearSolver:
         mask = l > b_norm * threshold
         return np.matmul(basis, T[:, mask])
 
+    def remove_linear_dependence_half_distributed(self, basis, threshold):
+        """
+        Removes linear dependence in a set of symmetrized vectors.
+
+        :param basis:
+            The set of upper parts of symmetrized vectors.
+        :param threshold:
+            The threshold for removing linear dependence.
+
+        :return:
+            The new set of vectors.
+        """
+
+        half_Sb = basis.matmul_AtB(basis)
+
+        if self.rank == mpi_master():
+            Sb = 2.0 * half_Sb
+            l, T = np.linalg.eigh(Sb)
+            b_norm = np.sqrt(Sb.diagonal())
+            mask = l > b_norm * threshold
+            Tmask = T[:, mask].copy()
+        else:
+            Tmask = None
+        Tmask = self.comm.bcast(Tmask, root=mpi_master())
+
+        return basis.matmul_AB_no_gather(Tmask)
+
     @staticmethod
     def orthogonalize_gram_schmidt(tvecs):
         """
@@ -1284,6 +1455,37 @@ class LinearSolver:
 
         return tvecs
 
+    def orthogonalize_gram_schmidt_half_distributed(self, tvecs):
+        """
+        Applies modified Gram Schmidt orthogonalization to trial vectors.
+
+        :param tvecs:
+            The trial vectors.
+
+        :return:
+            The orthogonalized trial vectors.
+        """
+
+        invsqrt2 = 1.0 / np.sqrt(2.0)
+
+        if tvecs.shape(1) > 0:
+
+            n2 = tvecs.dot(0, tvecs, 0)
+            f = invsqrt2 / np.sqrt(n2)
+            tvecs.data[:, 0] *= f
+
+            for i in range(1, tvecs.shape(1)):
+                for j in range(i):
+                    dot_ij = tvecs.dot(i, tvecs, j)
+                    dot_jj = tvecs.dot(j, tvecs, j)
+                    f = dot_ij / dot_jj
+                    tvecs.data[:, i] -= f * tvecs.data[:, j]
+                n2 = tvecs.dot(i, tvecs, i)
+                f = invsqrt2 / np.sqrt(n2)
+                tvecs.data[:, i] *= f
+
+        return tvecs
+
     @staticmethod
     def normalize(vecs):
         """
@@ -1327,6 +1529,25 @@ class LinearSolver:
         else:
             invnorm = invsqrt2 / np.linalg.norm(vecs)
             vecs *= invnorm
+
+        return vecs
+
+    def normalize_half_distributed(self, vecs):
+        """
+        Normalizes half-sized vectors by dividing by vector norm.
+
+        :param vecs:
+            The half-sized vectors.
+
+        :param Retruns:
+            The normalized vectors.
+        """
+
+        invsqrt2 = 1.0 / np.sqrt(2.0)
+
+        invnorm = invsqrt2 / vecs.norm(axis=0)
+
+        vecs.data *= invnorm
 
         return vecs
 

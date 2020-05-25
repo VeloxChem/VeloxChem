@@ -1,6 +1,7 @@
 import itertools
 import numpy as np
 import time as tm
+import math
 
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
@@ -88,9 +89,12 @@ class LinearResponseEigenSolver(LinearSolver):
             'LinearResponseEigenSolver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            nocc = nalpha
-            norb = scf_tensors['C'].shape[1]
             orb_ene = scf_tensors['E']
+        else:
+            orb_ene = None
+        orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
+        norb = orb_ene.shape[0]
+        nocc = molecule.number_of_alpha_electrons()
 
         # ERI information
         eri_dict = self.init_eri(molecule, basis)
@@ -120,60 +124,29 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # read initial guess from restart file
         if self.restart:
-            dist_bger, dist_bung, dist_e2bger, dist_e2bung = [
-                DistributedArray.read_from_hdf5_file(self.checkpoint_file,
-                                                     label, self.comm)
-                for label in rsp_vector_labels
-            ]
-            checkpoint_text = 'Restarting from checkpoint file: '
-            checkpoint_text += self.checkpoint_file
-            self.ostream.print_info(checkpoint_text)
-            self.ostream.print_blank()
+            self.read_vectors(rsp_vector_labels)
 
         # generate initial guess from scratch
         else:
-            if self.rank == mpi_master():
-                igs = self.initial_excitations(self.nstates, orb_ene, nocc,
-                                               norb)
-                bger, bung = self.setup_trials(igs)
+            igs = self.initial_excitations(self.nstates, orb_ene, nocc, norb)
+            bger, bung = self.setup_trials(igs, None)
 
-                assert_msg_critical(
-                    bger.any() or bung.any(),
-                    'LinearResponseEigenSolver: trial vector is empty')
-
-                if bger is None or not bger.any():
-                    bger = np.zeros((bung.shape[0], 0))
-                if bung is None or not bung.any():
-                    bung = np.zeros((bger.shape[0], 0))
-            else:
-                bger, bung = None, None
-
-            e2bger, e2bung = self.e2n_half_size(bger, bung, molecule, basis,
-                                                scf_tensors, eri_dict, dft_dict,
-                                                pe_dict, timing_dict)
-
-            dist_bger = DistributedArray(bger, self.comm)
-            dist_bung = DistributedArray(bung, self.comm)
-
-            bger, bung = None, None
-
-            dist_e2bger = DistributedArray(e2bger, self.comm)
-            dist_e2bung = DistributedArray(e2bung, self.comm)
-
-            e2bger, e2bung = None, None
+            self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
+                               eri_dict, dft_dict, pe_dict, timing_dict)
 
         profiler.check_memory_usage('Initial guess')
 
-        excitations = [(None, None)] * self.nstates
-        exresiduals = [(None, None)] * self.nstates
+        excitations = {}
+        exresiduals = {}
         relative_residual_norm = {}
 
         signal_handler = SignalHandler()
-        signal_handler.add_sigterm_function(
-            self.graceful_exit, molecule, basis, dft_dict, pe_dict,
-            [dist_bger, dist_bung, dist_e2bger, dist_e2bung], rsp_vector_labels)
+        signal_handler.add_sigterm_function(self.graceful_exit, molecule, basis,
+                                            dft_dict, pe_dict,
+                                            rsp_vector_labels)
 
         iter_per_trail_in_hours = None
+        sqrt_2 = math.sqrt(2.0)
 
         # start iterations
         for iteration in range(self.max_iter):
@@ -184,9 +157,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
             self.cur_iter = iteration
 
-            e2gg = dist_bger.matmul_AtB(dist_e2bger, 2.0)
-            e2uu = dist_bung.matmul_AtB(dist_e2bung, 2.0)
-            s2ug = dist_bung.matmul_AtB(dist_bger, 4.0)
+            e2gg = self.dist_bger.matmul_AtB(self.dist_e2bger, 2.0)
+            e2uu = self.dist_bung.matmul_AtB(self.dist_e2bung, 2.0)
+            s2ug = self.dist_bung.matmul_AtB(self.dist_bger, 4.0)
 
             if self.rank == mpi_master():
 
@@ -228,60 +201,78 @@ class LinearResponseEigenSolver(LinearSolver):
             else:
                 c_ger = None
                 c_ung = None
+                wn = None
             c_ger = self.comm.bcast(c_ger, root=mpi_master())
             c_ung = self.comm.bcast(c_ung, root=mpi_master())
+            wn = self.comm.bcast(wn, root=mpi_master())
 
             for k in range(self.nstates):
+                w = wn[k]
 
-                x_ger = dist_bger.matmul_AB(c_ger[:, k])
-                x_ung = dist_bung.matmul_AB(c_ung[:, k])
+                x_ger = self.dist_bger.matmul_AB(c_ger[:, k])
+                x_ung = self.dist_bung.matmul_AB(c_ung[:, k])
 
-                e2x_ger = dist_e2bger.matmul_AB(c_ger[:, k])
-                e2x_ung = dist_e2bung.matmul_AB(c_ung[:, k])
+                e2x_ger = self.dist_e2bger.matmul_AB(c_ger[:, k])
+                e2x_ung = self.dist_e2bung.matmul_AB(c_ung[:, k])
 
                 if self.rank == mpi_master():
-
-                    w = wn[k]
-
                     s2x_ger = 2.0 * x_ger
                     s2x_ung = 2.0 * x_ung
 
                     r_ger = e2x_ger - w * s2x_ung
                     r_ung = e2x_ung - w * s2x_ger
-                    r = np.hstack((r_ger, r_ung))
+                else:
+                    r_ger, r_ung = None, None
 
-                    x_ger_full = np.hstack((x_ger, x_ger))
-                    x_ung_full = np.hstack((x_ung, -x_ung))
-                    X = x_ger_full + x_ung_full
+                if self.rank == mpi_master():
+                    r = (r_ger, r_ung)
+                    x = (x_ger, x_ung)
 
-                    rn = np.linalg.norm(r) * np.sqrt(2.0)
-                    xn = np.linalg.norm(X)
+                    rn = sqrt_2 * math.sqrt(sum([np.dot(p, p) for p in r]))
+                    xn = sqrt_2 * math.sqrt(sum([np.dot(p, p) for p in x]))
+
                     if xn != 0:
                         relative_residual_norm[k] = rn / xn
                     else:
                         relative_residual_norm[k] = rn
 
-                    if relative_residual_norm[k] < self.conv_thresh:
-                        excitations[k] = (w, X)
-                    else:
-                        exresiduals[k] = (w, r)
+                    state_k_converged = (relative_residual_norm[k] <
+                                         self.conv_thresh)
+                else:
+                    state_k_converged = False
+                state_k_converged = self.comm.bcast(state_k_converged,
+                                                    root=mpi_master())
+
+                if state_k_converged:
+                    x = (DistributedArray(x_ger, self.comm),
+                         DistributedArray(x_ung, self.comm))
+                    excitations[k] = (w, x)
+                else:
+                    r = (DistributedArray(r_ger, self.comm),
+                         DistributedArray(r_ung, self.comm))
+                    exresiduals[k] = (w, r)
+
+            relative_residual_norm = self.comm.bcast(relative_residual_norm,
+                                                     root=mpi_master())
 
             # write to output
             if self.rank == mpi_master():
                 self.ostream.print_info(
                     '{:d} gerade trial vectors in reduced space'.format(
-                        dist_bger.shape(1)))
+                        self.dist_bger.shape(1)))
                 self.ostream.print_info(
                     '{:d} ungerade trial vectors in reduced space'.format(
-                        dist_bung.shape(1)))
+                        self.dist_bung.shape(1)))
                 self.ostream.print_blank()
 
                 profiler.print_memory_subspace(
                     {
-                        'dist_bger': dist_bger.array(),
-                        'dist_bung': dist_bung.array(),
-                        'dist_e2bger': dist_e2bger.array(),
-                        'dist_e2bung': dist_e2bung.array(),
+                        'dist_bger': self.dist_bger,
+                        'dist_bung': self.dist_bung,
+                        'dist_e2bger': self.dist_e2bger,
+                        'dist_e2bung': self.dist_e2bung,
+                        'exsolutions': excitations,
+                        'exresiduals': exresiduals,
                     }, self.ostream)
 
                 profiler.check_memory_usage(
@@ -302,31 +293,20 @@ class LinearResponseEigenSolver(LinearSolver):
             profiler.start_timer(iteration, 'Orthonorm.')
 
             # update trial vectors
-            if self.rank == mpi_master():
-                precond = [
-                    self.get_precond(orb_ene, nocc, norb, w) for w in list(wn)
-                ]
-            else:
-                precond = None
+            precond = {
+                k: self.get_precond(orb_ene, nocc, norb, w)
+                for k, w in enumerate(list(wn))
+            }
 
             new_trials_ger, new_trials_ung = self.setup_trials(
-                exresiduals, precond, dist_bger, dist_bung)
+                exresiduals, precond, self.dist_bger, self.dist_bung)
 
-            exresiduals = [(None, None)] * self.nstates
+            exresiduals.clear()
 
             profiler.stop_timer(iteration, 'Orthonorm.')
 
             if self.rank == mpi_master():
-                assert_msg_critical(
-                    new_trials_ger.any() or new_trials_ung.any(),
-                    'LinearResponseEigenSolver: unable to add new trial vector')
-
-                if new_trials_ger is None or not new_trials_ger.any():
-                    new_trials_ger = np.zeros((new_trials_ung.shape[0], 0))
-                if new_trials_ung is None or not new_trials_ung.any():
-                    new_trials_ung = np.zeros((new_trials_ger.shape[0], 0))
-
-                n_new_trials = new_trials_ger.shape[1] + new_trials_ung.shape[1]
+                n_new_trials = new_trials_ger.shape(1) + new_trials_ung.shape(1)
             else:
                 n_new_trials = None
             n_new_trials = self.comm.bcast(n_new_trials, root=mpi_master())
@@ -334,28 +314,14 @@ class LinearResponseEigenSolver(LinearSolver):
             if iter_per_trail_in_hours is not None:
                 next_iter_in_hours = iter_per_trail_in_hours * n_new_trials
                 if self.need_graceful_exit(next_iter_in_hours):
-                    self.graceful_exit(
-                        molecule, basis, dft_dict, pe_dict,
-                        [dist_bger, dist_bung, dist_e2bger, dist_e2bung],
-                        rsp_vector_labels)
+                    self.graceful_exit(molecule, basis, dft_dict, pe_dict,
+                                       rsp_vector_labels)
 
             profiler.start_timer(iteration, 'FockBuild')
 
-            new_e2bger, new_e2bung = self.e2n_half_size(
-                new_trials_ger, new_trials_ung, molecule, basis, scf_tensors,
-                eri_dict, dft_dict, pe_dict, timing_dict)
-
-            dist_bger.append(DistributedArray(new_trials_ger, self.comm),
-                             axis=1)
-            dist_bung.append(DistributedArray(new_trials_ung, self.comm),
-                             axis=1)
-
-            new_trials_ger, new_trials_ung = None, None
-
-            dist_e2bger.append(DistributedArray(new_e2bger, self.comm), axis=1)
-            dist_e2bung.append(DistributedArray(new_e2bung, self.comm), axis=1)
-
-            new_e2bger, new_e2bung = None, None
+            self.e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
+                               scf_tensors, eri_dict, dft_dict, pe_dict,
+                               timing_dict)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trail_in_hours = iter_in_hours / n_new_trials
@@ -370,7 +336,6 @@ class LinearResponseEigenSolver(LinearSolver):
         signal_handler.remove_sigterm_function()
 
         self.write_checkpoint(molecule, basis, dft_dict, pe_dict,
-                              [dist_bger, dist_bung, dist_e2bger, dist_e2bung],
                               rsp_vector_labels)
 
         # converged?
@@ -390,6 +355,13 @@ class LinearResponseEigenSolver(LinearSolver):
         angmom_rhs = self.get_rhs('angular_momentum', 'xyz', molecule, basis,
                                   scf_tensors)
 
+        eigvals = np.array([excitations[s][0] for s in range(self.nstates)])
+        # TODO: check system memory
+        eigvecs = [
+            self.get_full_solution_vector(excitations[s][1])
+            for s in range(self.nstates)
+        ]
+
         if self.rank == mpi_master() and self.is_converged:
             V_dipole = {op: V for op, V in zip('xyz', dipole_rhs)}
             V_linmom = {op: V for op, V in zip('xyz', linmom_rhs)}
@@ -398,9 +370,6 @@ class LinearResponseEigenSolver(LinearSolver):
             elec_tms = {}
             velo_tms = {}
             magn_tms = {}
-
-            eigvals = np.array([s[0] for s in excitations])
-            eigvecs = [s[1] for s in excitations]
 
             for comp in 'xyz':
                 elec_tms[comp] = np.array(
@@ -446,6 +415,29 @@ class LinearResponseEigenSolver(LinearSolver):
         else:
             return {}
 
+    def get_full_solution_vector(self, solution):
+        """
+        Gets a full solution vector from the distributed solution.
+
+        :param solution:
+            The distributed solution as a tuple.
+
+        :return:
+            The full solution vector.
+        """
+
+        (dist_x_ger, dist_x_ung) = solution
+
+        x_ger = dist_x_ger.get_full_vector()
+        x_ung = dist_x_ung.get_full_vector()
+
+        if self.rank == mpi_master():
+            x_ger_full = np.hstack((x_ger, x_ger))
+            x_ung_full = np.hstack((x_ung, -x_ung))
+            return x_ger_full + x_ung_full
+        else:
+            return None
+
     def print_iteration(self, relative_residual_norm, ws):
         """
         Prints information of the iteration.
@@ -489,7 +481,8 @@ class LinearResponseEigenSolver(LinearSolver):
             Number of orbitals.
 
         :return:
-            A list of initial excitations (excitation energy and vector).
+            A list of initial excitations (excitation energy and distributed
+            vector).
         """
 
         xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
@@ -500,27 +493,34 @@ class LinearResponseEigenSolver(LinearSolver):
 
         w = {ia: w for ia, w in zip(excitations, excitation_energies)}
 
-        final = []
-        for (i, a) in sorted(w, key=w.get)[:nstates]:
-            ia = excitations.index((i, a))
-            n_exc = len(excitations)
+        final = {}
+        for k, (i, a) in enumerate(sorted(w, key=w.get)[:nstates]):
+            if self.rank == mpi_master():
+                ia = excitations.index((i, a))
+                n_exc = len(excitations)
 
-            Xn = np.zeros(2 * n_exc)
-            Xn[ia] = 1.0
+                Xn = np.zeros(2 * n_exc)
+                Xn[ia] = 1.0
 
-            Xn_T = np.zeros(2 * n_exc)
-            Xn_T[:n_exc] = Xn[n_exc:]
-            Xn_T[n_exc:] = Xn[:n_exc]
+                Xn_T = np.zeros(2 * n_exc)
+                Xn_T[:n_exc] = Xn[n_exc:]
+                Xn_T[n_exc:] = Xn[:n_exc]
 
-            Xn_ger = 0.5 * (Xn + Xn_T)[:n_exc]
-            Xn_ung = 0.5 * (Xn - Xn_T)[:n_exc]
+                Xn_ger = 0.5 * (Xn + Xn_T)[:n_exc]
+                Xn_ung = 0.5 * (Xn - Xn_T)[:n_exc]
 
-            final.append((w[(i, a)], np.hstack((Xn_ger, Xn_ung))))
+                X = (Xn_ger, Xn_ung)
+            else:
+                X = (None, None)
+
+            final[k] = ((w[(i, a)],
+                         tuple([DistributedArray(v, self.comm) for v in X])))
+
         return final
 
-    def precond_trials(self, excitations, precond=None):
+    def precond_trials(self, excitations, precond):
         """
-        Applies preconditioner to trial vectors.
+        Applies preconditioner to distributed trial vectors.
 
         :param excitations:
             The set of excitations.
@@ -531,34 +531,37 @@ class LinearResponseEigenSolver(LinearSolver):
             The preconditioned gerade and ungerade trial vectors.
         """
 
-        if self.rank == mpi_master():
-            trials = []
+        trials_ger = []
+        trials_ung = []
+        sqrt_2 = math.sqrt(2.0)
 
-            for k, (w, X) in enumerate(excitations):
-                if w is None and X is None:
-                    continue
+        for k, (w, X) in excitations.items():
+            if precond is not None:
+                v = self.preconditioning(precond[k], X)
+            else:
+                v = X
+            norms = [sqrt_2 * p.norm() for p in v]
+            vn = math.sqrt(sum([n**2 for n in norms]))
 
-                if precond is not None:
-                    v = self.preconditioning(precond[k], X)
-                else:
-                    v = X
+            # TODO: check gerade and ungerade norms
 
-                if np.linalg.norm(v) * np.sqrt(2.0) > self.small_thresh:
-                    trials.append(v)
+            if vn > self.small_thresh:
+                # gerade
+                trials_ger.append(v[0].data)
+                # ungerade
+                trials_ung.append(v[1].data)
 
-            new_trials = np.array(trials).T
+        new_ger = np.array(trials_ger).T
+        new_ung = np.array(trials_ung).T
 
-            # decomposing the full space trial vectors...
+        dist_new_ger = DistributedArray(new_ger, self.comm, distribute=False)
+        dist_new_ung = DistributedArray(new_ung, self.comm, distribute=False)
 
-            new_ger, new_ung = self.decomp_trials(new_trials)
-        else:
-            new_ger, new_ung = None, None
-
-        return new_ger, new_ung
+        return dist_new_ger, dist_new_ung
 
     def get_precond(self, orb_ene, nocc, norb, w):
         """
-        Constructs the preconditioner matrix.
+        Constructs the preconditioners.
 
         :param orb_ene:
             The orbital energies.
@@ -570,7 +573,7 @@ class LinearResponseEigenSolver(LinearSolver):
             The frequency.
 
         :return:
-            The preconditioner matrix.
+            The distributed preconditioners.
         """
 
         # spawning needed components
@@ -586,53 +589,30 @@ class LinearResponseEigenSolver(LinearSolver):
         pa_diag = ediag / (ediag_sq - w_sq * sdiag_sq)
         pb_diag = (w * sdiag) / (ediag_sq - w_sq * sdiag_sq)
 
-        return (pa_diag, pb_diag)
+        return tuple(
+            [DistributedArray(p, self.comm) for p in [pa_diag, pb_diag]])
 
     def preconditioning(self, precond, v_in):
         """
-        Creates trial vectors out of residuals and the preconditioner matrix.
+        Applies preconditioner to a tuple of distributed trial vectors.
 
         :param precond:
-            The preconditioner matrix.
+            The preconditioner.
         :param v_in:
             The input trial vectors.
 
         :return:
-            The trail vectors after preconditioning.
+            A tuple of distributed trail vectors after preconditioning.
         """
 
-        pa, pb = precond
+        pa, pb = [p.data for p in precond]
 
-        v_in_rg, v_in_ru = self.decomp_trials(v_in)
+        v_in_rg, v_in_ru = [v.data for v in v_in]
 
         v_out_rg = pa * v_in_rg + pb * v_in_ru
         v_out_ru = pb * v_in_rg + pa * v_in_ru
 
-        return np.hstack((v_out_rg, v_out_ru))
-
-    def decomp_trials(self, vecs):
-        """
-        Decomposes trial vectors into gerade and ungerade parts.
-
-        :param vecs:
-            The trial vectors.
-
-        :return:
-            A tuple containing gerade and ungerade parts of the trial vectors.
-        """
-
-        assert_msg_critical(vecs.shape[0] % 2 == 0,
-                            'decomp_trials: shape[0] of array should be even')
-
-        ger, ung = None, None
-        half_rows = vecs.shape[0] // 2
-
-        if vecs.ndim == 1:
-            ger = vecs[:half_rows]
-            ung = vecs[half_rows:]
-
-        elif vecs.ndim == 2:
-            ger = vecs[:half_rows, :]
-            ung = vecs[half_rows:, :]
-
-        return ger, ung
+        return tuple([
+            DistributedArray(v, self.comm, distribute=False)
+            for v in [v_out_rg, v_out_ru]
+        ])

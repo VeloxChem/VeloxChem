@@ -47,7 +47,7 @@ class TestC6(unittest.TestCase):
                                          scf_drv.scf_tensors)
 
         if task.mpi_rank == mpi_master():
-            keys = [iw for iw in c6_results['solutions'].keys()]
+            keys = [iw for iw in c6_results['keys']]
             freqs = []
             for key in keys:
                 if key[1] not in freqs:
