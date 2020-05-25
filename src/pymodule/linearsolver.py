@@ -462,9 +462,18 @@ class LinearSolver:
 
         num_batches = 0
         batch_size = None
+
+        total_mem = psutil.virtual_memory().total
+        total_mem_list = self.comm.gather(total_mem, root=mpi_master())
+
         if self.rank == mpi_master():
+            # check if master node has larger memory
+            mem_adjust = 0.0
+            if total_mem > min(total_mem_list):
+                mem_adjust = total_mem - min(total_mem_list)
+
             # compute maximum batch size from available memory
-            avail_mem = psutil.virtual_memory().available
+            avail_mem = psutil.virtual_memory().available - mem_adjust
             mem_per_mat = mo.shape[0]**2 * ctypes.sizeof(ctypes.c_double)
             nthreads = int(os.environ['OMP_NUM_THREADS'])
             max_batch_size = int(avail_mem / mem_per_mat / (0.625 * nthreads))
