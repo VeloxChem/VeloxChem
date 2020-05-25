@@ -55,7 +55,7 @@ class MyInstall(SetuptoolsInstall):
 
 setup(
     name='veloxchem',
-    version='1.0rc1post1',
+    version='1.0rc1.post1',
     packages=[
         'veloxchem',
     ],
