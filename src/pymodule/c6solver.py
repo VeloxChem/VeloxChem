@@ -134,36 +134,6 @@ class C6Solver(LinearSolver):
             for v in [v_out_ru, v_out_ig]
         ])
 
-    def initial_guess(self, v1, op_imagfreq_keys):
-        """
-        Creating initial guess (un-orthonormalized trials) out of gradients.
-
-        :param v1:
-            The dictionary containing (operator, imaginary frequency) as keys
-            and right-hand sides as values.
-        :param op_imagfreq_keys:
-            The list of operator-frequency combinations.
-
-        :return:
-            The initial guess of distributed trial vectors.
-        """
-
-        ig = {}
-        sqrt_2 = math.sqrt(2.0)
-
-        for key in op_imagfreq_keys:
-            if self.rank == mpi_master():
-                gradger, gradung = self.decomp_grad(v1[key])
-                grad = (gradung.real, -gradger.imag)
-                gn = sqrt_2 * math.sqrt(sum([np.dot(g, g) for g in grad]))
-                if gn < self.small_thresh:
-                    grad = tuple([np.zeros(g) for g in grad])
-            else:
-                grad = (None, None)
-            ig[key] = tuple([DistributedArray(g, self.comm) for g in grad])
-
-        return ig
-
     def precond_trials(self, vectors, precond):
         """
         Applies preconditioner to distributed trial vectors.
@@ -282,6 +252,19 @@ class C6Solver(LinearSolver):
             iw: self.get_precond(orb_ene, nocc, norb, iw) for iw in imagfreqs
         }
 
+        # distribute the right-hand side
+        # dist_v1 will also serve as initial guess
+        dist_v1 = {}
+        for key in op_imagfreq_keys:
+            if self.rank == mpi_master():
+                gradger, gradung = self.decomp_grad(v1[key])
+                grad_ru = gradung.real
+                grad_ig = gradger.imag
+            else:
+                grad_ru, grad_ig = None, None
+            dist_v1[key] = (DistributedArray(grad_ru, self.comm),
+                            DistributedArray(grad_ig, self.comm))
+
         rsp_vector_labels = [
             'C6_bger_half_size',
             'C6_bung_half_size',
@@ -304,8 +287,7 @@ class C6Solver(LinearSolver):
 
         # generate initial guess from scratch
         else:
-            igs = self.initial_guess(v1, op_imagfreq_keys)
-            bger, bung = self.setup_trials(igs, precond)
+            bger, bung = self.setup_trials(dist_v1, precond)
 
             self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
                                eri_dict, dft_dict, pe_dict, timing_dict)
@@ -345,19 +327,11 @@ class C6Solver(LinearSolver):
                 if (iteration == 0 or
                         relative_residual_norm[(op, iw)] > self.conv_thresh):
 
-                    if self.rank == mpi_master():
-                        grad = v1[(op, iw)]
-                        gradger, gradung = self.decomp_grad(grad)
-                        gradung_real = gradung.real
-                    else:
-                        gradung_real = None
-                    self.dist_grad_realung = DistributedArray(
-                        gradung_real, self.comm)
+                    grad_ru, grad_ig = dist_v1[(op, iw)]
 
                     # projections onto gerade and ungerade subspaces:
 
-                    g_realung = self.dist_bung.matmul_AtB(
-                        self.dist_grad_realung, 2.0)
+                    g_realung = self.dist_bung.matmul_AtB(grad_ru, 2.0)
 
                     # creating gradient and matrix for linear equation
 
@@ -395,69 +369,56 @@ class C6Solver(LinearSolver):
 
                     # ...and projecting them onto respective subspace
 
-                    x_realung = self.dist_bung.matmul_AB(c_realung)
-                    x_imagger = self.dist_bger.matmul_AB(c_imagger)
-
-                    # composing full size response vector
-
-                    if self.rank == mpi_master():
-
-                        x_real = np.hstack((x_realung, -x_realung))
-                        x_imag = np.hstack((x_imagger, x_imagger))
-
-                        xv = np.matmul(x_real + 1j * x_imag, grad)
-                        xvs.append((op, iw, xv))
+                    x_realung = self.dist_bung.matmul_AB_no_gather(c_realung)
+                    x_imagger = self.dist_bger.matmul_AB_no_gather(c_imagger)
 
                     # composing E2 matrices projected onto solution subspace
 
-                    e2imagger = self.dist_e2bger.matmul_AB(c_imagger)
-                    e2realung = self.dist_e2bung.matmul_AB(c_realung)
+                    e2imagger = self.dist_e2bger.matmul_AB_no_gather(c_imagger)
+                    e2realung = self.dist_e2bung.matmul_AB_no_gather(c_realung)
 
                     # calculating the residual components
 
-                    if self.rank == mpi_master():
+                    s2imagger = 2.0 * x_imagger.data
+                    s2realung = 2.0 * x_realung.data
 
-                        s2imagger = 2.0 * x_imagger
-                        s2realung = 2.0 * x_realung
+                    r_realung = (e2realung.data + iw * s2imagger - grad_ru.data)
+                    r_imagger = (-e2imagger.data + iw * s2realung +
+                                 grad_ig.data)
 
-                        r_realung = (e2realung + iw * s2imagger - gradung.real)
-                        r_imagger = (-e2imagger + iw * s2realung + gradger.imag)
-                    else:
-                        r_realung, r_imagger = None, None
+                    r_realung = DistributedArray(r_realung,
+                                                 self.comm,
+                                                 distribute=False)
+                    r_imagger = DistributedArray(r_imagger,
+                                                 self.comm,
+                                                 distribute=False)
 
                     # calculating relative residual norm
                     # for convergence check
 
+                    r = (r_realung, r_imagger)
+                    x = (x_realung, x_imagger)
+
+                    x_full = self.get_full_solution_vector(x)
                     if self.rank == mpi_master():
-                        r = np.hstack((r_realung, r_imagger))
-                        x = np.hstack((x_realung, x_imagger))
+                        xv = np.dot(x_full, v1[(op, iw)])
+                        xvs.append((op, iw, xv))
 
-                        rn = sqrt_2 * math.sqrt(sum([np.dot(p, p) for p in r]))
-                        xn = sqrt_2 * math.sqrt(sum([np.dot(p, p) for p in x]))
+                    r_norms = [sqrt_2 * p.norm() for p in r]
+                    x_norms = [sqrt_2 * p.norm() for p in x]
 
-                        if xn != 0:
-                            relative_residual_norm[(op, iw)] = rn / xn
-                        else:
-                            relative_residual_norm[(op, iw)] = rn
+                    rn = math.sqrt(sum([n**2 for n in r_norms]))
+                    xn = math.sqrt(sum([n**2 for n in x_norms]))
 
-                        op_w_converged = (relative_residual_norm[(op, iw)] <
-                                          self.conv_thresh)
+                    if xn != 0:
+                        relative_residual_norm[(op, iw)] = rn / xn
                     else:
-                        op_w_converged = False
-                    op_w_converged = self.comm.bcast(op_w_converged,
-                                                     root=mpi_master())
+                        relative_residual_norm[(op, iw)] = rn
 
-                    if op_w_converged:
-                        x = (DistributedArray(x_realung, self.comm),
-                             DistributedArray(x_imagger, self.comm))
+                    if relative_residual_norm[(op, iw)] < self.conv_thresh:
                         solutions[(op, iw)] = x
                     else:
-                        r = (DistributedArray(r_realung, self.comm),
-                             DistributedArray(r_imagger, self.comm))
                         residuals[(op, iw)] = r
-
-            relative_residual_norm = self.comm.bcast(relative_residual_norm,
-                                                     root=mpi_master())
 
             # write to output
             if self.rank == mpi_master():

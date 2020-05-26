@@ -150,6 +150,17 @@ class LinearResponseSolver(LinearSolver):
         freqs = set([w for (op, w) in op_freq_keys])
         precond = {w: self.get_precond(orb_ene, nocc, norb, w) for w in freqs}
 
+        # distribute the right-hand side
+        # dist_v1 will also serve as initial guess
+        dist_v1 = {}
+        for key in op_freq_keys:
+            if self.rank == mpi_master():
+                gradger, gradung = self.decomp_grad(v1[key])
+            else:
+                gradger, gradung = None, None
+            dist_v1[key] = (DistributedArray(gradger, self.comm),
+                            DistributedArray(gradung, self.comm))
+
         rsp_vector_labels = [
             'LR_bger_half_size',
             'LR_bung_half_size',
@@ -171,8 +182,7 @@ class LinearResponseSolver(LinearSolver):
 
         # generate initial guess from scratch
         else:
-            igs = self.initial_guess(v1, op_freq_keys)
-            bger, bung = self.setup_trials(igs, precond)
+            bger, bung = self.setup_trials(dist_v1, precond)
 
             self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
                                eri_dict, dft_dict, pe_dict, timing_dict)
@@ -213,16 +223,10 @@ class LinearResponseSolver(LinearSolver):
                         relative_residual_norm[(op, freq)] < self.conv_thresh):
                     continue
 
-                if self.rank == mpi_master():
-                    v = v1[(op, freq)]
-                    gradger, gradung = self.decomp_grad(v)
-                else:
-                    gradger, gradung = None, None
-                self.dist_gradger = DistributedArray(gradger, self.comm)
-                self.dist_gradung = DistributedArray(gradung, self.comm)
+                gradger, gradung = dist_v1[(op, freq)]
 
-                g_ger = self.dist_bger.matmul_AtB(self.dist_gradger, 2.0)
-                g_ung = self.dist_bung.matmul_AtB(self.dist_gradung, 2.0)
+                g_ger = self.dist_bger.matmul_AtB(gradger, 2.0)
+                g_ung = self.dist_bung.matmul_AtB(gradung, 2.0)
 
                 if self.rank == mpi_master():
                     mat = np.zeros((n_ger + n_ung, n_ger + n_ung))
@@ -243,57 +247,45 @@ class LinearResponseSolver(LinearSolver):
                 c_ger = c[:n_ger]
                 c_ung = c[n_ger:]
 
-                x_ger = self.dist_bger.matmul_AB(c_ger)
-                x_ung = self.dist_bung.matmul_AB(c_ung)
+                x_ger = self.dist_bger.matmul_AB_no_gather(c_ger)
+                x_ung = self.dist_bung.matmul_AB_no_gather(c_ung)
 
-                e2x_ger = self.dist_e2bger.matmul_AB(c_ger)
-                e2x_ung = self.dist_e2bung.matmul_AB(c_ung)
+                e2x_ger = self.dist_e2bger.matmul_AB_no_gather(c_ger)
+                e2x_ung = self.dist_e2bung.matmul_AB_no_gather(c_ung)
+
+                s2x_ger = 2.0 * x_ger.data
+                s2x_ung = 2.0 * x_ung.data
+
+                r_ger = e2x_ger.data - freq * s2x_ung - gradger.data
+                r_ung = e2x_ung.data - freq * s2x_ger - gradung.data
+
+                r_ger = DistributedArray(r_ger, self.comm, distribute=False)
+                r_ung = DistributedArray(r_ung, self.comm, distribute=False)
+
+                r = (r_ger, r_ung)
+                x = (x_ger, x_ung)
+
+                x_full = self.get_full_solution_vector(x)
 
                 if self.rank == mpi_master():
-                    s2x_ger = 2.0 * x_ger
-                    s2x_ung = 2.0 * x_ung
-
-                    x_ger_full = np.hstack((x_ger, x_ger))
-                    x_ung_full = np.hstack((x_ung, -x_ung))
-
-                    xv = np.dot(x_ger_full + x_ung_full, v)
+                    xv = np.dot(x_full, v1[(op, freq)])
                     xvs.append((op, freq, xv))
 
-                    r_ger = e2x_ger - freq * s2x_ung - gradger
-                    r_ung = e2x_ung - freq * s2x_ger - gradung
+                r_norms = [sqrt_2 * p.norm() for p in r]
+                x_norms = [sqrt_2 * p.norm() for p in x]
+
+                rn = math.sqrt(sum([n**2 for n in r_norms]))
+                xn = math.sqrt(sum([n**2 for n in x_norms]))
+
+                if xn != 0:
+                    relative_residual_norm[(op, freq)] = rn / xn
                 else:
-                    r_ger, r_ung = None, None
+                    relative_residual_norm[(op, freq)] = rn
 
-                if self.rank == mpi_master():
-                    r = (r_ger, r_ung)
-                    x = (x_ger, x_ung)
-
-                    rn = sqrt_2 * math.sqrt(sum([np.dot(p, p) for p in r]))
-                    xn = sqrt_2 * math.sqrt(sum([np.dot(p, p) for p in x]))
-
-                    if xn != 0:
-                        relative_residual_norm[(op, freq)] = rn / xn
-                    else:
-                        relative_residual_norm[(op, freq)] = rn
-
-                    op_w_converged = (relative_residual_norm[(op, freq)] <
-                                      self.conv_thresh)
-                else:
-                    op_w_converged = False
-                op_w_converged = self.comm.bcast(op_w_converged,
-                                                 root=mpi_master())
-
-                if op_w_converged:
-                    x = (DistributedArray(x_ger, self.comm),
-                         DistributedArray(x_ung, self.comm))
+                if relative_residual_norm[(op, freq)] < self.conv_thresh:
                     solutions[(op, freq)] = x
                 else:
-                    r = (DistributedArray(r_ger, self.comm),
-                         DistributedArray(r_ung, self.comm))
                     residuals[(op, freq)] = r
-
-            relative_residual_norm = self.comm.bcast(relative_residual_norm,
-                                                     root=mpi_master())
 
             # write to output
             if self.rank == mpi_master():
@@ -473,36 +465,6 @@ class LinearResponseSolver(LinearSolver):
             self.ostream.print_header(output_iter.ljust(width))
         self.ostream.print_blank()
         self.ostream.flush()
-
-    def initial_guess(self, v1, op_freq_keys):
-        """
-        Creating initial guess for the linear response solver.
-
-        :param v1:
-            The dictionary containing (operator, frequency) as keys and
-            right-hand sides as values.
-        :param op_freq_keys:
-            The list of operator-frequency combinations.
-
-        :return:
-            The initial guess of distributed trial vectors.
-        """
-
-        ig = {}
-        sqrt_2 = math.sqrt(2.0)
-
-        for key in op_freq_keys:
-            if self.rank == mpi_master():
-                gradger, gradung = self.decomp_grad(v1[key])
-                grad = (gradger, gradung)
-                gn = sqrt_2 * math.sqrt(sum([np.dot(g, g) for g in grad]))
-                if gn < self.small_thresh:
-                    grad = tuple([np.zeros(g) for g in grad])
-            else:
-                grad = (None, None)
-            ig[key] = tuple([DistributedArray(g, self.comm) for g in grad])
-
-        return ig
 
     def get_precond(self, orb_ene, nocc, norb, w):
         """
