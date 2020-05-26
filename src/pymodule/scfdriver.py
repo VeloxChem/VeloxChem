@@ -1346,7 +1346,12 @@ class ScfDriver:
             The range of SCF iterations.
         """
 
-        return range(self.max_iter + 1)
+        # set the maximum number of SCF iterations
+        # (note the extra SCF cycle when starting from scratch)
+        if self.restart:
+            return range(self.max_iter)
+        else:
+            return range(self.max_iter + 1)
 
     def print_scf_energy(self):
         """
