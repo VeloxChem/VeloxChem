@@ -343,18 +343,14 @@ class LinearSolver:
         self.ostream.print_info(checkpoint_text)
         self.ostream.print_blank()
 
-    def append_vectors(self, bger, bung, e2bger, e2bung):
+    def append_trial_vectors(self, bger, bung):
         """
-        Appends distributed vectors.
+        Appends distributed trial vectors.
 
         :param bger:
             The distributed gerade trial vectors.
         :param bung:
             The distributed ungerade trial vectors.
-        :param e2bger:
-            The distributed gerade sigma vectors.
-        :param e2bung:
-            The distributed ungerade sigma vectors.
         """
 
         if self.dist_bger is None:
@@ -370,6 +366,16 @@ class LinearSolver:
                                               distribute=False)
         else:
             self.dist_bung.append(bung, axis=1)
+
+    def append_sigma_vectors(self, e2bger, e2bung):
+        """
+        Appends distributed sigma (E2 b) vectors.
+
+        :param e2bger:
+            The distributed gerade sigma vectors.
+        :param e2bung:
+            The distributed ungerade sigma vectors.
+        """
 
         if self.dist_e2bger is None:
             self.dist_e2bger = DistributedArray(e2bger.data,
@@ -552,20 +558,25 @@ class LinearSolver:
                               pe_dict, timing_dict)
 
             if self.rank == mpi_master():
-                faks = []
-                for ifock in range(fock.number_of_fock_matrices()):
-                    faks.append(fock.alpha_to_numpy(ifock).T)
 
-                gv = np.zeros((half_size, n_total))
+                batch_ger, batch_ung = 0, 0
+                for col in range(batch_start, batch_end):
+                    if col < n_ger:
+                        batch_ger += 1
+                    else:
+                        batch_ung += 1
 
-                for col, kn in enumerate(kns):
+                e2_ger = np.zeros((half_size, batch_ger))
+                e2_ung = np.zeros((half_size, batch_ung))
 
-                    fak = faks[col]
-                    # fak = fock.alpha_to_numpy(col).T
-                    # fbk = fock.beta_to_numpy(col).T
+                for ifock in range(batch_ger + batch_ung):
+                    fak = fock.alpha_to_numpy(ifock).T
+                    # fbk = fock.beta_to_numpy(ifock).T
 
-                    kfa = np.linalg.multi_dot([S, kn, fa])
-                    kfa -= np.linalg.multi_dot([fa, kn, S])
+                    kn = kns[ifock]
+
+                    kfa = (np.linalg.multi_dot([S, kn, fa]) -
+                           np.linalg.multi_dot([fa, kn, S]))
                     # kfb = S @ kn @ fb - fb @ kn @ S
 
                     fat = fak + kfa
@@ -579,17 +590,21 @@ class LinearSolver:
 
                     gmo = np.linalg.multi_dot([mo.T, gao, mo])
 
-                    gv[:, col] = -self.lrmat2vec(gmo, nocc, norb)[:half_size]
-
-                e2_ger = gv[:, :n_ger]
-                e2_ung = gv[:, n_ger:]
+                    if ifock < batch_ger:
+                        e2_ger[:, ifock] = -self.lrmat2vec(gmo, nocc,
+                                                           norb)[:half_size]
+                    else:
+                        e2_ung[:, ifock - batch_ger] = -self.lrmat2vec(
+                            gmo, nocc, norb)[:half_size]
             else:
                 e2_ger = None
                 e2_ung = None
             vecs_e2_ger = DistributedArray(e2_ger, self.comm)
             vecs_e2_ung = DistributedArray(e2_ung, self.comm)
 
-            self.append_vectors(vecs_ger, vecs_ung, vecs_e2_ger, vecs_e2_ung)
+            self.append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+
+        self.append_trial_vectors(vecs_ger, vecs_ung)
 
         self.ostream.print_blank()
 
