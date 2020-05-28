@@ -187,12 +187,12 @@ class LinearResponseEigenSolver(LinearSolver):
                 evecs = evecs[:, p]
 
                 wn = 1.0 / np.sqrt(evals[:self.nstates])
-                c_ger = np.matmul(tmat, evecs[:, :self.nstates])
+                c_ger = np.matmul(tmat, evecs[:, :self.nstates].copy())
                 c_ung = wn * np.linalg.multi_dot([e2uu_inv, s2ug, c_ger])
 
                 for k in range(self.nstates):
-                    c_ger_k = c_ger[:, k]
-                    c_ung_k = c_ung[:, k]
+                    c_ger_k = c_ger[:, k].copy()
+                    c_ung_k = c_ung[:, k].copy()
                     norm = np.sqrt(
                         np.linalg.multi_dot([c_ung_k.T, s2ug, c_ger_k]) +
                         np.linalg.multi_dot([c_ger_k.T, s2ug.T, c_ung_k]))
@@ -530,13 +530,13 @@ class LinearResponseEigenSolver(LinearSolver):
             norms = [sqrt_2 * p.norm() for p in v]
             vn = math.sqrt(sum([n**2 for n in norms]))
 
-            # TODO: check gerade and ungerade norms
-
             if vn > self.small_thresh:
                 # gerade
-                trials_ger.append(v[0].data)
+                if norms[0] > self.small_thresh:
+                    trials_ger.append(v[0].data)
                 # ungerade
-                trials_ung.append(v[1].data)
+                if norms[1] > self.small_thresh:
+                    trials_ung.append(v[1].data)
 
         new_ger = np.array(trials_ger).T
         new_ung = np.array(trials_ung).T

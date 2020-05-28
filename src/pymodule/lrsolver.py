@@ -546,13 +546,13 @@ class LinearResponseSolver(LinearSolver):
             norms = [sqrt_2 * p.norm() for p in v]
             vn = math.sqrt(sum([n**2 for n in norms]))
 
-            # TODO: check gerade and ungerade norms
-
             if vn > self.small_thresh:
                 # gerade
-                trials_ger.append(v[0].data)
+                if norms[0] > self.small_thresh:
+                    trials_ger.append(v[0].data)
                 # ungerade
-                trials_ung.append(v[1].data)
+                if norms[1] > self.small_thresh:
+                    trials_ung.append(v[1].data)
 
         new_ger = np.array(trials_ger).T
         new_ung = np.array(trials_ung).T
