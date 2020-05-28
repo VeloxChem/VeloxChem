@@ -294,6 +294,7 @@ class ScfDriver:
             if self.rank == mpi_master():
                 self.ref_mol_orbs = MolecularOrbitals.read_hdf5(
                     self.checkpoint_file)
+                self.mol_orbs = MolecularOrbitals(self.ref_mol_orbs)
         else:
             self.den_guess = DensityGuess("SAD")
 
@@ -535,7 +536,7 @@ class ScfDriver:
                                                     ao_basis, qq_data, e_grad)
 
             profiler.stop_timer(self.num_iter, 'FockBuild')
-            profiler.start_timer(self.num_iter, 'FockDiag')
+            profiler.start_timer(self.num_iter, 'CompEnergy')
 
             e_ee, e_kin, e_en = self.comp_energy(fock_mat, vxc_mat, e_pe,
                                                  kin_mat, npot_mat, den_mat)
@@ -556,9 +557,18 @@ class ScfDriver:
                 'diff_density': diff_den,
             })
 
-            self.check_convergence()
+            profiler.stop_timer(self.num_iter, 'CompEnergy')
+            profiler.check_memory_usage('Iteration {:d} Fock build'.format(
+                self.num_iter))
 
             self.print_iter_data(i)
+
+            self.check_convergence()
+
+            if self.is_converged:
+                break
+
+            profiler.start_timer(self.num_iter, 'FockDiag')
 
             self.store_diis_data(i, fock_mat, den_mat)
 
@@ -578,23 +588,19 @@ class ScfDriver:
             if (self.dft or self.pe) and not self.first_step:
                 profiler.update_timer(self.num_iter, self.timing_dict)
 
-            profiler.check_memory_usage('Iteration {:d}'.format(self.num_iter))
+            profiler.check_memory_usage('Iteration {:d} Fock diag'.format(
+                self.num_iter))
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
 
             if self.need_graceful_exit(iter_in_hours):
                 self.graceful_exit(molecule, ao_basis)
 
-            if self.is_converged:
-                break
-
         if not self.first_step:
             signal_handler.remove_sigterm_function()
 
-        # do not overwrite converged checkpoint file
-        if not (self.restart and self.num_iter == 1):
-            self.write_checkpoint(molecule.elem_ids_to_numpy(),
-                                  ao_basis.get_label())
+        self.write_checkpoint(molecule.elem_ids_to_numpy(),
+                              ao_basis.get_label())
 
         if self.rank == mpi_master():
             self.scf_tensors = {

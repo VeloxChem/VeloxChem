@@ -130,6 +130,8 @@ def main():
             rsp_dict['eri_thresh'] = scf_drv.eri_thresh
         if 'qq_type' not in rsp_dict:
             rsp_dict['qq_type'] = scf_drv.qq_type
+        if not scf_drv.restart:
+            rsp_dict['restart'] = 'no'
 
         if 'property' not in rsp_dict:
             rsp_dict['property'] = 'custom'
