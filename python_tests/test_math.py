@@ -3,6 +3,7 @@ import unittest
 
 from veloxchem.veloxchemlib import DenseMatrix
 from veloxchem.veloxchemlib import matmul
+from veloxchem.veloxchemlib import eigh
 
 
 class TestMath(unittest.TestCase):
@@ -94,6 +95,24 @@ class TestMath(unittest.TestCase):
 
         mat_C = matmul(mat_A.T.copy(), mat_B.T.copy())
         self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+    def test_eigh(self):
+
+        mat_A = np.arange(10., 20.)
+        np.random.shuffle(mat_A)
+        mat_A = np.diag(mat_A)
+        mat_A += np.random.uniform(0.01, 0.99, 100).reshape(10, 10)
+        mat_A = 0.5 * (mat_A + mat_A.T)
+        ref_eigvals, ref_eigvecs = np.linalg.eigh(mat_A)
+
+        eigvals, eigvecs = eigh(mat_A)
+        self.assertTrue(np.max(np.abs(eigvals - ref_eigvals)) < 1.0e-13)
+        for k in range(ref_eigvecs.shape[1]):
+            vec = eigvecs[:, k].copy()
+            ref_vec = ref_eigvecs[:, k].copy()
+            if np.dot(vec, ref_vec) < 0.0:
+                vec *= -1.0
+            self.assertTrue(np.max(np.abs(vec - ref_vec)) < 1.0e-13)
 
 
 if __name__ == "__main__":

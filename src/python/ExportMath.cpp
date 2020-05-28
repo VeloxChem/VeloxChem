@@ -118,7 +118,7 @@ matmul(const py::array_t<double>& A, const py::array_t<double>& B)
 
     errors::assertMsgCritical(ncol_A == nrow_B, "matmul - Inconsistent sizes");
 
-    // check storage style
+    // check layout
 
     auto c_style_A = py::detail::check_flags(A.ptr(), py::array::c_style);
 
@@ -180,6 +180,77 @@ matmul(const py::array_t<double>& A, const py::array_t<double>& B)
     return C;
 }
 
+static py::list
+eigh(const py::array_t<double>& A)
+{
+    // check dimension and shape
+
+    errors::assertMsgCritical(A.ndim() == 2, "eigh - Invalid shape of matrix A");
+
+    auto nrow_A = A.shape(0);
+
+    auto ncol_A = A.shape(1);
+
+    errors::assertMsgCritical(ncol_A == nrow_A, "eigh - Matrix A is not symmetric");
+
+    // check layout
+
+    auto c_style_A = py::detail::check_flags(A.ptr(), py::array::c_style);
+
+    auto f_style_A = py::detail::check_flags(A.ptr(), py::array::f_style);
+
+    errors::assertMsgCritical(c_style_A | f_style_A, "matmul - Matrix A is noncontiguous");
+
+    auto layout_A = LAPACK_ROW_MAJOR;
+
+    if (f_style_A) layout_A = LAPACK_COL_MAJOR;
+
+    // copy matrix into temporary storage
+
+    auto dim = nrow_A;
+
+    py::array_t<double> tmp_A({dim, dim});
+
+    std::memcpy(tmp_A.mutable_data(), A.data(), A.size() * sizeof(double));
+
+    // initialize eigenvalues and eigenvectors
+
+    py::array_t<double> eigenValues({dim});
+
+    py::array_t<double> eigenVectors({dim, dim});
+
+    // set up pointers to matrices and vectors
+
+    auto mat = tmp_A.mutable_data();
+
+    auto evecs = eigenVectors.mutable_data();
+
+    auto evals = eigenValues.mutable_data();
+
+    // temporary array for pivot data
+
+    CMemBlock<int32_t> idx(2 * dim);
+
+    // initialize number of eigenvalues
+
+    int32_t nval = 0;
+
+    // diagonalize matrix
+
+    auto st = LAPACKE_dsyevr(
+        layout_A, 'V', 'A', 'U', dim, mat, dim, 0.0, 0.0, 0, 0, 1.0e-13, &nval, evals, evecs, dim, idx.data());
+
+    errors::assertMsgCritical(st == 0, "eigh - Diagonalization failed");
+
+    py::list result;
+
+    result.append(eigenValues);
+
+    result.append(eigenVectors);
+
+    return result;
+}
+
 // Exports classes/functions in src/math to python
 
 void
@@ -214,6 +285,8 @@ export_math(py::module& m)
     m.def("mathconst_pi", &mathconst::getPiValue);
 
     m.def("matmul", &matmul);
+
+    m.def("eigh", &eigh);
 }
 
 }  // namespace vlx_math
