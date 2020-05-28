@@ -383,8 +383,8 @@ class ExcitonModelDriver:
 
                 nocc = monomer.number_of_alpha_electrons()
                 nvir = self.monomers[ind]['C'].shape[1] - nocc
-                mo_occ = self.monomers[ind]['C'][:, :nocc]
-                mo_vir = self.monomers[ind]['C'][:, nocc:]
+                mo_occ = self.monomers[ind]['C'][:, :nocc].copy()
+                mo_vir = self.monomers[ind]['C'][:, nocc:].copy()
 
                 for s in range(self.nstates):
                     # LE excitation energy
@@ -392,7 +392,7 @@ class ExcitonModelDriver:
                     self.H[h, h] = self.monomers[ind]['exc_energies'][s]
 
                     # LE transition dipole
-                    vec = self.monomers[ind]['exc_vectors'][:, s]
+                    vec = self.monomers[ind]['exc_vectors'][:, s].copy()
                     tdens = math.sqrt(2.0) * np.matmul(
                         mo_occ, np.matmul(vec.reshape(nocc, nvir), mo_vir.T))
                     self.trans_dipoles[h, :] = np.array(
@@ -597,8 +597,8 @@ class ExcitonModelDriver:
                         mo[ao_inds_B[row], nocc_A:nocc] = CB[row, :nocc_B]
                         mo[ao_inds_B[row], nocc + nvir_A:] = CB[row, nocc_B:]
 
-                    mo_occ = mo[:, :nocc]
-                    mo_vir = mo[:, nocc:]
+                    mo_occ = mo[:, :nocc].copy()
+                    mo_vir = mo[:, nocc:].copy()
 
                     # compute density matrix
                     dens = np.matmul(mo_occ, mo_occ.T)
@@ -667,8 +667,8 @@ class ExcitonModelDriver:
                         fock += vxc_mat.get_matrix().to_numpy()
 
                     fock_mo = np.matmul(mo.T, np.matmul(fock, mo))
-                    fock_occ = fock_mo[:nocc, :nocc]
-                    fock_vir = fock_mo[nocc:, nocc:]
+                    fock_occ = fock_mo[:nocc, :nocc].copy()
+                    fock_vir = fock_mo[nocc:, nocc:].copy()
 
                     # assemble TDA CI vectors
 

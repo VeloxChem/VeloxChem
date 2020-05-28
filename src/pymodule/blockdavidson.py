@@ -137,7 +137,7 @@ class BlockDavidsonSolver:
         rlmat = np.matmul(self.trial_matrices.T, self.sigma_matrices)
 
         reigs, rvecs = np.linalg.eigh(rlmat)
-        yvecs = rvecs[:, :self.neigenpairs]
+        yvecs = rvecs[:, :self.neigenpairs].copy()
         self.residual_eigs = reigs[:self.neigenpairs]
 
         self.ritz_vectors = np.matmul(self.trial_matrices, yvecs)

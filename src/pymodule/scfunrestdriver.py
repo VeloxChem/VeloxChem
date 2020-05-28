@@ -255,8 +255,8 @@ class ScfUnrestrictedDriver(ScfDriver):
         a_b = float(nalpha - nbeta) / 2.0
         s2_exact = a_b * (a_b + 1.0)
 
-        Cocc_a = mol_orbs.alpha_to_numpy()[:, :nalpha]
-        Cocc_b = mol_orbs.beta_to_numpy()[:, :nbeta]
+        Cocc_a = mol_orbs.alpha_to_numpy()[:, :nalpha].copy()
+        Cocc_b = mol_orbs.beta_to_numpy()[:, :nbeta].copy()
 
         ovl_a_b = np.matmul(Cocc_a.T, np.matmul(smat, Cocc_b))
         s2 = s2_exact + nbeta - np.sum(ovl_a_b**2)

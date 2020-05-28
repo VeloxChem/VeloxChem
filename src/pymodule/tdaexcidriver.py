@@ -244,8 +244,8 @@ class TDAExciDriver(LinearSolver):
 
         if self.rank == mpi_master() and self.is_converged:
             nocc = molecule.number_of_alpha_electrons()
-            mo_occ = scf_tensors['C'][:, :nocc]
-            mo_vir = scf_tensors['C'][:, nocc:]
+            mo_occ = scf_tensors['C'][:, :nocc].copy()
+            mo_vir = scf_tensors['C'][:, nocc:].copy()
 
             eigvals, rnorms = self.solver.get_eigenvalues()
             eigvecs = self.solver.ritz_vectors
@@ -407,8 +407,8 @@ class TDAExciDriver(LinearSolver):
             nocc = molecule.number_of_alpha_electrons()
             norb = tensors['C'].shape[1]
             nvir = norb - nocc
-            mo_occ = tensors['C'][:, :nocc]
-            mo_vir = tensors['C'][:, nocc:]
+            mo_occ = tensors['C'][:, :nocc].copy()
+            mo_vir = tensors['C'][:, nocc:].copy()
             ao_mats = []
             for vec in trial_vecs:
                 mat = vec.zvector_to_numpy().reshape(nocc, nvir)
@@ -470,8 +470,8 @@ class TDAExciDriver(LinearSolver):
         nocc = molecule.number_of_alpha_electrons()
         norb = tensors['C'].shape[1]
         nvir = norb - nocc
-        mo_occ = tensors['C'][:, :nocc]
-        mo_vir = tensors['C'][:, nocc:]
+        mo_occ = tensors['C'][:, :nocc].copy()
+        mo_vir = tensors['C'][:, nocc:].copy()
         orb_ene = tensors['E']
 
         sigma_vecs = []
