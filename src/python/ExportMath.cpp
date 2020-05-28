@@ -13,6 +13,12 @@
 #include <memory>
 #include <vector>
 
+#ifdef ENABLE_MKL
+#include "mkl.h"
+#else
+#include "cblas.h"
+#endif
+
 #include "DenseMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
@@ -93,6 +99,87 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr)
     return std::shared_ptr<CDenseMatrix>(new CDenseMatrix(vec, nrows, ncols));
 }
 
+static py::array_t<double>
+matmul(const py::array_t<double>& A, const py::array_t<double>& B)
+{
+    // check dimension and shape
+
+    errors::assertMsgCritical(A.ndim() == 2, "matmul - Invalid shape of matrix A");
+
+    errors::assertMsgCritical(B.ndim() == 2, "matmul - Invalid shape of matrix B");
+
+    auto nrow_A = A.shape(0);
+
+    auto ncol_A = A.shape(1);
+
+    auto nrow_B = B.shape(0);
+
+    auto ncol_B = B.shape(1);
+
+    errors::assertMsgCritical(ncol_A == nrow_B, "matmul - Inconsistent sizes");
+
+    // check storage style
+
+    auto c_style_A = py::detail::check_flags(A.ptr(), py::array::c_style);
+
+    auto f_style_A = py::detail::check_flags(A.ptr(), py::array::f_style);
+
+    errors::assertMsgCritical(c_style_A | f_style_A, "matmul - Matrix A is noncontiguous");
+
+    auto c_style_B = py::detail::check_flags(B.ptr(), py::array::c_style);
+
+    auto f_style_B = py::detail::check_flags(B.ptr(), py::array::f_style);
+
+    errors::assertMsgCritical(c_style_B | f_style_B, "matmul - Matrix B is noncontiguous");
+
+    // check transpose
+
+    auto trans_A = CblasNoTrans;
+
+    auto lda_A = ncol_A;
+
+    if (f_style_A)
+    {
+        trans_A = CblasTrans;
+
+        lda_A = nrow_A;
+    }
+
+    auto trans_B = CblasNoTrans;
+
+    auto lda_B = ncol_B;
+
+    if (f_style_B)
+    {
+        trans_B = CblasTrans;
+
+        lda_B = nrow_B;
+    }
+
+    // compute matrix-matrix multiplication
+
+    py::array_t<double> C({nrow_A, ncol_B});
+
+    auto lda_C = ncol_B;
+
+    cblas_dgemm(CblasRowMajor,
+                trans_A,
+                trans_B,
+                nrow_A,
+                ncol_B,
+                ncol_A,
+                1.0,
+                A.data(),
+                lda_A,
+                B.data(),
+                lda_B,
+                0.0,
+                C.mutable_data(),
+                lda_C);
+
+    return C;
+}
+
 // Exports classes/functions in src/math to python
 
 void
@@ -125,6 +212,8 @@ export_math(py::module& m)
     // exposing functions
 
     m.def("mathconst_pi", &mathconst::getPiValue);
+
+    m.def("matmul", &matmul);
 }
 
 }  // namespace vlx_math

@@ -2,6 +2,7 @@ import numpy as np
 import unittest
 
 from veloxchem.veloxchemlib import DenseMatrix
+from veloxchem.veloxchemlib import matmul
 
 
 class TestMath(unittest.TestCase):
@@ -48,6 +49,51 @@ class TestMath(unittest.TestCase):
 
         self.assertEqual(matrix.slice(0, 1, 2, 2),
                          DenseMatrix([[2., 3.], [5., 6.]]))
+
+    def test_matmul(self):
+
+        mat_A = np.arange(6.).reshape(2, 3)
+        mat_B = np.arange(12.).reshape(3, 4)
+        ref_C = np.matmul(mat_A, mat_B)
+
+        mat_C = matmul(mat_A, mat_B)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_A = np.arange(6.).reshape(3, 2)
+        mat_B = np.arange(12.).reshape(3, 4)
+        ref_C = np.matmul(mat_A.T, mat_B)
+
+        mat_C = matmul(mat_A.T, mat_B)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_C = matmul(mat_A.T.copy(), mat_B)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_A = np.arange(6.).reshape(2, 3)
+        mat_B = np.arange(12.).reshape(4, 3)
+        ref_C = np.matmul(mat_A, mat_B.T)
+
+        mat_C = matmul(mat_A, mat_B.T)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_C = matmul(mat_A, mat_B.T.copy())
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_A = np.arange(6.).reshape(3, 2)
+        mat_B = np.arange(12.).reshape(4, 3)
+        ref_C = np.matmul(mat_A.T, mat_B.T)
+
+        mat_C = matmul(mat_A.T, mat_B.T)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_C = matmul(mat_A.T.copy(), mat_B.T)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_C = matmul(mat_A.T, mat_B.T.copy())
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_C = matmul(mat_A.T.copy(), mat_B.T.copy())
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
 
 
 if __name__ == "__main__":
