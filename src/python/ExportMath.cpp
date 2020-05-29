@@ -17,6 +17,7 @@
 #include "mkl.h"
 #else
 #include "cblas.h"
+#include "lapacke.h"
 #endif
 
 #include "DenseMatrix.hpp"
@@ -215,7 +216,7 @@ eigh(const py::array_t<double>& A)
 
     // initialize eigenvalues and eigenvectors
 
-    py::array_t<double> eigenValues({dim});
+    py::array_t<double> eigenValues(dim);
 
     py::array_t<double> eigenVectors({dim, dim});
 
