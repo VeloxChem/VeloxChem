@@ -59,7 +59,8 @@ class C6(ResponseProperty):
 
         return self.rsp_property[key]
 
-    def integrate(self, rsp_property, imagfreqs, points, weights, w0):
+    @staticmethod
+    def integrate(rsp_property, imagfreqs, points, weights, w0):
         """
         Calculates the C6 value with a Gauss-Legendre quadrature for the
         integral in the Casimir-Polder relation using integration by
