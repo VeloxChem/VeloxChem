@@ -188,7 +188,7 @@ class TestComplexResponse(unittest.TestCase):
             # Verify that the results stored are the same as expected
             self.assertTrue(np.allclose(hf.get('amplitudes')[()], amplitudes))
             self.assertTrue(np.allclose(hf.get('frequencies')[()], frequencies))
-            self.assertTrue(np.allclose(hf.get('xx')[()], xx))
+            self.assertTrue(np.allclose(hf.get('xx')[()], xx, rtol=5e-05))
 
             hf.close()
 
