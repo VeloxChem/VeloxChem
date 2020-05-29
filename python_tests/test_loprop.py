@@ -1,11 +1,10 @@
-import os
-import sys
-import textwrap
-from unittest.mock import patch, MagicMock
-
-import pytest
-import numpy.testing as npt
 from mpi4py import MPI
+from unittest.mock import patch, MagicMock
+import numpy.testing as npt
+import textwrap
+import pytest
+import sys
+import os
 
 from veloxchem.main import main
 from veloxchem.mpitask import MpiTask
@@ -20,8 +19,7 @@ from veloxchem.loprop import (
 
 @pytest.fixture
 def sample():
-    inp = textwrap.dedent(
-        """
+    inp = textwrap.dedent("""
         @jobs
         task: loprop
         @end
@@ -39,8 +37,7 @@ def sample():
         H   0.0   1.4   1.1
         H   0.0  -1.4   1.1
         @end
-        """
-    )
+        """)
     return inp
 
 
@@ -55,7 +52,10 @@ def test_loprop_called_from_main(mock_mpi, mock_scf, mock_uscf, sample, tmpdir):
     # given
     task = mock_mpi()
     task.input_dict = {
-        'jobs': {'task': 'loprop', 'maximum_hours': 1},
+        'jobs': {
+            'task': 'loprop',
+            'maximum_hours': 1
+        },
         'loprop': {}
     }
     input_file = f'{tmpdir/"water.inp"}'
@@ -83,7 +83,10 @@ def test_scf_called_from_main(mock_mpi, mock_scf, mock_uscf, sample, tmpdir):
     # given
     task = mock_mpi()
     task.input_dict = {
-        'jobs': {'task': 'loprop', 'maximum_hours': 1},
+        'jobs': {
+            'task': 'loprop',
+            'maximum_hours': 1
+        },
         'loprop': {}
     }
     input_file = f'{tmpdir/"water.inp"}'
@@ -93,9 +96,8 @@ def test_scf_called_from_main(mock_mpi, mock_scf, mock_uscf, sample, tmpdir):
 
     # when
     with patch('veloxchem.main.LoPropDriver', autospec=True):
-        with patch(
-            'veloxchem.main.ScfRestrictedDriver', autospec=True
-        ) as mock_scf:
+        with patch('veloxchem.main.ScfRestrictedDriver',
+                   autospec=True) as mock_scf:
             main()
 
     # then
@@ -115,8 +117,12 @@ def test_overlap_called(mock_to_dalton, mock_ovldrv, mock_h5py):
     mock_mpi = MagicMock()
     task = mock_mpi()
     task.input_dict = {
-        'loprop': {'checkpoint_file': 'water.loprop.h5'},
-        'scf': {'checkpoint_file': 'water.scf.h5'},
+        'loprop': {
+            'checkpoint_file': 'water.loprop.h5'
+        },
+        'scf': {
+            'checkpoint_file': 'water.scf.h5'
+        },
     }
 
     # when
@@ -135,8 +141,12 @@ def test_save_coordinates(mock_mpi, sample, tmpdir):
     # Given
     task = mock_mpi()
     task.input_dict = {
-        'loprop': {'checkpoint_file': f'{tmpdir}/water.loprop.h5'},
-        'scf': {'checkpoint_file': f'{tmpdir}/water.scf.h5'},
+        'loprop': {
+            'checkpoint_file': f'{tmpdir}/water.loprop.h5'
+        },
+        'scf': {
+            'checkpoint_file': f'{tmpdir}/water.scf.h5'
+        },
     }
     task.molecule.x_to_numpy.return_value = [0., 0., 0.]
     task.molecule.y_to_numpy.return_value = [0., 1.4, -1.4]
@@ -147,12 +157,8 @@ def test_save_coordinates(mock_mpi, sample, tmpdir):
     loprop_driver.save_coordinates()
 
     # then
-    npt.assert_allclose(
-        loprop_driver.get_coordinates(),
-        [[0.0,  0.0,  0.0],
-         [0.0,  1.4,  1.1],
-         [0.0, -1.4,  1.1]]
-    )
+    npt.assert_allclose(loprop_driver.get_coordinates(),
+                        [[0.0, 0.0, 0.0], [0.0, 1.4, 1.1], [0.0, -1.4, 1.1]])
 
 
 def test_input_dict(sample, tmpdir):
@@ -177,8 +183,7 @@ def test_input_settings(tmpdir):
     Verify loprop options
     """
     input_file = f'{tmpdir/"water.inp"}'
-    input_content = textwrap.dedent(
-        """
+    input_content = textwrap.dedent("""
         @jobs
         task: 'loprop'
         @end
@@ -186,8 +191,7 @@ def test_input_settings(tmpdir):
         @loprop
         localize: charges
         @end
-        """
-    )
+        """)
     with open(input_file, 'w') as f:
         f.write(input_content)
 
@@ -201,8 +205,7 @@ def test_wrong_input(tmpdir):
     Verify loprop options
     """
     input_file = f'{tmpdir/"water.inp"}'
-    input_content = textwrap.dedent(
-        """
+    input_content = textwrap.dedent("""
         @jobs
         task: loprop
         @end
@@ -210,8 +213,7 @@ def test_wrong_input(tmpdir):
         @loprop
         localize: notimplemented
         @end
-        """
-    )
+        """)
     with open(input_file, 'w') as f:
         f.write(input_content)
 
@@ -257,12 +259,8 @@ def test_opa(sample, tmpdir):
     assert loprop_driver.get_opa() == [[0, 1, 3, 4, 5], [0], [0]]
 
 
-@pytest.mark.parametrize(
-    'input, expected',
-    [
-        (
-            textwrap.dedent(
-                """
+@pytest.mark.parametrize('input, expected', [
+    (textwrap.dedent("""
                 @ATOMBASIS H
                 S 3  1
                 1.301070100000e+01  1.968215800000e-02
@@ -273,13 +271,11 @@ def test_opa(sample, tmpdir):
                 P 1  1
                 8.000000000000e-01  1.000000000000e+00
                 @END
-                """
-            ),
-            {'S': 2, 'P': 1}
-        ),
-        (
-            textwrap.dedent(
-                """
+                """), {
+        'S': 2,
+        'P': 1
+    }),
+    (textwrap.dedent("""
                 @ATOMBASIS O
                 S 5  1
                 2.266176778500e+03 -5.343180992600e-03
@@ -300,23 +296,23 @@ def test_opa(sample, tmpdir):
                 D 1  1
                 1.200000000000e+00  1.000000000000e+00
                 @END
-                """
-            ),
-            {'S': 3, 'P': 2, 'D': 1}
-        ),
-    ],
-    ids=['H:2S1P', 'O:3S2P1D']
-)
+                """), {
+        'S': 3,
+        'P': 2,
+        'D': 1
+    }),
+],
+                         ids=['H:2S1P', 'O:3S2P1D'])
 def test_count_contracted(input, expected):
     assert count_contracted(input.split('\n')) == expected
 
 
-@pytest.mark.parametrize(
-    'input, expected',
-    [
-        ({'S': 2, 'P': 1}, 5),
-    ]
-)
+@pytest.mark.parametrize('input, expected', [
+    ({
+        'S': 2,
+        'P': 1
+    }, 5),
+])
 def test_count_contracted_on_atom(input, expected):
     assert count_contracted_on_atom(input) == expected
 
@@ -345,45 +341,42 @@ def test_get_lib_basis_file():
 class TestIntegrations:
 
     def test_h2o_only_charges(self, capsys, tmpdir):
-        inp = textwrap.dedent(
-            """
-            @jobs
-            task: loprop
-            maximum_hours: 1
-            @end
+        if MPI.COMM_WORLD.Get_size() == 1:
 
-            @method settings
-            basis: def2-svp
-            @end
+            inp = textwrap.dedent("""
+                @jobs
+                task: loprop
+                maximum_hours: 1
+                @end
 
-            @molecule
-            charge: 0
-            multiplicity: 1
-            units: au
-            xyz:
-            O   0.0   0.0   0.0
-            H   0.0   1.4   1.1
-            H   0.0  -1.4   1.1
-            @end
-            """
-        )
-        input_file = f'{tmpdir/"water.inp"}'
-        with open(input_file, 'w') as f:
-            f.write(inp)
+                @method settings
+                basis: def2-svp
+                @end
 
-        sys.argv[1:] = [input_file]
-        main()
-        std = capsys.readouterr()
+                @molecule
+                charge: 0
+                multiplicity: 1
+                units: au
+                xyz:
+                O   0.0   0.0   0.0
+                H   0.0   1.4   1.1
+                H   0.0  -1.4   1.1
+                @end
+                """)
+            input_file = f'{tmpdir/"water.inp"}'
+            with open(input_file, 'w') as f:
+                f.write(inp)
 
-        expected = textwrap.dedent(
-            """
-            AU
-            3 0 0 1
-            1     0.000     0.000     0.000     0.060
-            1     0.000     1.400     1.100    -0.030
-            1     0.000    -1.400     1.100    -0.030
-            """
+            sys.argv[1:] = [input_file]
+            main()
+            std = capsys.readouterr()
 
-        )
+            expected = textwrap.dedent("""
+                AU
+                3 0 0 1
+                1     0.000     0.000     0.000     0.060
+                1     0.000     1.400     1.100    -0.030
+                1     0.000    -1.400     1.100    -0.030
+                """)
 
-        assert expected in std.out
+            assert expected in std.out
