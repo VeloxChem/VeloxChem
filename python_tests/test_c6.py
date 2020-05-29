@@ -32,7 +32,7 @@ class TestC6(unittest.TestCase):
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        ref_freqs, ref_results, ref_c6_value = self.comp_ref_c6(data_lines)
+        ref_freqs, ref_results = self.get_ref_data(data_lines)
         ref_n_points = len(ref_freqs)
 
         c6_solver = C6Solver(task.mpi_comm, task.ostream)
@@ -67,7 +67,7 @@ class TestC6(unittest.TestCase):
             self.assertTrue(abs(c6_value - ref_c6_value) < 1.0e-4)
 
     @staticmethod
-    def comp_ref_c6(data_lines):
+    def get_ref_data(data_lines):
 
         ref_freqs = set()
         ref_results = {'response_functions': {}}
@@ -85,13 +85,8 @@ class TestC6(unittest.TestCase):
                                                freq)] = -(prop_real + 0j)
 
         ref_freqs = sorted(list(ref_freqs), reverse=True)[:-1]
-        ref_n_points = len(ref_freqs)
 
-        points, weights = np.polynomial.legendre.leggauss(ref_n_points)
-        ref_c6_value = C6.integrate(ref_results, ref_freqs, points, weights,
-                                    0.3)
-
-        return ref_freqs, ref_results, ref_c6_value
+        return ref_freqs, ref_results
 
     def test_c6_hf(self):
 
