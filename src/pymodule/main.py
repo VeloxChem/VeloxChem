@@ -81,7 +81,7 @@ def main():
 
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'scf', 'wavefunction', 'wave function', 'mp2',
-        'response', 'visualization', 'loprop'
+        'response', 'pulses', 'visualization', 'loprop'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -168,9 +168,20 @@ def main():
 
     # Pulsed Linear Response Theory
 
-    if 'pulses' in task.input_dict and scf_drv.restricted:
-        prt_dict = task.input_dict['pulses']
+    if ((task_type == 'pulses' or 'pulses' in task.input_dict) and
+            scf_drv.restricted):
+        if 'pulses' in task.input_dict:
+            prt_dict = task.input_dict['pulses']
+        else:
+            prt_dict = {}
         cpp_dict = {}
+
+        if 'eri_thresh' not in cpp_dict:
+            cpp_dict['eri_thresh'] = scf_drv.eri_thresh
+        if 'qq_type' not in cpp_dict:
+            cpp_dict['qq_type'] = scf_drv.qq_type
+        if not scf_drv.restart:
+            cpp_dict['restart'] = 'no'
 
         pulsed_response = PulsedResponse(task.mpi_comm, task.ostream)
         pulsed_response.update_settings(prt_dict, cpp_dict)
@@ -183,6 +194,11 @@ def main():
             mp2_dict = task.input_dict['mp2']
         else:
             mp2_dict = {}
+
+        if 'eri_thresh' not in mp2_dict:
+            mp2_dict['eri_thresh'] = scf_drv.eri_thresh
+        if 'qq_type' not in mp2_dict:
+            mp2_dict['qq_type'] = scf_drv.qq_type
 
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
         mp2_drv.update_settings(mp2_dict)
