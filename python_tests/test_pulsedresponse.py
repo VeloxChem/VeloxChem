@@ -149,8 +149,9 @@ class TestComplexResponse(unittest.TestCase):
     def test_filesave(self):
 
         directions = ['xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz']
-        expected_keys = ['amplitudes', 'frequencies', 'zero_padded'
-                         ] + directions
+        expected_keys = directions + [
+            'amplitudes', 'frequencies', 'zero_padded'
+        ]
 
         # Test the contents of the file
 
@@ -179,16 +180,15 @@ class TestComplexResponse(unittest.TestCase):
                         len(hf.get(primary_key)[()]) == len(hf.get(key)[()]))
                 except ValueError:
                     self.fail("Len of {}[{}] did not match data length {}!= {}".
-                              format(
-                                  primary_key, key,
-                                  len(
-                                      hf.get('zero_padded_frequencies')[()],
-                                      len(hf.get(key)[()]))))
+                              format(primary_key, key,
+                                     len(hf.get('zero_padded_frequencies')[()]),
+                                     len(hf.get(key)[()])))
 
             # Verify that the results stored are the same as expected
             self.assertTrue(np.allclose(hf.get('amplitudes')[()], amplitudes))
             self.assertTrue(np.allclose(hf.get('frequencies')[()], frequencies))
-            self.assertTrue(np.allclose(hf.get('xx')[()], xx, rtol=5e-05))
+            self.assertTrue(
+                np.allclose(hf.get('xx')[()], xx, rtol=1.0e-4, atol=0.0))
 
             hf.close()
 
