@@ -1,5 +1,6 @@
 import numpy as np
 import h5py
+import sys
 
 from .veloxchemlib import mpi_master
 from .cppsolver import ComplexResponse
@@ -74,7 +75,7 @@ class PulsedResponse:
             'carrier_frequencies'] * self.pulse_settings['centers']
         self.pulse_settings['field_max'] = 1.0e-5
         self.pulse_settings['pol_dir'] = 'x'
-        self.pulse_settings['frequency_range'] = "0.0 - 1.0 (0.0025)"
+        self.pulse_settings['frequency_range'] = '0.0 - 1.0 (0.0025)'
 
         self.multi_input_keys = [
             'pulse_widths', 'carrier_frequencies', 'field_max', 'centers', 'CEP'
@@ -124,7 +125,7 @@ class PulsedResponse:
         for key in self.multi_input_keys:
             if key not in self.pulse_settings:
                 raise KeyError(
-                    "Key '{}' not defined for PulsedResponse".format(key))
+                    'Key "{}" not defined for PulsedResponse'.format(key))
 
             if self.pulse_settings['number_pulses'] == 1:
                 self.pulse_settings[key] = [self.pulse_settings[key]]
@@ -133,13 +134,13 @@ class PulsedResponse:
                 try:
                     self.pulse_settings[key] = self.pulse_settings[key].split()
                 except AttributeError:
-                    raise AttributeError("Could not split key '{}' : {}".format(
+                    raise AttributeError('Could not split key "{}" : {}'.format(
                         key, self.pulse_settings[key]))
 
             length = len(self.pulse_settings[key])
             if length != self.pulse_settings['number_pulses']:
                 raise KeyError(
-                    "Lengt of key '{}' did not match 'number_pulses': {}".
+                    'Lengt of key "{}" did not match "number_pulses": {}'.
                     format(key, self.pulse_settings['number_pulses']))
 
         # Loop over number of pulses
@@ -155,7 +156,7 @@ class PulsedResponse:
                                 self.pulse_settings[key])
                     except ValueError:
                         raise ValueError(
-                            "Pulse key: '{}' not parseable as float: {}".format(
+                            'Pulse key: "{}" not parseable as float: {}'.format(
                                 key, self.pulse_settings[key]))
 
             # Compute electric field in frequency domain
@@ -182,7 +183,7 @@ class PulsedResponse:
         if (truncated_freqs[0] != 0.0):
             self.zero_pad = True
 
-        self.pulse_settings['zero_pad'] = "True" if self.zero_pad else "False"
+        self.pulse_settings['zero_pad'] = 'True' if self.zero_pad else 'False'
         self.pulse_settings['frequencies'] = truncated_freqs
         self.pulse_settings['dw'] = truncated_freqs[1] - truncated_freqs[0]
         self.pulse_settings['freq_amplitude'] = field_w
@@ -222,7 +223,7 @@ class PulsedResponse:
             self.print_header()
 
             self.ostream.print_info(
-                "Entering CPP Solver from Pulsed Linear Response")
+                'Entering CPP Solver from Pulsed Linear Response')
 
         # Launch the rsp_driver calculations on the selected frequencies
         results = self.rsp_driver.compute(molecule, ao_basis, scf_tensors)
@@ -241,7 +242,7 @@ class PulsedResponse:
                         )] = -results['response_functions'][(xyz1, xyz2, freq)]
 
             self.ostream.print_info(
-                "Exiting CPP Solver returning to Pulsed Linear Response")
+                'Exiting CPP Solver and returning to Pulsed Linear Response')
 
             # Store the results internally for saving to file is chosen
             self.results = results
@@ -250,7 +251,9 @@ class PulsedResponse:
                 self.results.update(results)
 
             # footer
-            self.print_footer()
+            self.ostream.print_blank()
+            self.ostream.print_info(
+                'Post-processing results and saving to files...')
 
             # Store results in h5 data file if requested
             if 'h5' in self.pulse_settings:
@@ -259,6 +262,9 @@ class PulsedResponse:
             # Store results in ascii txt file if requested
             if 'ascii' in self.pulse_settings:
                 self.write_ascii(self.pulse_settings['ascii'])
+
+            self.ostream.print_info('...done.')
+            self.ostream.print_blank()
 
         return results
 
@@ -278,71 +284,68 @@ class PulsedResponse:
         """
 
         if not fname:
-            raise ValueError("No filename given to write_hdf5()")
+            raise ValueError('No filename given to write_ascii()')
 
         # Add the .h5 extension if not given
-        if not fname[-3:] == ".txt":
-            fname += ".txt"
+        if not fname[-3:] == '.txt':
+            fname += '.txt'
 
         with open(fname, 'w') as f:
             for xyz1 in ['x', 'y', 'z']:
                 for xyz2 in ['x', 'y', 'z']:
-                    f.write("Frequency   Amplitude   {}{}\n".format(xyz1, xyz2))
+                    f.write('Frequency   Amplitude   {}{}\n'.format(xyz1, xyz2))
                     for freq, amp in zip(self.truncated_freqs, self.amplitudes):
                         cur_str = [
-                            "{0:12.6f} {1:>12.8f}{2:>+12.8f}j".format(
+                            '{0:12.6f} {1:>12.8f}{2:>+12.8f}j'.format(
                                 freq, np.real(amp), np.imag(amp))
                         ]
-                        cur_str.append("{0.real:12.8f}{0.imag:+.8f}j".format(
+                        cur_str.append('{0.real:12.8f}{0.imag:+.8f}j'.format(
                             self.results['properties_zeropad'][(xyz1, xyz2,
                                                                 freq)]))
-                        f.write(" ".join(cur_str) + "\n")
+                        f.write(' '.join(cur_str) + '\n')
 
     def write_hdf5(self, fname):
         """
-        Writes the Pulsed response vectors to the specified
-        output file in h5 format.
+        Writes the Pulsed response vectors to the specified output file in h5
+        format. The h5 file saved contains the following datasets:
+        - amplitudes
+            The pulse amplitudes for the calculated truncated_freqs
+        - zero_padded
+            Is the dataset zero padded or not
+        - 'xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'
+            =>  Amplitudes for all directions
+        - zero_padded_freqs
+            The zero padded frequency list
+        - zero_padded_amplitudes
+            The pulse amplitudes for the calculated frequencies zero
+            padded to match th zero padded frequencies.
 
         :param fname:
             Name of the checkpoint file.
-
-        :return:
-            The h5 file saved contains the following datasets:
-                - amplitudes
-                    The pulse amplitudes for the calculated truncated_freqs
-                - zero_padded
-                    Is the dataset zero padded or not
-                - 'xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'
-                    =>  Amplitudes for all directions
-                - zero_padded_freqs
-                    The zero padded frequency list
-                - zero_padded_amplitudes
-                    The pulse amplitudes for the calculated frequencies zero
-                    padded to match th zero padded frequencies.
         """
 
         if not fname:
-            raise ValueError("No filename given to write_hdf5()")
+            raise ValueError('No filename given to write_hdf5()')
 
         # Add the .h5 extension if not given
-        if not fname[-3:] == ".h5":
-            fname += ".h5"
+        if not fname[-3:] == '.h5':
+            fname += '.h5'
 
         # Convert the boolean to a a numpy array value
         zeropad = np.array([self.zero_pad])
-        """ Save all the internal data to the h5 datafile named 'fname'
-        """
+
+        # Save all the internal data to the h5 datafile named 'fname'
         try:
             with h5py.File(fname, 'w') as hf:
                 hf.create_dataset('frequencies',
                                   data=self.zero_padded_freqs,
-                                  compression="gzip")
+                                  compression='gzip')
                 hf.create_dataset('amplitudes',
                                   data=self.zero_padded_amplitudes,
-                                  compression="gzip")
+                                  compression='gzip')
                 hf.create_dataset('zero_padded',
                                   data=zeropad,
-                                  compression="gzip")
+                                  compression='gzip')
 
                 # Loop over all directions
                 for xyz1 in ['x', 'y', 'z']:
@@ -354,14 +357,13 @@ class PulsedResponse:
                                 self.results['properties_zeropad'][(xyz1, xyz2,
                                                                     freq)])
 
-                        hf.create_dataset("{}{}".format(xyz1, xyz2),
+                        hf.create_dataset('{}{}'.format(xyz1, xyz2),
                                           data=np.array(polarizability),
-                                          compression="gzip")
+                                          compression='gzip')
 
         except Exception as e:
-            print("Pulsed response failed to create h5 data file: {}".format(e))
-
-        return
+            print('Pulsed response failed to create h5 data file: {}'.format(e),
+                  file=sys.stdout)
 
     def apply_zero_pad(self, results):
         """
@@ -371,7 +373,7 @@ class PulsedResponse:
         The zero padding may be necessary due to:
             1)  the limited number of frequencies for which
                 the complex response function is being computed
-                as dictated by "field_cutoff_ratio"
+                as dictated by 'field_cutoff_ratio'
             2)  the need for extending the frequency range to achieve
                 higher temporal resolution
 
@@ -453,7 +455,7 @@ class PulsedResponse:
         # Create a new equidistant frequency list
         if self.rank == mpi_master():
             self.ostream.print_info(
-                "Pulsed response module adjusts frequencies to intersect with 0"
+                'Pulsed response module adjusts frequencies to intersect with 0'
             )
         zero_padded_frequencies = np.arange(0.0, frequencies[-1], dw)
         truncated_frequencies = zero_padded_frequencies[
@@ -487,17 +489,6 @@ class PulsedResponse:
                  np.exp(-(delta_t**2 * (w + w_carrier)**2) / 2.0) *
                  np.exp(1.j * (w + w_carrier) * t0 - 1.j * cep)))
 
-    def print_footer(self):
-        """
-        A footer to be printed after finalizing the calculation.
-        """
-
-        # PRT footer
-        self.ostream.print_blank()
-        self.ostream.print_header("Post processing results and saving to files")
-        self.ostream.print_header(44 * "-")
-        self.ostream.print_blank()
-
     def print_header(self):
         """
         Prints Pulsed Lionear Response calculation setup details to output
@@ -509,38 +500,38 @@ class PulsedResponse:
 
         # PRT header
         self.ostream.print_blank()
-        self.ostream.print_header("Pulsed Linear Reponse Theory Calculation")
-        self.ostream.print_header(44 * "=")
+        title = 'Pulsed Linear Reponse Theory Calculation'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
         # Print all settings
         header_fields = {
-            "field_cutoff_ratio": "Field cutoff ratio",
-            "envelope": "Envelope",
-            "pulse_widths": "Pulse Duration",
-            "carrier_frequencies": "Carrier Frequency",
-            "centers": "Pulse Center time",
-            "field_max": "Max Field",
-            "pol_dir": "Polarization Direction",
-            "frequency_range": "Frequency Range",
-            "zero_pad": "Zero padding results",
+            'field_cutoff_ratio': 'Field cutoff ratio',
+            'envelope': 'Envelope',
+            'pulse_widths': 'Pulse Duration',
+            'carrier_frequencies': 'Carrier Frequency',
+            'centers': 'Pulse Center time',
+            'field_max': 'Max Field',
+            'pol_dir': 'Polarization Direction',
+            'frequency_range': 'Frequency Range',
+            'zero_pad': 'Zero padding results',
         }
 
         # Print the header information fields
         for key, text in header_fields.items():
-            cur_str = "{0:30s} : {1:s}".format(text,
+            cur_str = '{0:30s} : {1:s}'.format(text,
                                                str(self.pulse_settings[key]))
             self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_blank()
 
         # Print the list of truncated frequencies and their amplitudes
-        self.ostream.print_blank()
-        self.ostream.print_header("Frequency | Amplitude")
-        self.ostream.print_header(21 * "=")
+        valstr = '{:<12s}  |  {:>18s}'.format('Frequency', 'Amplitude')
+        self.ostream.print_header(valstr.ljust(str_width))
+        self.ostream.print_header(('-' * 45).ljust(str_width))
 
-        str_width = 40
         for freq, amp in zip(self.truncated_freqs, self.amplitudes):
-            cur_str = "{0:12.6f} : {1:>12.8f}{2:>+12.8f}j".format(
-                freq, np.real(amp), np.imag(amp))
+            cur_str = '{:<12.6f}  :  {:>12.8f}   {:>+12.8f}j'.format(
+                freq, amp.real, amp.imag)
             self.ostream.print_header(cur_str.ljust(str_width))
-
         self.ostream.print_blank()
