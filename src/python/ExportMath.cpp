@@ -185,8 +185,6 @@ c_matmul(const py::array_t<double>& A, const py::array_t<double>& B)
 static py::array_t<double>
 c_multi_dot(const std::vector<py::array_t<double>>& matrices)
 {
-    auto n = matrices.size();
-
     py::array_t<double> prod(matrices[0]);
 
     for (size_t i = 1; i < matrices.size(); i++)
