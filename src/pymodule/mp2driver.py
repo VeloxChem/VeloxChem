@@ -183,14 +183,16 @@ class Mp2Driver:
             nocc = molecule.number_of_alpha_electrons()
 
             mo = mol_orbs.alpha_to_numpy()
-            mo_occ = mo[:, :nocc]
-            mo_vir = mo[:, nocc:]
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
 
             orb_ene = mol_orbs.ea_to_numpy()
             evir = orb_ene[nocc:]
             eab = evir.reshape(-1, 1) + evir
 
-            mo_ints_ids = [(i, j) for i in range(nocc) for j in range(nocc)]
+            mo_ints_ids = [
+                (i, j) for i in range(nocc) for j in range(i + 1, nocc)
+            ] + [(i, i) for i in range(nocc)]
             self.print_header(len(mo_ints_ids))
             valstr = 'Monitoring calculation on master node.'
             self.ostream.print_header(valstr.ljust(80))
@@ -250,14 +252,16 @@ class Mp2Driver:
 
             if local_master:
                 for ind, (i, j) in enumerate(batch_ids):
-                    eij = orb_ene[i] + orb_ene[j]
-                    denom = eij - eab
+                    f_ao = fock.alpha_to_numpy(ind)
+                    f_vv = np.linalg.multi_dot([mo_vir.T, f_ao, mo_vir])
+                    de = orb_ene[i] + orb_ene[j] - eab
 
-                    ij = np.linalg.multi_dot(
-                        [mo_vir.T, fock.alpha_to_numpy(ind), mo_vir])
-                    ij_asym = ij - ij.T
+                    ab = f_vv
+                    e_mp2 += np.sum(ab * (2.0 * ab - ab.T) / de)
 
-                    e_mp2 += np.sum(ij * (ij + ij_asym) / denom)
+                    if i != j:
+                        ba = f_vv.T
+                        e_mp2 += np.sum(ba * (2.0 * ba - ba.T) / de)
 
             if global_master:
                 valstr = '{:d} / {:d}'.format(batch_end - mo_ints_start,
