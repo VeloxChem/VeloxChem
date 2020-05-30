@@ -2,8 +2,9 @@ import numpy as np
 import unittest
 
 from veloxchem.veloxchemlib import DenseMatrix
-from veloxchem.veloxchemlib import matmul
-from veloxchem.veloxchemlib import eigh
+from veloxchem.veloxchemlib import c_matmul
+from veloxchem.veloxchemlib import c_multi_dot
+from veloxchem.veloxchemlib import c_eigh
 
 
 class TestMath(unittest.TestCase):
@@ -57,44 +58,58 @@ class TestMath(unittest.TestCase):
         mat_B = np.arange(12.).reshape(3, 4)
         ref_C = np.matmul(mat_A, mat_B)
 
-        mat_C = matmul(mat_A, mat_B)
+        mat_C = c_matmul(mat_A, mat_B)
         self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
 
         mat_A = np.arange(6.).reshape(3, 2)
         mat_B = np.arange(12.).reshape(3, 4)
         ref_C = np.matmul(mat_A.T, mat_B)
 
-        mat_C = matmul(mat_A.T, mat_B)
+        mat_C = c_matmul(mat_A.T, mat_B)
         self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
 
-        mat_C = matmul(mat_A.T.copy(), mat_B)
+        mat_C = c_matmul(mat_A.T.copy(), mat_B)
         self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
 
         mat_A = np.arange(6.).reshape(2, 3)
         mat_B = np.arange(12.).reshape(4, 3)
         ref_C = np.matmul(mat_A, mat_B.T)
 
-        mat_C = matmul(mat_A, mat_B.T)
+        mat_C = c_matmul(mat_A, mat_B.T)
         self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
 
-        mat_C = matmul(mat_A, mat_B.T.copy())
+        mat_C = c_matmul(mat_A, mat_B.T.copy())
         self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
 
         mat_A = np.arange(6.).reshape(3, 2)
         mat_B = np.arange(12.).reshape(4, 3)
         ref_C = np.matmul(mat_A.T, mat_B.T)
 
-        mat_C = matmul(mat_A.T, mat_B.T)
+        mat_C = c_matmul(mat_A.T, mat_B.T)
         self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
 
-        mat_C = matmul(mat_A.T.copy(), mat_B.T)
+        mat_C = c_matmul(mat_A.T.copy(), mat_B.T)
         self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
 
-        mat_C = matmul(mat_A.T, mat_B.T.copy())
+        mat_C = c_matmul(mat_A.T, mat_B.T.copy())
         self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
 
-        mat_C = matmul(mat_A.T.copy(), mat_B.T.copy())
+        mat_C = c_matmul(mat_A.T.copy(), mat_B.T.copy())
         self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+    def test_multi_dot(self):
+
+        mat_A = np.arange(6.).reshape(2, 3)
+        mat_B = np.arange(12.).reshape(3, 4)
+        mat_C = np.arange(16.).reshape(4, 4)
+
+        ref_prod = np.linalg.multi_dot([mat_A, mat_B, mat_C.T])
+        prod = c_multi_dot([mat_A, mat_B, mat_C.T])
+        self.assertTrue(np.max(np.abs(prod - ref_prod)) < 1.0e-13)
+
+        ref_prod = np.linalg.multi_dot([mat_A, mat_B, mat_C, mat_B.T, mat_A.T])
+        prod = c_multi_dot([mat_A, mat_B, mat_C, mat_B.T, mat_A.T])
+        self.assertTrue(np.max(np.abs(prod - ref_prod)) < 1.0e-13)
 
     def test_eigh(self):
 
@@ -105,7 +120,7 @@ class TestMath(unittest.TestCase):
         mat_A = 0.5 * (mat_A + mat_A.T)
         ref_eigvals, ref_eigvecs = np.linalg.eigh(mat_A)
 
-        eigvals, eigvecs = eigh(mat_A)
+        eigvals, eigvecs = c_eigh(mat_A)
         self.assertTrue(np.max(np.abs(eigvals - ref_eigvals)) < 1.0e-13)
         for k in range(ref_eigvecs.shape[1]):
             vec = eigvecs[:, k].copy()

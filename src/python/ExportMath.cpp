@@ -9,6 +9,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include <memory>
 #include <vector>
@@ -101,7 +102,7 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr)
 }
 
 static py::array_t<double>
-matmul(const py::array_t<double>& A, const py::array_t<double>& B)
+c_matmul(const py::array_t<double>& A, const py::array_t<double>& B)
 {
     // check dimension and shape
 
@@ -181,8 +182,25 @@ matmul(const py::array_t<double>& A, const py::array_t<double>& B)
     return C;
 }
 
+static py::array_t<double>
+c_multi_dot(const std::vector<py::array_t<double>>& matrices)
+{
+    auto n = matrices.size();
+
+    py::array_t<double> prod(matrices[0]);
+
+    for (size_t i = 1; i < matrices.size(); i++)
+    {
+        auto prod_new = c_matmul(prod, matrices[i]);
+
+        prod = py::array_t<double>(prod_new);
+    }
+
+    return prod;
+}
+
 static py::list
-eigh(const py::array_t<double>& A)
+c_eigh(const py::array_t<double>& A)
 {
     // check dimension and shape
 
@@ -285,9 +303,11 @@ export_math(py::module& m)
 
     m.def("mathconst_pi", &mathconst::getPiValue);
 
-    m.def("matmul", &matmul);
+    m.def("c_matmul", &c_matmul);
 
-    m.def("eigh", &eigh);
+    m.def("c_multi_dot", &c_multi_dot);
+
+    m.def("c_eigh", &c_eigh);
 }
 
 }  // namespace vlx_math
