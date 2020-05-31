@@ -205,3 +205,23 @@ def check_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict):
     return (match_labels and match_nuclear_repulsion and
             match_nuclear_charges and match_basis_set and match_dft_func and
             match_potfile)
+
+
+def append_rsp_solution_hdf5(fname, key, vec):
+    """
+    Appends a solution vector to checkpoint file.
+
+    :param fname:
+        The name of the checkpoint file.
+    :param key:
+        The key for the solution vector.
+    :param vec:
+        The solution vector.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str))
+
+    if valid_checkpoint:
+        hf = h5py.File(fname, 'a')
+        hf.create_dataset(key, data=vec, compression='gzip')
+        hf.close()

@@ -1,6 +1,7 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
+import random
 import os
 
 from veloxchem.veloxchemlib import mpi_master
@@ -36,14 +37,17 @@ class TestC6(unittest.TestCase):
         ref_n_points = len(ref_freqs)
 
         c6_solver = C6Solver(task.mpi_comm, task.ostream)
-        c6_solver.update_settings({'n_points': ref_n_points},
-                                  task.input_dict['method_settings'])
+        c6_solver.update_settings(
+            {
+                'n_points': ref_n_points,
+                'batch_size': random.choice([1, 10, 100])
+            }, task.input_dict['method_settings'])
         c6_results = c6_solver.compute(task.molecule, task.ao_basis,
                                        scf_drv.scf_tensors)
 
         if task.mpi_rank == mpi_master():
             freqs = set()
-            for op, iw in c6_results['keys']:
+            for apo, bop, iw in c6_results['response_functions']:
                 freqs.add(iw)
             freqs = sorted(list(freqs), reverse=True)[:-1]
             diff_freq = np.max(np.abs(np.array(freqs) - np.array(ref_freqs)))

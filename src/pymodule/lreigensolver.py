@@ -68,6 +68,11 @@ class LinearResponseEigenSolver(LinearSolver):
             dipole moments, oscillator strengths and rotatory strengths.
         """
 
+        self.dist_bger = None
+        self.dist_bung = None
+        self.dist_e2bger = None
+        self.dist_e2bung = None
+
         profiler = Profiler({
             'timing': self.timing,
             'profiling': self.profiling,

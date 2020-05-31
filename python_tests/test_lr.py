@@ -1,6 +1,7 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
+import random
 import os
 
 from veloxchem.veloxchemlib import mpi_master
@@ -36,8 +37,11 @@ class TestLR(unittest.TestCase):
         ref_prop = np.array([float(x) for x in raw_data.split()])
 
         lr_solver = LinearResponseSolver(task.mpi_comm, task.ostream)
-        lr_solver.update_settings({'frequencies': ','.join(ref_freqs_str)},
-                                  task.input_dict['method_settings'])
+        lr_solver.update_settings(
+            {
+                'frequencies': ','.join(ref_freqs_str),
+                'batch_size': random.choice([1, 10, 100])
+            }, task.input_dict['method_settings'])
         lr_results = lr_solver.compute(task.molecule, task.ao_basis,
                                        scf_drv.scf_tensors)
 

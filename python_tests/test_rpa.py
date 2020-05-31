@@ -1,6 +1,7 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
+import random
 import os
 
 from veloxchem.veloxchemlib import mpi_master
@@ -37,8 +38,11 @@ class TestRPA(unittest.TestCase):
         ref_rot_str = [float(line.split()[4]) for line in data_lines]
 
         rpa_solver = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
-        rpa_solver.update_settings({'nstates': len(ref_exc_ene)},
-                                   task.input_dict['method_settings'])
+        rpa_solver.update_settings(
+            {
+                'nstates': len(ref_exc_ene),
+                'batch_size': random.choice([1, 10, 100])
+            }, task.input_dict['method_settings'])
         rpa_results = rpa_solver.compute(task.molecule, task.ao_basis,
                                          scf_drv.scf_tensors)
 

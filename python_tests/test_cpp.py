@@ -1,6 +1,7 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
+import random
 import os
 
 from veloxchem.veloxchemlib import mpi_master
@@ -40,8 +41,11 @@ class TestCPP(unittest.TestCase):
         ref_prop_imag = [float(line.split()[5]) for line in data_lines]
 
         cpp_solver = ComplexResponse(task.mpi_comm, task.ostream)
-        cpp_solver.update_settings({'frequencies': ','.join(ref_freqs_str)},
-                                   task.input_dict['method_settings'])
+        cpp_solver.update_settings(
+            {
+                'frequencies': ','.join(ref_freqs_str),
+                'batch_size': random.choice([1, 10, 100])
+            }, task.input_dict['method_settings'])
         cpp_results = cpp_solver.compute(task.molecule, task.ao_basis,
                                          scf_drv.scf_tensors)
 

@@ -1,6 +1,8 @@
 import numpy as np
 import time as tm
+import psutil
 import math
+import sys
 
 from .veloxchemlib import mpi_master
 from .profiler import Profiler
@@ -10,6 +12,7 @@ from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_frequencies
 from .checkpoint import check_rsp_hdf5
+from .checkpoint import append_rsp_solution_hdf5
 
 
 class LinearResponseSolver(LinearSolver):
@@ -85,6 +88,11 @@ class LinearResponseSolver(LinearSolver):
             dictionarry containing solutions and kappa values when called from
             a non-linear response module.
         """
+
+        self.dist_bger = None
+        self.dist_bung = None
+        self.dist_e2bger = None
+        self.dist_e2bung = None
 
         profiler = Profiler({
             'timing': self.timing,
@@ -381,7 +389,15 @@ class LinearResponseSolver(LinearSolver):
                                  basis, scf_tensors)
 
             if self.is_converged:
+                key_0 = list(solutions.keys())[0]
+                x_0 = self.get_full_solution_vector(solutions[key_0])
+
                 if self.rank == mpi_master():
+                    avail_mem = psutil.virtual_memory().available
+                    write_solution_to_file = (
+                        avail_mem < sys.getsizeof(x_0) * len(solutions) * 2)
+                    full_solutions = {}
+
                     va = {op: v for op, v in zip(self.a_components, a_rhs)}
                     rsp_funcs = {}
 
@@ -392,10 +408,21 @@ class LinearResponseSolver(LinearSolver):
                         for aop in self.a_components:
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
 
-                # TODO: need to return solutions
+                            if write_solution_to_file:
+                                append_rsp_solution_hdf5(
+                                    self.checkpoint_file,
+                                    '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
+                            else:
+                                full_solutions[(bop, w)] = x
 
                 if self.rank == mpi_master():
-                    return {'response_functions': rsp_funcs}
+                    if write_solution_to_file:
+                        return {'response_functions': rsp_funcs}
+                    else:
+                        return {
+                            'response_functions': rsp_funcs,
+                            'solutions': full_solutions
+                        }
 
         else:
             if self.is_converged:
@@ -407,8 +434,6 @@ class LinearResponseSolver(LinearSolver):
 
                     if self.rank == mpi_master():
                         kappas[(op, w)] = self.lrvec2mat(x, nocc, norb)
-
-                # TODO: need to return solutions
 
                 if self.rank == mpi_master():
                     return {'kappas': kappas}
