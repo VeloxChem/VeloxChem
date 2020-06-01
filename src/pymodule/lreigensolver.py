@@ -1,7 +1,9 @@
 import itertools
 import numpy as np
 import time as tm
+import psutil
 import math
+import sys
 
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import mpi_master
@@ -13,6 +15,7 @@ from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
 from .checkpoint import check_rsp_hdf5
+from .checkpoint import append_rsp_solution_hdf5
 
 
 class LinearResponseEigenSolver(LinearSolver):
@@ -341,71 +344,74 @@ class LinearResponseEigenSolver(LinearSolver):
         profiler.print_memory_usage(self.ostream)
 
         # calculate properties
-        dipole_rhs = self.get_rhs('dipole', 'xyz', molecule, basis, scf_tensors)
-        linmom_rhs = self.get_rhs('linear_momentum', 'xyz', molecule, basis,
-                                  scf_tensors)
-        angmom_rhs = self.get_rhs('angular_momentum', 'xyz', molecule, basis,
-                                  scf_tensors)
+        if self.is_converged:
+            dipole_rhs = self.get_rhs('dipole', 'xyz', molecule, basis,
+                                      scf_tensors)
+            linmom_rhs = self.get_rhs('linear_momentum', 'xyz', molecule, basis,
+                                      scf_tensors)
+            angmom_rhs = self.get_rhs('angular_momentum', 'xyz', molecule,
+                                      basis, scf_tensors)
 
-        eigvals = np.array([excitations[s][0] for s in range(self.nstates)])
-        # TODO: check system memory
-        eigvecs = [
-            self.get_full_solution_vector(excitations[s][1])
-            for s in range(self.nstates)
-        ]
+            eigvals = np.array([excitations[s][0] for s in range(self.nstates)])
 
-        if self.rank == mpi_master() and self.is_converged:
-            V_dipole = {op: V for op, V in zip('xyz', dipole_rhs)}
-            V_linmom = {op: V for op, V in zip('xyz', linmom_rhs)}
-            V_angmom = {op: V for op, V in zip('xyz', angmom_rhs)}
+            elec_trans_dipoles = [np.zeros(3) for s in range(self.nstates)]
+            velo_trans_dipoles = [np.zeros(3) for s in range(self.nstates)]
+            magn_trans_dipoles = [np.zeros(3) for s in range(self.nstates)]
 
-            elec_tms = {}
-            velo_tms = {}
-            magn_tms = {}
+            key_0 = list(excitations.keys())[0]
+            x_0 = self.get_full_solution_vector(excitations[key_0][1])
 
-            for comp in 'xyz':
-                elec_tms[comp] = np.array(
-                    [np.dot(V_dipole[comp], vec) for vec in eigvecs])
-                velo_tms[comp] = -1.0 / eigvals * np.array(
-                    [np.dot(V_linmom[comp], vec) for vec in eigvecs])
-                magn_tms[comp] = 0.5 * np.array(
-                    [np.dot(V_angmom[comp], vec) for vec in eigvecs])
+            if self.rank == mpi_master():
+                avail_mem = psutil.virtual_memory().available
+                write_solution_to_file = (avail_mem <
+                                          sys.getsizeof(x_0) * self.nstates * 2)
+                if not write_solution_to_file:
+                    eigvecs = np.zeros((x_0.size, self.nstates))
 
-            elec_trans_dipoles = [
-                np.array([elec_tms['x'][s], elec_tms['y'][s], elec_tms['z'][s]])
-                for s in range(self.nstates)
-            ]
+            for s in range(self.nstates):
+                eigvec = self.get_full_solution_vector(excitations[s][1])
 
-            velo_trans_dipoles = [
-                np.array([velo_tms['x'][s], velo_tms['y'][s], velo_tms['z'][s]])
-                for s in range(self.nstates)
-            ]
+                if self.rank == mpi_master():
+                    for ind, comp in enumerate('xyz'):
+                        edip = np.dot(dipole_rhs[ind], eigvec)
+                        vdip = np.dot(linmom_rhs[ind], eigvec) / (-eigvals[s])
+                        mdip = np.dot(angmom_rhs[ind], eigvec) * 0.5
+                        elec_trans_dipoles[s][ind] = edip
+                        velo_trans_dipoles[s][ind] = vdip
+                        magn_trans_dipoles[s][ind] = mdip
 
-            magn_trans_dipoles = [
-                np.array([magn_tms['x'][s], magn_tms['y'][s], magn_tms['z'][s]])
-                for s in range(self.nstates)
-            ]
+                    if write_solution_to_file:
+                        append_rsp_solution_hdf5(self.checkpoint_file,
+                                                 'S{:d}'.format(s + 1), eigvec)
+                    else:
+                        eigvecs[:, s] = eigvec[:]
 
-            osc = 2.0 / 3.0 * eigvals * (elec_tms['x']**2 + elec_tms['y']**2 +
-                                         elec_tms['z']**2)
+            if self.rank == mpi_master():
+                osc = np.zeros(self.nstates)
+                rot_vel = np.zeros(self.nstates)
 
-            rot_vel = (velo_tms['x'] * magn_tms['x'] +
-                       velo_tms['y'] * magn_tms['y'] +
-                       velo_tms['z'] * magn_tms['z'])
+                for s in range(self.nstates):
+                    osc[s] = (2.0 / 3.0 * eigvals[s] *
+                              sum(elec_trans_dipoles[s]**2))
+                    rot_vel[s] = np.dot(
+                        velo_trans_dipoles[s],
+                        magn_trans_dipoles[s]) * rotatory_strength_in_cgs()
 
-            rot_vel *= rotatory_strength_in_cgs()
+                ret_dict = {
+                    'eigenvalues': eigvals,
+                    'electric_transition_dipoles': elec_trans_dipoles,
+                    'velocity_transition_dipoles': velo_trans_dipoles,
+                    'magnetic_transition_dipoles': magn_trans_dipoles,
+                    'oscillator_strengths': osc,
+                    'rotatory_strengths': rot_vel,
+                }
 
-            return {
-                'eigenvalues': eigvals,
-                'eigenvectors': np.array(eigvecs).T,
-                'electric_transition_dipoles': elec_trans_dipoles,
-                'velocity_transition_dipoles': velo_trans_dipoles,
-                'magnetic_transition_dipoles': magn_trans_dipoles,
-                'oscillator_strengths': osc,
-                'rotatory_strengths': rot_vel,
-            }
-        else:
-            return {}
+                if not write_solution_to_file:
+                    ret_dict['eigenvectors'] = eigvecs
+
+                return ret_dict
+
+        return {}
 
     def get_full_solution_vector(self, solution):
         """
