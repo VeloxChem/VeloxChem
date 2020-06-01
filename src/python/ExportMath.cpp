@@ -11,6 +11,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <cstring>
 #include <memory>
 #include <vector>
 
@@ -197,6 +198,46 @@ c_multi_dot(const std::vector<py::array_t<double>>& matrices)
     return prod;
 }
 
+static py::array_t<double>
+c_outer(const py::array_t<double>& A, const py::array_t<double>& B)
+{
+    // check dimension and shape
+
+    errors::assertMsgCritical(A.ndim() == 1, "outer - Invalid shape of vector A");
+
+    errors::assertMsgCritical(B.ndim() == 1, "outer - Invalid shape of vector B");
+
+    auto m = A.shape(0);
+
+    auto n = B.shape(0);
+
+    // check layout
+
+    auto c_style_A = py::detail::check_flags(A.ptr(), py::array::c_style);
+
+    auto f_style_A = py::detail::check_flags(A.ptr(), py::array::f_style);
+
+    errors::assertMsgCritical(c_style_A & f_style_A, "outer - Vector A is noncontiguous");
+
+    auto c_style_B = py::detail::check_flags(B.ptr(), py::array::c_style);
+
+    auto f_style_B = py::detail::check_flags(B.ptr(), py::array::f_style);
+
+    errors::assertMsgCritical(c_style_B & f_style_B, "outer - Vector B is noncontiguous");
+
+    // compute outer
+
+    py::array_t<double> C({m, n});
+
+    std::memset(C.mutable_data(), 0, sizeof(double) * C.size());
+
+    auto lda = n;
+
+    cblas_dger(CblasRowMajor, m, n, 1.0, A.data(), 1, B.data(), 1, C.mutable_data(), lda);
+
+    return C;
+}
+
 static py::list
 c_eigh(const py::array_t<double>& A)
 {
@@ -304,6 +345,8 @@ export_math(py::module& m)
     m.def("c_matmul", &c_matmul);
 
     m.def("c_multi_dot", &c_multi_dot);
+
+    m.def("c_outer", &c_outer);
 
     m.def("c_eigh", &c_eigh);
 }

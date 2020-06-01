@@ -4,6 +4,7 @@ import unittest
 from veloxchem.veloxchemlib import DenseMatrix
 from veloxchem.veloxchemlib import c_matmul
 from veloxchem.veloxchemlib import c_multi_dot
+from veloxchem.veloxchemlib import c_outer
 from veloxchem.veloxchemlib import c_eigh
 
 
@@ -110,6 +111,27 @@ class TestMath(unittest.TestCase):
         ref_prod = np.linalg.multi_dot([mat_A, mat_B, mat_C, mat_B.T, mat_A.T])
         prod = c_multi_dot([mat_A, mat_B, mat_C, mat_B.T, mat_A.T])
         self.assertTrue(np.max(np.abs(prod - ref_prod)) < 1.0e-13)
+
+    def test_outer(self):
+
+        vec_A = np.arange(1., 10.)
+        vec_B = np.arange(10., 100.)
+
+        ref_C = np.outer(vec_A, vec_B)
+        mat_C = c_outer(vec_A, vec_B)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        ref_C = np.outer(vec_B, vec_A)
+        mat_C = c_outer(vec_B, vec_A)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        ref_C = np.outer(vec_A, vec_A)
+        mat_C = c_outer(vec_A, vec_A)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        ref_C = np.outer(vec_B, vec_B)
+        mat_C = c_outer(vec_B, vec_B)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
 
     def test_eigh(self):
 
