@@ -569,6 +569,10 @@ class LinearSolver:
                 e2_ger = np.zeros((half_size, batch_ger))
                 e2_ung = np.zeros((half_size, batch_ung))
 
+
+                F_ger = []
+                F_ung = []
+
                 for ifock in range(batch_ger + batch_ung):
                     fak = fock.alpha_to_numpy(ifock).T
                     # fbk = fock.beta_to_numpy(ifock).T
@@ -593,20 +597,32 @@ class LinearSolver:
                     if ifock < batch_ger:
                         e2_ger[:, ifock] = -self.lrmat2vec(gmo, nocc,
                                                            norb)[:half_size]
+                        F_ger.append(np.linalg.multi_dot([mo.T, fak.T, mo]))
+
                     else:
                         e2_ung[:, ifock - batch_ger] = -self.lrmat2vec(
                             gmo, nocc, norb)[:half_size]
+                        F_ung.append(np.linalg.multi_dot([mo.T, fak.T, mo]))
+
             else:
                 e2_ger = None
                 e2_ung = None
+
             vecs_e2_ger = DistributedArray(e2_ger, self.comm)
             vecs_e2_ung = DistributedArray(e2_ung, self.comm)
+
+            #F_e2_ger = DistributedArray(F_ger,self.comm)
+            #F_e2_ung = DistributedArray(F_ung,self.comm)
 
             self.append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
 
         self.append_trial_vectors(vecs_ger, vecs_ung)
 
         self.ostream.print_blank()
+        if self.rank == mpi_master():
+            return F_ger,F_ung
+        else:
+            return None,None
 
     def comp_lr_fock(self, fock, dens, molecule, basis, eri_dict, dft_dict,
                      pe_dict, timing_dict):

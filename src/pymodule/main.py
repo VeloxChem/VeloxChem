@@ -21,7 +21,7 @@ from .visualizationdriver import VisualizationDriver
 from .loprop import LoPropDriver
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_maximum_hours
-
+from .rsptpa import TPA
 
 def main():
 
@@ -155,6 +155,8 @@ def main():
             rsp_prop = C6(rsp_dict, method_dict)
         elif prop_type == 'custom':
             rsp_prop = CustomProperty(rsp_dict, method_dict)
+        elif prop_type == 'tpa':
+                        rsp_prop = TPA(rsp_dict,method_dict)
         else:
             assert_msg_critical(False, 'input file: invalid response property')
 

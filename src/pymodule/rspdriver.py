@@ -3,6 +3,7 @@ from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .c6solver import C6Solver
 from .tdaexcidriver import TDAExciDriver
+from .tpa import twophotonabs
 
 
 class ResponseDriver:
@@ -152,6 +153,17 @@ class ResponseDriver:
             self.is_converged = c6_solver.is_converged
 
             return c6_result
+
+#         TPA 
+
+        if self.rsp_dict['response'] == 'cubic':
+
+            tpa = twophotonabs(self.comm, self.ostream)
+            tpa.update_settings(self.rsp_dict, self.method_dict)
+
+            return tpa.compute(molecule, ao_basis, scf_tensors)
+
+
 
     def prop_str(self):
         """

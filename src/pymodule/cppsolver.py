@@ -266,6 +266,7 @@ class ComplexResponse(LinearSolver):
             nonlinear_flag = False
             b_rhs = self.get_complex_rhs(self.b_operator, self.b_components,
                                          molecule, basis, scf_tensors)
+            
             if self.rank == mpi_master():
                 v1 = {(op, w): v for op, v in zip(self.b_components, b_rhs)
                       for w in self.frequencies}
@@ -326,11 +327,12 @@ class ComplexResponse(LinearSolver):
         else:
             bger, bung = self.setup_trials(dist_v1, precond)
 
-            self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
+            Fock_ger_mat,Fock_ung_mat = self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
                                eri_dict, dft_dict, pe_dict, timing_dict)
 
         profiler.check_memory_usage('Initial guess')
-
+        
+        Focks = {}
         solutions = {}
         residuals = {}
         relative_residual_norm = {}
@@ -457,6 +459,25 @@ class ComplexResponse(LinearSolver):
                     e2realung = self.dist_e2bung.matmul_AB_no_gather(c_realung)
                     e2imagung = self.dist_e2bung.matmul_AB_no_gather(c_imagung)
 
+                    Fock_real_ger = 0
+                    Fock_real_ung = 0
+                    Fock_imag_ung = 0
+                    Fock_imag_ger = 0
+
+
+                    for p in range(len(Fock_ger_mat)):
+                        Fock_real_ger += Fock_ger_mat[p]*c_realger[p]
+                        Fock_imag_ger += Fock_ger_mat[p]*c_imagger[p]
+
+                    for q in range(len(Fock_ung_mat)):
+                        Fock_real_ung += Fock_ung_mat[q]*c_realung[q]
+                        Fock_imag_ung += Fock_ung_mat[q]*c_imagung[q]
+
+
+                    Fock_matrix = Fock_real_ger + Fock_real_ung - 1j*(Fock_imag_ger+Fock_imag_ung)
+
+                    Focks.update({(op,w): Fock_matrix})
+
                     # calculating the residual components
 
                     s2realger = 2.0 * x_realger.data
@@ -577,9 +598,14 @@ class ComplexResponse(LinearSolver):
 
             # creating new sigma and rho linear transformations
 
-            self.e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
+            new_Fock_ger_mat,new_Fock_ung_mat= self.e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
                                scf_tensors, eri_dict, dft_dict, pe_dict,
                                timing_dict)
+            for a in new_Fock_ger_mat:
+                Fock_ger_mat.append(a)
+
+            for b in new_Fock_ung_mat:
+                Fock_ung_mat.append(b)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trail_in_hours = iter_in_hours / n_new_trials
@@ -651,9 +677,11 @@ class ComplexResponse(LinearSolver):
             if self.is_converged:
                 if self.rank == mpi_master():
                     kappas = {}
-
+                
+                exp_sol = {}
                 for op, w in solutions:
                     x = self.get_full_solution_vector(solutions[(op, w)])
+                    exp_sol.update({(op, w): x})
 
                     if self.rank == mpi_master():
                         kappas[(op,
@@ -661,7 +689,7 @@ class ComplexResponse(LinearSolver):
                                        1j * self.lrvec2mat(x.imag, nocc, norb))
 
                 if self.rank == mpi_master():
-                    return {'kappas': kappas}
+                    return {'Focks': Focks,'solutions': exp_sol,'kappas': kappas}
 
         return {}
 
