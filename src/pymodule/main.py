@@ -52,6 +52,11 @@ def main():
     else:
         method_dict = {}
 
+    if 'pe' in task.input_dict:
+        method_dict['pe_options'] = dict(task.input_dict['pe'])
+    else:
+        method_dict['pe_options'] = {}
+
     # Timelimit in hours
 
     if 'maximum_hours' in task.input_dict['jobs']:

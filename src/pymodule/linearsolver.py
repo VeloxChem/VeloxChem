@@ -48,7 +48,7 @@ class LinearSolver:
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.
         - pe: The flag for running polarizable embedding calculation.
-        - potfile: The name of the potential file for polarizable embedding.
+        - pe_options: The dictionary with options for polarizable embedding.
         - use_split_comm: The flag for using split communicators.
         - split_comm_ratio: The list of ratios for split communicators.
         - conv_thresh: The convergence threshold for the solver.
@@ -94,7 +94,7 @@ class LinearSolver:
 
         # polarizable embedding
         self.pe = False
-        self.potfile = None
+        self.pe_options = {}
 
         # split communicators
         self.use_split_comm = False
@@ -164,13 +164,23 @@ class LinearSolver:
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Undefined XC functional')
 
+        if 'pe_options' not in method_dict:
+            method_dict['pe_options'] = {}
+
         if 'pe' in method_dict:
             key = method_dict['pe'].lower()
             self.pe = True if key == 'yes' else False
-        if 'potfile' in method_dict:
-            if 'pe' not in method_dict:
+        else:
+            if ('potfile' in method_dict) or method_dict['pe_options']:
                 self.pe = True
-            self.potfile = method_dict['potfile']
+
+        if self.pe:
+            if ('potfile' in method_dict and
+                    'potfile' not in method_dict['pe_options']):
+                method_dict['pe_options']['potfile'] = method_dict['potfile']
+            assert_msg_critical('potfile' in method_dict['pe_options'],
+                                'SCF driver: No potential file defined')
+            self.pe_options = dict(method_dict['pe_options'])
 
         if 'use_split_comm' in method_dict:
             key = method_dict['use_split_comm'].lower()
@@ -304,15 +314,15 @@ class LinearSolver:
         # set up polarizable embedding
         if self.pe:
             from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, self.comm, self.potfile)
+            pe_drv = PolEmbed(molecule, basis, self.comm, self.pe_options)
             V_es = pe_drv.compute_multipole_potential_integrals()
 
             pot_info = "Reading polarizable embedding potential: {}".format(
-                self.potfile)
+                self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
 
-            with open(self.potfile, 'r') as f_pot:
+            with open(self.pe_options['potfile'], 'r') as f_pot:
                 potfile_text = os.linesep.join(f_pot.readlines())
         else:
             pe_drv = None
@@ -792,7 +802,7 @@ class LinearSolver:
         # calculate e_pe and V_pe on PE nodes
         if pe_comm:
             from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, local_comm, self.potfile)
+            pe_drv = PolEmbed(molecule, basis, local_comm, self.pe_options)
             pe_drv.V_es = V_es.copy()
             for ifock in range(fock.number_of_fock_matrices()):
                 dm = dens.alpha_to_numpy(ifock) + dens.beta_to_numpy(ifock)
@@ -1088,6 +1098,12 @@ class LinearSolver:
 
         dist_new_ger, dist_new_ung = self.precond_trials(vectors, precond)
 
+        if dist_new_ger.data.size == 0:
+            dist_new_ger.data = np.zeros((dist_new_ung.shape(0), 0))
+
+        if dist_new_ung.data.size == 0:
+            dist_new_ung.data = np.zeros((dist_new_ger.shape(0), 0))
+
         if dist_bger is not None:
             # t = t - (b (b.T t))
             bT_new_ger = dist_bger.matmul_AtB_allreduce(dist_new_ger, 2.0)
@@ -1119,12 +1135,6 @@ class LinearSolver:
             assert_msg_critical(
                 dist_new_ger.data.size > 0 or dist_new_ung.data.size > 0,
                 'LinearSolver: trial vectors are empty')
-
-        if dist_new_ger.data.size == 0:
-            dist_new_ger.data = np.zeros((dist_new_ung.shape(0), 0))
-
-        if dist_new_ung.data.size == 0:
-            dist_new_ung.data = np.zeros((dist_new_ger.shape(0), 0))
 
         return dist_new_ger, dist_new_ung
 

@@ -81,7 +81,7 @@ class ScfDriver:
         - molgrid: The molecular grid.
         - pe: The flag for running polarizable embedding calculation.
         - V_es: The polarizable embedding matrix.
-        - potfile: The name of the potential file for polarizable embedding.
+        - pe_options: The dictionary with options for polarizable embedding.
         - pe_summary: The summary string for polarizable embedding.
         - use_split_comm: The flag for using split communicators.
         - split_comm_ratio: The list of ratios for split communicators.
@@ -168,7 +168,7 @@ class ScfDriver:
         # polarizable embedding
         self.pe = False
         self.V_es = None
-        self.potfile = None
+        self.pe_options = {}
         self.pe_summary = ''
 
         # split communicators
@@ -224,15 +224,25 @@ class ScfDriver:
                 self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Undefined XC functional')
+                                'SCF driver: Undefined XC functional')
+
+        if 'pe_options' not in method_dict:
+            method_dict['pe_options'] = {}
 
         if 'pe' in method_dict:
             key = method_dict['pe'].lower()
             self.pe = True if key == 'yes' else False
-        if 'potfile' in method_dict:
-            if 'pe' not in method_dict:
+        else:
+            if ('potfile' in method_dict) or method_dict['pe_options']:
                 self.pe = True
-            self.potfile = method_dict['potfile']
+
+        if self.pe:
+            if ('potfile' in method_dict and
+                    'potfile' not in method_dict['pe_options']):
+                method_dict['pe_options']['potfile'] = method_dict['potfile']
+            assert_msg_critical('potfile' in method_dict['pe_options'],
+                                'SCF driver: No potential file defined')
+            self.pe_options = dict(method_dict['pe_options'])
 
         if 'use_split_comm' in method_dict:
             key = method_dict['use_split_comm'].lower()
@@ -280,7 +290,7 @@ class ScfDriver:
         # check dft setup
         if self.dft:
             assert_msg_critical(self.xcfun is not None,
-                                'SCF driver: undefined XC functional')
+                                'SCF driver: Undefined XC functional')
 
         # initial guess
         if self.restart:
@@ -325,20 +335,21 @@ class ScfDriver:
         # set up polarizable embedding
         if self.pe:
             from .polembed import PolEmbed
-            self.pe_drv = PolEmbed(molecule, ao_basis, self.comm, self.potfile)
+            self.pe_drv = PolEmbed(molecule, ao_basis, self.comm,
+                                   self.pe_options)
             self.V_es = self.pe_drv.compute_multipole_potential_integrals()
 
-            pot_info = "Reading polarizable embedding potential: {}".format(
-                self.potfile)
+            pot_info = 'Reading polarizable embedding potential: {}'.format(
+                self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
 
         # C2-DIIS method
-        if self.acc_type == "DIIS":
+        if self.acc_type == 'DIIS':
             self.comp_diis(molecule, ao_basis, min_basis, profiler)
 
         # two level C2-DIIS method
-        if self.acc_type == "L2_DIIS":
+        if self.acc_type == 'L2_DIIS':
 
             # first step
             self.first_step = True
@@ -358,7 +369,7 @@ class ScfDriver:
             self.diis_thresh = 1000.0
             self.conv_thresh = old_thresh
             self.max_iter = old_max_iter
-            self.den_guess.guess_type = "PRCMO"
+            self.den_guess.guess_type = 'PRCMO'
 
             self.comp_diis(molecule, ao_basis, val_basis, profiler)
 
@@ -1039,7 +1050,7 @@ class ScfDriver:
         # calculate e_pe and V_pe on PE nodes
         if pe_comm:
             from .polembed import PolEmbed
-            self.pe_drv = PolEmbed(molecule, basis, local_comm, self.potfile)
+            self.pe_drv = PolEmbed(molecule, basis, local_comm, self.pe_options)
             self.pe_drv.V_es = self.V_es.copy()
             dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
             e_pe, V_pe = self.pe_drv.get_pe_contribution(dm)
