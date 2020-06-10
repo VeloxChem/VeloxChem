@@ -165,19 +165,6 @@ class twophotonabs(LinearSolver):
             Nx['Nd'] = Nx['Nb']
             kX['Nd'] = kX['Nb']
 
-        if self.rank != mpi_master():
-            Focks = {}
-            Nx = {}
-            w = None
-            X = {}
-            d_a_mo = None
-            kX = {}
-            S = None
-            da = None
-            mo = None
-            nocc = None
-            norb = None
-
         NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz, E3_dict, E4_dict, NaX2Nyz_red, NxA2Nyz_red, E3_dict_red = tpa(
         ).main(self.eri_thresh, self.conv_thresh, self.lindep_thresh,
                self.max_iter, Focks, self.iso, Nx, w, X, self.damping, d_a_mo,
