@@ -92,23 +92,22 @@ class twophotonabs(LinearSolver):
         dipole_mats = dipole_drv.compute(molecule, ao_basis)
 
         rhs = {}
+        operator = 'dipole'
+        component = 'xyz'
+
+        b_rhs = self.get_complex_rhs(operator, component, molecule,
+                                     ao_basis, scf_tensors)
+
         if self.rank == mpi_master():
-            operator = 'dipole'
-            component = 'xyz'
-
-            b_rhs = self.get_complex_rhs(operator, component, molecule,
-                                         ao_basis, scf_tensors)
-            b_rhs = (b_rhs[0], b_rhs[1], b_rhs[2])
-
             v1 = {(op, wi): v for op, v in zip(component, b_rhs) for wi in w}
             X = {
                 'x': 2 * tpa().ao2mo(mo, dipole_mats.x_to_numpy()),
                 'y': 2 * tpa().ao2mo(mo, dipole_mats.y_to_numpy()),
                 'z': 2 * tpa().ao2mo(mo, dipole_mats.z_to_numpy())
             }
-
             self.comp = self.get_comp(w)
         else:
+            v1 = None
             X = None
             self.comp = None
 
@@ -118,15 +117,14 @@ class twophotonabs(LinearSolver):
 
         # Compute the first set of response vectors
         Nb_drv = ComplexResponse(self.comm, self.ostream)
-        if self.rank == mpi_master():
-            Nb_drv.update_settings({
-                'frequencies': self.frequencies,
-                'damping': self.damping,
-                'eri_thresh': self.eri_thresh,
-                'conv_thresh': self.conv_thresh,
-                'lindep_thresh': self.lindep_thresh,
-                'max_iter': self.max_iter,
-            })
+        Nb_drv.update_settings({
+            'frequencies': self.frequencies,
+            'damping': self.damping,
+            'eri_thresh': self.eri_thresh,
+            'conv_thresh': self.conv_thresh,
+            'lindep_thresh': self.lindep_thresh,
+            'max_iter': self.max_iter,
+        })
 
         Nb_Drv = Nb_drv.compute(molecule, ao_basis, scf_tensors, v1)
 

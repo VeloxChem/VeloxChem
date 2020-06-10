@@ -2264,20 +2264,13 @@ class tpa:
 
         """
 
-        if self.rank != mpi_master():
-            w = None
-            d_a_mo = None
-            damp = None
-            X = {}
-            Fock_dict = {}
-            kX = None
-            nocc = None
-            norb = None
-
         N_total_drv = ComplexResponse(comm, ostream)
+
+        XY_dict = {}
+        test_dict = {}
+        freq = None
+
         if self.rank == mpi_master():
-            XY_dict = {}
-            test_dict = {}
 
             XY_dict = self.get_XY(d_a_mo, X, w, Fock_dict, kX, nocc, norb)
 
@@ -2292,20 +2285,16 @@ class tpa:
             for i in range(len(wbd)):
                 freq += str(wbd[i]) + ','
 
-        else:
-            XY_dict = {}
-            test_dict = {}
-            freq = ''
+        freq = self.comm.bcast(freq, root=mpi_master())
 
-        if self.rank == mpi_master():
-            N_total_drv.update_settings({
-                'frequencies': freq,
-                'damping': damp,
-                'eri_thresh': eri_thresh,
-                'conv_thresh': conv_thresh,
-                'lindep_thresh': lindep_thresh,
-                'max_iter': max_iter,
-            })
+        N_total_drv.update_settings({
+            'frequencies': freq,
+            'damping': damp,
+            'eri_thresh': eri_thresh,
+            'conv_thresh': conv_thresh,
+            'lindep_thresh': lindep_thresh,
+            'max_iter': max_iter,
+        })
 
         start = time.time()
 
@@ -2344,16 +2333,7 @@ class tpa:
         """
         XY_dict = {}
         test_dict = {}
-
-        if self.rank != mpi_master():
-            w = None
-            d_a_mo = None
-            damp = None
-            X = {}
-            Fock_dict = {}
-            kX = None
-            nocc = None
-            norb = None
+        freq = None
 
         N_total_drv_2 = ComplexResponse(comm, ostream)
 
@@ -2372,20 +2352,16 @@ class tpa:
             for i in range(len(wbd)):
                 freq += str(wbd[i]) + ','
 
-        else:
-            XY_dict = {}
-            test_dict = {}
-            freq = ''
+        freq = self.comm.bcast(freq, root=mpi_master())
 
-        if self.rank == mpi_master():
-            N_total_drv_2.update_settings({
-                'frequencies': freq,
-                'damping': damp,
-                'eri_thresh': eri_thresh,
-                'conv_thresh': conv_thresh,
-                'lindep_thresh': lindep_thresh,
-                'max_iter': max_iter,
-            })
+        N_total_drv_2.update_settings({
+            'frequencies': freq,
+            'damping': damp,
+            'eri_thresh': eri_thresh,
+            'conv_thresh': conv_thresh,
+            'lindep_thresh': lindep_thresh,
+            'max_iter': max_iter,
+        })
 
         start = time.time()
 

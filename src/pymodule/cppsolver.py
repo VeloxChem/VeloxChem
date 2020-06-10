@@ -464,19 +464,19 @@ class ComplexResponse(LinearSolver):
                     Fock_imag_ung = 0
                     Fock_imag_ger = 0
 
+                    if self.rank == mpi_master():
 
-                    for p in range(len(Fock_ger_mat)):
-                        Fock_real_ger += Fock_ger_mat[p]*c_realger[p]
-                        Fock_imag_ger += Fock_ger_mat[p]*c_imagger[p]
+                        for p in range(len(Fock_ger_mat)):
+                            Fock_real_ger += Fock_ger_mat[p]*c_realger[p]
+                            Fock_imag_ger += Fock_ger_mat[p]*c_imagger[p]
 
-                    for q in range(len(Fock_ung_mat)):
-                        Fock_real_ung += Fock_ung_mat[q]*c_realung[q]
-                        Fock_imag_ung += Fock_ung_mat[q]*c_imagung[q]
+                        for q in range(len(Fock_ung_mat)):
+                            Fock_real_ung += Fock_ung_mat[q]*c_realung[q]
+                            Fock_imag_ung += Fock_ung_mat[q]*c_imagung[q]
 
+                        Fock_matrix = Fock_real_ger + Fock_real_ung - 1j*(Fock_imag_ger+Fock_imag_ung)
 
-                    Fock_matrix = Fock_real_ger + Fock_real_ung - 1j*(Fock_imag_ger+Fock_imag_ung)
-
-                    Focks.update({(op,w): Fock_matrix})
+                        Focks.update({(op,w): Fock_matrix})
 
                     # calculating the residual components
 
@@ -601,11 +601,13 @@ class ComplexResponse(LinearSolver):
             new_Fock_ger_mat,new_Fock_ung_mat= self.e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
                                scf_tensors, eri_dict, dft_dict, pe_dict,
                                timing_dict)
-            for a in new_Fock_ger_mat:
-                Fock_ger_mat.append(a)
 
-            for b in new_Fock_ung_mat:
-                Fock_ung_mat.append(b)
+            if self.rank == mpi_master():
+                for a in new_Fock_ger_mat:
+                    Fock_ger_mat.append(a)
+
+                for b in new_Fock_ung_mat:
+                    Fock_ung_mat.append(b)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trail_in_hours = iter_in_hours / n_new_trials
