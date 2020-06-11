@@ -62,11 +62,11 @@ class twophotonabs(LinearSolver):
             else:
                 self.iso = False
         if 'conv_thresh' in rsp_dict:
-            self.conv_thresh = rsp_dict['conv_thresh']
+            self.conv_thresh = float(rsp_dict['conv_thresh'])
         if 'lindep_thresh' in rsp_dict:
-            self.lindep_thresh = rsp_dict['lindep_thresh']
+            self.lindep_thresh = float(rsp_dict['lindep_thresh'])
         if 'max_iter' in rsp_dict:
-            self.max_iter = rsp_dict['max_iter']
+            self.max_iter = int(rsp_dict['max_iter'])
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
