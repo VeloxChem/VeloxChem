@@ -25,6 +25,7 @@ class MyBuildPy(SetuptoolsBuildPy):
             cmd += os.environ['OMP_NUM_THREADS']
         else:
             cmd += str(multiprocessing.cpu_count())
+        cmd += ' release'
         process = subprocess.Popen(cmd.split(),
                                    stdout=sys.stdout,
                                    stderr=subprocess.STDOUT)
