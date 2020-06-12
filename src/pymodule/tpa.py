@@ -1,10 +1,11 @@
+import numpy as np
+import sys
+
+from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .veloxchemlib import mpi_master
 from .inputparser import parse_frequencies
 from .cppsolver import ComplexResponse
 from .tpadriver import tpa
-from .veloxchemlib import ElectricDipoleIntegralsDriver
-import numpy as np
-from .veloxchemlib import mpi_master
-import sys
 from .linearsolver import LinearSolver
 
 
@@ -44,7 +45,7 @@ class twophotonabs(LinearSolver):
                         ev_frequencies.split("-")[2]) / 27.218679420751958
                     self.frequencies = str(star) + "-" + str(en) + "-" + str(
                         step)
-                    print(self.frequencies)
+                    #print(self.frequencies)
             else:
                 self.frequencies = rsp_dict['frequencies']
         if 'damping' in rsp_dict:
@@ -74,9 +75,9 @@ class twophotonabs(LinearSolver):
         """
 
         if self.rank == mpi_master():
-            print("Number of freqs")
-            num = parse_frequencies(self.frequencies)
-            print(len(num))
+            #print("Number of freqs")
+            #num = parse_frequencies(self.frequencies)
+            #print(len(num))
             S = scf_tensors['S']  # The overlap Matrix in AO basis
             da = scf_tensors['D'][0]  # Alpha Density
             mo = scf_tensors['C']  #  MO coeff matrix
@@ -97,7 +98,6 @@ class twophotonabs(LinearSolver):
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
         dipole_mats = dipole_drv.compute(molecule, ao_basis)
 
-        rhs = {}
         operator = 'dipole'
         component = 'xyz'
 

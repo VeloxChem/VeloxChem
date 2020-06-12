@@ -1,3 +1,11 @@
+from mpi4py import MPI
+import numpy as np
+import ctypes
+import psutil
+import time
+import sys
+import os
+
 from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
@@ -5,13 +13,10 @@ from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat, fockmat
 from .veloxchemlib import ericut
-import time
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
-from mpi4py import MPI
-import numpy as np
 
 
 class tpa:
@@ -1807,8 +1812,8 @@ class tpa:
         end = time.time()
 
         if self.rank == mpi_master():
-            print("Number of Focks for T[3] contraction")
-            print(len(Dens_list))
+            #print("Number of Focks for T[3] contraction")
+            #print(len(Dens_list))
             Fock_list = []
             for i in range(len(FF_AO)):
                 Fock_list.append(self.ao2mo(mo, FF_AO[i]))
@@ -2453,34 +2458,85 @@ class tpa:
                 return None
 
     def get_two_el_fock_mod_r(self, molecule, ao_basis, *dabs):
-        dts = []
-        if self.rank == mpi_master():
-            for dab in dabs[0]:
-                dt = 2 * dab
-                dts.append(dt)
-            dens = AODensityMatrix(dts, denmat.rest)
-        else:
-            dens = AODensityMatrix()
-
-        dens.broadcast(self.rank, self.comm)
-        fock = AOFockMatrix(dens)
-
-        for i in range(0, AOFockMatrix(dens).number_of_fock_matrices()):
-            fock.set_fock_type(fockmat.rgenjk, i)
-            fock.set_fock_type(fockmat.rgenk, i + 1)
 
         eri_driver = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_driver.compute(ericut.qqden, 1.0e-15, molecule,
                                        ao_basis)
-        eri_driver.compute(ericut.qqden, 1.0e-15, molecule, ao_basis)
-        eri_driver.compute(fock, dens, molecule, ao_basis, screening)
-        fock.reduce_sum(self.rank, self.size, self.comm)
-        fabs = []
-        if self.rank == mpi_master():
-            for i in range(0, len(dabs[0])):
-                ft = fock.to_numpy(i).T
-                fabs.append(ft)
 
+        # determine number of batches
+
+        num_batches = 0
+
+        total_mem = psutil.virtual_memory().total
+        total_mem_list = self.comm.gather(total_mem, root=mpi_master())
+
+        if self.rank == mpi_master():
+            n_ao = dabs[0][0].shape[0]
+            n_total = len(dabs[0])
+
+            # check if master node has larger memory
+            mem_adjust = 0.0
+            if total_mem > min(total_mem_list):
+                mem_adjust = total_mem - min(total_mem_list)
+
+            # compute maximum batch size from available memory
+            avail_mem = psutil.virtual_memory().available - mem_adjust
+            mem_per_mat = n_ao**2 * ctypes.sizeof(ctypes.c_double)
+            nthreads = int(os.environ['OMP_NUM_THREADS'])
+            max_batch_size = int(avail_mem / mem_per_mat / (0.625 * nthreads))
+            max_batch_size = max(1, max_batch_size)
+
+            batch_size = min(100, n_total, max_batch_size)
+
+            # get number of batches
+            num_batches = n_total // batch_size
+            if n_total % batch_size != 0:
+                num_batches += 1
+
+        num_batches = self.comm.bcast(num_batches, root=mpi_master())
+
+        # go through batches
+
+        fabs = []
+
+        if self.rank == mpi_master():
+            batch_str = '* Info * Processing Fock builds...'
+            batch_str += ' (batch size: {:d})'.format(batch_size)
+            print(batch_str)
+
+        for batch_ind in range(num_batches):
+
+            if self.rank == mpi_master():
+                print('* Info *   batch {}/{}'.format(batch_ind + 1, num_batches))
+                sys.stdout.flush()
+
+            # form density matrices
+
+            dts = []
+            if self.rank == mpi_master():
+                batch_start = batch_size * batch_ind
+                batch_end = min(batch_start + batch_size, n_total)
+                for dab in dabs[0][batch_start:batch_end]:
+                    dt = 2 * dab
+                    dts.append(dt)
+                dens = AODensityMatrix(dts, denmat.rest)
+            else:
+                dens = AODensityMatrix()
+
+            dens.broadcast(self.rank, self.comm)
+
+            fock = AOFockMatrix(dens)
+            for i in range(fock.number_of_fock_matrices()):
+                fock.set_fock_type(fockmat.rgenjk, i)
+
+            eri_driver.compute(fock, dens, molecule, ao_basis, screening)
+            fock.reduce_sum(self.rank, self.size, self.comm)
+
+            if self.rank == mpi_master():
+                for i in range(fock.number_of_fock_matrices()):
+                    fabs.append(fock.to_numpy(i).T)
+
+        if self.rank == mpi_master():
             return tuple(fabs)
         else:
             return None
