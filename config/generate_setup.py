@@ -160,8 +160,8 @@ def generate_setup(template_file, setup_file, user_flag=None):
 
     use_intel = (cxxname == 'icpc')
     use_gnu = cxxname in ['g++', 'x86_64-conda_cos6-linux-gnu-c++']
-    use_clang = cxxname in ['clang++', 'Crayclang'] or \
-	re.match(r'x86_64-apple-.*-clang\+\+', cxxname)
+    use_clang = (cxxname in ['clang++', 'Crayclang'] or
+                 re.match(r'x86_64-apple-.*-clang\+\+', cxxname))
 
     if not (use_intel or use_gnu or use_clang):
         print('*** Error: Unrecognized c++ compiler!')
@@ -187,6 +187,15 @@ def generate_setup(template_file, setup_file, user_flag=None):
     print('*** Checking math library... ', end='')
 
     use_mkl = 'MKLROOT' in os.environ
+
+    if not use_mkl:
+        conda_exe, conda_path = find_exe(['conda'])
+        python3_exe, python3_path = find_exe(['python3'])
+        if (conda_exe is not None and python3_exe is not None and
+                conda_path == python3_path):
+            os.environ['MKLROOT'] = os.sep.join(conda_path.split(os.sep)[:-1])
+            use_mkl = True
+
     use_openblas = 'OPENBLASROOT' in os.environ
     use_craylibsci = 'CRAY_LIBSCI_VERSION' in os.environ
 

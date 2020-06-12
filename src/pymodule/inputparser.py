@@ -249,6 +249,9 @@ class InputParser:
                 self.input_dict['loprop']['checkpoint_file'] = floprop
 
     def consistency_checks(self):
+        """
+        Checks consistency in the input groups.
+        """
 
         if self.is_basis_set:
             return
@@ -257,15 +260,30 @@ class InputParser:
 
     def verify_options(self, group):
         """
-        Detect input errors for selected input group
+        Detect input errors for selected input group.
+        Checks and messages defined by `verifiers` dict.
 
-        Checks and messages defined by `verifiers` dict
+        :param group:
+            The input group.
         """
+
+        verifyers = {
+            'loprop': {
+                'checkpoint_file': (lambda v: True, 'Always OK'),
+                'localize':
+                    (lambda v: v in ['charges'], 'localize: {} illegal value')
+            }
+        }
+
         if group in self.input_dict:
             for option, value in self.input_dict[group].items():
                 verify, msg = verifyers[group][option]
                 if not verify(value):
                     raise InputError(msg.format(value))
+
+
+class InputError(Exception):
+    pass
 
 
 def parse_frequencies(input_frequencies):
@@ -301,15 +319,3 @@ def parse_frequencies(input_frequencies):
         elif w:
             frequencies.append(float(w))
     return frequencies
-
-
-class InputError(Exception):
-    pass
-
-
-verifyers = {
-    'loprop': {
-        'checkpoint_file': (lambda v: True, 'Always OK'),
-        'localize': (lambda v: v in ['charges'], 'localize: {} illegal value')
-    }
-}
