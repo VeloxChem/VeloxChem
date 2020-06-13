@@ -49,7 +49,7 @@ class ResponseDriver:
         # convergence
         self.is_converged = False
 
-    def update_settings(self, rsp_dict, method_dict={}):
+    def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates settings in response solver.
 
@@ -60,7 +60,11 @@ class ResponseDriver:
         """
 
         self.rsp_dict = dict(rsp_dict)
-        self.method_dict = dict(method_dict)
+
+        if method_dict is None:
+            self.method_dict = {}
+        else:
+            self.method_dict = dict(method_dict)
 
         if 'property' in rsp_dict:
             self.prop_type = rsp_dict['property'].lower()

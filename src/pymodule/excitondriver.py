@@ -120,13 +120,16 @@ class ExcitonModelDriver:
         self.restart = True
         self.checkpoint_file = None
 
-    def update_settings(self, exciton_dict, method_dict={}):
+    def update_settings(self, exciton_dict, method_dict=None):
         """
         Updates settings in exciton model driver.
 
         :param exciton_dict:
             The settings dictionary.
         """
+
+        if method_dict is None:
+            method_dict = {}
 
         assert_msg_critical('fragments' in exciton_dict,
                             'ExcitonModel: fragments not defined')

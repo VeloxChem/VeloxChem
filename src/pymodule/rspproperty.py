@@ -17,13 +17,17 @@ class ResponseProperty:
         - rsp_property: The dictionary of response property.
     """
 
-    def __init__(self, rsp_dict, method_dict={}):
+    def __init__(self, rsp_dict, method_dict=None):
         """
         Initializes response property/spectroscopy.
         """
 
         self.rsp_dict = rsp_dict
-        self.method_dict = method_dict
+
+        if method_dict is None:
+            self.method_dict = {}
+        else:
+            self.method_dict = dict(method_dict)
 
     def init_driver(self, comm, ostream):
         """

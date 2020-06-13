@@ -50,7 +50,7 @@ class C6Solver(LinearSolver):
         self.conv_thresh = 1.0e-3
         self.lindep_thresh = 1.0e-10
 
-    def update_settings(self, rsp_dict, method_dict={}):
+    def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in C6 solver.
 
@@ -59,6 +59,9 @@ class C6Solver(LinearSolver):
         :param method_dict:
             The dictionary of method rsp_dict.
         """
+
+        if method_dict is None:
+            method_dict = {}
 
         super().update_settings(rsp_dict, method_dict)
 
