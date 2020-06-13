@@ -17,13 +17,17 @@ class CustomProperty(ResponseProperty):
         - rsp_property: The dictionary of response property.
     """
 
-    def __init__(self, rsp_dict, method_dict={}):
+    def __init__(self, rsp_dict, method_dict=None):
         """
         Initializes a custom, user-defined  property.
         """
 
         rsp_dict = dict(rsp_dict)
-        method_dict = dict(method_dict)
+
+        if method_dict is None:
+            method_dict = {}
+        else:
+            method_dict = dict(method_dict)
 
         rsp_dict['property'] = 'custom'
         if 'response' not in rsp_dict:
