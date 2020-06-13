@@ -60,9 +60,8 @@ class ResponseDriver:
         """
 
         self.rsp_dict = dict(rsp_dict)
-
         if method_dict is None:
-            self.method_dict = {}
+            self.method_dict = None
         else:
             self.method_dict = dict(method_dict)
 

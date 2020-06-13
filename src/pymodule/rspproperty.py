@@ -23,11 +23,7 @@ class ResponseProperty:
         """
 
         self.rsp_dict = rsp_dict
-
-        if method_dict is None:
-            self.method_dict = {}
-        else:
-            self.method_dict = dict(method_dict)
+        self.method_dict = method_dict
 
     def init_driver(self, comm, ostream):
         """
