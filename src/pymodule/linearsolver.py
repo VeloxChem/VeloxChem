@@ -135,7 +135,7 @@ class LinearSolver:
         self.dist_e2bger = None
         self.dist_e2bung = None
 
-    def update_settings(self, rsp_dict, method_dict={}):
+    def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in linear solver.
 
@@ -144,6 +144,9 @@ class LinearSolver:
         :param method_dict:
             The dictionary of method rsp_dict.
         """
+
+        if method_dict is None:
+            method_dict = {}
 
         if 'eri_thresh' in rsp_dict:
             self.eri_thresh = float(rsp_dict['eri_thresh'])

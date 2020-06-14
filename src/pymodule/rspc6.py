@@ -19,13 +19,17 @@ class C6(ResponseProperty):
         - rsp_property: The dictionary of response property.
     """
 
-    def __init__(self, rsp_dict, method_dict={}):
+    def __init__(self, rsp_dict, method_dict=None):
         """
         Initializes the C6 dispersion coefficient property.
         """
 
         rsp_dict = dict(rsp_dict)
-        method_dict = dict(method_dict)
+
+        if method_dict is None:
+            method_dict = {}
+        else:
+            method_dict = dict(method_dict)
 
         rsp_dict['property'] = 'c6'
         rsp_dict['response'] = 'linear'

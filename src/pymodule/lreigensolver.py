@@ -40,7 +40,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         self.nstates = 3
 
-    def update_settings(self, rsp_dict, method_dict={}):
+    def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in linear response eigensolver.
 
@@ -49,6 +49,9 @@ class LinearResponseEigenSolver(LinearSolver):
         :param method_dict:
             The dictionary of method rsp_dict.
         """
+
+        if method_dict is None:
+            method_dict = {}
 
         super().update_settings(rsp_dict, method_dict)
 

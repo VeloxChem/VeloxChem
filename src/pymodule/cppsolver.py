@@ -48,7 +48,7 @@ class ComplexResponse(LinearSolver):
         self.frequencies = (0,)
         self.damping = 0.004556335294880438
 
-    def update_settings(self, rsp_dict, method_dict={}):
+    def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in complex liner response solver.
 
@@ -57,6 +57,9 @@ class ComplexResponse(LinearSolver):
         :param method_dict:
             The dictionary of method rsp_dict.
         """
+
+        if method_dict is None:
+            method_dict = {}
 
         super().update_settings(rsp_dict, method_dict)
 

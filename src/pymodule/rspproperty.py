@@ -17,7 +17,7 @@ class ResponseProperty:
         - rsp_property: The dictionary of response property.
     """
 
-    def __init__(self, rsp_dict, method_dict={}):
+    def __init__(self, rsp_dict, method_dict=None):
         """
         Initializes response property/spectroscopy.
         """

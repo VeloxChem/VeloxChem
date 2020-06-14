@@ -46,7 +46,7 @@ class LinearResponseSolver(LinearSolver):
         self.b_components = 'xyz'
         self.frequencies = (0,)
 
-    def update_settings(self, rsp_dict, method_dict={}):
+    def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in linear response solver.
 
@@ -55,6 +55,9 @@ class LinearResponseSolver(LinearSolver):
         :param method_dict:
             The dictionary of method rsp_dict.
         """
+
+        if method_dict is None:
+            method_dict = {}
 
         super().update_settings(rsp_dict, method_dict)
 

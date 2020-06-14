@@ -186,16 +186,13 @@ def generate_setup(template_file, setup_file, user_flag=None):
 
     print('*** Checking math library... ', end='')
 
+    # check conda environment
+    if 'MKLROOT' not in os.environ:
+        is_conda = os.path.exists(os.path.join(sys.prefix, 'conda-meta'))
+        if is_conda:
+            os.environ['MKLROOT'] = sys.prefix
+
     use_mkl = 'MKLROOT' in os.environ
-
-    if not use_mkl:
-        conda_exe, conda_path = find_exe(['conda'])
-        python3_exe, python3_path = find_exe(['python3'])
-        if (conda_exe is not None and python3_exe is not None and
-                conda_path == python3_path):
-            os.environ['MKLROOT'] = os.sep.join(conda_path.split(os.sep)[:-1])
-            use_mkl = True
-
     use_openblas = 'OPENBLASROOT' in os.environ
     use_craylibsci = 'CRAY_LIBSCI_VERSION' in os.environ
 

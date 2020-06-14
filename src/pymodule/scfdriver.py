@@ -181,7 +181,7 @@ class ScfDriver:
         self.memory_profiling = False
         self.memory_tracing = False
 
-    def update_settings(self, scf_dict, method_dict={}):
+    def update_settings(self, scf_dict, method_dict=None):
         """
         Updates settings in SCF driver.
 
@@ -190,6 +190,9 @@ class ScfDriver:
         :param method_dict:
             The input dicitonary of method settings group.
         """
+
+        if method_dict is None:
+            method_dict = {}
 
         if 'acc_type' in scf_dict:
             self.acc_type = scf_dict['acc_type'].upper()
