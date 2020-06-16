@@ -5,19 +5,31 @@ from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
 from .inputparser import parse_frequencies
 from .cppsolver import ComplexResponse
-from .tpadriver import tpa
+from .tpadriver import TPAdriver
 from .linearsolver import LinearSolver
+import time
 
 
-class twophotonabs(LinearSolver):
+class TPA(LinearSolver):
+    """
+    Implements the isotropic cubic response function for two-photon absorption (TPA) 
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
+
+    Instance variables
+        - frequencies: The frequencies.
+        - damping: The damping parameter.
+    """
 
     def __init__(self, comm, ostream):
         np.set_printoptions(threshold=sys.maxsize)
-        # tpa setup
         self.iso = True
         self.reduced = False
 
-        # cpp setup
+        # cpp settings
         self.frequencies = 0
         self.comp = "zzzz,0,0,0"
         self.damping = 0.004556335294880438
@@ -33,6 +45,15 @@ class twophotonabs(LinearSolver):
         self.ostream = ostream
 
     def update_settings(self, rsp_dict, method_dict={}):
+        """
+        Updates response and method settings in complex liner response solver used for TPA
+
+        :param rsp_dict:
+            The dictionary of response dict.
+        :param method_dict:
+            The dictionary of method rsp_dict.
+        """
+
         if 'frequencies' in rsp_dict:
             if 'unit' in rsp_dict:
                 if rsp_dict['unit'] in 'eV':
@@ -45,7 +66,6 @@ class twophotonabs(LinearSolver):
                         ev_frequencies.split("-")[2]) / 27.218679420751958
                     self.frequencies = str(star) + "-" + str(en) + "-" + str(
                         step)
-                    #print(self.frequencies)
             else:
                 self.frequencies = rsp_dict['frequencies']
         if 'damping' in rsp_dict:
@@ -71,13 +91,39 @@ class twophotonabs(LinearSolver):
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
-        This routine computes all the single index response vectors and then call all the relevent functions to compute γ
-        """
+        Computes the isotropic cubic response function for two-photon absorption 
+        
+        :param molecule:
+        :param ao_basis:
+        :param scf_tesnor:
 
+        :return t4_dict:
+              A dictonary containing the isotropic T[4] contractions
+        :return t3_dict:
+              A dictonary containing the isotropic T[3] contractions
+        :return NaX3NyNz:
+              A dictonary containing the isotropic X[3] contractions
+        :return NaA3NxNy:
+              A dictonary containing the isotropic A[3] contractions
+        :return NaX2Nyz:
+              A dictonary containing the isotropic X[2] contractions
+        :return NxA2Nyz:
+              A dictonary containing the isotropic A[2] contractions
+        :return gamma:
+              A dictonary containing the isotropic cubic response functions for TPA
+              
+        :return t3_dict_red:
+              A dictonary containing the isotropic T[3] contractions for one-photon off-resonance TPA calculations
+        :return NaX2Nyz_red:
+              A dictonary containing the isotropic X[2] contractions for one-photo off-resonance TPA calculations
+        :return NxA2Nyz_red:
+              A dictonary containing the isotropic A[2] contractions for one-photo off-resonance TPA calculations
+        :return gamma_red:
+              A dictonary containing the reduced isotropic cubic response functions for TPA
+              
+        """
+        time_start = time.time()
         if self.rank == mpi_master():
-            #print("Number of freqs")
-            #num = parse_frequencies(self.frequencies)
-            #print(len(num))
             S = scf_tensors['S']  # The overlap Matrix in AO basis
             da = scf_tensors['D'][0]  # Alpha Density
             mo = scf_tensors['C']  #  MO coeff matrix
@@ -85,7 +131,7 @@ class twophotonabs(LinearSolver):
             )  # The number of occupied orbitals
             norb = mo.shape[1]  # The number of total orbitals
             w = parse_frequencies(self.frequencies)
-            d_a_mo = tpa().ao2mo_inv(mo, da)
+            d_a_mo = TPAdriver().ao2mo_inv(mo, da)
         else:
             S = None
             da = None
@@ -94,7 +140,10 @@ class twophotonabs(LinearSolver):
             nocc = None
             norb = None
             w = None
+        
 
+
+        # Computing first-order gradient vectors
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
         dipole_mats = dipole_drv.compute(molecule, ao_basis)
 
@@ -103,13 +152,15 @@ class twophotonabs(LinearSolver):
 
         b_rhs = self.get_complex_rhs(operator, component, molecule,
                                      ao_basis, scf_tensors)
+        
 
+        # Storing the dipole integral matrices used for the X[3],X[2],A[3] and A[2] contractions in MO basis
         if self.rank == mpi_master():
             v1 = {(op, wi): v for op, v in zip(component, b_rhs) for wi in w}
             X = {
-                'x': 2 * tpa().ao2mo(mo, dipole_mats.x_to_numpy()),
-                'y': 2 * tpa().ao2mo(mo, dipole_mats.y_to_numpy()),
-                'z': 2 * tpa().ao2mo(mo, dipole_mats.z_to_numpy())
+                'x': 2 * TPAdriver().ao2mo(mo, dipole_mats.x_to_numpy()),
+                'y': 2 * TPAdriver().ao2mo(mo, dipole_mats.y_to_numpy()),
+                'z': 2 * TPAdriver().ao2mo(mo, dipole_mats.z_to_numpy())
             }
             self.comp = self.get_comp(w)
         else:
@@ -121,7 +172,7 @@ class twophotonabs(LinearSolver):
         kX = {}
         Focks = {}
 
-        # Compute the first set of response vectors
+        # Updating settings for the first-order response vectors 
         Nb_drv = ComplexResponse(self.comm, self.ostream)
         Nb_drv.update_settings({
             'frequencies': self.frequencies,
@@ -131,7 +182,9 @@ class twophotonabs(LinearSolver):
             'lindep_thresh': self.lindep_thresh,
             'max_iter': self.max_iter,
         })
+        
 
+        # Computing the first-order response vectors 3 per frequency
         Nb_Drv = Nb_drv.compute(molecule, ao_basis, scf_tensors, v1)
 
         if self.rank == mpi_master():
@@ -140,7 +193,8 @@ class twophotonabs(LinearSolver):
             Nx.update({'Nb': Nb_Drv['solutions']})
             kX.update({'Nb': Nb_Drv['kappas']})
             Focks.update({'Fb': Nb_Drv['Focks']})
-
+            
+            # Storing the largest imaginary component of the response vector for plotting
             for k in Nx['Nb'].keys():
                 plot.append(np.max(np.abs(Nx['Nb'][k].imag)))
 
@@ -148,9 +202,12 @@ class twophotonabs(LinearSolver):
             kX['Nc'] = {}
             Focks['Fc'] = {}
             Focks['Fd'] = {}
-            """ Obtain all the Nc('x',-w) and kC('x',-w) from the Kb and Nb"""
+            
+            #  The first-order response vectors with negative frequency are obtained from the     
+            #  first-order response vectors with positive frequency by using flip_zy, see article. 
             for m in list(Nx['Nb'].keys()):
-                Nx['Nc'].update({(m[0], -m[1]): tpa().FlipYZ(Nx['Nb'][m])})
+                Nx['Nc'].update({(m[0], -m[1]): TPAdriver().flip_yz(Nx['Nb'][m])})
+            # Creating the response matrix for the negative first-order response vectors
                 kX['Nc'].update({
                     (m[0], -m[1]):
                         LinearSolver.lrvec2mat(Nx['Nc'][(m[0], -m[1])].real,
@@ -158,11 +215,15 @@ class twophotonabs(LinearSolver):
                         LinearSolver.lrvec2mat(Nx['Nc'][
                             (m[0], -m[1])].imag, nocc, norb) * 1j
                 })
+            #  The first-order Fock matrices  with positive and negative frequencies are each other complex conjugates
                 Focks['Fc'].update({(m[0], -m[1]): Focks['Fb'][m]})
                 Focks['Fd'].update({
                     (m[0], m[1]): np.conjugate(Focks['Fb'][m]).T
                 })
+            
 
+            # For the cubic-response with all operators being the dipole μ Nb=Na=Nd
+            # Likewise, Fb=Fd
             Focks['Fb'].update(Focks['Fd'])
 
             Nx['Na'] = Nx['Nb']
@@ -170,32 +231,36 @@ class twophotonabs(LinearSolver):
 
             Nx['Nd'] = Nx['Nb']
             kX['Nd'] = kX['Nb']
-
-        NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz, E3_dict, E4_dict, NaX2Nyz_red, NxA2Nyz_red, E3_dict_red = tpa(
+        
+        # Computing the third-order gradient and also the contractions of A[3] and A[2] which formally are not part of the 
+        # third-order gradient but which are used for the cubic response function
+        NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz, E3_dict, E4_dict, NaX2Nyz_red, NxA2Nyz_red, E3_dict_red = TPAdriver(
         ).main(self.eri_thresh, self.conv_thresh, self.lindep_thresh,
                self.max_iter, Focks, self.iso, Nx, w, X, self.damping, d_a_mo,
                kX, self.comp, S, da, mo, nocc, norb, scf_tensors, molecule,
                ao_basis, self.comm, self.ostream)
 
         if self.rank == mpi_master():
-            T4 = tpa().T4(self.damping, w, E4_dict, Nx, kX, self.comp, d_a_mo,
+            t4_dict = TPAdriver().get_t4(self.damping, w, E4_dict, Nx, kX, self.comp, d_a_mo,
                           nocc, norb)
-            T3 = tpa().T3(w, E3_dict, Nx, self.comp)
-            T3_red = tpa().T3(w, E3_dict_red, Nx, self.comp)
+            t3_dict = TPAdriver().get_t3(w, E3_dict, Nx, self.comp)
+            t3_dict_red = TPAdriver().get_t3(w, E3_dict_red, Nx, self.comp)
         else:
-            T4 = None
-            T3 = None
+            t4_dict = None
+            t3_dict = None
 
         gamma = {}
         gamma_red = {}
-
+        
+        # Combining all the terms to evaluate the iso-tropic cubic response function for TPA
+        # Full and reduced, see article 
         if self.rank == mpi_master():
             for i in range(len(w)):
                 if self.iso is True:
                     gamma.update({
                         (w[i], -w[i], w[i]):
                             1 / 15 *
-                            (T4[(w[i], -w[i], w[i])] + T3[(w[i], -w[i], w[i])] +
+                            (t4_dict[(w[i], -w[i], w[i])] + t3_dict[(w[i], -w[i], w[i])] +
                              NaX3NyNz[(w[i], -w[i], w[i])] +
                              NaA3NxNy[(w[i], -w[i], w[i])] +
                              NaX2Nyz[(w[i], -w[i], w[i])] +
@@ -203,24 +268,29 @@ class twophotonabs(LinearSolver):
                     })
                     gamma_red.update({
                         (w[i], -w[i], w[i]): 1 / 15 *
-                                             (T3_red[(w[i], -w[i], w[i])] +
+                                             (t3_dict_red[(w[i], -w[i], w[i])] +
                                               NaX2Nyz_red[(w[i], -w[i], w[i])] +
                                               NxA2Nyz_red[(w[i], -w[i], w[i])])
                     })
 
             self.print_header()
-            self.print_properties(self.iso, w, gamma, self.comp, T4, T3,
+            self.print_results(self.iso, w, gamma, self.comp, t4_dict, t3_dict,
                                   NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz)
-
+            
+            self.print_results_red(self.iso, w, gamma_red, self.comp, t3_dict_red, NaX2Nyz_red, NxA2Nyz_red)
             self.make_plots(w, gamma, gamma_red, plot)
         else:
             gamma = {}
             gamma_red = {}
+        time_end = time.time()
+        width = 50
+        w_str = "Total time =  {:.8f}".format(time_end-time_start)
+        self.ostream.print_header(w_str.ljust(width))
 
         if self.rank == mpi_master():
-            return T4, T3, NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz, gamma, w
+            return t4_dict, t3_dict, NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz, gamma, w, t3_dict_red,NaX2Nyz_red, NxA2Nyz_red,gamma_red
         else:
-            return None, None, None, None, None, None, None, None
+            return None, None, None, None, None, None, None, None,None, None, None, None
 
     def print_header(self):
         """
@@ -255,13 +325,25 @@ class twophotonabs(LinearSolver):
 
         self.ostream.flush()
 
-    def print_properties(self, iso, w1, gamma, comp, T4, T3, NaX3NyNz, NaA3NxNy,
+    def print_results(self, iso, w1, gamma, comp, t4_dict, t3_dict, NaX3NyNz, NaA3NxNy,
                          NaX2Nyz, NxA2Nyz):
         """
-        Prints properties.
+        Prints the results from the TPA calculation
 
-        :param props:
-            The dictionary of properties.
+        :param t4_dict:
+              A dictonary containing the isotropic T[4] contractions
+        :param t3_dict:
+              A dictonary containing the isotropic T[3] contractions
+        :param NaX3NyNz:
+              A dictonary containing the isotropic X[3] contractions
+        :param NaA3NxNy:
+              A dictonary containing the isotropic A[3] contractions
+        :param NaX2Nyz:
+              A dictonary containing the isotropic X[2] contractions
+        :param NxA2Nyz:
+              A dictonary containing the isotropic A[2] contractions
+        :param gamma:
+              A dictonary containing the isotropic cubic response functions for TPA
         """
         width = 50
 
@@ -281,15 +363,15 @@ class twophotonabs(LinearSolver):
 
         for w in w1:
             if iso is False:
-                w_str = "ΣT3term =  {:.8f}".format(T3[w, -w, w])
+                w_str = "ΣNaT3NxNyz =  {:.8f}".format(t3_dict[w, -w, w])
             else:
-                w_str = "ΣT3term =  {:.8f}".format(T3[w, -w, w] / 15)
+                w_str = "ΣNaT3NxNyz =  {:.8f}".format(t3_dict[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
             if iso is False:
-                w_str = "ΣT4term =  {:.8f}".format(T4[w, -w, w])
+                w_str = "ΣNaT4NxNyNz =  {:.8f}".format(t4_dict[w, -w, w])
             else:
-                w_str = "ΣT4term =  {:.8f}".format(T4[w, -w, w] / 15)
+                w_str = "ΣNaT4NxNyNz =  {:.8f}".format(t4_dict[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
             if iso is False:
@@ -323,12 +405,18 @@ class twophotonabs(LinearSolver):
             self.ostream.print_header(('-' * len(w_str)).ljust(width))
             self.ostream.print_blank()
 
-    def print_properties_red(self, iso, w1, gamma, comp, T3, NaX2Nyz, NxA2Nyz):
+    def print_results_red(self, iso, w1, gamma, comp, t3_dict, NaX2Nyz, NxA2Nyz):
         """
-        Prints properties.
+        Prints the results from the reduced TPA calculation
 
-        :param props:
-            The dictionary of properties.
+        :param t3_dict_red:
+              A dictonary containing the isotropic T[3] contractions for one-photon off-resonance TPA calculations
+        :param NaX2Nyz_red:
+              A dictonary containing the isotropic X[2] contractions for one-photo off-resonance TPA calculations
+        :param NxA2Nyz_red:
+              A dictonary containing the isotropic A[2] contractions for one-photo off-resonance TPA calculations
+        :param gamma_red:
+              A dictonary containing the reduced isotropic cubic response functions for TPA
         """
         width = 50
 
@@ -349,21 +437,21 @@ class twophotonabs(LinearSolver):
         for w in w1:
 
             if iso is False:
-                w_str = "T3term =  {:.8f}".format(T3[w, -w, w])
+                w_str = "ΣNaT3NxNyz =  {:.8f}".format(t3_dict[w, -w, w])
             else:
-                w_str = "T3term =  {:.8f}".format(T3[w, -w, w] / 15)
+                w_str = "ΣNaT3NxNyz =  {:.8f}".format(t3_dict[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
             if iso is False:
-                w_str = "NaX2Nyz =  {:.8f}".format(NaX2Nyz[w, -w, w])
+                w_str = "ΣNaX2Nyz =  {:.8f}".format(NaX2Nyz[w, -w, w])
             else:
-                w_str = "NaX2Nyz =  {:.8f}".format(NaX2Nyz[w, -w, w] / 15)
+                w_str = "ΣNaX2Nyz =  {:.8f}".format(NaX2Nyz[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
             if iso is False:
-                w_str = "NxA2Nyz =  {:.8f}".format(NxA2Nyz[w, -w, w])
+                w_str = "ΣNxA2Nyz =  {:.8f}".format(NxA2Nyz[w, -w, w])
             else:
-                w_str = "NxA2Nyz =  {:.8f}".format(NxA2Nyz[w, -w, w] / 15)
+                w_str = "ΣNxA2Nyz =  {:.8f}".format(NxA2Nyz[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
             w_str = '<<A;B,C,D>>= {:.8f}, w=({:.4f},{:.4f},{:.4f}), hω =({:.4f} eV)'.format(
@@ -373,8 +461,18 @@ class twophotonabs(LinearSolver):
             self.ostream.print_blank()
 
     def get_comp(self, w):
+        """
+        Makes a list of all the gamma tensor components that are to be computed for printing purposes and for the contraction of 
+        X[3],X[2],A[3],A[2]
+        
+        :param w:
+           A list of all the frequencies for the TPA calculation
+        :return comp:
+           A list of gamma tensors components inlcuded in the isotropic cubic response with their corresponding frequencies
+
+        """
+        
         if self.iso is True:
-            """ If the isotropic γ is to be computed this part of the code generates a list with all the tensor components to which are sent to the computation routine"""
             spat_A = ['x', 'y', 'z']
             comp_iso = []
 
@@ -411,15 +509,27 @@ class twophotonabs(LinearSolver):
         return self.comp
 
     def make_plots(self, w, gamma, gamma_red, plot):
+        """
+        Makes plots of the two-photon cross section [GM] 
+          1 a.u. = 1.896788 10^{-50} cm^4 s/photon
+          1 GM = 10^{-50} cm^4 s/photon
+        
+        :param gamma:
+              A dictonary containing the isotropic cubic response functions for TPA
+        :param gamma_red:
+              A dictonary containing the reduced isotropic cubic response functions for TPA
+        """
         g_comb = open('py_plot_comb.py', "w")
         add_stuff = 'import matplotlib \nimport matplotlib.pyplot as plt \n'
         omega_for_plot = 'ω = ['
         data_for_plot = 'σ = ['
+        # Contstats for the evauation of the cross section from the iso-tropic cubic response function
         N = 'N = ['
         N1 = 4
         af = 1 / 137
         pi = 3.14159265359
-        C = N1 * pi**(2) * af**(2)
+        c = 1.896788  
+        C = c*N1 * pi**(2) * af**(2)
         for i in range(len(w)):
             omega_for_plot += str(w[i] * 54.437358841503915 / 2) + ","
             data_for_plot += str(
@@ -444,8 +554,8 @@ class twophotonabs(LinearSolver):
         g_comb.write(data_for_plot)
 
         g_comb.write('\nplt.xlabel(\'ω eV\')')
-        g_comb.write('\nplt.ylabel(\'σ TPA cross\')\nplt.legend()')
+        g_comb.write('\nplt.ylabel(\'σ TPA cross\')')
         g_comb.write('\nplt.plot(ω,σ,\'-Dk\',label=\'Full\')')
-        g_comb.write('\nplt.plot(ω,σ_red,\'-or\',label=\'Reduced\')')
+        g_comb.write('\nplt.plot(ω,σ_red,\'-or\',label=\'Reduced\')\nplt.legend()')
         g_comb.write('\nplt.show()')
         #g_comb.write('\nplt.savefig(\"filename.eps\", facecolor=\'w\', edgecolor=\'w\',orientation=\'portrait\', papertype=None, format=\'eps\',transparent=True,frameon=None, metadata=None)')

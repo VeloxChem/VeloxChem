@@ -3,7 +3,7 @@ from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .c6solver import C6Solver
 from .tdaexcidriver import TDAExciDriver
-from .tpa import twophotonabs
+from .tpa import TPA
 
 
 class ResponseDriver:
@@ -161,7 +161,7 @@ class ResponseDriver:
 
         if self.rsp_dict['response'] == 'cubic':
 
-            tpa = twophotonabs(self.comm, self.ostream)
+            tpa = TPA(self.comm, self.ostream)
             tpa.update_settings(self.rsp_dict, self.method_dict)
 
             return tpa.compute(molecule, ao_basis, scf_tensors)

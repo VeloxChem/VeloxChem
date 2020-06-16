@@ -7,7 +7,7 @@ import os
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.tpa import twophotonabs
+from veloxchem.tpa import TPA
 
 
 class TestTPA(unittest.TestCase):
@@ -23,9 +23,9 @@ class TestTPA(unittest.TestCase):
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
         scf_tensors = scf_drv.scf_tensors
         
-        tpa = twophotonabs(task.mpi_comm, task.ostream)
+        tpa = TPA(task.mpi_comm, task.ostream)
         tpa.update_settings({'damping': task.input_dict['response']['damping'],'frequencies': task.input_dict['response']['frequencies']})
-        T4,T3,X3,A3,X2,A2,gamma,w = tpa.compute(task.molecule,task.ao_basis,scf_tensors)
+        T4,T3,X3,A3,X2,A2,gamma,w,T3_red,X2_red, A2_red,gamma_red = tpa.compute(task.molecule,task.ao_basis,scf_tensors)
         
         w = 0.05
         T3_ref = 42.19841751+0.28695214j
@@ -35,6 +35,11 @@ class TestTPA(unittest.TestCase):
         A2_ref  = -270.83461366-0.52758094j
         A3_ref  = 27.21320341+0.03029788j
         gamma_ref = -401.92066716-2.58015589j
+
+        T3_red_ref =  5.65167162+0.20325582j                                                  
+        X2_red_ref =  -96.30910639-1.72679037j                                                  
+        A2_red_ref =  -96.36431088-0.51886895j                                                  
+        gamma_red_ref = -187.02174564-2.04240350j
 
         if task.mpi_rank == mpi_master():
             self.assertTrue(np.max(np.abs(1/15*T3[(w, -w, w)].real - T3_ref.real)) < 1.0e-4)
@@ -57,7 +62,20 @@ class TestTPA(unittest.TestCase):
 
             self.assertTrue(np.max(np.abs(gamma[(w, -w, w)].real - gamma_ref.real)) < 1.0e-4)
             self.assertTrue(np.max(np.abs(gamma[(w, -w, w)].imag - gamma_ref.imag)) < 1.0e-4)
+            
 
+            #Reduced
+            self.assertTrue(np.max(np.abs(1/15*T3_red[(w, -w, w)].real - T3_red_ref.real)) < 1.0e-4)
+            self.assertTrue(np.max(np.abs(1/15*T3_red[(w, -w, w)].imag - T3_red_ref.imag)) < 1.0e-4)
+
+            self.assertTrue(np.max(np.abs(1/15*X2_red[(w, -w, w)].real - X2_red_ref.real)) < 1.0e-4)
+            self.assertTrue(np.max(np.abs(1/15*X2_red[(w, -w, w)].imag - X2_red_ref.imag)) < 1.0e-4)
+
+            self.assertTrue(np.max(np.abs(1/15*A2_red[(w, -w, w)].real - A2_red_ref.real)) < 1.0e-4)
+            self.assertTrue(np.max(np.abs(1/15*A2_red[(w, -w, w)].imag - A2_red_ref.imag)) < 1.0e-4)
+
+            self.assertTrue(np.max(np.abs(gamma_red[(w, -w, w)].real - gamma_red_ref.real)) < 1.0e-4)
+            self.assertTrue(np.max(np.abs(gamma_red[(w, -w, w)].imag - gamma_red_ref.imag)) < 1.0e-4)
     def test_tpa(self):
 
         inpfile = os.path.join('inputs', 'water_tpa.inp')
