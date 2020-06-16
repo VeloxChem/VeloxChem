@@ -1,4 +1,5 @@
 import numpy as np
+import time
 import sys
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
@@ -7,12 +8,12 @@ from .inputparser import parse_frequencies
 from .cppsolver import ComplexResponse
 from .tpadriver import TPAdriver
 from .linearsolver import LinearSolver
-import time
 
 
 class TPA(LinearSolver):
     """
-    Implements the isotropic cubic response function for two-photon absorption (TPA) 
+    Implements the isotropic cubic response function for two-photon absorption
+    (TPA)
 
     :param comm:
         The MPI communicator.
@@ -46,7 +47,8 @@ class TPA(LinearSolver):
 
     def update_settings(self, rsp_dict, method_dict={}):
         """
-        Updates response and method settings in complex liner response solver used for TPA
+        Updates response and method settings in complex liner response solver
+        used for TPA
 
         :param rsp_dict:
             The dictionary of response dict.
@@ -91,11 +93,15 @@ class TPA(LinearSolver):
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
-        Computes the isotropic cubic response function for two-photon absorption 
-        
+        Computes the isotropic cubic response function for two-photon
+        absorption
+
         :param molecule:
-        :param ao_basis:
-        :param scf_tesnor:
+            The molecule.
+        :param basis:
+            The AO basis.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
 
         :return t4_dict:
               A dictonary containing the isotropic T[4] contractions
@@ -110,23 +116,27 @@ class TPA(LinearSolver):
         :return NxA2Nyz:
               A dictonary containing the isotropic A[2] contractions
         :return gamma:
-              A dictonary containing the isotropic cubic response functions for TPA
-              
+              A dictonary containing the isotropic cubic response functions for
+              TPA
         :return t3_dict_red:
-              A dictonary containing the isotropic T[3] contractions for one-photon off-resonance TPA calculations
+              A dictonary containing the isotropic T[3] contractions for
+              one-photon off-resonance TPA calculations
         :return NaX2Nyz_red:
-              A dictonary containing the isotropic X[2] contractions for one-photo off-resonance TPA calculations
+              A dictonary containing the isotropic X[2] contractions for
+              one-photo off-resonance TPA calculations
         :return NxA2Nyz_red:
-              A dictonary containing the isotropic A[2] contractions for one-photo off-resonance TPA calculations
+              A dictonary containing the isotropic A[2] contractions for
+              one-photo off-resonance TPA calculations
         :return gamma_red:
-              A dictonary containing the reduced isotropic cubic response functions for TPA
-              
+              A dictonary containing the reduced isotropic cubic response
+              functions for TPA
         """
+
         time_start = time.time()
         if self.rank == mpi_master():
             S = scf_tensors['S']  # The overlap Matrix in AO basis
             da = scf_tensors['D'][0]  # Alpha Density
-            mo = scf_tensors['C']  #  MO coeff matrix
+            mo = scf_tensors['C']  # MO coeff matrix
             nocc = molecule.number_of_alpha_electrons(
             )  # The number of occupied orbitals
             norb = mo.shape[1]  # The number of total orbitals
@@ -140,8 +150,6 @@ class TPA(LinearSolver):
             nocc = None
             norb = None
             w = None
-        
-
 
         # Computing first-order gradient vectors
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
@@ -150,11 +158,11 @@ class TPA(LinearSolver):
         operator = 'dipole'
         component = 'xyz'
 
-        b_rhs = self.get_complex_rhs(operator, component, molecule,
-                                     ao_basis, scf_tensors)
-        
+        b_rhs = self.get_complex_rhs(operator, component, molecule, ao_basis,
+                                     scf_tensors)
 
-        # Storing the dipole integral matrices used for the X[3],X[2],A[3] and A[2] contractions in MO basis
+        # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
+        # A[2] contractions in MO basis
         if self.rank == mpi_master():
             v1 = {(op, wi): v for op, v in zip(component, b_rhs) for wi in w}
             X = {
@@ -172,7 +180,7 @@ class TPA(LinearSolver):
         kX = {}
         Focks = {}
 
-        # Updating settings for the first-order response vectors 
+        # Updating settings for the first-order response vectors
         Nb_drv = ComplexResponse(self.comm, self.ostream)
         Nb_drv.update_settings({
             'frequencies': self.frequencies,
@@ -182,7 +190,6 @@ class TPA(LinearSolver):
             'lindep_thresh': self.lindep_thresh,
             'max_iter': self.max_iter,
         })
-        
 
         # Computing the first-order response vectors 3 per frequency
         Nb_Drv = Nb_drv.compute(molecule, ao_basis, scf_tensors, v1)
@@ -190,11 +197,13 @@ class TPA(LinearSolver):
         if self.rank == mpi_master():
             plot = []
 
-            Nx.update({'Nb': Nb_Drv['solutions']})
-            kX.update({'Nb': Nb_Drv['kappas']})
-            Focks.update({'Fb': Nb_Drv['focks']})
-            
-            # Storing the largest imaginary component of the response vector for plotting
+            Nx['Nb'] = Nb_Drv['solutions']
+            kX['Nb'] = Nb_Drv['kappas']
+            Focks['Fb'] = Nb_Drv['focks']
+
+            # Storing the largest imaginary component of the response vector
+            # for plotting
+
             for k in Nx['Nb'].keys():
                 plot.append(np.max(np.abs(Nx['Nb'][k].imag)))
 
@@ -202,28 +211,31 @@ class TPA(LinearSolver):
             kX['Nc'] = {}
             Focks['Fc'] = {}
             Focks['Fd'] = {}
-            
-            #  The first-order response vectors with negative frequency are obtained from the     
-            #  first-order response vectors with positive frequency by using flip_zy, see article. 
+
+            # The first-order response vectors with negative frequency are
+            # obtained from the first-order response vectors with positive
+            # frequency by using flip_zy, see article.
+
             for m in list(Nx['Nb'].keys()):
-                Nx['Nc'].update({(m[0], -m[1]): TPAdriver().flip_yz(Nx['Nb'][m])})
-            # Creating the response matrix for the negative first-order response vectors
-                kX['Nc'].update({
-                    (m[0], -m[1]):
-                        LinearSolver.lrvec2mat(Nx['Nc'][(m[0], -m[1])].real,
-                                               nocc, norb) +
-                        LinearSolver.lrvec2mat(Nx['Nc'][
-                            (m[0], -m[1])].imag, nocc, norb) * 1j
-                })
-            #  The first-order Fock matrices  with positive and negative frequencies are each other complex conjugates
-                Focks['Fc'].update({(m[0], -m[1]): Focks['Fb'][m]})
-                Focks['Fd'].update({
-                    (m[0], m[1]): np.conjugate(Focks['Fb'][m]).T
-                })
-            
+                Nx['Nc'][(m[0], -m[1])] = TPAdriver().flip_yz(Nx['Nb'][m])
+
+                # Creating the response matrix for the negative first-order
+                # response vectors
+
+                kX['Nc'][(m[0], -m[1])] = LinearSolver.lrvec2mat(
+                    Nx['Nc'][(m[0], -m[1])].real, nocc,
+                    norb) + 1j * LinearSolver.lrvec2mat(
+                        Nx['Nc'][(m[0], -m[1])].imag, nocc, norb)
+
+                # The first-order Fock matrices  with positive and negative
+                # frequencies are each other complex conjugates
+
+                Focks['Fc'][(m[0], -m[1])] = Focks['Fb'][m]
+                Focks['Fd'][(m[0], m[1])] = np.conjugate(Focks['Fb'][m]).T
 
             # For the cubic-response with all operators being the dipole μ Nb=Na=Nd
             # Likewise, Fb=Fd
+
             Focks['Fb'].update(Focks['Fd'])
 
             Nx['Na'] = Nx['Nb']
@@ -231,18 +243,21 @@ class TPA(LinearSolver):
 
             Nx['Nd'] = Nx['Nb']
             kX['Nd'] = kX['Nb']
-        
-        # Computing the third-order gradient and also the contractions of A[3] and A[2] which formally are not part of the 
-        # third-order gradient but which are used for the cubic response function
-        NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz, E3_dict, E4_dict, NaX2Nyz_red, NxA2Nyz_red, E3_dict_red = TPAdriver(
-        ).main(self.eri_thresh, self.conv_thresh, self.lindep_thresh,
-               self.max_iter, Focks, self.iso, Nx, w, X, self.damping, d_a_mo,
-               kX, self.comp, S, da, mo, nocc, norb, scf_tensors, molecule,
-               ao_basis, self.comm, self.ostream)
+
+        # Computing the third-order gradient and also the contractions of
+        # A[3] and A[2] which formally are not part of the third-order gradient
+        # but which are used for the cubic response function
+
+        (NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz, E3_dict, E4_dict,
+         NaX2Nyz_red, NxA2Nyz_red, E3_dict_red) = TPAdriver().main(
+             self.eri_thresh, self.conv_thresh, self.lindep_thresh,
+             self.max_iter, Focks, self.iso, Nx, w, X, self.damping, d_a_mo, kX,
+             self.comp, S, da, mo, nocc, norb, scf_tensors, molecule, ao_basis,
+             self.comm, self.ostream)
 
         if self.rank == mpi_master():
-            t4_dict = TPAdriver().get_t4(self.damping, w, E4_dict, Nx, kX, self.comp, d_a_mo,
-                          nocc, norb)
+            t4_dict = TPAdriver().get_t4(self.damping, w, E4_dict, Nx, kX,
+                                         self.comp, d_a_mo, nocc, norb)
             t3_dict = TPAdriver().get_t3(w, E3_dict, Nx, self.comp)
             t3_dict_red = TPAdriver().get_t3(w, E3_dict_red, Nx, self.comp)
         else:
@@ -251,46 +266,47 @@ class TPA(LinearSolver):
 
         gamma = {}
         gamma_red = {}
-        
-        # Combining all the terms to evaluate the iso-tropic cubic response function for TPA
-        # Full and reduced, see article 
+
+        # Combining all the terms to evaluate the iso-tropic cubic response
+        # function. For TPA Full and reduced, see article
+
         if self.rank == mpi_master():
             for i in range(len(w)):
                 if self.iso is True:
-                    gamma.update({
-                        (w[i], -w[i], w[i]):
-                            1 / 15 *
-                            (t4_dict[(w[i], -w[i], w[i])] + t3_dict[(w[i], -w[i], w[i])] +
-                             NaX3NyNz[(w[i], -w[i], w[i])] +
-                             NaA3NxNy[(w[i], -w[i], w[i])] +
-                             NaX2Nyz[(w[i], -w[i], w[i])] +
-                             NxA2Nyz[(w[i], -w[i], w[i])])
-                    })
-                    gamma_red.update({
-                        (w[i], -w[i], w[i]): 1 / 15 *
-                                             (t3_dict_red[(w[i], -w[i], w[i])] +
-                                              NaX2Nyz_red[(w[i], -w[i], w[i])] +
-                                              NxA2Nyz_red[(w[i], -w[i], w[i])])
-                    })
+                    gamma[(w[i], -w[i],
+                           w[i])] = 1 / 15 * (t4_dict[(w[i], -w[i], w[i])] +
+                                              t3_dict[(w[i], -w[i], w[i])] +
+                                              NaX3NyNz[(w[i], -w[i], w[i])] +
+                                              NaA3NxNy[(w[i], -w[i], w[i])] +
+                                              NaX2Nyz[(w[i], -w[i], w[i])] +
+                                              NxA2Nyz[(w[i], -w[i], w[i])])
+                    gamma_red[(
+                        w[i], -w[i],
+                        w[i])] = 1 / 15 * (t3_dict_red[(w[i], -w[i], w[i])] +
+                                           NaX2Nyz_red[(w[i], -w[i], w[i])] +
+                                           NxA2Nyz_red[(w[i], -w[i], w[i])])
 
             self.print_header()
             self.print_results(self.iso, w, gamma, self.comp, t4_dict, t3_dict,
-                                  NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz)
-            
-            self.print_results_red(self.iso, w, gamma_red, self.comp, t3_dict_red, NaX2Nyz_red, NxA2Nyz_red)
+                               NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz)
+
+            self.print_results_red(self.iso, w, gamma_red, self.comp,
+                                   t3_dict_red, NaX2Nyz_red, NxA2Nyz_red)
             self.make_plots(w, gamma, gamma_red, plot)
         else:
             gamma = {}
             gamma_red = {}
-        time_end = time.time()
+
         width = 50
-        w_str = "Total time =  {:.8f}".format(time_end-time_start)
+        w_str = "Total time =  {:.8f}".format(time.time() - time_start)
         self.ostream.print_header(w_str.ljust(width))
 
         if self.rank == mpi_master():
-            return t4_dict, t3_dict, NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz, gamma, w, t3_dict_red,NaX2Nyz_red, NxA2Nyz_red,gamma_red
+            return (t4_dict, t3_dict, NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz,
+                    gamma, w, t3_dict_red, NaX2Nyz_red, NxA2Nyz_red, gamma_red)
         else:
-            return None, None, None, None, None, None, None, None,None, None, None, None
+            return (None, None, None, None, None, None, None, None, None, None,
+                    None, None)
 
     def print_header(self):
         """
@@ -325,10 +341,10 @@ class TPA(LinearSolver):
 
         self.ostream.flush()
 
-    def print_results(self, iso, w1, gamma, comp, t4_dict, t3_dict, NaX3NyNz, NaA3NxNy,
-                         NaX2Nyz, NxA2Nyz):
+    def print_results(self, iso, w1, gamma, comp, t4_dict, t3_dict, NaX3NyNz,
+                      NaA3NxNy, NaX2Nyz, NxA2Nyz):
         """
-        Prints the results from the TPA calculation
+        Prints the results from the TPA calculation.
 
         :param t4_dict:
               A dictonary containing the isotropic T[4] contractions
@@ -343,8 +359,10 @@ class TPA(LinearSolver):
         :param NxA2Nyz:
               A dictonary containing the isotropic A[2] contractions
         :param gamma:
-              A dictonary containing the isotropic cubic response functions for TPA
+              A dictonary containing the isotropic cubic response functions for
+              TPA
         """
+
         width = 50
 
         self.ostream.print_blank()
@@ -405,18 +423,23 @@ class TPA(LinearSolver):
             self.ostream.print_header(('-' * len(w_str)).ljust(width))
             self.ostream.print_blank()
 
-    def print_results_red(self, iso, w1, gamma, comp, t3_dict, NaX2Nyz, NxA2Nyz):
+    def print_results_red(self, iso, w1, gamma, comp, t3_dict, NaX2Nyz,
+                          NxA2Nyz):
         """
-        Prints the results from the reduced TPA calculation
+        Prints the results from the reduced TPA calculation.
 
         :param t3_dict_red:
-              A dictonary containing the isotropic T[3] contractions for one-photon off-resonance TPA calculations
+            A dictonary containing the isotropic T[3] contractions for
+            one-photon off-resonance TPA calculations
         :param NaX2Nyz_red:
-              A dictonary containing the isotropic X[2] contractions for one-photo off-resonance TPA calculations
+            A dictonary containing the isotropic X[2] contractions for
+            one-photo off-resonance TPA calculations
         :param NxA2Nyz_red:
-              A dictonary containing the isotropic A[2] contractions for one-photo off-resonance TPA calculations
+            A dictonary containing the isotropic A[2] contractions for
+            one-photo off-resonance TPA calculations
         :param gamma_red:
-              A dictonary containing the reduced isotropic cubic response functions for TPA
+            A dictonary containing the reduced isotropic cubic response
+            functions for TPA
         """
         width = 50
 
@@ -462,16 +485,16 @@ class TPA(LinearSolver):
 
     def get_comp(self, w):
         """
-        Makes a list of all the gamma tensor components that are to be computed for printing purposes and for the contraction of 
-        X[3],X[2],A[3],A[2]
-        
-        :param w:
-           A list of all the frequencies for the TPA calculation
-        :return comp:
-           A list of gamma tensors components inlcuded in the isotropic cubic response with their corresponding frequencies
+        Makes a list of all the gamma tensor components that are to be computed
+        for printing purposes and for the contraction of X[3],X[2],A[3],A[2]
 
+        :param w:
+            A list of all the frequencies for the TPA calculation
+        :return comp:
+            A list of gamma tensors components inlcuded in the isotropic cubic
+            response with their corresponding frequencies
         """
-        
+
         if self.iso is True:
             spat_A = ['x', 'y', 'z']
             comp_iso = []
@@ -510,15 +533,18 @@ class TPA(LinearSolver):
 
     def make_plots(self, w, gamma, gamma_red, plot):
         """
-        Makes plots of the two-photon cross section [GM] 
+        Makes plots of the two-photon cross section [GM]
           1 a.u. = 1.896788 10^{-50} cm^4 s/photon
           1 GM = 10^{-50} cm^4 s/photon
-        
+
         :param gamma:
-              A dictonary containing the isotropic cubic response functions for TPA
+            A dictonary containing the isotropic cubic response functions for
+            TPA
         :param gamma_red:
-              A dictonary containing the reduced isotropic cubic response functions for TPA
+            A dictonary containing the reduced isotropic cubic response
+            functions for TPA
         """
+
         g_comb = open('py_plot_comb.py', "w")
         add_stuff = 'import matplotlib \nimport matplotlib.pyplot as plt \n'
         omega_for_plot = 'ω = ['
@@ -528,8 +554,8 @@ class TPA(LinearSolver):
         N1 = 4
         af = 1 / 137
         pi = 3.14159265359
-        c = 1.896788  
-        C = c*N1 * pi**(2) * af**(2)
+        c = 1.896788
+        C = c * N1 * pi**(2) * af**(2)
         for i in range(len(w)):
             omega_for_plot += str(w[i] * 54.437358841503915 / 2) + ","
             data_for_plot += str(
@@ -556,6 +582,7 @@ class TPA(LinearSolver):
         g_comb.write('\nplt.xlabel(\'ω eV\')')
         g_comb.write('\nplt.ylabel(\'σ TPA cross\')')
         g_comb.write('\nplt.plot(ω,σ,\'-Dk\',label=\'Full\')')
-        g_comb.write('\nplt.plot(ω,σ_red,\'-or\',label=\'Reduced\')\nplt.legend()')
+        g_comb.write(
+            '\nplt.plot(ω,σ_red,\'-or\',label=\'Reduced\')\nplt.legend()')
         g_comb.write('\nplt.show()')
-        #g_comb.write('\nplt.savefig(\"filename.eps\", facecolor=\'w\', edgecolor=\'w\',orientation=\'portrait\', papertype=None, format=\'eps\',transparent=True,frameon=None, metadata=None)')
+        # g_comb.write('\nplt.savefig(\"filename.eps\", facecolor=\'w\', edgecolor=\'w\',orientation=\'portrait\', papertype=None, format=\'eps\',transparent=True,frameon=None, metadata=None)')
