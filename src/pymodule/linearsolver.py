@@ -75,6 +75,8 @@ class LinearSolver:
         - dist_bung: The distributed ungerade trial vectors.
         - dist_e2bger: The distributed gerade sigma vectors.
         - dist_e2bung: The distributed ungerade sigma vectors.
+        - dist_fock_ger: The distributed gerade Fock matrices in MO.
+        - dist_fock_ung: The distributed ungerade Fock matrices in MO.
     """
 
     def __init__(self, comm, ostream):
@@ -134,6 +136,8 @@ class LinearSolver:
         self.dist_bung = None
         self.dist_e2bger = None
         self.dist_e2bung = None
+        self.dist_fock_ger = None
+        self.dist_fock_ung = None
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -404,6 +408,30 @@ class LinearSolver:
         else:
             self.dist_e2bung.append(e2bung, axis=1)
 
+    def append_fock_matrices(self, fock_ger, fock_ung):
+        """
+        Appends distributed Fock matrices in MO.
+
+        :param fock_ger:
+            The distributed gerade Fock matrices in MO.
+        :param fock_ung:
+            The distributed ungerade Fock matrices in MO.
+        """
+
+        if self.dist_fock_ger is None:
+            self.dist_fock_ger = DistributedArray(fock_ger.data,
+                                                  self.comm,
+                                                  distribute=False)
+        else:
+            self.dist_fock_ger.append(fock_ger, axis=1)
+
+        if self.dist_fock_ung is None:
+            self.dist_fock_ung = DistributedArray(fock_ung.data,
+                                                  self.comm,
+                                                  distribute=False)
+        else:
+            self.dist_fock_ung.append(fock_ung, axis=1)
+
     def compute(self, molecule, basis, scf_tensors, v1=None):
         """
         Solves for the linear equations.
@@ -582,9 +610,8 @@ class LinearSolver:
                 e2_ger = np.zeros((half_size, batch_ger))
                 e2_ung = np.zeros((half_size, batch_ung))
 
-
-                F_ger = []
-                F_ung = []
+                fock_ger = np.zeros((norb**2, batch_ger))
+                fock_ung = np.zeros((norb**2, batch_ung))
 
                 for ifock in range(batch_ger + batch_ung):
                     fak = fock.alpha_to_numpy(ifock).T
@@ -610,32 +637,32 @@ class LinearSolver:
                     if ifock < batch_ger:
                         e2_ger[:, ifock] = -self.lrmat2vec(gmo, nocc,
                                                            norb)[:half_size]
-                        F_ger.append(np.linalg.multi_dot([mo.T, fak.T, mo]))
-
+                        fock_ger[:, ifock] = np.linalg.multi_dot(
+                            [mo.T, fak.T, mo]).reshape(norb**2)
                     else:
                         e2_ung[:, ifock - batch_ger] = -self.lrmat2vec(
                             gmo, nocc, norb)[:half_size]
-                        F_ung.append(np.linalg.multi_dot([mo.T, fak.T, mo]))
+                        fock_ung[:, ifock - batch_ger] = np.linalg.multi_dot(
+                            [mo.T, fak.T, mo]).reshape(norb**2)
 
             else:
                 e2_ger = None
                 e2_ung = None
+                fock_ger = None
+                fock_ung = None
 
             vecs_e2_ger = DistributedArray(e2_ger, self.comm)
             vecs_e2_ung = DistributedArray(e2_ung, self.comm)
 
-            #F_e2_ger = DistributedArray(F_ger,self.comm)
-            #F_e2_ung = DistributedArray(F_ung,self.comm)
+            dist_fock_ger = DistributedArray(fock_ger, self.comm)
+            dist_fock_ung = DistributedArray(fock_ung, self.comm)
 
             self.append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+            self.append_fock_matrices(dist_fock_ger, dist_fock_ung)
 
         self.append_trial_vectors(vecs_ger, vecs_ung)
 
         self.ostream.print_blank()
-        if self.rank == mpi_master():
-            return F_ger,F_ung
-        else:
-            return None,None
 
     def comp_lr_fock(self, fock, dens, molecule, basis, eri_dict, dft_dict,
                      pe_dict, timing_dict):

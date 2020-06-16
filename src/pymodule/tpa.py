@@ -192,7 +192,7 @@ class TPA(LinearSolver):
 
             Nx.update({'Nb': Nb_Drv['solutions']})
             kX.update({'Nb': Nb_Drv['kappas']})
-            Focks.update({'Fb': Nb_Drv['Focks']})
+            Focks.update({'Fb': Nb_Drv['focks']})
             
             # Storing the largest imaginary component of the response vector for plotting
             for k in Nx['Nb'].keys():

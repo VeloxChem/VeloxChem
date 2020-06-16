@@ -2766,7 +2766,7 @@ class TPAdriver:
         if self.rank == mpi_master():
             n_xy_dict = N_total_Drv['solutions']
             kxy_dict = N_total_Drv['kappas']
-            FXY_2_dict = N_total_Drv['Focks']
+            FXY_2_dict = N_total_Drv['focks']
 
             return n_xy_dict, kxy_dict, FXY_2_dict, xy_dict
         else:
@@ -2845,7 +2845,7 @@ class TPAdriver:
         if self.rank == mpi_master():
             n_xy_dict = N_total_Drv['solutions']
             kxy_dict = N_total_Drv['kappas']
-            FXY_2_dict = N_total_Drv['Focks']
+            FXY_2_dict = N_total_Drv['focks']
             time_n_xy = end - start
 
             return n_xy_dict, kxy_dict, FXY_2_dict, xy_dict
