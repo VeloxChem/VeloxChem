@@ -6,7 +6,6 @@ import time
 import sys
 import os
 
-from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
@@ -21,8 +20,10 @@ from .aodensitymatrix import AODensityMatrix
 
 class TPAdriver:
     """
-    Computes the third order-gradients used for the isotropic cubic response function, also contains some other methods used for the evaluation of some relevant 
-    quantities for TPA calculations, such as A[3] and A[2] contractions
+    Computes the third order-gradients used for the isotropic cubic response
+    function, also contains some other methods used for the evaluation of some
+    relevant quantities for TPA calculations, such as A[3] and
+    A[2] contractions
 
     :param comm:
         The MPI communicator.
@@ -39,18 +40,20 @@ class TPAdriver:
         self.num_thresh = 1E-12
 
     def get_e4(self, wi, kX, fo, nocc, norb):
-        """ 
-        Contracts E[4]n_xNyNz for the isotropic cubic response function. It takes the Fock matrices from fock_dict and contracts them with the response vectors.
-            
+        """
+        Contracts E[4]n_xNyNz for the isotropic cubic response function. It
+        takes the Fock matrices from fock_dict and contracts them with the
+        response vectors.
 
         : param wi - A list of freqs
-        : param kX - A dict of the single index response matricies 
+        : param kX - A dict of the single index response matricies
         : param fo - A dictonary of transformed Fock matricies from fock_dict
         : param nocc - The number of occupied orbitals
         : param norb - The total number of orbitals
 
         :return:
-             A dictonary of compounded E[4] tensors for the isotropic cubic response function for TPA
+            A dictonary of compounded E[4] tensors for the isotropic cubic
+            response function for TPA
         """
 
         f_iso_x = {}
@@ -60,7 +63,7 @@ class TPAdriver:
         F0 = fo['F0']
 
         for w in wi:
-            # Get all the response matrices and Fock matrices 
+            # Get all the response matrices and Fock matrices
             kx = kX['Nb'][('x', w)].T
             ky = kX['Nb'][('y', w)].T
             kz = kX['Nb'][('z', w)].T
@@ -92,12 +95,13 @@ class TPAdriver:
             f_sig_xy = 3 * fo['f_sig_xy'][w]
             f_sig_xz = 3 * fo['f_sig_xz'][w]
             f_sig_yz = 3 * fo['f_sig_yz'][w]
-            
-            # computes all the compounded Φ_αβ, see article, where small phi here is defined as:
+
+            # computes all the compounded Φ_αβ, see article, where small phi
+            # here is defined as:
             #   φ(κa,κb,Fb,F0) = [κa,[κb,F0]+3Fb]
-            #   Φ_αα^σ = φ(κα,κα,Fα,F0) + φ(κα,κα,Fα,F0) + Σ_{ρ}^{x,y,z}[φ(κρ,κρ,Fρ,F0)] for α=β 
-            #   Φ_αβ^σ = φ(κa,κa,Fb,F0) + φ(κb,κb,Fb,F0) for α≠β 
-            #  For the Φ_{αβ}^{λ+τ} component see article. 
+            #   Φ_αα^σ = φ(κα,κα,Fα,F0) + φ(κα,κα,Fα,F0) + Σ_{ρ}^{x,y,z}[φ(κρ,κρ,Fρ,F0)] for α=β
+            #   Φ_αβ^σ = φ(κa,κa,Fb,F0) + φ(κb,κb,Fb,F0) for α≠β
+            #  For the Φ_{αβ}^{λ+τ} component see article.
 
             Phi_sig_xx = 2 * (3 * self.phi(kx, kx, Fx, F0) + self.phi(
                 ky, ky, Fy, F0) + self.phi(kz, kz, Fz, F0))
@@ -120,16 +124,16 @@ class TPAdriver:
 
             Phi_lamtau_xx = 3 * self.phi(kx, kx_, Fx_, F0) + 3 * self.phi(
                 kx_, kx, Fx, F0) + self.phi(ky, ky_, Fy_, F0) + self.phi(
-                    ky_, ky, Fy, F0) + self.phi(
-                        kz, kz_, Fz_, F0) + self.phi(kz_, kz, Fz, F0)
+                    ky_, ky, Fy, F0) + self.phi(kz, kz_, Fz_, F0) + self.phi(
+                        kz_, kz, Fz, F0)
 
             Phi_lamtau_xx = 2 * Phi_lamtau_xx
 
             Phi_lamtau_yy = self.phi(kx, kx_, Fx_, F0) + self.phi(
                 kx_, kx, Fx,
                 F0) + 3 * self.phi(ky, ky_, Fy_, F0) + 3 * self.phi(
-                    ky_, ky, Fy, F0) + self.phi(
-                        kz, kz_, Fz_, F0) + self.phi(kz_, kz, Fz, F0)
+                    ky_, ky, Fy, F0) + self.phi(kz, kz_, Fz_, F0) + self.phi(
+                        kz_, kz, Fz, F0)
 
             Phi_lamtau_yy = 2 * Phi_lamtau_yy
 
@@ -157,11 +161,14 @@ class TPAdriver:
                     kz_, ky, Fy, F0)
             Phi_lamtau_yz = 2 * Phi_lamtau_yz
 
-            # Computess all the elements of the Fock vector formed from the E[4] contraction as E[4]NxNyNz = [f_{is} // f_{si}], for the isotropic case, as derived in the article
-            # the elements of f_{is} for each spatial component α is given by an expression of the form
-            # f_α = Σ_{β}^{x,y,z} [κ_{β}^{ω},Φ_{αβ}^{λ+τ}+f_{αβ}^{λ+τ}] + [κ_{β}^{-ω},Φ_{αβ}^{σ}+f_{αβ}^{σ}] 
+            # Computess all the elements of the Fock vector formed from the
+            # E[4] contraction as E[4]NxNyNz = [f_{is} // f_{si}], for the
+            # isotropic case, as derived in the article
+            # The elements of f_{is} for each spatial component α is given by
+            # an expression of the form
+            # f_α = Σ_{β}^{x,y,z} [κ_{β}^{ω},Φ_{αβ}^{λ+τ}+f_{αβ}^{λ+τ}] + [κ_{β}^{-ω},Φ_{αβ}^{σ}+f_{αβ}^{σ}]
 
-            ## x
+            # x
 
             # Creating the transformed total Fock matrices
 
@@ -172,15 +179,16 @@ class TPAdriver:
                     kz, Phi_lamtau_xz + f_lamtau_xz)
 
             f_x += self.commut(kx_, Phi_sig_xx + f_sig_xx) + self.commut(
-                ky_, Phi_sig_xy + f_sig_xy) + self.commut(kz_,
-                                                       Phi_sig_xz + f_sig_xz)
-            
-            # Taking the non redundant matrix elements {i,s} and forming the anti-symmetric Fock vector
+                ky_, Phi_sig_xy + f_sig_xy) + self.commut(
+                    kz_, Phi_sig_xz + f_sig_xz)
+
+            # Taking the non redundant matrix elements {i,s} and forming the
+            # anti-symmetric Fock vector
             f_x = -2 * 1 / 6 * LinearSolver.lrmat2vec(f_x.T, nocc, norb)
             f_x = np.array(self.anti_sym(f_x))
             f_iso_x.update({w: f_x})
 
-            ## y
+            # y
 
             # Creating the transformed total Fock matrices
             f_y = fo['F123_y'][w]
@@ -190,15 +198,16 @@ class TPAdriver:
                     kz, Phi_lamtau_yz + f_lamtau_yz)
 
             f_y += self.commut(kx_, Phi_sig_xy + f_sig_xy) + self.commut(
-                ky_, Phi_sig_yy + f_sig_yy) + self.commut(kz_,
-                                                       Phi_sig_yz + f_sig_yz)
+                ky_, Phi_sig_yy + f_sig_yy) + self.commut(
+                    kz_, Phi_sig_yz + f_sig_yz)
 
-            # Taking the non redundant matrix elements {i,s} and forming the anti-symmetric Fock vector
+            # Taking the non redundant matrix elements {i,s} and forming the
+            # anti-symmetric Fock vector
             f_y = -2 * 1 / 6 * LinearSolver.lrmat2vec(f_y.T, nocc, norb)
             f_y = np.array(self.anti_sym(f_y))
             f_iso_y.update({w: f_y})
 
-            ## z
+            # z
 
             # Creating the transformed total Fock matrices
             f_z = fo['F123_z'][w]
@@ -208,10 +217,11 @@ class TPAdriver:
                     kz, Phi_lamtau_zz + f_lamtau_zz)
 
             f_z += self.commut(kx_, Phi_sig_xz + f_sig_xz) + self.commut(
-                ky_, Phi_sig_yz + f_sig_yz) + self.commut(kz_,
-                                                       Phi_sig_zz + f_sig_zz)
+                ky_, Phi_sig_yz + f_sig_yz) + self.commut(
+                    kz_, Phi_sig_zz + f_sig_zz)
 
-            # Taking the non redundant matrix elements {i,s} and forming the anti-symmetric Fock vector
+            # Taking the non redundant matrix elements {i,s} and forming the
+            # anti-symmetric Fock vector
             f_z = -2 * 1 / 6 * LinearSolver.lrmat2vec(f_z.T, nocc, norb)
             f_z = np.array(self.anti_sym(f_z))
             f_iso_z.update({w: f_z})
@@ -220,13 +230,15 @@ class TPAdriver:
         return e4_dict
 
     def get_e3_red(self, wi, kX, kXY, fo, fo2, nocc, norb):
-        """ 
-        This code contracts E[3]n_xNyz for the isotropic cubic response function. It takes the Fock matrices from fock_dict and fock_dict_II and contracts them with the first and second-order response vectors.
+        """
+        This code contracts E[3]n_xNyz for the isotropic cubic response
+        function. It takes the Fock matrices from fock_dict and fock_dict_II
+        and contracts them with the first and second-order response vectors.
 
         :param wi:
              A list of freqs
-        :param kX: 
-            A dict of the single index response matricies 
+        :param kX:
+            A dict of the single index response matricies
         :param kXY:
             A dict of the two index response matrices
         :param fo:
@@ -239,7 +251,8 @@ class TPAdriver:
             The total number of orbitals
 
         :return:
-             A dictonary of compounded E[3] tensors for the isotropic reduced cubic response function for TPA
+            A dictonary of compounded E[3] tensors for the isotropic reduced
+            cubic response function for TPA
         """
 
         f_iso_x = {}
@@ -249,7 +262,7 @@ class TPAdriver:
         F0_a = fo['F0']
 
         for w in wi:
-            ### Response ####
+            # Response
             k_x_ = kX['Nc'][('x', -w)].T
             k_y_ = kX['Nc'][('y', -w)].T
             k_z_ = kX['Nc'][('z', -w)].T
@@ -262,12 +275,11 @@ class TPAdriver:
             k_sig_xz = kXY[(('N_sig_xz', w), 2 * w)].T
             k_sig_yz = kXY[(('N_sig_yz', w), 2 * w)].T
 
-            ### Focks #####
+            # Focks
 
             f_x_ = fo['Fc'][('x', -w)]
             f_y_ = fo['Fc'][('y', -w)]
             f_z_ = fo['Fc'][('z', -w)]
-
 
             f_sig_xx = np.conjugate(fo2[(('N_sig_xx', w), 2 * w)]).T
             f_sig_yy = np.conjugate(fo2[(('N_sig_yy', w), 2 * w)]).T
@@ -277,7 +289,7 @@ class TPAdriver:
             f_sig_xz = np.conjugate(fo2[(('N_sig_xz', w), 2 * w)]).T
             f_sig_yz = np.conjugate(fo2[(('N_sig_yz', w), 2 * w)]).T
 
-            ## x
+            # x
 
             zeta_sig_xx = self.xi(k_x_, k_sig_xx, f_x_, f_sig_xx, F0_a)
             zeta_sig_yy = self.xi(k_x_, k_sig_yy, f_x_, f_sig_yy, F0_a)
@@ -292,7 +304,7 @@ class TPAdriver:
             Ff_x = np.array(self.anti_sym(Ff_x))
             f_iso_x.update({w: Ff_x})
 
-            ## y
+            # y
 
             zeta_sig_yx = self.xi(k_x_, k_sig_xy, f_x_, f_sig_xy, F0_a)
             zeta_sig_yy = self.xi(k_y_, k_sig_yy, f_y_, f_sig_yy, F0_a)
@@ -304,7 +316,7 @@ class TPAdriver:
             Ff_y = np.array(self.anti_sym(Ff_y))
             f_iso_y.update({w: Ff_y})
 
-            ## z
+            # z
 
             zeta_sig_zx = self.xi(k_x_, k_sig_xz, f_x_, f_sig_xz, F0_a)
             zeta_sig_zy = self.xi(k_y_, k_sig_yz, f_y_, f_sig_yz, F0_a)
@@ -320,14 +332,14 @@ class TPAdriver:
         return e3_dict
 
     def get_e3(self, wi, kX, kXY, fo, fo2, nocc, norb):
-        """ 
-        This code contracts E[3] 
+        """
+        This code contracts E[3]
 
         : param iso - A boolean that specifies if the progam is to compute the isotropic γ or a user specief combination of components
         : param wi - A list of freqs
         : param keys - A dict of lists of keys that give information about what components are present
         : param track - A list containing information about what γ components that are to be computed
-        : param kX - A dict of the single index response matricies 
+        : param kX - A dict of the single index response matricies
         : param kXY - A dict of the two index response matrices
         : param fo - A dictonary of transformed Fock matricies from fock_dict
         : param fo2 - A dictonarty of transfromed Fock matricies from fock_dict_two
@@ -345,7 +357,7 @@ class TPAdriver:
         F0_a = fo['F0']
 
         for w in wi:
-            ### Response ####
+            # Response
             k_x_ = kX['Nc'][('x', -w)].T
             k_y_ = kX['Nc'][('y', -w)].T
             k_z_ = kX['Nc'][('z', -w)].T
@@ -370,7 +382,7 @@ class TPAdriver:
             k_lamtau_xz = kXY[(('N_lamtau_xz', w), 0)].T
             k_lamtau_yz = kXY[(('N_lamtau_yz', w), 0)].T
 
-            ### Focks #####
+            # Focks #
 
             f_x_ = fo['Fc'][('x', -w)]
             f_y_ = fo['Fc'][('y', -w)]
@@ -396,7 +408,7 @@ class TPAdriver:
             f_lamtau_xz = np.conjugate(fo2[(('N_lamtau_xz', w), 0)]).T
             f_lamtau_yz = np.conjugate(fo2[(('N_lamtau_yz', w), 0)]).T
 
-            ## x
+            # x
 
             zeta_sig_xx = self.xi(k_x_, k_sig_xx, f_x_, f_sig_xx, F0_a)
             zeta_sig_yy = self.xi(k_x_, k_sig_yy, f_x_, f_sig_yy, F0_a)
@@ -419,7 +431,7 @@ class TPAdriver:
             Ff_x = np.array(self.anti_sym(Ff_x))
             f_iso_x.update({w: Ff_x})
 
-            ## y
+            # y
 
             zeta_sig_yx = self.xi(k_x_, k_sig_xy, f_x_, f_sig_xy, F0_a)
             zeta_sig_yy = self.xi(k_y_, k_sig_yy, f_y_, f_sig_yy, F0_a)
@@ -436,7 +448,7 @@ class TPAdriver:
             Ff_y = np.array(self.anti_sym(Ff_y))
             f_iso_y.update({w: Ff_y})
 
-            ## z
+            # z
 
             zeta_sig_zx = self.xi(k_x_, k_sig_xz, f_x_, f_sig_xz, F0_a)
             zeta_sig_zy = self.xi(k_y_, k_sig_yz, f_y_, f_sig_yz, F0_a)
@@ -472,40 +484,46 @@ class TPAdriver:
             A matrix containing the MO coefficents
         :param nocc:
             The number of occupied orbitals
-        :param norb: 
+        :param norb:
             The number of total orbitals
-        
+
         :return:
             A list of tranformed compounded densities
         """
 
-        D = {}
         density_list = []
+
         for w in wi:
-            ### convert response matrix to ao basis ###
+            # convert response matrix to ao basis #
             kx = self.mo2ao(mo, kX['Nb'][('x', w)]).T
             ky = self.mo2ao(mo, kX['Nb'][('y', w)]).T
             kz = self.mo2ao(mo, kX['Nb'][('z', w)]).T
 
-            ### create the first order single indexed densiteies ###
+            # create the first order single indexed densiteies #
             Dx = self.transform_dens(kx, D0, S)
             Dy = self.transform_dens(ky, D0, S)
             Dz = self.transform_dens(kz, D0, S)
 
-            ### create the first order two indexed densities ###
-            ### σ terms ####
+            # create the first order two indexed densities #
+            # σ terms #
             D_sig_xx = 2 * (3 * self.transform_dens(kx, Dx, S) +
-                            self.transform_dens(ky, Dy, S) + self.transform_dens(kz, Dz, S))
-            D_sig_yy = 2 * (self.transform_dens(kx, Dx, S) + 3 *
-                            self.transform_dens(ky, Dy, S) + self.transform_dens(kz, Dz, S))
-            D_sig_zz = 2 * (self.transform_dens(kx, Dx, S) + self.transform_dens(ky, Dy, S)
-                            + 3 * self.transform_dens(kz, Dz, S))
+                            self.transform_dens(ky, Dy, S) +
+                            self.transform_dens(kz, Dz, S))
+            D_sig_yy = 2 * (self.transform_dens(kx, Dx, S) +
+                            3 * self.transform_dens(ky, Dy, S) +
+                            self.transform_dens(kz, Dz, S))
+            D_sig_zz = 2 * (self.transform_dens(kx, Dx, S) +
+                            self.transform_dens(ky, Dy, S) +
+                            3 * self.transform_dens(kz, Dz, S))
 
-            D_sig_xy = 2 * (self.transform_dens(ky, Dx, S) + self.transform_dens(kx, Dy, S))
-            D_sig_xz = 2 * (self.transform_dens(kx, Dz, S) + self.transform_dens(kz, Dx, S))
-            D_sig_yz = 2 * (self.transform_dens(ky, Dz, S) + self.transform_dens(kz, Dy, S))
+            D_sig_xy = 2 * (self.transform_dens(ky, Dx, S) +
+                            self.transform_dens(kx, Dy, S))
+            D_sig_xz = 2 * (self.transform_dens(kx, Dz, S) +
+                            self.transform_dens(kz, Dx, S))
+            D_sig_yz = 2 * (self.transform_dens(ky, Dz, S) +
+                            self.transform_dens(kz, Dy, S))
 
-            ## Create first order three indexed Densities ###
+            # Create first order three indexed Densities #
 
             density_list.append(D_sig_xx.real)
             density_list.append(D_sig_yy.real)
@@ -518,7 +536,7 @@ class TPAdriver:
 
     def get_densities(self, wi, kX, S, D0, mo, nocc, norb):
         """
-        commutputes the compounded densities needed for the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response function 
+        commutputes the compounded densities needed for the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response function
 
         :param wi:
             A list of the frequencies
@@ -532,16 +550,17 @@ class TPAdriver:
             A matrix containing the MO coefficents
         :param nocc:
             The number of occupied orbitals
-        :param norb: 
+        :param norb:
             The number of total orbitals
-        
+
         :return:
             A list of tranformed compounded densities
         """
-        D = {}
+
         density_list = []
+
         for w in wi:
-            ### convert response matrix to ao basis ###
+            # convert response matrix to ao basis #
             kx = self.mo2ao(mo, kX['Nb'][('x', w)]).T
             ky = self.mo2ao(mo, kX['Nb'][('y', w)]).T
             kz = self.mo2ao(mo, kX['Nb'][('z', w)]).T
@@ -549,7 +568,7 @@ class TPAdriver:
             kx_ = self.mo2ao(mo, kX['Nc'][('x', -w)]).T
             ky_ = self.mo2ao(mo, kX['Nc'][('y', -w)]).T
             kz_ = self.mo2ao(mo, kX['Nc'][('z', -w)]).T
-            ### create the first order single indexed densiteies ###
+            # create the first order single indexed densiteies #
             Dx = self.transform_dens(kx, D0, S)
             Dy = self.transform_dens(ky, D0, S)
             Dz = self.transform_dens(kz, D0, S)
@@ -557,23 +576,31 @@ class TPAdriver:
             Dx_ = self.transform_dens(kx_, D0, S)
             Dy_ = self.transform_dens(ky_, D0, S)
             Dz_ = self.transform_dens(kz_, D0, S)
-            ### create the first order two indexed densities ###
-            ### σ terms ####
+            # create the first order two indexed densities #
+            # σ terms #
             D_sig_xx = 2 * (3 * self.transform_dens(kx, Dx, S) +
-                            self.transform_dens(ky, Dy, S) + self.transform_dens(kz, Dz, S))
-            D_sig_yy = 2 * (self.transform_dens(kx, Dx, S) + 3 *
-                            self.transform_dens(ky, Dy, S) + self.transform_dens(kz, Dz, S))
-            D_sig_zz = 2 * (self.transform_dens(kx, Dx, S) + self.transform_dens(ky, Dy, S)
-                            + 3 * self.transform_dens(kz, Dz, S))
+                            self.transform_dens(ky, Dy, S) +
+                            self.transform_dens(kz, Dz, S))
+            D_sig_yy = 2 * (self.transform_dens(kx, Dx, S) +
+                            3 * self.transform_dens(ky, Dy, S) +
+                            self.transform_dens(kz, Dz, S))
+            D_sig_zz = 2 * (self.transform_dens(kx, Dx, S) +
+                            self.transform_dens(ky, Dy, S) +
+                            3 * self.transform_dens(kz, Dz, S))
 
-            D_sig_xy = 2 * (self.transform_dens(ky, Dx, S) + self.transform_dens(kx, Dy, S))
-            D_sig_xz = 2 * (self.transform_dens(kx, Dz, S) + self.transform_dens(kz, Dx, S))
-            D_sig_yz = 2 * (self.transform_dens(ky, Dz, S) + self.transform_dens(kz, Dy, S))
-            ### λ+τ terms ###
-            D_lamtau_xx = 2 * (3 * self.transform_dens(kx_, Dx, S) + self.transform_dens(
-                ky_, Dy, S) + self.transform_dens(kz_, Dz, S))
-            D_lamtau_xx += 2 * (3 * self.transform_dens(kx, Dx_, S) + self.transform_dens(
-                ky, Dy_, S) + self.transform_dens(kz, Dz_, S))
+            D_sig_xy = 2 * (self.transform_dens(ky, Dx, S) +
+                            self.transform_dens(kx, Dy, S))
+            D_sig_xz = 2 * (self.transform_dens(kx, Dz, S) +
+                            self.transform_dens(kz, Dx, S))
+            D_sig_yz = 2 * (self.transform_dens(ky, Dz, S) +
+                            self.transform_dens(kz, Dy, S))
+            # λ+τ terms #
+            D_lamtau_xx = 2 * (3 * self.transform_dens(kx_, Dx, S) +
+                               self.transform_dens(ky_, Dy, S) +
+                               self.transform_dens(kz_, Dz, S))
+            D_lamtau_xx += 2 * (3 * self.transform_dens(kx, Dx_, S) +
+                                self.transform_dens(ky, Dy_, S) +
+                                self.transform_dens(kz, Dz_, S))
 
             D_lamtau_yy = 2 * (self.transform_dens(kx_, Dx, S) +
                                3 * self.transform_dens(ky_, Dy, S) +
@@ -582,10 +609,12 @@ class TPAdriver:
                                 3 * self.transform_dens(ky, Dy_, S) +
                                 self.transform_dens(kz, Dz_, S))
 
-            D_lamtau_zz = 2 * (self.transform_dens(kx_, Dx, S) + self.transform_dens(
-                ky_, Dy, S) + 3 * self.transform_dens(kz_, Dz, S))
-            D_lamtau_zz += 2 * (self.transform_dens(kx, Dx_, S) + self.transform_dens(
-                ky, Dy_, S) + 3 * self.transform_dens(kz, Dz_, S))
+            D_lamtau_zz = 2 * (self.transform_dens(kx_, Dx, S) +
+                               self.transform_dens(ky_, Dy, S) +
+                               3 * self.transform_dens(kz_, Dz, S))
+            D_lamtau_zz += 2 * (self.transform_dens(kx, Dx_, S) +
+                                self.transform_dens(ky, Dy_, S) +
+                                3 * self.transform_dens(kz, Dz_, S))
 
             D_lamtau_xy = 2 * (self.transform_dens(ky_, Dx, S) +
                                self.transform_dens(kx_, Dy, S))
@@ -602,25 +631,31 @@ class TPAdriver:
             D_lamtau_yz += 2 * (self.transform_dens(ky, Dz_, S) +
                                 self.transform_dens(kz, Dy_, S))
 
-            ## Create first order three indexed Densities ###
+            # Create first order three indexed Densities #
 
-            D_lam_sig_tau_x = self.transform_dens(kx_, D_sig_xx, S) + self.transform_dens(
-                ky_, D_sig_xy, S) + self.transform_dens(kz_, D_sig_xz, S)
+            D_lam_sig_tau_x = self.transform_dens(
+                kx_, D_sig_xx, S) + self.transform_dens(
+                    ky_, D_sig_xy, S) + self.transform_dens(kz_, D_sig_xz, S)
             D_lam_sig_tau_x += self.transform_dens(
                 kx, D_lamtau_xx, S) + self.transform_dens(
-                    ky, D_lamtau_xy, S) + self.transform_dens(kz, D_lamtau_xz, S)
+                    ky, D_lamtau_xy, S) + self.transform_dens(
+                        kz, D_lamtau_xz, S)
 
-            D_lam_sig_tau_y = self.transform_dens(kx_, D_sig_xy, S) + self.transform_dens(
-                ky_, D_sig_yy, S) + self.transform_dens(kz_, D_sig_yz, S)
+            D_lam_sig_tau_y = self.transform_dens(
+                kx_, D_sig_xy, S) + self.transform_dens(
+                    ky_, D_sig_yy, S) + self.transform_dens(kz_, D_sig_yz, S)
             D_lam_sig_tau_y += self.transform_dens(
                 kx, D_lamtau_xy, S) + self.transform_dens(
-                    ky, D_lamtau_yy, S) + self.transform_dens(kz, D_lamtau_yz, S)
+                    ky, D_lamtau_yy, S) + self.transform_dens(
+                        kz, D_lamtau_yz, S)
 
-            D_lam_sig_tau_z = self.transform_dens(kx_, D_sig_xz, S) + self.transform_dens(
-                ky_, D_sig_yz, S) + self.transform_dens(kz_, D_sig_zz, S)
+            D_lam_sig_tau_z = self.transform_dens(
+                kx_, D_sig_xz, S) + self.transform_dens(
+                    ky_, D_sig_yz, S) + self.transform_dens(kz_, D_sig_zz, S)
             D_lam_sig_tau_z += self.transform_dens(
                 kx, D_lamtau_xz, S) + self.transform_dens(
-                    ky, D_lamtau_yz, S) + self.transform_dens(kz, D_lamtau_zz, S)
+                    ky, D_lamtau_yz, S) + self.transform_dens(
+                        kz, D_lamtau_zz, S)
 
             density_list.append(D_sig_xx)
             density_list.append(D_sig_yy)
@@ -642,9 +677,10 @@ class TPAdriver:
 
         return density_list
 
-    def get_fock_dict(self, wi, kX, density_list, S, D0, mo, molecule, ao_basis,ostream):
+    def get_fock_dict(self, wi, kX, density_list, S, D0, mo, molecule, ao_basis,
+                      ostream):
         """
-        commutputes the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response function 
+        commutputes the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response function
 
         :param wi:
             A list of the frequencies
@@ -657,11 +693,11 @@ class TPAdriver:
         :param mo:
             A matrix containing the MO coefficents
         :param molecule:
-        :param ao_basis: 
+        :param ao_basis:
 
         :return:
             A dictonary of compounded first-order Fock-matrices
-        
+
         """
         f_sig_xx = {}
         f_sig_yy = {}
@@ -680,21 +716,20 @@ class TPAdriver:
         f_lam_sig_tau_x = {}
         f_lam_sig_tau_y = {}
         f_lam_sig_tau_z = {}
-        
 
         if self.rank == mpi_master():
-            fock_num = 30*len(wi)
-            self.print_header(ostream,fock_num)
+            fock_num = 30 * len(wi)
+            self.print_header(ostream, fock_num)
         time_start_fock = time.time()
 
         # commutputes both real and imaginary Fock matrices
         ff_AO = self.get_fock_r(density_list, molecule, ao_basis, 1)
-        # The zeroth order Fock matrix is computed 
+        # The zeroth order Fock matrix is computed
         F0_a = self.get_fock_r(D0, molecule, ao_basis, 0)
 
         time_end_fock = time.time()
-        total_time_fock = time_end_fock-time_start_fock
-        self.print_time(ostream,total_time_fock)
+        total_time_fock = time_end_fock - time_start_fock
+        self.print_time(ostream, total_time_fock)
 
         if self.rank == mpi_master():
             F0_a = self.ao2mo(mo, F0_a)
@@ -749,9 +784,10 @@ class TPAdriver:
 
         return Fock
 
-    def get_fock_dict_red(self, wi, kX, density_list, S, D0, mo, molecule, ao_basis,ostream):
+    def get_fock_dict_red(self, wi, kX, density_list, S, D0, mo, molecule,
+                          ao_basis, ostream):
         """
-        commutputes the compounded Fock matrics F^{σ}  used for the reduced isotropic cubic response function 
+        commutputes the compounded Fock matrics F^{σ}  used for the reduced isotropic cubic response function
 
         :param wi:
             A list of the frequencies
@@ -764,8 +800,8 @@ class TPAdriver:
         :param mo:
             A matrix containing the MO coefficents
         :param molecule:
-        :param ao_basis: 
-        
+        :param ao_basis:
+
         :return:
             A dictonary of compounded first-order Fock-matrices
         """
@@ -778,16 +814,16 @@ class TPAdriver:
         f_sig_yz = {}
 
         if self.rank == mpi_master():
-            fock_num = 6*len(wi)
-            self.print_header(ostream,fock_num)
+            fock_num = 6 * len(wi)
+            self.print_header(ostream, fock_num)
         time_start_fock = time.time()
 
         Ff_AO = self.get_fock_r(density_list, molecule, ao_basis, 2)
         F0_a = self.get_fock_r(D0, molecule, ao_basis, 0)
 
         time_end_fock = time.time()
-        total_time_fock = time_end_fock-time_start_fock
-        self.print_time(ostream,total_time_fock)
+        total_time_fock = time_end_fock - time_start_fock
+        self.print_time(ostream, total_time_fock)
 
         if self.rank == mpi_master():
             F0_a = self.ao2mo(mo, F0_a)
@@ -824,7 +860,7 @@ class TPAdriver:
 
     def get_xy(self, d_a_mo, X, wi, Fock, kX, nocc, norb):
         """
-        commutputes the compounded gradient vectors N^{σ},N^{λ+τ} used for the isotropic cubic response function 
+        commutputes the compounded gradient vectors N^{σ},N^{λ+τ} used for the isotropic cubic response function
 
         :param d_a_mo:
             The SCF density matrix in MO basis
@@ -834,12 +870,12 @@ class TPAdriver:
             A list of the frequencies
         :param nocc:
             The number of occupied orbitals
-        :param norb: 
+        :param norb:
             The number of total orbitals
 
         :return:
             A dictonary of compounded gradient vectors
-        
+
         """
         xy_dict = {}
         if self.rank == mpi_master():
@@ -864,40 +900,46 @@ class TPAdriver:
                 f_y_ = Fock['Fc'][('y', -w)]
                 f_z_ = Fock['Fc'][('z', -w)]
 
-                ### BD σ gradients ####
-                xy_dict.update({
-                    (('N_sig_xx', w), 2 * w):
-                        self.anti_sym(-2 *
-                                     LinearSolver.lrmat2vec(
-                                         (3 * self.xi(kx, kx, f_x, f_x, F0) +
-                                          self.xi(ky, ky, f_y, f_y, F0) +
-                                          self.xi(kz, kz, f_z, f_z, F0) + 0.5 *
-                                          Fock['f_sig_xx'][w]).T, nocc, norb)) -
-                        3 * 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
-                        - 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
-                })
-                xy_dict.update({
-                    (('N_sig_yy', w), 2 * w):
-                        self.anti_sym(-2 *
-                                     LinearSolver.lrmat2vec(
-                                         (self.xi(kx, kx, f_x, f_x, F0) +
-                                          3 * self.xi(ky, ky, f_y, f_y, F0) +
-                                          self.xi(kz, kz, f_z, f_z, F0) + 0.5 *
-                                          Fock['f_sig_yy'][w]).T, nocc, norb)) -
-                        2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb) -
-                        3 * 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
-                        - 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
-                })
+                # BD σ gradients #
+                xy_dict.update(
+                    {
+                        (('N_sig_xx', w), 2 * w):
+                            self.anti_sym(
+                                -2 * LinearSolver.lrmat2vec(
+                                    (3 * self.xi(kx, kx, f_x, f_x, F0) +
+                                     self.xi(ky, ky, f_y, f_y, F0) +
+                                     self.xi(kz, kz, f_z, f_z, F0) +
+                                     0.5 * Fock['f_sig_xx'][w]).T, nocc, norb))
+                            - 3 * 2 *
+                            self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb) -
+                            2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
+                            -
+                            2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
+                    })
+                xy_dict.update(
+                    {
+                        (('N_sig_yy', w), 2 * w):
+                            self.anti_sym(
+                                -2 * LinearSolver.lrmat2vec(
+                                    (self.xi(kx, kx, f_x, f_x, F0) +
+                                     3 * self.xi(ky, ky, f_y, f_y, F0) +
+                                     self.xi(kz, kz, f_z, f_z, F0) +
+                                     0.5 * Fock['f_sig_yy'][w]).T, nocc, norb))
+                            -
+                            2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
+                            - 3 * 2 *
+                            self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb) -
+                            2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
+                    })
                 xy_dict.update({
                     (('N_sig_zz', w), 2 * w):
                         self.anti_sym(-2 *
-                                     LinearSolver.lrmat2vec(
-                                         (self.xi(kx, kx, f_x, f_x, F0) +
-                                          self.xi(ky, ky, f_y, f_y, F0) +
-                                          3 * self.xi(kz, kz, f_z, f_z, F0) +
-                                          0.5 * Fock['f_sig_zz'][w]).T, nocc,
-                                         norb))
+                                      LinearSolver.lrmat2vec(
+                                          (self.xi(kx, kx, f_x, f_x, F0) +
+                                           self.xi(ky, ky, f_y, f_y, F0) +
+                                           3 * self.xi(kz, kz, f_z, f_z, F0) +
+                                           0.5 * Fock['f_sig_zz'][w]).T, nocc,
+                                          norb))
                         - 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb) -
                         2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb) -
                         3 * 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
@@ -931,7 +973,7 @@ class TPAdriver:
                         2 * self.x2_contract(ky.T, mu_z, d_a_mo, nocc, norb)
                 })
 
-                ### BC CD λ+τ gradients ####
+                # BC CD λ+τ gradients #
                 xy_dict.update(
                     {
                         (('N_lamtau_xx', w), 0):
@@ -944,10 +986,11 @@ class TPAdriver:
                                     norb))
                             - 3 * 2 *
                             self.x2_contract(kx_.T, mu_x, d_a_mo, nocc, norb) -
-                            2 * self.x2_contract(ky_.T, mu_y, d_a_mo, nocc, norb)
-                            -
-                            2 * self.x2_contract(kz_.T, mu_z, d_a_mo, nocc, norb)
-                            - 3 * 2 *
+                            2 *
+                            self.x2_contract(ky_.T, mu_y, d_a_mo, nocc, norb) -
+                            2 *
+                            self.x2_contract(kz_.T, mu_z, d_a_mo, nocc, norb) -
+                            3 * 2 *
                             self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb) -
                             2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
                             -
@@ -965,10 +1008,10 @@ class TPAdriver:
                                      0.5 * Fock['f_lamtau_yy'][w]).T, nocc,
                                     norb))
                             - 2 * self.x2_contract(kx_.T, mu_x, d_a_mo,
-                                                  nocc, norb) - 3 * 2 *
+                                                   nocc, norb) - 3 * 2 *
                             self.x2_contract(ky_.T, mu_y, d_a_mo, nocc, norb) -
-                            2 * self.x2_contract(kz_.T, mu_z, d_a_mo, nocc, norb)
-                            -
+                            2 *
+                            self.x2_contract(kz_.T, mu_z, d_a_mo, nocc, norb) -
                             2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
                             - 3 * 2 *
                             self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb) -
@@ -986,9 +1029,9 @@ class TPAdriver:
                                      0.5 * Fock['f_lamtau_zz'][w]).T, nocc,
                                     norb))
                             - 2 * self.x2_contract(kx_.T, mu_x, d_a_mo,
-                                                  nocc, norb) -
-                            2 * self.x2_contract(ky_.T, mu_y, d_a_mo, nocc, norb)
-                            - 3 * 2 *
+                                                   nocc, norb) - 2 *
+                            self.x2_contract(ky_.T, mu_y, d_a_mo, nocc, norb) -
+                            3 * 2 *
                             self.x2_contract(kz_.T, mu_z, d_a_mo, nocc, norb) -
                             2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
                             -
@@ -1036,7 +1079,7 @@ class TPAdriver:
 
     def get_xy_red(self, d_a_mo, X, wi, Fock, kX, nocc, norb):
         """
-        commutputes the compounded gradient vectors N^{σ}  used for the reduced isotropic cubic response function 
+        commutputes the compounded gradient vectors N^{σ}  used for the reduced isotropic cubic response function
 
         :param d_a_mo:
             The SCF density matrix in MO basis
@@ -1046,12 +1089,12 @@ class TPAdriver:
             A list of the frequencies
         :param nocc:
             The number of occupied orbitals
-        :param norb: 
+        :param norb:
             The number of total orbitals
 
         :return:
             A dictonary of compounded gradient vectors
-        
+
         """
         xy_dict = {}
         if self.rank == mpi_master():
@@ -1064,47 +1107,52 @@ class TPAdriver:
                 ky = kX['Nb'][('y', w)].T
                 kz = kX['Nb'][('z', w)].T
 
-                ###### REAL PART #######
+                # REAL PART #
                 F0 = Fock['F0']
                 f_x = Fock['Fb'][('x', w)]
                 f_y = Fock['Fb'][('y', w)]
                 f_z = Fock['Fb'][('z', w)]
 
-
-                ### BD σ gradients ####
-                xy_dict.update({
-                    (('N_sig_xx', w), 2 * w):
-                        self.anti_sym(-2 *
-                                     LinearSolver.lrmat2vec(
-                                         (3 * self.xi(kx, kx, f_x, f_x, F0) +
-                                          self.xi(ky, ky, f_y, f_y, F0) +
-                                          self.xi(kz, kz, f_z, f_z, F0) + 0.5 *
-                                          Fock['f_sig_xx'][w]).T, nocc, norb)) -
-                        3 * 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
-                        - 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
-                })
-                xy_dict.update({
-                    (('N_sig_yy', w), 2 * w):
-                        self.anti_sym(-2 *
-                                     LinearSolver.lrmat2vec(
-                                         (self.xi(kx, kx, f_x, f_x, F0) +
-                                          3 * self.xi(ky, ky, f_y, f_y, F0) +
-                                          self.xi(kz, kz, f_z, f_z, F0) + 0.5 *
-                                          Fock['f_sig_yy'][w]).T, nocc, norb)) -
-                        2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb) -
-                        3 * 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
-                        - 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
-                })
+                # BD σ gradients #
+                xy_dict.update(
+                    {
+                        (('N_sig_xx', w), 2 * w):
+                            self.anti_sym(
+                                -2 * LinearSolver.lrmat2vec(
+                                    (3 * self.xi(kx, kx, f_x, f_x, F0) +
+                                     self.xi(ky, ky, f_y, f_y, F0) +
+                                     self.xi(kz, kz, f_z, f_z, F0) +
+                                     0.5 * Fock['f_sig_xx'][w]).T, nocc, norb))
+                            - 3 * 2 *
+                            self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb) -
+                            2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
+                            -
+                            2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
+                    })
+                xy_dict.update(
+                    {
+                        (('N_sig_yy', w), 2 * w):
+                            self.anti_sym(
+                                -2 * LinearSolver.lrmat2vec(
+                                    (self.xi(kx, kx, f_x, f_x, F0) +
+                                     3 * self.xi(ky, ky, f_y, f_y, F0) +
+                                     self.xi(kz, kz, f_z, f_z, F0) +
+                                     0.5 * Fock['f_sig_yy'][w]).T, nocc, norb))
+                            -
+                            2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
+                            - 3 * 2 *
+                            self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb) -
+                            2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
+                    })
                 xy_dict.update({
                     (('N_sig_zz', w), 2 * w):
                         self.anti_sym(-2 *
-                                     LinearSolver.lrmat2vec(
-                                         (self.xi(kx, kx, f_x, f_x, F0) +
-                                          self.xi(ky, ky, f_y, f_y, F0) +
-                                          3 * self.xi(kz, kz, f_z, f_z, F0) +
-                                          0.5 * Fock['f_sig_zz'][w]).T, nocc,
-                                         norb))
+                                      LinearSolver.lrmat2vec(
+                                          (self.xi(kx, kx, f_x, f_x, F0) +
+                                           self.xi(ky, ky, f_y, f_y, F0) +
+                                           3 * self.xi(kz, kz, f_z, f_z, F0) +
+                                           0.5 * Fock['f_sig_zz'][w]).T, nocc,
+                                          norb))
                         - 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb) -
                         2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb) -
                         3 * 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
@@ -1147,37 +1195,33 @@ class TPAdriver:
         """
         Computes the terms involving X[2],A[2] in the reduced isotropic cubic response function
 
-        : param iso: 
+        : param iso:
             A bolean value that states if its the isotrpoic gamma or a user defined case
-        : param wi: 
+        : param wi:
             A list containing all the frequencies
-        : param keys: 
+        : param keys:
             A dictonray or lists that are used to tell the program which elements are present
-        : param track: 
+        : param track:
             A list that contains information about what γ components that are to be computed and which freqs
-        : param n_x:  
+        : param n_x:
             A dictonary containing all the single-index response vectors
-        : param n_xy:  
+        : param n_xy:
             A dictonary containing all the two-index response vectors
-        : param X:  
+        : param X:
             A dictonray with all the property integral matricies
-        : param kX: 
+        : param kX:
             A dictonary with all the respone matricies
-        : param kXY: 
+        : param kXY:
             A dictonary containing all the two-index response matricies
-        : param da:  
+        : param da:
             The SCF density matrix in MO bassi
 
         :return:
             A dictonary of final X[2],A[2] contraction values
         """
 
-        START = time.time()
-
         na_x2_nyz_dict = {}
         nx_a2_nyz_dict = {}
-
-        count = 0
 
         for i in range(len(wi)):
             wb = float(track[i * int(len(track) / len(wi))].split(",")[1])
@@ -1186,14 +1230,12 @@ class TPAdriver:
             w = float(track[i * int(len(track) / len(wi))].split(",")[1])
             wd = float(track[i * int(len(track) / len(wi))].split(",")[3])
 
-            wcd = 0
             wbd = wb + wd
-            wbc = 0
 
             na_x2_nyz = 0
             nx_a2_nyz = 0
 
-            ### BD
+            # BD
 
             kbd = kXY[(('N_sig_xx', w), wbd)]
             Nbd = n_xy[(('N_sig_xx', w), wbd)]
@@ -1234,7 +1276,7 @@ class TPAdriver:
             nx_a2_nyz += self.a2_contract(kc, A, da, mol_orbs, task) @ Nbd
             nx_a2_nyz += self.a2_contract(kbd, A, da, mol_orbs, task) @ Nc
 
-            ### y
+            # y
 
             kbd = kXY[(('N_sig_xy', w), wbd)]
             Nbd = n_xy[(('N_sig_xy', w), wbd)]
@@ -1275,7 +1317,7 @@ class TPAdriver:
             nx_a2_nyz += self.a2_contract(kc, A, da, mol_orbs, task) @ Nbd
             nx_a2_nyz += self.a2_contract(kbd, A, da, mol_orbs, task) @ Nc
 
-            ### z
+            # z
 
             kbd = kXY[(('N_sig_xz', w), wbd)]
             Nbd = n_xy[(('N_sig_xz', w), wbd)]
@@ -1319,46 +1361,41 @@ class TPAdriver:
             na_x2_nyz_dict.update({(w, -w, w): na_x2_nyz})
             nx_a2_nyz_dict.update({(w, -w, w): nx_a2_nyz})
 
-        END = time.time()
-        TIME_OTHER = END - START
         return na_x2_nyz_dict, nx_a2_nyz_dict
 
     def other(self, iso, wi, track, n_x, n_xy, X, kX, kXY, da, mol_orbs, task):
         """
         commutputes the terms involving X[3],A[3],X[2],A[2] in the isotropic cubic response function
 
-        : param iso: 
+        : param iso:
             A bolean value that states if its the isotrpoic gamma or a user defined case
-        : param wi: 
+        : param wi:
             A list containing all the frequencies
-        : param keys: 
+        : param keys:
             A dictonray or lists that are used to tell the program which elements are present
-        : param track: 
+        : param track:
             A list that contains information about what γ components that are to be computed and which freqs
-        : param n_x:  
+        : param n_x:
             A dictonary containing all the single-index response vectors
-        : param n_xy:  
+        : param n_xy:
             A dictonary containing all the two-index response vectors
-        : param X:  
+        : param X:
             A dictonray with all the property integral matricies
-        : param kX: 
+        : param kX:
             A dictonary with all the respone matricies
-        : param kXY: 
+        : param kXY:
             A dictonary containing all the two-index response matricies
-        : param da:  
+        : param da:
             The SCF density matrix in MO bassi
 
         :return:
             A dictonary of final X[2],A[2] contraction values
         """
 
-        START = time.time()
-
         na_a3_nx_ny_dict = {}
         na_x3_ny_nz_dict = {}
         na_x2_nyz_dict = {}
         nx_a2_nyz_dict = {}
-
 
         count = 0
         for j in range(len(wi)):
@@ -1374,7 +1411,7 @@ class TPAdriver:
                 Na = n_x['Na'][(track[i][0], w1)]
                 Nb = n_x['Nb'][(track[i][1], w1)]
 
-                ####
+                #
                 Nc = n_x['Nc'][(track[i][2], w2)]
                 Nd = n_x['Nd'][(track[i][3], w3)]
 
@@ -1387,29 +1424,35 @@ class TPAdriver:
                 C = X[track[i][2]]
                 D = X[track[i][3]]
 
-                ## Na X[3]NyNz
+                # Na X[3]NyNz
 
                 na_x3_ny_nz += -Na.T @ self.x3_contract(kc, kd, B, da, mol_orbs,
-                                                    task)
+                                                        task)
                 na_x3_ny_nz += -Na.T @ self.x3_contract(kd, kc, B, da, mol_orbs,
-                                                    task)
+                                                        task)
                 na_x3_ny_nz += -Na.T @ self.x3_contract(kd, kb, C, da, mol_orbs,
-                                                    task)
+                                                        task)
                 na_x3_ny_nz += -Na.T @ self.x3_contract(kb, kd, C, da, mol_orbs,
-                                                    task)
+                                                        task)
                 na_x3_ny_nz += -Na.T @ self.x3_contract(kb, kc, D, da, mol_orbs,
-                                                    task)
+                                                        task)
                 na_x3_ny_nz += -Na.T @ self.x3_contract(kc, kb, D, da, mol_orbs,
-                                                    task)
+                                                        task)
 
-                ### NaA[3]n_xNy
+                # NaA[3]n_xNy
 
-                na_a3_nx_ny += self.a3_contract(kb, kc, A, da, mol_orbs, task) @ Nd
-                na_a3_nx_ny += self.a3_contract(kb, kd, A, da, mol_orbs, task) @ Nc
-                na_a3_nx_ny += self.a3_contract(kc, kb, A, da, mol_orbs, task) @ Nd
-                na_a3_nx_ny += self.a3_contract(kc, kd, A, da, mol_orbs, task) @ Nb
-                na_a3_nx_ny += self.a3_contract(kd, kb, A, da, mol_orbs, task) @ Nc
-                na_a3_nx_ny += self.a3_contract(kd, kc, A, da, mol_orbs, task) @ Nb
+                na_a3_nx_ny += self.a3_contract(kb, kc, A, da, mol_orbs,
+                                                task) @ Nd
+                na_a3_nx_ny += self.a3_contract(kb, kd, A, da, mol_orbs,
+                                                task) @ Nc
+                na_a3_nx_ny += self.a3_contract(kc, kb, A, da, mol_orbs,
+                                                task) @ Nd
+                na_a3_nx_ny += self.a3_contract(kc, kd, A, da, mol_orbs,
+                                                task) @ Nb
+                na_a3_nx_ny += self.a3_contract(kd, kb, A, da, mol_orbs,
+                                                task) @ Nc
+                na_a3_nx_ny += self.a3_contract(kd, kc, A, da, mol_orbs,
+                                                task) @ Nb
 
             count += int(len(track) / len(wi))
 
@@ -1425,13 +1468,12 @@ class TPAdriver:
 
             wcd = 0
             wbd = wb + wd
-            wbc = 0
 
             na_x2_nyz = 0
             nx_a2_nyz = 0
 
-            ## CD
-            ## x
+            # CD
+            # x
             kcd = kXY[(('N_lamtau_xx', w), wcd)]
             Ncd = n_xy[(('N_lamtau_xx', w), wcd)]
 
@@ -1472,7 +1514,7 @@ class TPAdriver:
             nx_a2_nyz += self.a2_contract(kb, A, da, mol_orbs, task) @ Ncd
             nx_a2_nyz += self.a2_contract(kcd, A, da, mol_orbs, task) @ Nb
 
-            ### y
+            # y
 
             kcd = kXY[(('N_lamtau_xy', w), wcd)]
             Ncd = n_xy[(('N_lamtau_xy', w), wcd)]
@@ -1514,7 +1556,7 @@ class TPAdriver:
             nx_a2_nyz += self.a2_contract(kb, A, da, mol_orbs, task) @ Ncd
             nx_a2_nyz += self.a2_contract(kcd, A, da, mol_orbs, task) @ Nb
 
-            ### z
+            # z
 
             kcd = kXY[(('N_lamtau_xz', w), wcd)]
             Ncd = n_xy[(('N_lamtau_xz', w), wcd)]
@@ -1555,7 +1597,7 @@ class TPAdriver:
             nx_a2_nyz += self.a2_contract(kb, A, da, mol_orbs, task) @ Ncd
             nx_a2_nyz += self.a2_contract(kcd, A, da, mol_orbs, task) @ Nb
 
-            ### BD
+            # BD
 
             kbd = kXY[(('N_sig_xx', w), wbd)]
             Nbd = n_xy[(('N_sig_xx', w), wbd)]
@@ -1596,7 +1638,7 @@ class TPAdriver:
             nx_a2_nyz += self.a2_contract(kc, A, da, mol_orbs, task) @ Nbd
             nx_a2_nyz += self.a2_contract(kbd, A, da, mol_orbs, task) @ Nc
 
-            ### y
+            # y
 
             kbd = kXY[(('N_sig_xy', w), wbd)]
             Nbd = n_xy[(('N_sig_xy', w), wbd)]
@@ -1637,7 +1679,7 @@ class TPAdriver:
             nx_a2_nyz += self.a2_contract(kc, A, da, mol_orbs, task) @ Nbd
             nx_a2_nyz += self.a2_contract(kbd, A, da, mol_orbs, task) @ Nc
 
-            ### z
+            # z
 
             kbd = kXY[(('N_sig_xz', w), wbd)]
             Nbd = n_xy[(('N_sig_xz', w), wbd)]
@@ -1681,12 +1723,10 @@ class TPAdriver:
             na_x2_nyz_dict.update({(w, -w, w): na_x2_nyz})
             nx_a2_nyz_dict.update({(w, -w, w): nx_a2_nyz})
 
-        END = time.time()
-        TIME_OTHER = END - START
         return na_x3_ny_nz_dict, na_a3_nx_ny_dict, na_x2_nyz_dict, nx_a2_nyz_dict
 
     def get_t4(self, damp, wi, e4_dict, n_x, Kx, track, da, mol_orbs, task):
-        """ 
+        """
         commutbines the contraction of the E[4] tensor with that of the S[4] and R[4] tensors to return the contraction of T[4] as a dictonary of vectors
         T[4]n_xNyNz = (E^[4]-ω_1S^[4]-ω_1S^[4]-ω_3S^[4]-γiR^[4])
 
@@ -1720,8 +1760,8 @@ class TPAdriver:
             w = float(track[i * int(len(track) / len(wi))].split(",")[1])
             ww = float(track[i * int(len(track) / len(wi))].split(",")[1])
             t4term = n_x['Na'][('x', w)] @ (e4_dict['f_iso_x'][ww] - S4[
-                ('x', ww)]) + n_x['Na'][('y', w)] @ (e4_dict['f_iso_y'][ww] - S4[
-                    ('y', ww)]) + n_x['Na'][
+                ('x', ww)]) + n_x['Na'][('y', w)] @ (
+                    e4_dict['f_iso_y'][ww] - S4[('y', ww)]) + n_x['Na'][
                         ('z', w)] @ (e4_dict['f_iso_z'][ww] - S4[('z', ww)])
 
             if damp > 0:
@@ -1733,8 +1773,8 @@ class TPAdriver:
         return T4term
 
     def S4_dict(self, wi, kX, track, D0, nocc, norb):
-        """ 
-        commutputes the S4 contractions 
+        """
+        commutputes the S4 contractions
 
         : param wi:
             A list of all the freqs
@@ -1807,7 +1847,7 @@ class TPAdriver:
         return S4terms
 
     def s4_for_r4(self, k1, k2, k3, D, nocc, norb):
-        """ 
+        """
         Returns the contraction of S[4] for the contraction of R[4]
         :param k1,k2,k3:
             A response matrix
@@ -1822,8 +1862,8 @@ class TPAdriver:
         return S4_123
 
     def s4(self, k1, k2, k3, D, nocc, norb):
-        """ 
-        
+        """
+
         This code returns the contraction of S[4] for S[4] dict
 
         :param k1,k2,k3:
@@ -1843,7 +1883,7 @@ class TPAdriver:
         return A
 
     def S4contract(self, k1, k2, k3, D, nocc, norb):
-        """ 
+        """
 
         This code returns the contraction of S[4] for S[4] dict
 
@@ -1884,12 +1924,12 @@ class TPAdriver:
         return NewXY
 
     def transform_dens(self, k, D, S):
-        """ 
-        Creates the perturbed density 
+        """
+        Creates the perturbed density
 
         : param k Response vector in matrix form in AO basis
         : param D The density that is to be perturbed in AO basis
-        : param S Overlap matrix 
+        : param S Overlap matrix
 
         returns [k,D]
         """
@@ -1899,9 +1939,9 @@ class TPAdriver:
         return np.array(da_a)
 
     def mo2ao(self, mo, A):
-        """ 
-        Converts a matrix to atomic basis 
-        : param mo -  molecular orbital coefficent matrix 
+        """
+        Converts a matrix to atomic basis
+        : param mo -  molecular orbital coefficent matrix
         : param A - The matrix in MO basis that is the converted to AO basis
         """
 
@@ -1915,14 +1955,14 @@ class TPAdriver:
 
     def ao2mo(self, mo, A):
         """
-        : param mo -  molecular orbital coefficent matrix 
+        : param mo -  molecular orbital coefficent matrix
         : param A - The matrix in AO basis that is the converted to MO basis
         """
 
         return (mo.T @ A @ mo)
 
     def commut(self, A, B):
-        """ 
+        """
         commutes two matricies A and B
         """
         return (A @ B - B @ A)
@@ -1932,11 +1972,11 @@ class TPAdriver:
         Contracts the generalized dipole gradient tensor of rank 2 with a second-order response matrix
 
         : param: k - Respose vector in matrix representation
-        : param A - Property operator in matrix represatiation 
+        : param A - Property operator in matrix represatiation
         : param D - Density matrix
         : param nocc - Number of occupied orbitals
         : param norb - Number of total orbtials
-        
+
         X[2]N1 = [[k1,X],D.T]
 
         :return :
@@ -1959,7 +1999,7 @@ class TPAdriver:
         : param: k1,k2:
             First-order response matrix
         : param A:
-            A dipole intergral  matrix 
+            A dipole intergral  matrix
         : param D:
             Density matrix
         : param nocc:
@@ -1967,7 +2007,7 @@ class TPAdriver:
         : param norb:
             Number of total orbtials
 
-        X[3]N1N2 = -(1/2)[[k2,[k1,X]],D.T] 
+        X[3]N1N2 = -(1/2)[[k2,[k1,X]],D.T]
 
         :return :
             Returns a matrix
@@ -1989,7 +2029,7 @@ class TPAdriver:
         : param: k1,k2:
             First-order response matrix
         : param A:
-            A dipole intergral  matrix 
+            A dipole intergral  matrix
         : param D:
             Density matrix
         : param nocc:
@@ -1997,7 +2037,7 @@ class TPAdriver:
         : param norb:
             Number of total orbtials
 
-        A[3]N1N2 = (1/6)[[k2,[k1,A]],D.T] 
+        A[3]N1N2 = (1/6)[[k2,[k1,A]],D.T]
 
         :return :
             Returns a matrix
@@ -2018,11 +2058,11 @@ class TPAdriver:
 
 
         : param: k - Respose vector in matrix representation
-        : param A - Property operator in matrix represatiation 
+        : param A - Property operator in matrix represatiation
         : param D - Density matrix
         : param nocc - Number of occupied orbitals
         : param norb - Number of total orbtials
-        
+
         A[2]N1 = -(1 / 2)[[k1,X],D.T]
 
         :return :
@@ -2038,9 +2078,9 @@ class TPAdriver:
         return -(1 / 2) * A2n_x_c
 
     def get_fock_dict_II_red(self, wi, kX, density_list, S, D0, mo, molecule,
-                         ao_basis,ostream):
+                             ao_basis, ostream):
         """
-        Computes the compounded second-order Fock matrics used for the reduced isotropic cubic response function  
+        Computes the compounded second-order Fock matrics used for the reduced isotropic cubic response function
 
         :param wi:
             A list of the frequencies
@@ -2053,29 +2093,26 @@ class TPAdriver:
         :param mo:
             A matrix containing the MO coefficents
         :param molecule:
-        :param ao_basis: 
+        :param ao_basis:
 
         :return:
             A dictonary of compounded second-order Fock-matrices
-        
+
         """
         F123_x = {}
         F123_y = {}
         F123_z = {}
 
         if self.rank == mpi_master():
-            fock_num = 3*len(wi)
-            self.print_header(ostream,fock_num)
+            fock_num = 3 * len(wi)
+            self.print_header(ostream, fock_num)
         time_start_fock = time.time()
 
-        start = time.time()
         Ff_AO = self.get_fock_r(density_list, molecule, ao_basis, 3)
-        end = time.time()
 
         time_end_fock = time.time()
-        total_time_fock = time_end_fock-time_start_fock
-        self.print_time(ostream,total_time_fock)
-
+        total_time_fock = time_end_fock - time_start_fock
+        self.print_time(ostream, total_time_fock)
 
         if self.rank == mpi_master():
             fock_list = []
@@ -2094,9 +2131,10 @@ class TPAdriver:
             fock_dict = {}
         return fock_dict
 
-    def get_fock_dict_II(self, wi, kX, density_list, S, D0, mo, molecule, ao_basis,ostream):
+    def get_fock_dict_II(self, wi, kX, density_list, S, D0, mo, molecule,
+                         ao_basis, ostream):
         """
-        Computes the compounded second-order Fock matrics used for the isotropic cubic response function  
+        Computes the compounded second-order Fock matrics used for the isotropic cubic response function
 
         :param wi:
             A list of the frequencies
@@ -2109,28 +2147,27 @@ class TPAdriver:
         :param mo:
             A matrix containing the MO coefficents
         :param molecule:
-        :param ao_basis: 
+        :param ao_basis:
 
         :return:
             A dictonary of compounded second-order Fock-matrices
-        
+
         """
 
         F123_x = {}
         F123_y = {}
         F123_z = {}
 
-
         if self.rank == mpi_master():
-            fock_num = 6*len(wi)
-            self.print_header(ostream,fock_num)
+            fock_num = 6 * len(wi)
+            self.print_header(ostream, fock_num)
         time_start_fock = time.time()
 
         Ff_AO = self.get_fock_r(density_list, molecule, ao_basis, 1)
 
         time_end_fock = time.time()
-        total_time_fock = time_end_fock-time_start_fock
-        self.print_time(ostream,total_time_fock)
+        total_time_fock = time_end_fock - time_start_fock
+        self.print_time(ostream, total_time_fock)
 
         if self.rank == mpi_master():
             fock_list = []
@@ -2151,7 +2188,7 @@ class TPAdriver:
 
     def get_densities_II_red(self, wi, kX, kXY, S, D0, mo):
         """
-        Computes the compounded densities needed for the compounded second-order Fock matrics used for the reduced isotropic cubic response function 
+        Computes the compounded densities needed for the compounded second-order Fock matrics used for the reduced isotropic cubic response function
 
         :param wi:
             A list of the frequencies
@@ -2165,9 +2202,9 @@ class TPAdriver:
             A matrix containing the MO coefficents
         :param nocc:
             The number of occupied orbitals
-        :param norb: 
+        :param norb:
             The number of total orbitals
-        
+
         :return:
             A list of tranformed compounded densities
         """
@@ -2185,8 +2222,7 @@ class TPAdriver:
             ky_ = self.mo2ao(mo, kX['Nc'][('y', -w)]).T
             kz_ = self.mo2ao(mo, kX['Nc'][('z', -w)]).T
 
-
-            ### SIGMA contributiatons ###
+            # SIGMA contributiatons #
             Dc_x_ = self.transform_dens(kx_, D0, S)
             Dc_y_ = self.transform_dens(ky_, D0, S)
             Dc_z_ = self.transform_dens(kz_, D0, S)
@@ -2199,7 +2235,7 @@ class TPAdriver:
             D_sig_xz = self.transform_dens(k_sig_xz, D0, S)
             D_sig_yz = self.transform_dens(k_sig_yz, D0, S)
 
-            ### x ####
+            # x #
 
             Dx = self.transform_dens(kx_, D_sig_xx, S)
             Dx += self.transform_dens(k_sig_xx, Dc_x_, S)
@@ -2209,7 +2245,7 @@ class TPAdriver:
             Dx += self.transform_dens(kz_, D_sig_xz, S)
             Dx += self.transform_dens(k_sig_xz, Dc_z_, S)
 
-            ## y ###
+            # y #
             Dy = self.transform_dens(kx_, D_sig_xy, S)
             Dy += self.transform_dens(k_sig_xy, Dc_x_, S)
 
@@ -2219,7 +2255,7 @@ class TPAdriver:
             Dy += self.transform_dens(kz_, D_sig_yz, S)
             Dy += self.transform_dens(k_sig_yz, Dc_z_, S)
 
-            ## z ###
+            # z #
             Dz = self.transform_dens(kx_, D_sig_xz, S)
             Dz += self.transform_dens(k_sig_xz, Dc_x_, S)
 
@@ -2236,7 +2272,7 @@ class TPAdriver:
 
     def get_densities_II(self, wi, kX, kXY, S, D0, mo):
         """
-        Computes the compounded densities needed for the compounded second-order Fock matrics used for the isotropic cubic response function 
+        Computes the compounded densities needed for the compounded second-order Fock matrics used for the isotropic cubic response function
 
         :param wi:
             A list of the frequencies
@@ -2250,13 +2286,15 @@ class TPAdriver:
             A matrix containing the MO coefficents
         :param nocc:
             The number of occupied orbitals
-        :param norb: 
+        :param norb:
             The number of total orbitals
-        
+
         :return:
             A list of tranformed compounded densities
         """
+
         density_list = []
+
         for w in wi:
             k_sig_xx = self.mo2ao(mo, kXY[(('N_sig_xx', w), 2 * w)]).T
             k_sig_yy = self.mo2ao(mo, kXY[(('N_sig_yy', w), 2 * w)]).T
@@ -2282,7 +2320,7 @@ class TPAdriver:
             ky = self.mo2ao(mo, kX['Nb'][('y', w)]).T
             kz = self.mo2ao(mo, kX['Nb'][('z', w)]).T
 
-            ### SIGMA contributiatons ###
+            # SIGMA contributiatons #
             Dc_x_ = self.transform_dens(kx_, D0, S)
             Dc_y_ = self.transform_dens(ky_, D0, S)
             Dc_z_ = self.transform_dens(kz_, D0, S)
@@ -2295,7 +2333,7 @@ class TPAdriver:
             D_sig_xz = self.transform_dens(k_sig_xz, D0, S)
             D_sig_yz = self.transform_dens(k_sig_yz, D0, S)
 
-            ### LAM + TAU contributiatons ###
+            # LAM + TAU contributiatons #
             Dc_x = self.transform_dens(kx, D0, S)
             Dc_y = self.transform_dens(ky, D0, S)
             Dc_z = self.transform_dens(kz, D0, S)
@@ -2308,8 +2346,7 @@ class TPAdriver:
             D_lamtau_xz = self.transform_dens(k_lamtau_xz, D0, S)
             D_lamtau_yz = self.transform_dens(k_lamtau_yz, D0, S)
 
-            ### x ####
-
+            # x #
             Dx = self.transform_dens(kx_, D_sig_xx, S)
             Dx += self.transform_dens(k_sig_xx, Dc_x_, S)
             Dx += self.transform_dens(ky_, D_sig_xy, S)
@@ -2327,7 +2364,7 @@ class TPAdriver:
             Dx += self.transform_dens(kz, D_lamtau_xz, S)
             Dx += self.transform_dens(k_lamtau_xz, Dc_z, S)
 
-            ## y ###
+            # y #
             Dy = self.transform_dens(kx_, D_sig_xy, S)
             Dy += self.transform_dens(k_sig_xy, Dc_x_, S)
 
@@ -2346,7 +2383,7 @@ class TPAdriver:
             Dy += self.transform_dens(kz, D_lamtau_yz, S)
             Dy += self.transform_dens(k_lamtau_yz, Dc_z, S)
 
-            ## z ###
+            # z #
             Dz = self.transform_dens(kx_, D_sig_xz, S)
             Dz += self.transform_dens(k_sig_xz, Dc_x_, S)
 
@@ -2383,13 +2420,12 @@ class TPAdriver:
 
         """
         xi = 0.5 * (self.commut(kA,
-                              self.commut(kB, F0) + 2 * Fb) +
-                     self.commut(kB,
-                              self.commut(kA, F0) + 2 * Fa))
+                                self.commut(kB, F0) + 2 * Fb) +
+                    self.commut(kB,
+                                self.commut(kA, F0) + 2 * Fa))
         return xi
 
     def phi(self, kA, kB, Fb, F0):
-
         """
         Returns a matrix used for the E[3] contraction
 
@@ -2406,14 +2442,13 @@ class TPAdriver:
     def main(self, eri_thresh, conv_thresh, lindep_thresh, max_iter, Focks, iso,
              n_x, w, X, damp, d_a_mo, kX, track, S, D0, mo, nocc, norb,
              scf_tensors, molecule, ao_basis, comm, ostream):
-
-        """ 
-        This code calls all the relevent functions to third-order isotropic gradient 
+        """
+        This code calls all the relevent functions to third-order isotropic gradient
 
         :param n_x:
             A dictonary containing all the single index response vectors
         :param w:
-            A list of all the frequencies 
+            A list of all the frequencies
         :param X:
             A dictonary of matricies containing all the dipole integrals
         :param damp:
@@ -2428,28 +2463,29 @@ class TPAdriver:
             The overlap matrix
         :param mo:
             The MO coefficient matrix
-        :param nocc: 
+        :param nocc:
             The number of occupied orbitals
         :param norb:
             The number of total orbitals
 
         """
-            
-        # computing all compounded first-order densities 
+
+        # computing all compounded first-order densities
         if self.rank == mpi_master():
             density_list = self.get_densities(w, kX, S, D0, mo, nocc, norb)
-            density_list_red = self.get_densities_red(w, kX, S, D0, mo, nocc, norb)
+            density_list_red = self.get_densities_red(w, kX, S, D0, mo, nocc,
+                                                      norb)
         else:
             density_list = None
             density_list_red = None
-            Dens_dict = {}
-        
+
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(w, kX, density_list, S, (D0, D0), mo, molecule,
-                                   ao_basis,ostream)
-        
-        fock_dict_red = self.get_fock_dict_red(w, kX, density_list_red, S, (D0, D0),
-                                           mo, molecule, ao_basis,ostream)
+        fock_dict = self.get_fock_dict(w, kX, density_list, S, (D0, D0), mo,
+                                       molecule, ao_basis, ostream)
+
+        fock_dict_red = self.get_fock_dict_red(w, kX, density_list_red, S,
+                                               (D0, D0), mo, molecule, ao_basis,
+                                               ostream)
 
         if self.rank == mpi_master():
             fock_dict.update(Focks)
@@ -2460,7 +2496,7 @@ class TPAdriver:
             e4_dict = {}
             fock_dict = {}
             fock_dict_red = {}
-        
+
         # computing all the compounded second-order response vectors and extracting some of the second-order Fock matrices from the subspace
         n_xy_dict, kxy_dict, Focks_xy, XΥ_dict = self.get_n_xy(
             eri_thresh, conv_thresh, lindep_thresh, max_iter, w, d_a_mo, damp,
@@ -2470,12 +2506,12 @@ class TPAdriver:
             eri_thresh, conv_thresh, lindep_thresh, max_iter, w, d_a_mo, damp,
             X, fock_dict_red, kX, nocc, norb, molecule, ao_basis, scf_tensors,
             comm, ostream)
-        
+
         # computing all second-order compounded densities based on the second-order response vectors
         if self.rank == mpi_master():
             density_list_two = self.get_densities_II(w, kX, kxy_dict, S, D0, mo)
-            density_list_two_red = self.get_densities_II_red(w, kX, kxy_dict_red, S,
-                                                        D0, mo)
+            density_list_two_red = self.get_densities_II_red(
+                w, kX, kxy_dict_red, S, D0, mo)
         else:
             n_xy_dict = {}
             kxy_dict = {}
@@ -2486,31 +2522,32 @@ class TPAdriver:
             Focks_xy_red = {}
             density_list_two = None
             density_list_two_red = None
-        
+
         # computing the remaning second-order Fock matrices from the second-order densities
-        fock_dict_two = self.get_fock_dict_II(w, kX, density_list_two, S, D0, mo,
-                                          molecule, ao_basis,ostream)
-        fock_dict_two_red = self.get_fock_dict_II_red(w, kX, density_list_two_red, S,
-                                                  D0, mo, molecule, ao_basis,ostream)
+        fock_dict_two = self.get_fock_dict_II(w, kX, density_list_two, S, D0,
+                                              mo, molecule, ao_basis, ostream)
+        fock_dict_two_red = self.get_fock_dict_II_red(w, kX,
+                                                      density_list_two_red, S,
+                                                      D0, mo, molecule,
+                                                      ao_basis, ostream)
 
         if self.rank == mpi_master():
             # Adding the Fock matrices extracted from the second-order response vector subspace to the fock_dict's.
             fock_dict_two.update(Focks_xy)
             fock_dict_two_red.update(Focks_xy_red)
             # computing the compounded E[3] contractions for the isotropic cubic response function
-            e3_dict = self.get_e3(w, kX, kxy_dict, fock_dict, fock_dict_two, nocc,
-                              norb)
+            e3_dict = self.get_e3(w, kX, kxy_dict, fock_dict, fock_dict_two,
+                                  nocc, norb)
             e3_dict_red = self.get_e3_red(w, kX, kxy_dict_red, fock_dict_red,
-                                      fock_dict_two_red, nocc, norb)
-            
+                                          fock_dict_two_red, nocc, norb)
+
             # computing the X[3],A[3],X[2],A[2] contractions for the isotropic cubic response function
             na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz = self.other(
                 iso, w, track, n_x, n_xy_dict, X, kX, kxy_dict, d_a_mo, nocc,
                 norb)
-            na_x2_nyz_red, nx_a2_nyz_red = self.other_red(iso, w, track, n_x,
-                                                      n_xy_dict_red, X, kX,
-                                                      kxy_dict_red, d_a_mo,
-                                                      nocc, norb)
+            na_x2_nyz_red, nx_a2_nyz_red = self.other_red(
+                iso, w, track, n_x, n_xy_dict_red, X, kX, kxy_dict_red, d_a_mo,
+                nocc, norb)
 
         else:
             e3_dict = {}
@@ -2526,11 +2563,11 @@ class TPAdriver:
 
     def get_t3(self, freqs, e3_dict, n_x, track):
         """
-        commutputes the T[3] contraction, for HF S[3] = 0, R[3] = 0 such that the T[3] contraction for the isotropic cubic response function in terms of compounded Fock matrices 
+        commutputes the T[3] contraction, for HF S[3] = 0, R[3] = 0 such that the T[3] contraction for the isotropic cubic response function in terms of compounded Fock matrices
         is given as:
-        
+
                              [(ζ_{α}^{σσ} + ζ_{α}^{λλ+ττ} + f_{α}^{λσ,τ})_is]
-        t3term = Σ_{α} N_{α} [(ζ_{α}^{σσ} + ζ_{α}^{λλ+ττ} + f_{α}^{λσ,τ})_si] 
+        t3term = Σ_{α} N_{α} [(ζ_{α}^{σσ} + ζ_{α}^{λλ+ττ} + f_{α}^{λσ,τ})_si]
 
         For more details see article
 
@@ -2558,7 +2595,6 @@ class TPAdriver:
                 ('y', w)] @ e3_dict['f_iso_y'][w] - n_x['Na'][
                     ('z', w)] @ e3_dict['f_iso_z'][w]
 
-
             t3_term.update({(w, -w, w): t3term})
 
             count += int(len(track) / len(freqs))
@@ -2569,7 +2605,7 @@ class TPAdriver:
         Returns a dict with all the R[4]NxNyNz contractions for the subsequent T[4] contraction
 
         : param freqs:
-            A list of all the frequencies 
+            A list of all the frequencies
         : param damp:
             The dampening constant
         : param kX:
@@ -2577,7 +2613,7 @@ class TPAdriver:
         : param n_x:
             A dictonary of all the first-order response vectors
         : param track:
-            A list of all the cubic response function components that are to be computed for the isotropic 
+            A list of all the cubic response function components that are to be computed for the isotropic
         : param d_a_mo:
             The zeroth-order density in MO basis
         : param nocc:
@@ -2603,7 +2639,7 @@ class TPAdriver:
             for i in range(int(len(track) * (1 / len(freqs)))):
                 i = i + count
 
-                Na = n_x['Na'][(track[i][0], w_s)]
+                # Na = n_x['Na'][(track[i][0], w_s)]
                 Nb = n_x['Nb'][(track[i][1], w1)]
                 Nc = n_x['Nc'][(track[i][2], w2)]
                 Nd = n_x['Nd'][(track[i][3], w3)]
@@ -2685,12 +2721,12 @@ class TPAdriver:
             TotVec.append(Avec[a])
         return TotVec
 
-    def get_n_xy(self, eri_thresh, conv_thresh, lindep_thresh, max_iter, w, d_a_mo,
-            damp, X, fock_dict, kX, nocc, norb, molecule, ao_basis, scf_tensors,
-            comm, ostream):
-        """ 
+    def get_n_xy(self, eri_thresh, conv_thresh, lindep_thresh, max_iter, w,
+                 d_a_mo, damp, X, fock_dict, kX, nocc, norb, molecule, ao_basis,
+                 scf_tensors, comm, ostream):
+        """
         commutputes all the second-order response vectors needed for the isotropic cubic response computation
-        
+
         : param eri_tresh:
             Eri threshold
         : param conv_thresh:
@@ -2699,7 +2735,7 @@ class TPAdriver:
             Linear dependance threshhold
         : param max_iter:
             Maximum number of iterations for the response solver
-        : param w: 
+        : param w:
             A list of all the frequencies
         : param d_a_mo:
             The density matrix in MO basis
@@ -2722,23 +2758,15 @@ class TPAdriver:
         N_total_drv = ComplexResponse(comm, ostream)
 
         xy_dict = {}
-        test_dict = {}
         freq = None
 
         if self.rank == mpi_master():
 
             # Get second-order gradients
-
             xy_dict = self.get_xy(d_a_mo, X, w, fock_dict, kX, nocc, norb)
-            
-            # DALTON only computes real second order gradiants, use test_dict to compare with DALTON..
-            #for l in xy_dict.keys():
-            #    test_dict.update({l: xy_dict[l].real})
-            
-            # Frequencies to compute 
+
+            # Frequencies to compute
             wbd = [sum(x) for x in zip(w, w)]
-            freq_bd_s = zip(w, wbd)
-            ff = list(freq_bd_s)
 
             freq = '0.0,'
             for i in range(len(wbd)):
@@ -2755,13 +2783,9 @@ class TPAdriver:
             'max_iter': max_iter,
         })
 
-        start = time.time()
-        
         # commutpute second-order response vectors
         N_total_Drv = N_total_drv.compute(molecule, ao_basis, scf_tensors,
                                           xy_dict)
-
-        end = time.time()
 
         if self.rank == mpi_master():
             n_xy_dict = N_total_Drv['solutions']
@@ -2773,11 +2797,11 @@ class TPAdriver:
             return None, None, None, None
 
     def get_n_xy_red(self, eri_thresh, conv_thresh, lindep_thresh, max_iter, w,
-                d_a_mo, damp, X, fock_dict, kX, nocc, norb, molecule, ao_basis,
-                scf_tensors, comm, ostream):
-        """ 
+                     d_a_mo, damp, X, fock_dict, kX, nocc, norb, molecule,
+                     ao_basis, scf_tensors, comm, ostream):
+        """
         commutputes all the second-order response vectors needed for the reduced isotropic cubic response computation
-        
+
         : param eri_tresh:
             Eri threshold
         : param conv_thresh:
@@ -2786,7 +2810,7 @@ class TPAdriver:
             Linear dependance threshhold
         : param max_iter:
             Maximum number of iterations for the response solver
-        : param w: 
+        : param w:
             A list of all the frequencies
         : param d_a_mo:
             The density matrix in MO basis
@@ -2804,10 +2828,11 @@ class TPAdriver:
             The number of total orbitals
 
         :return:
-            A dictonary of Fock matrices from the subspace,second-order response vectors and second-order response matrices
+            A dictonary of Fock matrices from the subspace,second-order
+            response vectors and second-order response matrices
         """
+
         xy_dict = {}
-        test_dict = {}
         freq = None
 
         N_total_drv_2 = ComplexResponse(comm, ostream)
@@ -2817,8 +2842,6 @@ class TPAdriver:
             xy_dict = self.get_xy_red(d_a_mo, X, w, fock_dict, kX, nocc, norb)
 
             wbd = [sum(x) for x in zip(w, w)]
-            freq_bd_s = zip(w, wbd)
-            ff = list(freq_bd_s)
 
             freq = ''
             for i in range(len(wbd)):
@@ -2835,29 +2858,23 @@ class TPAdriver:
             'max_iter': max_iter,
         })
 
-        start = time.time()
-
         N_total_Drv = N_total_drv_2.compute(molecule, ao_basis, scf_tensors,
                                             xy_dict)
-
-        end = time.time()
 
         if self.rank == mpi_master():
             n_xy_dict = N_total_Drv['solutions']
             kxy_dict = N_total_Drv['kappas']
             FXY_2_dict = N_total_Drv['focks']
-            time_n_xy = end - start
 
             return n_xy_dict, kxy_dict, FXY_2_dict, xy_dict
         else:
             return None, None, None, None
 
-
-################################# foCK CODE ##################################
+    # Fock code
 
     def get_fock_r(self, D, molecule, ao_basis, rank):
-        """ 
-        commutputes and returns a list of Fock matrices 
+        """
+        commutputes and returns a list of Fock matrices
 
         :param D:
             A list of densities
@@ -2867,7 +2884,8 @@ class TPAdriver:
 
         """
         if rank == 0:
-            # commutpute the unperturbed Fock matrix from the SCF Density and adds the one electron part 
+            # commutpute the unperturbed Fock matrix from the SCF Density and
+            # adds the one electron part
             da = D
             fa = self.get_two_el_fock_mod_r(
                 molecule,
@@ -2884,7 +2902,7 @@ class TPAdriver:
                 return None
 
         elif rank == 1:
-            # commutputes commutplex Fock matrices (only two-eletron parts 2J-K) 
+            # commutputes commutplex Fock matrices (only two-eletron parts 2J-K)
             D_total = []
             if self.rank == mpi_master():
                 for da in D:
@@ -2909,7 +2927,7 @@ class TPAdriver:
                 return None
 
         elif rank == 3:
-            # commutputes real Fock Matrices (only two-eletron parts 2J-K) 
+            # commutputes real Fock Matrices (only two-eletron parts 2J-K)
             f_total = self.get_two_el_fock_mod_r(molecule, ao_basis, D)
 
             ff = []
@@ -2923,7 +2941,7 @@ class TPAdriver:
                 return None
 
         else:
-            # commutputes imaginary Fock matrices (only two-eletron parts 2J-K) 
+            # commutputes imaginary Fock matrices (only two-eletron parts 2J-K)
             f_total = self.get_two_el_fock_mod_r(molecule, ao_basis, D)
 
             ff = []
@@ -2937,14 +2955,13 @@ class TPAdriver:
                 return None
 
     def get_two_el_fock_mod_r(self, molecule, ao_basis, *dabs):
-        """ 
+        """
         Returns the two-electron part of the Fock matix 2J-K
 
         :param molecule:
         :param ao_basis:
-        :param *dabs*:
+        :param dabs:
             A list of densitiy matrices
-
         """
 
         eri_driver = ElectronRepulsionIntegralsDriver(self.comm)
@@ -2995,7 +3012,8 @@ class TPAdriver:
         for batch_ind in range(num_batches):
 
             if self.rank == mpi_master():
-                print('* Info *   batch {}/{}'.format(batch_ind + 1, num_batches))
+                print('* Info *   batch {}/{}'.format(batch_ind + 1,
+                                                      num_batches))
                 sys.stdout.flush()
 
             # form density matrices
@@ -3031,11 +3049,10 @@ class TPAdriver:
 
     def get_one_el_hamiltonian(self, molecule, ao_basis):
         """
-        Returns the one electron part of the Fock matrix 
+        Returns the one electron part of the Fock matrix
 
         :param molecule:
         :param ao_basis:
-
         """
 
         kinetic_driver = KineticEnergyIntegralsDriver(self.comm)
@@ -3046,8 +3063,7 @@ class TPAdriver:
 
         return T - V
 
-        
-    def print_header(self,ostream,fock_number):
+    def print_header(self, ostream, fock_number):
         """
         Fock section setup header for output stream.
         :param fock_number:
@@ -3061,13 +3077,13 @@ class TPAdriver:
 
         width = 50
 
-        cur_str = "Total number of Fock matrices to compute : " + str(fock_number)  
+        cur_str = "Total number of Fock matrices to compute : " + str(
+            fock_number)
         ostream.print_header(cur_str.ljust(width))
 
         ostream.flush()
 
-
-    def print_time(self,ostream,time):
+    def print_time(self, ostream, time):
         """
         Prints time for Fock section
         :param time:
@@ -3076,7 +3092,7 @@ class TPAdriver:
 
         width = 50
 
-        cur_str = "Total time for Fock matrices: " + str(time) + " sec "   
+        cur_str = "Total time for Fock matrices: " + str(time) + " sec "
         ostream.print_header(cur_str.ljust(width))
 
         ostream.flush()
