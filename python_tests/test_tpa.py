@@ -15,7 +15,6 @@ class TestTPA(unittest.TestCase):
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
-        task.input_dict['scf']['conv_thresh'] = 1.0e-8
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
@@ -26,7 +25,8 @@ class TestTPA(unittest.TestCase):
         tpa = TPA(task.mpi_comm, task.ostream)
         tpa.update_settings({
             'damping': task.input_dict['response']['damping'],
-            'frequencies': task.input_dict['response']['frequencies']
+            'frequencies': task.input_dict['response']['frequencies'],
+            'conv_thresh': '1.0e-8',
         })
         (T4, T3, X3, A3, X2, A2, gamma, w, T3_red, X2_red, A2_red,
          gamma_red) = tpa.compute(task.molecule, task.ao_basis, scf_tensors)

@@ -1,17 +1,16 @@
-from mpi4py import MPI
 import numpy as np
 import ctypes
 import psutil
 import time
-import sys
 import os
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import mpi_master
-from .veloxchemlib import denmat, fockmat
-from .veloxchemlib import ericut
+from .veloxchemlib import denmat
+from .veloxchemlib import fockmat
+from .qqscheme import get_qq_scheme
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .aofockmatrix import AOFockMatrix
@@ -31,11 +30,39 @@ class TPAdriver:
         The output stream.
     """
 
-    def __init__(self):
+    def __init__(self, comm, ostream):
 
-        self.comm = MPI.COMM_WORLD
+        self.comm = comm
         self.rank = self.comm.Get_rank()
-        self.size = self.comm.Get_size()
+        self.nodes = self.comm.Get_size()
+
+        self.ostream = ostream
+
+    def update_settings(self, rsp_dict, method_dict=None):
+        """
+        Updates response and method settings for TPA
+
+        :param rsp_dict:
+            The dictionary of response dict.
+        :param method_dict:
+            The dictionary of method rsp_dict.
+        """
+
+        if method_dict is None:
+            method_dict = {}
+
+        if 'damping' in rsp_dict:
+            self.damping = float(rsp_dict['damping'])
+        if 'lindep_thresh' in rsp_dict:
+            self.lindep_thresh = float(rsp_dict['lindep_thresh'])
+        if 'conv_thresh' in rsp_dict:
+            self.conv_thresh = float(rsp_dict['conv_thresh'])
+        if 'max_iter' in rsp_dict:
+            self.max_iter = int(rsp_dict['max_iter'])
+        if 'eri_thresh' in rsp_dict:
+            self.eri_thresh = float(rsp_dict['eri_thresh'])
+        if 'qq_type' in rsp_dict:
+            self.qq_type = rsp_dict['qq_type']
 
     def get_e4(self, wi, kX, fo, nocc, norb):
         """
@@ -464,7 +491,8 @@ class TPAdriver:
 
     def get_densities_red(self, wi, kX, S, D0, mo, nocc, norb):
         """
-        commutputes the compounded densities needed for the compounded Fock matrics F^{σ} used for the reduced iostropic cubic response function
+        Computes the compounded densities needed for the compounded Fock
+        matrics F^{σ} used for the reduced iostropic cubic response function
 
         :param wi:
             A list of the frequencies
@@ -530,7 +558,9 @@ class TPAdriver:
 
     def get_densities(self, wi, kX, S, D0, mo, nocc, norb):
         """
-        commutputes the compounded densities needed for the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response function
+        Computes the compounded densities needed for the compounded Fock
+        matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
+        function
 
         :param wi:
             A list of the frequencies
@@ -671,17 +701,15 @@ class TPAdriver:
 
         return density_list
 
-    def get_fock_dict(self, wi, kX, density_list, S, D0, mo, molecule, ao_basis,
-                      ostream):
+    def get_fock_dict(self, wi, kX, density_list, D0, mo, molecule, ao_basis):
         """
-        commutputes the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response function
+        Computes the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the
+        isotropic cubic response function
 
         :param wi:
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
-        :param S:
-            The overlap matrix
         :param D0:
             The SCF density matrix in AO basis
         :param mo:
@@ -713,25 +741,21 @@ class TPAdriver:
 
         if self.rank == mpi_master():
             fock_num = 30 * len(wi)
-            self.print_header(ostream, fock_num)
+            self.print_header(fock_num)
         time_start_fock = time.time()
 
-        # commutputes both real and imaginary Fock matrices
-        ff_AO = self.get_fock_r(density_list, molecule, ao_basis, 1)
+        # computes both real and imaginary Fock matrices
+        ff_AO = self.get_fock_r(mo, density_list, molecule, ao_basis, 1)
         # The zeroth order Fock matrix is computed
-        F0_a = self.get_fock_r(D0, molecule, ao_basis, 0)
+        F0_a = self.get_fock_r(mo, D0, molecule, ao_basis, 0)
 
         time_end_fock = time.time()
         total_time_fock = time_end_fock - time_start_fock
-        self.print_time(ostream, total_time_fock)
+        self.print_time(total_time_fock)
 
         if self.rank == mpi_master():
-            F0_a = self.ao2mo(mo, F0_a)
 
-            fock_list = []
-
-            for i in range(len(ff_AO)):
-                fock_list.append(self.ao2mo(mo, ff_AO[i]))
+            fock_list = ff_AO
 
             count = 0
             for w in wi:
@@ -778,17 +802,16 @@ class TPAdriver:
 
         return Fock
 
-    def get_fock_dict_red(self, wi, kX, density_list, S, D0, mo, molecule,
-                          ao_basis, ostream):
+    def get_fock_dict_red(self, wi, kX, density_list, D0, mo, molecule,
+                          ao_basis):
         """
-        commutputes the compounded Fock matrics F^{σ}  used for the reduced isotropic cubic response function
+        Computes the compounded Fock matrics F^{σ}  used for the reduced
+        isotropic cubic response function
 
         :param wi:
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
-        :param S:
-            The overlap matrix
         :param D0:
             The SCF density matrix in AO basis
         :param mo:
@@ -809,23 +832,19 @@ class TPAdriver:
 
         if self.rank == mpi_master():
             fock_num = 6 * len(wi)
-            self.print_header(ostream, fock_num)
+            self.print_header(fock_num)
         time_start_fock = time.time()
 
-        Ff_AO = self.get_fock_r(density_list, molecule, ao_basis, 2)
-        F0_a = self.get_fock_r(D0, molecule, ao_basis, 0)
+        ff_AO = self.get_fock_r(mo, density_list, molecule, ao_basis, 2)
+        F0_a = self.get_fock_r(mo, D0, molecule, ao_basis, 0)
 
         time_end_fock = time.time()
         total_time_fock = time_end_fock - time_start_fock
-        self.print_time(ostream, total_time_fock)
+        self.print_time(total_time_fock)
 
         if self.rank == mpi_master():
-            F0_a = self.ao2mo(mo, F0_a)
 
-            fock_list = []
-
-            for i in range(len(Ff_AO)):
-                fock_list.append(self.ao2mo(mo, Ff_AO[i]))
+            fock_list = ff_AO
 
             count = 0
             for w in wi:
@@ -854,7 +873,8 @@ class TPAdriver:
 
     def get_xy(self, d_a_mo, X, wi, Fock, kX, nocc, norb):
         """
-        commutputes the compounded gradient vectors N^{σ},N^{λ+τ} used for the isotropic cubic response function
+        Computes the compounded gradient vectors N^{σ},N^{λ+τ} used for the
+        isotropic cubic response function
 
         :param d_a_mo:
             The SCF density matrix in MO basis
@@ -1073,7 +1093,8 @@ class TPAdriver:
 
     def get_xy_red(self, d_a_mo, X, wi, Fock, kX, nocc, norb):
         """
-        commutputes the compounded gradient vectors N^{σ}  used for the reduced isotropic cubic response function
+        Computes the compounded gradient vectors N^{σ}  used for the reduced
+        isotropic cubic response function
 
         :param d_a_mo:
             The SCF density matrix in MO basis
@@ -1359,7 +1380,8 @@ class TPAdriver:
 
     def other(self, iso, wi, track, n_x, n_xy, X, kX, kXY, da, mol_orbs, task):
         """
-        commutputes the terms involving X[3],A[3],X[2],A[2] in the isotropic cubic response function
+        Computes the terms involving X[3],A[3],X[2],A[2] in the isotropic cubic
+        response function
 
         : param iso:
             A bolean value that states if its the isotrpoic gamma or a user defined case
@@ -1719,13 +1741,13 @@ class TPAdriver:
 
         return na_x3_ny_nz_dict, na_a3_nx_ny_dict, na_x2_nyz_dict, nx_a2_nyz_dict
 
-    def get_t4(self, damp, wi, e4_dict, n_x, Kx, track, da, mol_orbs, task):
+    def get_t4(self, wi, e4_dict, n_x, Kx, track, da, mol_orbs, task):
         """
-        commutbines the contraction of the E[4] tensor with that of the S[4] and R[4] tensors to return the contraction of T[4] as a dictonary of vectors
+        Computes the contraction of the E[4] tensor with that of the S[4] and
+        R[4] tensors to return the contraction of T[4] as a dictonary of
+        vectors.
         T[4]n_xNyNz = (E^[4]-ω_1S^[4]-ω_1S^[4]-ω_3S^[4]-γiR^[4])
 
-        : param damp:
-            A scalar that is the damping parameter
         : param wi:
             A list of all the freqs
         : param e4_dict:
@@ -1746,8 +1768,8 @@ class TPAdriver:
         T4term = {}
         S4 = self.S4_dict(wi, Kx, track, da, mol_orbs, task)
 
-        if damp > 0:
-            R4term = self.get_r4(wi, damp, Kx, n_x, track, da, mol_orbs, task)
+        if self.damping > 0:
+            R4term = self.get_r4(wi, Kx, n_x, track, da, mol_orbs, task)
 
         for i in range(len(wi)):
 
@@ -1758,7 +1780,7 @@ class TPAdriver:
                     e4_dict['f_iso_y'][ww] - S4[('y', ww)]) + n_x['Na'][
                         ('z', w)] @ (e4_dict['f_iso_z'][ww] - S4[('z', ww)])
 
-            if damp > 0:
+            if self.damping > 0:
                 t4term += R4term[('x', ww)] + R4term[('y', ww)] + R4term[('z',
                                                                           ww)]
 
@@ -1768,7 +1790,7 @@ class TPAdriver:
 
     def S4_dict(self, wi, kX, track, D0, nocc, norb):
         """
-        commutputes the S4 contractions
+        Computes the S4 contractions
 
         : param wi:
             A list of all the freqs
@@ -1930,9 +1952,7 @@ class TPAdriver:
         returns [k,D]
         """
 
-        da = D
-        da_a = k.T @ S @ da - da @ S @ k.T
-        return np.array(da_a)
+        return k.T @ S @ D - D @ S @ k.T
 
     def mo2ao(self, mo, A):
         """
@@ -1942,12 +1962,6 @@ class TPAdriver:
         """
 
         return mo @ A @ mo.T
-
-    def ao2mo_inv(self, mo, A):
-        """
-        : param mo - molecular orbital coefficent matrix
-        """
-        return np.linalg.inv(mo) @ A @ np.linalg.inv(mo.T)
 
     def ao2mo(self, mo, A):
         """
@@ -1981,11 +1995,8 @@ class TPAdriver:
         """
 
         Xn_x = self.commut(self.commut(k, X), D.T)
-        X2n_x = [
-            LinearSolver.lrmat2vec(Xn_x.real, nocc, norb),
-            LinearSolver.lrmat2vec(Xn_x.imag, nocc, norb)
-        ]
-        X2n_x_c = X2n_x[0] + 1j * X2n_x[1]
+        X2n_x_c = (LinearSolver.lrmat2vec(Xn_x.real, nocc, norb) +
+                   1j * LinearSolver.lrmat2vec(Xn_x.imag, nocc, norb))
         return X2n_x_c
 
     def x3_contract(self, k1, k2, X, D, nocc, norb):
@@ -2073,8 +2084,8 @@ class TPAdriver:
         A2n_x_c = A2n_x[0] + 1j * A2n_x[1]
         return -(1 / 2) * A2n_x_c
 
-    def get_fock_dict_II_red(self, wi, kX, density_list, S, D0, mo, molecule,
-                             ao_basis, ostream):
+    def get_fock_dict_II_red(self, wi, kX, density_list, D0, mo, molecule,
+                             ao_basis):
         """
         Computes the compounded second-order Fock matrics used for the reduced isotropic cubic response function
 
@@ -2082,8 +2093,6 @@ class TPAdriver:
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
-        :param S:
-            The overlap matrix
         :param D0:
             The SCF density matrix in AO basis
         :param mo:
@@ -2101,19 +2110,18 @@ class TPAdriver:
 
         if self.rank == mpi_master():
             fock_num = 3 * len(wi)
-            self.print_header(ostream, fock_num)
+            self.print_header(fock_num)
         time_start_fock = time.time()
 
-        Ff_AO = self.get_fock_r(density_list, molecule, ao_basis, 3)
+        ff_AO = self.get_fock_r(mo, density_list, molecule, ao_basis, 3)
 
         time_end_fock = time.time()
         total_time_fock = time_end_fock - time_start_fock
-        self.print_time(ostream, total_time_fock)
+        self.print_time(total_time_fock)
 
         if self.rank == mpi_master():
-            fock_list = []
-            for i in range(len(Ff_AO)):
-                fock_list.append(self.ao2mo(mo, Ff_AO[i]))
+
+            fock_list = ff_AO
 
             count = 0
             for w in wi:
@@ -2127,8 +2135,8 @@ class TPAdriver:
             fock_dict = {}
         return fock_dict
 
-    def get_fock_dict_II(self, wi, kX, density_list, S, D0, mo, molecule,
-                         ao_basis, ostream):
+    def get_fock_dict_II(self, wi, kX, density_list, D0, mo, molecule,
+                         ao_basis):
         """
         Computes the compounded second-order Fock matrics used for the isotropic cubic response function
 
@@ -2136,8 +2144,6 @@ class TPAdriver:
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
-        :param S:
-            The overlap matrix
         :param D0:
             The SCF density matrix in AO basis
         :param mo:
@@ -2156,19 +2162,18 @@ class TPAdriver:
 
         if self.rank == mpi_master():
             fock_num = 6 * len(wi)
-            self.print_header(ostream, fock_num)
+            self.print_header(fock_num)
         time_start_fock = time.time()
 
-        Ff_AO = self.get_fock_r(density_list, molecule, ao_basis, 1)
+        ff_AO = self.get_fock_r(mo, density_list, molecule, ao_basis, 1)
 
         time_end_fock = time.time()
         total_time_fock = time_end_fock - time_start_fock
-        self.print_time(ostream, total_time_fock)
+        self.print_time(total_time_fock)
 
         if self.rank == mpi_master():
-            fock_list = []
-            for i in range(len(Ff_AO)):
-                fock_list.append(self.ao2mo(mo, Ff_AO[i]))
+
+            fock_list = ff_AO
 
             count = 0
             for w in wi:
@@ -2435,9 +2440,8 @@ class TPAdriver:
         xi = self.commut(kA, self.commut(kB, F0) + 3 * Fb)
         return xi
 
-    def main(self, eri_thresh, conv_thresh, lindep_thresh, max_iter, Focks, iso,
-             n_x, w, X, damp, d_a_mo, kX, track, S, D0, mo, nocc, norb,
-             scf_tensors, molecule, ao_basis, comm, ostream):
+    def main(self, Focks, iso, n_x, w, X, d_a_mo, kX, track, S, D0, mo, nocc,
+             norb, scf_tensors, molecule, ao_basis):
         """
         This code calls all the relevent functions to third-order isotropic gradient
 
@@ -2447,8 +2451,6 @@ class TPAdriver:
             A list of all the frequencies
         :param X:
             A dictonary of matricies containing all the dipole integrals
-        :param damp:
-            The damping constant
         :param d_a_mo:
             The SCF density in MO basis
         :param kX:
@@ -2476,12 +2478,11 @@ class TPAdriver:
             density_list_red = None
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(w, kX, density_list, S, (D0, D0), mo,
-                                       molecule, ao_basis, ostream)
+        fock_dict = self.get_fock_dict(w, kX, density_list, (D0, D0), mo,
+                                       molecule, ao_basis)
 
-        fock_dict_red = self.get_fock_dict_red(w, kX, density_list_red, S,
-                                               (D0, D0), mo, molecule, ao_basis,
-                                               ostream)
+        fock_dict_red = self.get_fock_dict_red(w, kX, density_list_red,
+                                               (D0, D0), mo, molecule, ao_basis)
 
         if self.rank == mpi_master():
             fock_dict.update(Focks)
@@ -2496,13 +2497,11 @@ class TPAdriver:
         # computing all the compounded second-order response vectors and
         # extracting some of the second-order Fock matrices from the subspace
         n_xy_dict, kxy_dict, Focks_xy, XΥ_dict = self.get_n_xy(
-            eri_thresh, conv_thresh, lindep_thresh, max_iter, w, d_a_mo, damp,
-            X, fock_dict, kX, nocc, norb, molecule, ao_basis, scf_tensors, comm,
-            ostream)
+            w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule, ao_basis,
+            scf_tensors)
         n_xy_dict_red, kxy_dict_red, Focks_xy_red, XΥ_dict_red = self.get_n_xy_red(
-            eri_thresh, conv_thresh, lindep_thresh, max_iter, w, d_a_mo, damp,
-            X, fock_dict_red, kX, nocc, norb, molecule, ao_basis, scf_tensors,
-            comm, ostream)
+            w, d_a_mo, X, fock_dict_red, kX, nocc, norb, molecule, ao_basis,
+            scf_tensors)
 
         # computing all second-order compounded densities based on the
         # second-order response vectors
@@ -2523,12 +2522,11 @@ class TPAdriver:
 
         # computing the remaning second-order Fock matrices from the
         # second-order densities
-        fock_dict_two = self.get_fock_dict_II(w, kX, density_list_two, S, D0,
-                                              mo, molecule, ao_basis, ostream)
+        fock_dict_two = self.get_fock_dict_II(w, kX, density_list_two, D0, mo,
+                                              molecule, ao_basis)
         fock_dict_two_red = self.get_fock_dict_II_red(w, kX,
-                                                      density_list_two_red, S,
-                                                      D0, mo, molecule,
-                                                      ao_basis, ostream)
+                                                      density_list_two_red, D0,
+                                                      mo, molecule, ao_basis)
 
         if self.rank == mpi_master():
             # Adding the Fock matrices extracted from the second-order response
@@ -2562,11 +2560,12 @@ class TPAdriver:
             na_x2_nyz_red = None
             nx_a2_nyz_red = None
 
-        return (na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz, e3_dict, e4_dict, na_x2_nyz_red, nx_a2_nyz_red, e3_dict_red)
+        return (na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz, e3_dict,
+                e4_dict, na_x2_nyz_red, nx_a2_nyz_red, e3_dict_red)
 
     def get_t3(self, freqs, e3_dict, n_x, track):
         """
-        commutputes the T[3] contraction, for HF S[3] = 0, R[3] = 0 such that
+        Computes the T[3] contraction, for HF S[3] = 0, R[3] = 0 such that
         the T[3] contraction for the isotropic cubic response function in terms
         of compounded Fock matrices is given as:
 
@@ -2604,15 +2603,13 @@ class TPAdriver:
             count += int(len(track) / len(freqs))
         return t3_term
 
-    def get_r4(self, freqs, damp, kX, n_x, track, d_a_mo, nocc, norb):
+    def get_r4(self, freqs, kX, n_x, track, d_a_mo, nocc, norb):
         """
         Returns a dict with all the R[4]NxNyNz contractions for the subsequent
         T[4] contraction
 
         : param freqs:
             A list of all the frequencies
-        : param damp:
-            The dampening constant
         : param kX:
             A dictonary of all the first-order response matrices
         : param n_x:
@@ -2631,6 +2628,8 @@ class TPAdriver:
 
         R4terms = {}
         count = 0
+
+        damp = self.damping
 
         for j in range(len(freqs)):
             w1 = float(track[j * int(len(track) / len(freqs))].split(",")[1])
@@ -2727,26 +2726,18 @@ class TPAdriver:
             TotVec.append(Avec[a])
         return TotVec
 
-    def get_n_xy(self, eri_thresh, conv_thresh, lindep_thresh, max_iter, w,
-                 d_a_mo, damp, X, fock_dict, kX, nocc, norb, molecule, ao_basis,
-                 scf_tensors, comm, ostream):
+    def get_n_xy(self, w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule,
+                 ao_basis, scf_tensors):
         """
-        commutputes all the second-order response vectors needed for the isotropic cubic response computation
+        Computes all the second-order response vectors needed for the isotropic
+        cubic response computation
 
         : param eri_tresh:
             Eri threshold
-        : param conv_thresh:
-            Convergance threshold for response solver
-        : param lindep_thres:
-            Linear dependance threshhold
-        : param max_iter:
-            Maximum number of iterations for the response solver
         : param w:
             A list of all the frequencies
         : param d_a_mo:
             The density matrix in MO basis
-        : param damp :
-            The damping parameter
         : param X :
             Dipole integrals
         : param fock_dict:
@@ -2761,7 +2752,7 @@ class TPAdriver:
             A dictonary of Fock matrices from the subspace,second-order response vectors and second-order response matrices
         """
 
-        N_total_drv = ComplexResponse(comm, ostream)
+        N_total_drv = ComplexResponse(self.comm, self.ostream)
 
         xy_dict = {}
         freq = None
@@ -2782,11 +2773,12 @@ class TPAdriver:
 
         N_total_drv.update_settings({
             'frequencies': freq,
-            'damping': damp,
-            'eri_thresh': eri_thresh,
-            'conv_thresh': conv_thresh,
-            'lindep_thresh': lindep_thresh,
-            'max_iter': max_iter,
+            'damping': self.damping,
+            'conv_thresh': self.conv_thresh,
+            'lindep_thresh': self.lindep_thresh,
+            'max_iter': self.max_iter,
+            'eri_thresh': self.eri_thresh,
+            'qq_type': self.qq_type,
         })
 
         # commutpute second-order response vectors
@@ -2802,26 +2794,18 @@ class TPAdriver:
         else:
             return None, None, None, None
 
-    def get_n_xy_red(self, eri_thresh, conv_thresh, lindep_thresh, max_iter, w,
-                     d_a_mo, damp, X, fock_dict, kX, nocc, norb, molecule,
-                     ao_basis, scf_tensors, comm, ostream):
+    def get_n_xy_red(self, w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule,
+                     ao_basis, scf_tensors):
         """
-        commutputes all the second-order response vectors needed for the reduced isotropic cubic response computation
+        Computes all the second-order response vectors needed for the reduced
+        isotropic cubic response computation
 
         : param eri_tresh:
             Eri threshold
-        : param conv_thresh:
-            Convergance threshold for response solver
-        : param lindep_thres:
-            Linear dependance threshhold
-        : param max_iter:
-            Maximum number of iterations for the response solver
         : param w:
             A list of all the frequencies
         : param d_a_mo:
             The density matrix in MO basis
-        : param damp :
-            The damping parameter
         : param X :
             Dipole integrals
         : param fock_dict:
@@ -2841,7 +2825,7 @@ class TPAdriver:
         xy_dict = {}
         freq = None
 
-        N_total_drv_2 = ComplexResponse(comm, ostream)
+        N_total_drv_2 = ComplexResponse(self.comm, self.ostream)
 
         if self.rank == mpi_master():
             # Get the second-order gradiants
@@ -2857,11 +2841,12 @@ class TPAdriver:
 
         N_total_drv_2.update_settings({
             'frequencies': freq,
-            'damping': damp,
-            'eri_thresh': eri_thresh,
-            'conv_thresh': conv_thresh,
-            'lindep_thresh': lindep_thresh,
-            'max_iter': max_iter,
+            'damping': self.damping,
+            'conv_thresh': self.conv_thresh,
+            'lindep_thresh': self.lindep_thresh,
+            'max_iter': self.max_iter,
+            'eri_thresh': self.eri_thresh,
+            'qq_type': self.qq_type,
         })
 
         N_total_Drv = N_total_drv_2.compute(molecule, ao_basis, scf_tensors,
@@ -2878,9 +2863,9 @@ class TPAdriver:
 
     # Fock code
 
-    def get_fock_r(self, D, molecule, ao_basis, rank):
+    def get_fock_r(self, mo, D, molecule, ao_basis, rank):
         """
-        commutputes and returns a list of Fock matrices
+        Computes and returns a list of Fock matrices
 
         :param D:
             A list of densities
@@ -2890,27 +2875,21 @@ class TPAdriver:
 
         """
         if rank == 0:
-            # commutpute the unperturbed Fock matrix from the SCF Density and
+            # computes the unperturbed Fock matrix from the SCF Density and
             # adds the one electron part
-            da = D
-            fa = self.get_two_el_fock_mod_r(
-                molecule,
-                ao_basis,
-                da,
-            )
+            fa = self.get_two_el_fock_mod_r(molecule, ao_basis, D)
             h = self.get_one_el_hamiltonian(molecule, ao_basis)
 
             if self.rank == mpi_master():
-                fa = 0.5 * fa[0]
-                fa += h
-                return fa
+                fa = 0.5 * fa[0] + h
+                return self.ao2mo(mo, fa)
             else:
                 return None
 
         elif rank == 1:
-            # commutputes commutplex Fock matrices (only two-eletron parts 2J-K)
-            D_total = []
+            # computes complex Fock matrices (only two-eletron parts 2J-K)
             if self.rank == mpi_master():
+                D_total = []
                 for da in D:
                     D_total.append(da.real)
                     D_total.append(da.imag)
@@ -2922,39 +2901,38 @@ class TPAdriver:
             ff = []
 
             if self.rank == mpi_master():
-                for i in range(int(0.5 * len(f_total))):
-                    if i == 0:
-                        ff.append(0.5 * f_total[0] + 0.5j * f_total[1])
-                    else:
-                        ff.append(0.5 * f_total[2 * i] +
-                                  0.5j * f_total[2 * i + 1])
+                for i in range(len(f_total) // 2):
+                    ff.append(
+                        self.ao2mo(
+                            mo,
+                            0.5 * f_total[2 * i] + 0.5j * f_total[2 * i + 1]))
                 return ff
             else:
                 return None
 
         elif rank == 3:
-            # commutputes real Fock Matrices (only two-eletron parts 2J-K)
+            # computes real Fock Matrices (only two-eletron parts 2J-K)
             f_total = self.get_two_el_fock_mod_r(molecule, ao_basis, D)
 
             ff = []
 
             if self.rank == mpi_master():
                 for i in range(len(f_total)):
-                    ff.append(0.5j * f_total[i])
+                    ff.append(self.ao2mo(mo, 0.5j * f_total[i]))
 
                 return ff
             else:
                 return None
 
         else:
-            # commutputes imaginary Fock matrices (only two-eletron parts 2J-K)
+            # computes imaginary Fock matrices (only two-eletron parts 2J-K)
             f_total = self.get_two_el_fock_mod_r(molecule, ao_basis, D)
 
             ff = []
 
             if self.rank == mpi_master():
                 for i in range(len(f_total)):
-                    ff.append(0.5 * f_total[i])
+                    ff.append(self.ao2mo(mo, 0.5 * f_total[i]))
 
                 return ff
             else:
@@ -2971,8 +2949,8 @@ class TPAdriver:
         """
 
         eri_driver = ElectronRepulsionIntegralsDriver(self.comm)
-        screening = eri_driver.compute(ericut.qqden, 1.0e-15, molecule,
-                                       ao_basis)
+        screening = eri_driver.compute(get_qq_scheme(self.qq_type),
+                                       self.eri_thresh, molecule, ao_basis)
 
         # determine number of batches
 
@@ -2990,7 +2968,7 @@ class TPAdriver:
             if total_mem > min(total_mem_list):
                 mem_adjust = total_mem - min(total_mem_list)
 
-            # compute maximum batch size from available memory
+            # computes maximum batch size from available memory
             avail_mem = psutil.virtual_memory().available - mem_adjust
             mem_per_mat = n_ao**2 * ctypes.sizeof(ctypes.c_double)
             nthreads = int(os.environ['OMP_NUM_THREADS'])
@@ -3011,16 +2989,16 @@ class TPAdriver:
         fabs = []
 
         if self.rank == mpi_master():
-            batch_str = '* Info * Processing Fock builds...'
+            batch_str = 'Processing Fock builds...'
             batch_str += ' (batch size: {:d})'.format(batch_size)
-            print(batch_str)
+            self.ostream.print_info(batch_str)
 
         for batch_ind in range(num_batches):
 
             if self.rank == mpi_master():
-                print('* Info *   batch {}/{}'.format(batch_ind + 1,
-                                                      num_batches))
-                sys.stdout.flush()
+                self.ostream.print_info('  batch {}/{}'.format(
+                    batch_ind + 1, num_batches))
+                self.ostream.flush()
 
             # form density matrices
 
@@ -3042,7 +3020,7 @@ class TPAdriver:
                 fock.set_fock_type(fockmat.rgenjk, i)
 
             eri_driver.compute(fock, dens, molecule, ao_basis, screening)
-            fock.reduce_sum(self.rank, self.size, self.comm)
+            fock.reduce_sum(self.rank, self.nodes, self.comm)
 
             if self.rank == mpi_master():
                 for i in range(fock.number_of_fock_matrices()):
@@ -3069,27 +3047,27 @@ class TPAdriver:
 
         return T - V
 
-    def print_header(self, ostream, fock_number):
+    def print_header(self, fock_number):
         """
         Fock section setup header for output stream.
         :param fock_number:
            Total number of Fock matrices to compute
         """
 
-        ostream.print_blank()
-        ostream.print_header("Fock matrix computation")
-        ostream.print_header(31 * "=")
-        ostream.print_blank()
+        self.ostream.print_blank()
+        self.ostream.print_header("Fock matrix computation")
+        self.ostream.print_header(31 * "=")
+        self.ostream.print_blank()
 
         width = 50
 
         cur_str = "Total number of Fock matrices to compute : " + str(
             fock_number)
-        ostream.print_header(cur_str.ljust(width))
+        self.ostream.print_header(cur_str.ljust(width))
 
-        ostream.flush()
+        self.ostream.flush()
 
-    def print_time(self, ostream, time):
+    def print_time(self, time):
         """
         Prints time for Fock section
         :param time:
@@ -3099,6 +3077,6 @@ class TPAdriver:
         width = 50
 
         cur_str = "Total time for Fock matrices: " + str(time) + " sec "
-        ostream.print_header(cur_str.ljust(width))
+        self.ostream.print_header(cur_str.ljust(width))
 
-        ostream.flush()
+        self.ostream.flush()

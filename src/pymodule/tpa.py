@@ -34,10 +34,11 @@ class TPA(LinearSolver):
         self.frequencies = 0
         self.comp = "zzzz,0,0,0"
         self.damping = 0.004556335294880438
-        self.eri_thresh = 1.0e-15
-        self.conv_thresh = 1.0e-8
         self.lindep_thresh = 1.0e-10
+        self.conv_thresh = 1.0e-4
         self.max_iter = 50
+        self.eri_thresh = 1.0e-15
+        self.qq_type = 'QQ_DEN'
 
         # mpi information
         self.comm = comm
@@ -146,14 +147,25 @@ class TPA(LinearSolver):
 
         time_start = time.time()
 
+        tpa_drv = TPAdriver(self.comm, self.ostream)
+
+        tpa_drv.update_settings({
+            'damping': self.damping,
+            'conv_thresh': self.conv_thresh,
+            'lindep_thresh': self.lindep_thresh,
+            'max_iter': self.max_iter,
+            'eri_thresh': self.eri_thresh,
+            'qq_type': self.qq_type,
+        })
+
         if self.rank == mpi_master():
             S = scf_tensors['S']
             da = scf_tensors['D'][0]
             mo = scf_tensors['C']
+            d_a_mo = np.linalg.multi_dot([mo.T, S, da, S, mo])
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
             w = parse_frequencies(self.frequencies)
-            d_a_mo = TPAdriver().ao2mo_inv(mo, da)
         else:
             S = None
             da = None
@@ -178,9 +190,9 @@ class TPA(LinearSolver):
         if self.rank == mpi_master():
             v1 = {(op, wi): v for op, v in zip(component, b_rhs) for wi in w}
             X = {
-                'x': 2 * TPAdriver().ao2mo(mo, dipole_mats.x_to_numpy()),
-                'y': 2 * TPAdriver().ao2mo(mo, dipole_mats.y_to_numpy()),
-                'z': 2 * TPAdriver().ao2mo(mo, dipole_mats.z_to_numpy())
+                'x': 2 * tpa_drv.ao2mo(mo, dipole_mats.x_to_numpy()),
+                'y': 2 * tpa_drv.ao2mo(mo, dipole_mats.y_to_numpy()),
+                'z': 2 * tpa_drv.ao2mo(mo, dipole_mats.z_to_numpy())
             }
             self.comp = self.get_comp(w)
         else:
@@ -197,10 +209,11 @@ class TPA(LinearSolver):
         Nb_drv.update_settings({
             'frequencies': self.frequencies,
             'damping': self.damping,
-            'eri_thresh': self.eri_thresh,
-            'conv_thresh': self.conv_thresh,
             'lindep_thresh': self.lindep_thresh,
+            'conv_thresh': self.conv_thresh,
             'max_iter': self.max_iter,
+            'eri_thresh': self.eri_thresh,
+            'qq_type': self.qq_type,
         })
 
         # Computing the first-order response vectors 3 per frequency
@@ -229,8 +242,7 @@ class TPA(LinearSolver):
             # frequency by using flip_zy, see article.
 
             for (op, freq) in Nx['Nb']:
-                Nx['Nc'][(op, -freq)] = TPAdriver().flip_yz(Nx['Nb'][(op,
-                                                                      freq)])
+                Nx['Nc'][(op, -freq)] = tpa_drv.flip_yz(Nx['Nb'][(op, freq)])
 
                 # Creating the response matrix for the negative first-order
                 # response vectors
@@ -263,18 +275,17 @@ class TPA(LinearSolver):
         # A[3] and A[2] which formally are not part of the third-order gradient
         # but which are used for the cubic response function
 
-        (NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz, E3_dict, E4_dict,
-         NaX2Nyz_red, NxA2Nyz_red, E3_dict_red) = TPAdriver().main(
-             self.eri_thresh, self.conv_thresh, self.lindep_thresh,
-             self.max_iter, Focks, self.iso, Nx, w, X, self.damping, d_a_mo, kX,
-             self.comp, S, da, mo, nocc, norb, scf_tensors, molecule, ao_basis,
-             self.comm, self.ostream)
+        (NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz, E3_dict, E4_dict, NaX2Nyz_red,
+         NxA2Nyz_red, E3_dict_red) = tpa_drv.main(Focks, self.iso, Nx, w, X,
+                                                  d_a_mo, kX, self.comp, S, da,
+                                                  mo, nocc, norb, scf_tensors,
+                                                  molecule, ao_basis)
 
         if self.rank == mpi_master():
-            t4_dict = TPAdriver().get_t4(self.damping, w, E4_dict, Nx, kX,
-                                         self.comp, d_a_mo, nocc, norb)
-            t3_dict = TPAdriver().get_t3(w, E3_dict, Nx, self.comp)
-            t3_dict_red = TPAdriver().get_t3(w, E3_dict_red, Nx, self.comp)
+            t4_dict = tpa_drv.get_t4(w, E4_dict, Nx, kX, self.comp, d_a_mo,
+                                     nocc, norb)
+            t3_dict = tpa_drv.get_t3(w, E3_dict, Nx, self.comp)
+            t3_dict_red = tpa_drv.get_t3(w, E3_dict_red, Nx, self.comp)
         else:
             t4_dict = None
             t3_dict = None
