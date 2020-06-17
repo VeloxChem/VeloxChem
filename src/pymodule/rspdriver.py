@@ -157,16 +157,15 @@ class ResponseDriver:
 
             return c6_result
 
-#         TPA 
+        # TPA
 
         if self.rsp_dict['response'] == 'cubic':
 
             tpa = TPA(self.comm, self.ostream)
+
             tpa.update_settings(self.rsp_dict, self.method_dict)
 
             return tpa.compute(molecule, ao_basis, scf_tensors)
-
-
 
     def prop_str(self):
         """

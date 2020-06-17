@@ -45,7 +45,7 @@ class TPA(LinearSolver):
         self.nodes = self.comm.Get_size()
         self.ostream = ostream
 
-    def update_settings(self, rsp_dict, method_dict={}):
+    def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in complex liner response solver
         used for TPA
@@ -55,6 +55,11 @@ class TPA(LinearSolver):
         :param method_dict:
             The dictionary of method rsp_dict.
         """
+
+        if method_dict is None:
+            method_dict = {}
+
+        # TODO: include unit in parse_frequencies
 
         if 'frequencies' in rsp_dict:
             if 'unit' in rsp_dict:
@@ -84,12 +89,19 @@ class TPA(LinearSolver):
                 self.iso = True
             else:
                 self.iso = False
-        if 'conv_thresh' in rsp_dict:
-            self.conv_thresh = float(rsp_dict['conv_thresh'])
-        if 'lindep_thresh' in rsp_dict:
-            self.lindep_thresh = float(rsp_dict['lindep_thresh'])
+
+        if 'eri_thresh' in rsp_dict:
+            self.eri_thresh = float(rsp_dict['eri_thresh'])
+        if 'qq_type' in rsp_dict:
+            self.qq_type = rsp_dict['qq_type']
+
         if 'max_iter' in rsp_dict:
             self.max_iter = int(rsp_dict['max_iter'])
+        if 'conv_thresh' in rsp_dict:
+            self.conv_thresh = float(rsp_dict['conv_thresh'])
+
+        if 'lindep_thresh' in rsp_dict:
+            self.lindep_thresh = float(rsp_dict['lindep_thresh'])
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -133,13 +145,13 @@ class TPA(LinearSolver):
         """
 
         time_start = time.time()
+
         if self.rank == mpi_master():
-            S = scf_tensors['S']  # The overlap Matrix in AO basis
-            da = scf_tensors['D'][0]  # Alpha Density
-            mo = scf_tensors['C']  # MO coeff matrix
-            nocc = molecule.number_of_alpha_electrons(
-            )  # The number of occupied orbitals
-            norb = mo.shape[1]  # The number of total orbitals
+            S = scf_tensors['S']
+            da = scf_tensors['D'][0]
+            mo = scf_tensors['C']
+            nocc = molecule.number_of_alpha_electrons()
+            norb = mo.shape[1]
             w = parse_frequencies(self.frequencies)
             d_a_mo = TPAdriver().ao2mo_inv(mo, da)
         else:
@@ -216,22 +228,25 @@ class TPA(LinearSolver):
             # obtained from the first-order response vectors with positive
             # frequency by using flip_zy, see article.
 
-            for m in list(Nx['Nb'].keys()):
-                Nx['Nc'][(m[0], -m[1])] = TPAdriver().flip_yz(Nx['Nb'][m])
+            for (op, freq) in Nx['Nb']:
+                Nx['Nc'][(op, -freq)] = TPAdriver().flip_yz(Nx['Nb'][(op,
+                                                                      freq)])
 
                 # Creating the response matrix for the negative first-order
                 # response vectors
 
-                kX['Nc'][(m[0], -m[1])] = LinearSolver.lrvec2mat(
-                    Nx['Nc'][(m[0], -m[1])].real, nocc,
-                    norb) + 1j * LinearSolver.lrvec2mat(
-                        Nx['Nc'][(m[0], -m[1])].imag, nocc, norb)
+                kX['Nc'][(op, -freq)] = (
+                    LinearSolver.lrvec2mat(Nx['Nc'][(op, -freq)].real, nocc,
+                                           norb) +
+                    1j * LinearSolver.lrvec2mat(Nx['Nc'][
+                        (op, -freq)].imag, nocc, norb))
 
-                # The first-order Fock matrices  with positive and negative
+                # The first-order Fock matrices with positive and negative
                 # frequencies are each other complex conjugates
 
-                Focks['Fc'][(m[0], -m[1])] = Focks['Fb'][m]
-                Focks['Fd'][(m[0], m[1])] = np.conjugate(Focks['Fb'][m]).T
+                Focks['Fc'][(op, -freq)] = Focks['Fb'][(op, freq)]
+                Focks['Fd'][(op, freq)] = np.conjugate(Focks['Fb'][(op,
+                                                                    freq)]).T
 
             # For the cubic-response with all operators being the dipole μ Nb=Na=Nd
             # Likewise, Fb=Fd

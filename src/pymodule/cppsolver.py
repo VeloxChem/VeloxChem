@@ -554,7 +554,8 @@ class ComplexResponse(LinearSolver):
 
                 profiler.print_memory_tracing(self.ostream)
 
-                self.print_iteration(relative_residual_norm, xvs)
+                self.print_iteration(relative_residual_norm, xvs,
+                                     nonlinear_flag)
 
             profiler.stop_timer(iteration, 'ReducedSpace')
 
@@ -717,7 +718,7 @@ class ComplexResponse(LinearSolver):
         else:
             return None
 
-    def print_iteration(self, relative_residual_norm, xvs):
+    def print_iteration(self, relative_residual_norm, xvs, nonlinear_flag):
         """
         Prints information of the iteration.
 
@@ -726,6 +727,8 @@ class ComplexResponse(LinearSolver):
         :param xvs:
             A list of tuples containing operator component, frequency, and
             property.
+        :param nonlinear_flag:
+            The flag for running cppsolver in nonlinear response.
         """
 
         width = 92
@@ -738,17 +741,19 @@ class ComplexResponse(LinearSolver):
         self.ostream.print_header(output_header.ljust(width))
         self.ostream.print_blank()
 
-        output_header = 'Operator:  {} ({})'.format(self.b_operator,
-                                                    self.b_components)
-        self.ostream.print_header(output_header.ljust(width))
-        self.ostream.print_blank()
+        if not nonlinear_flag:
+            output_header = 'Operator:  {} ({})'.format(self.b_operator,
+                                                        self.b_components)
+            self.ostream.print_header(output_header.ljust(width))
+            self.ostream.print_blank()
 
-        for op, freq, xv in xvs:
-            ops_label = '<<{};{}>>_{:.4f}'.format(op, op, freq)
-            rel_res = relative_residual_norm[(op, freq)]
-            output_iter = '{:<15s}: {:15.8f} {:15.8f}j   '.format(
-                ops_label, -xv.real, -xv.imag)
-            output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
-            self.ostream.print_header(output_iter.ljust(width))
-        self.ostream.print_blank()
+            for op, freq, xv in xvs:
+                ops_label = '<<{};{}>>_{:.4f}'.format(op, op, freq)
+                rel_res = relative_residual_norm[(op, freq)]
+                output_iter = '{:<15s}: {:15.8f} {:15.8f}j   '.format(
+                    ops_label, -xv.real, -xv.imag)
+                output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
+                self.ostream.print_header(output_iter.ljust(width))
+            self.ostream.print_blank()
+
         self.ostream.flush()
