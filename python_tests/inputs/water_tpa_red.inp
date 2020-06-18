@@ -1,0 +1,25 @@
+@jobs
+task: response
+@end
+
+@method settings
+basis: 6-311++G**
+@end
+
+@response
+property: TPA
+frequencies: 0.05
+damping: 0.004556335294880438
+tpa: reduced
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+unit: ang
+xyz:
+H     .7586020000         .0000000000        -.5042840000
+H     .7586020000         .0000000000         .5042840000
+O     .0000000000         .0000000000         .0000000000
+@end~
+
