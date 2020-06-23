@@ -2561,7 +2561,7 @@ class TPAdriver:
                 na_x2_nyz_red = None
                 nx_a2_nyz_red = None
 
-            return (na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz, e3_dict,
+            return (n_xy_dict,na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz, e3_dict,
                     e4_dict, na_x2_nyz_red, nx_a2_nyz_red, e3_dict_red)
 
         if full is True:
@@ -2629,7 +2629,7 @@ class TPAdriver:
                 na_x2_nyz = None
                 nx_a2_nyz = None
 
-            return (na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz, e3_dict,
+            return (n_xy_dict,na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz, e3_dict,
                     e4_dict)
 
         if reduced is True:
@@ -2696,7 +2696,7 @@ class TPAdriver:
                 na_x2_nyz_red = None
                 nx_a2_nyz_red = None
 
-            return (na_x2_nyz_red, nx_a2_nyz_red, e3_dict_red)
+            return (n_xy_dict_red,na_x2_nyz_red, nx_a2_nyz_red, e3_dict_red)
 
     def get_t3(self, freqs, e3_dict, n_x, track):
         """
