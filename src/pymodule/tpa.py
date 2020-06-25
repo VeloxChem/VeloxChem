@@ -28,10 +28,7 @@ class TPA(LinearSolver):
     def __init__(self, comm, ostream):
         np.set_printoptions(threshold=sys.maxsize)
         self.iso = True
-        self.reduced = True
-        self.full = False
-        self.mix = False
-
+        self.reduced = False
 
         # cpp settings
         self.frequencies = 0
@@ -106,22 +103,6 @@ class TPA(LinearSolver):
 
         if 'lindep_thresh' in rsp_dict:
             self.lindep_thresh = float(rsp_dict['lindep_thresh'])
-        # Used to specify it the user wants to compute the full cubic response which is valid in all spectral regions
-        # or the reduced which is only valid in one-photon off-resonance regions, or both at the same time.
-        if 'tpa' in rsp_dict:
-            self.rsp = rsp_dict['tpa']
-            if self.rsp in 'reduced':
-                self.reduced = True
-                self.full = False
-                self.mix = False
-            elif self.rsp in 'verify':
-                self.mix = True
-                self.full = False
-                self.reduced = False
-            elif self.rsp in 'full':
-                self.full = True
-                self.reduced = False
-                self.mix = False
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -239,12 +220,17 @@ class TPA(LinearSolver):
         Nb_Drv = Nb_drv.compute(molecule, ao_basis, scf_tensors, v1)
 
         if self.rank == mpi_master():
+            plot = []
 
             Nx['Nb'] = Nb_Drv['solutions']
             kX['Nb'] = Nb_Drv['kappas']
             Focks['Fb'] = Nb_Drv['focks']
 
-            
+            # Storing the largest imaginary component of the response vector
+            # for plotting
+
+            for k in Nx['Nb'].keys():
+                plot.append(np.max(np.abs(Nx['Nb'][k].imag)))
 
             Nx['Nc'] = {}
             kX['Nc'] = {}
@@ -285,66 +271,24 @@ class TPA(LinearSolver):
             Nx['Nd'] = Nx['Nb']
             kX['Nd'] = kX['Nb']
 
-            # Storing the largest imaginary component of the response vector
-            # for plotting
-            # Nb Im
-            vec_x = []
-            vec_y = []
-            vec_z = []
-
-            for k in Nx['Nb'].keys():
-                if k[0] in 'x':
-                    vec_x.append(np.linalg.norm(Nx['Nb'][k].imag))
-                if k[0] in 'y':
-                    vec_y.append(np.linalg.norm(Nx['Nb'][k].imag))
-                if k[0] in 'z':
-                    vec_z.append(np.linalg.norm(Nx['Nb'][k].imag))
-
         # Computing the third-order gradient and also the contractions of
         # A[3] and A[2] which formally are not part of the third-order gradient
         # but which are used for the cubic response function
-       
-        # Computes for both the reduced and full gamma tensors   
-        if self.mix is True:
-            (n_xy_dict,NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz, E3_dict, E4_dict, NaX2Nyz_red,
-             NxA2Nyz_red, E3_dict_red) = tpa_drv.main(Focks, self.iso, Nx, w, X,
-                                                      d_a_mo, kX, self.comp, S, da,
-                                                      mo, nocc, norb, scf_tensors,
-                                                      molecule, ao_basis,self.full,self.reduced,self.mix)
-        # Computes for only the reduced gamma tensor
-        if self.reduced is True:
-            (n_xy_dict,NaX2Nyz_red,
-             NxA2Nyz_red, E3_dict_red) = tpa_drv.main(Focks, self.iso, Nx, w, X,
-                                                      d_a_mo, kX, self.comp, S, da,
-                                                      mo, nocc, norb, scf_tensors,
-                                                      molecule, ao_basis,self.full,self.reduced,self.mix)
-        # Computes for only the full gamma tensor 
-        if self.full is True:
-            (n_xy_dict,NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz, E3_dict, E4_dict) = tpa_drv.main(Focks, self.iso, Nx, w, X,
-                                                      d_a_mo, kX, self.comp, S, da,
-                                                      mo, nocc, norb, scf_tensors,
-                                                      molecule, ao_basis,self.full,self.reduced,self.mix)
+
+        (NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz, E3_dict, E4_dict, NaX2Nyz_red,
+         NxA2Nyz_red, E3_dict_red) = tpa_drv.main(Focks, self.iso, Nx, w, X,
+                                                  d_a_mo, kX, self.comp, S, da,
+                                                  mo, nocc, norb, scf_tensors,
+                                                  molecule, ao_basis)
 
         if self.rank == mpi_master():
-
-            if self.mix is True:
-                t4_dict = tpa_drv.get_t4(w, E4_dict, Nx, kX, self.comp, d_a_mo,
-                                         nocc, norb)
-                t3_dict = tpa_drv.get_t3(w, E3_dict, Nx, self.comp)
-                t3_dict_red = tpa_drv.get_t3(w, E3_dict_red, Nx, self.comp)     
-
-            if self.reduced is True:
-                t3_dict_red = tpa_drv.get_t3(w, E3_dict_red, Nx, self.comp)     
-
-            if self.full is True:
-                t4_dict = tpa_drv.get_t4(w, E4_dict, Nx, kX, self.comp, d_a_mo,
-                                         nocc, norb)
-                t3_dict = tpa_drv.get_t3(w, E3_dict, Nx, self.comp)
-
+            t4_dict = tpa_drv.get_t4(w, E4_dict, Nx, kX, self.comp, d_a_mo,
+                                     nocc, norb)
+            t3_dict = tpa_drv.get_t3(w, E3_dict, Nx, self.comp)
+            t3_dict_red = tpa_drv.get_t3(w, E3_dict_red, Nx, self.comp)
         else:
             t4_dict = None
             t3_dict = None
-            t3_dict_red = None
 
         gamma = {}
         gamma_red = {}
@@ -354,42 +298,25 @@ class TPA(LinearSolver):
 
         if self.rank == mpi_master():
             for i in range(len(w)):
-                if self.mix is True or self.full is True:
-                    gamma[(w[i], -w[i],
-                           w[i])] = 1 / 15 * (t4_dict[(w[i], -w[i], w[i])] +
-                                              t3_dict[(w[i], -w[i], w[i])] +
-                                              NaX3NyNz[(w[i], -w[i], w[i])] +
-                                              NaA3NxNy[(w[i], -w[i], w[i])] +
-                                              NaX2Nyz[(w[i], -w[i], w[i])] +
-                                              NxA2Nyz[(w[i], -w[i], w[i])])
-                if self.mix is True or self.reduced is True:
-                    gamma_red[(
-                        w[i], -w[i],
-                        w[i])] = 1 / 15 * (t3_dict_red[(w[i], -w[i], w[i])] +
-                                           NaX2Nyz_red[(w[i], -w[i], w[i])] +
-                                           NxA2Nyz_red[(w[i], -w[i], w[i])])
+                gamma[(w[i], -w[i],
+                       w[i])] = 1 / 15 * (t4_dict[(w[i], -w[i], w[i])] +
+                                          t3_dict[(w[i], -w[i], w[i])] +
+                                          NaX3NyNz[(w[i], -w[i], w[i])] +
+                                          NaA3NxNy[(w[i], -w[i], w[i])] +
+                                          NaX2Nyz[(w[i], -w[i], w[i])] +
+                                          NxA2Nyz[(w[i], -w[i], w[i])])
+                gamma_red[(
+                    w[i], -w[i],
+                    w[i])] = 1 / 15 * (t3_dict_red[(w[i], -w[i], w[i])] +
+                                       NaX2Nyz_red[(w[i], -w[i], w[i])] +
+                                       NxA2Nyz_red[(w[i], -w[i], w[i])])
 
             self.print_header()
-            if self.mix is True or self.full is True:
-                self.print_results(self.iso, w, gamma, self.comp, t4_dict, t3_dict,
-                                   NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz)
-                if self.full is True:
-                    t3_dict_red = {}
-                    NaX2Nyz_red = {}
-                    NxA2Nyz_red = {}
-            if self.mix is True or self.reduced is True:
-                self.print_results_red(self.iso, w, gamma_red, self.comp,
-                                       t3_dict_red, NaX2Nyz_red, NxA2Nyz_red)
-                if self.reduced is True:
-                    t4_dict = {}
-                    t3_dict = {}
-                    NaX3NyNz = {}
-                    NaA3NxNy = {}
-                    NaX2Nyz = {}
-                    NxA2Nyz = {}
+            self.print_results(w, gamma, self.comp, t4_dict, t3_dict,
+                               NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz)
 
-
-            self.make_plots(n_xy_dict,w, gamma, gamma_red, vec_x,vec_y,vec_z,t4_dict,t3_dict,NaX3NyNz,NaA3NxNy,NaX2Nyz,NxA2Nyz,t3_dict_red, NaX2Nyz_red, NxA2Nyz_red)
+            self.print_results_red(w, gamma_red, self.comp,
+                                   t3_dict_red, NaX2Nyz_red, NxA2Nyz_red)
         else:
             gamma = {}
             gamma_red = {}
@@ -399,19 +326,11 @@ class TPA(LinearSolver):
         self.ostream.print_header(w_str.ljust(width))
 
         if self.rank == mpi_master():
-            if self.full is True:
-                return (w,t4_dict, t3_dict, NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz,
-                        gamma)
-            if self.reduced is True:
-                return (w, t3_dict_red, NaX2Nyz_red, NxA2Nyz_red, gamma_red)
+            return (t4_dict, t3_dict, NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz,
+                    gamma, w, t3_dict_red, NaX2Nyz_red, NxA2Nyz_red, gamma_red)
         else:
-            if self.full is True:
-                return (None, None, None, None, None, None, None, None)
-            if self.reduced is True:
-                return (None, None, None, None, None)
-            if self.mix is True:
-                return (None, None, None, None, None, None, None, None, None, None,
-                        None, None)
+            return (None, None, None, None, None, None, None, None, None, None,
+                    None, None)
 
     def print_header(self):
         """
@@ -446,7 +365,7 @@ class TPA(LinearSolver):
 
         self.ostream.flush()
 
-    def print_results(self, iso, w1, gamma, comp, t4_dict, t3_dict, NaX3NyNz,
+    def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, NaX3NyNz,
                       NaA3NxNy, NaX2Nyz, NxA2Nyz):
         """
         Prints the results from the TPA calculation.
@@ -477,49 +396,30 @@ class TPA(LinearSolver):
         self.ostream.print_header(w_str.ljust(width))
         self.ostream.print_blank()
         count = 1
-        for a in range(int(len(comp) * (1 / len(w1)))):
+        for a in range(int(len(comp) * (1 / len(freqs)))):
             w_str = str(count) + '. ' + str(comp[a].split(",")[0])
             self.ostream.print_header(w_str.ljust(width))
             count += 1
 
         self.ostream.print_blank()
 
-        for w in w1:
-            if iso is False:
-                w_str = "ΣNaT3NxNyz =  {:.8f}".format(t3_dict[w, -w, w])
-            else:
-                w_str = "ΣNaT3NxNyz =  {:.8f}".format(t3_dict[w, -w, w] / 15)
+        for w in freqs:
+            w_str = "ΣNaT3NxNyz =  {:.8f}".format(t3_dict[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            if iso is False:
-                w_str = "ΣNaT4NxNyNz =  {:.8f}".format(t4_dict[w, -w, w])
-            else:
-                w_str = "ΣNaT4NxNyNz =  {:.8f}".format(t4_dict[w, -w, w] / 15)
+            w_str = "ΣNaT4NxNyNz =  {:.8f}".format(t4_dict[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            if iso is False:
-                w_str = "ΣNaX2Nyz =  {:.8f}".format(NaX2Nyz[w, -w, w])
-            else:
-                w_str = "ΣNaX2Nyz =  {:.8f}".format(NaX2Nyz[w, -w, w] / 15)
+            w_str = "ΣNaX2Nyz =  {:.8f}".format(NaX2Nyz[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            if iso is False:
-                w_str = "ΣNaX3NyNz =  {:.8f}".format(NaX3NyNz[w, -w, w])
-            else:
-                w_str = "ΣNaX3NyNz =  {:.8f}".format(NaX3NyNz[w, -w, w] / 15)
-
+            w_str = "ΣNaX3NyNz =  {:.8f}".format(NaX3NyNz[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            if iso is False:
-                w_str = "ΣNxA2Nyz =  {:.8f}".format(NxA2Nyz[w, -w, w])
-            else:
-                w_str = "ΣNxA2Nyz =  {:.8f}".format(NxA2Nyz[w, -w, w] / 15)
+            w_str = "ΣNxA2Nyz =  {:.8f}".format(NxA2Nyz[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            if iso is False:
-                w_str = "ΣNaA3NxNy =  {:.8f}".format(NaA3NxNy[w, -w, w])
-            else:
-                w_str = "ΣNaA3NxNy =  {:.8f}".format(NaA3NxNy[w, -w, w] / 15)
+            w_str = "ΣNaA3NxNy =  {:.8f}".format(NaA3NxNy[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
             w_str = 'Σ<<μ;μ,μ,μ>>= {:.8f}, ω=({:.4f},{:.4f},{:.4f}), hω =({:.4f} eV)'.format(
@@ -528,7 +428,7 @@ class TPA(LinearSolver):
             self.ostream.print_header(('-' * len(w_str)).ljust(width))
             self.ostream.print_blank()
 
-    def print_results_red(self, iso, w1, gamma, comp, t3_dict, NaX2Nyz,
+    def print_results_red(self, freqs, gamma, comp, t3_dict, NaX2Nyz,
                           NxA2Nyz):
         """
         Prints the results from the reduced TPA calculation.
@@ -555,34 +455,25 @@ class TPA(LinearSolver):
         self.ostream.print_header(w_str.ljust(width))
         self.ostream.print_blank()
         count = 1
-        for a in range(int(len(comp) * (1 / len(w1)))):
+        for a in range(int(len(comp) * (1 / len(freqs)))):
             w_str = str(count) + '. ' + str(comp[a].split(",")[0])
             self.ostream.print_header(w_str.ljust(width))
             count += 1
 
         self.ostream.print_blank()
 
-        for w in w1:
+        for w in freqs:
 
-            if iso is False:
-                w_str = "ΣNaT3NxNyz =  {:.8f}".format(t3_dict[w, -w, w])
-            else:
-                w_str = "ΣNaT3NxNyz =  {:.8f}".format(t3_dict[w, -w, w] / 15)
+            w_str = "Reduced:ΣNaT3NxNyz =  {:.8f}".format(t3_dict[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            if iso is False:
-                w_str = "ΣNaX2Nyz =  {:.8f}".format(NaX2Nyz[w, -w, w])
-            else:
-                w_str = "ΣNaX2Nyz =  {:.8f}".format(NaX2Nyz[w, -w, w] / 15)
+            w_str = "Reduced:ΣNaX2Nyz =  {:.8f}".format(NaX2Nyz[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            if iso is False:
-                w_str = "ΣNxA2Nyz =  {:.8f}".format(NxA2Nyz[w, -w, w])
-            else:
-                w_str = "ΣNxA2Nyz =  {:.8f}".format(NxA2Nyz[w, -w, w] / 15)
+            w_str = "Reduced:ΣNxA2Nyz =  {:.8f}".format(NxA2Nyz[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = '<<A;B,C,D>>= {:.8f}, w=({:.4f},{:.4f},{:.4f}), hω =({:.4f} eV)'.format(
+            w_str = 'Reduced:<<A;B,C,D>>= {:.8f}, w=({:.4f},{:.4f},{:.4f}), hω =({:.4f} eV)'.format(
                 gamma[w, -w, w], w, -w, w, w * 54.437358841503915 / 2)
             self.ostream.print_header(w_str.ljust(width))
             self.ostream.print_header(('-' * len(w_str)).ljust(width))
@@ -635,217 +526,4 @@ class TPA(LinearSolver):
                 self.comp = comp
                 count += 1
         return self.comp
-
-    def make_plots(self,n_xy_dict, w, gamma, gamma_red, vec_x,vec_y,vec_z,t4_dict,t3_dict,NaX3NyNz,NaA3NxNy,NaX2Nyz,NxA2Nyz,t3_dict_red, NaX2Nyz_red, NxA2Nyz_red):
-        """
-        Makes plots of the two-photon cross section [GM] 
-          1 a.u. = 1.896788 10^{-50} cm^4 s/photon
-          1 GM = 10^{-50} cm^4 s/photon
-        
-        :param gamma:
-              A dictonary containing the isotropic cubic response functions for TPA
-        :param gamma_red:
-              A dictonary containing the reduced isotropic cubic response functions for TPA
-        """
-
-        g_comb = open('py_plot_comb.py', "w")
-        add_stuff = 'import matplotlib \nimport matplotlib.pyplot as plt \n'
-        g_comb.write(add_stuff)
-        
-        N_lamtau_xx = 'N_lamtau_xx = [' 
-        N_lamtau_yy = 'N_lamtau_yy = [' 
-        N_lamtau_zz = 'N_lamtau_zz = [' 
-        N_lamtau_xy = 'N_lamtau_xy = [' 
-        N_lamtau_xz = 'N_lamtau_xz = [' 
-        N_lamtau_yz = 'N_lamtau_yz = [' 
-        N_lam_tot = 'N_lam_tot = []'
-
-        N_sig_xx = 'N_sig_xx = [' 
-        N_sig_yy = 'N_sig_yy = [' 
-        N_sig_zz = 'N_sig_zz = [' 
-        N_sig_xy = 'N_sig_xy = [' 
-        N_sig_xz = 'N_sig_xz = [' 
-        N_sig_yz = 'N_sig_yz = [' 
-        N_sig_tot = 'N_sig_tot = []'
-
-        for k in n_xy_dict.keys():
-            if k[0][0] in 'N_lamtau_xx':
-                N_lamtau_xx += str(np.linalg.norm(n_xy_dict[k].imag)) + ","
-            if k[0][0] in 'N_lamtau_yy':
-                N_lamtau_yy += str(np.linalg.norm(n_xy_dict[k].imag)) + ","
-            if k[0][0] in 'N_lamtau_zz':
-                N_lamtau_zz += str(np.linalg.norm(n_xy_dict[k].imag)) + ","
-            if k[0][0] in 'N_lamtau_xy':
-                N_lamtau_xy += str(np.linalg.norm(n_xy_dict[k].imag)) + ","
-            if k[0][0] in 'N_lamtau_xz':
-                N_lamtau_xz += str(np.linalg.norm(n_xy_dict[k].imag)) + ","
-            if k[0][0] in 'N_lamtau_yz':
-                N_lamtau_yz += str(np.linalg.norm(n_xy_dict[k].imag)) + ","
-
-            if k[0][0] in 'N_sig_xx':
-                N_sig_xx += str(np.linalg.norm(n_xy_dict[k].imag)) + "," 
-            if k[0][0] in 'N_sig_yy':
-                N_sig_yy += str(np.linalg.norm(n_xy_dict[k].imag)) + ","
-            if k[0][0] in 'N_sig_zz':
-                N_sig_zz += str(np.linalg.norm(n_xy_dict[k].imag)) + ","
-            if k[0][0] in 'N_sig_xy':
-                N_sig_xy += str(np.linalg.norm(n_xy_dict[k].imag)) + ","
-            if k[0][0] in 'N_sig_xz': 
-                N_sig_xz += str(np.linalg.norm(n_xy_dict[k].imag)) + ","
-            if k[0][0] in 'N_sig_yz':
-                N_sig_yz += str(np.linalg.norm(n_xy_dict[k].imag)) + ","
-
-        N_lamtau_xx +=  "]\n" 
-        N_lamtau_yy +=  "]\n" 
-        N_lamtau_zz +=  "]\n" 
-        N_lamtau_xy +=  "]\n" 
-        N_lamtau_xz +=  "]\n" 
-        N_lamtau_yz +=  "]\n" 
-
-        N_sig_xx +=  "]\n" 
-        N_sig_yy +=  "]\n" 
-        N_sig_zz +=  "]\n" 
-        N_sig_xy +=  "]\n" 
-        N_sig_xz +=  "]\n" 
-        N_sig_yz +=  "]\n" 
-
-        g_comb.write(N_lamtau_xx)
-        g_comb.write(N_lamtau_yy)
-        g_comb.write(N_lamtau_zz)
-        g_comb.write(N_lamtau_xy)
-        g_comb.write(N_lamtau_xz)
-        g_comb.write(N_lamtau_yz)
-
-        
-        g_comb.write(N_sig_xx)
-        g_comb.write(N_sig_yy)
-        g_comb.write(N_sig_zz)
-        g_comb.write(N_sig_xy)
-        g_comb.write(N_sig_xz)
-        g_comb.write(N_sig_yz)
-
-        N_x = 'N_x = ['
-        N_y = 'N_y = ['
-        N_z = 'N_z = ['
-        N_t = 'N_t = ['
-
-        x3 = 'x3 = ['
-        a3 = 'a3 = ['
-        x2 = 'x2 = ['
-        x2_red = 'x2_red = ['
-        a2 = 'a2 = ['
-        a2_red = 'a2_red = ['
-        t4 = 't4 = ['
-        t3 = 't3 = ['
-        t3_red = 't3_red = ['
-
-        N1 = 4
-        af = 1 / 137
-        pi = 3.14159265359
-        c = 1.896788
-        C = c*N1 * pi**(2) * af**(2)
-        omega_for_plot = 'ω = ['
-
-        for i in range(len(w)):
-            omega_for_plot += str(w[i] * 54.437358841503915 / 2) + ","
-            N_x += str(vec_x[i]) + ","
-            N_y += str(vec_y[i]) + ","
-            N_z += str(vec_z[i]) + ","
-            N_t += str(vec_x[i]+vec_y[i]+vec_z[i]) + ","
-        N_x += "]\n"
-        N_y += "]\n"
-        N_z += "]\n"
-        N_t += "]\n"
-        g_comb.write(N_x)
-        g_comb.write(N_y)
-        g_comb.write(N_z)
-        g_comb.write(N_t)
-        omega_for_plot += "] \n"
-        g_comb.write(omega_for_plot)
-
-        if self.mix is True or self.full is True:
-            data_for_plot = 'σ = ['
-            # Contstats for the evauation of the cross section from the iso-tropic cubic response function
-            for i in range(len(w)):
-                data_for_plot += str(
-                    C * w[i]**2 * gamma[(w[i], -w[i], w[i])].imag) + ","
-                t4 += str(
-                    C * w[i]**2 * t4_dict[(w[i], -w[i], w[i])].imag) + ","
-                t3 += str(
-                    C * w[i]**2 * t3_dict[(w[i], -w[i], w[i])].imag) + ","
-                x3 += str(
-                    C * w[i]**2 * NaX3NyNz[(w[i], -w[i], w[i])].imag) + ","
-                a3 += str(
-                    C * w[i]**2 * NaA3NxNy[(w[i], -w[i], w[i])].imag) + ","
-                x2 += str(
-                    C * w[i]**2 * NaX2Nyz[(w[i], -w[i], w[i])].imag) + ","
-                a2 += str(
-                    C * w[i]**2 * NxA2Nyz[(w[i], -w[i], w[i])].imag) + ","
-            data_for_plot += "]\n"
-            t4 += "]\n"
-            t3 += "]\n"
-            x3 += "]\n"
-            a3 += "]\n"
-            x2 += "]\n"
-            a2 += "]\n"
-            g_comb.write(data_for_plot)
-            g_comb.write(t4)
-            g_comb.write(t3)
-            g_comb.write(x3)
-            g_comb.write(a3)
-            g_comb.write(x2)
-            g_comb.write(a2)
-
-        if self.mix is True or self.reduced is True:
-            data_for_plot = 'σ_red = ['
-            for i in range(len(w)):
-                data_for_plot += str(
-                    C * w[i]**2 * gamma_red[(w[i], -w[i], w[i])].imag) + ","
-                t3_red += str(
-                    C * w[i]**2 * t3_dict_red[(w[i], -w[i], w[i])].imag) + ","
-                x2_red += str(
-                    C * w[i]**2 * NaX2Nyz_red[(w[i], -w[i], w[i])].imag) + ","
-                a2_red += str(
-                    C * w[i]**2 * NxA2Nyz_red[(w[i], -w[i], w[i])].imag) + ","
-            data_for_plot += "]\n"
-            t3_red += "]\n"
-            x2_red += "]\n"
-            a2_red += "]\n"
-
-            g_comb.write(data_for_plot)
-            g_comb.write(t3_red)
-            g_comb.write(x2_red)
-            g_comb.write(a2_red)
-
-
-        if self.mix is True:
-            data_for_plot = 'σ_comp = ['
-            for i in range(len(w)):
-                data_for_plot += str(
-                    abs(C * w[i]**2 * gamma_red[(w[i], -w[i], w[i])].imag-C * w[i]**2 * gamma[(w[i], -w[i], w[i])].imag)) + ","
-            data_for_plot += "]\n"
-            g_comb.write(data_for_plot)
-
-
-        g_comb.write('\nfig,ax1=plt.subplots()')
-        g_comb.write('\nax2 = ax1.twinx()')
-        g_comb.write('\nplt.xlabel(\'ω eV\')')
-        g_comb.write('\nplt.ylabel(\'σ TPA cross [GM]\')')
-        
-        ## Plot shows if there are any imaginary elements present in the first-order response vectors
-        g_comb.write('\nax2.plot(ω,N_x,\'--*c\',label=\'Nb Im x\')')
-        g_comb.write('\nax2.plot(ω,N_y,\'--hc\',label=\'Nb Im y\')')
-        g_comb.write('\nax2.plot(ω,N_z,\'--+c\',label=\'Nb Im z\')')
-        g_comb.write('\nax2.plot(ω,N_t,\'--+c\',label=\'Nb Im x+y+z\')')
-
-        g_comb.write('\nplt.legend()')
-        if self.mix is True or self.full is True:
-            g_comb.write('\nax1.plot(ω,σ,\'-Dk\',label=\'Full\')')
-        if self.mix is True or self.reduced is True:
-            g_comb.write('\nax1.plot(ω,σ_red,\'-or\',label=\'Reduced\')\nplt.legend()')
-        if self.mix is True:
-            g_comb.write('\nax1.plot(ω,σ_comp,\'-.y\',label=\'error\')\nplt.legend()')
-        g_comb.write('\nplt.show()')
-        #g_comb.write('\nplt.savefig(\"filename.eps\", facecolor=\'w\', edgecolor=\'w\',orientation=\'portrait\', papertype=None, format=\'eps\',transparent=True,frameon=None, metadata=None)')
-                                                                          
 

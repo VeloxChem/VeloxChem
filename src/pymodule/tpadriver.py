@@ -2109,7 +2109,7 @@ class TPAdriver:
         F123_z = {}
 
         if self.rank == mpi_master():
-            fock_num = 3 * len(wi)
+            fock_num = 6 * len(wi)
             self.print_header(fock_num)
         time_start_fock = time.time()
 
@@ -2441,7 +2441,7 @@ class TPAdriver:
         return xi
 
     def main(self, Focks, iso, n_x, w, X, d_a_mo, kX, track, S, D0, mo, nocc,
-             norb, scf_tensors, molecule, ao_basis,full,reduced,mix):
+             norb, scf_tensors, molecule, ao_basis):
         """
         This code calls all the relevent functions to third-order isotropic gradient
 
@@ -2467,236 +2467,101 @@ class TPAdriver:
             The number of total orbitals
 
         """
-        # Computes for both full and mixed
-        if mix is True:
-            if self.rank == mpi_master():
-                # computing all compounded first-order densities
-                density_list = self.get_densities(w, kX, S, D0, mo, nocc, norb)
-                density_list_red = self.get_densities_red(w, kX, S, D0, mo, nocc,
-                                                          norb)
-            else:
-                density_list = None
-                density_list_red = None
 
-            #  computing the compounded first-order Fock matrices
-            fock_dict = self.get_fock_dict(w, kX, density_list, (D0, D0), mo,
-                                           molecule, ao_basis)
+        # computing all compounded first-order densities
+        if self.rank == mpi_master():
+            density_list = self.get_densities(w, kX, S, D0, mo, nocc, norb)
+            density_list_red = self.get_densities_red(w, kX, S, D0, mo, nocc,
+                                                      norb)
+        else:
+            density_list = None
+            density_list_red = None
 
-            fock_dict_red = self.get_fock_dict_red(w, kX, density_list_red,
-                                                   (D0, D0), mo, molecule, ao_basis)
+        #  computing the compounded first-order Fock matrices
+        fock_dict = self.get_fock_dict(w, kX, density_list, (D0, D0), mo,
+                                       molecule, ao_basis)
 
-            if self.rank == mpi_master():
-                fock_dict.update(Focks)
-                fock_dict_red.update(Focks)
-                e4_dict = self.get_e4(w, kX, fock_dict, nocc, norb)
+        fock_dict_red = self.get_fock_dict_red(w, kX, density_list_red,
+                                               (D0, D0), mo, molecule, ao_basis)
 
-            else:
-                e4_dict = {}
-                fock_dict = {}
-                fock_dict_red = {}
+        if self.rank == mpi_master():
+            fock_dict.update(Focks)
+            fock_dict_red.update(Focks)
+            e4_dict = self.get_e4(w, kX, fock_dict, nocc, norb)
 
-            # computing all the compounded second-order response vectors and
-            # extracting some of the second-order Fock matrices from the subspace
-            n_xy_dict, kxy_dict, Focks_xy, XΥ_dict = self.get_n_xy(
-                w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule, ao_basis,
-                scf_tensors)
-            n_xy_dict_red, kxy_dict_red, Focks_xy_red, XΥ_dict_red = self.get_n_xy_red(
-                w, d_a_mo, X, fock_dict_red, kX, nocc, norb, molecule, ao_basis,
-                scf_tensors)
+        else:
+            e4_dict = {}
+            fock_dict = {}
+            fock_dict_red = {}
 
-            # computing all second-order compounded densities based on the
-            # second-order response vectors
-            if self.rank == mpi_master():
-                density_list_two = self.get_densities_II(w, kX, kxy_dict, S, D0, mo)
-                density_list_two_red = self.get_densities_II_red(
-                    w, kX, kxy_dict_red, S, D0, mo)
-            else:
-                n_xy_dict = {}
-                kxy_dict = {}
-                Focks_xy = {}
+        # computing all the compounded second-order response vectors and
+        # extracting some of the second-order Fock matrices from the subspace
+        n_xy_dict, kxy_dict, Focks_xy, XΥ_dict = self.get_n_xy(
+            w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule, ao_basis,
+            scf_tensors)
+        n_xy_dict_red, kxy_dict_red, Focks_xy_red, XΥ_dict_red = self.get_n_xy_red(
+            w, d_a_mo, X, fock_dict_red, kX, nocc, norb, molecule, ao_basis,
+            scf_tensors)
 
-                n_xy_dict_red = {}
-                kxy_dict_red = {}
-                Focks_xy_red = {}
-                density_list_two = None
-                density_list_two_red = None
+        # computing all second-order compounded densities based on the
+        # second-order response vectors
+        if self.rank == mpi_master():
+            density_list_two = self.get_densities_II(w, kX, kxy_dict, S, D0, mo)
+            density_list_two_red = self.get_densities_II_red(
+                w, kX, kxy_dict_red, S, D0, mo)
+        else:
+            n_xy_dict = {}
+            kxy_dict = {}
+            Focks_xy = {}
 
-            # computing the remaning second-order Fock matrices from the
-            # second-order densities
-            fock_dict_two = self.get_fock_dict_II(w, kX, density_list_two, D0, mo,
-                                                  molecule, ao_basis)
-            fock_dict_two_red = self.get_fock_dict_II_red(w, kX,
-                                                          density_list_two_red, D0,
-                                                          mo, molecule, ao_basis)
+            n_xy_dict_red = {}
+            kxy_dict_red = {}
+            Focks_xy_red = {}
+            density_list_two = None
+            density_list_two_red = None
 
-            if self.rank == mpi_master():
-                # Adding the Fock matrices extracted from the second-order response
-                # vector subspace to the fock_dict's.
-                fock_dict_two.update(Focks_xy)
-                fock_dict_two_red.update(Focks_xy_red)
+        # computing the remaning second-order Fock matrices from the
+        # second-order densities
+        fock_dict_two = self.get_fock_dict_II(w, kX, density_list_two, D0, mo,
+                                              molecule, ao_basis)
+        fock_dict_two_red = self.get_fock_dict_II_red(w, kX,
+                                                      density_list_two_red, D0,
+                                                      mo, molecule, ao_basis)
 
-                # computing the compounded E[3] contractions for the isotropic
-                # cubic response function
-                e3_dict = self.get_e3(w, kX, kxy_dict, fock_dict, fock_dict_two,
-                                      nocc, norb)
-                e3_dict_red = self.get_e3_red(w, kX, kxy_dict_red, fock_dict_red,
-                                              fock_dict_two_red, nocc, norb)
+        if self.rank == mpi_master():
+            # Adding the Fock matrices extracted from the second-order response
+            # vector subspace to the fock_dict's.
+            fock_dict_two.update(Focks_xy)
+            fock_dict_two_red.update(Focks_xy_red)
 
-                # computing the X[3],A[3],X[2],A[2] contractions for the isotropic
-                # cubic response function
-                na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz = self.other(
-                    iso, w, track, n_x, n_xy_dict, X, kX, kxy_dict, d_a_mo, nocc,
-                    norb)
-                na_x2_nyz_red, nx_a2_nyz_red = self.other_red(
-                    iso, w, track, n_x, n_xy_dict_red, X, kX, kxy_dict_red, d_a_mo,
-                    nocc, norb)
+            # computing the compounded E[3] contractions for the isotropic
+            # cubic response function
+            e3_dict = self.get_e3(w, kX, kxy_dict, fock_dict, fock_dict_two,
+                                  nocc, norb)
+            e3_dict_red = self.get_e3_red(w, kX, kxy_dict_red, fock_dict_red,
+                                          fock_dict_two_red, nocc, norb)
 
-            else:
-                e3_dict = {}
-                na_x3_ny_nz = None
-                na_a3_nx_ny = None
-                na_x2_nyz = None
-                nx_a2_nyz = None
-                e3_dict_red = {}
-                na_x2_nyz_red = None
-                nx_a2_nyz_red = None
+            # computing the X[3],A[3],X[2],A[2] contractions for the isotropic
+            # cubic response function
+            na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz = self.other(
+                iso, w, track, n_x, n_xy_dict, X, kX, kxy_dict, d_a_mo, nocc,
+                norb)
+            na_x2_nyz_red, nx_a2_nyz_red = self.other_red(
+                iso, w, track, n_x, n_xy_dict_red, X, kX, kxy_dict_red, d_a_mo,
+                nocc, norb)
 
-            return (n_xy_dict,na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz, e3_dict,
-                    e4_dict, na_x2_nyz_red, nx_a2_nyz_red, e3_dict_red)
+        else:
+            e3_dict = {}
+            na_x3_ny_nz = None
+            na_a3_nx_ny = None
+            na_x2_nyz = None
+            nx_a2_nyz = None
+            e3_dict_red = {}
+            na_x2_nyz_red = None
+            nx_a2_nyz_red = None
 
-        if full is True:
-            if self.rank == mpi_master():
-                # computing all compounded first-order densities
-                density_list = self.get_densities(w, kX, S, D0, mo, nocc, norb)
-            else:
-                density_list = None
-
-            #  computing the compounded first-order Fock matrices
-            fock_dict = self.get_fock_dict(w, kX, density_list, (D0, D0), mo,
-                                           molecule, ao_basis)
-
-
-            if self.rank == mpi_master():
-                fock_dict.update(Focks)
-                e4_dict = self.get_e4(w, kX, fock_dict, nocc, norb)
-
-            else:
-                e4_dict = {}
-                fock_dict = {}
-
-            # computing all the compounded second-order response vectors and
-            # extracting some of the second-order Fock matrices from the subspace
-            n_xy_dict, kxy_dict, Focks_xy, XΥ_dict = self.get_n_xy(
-                w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule, ao_basis,
-                scf_tensors)
-
-            # computing all second-order compounded densities based on the
-            # second-order response vectors
-            if self.rank == mpi_master():
-                density_list_two = self.get_densities_II(w, kX, kxy_dict, S, D0, mo)
-            else:
-                n_xy_dict = {}
-                kxy_dict = {}
-                Focks_xy = {}
-
-                density_list_two = None
-                density_list_two_red = None
-
-            # computing the remaning second-order Fock matrices from the
-            # second-order densities
-            fock_dict_two = self.get_fock_dict_II(w, kX, density_list_two, D0, mo,
-                                                  molecule, ao_basis)
-
-            if self.rank == mpi_master():
-                # Adding the Fock matrices extracted from the second-order response
-                # vector subspace to the fock_dict's.
-                fock_dict_two.update(Focks_xy)
-                # computing the compounded E[3] contractions for the isotropic
-                # cubic response function
-                e3_dict = self.get_e3(w, kX, kxy_dict, fock_dict, fock_dict_two,
-                                      nocc, norb)
-
-                # computing the X[3],A[3],X[2],A[2] contractions for the isotropic
-                # cubic response function
-                na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz = self.other(
-                    iso, w, track, n_x, n_xy_dict, X, kX, kxy_dict, d_a_mo, nocc,
-                    norb)
-
-            else:
-                e3_dict = {}
-                na_x3_ny_nz = None
-                na_a3_nx_ny = None
-                na_x2_nyz = None
-                nx_a2_nyz = None
-
-            return (n_xy_dict,na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz, e3_dict,
-                    e4_dict)
-
-        if reduced is True:
-            if self.rank == mpi_master():
-                # computing all compounded first-order densities
-                density_list_red = self.get_densities_red(w, kX, S, D0, mo, nocc,
-                                                          norb)
-            else:
-                density_list_red = None
-
-            #  computing the compounded first-order Fock matrices
-
-            fock_dict_red = self.get_fock_dict_red(w, kX, density_list_red,
-                                                   (D0, D0), mo, molecule, ao_basis)
-
-            if self.rank == mpi_master():
-                fock_dict_red.update(Focks)
-
-            else:
-                fock_dict_red = {}
-
-            # computing all the compounded second-order response vectors and
-            # extracting some of the second-order Fock matrices from the subspace
-            n_xy_dict_red, kxy_dict_red, Focks_xy_red, XΥ_dict_red = self.get_n_xy_red(
-                w, d_a_mo, X, fock_dict_red, kX, nocc, norb, molecule, ao_basis,
-                scf_tensors)
-
-            # computing all second-order compounded densities based on the
-            # second-order response vectors
-            if self.rank == mpi_master():
-                density_list_two_red = self.get_densities_II_red(
-                    w, kX, kxy_dict_red, S, D0, mo)
-            else:
-
-                n_xy_dict_red = {}
-                kxy_dict_red = {}
-                Focks_xy_red = {}
-                density_list_two_red = None
-
-            # computing the remaning second-order Fock matrices from the
-            # second-order densities
-            fock_dict_two_red = self.get_fock_dict_II_red(w, kX,
-                                                          density_list_two_red, D0,
-                                                          mo, molecule, ao_basis)
-
-            if self.rank == mpi_master():
-                # Adding the Fock matrices extracted from the second-order response
-                # vector subspace to the fock_dict's.
-                fock_dict_two_red.update(Focks_xy_red)
-
-                # computing the compounded E[3] contractions for the isotropic
-                # cubic response function
-                e3_dict_red = self.get_e3_red(w, kX, kxy_dict_red, fock_dict_red,
-                                              fock_dict_two_red, nocc, norb)
-
-                # computing the X[3],A[3],X[2],A[2] contractions for the isotropic
-                # cubic response function
-                na_x2_nyz_red, nx_a2_nyz_red = self.other_red(
-                    iso, w, track, n_x, n_xy_dict_red, X, kX, kxy_dict_red, d_a_mo,
-                    nocc, norb)
-
-            else:
-                e3_dict_red = {}
-                na_x2_nyz_red = None
-                nx_a2_nyz_red = None
-
-            return (n_xy_dict_red,na_x2_nyz_red, nx_a2_nyz_red, e3_dict_red)
+        return (na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz, e3_dict,
+                e4_dict, na_x2_nyz_red, nx_a2_nyz_red, e3_dict_red)
 
     def get_t3(self, freqs, e3_dict, n_x, track):
         """
