@@ -1,5 +1,4 @@
 from .rspproperty import ResponseProperty
-from .inputparser import parse_frequencies
 
 
 class TPA(ResponseProperty):
@@ -33,7 +32,6 @@ class TPA(ResponseProperty):
         rsp_dict['response'] = 'cubic'
         rsp_dict['residue'] = 'none'
         rsp_dict['complex'] = 'yes'
-
 
         if 'frequencies' not in rsp_dict:
             rsp_dict['frequencies'] = '0'

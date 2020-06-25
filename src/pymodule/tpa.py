@@ -30,6 +30,11 @@ class TPA(LinearSolver):
         self.iso = True
         self.reduced = False
 
+        # ERI settings
+        self.eri_thresh = 1.0e-15
+        self.qq_type = 'QQ_DEN'
+        self.batch_size = None
+
         # cpp settings
         self.frequencies = 0
         self.comp = "zzzz,0,0,0"
@@ -37,8 +42,6 @@ class TPA(LinearSolver):
         self.lindep_thresh = 1.0e-10
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
-        self.eri_thresh = 1.0e-15
-        self.qq_type = 'QQ_DEN'
 
         # mpi information
         self.comm = comm
@@ -95,6 +98,8 @@ class TPA(LinearSolver):
             self.eri_thresh = float(rsp_dict['eri_thresh'])
         if 'qq_type' in rsp_dict:
             self.qq_type = rsp_dict['qq_type']
+        if 'batch_size' in rsp_dict:
+            self.batch_size = int(rsp_dict['batch_size'])
 
         if 'max_iter' in rsp_dict:
             self.max_iter = int(rsp_dict['max_iter'])
@@ -157,6 +162,8 @@ class TPA(LinearSolver):
             'eri_thresh': self.eri_thresh,
             'qq_type': self.qq_type,
         })
+        if self.batch_size is not None:
+            tpa_drv.update_settings({'batch_size': self.batch_size})
 
         if self.rank == mpi_master():
             S = scf_tensors['S']
@@ -215,6 +222,8 @@ class TPA(LinearSolver):
             'eri_thresh': self.eri_thresh,
             'qq_type': self.qq_type,
         })
+        if self.batch_size is not None:
+            Nb_drv.update_settings({'batch_size': self.batch_size})
 
         # Computing the first-order response vectors 3 per frequency
         Nb_Drv = Nb_drv.compute(molecule, ao_basis, scf_tensors, v1)
@@ -277,9 +286,9 @@ class TPA(LinearSolver):
 
         (NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz, E3_dict, E4_dict, NaX2Nyz_red,
          NxA2Nyz_red, E3_dict_red) = tpa_drv.main(Focks, self.iso, Nx, w, X,
-                                                  d_a_mo, kX, self.comp, S, da,
-                                                  mo, nocc, norb, scf_tensors,
-                                                  molecule, ao_basis)
+                                                  d_a_mo, kX, self.comp,
+                                                  scf_tensors, molecule,
+                                                  ao_basis)
 
         if self.rank == mpi_master():
             t4_dict = tpa_drv.get_t4(w, E4_dict, Nx, kX, self.comp, d_a_mo,
@@ -298,25 +307,22 @@ class TPA(LinearSolver):
 
         if self.rank == mpi_master():
             for i in range(len(w)):
-                gamma[(w[i], -w[i],
-                       w[i])] = 1 / 15 * (t4_dict[(w[i], -w[i], w[i])] +
-                                          t3_dict[(w[i], -w[i], w[i])] +
-                                          NaX3NyNz[(w[i], -w[i], w[i])] +
-                                          NaA3NxNy[(w[i], -w[i], w[i])] +
-                                          NaX2Nyz[(w[i], -w[i], w[i])] +
-                                          NxA2Nyz[(w[i], -w[i], w[i])])
-                gamma_red[(
-                    w[i], -w[i],
-                    w[i])] = 1 / 15 * (t3_dict_red[(w[i], -w[i], w[i])] +
-                                       NaX2Nyz_red[(w[i], -w[i], w[i])] +
-                                       NxA2Nyz_red[(w[i], -w[i], w[i])])
+                gamma[(w[i], -w[i], w[i])] = 1 / 15 * (
+                    t4_dict[(w[i], -w[i], w[i])] + t3_dict[
+                        (w[i], -w[i], w[i])] + NaX3NyNz[(w[i], -w[i], w[i])] +
+                    NaA3NxNy[(w[i], -w[i], w[i])] +
+                    NaX2Nyz[(w[i], -w[i], w[i])] + NxA2Nyz[(w[i], -w[i], w[i])])
+                gamma_red[(w[i], -w[i],
+                           w[i])] = 1 / 15 * (t3_dict_red[(w[i], -w[i], w[i])] +
+                                              NaX2Nyz_red[(w[i], -w[i], w[i])] +
+                                              NxA2Nyz_red[(w[i], -w[i], w[i])])
 
             self.print_header()
-            self.print_results(w, gamma, self.comp, t4_dict, t3_dict,
-                               NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz)
+            self.print_results(w, gamma, self.comp, t4_dict, t3_dict, NaX3NyNz,
+                               NaA3NxNy, NaX2Nyz, NxA2Nyz)
 
-            self.print_results_red(w, gamma_red, self.comp,
-                                   t3_dict_red, NaX2Nyz_red, NxA2Nyz_red)
+            self.print_results_red(w, gamma_red, self.comp, t3_dict_red,
+                                   NaX2Nyz_red, NxA2Nyz_red)
         else:
             gamma = {}
             gamma_red = {}
@@ -428,8 +434,7 @@ class TPA(LinearSolver):
             self.ostream.print_header(('-' * len(w_str)).ljust(width))
             self.ostream.print_blank()
 
-    def print_results_red(self, freqs, gamma, comp, t3_dict, NaX2Nyz,
-                          NxA2Nyz):
+    def print_results_red(self, freqs, gamma, comp, t3_dict, NaX2Nyz, NxA2Nyz):
         """
         Prints the results from the reduced TPA calculation.
 
@@ -464,7 +469,8 @@ class TPA(LinearSolver):
 
         for w in freqs:
 
-            w_str = "Reduced:ΣNaT3NxNyz =  {:.8f}".format(t3_dict[w, -w, w] / 15)
+            w_str = "Reduced:ΣNaT3NxNyz =  {:.8f}".format(t3_dict[w, -w, w] /
+                                                          15)
             self.ostream.print_header(w_str.ljust(width))
 
             w_str = "Reduced:ΣNaX2Nyz =  {:.8f}".format(NaX2Nyz[w, -w, w] / 15)
@@ -526,4 +532,3 @@ class TPA(LinearSolver):
                 self.comp = comp
                 count += 1
         return self.comp
-

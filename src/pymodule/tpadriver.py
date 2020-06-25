@@ -38,6 +38,8 @@ class TPAdriver:
 
         self.ostream = ostream
 
+        self.batch_size = None
+
     def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings for TPA
@@ -63,6 +65,8 @@ class TPAdriver:
             self.eri_thresh = float(rsp_dict['eri_thresh'])
         if 'qq_type' in rsp_dict:
             self.qq_type = rsp_dict['qq_type']
+        if 'batch_size' in rsp_dict:
+            self.batch_size = int(rsp_dict['batch_size'])
 
     def get_e4(self, wi, kX, fo, nocc, norb):
         """
@@ -2440,8 +2444,8 @@ class TPAdriver:
         xi = self.commut(kA, self.commut(kB, F0) + 3 * Fb)
         return xi
 
-    def main(self, Focks, iso, n_x, w, X, d_a_mo, kX, track, S, D0, mo, nocc,
-             norb, scf_tensors, molecule, ao_basis):
+    def main(self, Focks, iso, n_x, w, X, d_a_mo, kX, track, scf_tensors,
+             molecule, ao_basis):
         """
         This code calls all the relevent functions to third-order isotropic gradient
 
@@ -2456,17 +2460,22 @@ class TPAdriver:
         :param kX:
             A dictonary containing all the response matricies
         :param track:
-            A list that contains all the information about which γ components and at what freqs they are to be computed
-        :param S:
-            The overlap matrix
-        :param mo:
-            The MO coefficient matrix
-        :param nocc:
-            The number of occupied orbitals
-        :param norb:
-            The number of total orbitals
-
+            A list that contains all the information about which γ components
+            and at what freqs they are to be computed
         """
+
+        if self.rank == mpi_master():
+            S = scf_tensors['S']
+            D0 = scf_tensors['D'][0]
+            mo = scf_tensors['C']
+            nocc = molecule.number_of_alpha_electrons()
+            norb = mo.shape[1]
+        else:
+            S = None
+            D0 = None
+            mo = None
+            nocc = None
+            norb = None
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
@@ -2780,6 +2789,8 @@ class TPAdriver:
             'eri_thresh': self.eri_thresh,
             'qq_type': self.qq_type,
         })
+        if self.batch_size is not None:
+            N_total_drv.update_settings({'batch_size': self.batch_size})
 
         # commutpute second-order response vectors
         N_total_Drv = N_total_drv.compute(molecule, ao_basis, scf_tensors,
@@ -2848,6 +2859,8 @@ class TPAdriver:
             'eri_thresh': self.eri_thresh,
             'qq_type': self.qq_type,
         })
+        if self.batch_size is not None:
+            N_total_drv_2.update_settings({'batch_size': self.batch_size})
 
         N_total_Drv = N_total_drv_2.compute(molecule, ao_basis, scf_tensors,
                                             xy_dict)
@@ -2975,7 +2988,9 @@ class TPAdriver:
             max_batch_size = int(avail_mem / mem_per_mat / (0.625 * nthreads))
             max_batch_size = max(1, max_batch_size)
 
-            batch_size = min(100, n_total, max_batch_size)
+            batch_size = self.batch_size
+            if batch_size is None:
+                batch_size = min(100, n_total, max_batch_size)
 
             # get number of batches
             num_batches = n_total // batch_size
