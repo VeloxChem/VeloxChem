@@ -159,13 +159,18 @@ class ResponseDriver:
 
         # TPA
 
-        if self.rsp_dict['response'] == 'cubic':
+        if (self.rsp_dict['response'] == 'cubic' and
+                self.rsp_dict['complex'] == 'yes'):
 
-            tpa = TPA(self.comm, self.ostream)
+            tpa_solver = TPA(self.comm, self.ostream)
 
-            tpa.update_settings(self.rsp_dict, self.method_dict)
+            tpa_solver.update_settings(self.rsp_dict, self.method_dict)
 
-            return tpa.compute(molecule, ao_basis, scf_tensors)
+            tpa_result = tpa_solver.compute(molecule, ao_basis, scf_tensors)
+
+            self.is_converged = tpa_solver.is_converged
+
+            return tpa_result
 
     def prop_str(self):
         """

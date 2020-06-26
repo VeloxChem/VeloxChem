@@ -28,7 +28,7 @@ class TPA(LinearSolver):
     def __init__(self, comm, ostream):
         np.set_printoptions(threshold=sys.maxsize)
         self.iso = True
-        self.reduced = False
+        self.reduced_tpa = False
 
         # ERI settings
         self.eri_thresh = 1.0e-15
@@ -81,12 +81,9 @@ class TPA(LinearSolver):
                 self.frequencies = rsp_dict['frequencies']
         if 'damping' in rsp_dict:
             self.damping = float(rsp_dict['damping'])
-        if 'reduced' in rsp_dict:
-            self.reduced = rsp_dict['reduced']
-            if self.reduced in 'True':
-                self.reduced = True
-            else:
-                self.reduced = False
+        if 'reduced_tpa' in rsp_dict:
+            key = rsp_dict['reduced_tpa'].lower()
+            self.reduced_tpa = True if key in ['yes', 'y'] else False
         if 'component' in rsp_dict:
             self.comp = rsp_dict['component']
             if self.comp in 'isotropic':
@@ -269,7 +266,7 @@ class TPA(LinearSolver):
                 Focks['Fd'][(op, freq)] = np.conjugate(Focks['Fb'][(op,
                                                                     freq)]).T
 
-            # For the cubic-response with all operators being the dipole μ Nb=Na=Nd
+            # For cubic-response with all operators being the dipole μ Nb=Na=Nd
             # Likewise, Fb=Fd
 
             Focks['Fb'].update(Focks['Fd'])
@@ -284,59 +281,81 @@ class TPA(LinearSolver):
         # A[3] and A[2] which formally are not part of the third-order gradient
         # but which are used for the cubic response function
 
-        (NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz, E3_dict, E4_dict, NaX2Nyz_red,
-         NxA2Nyz_red, E3_dict_red) = tpa_drv.main(Focks, self.iso, Nx, w, X,
-                                                  d_a_mo, kX, self.comp,
-                                                  scf_tensors, molecule,
-                                                  ao_basis)
+        tpa_dict = tpa_drv.main(Focks, self.iso, Nx, w, X, d_a_mo, kX,
+                                self.comp, self.reduced_tpa, scf_tensors,
+                                molecule, ao_basis)
 
         if self.rank == mpi_master():
-            t4_dict = tpa_drv.get_t4(w, E4_dict, Nx, kX, self.comp, d_a_mo,
-                                     nocc, norb)
-            t3_dict = tpa_drv.get_t3(w, E3_dict, Nx, self.comp)
-            t3_dict_red = tpa_drv.get_t3(w, E3_dict_red, Nx, self.comp)
-        else:
-            t4_dict = None
-            t3_dict = None
+            NaX2Nyz_red = tpa_dict['na_x2_nyz_red']
+            NxA2Nyz_red = tpa_dict['nx_a2_nyz_red']
+            E3_dict_red = tpa_dict['e3_dict_red']
 
-        gamma = {}
-        gamma_red = {}
+            t3_dict_red = tpa_drv.get_t3(w, E3_dict_red, Nx, self.comp)
+
+            if not self.reduced_tpa:
+                NaX3NyNz = tpa_dict['na_x3_ny_nz']
+                NaA3NxNy = tpa_dict['na_a3_nx_ny']
+                NaX2Nyz = tpa_dict['na_x2_nyz']
+                NxA2Nyz = tpa_dict['nx_a2_nyz']
+                E3_dict = tpa_dict['e3_dict']
+                E4_dict = tpa_dict['e4_dict']
+
+                t4_dict = tpa_drv.get_t4(w, E4_dict, Nx, kX, self.comp, d_a_mo,
+                                         nocc, norb)
+                t3_dict = tpa_drv.get_t3(w, E3_dict, Nx, self.comp)
 
         # Combining all the terms to evaluate the iso-tropic cubic response
         # function. For TPA Full and reduced, see article
 
         if self.rank == mpi_master():
+            gamma_red = {}
+            gamma = {}
+
             for i in range(len(w)):
-                gamma[(w[i], -w[i], w[i])] = 1 / 15 * (
-                    t4_dict[(w[i], -w[i], w[i])] + t3_dict[
-                        (w[i], -w[i], w[i])] + NaX3NyNz[(w[i], -w[i], w[i])] +
-                    NaA3NxNy[(w[i], -w[i], w[i])] +
-                    NaX2Nyz[(w[i], -w[i], w[i])] + NxA2Nyz[(w[i], -w[i], w[i])])
-                gamma_red[(w[i], -w[i],
-                           w[i])] = 1 / 15 * (t3_dict_red[(w[i], -w[i], w[i])] +
-                                              NaX2Nyz_red[(w[i], -w[i], w[i])] +
-                                              NxA2Nyz_red[(w[i], -w[i], w[i])])
+                gamma_red[(w[i], -w[i], w[i])] = 1. / 15 * (t3_dict_red[
+                    (w[i], -w[i], w[i])] + NaX2Nyz_red[
+                        (w[i], -w[i], w[i])] + NxA2Nyz_red[(w[i], -w[i], w[i])])
+                if not self.reduced_tpa:
+                    gamma[(w[i], -w[i],
+                           w[i])] = 1. / 15 * (t4_dict[(w[i], -w[i], w[i])] +
+                                               t3_dict[(w[i], -w[i], w[i])] +
+                                               NaX3NyNz[(w[i], -w[i], w[i])] +
+                                               NaA3NxNy[(w[i], -w[i], w[i])] +
+                                               NaX2Nyz[(w[i], -w[i], w[i])] +
+                                               NxA2Nyz[(w[i], -w[i], w[i])])
 
             self.print_header()
-            self.print_results(w, gamma, self.comp, t4_dict, t3_dict, NaX3NyNz,
-                               NaA3NxNy, NaX2Nyz, NxA2Nyz)
-
             self.print_results_red(w, gamma_red, self.comp, t3_dict_red,
                                    NaX2Nyz_red, NxA2Nyz_red)
-        else:
-            gamma = {}
-            gamma_red = {}
+            if not self.reduced_tpa:
+                self.print_results(w, gamma, self.comp, t4_dict, t3_dict,
+                                   NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz)
 
-        width = 50
-        w_str = "Total time =  {:.8f}".format(time.time() - time_start)
-        self.ostream.print_header(w_str.ljust(width))
+        self.is_converged = True
 
         if self.rank == mpi_master():
-            return (t4_dict, t3_dict, NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz,
-                    gamma, w, t3_dict_red, NaX2Nyz_red, NxA2Nyz_red, gamma_red)
+            result = {
+                'w': w,
+                't3_dict_red': t3_dict_red,
+                'NaX2Nyz_red': NaX2Nyz_red,
+                'NxA2Nyz_red': NxA2Nyz_red,
+                'gamma_red': gamma_red,
+            }
+
+            if not self.reduced_tpa:
+                result.update({
+                    't4_dict': t4_dict,
+                    't3_dict': t3_dict,
+                    'NaX3NyNz': NaX3NyNz,
+                    'NaA3NxNy': NaA3NxNy,
+                    'NaX2Nyz': NaX2Nyz,
+                    'NxA2Nyz': NxA2Nyz,
+                    'gamma': gamma,
+                })
+
+            return result
         else:
-            return (None, None, None, None, None, None, None, None, None, None,
-                    None, None)
+            return {}
 
     def print_header(self):
         """
@@ -344,8 +363,10 @@ class TPA(LinearSolver):
         """
 
         self.ostream.print_blank()
-        self.ostream.print_header("Two-Photon Absorbtion Driver Setup")
-        self.ostream.print_header(31 * "=")
+
+        title = 'Two-Photon Absorbtion Driver Setup'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
         width = 50
@@ -356,9 +377,8 @@ class TPA(LinearSolver):
         cur_str = "Damping     : " + \
             "{:.1e}".format(self.damping)
         self.ostream.print_header(cur_str.ljust(width))
-        self.ostream.print_blank()
-        self.ostream.print_header(('-' * len(cur_str)).ljust(width))
-        cur_str = "Eri threshold for response solver : " + str(self.eri_thresh)
+
+        cur_str = "ERI threshold for response solver : " + str(self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(width))
         cur_str = "Convergance threshold for response solver : " + str(
             self.conv_thresh)
@@ -395,8 +415,6 @@ class TPA(LinearSolver):
 
         width = 50
 
-        self.ostream.print_blank()
-        self.ostream.print_blank()
         w_str = "Gamma tensor components computed per frequency"
         self.ostream.print_blank()
         self.ostream.print_header(w_str.ljust(width))
@@ -428,8 +446,9 @@ class TPA(LinearSolver):
             w_str = "ΣNaA3NxNy =  {:.8f}".format(NaA3NxNy[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = 'Σ<<μ;μ,μ,μ>>= {:.8f}, ω=({:.4f},{:.4f},{:.4f}), hω =({:.4f} eV)'.format(
-                gamma[w, -w, w], w, -w, w, w * 54.437358841503915 / 2)
+            w_str = 'Σ<<μ;μ,μ,μ>>= {:.8f}, '.format(gamma[w, -w, w])
+            w_str += 'ω=({:.4f},{:.4f},{:.4f}), '.format(w, -w, w)
+            w_str += 'hω =({:.4f} eV)'.format(w * 54.437358841503915 / 2)
             self.ostream.print_header(w_str.ljust(width))
             self.ostream.print_header(('-' * len(w_str)).ljust(width))
             self.ostream.print_blank()
@@ -453,8 +472,6 @@ class TPA(LinearSolver):
         """
         width = 50
 
-        self.ostream.print_blank()
-        self.ostream.print_blank()
         w_str = "Gamma tensor components computed per frequency"
         self.ostream.print_blank()
         self.ostream.print_header(w_str.ljust(width))
@@ -479,8 +496,9 @@ class TPA(LinearSolver):
             w_str = "Reduced:ΣNxA2Nyz =  {:.8f}".format(NxA2Nyz[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = 'Reduced:<<A;B,C,D>>= {:.8f}, w=({:.4f},{:.4f},{:.4f}), hω =({:.4f} eV)'.format(
-                gamma[w, -w, w], w, -w, w, w * 54.437358841503915 / 2)
+            w_str = 'Reduced:<<A;B,C,D>>= {:.8f}, '.format(gamma[w, -w, w])
+            w_str += 'w=({:.4f},{:.4f},{:.4f}), '.format(w, -w, w)
+            w_str += 'hω =({:.4f} eV)'.format(w * 54.437358841503915 / 2)
             self.ostream.print_header(w_str.ljust(width))
             self.ostream.print_header(('-' * len(w_str)).ljust(width))
             self.ostream.print_blank()
@@ -497,7 +515,7 @@ class TPA(LinearSolver):
             response with their corresponding frequencies
         """
 
-        if self.iso is True:
+        if self.iso:
             spat_A = ['x', 'y', 'z']
             comp_iso = []
 

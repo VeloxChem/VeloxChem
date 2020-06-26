@@ -744,8 +744,7 @@ class TPAdriver:
         f_lam_sig_tau_z = {}
 
         if self.rank == mpi_master():
-            fock_num = 30 * len(wi)
-            self.print_header(fock_num)
+            self.print_fock_header()
         time_start_fock = time.time()
 
         # computes both real and imaginary Fock matrices
@@ -755,7 +754,7 @@ class TPAdriver:
 
         time_end_fock = time.time()
         total_time_fock = time_end_fock - time_start_fock
-        self.print_time(total_time_fock)
+        self.print_fock_time(total_time_fock)
 
         if self.rank == mpi_master():
 
@@ -835,8 +834,7 @@ class TPAdriver:
         f_sig_yz = {}
 
         if self.rank == mpi_master():
-            fock_num = 6 * len(wi)
-            self.print_header(fock_num)
+            self.print_fock_header()
         time_start_fock = time.time()
 
         ff_AO = self.get_fock_r(mo, density_list, molecule, ao_basis, 2)
@@ -844,7 +842,7 @@ class TPAdriver:
 
         time_end_fock = time.time()
         total_time_fock = time_end_fock - time_start_fock
-        self.print_time(total_time_fock)
+        self.print_fock_time(total_time_fock)
 
         if self.rank == mpi_master():
 
@@ -2005,7 +2003,8 @@ class TPAdriver:
 
     def x3_contract(self, k1, k2, X, D, nocc, norb):
         """
-        Contracts the generalized dipole gradient tensor of rank 3 with two first-order response matrices
+        Contracts the generalized dipole gradient tensor of rank 3 with two
+        first-order response matrices
 
         : param: k1,k2:
             First-order response matrix
@@ -2035,7 +2034,8 @@ class TPAdriver:
 
     def a3_contract(self, k1, k2, A, D, nocc, norb):
         """
-        Contracts the generalized dipole gradient tensor of rank 3 with two first-order response matrices
+        Contracts the generalized dipole gradient tensor of rank 3 with two
+        first-order response matrices
 
         : param: k1,k2:
             First-order response matrix
@@ -2065,7 +2065,8 @@ class TPAdriver:
 
     def a2_contract(self, k, A, D, nocc, norb):
         """
-        Contracts the generalized dipole gradient tensor of rank 2 with a second-order response matrix
+        Contracts the generalized dipole gradient tensor of rank 2 with a
+        second-order response matrix
 
 
         : param: k - Respose vector in matrix representation
@@ -2113,15 +2114,14 @@ class TPAdriver:
         F123_z = {}
 
         if self.rank == mpi_master():
-            fock_num = 6 * len(wi)
-            self.print_header(fock_num)
+            self.print_fock_header()
         time_start_fock = time.time()
 
         ff_AO = self.get_fock_r(mo, density_list, molecule, ao_basis, 1)
 
         time_end_fock = time.time()
         total_time_fock = time_end_fock - time_start_fock
-        self.print_time(total_time_fock)
+        self.print_fock_time(total_time_fock)
 
         if self.rank == mpi_master():
 
@@ -2165,15 +2165,14 @@ class TPAdriver:
         F123_z = {}
 
         if self.rank == mpi_master():
-            fock_num = 6 * len(wi)
-            self.print_header(fock_num)
+            self.print_fock_header()
         time_start_fock = time.time()
 
         ff_AO = self.get_fock_r(mo, density_list, molecule, ao_basis, 1)
 
         time_end_fock = time.time()
         total_time_fock = time_end_fock - time_start_fock
-        self.print_time(total_time_fock)
+        self.print_fock_time(total_time_fock)
 
         if self.rank == mpi_master():
 
@@ -2444,8 +2443,8 @@ class TPAdriver:
         xi = self.commut(kA, self.commut(kB, F0) + 3 * Fb)
         return xi
 
-    def main(self, Focks, iso, n_x, w, X, d_a_mo, kX, track, scf_tensors,
-             molecule, ao_basis):
+    def main(self, Focks, iso, n_x, w, X, d_a_mo, kX, track, reduced_tpa,
+             scf_tensors, molecule, ao_basis):
         """
         This code calls all the relevent functions to third-order isotropic gradient
 
@@ -2462,6 +2461,9 @@ class TPAdriver:
         :param track:
             A list that contains all the information about which γ components
             and at what freqs they are to be computed
+        :param reduced_tpa:
+            The flag for computing reduced isotropic cubic response functions
+            for TPA
         """
 
         if self.rank == mpi_master():
@@ -2478,99 +2480,102 @@ class TPAdriver:
             norb = None
 
         # computing all compounded first-order densities
+        density_list = None
+        density_list_red = None
+
         if self.rank == mpi_master():
-            density_list = self.get_densities(w, kX, S, D0, mo, nocc, norb)
             density_list_red = self.get_densities_red(w, kX, S, D0, mo, nocc,
                                                       norb)
-        else:
-            density_list = None
-            density_list_red = None
+            if not reduced_tpa:
+                density_list = self.get_densities(w, kX, S, D0, mo, nocc, norb)
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(w, kX, density_list, (D0, D0), mo,
-                                       molecule, ao_basis)
-
         fock_dict_red = self.get_fock_dict_red(w, kX, density_list_red,
                                                (D0, D0), mo, molecule, ao_basis)
+        if not reduced_tpa:
+            fock_dict = self.get_fock_dict(w, kX, density_list, (D0, D0), mo,
+                                           molecule, ao_basis)
 
         if self.rank == mpi_master():
-            fock_dict.update(Focks)
             fock_dict_red.update(Focks)
-            e4_dict = self.get_e4(w, kX, fock_dict, nocc, norb)
-
-        else:
-            e4_dict = {}
-            fock_dict = {}
-            fock_dict_red = {}
+            if not reduced_tpa:
+                fock_dict.update(Focks)
+                e4_dict = self.get_e4(w, kX, fock_dict, nocc, norb)
 
         # computing all the compounded second-order response vectors and
         # extracting some of the second-order Fock matrices from the subspace
-        n_xy_dict, kxy_dict, Focks_xy, XΥ_dict = self.get_n_xy(
-            w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule, ao_basis,
-            scf_tensors)
         n_xy_dict_red, kxy_dict_red, Focks_xy_red, XΥ_dict_red = self.get_n_xy_red(
             w, d_a_mo, X, fock_dict_red, kX, nocc, norb, molecule, ao_basis,
             scf_tensors)
+        if not reduced_tpa:
+            n_xy_dict, kxy_dict, Focks_xy, XΥ_dict = self.get_n_xy(
+                w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule, ao_basis,
+                scf_tensors)
 
         # computing all second-order compounded densities based on the
         # second-order response vectors
+        density_list_two = None
+        density_list_two_red = None
+
         if self.rank == mpi_master():
-            density_list_two = self.get_densities_II(w, kX, kxy_dict, S, D0, mo)
             density_list_two_red = self.get_densities_II_red(
                 w, kX, kxy_dict_red, S, D0, mo)
-        else:
-            n_xy_dict = {}
-            kxy_dict = {}
-            Focks_xy = {}
-
-            n_xy_dict_red = {}
-            kxy_dict_red = {}
-            Focks_xy_red = {}
-            density_list_two = None
-            density_list_two_red = None
+            if not reduced_tpa:
+                density_list_two = self.get_densities_II(
+                    w, kX, kxy_dict, S, D0, mo)
 
         # computing the remaning second-order Fock matrices from the
         # second-order densities
-        fock_dict_two = self.get_fock_dict_II(w, kX, density_list_two, D0, mo,
-                                              molecule, ao_basis)
         fock_dict_two_red = self.get_fock_dict_II_red(w, kX,
                                                       density_list_two_red, D0,
                                                       mo, molecule, ao_basis)
+        if not reduced_tpa:
+            fock_dict_two = self.get_fock_dict_II(w, kX, density_list_two, D0,
+                                                  mo, molecule, ao_basis)
 
         if self.rank == mpi_master():
             # Adding the Fock matrices extracted from the second-order response
             # vector subspace to the fock_dict's.
-            fock_dict_two.update(Focks_xy)
             fock_dict_two_red.update(Focks_xy_red)
+            if not reduced_tpa:
+                fock_dict_two.update(Focks_xy)
 
             # computing the compounded E[3] contractions for the isotropic
             # cubic response function
-            e3_dict = self.get_e3(w, kX, kxy_dict, fock_dict, fock_dict_two,
-                                  nocc, norb)
             e3_dict_red = self.get_e3_red(w, kX, kxy_dict_red, fock_dict_red,
                                           fock_dict_two_red, nocc, norb)
+            if not reduced_tpa:
+                e3_dict = self.get_e3(w, kX, kxy_dict, fock_dict, fock_dict_two,
+                                      nocc, norb)
 
             # computing the X[3],A[3],X[2],A[2] contractions for the isotropic
             # cubic response function
-            na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz = self.other(
-                iso, w, track, n_x, n_xy_dict, X, kX, kxy_dict, d_a_mo, nocc,
-                norb)
             na_x2_nyz_red, nx_a2_nyz_red = self.other_red(
                 iso, w, track, n_x, n_xy_dict_red, X, kX, kxy_dict_red, d_a_mo,
                 nocc, norb)
+            if not reduced_tpa:
+                na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz = self.other(
+                    iso, w, track, n_x, n_xy_dict, X, kX, kxy_dict, d_a_mo,
+                    nocc, norb)
 
+            result = {
+                'na_x2_nyz_red': na_x2_nyz_red,
+                'nx_a2_nyz_red': nx_a2_nyz_red,
+                'e3_dict_red': e3_dict_red,
+            }
+            if not reduced_tpa:
+                result.update({
+                    'na_x3_ny_nz': na_x3_ny_nz,
+                    'na_a3_nx_ny': na_a3_nx_ny,
+                    'na_x2_nyz': na_x2_nyz,
+                    'nx_a2_nyz': nx_a2_nyz,
+                    'e3_dict': e3_dict,
+                    'e4_dict': e4_dict,
+                })
+
+            return result
         else:
-            e3_dict = {}
-            na_x3_ny_nz = None
-            na_a3_nx_ny = None
-            na_x2_nyz = None
-            nx_a2_nyz = None
-            e3_dict_red = {}
-            na_x2_nyz_red = None
-            nx_a2_nyz_red = None
-
-        return (na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz, e3_dict,
-                e4_dict, na_x2_nyz_red, nx_a2_nyz_red, e3_dict_red)
+            return {}
 
     def get_t3(self, freqs, e3_dict, n_x, track):
         """
@@ -2742,7 +2747,7 @@ class TPAdriver:
         cubic response computation
 
         : param eri_tresh:
-            Eri threshold
+            ERI threshold
         : param w:
             A list of all the frequencies
         : param d_a_mo:
@@ -2758,7 +2763,8 @@ class TPAdriver:
         : param norb:
             The number of total orbitals
         :return:
-            A dictonary of Fock matrices from the subspace,second-order response vectors and second-order response matrices
+            A dictonary of Fock matrices from the subspace,second-order
+            response vectors and second-order response matrices
         """
 
         N_total_drv = ComplexResponse(self.comm, self.ostream)
@@ -2812,7 +2818,7 @@ class TPAdriver:
         isotropic cubic response computation
 
         : param eri_tresh:
-            Eri threshold
+            ERI threshold
         : param w:
             A list of all the frequencies
         : param d_a_mo:
@@ -3041,6 +3047,8 @@ class TPAdriver:
                 for i in range(fock.number_of_fock_matrices()):
                     fabs.append(fock.to_numpy(i).T)
 
+        self.ostream.print_blank()
+
         if self.rank == mpi_master():
             return tuple(fabs)
         else:
@@ -3062,36 +3070,25 @@ class TPAdriver:
 
         return T - V
 
-    def print_header(self, fock_number):
+    def print_fock_header(self):
         """
-        Fock section setup header for output stream.
-        :param fock_number:
-           Total number of Fock matrices to compute
+        Prints Fock section header.
         """
 
-        self.ostream.print_blank()
-        self.ostream.print_header("Fock matrix computation")
-        self.ostream.print_header(31 * "=")
+        title = 'Fock Matrix Computation'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
-        width = 50
-
-        cur_str = "Total number of Fock matrices to compute : " + str(
-            fock_number)
-        self.ostream.print_header(cur_str.ljust(width))
-
-        self.ostream.flush()
-
-    def print_time(self, time):
+    def print_fock_time(self, time):
         """
-        Prints time for Fock section
+        Prints time for Fock section.
+
         :param time:
            Total time to compute Fock matrices
         """
 
-        width = 50
-
-        cur_str = "Total time for Fock matrices: " + str(time) + " sec "
-        self.ostream.print_header(cur_str.ljust(width))
-
+        cur_str = 'Time spent in Fock matrices: {:.2f} sec'.format(time)
+        self.ostream.print_info(cur_str)
+        self.ostream.print_blank()
         self.ostream.flush()
