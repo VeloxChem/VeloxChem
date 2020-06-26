@@ -1,5 +1,4 @@
 import numpy as np
-import time
 import sys
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
@@ -147,8 +146,6 @@ class TPA(LinearSolver):
               functions for TPA
         """
 
-        time_start = time.time()
-
         tpa_drv = TPAdriver(self.comm, self.ostream)
 
         tpa_drv.update_settings({
@@ -281,9 +278,9 @@ class TPA(LinearSolver):
         # A[3] and A[2] which formally are not part of the third-order gradient
         # but which are used for the cubic response function
 
-        tpa_dict = tpa_drv.main(Focks, self.iso, Nx, w, X, d_a_mo, kX,
-                                self.comp, self.reduced_tpa, scf_tensors,
-                                molecule, ao_basis)
+        tpa_dict = tpa_drv.main(Focks, Nx, w, X, d_a_mo, kX, self.comp,
+                                self.reduced_tpa, scf_tensors, molecule,
+                                ao_basis)
 
         if self.rank == mpi_master():
             NaX2Nyz_red = tpa_dict['na_x2_nyz_red']
@@ -420,7 +417,7 @@ class TPA(LinearSolver):
         self.ostream.print_header(w_str.ljust(width))
         self.ostream.print_blank()
         count = 1
-        for a in range(int(len(comp) * (1 / len(freqs)))):
+        for a in range(len(comp) // len(freqs)):
             w_str = str(count) + '. ' + str(comp[a].split(",")[0])
             self.ostream.print_header(w_str.ljust(width))
             count += 1
@@ -477,7 +474,7 @@ class TPA(LinearSolver):
         self.ostream.print_header(w_str.ljust(width))
         self.ostream.print_blank()
         count = 1
-        for a in range(int(len(comp) * (1 / len(freqs)))):
+        for a in range(len(comp) // len(freqs)):
             w_str = str(count) + '. ' + str(comp[a].split(",")[0])
             self.ostream.print_header(w_str.ljust(width))
             count += 1
