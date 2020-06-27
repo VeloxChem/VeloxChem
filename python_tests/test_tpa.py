@@ -26,6 +26,7 @@ class TestTPA(unittest.TestCase):
             'damping': task.input_dict['response']['damping'],
             'frequencies': task.input_dict['response']['frequencies'],
             'conv_thresh': '1.0e-8',
+            'tpa_type': 'all',
         })
         tpa_result = tpa.compute(task.molecule, task.ao_basis, scf_tensors)
 

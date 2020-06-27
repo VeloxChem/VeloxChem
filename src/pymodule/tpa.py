@@ -1,13 +1,13 @@
 import numpy as np
-import sys
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import hartree_in_ev
-from .inputparser import parse_frequencies
 from .cppsolver import ComplexResponse
 from .tpadriver import TPAdriver
 from .linearsolver import LinearSolver
+from .inputparser import parse_frequencies
+from .errorhandler import assert_msg_critical
 
 
 class TPA(LinearSolver):
@@ -26,9 +26,13 @@ class TPA(LinearSolver):
     """
 
     def __init__(self, comm, ostream):
-        np.set_printoptions(threshold=sys.maxsize)
+        """
+        Initializes the isotropic cubic response function for two-photon
+        absorption (TPA)
+        """
+
         self.iso = True
-        self.reduced_tpa = False
+        self.tpa_type = 'full'
 
         # ERI settings
         self.eri_thresh = 1.0e-15
@@ -63,13 +67,15 @@ class TPA(LinearSolver):
         if method_dict is None:
             method_dict = {}
 
+        if 'tpa_type' in rsp_dict:
+            self.tpa_type = rsp_dict['tpa_type'].lower()
+            assert_msg_critical(self.tpa_type in ['full', 'reduced', 'all'],
+                                'TPA: Invalid tpa type')
+
         if 'frequencies' in rsp_dict:
             self.frequencies = parse_frequencies(rsp_dict['frequencies'])
         if 'damping' in rsp_dict:
             self.damping = float(rsp_dict['damping'])
-        if 'reduced_tpa' in rsp_dict:
-            key = rsp_dict['reduced_tpa'].lower()
-            self.reduced_tpa = True if key in ['yes', 'y'] else False
         if 'component' in rsp_dict:
             self.comp = rsp_dict['component']
             if self.comp in 'isotropic':
@@ -225,24 +231,22 @@ class TPA(LinearSolver):
             # obtained from the first-order response vectors with positive
             # frequency by using flip_zy, see article.
 
-            for (op, freq) in Nx['Nb']:
-                Nx['Nc'][(op, -freq)] = tpa_drv.flip_yz(Nx['Nb'][(op, freq)])
+            for (op, w) in Nx['Nb']:
+                Nx['Nc'][(op, -w)] = tpa_drv.flip_yz(Nx['Nb'][(op, w)])
 
                 # Creating the response matrix for the negative first-order
                 # response vectors
 
-                kX['Nc'][(op, -freq)] = (
-                    LinearSolver.lrvec2mat(Nx['Nc'][(op, -freq)].real, nocc,
-                                           norb) +
-                    1j * LinearSolver.lrvec2mat(Nx['Nc'][
-                        (op, -freq)].imag, nocc, norb))
+                kX['Nc'][(op, -w)] = (
+                    LinearSolver.lrvec2mat(Nx['Nc'][(op, -w)].real, nocc,
+                                           norb) + 1j *
+                    LinearSolver.lrvec2mat(Nx['Nc'][(op, -w)].imag, nocc, norb))
 
                 # The first-order Fock matrices with positive and negative
-                # frequencies are each other complex conjugates
+                # wuencies are each other complex conjugates
 
-                Focks['Fc'][(op, -freq)] = Focks['Fb'][(op, freq)]
-                Focks['Fd'][(op, freq)] = np.conjugate(Focks['Fb'][(op,
-                                                                    freq)]).T
+                Focks['Fc'][(op, -w)] = Focks['Fb'][(op, w)]
+                Focks['Fd'][(op, w)] = np.conjugate(Focks['Fb'][(op, w)]).T
 
             # For cubic-response with all operators being the dipole μ Nb=Na=Nd
             # Likewise, Fb=Fd
@@ -260,18 +264,11 @@ class TPA(LinearSolver):
         # but which are used for the cubic response function
 
         tpa_dict = tpa_drv.main(Focks, Nx, self.frequencies, X, d_a_mo, kX,
-                                self.comp, self.reduced_tpa, scf_tensors,
-                                molecule, ao_basis)
+                                self.comp, self.tpa_type, scf_tensors, molecule,
+                                ao_basis)
 
         if self.rank == mpi_master():
-            NaX2Nyz_red = tpa_dict['na_x2_nyz_red']
-            NxA2Nyz_red = tpa_dict['nx_a2_nyz_red']
-            E3_dict_red = tpa_dict['e3_dict_red']
-
-            t3_dict_red = tpa_drv.get_t3(self.frequencies, E3_dict_red, Nx,
-                                         self.comp)
-
-            if not self.reduced_tpa:
+            if self.tpa_type in ['full', 'all']:
                 NaX3NyNz = tpa_dict['na_x3_ny_nz']
                 NaA3NxNy = tpa_dict['na_a3_nx_ny']
                 NaX2Nyz = tpa_dict['na_x2_nyz']
@@ -284,44 +281,53 @@ class TPA(LinearSolver):
                 t3_dict = tpa_drv.get_t3(self.frequencies, E3_dict, Nx,
                                          self.comp)
 
+            if self.tpa_type in ['reduced', 'all']:
+                NaX2Nyz_red = tpa_dict['na_x2_nyz_red']
+                NxA2Nyz_red = tpa_dict['nx_a2_nyz_red']
+                E3_dict_red = tpa_dict['e3_dict_red']
+
+                t3_dict_red = tpa_drv.get_t3(self.frequencies, E3_dict_red, Nx,
+                                             self.comp)
+
         # Combining all the terms to evaluate the iso-tropic cubic response
         # function. For TPA Full and reduced, see article
 
         if self.rank == mpi_master():
-            gamma_red = {}
-            gamma = {}
+            self.print_header()
 
-            for w in self.frequencies:
-                gamma_red[(
-                    w, -w,
-                    w)] = 1. / 15 * (t3_dict_red[(w, -w, w)] + NaX2Nyz_red[
-                        (w, -w, w)] + NxA2Nyz_red[(w, -w, w)])
-                if not self.reduced_tpa:
+            if self.tpa_type in ['full', 'all']:
+                gamma = {}
+
+                for w in self.frequencies:
                     gamma[(w, -w, w)] = 1. / 15 * (
                         t4_dict[(w, -w, w)] + t3_dict[(w, -w, w)] +
                         NaX3NyNz[(w, -w, w)] + NaA3NxNy[(w, -w, w)] +
                         NaX2Nyz[(w, -w, w)] + NxA2Nyz[(w, -w, w)])
 
-            self.print_header()
-            self.print_results_red(self.frequencies, gamma_red, self.comp,
-                                   t3_dict_red, NaX2Nyz_red, NxA2Nyz_red)
-            if not self.reduced_tpa:
                 self.print_results(self.frequencies, gamma, self.comp, t4_dict,
                                    t3_dict, NaX3NyNz, NaA3NxNy, NaX2Nyz,
                                    NxA2Nyz)
 
+            if self.tpa_type in ['reduced', 'all']:
+                gamma_red = {}
+
+                for w in self.frequencies:
+                    gamma_red[(
+                        w, -w,
+                        w)] = 1. / 15 * (t3_dict_red[(w, -w, w)] + NaX2Nyz_red[
+                            (w, -w, w)] + NxA2Nyz_red[(w, -w, w)])
+
+                self.print_results_red(self.frequencies, gamma_red, self.comp,
+                                       t3_dict_red, NaX2Nyz_red, NxA2Nyz_red)
+
         self.is_converged = True
 
-        if self.rank == mpi_master():
-            result = {
-                'w': self.frequencies,
-                't3_dict_red': t3_dict_red,
-                'NaX2Nyz_red': NaX2Nyz_red,
-                'NxA2Nyz_red': NxA2Nyz_red,
-                'gamma_red': gamma_red,
-            }
+        result = {}
 
-            if not self.reduced_tpa:
+        if self.rank == mpi_master():
+            result.update({'w': self.frequencies})
+
+            if self.tpa_type in ['full', 'all']:
                 result.update({
                     't4_dict': t4_dict,
                     't3_dict': t3_dict,
@@ -332,9 +338,15 @@ class TPA(LinearSolver):
                     'gamma': gamma,
                 })
 
-            return result
-        else:
-            return {}
+            if self.tpa_type in ['reduced', 'all']:
+                result.update({
+                    't3_dict_red': t3_dict_red,
+                    'NaX2Nyz_red': NaX2Nyz_red,
+                    'NxA2Nyz_red': NxA2Nyz_red,
+                    'gamma_red': gamma_red,
+                })
+
+        return result
 
     def print_header(self):
         """
@@ -454,11 +466,10 @@ class TPA(LinearSolver):
         self.ostream.print_blank()
         self.ostream.print_header(w_str.ljust(width))
         self.ostream.print_blank()
-        count = 1
+
         for a in range(len(comp) // len(freqs)):
-            w_str = str(count) + '. ' + str(comp[a].split(",")[0])
+            w_str = str(a + 1) + '. ' + str(comp[a].split(",")[0])
             self.ostream.print_header(w_str.ljust(width))
-            count += 1
 
         self.ostream.print_blank()
 
@@ -516,9 +527,7 @@ class TPA(LinearSolver):
             self.comp = sorted(comp_iso, key=comp_iso.index)
 
         else:
-
             Track = self.comp.split(",")
-            count = 0
             comp = []
             for i in range(len(w)):
                 for case in Track:
@@ -526,5 +535,5 @@ class TPA(LinearSolver):
                         w[i]) + ',' + str(-w[i]) + ',' + str(w[i])
                     comp.append(t)
                 self.comp = comp
-                count += 1
+
         return self.comp

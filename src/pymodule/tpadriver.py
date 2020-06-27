@@ -2413,8 +2413,8 @@ class TPAdriver:
         xi = self.commut(kA, self.commut(kB, F0) + 3 * Fb)
         return xi
 
-    def main(self, Focks, n_x, w, X, d_a_mo, kX, track, reduced_tpa,
-             scf_tensors, molecule, ao_basis):
+    def main(self, Focks, n_x, w, X, d_a_mo, kX, track, tpa_type, scf_tensors,
+             molecule, ao_basis):
         """
         This code calls all the relevent functions to third-order isotropic
         gradient
@@ -2432,9 +2432,9 @@ class TPAdriver:
         :param track:
             A list that contains all the information about which γ components
             and at what freqs they are to be computed
-        :param reduced_tpa:
-            The flag for computing reduced isotropic cubic response functions
-            for TPA
+        :param tpa_type:
+            The flag for computing full or reduced isotropic cubic response
+            functions for TPA
         """
 
         if self.rank == mpi_master():
@@ -2444,7 +2444,6 @@ class TPAdriver:
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
         else:
-            S = None
             D0 = None
             mo = None
             nocc = None
@@ -2455,33 +2454,39 @@ class TPAdriver:
         density_list_red = None
 
         if self.rank == mpi_master():
-            density_list_red = self.get_densities_red(w, kX, S, D0, mo, nocc,
-                                                      norb)
-            if not reduced_tpa:
+            if tpa_type in ['full', 'all']:
                 density_list = self.get_densities(w, kX, S, D0, mo, nocc, norb)
+            if tpa_type in ['reduced', 'all']:
+                density_list_red = self.get_densities_red(
+                    w, kX, S, D0, mo, nocc, norb)
 
         #  computing the compounded first-order Fock matrices
-        fock_dict_red = self.get_fock_dict_red(w, kX, density_list_red,
-                                               (D0, D0), mo, molecule, ao_basis)
-        if not reduced_tpa:
+        if tpa_type in ['full', 'all']:
             fock_dict = self.get_fock_dict(w, kX, density_list, (D0, D0), mo,
                                            molecule, ao_basis)
+        if tpa_type in ['reduced', 'all']:
+            fock_dict_red = self.get_fock_dict_red(w, kX, density_list_red,
+                                                   (D0, D0), mo, molecule,
+                                                   ao_basis)
 
         if self.rank == mpi_master():
-            fock_dict_red.update(Focks)
-            if not reduced_tpa:
+            if tpa_type in ['full', 'all']:
                 fock_dict.update(Focks)
                 e4_dict = self.get_e4(w, kX, fock_dict, nocc, norb)
+            if tpa_type in ['reduced', 'all']:
+                fock_dict_red.update(Focks)
 
         # computing all the compounded second-order response vectors and
         # extracting some of the second-order Fock matrices from the subspace
-        (n_xy_dict_red, kxy_dict_red, Focks_xy_red,
-         XΥ_dict_red) = self.get_n_xy_red(w, d_a_mo, X, fock_dict_red, kX, nocc,
-                                          norb, molecule, ao_basis, scf_tensors)
-        if not reduced_tpa:
+        if tpa_type in ['full', 'all']:
             (n_xy_dict, kxy_dict, Focks_xy,
              XΥ_dict) = self.get_n_xy(w, d_a_mo, X, fock_dict, kX, nocc, norb,
                                       molecule, ao_basis, scf_tensors)
+        if tpa_type in ['reduced', 'all']:
+            (n_xy_dict_red, kxy_dict_red, Focks_xy_red,
+             XΥ_dict_red) = self.get_n_xy_red(w, d_a_mo, X, fock_dict_red, kX,
+                                              nocc, norb, molecule, ao_basis,
+                                              scf_tensors)
 
         # computing all second-order compounded densities based on the
         # second-order response vectors
@@ -2489,51 +2494,55 @@ class TPAdriver:
         density_list_two_red = None
 
         if self.rank == mpi_master():
-            density_list_two_red = self.get_densities_II_red(
-                w, kX, kxy_dict_red, S, D0, mo)
-            if not reduced_tpa:
+            if tpa_type in ['full', 'all']:
                 density_list_two = self.get_densities_II(
                     w, kX, kxy_dict, S, D0, mo)
+            if tpa_type in ['reduced', 'all']:
+                density_list_two_red = self.get_densities_II_red(
+                    w, kX, kxy_dict_red, S, D0, mo)
 
         # computing the remaning second-order Fock matrices from the
         # second-order densities
-        fock_dict_two_red = self.get_fock_dict_II(w, kX, density_list_two_red,
-                                                  D0, mo, molecule, ao_basis)
-        if not reduced_tpa:
+        if tpa_type in ['full', 'all']:
             fock_dict_two = self.get_fock_dict_II(w, kX, density_list_two, D0,
                                                   mo, molecule, ao_basis)
+        if tpa_type in ['reduced', 'all']:
+            fock_dict_two_red = self.get_fock_dict_II(w, kX,
+                                                      density_list_two_red, D0,
+                                                      mo, molecule, ao_basis)
+
+        result = {}
 
         if self.rank == mpi_master():
             # Adding the Fock matrices extracted from the second-order response
             # vector subspace to the fock_dict's.
-            fock_dict_two_red.update(Focks_xy_red)
-            if not reduced_tpa:
+            if tpa_type in ['full', 'all']:
                 fock_dict_two.update(Focks_xy)
+            if tpa_type in ['reduced', 'all']:
+                fock_dict_two_red.update(Focks_xy_red)
 
             # computing the compounded E[3] contractions for the isotropic
             # cubic response function
-            e3_dict_red = self.get_e3_red(w, kX, kxy_dict_red, fock_dict_red,
-                                          fock_dict_two_red, nocc, norb)
-            if not reduced_tpa:
+            if tpa_type in ['full', 'all']:
                 e3_dict = self.get_e3(w, kX, kxy_dict, fock_dict, fock_dict_two,
                                       nocc, norb)
+            if tpa_type in ['reduced', 'all']:
+                e3_dict_red = self.get_e3_red(w, kX, kxy_dict_red,
+                                              fock_dict_red, fock_dict_two_red,
+                                              nocc, norb)
 
             # computing the X[3],A[3],X[2],A[2] contractions for the isotropic
             # cubic response function
-            na_x2_nyz_red, nx_a2_nyz_red = self.other_red(
-                w, track, n_x, n_xy_dict_red, X, kX, kxy_dict_red, d_a_mo, nocc,
-                norb)
-            if not reduced_tpa:
+            if tpa_type in ['full', 'all']:
                 na_x3_ny_nz, na_a3_nx_ny, na_x2_nyz, nx_a2_nyz = self.other(
                     w, track, n_x, n_xy_dict, X, kX, kxy_dict, d_a_mo, nocc,
                     norb)
+            if tpa_type in ['reduced', 'all']:
+                na_x2_nyz_red, nx_a2_nyz_red = self.other_red(
+                    w, track, n_x, n_xy_dict_red, X, kX, kxy_dict_red, d_a_mo,
+                    nocc, norb)
 
-            result = {
-                'na_x2_nyz_red': na_x2_nyz_red,
-                'nx_a2_nyz_red': nx_a2_nyz_red,
-                'e3_dict_red': e3_dict_red,
-            }
-            if not reduced_tpa:
+            if tpa_type in ['full', 'all']:
                 result.update({
                     'na_x3_ny_nz': na_x3_ny_nz,
                     'na_a3_nx_ny': na_a3_nx_ny,
@@ -2541,6 +2550,12 @@ class TPAdriver:
                     'nx_a2_nyz': nx_a2_nyz,
                     'e3_dict': e3_dict,
                     'e4_dict': e4_dict,
+                })
+            if tpa_type in ['reduced', 'all']:
+                result.update({
+                    'na_x2_nyz_red': na_x2_nyz_red,
+                    'nx_a2_nyz_red': nx_a2_nyz_red,
+                    'e3_dict_red': e3_dict_red,
                 })
 
             return result
