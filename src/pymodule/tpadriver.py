@@ -224,8 +224,8 @@ class TPAdriver:
             # Taking the non redundant matrix elements {i,s} and forming the
             # anti-symmetric Fock vector
             f_x = -2 * 1. / 6 * LinearSolver.lrmat2vec(f_x.T, nocc, norb)
-            f_x = np.array(self.anti_sym(f_x))
-            f_iso_x.update({w: f_x})
+            f_x = self.anti_sym(f_x)
+            f_iso_x[w] = f_x
 
             # y
 
@@ -243,8 +243,8 @@ class TPAdriver:
             # Taking the non redundant matrix elements {i,s} and forming the
             # anti-symmetric Fock vector
             f_y = -2 * 1. / 6 * LinearSolver.lrmat2vec(f_y.T, nocc, norb)
-            f_y = np.array(self.anti_sym(f_y))
-            f_iso_y.update({w: f_y})
+            f_y = self.anti_sym(f_y)
+            f_iso_y[w] = f_y
 
             # z
 
@@ -262,8 +262,8 @@ class TPAdriver:
             # Taking the non redundant matrix elements {i,s} and forming the
             # anti-symmetric Fock vector
             f_z = -2 * 1. / 6 * LinearSolver.lrmat2vec(f_z.T, nocc, norb)
-            f_z = np.array(self.anti_sym(f_z))
-            f_iso_z.update({w: f_z})
+            f_z = self.anti_sym(f_z)
+            f_iso_z[w] = f_z
 
         e4_dict = {'f_iso_x': f_iso_x, 'f_iso_y': f_iso_y, 'f_iso_z': f_iso_z}
         return e4_dict
@@ -338,8 +338,8 @@ class TPAdriver:
             X_terms = (zeta_sig_xx + zeta_sig_xy +
                        zeta_sig_xz).T + (0.5 * fo2['F123_x'][w]).T
             Ff_x = -2 * LinearSolver.lrmat2vec(X_terms, nocc, norb)
-            Ff_x = np.array(self.anti_sym(Ff_x))
-            f_iso_x.update({w: Ff_x})
+            Ff_x = self.anti_sym(Ff_x)
+            f_iso_x[w] = Ff_x
 
             # y #
             zeta_sig_yx = self.xi(k_x_, k_sig_xy, f_x_, f_sig_xy, F0_a)
@@ -349,8 +349,8 @@ class TPAdriver:
             Y_terms = (zeta_sig_yx + zeta_sig_yy +
                        zeta_sig_yz).T + (0.5 * fo2['F123_y'][w]).T
             Ff_y = -2 * LinearSolver.lrmat2vec(Y_terms, nocc, norb)
-            Ff_y = np.array(self.anti_sym(Ff_y))
-            f_iso_y.update({w: Ff_y})
+            Ff_y = self.anti_sym(Ff_y)
+            f_iso_y[w] = Ff_y
 
             # z #
             zeta_sig_zx = self.xi(k_x_, k_sig_xz, f_x_, f_sig_xz, F0_a)
@@ -360,8 +360,8 @@ class TPAdriver:
             Z_terms = (zeta_sig_zx + zeta_sig_zy +
                        zeta_sig_zz).T + (0.5 * fo2['F123_z'][w]).T
             Ff_z = -2 * LinearSolver.lrmat2vec(Z_terms, nocc, norb)
-            Ff_z = np.array(self.anti_sym(Ff_z))
-            f_iso_z.update({w: Ff_z})
+            Ff_z = self.anti_sym(Ff_z)
+            f_iso_z[w] = Ff_z
 
         e3_dict = {'f_iso_x': f_iso_x, 'f_iso_y': f_iso_y, 'f_iso_z': f_iso_z}
         return e3_dict
@@ -477,8 +477,8 @@ class TPAdriver:
                 zeta_lamtau_xx + zeta_lamtau_xy +
                 zeta_lamtau_xz).T + (0.5 * fo2['F123_x'][w]).T
             Ff_x = -2 * LinearSolver.lrmat2vec(X_terms, nocc, norb)
-            Ff_x = np.array(self.anti_sym(Ff_x))
-            f_iso_x.update({w: Ff_x})
+            Ff_x = self.anti_sym(Ff_x)
+            f_iso_x[w] = Ff_x
 
             # y
 
@@ -494,8 +494,8 @@ class TPAdriver:
                 zeta_lamtau_yx + zeta_lamtau_yy +
                 zeta_lamtau_yz).T + (0.5 * fo2['F123_y'][w]).T
             Ff_y = -2 * LinearSolver.lrmat2vec(Y_terms, nocc, norb)
-            Ff_y = np.array(self.anti_sym(Ff_y))
-            f_iso_y.update({w: Ff_y})
+            Ff_y = self.anti_sym(Ff_y)
+            f_iso_y[w] = Ff_y
 
             # z
 
@@ -511,8 +511,8 @@ class TPAdriver:
                 zeta_lamtau_zx + zeta_lamtau_zy +
                 zeta_lamtau_zz).T + (0.5 * fo2['F123_z'][w]).T
             Ff_z = -2 * LinearSolver.lrmat2vec(Z_terms, nocc, norb)
-            Ff_z = np.array(self.anti_sym(Ff_z))
-            f_iso_z.update({w: Ff_z})
+            Ff_z = self.anti_sym(Ff_z)
+            f_iso_z[w] = Ff_z
 
         e3_dict = {'f_iso_x': f_iso_x, 'f_iso_y': f_iso_y, 'f_iso_z': f_iso_z}
         return e3_dict
@@ -749,62 +749,57 @@ class TPAdriver:
             A dictonary of compounded first-order Fock-matrices
 
         """
-        f_sig_xx = {}
-        f_sig_yy = {}
-        f_sig_zz = {}
-        f_sig_xy = {}
-        f_sig_xz = {}
-        f_sig_yz = {}
-
-        f_lamtau_xx = {}
-        f_lamtau_yy = {}
-        f_lamtau_zz = {}
-        f_lamtau_xy = {}
-        f_lamtau_xz = {}
-        f_lamtau_yz = {}
-
-        f_lam_sig_tau_x = {}
-        f_lam_sig_tau_y = {}
-        f_lam_sig_tau_z = {}
 
         if self.rank == mpi_master():
             self.print_fock_header()
+
         time_start_fock = time.time()
-
-        # computes both real and imaginary Fock matrices
-        ff_AO = self.get_fock_r(mo, density_list, molecule, ao_basis, 1)
-        # The zeroth order Fock matrix is computed
+        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis, 1)
         F0_a = self.get_fock_r(mo, D0, molecule, ao_basis, 0)
-
         time_end_fock = time.time()
+
         total_time_fock = time_end_fock - time_start_fock
         self.print_fock_time(total_time_fock)
 
+        Fock = {}
+
         if self.rank == mpi_master():
+            f_sig_xx = {}
+            f_sig_yy = {}
+            f_sig_zz = {}
+            f_sig_xy = {}
+            f_sig_xz = {}
+            f_sig_yz = {}
 
-            fock_list = ff_AO
+            f_lamtau_xx = {}
+            f_lamtau_yy = {}
+            f_lamtau_zz = {}
+            f_lamtau_xy = {}
+            f_lamtau_xz = {}
+            f_lamtau_yz = {}
 
-            count = 0
-            for w in wi:
-                f_sig_xx.update({w: fock_list[15 * count]})
-                f_sig_yy.update({w: fock_list[15 * count + 1]})
-                f_sig_zz.update({w: fock_list[15 * count + 2]})
-                f_sig_xy.update({w: fock_list[15 * count + 3]})
-                f_sig_xz.update({w: fock_list[15 * count + 4]})
-                f_sig_yz.update({w: fock_list[15 * count + 5]})
+            f_lam_sig_tau_x = {}
+            f_lam_sig_tau_y = {}
+            f_lam_sig_tau_z = {}
 
-                f_lamtau_xx.update({w: fock_list[15 * count + 6]})
-                f_lamtau_yy.update({w: fock_list[15 * count + 7]})
-                f_lamtau_zz.update({w: fock_list[15 * count + 8]})
-                f_lamtau_xy.update({w: fock_list[15 * count + 9]})
-                f_lamtau_xz.update({w: fock_list[15 * count + 10]})
-                f_lamtau_yz.update({w: fock_list[15 * count + 11]})
+            for count, w in enumerate(wi):
+                f_sig_xx[w] = fock_list[15 * count]
+                f_sig_yy[w] = fock_list[15 * count + 1]
+                f_sig_zz[w] = fock_list[15 * count + 2]
+                f_sig_xy[w] = fock_list[15 * count + 3]
+                f_sig_xz[w] = fock_list[15 * count + 4]
+                f_sig_yz[w] = fock_list[15 * count + 5]
 
-                f_lam_sig_tau_x.update({w: fock_list[15 * count + 12]})
-                f_lam_sig_tau_y.update({w: fock_list[15 * count + 13]})
-                f_lam_sig_tau_z.update({w: fock_list[15 * count + 14]})
+                f_lamtau_xx[w] = fock_list[15 * count + 6]
+                f_lamtau_yy[w] = fock_list[15 * count + 7]
+                f_lamtau_zz[w] = fock_list[15 * count + 8]
+                f_lamtau_xy[w] = fock_list[15 * count + 9]
+                f_lamtau_xz[w] = fock_list[15 * count + 10]
+                f_lamtau_yz[w] = fock_list[15 * count + 11]
 
-                count += 1
+                f_lam_sig_tau_x[w] = fock_list[15 * count + 12]
+                f_lam_sig_tau_y[w] = fock_list[15 * count + 13]
+                f_lam_sig_tau_z[w] = fock_list[15 * count + 14]
 
             Fock = {
                 'F0': F0_a,
@@ -824,8 +819,6 @@ class TPAdriver:
                 'F123_y': f_lam_sig_tau_y,
                 'F123_z': f_lam_sig_tau_z
             }
-        else:
-            Fock = {}
 
         return Fock
 
@@ -850,38 +843,34 @@ class TPAdriver:
             A dictonary of compounded first-order Fock-matrices
         """
 
-        f_sig_xx = {}
-        f_sig_yy = {}
-        f_sig_zz = {}
-        f_sig_xy = {}
-        f_sig_xz = {}
-        f_sig_yz = {}
-
         if self.rank == mpi_master():
             self.print_fock_header()
+
         time_start_fock = time.time()
-
-        ff_AO = self.get_fock_r(mo, density_list, molecule, ao_basis, 2)
+        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis, 2)
         F0_a = self.get_fock_r(mo, D0, molecule, ao_basis, 0)
-
         time_end_fock = time.time()
+
         total_time_fock = time_end_fock - time_start_fock
         self.print_fock_time(total_time_fock)
 
+        Fock = {}
+
         if self.rank == mpi_master():
+            f_sig_xx = {}
+            f_sig_yy = {}
+            f_sig_zz = {}
+            f_sig_xy = {}
+            f_sig_xz = {}
+            f_sig_yz = {}
 
-            fock_list = ff_AO
-
-            count = 0
-            for w in wi:
-                f_sig_xx.update({w: fock_list[6 * count]})
-                f_sig_yy.update({w: fock_list[6 * count + 1]})
-                f_sig_zz.update({w: fock_list[6 * count + 2]})
-                f_sig_xy.update({w: fock_list[6 * count + 3]})
-                f_sig_xz.update({w: fock_list[6 * count + 4]})
-                f_sig_yz.update({w: fock_list[6 * count + 5]})
-
-                count += 1
+            for count, w in enumerate(wi):
+                f_sig_xx[w] = fock_list[6 * count]
+                f_sig_yy[w] = fock_list[6 * count + 1]
+                f_sig_zz[w] = fock_list[6 * count + 2]
+                f_sig_xy[w] = fock_list[6 * count + 3]
+                f_sig_xz[w] = fock_list[6 * count + 4]
+                f_sig_yz[w] = fock_list[6 * count + 5]
 
             Fock = {
                 'F0': F0_a,
@@ -892,8 +881,6 @@ class TPAdriver:
                 'f_sig_xz': f_sig_xz,
                 'f_sig_yz': f_sig_yz
             }
-        else:
-            Fock = {}
 
         return Fock
 
@@ -917,7 +904,9 @@ class TPAdriver:
             A dictonary of compounded gradient vectors
 
         """
+
         xy_dict = {}
+
         if self.rank == mpi_master():
             for w in wi:
                 mu_x = X['x']
@@ -941,180 +930,172 @@ class TPAdriver:
                 f_z_ = Fock['Fc'][('z', -w)]
 
                 # BD σ gradients #
-                xy_dict.update(
-                    {
-                        (('N_sig_xx', w), 2 * w):
-                            self.anti_sym(
-                                -2 * LinearSolver.lrmat2vec(
-                                    (3 * self.xi(kx, kx, f_x, f_x, F0) +
-                                     self.xi(ky, ky, f_y, f_y, F0) +
-                                     self.xi(kz, kz, f_z, f_z, F0) +
-                                     0.5 * Fock['f_sig_xx'][w]).T, nocc, norb))
-                            - 3 * 2 *
-                            self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb) -
-                            2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
-                            -
-                            2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
-                    })
-                xy_dict.update(
-                    {
-                        (('N_sig_yy', w), 2 * w):
-                            self.anti_sym(
-                                -2 * LinearSolver.lrmat2vec(
-                                    (self.xi(kx, kx, f_x, f_x, F0) +
-                                     3 * self.xi(ky, ky, f_y, f_y, F0) +
-                                     self.xi(kz, kz, f_z, f_z, F0) +
-                                     0.5 * Fock['f_sig_yy'][w]).T, nocc, norb))
-                            -
-                            2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
-                            - 3 * 2 *
-                            self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb) -
-                            2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
-                    })
-                xy_dict.update({
-                    (('N_sig_zz', w), 2 * w):
-                        self.anti_sym(-2 *
-                                      LinearSolver.lrmat2vec(
-                                          (self.xi(kx, kx, f_x, f_x, F0) +
-                                           self.xi(ky, ky, f_y, f_y, F0) +
-                                           3 * self.xi(kz, kz, f_z, f_z, F0) +
-                                           0.5 * Fock['f_sig_zz'][w]).T, nocc,
-                                          norb))
-                        - 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb) -
-                        3 * 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
-                })
+                xy_dict[((
+                    'N_sig_xx', w
+                ), 2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                    (3 * self.xi(kx, kx, f_x, f_x, F0) + self.xi(
+                        ky, ky, f_y, f_y, F0) + self.xi(kz, kz, f_z, f_z, F0) +
+                     0.5 * Fock['f_sig_xx'][w]).T,
+                    nocc, norb)) - 3 * 2 * self.x2_contract(
+                        kx.T, mu_x, d_a_mo, nocc, norb) - 2 * self.x2_contract(
+                            ky.T, mu_y, d_a_mo, nocc, norb
+                        ) - 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
 
-                xy_dict.update({
-                    (('N_sig_xy', w), 2 * w):
-                        self.anti_sym(-2 * LinearSolver.lrmat2vec(
-                            (self.xi(ky, kx, f_y, f_x, F0) +
-                             self.xi(kx, ky, f_x, f_y, F0) +
-                             0.5 * Fock['f_sig_xy'][w]).T, nocc, norb)) -
-                        2 * self.x2_contract(ky.T, mu_x, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(kx.T, mu_y, d_a_mo, nocc, norb)
-                })
-                xy_dict.update({
-                    (('N_sig_xz', w), 2 * w):
-                        self.anti_sym(-2 * LinearSolver.lrmat2vec(
-                            (self.xi(kz, kx, f_z, f_x, F0) +
-                             self.xi(kx, kz, f_x, f_z, F0) +
-                             0.5 * Fock['f_sig_xz'][w]).T, nocc, norb)) -
-                        2 * self.x2_contract(kz.T, mu_x, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(kx.T, mu_z, d_a_mo, nocc, norb)
-                })
-                xy_dict.update({
-                    (('N_sig_yz', w), 2 * w):
-                        self.anti_sym(-2 * LinearSolver.lrmat2vec(
-                            (self.xi(kz, ky, f_z, f_y, F0) +
-                             self.xi(ky, kz, f_y, f_z, F0) +
-                             0.5 * Fock['f_sig_yz'][w]).T, nocc, norb)) -
-                        2 * self.x2_contract(kz.T, mu_y, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(ky.T, mu_z, d_a_mo, nocc, norb)
-                })
+                xy_dict[(('N_sig_yy', w),
+                         2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                             (self.xi(kx, kx, f_x, f_x, F0) +
+                              3 * self.xi(ky, ky, f_y, f_y, F0) +
+                              self.xi(kz, kz, f_z, f_z, F0) +
+                              0.5 * Fock['f_sig_yy'][w]).T, nocc,
+                             norb)) - 2 * self.x2_contract(
+                                 kx.T, mu_x, d_a_mo, nocc,
+                                 norb) - 3 * 2 * self.x2_contract(
+                                     ky.T, mu_y, d_a_mo, nocc,
+                                     norb) - 2 * self.x2_contract(
+                                         kz.T, mu_z, d_a_mo, nocc, norb)
+
+                xy_dict[((
+                    'N_sig_zz', w
+                ), 2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                    (self.xi(kx, kx, f_x, f_x, F0) +
+                     self.xi(ky, ky, f_y, f_y, F0) + 3 * self.xi(
+                         kz, kz, f_z, f_z, F0) + 0.5 * Fock['f_sig_zz'][w]).T,
+                    nocc, norb)) - 2 * self.x2_contract(
+                        kx.T, mu_x, d_a_mo, nocc, norb) - 2 * self.x2_contract(
+                            ky.T, mu_y, d_a_mo, nocc,
+                            norb) - 3 * 2 * self.x2_contract(
+                                kz.T, mu_z, d_a_mo, nocc, norb)
+
+                xy_dict[((
+                    'N_sig_xy', w
+                ), 2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                    (self.xi(ky, kx, f_y, f_x, F0) + self.xi(
+                        kx, ky, f_x, f_y, F0) + 0.5 * Fock['f_sig_xy'][w]).T,
+                    nocc, norb)) - 2 * self.x2_contract(
+                        ky.T, mu_x, d_a_mo, nocc, norb) - 2 * self.x2_contract(
+                            kx.T, mu_y, d_a_mo, nocc, norb)
+
+                xy_dict[((
+                    'N_sig_xz', w
+                ), 2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                    (self.xi(kz, kx, f_z, f_x, F0) + self.xi(
+                        kx, kz, f_x, f_z, F0) + 0.5 * Fock['f_sig_xz'][w]).T,
+                    nocc, norb)) - 2 * self.x2_contract(
+                        kz.T, mu_x, d_a_mo, nocc, norb) - 2 * self.x2_contract(
+                            kx.T, mu_z, d_a_mo, nocc, norb)
+
+                xy_dict[((
+                    'N_sig_yz', w
+                ), 2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                    (self.xi(kz, ky, f_z, f_y, F0) + self.xi(
+                        ky, kz, f_y, f_z, F0) + 0.5 * Fock['f_sig_yz'][w]).T,
+                    nocc, norb)) - 2 * self.x2_contract(
+                        kz.T, mu_y, d_a_mo, nocc, norb) - 2 * self.x2_contract(
+                            ky.T, mu_z, d_a_mo, nocc, norb)
 
                 # BC CD λ+τ gradients #
-                xy_dict.update(
-                    {
-                        (('N_lamtau_xx', w), 0):
-                            self.anti_sym(
-                                -2 * LinearSolver.lrmat2vec(
-                                    (3 * 2 * self.xi(kx_, kx, f_x_, f_x, F0) +
-                                     2 * self.xi(ky_, ky, f_y_, f_y, F0) +
-                                     2 * self.xi(kz_, kz, f_z_, f_z, F0) +
-                                     0.5 * Fock['f_lamtau_xx'][w]).T, nocc,
-                                    norb))
-                            - 3 * 2 *
-                            self.x2_contract(kx_.T, mu_x, d_a_mo, nocc, norb) -
-                            2 *
-                            self.x2_contract(ky_.T, mu_y, d_a_mo, nocc, norb) -
-                            2 *
-                            self.x2_contract(kz_.T, mu_z, d_a_mo, nocc, norb) -
-                            3 * 2 *
-                            self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb) -
-                            2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
-                            -
-                            2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
-                    })
+                xy_dict[(
+                    ('N_lamtau_xx',
+                     w), 0)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                         (3 * 2 * self.xi(kx_, kx, f_x_, f_x, F0) +
+                          2 * self.xi(ky_, ky, f_y_, f_y, F0) +
+                          2 * self.xi(kz_, kz, f_z_, f_z, F0) +
+                          0.5 * Fock['f_lamtau_xx'][w]).T, nocc,
+                         norb)) - 3 * 2 * self.x2_contract(
+                             kx_.T, mu_x, d_a_mo, nocc,
+                             norb) - 2 * self.x2_contract(
+                                 ky_.T, mu_y, d_a_mo, nocc,
+                                 norb) - 2 * self.x2_contract(
+                                     kz_.T, mu_z, d_a_mo, nocc,
+                                     norb) - 3 * 2 * self.x2_contract(
+                                         kx.T, mu_x, d_a_mo, nocc,
+                                         norb) - 2 * self.x2_contract(
+                                             ky.T, mu_y, d_a_mo, nocc,
+                                             norb) - 2 * self.x2_contract(
+                                                 kz.T, mu_z, d_a_mo, nocc, norb)
 
-                xy_dict.update(
-                    {
-                        (('N_lamtau_yy', w), 0):
-                            self.anti_sym(
-                                -2 * LinearSolver.lrmat2vec(
-                                    (2 * self.xi(kx_, kx, f_x_, f_x, F0) +
-                                     3 * 2 * self.xi(ky_, ky, f_y_, f_y, F0) +
-                                     2 * self.xi(kz_, kz, f_z_, f_z, F0) +
-                                     0.5 * Fock['f_lamtau_yy'][w]).T, nocc,
-                                    norb))
-                            - 2 * self.x2_contract(kx_.T, mu_x, d_a_mo,
-                                                   nocc, norb) - 3 * 2 *
-                            self.x2_contract(ky_.T, mu_y, d_a_mo, nocc, norb) -
-                            2 *
-                            self.x2_contract(kz_.T, mu_z, d_a_mo, nocc, norb) -
-                            2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
-                            - 3 * 2 *
-                            self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb) -
-                            2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
-                    })
+                xy_dict[(
+                    ('N_lamtau_yy',
+                     w), 0)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                         (2 * self.xi(kx_, kx, f_x_, f_x, F0) +
+                          3 * 2 * self.xi(ky_, ky, f_y_, f_y, F0) +
+                          2 * self.xi(kz_, kz, f_z_, f_z, F0) +
+                          0.5 * Fock['f_lamtau_yy'][w]).T,
+                         nocc, norb)) - 2 * self.x2_contract(
+                             kx_.T, mu_x, d_a_mo, nocc,
+                             norb) - 3 * 2 * self.x2_contract(
+                                 ky_.T, mu_y, d_a_mo, nocc,
+                                 norb) - 2 * self.x2_contract(
+                                     kz_.T, mu_z, d_a_mo, nocc,
+                                     norb) - 2 * self.x2_contract(
+                                         kx.T, mu_x, d_a_mo, nocc,
+                                         norb) - 3 * 2 * self.x2_contract(
+                                             ky.T, mu_y, d_a_mo, nocc,
+                                             norb) - 2 * self.x2_contract(
+                                                 kz.T, mu_z, d_a_mo, nocc, norb)
 
-                xy_dict.update(
-                    {
-                        (('N_lamtau_zz', w), 0):
-                            self.anti_sym(
-                                -2 * LinearSolver.lrmat2vec(
-                                    (2 * self.xi(kx_, kx, f_x_, f_x, F0) +
-                                     2 * self.xi(ky_, ky, f_y_, f_y, F0) +
-                                     3 * 2 * self.xi(kz_, kz, f_z_, f_z, F0) +
-                                     0.5 * Fock['f_lamtau_zz'][w]).T, nocc,
-                                    norb))
-                            - 2 * self.x2_contract(kx_.T, mu_x, d_a_mo,
-                                                   nocc, norb) - 2 *
-                            self.x2_contract(ky_.T, mu_y, d_a_mo, nocc, norb) -
-                            3 * 2 *
-                            self.x2_contract(kz_.T, mu_z, d_a_mo, nocc, norb) -
-                            2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
-                            -
-                            2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
-                            - 3 * 2 *
-                            self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
-                    })
+                xy_dict[(
+                    ('N_lamtau_zz',
+                     w), 0)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                         (2 * self.xi(kx_, kx, f_x_, f_x, F0) +
+                          2 * self.xi(ky_, ky, f_y_, f_y, F0) +
+                          3 * 2 * self.xi(kz_, kz, f_z_, f_z, F0) +
+                          0.5 * Fock['f_lamtau_zz'][w]).T,
+                         nocc, norb)) - 2 * self.x2_contract(
+                             kx_.T, mu_x, d_a_mo, nocc,
+                             norb) - 2 * self.x2_contract(
+                                 ky_.T, mu_y, d_a_mo, nocc,
+                                 norb) - 3 * 2 * self.x2_contract(
+                                     kz_.T, mu_z, d_a_mo, nocc,
+                                     norb) - 2 * self.x2_contract(
+                                         kx.T, mu_x, d_a_mo, nocc,
+                                         norb) - 2 * self.x2_contract(
+                                             ky.T, mu_y, d_a_mo, nocc,
+                                             norb) - 3 * 2 * self.x2_contract(
+                                                 kz.T, mu_z, d_a_mo, nocc, norb)
 
-                xy_dict.update({
-                    (('N_lamtau_xy', w), 0):
-                        self.anti_sym(-2 * LinearSolver.lrmat2vec(
-                            (2 * self.xi(ky_, kx, f_y_, f_x, F0) +
-                             2 * self.xi(kx_, ky, f_x_, f_y, F0) +
-                             0.5 * Fock['f_lamtau_xy'][w]).T, nocc, norb)) -
-                        2 * self.x2_contract(ky.T, mu_x, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(kx.T, mu_y, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(ky_.T, mu_x, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(kx_.T, mu_y, d_a_mo, nocc, norb)
-                })
-                xy_dict.update({
-                    (('N_lamtau_xz', w), 0):
-                        self.anti_sym(-2 * LinearSolver.lrmat2vec(
-                            (2 * self.xi(kz_, kx, f_z_, f_x, F0) +
-                             2 * self.xi(kx_, kz, f_x_, f_z, F0) +
-                             0.5 * Fock['f_lamtau_xz'][w]).T, nocc, norb)) -
-                        2 * self.x2_contract(kz.T, mu_x, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(kx.T, mu_z, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(kz_.T, mu_x, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(kx_.T, mu_z, d_a_mo, nocc, norb)
-                })
-                xy_dict.update({
-                    (('N_lamtau_yz', w), 0):
-                        self.anti_sym(-2 * LinearSolver.lrmat2vec(
-                            (2 * self.xi(kz_, ky, f_z_, f_y, F0) +
-                             2 * self.xi(ky_, kz, f_y_, f_z, F0) +
-                             0.5 * Fock['f_lamtau_yz'][w]).T, nocc, norb)) -
-                        2 * self.x2_contract(kz.T, mu_y, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(ky.T, mu_z, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(kz_.T, mu_y, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(ky_.T, mu_z, d_a_mo, nocc, norb)
-                })
-        else:
-            xy_dict = {}
+                xy_dict[(('N_lamtau_xy', w),
+                         0)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                             (2 * self.xi(ky_, kx, f_y_, f_x, F0) +
+                              2 * self.xi(kx_, ky, f_x_, f_y, F0) +
+                              0.5 * Fock['f_lamtau_xy'][w]).T, nocc,
+                             norb)) - 2 * self.x2_contract(
+                                 ky.T, mu_x, d_a_mo, nocc,
+                                 norb) - 2 * self.x2_contract(
+                                     kx.T, mu_y, d_a_mo, nocc,
+                                     norb) - 2 * self.x2_contract(
+                                         ky_.T, mu_x, d_a_mo, nocc,
+                                         norb) - 2 * self.x2_contract(
+                                             kx_.T, mu_y, d_a_mo, nocc, norb)
+
+                xy_dict[(('N_lamtau_xz', w),
+                         0)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                             (2 * self.xi(kz_, kx, f_z_, f_x, F0) +
+                              2 * self.xi(kx_, kz, f_x_, f_z, F0) +
+                              0.5 * Fock['f_lamtau_xz'][w]).T, nocc,
+                             norb)) - 2 * self.x2_contract(
+                                 kz.T, mu_x, d_a_mo, nocc,
+                                 norb) - 2 * self.x2_contract(
+                                     kx.T, mu_z, d_a_mo, nocc,
+                                     norb) - 2 * self.x2_contract(
+                                         kz_.T, mu_x, d_a_mo, nocc,
+                                         norb) - 2 * self.x2_contract(
+                                             kx_.T, mu_z, d_a_mo, nocc, norb)
+
+                xy_dict[(('N_lamtau_yz', w),
+                         0)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                             (2 * self.xi(kz_, ky, f_z_, f_y, F0) +
+                              2 * self.xi(ky_, kz, f_y_, f_z, F0) +
+                              0.5 * Fock['f_lamtau_yz'][w]).T, nocc,
+                             norb)) - 2 * self.x2_contract(
+                                 kz.T, mu_y, d_a_mo, nocc,
+                                 norb) - 2 * self.x2_contract(
+                                     ky.T, mu_z, d_a_mo, nocc,
+                                     norb) - 2 * self.x2_contract(
+                                         kz_.T, mu_y, d_a_mo, nocc,
+                                         norb) - 2 * self.x2_contract(
+                                             ky_.T, mu_z, d_a_mo, nocc, norb)
+
         return xy_dict
 
     def get_xy_red(self, d_a_mo, X, wi, Fock, kX, nocc, norb):
@@ -1138,6 +1119,7 @@ class TPAdriver:
         """
 
         xy_dict = {}
+
         if self.rank == mpi_master():
             for w in wi:
                 mu_x = X['x']
@@ -1155,80 +1137,69 @@ class TPAdriver:
                 f_z = Fock['Fb'][('z', w)]
 
                 # BD σ gradients #
-                xy_dict.update(
-                    {
-                        (('N_sig_xx', w), 2 * w):
-                            self.anti_sym(
-                                -2 * LinearSolver.lrmat2vec(
-                                    (3 * self.xi(kx, kx, f_x, f_x, F0) +
-                                     self.xi(ky, ky, f_y, f_y, F0) +
-                                     self.xi(kz, kz, f_z, f_z, F0) +
-                                     0.5 * Fock['f_sig_xx'][w]).T, nocc, norb))
-                            - 3 * 2 *
-                            self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb) -
-                            2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
-                            -
-                            2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
-                    })
-                xy_dict.update(
-                    {
-                        (('N_sig_yy', w), 2 * w):
-                            self.anti_sym(
-                                -2 * LinearSolver.lrmat2vec(
-                                    (self.xi(kx, kx, f_x, f_x, F0) +
-                                     3 * self.xi(ky, ky, f_y, f_y, F0) +
-                                     self.xi(kz, kz, f_z, f_z, F0) +
-                                     0.5 * Fock['f_sig_yy'][w]).T, nocc, norb))
-                            -
-                            2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
-                            - 3 * 2 *
-                            self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb) -
-                            2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
-                    })
-                xy_dict.update({
-                    (('N_sig_zz', w), 2 * w):
-                        self.anti_sym(-2 *
-                                      LinearSolver.lrmat2vec(
-                                          (self.xi(kx, kx, f_x, f_x, F0) +
-                                           self.xi(ky, ky, f_y, f_y, F0) +
-                                           3 * self.xi(kz, kz, f_z, f_z, F0) +
-                                           0.5 * Fock['f_sig_zz'][w]).T, nocc,
-                                          norb))
-                        - 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb) -
-                        3 * 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
-                })
+                xy_dict[((
+                    'N_sig_xx', w
+                ), 2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                    (3 * self.xi(kx, kx, f_x, f_x, F0) + self.xi(
+                        ky, ky, f_y, f_y, F0) + self.xi(kz, kz, f_z, f_z, F0) +
+                     0.5 * Fock['f_sig_xx'][w]).T,
+                    nocc, norb)) - 3 * 2 * self.x2_contract(
+                        kx.T, mu_x, d_a_mo, nocc, norb) - 2 * self.x2_contract(
+                            ky.T, mu_y, d_a_mo, nocc, norb
+                        ) - 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
 
-                xy_dict.update({
-                    (('N_sig_xy', w), 2 * w):
-                        self.anti_sym(-2 * LinearSolver.lrmat2vec(
-                            (self.xi(ky, kx, f_y, f_x, F0) +
-                             self.xi(kx, ky, f_x, f_y, F0) +
-                             0.5 * Fock['f_sig_xy'][w]).T, nocc, norb)) -
-                        2 * self.x2_contract(ky.T, mu_x, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(kx.T, mu_y, d_a_mo, nocc, norb)
-                })
-                xy_dict.update({
-                    (('N_sig_xz', w), 2 * w):
-                        self.anti_sym(-2 * LinearSolver.lrmat2vec(
-                            (self.xi(kz, kx, f_z, f_x, F0) +
-                             self.xi(kx, kz, f_x, f_z, F0) +
-                             0.5 * Fock['f_sig_xz'][w]).T, nocc, norb)) -
-                        2 * self.x2_contract(kz.T, mu_x, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(kx.T, mu_z, d_a_mo, nocc, norb)
-                })
-                xy_dict.update({
-                    (('N_sig_yz', w), 2 * w):
-                        self.anti_sym(-2 * LinearSolver.lrmat2vec(
-                            (self.xi(kz, ky, f_z, f_y, F0) +
-                             self.xi(ky, kz, f_y, f_z, F0) +
-                             0.5 * Fock['f_sig_yz'][w]).T, nocc, norb)) -
-                        2 * self.x2_contract(kz.T, mu_y, d_a_mo, nocc, norb) -
-                        2 * self.x2_contract(ky.T, mu_z, d_a_mo, nocc, norb)
-                })
+                xy_dict[(('N_sig_yy', w),
+                         2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                             (self.xi(kx, kx, f_x, f_x, F0) +
+                              3 * self.xi(ky, ky, f_y, f_y, F0) +
+                              self.xi(kz, kz, f_z, f_z, F0) +
+                              0.5 * Fock['f_sig_yy'][w]).T, nocc,
+                             norb)) - 2 * self.x2_contract(
+                                 kx.T, mu_x, d_a_mo, nocc,
+                                 norb) - 3 * 2 * self.x2_contract(
+                                     ky.T, mu_y, d_a_mo, nocc,
+                                     norb) - 2 * self.x2_contract(
+                                         kz.T, mu_z, d_a_mo, nocc, norb)
 
-        else:
-            xy_dict = {}
+                xy_dict[((
+                    'N_sig_zz', w
+                ), 2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                    (self.xi(kx, kx, f_x, f_x, F0) +
+                     self.xi(ky, ky, f_y, f_y, F0) + 3 * self.xi(
+                         kz, kz, f_z, f_z, F0) + 0.5 * Fock['f_sig_zz'][w]).T,
+                    nocc, norb)) - 2 * self.x2_contract(
+                        kx.T, mu_x, d_a_mo, nocc, norb) - 2 * self.x2_contract(
+                            ky.T, mu_y, d_a_mo, nocc,
+                            norb) - 3 * 2 * self.x2_contract(
+                                kz.T, mu_z, d_a_mo, nocc, norb)
+
+                xy_dict[((
+                    'N_sig_xy', w
+                ), 2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                    (self.xi(ky, kx, f_y, f_x, F0) + self.xi(
+                        kx, ky, f_x, f_y, F0) + 0.5 * Fock['f_sig_xy'][w]).T,
+                    nocc, norb)) - 2 * self.x2_contract(
+                        ky.T, mu_x, d_a_mo, nocc, norb) - 2 * self.x2_contract(
+                            kx.T, mu_y, d_a_mo, nocc, norb)
+
+                xy_dict[((
+                    'N_sig_xz', w
+                ), 2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                    (self.xi(kz, kx, f_z, f_x, F0) + self.xi(
+                        kx, kz, f_x, f_z, F0) + 0.5 * Fock['f_sig_xz'][w]).T,
+                    nocc, norb)) - 2 * self.x2_contract(
+                        kz.T, mu_x, d_a_mo, nocc, norb) - 2 * self.x2_contract(
+                            kx.T, mu_z, d_a_mo, nocc, norb)
+
+                xy_dict[((
+                    'N_sig_yz', w
+                ), 2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
+                    (self.xi(kz, ky, f_z, f_y, F0) + self.xi(
+                        ky, kz, f_y, f_z, F0) + 0.5 * Fock['f_sig_yz'][w]).T,
+                    nocc, norb)) - 2 * self.x2_contract(
+                        kz.T, mu_y, d_a_mo, nocc, norb) - 2 * self.x2_contract(
+                            ky.T, mu_z, d_a_mo, nocc, norb)
+
         return xy_dict
 
     def other_red(self, wi, track, n_x, n_xy, X, kX, kXY, da, mol_orbs, task):
@@ -1400,8 +1371,8 @@ class TPAdriver:
             nx_a2_nyz += self.a2_contract(kc, A, da, mol_orbs, task) @ Nbd
             nx_a2_nyz += self.a2_contract(kbd, A, da, mol_orbs, task) @ Nc
 
-            na_x2_nyz_dict.update({(w, -w, w): na_x2_nyz})
-            nx_a2_nyz_dict.update({(w, -w, w): nx_a2_nyz})
+            na_x2_nyz_dict[(w, -w, w)] = na_x2_nyz
+            nx_a2_nyz_dict[(w, -w, w)] = nx_a2_nyz
 
         return na_x2_nyz_dict, nx_a2_nyz_dict
 
@@ -1497,8 +1468,8 @@ class TPAdriver:
 
             count += (len(track) // len(wi))
 
-            na_a3_nx_ny_dict.update({(wi[j], -wi[j], wi[j]): na_a3_nx_ny})
-            na_x3_ny_nz_dict.update({(wi[j], -wi[j], wi[j]): na_x3_ny_nz})
+            na_a3_nx_ny_dict[(wi[j], -wi[j], wi[j])] = na_a3_nx_ny
+            na_x3_ny_nz_dict[(wi[j], -wi[j], wi[j])] = na_x3_ny_nz
 
         for i in range(len(wi)):
             wb = float(track[i * (len(track) // len(wi))].split(",")[1])
@@ -1761,8 +1732,8 @@ class TPAdriver:
             nx_a2_nyz += self.a2_contract(kc, A, da, mol_orbs, task) @ Nbd
             nx_a2_nyz += self.a2_contract(kbd, A, da, mol_orbs, task) @ Nc
 
-            na_x2_nyz_dict.update({(w, -w, w): na_x2_nyz})
-            nx_a2_nyz_dict.update({(w, -w, w): nx_a2_nyz})
+            na_x2_nyz_dict[(w, -w, w)] = na_x2_nyz
+            nx_a2_nyz_dict[(w, -w, w)] = nx_a2_nyz
 
         return (na_x3_ny_nz_dict, na_a3_nx_ny_dict, na_x2_nyz_dict,
                 nx_a2_nyz_dict)
@@ -1792,7 +1763,6 @@ class TPAdriver:
             A dictonary of final T[4] contraction values
         """
 
-        count = 0
         T4term = {}
         S4 = self.S4_dict(wi, Kx, track, da, mol_orbs, task)
 
@@ -1812,8 +1782,8 @@ class TPAdriver:
                 t4term += R4term[('x', ww)] + R4term[('y', ww)] + R4term[('z',
                                                                           ww)]
 
-            T4term.update({(ww, -ww, ww): t4term})
-            count += (len(track) // len(wi))
+            T4term[(ww, -ww, ww)] = t4term
+
         return T4term
 
     def S4_dict(self, wi, kX, track, D0, nocc, norb):
@@ -1873,9 +1843,9 @@ class TPAdriver:
 
             count += (len(track) // len(wi))
 
-            S4terms.update({('x', w): -S4_term_x})
-            S4terms.update({('y', w): -S4_term_y})
-            S4terms.update({('z', w): -S4_term_z})
+            S4terms[('x', w)] = -S4_term_x
+            S4terms[('y', w)] = -S4_term_y
+            S4terms[('z', w)] = -S4_term_z
 
         return S4terms
 
@@ -1891,6 +1861,7 @@ class TPAdriver:
         :param norb:
             The number of total orbitals
         """
+
         S4_123 = self.S4contract(k1, k2, k3, D, nocc, norb)
         return S4_123
 
@@ -1907,8 +1878,8 @@ class TPAdriver:
             The number of occupied orbtials
         :param norb:
             The number of total orbitals
-
         """
+
         S4_123 = self.S4contract(k1, k2, k3, D, nocc, norb)
         S4_132 = self.S4contract(k1, k3, k2, D, nocc, norb)
         A = S4_123 + S4_132
@@ -1917,8 +1888,7 @@ class TPAdriver:
 
     def S4contract(self, k1, k2, k3, D, nocc, norb):
         """
-
-        This code returns the contraction of S[4] for S[4] dict
+        Returns the contraction of S[4] for S[4] dict
 
         :param k1,k2,k3:
             A response matrix
@@ -1928,8 +1898,8 @@ class TPAdriver:
             The number of occupied orbtials
         :param norb:
             The number of total orbitals
-
         """
+
         S4N1N2N3 = self.commut(self.commut(k3, self.commut(k2, k1)), D.T)
         S4N1N2N3 = [
             LinearSolver.lrmat2vec(S4N1N2N3.real, nocc, norb),
@@ -1939,24 +1909,26 @@ class TPAdriver:
         return (2. / 6) * S4N1N2N3_c
 
     def flip_xy(self, X):
-        # TODO: rewrite flip_xy
-        NewXY = []
-        for a in range(int(len(X) / 2), len(X), 1):
-            NewXY.append(X[a])
-        for a in range(0, int(len(X) / 2), 1):
-            NewXY.append(X[a])
-        NewXY = np.array(NewXY)
-        return NewXY
+
+        if X.ndim == 1:
+            new_xy = np.zeros_like(X)
+            half_len = X.shape[0] // 2
+            new_xy[:half_len] = X[half_len:]
+            new_xy[half_len:] = X[:half_len]
+            return new_xy
+
+        return None
 
     def flip_yz(self, X):
-        # TODO: rewrite flip_yz
-        NewXY = []
-        for a in range(int(len(X) / 2), len(X), 1):
-            NewXY.append(-X[a].real + 1j * X[a].imag)
-        for a in range(0, int(len(X) / 2), 1):
-            NewXY.append(-X[a].real + 1j * X[a].imag)
-        NewXY = np.array(NewXY)
-        return NewXY
+
+        if X.ndim == 1:
+            new_yz = np.zeros_like(X)
+            half_len = X.shape[0] // 2
+            new_yz[:half_len] = -X.real[half_len:] + 1j * X.imag[half_len:]
+            new_yz[half_len:] = -X.real[:half_len] + 1j * X.imag[:half_len]
+            return new_yz
+
+        return None
 
     def transform_dens(self, k, D, S):
         """
@@ -2077,7 +2049,7 @@ class TPAdriver:
     def a3_contract(self, k1, k2, A, D, nocc, norb):
         """
         Contracts the generalized dipole gradient tensor of rank 3 with two
-        first-order response matrices
+        first-order response matrices. A[3]N1N2 = (1/6)[[k2,[k1,A]],D.T]
 
         :param: k1:
             First-order response matrix
@@ -2092,11 +2064,8 @@ class TPAdriver:
         :param norb:
             Number of total orbtials
 
-        A[3]N1N2 = (1/6)[[k2,[k1,A]],D.T]
-
         :return :
             Returns a matrix
-
         """
 
         A3n_xNy = self.commut(self.commut(k2.T, self.commut(k1.T, A)), D.T)
@@ -2135,57 +2104,6 @@ class TPAdriver:
         A2n_x_c = A2n_x[0] + 1j * A2n_x[1]
         return -(1. / 2) * A2n_x_c
 
-    def get_fock_dict_II_red(self, wi, kX, density_list, D0, mo, molecule,
-                             ao_basis):
-        """
-        Computes the compounded second-order Fock matrics used for the reduced
-        isotropic cubic response function
-
-        :param wi:
-            A list of the frequencies
-        :param kX:
-            A dictonary with all the first-order response matrices
-        :param D0:
-            The SCF density matrix in AO basis
-        :param mo:
-            A matrix containing the MO coefficents
-        :param molecule:
-        :param ao_basis:
-
-        :return:
-            A dictonary of compounded second-order Fock-matrices
-
-        """
-        F123_x = {}
-        F123_y = {}
-        F123_z = {}
-
-        if self.rank == mpi_master():
-            self.print_fock_header()
-        time_start_fock = time.time()
-
-        ff_AO = self.get_fock_r(mo, density_list, molecule, ao_basis, 1)
-
-        time_end_fock = time.time()
-        total_time_fock = time_end_fock - time_start_fock
-        self.print_fock_time(total_time_fock)
-
-        if self.rank == mpi_master():
-
-            fock_list = ff_AO
-
-            count = 0
-            for w in wi:
-                F123_x.update({w: fock_list[3 * count]})
-                F123_y.update({w: fock_list[3 * count + 1]})
-                F123_z.update({w: fock_list[3 * count + 2]})
-                count += 1
-
-            fock_dict = {'F123_x': F123_x, 'F123_y': F123_y, 'F123_z': F123_z}
-        else:
-            fock_dict = {}
-        return fock_dict
-
     def get_fock_dict_II(self, wi, kX, density_list, D0, mo, molecule,
                          ao_basis):
         """
@@ -2205,37 +2123,32 @@ class TPAdriver:
 
         :return:
             A dictonary of compounded second-order Fock-matrices
-
         """
-
-        F123_x = {}
-        F123_y = {}
-        F123_z = {}
 
         if self.rank == mpi_master():
             self.print_fock_header()
+
         time_start_fock = time.time()
-
-        ff_AO = self.get_fock_r(mo, density_list, molecule, ao_basis, 1)
-
+        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis, 1)
         time_end_fock = time.time()
+
         total_time_fock = time_end_fock - time_start_fock
         self.print_fock_time(total_time_fock)
 
+        fock_dict = {}
+
         if self.rank == mpi_master():
+            F123_x = {}
+            F123_y = {}
+            F123_z = {}
 
-            fock_list = ff_AO
-
-            count = 0
-            for w in wi:
-                F123_x.update({w: fock_list[3 * count]})
-                F123_y.update({w: fock_list[3 * count + 1]})
-                F123_z.update({w: fock_list[3 * count + 2]})
-                count += 1
+            for count, w in enumerate(wi):
+                F123_x[w] = fock_list[3 * count]
+                F123_y[w] = fock_list[3 * count + 1]
+                F123_z[w] = fock_list[3 * count + 2]
 
             fock_dict = {'F123_x': F123_x, 'F123_y': F123_y, 'F123_z': F123_z}
-        else:
-            fock_dict = {}
+
         return fock_dict
 
     def get_densities_II_red(self, wi, kX, kXY, S, D0, mo):
@@ -2262,7 +2175,9 @@ class TPAdriver:
         :return:
             A list of tranformed compounded densities
         """
+
         density_list = []
+
         for w in wi:
             k_sig_xx = self.mo2ao(mo, kXY[(('N_sig_xx', w), 2 * w)]).T
             k_sig_yy = self.mo2ao(mo, kXY[(('N_sig_yy', w), 2 * w)]).T
@@ -2322,6 +2237,7 @@ class TPAdriver:
             density_list.append(Dx)
             density_list.append(Dy)
             density_list.append(Dz)
+
         return density_list
 
     def get_densities_II(self, wi, kX, kXY, S, D0, mo):
@@ -2461,6 +2377,7 @@ class TPAdriver:
             density_list.append(Dx)
             density_list.append(Dy)
             density_list.append(Dz)
+
         return density_list
 
     def xi(self, kA, kB, Fa, Fb, F0):
@@ -2473,8 +2390,8 @@ class TPAdriver:
             First-order perturbed Fock matrices
         :param F0:
             SCF Fock matrix
-
         """
+
         xi = 0.5 * (self.commut(kA,
                                 self.commut(kB, F0) + 2 * Fb) +
                     self.commut(kB,
@@ -2492,6 +2409,7 @@ class TPAdriver:
         :param F0:
             SCF Fock matrix
         """
+
         xi = self.commut(kA, self.commut(kB, F0) + 3 * Fb)
         return xi
 
@@ -2579,9 +2497,8 @@ class TPAdriver:
 
         # computing the remaning second-order Fock matrices from the
         # second-order densities
-        fock_dict_two_red = self.get_fock_dict_II_red(w, kX,
-                                                      density_list_two_red, D0,
-                                                      mo, molecule, ao_basis)
+        fock_dict_two_red = self.get_fock_dict_II(w, kX, density_list_two_red,
+                                                  D0, mo, molecule, ao_basis)
         if not reduced_tpa:
             fock_dict_two = self.get_fock_dict_II(w, kX, density_list_two, D0,
                                                   mo, molecule, ao_basis)
@@ -2658,7 +2575,6 @@ class TPAdriver:
             A dictonary of the final values for the NaT[3]NxNyz contractions
         """
 
-        count = 0
         t3_term = {}
 
         for i in range(len(freqs)):
@@ -2668,9 +2584,8 @@ class TPAdriver:
                 ('y', w)] @ e3_dict['f_iso_y'][w] - n_x['Na'][
                     ('z', w)] @ e3_dict['f_iso_z'][w]
 
-            t3_term.update({(w, -w, w): t3term})
+            t3_term[(w, -w, w)] = t3term
 
-            count += (len(track) // len(freqs))
         return t3_term
 
     def get_r4(self, freqs, kX, n_x, track, d_a_mo, nocc, norb):
@@ -2768,9 +2683,9 @@ class TPAdriver:
                         kA.T, kD, kC, d_a_mo, nocc, norb)
 
             count += (len(track) // len(freqs))
-            R4terms.update({('x', w1): -R4x})
-            R4terms.update({('y', w1): -R4y})
-            R4terms.update({('z', w1): -R4z})
+            R4terms[('x', w1)] = -R4x
+            R4terms[('y', w1)] = -R4y
+            R4terms[('z', w1)] = -R4z
 
         return R4terms
 
@@ -2779,23 +2694,17 @@ class TPAdriver:
         Returns an antisymetrized vector
 
         :param Vec:
-            Vector to me anti-symetrized
+            Vector to be anti-symetrized
         """
-        # TODO: rewrite anti_sym
 
-        N = len(Vec)
-        NewVec = []
-        Avec = []
-        TotVec = []
-        for a in range(int(N / 2)):
-            NewVec.append(Vec[a])
-        for a in range(int(N / 2), N):
-            Avec.append(-Vec[a])
-        for a in range(len(NewVec)):
-            TotVec.append(NewVec[a])
-        for a in range(len(Avec)):
-            TotVec.append(Avec[a])
-        return TotVec
+        if Vec.ndim == 1:
+            new_vec = np.zeros_like(Vec)
+            half_len = Vec.shape[0] // 2
+            new_vec[:half_len] = Vec[:half_len]
+            new_vec[half_len:] = -Vec[half_len:]
+            return new_vec
+
+        return None
 
     def get_n_xy(self, w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule,
                  ao_basis, scf_tensors):
@@ -2896,7 +2805,6 @@ class TPAdriver:
             A dictonary of Fock matrices from the subspace,second-order
             response vectors and second-order response matrices
         """
-
         xy_dict = {}
         freq = None
 
@@ -2951,6 +2859,7 @@ class TPAdriver:
         :param rank:
 
         """
+
         if rank == 0:
             # computes the unperturbed Fock matrix from the SCF Density and
             # adds the one electron part

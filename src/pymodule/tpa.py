@@ -3,6 +3,7 @@ import sys
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
+from .veloxchemlib import hartree_in_ev
 from .inputparser import parse_frequencies
 from .cppsolver import ComplexResponse
 from .tpadriver import TPAdriver
@@ -35,8 +36,8 @@ class TPA(LinearSolver):
         self.batch_size = None
 
         # cpp settings
-        self.frequencies = 0
-        self.comp = "zzzz,0,0,0"
+        self.frequencies = (0,)
+        self.comp = 'zzzz,0,0,0'
         self.damping = 0.004556335294880438
         self.lindep_thresh = 1.0e-10
         self.conv_thresh = 1.0e-4
@@ -62,22 +63,8 @@ class TPA(LinearSolver):
         if method_dict is None:
             method_dict = {}
 
-        # TODO: include unit in parse_frequencies
-
         if 'frequencies' in rsp_dict:
-            if 'unit' in rsp_dict:
-                if rsp_dict['unit'] in 'eV':
-                    ev_frequencies = rsp_dict['frequencies']
-                    star = float(
-                        ev_frequencies.split("-")[0]) / 27.218679420751958
-                    en = float(
-                        ev_frequencies.split("-")[1]) / 27.218679420751958
-                    step = float(
-                        ev_frequencies.split("-")[2]) / 27.218679420751958
-                    self.frequencies = str(star) + "-" + str(en) + "-" + str(
-                        step)
-            else:
-                self.frequencies = rsp_dict['frequencies']
+            self.frequencies = parse_frequencies(rsp_dict['frequencies'])
         if 'damping' in rsp_dict:
             self.damping = float(rsp_dict['damping'])
         if 'reduced_tpa' in rsp_dict:
@@ -166,15 +153,8 @@ class TPA(LinearSolver):
             d_a_mo = np.linalg.multi_dot([mo.T, S, da, S, mo])
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
-            w = parse_frequencies(self.frequencies)
         else:
-            S = None
-            da = None
-            mo = None
             d_a_mo = None
-            nocc = None
-            norb = None
-            w = None
 
         # Computing first-order gradient vectors
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
@@ -189,13 +169,14 @@ class TPA(LinearSolver):
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
         if self.rank == mpi_master():
-            v1 = {(op, wi): v for op, v in zip(component, b_rhs) for wi in w}
+            v1 = {(op, w): v for op, v in zip(component, b_rhs)
+                  for w in self.frequencies}
             X = {
                 'x': 2 * tpa_drv.ao2mo(mo, dipole_mats.x_to_numpy()),
                 'y': 2 * tpa_drv.ao2mo(mo, dipole_mats.y_to_numpy()),
                 'z': 2 * tpa_drv.ao2mo(mo, dipole_mats.z_to_numpy())
             }
-            self.comp = self.get_comp(w)
+            self.comp = self.get_comp(self.frequencies)
         else:
             v1 = None
             X = None
@@ -278,16 +259,17 @@ class TPA(LinearSolver):
         # A[3] and A[2] which formally are not part of the third-order gradient
         # but which are used for the cubic response function
 
-        tpa_dict = tpa_drv.main(Focks, Nx, w, X, d_a_mo, kX, self.comp,
-                                self.reduced_tpa, scf_tensors, molecule,
-                                ao_basis)
+        tpa_dict = tpa_drv.main(Focks, Nx, self.frequencies, X, d_a_mo, kX,
+                                self.comp, self.reduced_tpa, scf_tensors,
+                                molecule, ao_basis)
 
         if self.rank == mpi_master():
             NaX2Nyz_red = tpa_dict['na_x2_nyz_red']
             NxA2Nyz_red = tpa_dict['nx_a2_nyz_red']
             E3_dict_red = tpa_dict['e3_dict_red']
 
-            t3_dict_red = tpa_drv.get_t3(w, E3_dict_red, Nx, self.comp)
+            t3_dict_red = tpa_drv.get_t3(self.frequencies, E3_dict_red, Nx,
+                                         self.comp)
 
             if not self.reduced_tpa:
                 NaX3NyNz = tpa_dict['na_x3_ny_nz']
@@ -297,9 +279,10 @@ class TPA(LinearSolver):
                 E3_dict = tpa_dict['e3_dict']
                 E4_dict = tpa_dict['e4_dict']
 
-                t4_dict = tpa_drv.get_t4(w, E4_dict, Nx, kX, self.comp, d_a_mo,
-                                         nocc, norb)
-                t3_dict = tpa_drv.get_t3(w, E3_dict, Nx, self.comp)
+                t4_dict = tpa_drv.get_t4(self.frequencies, E4_dict, Nx, kX,
+                                         self.comp, d_a_mo, nocc, norb)
+                t3_dict = tpa_drv.get_t3(self.frequencies, E3_dict, Nx,
+                                         self.comp)
 
         # Combining all the terms to evaluate the iso-tropic cubic response
         # function. For TPA Full and reduced, see article
@@ -308,31 +291,30 @@ class TPA(LinearSolver):
             gamma_red = {}
             gamma = {}
 
-            for i in range(len(w)):
-                gamma_red[(w[i], -w[i], w[i])] = 1. / 15 * (t3_dict_red[
-                    (w[i], -w[i], w[i])] + NaX2Nyz_red[
-                        (w[i], -w[i], w[i])] + NxA2Nyz_red[(w[i], -w[i], w[i])])
+            for w in self.frequencies:
+                gamma_red[(
+                    w, -w,
+                    w)] = 1. / 15 * (t3_dict_red[(w, -w, w)] + NaX2Nyz_red[
+                        (w, -w, w)] + NxA2Nyz_red[(w, -w, w)])
                 if not self.reduced_tpa:
-                    gamma[(w[i], -w[i],
-                           w[i])] = 1. / 15 * (t4_dict[(w[i], -w[i], w[i])] +
-                                               t3_dict[(w[i], -w[i], w[i])] +
-                                               NaX3NyNz[(w[i], -w[i], w[i])] +
-                                               NaA3NxNy[(w[i], -w[i], w[i])] +
-                                               NaX2Nyz[(w[i], -w[i], w[i])] +
-                                               NxA2Nyz[(w[i], -w[i], w[i])])
+                    gamma[(w, -w, w)] = 1. / 15 * (
+                        t4_dict[(w, -w, w)] + t3_dict[(w, -w, w)] +
+                        NaX3NyNz[(w, -w, w)] + NaA3NxNy[(w, -w, w)] +
+                        NaX2Nyz[(w, -w, w)] + NxA2Nyz[(w, -w, w)])
 
             self.print_header()
-            self.print_results_red(w, gamma_red, self.comp, t3_dict_red,
-                                   NaX2Nyz_red, NxA2Nyz_red)
+            self.print_results_red(self.frequencies, gamma_red, self.comp,
+                                   t3_dict_red, NaX2Nyz_red, NxA2Nyz_red)
             if not self.reduced_tpa:
-                self.print_results(w, gamma, self.comp, t4_dict, t3_dict,
-                                   NaX3NyNz, NaA3NxNy, NaX2Nyz, NxA2Nyz)
+                self.print_results(self.frequencies, gamma, self.comp, t4_dict,
+                                   t3_dict, NaX3NyNz, NaA3NxNy, NaX2Nyz,
+                                   NxA2Nyz)
 
         self.is_converged = True
 
         if self.rank == mpi_master():
             result = {
-                'w': w,
+                'w': self.frequencies,
                 't3_dict_red': t3_dict_red,
                 'NaX2Nyz_red': NaX2Nyz_red,
                 'NxA2Nyz_red': NxA2Nyz_red,
@@ -368,8 +350,7 @@ class TPA(LinearSolver):
 
         width = 50
 
-        cur_str = "Frequencies : " + str(
-            self.frequencies) + " (start-stop-step)"
+        cur_str = "Frequencies : " + str(self.frequencies)
         self.ostream.print_header(cur_str.ljust(width))
         cur_str = "Damping     : " + \
             "{:.1e}".format(self.damping)
@@ -416,11 +397,10 @@ class TPA(LinearSolver):
         self.ostream.print_blank()
         self.ostream.print_header(w_str.ljust(width))
         self.ostream.print_blank()
-        count = 1
+
         for a in range(len(comp) // len(freqs)):
-            w_str = str(count) + '. ' + str(comp[a].split(",")[0])
+            w_str = str(a + 1) + '. ' + str(comp[a].split(",")[0])
             self.ostream.print_header(w_str.ljust(width))
-            count += 1
 
         self.ostream.print_blank()
 
@@ -445,7 +425,7 @@ class TPA(LinearSolver):
 
             w_str = 'Σ<<μ;μ,μ,μ>>= {:.8f}, '.format(gamma[w, -w, w])
             w_str += 'ω=({:.4f},{:.4f},{:.4f}), '.format(w, -w, w)
-            w_str += 'hω =({:.4f} eV)'.format(w * 54.437358841503915 / 2)
+            w_str += 'hω =({:.4f} eV)'.format(w * hartree_in_ev())
             self.ostream.print_header(w_str.ljust(width))
             self.ostream.print_header(('-' * len(w_str)).ljust(width))
             self.ostream.print_blank()
@@ -467,6 +447,7 @@ class TPA(LinearSolver):
             A dictonary containing the reduced isotropic cubic response
             functions for TPA
         """
+
         width = 50
 
         w_str = "Gamma tensor components computed per frequency"
@@ -495,7 +476,7 @@ class TPA(LinearSolver):
 
             w_str = 'Reduced:<<A;B,C,D>>= {:.8f}, '.format(gamma[w, -w, w])
             w_str += 'w=({:.4f},{:.4f},{:.4f}), '.format(w, -w, w)
-            w_str += 'hω =({:.4f} eV)'.format(w * 54.437358841503915 / 2)
+            w_str += 'hω =({:.4f} eV)'.format(w * hartree_in_ev())
             self.ostream.print_header(w_str.ljust(width))
             self.ostream.print_header(('-' * len(w_str)).ljust(width))
             self.ostream.print_blank()
