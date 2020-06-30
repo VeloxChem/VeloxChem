@@ -569,9 +569,9 @@ class TpaDriver:
 
     def get_e4(self, wi, kX, fo, nocc, norb):
         """
-        Contracts E[4]n_xNyNz for the isotropic cubic response function. It
-        takes the Fock matrices from fock_dict and contracts them with the
-        response vectors.
+        Contracts E[4]n_xNyNz for the isotropic cubic response function. Takes
+        the Fock matrices from fock_dict and contracts them with the response
+        vectors.
 
         :param wi:
             A list of freqs

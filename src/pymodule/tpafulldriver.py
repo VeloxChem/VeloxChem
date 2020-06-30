@@ -10,10 +10,8 @@ from .tpadriver import TpaDriver
 
 class TpaFullDriver(TpaDriver):
     """
-    Computes the third order-gradients used for the isotropic cubic response
-    function, also contains some other methods used for the evaluation of some
-    relevant quantities for TPA calculations, such as A[3] and
-    A[2] contractions
+    Implements the full isotropic cubic response driver for two-photon
+    absorption (TPA)
 
     :param comm:
         The MPI communicator.
@@ -23,7 +21,8 @@ class TpaFullDriver(TpaDriver):
 
     def __init__(self, comm, ostream):
         """
-        Initializes TPA driver
+        Initializes the full isotropic cubic response driver for two-photon
+        absorption (TPA)
         """
 
         super().__init__(comm, ostream)
@@ -197,6 +196,8 @@ class TpaFullDriver(TpaDriver):
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
+        :param density_list:
+            A list of tranformed compounded densities
         :param D0:
             The SCF density matrix in AO basis
         :param mo:
@@ -208,7 +209,6 @@ class TpaFullDriver(TpaDriver):
 
         :return:
             A dictonary of compounded first-order Fock-matrices
-
         """
 
         if self.rank == mpi_master():
@@ -285,9 +285,9 @@ class TpaFullDriver(TpaDriver):
 
     def get_e4(self, wi, kX, fo, nocc, norb):
         """
-        Contracts E[4]n_xNyNz for the isotropic cubic response function. It
-        takes the Fock matrices from fock_dict and contracts them with the
-        response vectors.
+        Contracts E[4]n_xNyNz for the isotropic cubic response function. Takes
+        the Fock matrices from fock_dict and contracts them with the response
+        vectors.
 
         :param wi:
             A list of freqs
@@ -485,22 +485,26 @@ class TpaFullDriver(TpaDriver):
         Computes all the second-order response vectors needed for the isotropic
         cubic response computation
 
-        :param eri_tresh:
-            ERI threshold
         :param w:
             A list of all the frequencies
         :param d_a_mo:
             The density matrix in MO basis
-        :param X :
+        :param X:
             Dipole integrals
         :param fock_dict:
             A dictonary containing all the Fock matricies
-        :param kX :
+        :param kX:
             A dictonary containg all the response matricies
         :param nocc:
             The number of occupied orbitals
         :param norb:
             The number of total orbitals
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
 
         :return:
             A dictonary of Fock matrices from the subspace,second-order
@@ -557,10 +561,14 @@ class TpaFullDriver(TpaDriver):
 
         :param d_a_mo:
             The SCF density matrix in MO basis
-        :param kX:
-            A dictonary with all the first-order response matrices
+        :param X:
+            Dipole integrals
         :param wi:
             A list of the frequencies
+        :param Fock:
+            A dictonary containing all the Fock matricies
+        :param kX:
+            A dictonary with all the first-order response matrices
         :param nocc:
             The number of occupied orbitals
         :param norb:
@@ -773,16 +781,14 @@ class TpaFullDriver(TpaDriver):
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
+        :param kXY:
+            A dict of the two index response matrices
         :param S:
             The overlap matrix
         :param D0:
             The SCF density matrix in AO basis
         :param mo:
             A matrix containing the MO coefficents
-        :param nocc:
-            The number of occupied orbitals
-        :param norb:
-            The number of total orbitals
 
         :return:
             A list of tranformed compounded densities
@@ -913,12 +919,16 @@ class TpaFullDriver(TpaDriver):
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
+        :param density_list:
+            A list of tranformed compounded densities
         :param D0:
             The SCF density matrix in AO basis
         :param mo:
             A matrix containing the MO coefficents
         :param molecule:
+            The molecule
         :param ao_basis:
+            The AO basis set
 
         :return:
             A dictonary of compounded second-order Fock-matrices
@@ -952,19 +962,10 @@ class TpaFullDriver(TpaDriver):
 
     def get_e3(self, wi, kX, kXY, fo, fo2, nocc, norb):
         """
-        This code contracts E[3]
+        Contracts E[3]
 
-        :param iso:
-            A boolean that specifies if the progam is to compute the isotropic
-            γ or a user specief combination of components
         :param wi:
             A list of freqs
-        :param keys:
-            A dict of lists of keys that give information about what components
-            are present
-        :param track:
-            A list containing information about what γ components that are to
-            be computed
         :param kX:
             A dict of the single index response matricies
         :param kXY:
@@ -1107,9 +1108,6 @@ class TpaFullDriver(TpaDriver):
 
         :param wi:
             A list containing all the frequencies
-        :param keys:
-            A dictonray or lists that are used to tell the program which
-            elements are present
         :param track:
             A list that contains information about what γ components that are
             to be computed and which freqs
@@ -1125,6 +1123,10 @@ class TpaFullDriver(TpaDriver):
             A dictonary containing all the two-index response matricies
         :param da:
             The SCF density matrix in MO bassi
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The total number of orbitals
 
         :return:
             A dictonary of final X[2],A[2] contraction values
@@ -1479,6 +1481,10 @@ class TpaFullDriver(TpaDriver):
             be computed
         :param da:
             The SCF density matrix in MO basis
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The total number of orbitals
 
         :return:
             A dictonary of final T[4] contraction values
@@ -1572,10 +1578,13 @@ class TpaFullDriver(TpaDriver):
 
     def s4(self, k1, k2, k3, D, nocc, norb):
         """
+        Returns the contraction of S[4] for S[4] dict
 
-        This code returns the contraction of S[4] for S[4] dict
-
-        :param k1,k2,k3:
+        :param k1:
+            A response matrix
+        :param k2:
+            A response matrix
+        :param k3:
             A response matrix
         :param D:
             A density matrix
@@ -1583,6 +1592,9 @@ class TpaFullDriver(TpaDriver):
             The number of occupied orbtials
         :param norb:
             The number of total orbitals
+
+        :return:
+            The contraction of S[4] for S[4] dict
         """
 
         S4_123 = self.S4contract(k1, k2, k3, D, nocc, norb)
@@ -1595,7 +1607,11 @@ class TpaFullDriver(TpaDriver):
         """
         Returns the contraction of S[4] for S[4] dict
 
-        :param k1,k2,k3:
+        :param k1:
+            A response matrix
+        :param k2:
+            A response matrix
+        :param k3:
             A response matrix
         :param D:
             A density matrix
@@ -1603,6 +1619,9 @@ class TpaFullDriver(TpaDriver):
             The number of occupied orbtials
         :param norb:
             The number of total orbitals
+
+        :return:
+            The contraction of S[4] for S[4] dict
         """
 
         S4N1N2N3 = self.commut(self.commut(k3, self.commut(k2, k1)), D.T)
@@ -1634,6 +1653,9 @@ class TpaFullDriver(TpaDriver):
         :param norb:
             The total number of orbitals
 
+        :return:
+            A dict with all the R[4]NxNyNz contractions for the subsequent
+            T[4] contraction
         """
 
         R4terms = {}
@@ -1717,7 +1739,12 @@ class TpaFullDriver(TpaDriver):
     def s4_for_r4(self, k1, k2, k3, D, nocc, norb):
         """
         Returns the contraction of S[4] for the contraction of R[4]
-        :param k1,k2,k3:
+
+        :param k1:
+            A response matrix
+        :param k2:
+            A response matrix
+        :param k3:
             A response matrix
         :param D:
             A density matrix
@@ -1725,6 +1752,9 @@ class TpaFullDriver(TpaDriver):
             The number of occupied orbtials
         :param norb:
             The number of total orbitals
+
+        :return:
+            The contraction of S[4] for the contraction of R[4]
         """
 
         S4_123 = self.S4contract(k1, k2, k3, D, nocc, norb)
@@ -1734,16 +1764,20 @@ class TpaFullDriver(TpaDriver):
         """
         Prints the results from the TPA calculation.
 
+        :param freqs:
+            List of frequencies
         :param gamma:
-              A dictonary containing the isotropic cubic response functions for
-              TPA
+            A dictonary containing the isotropic cubic response functions for
+            TPA
+        :param comp:
+            List of gamma tensors components
         :param t4_dict:
-              A dictonary containing the isotropic T[4] contractions
+            A dictonary containing the isotropic T[4] contractions
         :param t3_dict:
-              A dictonary containing the isotropic T[3] contractions
+            A dictonary containing the isotropic T[3] contractions
         :param tpa_dict:
-              A dictonary containing the isotropic X[3], A[3], X[2], A[2]
-              contractions
+            A dictonary containing the isotropic X[3], A[3], X[2], A[2]
+            contractions
         """
 
         NaX3NyNz = tpa_dict['NaX3NyNz']

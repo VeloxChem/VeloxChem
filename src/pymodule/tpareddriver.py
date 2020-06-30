@@ -10,10 +10,8 @@ from .tpadriver import TpaDriver
 
 class TpaReducedDriver(TpaDriver):
     """
-    Computes the third order-gradients used for the isotropic cubic response
-    function, also contains some other methods used for the evaluation of some
-    relevant quantities for TPA calculations, such as A[3] and
-    A[2] contractions
+    Implements the reduced isotropic cubic response driver for two-photon
+    absorption (TPA)
 
     :param comm:
         The MPI communicator.
@@ -23,7 +21,8 @@ class TpaReducedDriver(TpaDriver):
 
     def __init__(self, comm, ostream):
         """
-        Initializes TPA driver
+        Initializes the reduced isotropic cubic response driver for two-photon
+        absorption (TPA)
         """
 
         super().__init__(comm, ostream)
@@ -119,6 +118,8 @@ class TpaReducedDriver(TpaDriver):
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
+        :param density_list:
+            A list of tranformed compounded densities
         :param D0:
             The SCF density matrix in AO basis
         :param mo:
@@ -179,8 +180,6 @@ class TpaReducedDriver(TpaDriver):
         Computes all the second-order response vectors needed for the reduced
         isotropic cubic response computation
 
-        :param eri_tresh:
-            ERI threshold
         :param w:
             A list of all the frequencies
         :param d_a_mo:
@@ -189,12 +188,18 @@ class TpaReducedDriver(TpaDriver):
             Dipole integrals
         :param fock_dict:
             A dictonary containing all the Fock matricies
-        :param kX :
+        :param kX:
             A dictonary containg all the response matricies
         :param nocc:
             The number of occupied orbitals
         :param norb:
             The number of total orbitals
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
 
         :return:
             A dictonary of Fock matrices from the subspace,second-order
@@ -248,10 +253,14 @@ class TpaReducedDriver(TpaDriver):
 
         :param d_a_mo:
             The SCF density matrix in MO basis
-        :param kX:
-            A dictonary with all the first-order response matrices
+        :param X:
+            Dipole integrals
         :param wi:
             A list of the frequencies
+        :param Fock:
+            A dictonary containing all the Fock matricies
+        :param kX:
+            A dictonary with all the first-order response matrices
         :param nocc:
             The number of occupied orbitals
         :param norb:
@@ -355,16 +364,14 @@ class TpaReducedDriver(TpaDriver):
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
+        :param kXY:
+            A dict of the two index response matrices
         :param S:
             The overlap matrix
         :param D0:
             The SCF density matrix in AO basis
         :param mo:
             A matrix containing the MO coefficents
-        :param nocc:
-            The number of occupied orbitals
-        :param norb:
-            The number of total orbitals
 
         :return:
             A list of tranformed compounded densities
@@ -444,12 +451,16 @@ class TpaReducedDriver(TpaDriver):
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
+        :param density_list:
+            A list of tranformed compounded densities
         :param D0:
             The SCF density matrix in AO basis
         :param mo:
             A matrix containing the MO coefficents
         :param molecule:
+            The molecule
         :param ao_basis:
+            The AO basis set
 
         :return:
             A dictonary of compounded second-order Fock-matrices
@@ -483,9 +494,9 @@ class TpaReducedDriver(TpaDriver):
 
     def get_e3(self, wi, kX, kXY, fo, fo2, nocc, norb):
         """
-        This code contracts E[3]n_xNyz for the isotropic cubic response
-        function. It takes the Fock matrices from fock_dict and fock_dict_II
-        and contracts them with the first and second-order response vectors.
+        Contracts E[3]n_xNyz for the isotropic cubic response function. Takes
+        the Fock matrices from fock_dict and fock_dict_II and contracts them
+        with the first and second-order response vectors.
 
         :param wi:
              A list of freqs
@@ -585,9 +596,6 @@ class TpaReducedDriver(TpaDriver):
 
         :param wi:
             A list containing all the frequencies
-        :param keys:
-            A dictonray or lists that are used to tell the program which
-            elements are present
         :param track:
             A list that contains information about what γ components that are
             to be computed and which freqs
@@ -602,7 +610,11 @@ class TpaReducedDriver(TpaDriver):
         :param kXY:
             A dictonary containing all the two-index response matricies
         :param da:
-            The SCF density matrix in MO bassi
+            The SCF density matrix in MO basis
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The total number of orbitals
 
         :return:
             A dictonary of final X[2],A[2] contraction values
@@ -759,9 +771,16 @@ class TpaReducedDriver(TpaDriver):
         """
         Prints the results from the reduced TPA calculation.
 
+        :param freqs:
+            List of frequencies
         :param gamma:
             A dictonary containing the reduced isotropic cubic response
             functions for TPA
+        :param comp:
+            List of gamma tensors components
+        :param t4_dict:
+            A dictonary containing the isotropic T[4] contractions (None for
+            one-photon off-resonance TPA calculations)
         :param t3_dict:
             A dictonary containing the isotropic T[3] contractions for
             one-photon off-resonance TPA calculations
