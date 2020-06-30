@@ -1460,12 +1460,11 @@ class TpaFullDriver(TpaDriver):
             'NxA2Nyz': nx_a2_nyz_dict,
         }
 
-    def get_t4(self, wi, e4_dict, n_x, Kx, track, da, nocc, norb):
+    def get_t4(self, wi, e4_dict, n_x, kX, track, da, nocc, norb):
         """
         Computes the contraction of the E[4] tensor with that of the S[4] and
         R[4] tensors to return the contraction of T[4] as a dictonary of
-        vectors.
-        T[4]n_xNyNz = (E^[4]-ω_1S^[4]-ω_1S^[4]-ω_3S^[4]-γiR^[4])
+        vectors. T[4]n_xNyNz = (E^[4]-ω_1S^[4]-ω_1S^[4]-ω_3S^[4]-γiR^[4])
 
         :param wi:
             A list of all the freqs
@@ -1486,10 +1485,10 @@ class TpaFullDriver(TpaDriver):
         """
 
         T4term = {}
-        S4 = self.S4_dict(wi, Kx, track, da, nocc, norb)
+        S4 = self.S4_dict(wi, kX, track, da, nocc, norb)
 
         if self.damping > 0:
-            R4term = self.get_r4(wi, Kx, n_x, track, da, nocc, norb)
+            R4term = self.get_r4(wi, kX, n_x, track, da, nocc, norb)
 
         for i in range(len(wi)):
 

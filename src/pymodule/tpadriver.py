@@ -23,7 +23,7 @@ from .errorhandler import assert_msg_critical
 
 class TpaDriver:
     """
-    Implements the isotropic cubic response function for two-photon absorption
+    Implements the isotropic cubic response driver for two-photon absorption
     (TPA)
 
     :param comm:
@@ -32,17 +32,35 @@ class TpaDriver:
         The output stream.
 
     Instance variables
+        - is_converged: The flag for convergence.
+        - eri_thresh: The electron repulsion integrals screening threshold.
+        - qq_type: The electron repulsion integrals screening scheme.
+        - batch_size: The batch size for computation of Fock matrices.
         - frequencies: The frequencies.
+        - comp: The list of all the gamma tensor components
         - damping: The damping parameter.
+        - lindep_thresh: The threshold for removing linear dependence in the
+          trial vectors.
+        - conv_thresh: The convergence threshold for the solver.
+        - max_iter: The maximum number of solver iterations.
+        - comm: The MPI communicator.
+        - rank: The MPI rank.
+        - nodes: Number of MPI processes.
+        - ostream: The output stream.
+        - timing: The flag for printing timing information.
+        - profiling: The flag for printing profiling information.
+        - memory_profiling: The flag for printing memory usage.
+        - memory_tracing: The flag for tracing memory allocation.
     """
 
     def __init__(self, comm, ostream):
         """
-        Initializes the isotropic cubic response function for two-photon
+        Initializes the isotropic cubic response driver for two-photon
         absorption (TPA)
         """
 
         self.iso = True
+        self.is_converged = False
 
         # ERI settings
         self.eri_thresh = 1.0e-15
@@ -61,6 +79,8 @@ class TpaDriver:
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
+
+        # output stream
         self.ostream = ostream
 
         # timing and profiling
@@ -71,8 +91,7 @@ class TpaDriver:
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
-        Updates response and method settings in complex liner response solver
-        used for TPA
+        Updates response and method settings in TPA driver
 
         :param rsp_dict:
             The dictionary of response dict.
@@ -105,7 +124,6 @@ class TpaDriver:
             self.max_iter = int(rsp_dict['max_iter'])
         if 'conv_thresh' in rsp_dict:
             self.conv_thresh = float(rsp_dict['conv_thresh'])
-
         if 'lindep_thresh' in rsp_dict:
             self.lindep_thresh = float(rsp_dict['lindep_thresh'])
 
@@ -195,12 +213,9 @@ class TpaDriver:
             X = None
             self.comp = None
 
-        Nx = {}
-        kX = {}
-        Focks = {}
-
-        # Updating settings for the first-order response vectors
+        # Computing the first-order response vectors (3 per frequency)
         Nb_drv = ComplexResponse(self.comm, self.ostream)
+
         Nb_drv.update_settings({
             'frequencies': self.frequencies,
             'damping': self.damping,
@@ -210,24 +225,18 @@ class TpaDriver:
             'eri_thresh': self.eri_thresh,
             'qq_type': self.qq_type,
         })
-        if self.batch_size is not None:
-            Nb_drv.update_settings({'batch_size': self.batch_size})
+        Nb_drv.batch_size = self.batch_size
 
-        # Computing the first-order response vectors 3 per frequency
-        Nb_Drv = Nb_drv.compute(molecule, ao_basis, scf_tensors, v1)
+        Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v1)
+
+        Nx = {}
+        kX = {}
+        Focks = {}
 
         if self.rank == mpi_master():
-            plot = []
-
-            Nx['Nb'] = Nb_Drv['solutions']
-            kX['Nb'] = Nb_Drv['kappas']
-            Focks['Fb'] = Nb_Drv['focks']
-
-            # Storing the largest imaginary component of the response vector
-            # for plotting
-
-            for k in Nx['Nb'].keys():
-                plot.append(np.max(np.abs(Nx['Nb'][k].imag)))
+            Nx['Nb'] = Nb_results['solutions']
+            kX['Nb'] = Nb_results['kappas']
+            Focks['Fb'] = Nb_results['focks']
 
             Nx['Nc'] = {}
             kX['Nc'] = {}
@@ -274,8 +283,6 @@ class TpaDriver:
                              self.comp, scf_tensors, molecule, ao_basis,
                              profiler)
 
-        self.is_converged = True
-
         valstr = '*** Time spent in TPA calculation: {:.2f} sec ***'.format(
             time.time() - start_time)
         self.ostream.print_header(valstr)
@@ -284,13 +291,14 @@ class TpaDriver:
 
         profiler.end(self.ostream)
 
+        self.is_converged = True
+
         return tpa_dict
 
     def main(self, Focks, Nx, w, X, d_a_mo, kX, track, scf_tensors, molecule,
              ao_basis, profiler):
         """
-        This code calls all the relevent functions to third-order isotropic
-        gradient
+        Computes all the relevent terms to third-order isotropic gradient
 
         :param Nx:
             A dictonary containing all the single index response vectors
@@ -305,6 +313,18 @@ class TpaDriver:
         :param track:
             A list that contains all the information about which γ components
             and at what freqs they are to be computed
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis.
+        :param profiler:
+            The profiler.
+
+        :return:
+            A dictionary containing all the relevent terms to third-order
+            isotropic gradient
         """
 
         if self.rank == mpi_master():
@@ -361,16 +381,15 @@ class TpaDriver:
             e3_dict = self.get_e3(w, kX, kxy_dict, fock_dict, fock_dict_two,
                                   nocc, norb)
 
-        if self.rank == mpi_master():
             # computing the X[3],A[3],X[2],A[2] contractions for the isotropic
             # cubic response function
             other_dict = self.other(w, track, Nx, n_xy_dict, X, kX, kxy_dict,
                                     d_a_mo, nocc, norb)
 
-        result = {}
-
         # Combining all the terms to evaluate the iso-tropic cubic response
         # function. For TPA Full and reduced, see article
+
+        result = {}
 
         if self.rank == mpi_master():
             t4_dict = self.get_t4(self.frequencies, e4_dict, Nx, kX, self.comp,
@@ -401,7 +420,33 @@ class TpaDriver:
 
         return result
 
-    def get_t4(self, wi, e4_dict, n_x, Kx, track, da, mol_orbs, task):
+    def get_t4(self, wi, e4_dict, n_x, kX, track, da, nocc, norb):
+        """
+        Computes the contraction of the E[4] tensor with that of the S[4] and
+        R[4] tensors to return the contraction of T[4] as a dictonary of
+        vectors. T[4]n_xNyNz = (E^[4]-ω_1S^[4]-ω_1S^[4]-ω_3S^[4]-γiR^[4])
+
+        :param wi:
+            A list of all the freqs
+        :param e4_dict:
+            A dictonary of all the E[4] contraction
+        :param n_x:
+            A dictonary with all the single index response vectors
+        :param kX:
+            A dictonray containng all the response matricies
+        :param track:
+            A list containg information about all the γ components that are to
+            be computed
+        :param da:
+            The SCF density matrix in MO basis
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The total number of orbitals
+
+        :return:
+            A dictonary of final T[4] contraction values
+        """
 
         return None
 
@@ -416,8 +461,6 @@ class TpaDriver:
 
         For more details see article
 
-        :param keys:
-            Keys from the initial get_densitiesDict
         :param freqs:
             List of frequencies of the pertubations
         :param e3_dict:
@@ -460,21 +503,16 @@ class TpaDriver:
 
         width = 50
 
-        cur_str = "Frequencies : " + str(self.frequencies)
+        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
+            self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(width))
-        cur_str = "Damping     : " + \
-            "{:.6e}".format(self.damping)
-        self.ostream.print_header(cur_str.ljust(width))
-
-        cur_str = "ERI threshold for response solver : " + str(self.eri_thresh)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = "Convergance threshold for response solver : " + str(
+        cur_str = 'Convergance Threshold           : {:.1e}'.format(
             self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(width))
-        cur_str = "Linear-dep threshold for response solver : " + str(
-            self.lindep_thresh)
+        cur_str = 'Max. Number of Iterations       : {:d}'.format(self.max_iter)
         self.ostream.print_header(cur_str.ljust(width))
-        cur_str = "Max iterations for response solver : " + str(self.max_iter)
+        cur_str = 'Damping Parameter               : {:.6e}'.format(
+            self.damping)
         self.ostream.print_header(cur_str.ljust(width))
 
         self.ostream.print_blank()
@@ -487,10 +525,13 @@ class TpaDriver:
 
         :param w:
             A list of all the frequencies for the TPA calculation
-        :return comp:
+
+        :return:
             A list of gamma tensors components inlcuded in the isotropic cubic
             response with their corresponding frequencies
         """
+
+        # TODO: look into "self.iso"
 
         if self.iso:
             spat_A = ['x', 'y', 'z']
@@ -527,10 +568,32 @@ class TpaDriver:
         return self.comp
 
     def get_e4(self, wi, kX, fo, nocc, norb):
+        """
+        Contracts E[4]n_xNyNz for the isotropic cubic response function. It
+        takes the Fock matrices from fock_dict and contracts them with the
+        response vectors.
 
-        return {}
+        :param wi:
+            A list of freqs
+        :param kX:
+            A dict of the single index response matricies
+        :param fo:
+            A dictonary of transformed Fock matricies from fock_dict
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The total number of orbitals
+
+        :return:
+            A dictonary of compounded E[4] tensors for the isotropic cubic
+            response function for TPA
+        """
+
+        return None
 
     def flip_xy(self, X):
+
+        # TODO: add docstring for flip_xy
 
         if X.ndim == 1:
             new_xy = np.zeros_like(X)
@@ -542,6 +605,8 @@ class TpaDriver:
         return None
 
     def flip_yz(self, X):
+
+        # TODO: add docstring for flip_yz
 
         if X.ndim == 1:
             new_yz = np.zeros_like(X)
@@ -563,8 +628,11 @@ class TpaDriver:
         :param S:
             Overlap matrix
 
-        :return: [k,D]
+        :return:
+            [k,D]
         """
+
+        # TODO: replace "@" by np.matmul or np.linalg.multi_dot
 
         return k.T @ S @ D - D @ S @ k.T
 
@@ -608,7 +676,7 @@ class TpaDriver:
             Matrix B.
 
         :return:
-            A@B-B@A
+            AB - BA
         """
 
         return A @ B - B @ A
@@ -620,7 +688,7 @@ class TpaDriver:
 
         :param: k:
             Respose vector in matrix representation
-        :param A:
+        :param X:
             Property operator in matrix represatiation
         :param D:
             Density matrix
@@ -629,7 +697,7 @@ class TpaDriver:
         :param norb:
             Number of total orbtials
 
-        :return :
+        :return:
             Returns a matrix
         """
 
@@ -656,7 +724,7 @@ class TpaDriver:
         :param norb:
             Number of total orbtials
 
-        :return :
+        :return:
             Returns a matrix
         """
 
@@ -678,7 +746,7 @@ class TpaDriver:
         :param: k2:
             First-order response matrix
         :param A:
-            A dipole intergral  matrix
+            A dipole intergral matrix
         :param D:
             Density matrix
         :param nocc:
@@ -686,7 +754,7 @@ class TpaDriver:
         :param norb:
             Number of total orbtials
 
-        :return :
+        :return:
             Returns a matrix
         """
 
@@ -714,7 +782,7 @@ class TpaDriver:
         :param norb:
             Number of total orbtials
 
-        :return :
+        :return:
             Returns a matrix
         """
 
@@ -730,12 +798,19 @@ class TpaDriver:
         """
         Returns a matrix used for the E[4] contraction
 
-        :param kA,kB:
-            First-order response matrices
-        :param Fa,Fb:
-            First-order perturbed Fock matrices
+        :param kA:
+            First-order response matrix
+        :param kB:
+            First-order response matrix
+        :param Fa:
+            First-order perturbed Fock matrix
+        :param Fb:
+            First-order perturbed Fock matrix
         :param F0:
             SCF Fock matrix
+
+        :return:
+            Returns a matrix
         """
 
         return 0.5 * (self.commut(kA,
@@ -747,31 +822,41 @@ class TpaDriver:
         """
         Returns a matrix used for the E[3] contraction
 
-        :param kA,kB:
-            First-order or Second-order response matrices
-        :param Fa,Fb:
-            First-order or Second-order perturbed Fock matrices
+        :param kA:
+            First-order or Second-order response matrix
+        :param kB:
+            First-order or Second-order response matrix
+        :param Fa:
+            First-order or Second-order perturbed Fock matrix
+        :param Fb:
+            First-order or Second-order perturbed Fock matrix
         :param F0:
             SCF Fock matrix
+
+        :return:
+            Returns a matrix
         """
 
         return self.commut(kA, self.commut(kB, F0) + 3 * Fb)
 
-    def anti_sym(self, Vec):
+    def anti_sym(self, vec):
         """
         Returns an antisymetrized vector
 
-        :param Vec:
-            Vector to be anti-symetrized
+        :param vec:
+            The vector to be anti-symetrized
+
+        :return:
+            An antisymetrized vector
         """
 
         # TODO: look into "anti_sym"
 
-        if Vec.ndim == 1:
-            new_vec = np.zeros_like(Vec)
-            half_len = Vec.shape[0] // 2
-            new_vec[:half_len] = Vec[:half_len]
-            new_vec[half_len:] = -Vec[half_len:]
+        if vec.ndim == 1:
+            new_vec = np.zeros_like(vec)
+            half_len = vec.shape[0] // 2
+            new_vec[:half_len] = vec[:half_len]
+            new_vec[half_len:] = -vec[half_len:]
             return new_vec
 
         return None
@@ -780,6 +865,8 @@ class TpaDriver:
         """
         Computes and returns a list of Fock matrices
 
+        :param mo:
+            The MO coefficients
         :param D:
             A list of densities
         :param molecule:
@@ -787,7 +874,10 @@ class TpaDriver:
         :param ao_basis:
             The AO basis set
         :param rank:
-            ---
+            ...
+
+        :return:
+            A list of Fock matrices
         """
 
         # TODO: look into "rank"
@@ -863,9 +953,14 @@ class TpaDriver:
         Returns the two-electron part of the Fock matix 2J-K
 
         :param molecule:
+            The molecule
         :param ao_basis:
+            The AO basis set
         :param dabs:
             A list of densitiy matrices
+
+        :return:
+            A tuple containing the two-electron part of the Fock matix
         """
 
         # TODO: look into "dabs"
@@ -964,7 +1059,12 @@ class TpaDriver:
         Returns the one electron part of the Fock matrix
 
         :param molecule:
+            The molecule
         :param ao_basis:
+            The AO basis set
+
+        :return:
+            The one electron part of the Fock matrix
         """
 
         kinetic_driver = KineticEnergyIntegralsDriver(self.comm)
@@ -977,7 +1077,7 @@ class TpaDriver:
 
     def print_fock_header(self):
         """
-        Prints Fock section header.
+        Prints header for Fock computation
         """
 
         title = 'Fock Matrix Computation'
@@ -987,7 +1087,7 @@ class TpaDriver:
 
     def print_fock_time(self, time):
         """
-        Prints time for Fock section.
+        Prints time for Fock computation
 
         :param time:
             Total time to compute Fock matrices
