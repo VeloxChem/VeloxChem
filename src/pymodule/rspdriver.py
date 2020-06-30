@@ -3,7 +3,8 @@ from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .c6solver import C6Solver
 from .tdaexcidriver import TDAExciDriver
-from .tpa import TPA
+from .tpafulldriver import TpaFullDriver
+from .tpareddriver import TpaReducedDriver
 
 
 class ResponseDriver:
@@ -162,7 +163,13 @@ class ResponseDriver:
         if (self.rsp_dict['response'] == 'cubic' and
                 self.rsp_dict['complex'] == 'yes'):
 
-            tpa_solver = TPA(self.comm, self.ostream)
+            if ('tpa_type' not in self.rsp_dict or
+                    self.rsp_dict['tpa_type'].lower() == 'full'):
+                tpa_solver = TpaFullDriver(self.comm, self.ostream)
+
+            elif ('tpa_type' in self.rsp_dict and
+                    self.rsp_dict['tpa_type'].lower() == 'reduced'):
+                tpa_solver = TpaReducedDriver(self.comm, self.ostream)
 
             tpa_solver.update_settings(self.rsp_dict, self.method_dict)
 
