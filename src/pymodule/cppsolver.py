@@ -313,6 +313,12 @@ class ComplexResponse(LinearSolver):
             'CLR_e2bung_half_size',
         ]
 
+        if nonlinear_flag:
+            rsp_vector_labels += [
+                'CLR_Fock_ger',
+                'CLR_Fock_ung',
+            ]
+
         # check validity of checkpoint file
         if self.restart:
             if self.rank == mpi_master():
@@ -323,7 +329,13 @@ class ComplexResponse(LinearSolver):
 
         # read initial guess from restart file
         if self.restart:
-            self.read_vectors(rsp_vector_labels)
+            if not nonlinear_flag:
+                (self.dist_bger, self.dist_bung, self.dist_e2bger,
+                 self.dist_e2bung) = self.read_vectors(rsp_vector_labels)
+            else:
+                (self.dist_bger, self.dist_bung, self.dist_e2bger,
+                 self.dist_e2bung, self.dist_fock_ger,
+                 self.dist_fock_ung) = self.read_vectors(rsp_vector_labels)
 
         # generate initial guess from scratch
         else:
@@ -461,16 +473,17 @@ class ComplexResponse(LinearSolver):
                     e2realung = self.dist_e2bung.matmul_AB_no_gather(c_realung)
                     e2imagung = self.dist_e2bung.matmul_AB_no_gather(c_imagung)
 
-                    fock_realger = self.dist_fock_ger.matmul_AB(c_realger)
-                    fock_imagger = self.dist_fock_ger.matmul_AB(c_imagger)
-                    fock_realung = self.dist_fock_ung.matmul_AB(c_realung)
-                    fock_imagung = self.dist_fock_ung.matmul_AB(c_imagung)
+                    if nonlinear_flag:
+                        fock_realger = self.dist_fock_ger.matmul_AB(c_realger)
+                        fock_imagger = self.dist_fock_ger.matmul_AB(c_imagger)
+                        fock_realung = self.dist_fock_ung.matmul_AB(c_realung)
+                        fock_imagung = self.dist_fock_ung.matmul_AB(c_imagung)
 
-                    if self.rank == mpi_master():
-                        focks[(op,
-                               w)] = (fock_realger + fock_realung - 1j *
-                                      (fock_imagger + fock_imagung)).reshape(
-                                          norb, norb)
+                        if self.rank == mpi_master():
+                            focks[(op, w)] = (
+                                fock_realger + fock_realung - 1j *
+                                (fock_imagger + fock_imagung)).reshape(
+                                    norb, norb)
 
                     # calculating the residual components
 
@@ -609,7 +622,20 @@ class ComplexResponse(LinearSolver):
 
         signal_handler.remove_sigterm_function()
 
-        self.write_checkpoint(molecule, basis, dft_dict, pe_dict,
+        dist_arrays = [
+            self.dist_bger,
+            self.dist_bung,
+            self.dist_e2bger,
+            self.dist_e2bung,
+        ]
+
+        if nonlinear_flag:
+            dist_arrays += [
+                self.dist_fock_ger,
+                self.dist_fock_ung,
+            ]
+
+        self.write_checkpoint(molecule, basis, dft_dict, pe_dict, dist_arrays,
                               rsp_vector_labels)
 
         # converged?

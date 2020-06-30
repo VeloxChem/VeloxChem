@@ -135,7 +135,8 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # read initial guess from restart file
         if self.restart:
-            self.read_vectors(rsp_vector_labels)
+            (self.dist_bger, self.dist_bung, self.dist_e2bger,
+             self.dist_e2bung) = self.read_vectors(rsp_vector_labels)
 
         # generate initial guess from scratch
         else:
@@ -333,7 +334,14 @@ class LinearResponseEigenSolver(LinearSolver):
 
         signal_handler.remove_sigterm_function()
 
-        self.write_checkpoint(molecule, basis, dft_dict, pe_dict,
+        dist_arrays = [
+            self.dist_bger,
+            self.dist_bung,
+            self.dist_e2bger,
+            self.dist_e2bung,
+        ]
+
+        self.write_checkpoint(molecule, basis, dft_dict, pe_dict, dist_arrays,
                               rsp_vector_labels)
 
         # converged?

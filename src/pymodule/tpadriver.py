@@ -3,6 +3,7 @@ import ctypes
 import psutil
 import time
 import os
+import re
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
@@ -47,6 +48,8 @@ class TpaDriver:
         - rank: The MPI rank.
         - nodes: Number of MPI processes.
         - ostream: The output stream.
+        - restart: The flag for restarting from checkpoint file.
+        - checkpoint_file: The name of checkpoint file.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
@@ -82,6 +85,10 @@ class TpaDriver:
 
         # output stream
         self.ostream = ostream
+
+        # restart information
+        self.restart = True
+        self.checkpoint_file = None
 
         # timing and profiling
         self.timing = False
@@ -126,6 +133,12 @@ class TpaDriver:
             self.conv_thresh = float(rsp_dict['conv_thresh'])
         if 'lindep_thresh' in rsp_dict:
             self.lindep_thresh = float(rsp_dict['lindep_thresh'])
+
+        if 'restart' in rsp_dict:
+            key = rsp_dict['restart'].lower()
+            self.restart = True if key == 'yes' else False
+        if 'checkpoint_file' in rsp_dict:
+            self.checkpoint_file = rsp_dict['checkpoint_file']
 
         if 'timing' in rsp_dict:
             key = rsp_dict['timing'].lower()
@@ -226,6 +239,10 @@ class TpaDriver:
             'qq_type': self.qq_type,
         })
         Nb_drv.batch_size = self.batch_size
+        Nb_drv.restart = self.restart
+        if self.checkpoint_file is not None:
+            Nb_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
+            Nb_drv.checkpoint_file += '_tpa_1.h5'
 
         Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v1)
 

@@ -347,18 +347,24 @@ class LinearSolver:
         Reads vectors from checkpoint file.
 
         :param rsp_vector_labels:
-            The list of labels of response vectors.
+            The list of labels of vectors.
+
+        :return:
+            A tuple containing the vectors.
         """
 
-        self.dist_bger, self.dist_bung, self.dist_e2bger, self.dist_e2bung = [
+        dist_arrays = [
             DistributedArray.read_from_hdf5_file(self.checkpoint_file, label,
                                                  self.comm)
             for label in rsp_vector_labels
         ]
+
         checkpoint_text = 'Restarting from checkpoint file: '
         checkpoint_text += self.checkpoint_file
         self.ostream.print_info(checkpoint_text)
         self.ostream.print_blank()
+
+        return tuple(dist_arrays)
 
     def append_trial_vectors(self, bger, bung):
         """
@@ -882,7 +888,8 @@ class LinearSolver:
         self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
                                                 root=mpi_master())
 
-    def write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
+    def write_checkpoint(self, molecule, basis, dft_dict, pe_dict, dist_arrays,
+                         labels):
         """
         Writes checkpoint file.
 
@@ -894,6 +901,8 @@ class LinearSolver:
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
+        :param dist_arrays:
+            The list of distributed arrays to write to checkpoint.
         :param labels:
             The list of labels.
         """
@@ -909,10 +918,6 @@ class LinearSolver:
         success = self.comm.bcast(success, root=mpi_master())
 
         if success:
-            dist_arrays = [
-                self.dist_bger, self.dist_bung, self.dist_e2bger,
-                self.dist_e2bung
-            ]
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
 

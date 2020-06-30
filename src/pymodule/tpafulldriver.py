@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import re
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import hartree_in_ev
@@ -540,6 +541,11 @@ class TpaFullDriver(TpaDriver):
             'qq_type': self.qq_type,
         })
         N_total_drv.batch_size = self.batch_size
+        N_total_drv.restart = self.restart
+        if self.checkpoint_file is not None:
+            N_total_drv.checkpoint_file = re.sub(r'\.h5$', r'',
+                                                 self.checkpoint_file)
+            N_total_drv.checkpoint_file += '_tpa_2_full.h5'
 
         # commutpute second-order response vectors
         N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
