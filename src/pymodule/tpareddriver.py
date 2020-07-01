@@ -633,13 +633,15 @@ class TpaReducedDriver(TpaDriver):
         na_x2_nyz_dict = {}
         nx_a2_nyz_dict = {}
 
-        for i in range(len(wi)):
+        comp_per_freq = len(track) // len(wi)
 
-            wb = float(track[i * (len(track) // len(wi))].split(",")[1])
-            wa = float(track[i * (len(track) // len(wi))].split(",")[1])
-            wc = float(track[i * (len(track) // len(wi))].split(",")[2])
-            w = float(track[i * (len(track) // len(wi))].split(",")[1])
-            wd = float(track[i * (len(track) // len(wi))].split(",")[3])
+        for i in range(len(wi)):
+            vals = track[i * comp_per_freq].split(',')
+            w = float(vals[1])
+            wa = float(vals[1])
+            wb = float(vals[1])
+            wc = float(vals[2])
+            wd = float(vals[3])
 
             wbd = wb + wd
 
@@ -804,27 +806,27 @@ class TpaReducedDriver(TpaDriver):
 
         width = 50
 
-        w_str = "Gamma tensor components computed per frequency"
+        w_str = 'Gamma tensor components computed per frequency'
         self.ostream.print_blank()
         self.ostream.print_header(w_str.ljust(width))
         self.ostream.print_blank()
 
         for a in range(len(comp) // len(freqs)):
-            w_str = str(a + 1) + '. ' + str(comp[a].split(",")[0])
+            w_str = str(a + 1) + '. ' + str(comp[a].split(',')[0])
             self.ostream.print_header(w_str.ljust(width))
 
         self.ostream.print_blank()
 
         for w in freqs:
 
-            w_str = "Reduced:ΣNaT3NxNyz =  {:.8f}".format(t3_dict[w, -w, w] /
+            w_str = 'Reduced:ΣNaT3NxNyz =  {:.8f}'.format(t3_dict[w, -w, w] /
                                                           15)
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = "Reduced:ΣNaX2Nyz =  {:.8f}".format(NaX2Nyz[w, -w, w] / 15)
+            w_str = 'Reduced:ΣNaX2Nyz =  {:.8f}'.format(NaX2Nyz[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = "Reduced:ΣNxA2Nyz =  {:.8f}".format(NxA2Nyz[w, -w, w] / 15)
+            w_str = 'Reduced:ΣNxA2Nyz =  {:.8f}'.format(NxA2Nyz[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
             w_str = 'Reduced:<<A;B,C,D>>= {:.8f}, '.format(gamma[w, -w, w])

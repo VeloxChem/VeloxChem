@@ -1136,30 +1136,34 @@ class TpaFullDriver(TpaDriver):
         na_x2_nyz_dict = {}
         nx_a2_nyz_dict = {}
 
-        count = 0
+        comp_per_freq = len(track) // len(wi)
+
         for j in range(len(wi)):
             na_x3_ny_nz = 0
             na_a3_nx_ny = 0
 
-            for i in range(count, count + len(track) // len(wi)):
-                w1 = float(track[i].split(",")[1])
-                w2 = float(track[i].split(",")[2])
-                w3 = float(track[i].split(",")[3])
+            for i in range(j * comp_per_freq, (j + 1) * comp_per_freq):
+                comp_i = track[i]
 
-                Na = n_x['Na'][(track[i][0], w1)]
-                Nb = n_x['Nb'][(track[i][1], w1)]
+                vals = comp_i.split(',')
+                w1 = float(vals[1])
+                w2 = float(vals[2])
+                w3 = float(vals[3])
 
-                Nc = n_x['Nc'][(track[i][2], w2)]
-                Nd = n_x['Nd'][(track[i][3], w3)]
+                Na = n_x['Na'][(comp_i[0], w1)]
+                Nb = n_x['Nb'][(comp_i[1], w1)]
 
-                kb = kX['Nb'][(track[i][1], w1)]
-                kc = kX['Nc'][(track[i][2], w2)]
-                kd = kX['Nd'][(track[i][3], w3)]
+                Nc = n_x['Nc'][(comp_i[2], w2)]
+                Nd = n_x['Nd'][(comp_i[3], w3)]
 
-                A = X[track[i][0]]
-                B = X[track[i][1]]
-                C = X[track[i][2]]
-                D = X[track[i][3]]
+                kb = kX['Nb'][(comp_i[1], w1)]
+                kc = kX['Nc'][(comp_i[2], w2)]
+                kd = kX['Nd'][(comp_i[3], w3)]
+
+                A = X[comp_i[0]]
+                B = X[comp_i[1]]
+                C = X[comp_i[2]]
+                D = X[comp_i[3]]
 
                 # Na X[3]NyNz
 
@@ -1185,17 +1189,16 @@ class TpaFullDriver(TpaDriver):
                 na_a3_nx_ny += self.a3_contract(kd, kb, A, da, nocc, norb) @ Nc
                 na_a3_nx_ny += self.a3_contract(kd, kc, A, da, nocc, norb) @ Nb
 
-            count += (len(track) // len(wi))
-
             na_a3_nx_ny_dict[(wi[j], -wi[j], wi[j])] = na_a3_nx_ny
             na_x3_ny_nz_dict[(wi[j], -wi[j], wi[j])] = na_x3_ny_nz
 
         for i in range(len(wi)):
-            wb = float(track[i * (len(track) // len(wi))].split(",")[1])
-            wa = float(track[i * (len(track) // len(wi))].split(",")[1])
-            wc = float(track[i * (len(track) // len(wi))].split(",")[2])
-            w = float(track[i * (len(track) // len(wi))].split(",")[1])
-            wd = float(track[i * (len(track) // len(wi))].split(",")[3])
+            vals = track[i * comp_per_freq].split(',')
+            w = float(vals[1])
+            wa = float(vals[1])
+            wb = float(vals[1])
+            wc = float(vals[2])
+            wd = float(vals[3])
 
             wcd = 0
             wbd = wb + wd
@@ -1495,10 +1498,13 @@ class TpaFullDriver(TpaDriver):
         if self.damping > 0:
             R4term = self.get_r4(wi, kX, n_x, track, da, nocc, norb)
 
-        for i in range(len(wi)):
+        comp_per_freq = len(track) // len(wi)
 
-            w = float(track[i * (len(track) // len(wi))].split(",")[1])
-            ww = float(track[i * (len(track) // len(wi))].split(",")[1])
+        for i in range(len(wi)):
+            vals = track[i * comp_per_freq].split(',')
+            w = float(vals[1])
+            ww = float(vals[1])
+
             t4term = n_x['Na'][('x', w)] @ (e4_dict['f_iso_x'][ww] - S4[
                 ('x', ww)]) + n_x['Na'][('y', w)] @ (
                     e4_dict['f_iso_y'][ww] - S4[('y', ww)]) + n_x['Na'][
@@ -1535,39 +1541,40 @@ class TpaFullDriver(TpaDriver):
         """
 
         S4terms = {}
+        comp_per_freq = len(track) // len(wi)
 
-        count = 0
         for j in range(len(wi)):
-            w = float(track[j * (len(track) // len(wi))].split(",")[1])
-            w1 = float(track[j * (len(track) // len(wi))].split(",")[1])
-            w2 = float(track[j * (len(track) // len(wi))].split(",")[2])
-            w3 = float(track[j * (len(track) // len(wi))].split(",")[3])
+            vals = track[j * comp_per_freq].split(',')
+            w = float(vals[1])
+            w1 = float(vals[1])
+            w2 = float(vals[2])
+            w3 = float(vals[3])
 
             S4_term_x = 0
             S4_term_y = 0
             S4_term_z = 0
 
-            for i in range(count, count + len(track) // len(wi)):
-                kB = kX['Nb'][(track[i][1], w1)]
-                kC = kX['Nc'][(track[i][2], w2)]
-                kD = kX['Nd'][(track[i][3], w3)]
+            for i in range(j * comp_per_freq, (j + 1) * comp_per_freq):
+                comp_i = track[i]
 
-                if track[i][0] in 'x':
+                kB = kX['Nb'][(comp_i[1], w1)]
+                kC = kX['Nc'][(comp_i[2], w2)]
+                kD = kX['Nd'][(comp_i[3], w3)]
+
+                if comp_i[0] in 'x':
                     S4_term_x += w1 * self.s4(kB, kC, kD, D0, nocc, norb)
                     S4_term_x += w2 * self.s4(kC, kB, kD, D0, nocc, norb)
                     S4_term_x += w3 * self.s4(kD, kB, kC, D0, nocc, norb)
 
-                if track[i][0] in 'y':
+                elif comp_i[0] in 'y':
                     S4_term_y += w1 * self.s4(kB, kC, kD, D0, nocc, norb)
                     S4_term_y += w2 * self.s4(kC, kB, kD, D0, nocc, norb)
                     S4_term_y += w3 * self.s4(kD, kB, kC, D0, nocc, norb)
 
-                if track[i][0] in 'z':
+                elif comp_i[0] == 'z':
                     S4_term_z += w1 * self.s4(kB, kC, kD, D0, nocc, norb)
                     S4_term_z += w2 * self.s4(kC, kB, kD, D0, nocc, norb)
                     S4_term_z += w3 * self.s4(kD, kB, kC, D0, nocc, norb)
-
-            count += (len(track) // len(wi))
 
             S4terms[('x', w)] = -S4_term_x
             S4terms[('y', w)] = -S4_term_y
@@ -1658,35 +1665,38 @@ class TpaFullDriver(TpaDriver):
         """
 
         R4terms = {}
-        count = 0
 
         damp = self.damping
+        comp_per_freq = len(track) // len(freqs)
 
         for j in range(len(freqs)):
-            w1 = float(track[j * (len(track) // len(freqs))].split(",")[1])
-            w2 = float(track[j * (len(track) // len(freqs))].split(",")[2])
-            w3 = float(track[j * (len(track) // len(freqs))].split(",")[3])
+            vals = track[j * comp_per_freq].split(',')
+            w1 = float(vals[1])
+            w2 = float(vals[2])
+            w3 = float(vals[3])
             w_s = w1 + w2 + w3
 
             R4x = 0
             R4y = 0
             R4z = 0
 
-            for i in range(count, count + len(track) // len(freqs)):
-                # Na = n_x['Na'][(track[i][0], w_s)]
-                Nb = n_x['Nb'][(track[i][1], w1)]
-                Nc = n_x['Nc'][(track[i][2], w2)]
-                Nd = n_x['Nd'][(track[i][3], w3)]
-                kA = kX['Na'][(track[i][0], w_s)]
-                kB = kX['Nb'][(track[i][1], w1)]
-                kC = kX['Nc'][(track[i][2], w2)]
-                kD = kX['Nd'][(track[i][3], w3)]
+            for i in range(j * comp_per_freq, (j + 1) * comp_per_freq):
+                comp_i = track[i]
+
+                # Na = n_x['Na'][(comp_i[0], w_s)]
+                Nb = n_x['Nb'][(comp_i[1], w1)]
+                Nc = n_x['Nc'][(comp_i[2], w2)]
+                Nd = n_x['Nd'][(comp_i[3], w3)]
+                kA = kX['Na'][(comp_i[0], w_s)]
+                kB = kX['Nb'][(comp_i[1], w1)]
+                kC = kX['Nc'][(comp_i[2], w2)]
+                kD = kX['Nd'][(comp_i[3], w3)]
 
                 Nb_h = self.flip_xy(Nb)
                 Nc_h = self.flip_xy(Nc)
                 Nd_h = self.flip_xy(Nd)
 
-                if track[i][0] in 'x':
+                if comp_i[0] == 'x':
                     R4x += -1j * damp * Nd_h @ self.s4_for_r4(
                         kA.T, kB, kC, d_a_mo, nocc, norb)
                     R4x += -1j * damp * Nc_h @ self.s4_for_r4(
@@ -1700,7 +1710,7 @@ class TpaFullDriver(TpaDriver):
                     R4x += -1j * damp * Nb_h @ self.s4_for_r4(
                         kA.T, kD, kC, d_a_mo, nocc, norb)
 
-                if track[i][0] in 'y':
+                elif comp_i[0] == 'y':
                     R4y += -1j * damp * Nd_h @ self.s4_for_r4(
                         kA.T, kB, kC, d_a_mo, nocc, norb)
                     R4y += -1j * damp * Nc_h @ self.s4_for_r4(
@@ -1714,7 +1724,7 @@ class TpaFullDriver(TpaDriver):
                     R4y += -1j * damp * Nb_h @ self.s4_for_r4(
                         kA.T, kD, kC, d_a_mo, nocc, norb)
 
-                if track[i][0] in 'z':
+                elif comp_i[0] == 'z':
                     R4z += -1j * damp * Nd_h @ self.s4_for_r4(
                         kA.T, kB, kC, d_a_mo, nocc, norb)
                     R4z += -1j * damp * Nc_h @ self.s4_for_r4(
@@ -1728,7 +1738,6 @@ class TpaFullDriver(TpaDriver):
                     R4z += -1j * damp * Nb_h @ self.s4_for_r4(
                         kA.T, kD, kC, d_a_mo, nocc, norb)
 
-            count += (len(track) // len(freqs))
             R4terms[('x', w1)] = -R4x
             R4terms[('y', w1)] = -R4y
             R4terms[('z', w1)] = -R4z
@@ -1786,34 +1795,34 @@ class TpaFullDriver(TpaDriver):
 
         width = 50
 
-        w_str = "Gamma tensor components computed per frequency"
+        w_str = 'Gamma tensor components computed per frequency'
         self.ostream.print_blank()
         self.ostream.print_header(w_str.ljust(width))
         self.ostream.print_blank()
 
         for a in range(len(comp) // len(freqs)):
-            w_str = str(a + 1) + '. ' + str(comp[a].split(",")[0])
+            w_str = str(a + 1) + '. ' + str(comp[a].split(',')[0])
             self.ostream.print_header(w_str.ljust(width))
 
         self.ostream.print_blank()
 
         for w in freqs:
-            w_str = "ΣNaT3NxNyz =  {:.8f}".format(t3_dict[w, -w, w] / 15)
+            w_str = 'ΣNaT3NxNyz =  {:.8f}'.format(t3_dict[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = "ΣNaT4NxNyNz =  {:.8f}".format(t4_dict[w, -w, w] / 15)
+            w_str = 'ΣNaT4NxNyNz =  {:.8f}'.format(t4_dict[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = "ΣNaX2Nyz =  {:.8f}".format(NaX2Nyz[w, -w, w] / 15)
+            w_str = 'ΣNaX2Nyz =  {:.8f}'.format(NaX2Nyz[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = "ΣNaX3NyNz =  {:.8f}".format(NaX3NyNz[w, -w, w] / 15)
+            w_str = 'ΣNaX3NyNz =  {:.8f}'.format(NaX3NyNz[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = "ΣNxA2Nyz =  {:.8f}".format(NxA2Nyz[w, -w, w] / 15)
+            w_str = 'ΣNxA2Nyz =  {:.8f}'.format(NxA2Nyz[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = "ΣNaA3NxNy =  {:.8f}".format(NaA3NxNy[w, -w, w] / 15)
+            w_str = 'ΣNaA3NxNy =  {:.8f}'.format(NaA3NxNy[w, -w, w] / 15)
             self.ostream.print_header(w_str.ljust(width))
 
             w_str = 'Σ<<μ;μ,μ,μ>>= {:.8f}, '.format(gamma[w, -w, w])
