@@ -540,6 +540,8 @@ class TpaFullDriver(TpaDriver):
             'eri_thresh': self.eri_thresh,
             'qq_type': self.qq_type,
         })
+        N_total_drv.timing = self.timing
+        N_total_drv.memory_profiling = self.memory_profiling
         N_total_drv.batch_size = self.batch_size
         N_total_drv.restart = self.restart
         if self.checkpoint_file is not None:
@@ -915,8 +917,7 @@ class TpaFullDriver(TpaDriver):
 
         return density_list
 
-    def get_fock_dict_II(self, wi, kX, density_list, D0, mo, molecule,
-                         ao_basis):
+    def get_fock_dict_II(self, wi, kX, density_list, mo, molecule, ao_basis):
         """
         Computes the compounded second-order Fock matrics used for the
         isotropic cubic response function
@@ -927,8 +928,6 @@ class TpaFullDriver(TpaDriver):
             A dictonary with all the first-order response matrices
         :param density_list:
             A list of tranformed compounded densities
-        :param D0:
-            The SCF density matrix in AO basis
         :param mo:
             A matrix containing the MO coefficents
         :param molecule:

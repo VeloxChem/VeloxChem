@@ -62,7 +62,6 @@ class TpaDriver:
         absorption (TPA)
         """
 
-        self.iso = True
         self.is_converged = False
 
         # ERI settings
@@ -72,7 +71,7 @@ class TpaDriver:
 
         # cpp settings
         self.frequencies = (0,)
-        self.comp = 'zzzz,0,0,0'
+        self.comp = None
         self.damping = 0.004556335294880438
         self.lindep_thresh = 1.0e-10
         self.conv_thresh = 1.0e-4
@@ -113,12 +112,6 @@ class TpaDriver:
             self.frequencies = parse_frequencies(rsp_dict['frequencies'])
         if 'damping' in rsp_dict:
             self.damping = float(rsp_dict['damping'])
-        if 'component' in rsp_dict:
-            self.comp = rsp_dict['component']
-            if self.comp in 'isotropic':
-                self.iso = True
-            else:
-                self.iso = False
 
         if 'eri_thresh' in rsp_dict:
             self.eri_thresh = float(rsp_dict['eri_thresh'])
@@ -172,7 +165,7 @@ class TpaDriver:
         """
 
         profiler = Profiler({
-            'timing': self.timing,
+            'timing': False,
             'profiling': self.profiling,
             'memory_profiling': self.memory_profiling,
             'memory_tracing': self.memory_tracing,
@@ -238,6 +231,8 @@ class TpaDriver:
             'eri_thresh': self.eri_thresh,
             'qq_type': self.qq_type,
         })
+        Nb_drv.timing = self.timing
+        Nb_drv.memory_profiling = self.memory_profiling
         Nb_drv.batch_size = self.batch_size
         Nb_drv.restart = self.restart
         if self.checkpoint_file is not None:
@@ -291,6 +286,8 @@ class TpaDriver:
 
             Nx['Nd'] = Nx['Nb']
             kX['Nd'] = kX['Nb']
+
+        profiler.check_memory_usage('1st CPP')
 
         # Computing the third-order gradient and also the contractions of
         # A[3] and A[2] which formally are not part of the third-order gradient
@@ -362,6 +359,8 @@ class TpaDriver:
         else:
             density_list = None
 
+        profiler.check_memory_usage('1st densities')
+
         #  computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(w, kX, density_list, (D0, D0), mo,
                                        molecule, ao_basis)
@@ -370,11 +369,15 @@ class TpaDriver:
             fock_dict.update(Focks)
             e4_dict = self.get_e4(w, kX, fock_dict, nocc, norb)
 
+        profiler.check_memory_usage('1st Focks')
+
         # computing all the compounded second-order response vectors and
         # extracting some of the second-order Fock matrices from the subspace
         (n_xy_dict, kxy_dict, Focks_xy,
          XΥ_dict) = self.get_n_xy(w, d_a_mo, X, fock_dict, kX, nocc, norb,
                                   molecule, ao_basis, scf_tensors)
+
+        profiler.check_memory_usage('2nd CPP')
 
         # computing all second-order compounded densities based on the
         # second-order response vectors
@@ -383,10 +386,14 @@ class TpaDriver:
         else:
             density_list_two = None
 
+        profiler.check_memory_usage('2nd densities')
+
         # computing the remaning second-order Fock matrices from the
         # second-order densities
-        fock_dict_two = self.get_fock_dict_II(w, kX, density_list_two, D0, mo,
+        fock_dict_two = self.get_fock_dict_II(w, kX, density_list_two, mo,
                                               molecule, ao_basis)
+
+        profiler.check_memory_usage('2nd Focks')
 
         if self.rank == mpi_master():
             # Adding the Fock matrices extracted from the second-order response
@@ -402,6 +409,8 @@ class TpaDriver:
             # cubic response function
             other_dict = self.other(w, track, Nx, n_xy_dict, X, kX, kxy_dict,
                                     d_a_mo, nocc, norb)
+
+        profiler.check_memory_usage('Other terms')
 
         # Combining all the terms to evaluate the iso-tropic cubic response
         # function. For TPA Full and reduced, see article
@@ -434,6 +443,8 @@ class TpaDriver:
                 'gamma': gamma,
                 'w': self.frequencies,
             })
+
+        profiler.check_memory_usage('End of TPA')
 
         return result
 
@@ -535,12 +546,12 @@ class TpaDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def get_comp(self, w):
+    def get_comp(self, freqs):
         """
         Makes a list of all the gamma tensor components that are to be computed
         for printing purposes and for the contraction of X[3],X[2],A[3],A[2]
 
-        :param w:
+        :param freqs:
             A list of all the frequencies for the TPA calculation
 
         :return:
@@ -548,41 +559,21 @@ class TpaDriver:
             response with their corresponding frequencies
         """
 
-        # TODO: look into "self.iso"
+        comp_iso = []
+        spat_A = 'xyz'
 
-        if self.iso:
-            spat_A = ['x', 'y', 'z']
-            comp_iso = []
+        for w in freqs:
+            w_key = '{},{},{}'.format(w, -w, w)
+            for b in spat_A:
+                for a in spat_A:
+                    aabb = '{}{}{}{}'.format(a, a, b, b)
+                    abab = '{}{}{}{}'.format(a, b, a, b)
+                    abba = '{}{}{}{}'.format(a, b, b, a)
+                    comp_iso.append(aabb + ',' + w_key)
+                    comp_iso.append(abab + ',' + w_key)
+                    comp_iso.append(abba + ',' + w_key)
 
-            for a, b, e in ((a, b, e) for e in range(len(w))
-                            for b in range(len(spat_A))
-                            for a in range(len(spat_A))):
-                comp_iso.append(
-                    str(spat_A[a]) + str(spat_A[a]) + str(spat_A[b]) +
-                    str(spat_A[b]) + ',' + str(w[e]) + ',' + str(-w[e]) + ',' +
-                    str(w[e]))
-                comp_iso.append(
-                    str(spat_A[a]) + str(spat_A[b]) + str(spat_A[a]) +
-                    str(spat_A[b]) + ',' + str(w[e]) + ',' + str(-w[e]) + ',' +
-                    str(w[e]))
-                comp_iso.append(
-                    str(spat_A[a]) + str(spat_A[b]) + str(spat_A[b]) +
-                    str(spat_A[a]) + ',' + str(w[e]) + ',' + str(-w[e]) + ',' +
-                    str(w[e]))
-
-            self.comp = sorted(comp_iso, key=comp_iso.index)
-
-        else:
-            Track = self.comp.split(",")
-            comp = []
-            for i in range(len(w)):
-                for case in Track:
-                    t = case[0] + case[1] + case[2] + case[3] + ',' + str(
-                        w[i]) + ',' + str(-w[i]) + ',' + str(w[i])
-                    comp.append(t)
-                self.comp = comp
-
-        return self.comp
+        return sorted(comp_iso, key=comp_iso.index)
 
     def get_e4(self, wi, kX, fo, nocc, norb):
         """
@@ -965,7 +956,7 @@ class TpaDriver:
             else:
                 return None
 
-    def get_two_el_fock_mod_r(self, molecule, ao_basis, *dabs):
+    def get_two_el_fock_mod_r(self, molecule, ao_basis, dabs):
         """
         Returns the two-electron part of the Fock matix 2J-K
 
@@ -979,8 +970,6 @@ class TpaDriver:
         :return:
             A tuple containing the two-electron part of the Fock matix
         """
-
-        # TODO: look into "dabs"
 
         # TODO: make a function to determine batch size
 
@@ -996,8 +985,8 @@ class TpaDriver:
         total_mem_list = self.comm.gather(total_mem, root=mpi_master())
 
         if self.rank == mpi_master():
-            n_ao = dabs[0][0].shape[0]
-            n_total = len(dabs[0])
+            n_ao = dabs[0].shape[0]
+            n_total = len(dabs)
 
             # check if master node has larger memory
             mem_adjust = 0.0
@@ -1044,7 +1033,7 @@ class TpaDriver:
             if self.rank == mpi_master():
                 batch_start = batch_size * batch_ind
                 batch_end = min(batch_start + batch_size, n_total)
-                for dab in dabs[0][batch_start:batch_end]:
+                for dab in dabs[batch_start:batch_end]:
                     dt = 2 * dab
                     dts.append(dt)
                 dens = AODensityMatrix(dts, denmat.rest)
