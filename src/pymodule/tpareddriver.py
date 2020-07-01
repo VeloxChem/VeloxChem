@@ -658,10 +658,11 @@ class TpaReducedDriver(TpaDriver):
             A = X['x']
             C = X['x']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             kbd = kXY[(('N_sig_xy', w), wbd)]
             Nbd = n_xy[(('N_sig_xy', w), wbd)]
@@ -671,10 +672,11 @@ class TpaReducedDriver(TpaDriver):
             A = X['x']
             C = X['y']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             kbd = kXY[(('N_sig_xz', w), wbd)]
             Nbd = n_xy[(('N_sig_xz', w), wbd)]
@@ -684,10 +686,11 @@ class TpaReducedDriver(TpaDriver):
             A = X['x']
             C = X['z']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             # y
 
@@ -699,10 +702,11 @@ class TpaReducedDriver(TpaDriver):
             A = X['y']
             C = X['x']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             kbd = kXY[(('N_sig_yy', w), wbd)]
             Nbd = n_xy[(('N_sig_yy', w), wbd)]
@@ -712,10 +716,11 @@ class TpaReducedDriver(TpaDriver):
             A = X['y']
             C = X['y']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             kbd = kXY[(('N_sig_yz', w), wbd)]
             Nbd = n_xy[(('N_sig_yz', w), wbd)]
@@ -725,10 +730,11 @@ class TpaReducedDriver(TpaDriver):
             A = X['y']
             C = X['z']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             # z
 
@@ -740,10 +746,11 @@ class TpaReducedDriver(TpaDriver):
             A = X['z']
             C = X['x']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             kbd = kXY[(('N_sig_yz', w), wbd)]
             Nbd = n_xy[(('N_sig_yz', w), wbd)]
@@ -753,10 +760,11 @@ class TpaReducedDriver(TpaDriver):
             A = X['z']
             C = X['y']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             kbd = kXY[(('N_sig_zz', w), wbd)]
             Nbd = n_xy[(('N_sig_zz', w), wbd)]
@@ -766,10 +774,11 @@ class TpaReducedDriver(TpaDriver):
             A = X['z']
             C = X['z']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             na_x2_nyz_dict[(w, -w, w)] = na_x2_nyz
             nx_a2_nyz_dict[(w, -w, w)] = nx_a2_nyz

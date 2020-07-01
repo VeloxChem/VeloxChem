@@ -1167,27 +1167,33 @@ class TpaFullDriver(TpaDriver):
 
                 # Na X[3]NyNz
 
-                na_x3_ny_nz += -Na.T @ self.x3_contract(kc, kd, B, da, nocc,
-                                                        norb)
-                na_x3_ny_nz += -Na.T @ self.x3_contract(kd, kc, B, da, nocc,
-                                                        norb)
-                na_x3_ny_nz += -Na.T @ self.x3_contract(kd, kb, C, da, nocc,
-                                                        norb)
-                na_x3_ny_nz += -Na.T @ self.x3_contract(kb, kd, C, da, nocc,
-                                                        norb)
-                na_x3_ny_nz += -Na.T @ self.x3_contract(kb, kc, D, da, nocc,
-                                                        norb)
-                na_x3_ny_nz += -Na.T @ self.x3_contract(kc, kb, D, da, nocc,
-                                                        norb)
+                na_x3_ny_nz += -np.matmul(
+                    Na.T, self.x3_contract(kc, kd, B, da, nocc, norb))
+                na_x3_ny_nz += -np.matmul(
+                    Na.T, self.x3_contract(kd, kc, B, da, nocc, norb))
+                na_x3_ny_nz += -np.matmul(
+                    Na.T, self.x3_contract(kd, kb, C, da, nocc, norb))
+                na_x3_ny_nz += -np.matmul(
+                    Na.T, self.x3_contract(kb, kd, C, da, nocc, norb))
+                na_x3_ny_nz += -np.matmul(
+                    Na.T, self.x3_contract(kb, kc, D, da, nocc, norb))
+                na_x3_ny_nz += -np.matmul(
+                    Na.T, self.x3_contract(kc, kb, D, da, nocc, norb))
 
                 # NaA[3]n_xNy
 
-                na_a3_nx_ny += self.a3_contract(kb, kc, A, da, nocc, norb) @ Nd
-                na_a3_nx_ny += self.a3_contract(kb, kd, A, da, nocc, norb) @ Nc
-                na_a3_nx_ny += self.a3_contract(kc, kb, A, da, nocc, norb) @ Nd
-                na_a3_nx_ny += self.a3_contract(kc, kd, A, da, nocc, norb) @ Nb
-                na_a3_nx_ny += self.a3_contract(kd, kb, A, da, nocc, norb) @ Nc
-                na_a3_nx_ny += self.a3_contract(kd, kc, A, da, nocc, norb) @ Nb
+                na_a3_nx_ny += np.matmul(
+                    self.a3_contract(kb, kc, A, da, nocc, norb), Nd)
+                na_a3_nx_ny += np.matmul(
+                    self.a3_contract(kb, kd, A, da, nocc, norb), Nc)
+                na_a3_nx_ny += np.matmul(
+                    self.a3_contract(kc, kb, A, da, nocc, norb), Nd)
+                na_a3_nx_ny += np.matmul(
+                    self.a3_contract(kc, kd, A, da, nocc, norb), Nb)
+                na_a3_nx_ny += np.matmul(
+                    self.a3_contract(kd, kb, A, da, nocc, norb), Nc)
+                na_a3_nx_ny += np.matmul(
+                    self.a3_contract(kd, kc, A, da, nocc, norb), Nb)
 
             na_a3_nx_ny_dict[(wi[j], -wi[j], wi[j])] = na_a3_nx_ny
             na_x3_ny_nz_dict[(wi[j], -wi[j], wi[j])] = na_x3_ny_nz
@@ -1216,10 +1222,11 @@ class TpaFullDriver(TpaDriver):
             kb = kX['Nb'][('x', w)]
             A = X['x']
             B = X['x']
-            na_x2_nyz += Na.T @ self.x2_contract(kcd, B, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kcd, B, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kb, A, da, nocc, norb) @ Ncd
-            nx_a2_nyz += self.a2_contract(kcd, A, da, nocc, norb) @ Nb
+            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
 
             kcd = kXY[(('N_lamtau_xy', w), wcd)]
             Ncd = n_xy[(('N_lamtau_xy', w), wcd)]
@@ -1230,10 +1237,11 @@ class TpaFullDriver(TpaDriver):
             A = X['x']
             B = X['y']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kcd, B, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kcd, B, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kb, A, da, nocc, norb) @ Ncd
-            nx_a2_nyz += self.a2_contract(kcd, A, da, nocc, norb) @ Nb
+            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
 
             kcd = kXY[(('N_lamtau_xz', w), wcd)]
             Ncd = n_xy[(('N_lamtau_xz', w), wcd)]
@@ -1243,10 +1251,11 @@ class TpaFullDriver(TpaDriver):
             A = X['x']
             B = X['z']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kcd, B, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kcd, B, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kb, A, da, nocc, norb) @ Ncd
-            nx_a2_nyz += self.a2_contract(kcd, A, da, nocc, norb) @ Nb
+            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
 
             # y
 
@@ -1258,10 +1267,11 @@ class TpaFullDriver(TpaDriver):
             B = X['x']
             Na = n_x['Na'][('y', wa)]
 
-            na_x2_nyz += Na.T @ self.x2_contract(kcd, B, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kcd, B, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kb, A, da, nocc, norb) @ Ncd
-            nx_a2_nyz += self.a2_contract(kcd, A, da, nocc, norb) @ Nb
+            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
 
             kcd = kXY[(('N_lamtau_yy', w), wcd)]
             Ncd = n_xy[(('N_lamtau_yy', w), wcd)]
@@ -1271,10 +1281,11 @@ class TpaFullDriver(TpaDriver):
             A = X['y']
             B = X['y']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kcd, B, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kcd, B, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kb, A, da, nocc, norb) @ Ncd
-            nx_a2_nyz += self.a2_contract(kcd, A, da, nocc, norb) @ Nb
+            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
 
             kcd = kXY[(('N_lamtau_yz', w), wcd)]
             Ncd = n_xy[(('N_lamtau_yz', w), wcd)]
@@ -1285,10 +1296,11 @@ class TpaFullDriver(TpaDriver):
             B = X['z']
             Na = n_x['Na'][('y', wa)]
 
-            na_x2_nyz += Na.T @ self.x2_contract(kcd, B, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kcd, B, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kb, A, da, nocc, norb) @ Ncd
-            nx_a2_nyz += self.a2_contract(kcd, A, da, nocc, norb) @ Nb
+            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
 
             # z
 
@@ -1300,10 +1312,11 @@ class TpaFullDriver(TpaDriver):
             A = X['z']
             B = X['x']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kcd, B, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kcd, B, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kb, A, da, nocc, norb) @ Ncd
-            nx_a2_nyz += self.a2_contract(kcd, A, da, nocc, norb) @ Nb
+            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
 
             kcd = kXY[(('N_lamtau_yz', w), wcd)]
             Ncd = n_xy[(('N_lamtau_yz', w), wcd)]
@@ -1313,10 +1326,11 @@ class TpaFullDriver(TpaDriver):
             A = X['z']
             B = X['y']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kcd, B, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kcd, B, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kb, A, da, nocc, norb) @ Ncd
-            nx_a2_nyz += self.a2_contract(kcd, A, da, nocc, norb) @ Nb
+            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
 
             kcd = kXY[(('N_lamtau_zz', w), wcd)]
             Ncd = n_xy[(('N_lamtau_zz', w), wcd)]
@@ -1326,10 +1340,11 @@ class TpaFullDriver(TpaDriver):
             A = X['z']
             B = X['z']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kcd, B, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kcd, B, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kb, A, da, nocc, norb) @ Ncd
-            nx_a2_nyz += self.a2_contract(kcd, A, da, nocc, norb) @ Nb
+            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
 
             # BD
 
@@ -1341,10 +1356,11 @@ class TpaFullDriver(TpaDriver):
             A = X['x']
             C = X['x']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             kbd = kXY[(('N_sig_xy', w), wbd)]
             Nbd = n_xy[(('N_sig_xy', w), wbd)]
@@ -1354,10 +1370,11 @@ class TpaFullDriver(TpaDriver):
             A = X['x']
             C = X['y']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             kbd = kXY[(('N_sig_xz', w), wbd)]
             Nbd = n_xy[(('N_sig_xz', w), wbd)]
@@ -1367,10 +1384,11 @@ class TpaFullDriver(TpaDriver):
             A = X['x']
             C = X['z']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             # y
 
@@ -1382,10 +1400,11 @@ class TpaFullDriver(TpaDriver):
             A = X['y']
             C = X['x']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             kbd = kXY[(('N_sig_yy', w), wbd)]
             Nbd = n_xy[(('N_sig_yy', w), wbd)]
@@ -1395,10 +1414,11 @@ class TpaFullDriver(TpaDriver):
             A = X['y']
             C = X['y']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             kbd = kXY[(('N_sig_yz', w), wbd)]
             Nbd = n_xy[(('N_sig_yz', w), wbd)]
@@ -1408,10 +1428,11 @@ class TpaFullDriver(TpaDriver):
             A = X['y']
             C = X['z']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             # z
 
@@ -1423,10 +1444,11 @@ class TpaFullDriver(TpaDriver):
             A = X['z']
             C = X['x']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             kbd = kXY[(('N_sig_yz', w), wbd)]
             Nbd = n_xy[(('N_sig_yz', w), wbd)]
@@ -1436,10 +1458,11 @@ class TpaFullDriver(TpaDriver):
             A = X['z']
             C = X['y']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             kbd = kXY[(('N_sig_zz', w), wbd)]
             Nbd = n_xy[(('N_sig_zz', w), wbd)]
@@ -1449,10 +1472,11 @@ class TpaFullDriver(TpaDriver):
             A = X['z']
             C = X['z']
 
-            na_x2_nyz += Na.T @ self.x2_contract(kbd, C, da, nocc, norb)
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kbd, C, da, nocc, norb))
 
-            nx_a2_nyz += self.a2_contract(kc, A, da, nocc, norb) @ Nbd
-            nx_a2_nyz += self.a2_contract(kbd, A, da, nocc, norb) @ Nc
+            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
             na_x2_nyz_dict[(w, -w, w)] = na_x2_nyz
             nx_a2_nyz_dict[(w, -w, w)] = nx_a2_nyz
@@ -1505,14 +1529,16 @@ class TpaFullDriver(TpaDriver):
             w = float(vals[1])
             ww = float(vals[1])
 
-            t4term = n_x['Na'][('x', w)] @ (e4_dict['f_iso_x'][ww] - S4[
-                ('x', ww)]) + n_x['Na'][('y', w)] @ (
-                    e4_dict['f_iso_y'][ww] - S4[('y', ww)]) + n_x['Na'][
-                        ('z', w)] @ (e4_dict['f_iso_z'][ww] - S4[('z', ww)])
+            t4term = (np.matmul(n_x['Na'][('x', w)],
+                                e4_dict['f_iso_x'][ww] - S4[('x', ww)]) +
+                      np.matmul(n_x['Na'][('y', w)],
+                                e4_dict['f_iso_y'][ww] - S4[('y', ww)]) +
+                      np.matmul(n_x['Na'][('z', w)],
+                                e4_dict['f_iso_z'][ww] - S4[('z', ww)]))
 
             if self.damping > 0:
-                t4term += R4term[('x', ww)] + R4term[('y', ww)] + R4term[('z',
-                                                                          ww)]
+                t4term += (R4term[('x', ww)] + R4term[('y', ww)] +
+                           R4term[('z', ww)])
 
             T4term[(ww, -ww, ww)] = t4term
 
@@ -1697,46 +1723,46 @@ class TpaFullDriver(TpaDriver):
                 Nd_h = self.flip_xy(Nd)
 
                 if comp_i[0] == 'x':
-                    R4x += -1j * damp * Nd_h @ self.s4_for_r4(
-                        kA.T, kB, kC, d_a_mo, nocc, norb)
-                    R4x += -1j * damp * Nc_h @ self.s4_for_r4(
-                        kA.T, kB, kD, d_a_mo, nocc, norb)
-                    R4x += -1j * damp * Nd_h @ self.s4_for_r4(
-                        kA.T, kC, kB, d_a_mo, nocc, norb)
-                    R4x += -1j * damp * Nb_h @ self.s4_for_r4(
-                        kA.T, kC, kD, d_a_mo, nocc, norb)
-                    R4x += -1j * damp * Nc_h @ self.s4_for_r4(
-                        kA.T, kD, kB, d_a_mo, nocc, norb)
-                    R4x += -1j * damp * Nb_h @ self.s4_for_r4(
-                        kA.T, kD, kC, d_a_mo, nocc, norb)
+                    R4x += -1j * damp * np.matmul(
+                        Nd_h, self.s4_for_r4(kA.T, kB, kC, d_a_mo, nocc, norb))
+                    R4x += -1j * damp * np.matmul(
+                        Nc_h, self.s4_for_r4(kA.T, kB, kD, d_a_mo, nocc, norb))
+                    R4x += -1j * damp * np.matmul(
+                        Nd_h, self.s4_for_r4(kA.T, kC, kB, d_a_mo, nocc, norb))
+                    R4x += -1j * damp * np.matmul(
+                        Nb_h, self.s4_for_r4(kA.T, kC, kD, d_a_mo, nocc, norb))
+                    R4x += -1j * damp * np.matmul(
+                        Nc_h, self.s4_for_r4(kA.T, kD, kB, d_a_mo, nocc, norb))
+                    R4x += -1j * damp * np.matmul(
+                        Nb_h, self.s4_for_r4(kA.T, kD, kC, d_a_mo, nocc, norb))
 
                 elif comp_i[0] == 'y':
-                    R4y += -1j * damp * Nd_h @ self.s4_for_r4(
-                        kA.T, kB, kC, d_a_mo, nocc, norb)
-                    R4y += -1j * damp * Nc_h @ self.s4_for_r4(
-                        kA.T, kB, kD, d_a_mo, nocc, norb)
-                    R4y += -1j * damp * Nd_h @ self.s4_for_r4(
-                        kA.T, kC, kB, d_a_mo, nocc, norb)
-                    R4y += -1j * damp * Nb_h @ self.s4_for_r4(
-                        kA.T, kC, kD, d_a_mo, nocc, norb)
-                    R4y += -1j * damp * Nc_h @ self.s4_for_r4(
-                        kA.T, kD, kB, d_a_mo, nocc, norb)
-                    R4y += -1j * damp * Nb_h @ self.s4_for_r4(
-                        kA.T, kD, kC, d_a_mo, nocc, norb)
+                    R4y += -1j * damp * np.matmul(
+                        Nd_h, self.s4_for_r4(kA.T, kB, kC, d_a_mo, nocc, norb))
+                    R4y += -1j * damp * np.matmul(
+                        Nc_h, self.s4_for_r4(kA.T, kB, kD, d_a_mo, nocc, norb))
+                    R4y += -1j * damp * np.matmul(
+                        Nd_h, self.s4_for_r4(kA.T, kC, kB, d_a_mo, nocc, norb))
+                    R4y += -1j * damp * np.matmul(
+                        Nb_h, self.s4_for_r4(kA.T, kC, kD, d_a_mo, nocc, norb))
+                    R4y += -1j * damp * np.matmul(
+                        Nc_h, self.s4_for_r4(kA.T, kD, kB, d_a_mo, nocc, norb))
+                    R4y += -1j * damp * np.matmul(
+                        Nb_h, self.s4_for_r4(kA.T, kD, kC, d_a_mo, nocc, norb))
 
                 elif comp_i[0] == 'z':
-                    R4z += -1j * damp * Nd_h @ self.s4_for_r4(
-                        kA.T, kB, kC, d_a_mo, nocc, norb)
-                    R4z += -1j * damp * Nc_h @ self.s4_for_r4(
-                        kA.T, kB, kD, d_a_mo, nocc, norb)
-                    R4z += -1j * damp * Nd_h @ self.s4_for_r4(
-                        kA.T, kC, kB, d_a_mo, nocc, norb)
-                    R4z += -1j * damp * Nb_h @ self.s4_for_r4(
-                        kA.T, kC, kD, d_a_mo, nocc, norb)
-                    R4z += -1j * damp * Nc_h @ self.s4_for_r4(
-                        kA.T, kD, kB, d_a_mo, nocc, norb)
-                    R4z += -1j * damp * Nb_h @ self.s4_for_r4(
-                        kA.T, kD, kC, d_a_mo, nocc, norb)
+                    R4z += -1j * damp * np.matmul(
+                        Nd_h, self.s4_for_r4(kA.T, kB, kC, d_a_mo, nocc, norb))
+                    R4z += -1j * damp * np.matmul(
+                        Nc_h, self.s4_for_r4(kA.T, kB, kD, d_a_mo, nocc, norb))
+                    R4z += -1j * damp * np.matmul(
+                        Nd_h, self.s4_for_r4(kA.T, kC, kB, d_a_mo, nocc, norb))
+                    R4z += -1j * damp * np.matmul(
+                        Nb_h, self.s4_for_r4(kA.T, kC, kD, d_a_mo, nocc, norb))
+                    R4z += -1j * damp * np.matmul(
+                        Nc_h, self.s4_for_r4(kA.T, kD, kB, d_a_mo, nocc, norb))
+                    R4z += -1j * damp * np.matmul(
+                        Nb_h, self.s4_for_r4(kA.T, kD, kC, d_a_mo, nocc, norb))
 
             R4terms[('x', w1)] = -R4x
             R4terms[('y', w1)] = -R4y

@@ -509,9 +509,9 @@ class TpaDriver:
         for i in range(len(freqs)):
             w = float(track[i * (len(track) // len(freqs))].split(",")[1])
 
-            t3term = -n_x['Na'][('x', w)] @ e3_dict['f_iso_x'][w] - n_x['Na'][
-                ('y', w)] @ e3_dict['f_iso_y'][w] - n_x['Na'][
-                    ('z', w)] @ e3_dict['f_iso_z'][w]
+            t3term = -(np.matmul(n_x['Na'][('x', w)], e3_dict['f_iso_x'][w]) +
+                       np.matmul(n_x['Na'][('y', w)], e3_dict['f_iso_y'][w]) +
+                       np.matmul(n_x['Na'][('z', w)], e3_dict['f_iso_z'][w]))
 
             t3_term[(w, -w, w)] = t3term
 
@@ -640,9 +640,8 @@ class TpaDriver:
             [k,D]
         """
 
-        # TODO: replace "@" by np.matmul or np.linalg.multi_dot
-
-        return k.T @ S @ D - D @ S @ k.T
+        return (np.linalg.multi_dot([k.T, S, D]) -
+                np.linalg.multi_dot([D, S, k.T]))
 
     def mo2ao(self, mo, A):
         """
@@ -657,7 +656,7 @@ class TpaDriver:
             The matrix in AO basis
         """
 
-        return mo @ A @ mo.T
+        return np.linalg.multi_dot([mo, A, mo.T])
 
     def ao2mo(self, mo, A):
         """
@@ -672,7 +671,7 @@ class TpaDriver:
             The matrix in MO basis
         """
 
-        return mo.T @ A @ mo
+        return np.linalg.multi_dot([mo.T, A, mo])
 
     def commut(self, A, B):
         """
@@ -687,7 +686,7 @@ class TpaDriver:
             AB - BA
         """
 
-        return A @ B - B @ A
+        return np.matmul(A, B) - np.matmul(B, A)
 
     def x2_contract(self, k, X, D, nocc, norb):
         """
