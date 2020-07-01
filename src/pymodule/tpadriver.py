@@ -355,15 +355,15 @@ class TpaDriver:
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            density_list = self.get_densities(w, kX, S, D0, mo, nocc, norb)
+            density_list = self.get_densities(w, kX, S, D0, mo)
         else:
             density_list = None
 
         profiler.check_memory_usage('1st densities')
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(w, kX, density_list, (D0, D0), mo,
-                                       molecule, ao_basis)
+        fock_dict = self.get_fock_dict(w, density_list, (D0, D0), mo, molecule,
+                                       ao_basis)
 
         if self.rank == mpi_master():
             fock_dict.update(Focks)
@@ -390,8 +390,8 @@ class TpaDriver:
 
         # computing the remaning second-order Fock matrices from the
         # second-order densities
-        fock_dict_two = self.get_fock_dict_II(w, kX, density_list_two, mo,
-                                              molecule, ao_basis)
+        fock_dict_two = self.get_fock_dict_II(w, density_list_two, mo, molecule,
+                                              ao_basis)
 
         profiler.check_memory_usage('2nd Focks')
 

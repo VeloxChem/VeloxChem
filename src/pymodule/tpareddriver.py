@@ -43,7 +43,7 @@ class TpaReducedDriver(TpaDriver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def get_densities(self, wi, kX, S, D0, mo, nocc, norb):
+    def get_densities(self, wi, kX, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded Fock
         matrics F^{σ} used for the reduced iostropic cubic response function
@@ -58,10 +58,6 @@ class TpaReducedDriver(TpaDriver):
             The SCF density matrix in AO basis
         :param mo:
             A matrix containing the MO coefficents
-        :param nocc:
-            The number of occupied orbitals
-        :param norb:
-            The number of total orbitals
 
         :return:
             A list of tranformed compounded densities
@@ -110,15 +106,13 @@ class TpaReducedDriver(TpaDriver):
 
         return density_list
 
-    def get_fock_dict(self, wi, kX, density_list, D0, mo, molecule, ao_basis):
+    def get_fock_dict(self, wi, density_list, D0, mo, molecule, ao_basis):
         """
         Computes the compounded Fock matrics F^{σ}  used for the reduced
         isotropic cubic response function
 
         :param wi:
             A list of the frequencies
-        :param kX:
-            A dictonary with all the first-order response matrices
         :param density_list:
             A list of tranformed compounded densities
         :param D0:
@@ -297,68 +291,81 @@ class TpaReducedDriver(TpaDriver):
                 f_z = Fock['Fb'][('z', w)]
 
                 # BD σ gradients #
-                xy_dict[((
-                    'N_sig_xx', w
-                ), 2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
-                    (3 * self.xi(kx, kx, f_x, f_x, F0) + self.xi(
-                        ky, ky, f_y, f_y, F0) + self.xi(kz, kz, f_z, f_z, F0) +
-                     0.5 * Fock['f_sig_xx'][w]).T,
-                    nocc, norb)) - 3 * 2 * self.x2_contract(
-                        kx.T, mu_x, d_a_mo, nocc, norb) - 2 * self.x2_contract(
-                            ky.T, mu_y, d_a_mo, nocc, norb
-                        ) - 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
 
-                xy_dict[(('N_sig_yy', w),
-                         2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
-                             (self.xi(kx, kx, f_x, f_x, F0) +
-                              3 * self.xi(ky, ky, f_y, f_y, F0) +
-                              self.xi(kz, kz, f_z, f_z, F0) +
-                              0.5 * Fock['f_sig_yy'][w]).T, nocc,
-                             norb)) - 2 * self.x2_contract(
-                                 kx.T, mu_x, d_a_mo, nocc,
-                                 norb) - 3 * 2 * self.x2_contract(
-                                     ky.T, mu_y, d_a_mo, nocc,
-                                     norb) - 2 * self.x2_contract(
-                                         kz.T, mu_z, d_a_mo, nocc, norb)
+                key = (('N_sig_xx', w), 2 * w)
+                mat = (3 * self.xi(kx, kx, f_x, f_x, F0) +
+                       self.xi(ky, ky, f_y, f_y, F0) +
+                       self.xi(kz, kz, f_z, f_z, F0) +
+                       0.5 * Fock['f_sig_xx'][w]).T
+                xy_dict[key] = self.anti_sym(
+                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+                xy_dict[key] -= 6 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc,
+                                                     norb)
+                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc,
+                                                     norb)
+                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc,
+                                                     norb)
 
-                xy_dict[((
-                    'N_sig_zz', w
-                ), 2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
-                    (self.xi(kx, kx, f_x, f_x, F0) +
-                     self.xi(ky, ky, f_y, f_y, F0) + 3 * self.xi(
-                         kz, kz, f_z, f_z, F0) + 0.5 * Fock['f_sig_zz'][w]).T,
-                    nocc, norb)) - 2 * self.x2_contract(
-                        kx.T, mu_x, d_a_mo, nocc, norb) - 2 * self.x2_contract(
-                            ky.T, mu_y, d_a_mo, nocc,
-                            norb) - 3 * 2 * self.x2_contract(
-                                kz.T, mu_z, d_a_mo, nocc, norb)
+                key = (('N_sig_yy', w), 2 * w)
+                mat = (self.xi(kx, kx, f_x, f_x, F0) +
+                       3 * self.xi(ky, ky, f_y, f_y, F0) +
+                       self.xi(kz, kz, f_z, f_z, F0) +
+                       0.5 * Fock['f_sig_yy'][w]).T
+                xy_dict[key] = self.anti_sym(
+                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc,
+                                                     norb)
+                xy_dict[key] -= 6 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc,
+                                                     norb)
+                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc,
+                                                     norb)
 
-                xy_dict[((
-                    'N_sig_xy', w
-                ), 2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
-                    (self.xi(ky, kx, f_y, f_x, F0) + self.xi(
-                        kx, ky, f_x, f_y, F0) + 0.5 * Fock['f_sig_xy'][w]).T,
-                    nocc, norb)) - 2 * self.x2_contract(
-                        ky.T, mu_x, d_a_mo, nocc, norb) - 2 * self.x2_contract(
-                            kx.T, mu_y, d_a_mo, nocc, norb)
+                key = (('N_sig_zz', w), 2 * w)
+                mat = (self.xi(kx, kx, f_x, f_x, F0) +
+                       self.xi(ky, ky, f_y, f_y, F0) +
+                       3 * self.xi(kz, kz, f_z, f_z, F0) +
+                       0.5 * Fock['f_sig_zz'][w]).T
+                xy_dict[key] = self.anti_sym(
+                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc,
+                                                     norb)
+                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc,
+                                                     norb)
+                xy_dict[key] -= 6 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc,
+                                                     norb)
 
-                xy_dict[((
-                    'N_sig_xz', w
-                ), 2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
-                    (self.xi(kz, kx, f_z, f_x, F0) + self.xi(
-                        kx, kz, f_x, f_z, F0) + 0.5 * Fock['f_sig_xz'][w]).T,
-                    nocc, norb)) - 2 * self.x2_contract(
-                        kz.T, mu_x, d_a_mo, nocc, norb) - 2 * self.x2_contract(
-                            kx.T, mu_z, d_a_mo, nocc, norb)
+                key = (('N_sig_xy', w), 2 * w)
+                mat = (self.xi(ky, kx, f_y, f_x, F0) +
+                       self.xi(kx, ky, f_x, f_y, F0) +
+                       0.5 * Fock['f_sig_xy'][w]).T
+                xy_dict[key] = self.anti_sym(
+                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_x, d_a_mo, nocc,
+                                                     norb)
+                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_y, d_a_mo, nocc,
+                                                     norb)
 
-                xy_dict[((
-                    'N_sig_yz', w
-                ), 2 * w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(
-                    (self.xi(kz, ky, f_z, f_y, F0) + self.xi(
-                        ky, kz, f_y, f_z, F0) + 0.5 * Fock['f_sig_yz'][w]).T,
-                    nocc, norb)) - 2 * self.x2_contract(
-                        kz.T, mu_y, d_a_mo, nocc, norb) - 2 * self.x2_contract(
-                            ky.T, mu_z, d_a_mo, nocc, norb)
+                key = (('N_sig_xz', w), 2 * w)
+                mat = (self.xi(kz, kx, f_z, f_x, F0) +
+                       self.xi(kx, kz, f_x, f_z, F0) +
+                       0.5 * Fock['f_sig_xz'][w]).T
+                xy_dict[key] = self.anti_sym(
+                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_x, d_a_mo, nocc,
+                                                     norb)
+                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_z, d_a_mo, nocc,
+                                                     norb)
+
+                key = (('N_sig_yz', w), 2 * w)
+                mat = (self.xi(kz, ky, f_z, f_y, F0) +
+                       self.xi(ky, kz, f_y, f_z, F0) +
+                       0.5 * Fock['f_sig_yz'][w]).T
+                xy_dict[key] = self.anti_sym(
+                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_y, d_a_mo, nocc,
+                                                     norb)
+                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_z, d_a_mo, nocc,
+                                                     norb)
 
         return xy_dict
 
@@ -449,15 +456,13 @@ class TpaReducedDriver(TpaDriver):
 
         return density_list
 
-    def get_fock_dict_II(self, wi, kX, density_list, mo, molecule, ao_basis):
+    def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis):
         """
         Computes the compounded second-order Fock matrics used for the
         isotropic cubic response function
 
         :param wi:
             A list of the frequencies
-        :param kX:
-            A dictonary with all the first-order response matrices
         :param density_list:
             A list of tranformed compounded densities
         :param mo:
