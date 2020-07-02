@@ -407,8 +407,8 @@ class TpaDriver:
 
             # computing the X[3],A[3],X[2],A[2] contractions for the isotropic
             # cubic response function
-            other_dict = self.other(w, track, Nx, n_xy_dict, X, kX, kxy_dict,
-                                    d_a_mo, nocc, norb)
+            other_dict = self.get_other_terms(w, track, Nx, n_xy_dict, X, kX,
+                                              kxy_dict, d_a_mo, nocc, norb)
 
         profiler.check_memory_usage('Other terms')
 
@@ -447,6 +447,217 @@ class TpaDriver:
         profiler.check_memory_usage('End of TPA')
 
         return result
+
+    def get_densities(self, wi, kX, S, D0, mo):
+        """
+        Computes the compounded densities needed for the compounded Fock
+        matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
+        function
+
+        :param wi:
+            A list of the frequencies
+        :param kX:
+            A dictonary with all the first-order response matrices
+        :param S:
+            The overlap matrix
+        :param D0:
+            The SCF density matrix in AO basis
+        :param mo:
+            A matrix containing the MO coefficents
+
+        :return:
+            A list of tranformed compounded densities
+        """
+
+        return None
+
+    def get_fock_dict(self, wi, density_list, D0, mo, molecule, ao_basis):
+        """
+        Computes the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the
+        isotropic cubic response function
+
+        :param wi:
+            A list of the frequencies
+        :param density_list:
+            A list of tranformed compounded densities
+        :param D0:
+            The SCF density matrix in AO basis
+        :param mo:
+            A matrix containing the MO coefficents
+        :param molecule:
+            The molecule
+        :param ao_basis:
+            The AO basis set
+
+        :return:
+            A dictonary of compounded first-order Fock-matrices
+        """
+
+        return None
+
+    def get_e4(self, wi, kX, fo, nocc, norb):
+        """
+        Contracts E[4]n_xNyNz for the isotropic cubic response function. Takes
+        the Fock matrices from fock_dict and contracts them with the response
+        vectors.
+
+        :param wi:
+            A list of freqs
+        :param kX:
+            A dict of the single index response matricies
+        :param fo:
+            A dictonary of transformed Fock matricies from fock_dict
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The total number of orbitals
+
+        :return:
+            A dictonary of compounded E[4] tensors for the isotropic cubic
+            response function for TPA
+        """
+
+        return None
+
+    def get_n_xy(self, w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule,
+                 ao_basis, scf_tensors):
+        """
+        Computes all the second-order response vectors needed for the isotropic
+        cubic response computation
+
+        :param w:
+            A list of all the frequencies
+        :param d_a_mo:
+            The density matrix in MO basis
+        :param X:
+            Dipole integrals
+        :param fock_dict:
+            A dictonary containing all the Fock matricies
+        :param kX:
+            A dictonary containg all the response matricies
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The number of total orbitals
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+
+        :return:
+            A dictonary of Fock matrices from the subspace,second-order
+            response vectors and second-order response matrices
+        """
+
+        return None
+
+    def get_densities_II(self, wi, kX, kXY, S, D0, mo):
+        """
+        Computes the compounded densities needed for the compounded
+        second-order Fock matrics used for the isotropic cubic response
+        function
+
+        :param wi:
+            A list of the frequencies
+        :param kX:
+            A dictonary with all the first-order response matrices
+        :param kXY:
+            A dict of the two index response matrices
+        :param S:
+            The overlap matrix
+        :param D0:
+            The SCF density matrix in AO basis
+        :param mo:
+            A matrix containing the MO coefficents
+
+        :return:
+            A list of tranformed compounded densities
+        """
+
+        return None
+
+    def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis):
+        """
+        Computes the compounded second-order Fock matrics used for the
+        isotropic cubic response function
+
+        :param wi:
+            A list of the frequencies
+        :param density_list:
+            A list of tranformed compounded densities
+        :param mo:
+            A matrix containing the MO coefficents
+        :param molecule:
+            The molecule
+        :param ao_basis:
+            The AO basis set
+
+        :return:
+            A dictonary of compounded second-order Fock-matrices
+        """
+
+        return None
+
+    def get_e3(self, wi, kX, kXY, fo, fo2, nocc, norb):
+        """
+        Contracts E[3]
+
+        :param wi:
+            A list of freqs
+        :param kX:
+            A dict of the single index response matricies
+        :param kXY:
+            A dict of the two index response matrices
+        :param fo:
+            A dictonary of transformed Fock matricies from fock_dict
+        :param fo2:
+            A dictonarty of transfromed Fock matricies from fock_dict_two
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The total number of orbitals
+
+        :return:
+            A dictonary of compounded E[3] tensors for the isotropic cubic
+            response function for TPA
+        """
+
+        return None
+
+    def get_other_terms(self, wi, track, n_x, n_xy, X, kX, kXY, da, nocc, norb):
+        """
+        Computes the terms involving X[3],A[3],X[2],A[2] in the isotropic cubic
+        response function
+
+        :param wi:
+            A list containing all the frequencies
+        :param track:
+            A list that contains information about what γ components that are
+            to be computed and which freqs
+        :param n_x:
+            A dictonary containing all the single-index response vectors
+        :param n_xy:
+            A dictonary containing all the two-index response vectors
+        :param X:
+            A dictonray with all the property integral matricies
+        :param kX:
+            A dictonary with all the respone matricies
+        :param kXY:
+            A dictonary containing all the two-index response matricies
+        :param da:
+            The SCF density matrix in MO bassi
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The total number of orbitals
+
+        :return:
+            A dictonary of final X[2],A[2] contraction values
+        """
+
+        return None
 
     def get_t4(self, wi, e4_dict, n_x, kX, track, da, nocc, norb):
         """
@@ -517,6 +728,28 @@ class TpaDriver:
 
         return t3_term
 
+    def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
+        """
+        Prints the results from the TPA calculation.
+
+        :param freqs:
+            List of frequencies
+        :param gamma:
+            A dictonary containing the isotropic cubic response functions for
+            TPA
+        :param comp:
+            List of gamma tensors components
+        :param t4_dict:
+            A dictonary containing the isotropic T[4] contractions
+        :param t3_dict:
+            A dictonary containing the isotropic T[3] contractions
+        :param tpa_dict:
+            A dictonary containing the isotropic X[3], A[3], X[2], A[2]
+            contractions
+        """
+
+        return None
+
     def print_header(self):
         """
         Prints TPA setup header to output stream.
@@ -574,30 +807,6 @@ class TpaDriver:
                     comp_iso.append(abba + ',' + w_key)
 
         return sorted(comp_iso, key=comp_iso.index)
-
-    def get_e4(self, wi, kX, fo, nocc, norb):
-        """
-        Contracts E[4]n_xNyNz for the isotropic cubic response function. Takes
-        the Fock matrices from fock_dict and contracts them with the response
-        vectors.
-
-        :param wi:
-            A list of freqs
-        :param kX:
-            A dict of the single index response matricies
-        :param fo:
-            A dictonary of transformed Fock matricies from fock_dict
-        :param nocc:
-            The number of occupied orbitals
-        :param norb:
-            The total number of orbitals
-
-        :return:
-            A dictonary of compounded E[4] tensors for the isotropic cubic
-            response function for TPA
-        """
-
-        return None
 
     def flip_xy(self, X):
 

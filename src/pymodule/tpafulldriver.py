@@ -1100,7 +1100,7 @@ class TpaFullDriver(TpaDriver):
 
         return {'f_iso_x': f_iso_x, 'f_iso_y': f_iso_y, 'f_iso_z': f_iso_z}
 
-    def other(self, wi, track, n_x, n_xy, X, kX, kXY, da, nocc, norb):
+    def get_other_terms(self, wi, track, n_x, n_xy, X, kX, kXY, da, nocc, norb):
         """
         Computes the terms involving X[3],A[3],X[2],A[2] in the isotropic cubic
         response function
