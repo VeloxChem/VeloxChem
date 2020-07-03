@@ -123,7 +123,7 @@ def generate_setup(template_file, setup_file, user_flag=None):
 
     print('*** Checking c++ compiler... ', end='')
 
-    if 'CXX' in os.environ:
+    if 'CRAYPE_VERSION' in os.environ and 'CXX' in os.environ:
         cxx, cxx_path = find_exe([os.environ['CXX']])
     else:
         if isinstance(user_flag, str) and user_flag.lower() == 'gnu':
@@ -135,7 +135,7 @@ def generate_setup(template_file, setup_file, user_flag=None):
 
     if cxx is None:
         print('*** Error: Unable to find c++ compiler!')
-        if 'CXX' in os.environ:
+        if 'CRAYPE_VERSION' in os.environ and 'CXX' in os.environ:
             print('***        Please make sure that CXX is correctly set.')
         else:
             print('***        Please make sure that mpiicpc, mpicxx, or')
@@ -189,7 +189,10 @@ def generate_setup(template_file, setup_file, user_flag=None):
     # check conda environment
     if 'MKLROOT' not in os.environ:
         is_conda = os.path.exists(os.path.join(sys.prefix, 'conda-meta'))
-        if is_conda:
+        mkl_core = os.path.join(sys.prefix, 'lib', 'libmkl_core')
+        has_mkl_core = (os.path.isfile(mkl_core + '.so') or
+                        os.path.isfile(mkl_core + '.dylib'))
+        if is_conda and has_mkl_core:
             os.environ['MKLROOT'] = sys.prefix
 
     use_mkl = 'MKLROOT' in os.environ
