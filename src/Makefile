@@ -17,7 +17,7 @@ VLX_TARGET := ../build/lib/veloxchem/veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
 PYVLX_MAIN := vlx
 
-LIB_LIST += -shared $(PYTHON_LD)
+LIB_LIST += -shared $(LTOFLAG)
 
 # Select compiler flags
 ifneq "$(MAKECMDGOALS)" "release"
@@ -60,7 +60,7 @@ debug: $(VLX_LIBS)
 release: $(VLX_LIBS)
 	mkdir -p $(CURDIR)/../build/lib/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/lib/veloxchem
-	@echo ====== Linking debug version of $(VLX_TARGET)...
+	@echo ====== Linking release version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
 
