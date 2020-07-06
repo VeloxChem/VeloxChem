@@ -18,7 +18,7 @@ from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
-from .inputparser import parse_frequencies
+from .inputparser import InputParser
 from .errorhandler import assert_msg_critical
 
 
@@ -109,7 +109,8 @@ class TpaDriver:
             method_dict = {}
 
         if 'frequencies' in rsp_dict:
-            self.frequencies = parse_frequencies(rsp_dict['frequencies'])
+            self.frequencies = InputParser.parse_frequencies(
+                rsp_dict['frequencies'])
         if 'damping' in rsp_dict:
             self.damping = float(rsp_dict['damping'])
 
