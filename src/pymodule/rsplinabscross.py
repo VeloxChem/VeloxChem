@@ -2,7 +2,7 @@ import math
 
 from .veloxchemlib import hartree_in_ev
 from .rspproperty import ResponseProperty
-from .inputparser import parse_frequencies
+from .inputparser import InputParser
 
 
 class LinearAbsorptionCrossSection(ResponseProperty):
@@ -77,7 +77,9 @@ class LinearAbsorptionCrossSection(ResponseProperty):
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
-        for w in parse_frequencies(self.rsp_dict['frequencies']):
+        freqs = InputParser.parse_frequencies(self.rsp_dict['frequencies'])
+
+        for w in freqs:
             title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
                 'Dipole', 'Dipole', 'Frequency', 'Real', 'Imaginary')
             ostream.print_header(title.ljust(width))
@@ -97,8 +99,6 @@ class LinearAbsorptionCrossSection(ResponseProperty):
         ostream.print_header(title.ljust(width))
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
-
-        freqs = parse_frequencies(self.rsp_dict['frequencies'])
 
         if len(freqs) == 1 and freqs[0] == 0.0:
             text = '*** No linear absorption spectrum at zero frequency.'

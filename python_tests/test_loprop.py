@@ -1,5 +1,6 @@
 from mpi4py import MPI
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+from unittest.mock import MagicMock
 import numpy.testing as npt
 import textwrap
 import pytest
@@ -8,7 +9,8 @@ import os
 
 from veloxchem.main import main
 from veloxchem.mpitask import MpiTask
-from veloxchem.inputparser import InputParser, InputError
+from veloxchem.inputparser import InputParser
+from veloxchem.inputparser import InputError
 from veloxchem.loprop import (
     LoPropDriver,
     count_contracted,

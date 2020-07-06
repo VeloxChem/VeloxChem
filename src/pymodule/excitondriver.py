@@ -842,9 +842,9 @@ class ExcitonModelDriver:
 
                             valstr += '  {:20.12f}'.format(coupling)
 
-                            if not (svec['type'] == 'CT' and
-                                    cvec['type'] == 'CT' and
-                                    svec['index'] > cvec['index']):
+                            if not ((svec['type'] == 'CT') and
+                                    (cvec['type'] == 'CT') and
+                                    (svec['index'] > cvec['index'])):
                                 self.ostream.print_header(valstr.ljust(72))
 
                         self.ostream.print_blank()

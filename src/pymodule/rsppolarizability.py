@@ -1,5 +1,5 @@
 from .rspproperty import ResponseProperty
-from .inputparser import parse_frequencies
+from .inputparser import InputParser
 
 
 class Polarizability(ResponseProperty):
@@ -72,7 +72,9 @@ class Polarizability(ResponseProperty):
 
         width = 92
 
-        for w in parse_frequencies(self.rsp_dict['frequencies']):
+        freqs = InputParser.parse_frequencies(self.rsp_dict['frequencies'])
+
+        for w in freqs:
             w_str = 'Polarizability (w={:.4f})'.format(w)
             ostream.print_header(w_str.ljust(width))
             ostream.print_header(('-' * len(w_str)).ljust(width))
