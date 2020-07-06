@@ -9,8 +9,8 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
+from .inputparser import InputParser
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_frequencies
 from .checkpoint import check_rsp_hdf5
 from .checkpoint import append_rsp_solution_hdf5
 
@@ -73,7 +73,8 @@ class ComplexResponse(LinearSolver):
             self.b_components = rsp_dict['b_components'].lower()
 
         if 'frequencies' in rsp_dict:
-            self.frequencies = parse_frequencies(rsp_dict['frequencies'])
+            self.frequencies = InputParser.parse_frequencies(
+                rsp_dict['frequencies'])
         if 'damping' in rsp_dict:
             self.damping = float(rsp_dict['damping'])
 

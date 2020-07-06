@@ -2,13 +2,18 @@ from mpi4py import MPI
 import numpy as np
 import unittest
 import random
+import pytest
+import sys
 import os
+try:
+    import cppe
+except ImportError:
+    pass
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lrsolver import LinearResponseSolver
-
 
 class TestLR(unittest.TestCase):
 
@@ -19,10 +24,6 @@ class TestLR(unittest.TestCase):
 
         if potfile is not None:
             task.input_dict['method_settings']['potfile'] = potfile
-            try:
-                import cppe
-            except ImportError:
-                return
 
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
@@ -124,6 +125,7 @@ class TestLR(unittest.TestCase):
 
         self.run_lr(inpfile, potfile, xcfun_label, raw_data)
 
+    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_lr_hf_pe(self):
 
         inpfile = os.path.join('inputs', 'pe_water.inp')
@@ -150,6 +152,7 @@ class TestLR(unittest.TestCase):
 
         self.run_lr(inpfile, potfile, xcfun_label, raw_data)
 
+    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_lr_dft_pe(self):
 
         inpfile = os.path.join('inputs', 'pe_water.inp')

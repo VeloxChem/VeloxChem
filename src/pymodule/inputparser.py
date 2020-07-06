@@ -281,41 +281,41 @@ class InputParser:
                 if not verify(value):
                     raise InputError(msg.format(value))
 
+    @staticmethod
+    def parse_frequencies(input_frequencies):
+        """
+        Parses frequencies input for response solver.
+        Input example: '0.0 - 0.2525 (0.0025), 0.5 - 1.0 (0.02), 2.0'
+
+        :param input_frequencies:
+            The string of input frequencies.
+        """
+        if isinstance(input_frequencies, list):
+            return input_frequencies
+
+        if isinstance(input_frequencies, np.ndarray):
+            return input_frequencies.tolist()
+
+        frequencies = []
+        for w in input_frequencies.split(','):
+            if '-' in w:
+                m = re.search(r'^(.*)-(.*)\((.*)\)$', w)
+                if m is None:
+                    m = re.search(r'^(.*)-(.*)-(.*)$', w)
+
+                assert_msg_critical(m is not None,
+                                    'InputParser: failed to read frequencies')
+
+                frequencies += list(
+                    np.arange(
+                        float(m.group(1)),
+                        float(m.group(2)),
+                        float(m.group(3)),
+                    ))
+            elif w:
+                frequencies.append(float(w))
+        return frequencies
+
 
 class InputError(Exception):
     pass
-
-
-def parse_frequencies(input_frequencies):
-    """
-    Parses frequencies input for response solver.
-    Input example: "0.0 - 0.2525 (0.0025), 0.5 - 1.0 (0.02), 2.0"
-
-    :param input_frequencies:
-        The string of input frequencies.
-    """
-    if isinstance(input_frequencies, list):
-        return input_frequencies
-
-    if isinstance(input_frequencies, np.ndarray):
-        return input_frequencies.tolist()
-
-    frequencies = []
-    for w in input_frequencies.split(','):
-        if '-' in w:
-            m = re.search(r'^(.*)-(.*)\((.*)\)$', w)
-            if m is None:
-                m = re.search(r'^(.*)-(.*)-(.*)$', w)
-
-            assert_msg_critical(m is not None,
-                                'InputParser: failed to read frequencies')
-
-            frequencies += list(
-                np.arange(
-                    float(m.group(1)),
-                    float(m.group(2)),
-                    float(m.group(3)),
-                ))
-        elif w:
-            frequencies.append(float(w))
-    return frequencies

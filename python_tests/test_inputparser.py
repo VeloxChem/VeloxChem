@@ -1,5 +1,6 @@
 from mpi4py import MPI
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
+from unittest.mock import mock_open
 import numpy.testing as npt
 import numpy as np
 import textwrap
@@ -8,7 +9,6 @@ import sys
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.inputparser import InputParser
-from veloxchem.inputparser import parse_frequencies
 
 
 @patch.object(InputParser, 'parse')
@@ -363,4 +363,5 @@ def test_error_in_input(tmpdir):
                           )])
 def test_parse_frequencies(input_frequencies, expected):
     if MPI.COMM_WORLD.Get_rank() == mpi_master():
-        npt.assert_allclose(parse_frequencies(input_frequencies), expected)
+        npt.assert_allclose(InputParser.parse_frequencies(input_frequencies),
+                            expected)

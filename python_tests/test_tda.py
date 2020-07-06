@@ -1,7 +1,13 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
+import pytest
+import sys
 import os
+try:
+    import cppe
+except ImportError:
+    pass
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.veloxchemlib import hartree_in_ev
@@ -19,10 +25,6 @@ class TestTDA(unittest.TestCase):
 
         if potfile is not None:
             task.input_dict['method_settings']['potfile'] = potfile
-            try:
-                import cppe
-            except ImportError:
-                return
 
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
@@ -123,6 +125,7 @@ class TestTDA(unittest.TestCase):
 
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
+    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_tda_hf_pe(self):
 
         inpfile = os.path.join('inputs', 'pe_water.inp')
@@ -149,6 +152,7 @@ class TestTDA(unittest.TestCase):
 
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
+    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_tda_dft_pe(self):
 
         inpfile = os.path.join('inputs', 'pe_water.inp')
