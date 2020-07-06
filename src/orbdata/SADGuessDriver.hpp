@@ -45,66 +45,66 @@ class CSADGuessDriver
     /**
      Gets occupation numbers for 1s elements.
 
-     @param occ number of 1s orbital.
+     @param nocc number of 1s orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc1s(double occ) const;
+    std::vector<double> _getOcc1s(const double nocc) const;
 
     /**
      Gets occupation numbers for 2s elements.
 
-     @param occ number of 2s orbital.
+     @param nocc number of 2s orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc2s(double occ) const;
+    std::vector<double> _getOcc2s(const double nocc) const;
 
     /**
      Gets occupation numbers for 2p elements.
 
-     @param occ number of 2s2p orbitals.
+     @param nocc number of 2s2p orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc2s2p(double occ) const;
+    std::vector<double> _getOcc2s2p(const double nocc) const;
 
     /**
      Gets occupation numbers for 3s elements.
 
-     @param occ number of 3s orbital.
+     @param nocc number of 3s orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc3s(double occ) const;
+    std::vector<double> _getOcc3s(const double nocc) const;
 
     /**
      Gets occupation numbers for 3p elements.
 
-     @param occ number of 3s3p orbitals.
+     @param nocc number of 3s3p orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc3s3p(double occ) const;
+    std::vector<double> _getOcc3s3p(const double nocc) const;
 
     /**
      Gets occupation numbers for 4s elements.
 
-     @param occ number of 4s orbital.
+     @param nocc number of 4s orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc4s(double occ) const;
+    std::vector<double> _getOcc4s(const double nocc) const;
 
     /**
      Gets occupation numbers for 3d elements.
 
-     @param occ number of 3d orbitals.
+     @param nocc number of 3d orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc3d(double occ) const;
+    std::vector<double> _getOcc3d(const double nocc) const;
 
     /**
      Gets occupation numbers for 4p elements.
 
-     @param occ number of 4s4p orbitals.
+     @param nocc number of 4s4p orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc4s4p(double occ) const;
+    std::vector<double> _getOcc4s4p(const double nocc) const;
 
     /**
      Computes SAD initial guess.

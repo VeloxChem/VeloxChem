@@ -31,72 +31,72 @@ CSADGuessDriver::~CSADGuessDriver()
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc1s(double occ) const
+CSADGuessDriver::_getOcc1s(const double nocc) const
 {
-    occ = std::min(std::max(0.0, occ), 1.0);
+    double occ = std::min(std::max(0.0, nocc), 1.0);
 
     //                           1s
     return std::vector<double>({occ});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc2s(double occ) const
+CSADGuessDriver::_getOcc2s(const double nocc) const
 {
-    occ = std::min(std::max(0.0, occ), 1.0);
+    double occ = std::min(std::max(0.0, nocc), 1.0);
 
     //                           1s   2s
     return std::vector<double>({1.0, occ});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc2s2p(double occ) const
+CSADGuessDriver::_getOcc2s2p(const double nocc) const
 {
-    occ = std::min(std::max(0.0, occ), 1.0);
+    double occ = std::min(std::max(0.0, nocc), 1.0);
 
     //                           1s   2s   2p-1 2p0  2p+1
     return std::vector<double>({1.0, occ, occ, occ, occ});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc3s(double occ) const
+CSADGuessDriver::_getOcc3s(const double nocc) const
 {
-    occ = std::min(std::max(0.0, occ), 1.0);
+    double occ = std::min(std::max(0.0, nocc), 1.0);
 
     //                           1s   2s   3s   2p-1 2p0  2p+1
     return std::vector<double>({1.0, 1.0, occ, 1.0, 1.0, 1.0});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc3s3p(double occ) const
+CSADGuessDriver::_getOcc3s3p(const double nocc) const
 {
-    occ = std::min(std::max(0.0, occ), 1.0);
+    double occ = std::min(std::max(0.0, nocc), 1.0);
 
     //                           1s   2s   3s   2p-1 3p-1 2p0  3p0  2p+1 3p+1
     return std::vector<double>({1.0, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc4s(double occ) const
+CSADGuessDriver::_getOcc4s(const double nocc) const
 {
-    occ = std::min(std::max(0.0, occ), 1.0);
+    double occ = std::min(std::max(0.0, nocc), 1.0);
 
     //                           1s   2s   3s   4s   2p-1 3p-1 2p0  3p0  2p+1 3p+1
     return std::vector<double>({1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc3d(double occ) const
+CSADGuessDriver::_getOcc3d(const double nocc) const
 {
-    occ = std::min(std::max(0.0, occ), 1.0);
+    double occ = std::min(std::max(0.0, nocc), 1.0);
 
     //                           1s   2s   3s   4s  2p-1 3p-1 2p0  3p0  2p+1 3p+1 3d-2 3d-1 3d0  3d+1 3d+2
     return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, occ, occ, occ, occ});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc4s4p(double occ) const
+CSADGuessDriver::_getOcc4s4p(const double nocc) const
 {
-    occ = std::min(std::max(0.0, occ), 1.0);
+    double occ = std::min(std::max(0.0, nocc), 1.0);
 
     //                           1s   2s   3s   4s  2p-1 3p-1 4p-1 2p0  3p0  4p0  2p+1 3p+1 4p+1 3d-2 3d-1 3d0  3d+1 3d+2
     return std::vector<double>({1.0, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0});
