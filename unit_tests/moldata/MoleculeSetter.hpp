@@ -1,10 +1,10 @@
 //
-//                       V.E.L.O.X. C.H.E.M. X
+//                           VELOXCHEM 1.0-RC
 //      ---------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
-//  Copyright © 2019 by Velox Chem X developers. All rights reserved.
+//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 
 #ifndef MoleculeSetter_hpp
 #define MoleculeSetter_hpp

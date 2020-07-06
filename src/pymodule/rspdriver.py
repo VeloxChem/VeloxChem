@@ -1,6 +1,7 @@
 from .cppsolver import ComplexResponse
 from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
+from .c6solver import C6Solver
 from .tdaexcidriver import TDAExciDriver
 
 
@@ -22,6 +23,8 @@ class ResponseDriver:
         - comm: The MPI communicator.
         - rank: The rank of MPI process.
         - nodes: The number of MPI processes.
+        - ostream: The output stream.
+        - is_converged: The flag for convergence.
     """
 
     def __init__(self, comm, ostream):
@@ -43,7 +46,10 @@ class ResponseDriver:
         # output stream
         self.ostream = ostream
 
-    def update_settings(self, rsp_dict, method_dict={}):
+        # convergence
+        self.is_converged = False
+
+    def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates settings in response solver.
 
@@ -54,7 +60,10 @@ class ResponseDriver:
         """
 
         self.rsp_dict = dict(rsp_dict)
-        self.method_dict = dict(method_dict)
+        if method_dict is None:
+            self.method_dict = None
+        else:
+            self.method_dict = dict(method_dict)
 
         if 'property' in rsp_dict:
             self.prop_type = rsp_dict['property'].lower()
@@ -91,7 +100,11 @@ class ResponseDriver:
 
             solver.update_settings(self.rsp_dict, self.method_dict)
 
-            return solver.compute(molecule, ao_basis, scf_tensors)
+            result = solver.compute(molecule, ao_basis, scf_tensors)
+
+            self.is_converged = solver.is_converged
+
+            return result
 
         # Linear response solver
 
@@ -103,19 +116,45 @@ class ResponseDriver:
 
             solver.update_settings(self.rsp_dict, self.method_dict)
 
-            return solver.compute(molecule, ao_basis, scf_tensors)
+            result = solver.compute(molecule, ao_basis, scf_tensors)
+
+            self.is_converged = solver.is_converged
+
+            return result
 
         # Complex linear response solver
 
         if (self.rsp_dict['response'] == 'linear' and
                 self.rsp_dict['residue'] == 'none' and
+                self.rsp_dict['onlystatic'] == 'no' and
                 self.rsp_dict['complex'] == 'yes'):
 
             clr_solver = ComplexResponse(self.comm, self.ostream)
 
             clr_solver.update_settings(self.rsp_dict, self.method_dict)
 
-            return clr_solver.compute(molecule, ao_basis, scf_tensors)
+            clr_result = clr_solver.compute(molecule, ao_basis, scf_tensors)
+
+            self.is_converged = clr_solver.is_converged
+
+            return clr_result
+
+        # C6 linear response solver
+
+        if (self.rsp_dict['response'] == 'linear' and
+                self.rsp_dict['residue'] == 'none' and
+                self.rsp_dict['onlystatic'] == 'yes' and
+                self.rsp_dict['complex'] == 'yes'):
+
+            c6_solver = C6Solver(self.comm, self.ostream)
+
+            c6_solver.update_settings(self.rsp_dict, self.method_dict)
+
+            c6_result = c6_solver.compute(molecule, ao_basis, scf_tensors)
+
+            self.is_converged = c6_solver.is_converged
+
+            return c6_result
 
     def prop_str(self):
         """
@@ -137,5 +176,11 @@ class ResponseDriver:
 
         if self.prop_type == 'circular dichroism spectrum':
             return 'Circular Dichroism Spectrum'
+
+        if self.prop_type == 'c6':
+            return 'C6 Dispersion Coefficient'
+
+        if self.prop_type == 'custom':
+            return 'Custom Response Property'
 
         return 'Undefined'

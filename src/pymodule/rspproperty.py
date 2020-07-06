@@ -17,7 +17,7 @@ class ResponseProperty:
         - rsp_property: The dictionary of response property.
     """
 
-    def __init__(self, rsp_dict, method_dict={}):
+    def __init__(self, rsp_dict, method_dict=None):
         """
         Initializes response property/spectroscopy.
         """
@@ -40,6 +40,8 @@ class ResponseProperty:
 
     def compute(self, molecule, basis, scf_tensors):
         """
+        Computes response property/spectroscopy.
+
         :param molecule:
             The molecule.
         :param basis:
@@ -50,6 +52,16 @@ class ResponseProperty:
 
         self.rsp_property = self.rsp_driver.compute(molecule, basis,
                                                     scf_tensors)
+
+    def converged(self):
+        """
+        Checks if the response calculation is converged.
+
+        :return:
+            True if the response calculation is converged, False otherwise.
+        """
+
+        return self.rsp_driver.is_converged
 
     def get_property(self, key):
         """

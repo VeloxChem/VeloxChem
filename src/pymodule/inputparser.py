@@ -39,6 +39,7 @@ class InputParser:
         self.basis_set_name = ''
 
         self.parse()
+        self.consistency_checks()
 
     # defining main functions
 
@@ -224,56 +225,97 @@ class InputParser:
                 fname = '.'.join(fname.split('.')[:-1])
             fchkp = fname + '.scf.h5'
             frsp = fname + '.rsp.h5'
-            fcpp = fname + '.cpp.h5'
             fexciton = fname + '.exciton.h5'
+            floprop = fname + '.loprop.h5'
 
             if 'scf' not in self.input_dict:
                 self.input_dict['scf'] = {}
-            self.input_dict['scf']['checkpoint_file'] = fchkp
+            if 'checkpoint_file' not in self.input_dict['scf']:
+                self.input_dict['scf']['checkpoint_file'] = fchkp
 
             if 'response' not in self.input_dict:
                 self.input_dict['response'] = {}
-            self.input_dict['response']['checkpoint_file'] = frsp
-
-            if 'cpp' not in self.input_dict:
-                self.input_dict['cpp'] = {}
-            self.input_dict['cpp']['checkpoint_file'] = fcpp
+            if 'checkpoint_file' not in self.input_dict['response']:
+                self.input_dict['response']['checkpoint_file'] = frsp
 
             if 'exciton' not in self.input_dict:
                 self.input_dict['exciton'] = {}
-            self.input_dict['exciton']['checkpoint_file'] = fexciton
+            if 'checkpoint_file' not in self.input_dict['exciton']:
+                self.input_dict['exciton']['checkpoint_file'] = fexciton
+
+            if 'loprop' not in self.input_dict:
+                self.input_dict['loprop'] = {}
+            if 'checkpoint_file' not in self.input_dict['loprop']:
+                self.input_dict['loprop']['checkpoint_file'] = floprop
+
+    def consistency_checks(self):
+        """
+        Checks consistency in the input groups.
+        """
+
+        if self.is_basis_set:
+            return
+
+        self.verify_options('loprop')
+
+    def verify_options(self, group):
+        """
+        Detect input errors for selected input group.
+        Checks and messages defined by `verifiers` dict.
+
+        :param group:
+            The input group.
+        """
+
+        verifyers = {
+            'loprop': {
+                'checkpoint_file': (lambda v: True, 'Always OK'),
+                'localize':
+                    (lambda v: v in ['charges'], 'localize: {} illegal value')
+            }
+        }
+
+        if group in self.input_dict:
+            for option, value in self.input_dict[group].items():
+                verify, msg = verifyers[group][option]
+                if not verify(value):
+                    raise InputError(msg.format(value))
+
+    @staticmethod
+    def parse_frequencies(input_frequencies):
+        """
+        Parses frequencies input for response solver.
+        Input example: '0.0 - 0.2525 (0.0025), 0.5 - 1.0 (0.02), 2.0'
+
+        :param input_frequencies:
+            The string of input frequencies.
+        """
+        if isinstance(input_frequencies, list):
+            return input_frequencies
+
+        if isinstance(input_frequencies, np.ndarray):
+            return input_frequencies.tolist()
+
+        frequencies = []
+        for w in input_frequencies.split(','):
+            if '-' in w:
+                m = re.search(r'^(.*)-(.*)\((.*)\)$', w)
+                if m is None:
+                    m = re.search(r'^(.*)-(.*)-(.*)$', w)
+
+                assert_msg_critical(m is not None,
+                                    'InputParser: failed to read frequencies')
+
+                frequencies += list(
+                    np.arange(
+                        float(m.group(1)),
+                        float(m.group(2)),
+                        float(m.group(3)),
+                    ))
+            elif w:
+                frequencies.append(float(w))
+        return frequencies
 
 
-def parse_frequencies(input_frequencies):
-    """
-    Parses frequencies input for response solver.
-    Input example: "0.0 - 0.2525 (0.0025), 0.5 - 1.0 (0.02), 2.0"
-
-    :param input_frequencies:
-        The string of input frequencies.
-    """
-    if isinstance(input_frequencies, list):
-        return input_frequencies
-
-    if isinstance(input_frequencies, np.ndarray):
-        return input_frequencies.tolist()
-
-    frequencies = []
-    for w in input_frequencies.split(','):
-        if '-' in w:
-            m = re.search(r'^(.*)-(.*)\((.*)\)$', w)
-            if m is None:
-                m = re.search(r'^(.*)-(.*)-(.*)$', w)
-
-            assert_msg_critical(m is not None,
-                                'InputParser: failed to read frequencies')
-
-            frequencies += list(
-                np.arange(
-                    float(m.group(1)),
-                    float(m.group(2)),
-                    float(m.group(3)),
-                ))
-        elif w:
-            frequencies.append(float(w))
-    return frequencies
+class InputError(Exception):
+    pass

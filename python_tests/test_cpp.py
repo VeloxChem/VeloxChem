@@ -1,7 +1,14 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
+import random
+import pytest
+import sys
 import os
+try:
+    import cppe
+except ImportError:
+    pass
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
@@ -18,10 +25,6 @@ class TestCPP(unittest.TestCase):
 
         if potfile is not None:
             task.input_dict['method_settings']['potfile'] = potfile
-            try:
-                import cppe
-            except ImportError:
-                return
 
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
@@ -40,8 +43,11 @@ class TestCPP(unittest.TestCase):
         ref_prop_imag = [float(line.split()[5]) for line in data_lines]
 
         cpp_solver = ComplexResponse(task.mpi_comm, task.ostream)
-        cpp_solver.update_settings({'frequencies': ','.join(ref_freqs_str)},
-                                   task.input_dict['method_settings'])
+        cpp_solver.update_settings(
+            {
+                'frequencies': ','.join(ref_freqs_str),
+                'batch_size': random.choice([1, 10, 100])
+            }, task.input_dict['method_settings'])
         cpp_results = cpp_solver.compute(task.molecule, task.ao_basis,
                                          scf_drv.scf_tensors)
 
@@ -165,6 +171,7 @@ class TestCPP(unittest.TestCase):
 
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
+    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_cpp_hf_pe(self):
 
         inpfile = os.path.join('inputs', 'pe_water.inp')
@@ -204,6 +211,7 @@ class TestCPP(unittest.TestCase):
 
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
+    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_cpp_dft_pe(self):
 
         inpfile = os.path.join('inputs', 'pe_water.inp')

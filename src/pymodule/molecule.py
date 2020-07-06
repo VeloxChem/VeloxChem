@@ -108,7 +108,33 @@ def _Molecule_center_of_mass(self):
     return x_center, y_center, z_center
 
 
+def _Molecule_more_info(self):
+    """
+    Returns more information about the molecule.
+
+    :return:
+        Molecular information in plain text.
+    """
+
+    width = 70
+    mol_info = []
+
+    mol_info.append('Molecular charge            : {:.0f}'.format(
+        self.get_charge()).ljust(width))
+    mol_info.append('Spin multiplicity           : {:d}'.format(
+        self.get_multiplicity()).ljust(width))
+    mol_info.append('Number of atoms             : {:d}'.format(
+        self.number_of_atoms()).ljust(width))
+    mol_info.append('Number of alpha electrons   : {:d}'.format(
+        self.number_of_alpha_electrons()).ljust(width))
+    mol_info.append('Number of beta  electrons   : {:d}'.format(
+        self.number_of_beta_electrons()).ljust(width))
+
+    return os.linesep.join(mol_info)
+
+
 Molecule.read_str = _Molecule_read_str
 Molecule.read_xyz = _Molecule_read_xyz
 Molecule.from_dict = _Molecule_from_dict
 Molecule.center_of_mass = _Molecule_center_of_mass
+Molecule.more_info = _Molecule_more_info

@@ -1,10 +1,14 @@
 import numpy as np
+import os
 try:
     import cppe
 except ImportError:
     raise ImportError(
-        'Unable to import cppe; '
-        'please download and install from https://github.com/maxscheurer/cppe')
+        'Unable to import cppe. ' + os.linesep +
+        'Please download and install from ' +
+        'https://github.com/maxscheurer/cppe ' + os.linesep +
+        'or install via ' +
+        '\'pip install git+https://github.com/maxscheurer/cppe.git\'')
 
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricFieldIntegralsDriver
@@ -22,10 +26,8 @@ class PolEmbed:
         The AO basis set.
     :param comm:
         The MPI communicator.
-    :param potfile:
-        The name of the potential file for polarizable embedding.
-    :param iso_pol:
-        The flag for using isotropic polarizability.
+    :param pe_dict:
+        The dictionary with options for CPPE.
 
     Instance variables
         - molecule: The molecule.
@@ -34,12 +36,12 @@ class PolEmbed:
         - rank: The rank of MPI process.
         - nodes: The number of MPI processes.
         - V_es: The multipole contribution to Fock matrix.
-        - options: The CPPE options object.
+        - options: The dictionary with options for CPPE.
         - cppe_state: The CPPE state object.
         - polarizable_coords: The coordinates of the polarizable sites.
     """
 
-    def __init__(self, molecule, basis, comm, potfile, iso_pol=True):
+    def __init__(self, molecule, basis, comm, pe_dict):
         """
         Initializes interface to the CPPE library.
         """
@@ -52,9 +54,8 @@ class PolEmbed:
         self.output = ''
         self.V_es = None
 
-        self.options = cppe.PeOptions()
-        self.options.potfile = potfile
-        self.options.iso_pol = iso_pol
+        self.check_cppe_version()
+        self.update_options(pe_dict)
 
         cppe_mol = cppe.Molecule()
         coords = np.vstack(
@@ -76,6 +77,58 @@ class PolEmbed:
                 if site.is_polarizable
             ])
             self.polarizable_coords = coords
+
+    def check_cppe_version(self):
+        """
+        Checks the version of CPPE.
+        """
+
+        from pkg_resources import parse_version
+        min_cppe_version = '0.2.0'
+
+        if parse_version(cppe.__version__) < parse_version(min_cppe_version):
+            err_str = 'cppe version {} or higher is required.'.format(
+                min_cppe_version) + os.linesep
+            err_str += 'cppe version {} was found.'.format(cppe.__version__)
+            raise ModuleNotFoundError(err_str)
+
+    def update_options(self, pe_dict):
+        """
+        Updates PE options based on the input dictionary.
+
+        :param pe_dict:
+            The dictionary with options for CPPE.
+        """
+
+        keytypes = {
+            'potfile': 'string',
+            'iso_pol': 'bool',
+            'induced_thresh': 'float',
+            'maxiter': 'int',
+            'damp_induced': 'bool',
+            'damp_multipole': 'bool',
+            'damping_factor_induced': 'float',
+            'damping_factor_multipole': 'float',
+            'pe_border': 'bool',
+            'border_type': 'string',
+            'border_rmin': 'float',
+            'border_nredist': 'int',
+            'border_redist_order': 'int',
+            'border_redist_pol': 'bool',
+        }
+
+        self.options = {}
+
+        for key in pe_dict:
+            if keytypes[key] == 'string':
+                self.options[key] = str(pe_dict[key])
+            elif keytypes[key] == 'float':
+                self.options[key] = float(pe_dict[key])
+            elif keytypes[key] == 'int':
+                self.options[key] = int(pe_dict[key])
+            elif keytypes[key] == 'bool':
+                boolstr = pe_dict[key].lower()
+                self.options[key] = True if boolstr in ['yes', 'y'] else False
 
     def print_callback(self, output):
         """

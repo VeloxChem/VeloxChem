@@ -1,10 +1,10 @@
 //
-//                             VELOXCHEM
+//                           VELOXCHEM 1.0-RC
 //      ---------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2019 by VeloxChem developers. All rights reserved.
-//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
+//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 
 #include "FourIndexesTest.hpp"
 

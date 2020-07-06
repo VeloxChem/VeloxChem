@@ -2,6 +2,10 @@ import numpy as np
 import unittest
 
 from veloxchem.veloxchemlib import DenseMatrix
+from veloxchem.veloxchemlib import c_matmul
+from veloxchem.veloxchemlib import c_multi_dot
+from veloxchem.veloxchemlib import c_outer
+from veloxchem.veloxchemlib import c_eigh
 
 
 class TestMath(unittest.TestCase):
@@ -48,6 +52,104 @@ class TestMath(unittest.TestCase):
 
         self.assertEqual(matrix.slice(0, 1, 2, 2),
                          DenseMatrix([[2., 3.], [5., 6.]]))
+
+    def test_matmul(self):
+
+        mat_A = np.arange(6.).reshape(2, 3)
+        mat_B = np.arange(12.).reshape(3, 4)
+        ref_C = np.matmul(mat_A, mat_B)
+
+        mat_C = c_matmul(mat_A, mat_B)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_A = np.arange(6.).reshape(3, 2)
+        mat_B = np.arange(12.).reshape(3, 4)
+        ref_C = np.matmul(mat_A.T, mat_B)
+
+        mat_C = c_matmul(mat_A.T, mat_B)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_C = c_matmul(mat_A.T.copy(), mat_B)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_A = np.arange(6.).reshape(2, 3)
+        mat_B = np.arange(12.).reshape(4, 3)
+        ref_C = np.matmul(mat_A, mat_B.T)
+
+        mat_C = c_matmul(mat_A, mat_B.T)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_C = c_matmul(mat_A, mat_B.T.copy())
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_A = np.arange(6.).reshape(3, 2)
+        mat_B = np.arange(12.).reshape(4, 3)
+        ref_C = np.matmul(mat_A.T, mat_B.T)
+
+        mat_C = c_matmul(mat_A.T, mat_B.T)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_C = c_matmul(mat_A.T.copy(), mat_B.T)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_C = c_matmul(mat_A.T, mat_B.T.copy())
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_C = c_matmul(mat_A.T.copy(), mat_B.T.copy())
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+    def test_multi_dot(self):
+
+        mat_A = np.arange(6.).reshape(2, 3)
+        mat_B = np.arange(12.).reshape(3, 4)
+        mat_C = np.arange(16.).reshape(4, 4)
+
+        ref_prod = np.linalg.multi_dot([mat_A, mat_B, mat_C.T])
+        prod = c_multi_dot([mat_A, mat_B, mat_C.T])
+        self.assertTrue(np.max(np.abs(prod - ref_prod)) < 1.0e-13)
+
+        ref_prod = np.linalg.multi_dot([mat_A, mat_B, mat_C, mat_B.T, mat_A.T])
+        prod = c_multi_dot([mat_A, mat_B, mat_C, mat_B.T, mat_A.T])
+        self.assertTrue(np.max(np.abs(prod - ref_prod)) < 1.0e-13)
+
+    def test_outer(self):
+
+        vec_A = np.arange(1., 10.)
+        vec_B = np.arange(10., 100.)
+
+        ref_C = np.outer(vec_A, vec_B)
+        mat_C = c_outer(vec_A, vec_B)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        ref_C = np.outer(vec_B, vec_A)
+        mat_C = c_outer(vec_B, vec_A)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        ref_C = np.outer(vec_A, vec_A)
+        mat_C = c_outer(vec_A, vec_A)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        ref_C = np.outer(vec_B, vec_B)
+        mat_C = c_outer(vec_B, vec_B)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+    def test_eigh(self):
+
+        mat_A = np.arange(10., 20.)
+        np.random.shuffle(mat_A)
+        mat_A = np.diag(mat_A)
+        mat_A += np.random.uniform(0.01, 0.99, 100).reshape(10, 10)
+        mat_A = 0.5 * (mat_A + mat_A.T)
+        ref_eigvals, ref_eigvecs = np.linalg.eigh(mat_A)
+
+        eigvals, eigvecs = c_eigh(mat_A)
+        self.assertTrue(np.max(np.abs(eigvals - ref_eigvals)) < 1.0e-13)
+        for k in range(ref_eigvecs.shape[1]):
+            vec = eigvecs[:, k].copy()
+            ref_vec = ref_eigvecs[:, k].copy()
+            if np.dot(vec, ref_vec) < 0.0:
+                vec *= -1.0
+            self.assertTrue(np.max(np.abs(vec - ref_vec)) < 1.0e-13)
 
 
 if __name__ == "__main__":

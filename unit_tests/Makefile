@@ -1,10 +1,10 @@
 #
-#                      V.E.L.O.X. C.H.E.M. MP
+#                           VELOXCHEM 1.0-RC
 #      ---------------------------------------------------
-#           An Electronic Structure Code for Nanoscale
+#                     An Electronic Structure Code
 #
-#  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
-#  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+#  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
 
 # Makefile for unit tests suite
 
@@ -12,7 +12,7 @@ include ../src/Makefile.setup
 
 # Set TARGET for unit tests suite
 
-VLX_TARGET   := UnitTestVeloxChemMP.x
+VLX_TARGET   := UnitTestVeloxChem.x
 VLX_MAIN_SCR := $(subst .x,.cpp,$(VLX_TARGET))
 VLX_MAIN_OBJ := $(subst .x,.o,$(VLX_TARGET))
 VLX_MAIN_DEP := $(subst .x,.d,$(VLX_TARGET))

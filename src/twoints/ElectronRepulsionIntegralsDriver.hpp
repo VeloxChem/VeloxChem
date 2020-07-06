@@ -1,10 +1,10 @@
 //
-//                             VELOXCHEM
+//                           VELOXCHEM 1.0-RC
 //      ---------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2019 by VeloxChem developers. All rights reserved.
-//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
+//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 
 #ifndef ElectronRepulsionIntegralsDriver_hpp
 #define ElectronRepulsionIntegralsDriver_hpp
@@ -31,7 +31,6 @@
 #include "AODensityMatrix.hpp"
 #include "AOFockMatrix.hpp"
 #include "RecursionMap.hpp"
-#include "CudaDevices.hpp"
 
 
 /**
@@ -70,21 +69,6 @@ class CElectronRepulsionIntegralsDriver
                                                  const CCauchySchwarzScreener& intsScreener,
                                                  const CGtoPairsBlock&         braGtoPairsBlock,
                                                  const CGtoPairsBlock&         ketGtoPairsBlock) const;
-    
-    /**
-     Computes electronic repulsion integrals for combination of GTOs pairs blocks on CUDA compute capable device.
-     
-     @param distPattern the ponter to integrals distribution pattern.
-     @param intsScreener the integrals screener object.
-     @param braGtoPairsBlock the GTOs pairsblock on bra side.
-     @param ketGtoPairsBlock the GTOs pairs block on ket side.
-     @param cudaDevices the CUDA compute capable devices.
-     */
-    void _compElectronRepulsionForGtoPairsBlocksOnGPU(      CTwoIntsDistribution&   distPattern,
-                                                      const CCauchySchwarzScreener& intsScreener,
-                                                      const CGtoPairsBlock&         braGtoPairsBlock,
-                                                      const CGtoPairsBlock&         ketGtoPairsBlock,
-                                                      const CCudaDevices*           cudaDevices) const;
     
     /**
      Sets horrizontal recursion map for bra side.
@@ -229,23 +213,6 @@ class CElectronRepulsionIntegralsDriver
                                          const CScreeningContainer* screeningContainer) const;
     
     /**
-     Comutes electron repulsion integrals and stores them into AO Fock matrix
-     for two GTOs pairs containers on give CUDA compute capable devices.
-     
-     @param aoFockMatrix the AO Fock matrix.
-     @param aoDensityMatrix the AO density matrix.
-     @param braGtoPairsContainer the GTOs pairs container on bra side.
-     @param ketGtoPairsContainer the GTOs pairs container on ket side.
-     @param screeningContainer the screening container object.
-     */
-    void _compElectronRepulsionIntegralsOnGPU(      CAOFockMatrix&       aoFockMatrix,
-                                              const CAODensityMatrix&    aoDensityMatrix,
-                                              const CGtoPairsContainer*  braGtoPairsContainer,
-                                              const CGtoPairsContainer*  ketGtoPairsContainer,
-                                              const CScreeningContainer* screeningContainer,
-                                              const CCudaDevices&        cudaDevices) const;
-
-    /**
      Comutes maximum Q values of electron repulsion integrals for GTOs pairs
      block.
 
@@ -278,17 +245,6 @@ class CElectronRepulsionIntegralsDriver
                                      const int32_t nKetGtoPairsBlocks,
                                      const bool    isBraEqualKet) const;
     
-    /**
-     Creates tasks execution grid for computation of AO Fock matrix on CUDA
-     compute capable devices associated with specific MPI process.
-
-     @param braGtoPairsContainer the GTOs pairs container on bra side.
-     @param ketGtoPairsContainer the GTOs pairs container on ket side.
-     @return the vector of tasks indexes.
-     */
-    CMemBlock2D<int32_t> _setTasksGridForGPU(const CGtoPairsContainer* braGtoPairsContainer,
-                                             const CGtoPairsContainer* ketGtoPairsContainer) const;
-        
 public:
     
     /**
@@ -312,14 +268,12 @@ public:
      @param molecule the molecule.
      @param aoBasis the molecular AO basis.
      @param screeningContainer the screening container object.
-     @param cudaDevices the CUDA compute capable devices.
      */
     void compute(      CAOFockMatrix&       aoFockMatrix,
                  const CAODensityMatrix&    aoDensityMatrix,
                  const CMolecule&           molecule,
                  const CMolecularBasis&     aoBasis,
-                 const CScreeningContainer& screeningContainer,
-                 const CCudaDevices&        cudaDevices = CCudaDevices()) const;
+                 const CScreeningContainer& screeningContainer) const;
     
     /**
      Computes Q values for electron repulsion integrals for molecule with

@@ -1,10 +1,10 @@
 //
-//                             VELOXCHEM
+//                           VELOXCHEM 1.0-RC
 //      ---------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
-//  Copyright © 2019 by VeloxChem developers. All rights reserved.
+//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
@@ -102,18 +102,6 @@ CElectronRepulsionIntegralsDriver_compute(const CElectronRepulsionIntegralsDrive
                                           const CScreeningContainer& screeningContainer)
 {
     self.compute(aoFockMatrix, aoDensityMatrix, molecule, aoBasis, screeningContainer);
-}
-
-static void
-CElectronRepulsionIntegralsDriver_compute_1(const CElectronRepulsionIntegralsDriver& self,
-                                                  CAOFockMatrix&       aoFockMatrix,
-                                            const CAODensityMatrix&    aoDensityMatrix,
-                                            const CMolecule&           molecule,
-                                            const CMolecularBasis&     aoBasis,
-                                            const CScreeningContainer& screeningContainer,
-                                            const CCudaDevices&        cudaDevices)
-{
-    self.compute(aoFockMatrix, aoDensityMatrix, molecule, aoBasis, screeningContainer, cudaDevices);
 }
 
 // Helper function for exporting CElectronRepulsionIntegralsDriver.computeInMemory
@@ -389,7 +377,6 @@ export_twoints(py::module& m)
                  const ericut, const double, const CMolecule&, const CMolecularBasis&) const) &
                  CElectronRepulsionIntegralsDriver::compute)
         .def("compute", &CElectronRepulsionIntegralsDriver_compute)
-        .def("compute", &CElectronRepulsionIntegralsDriver_compute_1)
         .def("compute_in_mem", &CElectronRepulsionIntegralsDriver_compute_in_mem);
 
     // CMOIntsBatch class

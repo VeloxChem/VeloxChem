@@ -24,8 +24,8 @@ from .scfrestdriver import ScfRestrictedDriver
 from .rspabsorption import Absorption
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
-from .lrmatvecdriver import read_rsp_hdf5
-from .lrmatvecdriver import write_rsp_hdf5
+from .checkpoint import read_rsp_hdf5
+from .checkpoint import write_rsp_hdf5
 
 
 class ExcitonModelDriver:
@@ -120,13 +120,16 @@ class ExcitonModelDriver:
         self.restart = True
         self.checkpoint_file = None
 
-    def update_settings(self, exciton_dict, method_dict={}):
+    def update_settings(self, exciton_dict, method_dict=None):
         """
         Updates settings in exciton model driver.
 
         :param exciton_dict:
             The settings dictionary.
         """
+
+        if method_dict is None:
+            method_dict = {}
 
         assert_msg_critical('fragments' in exciton_dict,
                             'ExcitonModel: fragments not defined')
@@ -383,8 +386,8 @@ class ExcitonModelDriver:
 
                 nocc = monomer.number_of_alpha_electrons()
                 nvir = self.monomers[ind]['C'].shape[1] - nocc
-                mo_occ = self.monomers[ind]['C'][:, :nocc]
-                mo_vir = self.monomers[ind]['C'][:, nocc:]
+                mo_occ = self.monomers[ind]['C'][:, :nocc].copy()
+                mo_vir = self.monomers[ind]['C'][:, nocc:].copy()
 
                 for s in range(self.nstates):
                     # LE excitation energy
@@ -392,7 +395,7 @@ class ExcitonModelDriver:
                     self.H[h, h] = self.monomers[ind]['exc_energies'][s]
 
                     # LE transition dipole
-                    vec = self.monomers[ind]['exc_vectors'][:, s]
+                    vec = self.monomers[ind]['exc_vectors'][:, s].copy()
                     tdens = math.sqrt(2.0) * np.matmul(
                         mo_occ, np.matmul(vec.reshape(nocc, nvir), mo_vir.T))
                     self.trans_dipoles[h, :] = np.array(
@@ -418,11 +421,11 @@ class ExcitonModelDriver:
         if self.restart:
             if self.rank == mpi_master():
                 (dimer_indices, num_states, H, tdip, vdip, mdip,
-                 state_info) = read_rsp_hdf5(
-                     self.checkpoint_file, rsp_vector_labels,
-                     molecule.nuclear_repulsion_energy(),
-                     molecule.elem_ids_to_numpy(), basis.get_label(),
-                     dft_func_label, potfile_text, self.ostream)
+                 state_info) = read_rsp_hdf5(self.checkpoint_file,
+                                             rsp_vector_labels, molecule, basis,
+                                             {'dft_func_label': dft_func_label},
+                                             {'potfile_text': potfile_text},
+                                             self.ostream)
                 read_success = (dimer_indices is not None and
                                 num_states is not None and H is not None and
                                 tdip is not None and vdip is not None and
@@ -590,15 +593,15 @@ class ExcitonModelDriver:
 
                     for row in range(nao_A):
                         mo[ao_inds_A[row], :nocc_A] = CA[row, :nocc_A]
-                        mo[ao_inds_A[row], nocc:nocc +
-                           nvir_A] = CA[row, nocc_A:]
+                        mo[ao_inds_A[row], nocc:nocc + nvir_A] = CA[row,
+                                                                    nocc_A:]
 
                     for row in range(nao_B):
                         mo[ao_inds_B[row], nocc_A:nocc] = CB[row, :nocc_B]
                         mo[ao_inds_B[row], nocc + nvir_A:] = CB[row, nocc_B:]
 
-                    mo_occ = mo[:, :nocc]
-                    mo_vir = mo[:, nocc:]
+                    mo_occ = mo[:, :nocc].copy()
+                    mo_vir = mo[:, nocc:].copy()
 
                     # compute density matrix
                     dens = np.matmul(mo_occ, mo_occ.T)
@@ -667,8 +670,8 @@ class ExcitonModelDriver:
                         fock += vxc_mat.get_matrix().to_numpy()
 
                     fock_mo = np.matmul(mo.T, np.matmul(fock, mo))
-                    fock_occ = fock_mo[:nocc, :nocc]
-                    fock_vir = fock_mo[nocc:, nocc:]
+                    fock_occ = fock_mo[:nocc, :nocc].copy()
+                    fock_vir = fock_mo[nocc:, nocc:].copy()
 
                     # assemble TDA CI vectors
 
@@ -839,9 +842,9 @@ class ExcitonModelDriver:
 
                             valstr += '  {:20.12f}'.format(coupling)
 
-                            if not (svec['type'] == 'CT' and
-                                    cvec['type'] == 'CT' and
-                                    svec['index'] > cvec['index']):
+                            if not ((svec['type'] == 'CT') and
+                                    (cvec['type'] == 'CT') and
+                                    (svec['index'] > cvec['index'])):
                                 self.ostream.print_header(valstr.ljust(72))
 
                         self.ostream.print_blank()
@@ -916,8 +919,8 @@ class ExcitonModelDriver:
                                     ctAC += excitation_id[ind_A, ind_C]
                                     ctBC += excitation_id[ind_B, ind_C]
 
-                                    coupling = -fock_occ[nocc_A - 1 - oA, nocc -
-                                                         1 - oB]
+                                    coupling = -fock_occ[nocc_A - 1 - oA,
+                                                         nocc - 1 - oB]
 
                                     self.H[ctAC, ctBC] = coupling
                                     self.H[ctBC, ctAC] = coupling
@@ -956,11 +959,9 @@ class ExcitonModelDriver:
 
                 if self.rank == mpi_master():
                     write_rsp_hdf5(self.checkpoint_file, rsp_vector_list,
-                                   rsp_vector_labels,
-                                   molecule.nuclear_repulsion_energy(),
-                                   molecule.elem_ids_to_numpy(),
-                                   basis.get_label(), dft_func_label,
-                                   potfile_text, self.ostream)
+                                   rsp_vector_labels, molecule, basis,
+                                   {'dft_func_label': dft_func_label},
+                                   {'potfile_text': potfile_text}, self.ostream)
 
         if self.rank == mpi_master():
             self.print_banner('Summary')

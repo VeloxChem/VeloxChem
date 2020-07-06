@@ -12,15 +12,20 @@ class MyBuildPy(SetuptoolsBuildPy):
 
     def run(self):
         self.check_setup_file()
+        python_exe = 'python{}.{}'.format(sys.version_info[0],
+                                          sys.version_info[1])
+        self.update_vlx_script(python_exe)
         self.make_veloxchem()
         SetuptoolsBuildPy.run(self)
+        self.update_vlx_script('python3')
 
     def make_veloxchem(self):
-        cmd = 'make -C src -j '
+        cmd = 'make -C src -s -j '
         if 'OMP_NUM_THREADS' in os.environ:
             cmd += os.environ['OMP_NUM_THREADS']
         else:
             cmd += str(multiprocessing.cpu_count())
+        cmd += ' release'
         process = subprocess.Popen(cmd.split(),
                                    stdout=sys.stdout,
                                    stderr=subprocess.STDOUT)
@@ -35,28 +40,28 @@ class MyBuildPy(SetuptoolsBuildPy):
             print('*** Generating Makefile.setup...')
             generate_setup(template_file, setup_file)
 
+    def update_vlx_script(self, python_exe):
+        vlx_file = os.path.join('src', 'vlx')
+        with open(vlx_file, 'w', encoding='utf-8') as f_vlx:
+            print('#!/usr/bin/env {}'.format(python_exe), file=f_vlx)
+            print('from veloxchem.main import main', file=f_vlx)
+            print('main()', file=f_vlx)
+
 
 class MyInstall(SetuptoolsInstall):
 
     def run(self):
-        package_dir = os.path.join('build', 'python', 'veloxchem')
-        if not os.path.isdir(package_dir):
-            try:
-                os.makedirs(package_dir)
-            except IOError:
-                raise IOError(
-                    'Unable to create package dir {}'.format(package_dir))
         SetuptoolsInstall.run(self)
 
 
 setup(
     name='veloxchem',
-    version='0.0',
+    version='1.0rc1.post1',
     packages=[
         'veloxchem',
     ],
     package_dir={
-        'veloxchem': os.path.join('build', 'python', 'veloxchem'),
+        'veloxchem': os.path.join('src', 'pymodule'),
     },
     package_data={
         'veloxchem': [
@@ -65,7 +70,7 @@ setup(
         ],
     },
     scripts=[
-        os.path.join('build', 'bin', 'vlx'),
+        os.path.join('src', 'vlx'),
     ],
     python_requires='>=3.5',
     install_requires=[
@@ -73,6 +78,8 @@ setup(
         'mpi4py>=3.0',
         'numpy>=1.13',
         'h5py>=2.8',
+        'loprop>=0.2.3',
+        'psutil>=5.6.7',
     ],
     tests_require=[
         'pytest>=5.1.2',

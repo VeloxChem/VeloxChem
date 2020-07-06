@@ -149,8 +149,9 @@ class TestComplexResponse(unittest.TestCase):
     def test_filesave(self):
 
         directions = ['xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz']
-        expected_keys = ['amplitudes', 'frequencies', 'zero_padded'
-                         ] + directions
+        expected_keys = directions + [
+            'amplitudes', 'frequencies', 'zero_padded'
+        ]
 
         # Test the contents of the file
 
@@ -179,11 +180,9 @@ class TestComplexResponse(unittest.TestCase):
                         len(hf.get(primary_key)[()]) == len(hf.get(key)[()]))
                 except ValueError:
                     self.fail("Len of {}[{}] did not match data length {}!= {}".
-                              format(
-                                  primary_key, key,
-                                  len(
-                                      hf.get('zero_padded_frequencies')[()],
-                                      len(hf.get(key)[()]))))
+                              format(primary_key, key,
+                                     len(hf.get('zero_padded_frequencies')[()]),
+                                     len(hf.get(key)[()])))
 
             # Verify that the results stored are the same as expected
             self.assertTrue(np.allclose(hf.get('amplitudes')[()], amplitudes))
@@ -194,10 +193,7 @@ class TestComplexResponse(unittest.TestCase):
 
     def test_pulsed_response(self):
 
-        expected_keys = [
-            'properties', 'solutions', 'kappas', 'pulse_settings',
-            'properties_zeropad'
-        ]
+        expected_keys = ['properties', 'pulse_settings', 'properties_zeropad']
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 

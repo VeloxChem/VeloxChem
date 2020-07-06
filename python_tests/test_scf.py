@@ -1,7 +1,13 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
+import pytest
+import sys
 import os
+try:
+    import cppe
+except ImportError:
+    pass
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
@@ -17,10 +23,6 @@ class TestSCF(unittest.TestCase):
 
         if potfile is not None:
             task.input_dict['method_settings']['potfile'] = potfile
-            try:
-                import cppe
-            except ImportError:
-                return
 
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
@@ -80,6 +82,7 @@ class TestSCF(unittest.TestCase):
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
 
+    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_scf_hf_pe(self):
 
         inpfile = os.path.join('inputs', 'pe_water.inp')
@@ -97,6 +100,7 @@ class TestSCF(unittest.TestCase):
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
 
+    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_scf_dft_pe(self):
 
         inpfile = os.path.join('inputs', 'pe_water.inp')

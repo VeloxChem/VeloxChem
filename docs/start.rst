@@ -8,6 +8,7 @@ Sample input
    :maxdepth: 2
 
    inputs/scf.rst
+   inputs/pe.rst
    inputs/rsp.rst
    inputs/mp2.rst
    inputs/cube.rst
@@ -17,4 +18,4 @@ Running
 
 ::
 
-    $ python -m veloxchem water.inp water.out
+    $ python3 -m veloxchem water.inp water.out

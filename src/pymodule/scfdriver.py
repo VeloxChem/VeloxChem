@@ -2,6 +2,7 @@ from collections import deque
 import numpy as np
 import time as tm
 import math
+import sys
 import os
 
 from .veloxchemlib import OverlapIntegralsDriver
@@ -16,11 +17,13 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb
+from .profiler import Profiler
 from .molecularbasis import MolecularBasis
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
 from .subcommunicators import SubCommunicators
+from .signalhandler import SignalHandler
 from .denguess import DensityGuess
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
@@ -69,7 +72,6 @@ class ScfDriver:
         - nodes: The number of MPI processes.
         - restart: The flag for restarting from checkpoint file.
         - checkpoint_file: The name of checkpoint file.
-        - checkpoint_time: The timer of checkpoint file.
         - ref_mol_orbs: The reference molecular orbitals read from checkpoint
           file.
         - restricted: The flag for restricted SCF.
@@ -79,12 +81,14 @@ class ScfDriver:
         - molgrid: The molecular grid.
         - pe: The flag for running polarizable embedding calculation.
         - V_es: The polarizable embedding matrix.
-        - potfile: The name of the potential file for polarizable embedding.
+        - pe_options: The dictionary with options for polarizable embedding.
         - pe_summary: The summary string for polarizable embedding.
         - use_split_comm: The flag for using split communicators.
         - split_comm_ratio: The list of ratios for split communicators.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
+        - memory_profiling: The flag for printing memory usage.
+        - memory_tracing: The flag for tracing memory allocation using
     """
 
     def __init__(self, comm, ostream):
@@ -147,8 +151,10 @@ class ScfDriver:
         # restart information
         self.restart = True
         self.checkpoint_file = None
-        self.checkpoint_time = None
         self.ref_mol_orbs = None
+
+        self.program_start_time = None
+        self.maximum_hours = None
 
         # restricted?
         self.restricted = True
@@ -162,7 +168,7 @@ class ScfDriver:
         # polarizable embedding
         self.pe = False
         self.V_es = None
-        self.potfile = None
+        self.pe_options = {}
         self.pe_summary = ''
 
         # split communicators
@@ -172,8 +178,10 @@ class ScfDriver:
         # timing and profiling
         self.timing = False
         self.profiling = False
+        self.memory_profiling = False
+        self.memory_tracing = False
 
-    def update_settings(self, scf_dict, method_dict={}):
+    def update_settings(self, scf_dict, method_dict=None):
         """
         Updates settings in SCF driver.
 
@@ -182,6 +190,9 @@ class ScfDriver:
         :param method_dict:
             The input dicitonary of method settings group.
         """
+
+        if method_dict is None:
+            method_dict = {}
 
         if 'acc_type' in scf_dict:
             self.acc_type = scf_dict['acc_type'].upper()
@@ -201,6 +212,11 @@ class ScfDriver:
         if 'checkpoint_file' in scf_dict:
             self.checkpoint_file = scf_dict['checkpoint_file']
 
+        if 'program_start_time' in scf_dict:
+            self.program_start_time = scf_dict['program_start_time']
+        if 'maximum_hours' in scf_dict:
+            self.maximum_hours = scf_dict['maximum_hours']
+
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
             self.dft = True if key == 'yes' else False
@@ -211,15 +227,25 @@ class ScfDriver:
                 self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Undefined XC functional')
+                                'SCF driver: Undefined XC functional')
+
+        if 'pe_options' not in method_dict:
+            method_dict['pe_options'] = {}
 
         if 'pe' in method_dict:
             key = method_dict['pe'].lower()
             self.pe = True if key == 'yes' else False
-        if 'potfile' in method_dict:
-            if 'pe' not in method_dict:
+        else:
+            if ('potfile' in method_dict) or method_dict['pe_options']:
                 self.pe = True
-            self.potfile = method_dict['potfile']
+
+        if self.pe:
+            if ('potfile' in method_dict and
+                    'potfile' not in method_dict['pe_options']):
+                method_dict['pe_options']['potfile'] = method_dict['potfile']
+            assert_msg_critical('potfile' in method_dict['pe_options'],
+                                'SCF driver: No potential file defined')
+            self.pe_options = dict(method_dict['pe_options'])
 
         if 'use_split_comm' in method_dict:
             key = method_dict['use_split_comm'].lower()
@@ -231,6 +257,13 @@ class ScfDriver:
         if 'profiling' in scf_dict:
             key = scf_dict['profiling'].lower()
             self.profiling = True if key in ['yes', 'y'] else False
+
+        if 'memory_profiling' in scf_dict:
+            key = scf_dict['memory_profiling'].lower()
+            self.memory_profiling = True if key in ['yes', 'y'] else False
+        if 'memory_tracing' in scf_dict:
+            key = scf_dict['memory_tracing'].lower()
+            self.memory_tracing = True if key in ['yes', 'y'] else False
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
@@ -244,24 +277,23 @@ class ScfDriver:
             The minimal AO basis set.
         """
 
+        profiler = Profiler()
+
+        self.scf_start_time = tm.time()
+
         if min_basis is None:
             if self.rank == mpi_master():
                 min_basis = MolecularBasis.read(molecule, 'MIN-CC-PVDZ')
+            else:
+                min_basis = MolecularBasis()
             min_basis.broadcast(self.rank, self.comm)
 
-        # set up timing data
-        if self.timing:
-            self.timing_dict = {
-                'fock_2e': [],
-                'dft_vxc': [],
-                'fock_diag': [],
-                'pol_embed': []
-            }
+        self.timing_dict = {}
 
         # check dft setup
         if self.dft:
             assert_msg_critical(self.xcfun is not None,
-                                'SCF driver: undefined XC functional')
+                                'SCF driver: Undefined XC functional')
 
         # initial guess
         if self.restart:
@@ -275,6 +307,7 @@ class ScfDriver:
             if self.rank == mpi_master():
                 self.ref_mol_orbs = MolecularOrbitals.read_hdf5(
                     self.checkpoint_file)
+                self.mol_orbs = MolecularOrbitals(self.ref_mol_orbs)
         else:
             self.den_guess = DensityGuess("SAD")
 
@@ -305,20 +338,21 @@ class ScfDriver:
         # set up polarizable embedding
         if self.pe:
             from .polembed import PolEmbed
-            self.pe_drv = PolEmbed(molecule, ao_basis, self.comm, self.potfile)
+            self.pe_drv = PolEmbed(molecule, ao_basis, self.comm,
+                                   self.pe_options)
             self.V_es = self.pe_drv.compute_multipole_potential_integrals()
 
-            pot_info = "Reading polarizable embedding potential: {}".format(
-                self.potfile)
+            pot_info = 'Reading polarizable embedding potential: {}'.format(
+                self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
 
         # C2-DIIS method
-        if self.acc_type == "DIIS":
-            self.comp_diis(molecule, ao_basis, min_basis)
+        if self.acc_type == 'DIIS':
+            self.comp_diis(molecule, ao_basis, min_basis, profiler)
 
         # two level C2-DIIS method
-        if self.acc_type == "L2_DIIS":
+        if self.acc_type == 'L2_DIIS':
 
             # first step
             self.first_step = True
@@ -330,7 +364,7 @@ class ScfDriver:
             self.max_iter = 5
 
             val_basis = ao_basis.get_valence_basis()
-            self.comp_diis(molecule, val_basis, min_basis)
+            self.comp_diis(molecule, val_basis, min_basis, profiler)
 
             # second step
             self.first_step = False
@@ -338,15 +372,23 @@ class ScfDriver:
             self.diis_thresh = 1000.0
             self.conv_thresh = old_thresh
             self.max_iter = old_max_iter
-            self.den_guess.guess_type = "PRCMO"
+            self.den_guess.guess_type = 'PRCMO'
 
-            self.comp_diis(molecule, ao_basis, val_basis)
+            self.comp_diis(molecule, ao_basis, val_basis, profiler)
 
         self.fock_matrices.clear()
         self.den_matrices.clear()
 
         self.fock_matrices_beta.clear()
         self.den_matrices_beta.clear()
+
+        profiler.end(self.ostream, scf_flag=True)
+
+        if not self.is_converged:
+            self.ostream.print_header(
+                '*** Warning: SCF is not converged!'.ljust(92))
+            self.ostream.print_blank()
+            return
 
         if self.rank == mpi_master():
             self.print_scf_energy()
@@ -358,17 +400,6 @@ class ScfDriver:
             self.print_ground_state(molecule, s2)
             self.mol_orbs.print_orbitals(molecule, ao_basis, False,
                                          self.ostream)
-
-            if (self.checkpoint_file and
-                    isinstance(self.checkpoint_file, str) and
-                    os.path.isfile(self.checkpoint_file)):
-                checkpoint_text = "Checkpoint written to file: "
-                checkpoint_text += self.checkpoint_file
-                self.ostream.print_info(checkpoint_text)
-                self.ostream.print_blank()
-
-            if self.timing:
-                self.print_timing()
 
     def write_checkpoint(self, nuclear_charges, basis_set):
         """
@@ -384,8 +415,12 @@ class ScfDriver:
             if self.checkpoint_file and isinstance(self.checkpoint_file, str):
                 self.mol_orbs.write_hdf5(self.checkpoint_file, nuclear_charges,
                                          basis_set)
+                self.ostream.print_blank()
+                checkpoint_text = "Checkpoint written to file: "
+                checkpoint_text += self.checkpoint_file
+                self.ostream.print_info(checkpoint_text)
 
-    def comp_diis(self, molecule, ao_basis, min_basis):
+    def comp_diis(self, molecule, ao_basis, min_basis, profiler):
         """
         Performs SCF calculation with C2-DIIS acceleration.
 
@@ -395,17 +430,19 @@ class ScfDriver:
             The AO basis set.
         :param min_basis:
             The minimal AO basis set.
+        :param profiler:
+            The profiler.
         """
 
-        if self.profiling and not self.first_step:
-            import cProfile
-            import pstats
-            import io
-            pr = cProfile.Profile()
-            pr.enable()
+        if not self.first_step:
+            profiler.begin({
+                'timing': self.timing,
+                'profiling': self.profiling,
+                'memory_profiling': self.memory_profiling,
+                'memory_tracing': self.memory_tracing,
+            })
 
-        start_time = tm.time()
-        self.checkpoint_time = start_time
+        diis_start_time = tm.time()
 
         self.fock_matrices.clear()
         self.den_matrices.clear()
@@ -482,6 +519,8 @@ class ScfDriver:
             qq_data = eri_drv.compute(get_qq_scheme(self.qq_type),
                                       self.eri_thresh, molecule, ao_basis)
 
+        profiler.check_memory_usage('Initial guess')
+
         self.split_comm_ratio = None
 
         e_grad = None
@@ -489,32 +528,65 @@ class ScfDriver:
         if self.rank == mpi_master():
             self.print_scf_title()
 
+        if not self.first_step:
+            signal_handler = SignalHandler()
+            signal_handler.add_sigterm_function(self.graceful_exit, molecule,
+                                                ao_basis)
+
         for i in self.get_scf_range():
+
+            # set the current number of SCF iterations
+            # (note the extra SCF cycle when starting from scratch)
+            if self.restart:
+                self.num_iter = i + 1
+            else:
+                self.num_iter = i
+
+            iter_start_time = tm.time()
+
+            profiler.start_timer(self.num_iter, 'FockBuild')
 
             vxc_mat, e_pe, V_pe = self.comp_2e_fock(fock_mat, den_mat, molecule,
                                                     ao_basis, qq_data, e_grad)
+
+            profiler.stop_timer(self.num_iter, 'FockBuild')
+            profiler.start_timer(self.num_iter, 'CompEnergy')
 
             e_ee, e_kin, e_en = self.comp_energy(fock_mat, vxc_mat, e_pe,
                                                  kin_mat, npot_mat, den_mat)
 
             self.comp_full_fock(fock_mat, vxc_mat, V_pe, kin_mat, npot_mat)
 
-            e_grad = self.comp_gradient(fock_mat, ovl_mat, den_mat, oao_mat)
+            e_grad, max_grad = self.comp_gradient(fock_mat, ovl_mat, den_mat,
+                                                  oao_mat)
 
-            self.set_skip_iter_flag(i, e_grad)
+            self.set_skip_iter_flag(e_grad)
 
             diff_den = self.comp_density_change(den_mat, self.density)
 
-            self.add_iter_data(e_ee, e_kin, e_en, e_grad, diff_den)
+            self.density = AODensityMatrix(den_mat)
 
-            self.check_convergence()
+            self.add_iter_data({
+                'energy': e_ee + e_kin + e_en + self.nuc_energy,
+                'gradient_norm': e_grad,
+                'max_gradient': max_grad,
+                'diff_density': diff_den,
+            })
+
+            profiler.stop_timer(self.num_iter, 'CompEnergy')
+            profiler.check_memory_usage('Iteration {:d} Fock build'.format(
+                self.num_iter))
 
             self.print_iter_data(i)
 
-            self.store_diis_data(i, fock_mat, den_mat)
+            self.check_convergence()
 
-            if self.timing and not self.first_step:
-                diag_t0 = tm.time()
+            if self.is_converged:
+                break
+
+            profiler.start_timer(self.num_iter, 'FockDiag')
+
+            self.store_diis_data(i, fock_mat, den_mat)
 
             eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
@@ -522,36 +594,27 @@ class ScfDriver:
 
             self.update_mol_orbs_phase()
 
-            if self.timing and not self.first_step:
-                self.timing_dict['fock_diag'].append(tm.time() - diag_t0)
-
-            if tm.time() - self.checkpoint_time > 900.0:
-                self.write_checkpoint(molecule.elem_ids_to_numpy(),
-                                      ao_basis.get_label())
-                self.checkpoint_time = tm.time()
-
-            self.density = AODensityMatrix(den_mat)
-
             den_mat = self.gen_new_density(molecule)
 
             den_mat.broadcast(self.rank, self.comm)
 
-            if self.is_converged:
-                break
+            profiler.stop_timer(self.num_iter, 'FockDiag')
+            if (self.dft or self.pe) and not self.first_step:
+                profiler.update_timer(self.num_iter, self.timing_dict)
+
+            profiler.check_memory_usage('Iteration {:d} Fock diag.'.format(
+                self.num_iter))
+
+            iter_in_hours = (tm.time() - iter_start_time) / 3600
+
+            if self.need_graceful_exit(iter_in_hours):
+                self.graceful_exit(molecule, ao_basis)
+
+        if not self.first_step:
+            signal_handler.remove_sigterm_function()
 
         self.write_checkpoint(molecule.elem_ids_to_numpy(),
                               ao_basis.get_label())
-
-        if self.profiling and not self.first_step:
-            pr.disable()
-            s = io.StringIO()
-            sortby = 'cumulative'
-            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-            ps.print_stats(20)
-            if self.rank == mpi_master():
-                self.ostream.print_blank()
-                for line in s.getvalue().split(os.linesep):
-                    self.ostream.print_info(line)
 
         if self.rank == mpi_master():
             self.scf_tensors = {
@@ -572,11 +635,57 @@ class ScfDriver:
             }
 
         if self.rank == mpi_master():
-            self.print_scf_finish(start_time)
+            self.print_scf_finish(diis_start_time)
 
-        if self.rank == mpi_master() and not self.first_step:
-            assert_msg_critical(self.is_converged,
-                                'ScfDriver.compute: failed to converge')
+        profiler.check_memory_usage('End of SCF')
+
+    def need_graceful_exit(self, iter_in_hours):
+        """
+        Checks if a graceful exit is needed.
+
+        :param iter_in_hours:
+            The time spent in one iteration (in hours).
+
+        :return:
+            True if a graceful exit is needed, False otherwise.
+        """
+
+        if self.maximum_hours is not None:
+            remaining_hours = (self.maximum_hours -
+                               (tm.time() - self.program_start_time) / 3600)
+            # exit gracefully when the remaining time is not sufficient to
+            # complete the next iteration (plus 25% to be on the safe side).
+            if remaining_hours < iter_in_hours * 1.25:
+                return True
+        return False
+
+    def graceful_exit(self, molecule, basis):
+        """
+        Gracefully exits the program.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+
+        :return:
+            The return code.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_info('Preparing for a graceful termination...')
+        self.ostream.flush()
+
+        self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
+
+        self.ostream.print_blank()
+        self.ostream.print_info('...done.')
+        self.ostream.print_blank()
+        self.ostream.print_info('Exiting program.')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        sys.exit(0)
 
     def comp_one_ints(self, molecule, basis):
         """
@@ -711,18 +820,13 @@ class ScfDriver:
 
         return AODensityMatrix()
 
-    def set_skip_iter_flag(self, i, e_grad):
+    def set_skip_iter_flag(self, e_grad):
         """
-        Sets SCF iteration skiping flag based on iteration number and C2-DIIS
-        switch on threshold.
+        Sets SCF iteration skiping flag based on C2-DIIS switch on threshold.
 
-        :param i:
-            The number of current SCF iteration.
         :param e_grad:
             The electronic gradient at current SCF iteration.
         """
-
-        self.num_iter = i
 
         self.use_level_shift = False
 
@@ -808,7 +912,7 @@ class ScfDriver:
         fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
         if self.timing and not self.first_step:
-            self.timing_dict['fock_2e'].append(tm.time() - eri_t0)
+            self.timing_dict['ERI'] = tm.time() - eri_t0
             vxc_t0 = tm.time()
 
         if self.dft and not self.first_step:
@@ -823,7 +927,8 @@ class ScfDriver:
             vxc_mat = None
 
         if self.timing and not self.first_step:
-            self.timing_dict['dft_vxc'].append(tm.time() - vxc_t0)
+            if self.dft:
+                self.timing_dict['DFT'] = tm.time() - vxc_t0
             pe_t0 = tm.time()
 
         if self.pe and not self.first_step:
@@ -835,7 +940,8 @@ class ScfDriver:
             e_pe, V_pe = 0.0, None
 
         if self.timing and not self.first_step:
-            self.timing_dict['pol_embed'].append(tm.time() - pe_t0)
+            if self.pe:
+                self.timing_dict['PE'] = tm.time() - pe_t0
 
         return vxc_mat, e_pe, V_pe
 
@@ -947,7 +1053,7 @@ class ScfDriver:
         # calculate e_pe and V_pe on PE nodes
         if pe_comm:
             from .polembed import PolEmbed
-            self.pe_drv = PolEmbed(molecule, basis, local_comm, self.potfile)
+            self.pe_drv = PolEmbed(molecule, basis, local_comm, self.pe_options)
             self.pe_drv.V_es = self.V_es.copy()
             dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
             e_pe, V_pe = self.pe_drv.get_pe_contribution(dm)
@@ -1220,30 +1326,22 @@ class ScfDriver:
 
         return nteri
 
-    def add_iter_data(self, e_ee, e_kin, e_en, e_grad, diff_den):
+    def add_iter_data(self, d):
         """
         Adds SCF iteration data (electronic energy, electronic energy change,
         electronic gradient, density difference) to SCF iterations list.
 
-        :param e_ee:
-            The electronic energy.
-        :param e_kin:
-            The kinetic energy.
-        :param e_en:
-            The nuclear potential energy.
-        :param e_grad:
-            The electronic energy gradient.
-        :param diff_den:
-            The density change with respect to previous SCF iteration.
+        :param d:
+            The dictionary containing SCF iteration data.
         """
 
-        e_elec = e_ee + e_kin + e_en + self.nuc_energy
+        e_dict = dict(d)
 
-        de_elec = e_elec - self.old_energy
+        e_dict['diff_energy'] = e_dict['energy'] - self.old_energy
 
-        self.iter_data.append((e_elec, de_elec, e_grad, diff_den))
+        self.iter_data.append(e_dict)
 
-        self.old_energy = e_elec
+        self.old_energy = e_dict['energy']
 
     def check_convergence(self):
         """
@@ -1253,9 +1351,9 @@ class ScfDriver:
 
         self.is_converged = False
 
-        if len(self.iter_data) > 1:
+        if self.num_iter > 0:
 
-            e_elec, de_elec, e_grad, diff_den = self.iter_data[-1]
+            e_grad = self.iter_data[-1]['gradient_norm']
 
             if e_grad < self.conv_thresh:
                 self.is_converged = True
@@ -1268,7 +1366,12 @@ class ScfDriver:
             The range of SCF iterations.
         """
 
-        return range(self.max_iter + 1)
+        # set the maximum number of SCF iterations
+        # (note the extra SCF cycle when starting from scratch)
+        if self.restart:
+            return range(self.max_iter)
+        else:
+            return range(self.max_iter + 1)
 
     def print_scf_energy(self):
         """
@@ -1340,21 +1443,21 @@ class ScfDriver:
         """
 
         if self.first_step:
-            self.ostream.print_info("Starting Reduced Basis SCF calculation...")
+            self.ostream.print_info('Starting Reduced Basis SCF calculation...')
 
         else:
             self.ostream.print_blank()
             if self.dft:
-                self.ostream.print_header(
-                    "Iter. |     Kohn-Sham Energy, au    | "
-                    "Energy Change, au |  Gradient Norm  | "
-                    "Density Change |")
+                valstr = '{} | {} | {} | {} | {} | {}'.format(
+                    'Iter.', '   Kohn-Sham Energy', 'Energy Change',
+                    'Gradient Norm', 'Max. Gradient', 'Density Change')
+                self.ostream.print_header(valstr)
             else:
-                self.ostream.print_header(
-                    "Iter. |   Hartree-Fock Energy, au   | "
-                    "Energy Change, au |  Gradient Norm  | "
-                    "Density Change |")
-            self.ostream.print_header(92 * "-")
+                valstr = '{} | {} | {} | {} | {} | {}'.format(
+                    'Iter.', 'Hartree-Fock Energy', 'Energy Change',
+                    'Gradient Norm', 'Max. Gradient', 'Density Change')
+                self.ostream.print_header(valstr)
+            self.ostream.print_header(92 * '-')
 
     def print_scf_finish(self, start_time):
         """
@@ -1401,22 +1504,25 @@ class ScfDriver:
                 return
 
             # DIIS or second step in two level DIIS
-            if i > 0:
+            if self.num_iter > 0:
 
-                if len(self.iter_data) > 0:
-                    te, diff_te, e_grad, diff_den = self.iter_data[-1]
+                if self.iter_data:
+                    te = self.iter_data[-1]['energy']
+                    diff_te = self.iter_data[-1]['diff_energy']
+                    e_grad = self.iter_data[-1]['gradient_norm']
+                    max_grad = self.iter_data[-1]['max_gradient']
+                    diff_den = self.iter_data[-1]['diff_density']
 
-                if i == 1:
+                if self.num_iter == 1:
                     diff_te = 0.0
                     diff_den = 0.0
 
-                exec_str = " " + (str(i)).rjust(3) + 4 * " "
-                exec_str += ("{:7.12f}".format(te)).center(27) + 3 * " "
-                exec_str += ("{:5.10f}".format(diff_te)).center(17) + 3 * " "
-                exec_str += ("{:5.8f}".format(e_grad)).center(15) + 3 * " "
-                exec_str += ("{:5.8f}".format(diff_den)).center(15) + " "
+                valstr = ' {:3d}   {:20.12f} {:15.10f} '.format(
+                    self.num_iter, te, diff_te)
+                valstr += '{:15.8f} {:15.8f} {:15.8f} '.format(
+                    e_grad, max_grad, diff_den)
 
-                self.ostream.print_header(exec_str)
+                self.ostream.print_header(valstr)
                 self.ostream.flush()
 
     def get_scf_energy(self):
@@ -1599,7 +1705,7 @@ class ScfDriver:
 
         enuc = self.nuc_energy
 
-        etot = self.iter_data[-1][0]
+        etot = self.iter_data[-1]['energy']
 
         e_el = etot - enuc
 
@@ -1615,39 +1721,6 @@ class ScfDriver:
         self.ostream.print_header(
             "------------------------------------".ljust(92))
 
-        grad = self.iter_data[-1][2]
+        grad = self.iter_data[-1]['gradient_norm']
         valstr = "Gradient Norm                      :{:20.10f} au".format(grad)
         self.ostream.print_header(valstr.ljust(92))
-
-    def print_timing(self):
-        """
-        Prints timing breakdown for the scf driver.
-        """
-
-        width = 92
-
-        valstr = 'Timing (in sec):'
-        self.ostream.print_header(valstr.ljust(width))
-        self.ostream.print_header(('-' * len(valstr)).ljust(width))
-
-        valstr = '{:<15s} {:>15s}'.format('', 'Fock 2E Part')
-        if self.dft:
-            valstr += ' {:>15s}'.format('XC Part')
-        if self.pe:
-            valstr += ' {:>15s}'.format('PE Part')
-        valstr += ' {:>15s}'.format('Diag. Part')
-        self.ostream.print_header(valstr.ljust(width))
-
-        for i in range(len(self.timing_dict['fock_2e'])):
-
-            title = 'Iteration {:<5d}'.format(i)
-            valstr = '{:<15s} {:15.3f}'.format(title,
-                                               self.timing_dict['fock_2e'][i])
-            if self.dft:
-                valstr += ' {:15.3f}'.format(self.timing_dict['dft_vxc'][i])
-            if self.pe:
-                valstr += ' {:15.3f}'.format(self.timing_dict['pol_embed'][i])
-            valstr += ' {:15.3f}'.format(self.timing_dict['fock_diag'][i])
-            self.ostream.print_header(valstr.ljust(width))
-
-        self.ostream.print_blank()

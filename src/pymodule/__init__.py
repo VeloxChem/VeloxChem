@@ -18,7 +18,6 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import TwoIndexes
 from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import ExcitationVector
-from .veloxchemlib import CudaDevices
 
 # C++ functions
 from .veloxchemlib import mpi_master
@@ -31,6 +30,8 @@ from .veloxchemlib import mathconst_pi
 
 # C++ enums
 from .veloxchemlib import denmat
+from .veloxchemlib import fockmat
+from .veloxchemlib import szblock
 from .veloxchemlib import ericut
 from .veloxchemlib import molorb
 from .veloxchemlib import moints
@@ -54,20 +55,23 @@ from .tdaexcidriver import TDAExciDriver
 from .blockdavidson import BlockDavidsonSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .lrsolver import LinearResponseSolver
+from .cppsolver import ComplexResponse
+from .c6solver import C6Solver
 from .rspproperty import ResponseProperty
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
+from .rspc6 import C6
+from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
-from .cppsolver import ComplexResponse
+from .loprop import LoPropDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
-from .main import main
 
 # Environment variable: basis set path
 import os

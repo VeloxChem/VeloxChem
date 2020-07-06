@@ -1,10 +1,10 @@
 //
-//                             VELOXCHEM
+//                           VELOXCHEM 1.0-RC
 //      ---------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2019 by VeloxChem developers. All rights reserved.
-//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
+//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 
 #include "SADGuessDriverTest.hpp"
 
@@ -119,7 +119,7 @@ TEST_F(CSADGuessDriverTest, OccupationNumbers)
 
     CSADGuessDriver saddrv(MPI_COMM_WORLD);
 
-    for (int32_t i = 0; i < refocc.size(); i++)
+    for (int32_t i = 0; i < static_cast<int32_t>(refocc.size()); i++)
     {
         auto qocc = saddrv.getOccupationNumbersForElement(i, 0.0);
 

@@ -74,12 +74,6 @@ class MOIntegralsDriver:
             The computed MO integrals.
         """
 
-        self.ostream.print_blank()
-        self.ostream.print_header("Conventional AO->MO Integral Transformation")
-        self.ostream.print_header(45 * "=")
-        self.ostream.print_blank()
-        self.ostream.flush()
-
         mo = mol_orbs.alpha_to_numpy()
         nocc = molecule.number_of_alpha_electrons()
         mo_occ = mo[:, :nocc]
@@ -93,19 +87,12 @@ class MOIntegralsDriver:
 
         mo_coefs = [mo_occ if x.lower() == 'o' else mo_vir for x in mints_type]
 
-        t0 = tm.time()
         pqrs = np.zeros((nao, nao, nao, nao))
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         eri_drv.compute_in_mem(molecule, basis, pqrs)
-        t1 = tm.time()
-        eri_info = 'Time spent in AO integrals: {:.2f} sec'.format(t1 - t0)
-        self.ostream.print_info(eri_info)
-        self.ostream.print_blank()
-        self.ostream.flush()
 
         # Note that we calculate the integrals in physicists' notation
 
-        t0 = tm.time()
         tqrs = np.einsum('pqrs,pt->tqrs', pqrs, mo_coefs[0], optimize=True)
         del pqrs
         turs = np.einsum('tqrs,qu->turs', tqrs, mo_coefs[2], optimize=True)
@@ -114,12 +101,6 @@ class MOIntegralsDriver:
         del turs
         tuvw = np.einsum('tuvs,sw->tuvw', tuvs, mo_coefs[3], optimize=True)
         del tuvs
-        t1 = tm.time()
-        mo_eri_info = 'Time spent in AO->MO transformation: {:.2f} sec'.format(
-            t1 - t0)
-        self.ostream.print_info(mo_eri_info)
-        self.ostream.print_blank()
-        self.ostream.flush()
 
         return tuvw.swapaxes(1, 2)
 

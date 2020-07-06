@@ -1,7 +1,14 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
+import random
+import pytest
+import sys
 import os
+try:
+    import cppe
+except ImportError:
+    pass
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.veloxchemlib import hartree_in_ev
@@ -19,10 +26,6 @@ class TestRPA(unittest.TestCase):
 
         if potfile is not None:
             task.input_dict['method_settings']['potfile'] = potfile
-            try:
-                import cppe
-            except ImportError:
-                return
 
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
@@ -37,8 +40,11 @@ class TestRPA(unittest.TestCase):
         ref_rot_str = [float(line.split()[4]) for line in data_lines]
 
         rpa_solver = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
-        rpa_solver.update_settings({'nstates': len(ref_exc_ene)},
-                                   task.input_dict['method_settings'])
+        rpa_solver.update_settings(
+            {
+                'nstates': len(ref_exc_ene),
+                'batch_size': random.choice([1, 10, 100])
+            }, task.input_dict['method_settings'])
         rpa_results = rpa_solver.compute(task.molecule, task.ao_basis,
                                          scf_drv.scf_tensors)
 
@@ -123,6 +129,7 @@ class TestRPA(unittest.TestCase):
 
         self.run_rpa(inpfile, potfile, xcfun_label, data_lines)
 
+    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_rpa_hf_pe(self):
 
         inpfile = os.path.join('inputs', 'pe_water.inp')
@@ -149,6 +156,7 @@ class TestRPA(unittest.TestCase):
 
         self.run_rpa(inpfile, potfile, xcfun_label, data_lines)
 
+    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_rpa_dft_pe(self):
 
         inpfile = os.path.join('inputs', 'pe_water.inp')

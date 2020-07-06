@@ -1,10 +1,10 @@
 #
-#                             VELOXCHEM
+#                           VELOXCHEM 1.0-RC
 #      ---------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2019 by VeloxChem developers. All rights reserved.
-#  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
+#  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
 
 before_script:
   - set +e && source /opt/intel/bin/compilervars.sh intel64 && set -e
@@ -14,6 +14,7 @@ before_script:
   - export PYTHONPATH=$PYTHONPATH:/home/xinli/software/cppe/build/stage/lib
   - export GTESTROOT=/home/xinli/software/googletest/googletest
   - export GTESTLIB=/home/xinli/software/googletest/googletest/lib/libgtest.a
+  - export MPICC=$I_MPI_ROOT/intel64/mpi/mpiicc
 
 after_script:
   - echo "Done!"
@@ -35,7 +36,11 @@ veloxchem_test:
     - vlx-test
   stage: test
   script:
+    - python3.6 -m venv --without-pip venv
+    - source venv/bin/activate
+    - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+    - python3 get-pip.py
+    - pip install -r requirements-dev.txt
+    - python3 -m pytest -v --cov=veloxchem python_tests/
     - python3 config/generate_setup.py
-    - make -j 6 -C src release && make -j 6 -C unit_tests release
-    - export PYTHONPATH=$(pwd)/build/python:$PYTHONPATH
-    - ./build/bin/UnitTestVeloxChemMP.x && python3 -m pytest -v --cov=veloxchem python_tests/
+    - make -C unit_tests -j -s && ./build/bin/UnitTestVeloxChem.x 

@@ -1,8 +1,6 @@
 import numpy as np
 
-from .lrmatvecdriver import remove_linear_dependence
-from .lrmatvecdriver import orthogonalize_gram_schmidt
-from .lrmatvecdriver import normalize
+from .linearsolver import LinearSolver
 
 
 class BlockDavidsonSolver:
@@ -88,8 +86,8 @@ class BlockDavidsonSolver:
             The convergence threshold for the solver.
 
         :return:
-            The true if residual norms are converged for all eigenpairs,
-            false otherwise.
+            True if residual norms are converged for all eigenpairs, False
+            otherwise.
         """
 
         for rval in self.residual_norms:
@@ -139,7 +137,7 @@ class BlockDavidsonSolver:
         rlmat = np.matmul(self.trial_matrices.T, self.sigma_matrices)
 
         reigs, rvecs = np.linalg.eigh(rlmat)
-        yvecs = rvecs[:, :self.neigenpairs]
+        yvecs = rvecs[:, :self.neigenpairs].copy()
         self.residual_eigs = reigs[:self.neigenpairs]
 
         self.ritz_vectors = np.matmul(self.trial_matrices, yvecs)
@@ -169,7 +167,7 @@ class BlockDavidsonSolver:
             pmat[:, 0] = 1.0 / pmat[:, 0]
             tvecs[:, i] *= pmat[:, 0]
 
-        tvecs = normalize(tvecs)
+        tvecs = LinearSolver.normalize(tvecs)
 
         return tvecs
 
@@ -185,8 +183,8 @@ class BlockDavidsonSolver:
         tvecs = tvecs - np.matmul(self.trial_matrices,
                                   np.matmul(self.trial_matrices.T, tvecs))
 
-        tvecs = remove_linear_dependence(tvecs, 1.0e-6)
-        tvecs = orthogonalize_gram_schmidt(tvecs)
-        tvecs = normalize(tvecs)
+        tvecs = LinearSolver.remove_linear_dependence(tvecs, 1.0e-6)
+        tvecs = LinearSolver.orthogonalize_gram_schmidt(tvecs)
+        tvecs = LinearSolver.normalize(tvecs)
 
         return tvecs

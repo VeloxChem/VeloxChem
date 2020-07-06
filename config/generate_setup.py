@@ -5,6 +5,7 @@ import platform
 import site
 import sys
 import os
+import re
 
 
 def find_exe(executables):
@@ -97,7 +98,7 @@ def check_file(filename, label):
         sys.exit(1)
 
 
-def generate_setup(template_file, setup_file):
+def generate_setup(template_file, setup_file, user_flag=None):
 
     # OS information
 
@@ -122,16 +123,19 @@ def generate_setup(template_file, setup_file):
 
     print('*** Checking c++ compiler... ', end='')
 
-    if 'CXX' in os.environ:
+    if 'CRAYPE_VERSION' in os.environ and 'CXX' in os.environ:
         cxx, cxx_path = find_exe([os.environ['CXX']])
     else:
-        cxx, cxx_path = find_exe(['mpiicpc', 'mpicxx', 'mpiCXX'])
+        if isinstance(user_flag, str) and user_flag.lower() == 'gnu':
+            cxx, cxx_path = find_exe(['mpicxx', 'mpiicpc', 'mpiCXX'])
+        else:
+            cxx, cxx_path = find_exe(['mpiicpc', 'mpicxx', 'mpiCXX'])
 
     print(cxx)
 
     if cxx is None:
         print('*** Error: Unable to find c++ compiler!')
-        if 'CXX' in os.environ:
+        if 'CRAYPE_VERSION' in os.environ and 'CXX' in os.environ:
             print('***        Please make sure that CXX is correctly set.')
         else:
             print('***        Please make sure that mpiicpc, mpicxx, or')
@@ -156,16 +160,13 @@ def generate_setup(template_file, setup_file):
 
     use_intel = (cxxname == 'icpc')
     use_gnu = cxxname in ['g++', 'x86_64-conda_cos6-linux-gnu-c++']
-    use_clang = cxxname in ['clang++', 'Crayclang']
+    use_clang = (cxxname in ['clang++', 'Crayclang'] or
+                 re.match(r'x86_64-apple-.*-clang\+\+', cxxname))
 
     if not (use_intel or use_gnu or use_clang):
         print('*** Error: Unrecognized c++ compiler!')
         print('***        Only Intel, GNU, and Clang compilers are supported.')
         sys.exit(1)
-
-    # cuda information
-
-    use_gpu = False
 
     # cxx and omp flags
 
@@ -185,10 +186,20 @@ def generate_setup(template_file, setup_file):
 
     print('*** Checking math library... ', end='')
 
-    use_mkl = 'MKLROOT' in os.environ
-    use_openblas = not use_mkl and 'OPENBLASROOT' in os.environ
+    # check conda environment
+    if 'MKLROOT' not in os.environ:
+        is_conda = os.path.exists(os.path.join(sys.prefix, 'conda-meta'))
+        mkl_core = os.path.join(sys.prefix, 'lib', 'libmkl_core')
+        has_mkl_core = (os.path.isfile(mkl_core + '.so') or
+                        os.path.isfile(mkl_core + '.dylib'))
+        if is_conda and has_mkl_core:
+            os.environ['MKLROOT'] = sys.prefix
 
-    if not (use_mkl or use_openblas):
+    use_mkl = 'MKLROOT' in os.environ
+    use_openblas = 'OPENBLASROOT' in os.environ
+    use_craylibsci = 'CRAY_LIBSCI_VERSION' in os.environ
+
+    if not (use_mkl or use_openblas or use_craylibsci):
         print()
         print('*** Error: Unable to find math library!')
         print('***        Please make sure that you have set MKLROOT or')
@@ -229,7 +240,7 @@ def generate_setup(template_file, setup_file):
 
     # openblas flags
 
-    if use_openblas:
+    elif use_openblas:
         print('OpenBLAS')
 
         openblas_inc = os.path.join(os.environ['OPENBLASROOT'], 'include')
@@ -242,7 +253,19 @@ def generate_setup(template_file, setup_file):
         math_lib += os.linesep + 'MATH_LIB := -L{}'.format(openblas_dir)
         math_lib += os.linesep + 'MATH_LIB += -Wl,-rpath,{}'.format(
             openblas_dir)
-        math_lib += os.linesep + 'MATH_LIB += -lopenblas {} {}'.format(
+        openblas_flag = '-lopenblas'
+        if use_intel:
+            openblas_flag += ' -lifcore'
+        math_lib += os.linesep + 'MATH_LIB += {} {} {}'.format(
+            openblas_flag, omp_flag, '-lpthread -lm -ldl')
+
+    # cray-libsci flags
+
+    elif use_craylibsci:
+        print('Cray LibSci')
+
+        math_lib = 'MATH_INC := '
+        math_lib += os.linesep + 'MATH_LIB := {} {}'.format(
             omp_flag, '-lpthread -lm -ldl')
 
     # extra flags for mac
@@ -284,8 +307,6 @@ def generate_setup(template_file, setup_file):
         gtest_root = None
         gtest_lib = None
 
-    # TODO: add GPU detection
-
     # print Makefile.setup
 
     with open(template_file, 'r', encoding='utf-8') as f_temp:
@@ -298,8 +319,6 @@ def generate_setup(template_file, setup_file):
                 print('', file=f_mkfile)
 
                 print('USE_MPI := true', file=f_mkfile)
-                print('USE_GPU := {}'.format('true' if use_gpu else 'false'),
-                      file=f_mkfile)
                 print('USE_MKL := {}'.format('true' if use_mkl else 'false'),
                       file=f_mkfile)
                 print('', file=f_mkfile)
@@ -307,7 +326,10 @@ def generate_setup(template_file, setup_file):
                 print(math_lib, file=f_mkfile)
                 print('', file=f_mkfile)
 
-                print('PYTHON :=', 'python3', file=f_mkfile)
+                print('PYTHON :=',
+                      'python{}.{}'.format(sys.version_info[0],
+                                           sys.version_info[1]),
+                      file=f_mkfile)
                 python_version = 'python{}.{}{}'.format(sys.version_info[0],
                                                         sys.version_info[1],
                                                         sys.abiflags)
@@ -354,4 +376,8 @@ if __name__ == '__main__':
         print('*** Error: Cannot find template file {}'.format(template_file))
         sys.exit(1)
 
-    generate_setup(template_file, setup_file)
+    user_flag = None
+    if len(sys.argv) > 1:
+        user_flag = sys.argv[1]
+
+    generate_setup(template_file, setup_file, user_flag)

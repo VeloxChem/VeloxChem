@@ -1,10 +1,10 @@
 //
-//                             VELOXCHEM
+//                           VELOXCHEM 1.0-RC
 //      ---------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
-//  Copyright © 2019 by VeloxChem developers. All rights reserved.
+//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>

@@ -1,10 +1,10 @@
 //
-//                             VELOXCHEM
+//                           VELOXCHEM 1.0-RC
 //      ---------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2019 by VeloxChem developers. All rights reserved.
-//  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
+//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 
 #include "GtoPairsBlock.hpp"
 
@@ -609,10 +609,9 @@ CGtoPairsBlock::operator!=(const CGtoPairsBlock& other) const
 }
 
 std::vector<CGtoPairsBlock>
-CGtoPairsBlock::split(const int32_t       nodes,
-                      const CCudaDevices& cudaDevices) const
+CGtoPairsBlock::split(const int32_t nodes) const
 {
-    auto batchSize = (cudaDevices.getNumberOfDevices() > 0)  ? _getBlockDimensionsForGPU() : _getBlockDimensions();
+    auto batchSize = _getBlockDimensions();
 
     // determine number of batches
 
@@ -1478,30 +1477,6 @@ CGtoPairsBlock::_getBlockDimensions() const
 
     if (angab == 1) ndim = 250;
 
-    return ndim;
-}
-
-int32_t
-CGtoPairsBlock::_getBlockDimensionsForGPU() const
-{
-    auto angab = _braAngularMomentum + _ketAngularMomentum;
-    
-    int32_t ndim = 6400;
-    
-    if (angab > 8) ndim = 320;
-    
-    if (angab > 6) ndim = 640;
-    
-    if (angab > 4) ndim = 1280;
-    
-    if (angab == 4) ndim = 2560;
-    
-    if (angab == 3) ndim = 3200;
-    
-    if (angab == 2) ndim = 3840;
-    
-    if (angab == 1) ndim = 5120;
-    
     return ndim;
 }
 
