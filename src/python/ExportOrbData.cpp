@@ -153,7 +153,7 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
     {
         const py::array_t<double>& arr = eig_vals[i];
 
-        std::string errdim("MolecularOrbitals eigenvalues: need 1D numpy arrays");
+        std::string errdim("MolecularOrbitals eigenvalues - Expect 1D numpy arrays");
 
         errors::assertMsgCritical(arr.ndim() == 1, errdim);
 

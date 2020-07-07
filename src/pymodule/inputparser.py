@@ -63,11 +63,11 @@ class InputParser:
             self.empty_group_check()
 
         except FileNotFoundError:
-            errmsg = 'input parser: cannot open file {}'.format(self.filename)
+            errmsg = 'InputParser: cannot open file {}'.format(self.filename)
             self.success_monitor = False
 
         except SyntaxError:
-            errmsg = 'input parser: bad syntax in file '
+            errmsg = 'InputParser: bad syntax in file '
             errmsg += self.filename + os.linesep + '     '
             errmsg += 'You may check for incorrect, '
             errmsg += 'incomplete or empty groups.'

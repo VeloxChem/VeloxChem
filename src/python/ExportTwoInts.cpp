@@ -112,13 +112,13 @@ CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegra
                                                  const CMolecularBasis&                   basis,
                                                        py::array_t<double>&               eri)
 {
-    std::string errsrc("compute_in_mem: need a c_style contiguous numpy array");
+    std::string errsrc("compute_in_mem - Expect a c_style contiguous numpy array");
 
     auto c_style = py::detail::check_flags(eri.ptr(), py::array::c_style);
 
     errors::assertMsgCritical(c_style, errsrc);
 
-    std::string errshape("compute_in_mem: invalid shape");
+    std::string errshape("compute_in_mem - Invalid shape");
 
     errors::assertMsgCritical(eri.ndim() == 4, errshape);
 
@@ -141,7 +141,7 @@ CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegra
         }
     }
 
-    std::string errsize("compute_in_mem: inconsistent size");
+    std::string errsize("compute_in_mem - Inconsistent size");
 
     errors::assertMsgCritical(eri.shape(0) == nao, errsize);
 
