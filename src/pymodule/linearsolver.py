@@ -169,7 +169,7 @@ class LinearSolver:
                 self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Undefined XC functional')
+                                'Response solver: Undefined XC functional')
 
         if 'pe_options' not in method_dict:
             method_dict['pe_options'] = {}
