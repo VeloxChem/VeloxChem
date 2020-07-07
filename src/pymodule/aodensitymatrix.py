@@ -21,20 +21,20 @@ def _AODensityMatrix_write_hdf5(self, fname):
     for index in range(self.number_of_density_matrices()):
 
         if self.get_density_type() == denmat.rest:
-            name = str(count) + "_rest.alpha_" + str(index)
+            name = str(count) + '_rest.alpha_' + str(index)
             array = self.alpha_to_numpy(index)
-            hf.create_dataset(name, data=array, compression="gzip")
+            hf.create_dataset(name, data=array, compression='gzip')
             count += 1
 
         else:
-            name = str(count) + "_unrest.alpha_" + str(index)
+            name = str(count) + '_unrest.alpha_' + str(index)
             array = self.alpha_to_numpy(index)
-            hf.create_dataset(name, data=array, compression="gzip")
+            hf.create_dataset(name, data=array, compression='gzip')
             count += 1
 
-            name = str(count) + "_unrest.beta_" + str(index)
+            name = str(count) + '_unrest.beta_' + str(index)
             array = self.beta_to_numpy(index)
-            hf.create_dataset(name, data=array, compression="gzip")
+            hf.create_dataset(name, data=array, compression='gzip')
             count += 1
 
     hf.close()
@@ -53,9 +53,9 @@ def _AODensityMatrix_read_hdf5(fname):
     """
 
     dentype = {
-        "rest.alpha": denmat.rest,
-        "unrest.alpha": denmat.unrest,
-        "unrest.beta": denmat.unrest
+        'rest.alpha': denmat.rest,
+        'unrest.alpha': denmat.unrest,
+        'unrest.beta': denmat.unrest
     }
 
     hf = h5py.File(fname, 'r')
@@ -65,12 +65,12 @@ def _AODensityMatrix_read_hdf5(fname):
 
     ordered_keys = []
     for key in list(hf.keys()):
-        i = int(key.split("_")[0])
+        i = int(key.split('_')[0])
         ordered_keys.append((i, key))
     ordered_keys.sort()
 
     for i, key in ordered_keys:
-        type_str = key.split("_")[1]
+        type_str = key.split('_')[1]
         dens.append(np.array(hf.get(key)))
         types.append(dentype[type_str])
 
@@ -78,10 +78,10 @@ def _AODensityMatrix_read_hdf5(fname):
 
     assert_msg_critical(
         len(set(types)) == 1,
-        "AODensityMatrix.read_hdf5: inconsistent density type!")
+        'AODensityMatrix.read_hdf5: inconsistent density type')
 
     assert_msg_critical(types[0] in list(dentype.values()),
-                        "AODensityMatrix.read_hdf5: invalid density type!")
+                        'AODensityMatrix.read_hdf5: invalid density type')
 
     return AODensityMatrix(dens, types[0])
 

@@ -34,7 +34,7 @@ CCubicGrid::CCubicGrid(const std::vector<double>& origin, const std::vector<doub
 
     , _numPoints(numPoints)
 {
-    std::string errmsg("CubicGrid: incorrect dimension");
+    std::string errmsg("CubicGrid - Incorrect dimension");
 
     errors::assertMsgCritical(_origin.size() == 3, errmsg);
 

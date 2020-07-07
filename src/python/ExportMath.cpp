@@ -57,7 +57,7 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr)
 {
     // check dimension
 
-    std::string errdim("Matrix_from_numpy: need a 2D numpy array");
+    std::string errdim("Matrix_from_numpy - Expect a 2D numpy array");
 
     errors::assertMsgCritical(arr.ndim() == 2, errdim);
 
@@ -68,7 +68,7 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr)
 
     // check that the numpy array is c-style contiguous
 
-    std::string errsrc("Matrix_from_numpy: need a contiguous numpy array");
+    std::string errsrc("Matrix_from_numpy - Expect a contiguous numpy array");
 
     auto c_style = py::detail::check_flags(arr.ptr(), py::array::c_style);
 
