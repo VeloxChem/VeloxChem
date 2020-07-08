@@ -159,9 +159,9 @@ def generate_setup(template_file, setup_file, user_flag=None):
         sys.exit(1)
 
     use_intel = (cxxname == 'icpc')
-    use_gnu = cxxname in ['g++', 'x86_64-conda_cos6-linux-gnu-c++']
+    use_gnu = (cxxname == 'g++' or re.match(r'.*-gnu-c\+\+', cxxname))
     use_clang = (cxxname in ['clang++', 'Crayclang'] or
-                 re.match(r'x86_64-apple-.*-clang\+\+', cxxname))
+                 re.match(r'.*-clang\+\+', cxxname))
 
     if not (use_intel or use_gnu or use_clang):
         print('*** Error: Unrecognized c++ compiler!')
