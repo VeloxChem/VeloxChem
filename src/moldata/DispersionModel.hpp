@@ -3,7 +3,7 @@
 //      ---------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2019 by VeloxChem developers. All rights reserved.
+//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #ifndef DispersionModel_hpp
@@ -169,28 +169,38 @@ class CDispersionModel
      Computes Gaussian weights and reference c6 coefficients.
 
      @param molecule the molecule.
+     @param covcn the covalent coordination numbers.
      */
-    void _compWeightsAndCoefficients(const CMolecule& molecule);
+    void _compWeightsAndCoefficients(const CMolecule& molecule, const std::vector<double>& covcn);
 
     /**
      Computes two-body contribution to dispersion energy and gradient.
 
      @param molecule the molecule.
      @param xcLabel the label of the density functional.
+     @param chg the partial charges.
+     @param dqdr the derivative of the partial charges.
+     @param dcovcndr the derivative of the covalent coordination numbers.
      @param gradient the derivative matrix of dimension (3,N).
      @return the two-body contribution to the dispersion energy.
      */
-    double _compTwoBodyContribution(const CMolecule& molecule, const std::string& xcLabel, CDenseMatrix& gradient);
+    double _compTwoBodyContribution(const CMolecule&           molecule,
+                                    const std::string&         xcLabel,
+                                    const std::vector<double>& chg,
+                                    const CDenseMatrix&        dqdr,
+                                    const CDenseMatrix&        dcovcndr,
+                                    CDenseMatrix&              gradient);
 
     /**
      Computes three-body contribution to dispersion energy and gradient.
 
      @param molecule the molecule.
      @param xcLabel the label of the density functional.
+     @param dcovcndr the derivative of the covalent coordination numbers.
      @param gradient the derivative matrix of dimension (3,N).
      @return the three-body contribution to the dispersion energy.
      */
-    double _compThreeBodyContribution(const CMolecule& molecule, const std::string& xcLabel, CDenseMatrix& gradient);
+    double _compThreeBodyContribution(const CMolecule& molecule, const std::string& xcLabel, const CDenseMatrix& dcovcndr, CDenseMatrix& gradient);
 
    public:
     /**

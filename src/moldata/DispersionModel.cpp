@@ -3,7 +3,7 @@
 //      ---------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2019 by VeloxChem developers. All rights reserved.
+//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
 //  Contact: Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
 
 #include "DispersionModel.hpp"
@@ -286,7 +286,7 @@ CDispersionModel::_initialize(const CMolecule& molecule)
 }
 
 void
-CDispersionModel::_compWeightsAndCoefficients(const CMolecule& molecule)
+CDispersionModel::_compWeightsAndCoefficients(const CMolecule& molecule, const std::vector<double>& covcn)
 {
     // initialize weights and coefficients
 
@@ -322,10 +322,6 @@ CDispersionModel::_compWeightsAndCoefficients(const CMolecule& molecule)
     auto idselem = molecule.getIdsElemental();
 
     auto natoms = molecule.getNumberOfAtoms();
-
-    CDenseMatrix dcovcndr(3 * natoms, natoms);
-
-    auto covcn = coordnum::getCovalentCoordinationNumber(molecule, dcovcndr);
 
     // compute weights
 
@@ -441,7 +437,12 @@ CDispersionModel::_compWeightsAndCoefficients(const CMolecule& molecule)
 }
 
 double
-CDispersionModel::_compTwoBodyContribution(const CMolecule& molecule, const std::string& xcLabel, CDenseMatrix& gradient)
+CDispersionModel::_compTwoBodyContribution(const CMolecule&           molecule,
+                                           const std::string&         xcLabel,
+                                           const std::vector<double>& chg,
+                                           const CDenseMatrix&        dqdr,
+                                           const CDenseMatrix&        dcovcndr,
+                                           CDenseMatrix&              gradient)
 {
     // get functional parameters
 
@@ -484,14 +485,6 @@ CDispersionModel::_compTwoBodyContribution(const CMolecule& molecule, const std:
     auto ycoord = molecule.getCoordinatesY();
 
     auto zcoord = molecule.getCoordinatesZ();
-
-    CDenseMatrix dqdr(3 * natoms, natoms);
-
-    auto chg = parchg::getPartialCharges(molecule, molecule.getCharge(), dqdr);
-
-    CDenseMatrix dcovcndr(3 * natoms, natoms);
-
-    auto covcn = coordnum::getCovalentCoordinationNumber(molecule, dcovcndr);
 
     // compute two-body contribution to dispersion energy
 
@@ -641,7 +634,10 @@ CDispersionModel::_compTwoBodyContribution(const CMolecule& molecule, const std:
 }
 
 double
-CDispersionModel::_compThreeBodyContribution(const CMolecule& molecule, const std::string& xcLabel, CDenseMatrix& gradient)
+CDispersionModel::_compThreeBodyContribution(const CMolecule&    molecule,
+                                             const std::string&  xcLabel,
+                                             const CDenseMatrix& dcovcndr,
+                                             CDenseMatrix&       gradient)
 {
     // get functional parameters
 
@@ -684,10 +680,6 @@ CDispersionModel::_compThreeBodyContribution(const CMolecule& molecule, const st
     auto ycoord = molecule.getCoordinatesY();
 
     auto zcoord = molecule.getCoordinatesZ();
-
-    CDenseMatrix dcovcndr(3 * natoms, natoms);
-
-    auto covcn = coordnum::getCovalentCoordinationNumber(molecule, dcovcndr);
 
     // prepare c6ab
 
@@ -935,15 +927,23 @@ CDispersionModel::compute(const CMolecule& molecule, const std::string& xcLabel)
 {
     _initialize(molecule);
 
-    _compWeightsAndCoefficients(molecule);
-
     auto natoms = molecule.getNumberOfAtoms();
+
+    CDenseMatrix dqdr(3 * natoms, natoms);
+
+    auto chg = parchg::getPartialCharges(molecule, molecule.getCharge(), dqdr);
+
+    CDenseMatrix dcovcndr(3 * natoms, natoms);
+
+    auto covcn = coordnum::getCovalentCoordinationNumber(molecule, dcovcndr);
+
+    _compWeightsAndCoefficients(molecule, covcn);
 
     CDenseMatrix gradient(3, natoms);
 
-    auto ed = _compTwoBodyContribution(molecule, xcLabel, gradient);
+    auto ed = _compTwoBodyContribution(molecule, xcLabel, chg, dqdr, dcovcndr, gradient);
 
-    auto eabc = _compThreeBodyContribution(molecule, xcLabel, gradient);
+    auto eabc = _compThreeBodyContribution(molecule, xcLabel, dcovcndr, gradient);
 
     _energy = ed + eabc;
 
