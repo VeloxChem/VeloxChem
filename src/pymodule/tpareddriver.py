@@ -48,6 +48,7 @@ class TpaReducedDriver(TpaDriver):
         Computes the compounded densities needed for the compounded Fock
         matrics F^{σ} used for the reduced iostropic cubic response function
 
+
         :param wi:
             A list of the frequencies
         :param kX:
@@ -62,6 +63,7 @@ class TpaReducedDriver(TpaDriver):
         :return:
             A list of tranformed compounded densities
         """
+
 
         density_list = []
 
@@ -132,8 +134,8 @@ class TpaReducedDriver(TpaDriver):
             self.print_fock_header()
 
         time_start_fock = time.time()
-        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis, 2)
-        F0_a = self.get_fock_r(mo, D0, molecule, ao_basis, 0)
+        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis, "real")
+        F0_a = self.get_fock_r(mo, D0, molecule, ao_basis, "SCF")
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -375,6 +377,8 @@ class TpaReducedDriver(TpaDriver):
         second-order Fock matrics used for the reduced isotropic cubic response
         function
 
+        Note: All densities are 1/3 of the ones in the paper, instead all the Fock matrices are multiplied by 3.
+
         :param wi:
             A list of the frequencies
         :param kX:
@@ -480,7 +484,7 @@ class TpaReducedDriver(TpaDriver):
             self.print_fock_header()
 
         time_start_fock = time.time()
-        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis, 1)
+        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis, "real_and_imag")
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -780,8 +784,8 @@ class TpaReducedDriver(TpaDriver):
             nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
             nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
-            na_x2_nyz_dict[(w, -w, w)] = na_x2_nyz
-            nx_a2_nyz_dict[(w, -w, w)] = nx_a2_nyz
+            na_x2_nyz_dict[(w, -w, w)] = -(1./15)*na_x2_nyz
+            nx_a2_nyz_dict[(w, -w, w)] = -(1./15)*nx_a2_nyz
 
         return {
             'NaX2Nyz': na_x2_nyz_dict,
@@ -813,7 +817,7 @@ class TpaReducedDriver(TpaDriver):
         NaX2Nyz = other_dict['NaX2Nyz']
         NxA2Nyz = other_dict['NxA2Nyz']
 
-        width = 50
+        width = 94
 
         w_str = 'Gamma tensor components computed per frequency'
         self.ostream.print_blank()
@@ -826,21 +830,40 @@ class TpaReducedDriver(TpaDriver):
 
         self.ostream.print_blank()
 
+        w_str = 'Gamma Tensor Components at Given Frequencies'
+        self.ostream.print_blank()
+        self.ostream.print_header(w_str.ljust(width))
+        self.ostream.print_blank()
+        
         for w in freqs:
+            title = '{:<7s} {:>10s} {:>10s} {:>16s}'.format(
+                'Contribution', 'Frequency', 'Real', 'Imaginary')
+            self.ostream.print_header(title.ljust(width))
+            self.ostream.print_header(('-' * len(title)).ljust(width))
+            
+            cont_label = "ΣNaT3NxNyz  {:10.4f}".format(w)
 
-            w_str = 'Reduced:ΣNaT3NxNyz =  {:.8f}'.format(t3_dict[w, -w, w] /
-                                                          15)
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,t3_dict[w, -w, w].real,t3_dict[w, -w, w].imag )
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = 'Reduced:ΣNaX2Nyz =  {:.8f}'.format(NaX2Nyz[w, -w, w] / 15)
+
+            cont_label = "ΣNaX2Nyz  {:12.4f}".format(w)
+
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,NaX2Nyz[w, -w, w].real,NaX2Nyz[w, -w, w].imag )
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = 'Reduced:ΣNxA2Nyz =  {:.8f}'.format(NxA2Nyz[w, -w, w] / 15)
+
+            cont_label = "ΣNxA2Nyz  {:12.4f}".format(w)
+
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,NxA2Nyz[w, -w, w].real,NxA2Nyz[w, -w, w].imag )
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = 'Reduced:<<A;B,C,D>>= {:.8f}, '.format(gamma[w, -w, w])
-            w_str += 'w=({:.4f},{:.4f},{:.4f}), '.format(w, -w, w)
-            w_str += 'hω =({:.4f} eV)'.format(w * hartree_in_ev())
+
+            cont_label = "Σ<<μ;μ,μ,μ>>  {:8.4f}".format(w)
+
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,gamma[w, -w, w].real,gamma[w, -w, w].imag )
             self.ostream.print_header(w_str.ljust(width))
-            self.ostream.print_header(('-' * len(w_str)).ljust(width))
             self.ostream.print_blank()
+
+        self.ostream.print_blank()
+            

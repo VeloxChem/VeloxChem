@@ -21,7 +21,6 @@ from .aodensitymatrix import AODensityMatrix
 from .inputparser import InputParser
 from .errorhandler import assert_msg_critical
 
-
 class TpaDriver:
     """
     Implements the isotropic cubic response driver for two-photon absorption
@@ -207,6 +206,7 @@ class TpaDriver:
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
         if self.rank == mpi_master():
+            
             v1 = {(op, w): v for op, v in zip(component, b_rhs)
                   for w in self.frequencies}
             X = {
@@ -293,6 +293,7 @@ class TpaDriver:
         # Computing the third-order gradient and also the contractions of
         # A[3] and A[2] which formally are not part of the third-order gradient
         # but which are used for the cubic response function
+
 
         tpa_dict = self.main(Focks, Nx, self.frequencies, X, d_a_mo, kX,
                              self.comp, scf_tensors, molecule, ao_basis,
@@ -431,7 +432,8 @@ class TpaDriver:
                     sum_val += t4_dict[(w, -w, w)]
                 for key, val in other_dict.items():
                     sum_val += val[(w, -w, w)]
-                gamma[(w, -w, w)] = 1. / 15 * sum_val
+                gamma[(w, -w, w)] = sum_val
+
 
             self.print_results(self.frequencies, gamma, self.comp, t4_dict,
                                t3_dict, other_dict)
@@ -721,11 +723,11 @@ class TpaDriver:
         for i in range(len(freqs)):
             w = float(track[i * (len(track) // len(freqs))].split(",")[1])
 
-            t3term = -(np.matmul(n_x['Na'][('x', w)], e3_dict['f_iso_x'][w]) +
+            t3term = (np.matmul(n_x['Na'][('x', w)], e3_dict['f_iso_x'][w]) +
                        np.matmul(n_x['Na'][('y', w)], e3_dict['f_iso_y'][w]) +
                        np.matmul(n_x['Na'][('z', w)], e3_dict['f_iso_z'][w]))
 
-            t3_term[(w, -w, w)] = t3term
+            t3_term[(w, -w, w)] = 1./15*t3term
 
         return t3_term
 
@@ -926,7 +928,7 @@ class TpaDriver:
     def x3_contract(self, k1, k2, X, D, nocc, norb):
         """
         Contracts the generalized dipole gradient tensor of rank 3 with two
-        first-order response matrices. X[3]N1N2 = -(1/2)[[k2,[k1,X]],D.T]
+        first-order response matrices. X[3]N1N2 = (1/2)[[k2,[k1,X]],D.T]
 
         :param: k1:
             First-order response matrix
@@ -951,12 +953,12 @@ class TpaDriver:
             LinearSolver.lrmat2vec(X3n_xNy.imag, nocc, norb)
         ]
         X3n_xNy_c = X3n_xNy[0] + 1j * X3n_xNy[1]
-        return -(1. / 2) * X3n_xNy_c
+        return (1. / 2) * X3n_xNy_c
 
     def a3_contract(self, k1, k2, A, D, nocc, norb):
         """
         Contracts the generalized dipole gradient tensor of rank 3 with two
-        first-order response matrices. A[3]N1N2 = (1/6)[[k2,[k1,A]],D.T]
+        first-order response matrices. A[3]N1N2 = -(1/6)[[k2,[k1,A]],D.T]
 
         :param: k1:
             First-order response matrix
@@ -981,12 +983,12 @@ class TpaDriver:
             LinearSolver.lrmat2vec(A3n_xNy.imag, nocc, norb)
         ]
         A3n_xNy_c = A3n_xNy[0] + 1j * A3n_xNy[1]
-        return (1. / 6) * A3n_xNy_c
+        return -(1. / 6) * A3n_xNy_c
 
     def a2_contract(self, k, A, D, nocc, norb):
         """
         Contracts the generalized dipole gradient tensor of rank 2 with a
-        second-order response matrix. A[2]N1 = -(1 / 2)[[k1,X],D.T]
+        second-order response matrix. A[2]N1 = (1 / 2)[[k1,X],D.T]
 
         :param: k:
             Respose vector in matrix representation
@@ -1078,7 +1080,7 @@ class TpaDriver:
 
         return None
 
-    def get_fock_r(self, mo, D, molecule, ao_basis, rank):
+    def get_fock_r(self, mo, D, molecule, ao_basis, fock_flag):
         """
         Computes and returns a list of Fock matrices
 
@@ -1101,7 +1103,7 @@ class TpaDriver:
 
         # TODO: move AO-to-MO transformation into get_two_el_fock_mod_r
 
-        if rank == 0:
+        if fock_flag == "SCF":
             # computes the unperturbed Fock matrix from the SCF Density and
             # adds the one electron part
             fa = self.get_two_el_fock_mod_r(molecule, ao_basis, D)
@@ -1113,7 +1115,7 @@ class TpaDriver:
             else:
                 return None
 
-        elif rank == 1:
+        elif fock_flag == "real_and_imag":
             # computes complex Fock matrices (only two-eletron parts 2J-K)
             if self.rank == mpi_master():
                 D_total = []
@@ -1137,7 +1139,7 @@ class TpaDriver:
             else:
                 return None
 
-        elif rank == 3:
+        elif fock_flag == "imag":
             # computes real Fock Matrices (only two-eletron parts 2J-K)
             f_total = self.get_two_el_fock_mod_r(molecule, ao_basis, D)
 
@@ -1151,7 +1153,7 @@ class TpaDriver:
             else:
                 return None
 
-        else:
+        elif fock_flag == "real":
             # computes imaginary Fock matrices (only two-eletron parts 2J-K)
             f_total = self.get_two_el_fock_mod_r(molecule, ao_basis, D)
 
@@ -1164,6 +1166,8 @@ class TpaDriver:
                 return ff
             else:
                 return None
+        else:
+            return None
 
     def get_two_el_fock_mod_r(self, molecule, ao_basis, dabs):
         """

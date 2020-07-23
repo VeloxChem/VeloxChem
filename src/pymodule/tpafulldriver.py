@@ -47,7 +47,9 @@ class TpaFullDriver(TpaDriver):
         """
         Computes the compounded densities needed for the compounded Fock
         matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
-        function
+        function.
+
+        Note: All densities are 1/3 of the ones in the paper, instead all the Fock matrices are multiplied by 3. 
 
         :param wi:
             A list of the frequencies
@@ -63,7 +65,7 @@ class TpaFullDriver(TpaDriver):
         :return:
             A list of tranformed compounded densities
         """
-
+        
         density_list = []
 
         for w in wi:
@@ -207,8 +209,8 @@ class TpaFullDriver(TpaDriver):
             self.print_fock_header()
 
         time_start_fock = time.time()
-        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis, 1)
-        F0_a = self.get_fock_r(mo, D0, molecule, ao_basis, 0)
+        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis, "real_and_imag")
+        F0_a = self.get_fock_r(mo, D0, molecule, ao_basis, "SCF")
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -937,7 +939,7 @@ class TpaFullDriver(TpaDriver):
             self.print_fock_header()
 
         time_start_fock = time.time()
-        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis, 1)
+        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis, "real_and_imag")
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -1195,8 +1197,8 @@ class TpaFullDriver(TpaDriver):
                 na_a3_nx_ny += np.matmul(
                     self.a3_contract(kd, kc, A, da, nocc, norb), Nb)
 
-            na_a3_nx_ny_dict[(wi[j], -wi[j], wi[j])] = na_a3_nx_ny
-            na_x3_ny_nz_dict[(wi[j], -wi[j], wi[j])] = na_x3_ny_nz
+            na_a3_nx_ny_dict[(wi[j], -wi[j], wi[j])] = (1./15)*na_a3_nx_ny
+            na_x3_ny_nz_dict[(wi[j], -wi[j], wi[j])] = (1./15)*na_x3_ny_nz
 
         for i in range(len(wi)):
             vals = track[i * comp_per_freq].split(',')
@@ -1478,8 +1480,8 @@ class TpaFullDriver(TpaDriver):
             nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
             nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
-            na_x2_nyz_dict[(w, -w, w)] = na_x2_nyz
-            nx_a2_nyz_dict[(w, -w, w)] = nx_a2_nyz
+            na_x2_nyz_dict[(w, -w, w)] = -(1./15)*na_x2_nyz
+            nx_a2_nyz_dict[(w, -w, w)] = -(1./15)*nx_a2_nyz
 
         return {
             'NaX3NyNz': na_x3_ny_nz_dict,
@@ -1540,7 +1542,7 @@ class TpaFullDriver(TpaDriver):
                 t4term += (R4term[('x', ww)] + R4term[('y', ww)] +
                            R4term[('z', ww)])
 
-            T4term[(ww, -ww, ww)] = t4term
+            T4term[(ww, -ww, ww)] = -(1./15)*t4term
 
         return T4term
 
@@ -1819,7 +1821,7 @@ class TpaFullDriver(TpaDriver):
         NaX2Nyz = tpa_dict['NaX2Nyz']
         NxA2Nyz = tpa_dict['NxA2Nyz']
 
-        width = 50
+        width = 94
 
         w_str = 'Gamma tensor components computed per frequency'
         self.ostream.print_blank()
@@ -1832,28 +1834,59 @@ class TpaFullDriver(TpaDriver):
 
         self.ostream.print_blank()
 
+        w_str = 'Gamma Tensor Components at Given Frequencies'
+        self.ostream.print_blank()
+        self.ostream.print_header(w_str.ljust(width))
+        self.ostream.print_blank()
+        
         for w in freqs:
-            w_str = 'ΣNaT3NxNyz =  {:.8f}'.format(t3_dict[w, -w, w] / 15)
+            title = '{:<7s} {:>10s} {:>10s} {:>16s}'.format(
+                'Contribution', 'Frequency', 'Real', 'Imaginary')
+            self.ostream.print_header(title.ljust(width))
+            self.ostream.print_header(('-' * len(title)).ljust(width))
+            
+            cont_label = "ΣNaT3NxNyz  {:10.4f}".format(w)
+
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,t3_dict[w, -w, w].real,t3_dict[w, -w, w].imag )
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = 'ΣNaT4NxNyNz =  {:.8f}'.format(t4_dict[w, -w, w] / 15)
+
+            cont_label = "ΣNaT4NxNyNz  {:9.4f}".format(w)
+
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,t4_dict[w, -w, w].real,t4_dict[w, -w, w].imag )
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = 'ΣNaX2Nyz =  {:.8f}'.format(NaX2Nyz[w, -w, w] / 15)
+
+            cont_label = "ΣNaX2Nyz  {:12.4f}".format(w)
+
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,NaX2Nyz[w, -w, w].real,NaX2Nyz[w, -w, w].imag )
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = 'ΣNaX3NyNz =  {:.8f}'.format(NaX3NyNz[w, -w, w] / 15)
+
+
+            cont_label = "ΣNaX3NyNz  {:11.4f}".format(w)
+
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,NaX3NyNz[w, -w, w].real,NaX3NyNz[w, -w, w].imag )
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = 'ΣNxA2Nyz =  {:.8f}'.format(NxA2Nyz[w, -w, w] / 15)
+
+            cont_label = "ΣNxA2Nyz  {:12.4f}".format(w)
+
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,NxA2Nyz[w, -w, w].real,NxA2Nyz[w, -w, w].imag )
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = 'ΣNaA3NxNy =  {:.8f}'.format(NaA3NxNy[w, -w, w] / 15)
+
+            cont_label = "ΣNaA3NxNy  {:11.4f}".format(w)
+
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,NaA3NxNy[w, -w, w].real,NaA3NxNy[w, -w, w].imag )
             self.ostream.print_header(w_str.ljust(width))
 
-            w_str = 'Σ<<μ;μ,μ,μ>>= {:.8f}, '.format(gamma[w, -w, w])
-            w_str += 'ω=({:.4f},{:.4f},{:.4f}), '.format(w, -w, w)
-            w_str += 'hω =({:.4f} eV)'.format(w * hartree_in_ev())
+
+            cont_label = "Σ<<μ;μ,μ,μ>>  {:8.4f}".format(w)
+
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,gamma[w, -w, w].real,gamma[w, -w, w].imag )
             self.ostream.print_header(w_str.ljust(width))
-            self.ostream.print_header(('-' * len(w_str)).ljust(width))
             self.ostream.print_blank()
+
+        self.ostream.print_blank()
+            
