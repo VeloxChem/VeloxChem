@@ -1198,7 +1198,7 @@ class TpaDriver:
 
             batch_size = self.batch_size
             if batch_size is None:
-                batch_size = min(100, n_total, max_batch_size)
+                batch_size = min(n_total, max_batch_size)
 
             # get number of batches
             num_batches = n_total // batch_size
