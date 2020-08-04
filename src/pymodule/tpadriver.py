@@ -21,6 +21,7 @@ from .aodensitymatrix import AODensityMatrix
 from .inputparser import InputParser
 from .errorhandler import assert_msg_critical
 
+
 class TpaDriver:
     """
     Implements the isotropic cubic response driver for two-photon absorption
@@ -206,7 +207,7 @@ class TpaDriver:
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
         if self.rank == mpi_master():
-            
+
             v1 = {(op, w): v for op, v in zip(component, b_rhs)
                   for w in self.frequencies}
             X = {
@@ -294,7 +295,6 @@ class TpaDriver:
         # A[3] and A[2] which formally are not part of the third-order gradient
         # but which are used for the cubic response function
 
-
         tpa_dict = self.main(Focks, Nx, self.frequencies, X, d_a_mo, kX,
                              self.comp, scf_tensors, molecule, ao_basis,
                              profiler)
@@ -347,11 +347,13 @@ class TpaDriver:
             S = scf_tensors['S']
             D0 = scf_tensors['D'][0]
             mo = scf_tensors['C']
+            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F'][0], mo])
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
         else:
             D0 = None
             mo = None
+            F0 = None
             nocc = None
             norb = None
 
@@ -364,7 +366,7 @@ class TpaDriver:
         profiler.check_memory_usage('1st densities')
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(w, density_list, (D0, D0), mo, molecule,
+        fock_dict = self.get_fock_dict(w, density_list, F0, mo, molecule,
                                        ao_basis)
 
         if self.rank == mpi_master():
@@ -434,7 +436,6 @@ class TpaDriver:
                     sum_val += val[(w, -w, w)]
                 gamma[(w, -w, w)] = sum_val
 
-
             self.print_results(self.frequencies, gamma, self.comp, t4_dict,
                                t3_dict, other_dict)
 
@@ -474,7 +475,7 @@ class TpaDriver:
 
         return None
 
-    def get_fock_dict(self, wi, density_list, D0, mo, molecule, ao_basis):
+    def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis):
         """
         Computes the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the
         isotropic cubic response function
@@ -483,8 +484,8 @@ class TpaDriver:
             A list of the frequencies
         :param density_list:
             A list of tranformed compounded densities
-        :param D0:
-            The SCF density matrix in AO basis
+        :param F0:
+            The Fock matrix in MO basis
         :param mo:
             A matrix containing the MO coefficents
         :param molecule:
@@ -724,10 +725,10 @@ class TpaDriver:
             w = float(track[i * (len(track) // len(freqs))].split(",")[1])
 
             t3term = (np.matmul(n_x['Na'][('x', w)], e3_dict['f_iso_x'][w]) +
-                       np.matmul(n_x['Na'][('y', w)], e3_dict['f_iso_y'][w]) +
-                       np.matmul(n_x['Na'][('z', w)], e3_dict['f_iso_z'][w]))
+                      np.matmul(n_x['Na'][('y', w)], e3_dict['f_iso_y'][w]) +
+                      np.matmul(n_x['Na'][('z', w)], e3_dict['f_iso_z'][w]))
 
-            t3_term[(w, -w, w)] = 1./15*t3term
+            t3_term[(w, -w, w)] = 1. / 15 * t3term
 
         return t3_term
 
@@ -1099,23 +1100,9 @@ class TpaDriver:
             A list of Fock matrices
         """
 
-        # TODO: look into "rank"
-
         # TODO: move AO-to-MO transformation into get_two_el_fock_mod_r
 
-        if fock_flag == "SCF":
-            # computes the unperturbed Fock matrix from the SCF Density and
-            # adds the one electron part
-            fa = self.get_two_el_fock_mod_r(molecule, ao_basis, D)
-            h = self.get_one_el_hamiltonian(molecule, ao_basis)
-
-            if self.rank == mpi_master():
-                fa = 0.5 * fa[0] + h
-                return self.ao2mo(mo, fa)
-            else:
-                return None
-
-        elif fock_flag == "real_and_imag":
+        if fock_flag == 'real_and_imag':
             # computes complex Fock matrices (only two-eletron parts 2J-K)
             if self.rank == mpi_master():
                 D_total = []
@@ -1127,9 +1114,8 @@ class TpaDriver:
 
             f_total = self.get_two_el_fock_mod_r(molecule, ao_basis, D_total)
 
-            ff = []
-
             if self.rank == mpi_master():
+                ff = []
                 for i in range(len(f_total) // 2):
                     ff.append(
                         self.ao2mo(
@@ -1139,33 +1125,30 @@ class TpaDriver:
             else:
                 return None
 
-        elif fock_flag == "imag":
+        elif fock_flag == 'imag':
             # computes real Fock Matrices (only two-eletron parts 2J-K)
             f_total = self.get_two_el_fock_mod_r(molecule, ao_basis, D)
 
-            ff = []
-
             if self.rank == mpi_master():
+                ff = []
                 for i in range(len(f_total)):
                     ff.append(self.ao2mo(mo, 0.5j * f_total[i]))
-
                 return ff
             else:
                 return None
 
-        elif fock_flag == "real":
+        elif fock_flag == 'real':
             # computes imaginary Fock matrices (only two-eletron parts 2J-K)
             f_total = self.get_two_el_fock_mod_r(molecule, ao_basis, D)
 
-            ff = []
-
             if self.rank == mpi_master():
+                ff = []
                 for i in range(len(f_total)):
                     ff.append(self.ao2mo(mo, 0.5 * f_total[i]))
-
                 return ff
             else:
                 return None
+
         else:
             return None
 

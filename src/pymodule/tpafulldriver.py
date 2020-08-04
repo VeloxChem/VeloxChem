@@ -3,7 +3,6 @@ import time
 import re
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import hartree_in_ev
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .tpadriver import TpaDriver
@@ -47,9 +46,8 @@ class TpaFullDriver(TpaDriver):
         """
         Computes the compounded densities needed for the compounded Fock
         matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
-        function.
-
-        Note: All densities are 1/3 of the ones in the paper, instead all the Fock matrices are multiplied by 3. 
+        function. Note: All densities are 1/3 of those in the paper, and all
+        the Fock matrices are later scaled by 3.
 
         :param wi:
             A list of the frequencies
@@ -65,7 +63,7 @@ class TpaFullDriver(TpaDriver):
         :return:
             A list of tranformed compounded densities
         """
-        
+
         density_list = []
 
         for w in wi:
@@ -183,7 +181,7 @@ class TpaFullDriver(TpaDriver):
 
         return density_list
 
-    def get_fock_dict(self, wi, density_list, D0, mo, molecule, ao_basis):
+    def get_fock_dict(self, wi, density_list, F0_a, mo, molecule, ao_basis):
         """
         Computes the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the
         isotropic cubic response function
@@ -192,8 +190,8 @@ class TpaFullDriver(TpaDriver):
             A list of the frequencies
         :param density_list:
             A list of tranformed compounded densities
-        :param D0:
-            The SCF density matrix in AO basis
+        :param F0_a:
+            The Fock matrix in MO basis
         :param mo:
             A matrix containing the MO coefficents
         :param molecule:
@@ -209,8 +207,8 @@ class TpaFullDriver(TpaDriver):
             self.print_fock_header()
 
         time_start_fock = time.time()
-        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis, "real_and_imag")
-        F0_a = self.get_fock_r(mo, D0, molecule, ao_basis, "SCF")
+        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis,
+                                    'real_and_imag')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -939,7 +937,8 @@ class TpaFullDriver(TpaDriver):
             self.print_fock_header()
 
         time_start_fock = time.time()
-        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis, "real_and_imag")
+        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis,
+                                    "real_and_imag")
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -1197,8 +1196,8 @@ class TpaFullDriver(TpaDriver):
                 na_a3_nx_ny += np.matmul(
                     self.a3_contract(kd, kc, A, da, nocc, norb), Nb)
 
-            na_a3_nx_ny_dict[(wi[j], -wi[j], wi[j])] = (1./15)*na_a3_nx_ny
-            na_x3_ny_nz_dict[(wi[j], -wi[j], wi[j])] = (1./15)*na_x3_ny_nz
+            na_a3_nx_ny_dict[(wi[j], -wi[j], wi[j])] = (1. / 15) * na_a3_nx_ny
+            na_x3_ny_nz_dict[(wi[j], -wi[j], wi[j])] = (1. / 15) * na_x3_ny_nz
 
         for i in range(len(wi)):
             vals = track[i * comp_per_freq].split(',')
@@ -1480,8 +1479,8 @@ class TpaFullDriver(TpaDriver):
             nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
             nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
-            na_x2_nyz_dict[(w, -w, w)] = -(1./15)*na_x2_nyz
-            nx_a2_nyz_dict[(w, -w, w)] = -(1./15)*nx_a2_nyz
+            na_x2_nyz_dict[(w, -w, w)] = -(1. / 15) * na_x2_nyz
+            nx_a2_nyz_dict[(w, -w, w)] = -(1. / 15) * nx_a2_nyz
 
         return {
             'NaX3NyNz': na_x3_ny_nz_dict,
@@ -1542,7 +1541,7 @@ class TpaFullDriver(TpaDriver):
                 t4term += (R4term[('x', ww)] + R4term[('y', ww)] +
                            R4term[('z', ww)])
 
-            T4term[(ww, -ww, ww)] = -(1./15)*t4term
+            T4term[(ww, -ww, ww)] = -(1. / 15) * t4term
 
         return T4term
 
@@ -1838,55 +1837,61 @@ class TpaFullDriver(TpaDriver):
         self.ostream.print_blank()
         self.ostream.print_header(w_str.ljust(width))
         self.ostream.print_blank()
-        
+
         for w in freqs:
             title = '{:<7s} {:>10s} {:>10s} {:>16s}'.format(
                 'Contribution', 'Frequency', 'Real', 'Imaginary')
             self.ostream.print_header(title.ljust(width))
             self.ostream.print_header(('-' * len(title)).ljust(width))
-            
+
             cont_label = "ΣNaT3NxNyz  {:10.4f}".format(w)
 
-            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,t3_dict[w, -w, w].real,t3_dict[w, -w, w].imag )
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,
+                                                        t3_dict[w, -w, w].real,
+                                                        t3_dict[w, -w, w].imag)
             self.ostream.print_header(w_str.ljust(width))
-
 
             cont_label = "ΣNaT4NxNyNz  {:9.4f}".format(w)
 
-            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,t4_dict[w, -w, w].real,t4_dict[w, -w, w].imag )
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,
+                                                        t4_dict[w, -w, w].real,
+                                                        t4_dict[w, -w, w].imag)
             self.ostream.print_header(w_str.ljust(width))
-
 
             cont_label = "ΣNaX2Nyz  {:12.4f}".format(w)
 
-            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,NaX2Nyz[w, -w, w].real,NaX2Nyz[w, -w, w].imag )
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,
+                                                        NaX2Nyz[w, -w, w].real,
+                                                        NaX2Nyz[w, -w, w].imag)
             self.ostream.print_header(w_str.ljust(width))
-
-
 
             cont_label = "ΣNaX3NyNz  {:11.4f}".format(w)
 
-            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,NaX3NyNz[w, -w, w].real,NaX3NyNz[w, -w, w].imag )
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,
+                                                        NaX3NyNz[w, -w, w].real,
+                                                        NaX3NyNz[w, -w, w].imag)
             self.ostream.print_header(w_str.ljust(width))
-
 
             cont_label = "ΣNxA2Nyz  {:12.4f}".format(w)
 
-            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,NxA2Nyz[w, -w, w].real,NxA2Nyz[w, -w, w].imag )
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,
+                                                        NxA2Nyz[w, -w, w].real,
+                                                        NxA2Nyz[w, -w, w].imag)
             self.ostream.print_header(w_str.ljust(width))
-
 
             cont_label = "ΣNaA3NxNy  {:11.4f}".format(w)
 
-            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,NaA3NxNy[w, -w, w].real,NaA3NxNy[w, -w, w].imag )
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,
+                                                        NaA3NxNy[w, -w, w].real,
+                                                        NaA3NxNy[w, -w, w].imag)
             self.ostream.print_header(w_str.ljust(width))
-
 
             cont_label = "Σ<<μ;μ,μ,μ>>  {:8.4f}".format(w)
 
-            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,gamma[w, -w, w].real,gamma[w, -w, w].imag )
+            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,
+                                                        gamma[w, -w, w].real,
+                                                        gamma[w, -w, w].imag)
             self.ostream.print_header(w_str.ljust(width))
             self.ostream.print_blank()
 
         self.ostream.print_blank()
-            

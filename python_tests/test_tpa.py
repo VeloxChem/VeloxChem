@@ -38,23 +38,17 @@ class TestTPA(unittest.TestCase):
         if task.mpi_rank == mpi_master():
             for key in [
                     't4_dict', 't3_dict', 'NaX3NyNz', 'NaA3NxNy', 'NaX2Nyz',
-                    'NxA2Nyz'
-            ]:
-                if key in tpa_result:
-                    if tpa_result[key] is None:
-                        continue
-
-            for key in [
-                    't4_dict', 't3_dict', 'NaX3NyNz', 'NaA3NxNy', 'NaX2Nyz',
                     'NxA2Nyz', 'gamma'
             ]:
                 if key in tpa_result and key in ref_result:
                     if tpa_result[key] is None:
                         continue
-                    self.assertTrue(abs(tpa_result[key][(w, -w, w)].real -
-                                    ref_result[key].real) < 1.0e-4)
-                    self.assertTrue(abs(tpa_result[key][(w, -w, w)].imag -
-                                    ref_result[key].imag) < 1.0e-4)
+                    self.assertTrue(
+                        abs(tpa_result[key][(w, -w, w)].real -
+                            ref_result[key].real) < 1.0e-4)
+                    self.assertTrue(
+                        abs(tpa_result[key][(w, -w, w)].imag -
+                            ref_result[key].imag) < 1.0e-4)
 
     def test_tpa_full(self):
 
@@ -84,7 +78,7 @@ class TestTPA(unittest.TestCase):
             't3_dict': -15.12982062 - 0.19793495j,
             'NaX2Nyz': 96.30910639 + 1.72679037j,
             'NxA2Nyz': 96.36431088 + 0.51886895j,
-            'gamma': 177.54359664  + 2.04772438j,
+            'gamma': 177.54359664 + 2.04772438j,
         }
 
         inpfile = os.path.join('inputs', 'water_tpa.inp')
