@@ -6,8 +6,6 @@ import os
 import re
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import KineticEnergyIntegralsDriver
-from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
@@ -1006,6 +1004,8 @@ class TpaDriver:
             Returns a matrix
         """
 
+        # TODO: look into a2_contract
+
         An_x = self.commut(self.commut(k.T, A), D.T)
         A2n_x = [
             LinearSolver.lrmat2vec(An_x.real, nocc, norb),
@@ -1069,8 +1069,6 @@ class TpaDriver:
         :return:
             An antisymetrized vector
         """
-
-        # TODO: look into "anti_sym"
 
         if vec.ndim == 1:
             new_vec = np.zeros_like(vec)
@@ -1255,27 +1253,6 @@ class TpaDriver:
             return tuple(fabs)
         else:
             return None
-
-    def get_one_el_hamiltonian(self, molecule, ao_basis):
-        """
-        Returns the one electron part of the Fock matrix
-
-        :param molecule:
-            The molecule
-        :param ao_basis:
-            The AO basis set
-
-        :return:
-            The one electron part of the Fock matrix
-        """
-
-        kinetic_driver = KineticEnergyIntegralsDriver(self.comm)
-        potential_driver = NuclearPotentialIntegralsDriver(self.comm)
-
-        T = kinetic_driver.compute(molecule, ao_basis).to_numpy()
-        V = potential_driver.compute(molecule, ao_basis).to_numpy()
-
-        return T - V
 
     def print_fock_header(self):
         """

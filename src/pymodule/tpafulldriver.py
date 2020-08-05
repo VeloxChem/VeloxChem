@@ -1886,6 +1886,8 @@ class TpaFullDriver(TpaDriver):
                                                         NaA3NxNy[w, -w, w].imag)
             self.ostream.print_header(w_str.ljust(width))
 
+            # TODO: print Gamma, and perhaps T3/T4/X2/X3/A2/A3
+
             cont_label = "Σ<<μ;μ,μ,μ>>  {:8.4f}".format(w)
 
             w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,
