@@ -938,7 +938,7 @@ class TpaFullDriver(TpaDriver):
 
         time_start_fock = time.time()
         fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis,
-                                    "real_and_imag")
+                                    'real_and_imag')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock

@@ -1091,17 +1091,14 @@ class TpaDriver:
             The molecule
         :param ao_basis:
             The AO basis set
-        :param rank:
-            ...
+        :param fock_flag:
+            The type of Fock matrices
 
         :return:
             A list of Fock matrices
         """
 
-        # TODO: move AO-to-MO transformation into get_two_el_fock_mod_r
-
         if fock_flag == 'real_and_imag':
-            # computes complex Fock matrices (only two-eletron parts 2J-K)
             if self.rank == mpi_master():
                 D_total = []
                 for da in D:
@@ -1124,7 +1121,6 @@ class TpaDriver:
                 return None
 
         elif fock_flag == 'imag':
-            # computes real Fock Matrices (only two-eletron parts 2J-K)
             f_total = self.get_two_el_fock_mod_r(molecule, ao_basis, D)
 
             if self.rank == mpi_master():
@@ -1136,7 +1132,6 @@ class TpaDriver:
                 return None
 
         elif fock_flag == 'real':
-            # computes imaginary Fock matrices (only two-eletron parts 2J-K)
             f_total = self.get_two_el_fock_mod_r(molecule, ao_basis, D)
 
             if self.rank == mpi_master():
