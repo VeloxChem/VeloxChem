@@ -1271,3 +1271,21 @@ class TpaDriver:
         self.ostream.print_info(cur_str)
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def print_component(self, label, freq, value, width):
+        """
+        Prints TPA component.
+
+        :param label:
+            The label
+        :param freq:
+            The frequency
+        :param value:
+            The complex value
+        :param width:
+            The width for the output
+        """
+
+        w_str = '{:<9s} {:12.4f} {:20.8f} {:20.8f}j'.format(
+            label, freq, value.real, value.imag)
+        self.ostream.print_header(w_str.ljust(width))

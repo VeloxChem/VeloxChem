@@ -834,40 +834,16 @@ class TpaReducedDriver(TpaDriver):
         self.ostream.print_blank()
 
         for w in freqs:
-            title = '{:<7s} {:>10s} {:>10s} {:>16s}'.format(
-                'Contribution', 'Frequency', 'Real', 'Imaginary')
+            title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
+                'Component', 'Frequency', 'Real', 'Imaginary')
             self.ostream.print_header(title.ljust(width))
             self.ostream.print_header(('-' * len(title)).ljust(width))
 
-            cont_label = "ΣNaT3NxNyz  {:10.4f}".format(w)
+            self.print_component('T3', w, t3_dict[w, -w, w], width)
+            self.print_component('X2', w, NaX2Nyz[w, -w, w], width)
+            self.print_component('A2', w, NxA2Nyz[w, -w, w], width)
+            self.print_component('Gamma', w, gamma[w, -w, w], width)
 
-            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,
-                                                        t3_dict[w, -w, w].real,
-                                                        t3_dict[w, -w, w].imag)
-            self.ostream.print_header(w_str.ljust(width))
-
-            cont_label = "ΣNaX2Nyz  {:12.4f}".format(w)
-
-            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,
-                                                        NaX2Nyz[w, -w, w].real,
-                                                        NaX2Nyz[w, -w, w].imag)
-            self.ostream.print_header(w_str.ljust(width))
-
-            cont_label = "ΣNxA2Nyz  {:12.4f}".format(w)
-
-            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,
-                                                        NxA2Nyz[w, -w, w].real,
-                                                        NxA2Nyz[w, -w, w].imag)
-            self.ostream.print_header(w_str.ljust(width))
-
-            # TODO: print Gamma, and perhaps T3/X2/A2
-
-            cont_label = "Σ<<μ;μ,μ,μ>>  {:8.4f}".format(w)
-
-            w_str = '{:<15s} {:15.8f} {:13.8f}j'.format(cont_label,
-                                                        gamma[w, -w, w].real,
-                                                        gamma[w, -w, w].imag)
-            self.ostream.print_header(w_str.ljust(width))
             self.ostream.print_blank()
 
         self.ostream.print_blank()
