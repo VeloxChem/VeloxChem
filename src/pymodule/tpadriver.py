@@ -1107,48 +1107,34 @@ class TpaDriver:
             else:
                 D_total = None
 
-            f_total = self.get_two_el_fock_mod_r(molecule, ao_basis, D_total)
+            f_total = self.get_two_el_fock_mod_r(mo, molecule, ao_basis,
+                                                 D_total)
 
             if self.rank == mpi_master():
                 ff = []
                 for i in range(len(f_total) // 2):
-                    ff.append(
-                        self.ao2mo(
-                            mo,
-                            0.5 * f_total[2 * i] + 0.5j * f_total[2 * i + 1]))
-                return ff
-            else:
-                return None
-
-        elif fock_flag == 'imag':
-            f_total = self.get_two_el_fock_mod_r(molecule, ao_basis, D)
-
-            if self.rank == mpi_master():
-                ff = []
-                for i in range(len(f_total)):
-                    ff.append(self.ao2mo(mo, 0.5j * f_total[i]))
+                    ff.append(f_total[2 * i] + 1j * f_total[2 * i + 1])
                 return ff
             else:
                 return None
 
         elif fock_flag == 'real':
-            f_total = self.get_two_el_fock_mod_r(molecule, ao_basis, D)
+            f_total = self.get_two_el_fock_mod_r(mo, molecule, ao_basis, D)
 
             if self.rank == mpi_master():
-                ff = []
-                for i in range(len(f_total)):
-                    ff.append(self.ao2mo(mo, 0.5 * f_total[i]))
-                return ff
+                return f_total
             else:
                 return None
 
         else:
             return None
 
-    def get_two_el_fock_mod_r(self, molecule, ao_basis, dabs):
+    def get_two_el_fock_mod_r(self, mo, molecule, ao_basis, dabs):
         """
-        Returns the two-electron part of the Fock matix 2J-K
+        Returns the two-electron part of the Fock matix in MO basis
 
+        :param mo:
+            The MO coefficients
         :param molecule:
             The molecule
         :param ao_basis:
@@ -1157,7 +1143,8 @@ class TpaDriver:
             A list of densitiy matrices
 
         :return:
-            A tuple containing the two-electron part of the Fock matix
+            A tuple containing the two-electron part of the Fock matix (in MO
+            basis)
         """
 
         # TODO: make a function to determine batch size
@@ -1218,13 +1205,13 @@ class TpaDriver:
 
             # form density matrices
 
-            dts = []
             if self.rank == mpi_master():
                 batch_start = batch_size * batch_ind
                 batch_end = min(batch_start + batch_size, n_total)
-                for dab in dabs[batch_start:batch_end]:
-                    dt = 2 * dab
-                    dts.append(dt)
+                dts = [
+                    np.ascontiguousarray(dab)
+                    for dab in dabs[batch_start:batch_end]
+                ]
                 dens = AODensityMatrix(dts, denmat.rest)
             else:
                 dens = AODensityMatrix()
@@ -1240,7 +1227,7 @@ class TpaDriver:
 
             if self.rank == mpi_master():
                 for i in range(fock.number_of_fock_matrices()):
-                    fabs.append(fock.to_numpy(i).T)
+                    fabs.append(self.ao2mo(mo, fock.to_numpy(i).T))
 
         self.ostream.print_blank()
 
