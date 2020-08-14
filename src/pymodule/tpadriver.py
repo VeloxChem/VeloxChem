@@ -293,9 +293,10 @@ class TpaDriver:
         # A[3] and A[2] which formally are not part of the third-order gradient
         # but which are used for the cubic response function
 
-        tpa_dict = self.main(Focks, Nx, self.frequencies, X, d_a_mo, kX,
-                             self.comp, scf_tensors, molecule, ao_basis,
-                             profiler)
+        tpa_dict = self.compute_tpa_components(Focks, Nx, self.frequencies, X,
+                                               d_a_mo, kX, self.comp,
+                                               scf_tensors, molecule, ao_basis,
+                                               profiler)
 
         valstr = '*** Time spent in TPA calculation: {:.2f} sec ***'.format(
             time.time() - start_time)
@@ -309,8 +310,8 @@ class TpaDriver:
 
         return tpa_dict
 
-    def main(self, Focks, Nx, w, X, d_a_mo, kX, track, scf_tensors, molecule,
-             ao_basis, profiler):
+    def compute_tpa_components(self, Focks, Nx, w, X, d_a_mo, kX, track,
+                               scf_tensors, molecule, ao_basis, profiler):
         """
         Computes all the relevent terms to third-order isotropic gradient
 
