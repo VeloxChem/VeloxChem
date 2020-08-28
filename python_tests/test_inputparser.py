@@ -317,7 +317,7 @@ def test_missing_file():
         with pytest.raises(AssertionError) as nofileinfo:
             InputParser('no_file')
 
-        assert str(nofileinfo.value) == 'input parser: cannot open file no_file'
+        assert str(nofileinfo.value) == 'InputParser: cannot open file no_file'
 
 
 def test_error_in_input(tmpdir):
