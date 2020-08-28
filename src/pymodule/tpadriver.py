@@ -813,7 +813,18 @@ class TpaDriver:
 
     def flip_xy(self, X):
 
-        # TODO: add docstring for flip_xy
+        """
+        Swaps upper and lower parts of a response vector. 
+        This is used when rewriting the R^[4] tensor contraction in 
+        terms of S^[4] tensor contractions. 
+
+        :param X:
+            A response vector v = (Z,-Y^*)
+
+        :return: 
+            A response vector of the form v' = (-Y^*,Z)
+        """
+
 
         if X.ndim == 1:
             new_xy = np.zeros_like(X)
@@ -826,7 +837,16 @@ class TpaDriver:
 
     def flip_yz(self, X):
 
-        # TODO: add docstring for flip_yz
+        """
+        This method takes a first-order response vector with a given sign of the frequency and returns 
+        the first-order response vector with reversed frequency argument.
+
+        :param X:
+            A response vector N(ω,x) = (Z,-Y^*)
+
+        :return: 
+            A response vector with reversed optical frequency N(-ω,x) = (Y,-Z^*)
+        """
 
         if X.ndim == 1:
             new_yz = np.zeros_like(X)
@@ -988,7 +1008,9 @@ class TpaDriver:
     def a2_contract(self, k, A, D, nocc, norb):
         """
         Contracts the generalized dipole gradient tensor of rank 2 with a
-        second-order response matrix. A[2]N1 = (1 / 2)[[k1,X],D.T]
+        second-order response matrix. A[2]N1 = -(1 / 2)[[k1,X],D.T]
+
+        # Note that the sign needs further investigation.
 
         :param: k:
             Respose vector in matrix representation
@@ -1004,8 +1026,6 @@ class TpaDriver:
         :return:
             Returns a matrix
         """
-
-        # TODO: look into a2_contract
 
         An_x = self.commut(self.commut(k.T, A), D.T)
         A2n_x = [
