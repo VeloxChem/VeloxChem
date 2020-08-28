@@ -10,12 +10,15 @@ from veloxchem.tpareddriver import TpaReducedDriver
 
 
 class TestTPA(unittest.TestCase):
-
     """
-    Tests the TPA code for the full and reduced expressions. Note that if one wants to compare with DALTON, one needs to only pass in the real part 
-    of the second-order gradients to the response solver when computing the second-order response vectors. Furthermore, to get identical values as DALTON one    needs to take into account the linear dependence threshold otherwise discrepancies can already be seen in the SCF energies. Some basis sets that have 
-    been used to compare with DALTON which yielded correct values are aug-cc-pVDZ / cc-pvdz / def2-svp.
-
+    Tests the TPA code for the full and reduced expressions. Note that if one
+    wants to compare with DALTON, one needs to only pass in the real part of
+    the second-order gradients to the response solver when computing the
+    second-order response vectors. Furthermore, to get identical values as
+    DALTON one needs to take into account the linear dependence threshold
+    otherwise discrepancies can already be seen in the SCF energies. Some basis
+    sets that have been used to compare with DALTON which yielded correct
+    values are aug-cc-pVDZ / cc-pVDZ / def2-SVP.
     """
 
     def run_tpa(self, inpfile, tpa_type, w, ref_result):

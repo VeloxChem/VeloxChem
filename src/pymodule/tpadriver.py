@@ -812,19 +812,17 @@ class TpaDriver:
         return sorted(comp_iso, key=comp_iso.index)
 
     def flip_xy(self, X):
-
         """
-        Swaps upper and lower parts of a response vector. 
-        This is used when rewriting the R^[4] tensor contraction in 
-        terms of S^[4] tensor contractions. 
+        Swaps upper and lower parts of a response vector. This is used when
+        rewriting the R^[4] tensor contraction in terms of S^[4] tensor
+        contractions.
 
         :param X:
             A response vector v = (Z,-Y^*)
 
-        :return: 
+        :return:
             A response vector of the form v' = (-Y^*,Z)
         """
-
 
         if X.ndim == 1:
             new_xy = np.zeros_like(X)
@@ -836,16 +834,17 @@ class TpaDriver:
         return None
 
     def flip_yz(self, X):
-
         """
-        This method takes a first-order response vector with a given sign of the frequency and returns 
-        the first-order response vector with reversed frequency argument.
+        This method takes a first-order response vector with a given sign of
+        the frequency and returns the first-order response vector with reversed
+        frequency argument.
 
         :param X:
             A response vector N(ω,x) = (Z,-Y^*)
 
-        :return: 
-            A response vector with reversed optical frequency N(-ω,x) = (Y,-Z^*)
+        :return:
+            A response vector with reversed optical frequency N(-ω,x) =
+            (Y,-Z^*)
         """
 
         if X.ndim == 1:
