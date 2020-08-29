@@ -343,7 +343,8 @@ class ComplexResponse(LinearSolver):
             bger, bung = self.setup_trials(dist_v1, precond)
 
             self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                               eri_dict, dft_dict, pe_dict, timing_dict)
+                               eri_dict, dft_dict, pe_dict, timing_dict,
+                               nonlinear_flag)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -609,7 +610,7 @@ class ComplexResponse(LinearSolver):
 
             self.e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
                                scf_tensors, eri_dict, dft_dict, pe_dict,
-                               timing_dict)
+                               timing_dict, nonlinear_flag)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trail_in_hours = iter_in_hours / n_new_trials

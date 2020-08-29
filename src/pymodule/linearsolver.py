@@ -458,8 +458,17 @@ class LinearSolver:
 
         return None
 
-    def e2n_half_size(self, vecs_ger, vecs_ung, molecule, basis, scf_tensors,
-                      eri_dict, dft_dict, pe_dict, timing_dict):
+    def e2n_half_size(self,
+                      vecs_ger,
+                      vecs_ung,
+                      molecule,
+                      basis,
+                      scf_tensors,
+                      eri_dict,
+                      dft_dict,
+                      pe_dict,
+                      timing_dict,
+                      nonlinear_flag=False):
         """
         Computes the E2 b matrix vector product.
 
@@ -481,6 +490,8 @@ class LinearSolver:
             The dictionary containing PE information.
         :param timing_dict:
             The dictionary containing timing information.
+        :param nonlinear_flag:
+            The flag for running in nonlinear response.
 
         :return:
             The gerade and ungerade E2 b matrix vector product in half-size.
@@ -604,6 +615,12 @@ class LinearSolver:
             self.comp_lr_fock(fock, dens, molecule, basis, eri_dict, dft_dict,
                               pe_dict, timing_dict)
 
+            e2_ger = None
+            e2_ung = None
+
+            fock_ger = None
+            fock_ung = None
+
             if self.rank == mpi_master():
 
                 batch_ger, batch_ung = 0, 0
@@ -616,8 +633,9 @@ class LinearSolver:
                 e2_ger = np.zeros((half_size, batch_ger))
                 e2_ung = np.zeros((half_size, batch_ung))
 
-                fock_ger = np.zeros((norb**2, batch_ger))
-                fock_ung = np.zeros((norb**2, batch_ung))
+                if nonlinear_flag:
+                    fock_ger = np.zeros((norb**2, batch_ger))
+                    fock_ung = np.zeros((norb**2, batch_ung))
 
                 for ifock in range(batch_ger + batch_ung):
                     fak = fock.alpha_to_numpy(ifock).T
@@ -643,28 +661,25 @@ class LinearSolver:
                     if ifock < batch_ger:
                         e2_ger[:, ifock] = -self.lrmat2vec(gmo, nocc,
                                                            norb)[:half_size]
-                        fock_ger[:, ifock] = np.linalg.multi_dot(
-                            [mo.T, fak.T, mo]).reshape(norb**2)
+                        if nonlinear_flag:
+                            fock_ger[:, ifock] = np.linalg.multi_dot(
+                                [mo.T, fak.T, mo]).reshape(norb**2)
                     else:
                         e2_ung[:, ifock - batch_ger] = -self.lrmat2vec(
                             gmo, nocc, norb)[:half_size]
-                        fock_ung[:, ifock - batch_ger] = np.linalg.multi_dot(
-                            [mo.T, fak.T, mo]).reshape(norb**2)
-
-            else:
-                e2_ger = None
-                e2_ung = None
-                fock_ger = None
-                fock_ung = None
+                        if nonlinear_flag:
+                            fock_ung[:,
+                                     ifock - batch_ger] = np.linalg.multi_dot(
+                                         [mo.T, fak.T, mo]).reshape(norb**2)
 
             vecs_e2_ger = DistributedArray(e2_ger, self.comm)
             vecs_e2_ung = DistributedArray(e2_ung, self.comm)
-
-            dist_fock_ger = DistributedArray(fock_ger, self.comm)
-            dist_fock_ung = DistributedArray(fock_ung, self.comm)
-
             self.append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
-            self.append_fock_matrices(dist_fock_ger, dist_fock_ung)
+
+            if nonlinear_flag:
+                dist_fock_ger = DistributedArray(fock_ger, self.comm)
+                dist_fock_ung = DistributedArray(fock_ung, self.comm)
+                self.append_fock_matrices(dist_fock_ger, dist_fock_ung)
 
         self.append_trial_vectors(vecs_ger, vecs_ung)
 
