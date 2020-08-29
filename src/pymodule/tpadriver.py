@@ -1,8 +1,5 @@
 import numpy as np
-import ctypes
-import psutil
 import time
-import os
 import re
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
@@ -18,6 +15,8 @@ from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .inputparser import InputParser
 from .errorhandler import assert_msg_critical
+from .batchsize import get_batch_size
+from .batchsize import get_number_of_batches
 
 
 class TpaDriver:
@@ -1167,45 +1166,21 @@ class TpaDriver:
             basis)
         """
 
-        # TODO: make a function to determine batch size
-
         eri_driver = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_driver.compute(get_qq_scheme(self.qq_type),
                                        self.eri_thresh, molecule, ao_basis)
 
         # determine number of batches
 
-        num_batches = 0
-
-        total_mem = psutil.virtual_memory().total
-        total_mem_list = self.comm.gather(total_mem, root=mpi_master())
-
         if self.rank == mpi_master():
-            n_ao = dabs[0].shape[0]
             n_total = len(dabs)
+            n_ao = dabs[0].shape[0]
+        else:
+            n_total = None
+            n_ao = None
 
-            # check if master node has larger memory
-            mem_adjust = 0.0
-            if total_mem > min(total_mem_list):
-                mem_adjust = total_mem - min(total_mem_list)
-
-            # computes maximum batch size from available memory
-            avail_mem = psutil.virtual_memory().available - mem_adjust
-            mem_per_mat = n_ao**2 * ctypes.sizeof(ctypes.c_double)
-            nthreads = int(os.environ['OMP_NUM_THREADS'])
-            max_batch_size = int(avail_mem / mem_per_mat / (0.625 * nthreads))
-            max_batch_size = max(1, max_batch_size)
-
-            batch_size = self.batch_size
-            if batch_size is None:
-                batch_size = min(n_total, max_batch_size)
-
-            # get number of batches
-            num_batches = n_total // batch_size
-            if n_total % batch_size != 0:
-                num_batches += 1
-
-        num_batches = self.comm.bcast(num_batches, root=mpi_master())
+        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
+        num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         # go through batches
 

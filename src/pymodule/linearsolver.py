@@ -1,8 +1,6 @@
 import numpy as np
 import time as tm
 import itertools
-import ctypes
-import psutil
 import sys
 import os
 
@@ -29,6 +27,8 @@ from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .checkpoint import write_rsp_hdf5
+from .batchsize import get_batch_size
+from .batchsize import get_number_of_batches
 
 
 class LinearSolver:
@@ -524,36 +524,10 @@ class LinearSolver:
 
         # determine number of batches
 
-        num_batches = 0
-        batch_size = None
+        n_ao = mo.shape[0] if self.rank == mpi_master() else None
 
-        total_mem = psutil.virtual_memory().total
-        total_mem_list = self.comm.gather(total_mem, root=mpi_master())
-
-        if self.rank == mpi_master():
-            # check if master node has larger memory
-            mem_adjust = 0.0
-            if total_mem > min(total_mem_list):
-                mem_adjust = total_mem - min(total_mem_list)
-
-            # compute maximum batch size from available memory
-            avail_mem = psutil.virtual_memory().available - mem_adjust
-            mem_per_mat = mo.shape[0]**2 * ctypes.sizeof(ctypes.c_double)
-            nthreads = int(os.environ['OMP_NUM_THREADS'])
-            max_batch_size = int(avail_mem / mem_per_mat / (0.625 * nthreads))
-            max_batch_size = max(1, max_batch_size)
-
-            # set batch size
-            batch_size = self.batch_size
-            if batch_size is None:
-                batch_size = min(n_total, max_batch_size)
-
-            # get number of batches
-            num_batches = n_total // batch_size
-            if n_total % batch_size != 0:
-                num_batches += 1
-        batch_size = self.comm.bcast(batch_size, root=mpi_master())
-        num_batches = self.comm.bcast(num_batches, root=mpi_master())
+        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
+        num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         # go through batches
 
