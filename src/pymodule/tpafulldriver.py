@@ -1832,9 +1832,9 @@ class TpaFullDriver(TpaDriver):
             self.ostream.print_header(w_str.ljust(width))
 
         self.ostream.print_blank()
+        self.ostream.print_blank()
 
         w_str = 'Gamma Tensor Components at Given Frequencies'
-        self.ostream.print_blank()
         self.ostream.print_header(w_str.ljust(width))
         self.ostream.print_blank()
 
