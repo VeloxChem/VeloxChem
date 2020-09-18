@@ -1,7 +1,6 @@
 import numpy as np
 import time as tm
 
-from .veloxchemlib import ChemicalElement
 from .molecule import Molecule
 from .outputstream import OutputStream
 from .scfrestdriver import ScfRestrictedDriver
@@ -63,18 +62,10 @@ class GradientDriver:
         start_time = tm.time()
 
         # atom labels
-        labels = []
-        for elem_id in molecule.elem_ids_to_numpy():
-            elem = ChemicalElement()
-            elem.set_atom_type(elem_id)
-            labels.append(elem.get_name())
+        labels = molecule.get_labels()
 
         # atom coordinates (nx3)
-        coords = np.array([
-            molecule.x_to_numpy(),
-            molecule.y_to_numpy(),
-            molecule.z_to_numpy(),
-        ]).T
+        coords = molecule.get_coordinates()
 
         # numerical gradient
         self.gradient = np.zeros((molecule.number_of_atoms(), 3))
@@ -101,12 +92,14 @@ class GradientDriver:
         self.ostream.print_blank()
 
         # print gradient
+        self.print_geometry(molecule)
         self.print_gradient(molecule, labels)
 
         valstr = '*** Time spent in gradient calculation: '
         valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def get_gradient(self):
         """
@@ -118,6 +111,16 @@ class GradientDriver:
 
         return self.gradient
 
+    def print_geometry(self, molecule):
+        """
+        Prints the gradient.
+
+        :param molecule:
+            The molecule.
+        """
+
+        self.ostream.print_block(molecule.get_string())
+
     def print_gradient(self, molecule, labels):
         """
         Prints the gradient.
@@ -128,25 +131,23 @@ class GradientDriver:
             The atom labels.
         """
 
-        width = 72
-
         title = 'Gradient (Hartree/Bohr)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * (len(title) + 2))
         self.ostream.print_blank()
 
-        valstr = 'Atom '
-        valstr += ' {:>20s}'.format('Gradient X ')
-        valstr += ' {:>20s}'.format('Gradient Y ')
-        valstr += ' {:>20s}'.format('Gradient Z ')
-        self.ostream.print_header(valstr.ljust(width))
+        valstr = '  Atom '
+        valstr += '{:>20s}  '.format('Gradient X')
+        valstr += '{:>20s}  '.format('Gradient Y')
+        valstr += '{:>20s}  '.format('Gradient Z')
+        self.ostream.print_header(valstr)
         self.ostream.print_blank()
 
         for i in range(molecule.number_of_atoms()):
-            valstr = ' {:<3s} '.format(labels[i])
+            valstr = '  {:<4s}'.format(labels[i])
             for d in range(3):
-                valstr += ' {:20.10f}'.format(self.gradient[i, d])
-            self.ostream.print_header(valstr.ljust(width))
+                valstr += '{:22.12f}'.format(self.gradient[i, d])
+            self.ostream.print_header(valstr)
 
         self.ostream.print_blank()
         self.ostream.flush()

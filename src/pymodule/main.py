@@ -9,6 +9,7 @@ from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .gradientdriver import GradientDriver
+from .optimizationdriver import OptimizationDriver
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
@@ -87,7 +88,7 @@ def main():
 
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'scf', 'wavefunction', 'wave function', 'mp2',
-        'gradient', 'response', 'pulses', 'visualization', 'loprop'
+        'gradient', 'optimize', 'response', 'pulses', 'visualization', 'loprop'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -127,6 +128,13 @@ def main():
         grad_drv = GradientDriver(task.mpi_comm, task.ostream)
         grad_drv.update_settings(scf_dict, method_dict)
         grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+    # Geometry optimization
+
+    if task_type == 'optimize' and scf_drv.restricted:
+        opt_drv = OptimizationDriver(task.mpi_comm, task.ostream)
+        opt_drv.update_settings(scf_dict, method_dict)
+        opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Response
 
