@@ -388,6 +388,7 @@ class ScfDriver:
             self.ostream.print_header(
                 '*** Warning: SCF is not converged!'.ljust(92))
             self.ostream.print_blank()
+            self.ostream.flush()
             return
 
         if self.rank == mpi_master():
@@ -400,6 +401,7 @@ class ScfDriver:
             self.print_ground_state(molecule, s2)
             self.mol_orbs.print_orbitals(molecule, ao_basis, False,
                                          self.ostream)
+            self.ostream.flush()
 
     def write_checkpoint(self, nuclear_charges, basis_set):
         """

@@ -8,6 +8,7 @@ from .veloxchemlib import mpi_master
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
+from .gradientdriver import GradientDriver
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
@@ -86,7 +87,7 @@ def main():
 
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'scf', 'wavefunction', 'wave function', 'mp2',
-        'response', 'pulses', 'visualization', 'loprop'
+        'gradient', 'response', 'pulses', 'visualization', 'loprop'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -119,6 +120,13 @@ def main():
 
         if not scf_drv.is_converged:
             return
+
+    # Gradient
+
+    if task_type == 'gradient' and scf_drv.restricted:
+        grad_drv = GradientDriver(task.mpi_comm, task.ostream)
+        grad_drv.update_settings(scf_dict, method_dict)
+        grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Response
 
