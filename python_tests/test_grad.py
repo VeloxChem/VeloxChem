@@ -8,7 +8,7 @@ from veloxchem.mpitask import MpiTask
 from veloxchem.gradientdriver import GradientDriver
 
 
-class TestSCF(unittest.TestCase):
+class TestGrad(unittest.TestCase):
 
     def run_grad(self, inpfile, ref_grad):
 
