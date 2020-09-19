@@ -25,12 +25,11 @@ CVisualizationDriver::CVisualizationDriver(MPI_Comm comm)
 
     _locNodes = mpi::nodes(comm);
 
-    mpi::duplicate(comm, &_locComm);
+    _locComm = comm;
 }
 
 CVisualizationDriver::~CVisualizationDriver()
 {
-    mpi::destroy(&_locComm);
 }
 
 std::vector<std::vector<int32_t>>
@@ -171,7 +170,7 @@ CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
 int32_t
 CVisualizationDriver::getRank() const
 {
-    return mpi::rank(_locComm);
+    return _locRank;
 }
 
 std::vector<std::vector<int32_t>>

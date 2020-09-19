@@ -52,12 +52,11 @@ CAngularMomentumIntegralsDriver::CAngularMomentumIntegralsDriver(MPI_Comm comm)
 
     _locNodes = mpi::nodes(comm);
 
-    mpi::duplicate(comm, &_locComm);
+    _locComm = comm;
 }
 
 CAngularMomentumIntegralsDriver::~CAngularMomentumIntegralsDriver()
 {
-    mpi::destroy(&_locComm);
 }
 
 void
