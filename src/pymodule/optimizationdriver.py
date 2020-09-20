@@ -1,3 +1,4 @@
+import os
 import tempfile
 import geometric
 
@@ -18,6 +19,7 @@ class OptimizationDriver:
         The output stream.
 
     Instance variables
+        - rank: The rank of MPI process.
         - coordsys: The coordinate system.
         - constraints: The constraints.
         - check_interval: The interval (number of steps) for checking
@@ -34,6 +36,7 @@ class OptimizationDriver:
         """
 
         self.comm = comm
+        self.rank = comm.Get_rank()
         self.ostream = ostream
 
         self.coordsys = 'tric'
@@ -95,18 +98,26 @@ class OptimizationDriver:
         opt_engine = OptimizationEngine(molecule, ao_basis, min_basis,
                                         self.scf_drv, self.grad_drv)
 
-        if self.comm.Get_rank() == mpi_master():
-            tmpf = self.scf_drv.checkpoint_file
-        else:
-            tmpf = tempfile.mktemp()
+        if self.rank == mpi_master():
+            suffix = '.scf.h5'
+            if self.scf_drv.checkpoint_file[-len(suffix):] == suffix:
+                temp_f = self.scf_drv.checkpoint_file[:-len(suffix)]
+            else:
+                temp_f = self.scf_drv.checkpoint_file
 
-        m = geometric.optimize.run_optimizer(customengine=opt_engine,
-                                             coordsys=self.coordsys,
-                                             check=self.check_interval,
-                                             constraints=self.constraints,
-                                             transition=self.transition,
-                                             hessian=self.hessian,
-                                             input=tmpf)
+        with tempfile.TemporaryDirectory() as temp_d:
+
+            if self.rank != mpi_master():
+                temp_f = self.scf_drv.checkpoint_file
+                temp_f = os.path.join(temp_d, 'tmp_{:d}'.format(self.rank))
+
+            m = geometric.optimize.run_optimizer(customengine=opt_engine,
+                                                 coordsys=self.coordsys,
+                                                 check=self.check_interval,
+                                                 constraints=self.constraints,
+                                                 transition=self.transition,
+                                                 hessian=self.hessian,
+                                                 input=temp_f)
 
         coords = m.xyzs[-1] / geometric.nifty.bohr2ang
         labels = molecule.get_labels()
