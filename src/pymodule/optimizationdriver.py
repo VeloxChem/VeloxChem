@@ -1,6 +1,7 @@
 import tempfile
 import geometric
 
+from .veloxchemlib import mpi_master
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
 from .gradientdriver import GradientDriver
@@ -17,6 +18,12 @@ class OptimizationDriver:
         The output stream.
 
     Instance variables
+        - coordsys: The coordinate system.
+        - constraints: The constraints.
+        - check_interval: The interval (number of steps) for checking
+          coordinate system.
+        - transition: The flag for transition state searching.
+        - hessian: The flag for computing Hessian.
         - scf_drv: The SCF driver.
         - grad_drv: The gradient driver.
     """
@@ -29,18 +36,43 @@ class OptimizationDriver:
         self.comm = comm
         self.ostream = ostream
 
+        self.coordsys = 'tric'
+        self.check_interval = 0
+        self.constraints = None
+
+        self.transition = False
+        self.hessian = 'never'
+
         self.scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
         self.grad_drv = GradientDriver(self.comm, self.ostream)
 
-    def update_settings(self, scf_dict, method_dict=None):
+    def update_settings(self, opt_dict, scf_dict, method_dict=None):
         """
         Updates settings in optimization driver.
 
+        :param opt_dict:
+            The input dictionary of optimize group.
         :param scf_dict:
             The input dictionary of scf group.
         :param method_dict:
             The input dicitonary of method settings group.
         """
+
+        if 'coordsys' in opt_dict:
+            self.coordsys = opt_dict['coordsys'].lower()
+        if 'check_interval' in opt_dict:
+            self.check_interval = int(opt_dict['check_interval'])
+        if 'constraints' in opt_dict:
+            self.constraints = opt_dict['constraints']
+
+        if 'transition' in opt_dict:
+            key = opt_dict['transition'].lower()
+            self.transition = True if key == 'yes' else False
+
+        if 'hessian' in opt_dict:
+            self.hessian = opt_dict['hessian'].lower()
+        elif self.transition:
+            self.hessian = 'first'
 
         self.scf_drv.update_settings(scf_dict, method_dict)
         self.grad_drv.update_settings(scf_dict, method_dict)
@@ -60,16 +92,23 @@ class OptimizationDriver:
             The molecule with final geometry.
         """
 
-        opt_engine = OptimizationEngine(molecule, ao_basis, self.scf_drv,
-                                        self.grad_drv)
+        opt_engine = OptimizationEngine(molecule, ao_basis, min_basis,
+                                        self.scf_drv, self.grad_drv)
 
-        tmpf = tempfile.mktemp()
+        if self.comm.Get_rank() == mpi_master():
+            tmpf = self.scf_drv.checkpoint_file
+        else:
+            tmpf = tempfile.mktemp()
+
         m = geometric.optimize.run_optimizer(customengine=opt_engine,
-                                             check=1,
+                                             coordsys=self.coordsys,
+                                             check=self.check_interval,
+                                             constraints=self.constraints,
+                                             transition=self.transition,
+                                             hessian=self.hessian,
                                              input=tmpf)
 
         coords = m.xyzs[-1] / geometric.nifty.bohr2ang
         labels = molecule.get_labels()
 
-        final_mol = Molecule(labels, coords.reshape(-1, 3), units='au')
-        return final_mol
+        return Molecule(labels, coords.reshape(-1, 3), units='au')

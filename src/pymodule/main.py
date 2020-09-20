@@ -132,8 +132,12 @@ def main():
     # Geometry optimization
 
     if task_type == 'optimize' and scf_drv.restricted:
+        if 'optimize' in task.input_dict:
+            opt_dict = task.input_dict['optimize']
+        else:
+            opt_dict = {}
         opt_drv = OptimizationDriver(task.mpi_comm, task.ostream)
-        opt_drv.update_settings(scf_dict, method_dict)
+        opt_drv.update_settings(opt_dict, scf_dict, method_dict)
         opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Response
