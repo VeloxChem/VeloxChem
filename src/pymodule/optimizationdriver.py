@@ -1,5 +1,6 @@
 import os
 import tempfile
+import contextlib
 import geometric
 
 from .veloxchemlib import mpi_master
@@ -98,28 +99,52 @@ class OptimizationDriver:
         opt_engine = OptimizationEngine(molecule, ao_basis, min_basis,
                                         self.scf_drv, self.grad_drv)
 
+        # input_fname is used by geomeTRIC to create .log and other files. On
+        # master node input_fname is determined based on the checkpoint file.
+        # On other nodes input_fname points to file in a temporary directory.
+
         if self.rank == mpi_master():
             suffix = '.scf.h5'
             if self.scf_drv.checkpoint_file[-len(suffix):] == suffix:
-                temp_f = self.scf_drv.checkpoint_file[:-len(suffix)]
+                input_fname = self.scf_drv.checkpoint_file[:-len(suffix)]
             else:
-                temp_f = self.scf_drv.checkpoint_file
+                input_fname = self.scf_drv.checkpoint_file
 
-        with tempfile.TemporaryDirectory() as temp_d:
+        with tempfile.TemporaryDirectory() as temp_dir:
 
             if self.rank != mpi_master():
-                temp_f = self.scf_drv.checkpoint_file
-                temp_f = os.path.join(temp_d, 'tmp_{:d}'.format(self.rank))
+                input_fname = os.path.join(temp_dir,
+                                           'tmp_{:d}'.format(self.rank))
 
-            m = geometric.optimize.run_optimizer(customengine=opt_engine,
-                                                 coordsys=self.coordsys,
-                                                 check=self.check_interval,
-                                                 constraints=self.constraints,
-                                                 transition=self.transition,
-                                                 hessian=self.hessian,
-                                                 input=temp_f)
+            # geomeTRIC prints information to stdout and stderr. On master node
+            # this is redirected to the output stream. On other nodes this is
+            # redirected to os.devnull.
+
+            with open(os.devnull, 'w') as devnull:
+
+                if self.rank == mpi_master():
+                    fh = self.ostream.stream
+                else:
+                    fh = devnull
+
+                with contextlib.redirect_stdout(fh):
+                    with contextlib.redirect_stderr(fh):
+                        m = geometric.optimize.run_optimizer(
+                            customengine=opt_engine,
+                            coordsys=self.coordsys,
+                            check=self.check_interval,
+                            constraints=self.constraints,
+                            transition=self.transition,
+                            hessian=self.hessian,
+                            input=input_fname)
 
         coords = m.xyzs[-1] / geometric.nifty.bohr2ang
         labels = molecule.get_labels()
 
-        return Molecule(labels, coords.reshape(-1, 3), units='au')
+        if self.rank == mpi_master():
+            final_mol = Molecule(labels, coords.reshape(-1, 3), units='au')
+        else:
+            final_mol = Molecule()
+        final_mol.broadcast(self.rank, self.comm)
+
+        return final_mol

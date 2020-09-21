@@ -1,5 +1,6 @@
 import geometric
 
+from .veloxchemlib import mpi_master
 from .molecule import Molecule
 
 
@@ -24,6 +25,8 @@ class OptimizationEngine(geometric.engine.Engine):
         - vlx_min_basis: The minimal AO basis set.
         - scf_drv: The SCF driver.
         - grad_drv: The gradient driver.
+        - comm: The MPI communicator.
+        - rank: The rank of MPI process.
     """
 
     def __init__(self, molecule, ao_basis, min_basis, scf_drv, grad_drv):
@@ -46,6 +49,9 @@ class OptimizationEngine(geometric.engine.Engine):
         self.scf_drv = scf_drv
         self.grad_drv = grad_drv
 
+        self.comm = scf_drv.comm
+        self.rank = scf_drv.rank
+
     def calc_new(self, coords, dirname):
         """
         Implements calc_new method for the engine.
@@ -60,7 +66,12 @@ class OptimizationEngine(geometric.engine.Engine):
         """
 
         labels = self.vlx_molecule.get_labels()
-        new_mol = Molecule(labels, coords.reshape(-1, 3), units='au')
+
+        if self.rank == mpi_master():
+            new_mol = Molecule(labels, coords.reshape(-1, 3), units='au')
+        else:
+            new_mol = Molecule()
+        new_mol.broadcast(self.rank, self.comm)
 
         self.scf_drv.compute(new_mol, self.vlx_ao_basis, self.vlx_min_basis)
         energy = self.scf_drv.get_scf_energy()

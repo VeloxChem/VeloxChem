@@ -18,7 +18,6 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb
 from .profiler import Profiler
-from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
@@ -281,10 +280,6 @@ class ScfDriver:
         profiler = Profiler()
 
         self.scf_start_time = tm.time()
-
-        if self.rank != mpi_master():
-            molecule = Molecule()
-        molecule.broadcast(self.rank, self.comm)
 
         if min_basis is None:
             if self.rank == mpi_master():
