@@ -617,3 +617,99 @@ class LinearResponseEigenSolver(LinearSolver):
             DistributedArray(v, self.comm, distribute=False)
             for v in [v_out_rg, v_out_ru]
         ])
+
+    def get_e2(self, molecule, basis, scf_tensors):
+        """
+        Calculates the E[2] matrix.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+
+        :return:
+            The E[2] matrix as numpy array.
+        """
+
+        self.dist_bger = None
+        self.dist_bung = None
+        self.dist_e2bger = None
+        self.dist_e2bung = None
+
+        # sanity check
+        nalpha = molecule.number_of_alpha_electrons()
+        nbeta = molecule.number_of_beta_electrons()
+        assert_msg_critical(
+            nalpha == nbeta,
+            'LinearResponseEigenSolver: not implemented for unrestricted case')
+
+        if self.rank == mpi_master():
+            orb_ene = scf_tensors['E']
+        else:
+            orb_ene = None
+        orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
+        norb = orb_ene.shape[0]
+        nocc = molecule.number_of_alpha_electrons()
+
+        # ERI information
+        eri_dict = self.init_eri(molecule, basis)
+
+        # DFT information
+        dft_dict = self.init_dft(molecule, scf_tensors)
+
+        # PE information
+        pe_dict = self.init_pe(molecule, basis)
+
+        timing_dict = {}
+
+        # generate initial guess from scratch
+
+        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
+        excitations = list(
+            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
+
+        igs = {}
+        n_exc = len(excitations)
+
+        for i in range(2 * n_exc):
+            Xn = np.zeros(2 * n_exc)
+            Xn[i] = 1.0
+
+            Xn_T = np.zeros(2 * n_exc)
+            Xn_T[:n_exc] = Xn[n_exc:]
+            Xn_T[n_exc:] = Xn[:n_exc]
+
+            Xn_ger = 0.5 * (Xn + Xn_T)[:n_exc]
+            Xn_ung = 0.5 * (Xn - Xn_T)[:n_exc]
+
+            dist_x_ger = DistributedArray(Xn_ger, self.comm)
+            dist_x_ung = DistributedArray(Xn_ung, self.comm)
+
+            igs[i] = (1.0, (dist_x_ger, dist_x_ung))
+
+        bger, bung = self.setup_trials(igs, precond=None, renormalize=False)
+
+        self.e2n_half_size(bger, bung, molecule, basis, scf_tensors, eri_dict,
+                           dft_dict, pe_dict, timing_dict)
+
+        if self.rank == mpi_master():
+            E2 = np.zeros((2 * n_exc, 2 * n_exc))
+
+        for i in range(2 * n_exc):
+            e2bger = DistributedArray(self.dist_e2bger.data[:, i],
+                                      self.comm,
+                                      distribute=False)
+            e2bung = DistributedArray(self.dist_e2bung.data[:, i],
+                                      self.comm,
+                                      distribute=False)
+            sigma = self.get_full_solution_vector((e2bger, e2bung))
+
+            if self.rank == mpi_master():
+                E2[:, i] = sigma[:]
+
+        if self.rank == mpi_master():
+            return E2
+        else:
+            return None
