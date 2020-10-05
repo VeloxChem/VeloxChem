@@ -1,0 +1,25 @@
+target_sources(veloxchemlib
+  PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/AngularMomentumMatrix.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ElectricDipoleMatrix.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ElectricFieldGradientMatrix.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ElectricFieldMatrix.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ElectronicPotentialMatrix.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/GenIntsFunc.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/KineticEnergyMatrix.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/LinearMomentumMatrix.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/NuclearPotentialMatrix.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/OneIntsDistributor.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/OneIntsFunc.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/OverlapMatrix.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/RecursionFunction.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/RecursionFunctionsList.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/RecursionMap.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/RecursionTerm.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/TwoCentersRecursionFunctions.cpp
+  )
+
+target_include_directories(veloxchemlib
+  PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}
+  )
