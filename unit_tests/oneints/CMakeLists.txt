@@ -1,0 +1,21 @@
+target_sources(utests
+  PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/AngularMomentumMatrixTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ElectricDipoleMatrixTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ElectricFieldGradientMatrixTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ElectricFieldMatrixTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ElectronicPotentialMatrixTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/GenIntsFuncTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/KineticEnergyMatrixTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/LinearMomentumMatrixTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/NuclearPotentialMatrixTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/OneIntsDistributionTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/OneIntsDistTypeTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/OneIntsFuncTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/OverlapMatrixTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/RecursionFunctionsListTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/RecursionFunctionTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/RecursionMapTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/RecursionTermTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/TwoCentersRecursionFunctionsTest.cpp
+  )

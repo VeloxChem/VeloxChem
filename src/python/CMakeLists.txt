@@ -1,5 +1,8 @@
-target_sources(veloxchemlib
-  PRIVATE
+# create Python module with pybind11
+# * use pybind11 header files with -isystem
+# * explicitly disable LTO, even for release builds
+pybind11_add_module(veloxchemlib
+  MODULE SYSTEM NO_EXTRAS
     ${CMAKE_CURRENT_LIST_DIR}/ExportDFT.cpp
     ${CMAKE_CURRENT_LIST_DIR}/ExportGeneral.cpp
     ${CMAKE_CURRENT_LIST_DIR}/ExportMath.cpp
@@ -12,7 +15,16 @@ target_sources(veloxchemlib
     ${CMAKE_CURRENT_LIST_DIR}/ExportVisualization.cpp
   )
 
-# find mpi4py, this is always needed, even when building without MPI
+target_precompile_headers(veloxchemlib
+  PRIVATE
+    <mpi4py/mpi4py.h>
+    <pybind11/numpy.h>
+    <pybind11/operators.h>
+    <pybind11/pybind11.h>
+    <pybind11/stl.h>
+  )
+
+# find mpi4py
 include(${PROJECT_SOURCE_DIR}/cmake/custom/FindPythonModule.cmake)
 
 find_python_module(mpi4py REQUIRED)
@@ -54,4 +66,9 @@ endif()
 target_include_directories(veloxchemlib
   SYSTEM PRIVATE
     ${mpi4py_INCLUDE_DIRS}
+  )
+
+target_link_libraries(veloxchemlib
+  PRIVATE
+    vlxobjs
   )

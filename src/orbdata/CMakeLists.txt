@@ -1,4 +1,4 @@
-target_sources(veloxchemlib
+target_sources(vlxobjs
   PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/AngularMomentum.cpp
     ${CMAKE_CURRENT_LIST_DIR}/AODensityMatrix.cpp
@@ -17,7 +17,7 @@ target_sources(veloxchemlib
     ${CMAKE_CURRENT_LIST_DIR}/SphericalMomentum.cpp
   )
 
-target_include_directories(veloxchemlib
-  PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
   )

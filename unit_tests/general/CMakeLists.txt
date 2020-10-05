@@ -1,0 +1,14 @@
+target_sources(utests
+  PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/CodataTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ErrorHandlerTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/FourIndexesTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/MemAllocTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/MemBlock2DTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/MemBlockTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/MpiFuncTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/OMPTasksTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/StringFormatTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ThreeIndexesTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/TwoIndexesTest.cpp
+  )

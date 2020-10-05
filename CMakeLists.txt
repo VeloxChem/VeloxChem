@@ -1,5 +1,5 @@
 # set minimum cmake version
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.16)
 
 # project name
 project(VeloxChem LANGUAGES CXX)
@@ -52,10 +52,9 @@ include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_cxx.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/compiler_flags/CXXFlags.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_default_build_paths.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_safeguards.cmake)
+# download pybind11 if not available on the system
+include(${PROJECT_SOURCE_DIR}/external/upstream/fetch_pybind11.cmake)
 # TODO code coverage
 include(${PROJECT_SOURCE_DIR}/cmake/custom/alignment.cmake)
-include(${PROJECT_SOURCE_DIR}/cmake/custom/mpi.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/main.cmake)
-# TODO handle tests
-#include(${PROJECT_SOURCE_DIR}/cmake/custom/tests.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_save_flags.cmake)

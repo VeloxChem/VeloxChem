@@ -354,7 +354,7 @@ class CMolecule
 
      @param output the output text stream.
      @param source the molecule object.
-     */
+    */
     friend std::ostream& operator<<(std::ostream& output, const CMolecule& source);
 };
 

@@ -1,0 +1,24 @@
+target_sources(utests
+  PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/AngularMomentumTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/AODensityMatrixTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/AtomBasisSetter.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/AtomBasisTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/BasisFunctionTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/GenFuncTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/GtoBlockTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/GtoContainerTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/GtoPairsBlockTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/GtoPairsContainerTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/GtoTransformTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/MolecularBasisSetter.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/MolecularBasisTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/MolecularOrbitalsTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/SADGuessDriverTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/SphericalMomentumTest.cpp
+  )
+
+target_include_directories(utests
+  PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}
+  )

@@ -1,38 +1,40 @@
-include(${PROJECT_SOURCE_DIR}/external/upstream/fetch_pybind11.cmake)
+add_library(vlxobjs OBJECT "")
 
-# we explicitly disable LTO, even for release builds
-pybind11_add_module(veloxchemlib MODULE SYSTEM NO_EXTRAS "")
-
-target_compile_definitions(veloxchemlib
-  PRIVATE
+target_compile_definitions(vlxobjs
+  PUBLIC
     # TODO should probably be namespaced, like VLX_HAS_MPI or similar
-    ENABLE_MPI=$<BOOL:$<TARGET_EXISTS:MPI::MPI_CXX>>
-    VLX_ALIGN=${VLX_ALIGN}
+    $<BUILD_INTERFACE:ENABLE_MPI=$<BOOL:$<TARGET_EXISTS:MPI::MPI_CXX>>>
+    $<BUILD_INTERFACE:VLX_ALIGN=${VLX_ALIGN}>
     # TODO should probably be namespaced, like VLX_HAS_MKL or similar
-    ENABLE_MKL=$<BOOL:$<TARGET_EXISTS:MKL>>
+    $<BUILD_INTERFACE:ENABLE_MKL=$<BOOL:$<TARGET_EXISTS:MKL>>>
   )
 
 # NOTE we only add the OpenMP flag for the selected compiler, but do not link
 # against the runtime explicitly.  This avoids conflicts between what the
 # compiled and MKL think
-target_compile_options(veloxchemlib
-  PRIVATE
-    ${OpenMP_CXX_FLAGS}
+target_compile_options(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${OpenMP_CXX_FLAGS}>
   )
 
 # FIXME the includes should be relative to the source folder:
 # that is: #include "dft/AOKohnShamMatrix.hpp", rather than: #include "AOKohnShamMatrix.hpp"
-target_include_directories(veloxchemlib
-  PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}
-  INTERFACE
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   )
 
-target_link_libraries(veloxchemlib
-  PRIVATE
-    $<$<TARGET_EXISTS:MPI::MPI_CXX>:MPI::MPI_CXX>
+target_link_libraries(vlxobjs
+  PUBLIC
+    MPI::MPI_CXX
     MKL
+  )
+
+set_target_properties(vlxobjs
+  PROPERTIES
+    POSITION_INDEPENDENT_CODE 1
   )
 
 add_subdirectory(dft)
