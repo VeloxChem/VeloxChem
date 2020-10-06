@@ -1,3 +1,5 @@
+# we compile everything as object files, then we link to the Python module and
+# the unit test executable
 add_library(vlxobjs OBJECT "")
 
 target_compile_definitions(vlxobjs
@@ -51,13 +53,10 @@ add_subdirectory(oneints_lmom)
 add_subdirectory(oneints_npot)
 add_subdirectory(oneints_ovl)
 add_subdirectory(orbdata)
-add_subdirectory(python)
 add_subdirectory(response)
 add_subdirectory(specfunc)
 add_subdirectory(twoints)
 add_subdirectory(visualization)
-
-# TODO figure out how to handle the Python modules...
-# add_subdirectory(pymodule)
+add_subdirectory(python)
 
 # TODO Install rules
