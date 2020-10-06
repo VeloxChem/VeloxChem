@@ -59,4 +59,7 @@ set_target_properties(utests
   )
 
 include(GoogleTest)
-gtest_discover_tests(utests)
+gtest_discover_tests(utests
+  PROPERTIES
+    LABELS "unit"
+  )

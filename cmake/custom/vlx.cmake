@@ -54,6 +54,25 @@ endforeach()
 
 add_subdirectory(src)
 
+# handle folder with basis sets
+# 1. symlink under the build tree
+file(
+  CREATE_LINK
+    ${PROJECT_SOURCE_DIR}/basis
+    ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/basis
+  COPY_ON_ERROR
+  SYMBOLIC
+  )
+# 2. install rules for basis sets folder
+install(
+  DIRECTORY
+    ${PROJECT_SOURCE_DIR}/basis
+  DESTINATION
+    ${PYMOD_INSTALL_FULLDIR}
+  )
+
 enable_testing()
+include(CTest)
 # This must come last!!
 add_subdirectory(unit_tests)
+add_subdirectory(python_tests)

@@ -58,5 +58,3 @@ add_subdirectory(specfunc)
 add_subdirectory(twoints)
 add_subdirectory(visualization)
 add_subdirectory(python)
-
-# TODO Install rules
