@@ -53,7 +53,7 @@ namespace genfunc {  // genfunc namespace
  @param nElements the number of elements in individual contracted data
         vector.
  @param nBlocks the number of contracted vectors.
-*/
+ */
 void contract(CMemBlock2D<double>&       contrData,
               const CMemBlock2D<double>& primData,
               const int32_t              contrIndex,
@@ -73,7 +73,7 @@ void contract(CMemBlock2D<double>&       contrData,
  @param braGtoBlock the GTOs block on bra side.
  @param ketGtoBlock the GTOs block on ket side.
  @param iContrGto the index of contracted GTO on bra side.
-*/
+ */
 void contract(CMemBlock2D<double>& contrData,
               CMemBlock2D<double>& primData,
               const int32_t        primIndex,
@@ -94,7 +94,7 @@ void contract(CMemBlock2D<double>& contrData,
  @param braGtoBlock the GTOs block on bra side.
  @param ketGtoPairsBlock the GTOs pairs block on ket side.
  @param iContrGto the index of contracted GTO on bra side.
-*/
+ */
 void contract(CMemBlock2D<double>&        contrData,
               CMemBlock2D<double>&        primData,
               const CVecThreeIndexes&     contrPattern,
@@ -118,7 +118,7 @@ void contract(CMemBlock2D<double>&        contrData,
  @param nKetPrimPairs the number of primitive GTOs pairs on ket side.
  @param nKetContrPairs the number of contractes GTOs pairs on ket side.
  @param iContrPair the index of contracted GTOs pair on bra side.
-*/
+ */
 void contract(      CMemBlock2D<double>& contrData,
                     CMemBlock2D<double>* primData,
               const CRecursionMap&       contractionMap,

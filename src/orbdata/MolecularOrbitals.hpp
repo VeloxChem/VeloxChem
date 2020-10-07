@@ -311,7 +311,7 @@ class CMolecularOrbitals
 
      @param output the output text stream.
      @param source the molecular orbitals object.
-    */
+     */
     friend std::ostream& operator<<(std::ostream& output, const CMolecularOrbitals& source);
 };
 

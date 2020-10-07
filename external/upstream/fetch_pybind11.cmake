@@ -7,25 +7,12 @@ if(pybind11_FOUND)
 else()
   message(STATUS "Suitable pybind11 could not be located. Fetching and building!")
   include(FetchContent)
-  FetchContent_Declare(pybind11_sources
+  FetchContent_Declare(pybind11
     QUIET
     URL
       https://github.com/pybind/pybind11/archive/v2.5.0.tar.gz
     )
-
-  FetchContent_GetProperties(pybind11_sources)
-
   set(PYBIND11_PYTHON_VERSION ${PYBIND11_PYTHON_VERSION})
   set(PYBIND11_TEST OFF CACHE BOOL "")
-  # FIXME Needed?
-  #set(PYMOD_INSTALL_FULLDIR ${PYMOD_INSTALL_FULLDIR})
-
-  if(NOT pybind11_sources_POPULATED)
-    FetchContent_Populate(pybind11_sources)
-
-    add_subdirectory(
-      ${pybind11_sources_SOURCE_DIR}
-      ${pybind11_sources_BINARY_DIR}
-      )
-  endif()
+  FetchContent_MakeAvailable(pybind11)
 endif()

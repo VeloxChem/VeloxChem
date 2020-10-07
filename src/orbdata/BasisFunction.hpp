@@ -32,7 +32,6 @@
 
 #include <mpi.h>
 
-
 /**
  Class CBasisFunction stores data about single contracted basis function and
  provides set of methods for handling of basis function data.

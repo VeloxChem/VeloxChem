@@ -26,14 +26,13 @@
 #ifndef Codata_hpp
 #define Codata_hpp
 
-
 namespace units {  // units namespace
 
 /**
  Gets Bohr value in Angstroms.
 
  @return the conversion factor.
-*/
+ */
 double getBohrValueInAngstroms();
 
 /**

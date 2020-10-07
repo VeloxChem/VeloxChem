@@ -29,7 +29,6 @@
 #include <cstdint>
 #include <string>
 
-
 namespace angmom {  // angmom namespace
 
 /**
@@ -37,7 +36,7 @@ namespace angmom {  // angmom namespace
 
  @param angularMomentum the angular momentum.
  @return the number of spherical components.
-*/
+ */
 int32_t to_SphericalComponents(const int32_t angularMomentum);
 
 /**

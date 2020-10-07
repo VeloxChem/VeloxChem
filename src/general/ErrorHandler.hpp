@@ -28,7 +28,6 @@
 
 #include <string>
 
-
 namespace errors {  // errors namespace
 
 /**

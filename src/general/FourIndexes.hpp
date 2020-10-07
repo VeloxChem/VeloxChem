@@ -29,7 +29,6 @@
 #include <cstdint>
 #include <ostream>
 
-
 /**
  Class CFourIndexes stores information about triple of indexes and provides
  functions to manipulate these indexes.

@@ -29,7 +29,6 @@
 #include <cstdint>
 #include <ostream>
 
-
 /**
  Class CThreeIndexes stores information about triple of indexes and provides
  functions to manipulate these indexes.

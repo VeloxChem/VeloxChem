@@ -29,7 +29,6 @@
 #include <cstdint>
 #include <ostream>
 
-
 /**
  Class CTwoIndexes stores information about pair of indexes and provides
  functions to manipulate these indexes.

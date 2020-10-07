@@ -30,7 +30,6 @@
 #include <ostream>
 #include <string>
 
-
 /**
  Class CChemicalElement stores information about chemical elements H-Rn and
  provides methods for retrieving various properties of chemical elements H-Rn.
