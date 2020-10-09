@@ -82,9 +82,9 @@ class TestE2(unittest.TestCase):
 
             S2 = np.zeros(E2.shape)
             for i in range(n):
-                S2[i, i] = 2.0
-                S2[i + n, i + n] = -2.0
-            evals, evecs = np.linalg.eig((np.linalg.solve(E2, S2)))
+                S2[i, i] = 1.0
+                S2[i + n, i + n] = -1.0
+            evals, evecs = np.linalg.eig((np.linalg.solve(E2 / 2.0, S2)))
             evals = np.sort(1.0 / evals.real)[n:]
             self.assertTrue(np.max(np.abs(evals - ref_evals)) < 1.0e-6)
 

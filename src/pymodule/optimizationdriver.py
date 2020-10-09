@@ -1,4 +1,5 @@
 import os
+import sys
 import tempfile
 import contextlib
 import geometric
@@ -105,7 +106,9 @@ class OptimizationDriver:
 
         if self.rank == mpi_master():
             suffix = '.scf.h5'
-            if self.scf_drv.checkpoint_file[-len(suffix):] == suffix:
+            if self.scf_drv.checkpoint_file is None:
+                input_fname = 'tmp'
+            elif self.scf_drv.checkpoint_file[-len(suffix):] == suffix:
                 input_fname = self.scf_drv.checkpoint_file[:-len(suffix)]
             else:
                 input_fname = self.scf_drv.checkpoint_file
@@ -123,7 +126,7 @@ class OptimizationDriver:
             with open(os.devnull, 'w') as devnull:
 
                 if self.rank == mpi_master():
-                    fh = self.ostream.stream
+                    fh = sys.stdout
                 else:
                     fh = devnull
 
