@@ -52,6 +52,7 @@ pybind11_add_module(veloxchemlib
     ${CMAKE_CURRENT_LIST_DIR}/ExportTwoInts.cpp
     ${CMAKE_CURRENT_LIST_DIR}/ExportVeloxChemLib.cpp
     ${CMAKE_CURRENT_LIST_DIR}/ExportVisualization.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/ExportXTB.cpp
   )
 
 target_precompile_headers(veloxchemlib
