@@ -1,7 +1,7 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
-import os
+from pathlib import Path
 
 from veloxchem.veloxchemlib import denmat
 from veloxchem.veloxchemlib import molorb
@@ -16,12 +16,11 @@ class TestOrbData(unittest.TestCase):
 
     def test_get_label(self):
 
-        inpfile = os.path.join('inputs', 'dimer.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
-        outfile = inpfile.replace('.inp', '.out')
+        here = Path(__file__).parent
+        inpfile = here / 'inputs/dimer.inp'
+        outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
         self.assertEqual(task.ao_basis.get_label(), "DEF2-SVP")
 
     def test_density_matrix(self):
@@ -86,9 +85,8 @@ class TestOrbData(unittest.TestCase):
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
-            h5file = os.path.join('inputs', 'dummy.h5')
-            if not os.path.isdir('inputs'):
-                h5file = os.path.join('python_tests', h5file)
+            here = Path(__file__).parent
+            h5file = str(here / 'inputs/dummy.h5')
 
             d_rest.write_hdf5(h5file)
             dummy = AODensityMatrix.read_hdf5(h5file)
@@ -140,9 +138,8 @@ class TestOrbData(unittest.TestCase):
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
-            h5file = os.path.join('inputs', 'dummy.h5')
-            if not os.path.isdir('inputs'):
-                h5file = os.path.join('python_tests', h5file)
+            here = Path(__file__).parent
+            h5file = str(here / 'inputs/dummy.h5')
 
             nuc_chg = np.array([1, 8, 1], dtype=np.int32)
             orb_rest.write_hdf5(h5file, nuc_chg, 'sto-3g')

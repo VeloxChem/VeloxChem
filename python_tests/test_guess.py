@@ -1,7 +1,7 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
-import os
+from pathlib import Path
 
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
 from veloxchem.veloxchemlib import SADGuessDriver
@@ -13,12 +13,11 @@ class TestInitialGuess(unittest.TestCase):
 
     def test_sad_guess(self):
 
-        inpfile = os.path.join('inputs', 'water.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
-        outfile = inpfile.replace('.inp', '.out')
+        here = Path(__file__).parent
+        inpfile = here / 'inputs/water.inp'
+        outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
 
         molecule = task.molecule
         ao_basis = task.ao_basis

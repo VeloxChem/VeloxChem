@@ -20,3 +20,4 @@ htmlcov
 .vscode
 Makefile.setup
 veloxchem.egg-info
+/.ccls-cache/

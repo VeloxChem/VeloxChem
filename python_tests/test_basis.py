@@ -1,6 +1,7 @@
 import unittest
 import hashlib
 import os
+from pathlib import Path
 
 from veloxchem.inputparser import InputParser
 
@@ -9,33 +10,30 @@ class TestBasis(unittest.TestCase):
 
     def test_basis_sets(self):
 
-        basis_dir = 'basis'
-        if not os.path.isdir(basis_dir):
-            basis_dir = os.path.join(os.pardir, basis_dir)
+        here = Path(__file__).parents[1]
+        basis_dir = here / 'basis'
 
-        for basis_name in os.listdir(basis_dir):
-            if basis_name == 'MIN-CC-PVDZ':
+        for basis in basis_dir.iterdir():
+            if not basis.is_file():
                 continue
 
-            if 'RI' in basis_name:
+            if basis.name == 'MIN-CC-PVDZ':
                 continue
 
-            basis_file = os.path.join(basis_dir, basis_name)
-            if not os.path.isfile(basis_file):
+            if 'RI' in basis.name:
                 continue
 
             # get reference md5
 
-            f_basis = open(basis_file, 'r')
-            expected_md5 = f_basis.readlines()[-1].strip()
-            f_basis.close()
+            with basis.open('r') as f:
+                expected_md5 = f.readlines()[-1].strip()
 
             # get actual md5
 
-            basis_parser = InputParser(basis_file)
+            basis_parser = InputParser(str(basis))
             basis_dict = basis_parser.get_dict()
 
-            basis_string = '@BASIS_SET ' + basis_name + os.linesep + os.linesep
+            basis_string = '@BASIS_SET ' + basis.name + os.linesep + os.linesep
 
             for key in basis_dict:
                 if 'atombasis_' not in key:

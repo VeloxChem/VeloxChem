@@ -2,7 +2,7 @@ from mpi4py import MPI
 import numpy as np
 import unittest
 import h5py
-import os
+from pathlib import Path
 
 from veloxchem.veloxchemlib import OverlapMatrix
 from veloxchem.veloxchemlib import KineticEnergyMatrix
@@ -50,12 +50,11 @@ class TestOneInts(unittest.TestCase):
 
     def test_1e_integrals(self):
 
-        inpfile = os.path.join('inputs', 'h2se.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
-        outfile = inpfile.replace('.inp', '.out')
+        here = Path(__file__).parent
+        inpfile = here / 'inputs/h2se.inp'
+        outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
 
         molecule = task.molecule
         basis = task.ao_basis
@@ -80,10 +79,7 @@ class TestOneInts(unittest.TestCase):
         # compare with reference
 
         if rank == mpi_master():
-
-            h5file = os.path.join('inputs', 'h2se.onee.h5')
-            if not os.path.isfile(h5file):
-                h5file = os.path.join('python_tests', h5file)
+            h5file = here / 'inputs/h2se.onee.h5'
 
             hf = h5py.File(h5file, 'r')
             S2 = np.array(hf.get("overlap"))
@@ -108,17 +104,12 @@ class TestOneInts(unittest.TestCase):
         kindrv = KineticEnergyIntegralsDriver(comm)
         npotdrv = NuclearPotentialIntegralsDriver(comm)
 
-        h2ofile = os.path.join('inputs', 'h2o.xyz')
-        if not os.path.isfile(h2ofile):
-            h2ofile = os.path.join('python_tests', h2ofile)
+        here = Path(__file__).parent
+        h2ofile = here / 'inputs/h2o.xyz'
 
-        nh3file = os.path.join('inputs', 'nh3.xyz')
-        if not os.path.isfile(nh3file):
-            nh3file = os.path.join('python_tests', nh3file)
+        nh3file = here / 'inputs/nh3.xyz'
 
-        h5file = os.path.join('inputs', 'mix_basis_1e.h5')
-        if not os.path.isfile(h5file):
-            h5file = os.path.join('python_tests', h5file)
+        h5file = here / 'inputs/mix_basis_1e.h5'
 
         # one molecule, one basis set
 

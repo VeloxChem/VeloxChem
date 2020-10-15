@@ -3,6 +3,7 @@ import numpy as np
 import unittest
 import h5py
 import os
+from pathlib import Path
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -72,12 +73,11 @@ class TestComplexResponse(unittest.TestCase):
 
         cls.h5fname = "pulsed"
 
-        inpfile = os.path.join('inputs', 'pulsed_water.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
-        outfile = inpfile.replace('.inp', '.out')
+        here = Path(__file__).parent
+        inpfile = here / 'inputs/pulsed_water.inp'
+        outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
 
         # scf
         pulse_input = task.input_dict['pulses']

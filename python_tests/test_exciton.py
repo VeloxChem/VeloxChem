@@ -2,6 +2,7 @@ from mpi4py import MPI
 import numpy as np
 import unittest
 import os
+from pathlib import Path
 
 from veloxchem.veloxchemlib import DenseMatrix
 from veloxchem.veloxchemlib import OverlapMatrix
@@ -45,12 +46,11 @@ class TestExciton(unittest.TestCase):
 
     def test_assemble_matrices(self):
 
-        inpfile = os.path.join('inputs', 'dimer.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
-        outfile = inpfile.replace('.inp', '.out')
+        here = Path(__file__).parent
+        inpfile = here / 'inputs/dimer.inp'
+        outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
 
         molecule = task.molecule
         basis = task.ao_basis
@@ -120,9 +120,8 @@ class TestExciton(unittest.TestCase):
 
     def run_exciton_model(self, method_dict, ref_H, threshold):
 
-        inpfile = os.path.join('inputs', 'exciton.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs/exciton.inp')
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['exciton']['checkpoint_file'] = None

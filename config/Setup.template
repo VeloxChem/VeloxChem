@@ -44,7 +44,7 @@ LIB_LIST += $(MACLIBS)
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
 PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
-PYTHON_INC += -I$(PYTHON_USER_INC) $(shell $(PYTHON) -m pybind11 --includes)
+PYTHON_INC += -I $(shell $(PYTHON) -m pybind11 --includes)
 
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC)
