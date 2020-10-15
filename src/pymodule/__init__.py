@@ -72,17 +72,8 @@ from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 
-# Environment variable: basis set path
-import os
-if 'VLXBASISPATH' not in os.environ:
-    module_path = os.path.dirname(os.path.abspath(__file__))
-    os.environ['VLXBASISPATH'] = os.path.join(module_path, 'basis')
-if 'OMP_NUM_THREADS' not in os.environ:
-    import multiprocessing
-    import sys
-    ncores = multiprocessing.cpu_count()
-    os.environ['OMP_NUM_THREADS'] = str(ncores)
-    print('* Warning * Environment variable OMP_NUM_THREADS not set.',
-          file=sys.stdout)
-    print('* Warning * Setting OMP_NUM_THREADS to {:d}.'.format(ncores),
-          file=sys.stdout)
+# Environment variable: basis set path and number of OpenMP threads
+from .environ import set_vlxbasispath, set_omp_num_threads
+
+set_vlxbasispath()
+set_omp_num_threads()

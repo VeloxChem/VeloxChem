@@ -159,7 +159,7 @@ def generate_setup(template_file, setup_file, user_flag=None):
         sys.exit(1)
 
     use_intel = (cxxname == 'icpc')
-    use_gnu = (cxxname == 'g++' or re.match(r'.*-gnu-c\+\+', cxxname))
+    use_gnu = re.match(r"(.*(c|g|gnu-c)\+\+)", cxxname)
     use_clang = (cxxname in ['clang++', 'Crayclang'] or
                  re.match(r'.*-clang\+\+', cxxname))
 
@@ -290,8 +290,6 @@ def generate_setup(template_file, setup_file, user_flag=None):
         print('***        Please install via \"pip install pybind11 [--user]\"')
         sys.exit(1)
 
-    python_user_base = site.getuserbase()
-
     # google test lib
 
     if 'GTESTROOT' in os.environ:
@@ -333,9 +331,6 @@ def generate_setup(template_file, setup_file, user_flag=None):
                 python_version = 'python{}.{}{}'.format(sys.version_info[0],
                                                         sys.version_info[1],
                                                         sys.abiflags)
-                print('PYTHON_USER_INC :=',
-                      os.path.join(python_user_base, 'include', python_version),
-                      file=f_mkfile)
                 print('', file=f_mkfile)
 
                 print('CXX :=', cxx, file=f_mkfile)

@@ -1,7 +1,7 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
-import os
+from pathlib import Path
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.veloxchemlib import rotatory_strength_in_cgs
@@ -15,9 +15,8 @@ class TestGlycol(unittest.TestCase):
     def test_glycol_ecd(self):
 
         # scf
-        inpfile = os.path.join('inputs', 'glycol.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs/glycol.inp')
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
