@@ -176,7 +176,7 @@ class TestCPP(unittest.TestCase):
         inpfile = str(here / 'inputs/pe_water.inp')
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/pe_water.pot')
+        potfile = str(here / 'inputs/pe_water.pot')
 
         xcfun_label = None
 
@@ -214,7 +214,7 @@ class TestCPP(unittest.TestCase):
         inpfile = str(here / 'inputs/pe_water.inp')
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/pe_water.pot')
+        potfile = str(here / 'inputs/pe_water.pot')
 
         xcfun_label = 'b3lyp'
 
