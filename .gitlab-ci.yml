@@ -40,7 +40,6 @@ veloxchem_test:
     - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
     - python3 get-pip.py
     - pip install -r requirements-dev.txt
-    - pip install pybind11
     - python3 -m pytest -v --cov=veloxchem python_tests/
     - python3 config/generate_setup.py
     - make -C unit_tests -j -s && ./build/bin/UnitTestVeloxChem.x 
