@@ -2,6 +2,7 @@ import numpy as np
 import os
 
 from .veloxchemlib import Molecule
+from .veloxchemlib import ChemicalElement
 
 
 @staticmethod
@@ -133,8 +134,43 @@ def _Molecule_more_info(self):
     return os.linesep.join(mol_info)
 
 
+def _Molecule_get_labels(self):
+    """
+    Returns atom labels.
+
+    :return:
+        A list of atom labels.
+    """
+
+    labels = []
+
+    for elem_id in self.elem_ids_to_numpy():
+        elem = ChemicalElement()
+        elem.set_atom_type(elem_id)
+        labels.append(elem.get_name())
+
+    return labels
+
+
+def _Molecule_get_coordinates(self):
+    """
+    Returns atom coordinates.
+
+    :return:
+        A numpy array of atom coordinates (nx3).
+    """
+
+    return np.array([
+        self.x_to_numpy(),
+        self.y_to_numpy(),
+        self.z_to_numpy(),
+    ]).T.copy()
+
+
 Molecule.read_str = _Molecule_read_str
 Molecule.read_xyz = _Molecule_read_xyz
 Molecule.from_dict = _Molecule_from_dict
 Molecule.center_of_mass = _Molecule_center_of_mass
 Molecule.more_info = _Molecule_more_info
+Molecule.get_labels = _Molecule_get_labels
+Molecule.get_coordinates = _Molecule_get_coordinates

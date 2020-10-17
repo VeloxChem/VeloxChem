@@ -22,12 +22,11 @@ CSADGuessDriver::CSADGuessDriver(MPI_Comm comm)
 
     _locNodes = mpi::nodes(comm);
 
-    mpi::duplicate(comm, &_locComm);
+    _locComm = comm;
 }
 
 CSADGuessDriver::~CSADGuessDriver()
 {
-    mpi::destroy(&_locComm);
 }
 
 std::vector<double>

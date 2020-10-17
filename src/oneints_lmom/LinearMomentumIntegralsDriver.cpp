@@ -36,12 +36,11 @@ CLinearMomentumIntegralsDriver::CLinearMomentumIntegralsDriver(MPI_Comm comm)
 
     _locNodes = mpi::nodes(comm);
 
-    mpi::duplicate(comm, &_locComm);
+    _locComm = comm;
 }
 
 CLinearMomentumIntegralsDriver::~CLinearMomentumIntegralsDriver()
 {
-    mpi::destroy(&_locComm);
 }
 
 CLinearMomentumMatrix

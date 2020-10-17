@@ -280,15 +280,7 @@ def generate_setup(template_file, setup_file, user_flag=None):
     if use_gnu:
         lto_flag = '-fno-lto'
 
-    # pybind11
-
-    try:
-        import pybind11
-    except ImportError:
-        print()
-        print('*** Error: Unable to find pybind11!')
-        print('***        Please install via \"pip install pybind11 [--user]\"')
-        sys.exit(1)
+    # user base
 
     # google test lib
 

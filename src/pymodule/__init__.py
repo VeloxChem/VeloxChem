@@ -45,6 +45,8 @@ from .molecularorbitals import MolecularOrbitals
 from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
+from .gradientdriver import GradientDriver
+from .optimizationdriver import OptimizationDriver
 from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver
 from .visualizationdriver import VisualizationDriver

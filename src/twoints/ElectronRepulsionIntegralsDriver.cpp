@@ -75,12 +75,11 @@ CElectronRepulsionIntegralsDriver::CElectronRepulsionIntegralsDriver(MPI_Comm co
     
     _locNodes = mpi::nodes(comm);
 
-    mpi::duplicate(comm, &_locComm);
+    _locComm = comm;
 }
 
 CElectronRepulsionIntegralsDriver::~CElectronRepulsionIntegralsDriver()
 {
-    mpi::destroy(&_locComm);
 }
 
 void

@@ -32,7 +32,7 @@ CGridDriver::CGridDriver(MPI_Comm comm)
 
     _locNodes = mpi::nodes(comm);
 
-    mpi::duplicate(comm, &_locComm);
+    _locComm = comm;
 }
 
 CGridDriver::~CGridDriver()
