@@ -49,6 +49,16 @@ PYTHON_INC += -I $(shell $(PYTHON) -m pybind11 --includes)
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC)
 
+# XTB interface (optional)
+
+ifeq ($(USE_XTB),true)
+  CPP_REL_FLG += -DENABLE_XTB -DXTB_PARAMS="$(XTB_PATH)" 
+  CPP_DEB_FLG += -DENABLE_XTB -DXTB_PARAMS="$(XTB_PATH)"
+  CXX_REL_FLG += $(XTB_INC)
+  CXX_DEB_FLG += $(XTB_INC)
+  LIB_LIST += $(XTB_LIB)
+endif
+
 # Native shell commands
 
 CP := cp -f
