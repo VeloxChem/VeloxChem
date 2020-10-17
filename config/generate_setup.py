@@ -2,7 +2,6 @@
 
 import subprocess
 import platform
-import site
 import sys
 import os
 import re
@@ -280,8 +279,6 @@ def generate_setup(template_file, setup_file, user_flag=None):
     if use_gnu:
         lto_flag = '-fno-lto'
 
-    # user base
-
     # google test lib
 
     if 'GTESTROOT' in os.environ:
@@ -320,9 +317,6 @@ def generate_setup(template_file, setup_file, user_flag=None):
                       'python{}.{}'.format(sys.version_info[0],
                                            sys.version_info[1]),
                       file=f_mkfile)
-                python_version = 'python{}.{}{}'.format(sys.version_info[0],
-                                                        sys.version_info[1],
-                                                        sys.abiflags)
                 print('', file=f_mkfile)
 
                 print('CXX :=', cxx, file=f_mkfile)

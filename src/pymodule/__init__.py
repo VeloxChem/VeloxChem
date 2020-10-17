@@ -1,9 +1,3 @@
-# mpi4py
-try:
-    from mpi4py import MPI
-except ImportError:
-    raise ImportError('Unable to import mpi4py.MPI')
-
 # C++ classes
 from .veloxchemlib import AtomBasis
 from .veloxchemlib import BasisFunction
