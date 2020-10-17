@@ -8,7 +8,7 @@
 
 #include "XTBDriver.hpp"
 
-#ifdef ENABLE_MKL
+#ifdef ENABLE_XTB
 #include "xtb.h"
 #endif
 
@@ -31,6 +31,7 @@ CXTBDriver::~CXTBDriver()
 void 
 CXTBDriver::compute()
 {
+#ifdef ENABLE_XTB
   int    const natoms = 7;
   int    const attyp[7] = {6,6,6,1,1,1,1};
   double const charge = 0.0;
@@ -121,5 +122,6 @@ CXTBDriver::compute()
   xtb_delCalculator(&calc);
   xtb_delMolecule(&mol);
   xtb_delEnvironment(&env);
+#endif
 }
 
