@@ -112,26 +112,22 @@ class MpiTask:
             self.ostream.print_info('...done.')
             self.ostream.print_blank()
 
-            if 'dft-b' in self.input_dict['method_settings']:
-                self.ao_basis = None
-                self.min_basis = None
-            else: 
-                basis_path = '.'
-                if 'basis_path' in self.input_dict['method_settings']:
-                    basis_path = self.input_dict['method_settings']['basis_path']
+            basis_path = '.'
+            if 'basis_path' in self.input_dict['method_settings']:
+                basis_path = self.input_dict['method_settings']['basis_path']
 
-                    basis_name = self.input_dict['method_settings']['basis'].upper()
+            basis_name = self.input_dict['method_settings']['basis'].upper()
 
-                    self.ao_basis = MolecularBasis.read(self.molecule, basis_name,
-                                                        basis_path, self.ostream)
+            self.ao_basis = MolecularBasis.read(self.molecule, basis_name,
+                                                basis_path, self.ostream)
 
-                    self.min_basis = MolecularBasis.read(self.molecule, 'MIN-CC-PVDZ',
-                                                         basis_path)
+            self.min_basis = MolecularBasis.read(self.molecule, 'MIN-CC-PVDZ',
+                                                 basis_path)
 
-                    self.ostream.print_block(
-                        self.ao_basis.get_string('Atomic Basis', self.molecule))
+            self.ostream.print_block(
+                self.ao_basis.get_string('Atomic Basis', self.molecule))
 
-                    self.ostream.flush()
+            self.ostream.flush()
 
         # broadcast input dictionary
 
@@ -141,10 +137,8 @@ class MpiTask:
         # broadcast molecule and basis set
 
         self.molecule.broadcast(self.mpi_rank, self.mpi_comm)
-        if self.ao_basis is not None: 
-            self.ao_basis.broadcast(self.mpi_rank, self.mpi_comm)
-        if self.min_basis is not None: 
-            self.min_basis.broadcast(self.mpi_rank, self.mpi_comm)
+        self.ao_basis.broadcast(self.mpi_rank, self.mpi_comm)
+        self.min_basis.broadcast(self.mpi_rank, self.mpi_comm)
 
     def finish(self):
         """

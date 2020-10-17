@@ -21,7 +21,7 @@ from .visualizationdriver import VisualizationDriver
 from .loprop import LoPropDriver
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_maximum_hours
-from .veloxchemlib import XTBDriver
+
 
 def main():
 
@@ -95,16 +95,6 @@ def main():
     run_unrestricted = (task_type == 'uhf')
 
     if run_scf:
-
-        # DFT-B via external XTB package
-        
-        if 'dft-b' in method_dict:
-            xtb_drv = XTBDriver(task.mpi_comm)
-            xtb_drv.compute()
-            return
-        
-        # Conventional SCF 
-
         if 'scf' in task.input_dict:
             scf_dict = task.input_dict['scf']
         else:
