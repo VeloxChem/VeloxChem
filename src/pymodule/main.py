@@ -22,6 +22,9 @@ from .loprop import LoPropDriver
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_maximum_hours
 
+from .veloxchemlib import XTBDriver
+
+
 
 def main():
 
@@ -56,6 +59,8 @@ def main():
         method_dict['pe_options'] = dict(task.input_dict['pe'])
     else:
         method_dict['pe_options'] = {}
+
+    use_xtb = 'xtb' in method_dict
 
     # Timelimit in hours
 
@@ -95,6 +100,11 @@ def main():
     run_unrestricted = (task_type == 'uhf')
 
     if run_scf:
+        if use_xtb:
+            xtb_drv = XTBDriver(task.mpi_comm)
+            xtb_drv.compute(task.molecule, 'gfn2-xtb')
+            return  
+
         if 'scf' in task.input_dict:
             scf_dict = task.input_dict['scf']
         else:

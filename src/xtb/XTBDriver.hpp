@@ -15,6 +15,10 @@
 #include "mpi.h"
 #include "Molecule.hpp"
 
+#ifdef ENABLE_XTB
+#include "xtb.h"
+#endif
+
 /**
  Class CXTBDriver enables DFT-B computations using XTB package from Grimme group.
 
@@ -36,6 +40,31 @@ class CXTBDriver
      The MPI communicator.
      */
     MPI_Comm _locComm;
+    
+#ifdef ENABLE_XTB
+    /**
+     The XTB package environment.
+    */
+    xtb_TEnvironment _environment;
+    
+    /**
+     The DFT-B calculator.
+    */
+    xtb_TCalculator _calculator;
+    
+    /**
+     The DFT-B results data.
+    */
+    xtb_TResults _results;
+
+    /**
+     Converts VeloxChem molecule to XTB molecular system data structure.
+      
+     @param molecule the molecule.
+     @returm the XTB  molecular system data structure.
+    */
+    xtb_TMolecule _set_molecule(const CMolecule& molecule);
+#endif
 
    public:
     /**
@@ -49,15 +78,15 @@ class CXTBDriver
      Destroys a XTB driver object.
      */
     ~CXTBDriver();
-
+    
     /**
      Computes DTB-B single point energy using XTB package.
 
-     @param molecule the molecule. 
-     @param method the GTN-XT string method. 
+     @param molecule the molecule.
+     @param method the string with DFT-B method name supported by XTB package.
      */
-    void compute(const CMolecule&   molecule, 
-		 const std::string& method); 
+    void compute(const CMolecule&   molecule,
+                 const std::string& method);
 
     /**
      Checks if XTB package is available. 
@@ -65,6 +94,13 @@ class CXTBDriver
      @return true if XTB package available, false otherwise.  
      */ 
     bool isAvailable() const;
+    
+    /**
+     Gets state of XTB environment.
+    
+     @return the state of XTB environment.
+    */
+    bool getState();
 };
 
 #endif /* XTBDriver_hpp */
