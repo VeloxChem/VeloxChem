@@ -24,6 +24,8 @@ CXTBDriver::CXTBDriver(MPI_Comm comm)
     
     _maxIterations = 280;
 
+    _natoms = 0; 
+
 #ifdef ENABLE_XTB
     _environment = xtb_newEnvironment();
         
@@ -133,19 +135,37 @@ CXTBDriver::getState()
     return false;
 }
 
+std::vector<double> 
+CXTBDriver::getGradient()
+{
+    std::vector<double> grad;
+
+    if ((_natoms > 0) && isMasterNode())  
+    {
+#ifdef ENABLE_XTB
+        grad = std::vector<double>(_natoms * 3, 0.0);
+
+        xtb_getGradient(_environment, _results, grad.data());
+#endif
+    } 
+
+    return grad; 
+}
+
+
 #ifdef ENABLE_XTB
 xtb_TMolecule
 CXTBDriver::_set_molecule(const CMolecule& molecule)
 {
-    int natoms = static_cast<int>(molecule.getNumberOfAtoms());
+    _natoms = static_cast<int>(molecule.getNumberOfAtoms());
     
     double charge = molecule.getCharge();
     
     int uhf = (molecule.getMultiplicity() > 1) ? 1 : 0;
     
-    std::vector<int> atoms(natoms, 0);
+    std::vector<int> atoms(_natoms, 0);
     
-    std::vector<double> coords(3 * natoms, 0.0);
+    std::vector<double> coords(3 * _natoms, 0.0);
     
     // reformat molecular data
     
@@ -157,7 +177,7 @@ CXTBDriver::_set_molecule(const CMolecule& molecule)
     
     auto rz =  molecule.getCoordinatesZ();
     
-    for (int i = 0; i < natoms; i++)
+    for (int i = 0; i < _natoms; i++)
     {
         atoms.at(i) = static_cast<int>(eleids[i]);
         
@@ -168,7 +188,7 @@ CXTBDriver::_set_molecule(const CMolecule& molecule)
         coords.at(3 * i + 2) = rz[i];
     }
     
-    return xtb_newMolecule(_environment, &natoms, atoms.data(),
+    return xtb_newMolecule(_environment, &_natoms, atoms.data(),
                            coords.data(),
                            &charge, &uhf,
                            NULL, NULL);

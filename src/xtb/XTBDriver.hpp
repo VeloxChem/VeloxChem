@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "mpi.h"
 #include "Molecule.hpp"
@@ -50,6 +51,11 @@ class CXTBDriver
     The maximum number of SCF iterations.
     */
     int _maxIterations;
+
+    /**
+     The number of atoms in XTB molecular system.
+    */
+    int _natoms; 
     
 #ifdef ENABLE_XTB
     /**
@@ -132,6 +138,13 @@ class CXTBDriver
      @return the state of XTB environment.
     */
     bool getState();
+
+    /**
+     Gets molecular gradient as vector (order: natoms x 3).
+    
+     @return the molecular gradient.
+    */
+    std::vector<double> getGradient(); 
 };
 
 #endif /* XTBDriver_hpp */

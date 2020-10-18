@@ -133,10 +133,13 @@ def main():
 
     # Gradient
 
-    if task_type == 'gradient' and scf_drv.restricted:
+    if task_type == 'gradient':
         grad_drv = GradientDriver(task.mpi_comm, task.ostream)
         grad_drv.update_settings(scf_dict, method_dict)
-        grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        if use_xtb: 
+            grad_drv.xtb_compute(xtb_drv, task.molecule)
+        elif scf_drv.restricted:
+            grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Geometry optimization
 

@@ -34,6 +34,15 @@ CXTBDriver_create(py::object py_comm)
     return std::shared_ptr<CXTBDriver>(new CXTBDriver(*comm_ptr));
 }
 
+static py::array_t<double>
+CXTBDriver_gradient_to_numpy(CXTBDriver& self)
+{
+    auto grad = self.getGradient(); 
+
+    return vlx_general::pointer_to_numpy(grad.data(), grad.size() / 3, 3);
+}
+
+
 void
 export_xtb(py::module& m)
 {
@@ -44,6 +53,7 @@ export_xtb(py::module& m)
 	.def("is_master_node", &CXTBDriver::isMasterNode)
 	.def("set_max_iter", &CXTBDriver::setMaxIterations)
 	.def("set_elec_temp", &CXTBDriver::setElectronicTemp)
+	.def("get_gradient", &CXTBDriver_gradient_to_numpy)
         .def("compute", &CXTBDriver::compute);
 }
 
