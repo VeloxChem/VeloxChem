@@ -21,8 +21,7 @@ from .visualizationdriver import VisualizationDriver
 from .loprop import LoPropDriver
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_maximum_hours
-
-from .veloxchemlib import XTBDriver
+from .xtbdriver import XTBDriver
 
 
 
@@ -100,11 +99,6 @@ def main():
     run_unrestricted = (task_type == 'uhf')
 
     if run_scf:
-        if use_xtb:
-            xtb_drv = XTBDriver(task.mpi_comm)
-            xtb_drv.compute(task.molecule, 'gfn2-xtb')
-            return  
-
         if 'scf' in task.input_dict:
             scf_dict = task.input_dict['scf']
         else:
@@ -112,23 +106,28 @@ def main():
 
         scf_dict['program_start_time'] = program_start_time
         scf_dict['maximum_hours'] = maximum_hours
+         
+        if use_xtb:
+            xtb_drv = XTBDriver(task.mpi_comm)
+            xtb_drv.compute_energy(task.molecule, scf_dict, method_dict, 
+                                   task.ostream)
+        else:  
+            nalpha = task.molecule.number_of_alpha_electrons()
+            nbeta = task.molecule.number_of_beta_electrons()
 
-        nalpha = task.molecule.number_of_alpha_electrons()
-        nbeta = task.molecule.number_of_beta_electrons()
+            if nalpha == nbeta and not run_unrestricted:
+                scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+            else:
+                scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
+            scf_drv.update_settings(scf_dict, method_dict)
+            scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        if nalpha == nbeta and not run_unrestricted:
-            scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        else:
-            scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(scf_dict, method_dict)
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+            mol_orbs = scf_drv.mol_orbs
+            density = scf_drv.density
+            scf_tensors = scf_drv.scf_tensors
 
-        mol_orbs = scf_drv.mol_orbs
-        density = scf_drv.density
-        scf_tensors = scf_drv.scf_tensors
-
-        if not scf_drv.is_converged:
-            return
+            if not scf_drv.is_converged:
+                return
 
     # Response
 

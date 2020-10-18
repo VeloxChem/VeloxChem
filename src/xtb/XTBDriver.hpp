@@ -41,6 +41,16 @@ class CXTBDriver
      */
     MPI_Comm _locComm;
     
+    /**
+    The electronic  temperature.
+    */
+    double _electronicTemp;
+    
+    /**
+    The maximum number of SCF iterations.
+    */
+    int _maxIterations;
+    
 #ifdef ENABLE_XTB
     /**
      The XTB package environment.

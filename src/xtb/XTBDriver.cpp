@@ -19,6 +19,10 @@ CXTBDriver::CXTBDriver(MPI_Comm comm)
     _locNodes = mpi::nodes(comm);
 
     _locComm = comm;
+    
+    _electronicTemp = 300.0;
+    
+    _maxIterations = 280;
 
 #ifdef ENABLE_XTB
     _environment = xtb_newEnvironment();
@@ -26,14 +30,18 @@ CXTBDriver::CXTBDriver(MPI_Comm comm)
     _calculator = xtb_newCalculator();
           
     _results = xtb_newResults();
-    
-    xtb_setVerbosity(_environment, XTB_VERBOSITY_FULL);
+   
+    xtb_setOutput(_environment, "xtb.scf.tempfile"); 
+
+    xtb_setVerbosity(_environment, XTB_VERBOSITY_FULL); 
 #endif
 }
 
 CXTBDriver::~CXTBDriver()
 {
 #ifdef ENABLE_XTB
+    xtb_releaseOutput(_environment);     
+
     xtb_delResults(&_results);
     
     xtb_delCalculator(&_calculator);
@@ -47,37 +55,43 @@ CXTBDriver::compute(const CMolecule&   molecule,
                     const std::string& method)
 {
 #ifdef ENABLE_XTB
- 
-    // set up molecular data structure
+    if (_locRank == mpi::master())
+    {
+        // set up molecular data structure
     
-    auto tmol = _set_molecule(molecule);
+        auto tmol = _set_molecule(molecule);
 
-    // load DFT-B method parameters
+        // load DFT-B method parameters
     
-    if (method == "gfn2-xtb")
-    {
-        xtb_loadGFN2xTB(_environment, tmol, _calculator, NULL);
-    }
-    else if (method == "gfn1-xtb")
-    {
-        xtb_loadGFN1xTB(_environment, tmol, _calculator, NULL);
-    }
-    else if (method == "gfn0-xtb")
-    {
-        xtb_loadGFN0xTB(_environment, tmol, _calculator, NULL);
-    }
-    else
-    {
-        return;
-    }
+        if (method == "gfn2")
+        {
+            xtb_loadGFN2xTB(_environment, tmol, _calculator, NULL);
+        }
+        else if (method == "gfn1")
+        {
+            xtb_loadGFN1xTB(_environment, tmol, _calculator, NULL);
+        }
+        else if (method == "gfn0")
+        {
+            xtb_loadGFN0xTB(_environment, tmol, _calculator, NULL);
+        }
+        else
+        {
+            return;
+        }
   
-    // perform single point calculation 
+        // perform single point calculation
 
-    xtb_singlepoint(_environment, tmol, _calculator, _results);
+        xtb_setMaxIter(_environment, _calculator, _maxIterations);
+        
+        xtb_setElectronicTemp(_environment, _calculator, _electronicTemp);
+        
+        xtb_singlepoint(_environment, tmol, _calculator, _results);
 
-    // delete molecular data structure     
+        // delete molecular data structure
 
-    xtb_delMolecule(&tmol);
+        xtb_delMolecule(&tmol); 
+    }
 #endif
 }
 
@@ -107,7 +121,7 @@ CXTBDriver::_set_molecule(const CMolecule& molecule)
     
     double charge = molecule.getCharge();
     
-    int uhf = 0;
+    int uhf = (molecule.getMultiplicity() > 1) ? 1 : 0;
     
     std::vector<int> atoms(natoms, 0);
     
