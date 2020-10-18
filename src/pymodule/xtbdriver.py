@@ -1,4 +1,4 @@
-import numpy as np
+import os
 
 from .veloxchemlib import XTBDriver
 
@@ -16,12 +16,12 @@ def _XTBDriver_compute_energy(self, molecule, scf_dict, method_dict, ostream):
         The output stream.
     """
 
-    self.compute(molecule, method_dict['xtb'].lower())
-    
-    with open("xtb.scf.tempfile",'r') as f:
-        for line in f.readlines(): 
-            ostream.print_line(line.rstrip('\n'))
-    
+    if self.is_master_node(): 
+        self.compute(molecule, method_dict['xtb'].lower())
+        with open("xtb.scf.tempfile",'r') as f:
+            for line in f.readlines(): 
+                ostream.print_line(line.rstrip('\n'))
+        os.remove("xtb.scf.tempfile")
     return
 
 XTBDriver.compute_energy = _XTBDriver_compute_energy

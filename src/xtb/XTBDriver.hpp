@@ -90,6 +90,20 @@ class CXTBDriver
     ~CXTBDriver();
     
     /**
+     Sets maximum number of SCF iterations. 
+
+     @param maxIterations the maximum number of iterations. 
+     */ 
+    void setMaxIterations(const int maxIterations); 
+
+    /**
+     Sets electronic temperature for electron smearing.
+     
+     @param electronicTemp the electronic temperature in Kelvins.   
+     */ 
+    void setElectronicTemp(const double electronicTemp);
+
+    /**
      Computes DTB-B single point energy using XTB package.
 
      @param molecule the molecule.
@@ -104,6 +118,13 @@ class CXTBDriver
      @return true if XTB package available, false otherwise.  
      */ 
     bool isAvailable() const;
+
+    /**
+     Checks if XTB driver is running on master node. 
+     
+     @return true if XTB driver is running on master node, false otherwise.  
+     */
+    bool isMasterNode() const; 
     
     /**
      Gets state of XTB environment.

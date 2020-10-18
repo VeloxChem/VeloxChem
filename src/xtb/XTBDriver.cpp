@@ -40,8 +40,6 @@ CXTBDriver::CXTBDriver(MPI_Comm comm)
 CXTBDriver::~CXTBDriver()
 {
 #ifdef ENABLE_XTB
-    xtb_releaseOutput(_environment);     
-
     xtb_delResults(&_results);
     
     xtb_delCalculator(&_calculator);
@@ -51,11 +49,23 @@ CXTBDriver::~CXTBDriver()
 }
 
 void 
+CXTBDriver::setMaxIterations(const int maxIterations)
+{
+    _maxIterations = maxIterations; 
+}
+
+void 
+CXTBDriver::setElectronicTemp(const double electronicTemp)
+{
+    _electronicTemp = electronicTemp; 
+}
+
+void 
 CXTBDriver::compute(const CMolecule&   molecule,
                     const std::string& method)
 {
 #ifdef ENABLE_XTB
-    if (_locRank == mpi::master())
+    if (isMasterNode())
     {
         // set up molecular data structure
     
@@ -90,9 +100,19 @@ CXTBDriver::compute(const CMolecule&   molecule,
 
         // delete molecular data structure
 
-        xtb_delMolecule(&tmol); 
+        xtb_delMolecule(&tmol);
+
+        // release output file
+	
+        xtb_releaseOutput(_environment);	
     }
 #endif
+}
+
+bool 
+CXTBDriver::isMasterNode() const 
+{
+    return _locRank == mpi::master(); 
 }
 
 bool 
