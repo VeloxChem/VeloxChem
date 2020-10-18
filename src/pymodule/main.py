@@ -11,6 +11,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .gradientdriver import GradientDriver
 from .xtbgradientdriver import XTBGradientDriver
 from .optimizationdriver import OptimizationDriver
+from .xtboptimizationdriver import XTBOptimizationDriver
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
@@ -147,14 +148,20 @@ def main():
 
     # Geometry optimization
 
-    if task_type == 'optimize' and scf_drv.restricted:
+    if task_type == 'optimize':
         if 'optimize' in task.input_dict:
             opt_dict = task.input_dict['optimize']
         else:
             opt_dict = {}
-        opt_drv = OptimizationDriver(task.mpi_comm, task.ostream)
-        opt_drv.update_settings(opt_dict, scf_dict, method_dict)
-        opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        if use_xtb:
+            opt_drv = XTBOptimizationDriver(task.mpi_comm, scf_dict, method_dict, task.ostream)
+            opt_drv.update_settings(opt_dict)
+            opt_drv.compute(task.molecule)
+        else: 
+            if scf_drv.restricted:
+                opt_drv = OptimizationDriver(task.mpi_comm, task.ostream)
+                opt_drv.update_settings(opt_dict, scf_dict, method_dict)
+                opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Response
 
