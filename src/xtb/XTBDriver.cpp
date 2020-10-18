@@ -32,10 +32,6 @@ CXTBDriver::CXTBDriver(MPI_Comm comm)
     _calculator = xtb_newCalculator();
           
     _results = xtb_newResults();
-   
-    xtb_setOutput(_environment, "xtb.scf.tempfile"); 
-
-    xtb_setVerbosity(_environment, XTB_VERBOSITY_FULL); 
 #endif
 }
 
@@ -69,7 +65,13 @@ CXTBDriver::compute(const CMolecule&   molecule,
 #ifdef ENABLE_XTB
     if (isMasterNode())
     {
-        // set up molecular data structure
+	// set up output stream 
+	
+	xtb_setOutput(_environment, "xtb.scf.tempfile");
+
+        xtb_setVerbosity(_environment, XTB_VERBOSITY_FULL);
+        
+	// set up molecular data structure
     
         auto tmol = _set_molecule(molecule);
 
@@ -133,6 +135,21 @@ CXTBDriver::getState()
     return xtb_checkEnvironment(_environment) > 0;
 #endif
     return false;
+}
+
+double 
+CXTBDriver::getEnergy() 
+{
+    double energy = 0.0; 
+ 
+    if (isMasterNode())
+    {
+#ifdef ENABLE_XTB
+        xtb_getEnergy(_environment, _results, &energy);
+#endif
+    }
+
+    return energy; 
 }
 
 std::vector<double> 

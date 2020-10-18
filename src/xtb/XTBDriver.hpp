@@ -140,6 +140,13 @@ class CXTBDriver
     bool getState();
 
     /**
+     Gets energy of molecular system.
+
+     @return the energy of molecular system.
+    */
+    double getEnergy();
+
+    /**
      Gets molecular gradient as vector (order: natoms x 3).
     
      @return the molecular gradient.

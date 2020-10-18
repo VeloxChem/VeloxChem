@@ -53,6 +53,7 @@ export_xtb(py::module& m)
 	.def("is_master_node", &CXTBDriver::isMasterNode)
 	.def("set_max_iter", &CXTBDriver::setMaxIterations)
 	.def("set_elec_temp", &CXTBDriver::setElectronicTemp)
+	.def("get_energy", &CXTBDriver::getEnergy)
 	.def("get_gradient", &CXTBDriver_gradient_to_numpy)
         .def("compute", &CXTBDriver::compute);
 }

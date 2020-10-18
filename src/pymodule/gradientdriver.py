@@ -46,31 +46,6 @@ class GradientDriver:
 
         self.scf_drv.update_settings(scf_dict, method_dict)
 
-    def xtb_compute(self, xtb_driver, molecule): 
-        """
-        Performs calculation of numerical gradient.
-
-        :param xtb_driver:
-            The XTB driver.
-        :param molecule:
-            The molecule.
-        """
-
-        self.print_xtb_header()
-        start_time = tm.time()
-
-        self.gradient = xtb_driver.get_gradient()
-        
-        # print gradient
-        self.print_geometry(molecule)
-        self.print_gradient(molecule, molecule.get_labels())
-
-        valstr = '*** Time spent in gradient calculation: '
-        valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.flush()
-
     def compute(self, molecule, ao_basis, min_basis=None):
         """
         Performs calculation of numerical gradient.
@@ -187,12 +162,3 @@ class GradientDriver:
         self.ostream.print_header(27 * "=")
         self.ostream.print_blank()
 
-    def print_xtb_header(self):
-        """
-        Prints XTB gradient calculation setup details to output stream.
-        """
-
-        self.ostream.print_blank()
-        self.ostream.print_header("Analytical XTB Gradient Driver")
-        self.ostream.print_header("==============================")
-        self.ostream.print_blank()

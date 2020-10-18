@@ -9,6 +9,7 @@ from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .gradientdriver import GradientDriver
+from .xtbgradientdriver import XTBGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
@@ -24,7 +25,6 @@ from .loprop import LoPropDriver
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_maximum_hours
 from .xtbdriver import XTBDriver
-
 
 
 def main():
@@ -136,10 +136,14 @@ def main():
     if task_type == 'gradient':
         grad_drv = GradientDriver(task.mpi_comm, task.ostream)
         grad_drv.update_settings(scf_dict, method_dict)
-        if use_xtb: 
-            grad_drv.xtb_compute(xtb_drv, task.molecule)
-        elif scf_drv.restricted:
-            grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        if use_xtb:
+            grad_drv = XTBGradientDriver(task.mpi_comm, xtb_drv, task.ostream)
+            grad_drv.compute(task.molecule)
+        else: 
+            if scf_drv.restricted:
+                grad_drv = GradientDriver(task.mpi_comm, task.ostream)
+                grad_drv.update_settings(scf_dict, method_dict)
+                grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Geometry optimization
 
