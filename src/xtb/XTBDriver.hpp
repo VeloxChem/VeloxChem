@@ -10,8 +10,10 @@
 #define XTBDriver_hpp
 
 #include <cstdint>
+#include <string>
 
 #include "mpi.h"
+#include "Molecule.hpp"
 
 /**
  Class CXTBDriver enables DFT-B computations using XTB package from Grimme group.
@@ -48,7 +50,21 @@ class CXTBDriver
      */
     ~CXTBDriver();
 
-    void compute();
+    /**
+     Computes DTB-B single point energy using XTB package.
+
+     @param molecule the molecule. 
+     @param method the GTN-XT string method. 
+     */
+    void compute(const CMolecule&   molecule, 
+		 const std::string& method); 
+
+    /**
+     Checks if XTB package is available. 
+     
+     @return true if XTB package available, false otherwise.  
+     */ 
+    bool isAvailable() const;
 };
 
 #endif /* XTBDriver_hpp */

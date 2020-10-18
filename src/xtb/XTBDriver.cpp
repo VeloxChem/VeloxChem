@@ -20,16 +20,17 @@ CXTBDriver::CXTBDriver(MPI_Comm comm)
 
     _locNodes = mpi::nodes(comm);
 
-    mpi::duplicate(comm, &_locComm);
+    _locComm = comm;
 }
 
 CXTBDriver::~CXTBDriver()
 {
-    mpi::destroy(&_locComm);
+    
 }
 
 void 
-CXTBDriver::compute()
+CXTBDriver::compute(const CMolecule&   molecule,
+                    const std::string& method)
 {
 #ifdef ENABLE_XTB
   int    const natoms = 7;
@@ -45,33 +46,35 @@ CXTBDriver::compute()
        1.92825631079613, 0.00000000000000,-2.53624948351102,
        0.00000000000000, 0.00000000000000, 5.23010455462158};
 
-  /*
-   * All objects except for the molecular structure can be
-   * constructued without other objects present.
-   *
-   * The construction of the molecular structure locks the
-   * number of atoms, atomic number, total charge, multiplicity
-   * and boundary conditions.
-  **/
-  xtb_TEnvironment env = xtb_newEnvironment();
-  xtb_TCalculator calc = xtb_newCalculator();
-  xtb_TResults res = xtb_newResults();
-  xtb_TMolecule mol = xtb_newMolecule(
-      env, &natoms, attyp, coord, &charge, &uhf, NULL, NULL);
-  if (xtb_checkEnvironment(env)) {
-    xtb_showEnvironment(env, NULL);
-    return;
-  }
+    // initialize XTB data objects  
+  
+    auto tenv = xtb_newEnvironment();
+  
+    auto tcalc = xtb_newCalculator();
+    
+    auto tres = xtb_newResults();
 
-  /*
-   * Apply changes to the environment which will be respected
-   * in all further API calls.
-  **/
-  xtb_setVerbosity(env, XTB_VERBOSITY_FULL);
-  if (xtb_checkEnvironment(env)) {
-    xtb_showEnvironment(env, NULL);
-    return;
-  }
+    // set up molecule 
+
+    auto tmol = xtb_newMolecule(tenv, &natoms, attyp, coord, &charge, &uhf, NULL, NULL);
+
+    if (xtb_checkEnvironment(tenv)) 
+    {
+        xtb_showEnvironment(tenv, NULL);
+        
+	return;
+    }
+
+    // set up maximum output 
+
+    xtb_setVerbosity(tenv, XTB_VERBOSITY_FULL);
+
+    if (xtb_checkEnvironment(tenv)) 
+    {
+        xtb_showEnvironment(tenv, NULL);
+
+        return;
+    }
 
   /*
    * Load a parametrisation, the last entry is a char* which can
@@ -83,9 +86,9 @@ CXTBDriver::compute()
    * The calculator has to be reconstructed if the molecular
    * structure is reconstructed.
   **/
-  xtb_loadGFN2xTB(env, mol, calc, NULL);
-  if (xtb_checkEnvironment(env)) {
-    xtb_showEnvironment(env, NULL);
+  xtb_loadGFN2xTB(tenv, tmol, tcalc, NULL);
+  if (xtb_checkEnvironment(tenv)) {
+    xtb_showEnvironment(tenv, NULL);
     return;
   }
 
@@ -96,9 +99,9 @@ CXTBDriver::compute()
    *
    * Not supported boundary conditions are usually raised here.
   **/
-  xtb_singlepoint(env, mol, calc, res);
-  if (xtb_checkEnvironment(env)) {
-    xtb_showEnvironment(env, NULL);
+  xtb_singlepoint(tenv, tmol, tcalc, tres);
+  if (xtb_checkEnvironment(tenv)) {
+    xtb_showEnvironment(tenv, NULL);
     return;
   }
 
@@ -108,9 +111,9 @@ CXTBDriver::compute()
    * for multiple entries before handling possible errors
   **/
   double energy = 0.0; 
-  xtb_getEnergy(env, res, &energy);
-  if (xtb_checkEnvironment(env)) {
-    xtb_showEnvironment(env, NULL);
+  xtb_getEnergy(tenv, tres, &energy);
+  if (xtb_checkEnvironment(tenv)) {
+    xtb_showEnvironment(tenv, NULL);
     return;
   }
 
@@ -118,10 +121,19 @@ CXTBDriver::compute()
    * deconstructor will deallocate the objects and overwrite the
    * pointer with NULL
   **/
-  xtb_delResults(&res);
-  xtb_delCalculator(&calc);
-  xtb_delMolecule(&mol);
-  xtb_delEnvironment(&env);
+  xtb_delResults(&tres);
+  xtb_delCalculator(&tcalc);
+  xtb_delMolecule(&tmol);
+  xtb_delEnvironment(&tenv);
 #endif
 }
 
+bool 
+CXTBDriver::isAvailable() const 
+{
+#ifdef ENABLE_XTB
+    return true;
+#endif
+	
+    return false; 
+}
