@@ -5,7 +5,8 @@ import os
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
-from veloxchem.gradientdriver import GradientDriver
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfgradientdriver import ScfGradientDriver
 
 
 class TestGrad(unittest.TestCase):
@@ -15,9 +16,12 @@ class TestGrad(unittest.TestCase):
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
 
-        grad_drv = GradientDriver(task.mpi_comm, task.ostream)
-        grad_drv.update_settings(task.input_dict['scf'],
-                                 task.input_dict['method_settings'])
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.update_settings(task.input_dict['scf'],
+                                task.input_dict['method_settings'])
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream, scf_drv)
         grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         if task.mpi_rank == mpi_master():

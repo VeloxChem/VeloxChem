@@ -1,3 +1,4 @@
+from .veloxchemlib import mpi_master
 from .gradientdriver import GradientDriver
 
 
@@ -35,6 +36,7 @@ class XTBGradientDriver(GradientDriver):
         self.print_header()
 
         self.gradient = self.xtb_drv.get_gradient()
+        self.gradient = self.comm.bcast(self.gradient, root=mpi_master())
 
         self.print_geometry(molecule)
         self.print_gradient(molecule, molecule.get_labels())

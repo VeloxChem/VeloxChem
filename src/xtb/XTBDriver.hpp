@@ -48,6 +48,11 @@ class CXTBDriver
     std::string _outputFilename;
     
     /**
+     The XTB method.
+     */
+    std::string _xtbMethod;
+    
+    /**
     The electronic temperature.
     */
     double _electronicTemp;
@@ -115,13 +120,18 @@ class CXTBDriver
     void setElectronicTemp(const double electronicTemp);
 
     /**
+     Sets XTB method.
+     
+     @param method the XTB method.
+     */ 
+    void setMethod(const std::string method);
+
+    /**
      Computes DTB-B single point energy using XTB package.
 
      @param molecule the molecule.
-     @param method the string with DFT-B method name supported by XTB package.
      */
-    void compute(const CMolecule&   molecule,
-                 const std::string& method);
+    void compute(const CMolecule&   molecule);
 
     /**
      Checks if XTB package is available. 

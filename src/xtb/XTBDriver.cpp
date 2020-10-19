@@ -15,6 +15,8 @@
 
 CXTBDriver::CXTBDriver(MPI_Comm comm)
     : _outputFilename(std::string("xtb.scf.tempfile"))
+
+    , _xtbMethod(std::string("gfn2"))
 {
     _locRank = mpi::rank(comm);
 
@@ -61,8 +63,13 @@ CXTBDriver::setElectronicTemp(const double electronicTemp)
 }
 
 void 
-CXTBDriver::compute(const CMolecule&   molecule,
-                    const std::string& method)
+CXTBDriver::setMethod(const std::string method)
+{
+    _xtbMethod = method; 
+}
+
+void 
+CXTBDriver::compute(const CMolecule&   molecule)
 {
 #ifdef ENABLE_XTB
     if (isMasterNode())
@@ -81,15 +88,15 @@ CXTBDriver::compute(const CMolecule&   molecule,
 
         // load DFT-B method parameters
     
-        if (method == "gfn2")
+        if (_xtbMethod == "gfn2")
         {
             xtb_loadGFN2xTB(_environment, tmol, _calculator, NULL);
         }
-        else if (method == "gfn1")
+        else if (_xtbMethod == "gfn1")
         {
             xtb_loadGFN1xTB(_environment, tmol, _calculator, NULL);
         }
-        else if (method == "gfn0")
+        else if (_xtbMethod == "gfn0")
         {
             xtb_loadGFN0xTB(_environment, tmol, _calculator, NULL);
         }

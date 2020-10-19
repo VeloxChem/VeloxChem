@@ -23,13 +23,14 @@ class OptimizationEngine(geometric.engine.Engine):
         - vlx_molecule: The molecule.
         - vlx_ao_basis: The AO basis set.
         - vlx_min_basis: The minimal AO basis set.
-        - scf_drv: The SCF driver.
+        - ener_drv: The energy driver.
         - grad_drv: The gradient driver.
+        - flag: The type of the optimization engine.
         - comm: The MPI communicator.
         - rank: The rank of MPI process.
     """
 
-    def __init__(self, molecule, ao_basis, min_basis, scf_drv, grad_drv):
+    def __init__(self, molecule, ao_basis, min_basis, ener_drv, grad_drv, flag):
         """
         Initializes optimization engine for geomeTRIC.
         """
@@ -46,11 +47,12 @@ class OptimizationEngine(geometric.engine.Engine):
         self.vlx_ao_basis = ao_basis
         self.vlx_min_basis = min_basis
 
-        self.scf_drv = scf_drv
+        self.ener_drv = ener_drv
         self.grad_drv = grad_drv
+        self.flag = flag
 
-        self.comm = scf_drv.comm
-        self.rank = scf_drv.rank
+        self.comm = grad_drv.comm
+        self.rank = grad_drv.comm.Get_rank()
 
     def calc_new(self, coords, dirname):
         """
@@ -73,11 +75,24 @@ class OptimizationEngine(geometric.engine.Engine):
             new_mol = Molecule()
         new_mol.broadcast(self.rank, self.comm)
 
-        self.scf_drv.compute(new_mol, self.vlx_ao_basis, self.vlx_min_basis)
-        energy = self.scf_drv.get_scf_energy()
+        if self.flag.upper() == 'XTB':
+            self.ener_drv.compute(new_mol)
+            energy = self.ener_drv.get_energy()
 
-        self.grad_drv.compute(new_mol, self.vlx_ao_basis, self.vlx_min_basis)
-        gradient = self.grad_drv.get_gradient()
+            self.grad_drv.compute(new_mol)
+            gradient = self.grad_drv.get_gradient()
+
+        elif self.flag.upper() == 'SCF':
+            self.ener_drv.compute(new_mol, self.vlx_ao_basis,
+                                  self.vlx_min_basis)
+            energy = self.ener_drv.get_scf_energy()
+
+            self.grad_drv.compute(new_mol, self.vlx_ao_basis,
+                                  self.vlx_min_basis)
+            gradient = self.grad_drv.get_gradient()
+
+        energy = self.comm.bcast(energy, root=mpi_master())
+        gradient = self.comm.bcast(gradient, root=mpi_master())
 
         return {
             'energy': energy,

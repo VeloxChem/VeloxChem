@@ -12,7 +12,6 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfgradientdriver import ScfGradientDriver
 from .xtbgradientdriver import XTBGradientDriver
 from .optimizationdriver import OptimizationDriver
-from .xtboptimizationdriver import XTBOptimizationDriver
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
@@ -112,7 +111,8 @@ def main():
 
         if use_xtb:
             xtb_drv = XTBDriver(task.mpi_comm)
-            xtb_drv.compute(task.molecule, method_dict['xtb'].lower())
+            xtb_drv.set_method(method_dict['xtb'].lower())
+            xtb_drv.compute(task.molecule)
             if task.mpi_rank == mpi_master():
                 for line in xtb_drv.get_output():
                     task.ostream.print_line(line)
@@ -153,15 +153,18 @@ def main():
             opt_dict = task.input_dict['optimize']
         else:
             opt_dict = {}
+
         if use_xtb:
-            opt_drv = XTBOptimizationDriver(task.mpi_comm, scf_dict,
-                                            method_dict, task.ostream)
-            opt_drv.update_settings(opt_dict)
-            opt_drv.compute(task.molecule)
+            grad_drv = XTBGradientDriver(task.mpi_comm, task.ostream, xtb_drv)
+            opt_drv = OptimizationDriver(task.mpi_comm, task.ostream,
+                                         sys.argv[1], xtb_drv, grad_drv, 'XTB')
         elif scf_drv.restricted:
-            opt_drv = OptimizationDriver(task.mpi_comm, task.ostream)
-            opt_drv.update_settings(opt_dict, scf_dict, method_dict)
-            opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+            grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream, scf_drv)
+            opt_drv = OptimizationDriver(task.mpi_comm, task.ostream,
+                                         sys.argv[1], scf_drv, grad_drv, 'SCF')
+
+        opt_drv.update_settings(opt_dict)
+        opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Response
 

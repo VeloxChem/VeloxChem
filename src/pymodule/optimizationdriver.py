@@ -6,8 +6,6 @@ import geometric
 
 from .veloxchemlib import mpi_master
 from .molecule import Molecule
-from .scfrestdriver import ScfRestrictedDriver
-from .gradientdriver import GradientDriver
 from .optimizationengine import OptimizationEngine
 
 
@@ -28,11 +26,13 @@ class OptimizationDriver:
           coordinate system.
         - transition: The flag for transition state searching.
         - hessian: The flag for computing Hessian.
-        - scf_drv: The SCF driver.
-        - grad_drv: The gradient driver.
+        - input_filename: The input filename.
+        - energy_driver: The energy driver.
+        - gradient_driver: The gradient driver.
+        - flag: The type of the optimization driver.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm, ostream, inp_fname, ener_drv, grad_drv, flag):
         """
         Initializes optimization driver.
         """
@@ -48,10 +48,12 @@ class OptimizationDriver:
         self.transition = False
         self.hessian = 'never'
 
-        self.scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
-        self.grad_drv = GradientDriver(self.comm, self.ostream)
+        self.input_filename = inp_fname
+        self.energy_driver = ener_drv
+        self.gradient_driver = grad_drv
+        self.flag = flag
 
-    def update_settings(self, opt_dict, scf_dict, method_dict=None):
+    def update_settings(self, opt_dict):
         """
         Updates settings in optimization driver.
 
@@ -79,9 +81,6 @@ class OptimizationDriver:
         elif self.transition:
             self.hessian = 'first'
 
-        self.scf_drv.update_settings(scf_dict, method_dict)
-        self.grad_drv.update_settings(scf_dict, method_dict)
-
     def compute(self, molecule, ao_basis, min_basis=None):
         """
         Performs geometry optimization.
@@ -98,20 +97,19 @@ class OptimizationDriver:
         """
 
         opt_engine = OptimizationEngine(molecule, ao_basis, min_basis,
-                                        self.scf_drv, self.grad_drv)
+                                        self.energy_driver,
+                                        self.gradient_driver, self.flag)
 
         # input_fname is used by geomeTRIC to create .log and other files. On
         # master node input_fname is determined based on the checkpoint file.
         # On other nodes input_fname points to file in a temporary directory.
 
         if self.rank == mpi_master():
-            suffix = '.scf.h5'
-            if self.scf_drv.checkpoint_file is None:
-                input_fname = 'tmp'
-            elif self.scf_drv.checkpoint_file[-len(suffix):] == suffix:
-                input_fname = self.scf_drv.checkpoint_file[:-len(suffix)]
+            suffix = '.inp'
+            if self.input_filename[-len(suffix):] == suffix:
+                input_fname = self.input_filename[:-len(suffix)]
             else:
-                input_fname = self.scf_drv.checkpoint_file
+                input_fname = self.input_filename
 
         with tempfile.TemporaryDirectory() as temp_dir:
 
