@@ -42,7 +42,10 @@ class XTBOptimizationEngine(geometric.engine.Engine):
         self.vlx_molecule = molecule
 
         self.scf_dict = scf_dict 
-        self.method_dict = method_dict
+        self.method_dict = method_dict 
+
+        self.charge = molecule.get_charge() 
+        self.mult = molecule.get_multiplicity()
 
     def calc_new(self, coords, dirname):
         """
@@ -61,6 +64,8 @@ class XTBOptimizationEngine(geometric.engine.Engine):
 
         if self.rank == mpi_master():
             new_mol = Molecule(labels, coords.reshape(-1, 3), units='au')
+            new_mol.set_charge(self.charge)
+            new_mol.set_multiplicity(self.mult)
         else:
             new_mol = Molecule()
         new_mol.broadcast(self.rank, self.comm)
