@@ -71,8 +71,10 @@ CXTBDriver::compute(const CMolecule&   molecule,
     
         xtb_setOutput(_environment, _outputFilename.c_str());
 
-        xtb_setVerbosity(_environment, XTB_VERBOSITY_FULL);
-        
+        xtb_setVerbosity(_environment, XTB_VERBOSITY_FULL); 
+
+        // xtb_setAccuracy(_environment, _calculator, 0.0001); 
+
         // set up molecular data structure
     
         auto tmol = _set_molecule(molecule);
@@ -210,8 +212,10 @@ CXTBDriver::_set_molecule(const CMolecule& molecule)
     _natoms = static_cast<int>(molecule.getNumberOfAtoms());
     
     double charge = molecule.getCharge();
-    
-    int uhf = (molecule.getMultiplicity() > 1) ? 1 : 0;
+   
+    int mult = static_cast<int>(molecule.getMultiplicity());  
+
+    int uhf = (mult > 1) ? mult - 1 : 0;
     
     std::vector<int> atoms(_natoms, 0);
     
