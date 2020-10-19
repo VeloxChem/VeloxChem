@@ -5,6 +5,7 @@ import os
 
 from .veloxchemlib import mpi_initialized
 from .veloxchemlib import mpi_master
+from .veloxchemlib import XTBDriver
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -25,7 +26,6 @@ from .visualizationdriver import VisualizationDriver
 from .loprop import LoPropDriver
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_maximum_hours
-from .xtbdriver import XTBDriver
 
 
 def main():
@@ -109,12 +109,15 @@ def main():
 
         scf_dict['program_start_time'] = program_start_time
         scf_dict['maximum_hours'] = maximum_hours
-         
+
         if use_xtb:
             xtb_drv = XTBDriver(task.mpi_comm)
-            xtb_drv.compute_energy(task.molecule, scf_dict, method_dict, 
-                                   task.ostream)
-        else:  
+            xtb_drv.compute(task.molecule, method_dict['xtb'].lower())
+            for line in xtb_drv.get_output():
+                task.ostream.print_line(line)
+            if os.path.isfile(xtb_drv.get_output_filename()):
+                os.remove(xtb_drv.get_output_filename())
+        else:
             nalpha = task.molecule.number_of_alpha_electrons()
             nbeta = task.molecule.number_of_beta_electrons()
 
@@ -140,11 +143,10 @@ def main():
         if use_xtb:
             grad_drv = XTBGradientDriver(task.mpi_comm, xtb_drv, task.ostream)
             grad_drv.compute(task.molecule)
-        else: 
-            if scf_drv.restricted:
-                grad_drv = GradientDriver(task.mpi_comm, task.ostream)
-                grad_drv.update_settings(scf_dict, method_dict)
-                grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        elif scf_drv.restricted:
+            grad_drv = GradientDriver(task.mpi_comm, task.ostream)
+            grad_drv.update_settings(scf_dict, method_dict)
+            grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Geometry optimization
 
@@ -154,14 +156,14 @@ def main():
         else:
             opt_dict = {}
         if use_xtb:
-            opt_drv = XTBOptimizationDriver(task.mpi_comm, scf_dict, method_dict, task.ostream)
+            opt_drv = XTBOptimizationDriver(task.mpi_comm, scf_dict,
+                                            method_dict, task.ostream)
             opt_drv.update_settings(opt_dict)
             opt_drv.compute(task.molecule)
-        else: 
-            if scf_drv.restricted:
-                opt_drv = OptimizationDriver(task.mpi_comm, task.ostream)
-                opt_drv.update_settings(opt_dict, scf_dict, method_dict)
-                opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        elif scf_drv.restricted:
+            opt_drv = OptimizationDriver(task.mpi_comm, task.ostream)
+            opt_drv.update_settings(opt_dict, scf_dict, method_dict)
+            opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Response
 

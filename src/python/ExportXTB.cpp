@@ -11,6 +11,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include <mpi.h>
 #include <memory>
@@ -42,7 +43,6 @@ CXTBDriver_gradient_to_numpy(CXTBDriver& self)
     return vlx_general::pointer_to_numpy(grad.data(), grad.size() / 3, 3);
 }
 
-
 void
 export_xtb(py::module& m)
 {
@@ -50,11 +50,13 @@ export_xtb(py::module& m)
 
     py::class_<CXTBDriver, std::shared_ptr<CXTBDriver>>(m, "XTBDriver")
         .def(py::init(&CXTBDriver_create))
-	.def("is_master_node", &CXTBDriver::isMasterNode)
-	.def("set_max_iter", &CXTBDriver::setMaxIterations)
-	.def("set_elec_temp", &CXTBDriver::setElectronicTemp)
-	.def("get_energy", &CXTBDriver::getEnergy)
-	.def("get_gradient", &CXTBDriver_gradient_to_numpy)
+        .def("is_master_node", &CXTBDriver::isMasterNode)
+        .def("set_max_iter", &CXTBDriver::setMaxIterations)
+        .def("set_elec_temp", &CXTBDriver::setElectronicTemp)
+        .def("get_output", &CXTBDriver::getOutput)
+        .def("get_output_filename", &CXTBDriver::getOutputFilename)
+        .def("get_energy", &CXTBDriver::getEnergy)
+        .def("get_gradient", &CXTBDriver_gradient_to_numpy)
         .def("compute", &CXTBDriver::compute);
 }
 

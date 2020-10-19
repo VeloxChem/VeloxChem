@@ -43,7 +43,12 @@ class CXTBDriver
     MPI_Comm _locComm;
     
     /**
-    The electronic  temperature.
+     The name of the XTB output file.
+     */
+    std::string _outputFilename;
+    
+    /**
+    The electronic temperature.
     */
     double _electronicTemp;
     
@@ -138,6 +143,20 @@ class CXTBDriver
      @return the state of XTB environment.
     */
     bool getState();
+
+    /**
+     Gets XTB output as a vector of strings.
+    
+     @return a vector of strings.
+    */
+    std::vector<std::string> getOutput();
+
+    /**
+     Gets XTB output filename.
+    
+     @return the output filename.
+    */
+    std::string getOutputFilename();
 
     /**
      Gets energy of molecular system.

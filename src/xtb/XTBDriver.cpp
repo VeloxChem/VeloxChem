@@ -8,11 +8,13 @@
 
 #include "XTBDriver.hpp"
 
-#include <vector>
+#include <iostream>
+#include <fstream>
 
 #include "MpiFunc.hpp"
 
 CXTBDriver::CXTBDriver(MPI_Comm comm)
+    : _outputFilename(std::string("xtb.scf.tempfile"))
 {
     _locRank = mpi::rank(comm);
 
@@ -65,13 +67,13 @@ CXTBDriver::compute(const CMolecule&   molecule,
 #ifdef ENABLE_XTB
     if (isMasterNode())
     {
-	// set up output stream 
-	
-	xtb_setOutput(_environment, "xtb.scf.tempfile");
+        // set up output stream 
+    
+        xtb_setOutput(_environment, _outputFilename.c_str());
 
         xtb_setVerbosity(_environment, XTB_VERBOSITY_FULL);
         
-	// set up molecular data structure
+        // set up molecular data structure
     
         auto tmol = _set_molecule(molecule);
 
@@ -107,8 +109,8 @@ CXTBDriver::compute(const CMolecule&   molecule,
         xtb_delMolecule(&tmol);
 
         // release output file
-	
-        xtb_releaseOutput(_environment);	
+    
+        xtb_releaseOutput(_environment);    
     }
 #endif
 }
@@ -135,6 +137,38 @@ CXTBDriver::getState()
     return xtb_checkEnvironment(_environment) > 0;
 #endif
     return false;
+}
+
+std::vector<std::string>
+CXTBDriver::getOutput()
+{
+    std::vector<std::string> output_strings;
+
+    std::ifstream fst(_outputFilename.c_str());
+
+    if (fst.is_open())
+    {
+        while(true)
+        {
+            std::string str;
+
+            std::getline(fst, str);
+
+            if (fst.eof()) break;
+
+            output_strings.push_back(str);
+        }
+
+        fst.close();
+    }
+
+    return output_strings;
+}
+
+std::string
+CXTBDriver::getOutputFilename()
+{
+    return _outputFilename;
 }
 
 double 
@@ -168,7 +202,6 @@ CXTBDriver::getGradient()
 
     return grad; 
 }
-
 
 #ifdef ENABLE_XTB
 xtb_TMolecule
@@ -211,4 +244,3 @@ CXTBDriver::_set_molecule(const CMolecule& molecule)
                            NULL, NULL);
 }
 #endif
-
