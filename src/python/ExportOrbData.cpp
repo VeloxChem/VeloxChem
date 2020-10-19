@@ -6,12 +6,14 @@
 //  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
 //  Contact: https://veloxchem.org/contact
 
+#include "ExportOrbData.hpp"
+
+#include <mpi.h>
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <mpi.h>
 #include <fstream>
 #include <string>
 
@@ -22,7 +24,6 @@
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
-#include "ExportOrbData.hpp"
 #include "GtoTransform.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularOrbitals.hpp"
@@ -57,17 +58,15 @@ CAODensityMatrix_str(const CAODensityMatrix& self)
 static py::array_t<double>
 CAODensityMatrix_alpha_density_to_numpy(const CAODensityMatrix& self, const int32_t iDensityMatrix)
 {
-    return vlx_general::pointer_to_numpy(self.alphaDensity(iDensityMatrix),
-                                         self.getNumberOfRows(iDensityMatrix),
-                                         self.getNumberOfColumns(iDensityMatrix));
+    return vlx_general::pointer_to_numpy(
+        self.alphaDensity(iDensityMatrix), self.getNumberOfRows(iDensityMatrix), self.getNumberOfColumns(iDensityMatrix));
 }
 
 static py::array_t<double>
 CAODensityMatrix_beta_density_to_numpy(const CAODensityMatrix& self, const int32_t iDensityMatrix)
 {
-    return vlx_general::pointer_to_numpy(self.betaDensity(iDensityMatrix),
-                                         self.getNumberOfRows(iDensityMatrix),
-                                         self.getNumberOfColumns(iDensityMatrix));
+    return vlx_general::pointer_to_numpy(
+        self.betaDensity(iDensityMatrix), self.getNumberOfRows(iDensityMatrix), self.getNumberOfColumns(iDensityMatrix));
 }
 
 // Helper function for CAODensityMatrix constructor
@@ -195,19 +194,31 @@ CSADGuessDriver_create(py::object py_comm)
 void
 export_orbdata(py::module& m)
 {
+    using namespace py::literals;
+
     // CBasisFunction class
 
     py::class_<CBasisFunction, std::shared_ptr<CBasisFunction>>(m, "BasisFunction")
         .def(py::init<>())
         .def(py::init<const std::vector<double>&, const std::vector<double>&, const int32_t>())
-        .def("normalize", &CBasisFunction::normalize);
+        .def("normalize", &CBasisFunction::normalize)
+        .def_property("angular_momentum", &CBasisFunction::getAngularMomentum, &CBasisFunction::setAngularMomentum)
+        .def_property("exponents", &CBasisFunction::getExponents, &CBasisFunction::setExponents)
+        .def_property("normalization_factors", &CBasisFunction::getNormalizationFactors, &CBasisFunction::setNormalizationFactors)
+        .def_property_readonly("n_primitives", &CBasisFunction::getNumberOfPrimitiveFunctions)
+        .def("__repr__", &CBasisFunction::repr);
 
     // CAtomBasis class
 
     py::class_<CAtomBasis, std::shared_ptr<CAtomBasis>>(m, "AtomBasis")
         .def(py::init<>())
         .def("add_basis_function", &CAtomBasis::addBasisFunction)
-        .def("set_elemental_id", &CAtomBasis::setIdElemental);
+        .def("set_elemental_id", &CAtomBasis::setIdElemental)
+        .def("__repr__", &CAtomBasis::repr)
+        .def(
+            "__iter__",
+            [](const CAtomBasis& obj) { return py::make_iterator(obj.begin(), obj.end()); },
+            py::keep_alive<0, 1>() /* Essential: keep object alive while iterator exists */);
 
     // CMolecularBasis class
 
@@ -220,7 +231,23 @@ export_orbdata(py::module& m)
         .def("broadcast", &CMolecularBasis_broadcast)
         .def("get_valence_basis", &CMolecularBasis::reduceToValenceBasis)
         .def("add_atom_basis", &CMolecularBasis::addAtomBasis)
-        .def(py::self == py::self);
+        .def("get_dimensions_of_basis", &CMolecularBasis::getDimensionsOfBasis)
+        .def("get_dimensions_of_primitive_basis", &CMolecularBasis::getDimensionsOfPrimitiveBasis)
+        .def(py::self == py::self)
+        .def("__repr__", &CMolecularBasis::repr)
+        .def("n_basis_functions",
+             vlx_general::overload_cast_<const CMolecule&, int32_t>()(&CMolecularBasis::getNumberOfBasisFunctions, py::const_),
+             "molecule"_a,
+             "ang_mom"_a)
+        .def("n_primitive_basis_functions",
+             vlx_general::overload_cast_<const CMolecule&, int32_t>()(&CMolecularBasis::getNumberOfPrimitiveBasisFunctions, py::const_),
+             "molecule"_a,
+             "ang_mom"_a)
+        .def(
+            "__iter__",
+            [](const CMolecularBasis& obj) {
+        return py::make_iterator(obj.begin(), obj.end()); },
+            py::keep_alive<0, 1>() /* Essential: keep object alive while iterator exists */);
 
     // denmat enum class
 
@@ -261,26 +288,18 @@ export_orbdata(py::module& m)
         .def("ea_to_numpy", &CMolecularOrbitals_alpha_energies_to_numpy)
         .def("eb_to_numpy", &CMolecularOrbitals_beta_energies_to_numpy)
         .def("get_orbitals_type", &CMolecularOrbitals::getOrbitalsType)
-        .def("get_ao_density",
-             (CAODensityMatrix(CMolecularOrbitals::*)(const int32_t) const) & CMolecularOrbitals::getAODensity)
-        .def("get_ao_density",
-             (CAODensityMatrix(CMolecularOrbitals::*)(const int32_t, const int32_t) const) &
-                 CMolecularOrbitals::getAODensity)
+        .def("get_ao_density", (CAODensityMatrix(CMolecularOrbitals::*)(const int32_t) const) & CMolecularOrbitals::getAODensity)
+        .def("get_ao_density", (CAODensityMatrix(CMolecularOrbitals::*)(const int32_t, const int32_t) const) & CMolecularOrbitals::getAODensity)
         .def("get_pair_density",
              (CAODensityMatrix(CMolecularOrbitals::*)(const std::vector<int32_t>&, const std::vector<int32_t>&) const) &
                  CMolecularOrbitals::getRestrictedPairDensity)
         .def("get_pair_density",
-             (CAODensityMatrix(CMolecularOrbitals::*)(const int32_t, const int32_t) const) &
-                 CMolecularOrbitals::getRestrictedPairDensity)
+             (CAODensityMatrix(CMolecularOrbitals::*)(const int32_t, const int32_t) const) & CMolecularOrbitals::getRestrictedPairDensity)
         .def("insert", &CMolecularOrbitals::insert)
         .def("number_mos", &CMolecularOrbitals::getNumberOfColumns)
         .def("number_aos", &CMolecularOrbitals::getNumberOfRows)
-        .def("alpha_orbitals",
-             (CDenseMatrix(CMolecularOrbitals::*)(const int32_t, const int32_t) const) &
-                 CMolecularOrbitals::alphaOrbitals)
-        .def("beta_orbitals",
-             (CDenseMatrix(CMolecularOrbitals::*)(const int32_t, const int32_t) const) &
-                 CMolecularOrbitals::betaOrbitals)
+        .def("alpha_orbitals", (CDenseMatrix(CMolecularOrbitals::*)(const int32_t, const int32_t) const) & CMolecularOrbitals::alphaOrbitals)
+        .def("beta_orbitals", (CDenseMatrix(CMolecularOrbitals::*)(const int32_t, const int32_t) const) & CMolecularOrbitals::betaOrbitals)
         .def("broadcast", &CMolecularOrbitals_broadcast)
         .def(py::self == py::self);
 

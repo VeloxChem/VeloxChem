@@ -191,13 +191,18 @@ class CBasisFunction
     void broadcast(int32_t rank, MPI_Comm comm);
 
     /**
-     Converts basis function object to text output and insert it into output
-     text stream.
-
-     @param output the output text stream.
-     @param source the basis function object.
+     Converts basis function object to text output
      */
-    friend std::ostream& operator<<(std::ostream& output, const CBasisFunction& source);
+    std::string repr() const;
 };
+
+/**
+ Converts basis function object to text output and insert it into output
+ text stream.
+
+ @param output the output text stream.
+ @param source the basis function object.
+ */
+std::ostream& operator<<(std::ostream& output, const CBasisFunction& source);
 
 #endif /* BasisFunction_hpp */

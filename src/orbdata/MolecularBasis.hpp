@@ -302,13 +302,91 @@ class CMolecularBasis
     void broadcast(int32_t rank, MPI_Comm comm);
 
     /**
-     Converts molecular basis object to text output and insert it into output
-     text stream.
-
-     @param output the output text stream.
-     @param source the molecular basis object.
+     Converts molecular basis object to text output
      */
-    friend std::ostream& operator<<(std::ostream& output, const CMolecularBasis& source);
+    std::string repr() const;
+
+    /** @{ Iterators */
+    using store_type     = std::vector<CAtomBasis>;
+    using iterator       = typename store_type::iterator;
+    using const_iterator = typename store_type::const_iterator;
+
+    iterator
+    begin() noexcept
+    {
+        return _atomicBasisSets.begin();
+    }
+    const_iterator
+    begin() const noexcept
+    {
+        return _atomicBasisSets.begin();
+    }
+    const_iterator
+    cbegin() const noexcept
+    {
+        return _atomicBasisSets.cbegin();
+    }
+
+    iterator
+    end() noexcept
+    {
+        return _atomicBasisSets.end();
+    }
+    const_iterator
+    end() const noexcept
+    {
+        return _atomicBasisSets.end();
+    }
+    const_iterator
+    cend() const noexcept
+    {
+        return _atomicBasisSets.cend();
+    }
+
+    using reverse_iterator       = typename store_type::reverse_iterator;
+    using const_reverse_iterator = typename store_type::const_reverse_iterator;
+
+    reverse_iterator
+    rbegin() noexcept
+    {
+        return _atomicBasisSets.rbegin();
+    }
+    const_reverse_iterator
+    rbegin() const noexcept
+    {
+        return _atomicBasisSets.rbegin();
+    }
+    const_reverse_iterator
+    crbegin() const noexcept
+    {
+        return _atomicBasisSets.crbegin();
+    }
+
+    reverse_iterator
+    rend() noexcept
+    {
+        return _atomicBasisSets.rend();
+    }
+    const_reverse_iterator
+    rend() const noexcept
+    {
+        return _atomicBasisSets.rend();
+    }
+    const_reverse_iterator
+    crend() const noexcept
+    {
+        return _atomicBasisSets.crend();
+    }
+    /** @}*/
 };
+
+/**
+ Converts molecular basis object to text output and insert it into output
+ text stream.
+
+ @param output the output text stream.
+ @param source the molecular basis object.
+ */
+std::ostream& operator<<(std::ostream& output, const CMolecularBasis& source);
 
 #endif /* MolecularBasis_hpp */

@@ -9,8 +9,11 @@
 #ifndef StringFormat_hpp
 #define StringFormat_hpp
 
+#include <array>
 #include <cstdint>
+#include <sstream>
 #include <string>
+#include <vector>
 
 #include "FmtType.hpp"
 
@@ -119,6 +122,36 @@ int32_t to_AngularMomentum(const std::string& label);
  */
 std::string to_AngularMomentum(const int32_t angularmomentum);
 
+template <typename T>
+auto
+stream_collection(const T& coll) -> std::string
+{
+    std::ostringstream os;
+    bool               first = true;
+    os << "[";
+    for (auto elem : coll)
+    {
+        if (!first) os << ", ";
+        os << elem;
+        first = false;
+    }
+    os << "]";
+    return os.str();
+}
 }  // namespace fstr
+
+template <typename T, size_t D>
+auto
+operator<<(std::ostream& os, const std::array<T, D>& coll) -> std::ostream&
+{
+    return (os << fstr::stream_collection(coll));
+}
+
+template <typename T>
+auto
+operator<<(std::ostream& os, const std::vector<T>& coll) -> std::ostream&
+{
+    return (os << fstr::stream_collection(coll));
+}
 
 #endif /* StringFormat_hpp */

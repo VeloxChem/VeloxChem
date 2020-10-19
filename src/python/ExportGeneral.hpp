@@ -83,6 +83,19 @@ py::array_t<int32_t> pointer_to_numpy(const int32_t* ptr, const int32_t nElement
 py::array_t<int32_t> pointer_to_numpy(const int32_t* ptr, const int32_t nRows, const int32_t nColumns);
 
 /**
+ Bind overloaded functions in a less verbose fashion
+
+ Use as:
+
+    vlx_general::overload_cast_<argument-list>()(name-of-function)
+
+ NOTE This is a workaround for C++11 usage of pybind11::overload_cast.
+ See: https://pybind11.readthedocs.io/en/stable/classes.html#overloaded-methods
+ */
+template <typename... Args>
+using overload_cast_ = py::detail::overload_cast_impl<Args...>;
+
+/**
  Exports classes/functions in src/general to python.
  */
 void export_general(py::module& m);
