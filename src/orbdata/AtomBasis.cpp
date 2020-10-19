@@ -8,6 +8,8 @@
 
 #include "AtomBasis.hpp"
 
+#include <sstream>
+
 #include "ChemicalElement.hpp"
 #include "MpiFunc.hpp"
 #include "StringFormat.hpp"
@@ -278,27 +280,33 @@ CAtomBasis::broadcast(int32_t rank, MPI_Comm comm)
     }
 }
 
+std::string CAtomBasis::repr() const {
+    std::ostringstream os;
+
+    os << std::endl;
+
+    os << "[CAtomBasis (Object):" << this << "]" << std::endl;
+
+    os << "_idElemental: " << _idElemental << std::endl;
+
+    os << "_maxAngularMomentum: " << _maxAngularMomentum;
+
+    os << std::endl;
+
+    os << "_basisFunctions: " << std::endl;
+
+    for (size_t i = 0; i < _basisFunctions.size(); i++)
+    {
+        os << "_basisFunctions[" << i << "]: " << std::endl;
+
+        os << _basisFunctions[i] << std::endl;
+    }
+
+    return os.str();
+}
+
 std::ostream&
 operator<<(std::ostream& output, const CAtomBasis& source)
 {
-    output << std::endl;
-
-    output << "[CAtomBasis (Object):" << &source << "]" << std::endl;
-
-    output << "_idElemental: " << source._idElemental << std::endl;
-
-    output << "_maxAngularMomentum: " << source._maxAngularMomentum;
-
-    output << std::endl;
-
-    output << "_basisFunctions: " << std::endl;
-
-    for (size_t i = 0; i < source._basisFunctions.size(); i++)
-    {
-        output << "_basisFunctions[" << i << "]: " << std::endl;
-
-        output << source._basisFunctions[i] << std::endl;
-    }
-
-    return output;
+    return (output << source.repr());
 }
