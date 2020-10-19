@@ -9,7 +9,7 @@ from .veloxchemlib import XTBDriver
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
-from .gradientdriver import GradientDriver
+from .scfgradientdriver import ScfGradientDriver
 from .xtbgradientdriver import XTBGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .xtboptimizationdriver import XTBOptimizationDriver
@@ -113,10 +113,11 @@ def main():
         if use_xtb:
             xtb_drv = XTBDriver(task.mpi_comm)
             xtb_drv.compute(task.molecule, method_dict['xtb'].lower())
-            for line in xtb_drv.get_output():
-                task.ostream.print_line(line)
-            if os.path.isfile(xtb_drv.get_output_filename()):
-                os.remove(xtb_drv.get_output_filename())
+            if task.mpi_rank == mpi_master():
+                for line in xtb_drv.get_output():
+                    task.ostream.print_line(line)
+                if os.path.isfile(xtb_drv.get_output_filename()):
+                    os.remove(xtb_drv.get_output_filename())
         else:
             nalpha = task.molecule.number_of_alpha_electrons()
             nbeta = task.molecule.number_of_beta_electrons()
@@ -138,14 +139,11 @@ def main():
     # Gradient
 
     if task_type == 'gradient':
-        grad_drv = GradientDriver(task.mpi_comm, task.ostream)
-        grad_drv.update_settings(scf_dict, method_dict)
         if use_xtb:
-            grad_drv = XTBGradientDriver(task.mpi_comm, xtb_drv, task.ostream)
+            grad_drv = XTBGradientDriver(task.mpi_comm, task.ostream, xtb_drv)
             grad_drv.compute(task.molecule)
         elif scf_drv.restricted:
-            grad_drv = GradientDriver(task.mpi_comm, task.ostream)
-            grad_drv.update_settings(scf_dict, method_dict)
+            grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream, scf_drv)
             grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Geometry optimization
