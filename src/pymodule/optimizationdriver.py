@@ -141,4 +141,29 @@ class OptimizationDriver:
             final_mol = Molecule()
         final_mol.broadcast(self.rank, self.comm)
 
+        if self.rank == mpi_master():
+            self.print_scan_result()
+
         return final_mol
+
+    def print_scan_result(self):
+
+        scan_file = 'scan-final.xyz'
+
+        self.ostream.print_blank()
+        self.ostream.print_info('Summary of geometry scan:')
+
+        if '$scan' in self.constraints and os.path.isfile(scan_file):
+            with open(scan_file, 'r') as fh:
+                while True:
+                    line = fh.readline()
+                    if not line:
+                        break
+                    natoms = int(line.split()[0])
+                    line = fh.readline()
+                    self.ostream.print_info(line.strip())
+                    for i in range(natoms):
+                        line = fh.readline()
+
+        self.ostream.print_blank()
+        self.ostream.flush()
