@@ -17,7 +17,7 @@ def test_input_dict(mock_parse):
     ip = InputParser('foo.inp')
 
     assert mock_parse.called
-    assert ip.filename == 'foo.inp'
+    assert ip.inpname == 'foo.inp'
     assert ip.outname is None
     assert ip.input_dict == {}
     assert ip.get_dict() is ip.input_dict
@@ -191,7 +191,7 @@ def test_convert_dict(mock_parse, grouped, todict):
 
         ip = InputParser('foo.inp')
         expected = {
-            'input_file': 'foo.inp',
+            'filename': 'foo',
             'scf': {
                 'checkpoint_file': 'foo.scf.h5'
             },
@@ -244,7 +244,7 @@ def test_convert_dict_with_output_file(mock_parse, grouped, todict):
 
     ip = InputParser('bar.inp', 'foo.out')
     expected = {
-        'input_file': 'bar.inp',
+        'filename': 'foo',
         'scf': {
             'checkpoint_file': 'foo.scf.h5'
         },
@@ -293,7 +293,7 @@ def test_full_input(tmpdir):
         ip = InputParser(str(tmpdir / 'h2o.inp'))
 
         expected = {
-            'input_file': str(tmpdir / 'h2o.inp'),
+            'filename': str(tmpdir / 'h2o'),
             'scf': {
                 'checkpoint_file': str(tmpdir / 'h2o.scf.h5')
             },
