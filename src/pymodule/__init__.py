@@ -11,7 +11,6 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import TwoIndexes
 from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import ExcitationVector
-from .veloxchemlib import XTBDriver
 
 # C++ functions
 from .veloxchemlib import mpi_master
@@ -40,7 +39,9 @@ from .molecularorbitals import MolecularOrbitals
 from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
-from .gradientdriver import GradientDriver
+from .scfgradientdriver import ScfGradientDriver
+from .xtbdriver import XTBDriver
+from .xtbgradientdriver import XTBGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver

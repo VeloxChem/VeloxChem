@@ -5,11 +5,11 @@ import os
 
 from .veloxchemlib import mpi_initialized
 from .veloxchemlib import mpi_master
-from .veloxchemlib import XTBDriver
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfgradientdriver import ScfGradientDriver
+from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .rsplinabscross import LinearAbsorptionCrossSection
@@ -112,12 +112,7 @@ def main():
         if use_xtb:
             xtb_drv = XTBDriver(task.mpi_comm)
             xtb_drv.set_method(method_dict['xtb'].lower())
-            xtb_drv.compute(task.molecule)
-            if task.mpi_rank == mpi_master():
-                for line in xtb_drv.get_output():
-                    task.ostream.print_line(line)
-                if os.path.isfile(xtb_drv.get_output_filename()):
-                    os.remove(xtb_drv.get_output_filename())
+            xtb_drv.compute(task.molecule, task.ostream)
         else:
             nalpha = task.molecule.number_of_alpha_electrons()
             nbeta = task.molecule.number_of_beta_electrons()
@@ -156,12 +151,10 @@ def main():
 
         if use_xtb:
             grad_drv = XTBGradientDriver(task.mpi_comm, task.ostream, xtb_drv)
-            opt_drv = OptimizationDriver(task.mpi_comm, task.ostream,
-                                         sys.argv[1], xtb_drv, grad_drv, 'XTB')
+            opt_drv = OptimizationDriver(sys.argv[1], grad_drv, 'XTB')
         elif scf_drv.restricted:
             grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream, scf_drv)
-            opt_drv = OptimizationDriver(task.mpi_comm, task.ostream,
-                                         sys.argv[1], scf_drv, grad_drv, 'SCF')
+            opt_drv = OptimizationDriver(sys.argv[1], grad_drv, 'SCF')
 
         opt_drv.update_settings(opt_dict)
         opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)

@@ -27,19 +27,18 @@ class OptimizationDriver:
         - transition: The flag for transition state searching.
         - hessian: The flag for computing Hessian.
         - input_filename: The input filename.
-        - energy_driver: The energy driver.
-        - gradient_driver: The gradient driver.
+        - grad_drv: The gradient driver.
         - flag: The type of the optimization driver.
     """
 
-    def __init__(self, comm, ostream, inp_fname, ener_drv, grad_drv, flag):
+    def __init__(self, inp_fname, grad_drv, flag):
         """
         Initializes optimization driver.
         """
 
-        self.comm = comm
-        self.rank = comm.Get_rank()
-        self.ostream = ostream
+        self.comm = grad_drv.comm
+        self.rank = grad_drv.comm.Get_rank()
+        self.ostream = grad_drv.ostream
 
         self.coordsys = 'tric'
         self.check_interval = 0
@@ -49,8 +48,7 @@ class OptimizationDriver:
         self.hessian = 'never'
 
         self.input_filename = inp_fname
-        self.energy_driver = ener_drv
-        self.gradient_driver = grad_drv
+        self.grad_drv = grad_drv
         self.flag = flag
 
     def update_settings(self, opt_dict):
@@ -97,8 +95,7 @@ class OptimizationDriver:
         """
 
         opt_engine = OptimizationEngine(molecule, ao_basis, min_basis,
-                                        self.energy_driver,
-                                        self.gradient_driver, self.flag)
+                                        self.grad_drv, self.flag)
 
         # input_fname is used by geomeTRIC to create .log and other files. On
         # master node input_fname is determined based on the checkpoint file.

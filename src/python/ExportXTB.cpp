@@ -58,7 +58,7 @@ export_xtb(py::module& m)
         .def("get_output_filename", &CXTBDriver::getOutputFilename)
         .def("get_energy", &CXTBDriver::getEnergy)
         .def("get_gradient", &CXTBDriver_gradient_to_numpy)
-        .def("compute", &CXTBDriver::compute);
+        .def("_compute", &CXTBDriver::compute);
 }
 
 }  // namespace vlx_xtb
