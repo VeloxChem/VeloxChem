@@ -71,6 +71,8 @@ class OptimizationEngine(geometric.engine.Engine):
 
         if self.rank == mpi_master():
             new_mol = Molecule(labels, coords.reshape(-1, 3), units='au')
+            new_mol.set_charge(self.vlx_molecule.get_charge())
+            new_mol.set_multiplicity(self.vlx_molecule.get_multiplicity())
         else:
             new_mol = Molecule()
         new_mol.broadcast(self.rank, self.comm)
