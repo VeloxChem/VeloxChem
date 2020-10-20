@@ -26,12 +26,12 @@ class OptimizationDriver:
           coordinate system.
         - transition: The flag for transition state searching.
         - hessian: The flag for computing Hessian.
-        - input_filename: The input filename.
+        - filename: The filename that will be used by geomeTRIC.
         - grad_drv: The gradient driver.
         - flag: The type of the optimization driver.
     """
 
-    def __init__(self, inp_fname, grad_drv, flag):
+    def __init__(self, filename, grad_drv, flag):
         """
         Initializes optimization driver.
         """
@@ -41,13 +41,13 @@ class OptimizationDriver:
         self.ostream = grad_drv.ostream
 
         self.coordsys = 'tric'
-        self.check_interval = 0
         self.constraints = None
+        self.check_interval = 0
 
         self.transition = False
         self.hessian = 'never'
 
-        self.input_filename = inp_fname
+        self.filename = filename
         self.grad_drv = grad_drv
         self.flag = flag
 
@@ -57,18 +57,14 @@ class OptimizationDriver:
 
         :param opt_dict:
             The input dictionary of optimize group.
-        :param scf_dict:
-            The input dictionary of scf group.
-        :param method_dict:
-            The input dicitonary of method settings group.
         """
 
         if 'coordsys' in opt_dict:
             self.coordsys = opt_dict['coordsys'].lower()
+        if 'constraints' in opt_dict:
+            self.constraints = list(opt_dict['constraints'])
         if 'check_interval' in opt_dict:
             self.check_interval = int(opt_dict['check_interval'])
-        if 'constraints' in opt_dict:
-            self.constraints = opt_dict['constraints']
 
         if 'transition' in opt_dict:
             key = opt_dict['transition'].lower()
@@ -97,22 +93,22 @@ class OptimizationDriver:
         opt_engine = OptimizationEngine(molecule, ao_basis, min_basis,
                                         self.grad_drv, self.flag)
 
-        # input_fname is used by geomeTRIC to create .log and other files. On
-        # master node input_fname is determined based on the checkpoint file.
-        # On other nodes input_fname points to file in a temporary directory.
-
-        if self.rank == mpi_master():
-            suffix = '.inp'
-            if self.input_filename[-len(suffix):] == suffix:
-                input_fname = self.input_filename[:-len(suffix)]
-            else:
-                input_fname = self.input_filename
+        # filename is used by geomeTRIC to create .log and other files. On
+        # master node filename is determined based on the input/output file.
+        # On other nodes filename points to file in a temporary directory.
 
         with tempfile.TemporaryDirectory() as temp_dir:
+            if self.rank == mpi_master():
+                filename = self.filename
+            else:
+                filename = os.path.join(temp_dir, 'tmp_{:d}'.format(self.rank))
 
-            if self.rank != mpi_master():
-                input_fname = os.path.join(temp_dir,
-                                           'tmp_{:d}'.format(self.rank))
+            if self.constraints is not None:
+                constr_filename = filename + '_constr.txt'
+                with open(constr_filename, 'w') as fh:
+                    fh.write(os.linesep.join(self.constraints))
+            else:
+                constr_filename = None
 
             # geomeTRIC prints information to stdout and stderr. On master node
             # this is redirected to the output stream. On other nodes this is
@@ -131,10 +127,10 @@ class OptimizationDriver:
                             customengine=opt_engine,
                             coordsys=self.coordsys,
                             check=self.check_interval,
-                            constraints=self.constraints,
+                            constraints=constr_filename,
                             transition=self.transition,
                             hessian=self.hessian,
-                            input=input_fname)
+                            input=filename)
 
         coords = m.xyzs[-1] / geometric.nifty.bohr2ang
         labels = molecule.get_labels()

@@ -151,10 +151,12 @@ def main():
 
         if use_xtb:
             grad_drv = XTBGradientDriver(task.mpi_comm, task.ostream, xtb_drv)
-            opt_drv = OptimizationDriver(sys.argv[1], grad_drv, 'XTB')
+            opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
+                                         'XTB')
         elif scf_drv.restricted:
             grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream, scf_drv)
-            opt_drv = OptimizationDriver(sys.argv[1], grad_drv, 'SCF')
+            opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
+                                         'SCF')
 
         opt_drv.update_settings(opt_dict)
         opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
