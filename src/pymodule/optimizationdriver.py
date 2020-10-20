@@ -142,28 +142,42 @@ class OptimizationDriver:
         final_mol.broadcast(self.rank, self.comm)
 
         if self.rank == mpi_master():
-            self.print_scan_result()
+            self.print_scan_result(m)
 
         return final_mol
 
-    def print_scan_result(self):
+    def print_scan_result(self, progress):
+        """
+        Prints summary of geometry scan.
 
-        scan_file = 'scan-final.xyz'
+        :param progress:
+            The geomeTRIC progress of geometry scan.
+        """
 
         self.ostream.print_blank()
-        self.ostream.print_info('Summary of geometry scan:')
+        self.ostream.print_header('Summary of Geometry Scan')
+        self.ostream.print_header('=' * 26)
+        self.ostream.print_blank()
 
-        if '$scan' in self.constraints and os.path.isfile(scan_file):
-            with open(scan_file, 'r') as fh:
-                while True:
-                    line = fh.readline()
-                    if not line:
-                        break
-                    natoms = int(line.split()[0])
-                    line = fh.readline()
-                    self.ostream.print_info(line.strip())
-                    for i in range(natoms):
-                        line = fh.readline()
+        scans = []
+
+        for step, energy in zip(progress.comms, progress.qm_energies):
+            if step.split()[:2] == ['Iteration', '0']:
+                scans.append([])
+            scans[-1].append(energy)
+
+        energies = [s[-1] for s in scans]
+
+        e_min = min(energies)
+        relative_energies = [e - e_min for e in energies]
+
+        line = ' {:<5s}{:>30s}{:>35s} '.format('Scan', 'Energy (a.u.)',
+                                               'Relative Energy (a.u.)')
+        self.ostream.print_header(line)
+        self.ostream.print_header('-' * len(line))
+        for i, (e, rel_e) in enumerate(zip(energies, relative_energies)):
+            line = '{:<5d}{:30.12f}{:30.12f}'.format(i + 1, e, rel_e)
+            self.ostream.print_header(line)
 
         self.ostream.print_blank()
         self.ostream.flush()
