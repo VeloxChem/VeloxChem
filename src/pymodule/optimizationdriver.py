@@ -103,7 +103,7 @@ class OptimizationDriver:
             else:
                 filename = os.path.join(temp_dir, 'tmp_{:d}'.format(self.rank))
 
-            if self.constraints is not None:
+            if self.constraints:
                 constr_filename = filename + '_constr.txt'
                 with open(constr_filename, 'w') as fh:
                     fh.write(os.linesep.join(self.constraints))
@@ -141,8 +141,9 @@ class OptimizationDriver:
             final_mol = Molecule()
         final_mol.broadcast(self.rank, self.comm)
 
-        if self.rank == mpi_master():
-            self.print_scan_result(m)
+        if self.constraints and '$scan' in self.constraints:
+            if self.rank == mpi_master():
+                self.print_scan_result(m)
 
         return final_mol
 
