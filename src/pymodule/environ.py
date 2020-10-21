@@ -9,6 +9,7 @@ def set_vlxbasispath():
         module_path = Path(__file__).parent
         environ['VLXBASISPATH'] = str(Path(module_path) / 'basis')
 
+
 def set_omp_num_threads(ncores=None):
     if ncores is not None:
         environ['OMP_NUM_THREADS'] = ncores

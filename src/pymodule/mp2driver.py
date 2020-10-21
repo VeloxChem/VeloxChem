@@ -292,24 +292,24 @@ class Mp2Driver:
         """
 
         self.ostream.print_blank()
-        self.ostream.print_header("MP2 Driver Setup")
-        self.ostream.print_header(18 * "=")
+        self.ostream.print_header('MP2 Driver Setup')
+        self.ostream.print_header(18 * '=')
         self.ostream.print_blank()
 
         str_width = 60
-        cur_str = "Number of Fock Matrices      : " + str(num_matrices)
+        cur_str = 'Number of Fock Matrices      : ' + str(num_matrices)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Size of Fock Matrices Batch  : " + str(self.batch_size)
+        cur_str = 'Size of Fock Matrices Batch  : ' + str(self.batch_size)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = "Number of Subcommunicators   : "
+        cur_str = 'Number of Subcommunicators   : '
         cur_str += str(self.nodes // self.comm_size)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = "ERI Screening Scheme         : " + get_qq_type(self.qq_type)
+        cur_str = 'ERI Screening Scheme         : ' + get_qq_type(self.qq_type)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "ERI Screening Threshold      : " + \
-            "{:.1e}".format(self.eri_thresh)
+        cur_str = 'ERI Screening Threshold      : {:.1e}'.format(
+            self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
         self.ostream.print_blank()
         self.ostream.flush()

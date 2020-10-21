@@ -1397,43 +1397,43 @@ class ScfDriver:
         """
 
         self.ostream.print_blank()
-        self.ostream.print_header("Self Consistent Field Driver Setup")
-        self.ostream.print_header(36 * "=")
+        self.ostream.print_header('Self Consistent Field Driver Setup')
+        self.ostream.print_header(36 * '=')
         self.ostream.print_blank()
 
         str_width = 84
-        cur_str = "Wave Function Model             : " + self.get_scf_type()
+        cur_str = 'Wave Function Model             : ' + self.get_scf_type()
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Initial Guess Model             : " + self.get_guess_type()
-        self.ostream.print_header(cur_str.ljust(str_width))
-
-        cur_str = "Convergence Accelerator         : " + self.get_acc_type()
-        self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Max. Number of Iterations       : " + str(self.max_iter)
-        self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Max. Number of Error Vectors    : " + str(self.max_err_vecs)
-        self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Convergence Threshold           : " + \
-            "{:.1e}".format(self.conv_thresh)
+        cur_str = 'Initial Guess Model             : ' + self.get_guess_type()
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = "ERI Screening Scheme            : " + get_qq_type(
+        cur_str = 'Convergence Accelerator         : ' + self.get_acc_type()
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = 'Max. Number of Error Vectors    : ' + str(self.max_err_vecs)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = 'Convergence Threshold           : {:.1e}'.format(
+            self.conv_thresh)
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        cur_str = 'ERI Screening Scheme            : ' + get_qq_type(
             self.qq_type)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "ERI Screening Mode              : " + self.get_qq_dyn()
+        cur_str = 'ERI Screening Mode              : ' + self.get_qq_dyn()
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "ERI Screening Threshold         : " + \
-            "{:.1e}".format(self.eri_thresh)
+        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
+            self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Linear Dependence Threshold     : " + \
-            "{:.1e}".format(self.ovl_thresh)
+        cur_str = 'Linear Dependence Threshold     : {:.1e}'.format(
+            self.ovl_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.dft:
-            cur_str = "Exchange-Correlation Functional : "
+            cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = "Molecular Grid Level            : " + str(
+            cur_str = 'Molecular Grid Level            : ' + str(
                 self.grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 

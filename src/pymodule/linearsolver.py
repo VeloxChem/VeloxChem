@@ -954,19 +954,19 @@ class LinearSolver:
 
         cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Convergence Threshold           : ' + \
-            '{:.1e}'.format(self.conv_thresh)
+        cur_str = 'Convergence Threshold           : {:.1e}'.format(
+            self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = 'ERI Screening Scheme            : ' + get_qq_type(
             self.qq_type)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'ERI Screening Threshold         : ' + \
-            '{:.1e}'.format(self.eri_thresh)
+        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
+            self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
         if self.batch_size is not None:
-            cur_str = 'Batch Size of Fock Matrices     : ' + \
-                '{:d}'.format(self.batch_size)
+            cur_str = 'Batch Size of Fock Matrices     : {:d}'.format(
+                self.batch_size)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.dft:
