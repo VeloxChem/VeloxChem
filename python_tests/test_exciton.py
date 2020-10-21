@@ -1,8 +1,7 @@
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
-import os
-from pathlib import Path
 
 from veloxchem.veloxchemlib import DenseMatrix
 from veloxchem.veloxchemlib import OverlapMatrix
@@ -146,12 +145,12 @@ class TestExciton(unittest.TestCase):
             self.assertTrue(eigval_diff < threshold)
 
             for ind in range(len(exciton_drv.monomers)):
-                scf_h5 = 'monomer_{:d}.scf.h5'.format(ind + 1)
-                rsp_h5 = 'monomer_{:d}.rsp.h5'.format(ind + 1)
-                if os.path.isfile(scf_h5):
-                    os.remove(scf_h5)
-                if os.path.isfile(rsp_h5):
-                    os.remove(rsp_h5)
+                scf_h5 = Path('monomer_{:d}.scf.h5'.format(ind + 1))
+                rsp_h5 = Path('monomer_{:d}.rsp.h5'.format(ind + 1))
+                if scf_h5.is_file():
+                    scf_h5.unlink()
+                if rsp_h5.is_file():
+                    rsp_h5.unlink()
 
     def test_exciton_model_rhf(self):
 

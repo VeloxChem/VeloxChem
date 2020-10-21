@@ -1,7 +1,7 @@
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
-import os
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
@@ -13,10 +13,9 @@ class TestE2(unittest.TestCase):
 
     def test_E2_Be(self):
 
-        inpfile = os.path.join('inputs', 'be.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
-        outfile = inpfile.replace('.inp', '.out')
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'be.inp')
+        outfile = str(here / 'inputs' / 'be.out')
 
         task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)

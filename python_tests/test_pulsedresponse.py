@@ -1,9 +1,8 @@
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
 import h5py
-import os
-from pathlib import Path
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -111,14 +110,14 @@ class TestComplexResponse(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
 
-        h5_file = '{}.h5'.format(cls.h5fname)
-        txt_file = '{}.txt'.format(cls.h5fname)
+        h5_file = Path('{}.h5'.format(cls.h5fname))
+        txt_file = Path('{}.txt'.format(cls.h5fname))
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            if os.path.isfile(h5_file):
-                os.remove(h5_file)
-            if os.path.isfile(txt_file):
-                os.remove(txt_file)
+            if h5_file.is_file():
+                h5_file.unlink()
+            if txt_file.is_file():
+                txt_file.unlink()
 
     def test_center_freq_peak(self):
 

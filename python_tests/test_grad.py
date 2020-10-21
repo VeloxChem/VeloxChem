@@ -1,7 +1,7 @@
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
-import os
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
@@ -30,9 +30,8 @@ class TestGrad(unittest.TestCase):
 
     def test_nh3(self):
 
-        inpfile = os.path.join('inputs', 'nh3.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'nh3.inp')
 
         ref_grad = np.array([
             [0.0133714, -0.0004248, -0.0062534, -0.0066932],
