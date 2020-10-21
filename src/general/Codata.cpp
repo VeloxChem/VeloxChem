@@ -23,6 +23,12 @@ getHartreeValueInElectronVolts()
 }
 
 double
+getHartreeValueInKiloCaloriePerMole()
+{
+    return 627.50947428;
+}
+
+double
 getRotatoryStrengthInCGS()
 {
     // Derived from Bohr radius (a0), elementary charge (e),

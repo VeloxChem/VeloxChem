@@ -19,6 +19,7 @@ from .veloxchemlib import ao_matrix_to_veloxchem
 from .veloxchemlib import ao_matrix_to_dalton
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import hartree_in_ev
+from .veloxchemlib import hartree_in_kcalpermol
 from .veloxchemlib import mathconst_pi
 
 # C++ enums

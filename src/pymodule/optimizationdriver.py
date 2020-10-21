@@ -5,6 +5,7 @@ import contextlib
 import geometric
 
 from .veloxchemlib import mpi_master
+from .veloxchemlib import hartree_in_kcalpermol
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 
@@ -172,12 +173,14 @@ class OptimizationDriver:
         e_min = min(energies)
         relative_energies = [e - e_min for e in energies]
 
-        line = ' {:<5s}{:>30s}{:>35s} '.format('Scan', 'Energy (a.u.)',
-                                               'Relative Energy (a.u.)')
+        line = '{:>5s}{:>20s}  {:>25s}{:>30s}'.format(
+            'Scan', 'Energy (a.u.)', 'Relative Energy (a.u.)',
+            'Relative Energy (kcal/mol)')
         self.ostream.print_header(line)
         self.ostream.print_header('-' * len(line))
         for i, (e, rel_e) in enumerate(zip(energies, relative_energies)):
-            line = '{:<5d}{:30.12f}{:30.12f}'.format(i + 1, e, rel_e)
+            line = '{:>5d}{:22.12f}{:22.12f}   {:25.10f}     '.format(
+                i + 1, e, rel_e, rel_e * hartree_in_kcalpermol())
             self.ostream.print_header(line)
 
         self.ostream.print_blank()
