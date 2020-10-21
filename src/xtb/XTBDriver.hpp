@@ -127,6 +127,13 @@ class CXTBDriver
     void setMethod(const std::string method);
 
     /**
+     Sets output filename.
+     
+     @param filename the output filename.
+     */ 
+    void setOutputFilename(const std::string filename);
+
+    /**
      Computes DTB-B single point energy using XTB package.
 
      @param molecule the molecule.

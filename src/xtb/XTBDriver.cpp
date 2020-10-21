@@ -69,7 +69,13 @@ CXTBDriver::setMethod(const std::string method)
 }
 
 void 
-CXTBDriver::compute(const CMolecule&   molecule)
+CXTBDriver::setOutputFilename(const std::string filename)
+{
+    _outputFilename = filename; 
+}
+
+void 
+CXTBDriver::compute(const CMolecule& molecule)
 {
 #ifdef ENABLE_XTB
     if (isMasterNode())
