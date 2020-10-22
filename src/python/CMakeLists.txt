@@ -7,7 +7,7 @@ find_python_module(mpi4py REQUIRED)
 if(mpi4py_FOUND)
   execute_process(
     COMMAND
-      "${PYTHON_EXECUTABLE}" "-c"
+      "${Python3_EXECUTABLE}" "-c"
       "import mpi4py as m; print(m.__version__); print(m.get_include());"
     RESULT_VARIABLE
       _mpi4py_SEARCH_SUCCESS
@@ -41,7 +41,7 @@ endif()
 # * use pybind11 header files with -isystem
 # * explicitly disable LTO, even for release builds
 pybind11_add_module(veloxchemlib
-  MODULE SYSTEM NO_EXTRAS
+  MODULE NO_EXTRAS
     ${CMAKE_CURRENT_LIST_DIR}/ExportDFT.cpp
     ${CMAKE_CURRENT_LIST_DIR}/ExportGeneral.cpp
     ${CMAKE_CURRENT_LIST_DIR}/ExportMath.cpp

@@ -31,7 +31,7 @@ foreach(_f IN LISTS _vlx_pytests)
     NAME
       ${_name}
     COMMAND
-      ${PYTHON_EXECUTABLE} -m pytest -v -s ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/../tests/${_f}
+      ${Python3_EXECUTABLE} -m pytest -v -s ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/../tests/${_f}
     WORKING_DIRECTORY
       ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/..
     )

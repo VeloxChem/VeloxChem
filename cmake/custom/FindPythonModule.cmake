@@ -38,14 +38,14 @@ macro(find_python_module module)
     set(${module}_tgtver ${ARG_EXACT})
   else()
     # deceive handle_standard_arguments into not caring about version
-    set(_${module}_requested_version_found "${PYTHON_EXECUTABLE}")
+    set(_${module}_requested_version_found "${Python3_EXECUTABLE}")
   endif()
 
   unset(PY_${module} CACHE)
   unset(${module}_VERSION CACHE)
 
   execute_process(
-    COMMAND "${PYTHON_EXECUTABLE}" "-c"
+    COMMAND "${Python3_EXECUTABLE}" "-c"
             "import re; \
              import ${module}; \
              print(re.compile('/__init__.py.*').sub('', ${module}.__file__))"
@@ -57,7 +57,7 @@ macro(find_python_module module)
   if(NOT ${_${module}_status})
     set(PY_${module} ${_${module}_location} CACHE STRING "Location of Python module ${module}" FORCE)
     execute_process(
-      COMMAND "${PYTHON_EXECUTABLE}" "-c"
+      COMMAND "${Python3_EXECUTABLE}" "-c"
               "import sys; \
                import ${module}; \
                print(${module}.__version__)"
@@ -72,7 +72,7 @@ macro(find_python_module module)
 
       if(${module}_tgtver)
         execute_process(
-          COMMAND "${PYTHON_EXECUTABLE}" "-c"
+          COMMAND "${Python3_EXECUTABLE}" "-c"
                   "from pkg_resources import parse_version; \
                    print(parse_version('${${module}_VERSION}') ${_op} parse_version('${${module}_tgtver}'))"
           RESULT_VARIABLE _${module}_verenuf_status
@@ -82,7 +82,7 @@ macro(find_python_module module)
           )
         if(NOT ${_${module}_verenuf_status})
           if(${_${module}_verenuf} STREQUAL "True")
-            set(_${module}_requested_version_found "${PYTHON_EXECUTABLE}")
+            set(_${module}_requested_version_found "${Python3_EXECUTABLE}")
           endif()
         endif()
       endif()

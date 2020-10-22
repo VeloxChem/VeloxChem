@@ -54,6 +54,7 @@ include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_default_build_paths.cma
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_safeguards.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/alignment.cmake)
 # download pybind11 if not available on the system
+find_package(Python3 3.6 REQUIRED COMPONENTS Interpreter Development NumPy)
 include(${PROJECT_SOURCE_DIR}/external/upstream/fetch_pybind11.cmake)
 # TODO code coverage
 include(${PROJECT_SOURCE_DIR}/cmake/custom/vlx.cmake)
