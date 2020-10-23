@@ -25,6 +25,7 @@ class OptimizationDriver:
         - constraints: The constraints.
         - check_interval: The interval (number of steps) for checking
           coordinate system.
+        - max_iter: The maximum number of optimization steps
         - transition: The flag for transition state searching.
         - hessian: The flag for computing Hessian.
         - filename: The filename that will be used by geomeTRIC.
@@ -44,6 +45,7 @@ class OptimizationDriver:
         self.coordsys = 'tric'
         self.constraints = None
         self.check_interval = 0
+        self.max_iter = 300
 
         self.transition = False
         self.hessian = 'never'
@@ -64,8 +66,16 @@ class OptimizationDriver:
             self.coordsys = opt_dict['coordsys'].lower()
         if 'constraints' in opt_dict:
             self.constraints = list(opt_dict['constraints'])
+
         if 'check_interval' in opt_dict:
             self.check_interval = int(opt_dict['check_interval'])
+        elif 'check' in opt_dict:
+            self.check_interval = int(opt_dict['check'])
+
+        if 'max_iter' in opt_dict:
+            self.max_iter = int(opt_dict['max_iter'])
+        elif 'maxiter' in opt_dict:
+            self.max_iter = int(opt_dict['maxiter'])
 
         if 'transition' in opt_dict:
             key = opt_dict['transition'].lower()
@@ -128,6 +138,7 @@ class OptimizationDriver:
                             customengine=opt_engine,
                             coordsys=self.coordsys,
                             check=self.check_interval,
+                            maxiter=self.max_iter,
                             constraints=constr_filename,
                             transition=self.transition,
                             hessian=self.hessian,
