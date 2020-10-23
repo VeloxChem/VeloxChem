@@ -1,4 +1,6 @@
-import os
+from pathlib import PurePath
+from pathlib import Path
+from os import devnull
 import sys
 import tempfile
 import contextlib
@@ -111,29 +113,35 @@ class OptimizationDriver:
         with tempfile.TemporaryDirectory() as temp_dir:
             if self.rank == mpi_master():
                 filename = self.filename
+                logfile = Path(filename + '.log')
+                if logfile.is_file():
+                    logfile.unlink()
             else:
-                filename = os.path.join(temp_dir, 'tmp_{:d}'.format(self.rank))
+                filename = PurePath(self.filename).name
+                filename = str(
+                    Path(temp_dir) / '{:s}_{:d}'.format(filename, self.rank))
 
             if self.constraints:
                 constr_filename = filename + '_constr.txt'
                 with open(constr_filename, 'w') as fh:
-                    fh.write(os.linesep.join(self.constraints))
+                    for line in self.constraints:
+                        print(line, file=fh)
             else:
                 constr_filename = None
 
             # geomeTRIC prints information to stdout and stderr. On master node
             # this is redirected to the output stream. On other nodes this is
-            # redirected to os.devnull.
+            # redirected to devnull.
 
-            with open(os.devnull, 'w') as devnull:
+            with open(devnull, 'w') as f_devnull:
 
                 if self.rank == mpi_master():
-                    fh = sys.stdout
+                    f_out = sys.stdout
                 else:
-                    fh = devnull
+                    f_out = f_devnull
 
-                with contextlib.redirect_stdout(fh):
-                    with contextlib.redirect_stderr(fh):
+                with contextlib.redirect_stdout(f_out):
+                    with contextlib.redirect_stderr(f_out):
                         m = geometric.optimize.run_optimizer(
                             customengine=opt_engine,
                             coordsys=self.coordsys,
@@ -158,12 +166,14 @@ class OptimizationDriver:
                 self.print_scan_result(m)
             else:
                 self.print_opt_result(m)
+            if self.hessian in ['last', 'first+last', 'each']:
+                self.print_vib_analysis('vdata_last')
 
         return final_mol
 
     def print_opt_result(self, progress):
         """
-        Prints summary of geometry scan.
+        Prints summary of geometry optimization.
 
         :param progress:
             The geomeTRIC progress of geometry scan.
@@ -226,6 +236,31 @@ class OptimizationDriver:
             line = '{:>5d}{:22.12f}{:22.12f}   {:25.10f}     '.format(
                 i + 1, e, rel_e, rel_e * hartree_in_kcalpermol())
             self.ostream.print_header(line)
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def print_vib_analysis(self, vdata_label):
+        """
+        Prints summary of vibrational analysis.
+
+        :param vdata_label:
+            The label of vdata filename.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Summary of Vibrational Analysis')
+        self.ostream.print_header('=' * 31)
+
+        text = []
+        with open(self.filename + '.' + vdata_label) as fh:
+            for line in fh:
+                if line[:2] == '# ':
+                    text.append(line[2:].strip())
+
+        maxlen = max([len(line) for line in text])
+        for line in text:
+            self.ostream.print_header(line.ljust(maxlen))
 
         self.ostream.print_blank()
         self.ostream.flush()
