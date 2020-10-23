@@ -153,11 +153,44 @@ class OptimizationDriver:
             final_mol = Molecule()
         final_mol.broadcast(self.rank, self.comm)
 
-        if self.constraints and '$scan' in self.constraints:
-            if self.rank == mpi_master():
+        if self.rank == mpi_master():
+            if self.constraints and '$scan' in self.constraints:
                 self.print_scan_result(m)
+            else:
+                self.print_opt_result(m)
 
         return final_mol
+
+    def print_opt_result(self, progress):
+        """
+        Prints summary of geometry scan.
+
+        :param progress:
+            The geomeTRIC progress of geometry scan.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Summary of Geometry Optimization')
+        self.ostream.print_header('=' * 34)
+        self.ostream.print_blank()
+
+        energies = list(progress.qm_energies)
+
+        e_min = min(energies)
+        relative_energies = [e - e_min for e in energies]
+
+        line = '{:>8s}{:>20s}  {:>25s}{:>30s}'.format(
+            'Opt.Step', 'Energy (a.u.)', 'Relative Energy (a.u.)',
+            'Relative Energy (kcal/mol)')
+        self.ostream.print_header(line)
+        self.ostream.print_header('-' * len(line))
+        for i, (e, rel_e) in enumerate(zip(energies, relative_energies)):
+            line = '{:>5d}   {:22.12f}{:22.12f}   {:25.10f}     '.format(
+                i, e, rel_e, rel_e * hartree_in_kcalpermol())
+            self.ostream.print_header(line)
+
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def print_scan_result(self, progress):
         """
