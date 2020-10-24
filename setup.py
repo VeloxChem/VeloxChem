@@ -11,7 +11,7 @@ import os
 class MyBuildPy(SetuptoolsBuildPy):
 
     def run(self):
-        self.check_setup_file()
+        self.update_setup_file()
         python_exe = 'python{}.{}'.format(sys.version_info[0],
                                           sys.version_info[1])
         self.update_vlx_script(python_exe)
@@ -33,12 +33,10 @@ class MyBuildPy(SetuptoolsBuildPy):
             print('Error: failed to build veloxchem')
             sys.exit(1)
 
-    def check_setup_file(self):
+    def update_setup_file(self):
         setup_file = os.path.join('src', 'Makefile.setup')
-        if not os.path.isfile(setup_file):
-            template_file = os.path.join('config', 'Setup.template')
-            print('*** Generating Makefile.setup...')
-            generate_setup(template_file, setup_file)
+        template_file = os.path.join('config', 'Setup.template')
+        generate_setup(template_file, setup_file)
 
     def update_vlx_script(self, python_exe):
         vlx_file = os.path.join('src', 'vlx')
