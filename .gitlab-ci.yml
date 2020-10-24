@@ -39,7 +39,6 @@ veloxchem_test:
     - source venv/bin/activate
     - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
     - python3 get-pip.py
-    - python3 -m pip install git+https://github.com/leeping/geomeTRIC.git
     - python3 -m pip install -r requirements-dev.txt
     - python3 -m pytest -v --cov=veloxchem python_tests/
     - python3 config/generate_setup.py
