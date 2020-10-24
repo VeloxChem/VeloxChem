@@ -10,6 +10,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import hartree_in_kcalpermol
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
+from .errorhandler import assert_msg_critical
 
 
 class OptimizationDriver:
@@ -85,6 +86,8 @@ class OptimizationDriver:
 
         if 'hessian' in opt_dict:
             self.hessian = opt_dict['hessian'].lower()
+            if self.hessian == 'only':
+                self.hessian = 'stop'
         elif self.transition:
             self.hessian = 'first'
 
@@ -113,9 +116,9 @@ class OptimizationDriver:
         with tempfile.TemporaryDirectory() as temp_dir:
             if self.rank == mpi_master():
                 filename = self.filename
-                logfile = Path(filename + '.log')
-                if logfile.is_file():
-                    logfile.unlink()
+                self.clean_up_file(filename + '.log')
+                self.clean_up_file(filename + '.tmp', 'hessian', 'hessian.txt')
+                self.clean_up_file(filename + '.tmp', 'hessian', 'coords.xyz')
             else:
                 filename = PurePath(self.filename).name
                 filename = str(
@@ -142,15 +145,21 @@ class OptimizationDriver:
 
                 with contextlib.redirect_stdout(f_out):
                     with contextlib.redirect_stderr(f_out):
-                        m = geometric.optimize.run_optimizer(
-                            customengine=opt_engine,
-                            coordsys=self.coordsys,
-                            check=self.check_interval,
-                            maxiter=self.max_iter,
-                            constraints=constr_filename,
-                            transition=self.transition,
-                            hessian=self.hessian,
-                            input=filename)
+                        try:
+                            m = geometric.optimize.run_optimizer(
+                                customengine=opt_engine,
+                                coordsys=self.coordsys,
+                                check=self.check_interval,
+                                maxiter=self.max_iter,
+                                constraints=constr_filename,
+                                transition=self.transition,
+                                hessian=self.hessian,
+                                input=filename)
+                        except geometric.errors.HessianExit:
+                            if (self.rank == mpi_master() and
+                                    self.hessian == 'stop'):
+                                self.print_vib_analysis('vdata_first')
+                            return molecule
 
         coords = m.xyzs[-1] / geometric.nifty.bohr2ang
         labels = molecule.get_labels()
@@ -170,6 +179,22 @@ class OptimizationDriver:
                 self.print_vib_analysis('vdata_last')
 
         return final_mol
+
+    def clean_up_file(self, *path_list):
+        """
+        Cleans up existing geomeTRIC file.
+
+        :param path_list:
+            A list contains the path to the file.
+        """
+
+        extfile = Path(path_list[0])
+
+        for p in path_list[1:]:
+            extfile /= p
+
+        if extfile.is_file():
+            extfile.unlink()
 
     def print_opt_result(self, progress):
         """
@@ -250,10 +275,22 @@ class OptimizationDriver:
 
         self.ostream.print_blank()
         self.ostream.print_header('Summary of Vibrational Analysis')
-        self.ostream.print_header('=' * 31)
+        self.ostream.print_header('=' * 33)
+
+        hessian_file = Path(self.filename + '.tmp') / 'hessian' / 'hessian.txt'
+        vdata_file = Path(self.filename + '.' + vdata_label)
+
+        assert_msg_critical(
+            hessian_file.is_file(),
+            'OptimizationDriver: cannot find hessian file {:s}'.format(
+                str(hessian_file)))
+        assert_msg_critical(
+            vdata_file.is_file(),
+            'OptimizationDriver: cannot find vdata file {:s}'.format(
+                str(vdata_file)))
 
         text = []
-        with open(self.filename + '.' + vdata_label) as fh:
+        with open(str(vdata_file)) as fh:
             for line in fh:
                 if line[:2] == '# ':
                     text.append(line[2:].strip())
@@ -261,6 +298,12 @@ class OptimizationDriver:
         maxlen = max([len(line) for line in text])
         for line in text:
             self.ostream.print_header(line.ljust(maxlen))
+
+        valstr = 'Hessian saved in {:s}'.format(str(hessian_file))
+        self.ostream.print_header(valstr.ljust(maxlen))
+        valstr = 'Frequencies and normal modes saved in {:s}'.format(
+            str(vdata_file))
+        self.ostream.print_header(valstr.ljust(maxlen))
 
         self.ostream.print_blank()
         self.ostream.flush()
