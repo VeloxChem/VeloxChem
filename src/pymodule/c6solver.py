@@ -39,9 +39,9 @@ class C6Solver(LinearSolver):
 
         super().__init__(comm, ostream)
 
-        self.a_operator = 'dipole'
+        self.a_operator = 'electric dipole'
         self.a_components = 'xyz'
-        self.b_operator = 'dipole'
+        self.b_operator = 'electric dipole'
         self.b_components = 'xyz'
 
         self.n_points = 9
@@ -238,8 +238,8 @@ class C6Solver(LinearSolver):
         timing_dict = {}
 
         # right-hand side (gradient)
-        b_rhs = self.get_complex_rhs(self.b_operator, self.b_components,
-                                     molecule, basis, scf_tensors)
+        b_rhs = self.get_complex_prop_grad(self.b_operator, self.b_components,
+                                           molecule, basis, scf_tensors)
 
         imagfreqs = [
             self.w0 * (1 - t) / (1 + t)
@@ -525,8 +525,8 @@ class C6Solver(LinearSolver):
         profiler.print_memory_usage(self.ostream)
 
         # calculate response functions
-        a_rhs = self.get_complex_rhs(self.a_operator, self.a_components,
-                                     molecule, basis, scf_tensors)
+        a_rhs = self.get_complex_prop_grad(self.a_operator, self.a_components,
+                                           molecule, basis, scf_tensors)
 
         if self.is_converged:
             key_0 = list(solutions.keys())[0]

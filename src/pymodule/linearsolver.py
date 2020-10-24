@@ -1141,9 +1141,9 @@ class LinearSolver:
 
         return dist_new_ger, dist_new_ung
 
-    def get_rhs(self, operator, components, molecule, basis, scf_tensors):
+    def get_prop_grad(self, operator, components, molecule, basis, scf_tensors):
         """
-        Creates right-hand side of linear response equations.
+        Computes property gradients for linear response equations.
 
         :param operator:
             The string for the operator.
@@ -1157,18 +1157,19 @@ class LinearSolver:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
-            The right-hand sides (gradients).
+            The property gradients.
         """
 
         # compute 1e integral
 
         assert_msg_critical(
             operator in [
-                'dipole', 'linear_momentum', 'linear momentum',
-                'angular_momentum', 'angular momentum'
-            ], 'get_rhs: unsupported operator {}'.format(operator))
+                'dipole', 'electric dipole', 'electric_dipole',
+                'linear_momentum', 'linear momentum', 'angular_momentum',
+                'angular momentum'
+            ], 'get_prop_grad: unsupported operator {}'.format(operator))
 
-        if operator == 'dipole':
+        if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
             dipole_mats = dipole_drv.compute(molecule, basis)
 
@@ -1224,10 +1225,10 @@ class LinearSolver:
         else:
             return tuple()
 
-    def get_complex_rhs(self, operator, components, molecule, basis,
-                        scf_tensors):
+    def get_complex_prop_grad(self, operator, components, molecule, basis,
+                              scf_tensors):
         """
-        Creates right-hand side of linear response equations.
+        Computes complex property gradients for linear response equations.
 
         :param operator:
             The string for the operator.
@@ -1241,18 +1242,20 @@ class LinearSolver:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
-            The right-hand sides (gradients).
+            The complex property gradients.
         """
 
         # compute 1e integral
 
         assert_msg_critical(
             operator in [
-                'dipole', 'linear_momentum', 'linear momentum',
-                'angular_momentum', 'angular momentum'
-            ], 'get_rhs: unsupported operator {}'.format(operator))
+                'dipole', 'electric dipole', 'electric_dipole',
+                'linear_momentum', 'linear momentum', 'angular_momentum',
+                'angular momentum'
+            ],
+            'get_complex_prop_grad: unsupported operator {}'.format(operator))
 
-        if operator == 'dipole':
+        if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
             dipole_mats = dipole_drv.compute(molecule, basis)
 

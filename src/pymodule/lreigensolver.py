@@ -348,12 +348,12 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # calculate properties
         if self.is_converged:
-            dipole_rhs = self.get_rhs('dipole', 'xyz', molecule, basis,
-                                      scf_tensors)
-            linmom_rhs = self.get_rhs('linear_momentum', 'xyz', molecule, basis,
-                                      scf_tensors)
-            angmom_rhs = self.get_rhs('angular_momentum', 'xyz', molecule,
-                                      basis, scf_tensors)
+            dipole_rhs = self.get_prop_grad('electric dipole', 'xyz', molecule,
+                                            basis, scf_tensors)
+            linmom_rhs = self.get_prop_grad('linear momentum', 'xyz', molecule,
+                                            basis, scf_tensors)
+            angmom_rhs = self.get_prop_grad('angular momentum', 'xyz', molecule,
+                                            basis, scf_tensors)
 
             eigvals = np.array([excitations[s][0] for s in range(self.nstates)])
 
