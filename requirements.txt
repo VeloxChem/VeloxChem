@@ -1,4 +1,5 @@
 --index-url https://pypi.python.org/simple
 
+-e git+https://github.com/maxscheurer/cppe.git#egg=cppe
 -e git+https://github.com/leeping/geomeTRIC.git#egg=geometric
 -e .
