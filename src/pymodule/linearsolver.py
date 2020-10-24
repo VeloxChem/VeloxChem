@@ -1166,7 +1166,7 @@ class LinearSolver:
             operator in [
                 'dipole', 'electric dipole', 'electric_dipole',
                 'linear_momentum', 'linear momentum', 'angular_momentum',
-                'angular momentum'
+                'angular momentum', 'magnetic dipole', 'magnetic_dipole'
             ], 'get_prop_grad: unsupported operator {}'.format(operator))
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
@@ -1196,6 +1196,17 @@ class LinearSolver:
             if self.rank == mpi_master():
                 integrals = (angmom_mats.x_to_numpy(), angmom_mats.y_to_numpy(),
                              angmom_mats.z_to_numpy())
+            else:
+                integrals = tuple()
+
+        elif operator in ['magnetic_dipole', 'magnetic dipole']:
+            angmom_drv = AngularMomentumIntegralsDriver(self.comm)
+            angmom_mats = angmom_drv.compute(molecule, basis)
+
+            if self.rank == mpi_master():
+                integrals = (-0.5 * angmom_mats.x_to_numpy(),
+                             -0.5 * angmom_mats.y_to_numpy(),
+                             -0.5 * angmom_mats.z_to_numpy())
             else:
                 integrals = tuple()
 

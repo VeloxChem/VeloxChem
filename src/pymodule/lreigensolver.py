@@ -348,12 +348,12 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # calculate properties
         if self.is_converged:
-            dipole_rhs = self.get_prop_grad('electric dipole', 'xyz', molecule,
-                                            basis, scf_tensors)
-            linmom_rhs = self.get_prop_grad('linear momentum', 'xyz', molecule,
-                                            basis, scf_tensors)
-            angmom_rhs = self.get_prop_grad('angular momentum', 'xyz', molecule,
-                                            basis, scf_tensors)
+            edip_rhs = self.get_prop_grad('electric dipole', 'xyz', molecule,
+                                          basis, scf_tensors)
+            lmom_rhs = self.get_prop_grad('linear momentum', 'xyz', molecule,
+                                          basis, scf_tensors)
+            mdip_rhs = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
+                                          basis, scf_tensors)
 
             eigvals = np.array([excitations[s][0] for s in range(self.nstates)])
 
@@ -376,9 +376,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
-                        edip = np.dot(dipole_rhs[ind], eigvec)
-                        vdip = np.dot(linmom_rhs[ind], eigvec) / (-eigvals[s])
-                        mdip = np.dot(angmom_rhs[ind], eigvec) * 0.5
+                        edip = np.dot(edip_rhs[ind], eigvec)
+                        vdip = np.dot(lmom_rhs[ind], eigvec) / (-eigvals[s])
+                        mdip = np.dot(mdip_rhs[ind], eigvec)
                         elec_trans_dipoles[s][ind] = edip
                         velo_trans_dipoles[s][ind] = vdip
                         magn_trans_dipoles[s][ind] = mdip
@@ -396,7 +396,7 @@ class LinearResponseEigenSolver(LinearSolver):
                 for s in range(self.nstates):
                     osc[s] = (2.0 / 3.0 * eigvals[s] *
                               sum(elec_trans_dipoles[s]**2))
-                    rot_vel[s] = np.dot(
+                    rot_vel[s] = -1.0 * np.dot(
                         velo_trans_dipoles[s],
                         magn_trans_dipoles[s]) * rotatory_strength_in_cgs()
 

@@ -77,7 +77,7 @@ class TestGlycol(unittest.TestCase):
                                      [-0.048419, -0.389297, 0.313643],
                                      [1.430297, 0.115747, 0.455256],
                                      [-0.921004, -1.647440, 0.072091]])
-            ref_magn_tms *= 0.5
+            ref_magn_tms *= -0.5
 
             self.assertTrue(np.max(np.abs(reigs - ref_eigs)) < 1.0e-6)
             self.assertTrue(np.max(np.abs(osc_strs - ref_osc_strs)) < 1.0e-4)
@@ -86,9 +86,7 @@ class TestGlycol(unittest.TestCase):
             for i in range(elec_tms.shape[0]):
                 if np.vdot(elec_tms[i, :], ref_elec_tms[i, :]) < 0.0:
                     elec_tms[i, :] *= -1.0
-                if np.vdot(velo_tms[i, :], ref_velo_tms[i, :]) < 0.0:
                     velo_tms[i, :] *= -1.0
-                if np.vdot(magn_tms[i, :], ref_magn_tms[i, :]) < 0.0:
                     magn_tms[i, :] *= -1.0
             self.assertTrue(np.max(np.abs(elec_tms - ref_elec_tms)) < 2.0e-4)
             self.assertTrue(np.max(np.abs(velo_tms - ref_velo_tms)) < 2.0e-4)
