@@ -122,7 +122,7 @@ class OptimizationDriver:
             else:
                 filename = PurePath(self.filename).name
                 filename = str(
-                    Path(temp_dir) / '{:s}_{:d}'.format(filename, self.rank))
+                    PurePath(temp_dir, '{:s}_{:d}'.format(filename, self.rank)))
 
             if self.constraints:
                 constr_filename = filename + '_constr.txt'
@@ -277,7 +277,7 @@ class OptimizationDriver:
         self.ostream.print_header('Summary of Vibrational Analysis')
         self.ostream.print_header('=' * 33)
 
-        hessian_file = Path(self.filename + '.tmp') / 'hessian' / 'hessian.txt'
+        hessian_file = Path(self.filename + '.tmp', 'hessian', 'hessian.txt')
         vdata_file = Path(self.filename + '.' + vdata_label)
 
         assert_msg_critical(

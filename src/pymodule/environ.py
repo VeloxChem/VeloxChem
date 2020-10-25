@@ -7,7 +7,7 @@ from sys import stdout
 def set_vlxbasispath():
     if 'VLXBASISPATH' not in environ:
         module_path = Path(__file__).parent
-        environ['VLXBASISPATH'] = str(Path(module_path) / 'basis')
+        environ['VLXBASISPATH'] = str(module_path / 'basis')
 
 
 def set_omp_num_threads(ncores=None):
