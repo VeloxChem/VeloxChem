@@ -3,6 +3,7 @@ import os
 
 from .veloxchemlib import Molecule
 from .veloxchemlib import ChemicalElement
+from .veloxchemlib import bohr_in_angstroms
 
 
 @staticmethod
@@ -167,6 +168,33 @@ def _Molecule_get_coordinates(self):
     ]).T.copy()
 
 
+def _Molecule_write_xyz(self, xyz_filename):
+    """
+    Writes molecular geometry to xyz file.
+
+    :param xyz_filename:
+        The name of the xyz file.
+    """
+
+    elem_ids = self.elem_ids_to_numpy()
+
+    xs = self.x_to_numpy() * bohr_in_angstroms()
+    ys = self.y_to_numpy() * bohr_in_angstroms()
+    zs = self.z_to_numpy() * bohr_in_angstroms()
+
+    with open(xyz_filename, 'w') as fh:
+
+        print('{:d}'.format(self.number_of_atoms()), file=fh)
+        print('', file=fh)
+
+        for elem_id, x, y, z in zip(elem_ids, xs, ys, zs):
+            elem = ChemicalElement()
+            elem.set_atom_type(elem_id)
+            print('{:<6s} {:22.12f} {:22.12f} {:22.12f}'.format(
+                elem.get_name(), x, y, z),
+                  file=fh)
+
+
 Molecule.read_str = _Molecule_read_str
 Molecule.read_xyz = _Molecule_read_xyz
 Molecule.from_dict = _Molecule_from_dict
@@ -174,3 +202,4 @@ Molecule.center_of_mass = _Molecule_center_of_mass
 Molecule.more_info = _Molecule_more_info
 Molecule.get_labels = _Molecule_get_labels
 Molecule.get_coordinates = _Molecule_get_coordinates
+Molecule.write_xyz = _Molecule_write_xyz
