@@ -282,22 +282,27 @@ def generate_setup(template_file, setup_file, user_flag=None):
     # xtb package
 
     use_xtb = 'XTBHOME' in os.environ
+
     if use_xtb:
-        xtb_root = os.environ['XTBHOME']
-        xtb_inc = os.path.join(xtb_root, 'include/xtb')
-        check_dir(xtb_inc, 'XTB Package include')
-        xtb_lib = os.path.join(xtb_root, 'lib/x86_64-linux-gnu', 'libxtb.a')
-        check_file(xtb_lib, 'XTB Package lib')
-        xtb_lib = os.path.join(xtb_root, 'lib/x86_64-linux-gnu') + " -lxtb"
-        xtb_path = os.path.join(xtb_root, 'share/xtb')
-        check_file(os.path.join(xtb_path, 'param_gfn0-xtb.txt'), 'GFN0-XTB Parameters')
-        check_file(os.path.join(xtb_path, 'param_gfn1-xtb.txt'), 'GFN1-XTB Parameters')
-        check_file(os.path.join(xtb_path, 'param_gfn2-xtb.txt'), 'GFN2-XTB Parameters')
-    else:
-        xtb_root = None
-        xtb_inc = None
-        xtb_lib = None
-        xtb_path = None 
+
+        xtb_inc = os.path.join(os.environ['XTBHOME'], 'include', 'xtb')
+        check_dir(xtb_inc, 'xtb include')
+
+        xtb_dir = os.path.join(os.environ['XTBHOME'], 'lib64')
+        check_dir(xtb_dir, 'xtb lib')
+
+        xtb_path = os.path.join(os.environ['XTBHOME'], 'share', 'xtb')
+        check_file(os.path.join(xtb_path, 'param_gfn0-xtb.txt'),
+                   'GFN0-XTB Parameters')
+        check_file(os.path.join(xtb_path, 'param_gfn1-xtb.txt'),
+                   'GFN1-XTB Parameters')
+        check_file(os.path.join(xtb_path, 'param_gfn2-xtb.txt'),
+                   'GFN2-XTB Parameters')
+
+        xtb_lib = 'XTB_INC := -I{}'.format(xtb_inc)
+        xtb_lib += os.linesep + 'XTB_LIB := -L{}'.format(xtb_dir)
+        xtb_lib += os.linesep + 'XTB_LIB += -Wl,-rpath,{} -lxtb'.format(xtb_dir)
+        xtb_lib += os.linesep + 'XTB_PATH := {}'.format(xtb_path)
 
     # google test lib
 
@@ -355,11 +360,9 @@ def generate_setup(template_file, setup_file, user_flag=None):
                 print('', file=f_mkfile)
 
                 if use_xtb:
-                    print('XTB_PATH :=', xtb_path, file=f_mkfile)
-                    print('XTB_INC := -I', xtb_inc, file=f_mkfile)
-                    print('XTB_LIB := -L', xtb_lib, file=f_mkfile)
+                    print(xtb_lib, file=f_mkfile)
                     print('', file=f_mkfile)
-                    
+
                 if gtest_root is not None and gtest_lib is not None:
                     print('GST_ROOT :=', gtest_root, file=f_mkfile)
                     print('GST_LIB :=', gtest_lib, file=f_mkfile)
