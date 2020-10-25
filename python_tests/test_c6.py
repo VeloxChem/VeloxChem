@@ -96,7 +96,7 @@ class TestC6(unittest.TestCase):
     def test_c6_hf(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/water.inp')
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -170,7 +170,7 @@ class TestC6(unittest.TestCase):
     def test_c6_dft(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/water.inp')
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -244,7 +244,7 @@ class TestC6(unittest.TestCase):
     def test_c6_dft_slda(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/water.inp')
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 

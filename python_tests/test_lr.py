@@ -15,6 +15,7 @@ from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lrsolver import LinearResponseSolver
 
+
 class TestLR(unittest.TestCase):
 
     def run_lr(self, inpfile, potfile, xcfun_label, raw_data):
@@ -56,7 +57,7 @@ class TestLR(unittest.TestCase):
     def test_lr_hf(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/water.inp')
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -79,7 +80,7 @@ class TestLR(unittest.TestCase):
     def test_lr_dft(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/water.inp')
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -102,7 +103,7 @@ class TestLR(unittest.TestCase):
     def test_lr_dft_slda(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/water.inp')
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -126,8 +127,8 @@ class TestLR(unittest.TestCase):
     def test_lr_hf_pe(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/pe_water.inp')
-        potfile = str(here / 'inputs/pe_water.pot')
+        inpfile = str(here / 'inputs' / 'pe_water.inp')
+        potfile = str(here / 'inputs' / 'pe_water.pot')
 
         xcfun_label = None
 
@@ -149,9 +150,8 @@ class TestLR(unittest.TestCase):
     def test_lr_dft_pe(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/pe_water.inp')
-        potfile = str(here / 'inputs/pe_water.pot')
-
+        inpfile = str(here / 'inputs' / 'pe_water.inp')
+        potfile = str(here / 'inputs' / 'pe_water.pot')
 
         xcfun_label = 'b3lyp'
 

@@ -13,7 +13,7 @@ class TestMolData(unittest.TestCase):
 
     def nh3_labels(self):
 
-        return ["N", "H", "H", "H"]
+        return ['N', 'H', 'H', 'H']
 
     def nh3_coords(self):
 
@@ -73,7 +73,7 @@ class TestMolData(unittest.TestCase):
     def test_get_sub_molecule(self):
 
         here = Path(__file__).parent
-        inpfile = here / 'inputs/dimer.inp'
+        inpfile = here / 'inputs' / 'dimer.inp'
         outfile = inpfile.with_suffix('.out')
 
         task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
@@ -177,13 +177,13 @@ class TestMolData(unittest.TestCase):
     def test_chemical_element(self):
 
         elem = ChemicalElement()
-        self.assertEqual("", elem.get_name())
-        elem.set_atom_type("BR")
-        self.assertEqual("Br", elem.get_name())
+        self.assertEqual('', elem.get_name())
+        elem.set_atom_type('BR')
+        self.assertEqual('Br', elem.get_name())
 
         elem2 = ChemicalElement()
         elem2.set_atom_type(35)
-        self.assertEqual("Br", elem2.get_name())
+        self.assertEqual('Br', elem2.get_name())
 
         self.assertEqual(elem, elem2)
 

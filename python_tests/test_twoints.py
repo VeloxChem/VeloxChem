@@ -147,7 +147,7 @@ class TestTwoInts(unittest.TestCase):
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
             here = Path(__file__).parent
-            h5file = here / 'inputs/dummy.h5'
+            h5file = here / 'inputs' / 'dummy.h5'
 
             f_rest.write_hdf5(h5file)
             f2 = AOFockMatrix.read_hdf5(h5file)
@@ -156,7 +156,7 @@ class TestTwoInts(unittest.TestCase):
     def test_fock_build(self):
 
         here = Path(__file__).parent
-        inpfile = here / 'inputs/h2se.inp'
+        inpfile = here / 'inputs' / 'h2se.inp'
         outfile = inpfile.with_suffix('.out')
 
         task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
@@ -181,7 +181,7 @@ class TestTwoInts(unittest.TestCase):
         # read density
 
         if rank == mpi_master():
-            densfile = str(here / 'inputs/h2se.dens.h5')
+            densfile = str(here / 'inputs' / 'h2se.dens.h5')
 
             dmat = AODensityMatrix.read_hdf5(densfile)
         else:
@@ -244,7 +244,7 @@ class TestTwoInts(unittest.TestCase):
 
         if rank == mpi_master():
 
-            twoefile = str(here / 'inputs/h2se.twoe.h5')
+            twoefile = str(here / 'inputs' / 'h2se.twoe.h5')
 
             fock_ref = AOFockMatrix.read_hdf5(twoefile)
 

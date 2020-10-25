@@ -46,7 +46,7 @@ class TestExciton(unittest.TestCase):
     def test_assemble_matrices(self):
 
         here = Path(__file__).parent
-        inpfile = here / 'inputs/dimer.inp'
+        inpfile = here / 'inputs' / 'dimer.inp'
         outfile = inpfile.with_suffix('.out')
 
         task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
@@ -120,7 +120,7 @@ class TestExciton(unittest.TestCase):
     def run_exciton_model(self, method_dict, ref_H, threshold):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/exciton.inp')
+        inpfile = str(here / 'inputs' / 'exciton.inp')
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['exciton']['checkpoint_file'] = None

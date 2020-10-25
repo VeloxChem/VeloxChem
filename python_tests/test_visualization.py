@@ -15,7 +15,7 @@ class TestVisualization(unittest.TestCase):
     def test_visualization_driver(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/h2se.inp')
+        inpfile = str(here / 'inputs' / 'h2se.inp')
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
@@ -95,5 +95,5 @@ class TestVisualization(unittest.TestCase):
         self.assertEqual(grid.values_to_numpy().shape, tuple(num_points))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

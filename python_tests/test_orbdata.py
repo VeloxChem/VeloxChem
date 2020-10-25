@@ -17,7 +17,7 @@ class TestOrbData(unittest.TestCase):
     def test_get_label(self):
 
         here = Path(__file__).parent
-        inpfile = here / 'inputs/dimer.inp'
+        inpfile = here / 'inputs' / 'dimer.inp'
         outfile = inpfile.with_suffix('.out')
 
         task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
@@ -86,7 +86,7 @@ class TestOrbData(unittest.TestCase):
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
             here = Path(__file__).parent
-            h5file = str(here / 'inputs/dummy.h5')
+            h5file = str(here / 'inputs' / 'dummy.h5')
 
             d_rest.write_hdf5(h5file)
             dummy = AODensityMatrix.read_hdf5(h5file)
@@ -139,25 +139,25 @@ class TestOrbData(unittest.TestCase):
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
             here = Path(__file__).parent
-            h5file = str(here / 'inputs/dummy.h5')
+            h5file = str(here / 'inputs' / 'dummy.h5')
 
             nuc_chg = np.array([1, 8, 1], dtype=np.int32)
             orb_rest.write_hdf5(h5file, nuc_chg, 'sto-3g')
             dummy = MolecularOrbitals.read_hdf5(h5file)
             self.assertEqual(orb_rest, dummy)
             self.assertTrue(
-                MolecularOrbitals.match_hdf5(h5file, nuc_chg, "sto-3g", True))
+                MolecularOrbitals.match_hdf5(h5file, nuc_chg, 'sto-3g', True))
 
             nuc_chg = np.array([1, 1, 8], dtype=np.int32)
             orb_unrest.write_hdf5(h5file, nuc_chg, 'cc-pvdz')
             dummy = MolecularOrbitals.read_hdf5(h5file)
             self.assertEqual(orb_unrest, dummy)
             self.assertTrue(
-                MolecularOrbitals.match_hdf5(h5file, nuc_chg, "cc-pvdz", False))
+                MolecularOrbitals.match_hdf5(h5file, nuc_chg, 'cc-pvdz', False))
 
     def test_rest_density(self):
 
-        mol = Molecule(["H", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+        mol = Molecule(['H', 'H'], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 
         arr = np.array([[.9, .2, .3], [.3, .8, .6], [.1, .5, .7]])
         ene = np.array([.7, .8, .9])
@@ -175,7 +175,7 @@ class TestOrbData(unittest.TestCase):
 
     def test_unrest_density(self):
 
-        mol = Molecule(["H", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+        mol = Molecule(['H', 'H'], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 
         arr_a = np.array([[.9, .2, .3], [.3, .8, .6], [.1, .5, .7]])
         ene_a = np.array([.7, .8, .9])

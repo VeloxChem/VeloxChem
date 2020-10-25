@@ -29,7 +29,7 @@ class TestMOIntegralsDriver(unittest.TestCase):
 
         # scf
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/h2se.inp')
+        inpfile = str(here / 'inputs' / 'h2se.inp')
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
 

@@ -14,7 +14,7 @@ class TestInitialGuess(unittest.TestCase):
     def test_sad_guess(self):
 
         here = Path(__file__).parent
-        inpfile = here / 'inputs/water.inp'
+        inpfile = here / 'inputs' / 'water.inp'
         outfile = inpfile.with_suffix('.out')
 
         task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)

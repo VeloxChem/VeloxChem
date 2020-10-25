@@ -57,7 +57,7 @@ class TestTDA(unittest.TestCase):
     def test_tda_hf(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/water.inp')
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -80,7 +80,7 @@ class TestTDA(unittest.TestCase):
     def test_tda_dft(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/water.inp')
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -103,7 +103,7 @@ class TestTDA(unittest.TestCase):
     def test_tda_dft_slda(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/water.inp')
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -127,8 +127,8 @@ class TestTDA(unittest.TestCase):
     def test_tda_hf_pe(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/pe_water.inp')
-        potfile = str(here / 'inputs/pe_water.pot')
+        inpfile = str(here / 'inputs' / 'pe_water.inp')
+        potfile = str(here / 'inputs' / 'pe_water.pot')
 
         xcfun_label = None
 
@@ -150,8 +150,8 @@ class TestTDA(unittest.TestCase):
     def test_tda_dft_pe(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/pe_water.inp')
-        potfile = str(here / 'inputs/pe_water.pot')
+        inpfile = str(here / 'inputs' / 'pe_water.inp')
+        potfile = str(here / 'inputs' / 'pe_water.pot')
 
         xcfun_label = 'b3lyp'
 

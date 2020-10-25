@@ -70,10 +70,10 @@ class TestComplexResponse(unittest.TestCase):
             subsequent tests
         """
 
-        cls.h5fname = "pulsed"
+        cls.h5fname = 'pulsed'
 
         here = Path(__file__).parent
-        inpfile = here / 'inputs/pulsed_water.inp'
+        inpfile = here / 'inputs' / 'pulsed_water.inp'
         outfile = inpfile.with_suffix('.out')
 
         task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
@@ -87,10 +87,10 @@ class TestComplexResponse(unittest.TestCase):
         pulse_input['number_pulses'] = 1
         pulse_input['centers'] = 300
         pulse_input['field_cutoff_ratio'] = 1e-5
-        pulse_input['frequency_range'] = "0.2-0.4(0.007)"
+        pulse_input['frequency_range'] = '0.2-0.4(0.007)'
         pulse_input['carrier_frequencies'] = 0.325
         pulse_input['pulse_widths'] = 50
-        pulse_input['pol_dir'] = "xyz"
+        pulse_input['pol_dir'] = 'xyz'
 
         cpp_input = {}
 
@@ -142,7 +142,7 @@ class TestComplexResponse(unittest.TestCase):
 
             if not calc_frequencies[max_index] == cloest_freq:
                 self.fail(
-                    "Amplitude max did not match center freq: {} != {}".format(
+                    'Amplitude max did not match center freq: {} != {}'.format(
                         cloest_freq, 0.325))
 
     def test_filesave(self):
@@ -168,7 +168,7 @@ class TestComplexResponse(unittest.TestCase):
             self.assertTrue(
                 len(hf.get('amplitudes')[()]) == len(hf.get('frequencies')[()]))
 
-            primary_key = "frequencies"
+            primary_key = 'frequencies'
 
             for key in directions:
                 try:
@@ -178,7 +178,7 @@ class TestComplexResponse(unittest.TestCase):
                     self.assertTrue(
                         len(hf.get(primary_key)[()]) == len(hf.get(key)[()]))
                 except ValueError:
-                    self.fail("Len of {}[{}] did not match data length {}!= {}".
+                    self.fail('Len of {}[{}] did not match data length {}!= {}'.
                               format(primary_key, key,
                                      len(hf.get('zero_padded_frequencies')[()]),
                                      len(hf.get(key)[()])))

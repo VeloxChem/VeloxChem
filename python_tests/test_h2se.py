@@ -17,7 +17,7 @@ class TestH2Se(unittest.TestCase):
     def test_h2se_scf(self):
 
         here = Path(__file__).parent
-        inpfile = here / 'inputs/h2se.inp'
+        inpfile = here / 'inputs' / 'h2se.inp'
         outfile = inpfile.with_suffix('.out')
 
         task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
@@ -53,7 +53,7 @@ class TestH2Se(unittest.TestCase):
 
         # scf
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/h2se.inp')
+        inpfile = str(here / 'inputs' / 'h2se.inp')
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)

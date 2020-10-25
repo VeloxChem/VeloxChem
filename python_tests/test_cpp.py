@@ -64,7 +64,7 @@ class TestCPP(unittest.TestCase):
     def test_cpp_hf(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/water.inp')
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -100,7 +100,7 @@ class TestCPP(unittest.TestCase):
     def test_cpp_dft(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/water.inp')
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -136,7 +136,7 @@ class TestCPP(unittest.TestCase):
     def test_cpp_dft_slda(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/water.inp')
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -173,10 +173,10 @@ class TestCPP(unittest.TestCase):
     def test_cpp_hf_pe(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/pe_water.inp')
+        inpfile = str(here / 'inputs' / 'pe_water.inp')
 
         here = Path(__file__).parent
-        potfile = str(here / 'inputs/pe_water.pot')
+        potfile = str(here / 'inputs' / 'pe_water.pot')
 
         xcfun_label = None
 
@@ -211,10 +211,10 @@ class TestCPP(unittest.TestCase):
     def test_cpp_dft_pe(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/pe_water.inp')
+        inpfile = str(here / 'inputs' / 'pe_water.inp')
 
         here = Path(__file__).parent
-        potfile = str(here / 'inputs/pe_water.pot')
+        potfile = str(here / 'inputs' / 'pe_water.pot')
 
         xcfun_label = 'b3lyp'
 

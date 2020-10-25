@@ -40,7 +40,7 @@ class TestSCF(unittest.TestCase):
     def test_scf_hf(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/water.inp')
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -54,7 +54,7 @@ class TestSCF(unittest.TestCase):
     def test_scf_dft(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/water.inp')
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -68,7 +68,7 @@ class TestSCF(unittest.TestCase):
     def test_scf_dft_slda(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/water.inp')
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -83,8 +83,8 @@ class TestSCF(unittest.TestCase):
     def test_scf_hf_pe(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/pe_water.inp')
-        potfile = str(here / 'inputs/pe_water.pot')
+        inpfile = str(here / 'inputs' / 'pe_water.inp')
+        potfile = str(here / 'inputs' / 'pe_water.pot')
 
         xcfun_label = None
 
@@ -97,8 +97,8 @@ class TestSCF(unittest.TestCase):
     def test_scf_dft_pe(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/pe_water.inp')
-        potfile = str(here / 'inputs/pe_water.pot')
+        inpfile = str(here / 'inputs' / 'pe_water.inp')
+        potfile = str(here / 'inputs' / 'pe_water.pot')
 
         xcfun_label = 'b3lyp'
 

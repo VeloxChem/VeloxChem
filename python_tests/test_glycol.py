@@ -16,7 +16,7 @@ class TestGlycol(unittest.TestCase):
 
         # scf
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs/glycol.inp')
+        inpfile = str(here / 'inputs' / 'glycol.inp')
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
