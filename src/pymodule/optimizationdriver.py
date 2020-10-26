@@ -188,10 +188,7 @@ class OptimizationDriver:
             A list contains the path to the file.
         """
 
-        extfile = Path(path_list[0])
-
-        for p in path_list[1:]:
-            extfile /= p
+        extfile = Path(*path_list)
 
         if extfile.is_file():
             extfile.unlink()
@@ -210,18 +207,25 @@ class OptimizationDriver:
         self.ostream.print_blank()
 
         energies = list(progress.qm_energies)
+        coords = [xyz / geometric.nifty.bohr2ang for xyz in progress.xyzs]
 
-        e_min = min(energies)
-        relative_energies = [e - e_min for e in energies]
-
-        line = '{:>8s}{:>20s}  {:>25s}{:>30s}'.format(
-            'Opt.Step', 'Energy (a.u.)', 'Relative Energy (a.u.)',
-            'Relative Energy (kcal/mol)')
+        line = '{:>8s}{:>20s}  {:>25s}{:>30}'.format('Opt.Step',
+                                                     'Energy (a.u.)',
+                                                     'Energy Change (a.u.)',
+                                                     'Displacement (RMS, Max)')
         self.ostream.print_header(line)
         self.ostream.print_header('-' * len(line))
-        for i, (e, rel_e) in enumerate(zip(energies, relative_energies)):
-            line = '{:>5d}   {:22.12f}{:22.12f}   {:25.10f}     '.format(
-                i, e, rel_e, rel_e * hartree_in_kcalpermol())
+
+        for i in range(len(energies)):
+            if i > 0:
+                delta_e = energies[i] - energies[i - 1]
+                rmsd, maxd = geometric.step.calc_drms_dmax(
+                    coords[i], coords[i - 1])
+            else:
+                delta_e = 0.0
+                rmsd, maxd = 0.0, 0.0
+            line = '{:>5d}   {:22.12f}{:22.12f}   {:15.3e}{:15.3e}'.format(
+                i, energies[i], delta_e, rmsd, maxd)
             self.ostream.print_header(line)
 
         self.ostream.print_blank()
