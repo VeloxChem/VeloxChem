@@ -213,7 +213,7 @@ class OptimizationDriver:
         Prints summary of geometry optimization.
 
         :param progress:
-            The geomeTRIC progress of geometry scan.
+            The geomeTRIC progress of geometry optimization.
         """
 
         self.ostream.print_blank()
@@ -334,7 +334,7 @@ class OptimizationDriver:
         between the optimized geometry and initial geometry.
 
         :param progress:
-            The geomeTRIC progress of geometry scan.
+            The geomeTRIC progress of geometry optimization.
         """
 
         self.ostream.print_blank()
