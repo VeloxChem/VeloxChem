@@ -1,12 +1,14 @@
 from pathlib import PurePath
 from pathlib import Path
 from os import devnull
+import numpy as np
 import sys
 import tempfile
 import contextlib
 import geometric
 
 from .veloxchemlib import mpi_master
+from .veloxchemlib import mathconst_pi
 from .veloxchemlib import hartree_in_kcalpermol
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
@@ -229,6 +231,10 @@ class OptimizationDriver:
             self.ostream.print_header(line)
 
         self.ostream.print_blank()
+        self.ostream.print_blank()
+
+        self.print_ic_rmsd(progress)
+        self.ostream.print_blank()
         self.ostream.flush()
 
     def print_scan_result(self, progress):
@@ -311,3 +317,74 @@ class OptimizationDriver:
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def print_ic_rmsd(self, progress):
+        """
+        Prints statistical deviation of bonds, angles and dihedral angles
+        between the optimized geometry and initial geometry.
+
+        :param progress:
+            The geomeTRIC progress of geometry scan.
+        """
+
+        ic = geometric.internal.DelocalizedInternalCoordinates(progress,
+                                                               build=True)
+
+        bonds = []
+        angles = []
+        dihedrals = []
+
+        for internal in ic.Prims.Internals:
+            if isinstance(internal, geometric.internal.Distance):
+                v1 = internal.value(progress.xyzs[0])
+                v2 = internal.value(progress.xyzs[-1])
+                bonds.append(abs(v1 - v2) * geometric.nifty.bohr2ang)
+            elif isinstance(internal, geometric.internal.Angle):
+                v1 = internal.value(progress.xyzs[0])
+                v2 = internal.value(progress.xyzs[-1])
+                angles.append(abs(v1 - v2) * 180.0 / mathconst_pi())
+            elif isinstance(internal, geometric.internal.Dihedral):
+                v1 = internal.value(progress.xyzs[0])
+                v2 = internal.value(progress.xyzs[-1])
+                diff_in_deg = (v1 - v2) * 180.0 / mathconst_pi()
+                if diff_in_deg > 180.0:
+                    diff_in_deg -= 360.0
+                elif diff_in_deg < -180.0:
+                    diff_in_deg += 360.0
+                dihedrals.append(abs(diff_in_deg))
+
+        np_bonds = np.array(bonds)
+        np_angles = np.array(angles)
+        np_dihedrals = np.array(dihedrals)
+
+        rms_bonds = np.sqrt(np.mean(np_bonds**2))
+        rms_angles = np.sqrt(np.mean(np_angles**2))
+        rms_dihedrals = np.sqrt(np.mean(np_dihedrals**2))
+
+        max_bonds = np.max(np_bonds)
+        max_angles = np.max(np_angles)
+        max_dihedrals = np.max(np_dihedrals)
+
+        valstr = 'Statistical Deviation between'
+        self.ostream.print_header(valstr)
+        valstr = 'Optimized and Initial Geometries'
+        self.ostream.print_header(valstr)
+        self.ostream.print_header((len(valstr) + 2) * '=')
+        self.ostream.print_blank()
+
+        valstr = '{:>15s} {:>20s}  {:>21s}'.format('Internal Coord.',
+                                                   'RMS deviation',
+                                                   'Max. deviation')
+        self.ostream.print_header(valstr)
+        self.ostream.print_header(len(valstr) * '-')
+
+        valstr = '{:>12s}    {:12.3f} Angstrom {:12.3f} Angstrom'.format(
+            'Bonds    ', rms_bonds, max_bonds)
+        self.ostream.print_header(valstr)
+        valstr = '{:>12s}    {:12.3f} degree   {:12.3f} degree  '.format(
+            'Angles   ', rms_angles, max_angles)
+        self.ostream.print_header(valstr)
+        valstr = '{:>12s}    {:12.3f} degree   {:12.3f} degree  '.format(
+            'Dihedrals', rms_dihedrals, max_dihedrals)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
