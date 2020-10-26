@@ -1,3 +1,5 @@
+import numpy as np
+import time as tm
 import geometric
 
 from .veloxchemlib import mpi_master
@@ -65,6 +67,8 @@ class OptimizationEngine(geometric.engine.Engine):
             A dictionary containing energy and gradient.
         """
 
+        start_time = tm.time()
+
         labels = self.molecule.get_labels()
 
         if self.rank == mpi_master():
@@ -74,6 +78,12 @@ class OptimizationEngine(geometric.engine.Engine):
         else:
             new_mol = Molecule()
         new_mol.broadcast(self.rank, self.comm)
+
+        self.grad_drv.ostream.print_info('Computing energy and gradient...')
+        self.grad_drv.ostream.flush()
+
+        ostream_state = self.grad_drv.ostream.state
+        self.grad_drv.ostream.state = False
 
         if self.flag.upper() == 'XTB':
             xtb_drv = self.grad_drv.xtb_drv
@@ -91,8 +101,25 @@ class OptimizationEngine(geometric.engine.Engine):
             self.grad_drv.compute(new_mol, self.ao_basis, self.min_basis)
             gradient = self.grad_drv.get_gradient()
 
+        self.grad_drv.ostream.state = ostream_state
+
         energy = self.comm.bcast(energy, root=mpi_master())
         gradient = self.comm.bcast(gradient, root=mpi_master())
+
+        if self.rank == mpi_master():
+            grad2 = np.sum(gradient**2, axis=1)
+            rms_grad = np.sqrt(np.mean(grad2))
+            max_grad = np.max(np.sqrt(grad2))
+            valstr = '  Energy   : {:.10f} a.u.'.format(energy)
+            self.grad_drv.ostream.print_info(valstr)
+            valstr = '  Gradient : {:.6e} a.u. (RMS)'.format(rms_grad)
+            self.grad_drv.ostream.print_info(valstr)
+            valstr = '             {:.6e} a.u. (Max)'.format(max_grad)
+            self.grad_drv.ostream.print_info(valstr)
+            valstr = '  Time     : {:.2f} sec'.format(tm.time() - start_time)
+            self.grad_drv.ostream.print_info(valstr)
+            self.grad_drv.ostream.print_blank()
+            self.grad_drv.ostream.flush()
 
         return {
             'energy': energy,

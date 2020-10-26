@@ -2,6 +2,7 @@ from pathlib import PurePath
 from pathlib import Path
 from os import devnull
 import numpy as np
+import time as tm
 import sys
 import tempfile
 import contextlib
@@ -108,8 +109,12 @@ class OptimizationDriver:
             The molecule with final geometry.
         """
 
+        self.print_header()
+        start_time = tm.time()
+
         opt_engine = OptimizationEngine(molecule, ao_basis, min_basis,
                                         self.grad_drv, self.flag)
+        hessian_exit = False
 
         # filename is used by geomeTRIC to create .log and other files. On
         # master node filename is determined based on the input/output file.
@@ -158,10 +163,12 @@ class OptimizationDriver:
                                 hessian=self.hessian,
                                 input=filename)
                         except geometric.errors.HessianExit:
-                            if (self.rank == mpi_master() and
-                                    self.hessian == 'stop'):
-                                self.print_vib_analysis('vdata_first')
-                            return molecule
+                            hessian_exit = True
+
+        if hessian_exit:
+            if self.rank == mpi_master() and self.hessian == 'stop':
+                self.print_vib_analysis('vdata_first')
+            return molecule
 
         coords = m.xyzs[-1] / geometric.nifty.bohr2ang
         labels = molecule.get_labels()
@@ -179,6 +186,12 @@ class OptimizationDriver:
                 self.print_opt_result(m)
             if self.hessian in ['last', 'first+last', 'each']:
                 self.print_vib_analysis('vdata_last')
+
+            valstr = '*** Time spent in Optimization Driver: '
+            valstr += '{:.2f} sec'.format(tm.time() - start_time)
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         return final_mol
 
@@ -231,11 +244,8 @@ class OptimizationDriver:
             self.ostream.print_header(line)
 
         self.ostream.print_blank()
-        self.ostream.print_blank()
 
         self.print_ic_rmsd(progress)
-        self.ostream.print_blank()
-        self.ostream.flush()
 
     def print_scan_result(self, progress):
         """
@@ -327,6 +337,8 @@ class OptimizationDriver:
             The geomeTRIC progress of geometry scan.
         """
 
+        self.ostream.print_blank()
+
         ic = geometric.internal.DelocalizedInternalCoordinates(progress,
                                                                build=True)
 
@@ -353,17 +365,20 @@ class OptimizationDriver:
                     diff_in_deg += 360.0
                 dihedrals.append(abs(diff_in_deg))
 
-        np_bonds = np.array(bonds)
-        np_angles = np.array(angles)
-        np_dihedrals = np.array(dihedrals)
+        if bonds:
+            np_bonds = np.array(bonds)
+            rms_bonds = np.sqrt(np.mean(np_bonds**2))
+            max_bonds = np.max(np_bonds)
 
-        rms_bonds = np.sqrt(np.mean(np_bonds**2))
-        rms_angles = np.sqrt(np.mean(np_angles**2))
-        rms_dihedrals = np.sqrt(np.mean(np_dihedrals**2))
+        if angles:
+            np_angles = np.array(angles)
+            rms_angles = np.sqrt(np.mean(np_angles**2))
+            max_angles = np.max(np_angles)
 
-        max_bonds = np.max(np_bonds)
-        max_angles = np.max(np_angles)
-        max_dihedrals = np.max(np_dihedrals)
+        if dihedrals:
+            np_dihedrals = np.array(dihedrals)
+            rms_dihedrals = np.sqrt(np.mean(np_dihedrals**2))
+            max_dihedrals = np.max(np_dihedrals)
 
         valstr = 'Statistical Deviation between'
         self.ostream.print_header(valstr)
@@ -378,13 +393,44 @@ class OptimizationDriver:
         self.ostream.print_header(valstr)
         self.ostream.print_header(len(valstr) * '-')
 
-        valstr = '{:>12s}    {:12.3f} Angstrom {:12.3f} Angstrom'.format(
-            'Bonds    ', rms_bonds, max_bonds)
-        self.ostream.print_header(valstr)
-        valstr = '{:>12s}    {:12.3f} degree   {:12.3f} degree  '.format(
-            'Angles   ', rms_angles, max_angles)
-        self.ostream.print_header(valstr)
-        valstr = '{:>12s}    {:12.3f} degree   {:12.3f} degree  '.format(
-            'Dihedrals', rms_dihedrals, max_dihedrals)
-        self.ostream.print_header(valstr)
+        if bonds:
+            valstr = '{:>12s}    {:12.3f} Angstrom {:12.3f} Angstrom'.format(
+                'Bonds    ', rms_bonds, max_bonds)
+            self.ostream.print_header(valstr)
+        if angles:
+            valstr = '{:>12s}    {:12.3f} degree   {:12.3f} degree  '.format(
+                'Angles   ', rms_angles, max_angles)
+            self.ostream.print_header(valstr)
+        if dihedrals:
+            valstr = '{:>12s}    {:12.3f} degree   {:12.3f} degree  '.format(
+                'Dihedrals', rms_dihedrals, max_dihedrals)
+            self.ostream.print_header(valstr)
+
         self.ostream.print_blank()
+        self.ostream.flush()
+
+    def print_header(self):
+        """
+        Prints header for optimization driver.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Optimization Driver Setup')
+        self.ostream.print_header(27 * '=')
+        self.ostream.print_blank()
+
+        lines = []
+        lines.append('Coordinate System       :    ' + self.coordsys.upper())
+        lines.append('Constraints             :    ' +
+                     ('Yes' if self.constraints else 'No'))
+        lines.append('Max. Number of Steps    :    ' + str(self.max_iter))
+        lines.append('Transition State        :    ' +
+                     ('Yes' if self.transition else 'No'))
+        lines.append('Hessian                 :    ' + self.hessian)
+
+        maxlen = max([len(line.split(':')[0]) * 2 for line in lines])
+        for line in lines:
+            self.ostream.print_header(line.ljust(maxlen))
+
+        self.ostream.print_blank()
+        self.ostream.flush()
