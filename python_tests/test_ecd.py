@@ -165,8 +165,7 @@ class TestECD(unittest.TestCase):
         """
         mdip = [float(x) for x in raw_vals.split()]
 
-        self.run_ecd(inpfile, self.gen_ref(eigvals, edip, vdip, mdip),
-                     'rpa')
+        self.run_ecd(inpfile, self.gen_ref(eigvals, edip, vdip, mdip), 'rpa')
 
 
 if __name__ == "__main__":
