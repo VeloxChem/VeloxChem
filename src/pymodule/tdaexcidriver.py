@@ -239,9 +239,7 @@ class TDAExciDriver(LinearSolver):
 
         # compute 1e dipole integrals
 
-        edip_ints = self.comp_electric_dipole_ints(molecule, basis)
-        lmom_ints = self.comp_linear_momentum_ints(molecule, basis)
-        mdip_ints = self.comp_magnetic_dipole_ints(molecule, basis)
+        integrals = self.comp_onee_integrals(molecule, basis)
 
         # print converged excited states
 
@@ -253,27 +251,21 @@ class TDAExciDriver(LinearSolver):
             eigvals, rnorms = self.solver.get_eigenvalues()
             eigvecs = self.solver.ritz_vectors
 
-            elec_trans_dipoles = self.comp_elec_trans_dipoles(
-                edip_ints, eigvecs, mo_occ, mo_vir)
-
-            velo_trans_dipoles = self.comp_velo_trans_dipoles(
-                lmom_ints, eigvals, eigvecs, mo_occ, mo_vir)
-
-            magn_trans_dipoles = self.comp_magn_trans_dipoles(
-                mdip_ints, eigvecs, mo_occ, mo_vir)
+            trans_dipoles = self.comp_trans_dipoles(integrals, eigvals, eigvecs,
+                                                    mo_occ, mo_vir)
 
             oscillator_strengths = self.comp_oscillator_strengths(
-                elec_trans_dipoles, eigvals)
+                trans_dipoles, eigvals)
 
             rotatory_strengths = self.comp_rotatory_strengths(
-                velo_trans_dipoles, magn_trans_dipoles)
+                trans_dipoles, eigvals)
 
             return {
                 'eigenvalues': eigvals,
                 'eigenvectors': eigvecs,
-                'electric_transition_dipoles': elec_trans_dipoles,
-                'velocity_transition_dipoles': velo_trans_dipoles,
-                'magnetic_transition_dipoles': magn_trans_dipoles,
+                'electric_transition_dipoles': trans_dipoles['electric'],
+                'velocity_transition_dipoles': trans_dipoles['velocity'],
+                'magnetic_transition_dipoles': trans_dipoles['magnetic'],
                 'oscillator_strengths': oscillator_strengths,
                 'rotatory_strengths': rotatory_strengths,
             }
@@ -494,9 +486,9 @@ class TDAExciDriver(LinearSolver):
 
         return sigma_mat
 
-    def comp_electric_dipole_ints(self, molecule, basis):
+    def comp_onee_integrals(self, molecule, basis):
         """
-        Computes one-electron electric dipole integrals.
+        Computes one-electron integrals.
 
         :param molecule:
             The molecule.
@@ -504,125 +496,41 @@ class TDAExciDriver(LinearSolver):
             The AO basis set.
 
         :return:
-            The Cartesian components of one-electron electric dipole integrals.
+            The one-electron integrals.
         """
 
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
         dipole_mats = dipole_drv.compute(molecule, basis)
 
-        if self.rank == mpi_master():
-            return (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
-                    dipole_mats.z_to_numpy())
-        else:
-            return ()
-
-    def comp_linear_momentum_ints(self, molecule, basis):
-        """
-        Computes one-electron linear momentum integrals.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-
-        :return:
-            The Cartesian components of one-electron linear momentum integrals.
-        """
-
         linmom_drv = LinearMomentumIntegralsDriver(self.comm)
         linmom_mats = linmom_drv.compute(molecule, basis)
 
-        if self.rank == mpi_master():
-            return (linmom_mats.x_to_numpy(), linmom_mats.y_to_numpy(),
-                    linmom_mats.z_to_numpy())
-        else:
-            return ()
-
-    def comp_angular_momentum_ints(self, molecule, basis):
-        """
-        Computes one-electron angular momentum integrals.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-
-        :return:
-            The Cartesian components of one-electron angular momentum integrals.
-        """
-
         angmom_drv = AngularMomentumIntegralsDriver(self.comm)
         angmom_mats = angmom_drv.compute(molecule, basis)
 
-        if self.rank == mpi_master():
-            return (angmom_mats.x_to_numpy(), angmom_mats.y_to_numpy(),
-                    angmom_mats.z_to_numpy())
-        else:
-            return ()
-
-    def comp_magnetic_dipole_ints(self, molecule, basis):
-        """
-        Computes one-electron magnetic dipole integrals.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-
-        :return:
-            The Cartesian components of one-electron magnetic dipole integrals.
-        """
-
-        angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-        angmom_mats = angmom_drv.compute(molecule, basis)
+        integrals = {}
 
         if self.rank == mpi_master():
-            return (-0.5 * angmom_mats.x_to_numpy(),
-                    -0.5 * angmom_mats.y_to_numpy(),
-                    -0.5 * angmom_mats.z_to_numpy())
-        else:
-            return ()
+            integrals['electric dipole'] = (dipole_mats.x_to_numpy(),
+                                            dipole_mats.y_to_numpy(),
+                                            dipole_mats.z_to_numpy())
+            integrals['linear momentum'] = (linmom_mats.x_to_numpy(),
+                                            linmom_mats.y_to_numpy(),
+                                            linmom_mats.z_to_numpy())
+            integrals['magnetic dipole'] = (0.5 * angmom_mats.x_to_numpy(),
+                                            0.5 * angmom_mats.y_to_numpy(),
+                                            0.5 * angmom_mats.z_to_numpy())
 
-    def comp_elec_trans_dipoles(self, dipole_ints, eigvecs, mo_occ, mo_vir):
+        return integrals
+
+    def comp_trans_dipoles(self, integrals, eigvals, eigvecs, mo_occ, mo_vir):
         """
-        Computes electric transition dipole moments in length form.
+        Computes transition dipole moments.
 
-        :param dipole_ints:
-            One-electron dipole integrals.
-        :param eigvecs:
-            The CI vectors.
-        :param mo_occ:
-            The occupied MO coefficients.
-        :param mo_vir:
-            The virtual MO coefficients.
-
-        :return:
-            The electric transition dipole moments in length form.
-        """
-
-        transition_dipoles = []
-
-        for s in range(self.nstates):
-            exc_vec = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
-            trans_dens = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
-            trans_dens *= math.sqrt(2.0)
-
-            trans_dipole = np.array(
-                [np.vdot(trans_dens, dipole_ints[d]) for d in range(3)])
-
-            transition_dipoles.append(trans_dipole)
-
-        return transition_dipoles
-
-    def comp_velo_trans_dipoles(self, linmom_ints, eigvals, eigvecs, mo_occ,
-                                mo_vir):
-        """
-        Computes electric transition dipole moments in velocity form.
-
-        :param linmom_ints:
-            One-electron linear momentum integrals.
+        :param integrals:
+            The one-electron integrals.
         :param eigvals:
-            The excitation energies.
+            The eigenvalues.
         :param eigvecs:
             The CI vectors.
         :param mo_occ:
@@ -631,51 +539,33 @@ class TDAExciDriver(LinearSolver):
             The virtual MO coefficients.
 
         :return:
-            The electric transition dipole moments in velocity form.
+            The transition dipole moments.
         """
 
-        transition_dipoles = []
+        transition_dipoles = {'electric': [], 'velocity': [], 'magnetic': []}
 
         for s in range(self.nstates):
             exc_vec = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
             trans_dens = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
             trans_dens *= math.sqrt(2.0)
 
-            trans_dipole = -(1.0 / eigvals[s]) * np.array(
-                [np.vdot(trans_dens, linmom_ints[d]) for d in range(3)])
+            transition_dipoles['electric'].append(
+                np.array([
+                    np.vdot(trans_dens, integrals['electric dipole'][d])
+                    for d in range(3)
+                ]))
 
-            transition_dipoles.append(trans_dipole)
+            transition_dipoles['velocity'].append(
+                np.array([
+                    np.vdot(trans_dens, integrals['linear momentum'][d]) /
+                    eigvals[s] for d in range(3)
+                ]))
 
-        return transition_dipoles
-
-    def comp_magn_trans_dipoles(self, angmom_ints, eigvecs, mo_occ, mo_vir):
-        """
-        Computes magnetic transition dipole moments.
-
-        :param angmom_ints:
-            One-electron angular momentum integrals.
-        :param eigvecs:
-            The CI vectors.
-        :param mo_occ:
-            The occupied MO coefficients.
-        :param mo_vir:
-            The virtual MO coefficients.
-
-        :return:
-            The magnetic transition dipole moments.
-        """
-
-        transition_dipoles = []
-
-        for s in range(self.nstates):
-            exc_vec = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
-            trans_dens = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
-            trans_dens *= math.sqrt(2.0)
-
-            trans_dipole = -1.0 * np.array(
-                [np.vdot(trans_dens, angmom_ints[d]) for d in range(3)])
-
-            transition_dipoles.append(trans_dipole)
+            transition_dipoles['magnetic'].append(
+                np.array([
+                    np.vdot(trans_dens, integrals['magnetic dipole'][d])
+                    for d in range(3)
+                ]))
 
         return transition_dipoles
 
@@ -684,7 +574,7 @@ class TDAExciDriver(LinearSolver):
         Computes oscillator strengths.
 
         :param transition_dipoles:
-            The electric transition dipole moments in length form.
+            The transition dipole moments.
         :param eigvals:
             The excitation energies.
 
@@ -696,19 +586,19 @@ class TDAExciDriver(LinearSolver):
 
         for s in range(self.nstates):
             exc_ene = eigvals[s]
-            dipole_strength = np.sum(transition_dipoles[s]**2)
+            dipole_strength = np.sum(transition_dipoles['electric'][s]**2)
             oscillator_strengths[s] = 2.0 / 3.0 * dipole_strength * exc_ene
 
         return oscillator_strengths
 
-    def comp_rotatory_strengths(self, velo_trans_dipoles, magn_trans_dipoles):
+    def comp_rotatory_strengths(self, trans_dipoles, eigvals):
         """
         Computes rotatory strengths in CGS unit.
 
-        :param velo_trans_dipoles:
-            The electric transition dipole moments in velocity form.
-        :param magn_trans_dipoles:
-            The magnetic transition dipole moments.
+        :param trans_dipoles:
+            The transition dipole moments.
+        :param eigvals:
+            The excitation energies.
 
         :return:
             The rotatory strengths in CGS unit.
@@ -717,9 +607,9 @@ class TDAExciDriver(LinearSolver):
         rotatory_strengths = np.zeros((self.nstates,))
 
         for s in range(self.nstates):
-            rotatory_strengths[s] = np.dot(velo_trans_dipoles[s],
-                                           magn_trans_dipoles[s])
-            rotatory_strengths[s] *= rotatory_strength_in_cgs()
+            rotatory_strengths[s] = -1.0 * np.dot(
+                trans_dipoles['velocity'][s],
+                trans_dipoles['magnetic'][s]) * rotatory_strength_in_cgs()
 
         return rotatory_strengths
 
