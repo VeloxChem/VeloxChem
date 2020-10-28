@@ -1,7 +1,6 @@
 from pathlib import PurePath
 from pathlib import Path
 from os import devnull
-import numpy as np
 import time as tm
 import sys
 import tempfile
@@ -9,7 +8,6 @@ import contextlib
 import geometric
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import mathconst_pi
 from .veloxchemlib import hartree_in_kcalpermol
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
@@ -56,6 +54,8 @@ class OptimizationDriver:
         self.transition = False
         self.hessian = 'never'
 
+        self.ref_xyz = None
+
         self.filename = filename
         self.grad_drv = grad_drv
         self.flag = flag
@@ -93,6 +93,9 @@ class OptimizationDriver:
                 self.hessian = 'stop'
         elif self.transition:
             self.hessian = 'first'
+
+        if 'ref_xyz' in opt_dict:
+            self.ref_xyz = opt_dict['ref_xyz']
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
@@ -180,10 +183,20 @@ class OptimizationDriver:
         final_mol.broadcast(self.rank, self.comm)
 
         if self.rank == mpi_master():
+            self.grad_drv.ostream.print_info('Geometry optimization completed.')
+            self.ostream.print_blank()
+
+            self.ostream.print_block(final_mol.get_string())
+
             if self.constraints and '$scan' in self.constraints:
                 self.print_scan_result(m)
             else:
                 self.print_opt_result(m)
+                if self.ref_xyz:
+                    self.print_ic_rmsd(final_mol, self.ref_xyz, 'Reference')
+                else:
+                    self.print_ic_rmsd(final_mol, molecule, 'Initial')
+
             if self.hessian in ['last', 'first+last', 'each']:
                 self.print_vib_analysis('vdata_last')
 
@@ -244,8 +257,6 @@ class OptimizationDriver:
             self.ostream.print_header(line)
 
         self.ostream.print_blank()
-
-        self.print_ic_rmsd(progress)
 
     def print_scan_result(self, progress):
         """
@@ -328,61 +339,36 @@ class OptimizationDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def print_ic_rmsd(self, progress):
+    def print_ic_rmsd(self, opt_mol, ref_mol, ref_flag):
         """
         Prints statistical deviation of bonds, angles and dihedral angles
-        between the optimized geometry and initial geometry.
+        between the optimized geometry and reference geometry.
 
-        :param progress:
-            The geomeTRIC progress of geometry optimization.
+        :param opt_mol:
+            The optimized molecule.
+        :param ref_mol:
+            The reference molecule (or xyz filename).
+        :param ref_flag:
+            The flag for reference molecule.
         """
 
         self.ostream.print_blank()
 
-        ic = geometric.internal.DelocalizedInternalCoordinates(progress,
-                                                               build=True)
+        xyz_filename = ref_mol if isinstance(ref_mol, str) else None
 
-        bonds = []
-        angles = []
-        dihedrals = []
+        ic_rmsd = opt_mol.get_ic_rmsd(ref_mol)
 
-        for internal in ic.Prims.Internals:
-            if isinstance(internal, geometric.internal.Distance):
-                v1 = internal.value(progress.xyzs[0])
-                v2 = internal.value(progress.xyzs[-1])
-                bonds.append(abs(v1 - v2) * geometric.nifty.bohr2ang)
-            elif isinstance(internal, geometric.internal.Angle):
-                v1 = internal.value(progress.xyzs[0])
-                v2 = internal.value(progress.xyzs[-1])
-                angles.append(abs(v1 - v2) * 180.0 / mathconst_pi())
-            elif isinstance(internal, geometric.internal.Dihedral):
-                v1 = internal.value(progress.xyzs[0])
-                v2 = internal.value(progress.xyzs[-1])
-                diff_in_deg = (v1 - v2) * 180.0 / mathconst_pi()
-                if diff_in_deg > 180.0:
-                    diff_in_deg -= 360.0
-                elif diff_in_deg < -180.0:
-                    diff_in_deg += 360.0
-                dihedrals.append(abs(diff_in_deg))
-
-        if bonds:
-            np_bonds = np.array(bonds)
-            rms_bonds = np.sqrt(np.mean(np_bonds**2))
-            max_bonds = np.max(np_bonds)
-
-        if angles:
-            np_angles = np.array(angles)
-            rms_angles = np.sqrt(np.mean(np_angles**2))
-            max_angles = np.max(np_angles)
-
-        if dihedrals:
-            np_dihedrals = np.array(dihedrals)
-            rms_dihedrals = np.sqrt(np.mean(np_dihedrals**2))
-            max_dihedrals = np.max(np_dihedrals)
+        if isinstance(ic_rmsd, str):
+            self.ostream.print_header(ic_rmsd)
+            self.ostream.print_blank()
+            self.ostream.flush()
+            return
 
         valstr = 'Statistical Deviation between'
         self.ostream.print_header(valstr)
-        valstr = 'Optimized and Initial Geometries'
+        valstr = 'Optimized Geometry and {} Geometry'.format(ref_flag)
+        if xyz_filename:
+            valstr += ' ({})'.format(xyz_filename)
         self.ostream.print_header(valstr)
         self.ostream.print_header((len(valstr) + 2) * '=')
         self.ostream.print_blank()
@@ -393,17 +379,32 @@ class OptimizationDriver:
         self.ostream.print_header(valstr)
         self.ostream.print_header(len(valstr) * '-')
 
-        if bonds:
-            valstr = '{:>12s}    {:12.3f} Angstrom {:12.3f} Angstrom'.format(
-                'Bonds    ', rms_bonds, max_bonds)
+        if ic_rmsd['bonds']:
+            valstr = '{:>12s}    {:12.3f} {:<8s} {:12.3f} {:<8s}'.format(
+                'Bonds    ',
+                ic_rmsd['bonds']['rms'],
+                ic_rmsd['bonds']['unit'],
+                ic_rmsd['bonds']['max'],
+                ic_rmsd['bonds']['unit'],
+            )
             self.ostream.print_header(valstr)
-        if angles:
-            valstr = '{:>12s}    {:12.3f} degree   {:12.3f} degree  '.format(
-                'Angles   ', rms_angles, max_angles)
+        if ic_rmsd['angles']:
+            valstr = '{:>12s}    {:12.3f} {:<8s} {:12.3f} {:<8s}'.format(
+                'Angles   ',
+                ic_rmsd['angles']['rms'],
+                ic_rmsd['angles']['unit'],
+                ic_rmsd['angles']['max'],
+                ic_rmsd['angles']['unit'],
+            )
             self.ostream.print_header(valstr)
-        if dihedrals:
-            valstr = '{:>12s}    {:12.3f} degree   {:12.3f} degree  '.format(
-                'Dihedrals', rms_dihedrals, max_dihedrals)
+        if ic_rmsd['dihedrals']:
+            valstr = '{:>12s}    {:12.3f} {:<8s} {:12.3f} {:<8s}'.format(
+                'Dihedrals',
+                ic_rmsd['dihedrals']['rms'],
+                ic_rmsd['dihedrals']['unit'],
+                ic_rmsd['dihedrals']['max'],
+                ic_rmsd['dihedrals']['unit'],
+            )
             self.ostream.print_header(valstr)
 
         self.ostream.print_blank()
