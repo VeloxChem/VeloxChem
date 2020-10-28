@@ -39,6 +39,7 @@ class TestECD(unittest.TestCase):
             mdip = np.array(rsp_results['magnetic_transition_dipoles'])
             osc = rsp_results['oscillator_strengths']
             rot = rsp_results['rotatory_strengths'] / rotatory_strength_in_cgs()
+            rot_len = (-1.0) * np.sum(edip * mdip, axis=1)
 
             for i in range(edip.shape[0]):
                 if np.vdot(edip[i, :], ref['edip'][i, :]) < 0.0:
@@ -52,6 +53,7 @@ class TestECD(unittest.TestCase):
             self.assertTrue(np.max(np.abs(mdip - ref['mdip'])) < 5.0e-4)
             self.assertTrue(np.max(np.abs(osc - ref['osc'])) < 1.0e-4)
             self.assertTrue(np.max(np.abs(rot - ref['rot'])) < 2.0e-4)
+            self.assertTrue(np.max(np.abs(rot_len - ref['rot_len'])) < 2.0e-4)
 
     def gen_ref(self, eigvals, edip, vdip, mdip):
 
@@ -63,6 +65,7 @@ class TestECD(unittest.TestCase):
 
         osc = (2.0 / 3.0) * np.sum(edip**2, axis=1) * eigvals
         rot = (-1.0) * np.sum(vdip * mdip, axis=1)
+        rot_len = (-1.0) * np.sum(edip * mdip, axis=1)
 
         return {
             'eig': eigvals,
@@ -71,6 +74,7 @@ class TestECD(unittest.TestCase):
             'mdip': mdip,
             'osc': osc,
             'rot': rot,
+            'rot_len': rot_len,
         }
 
     def test_ecd_tda(self):
