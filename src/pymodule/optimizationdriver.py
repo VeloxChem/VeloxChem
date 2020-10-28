@@ -193,9 +193,9 @@ class OptimizationDriver:
             else:
                 self.print_opt_result(m)
                 if self.ref_xyz:
-                    self.print_ic_rmsd(final_mol, self.ref_xyz, 'Reference')
+                    self.print_ic_rmsd(final_mol, self.ref_xyz)
                 else:
-                    self.print_ic_rmsd(final_mol, molecule, 'Initial')
+                    self.print_ic_rmsd(final_mol, molecule)
 
             if self.hessian in ['last', 'first+last', 'each']:
                 self.print_vib_analysis('vdata_last')
@@ -339,7 +339,7 @@ class OptimizationDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def print_ic_rmsd(self, opt_mol, ref_mol, ref_flag):
+    def print_ic_rmsd(self, opt_mol, ref_mol):
         """
         Prints statistical deviation of bonds, angles and dihedral angles
         between the optimized geometry and reference geometry.
@@ -348,8 +348,6 @@ class OptimizationDriver:
             The optimized molecule.
         :param ref_mol:
             The reference molecule (or xyz filename).
-        :param ref_flag:
-            The flag for reference molecule.
         """
 
         self.ostream.print_blank()
@@ -366,9 +364,11 @@ class OptimizationDriver:
 
         valstr = 'Statistical Deviation between'
         self.ostream.print_header(valstr)
-        valstr = 'Optimized Geometry and {} Geometry'.format(ref_flag)
         if xyz_filename:
+            valstr = 'Optimized Geometry and Reference Geometry'
             valstr += ' ({})'.format(xyz_filename)
+        else:
+            valstr = 'Optimized Geometry and Initial Geometry'
         self.ostream.print_header(valstr)
         self.ostream.print_header((len(valstr) + 2) * '=')
         self.ostream.print_blank()
