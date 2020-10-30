@@ -254,11 +254,12 @@ class TDAExciDriver(LinearSolver):
             trans_dipoles = self.comp_trans_dipoles(integrals, eigvals, eigvecs,
                                                     mo_occ, mo_vir)
 
-            oscillator_strengths = self.comp_oscillator_strengths(
-                trans_dipoles, eigvals)
+            oscillator_strengths = (2.0 / 3.0) * np.sum(
+                trans_dipoles['electric']**2, axis=1) * eigvals
 
-            rotatory_strengths = self.comp_rotatory_strengths(
-                trans_dipoles, eigvals)
+            rotatory_strengths = (-1.0) * np.sum(
+                trans_dipoles['velocity'] * trans_dipoles['magnetic'],
+                axis=1) * rotatory_strength_in_cgs()
 
             return {
                 'eigenvalues': eigvals,
@@ -542,7 +543,11 @@ class TDAExciDriver(LinearSolver):
             The transition dipole moments.
         """
 
-        transition_dipoles = {'electric': [], 'velocity': [], 'magnetic': []}
+        transition_dipoles = {
+            'electric': np.zeros((self.nstates, 3)),
+            'velocity': np.zeros((self.nstates, 3)),
+            'magnetic': np.zeros((self.nstates, 3))
+        }
 
         sqrt_2 = math.sqrt(2.0)
 
@@ -551,69 +556,22 @@ class TDAExciDriver(LinearSolver):
             trans_dens = sqrt_2 * np.linalg.multi_dot(
                 [mo_occ, exc_vec, mo_vir.T])
 
-            transition_dipoles['electric'].append(
-                np.array([
-                    np.vdot(trans_dens, integrals['electric dipole'][d].T)
-                    for d in range(3)
-                ]))
+            transition_dipoles['electric'][s, :] = np.array([
+                np.vdot(trans_dens, integrals['electric dipole'][d].T)
+                for d in range(3)
+            ])
 
-            transition_dipoles['velocity'].append(
-                np.array([
-                    np.vdot(trans_dens, integrals['linear momentum'][d].T) /
-                    (-eigvals[s]) for d in range(3)
-                ]))
+            transition_dipoles['velocity'][s, :] = np.array([
+                np.vdot(trans_dens, integrals['linear momentum'][d].T) /
+                (-eigvals[s]) for d in range(3)
+            ])
 
-            transition_dipoles['magnetic'].append(
-                np.array([
-                    np.vdot(trans_dens, integrals['angular momentum'][d].T) *
-                    (-0.5) for d in range(3)
-                ]))
+            transition_dipoles['magnetic'][s, :] = np.array([
+                np.vdot(trans_dens, integrals['angular momentum'][d].T) * (-0.5)
+                for d in range(3)
+            ])
 
         return transition_dipoles
-
-    def comp_oscillator_strengths(self, transition_dipoles, eigvals):
-        """
-        Computes oscillator strengths.
-
-        :param transition_dipoles:
-            The transition dipole moments.
-        :param eigvals:
-            The excitation energies.
-
-        :return:
-            The oscillator strengths.
-        """
-
-        oscillator_strengths = np.zeros((self.nstates,))
-
-        for s in range(self.nstates):
-            exc_ene = eigvals[s]
-            dipole_strength = np.sum(transition_dipoles['electric'][s]**2)
-            oscillator_strengths[s] = 2.0 / 3.0 * dipole_strength * exc_ene
-
-        return oscillator_strengths
-
-    def comp_rotatory_strengths(self, trans_dipoles, eigvals):
-        """
-        Computes rotatory strengths in CGS unit.
-
-        :param trans_dipoles:
-            The transition dipole moments.
-        :param eigvals:
-            The excitation energies.
-
-        :return:
-            The rotatory strengths in CGS unit.
-        """
-
-        rotatory_strengths = np.zeros((self.nstates,))
-
-        for s in range(self.nstates):
-            rotatory_strengths[s] = -1.0 * np.dot(
-                trans_dipoles['velocity'][s],
-                trans_dipoles['magnetic'][s]) * rotatory_strength_in_cgs()
-
-        return rotatory_strengths
 
     def print_iter_data(self, iteration):
         """

@@ -357,9 +357,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
             eigvals = np.array([excitations[s][0] for s in range(self.nstates)])
 
-            elec_trans_dipoles = [np.zeros(3) for s in range(self.nstates)]
-            velo_trans_dipoles = [np.zeros(3) for s in range(self.nstates)]
-            magn_trans_dipoles = [np.zeros(3) for s in range(self.nstates)]
+            elec_trans_dipoles = np.zeros((self.nstates, 3))
+            velo_trans_dipoles = np.zeros((self.nstates, 3))
+            magn_trans_dipoles = np.zeros((self.nstates, 3))
 
             key_0 = list(excitations.keys())[0]
             x_0 = self.get_full_solution_vector(excitations[key_0][1])
@@ -376,12 +376,12 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
-                        edip = np.dot(edip_rhs[ind], eigvec)
-                        vdip = np.dot(lmom_rhs[ind], eigvec) / (-eigvals[s])
-                        mdip = np.dot(mdip_rhs[ind], eigvec)
-                        elec_trans_dipoles[s][ind] = edip
-                        velo_trans_dipoles[s][ind] = vdip
-                        magn_trans_dipoles[s][ind] = mdip
+                        elec_trans_dipoles[s, ind] = np.vdot(
+                            edip_rhs[ind], eigvec)
+                        velo_trans_dipoles[s, ind] = np.vdot(
+                            lmom_rhs[ind], eigvec) / (-eigvals[s])
+                        magn_trans_dipoles[s, ind] = np.vdot(
+                            mdip_rhs[ind], eigvec)
 
                     if write_solution_to_file:
                         append_rsp_solution_hdf5(self.checkpoint_file,
@@ -390,15 +390,11 @@ class LinearResponseEigenSolver(LinearSolver):
                         eigvecs[:, s] = eigvec[:]
 
             if self.rank == mpi_master():
-                osc = np.zeros(self.nstates)
-                rot_vel = np.zeros(self.nstates)
-
-                for s in range(self.nstates):
-                    osc[s] = (2.0 / 3.0 * eigvals[s] *
-                              sum(elec_trans_dipoles[s]**2))
-                    rot_vel[s] = -1.0 * np.dot(
-                        velo_trans_dipoles[s],
-                        magn_trans_dipoles[s]) * rotatory_strength_in_cgs()
+                osc = (2.0 / 3.0) * np.sum(elec_trans_dipoles**2,
+                                           axis=1) * eigvals
+                rot_vel = (-1.0) * np.sum(
+                    velo_trans_dipoles * magn_trans_dipoles,
+                    axis=1) * rotatory_strength_in_cgs()
 
                 ret_dict = {
                     'eigenvalues': eigvals,
