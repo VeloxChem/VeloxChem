@@ -517,9 +517,9 @@ class TDAExciDriver(LinearSolver):
             integrals['linear momentum'] = (linmom_mats.x_to_numpy(),
                                             linmom_mats.y_to_numpy(),
                                             linmom_mats.z_to_numpy())
-            integrals['magnetic dipole'] = (0.5 * angmom_mats.x_to_numpy(),
-                                            0.5 * angmom_mats.y_to_numpy(),
-                                            0.5 * angmom_mats.z_to_numpy())
+            integrals['angular momentum'] = (angmom_mats.x_to_numpy(),
+                                             angmom_mats.y_to_numpy(),
+                                             angmom_mats.z_to_numpy())
 
         return integrals
 
@@ -544,27 +544,29 @@ class TDAExciDriver(LinearSolver):
 
         transition_dipoles = {'electric': [], 'velocity': [], 'magnetic': []}
 
+        sqrt_2 = math.sqrt(2.0)
+
         for s in range(self.nstates):
             exc_vec = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
-            trans_dens = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
-            trans_dens *= math.sqrt(2.0)
+            trans_dens = sqrt_2 * np.linalg.multi_dot(
+                [mo_occ, exc_vec, mo_vir.T])
 
             transition_dipoles['electric'].append(
                 np.array([
-                    np.vdot(trans_dens, integrals['electric dipole'][d])
+                    np.vdot(trans_dens, integrals['electric dipole'][d].T)
                     for d in range(3)
                 ]))
 
             transition_dipoles['velocity'].append(
                 np.array([
-                    np.vdot(trans_dens, integrals['linear momentum'][d]) /
-                    eigvals[s] for d in range(3)
+                    np.vdot(trans_dens, integrals['linear momentum'][d].T) /
+                    (-eigvals[s]) for d in range(3)
                 ]))
 
             transition_dipoles['magnetic'].append(
                 np.array([
-                    np.vdot(trans_dens, integrals['magnetic dipole'][d])
-                    for d in range(3)
+                    np.vdot(trans_dens, integrals['angular momentum'][d].T) *
+                    (-0.5) for d in range(3)
                 ]))
 
         return transition_dipoles
