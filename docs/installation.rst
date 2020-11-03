@@ -1,17 +1,17 @@
-Install
-=======
+Installation
+============
 
-From source
-^^^^^^^^^^^
-
-Get the source code
-+++++++++++++++++++
+Obtaining the source code
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The source code can be downloaded from this repository
 
 .. code-block:: bash
 
     https://gitlab.com/veloxchem/veloxchem
+
+Installing from source
+^^^^^^^^^^^^^^^^^^^^^^
 
 Debian based Linux
 ++++++++++++++++++
@@ -190,8 +190,8 @@ Windows
 Soon to come!
 
 
-Binaries
-^^^^^^^^
+Installing the binaries
+^^^^^^^^^^^^^^^^^^^^^^^
 
 Docker
 ++++++
@@ -205,8 +205,11 @@ on `Docker Hub <https://hub.docker.com/r/veloxchem/veloxchem>`_.
     # root@fcc794d899c7:/veloxchem# which vlx
     /usr/local/bin/vlx
 
+Dependencies
+^^^^^^^^^^^^
+
 The CPPE library for polarizable embedding
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+++++++++++++++++++++++++++++++++++++++++++
 
 If you are interested in using the CPPE library for polarizable embedding,
 please install it according to the instructions below. Note that cmake is
