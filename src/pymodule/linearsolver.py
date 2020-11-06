@@ -1003,6 +1003,7 @@ class LinearSolver:
         self.ostream.print_header(output_conv.ljust(width))
         self.ostream.print_blank()
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def check_convergence(self, relative_residual_norm):
         """

@@ -18,6 +18,7 @@ from .profiler import Profiler
 from .linearsolver import LinearSolver
 from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
+from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
 from .checkpoint import read_rsp_hdf5
 from .checkpoint import write_rsp_hdf5
@@ -36,6 +37,8 @@ class TDAExciDriver(LinearSolver):
     Instance variables
         - nstates: The number of excited states determined by driver.
         - solver: The eigenvalues solver.
+        - filename: The filename.
+        - nto: The flag for natural transition orbital analysis.
     """
 
     def __init__(self, comm, ostream):
@@ -50,6 +53,10 @@ class TDAExciDriver(LinearSolver):
 
         # solver setup
         self.solver = None
+
+        self.filename = None
+
+        self.nto = False
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -69,6 +76,13 @@ class TDAExciDriver(LinearSolver):
 
         if 'nstates' in rsp_dict:
             self.nstates = int(rsp_dict['nstates'])
+
+        if 'filename' in rsp_dict:
+            self.filename = rsp_dict['filename']
+
+        if 'nto' in rsp_dict:
+            key = rsp_dict['nto'].lower()
+            self.nto = True if key == 'yes' else False
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -261,6 +275,91 @@ class TDAExciDriver(LinearSolver):
                 trans_dipoles['velocity'] * trans_dipoles['magnetic'],
                 axis=1) * rotatory_strength_in_cgs()
 
+        # natural transition orbitals
+
+        if self.nto and self.is_converged:
+            vis_drv = VisualizationDriver(self.comm)
+            cubic_grid = vis_drv.gen_cubic_grid(molecule)
+
+            for s in range(self.nstates):
+                self.ostream.print_info(
+                    'Running NTO analysis for S{:d}...'.format(s + 1))
+                self.ostream.flush()
+
+                if self.rank == mpi_master():
+                    t_mat = eigvecs[:, s].reshape(mo_occ.shape[1],
+                                                  mo_vir.shape[1])
+                    u_mat, s_diag, vh_mat = np.linalg.svd(t_mat,
+                                                          full_matrices=True)
+                    lam_diag = s_diag**2
+                    nto_occ = MolecularOrbitals([np.matmul(mo_occ, u_mat)],
+                                                [-lam_diag], molorb.rest)
+                    nto_vir = MolecularOrbitals([np.matmul(mo_vir, vh_mat.T)],
+                                                [lam_diag], molorb.rest)
+                else:
+                    lam_diag = None
+                    nto_occ = MolecularOrbitals()
+                    nto_vir = MolecularOrbitals()
+
+                lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
+                nto_occ.broadcast(self.rank, self.comm)
+                nto_vir.broadcast(self.rank, self.comm)
+
+                for i_nto in range(lam_diag.size):
+                    if lam_diag[i_nto] < 0.1:
+                        continue
+
+                    self.ostream.print_info('  lambda: {:.4f}'.format(
+                        lam_diag[i_nto]))
+
+                    # hole
+
+                    vis_drv.compute(cubic_grid, molecule, basis, nto_occ, i_nto,
+                                    'alpha')
+
+                    if self.rank == mpi_master():
+                        occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(
+                            self.filename, s + 1, i_nto + 1)
+                        vis_drv.write_data(occ_cube_name, cubic_grid, molecule,
+                                           'nto', i_nto, 'alpha')
+
+                        occ_vec = nto_occ.alpha_to_numpy()[:, i_nto].copy()
+                        e_hole = np.vdot(
+                            occ_vec, np.matmul(scf_tensors['F'][0], occ_vec))
+
+                        self.ostream.print_info(
+                            '    E_hole    : {:10.4f} a.u.   Cube file: {:s}'.
+                            format(e_hole, occ_cube_name))
+                        self.ostream.flush()
+
+                    # electron
+
+                    vis_drv.compute(cubic_grid, molecule, basis, nto_vir, i_nto,
+                                    'alpha')
+
+                    if self.rank == mpi_master():
+                        vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(
+                            self.filename, s + 1, i_nto + 1)
+                        vis_drv.write_data(vir_cube_name, cubic_grid, molecule,
+                                           'nto', i_nto, 'alpha')
+
+                        vir_vec = nto_vir.alpha_to_numpy()[:, i_nto]
+                        e_particle = np.vdot(
+                            vir_vec, np.matmul(scf_tensors['F'][0], vir_vec))
+
+                        self.ostream.print_info(
+                            '    E_particle: {:10.4f} a.u.   Cube file: {:s}'.
+                            format(e_particle, vir_cube_name))
+                        self.ostream.flush()
+
+                self.ostream.print_blank()
+
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        # results
+
+        if self.rank == mpi_master() and self.is_converged:
             return {
                 'eigenvalues': eigvals,
                 'eigenvectors': eigvecs,

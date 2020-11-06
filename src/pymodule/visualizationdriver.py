@@ -66,7 +66,7 @@ def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
     :param molecule:
         The molecule.
     :param flag:
-        The flag for molecular orbitals ('mo') or density ('density').
+        The flag for the type of cube data (mo, nto, density).
     :param index:
         Index (0-based) of the molecular orbital or density matrix.
     :param spin:
@@ -88,8 +88,9 @@ def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
 
     print('VeloxChem Cube File', file=f_cube)
 
-    if flag == 'mo':
-        print('MO {:d} ({:s})'.format(index + 1, spin), file=f_cube)
+    if flag in ['mo', 'nto']:
+        print('{:s} {:d} ({:s})'.format(flag.upper(), index + 1, spin),
+              file=f_cube)
         print('{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}'.format(
             -natoms, x0, y0, z0, 1),
               file=f_cube)
@@ -109,7 +110,7 @@ def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
             elem_ids[a], float(elem_ids[a]), x[a], y[a], z[a]),
               file=f_cube)
 
-    if flag == 'mo':
+    if flag in ['mo', 'nto']:
         print('{:5d}{:5d}'.format(1, index + 1), file=f_cube)
 
     data = grid.values_to_numpy()

@@ -167,9 +167,11 @@ def main():
 
     if task_type == 'response' and scf_drv.restricted:
         if 'response' in task.input_dict:
-            rsp_dict = task.input_dict['response']
+            rsp_dict = dict(task.input_dict['response'])
         else:
             rsp_dict = {}
+
+        rsp_dict['filename'] = task.input_dict['filename']
 
         rsp_dict['program_start_time'] = program_start_time
         rsp_dict['maximum_hours'] = maximum_hours
