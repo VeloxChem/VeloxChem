@@ -8,6 +8,7 @@
 
 #include "CubicGrid.hpp"
 
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -189,4 +190,16 @@ double*
 CCubicGrid::values()
 {
     return _values.data();
+}
+
+void
+CCubicGrid::setValues(const std::vector<double> vals)
+{
+    std::string errmsg("CubicGrid.set_values - Inconsistent number of grid points");
+
+    auto npoints = _numPoints[0] * _numPoints[1] * _numPoints[2];
+
+    errors::assertMsgCritical(npoints == static_cast<int32_t>(vals.size()), errmsg);
+
+    std::memcpy(_values.data(), vals.data(), npoints * sizeof(double));
 }

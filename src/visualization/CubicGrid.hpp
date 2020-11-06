@@ -178,6 +178,13 @@ class CCubicGrid
      @return the pointer to first element of cubic grid values.
      */
     double* values();
+
+    /**
+     Sets the cubic grid values.
+
+     @param vals the values on the grid points.
+     */
+    void setValues(const std::vector<double> vals);
 };
 
 #endif /* CubicGrid_hpp */
