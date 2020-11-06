@@ -287,25 +287,33 @@ class TDAExciDriver(LinearSolver):
                 self.ostream.flush()
 
                 if self.rank == mpi_master():
+                    # SVD
                     t_mat = eigvecs[:, s].reshape(mo_occ.shape[1],
                                                   mo_vir.shape[1])
                     u_mat, s_diag, vh_mat = np.linalg.svd(t_mat,
                                                           full_matrices=True)
                     lam_diag = s_diag**2
-                    nto_occ = MolecularOrbitals([np.matmul(mo_occ, u_mat)],
-                                                [-lam_diag], molorb.rest)
-                    nto_vir = MolecularOrbitals([np.matmul(mo_vir, vh_mat.T)],
-                                                [lam_diag], molorb.rest)
+
+                    # holes in increasing order of lambda
+                    # particles in decreasing order of lambda
+                    nto_occ = np.flip(np.matmul(mo_occ, u_mat), axis=1)
+                    nto_vir = np.matmul(mo_vir, vh_mat.T)
+
+                    # NTOs including holes and particles
+                    nto_orbs = np.concatenate((nto_occ, nto_vir), axis=1)
+                    nto_ener = np.concatenate((lam_diag[::-1], lam_diag))
+                    nto_mo = MolecularOrbitals([nto_orbs], [nto_ener],
+                                               molorb.rest)
                 else:
                     lam_diag = None
-                    nto_occ = MolecularOrbitals()
-                    nto_vir = MolecularOrbitals()
+                    nto_mo = MolecularOrbitals()
 
                 lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
-                nto_occ.broadcast(self.rank, self.comm)
-                nto_vir.broadcast(self.rank, self.comm)
+                nto_mo.broadcast(self.rank, self.comm)
 
-                for i_nto in range(lam_diag.size):
+                num_nto = lam_diag.size
+
+                for i_nto in range(num_nto):
                     if lam_diag[i_nto] < 0.1:
                         continue
 
@@ -313,43 +321,35 @@ class TDAExciDriver(LinearSolver):
                         lam_diag[i_nto]))
 
                     # hole
-
-                    vis_drv.compute(cubic_grid, molecule, basis, nto_occ, i_nto,
-                                    'alpha')
+                    ind_occ = num_nto - i_nto - 1
+                    vis_drv.compute(cubic_grid, molecule, basis, nto_mo,
+                                    ind_occ, 'alpha')
 
                     if self.rank == mpi_master():
                         occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(
                             self.filename, s + 1, i_nto + 1)
                         vis_drv.write_data(occ_cube_name, cubic_grid, molecule,
-                                           'nto', i_nto, 'alpha')
-
-                        occ_vec = nto_occ.alpha_to_numpy()[:, i_nto].copy()
-                        e_hole = np.vdot(
-                            occ_vec, np.matmul(scf_tensors['F'][0], occ_vec))
+                                           'nto', ind_occ, 'alpha')
 
                         self.ostream.print_info(
-                            '    E_hole    : {:10.4f} a.u.   Cube file: {:s}'.
-                            format(e_hole, occ_cube_name))
+                            '    Cube file (hole)     : {:s}'.format(
+                                occ_cube_name))
                         self.ostream.flush()
 
                     # electron
-
-                    vis_drv.compute(cubic_grid, molecule, basis, nto_vir, i_nto,
-                                    'alpha')
+                    ind_vir = num_nto + i_nto
+                    vis_drv.compute(cubic_grid, molecule, basis, nto_mo,
+                                    ind_vir, 'alpha')
 
                     if self.rank == mpi_master():
                         vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(
                             self.filename, s + 1, i_nto + 1)
                         vis_drv.write_data(vir_cube_name, cubic_grid, molecule,
-                                           'nto', i_nto, 'alpha')
-
-                        vir_vec = nto_vir.alpha_to_numpy()[:, i_nto]
-                        e_particle = np.vdot(
-                            vir_vec, np.matmul(scf_tensors['F'][0], vir_vec))
+                                           'nto', ind_vir, 'alpha')
 
                         self.ostream.print_info(
-                            '    E_particle: {:10.4f} a.u.   Cube file: {:s}'.
-                            format(e_particle, vir_cube_name))
+                            '    Cube file (particle) : {:s}'.format(
+                                vir_cube_name))
                         self.ostream.flush()
 
                 self.ostream.print_blank()
