@@ -13,6 +13,8 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
+from .molecularorbitals import MolecularOrbitals
+from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
 from .checkpoint import check_rsp_hdf5
 from .checkpoint import append_rsp_solution_hdf5
@@ -29,6 +31,8 @@ class LinearResponseEigenSolver(LinearSolver):
 
     Instance variables
         - nstates: Number of excited states.
+        - filename: The filename.
+        - nto: The flag for natural transition orbital analysis.
     """
 
     def __init__(self, comm, ostream):
@@ -39,6 +43,10 @@ class LinearResponseEigenSolver(LinearSolver):
         super().__init__(comm, ostream)
 
         self.nstates = 3
+
+        self.filename = None
+
+        self.nto = False
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -57,6 +65,13 @@ class LinearResponseEigenSolver(LinearSolver):
 
         if 'nstates' in rsp_dict:
             self.nstates = int(rsp_dict['nstates'])
+
+        if 'filename' in rsp_dict:
+            self.filename = rsp_dict['filename']
+
+        if 'nto' in rsp_dict:
+            key = rsp_dict['nto'].lower()
+            self.nto = True if key == 'yes' else False
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -373,6 +388,73 @@ class LinearResponseEigenSolver(LinearSolver):
 
             for s in range(self.nstates):
                 eigvec = self.get_full_solution_vector(excitations[s][1])
+
+                if self.nto:
+                    self.ostream.print_info(
+                        'Running NTO analysis for S{:d}...'.format(s + 1))
+                    self.ostream.flush()
+
+                    vis_drv = VisualizationDriver(self.comm)
+                    cubic_grid = vis_drv.gen_cubic_grid(molecule)
+
+                    if self.rank == mpi_master():
+                        half_eigvec_size = eigvec.shape[0] // 2
+                        eigvec_x = eigvec[:half_eigvec_size].reshape(
+                            half_eigvec_size, 1) * np.sqrt(2.0)
+                        mo_occ = scf_tensors['C'][:, :nocc]
+                        mo_vir = scf_tensors['C'][:, nocc:]
+                        lam_diag, nto_mo = self.get_nto(0, eigvec_x, mo_occ,
+                                                        mo_vir)
+                    else:
+                        lam_diag = None
+                        nto_mo = MolecularOrbitals()
+                    lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
+                    nto_mo.broadcast(self.rank, self.comm)
+
+                    num_nto = lam_diag.size
+
+                    for i_nto in range(num_nto):
+                        if lam_diag[i_nto] < 0.1:
+                            continue
+
+                        self.ostream.print_info('  lambda: {:.4f}'.format(
+                            lam_diag[i_nto]))
+
+                        # hole
+                        ind_occ = num_nto - i_nto - 1
+                        vis_drv.compute(cubic_grid, molecule, basis, nto_mo,
+                                        ind_occ, 'alpha')
+
+                        if self.rank == mpi_master():
+                            occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(
+                                self.filename, s + 1, i_nto + 1)
+                            vis_drv.write_data(occ_cube_name, cubic_grid,
+                                               molecule, 'nto', ind_occ,
+                                               'alpha')
+
+                            self.ostream.print_info(
+                                '    Cube file (hole)     : {:s}'.format(
+                                    occ_cube_name))
+                            self.ostream.flush()
+
+                        # electron
+                        ind_vir = num_nto + i_nto
+                        vis_drv.compute(cubic_grid, molecule, basis, nto_mo,
+                                        ind_vir, 'alpha')
+
+                        if self.rank == mpi_master():
+                            vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(
+                                self.filename, s + 1, i_nto + 1)
+                            vis_drv.write_data(vir_cube_name, cubic_grid,
+                                               molecule, 'nto', ind_vir,
+                                               'alpha')
+
+                            self.ostream.print_info(
+                                '    Cube file (particle) : {:s}'.format(
+                                    vir_cube_name))
+                            self.ostream.flush()
+
+                    self.ostream.print_blank()
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
