@@ -21,10 +21,12 @@ from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
+from .veloxchemlib import molorb
 from .veloxchemlib import szblock
 from .veloxchemlib import parse_xc_func
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
+from .molecularorbitals import MolecularOrbitals
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
@@ -1659,3 +1661,37 @@ class LinearSolver:
         sdiag = 2.0 * np.ones(lz)
 
         return ediag, sdiag
+
+    def get_nto(self, s, eigvecs, mo_occ, mo_vir):
+        """
+        Gets the natural transition orbitals.
+
+        :param s:
+            The index of the root (0-based).
+        :param eigvecs:
+            The eigenvectors.
+        :param mo_occ:
+            The MO coefficients of occupied orbitals.
+        :param mo_vir:
+            The MO coefficients of virtual orbitals.
+
+        :return:
+            The lambda values (1D array) and the NTO coefficients (2D array).
+        """
+
+        # SVD
+        t_mat = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
+        u_mat, s_diag, vh_mat = np.linalg.svd(t_mat, full_matrices=True)
+        lam_diag = s_diag**2
+
+        # holes in increasing order of lambda
+        # particles in decreasing order of lambda
+        nto_occ = np.flip(np.matmul(mo_occ, u_mat), axis=1)
+        nto_vir = np.matmul(mo_vir, vh_mat.T)
+
+        # NTOs including holes and particles
+        nto_orbs = np.concatenate((nto_occ, nto_vir), axis=1)
+        nto_ener = np.zeros(nto_orbs.shape[1])
+        nto_mo = MolecularOrbitals([nto_orbs], [nto_ener], molorb.rest)
+
+        return lam_diag, nto_mo

@@ -41,19 +41,22 @@ class TestNTO(unittest.TestCase):
             nto_vals = []
 
             for s in range(ref_eig_vals.shape[0]):
-                t_mat = eig_vecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
-                u_mat, s_diag, vh_mat = np.linalg.svd(t_mat, full_matrices=True)
-                lam_diag = s_diag**2
-                nto_occ = np.matmul(mo_occ, u_mat)
-                nto_vir = np.matmul(mo_vir, vh_mat.T)
+                lam_diag, nto_mo = rsp_drv.get_nto(s, eig_vecs, mo_occ, mo_vir)
+                num_nto = lam_diag.size
+                nto_mo = nto_mo.alpha_to_numpy()
 
                 for i_nto in range(lam_diag.size):
                     if lam_diag[i_nto] < 0.1:
                         continue
-                    occ_vec = nto_occ[:, i_nto]
+
+                    ind_occ = num_nto - i_nto - 1
+                    occ_vec = nto_mo[:, ind_occ]
                     e_hole = np.vdot(occ_vec, np.matmul(fock, occ_vec))
-                    vir_vec = nto_vir[:, i_nto]
+
+                    ind_vir = num_nto + i_nto
+                    vir_vec = nto_mo[:, ind_vir]
                     e_particle = np.vdot(vir_vec, np.matmul(fock, vir_vec))
+
                     nto_vals += [lam_diag[i_nto], e_hole, e_particle]
 
             nto_vals = np.array(nto_vals)

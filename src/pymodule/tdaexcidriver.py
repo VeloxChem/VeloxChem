@@ -287,23 +287,7 @@ class TDAExciDriver(LinearSolver):
                 self.ostream.flush()
 
                 if self.rank == mpi_master():
-                    # SVD
-                    t_mat = eigvecs[:, s].reshape(mo_occ.shape[1],
-                                                  mo_vir.shape[1])
-                    u_mat, s_diag, vh_mat = np.linalg.svd(t_mat,
-                                                          full_matrices=True)
-                    lam_diag = s_diag**2
-
-                    # holes in increasing order of lambda
-                    # particles in decreasing order of lambda
-                    nto_occ = np.flip(np.matmul(mo_occ, u_mat), axis=1)
-                    nto_vir = np.matmul(mo_vir, vh_mat.T)
-
-                    # NTOs including holes and particles
-                    nto_orbs = np.concatenate((nto_occ, nto_vir), axis=1)
-                    nto_ener = np.zeros(nto_orbs.shape[1])
-                    nto_mo = MolecularOrbitals([nto_orbs], [nto_ener],
-                                               molorb.rest)
+                    lam_diag, nto_mo = self.get_nto(s, eigvecs, mo_occ, mo_vir)
                 else:
                     lam_diag = None
                     nto_mo = MolecularOrbitals()
