@@ -301,7 +301,7 @@ class TDAExciDriver(LinearSolver):
 
                     # NTOs including holes and particles
                     nto_orbs = np.concatenate((nto_occ, nto_vir), axis=1)
-                    nto_ener = np.concatenate((lam_diag[::-1], lam_diag))
+                    nto_ener = np.zeros(nto_orbs.shape[1])
                     nto_mo = MolecularOrbitals([nto_orbs], [nto_ener],
                                                molorb.rest)
                 else:
