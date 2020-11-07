@@ -1731,17 +1731,17 @@ class LinearSolver:
         vis_drv = VisualizationDriver(self.comm)
         cubic_grid = vis_drv.gen_cubic_grid(molecule)
 
-        num_nto = lam_diag.size
+        nocc = molecule.number_of_alpha_electrons()
         s = root
 
-        for i_nto in range(num_nto):
+        for i_nto in range(lam_diag.size):
             if lam_diag[i_nto] < nto_thresh:
                 continue
 
             self.ostream.print_info('  lambda: {:.4f}'.format(lam_diag[i_nto]))
 
             # hole
-            ind_occ = num_nto - i_nto - 1
+            ind_occ = nocc - i_nto - 1
             vis_drv.compute(cubic_grid, molecule, basis, nto_mo, ind_occ,
                             'alpha')
 
@@ -1756,7 +1756,7 @@ class LinearSolver:
                 self.ostream.flush()
 
             # electron
-            ind_vir = num_nto + i_nto
+            ind_vir = nocc + i_nto
             vis_drv.compute(cubic_grid, molecule, basis, nto_mo, ind_vir,
                             'alpha')
 

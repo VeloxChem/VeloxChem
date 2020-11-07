@@ -42,18 +42,17 @@ class TestNTO(unittest.TestCase):
 
             for s in range(ref_eig_vals.shape[0]):
                 lam_diag, nto_mo = rsp_drv.get_nto(s, eig_vecs, mo_occ, mo_vir)
-                num_nto = lam_diag.size
                 nto_mo = nto_mo.alpha_to_numpy()
 
                 for i_nto in range(lam_diag.size):
                     if lam_diag[i_nto] < 0.1:
                         continue
 
-                    ind_occ = num_nto - i_nto - 1
+                    ind_occ = nocc - i_nto - 1
                     occ_vec = nto_mo[:, ind_occ]
                     e_hole = np.vdot(occ_vec, np.matmul(fock, occ_vec))
 
-                    ind_vir = num_nto + i_nto
+                    ind_vir = nocc + i_nto
                     vir_vec = nto_mo[:, ind_vir]
                     e_particle = np.vdot(vir_vec, np.matmul(fock, vir_vec))
 
