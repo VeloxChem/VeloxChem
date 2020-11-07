@@ -27,6 +27,7 @@ from .veloxchemlib import parse_xc_func
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals
+from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
@@ -73,6 +74,7 @@ class LinearSolver:
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation.
+        - filename: The filename.
         - dist_bger: The distributed gerade trial vectors.
         - dist_bung: The distributed ungerade trial vectors.
         - dist_e2bger: The distributed gerade sigma vectors.
@@ -131,6 +133,9 @@ class LinearSolver:
         self.profiling = False
         self.memory_profiling = False
         self.memory_tracing = False
+
+        # filename
+        self.filename = None
 
         self.dist_bger = None
         self.dist_bung = None
@@ -222,6 +227,9 @@ class LinearSolver:
         if 'memory_tracing' in rsp_dict:
             key = rsp_dict['memory_tracing'].lower()
             self.memory_tracing = True if key in ['yes', 'y'] else False
+
+        if 'filename' in rsp_dict:
+            self.filename = rsp_dict['filename']
 
     def init_eri(self, molecule, basis):
         """
@@ -1695,3 +1703,71 @@ class LinearSolver:
         nto_mo = MolecularOrbitals([nto_orbs], [nto_ener], molorb.rest)
 
         return lam_diag, nto_mo
+
+    def write_nto_cubes(self,
+                        molecule,
+                        basis,
+                        root,
+                        lam_diag,
+                        nto_mo,
+                        nto_thresh=0.1):
+        """
+        Writes cube files for natural transition orbitals.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param root:
+            The index of the root (0-based).
+        :param lam_diag:
+            The lambda values (1D array).
+        :param nto_mo:
+            The NTO coefficients (2D array).
+        :param nto_thresh:
+            The threshold for writing NTO to cube file.
+        """
+
+        vis_drv = VisualizationDriver(self.comm)
+        cubic_grid = vis_drv.gen_cubic_grid(molecule)
+
+        num_nto = lam_diag.size
+        s = root
+
+        for i_nto in range(num_nto):
+            if lam_diag[i_nto] < nto_thresh:
+                continue
+
+            self.ostream.print_info('  lambda: {:.4f}'.format(lam_diag[i_nto]))
+
+            # hole
+            ind_occ = num_nto - i_nto - 1
+            vis_drv.compute(cubic_grid, molecule, basis, nto_mo, ind_occ,
+                            'alpha')
+
+            if self.rank == mpi_master():
+                occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(
+                    self.filename, s + 1, i_nto + 1)
+                vis_drv.write_data(occ_cube_name, cubic_grid, molecule, 'nto',
+                                   ind_occ, 'alpha')
+
+                self.ostream.print_info(
+                    '    Cube file (hole)     : {:s}'.format(occ_cube_name))
+                self.ostream.flush()
+
+            # electron
+            ind_vir = num_nto + i_nto
+            vis_drv.compute(cubic_grid, molecule, basis, nto_mo, ind_vir,
+                            'alpha')
+
+            if self.rank == mpi_master():
+                vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(
+                    self.filename, s + 1, i_nto + 1)
+                vis_drv.write_data(vir_cube_name, cubic_grid, molecule, 'nto',
+                                   ind_vir, 'alpha')
+
+                self.ostream.print_info(
+                    '    Cube file (particle) : {:s}'.format(vir_cube_name))
+                self.ostream.flush()
+
+        self.ostream.print_blank()

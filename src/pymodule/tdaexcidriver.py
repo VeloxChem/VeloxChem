@@ -18,7 +18,6 @@ from .profiler import Profiler
 from .linearsolver import LinearSolver
 from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
-from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
 from .checkpoint import read_rsp_hdf5
 from .checkpoint import write_rsp_hdf5
@@ -37,7 +36,6 @@ class TDAExciDriver(LinearSolver):
     Instance variables
         - nstates: The number of excited states determined by driver.
         - solver: The eigenvalues solver.
-        - filename: The filename.
         - nto: The flag for natural transition orbital analysis.
     """
 
@@ -54,8 +52,7 @@ class TDAExciDriver(LinearSolver):
         # solver setup
         self.solver = None
 
-        self.filename = None
-
+        # NTO
         self.nto = False
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -76,9 +73,6 @@ class TDAExciDriver(LinearSolver):
 
         if 'nstates' in rsp_dict:
             self.nstates = int(rsp_dict['nstates'])
-
-        if 'filename' in rsp_dict:
-            self.filename = rsp_dict['filename']
 
         if 'nto' in rsp_dict:
             key = rsp_dict['nto'].lower()
@@ -278,9 +272,6 @@ class TDAExciDriver(LinearSolver):
         # natural transition orbitals
 
         if self.nto and self.is_converged:
-            vis_drv = VisualizationDriver(self.comm)
-            cubic_grid = vis_drv.gen_cubic_grid(molecule)
-
             for s in range(self.nstates):
                 self.ostream.print_info(
                     'Running NTO analysis for S{:d}...'.format(s + 1))
@@ -291,52 +282,10 @@ class TDAExciDriver(LinearSolver):
                 else:
                     lam_diag = None
                     nto_mo = MolecularOrbitals()
-
                 lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
                 nto_mo.broadcast(self.rank, self.comm)
 
-                num_nto = lam_diag.size
-
-                for i_nto in range(num_nto):
-                    if lam_diag[i_nto] < 0.1:
-                        continue
-
-                    self.ostream.print_info('  lambda: {:.4f}'.format(
-                        lam_diag[i_nto]))
-
-                    # hole
-                    ind_occ = num_nto - i_nto - 1
-                    vis_drv.compute(cubic_grid, molecule, basis, nto_mo,
-                                    ind_occ, 'alpha')
-
-                    if self.rank == mpi_master():
-                        occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(
-                            self.filename, s + 1, i_nto + 1)
-                        vis_drv.write_data(occ_cube_name, cubic_grid, molecule,
-                                           'nto', ind_occ, 'alpha')
-
-                        self.ostream.print_info(
-                            '    Cube file (hole)     : {:s}'.format(
-                                occ_cube_name))
-                        self.ostream.flush()
-
-                    # electron
-                    ind_vir = num_nto + i_nto
-                    vis_drv.compute(cubic_grid, molecule, basis, nto_mo,
-                                    ind_vir, 'alpha')
-
-                    if self.rank == mpi_master():
-                        vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(
-                            self.filename, s + 1, i_nto + 1)
-                        vis_drv.write_data(vir_cube_name, cubic_grid, molecule,
-                                           'nto', ind_vir, 'alpha')
-
-                        self.ostream.print_info(
-                            '    Cube file (particle) : {:s}'.format(
-                                vir_cube_name))
-                        self.ostream.flush()
-
-                self.ostream.print_blank()
+                self.write_nto_cubes(molecule, basis, s, lam_diag, nto_mo)
 
             self.ostream.print_blank()
             self.ostream.flush()
