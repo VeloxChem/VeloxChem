@@ -13,7 +13,7 @@ The source code can be downloaded from this repository
 Installing from source
 ^^^^^^^^^^^^^^^^^^^^^^
 
-With Anaconda (x86_64 or POWER processor)
+With Anaconda (x86-64 or POWER processor)
 +++++++++++++++++++++++++++++++++++++++++
 
 - Create virtual environment ::
@@ -23,7 +23,7 @@ With Anaconda (x86_64 or POWER processor)
 
 - Install compiler and math library
 
-  - on Linux (x86_64 processor) ::
+  - on Linux (x86-64 processor) ::
 
         conda install gxx_linux-64 mkl mkl-include
 
@@ -32,16 +32,14 @@ With Anaconda (x86_64 or POWER processor)
         conda install gxx_linux-ppc64le openblas=0.3.3
         export OPENBLASROOT=/path/to/your/anaconda3/envs/vlx
 
-  - on MacOS (x86_64 processor) ::
+  - on MacOS (x86-64 processor) ::
 
         conda install clangxx_osx-64 mkl mkl-include
 
-- Install MPI and mpi4py ::
+- Install MPI, mpi4py and other Python modules ::
 
     conda install openmpi
     python3 -m pip install mpi4py --no-binary=mpi4py
-
-- Install other dependencies ::
 
     conda install pybind11 psutil pytest numpy h5py
     python3 -m pip install loprop
@@ -52,7 +50,7 @@ With Anaconda (x86_64 or POWER processor)
     python3 config/generate_setup.py
     python3 setup.py install
 
-Cray platform (x86_64 or ARM processor)
+Cray platform (x86-64 or ARM processor)
 +++++++++++++++++++++++++++++++++++++++
 
 - Load cray modules ::
@@ -61,11 +59,7 @@ Cray platform (x86_64 or ARM processor)
     module load cray-hdf5
     module load cray-python/3.6.5.7
 
-- Install python modules ::
-
-    python3 -m pip install pybind11 h5py psutil loprop --user
-
-- Manually install mpi4py
+- Install mpi4py
 
     1. Download ``mpi4py-3.0.3.tar.gz`` from https://pypi.org/project/mpi4py/#files
     2. ``tar xf mpi4py-3.0.3.tar.gz && cd mpi4py-3.0.3``
@@ -77,11 +71,15 @@ Cray platform (x86_64 or ARM processor)
         extra_compile_args   = -shared
         extra_link_args      = -Wl,-rpath,/opt/cray/pe/mpt/7.7.9/gni/mpich-gnu/8.2/lib
 
-    4. Install mpi4py ::
+    4. Build and install mpi4py ::
 
         python3 setup.py build --mpi=cray
         python3 setup.py install --prefix=/path/to/your/mpi4py
         export PYTHONPATH=/path/to/your/mpi4py/lib/python3.6/site-packages:$PYTHONPATH
+
+- Install other Python modules ::
+
+    python3 -m pip install pybind11 h5py psutil loprop --user
 
 - Use compiler wrapper to compile VeloxChem ::
 
@@ -102,13 +100,10 @@ Debian based Linux
     sudo apt-get update
     sudo apt-get install intel-mkl-2018.2-046
 
-- Install MPI and Python ::
+- Install MPI, Python, mpi4py and other Python modules ::
 
     sudo apt-get install mpich python3 python3-dev python3-pip
     sudo pip3 install --no-binary=mpi4py mpi4py
-
-- Install python modules ::
-
     sudo pip3 install numpy h5py pybind11 pytest loprop psutil
 
 - Install VeloxChem ::
@@ -126,16 +121,13 @@ RPM based Linux
     sudo rpm --import https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
     sudo yum install intel-mkl-2018.2-046
 
-- Install MPI and Python ::
+- Install MPI, Python, mpi4py and other Python modules ::
 
     sudo yum install mpich-3.2-devel python3-devel
     sudo ln -s /usr/lib64/mpich-3.2/bin/mpirun /usr/bin/mpirun
     sudo ln -s /usr/lib64/mpich-3.2/bin/mpicxx /usr/bin/mpicxx
     sudo ln -s /usr/lib64/mpich-3.2/bin/mpicc /usr/bin/mpicc
     sudo pip3 install --no-binary=mpi4py mpi4py
-
-- Install python modules ::
-
     sudo pip3 install numpy h5py pybind11 pytest loprop psutil
 
 - Install VeloxChem ::
@@ -147,12 +139,12 @@ RPM based Linux
 PowerLinux
 ++++++++++
 
-- See installation instructions `With Anaconda (x86_64 or POWER processor)`_
+- See installation instructions `With Anaconda (x86-64 or POWER processor)`_
 
 MacOS
 +++++
 
-- See installation instructions `With Anaconda (x86_64 or POWER processor)`_
+- See installation instructions `With Anaconda (x86-64 or POWER processor)`_
 
 Windows
 +++++++
