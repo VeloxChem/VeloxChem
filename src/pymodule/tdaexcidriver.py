@@ -36,6 +36,7 @@ class TDAExciDriver(LinearSolver):
     Instance variables
         - nstates: The number of excited states determined by driver.
         - solver: The eigenvalues solver.
+        - nto: The flag for natural transition orbital analysis.
     """
 
     def __init__(self, comm, ostream):
@@ -50,6 +51,9 @@ class TDAExciDriver(LinearSolver):
 
         # solver setup
         self.solver = None
+
+        # NTO
+        self.nto = False
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -69,6 +73,10 @@ class TDAExciDriver(LinearSolver):
 
         if 'nstates' in rsp_dict:
             self.nstates = int(rsp_dict['nstates'])
+
+        if 'nto' in rsp_dict:
+            key = rsp_dict['nto'].lower()
+            self.nto = True if key == 'yes' else False
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -261,6 +269,30 @@ class TDAExciDriver(LinearSolver):
                 trans_dipoles['velocity'] * trans_dipoles['magnetic'],
                 axis=1) * rotatory_strength_in_cgs()
 
+        # natural transition orbitals
+
+        if self.nto and self.is_converged:
+            for s in range(self.nstates):
+                self.ostream.print_info(
+                    'Running NTO analysis for S{:d}...'.format(s + 1))
+                self.ostream.flush()
+
+                if self.rank == mpi_master():
+                    lam_diag, nto_mo = self.get_nto(s, eigvecs, mo_occ, mo_vir)
+                else:
+                    lam_diag = None
+                    nto_mo = MolecularOrbitals()
+                lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
+                nto_mo.broadcast(self.rank, self.comm)
+
+                self.write_nto_cubes(molecule, basis, s, lam_diag, nto_mo)
+
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        # results
+
+        if self.rank == mpi_master() and self.is_converged:
             return {
                 'eigenvalues': eigvals,
                 'eigenvectors': eigvecs,

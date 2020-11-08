@@ -3,8 +3,8 @@ import numpy as np
 import unittest
 from pathlib import Path
 
-from veloxchem.veloxchemlib import CubicGrid
 from veloxchem.veloxchemlib import mpi_master
+from veloxchem.cubicgrid import CubicGrid
 from veloxchem.visualizationdriver import VisualizationDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.mpitask import MpiTask

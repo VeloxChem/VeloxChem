@@ -13,6 +13,7 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
+from .molecularorbitals import MolecularOrbitals
 from .errorhandler import assert_msg_critical
 from .checkpoint import check_rsp_hdf5
 from .checkpoint import append_rsp_solution_hdf5
@@ -29,6 +30,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
     Instance variables
         - nstates: Number of excited states.
+        - nto: The flag for natural transition orbital analysis.
     """
 
     def __init__(self, comm, ostream):
@@ -39,6 +41,8 @@ class LinearResponseEigenSolver(LinearSolver):
         super().__init__(comm, ostream)
 
         self.nstates = 3
+
+        self.nto = False
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -57,6 +61,10 @@ class LinearResponseEigenSolver(LinearSolver):
 
         if 'nstates' in rsp_dict:
             self.nstates = int(rsp_dict['nstates'])
+
+        if 'nto' in rsp_dict:
+            key = rsp_dict['nto'].lower()
+            self.nto = True if key == 'yes' else False
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -373,6 +381,27 @@ class LinearResponseEigenSolver(LinearSolver):
 
             for s in range(self.nstates):
                 eigvec = self.get_full_solution_vector(excitations[s][1])
+
+                if self.nto:
+                    self.ostream.print_info(
+                        'Running NTO analysis for S{:d}...'.format(s + 1))
+                    self.ostream.flush()
+
+                    if self.rank == mpi_master():
+                        half_eigvec_size = eigvec.shape[0] // 2
+                        eigvec_x = eigvec[:half_eigvec_size].reshape(
+                            half_eigvec_size, 1) * np.sqrt(2.0)
+                        mo_occ = scf_tensors['C'][:, :nocc]
+                        mo_vir = scf_tensors['C'][:, nocc:]
+                        lam_diag, nto_mo = self.get_nto(0, eigvec_x, mo_occ,
+                                                        mo_vir)
+                    else:
+                        lam_diag = None
+                        nto_mo = MolecularOrbitals()
+                    lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
+                    nto_mo.broadcast(self.rank, self.comm)
+
+                    self.write_nto_cubes(molecule, basis, s, lam_diag, nto_mo)
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):

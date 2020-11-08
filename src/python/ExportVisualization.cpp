@@ -62,6 +62,7 @@ export_visualization(py::module& m)
         .def("x_num_points", &CCubicGrid::numPointsX)
         .def("y_num_points", &CCubicGrid::numPointsY)
         .def("z_num_points", &CCubicGrid::numPointsZ)
+        .def("set_values", &CCubicGrid::setValues)
         .def("values_to_numpy", &CCubicGrid_values_to_numpy);
 
     // CVisualizationDriver class

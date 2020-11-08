@@ -46,6 +46,7 @@ from .xtbgradientdriver import XTBGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver
+from .cubicgrid import CubicGrid
 from .visualizationdriver import VisualizationDriver
 from .excitondriver import ExcitonModelDriver
 from .rspdriver import ResponseDriver
