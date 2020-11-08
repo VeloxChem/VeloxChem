@@ -12,7 +12,7 @@ Welcome to VeloxChem's documentation!
 
    introduction.rst
    installation.rst
-   start.rst
+   gettingstarted.rst
 
    api/modules.rst
 

@@ -1,13 +1,38 @@
 Getting started
 ===============
- 
+
 Structure of input file
 -----------------------
+
+The VeloxChem input file consists of multiple groups marked with
+``@group name`` and ``@end``. For example, the following input file
+has three groups: ``jobs``, ``method settings``, and ``molecule``.
+
+.. code-block:: bash
+
+  @jobs
+  task: scf
+  @end
+
+  @method settings
+  xcfun: b3lyp
+  basis: def2-svp
+  @end
+
+  @molecule
+  charge: 0
+  multiplicity: 1
+  units: au
+  xyz:  
+  O   0.0   0.0   0.0
+  H   0.0   1.4   1.1
+  H   0.0  -1.4   1.1
+  @end 
 
 .. toctree::
    :maxdepth: 2
 
-   inputs/structure.rst
+   inputs/keywords.rst
 
 Example input files
 -------------------
@@ -20,7 +45,6 @@ Example input files
    inputs/rsp.rst
    inputs/mp2.rst
    inputs/cube.rst
-
 
 Running with input file
 -----------------------
@@ -44,7 +68,7 @@ Running in Jupyter notebook
         H 0 0 1.795239827225189
         H 1.693194615993441 0 -0.599043184453037"""
 
-    basis_set_label = '6-31g'
+    basis_set_label = 'def2-svp'
 
     scf_settings = {'conv_thresh': 1.0e-6}
     method_settings = {'xcfun': 'b3lyp', 'grid_level': 4}
