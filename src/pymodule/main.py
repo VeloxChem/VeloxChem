@@ -27,6 +27,49 @@ from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_maximum_hours
 
 
+def select_scf_driver(task, scf_type):
+
+    nalpha = task.molecule.number_of_alpha_electrons()
+    nbeta = task.molecule.number_of_beta_electrons()
+
+    if nalpha == nbeta and scf_type == 'restricted':
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+    else:
+        scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
+
+    return scf_drv
+
+
+def select_rsp_property(task, rsp_dict, method_dict):
+
+    if 'property' not in rsp_dict:
+        rsp_dict['property'] = 'custom'
+    prop_type = rsp_dict['property'].lower()
+
+    if prop_type in ['polarizability', 'dipole polarizability']:
+        rsp_prop = Polarizability(rsp_dict, method_dict)
+    elif prop_type in ['absorption', 'uv-vis', 'ecd']:
+        rsp_prop = Absorption(rsp_dict, method_dict)
+    elif prop_type in [
+            'linear absorption cross-section', 'linear absorption (cpp)',
+            'absorption (cpp)'
+    ]:
+        rsp_prop = LinearAbsorptionCrossSection(rsp_dict, method_dict)
+    elif prop_type in [
+            'circular dichroism spectrum', 'circular dichroism (cpp)',
+            'ecd (cpp)'
+    ]:
+        rsp_prop = CircularDichroismSpectrum(rsp_dict, method_dict)
+    elif prop_type == 'c6':
+        rsp_prop = C6(rsp_dict, method_dict)
+    elif prop_type == 'custom':
+        rsp_prop = CustomProperty(rsp_dict, method_dict)
+    else:
+        assert_msg_critical(False, 'input file: invalid response property')
+
+    return rsp_prop
+
+
 def main():
 
     program_start_time = tm.time()
@@ -51,27 +94,25 @@ def main():
     task = MpiTask(sys.argv[1:], MPI.COMM_WORLD)
     task_type = task.input_dict['jobs']['task'].lower()
 
+    # Timelimit in hours
+
+    if 'maximum_hours' in task.input_dict['jobs']:
+        maximum_hours = float(task.input_dict['jobs']['maximum_hours'])
+    else:
+        maximum_hours = get_slurm_maximum_hours()
+
+    # Method settings
+
     if 'method_settings' in task.input_dict:
-        method_dict = task.input_dict['method_settings']
+        method_dict = dict(task.input_dict['method_settings'])
     else:
         method_dict = {}
 
     if 'pe' in task.input_dict:
+        # add @pe group to method_dict as pe_options
         method_dict['pe_options'] = dict(task.input_dict['pe'])
     else:
         method_dict['pe_options'] = {}
-
-    use_xtb = 'xtb' in method_dict
-
-    # Timelimit in hours
-
-    if 'maximum_hours' in task.input_dict['jobs']:
-        try:
-            maximum_hours = float(task.input_dict['jobs']['maximum_hours'])
-        except ValueError:
-            maximum_hours = None
-    else:
-        maximum_hours = get_slurm_maximum_hours()
 
     # Exciton model
 
@@ -98,7 +139,9 @@ def main():
     if task_type == 'visualization' and 'visualization' in task.input_dict:
         run_scf = 'read_dalton' not in task.input_dict['visualization']['cubes']
 
-    run_unrestricted = (task_type == 'uhf')
+    use_xtb = ('xtb' in method_dict)
+
+    scf_type = 'unrestricted' if task_type in ['uhf', 'uscf'] else 'restricted'
 
     if run_scf:
         if 'scf' in task.input_dict:
@@ -116,13 +159,7 @@ def main():
                                         '_xtb.out')
             xtb_drv.compute(task.molecule, task.ostream)
         else:
-            nalpha = task.molecule.number_of_alpha_electrons()
-            nbeta = task.molecule.number_of_beta_electrons()
-
-            if nalpha == nbeta and not run_unrestricted:
-                scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-            else:
-                scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
+            scf_drv = select_scf_driver(task, scf_type)
             scf_drv.update_settings(scf_dict, method_dict)
             scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
@@ -183,31 +220,7 @@ def main():
         if not scf_drv.restart:
             rsp_dict['restart'] = 'no'
 
-        if 'property' not in rsp_dict:
-            rsp_dict['property'] = 'custom'
-        prop_type = rsp_dict['property'].lower()
-
-        if prop_type in ['polarizability', 'dipole polarizability']:
-            rsp_prop = Polarizability(rsp_dict, method_dict)
-        elif prop_type in ['absorption', 'uv-vis', 'ecd']:
-            rsp_prop = Absorption(rsp_dict, method_dict)
-        elif prop_type in [
-                'linear absorption cross-section', 'linear absorption (cpp)',
-                'absorption (cpp)'
-        ]:
-            rsp_prop = LinearAbsorptionCrossSection(rsp_dict, method_dict)
-        elif prop_type in [
-                'circular dichroism spectrum', 'circular dichroism (cpp)',
-                'ecd (cpp)'
-        ]:
-            rsp_prop = CircularDichroismSpectrum(rsp_dict, method_dict)
-        elif prop_type == 'c6':
-            rsp_prop = C6(rsp_dict, method_dict)
-        elif prop_type == 'custom':
-            rsp_prop = CustomProperty(rsp_dict, method_dict)
-        else:
-            assert_msg_critical(False, 'input file: invalid response property')
-
+        rsp_prop = select_rsp_property(task, rsp_dict, method_dict)
         rsp_prop.init_driver(task.mpi_comm, task.ostream)
         rsp_prop.compute(task.molecule, task.ao_basis, scf_tensors)
         if not rsp_prop.converged():
