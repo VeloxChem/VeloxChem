@@ -28,6 +28,17 @@ from .slurminfo import get_slurm_maximum_hours
 
 
 def select_scf_driver(task, scf_type):
+    """
+    Selects SCF driver.
+
+    :param task:
+        The MPI task.
+    :param scf_type:
+        The type of SCF calculation (restricted or unrestricted).
+
+    :return:
+        The SCF driver object.
+    """
 
     nalpha = task.molecule.number_of_alpha_electrons()
     nbeta = task.molecule.number_of_beta_electrons()
@@ -41,29 +52,58 @@ def select_scf_driver(task, scf_type):
 
 
 def select_rsp_property(task, rsp_dict, method_dict):
+    """
+    Selects response property.
 
-    if 'property' not in rsp_dict:
-        rsp_dict['property'] = 'custom'
-    prop_type = rsp_dict['property'].lower()
+    :param task:
+        The MPI task.
+    :param rsp_dict:
+        The dictionary of response dict.
+    :param method_dict:
+        The dictionary of method rsp_dict.
 
-    if prop_type in ['polarizability', 'dipole polarizability']:
+    :return:
+        The response property object.
+    """
+
+    if 'property' in rsp_dict:
+        prop_type = rsp_dict['property'].lower()
+    else:
+        prop_type = 'custom'
+
+    if prop_type in [
+            'polarizability',
+            'dipole polarizability',
+    ]:
         rsp_prop = Polarizability(rsp_dict, method_dict)
-    elif prop_type in ['absorption', 'uv-vis', 'ecd']:
-        rsp_prop = Absorption(rsp_dict, method_dict)
+
     elif prop_type in [
-            'linear absorption cross-section', 'linear absorption (cpp)',
-            'absorption (cpp)'
+            'absorption',
+            'uv-vis',
+            'ecd',
+    ]:
+        rsp_prop = Absorption(rsp_dict, method_dict)
+
+    elif prop_type in [
+            'linear absorption cross-section',
+            'linear absorption (cpp)',
+            'absorption (cpp)',
     ]:
         rsp_prop = LinearAbsorptionCrossSection(rsp_dict, method_dict)
+
     elif prop_type in [
-            'circular dichroism spectrum', 'circular dichroism (cpp)',
-            'ecd (cpp)'
+            'circular dichroism spectrum',
+            'circular dichroism (cpp)',
+            'ecd (cpp)',
     ]:
         rsp_prop = CircularDichroismSpectrum(rsp_dict, method_dict)
+
     elif prop_type == 'c6':
         rsp_prop = C6(rsp_dict, method_dict)
+
     elif prop_type == 'custom':
         rsp_prop = CustomProperty(rsp_dict, method_dict)
+
     else:
         assert_msg_critical(False, 'input file: invalid response property')
 
@@ -71,6 +111,9 @@ def select_rsp_property(task, rsp_dict, method_dict):
 
 
 def main():
+    """
+    Runs VeloxChem with command line arguments.
+    """
 
     program_start_time = tm.time()
 
@@ -114,6 +157,8 @@ def main():
     else:
         method_dict['pe_options'] = {}
 
+    use_xtb = ('xtb' in method_dict)
+
     # Exciton model
 
     if task_type == 'exciton':
@@ -132,14 +177,13 @@ def main():
     # Self-consistent field
 
     run_scf = task_type in [
-        'hf', 'rhf', 'uhf', 'scf', 'wavefunction', 'wave function', 'mp2',
-        'gradient', 'optimize', 'response', 'pulses', 'visualization', 'loprop'
+        'hf', 'rhf', 'uhf', 'scf', 'uscf', 'wavefunction', 'wave function',
+        'mp2', 'gradient', 'optimize', 'response', 'pulses', 'visualization',
+        'loprop'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
         run_scf = 'read_dalton' not in task.input_dict['visualization']['cubes']
-
-    use_xtb = ('xtb' in method_dict)
 
     scf_type = 'unrestricted' if task_type in ['uhf', 'uscf'] else 'restricted'
 
@@ -237,8 +281,8 @@ def main():
             prt_dict = task.input_dict['pulses']
         else:
             prt_dict = {}
-        cpp_dict = {}
 
+        cpp_dict = {}
         if 'eri_thresh' not in cpp_dict:
             cpp_dict['eri_thresh'] = scf_drv.eri_thresh
         if 'qq_type' not in cpp_dict:
