@@ -1732,7 +1732,6 @@ class LinearSolver:
         cubic_grid = vis_drv.gen_cubic_grid(molecule)
 
         nocc = molecule.number_of_alpha_electrons()
-        s = root
 
         for i_nto in range(lam_diag.size):
             if lam_diag[i_nto] < nto_thresh:
@@ -1747,7 +1746,7 @@ class LinearSolver:
 
             if self.rank == mpi_master():
                 occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(
-                    self.filename, s + 1, i_nto + 1)
+                    self.filename, root + 1, i_nto + 1)
                 vis_drv.write_data(occ_cube_name, cubic_grid, molecule, 'nto',
                                    ind_occ, 'alpha')
 
@@ -1762,12 +1761,96 @@ class LinearSolver:
 
             if self.rank == mpi_master():
                 vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(
-                    self.filename, s + 1, i_nto + 1)
+                    self.filename, root + 1, i_nto + 1)
                 vis_drv.write_data(vir_cube_name, cubic_grid, molecule, 'nto',
                                    ind_vir, 'alpha')
 
                 self.ostream.print_info(
                     '    Cube file (particle) : {:s}'.format(vir_cube_name))
                 self.ostream.flush()
+
+        self.ostream.print_blank()
+
+    def get_detach_attach_densities(self, s, eigvecs, mo_occ, mo_vir):
+        """
+        Gets the detachment and attachment densities.
+
+        :param s:
+            The index of the root (0-based).
+        :param eigvecs:
+            The eigenvectors.
+        :param mo_occ:
+            The MO coefficients of occupied orbitals.
+        :param mo_vir:
+            The MO coefficients of virtual orbitals.
+
+        :return:
+            The detachment and attachment densities.
+        """
+
+        mo = np.hstack((mo_occ, mo_vir))
+        nocc = mo_occ.shape[1]
+        nvir = mo_vir.shape[1]
+
+        t_mat = eigvecs[:, s].reshape(nocc, nvir)
+        exc_D = np.matmul(t_mat, t_mat.T) * (-1.0)
+        exc_A = np.matmul(t_mat.T, t_mat)
+
+        delta = np.zeros((nocc + nvir, nocc + nvir))
+        delta[:nocc, :nocc] = exc_D[:, :]
+        delta[nocc:, nocc:] = exc_A[:, :]
+
+        t_evals, t_evecs = np.linalg.eigh(delta)
+        diag_D = t_evals * (t_evals < 0.0) * (-1.0)
+        diag_A = t_evals * (t_evals > 0.0)
+
+        dens_D = np.linalg.multi_dot(
+            [mo, t_evecs, np.diag(diag_D), t_evecs.T, mo.T])
+        dens_A = np.linalg.multi_dot(
+            [mo, t_evecs, np.diag(diag_A), t_evecs.T, mo.T])
+
+        return dens_D, dens_A
+
+    def write_detach_attach_cubes(self, molecule, basis, root, dens_DA):
+        """
+        Writes cube files for detachment and attachment densities.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param root:
+            The index of the root (0-based).
+        :param dens_DA:
+            The AODensityMatrix object containing detachment and attachment
+            densities.
+        """
+
+        vis_drv = VisualizationDriver(self.comm)
+        cubic_grid = vis_drv.gen_cubic_grid(molecule)
+
+        vis_drv.compute(cubic_grid, molecule, basis, dens_DA, 0, 'alpha')
+
+        if self.rank == mpi_master():
+            detach_cube_name = '{:s}_S{:d}_detach.cube'.format(
+                self.filename, root + 1)
+            vis_drv.write_data(detach_cube_name, cubic_grid, molecule,
+                               'density', 0, 'alpha')
+
+            self.ostream.print_info(
+                '  Cube file (detachment) : {:s}'.format(detach_cube_name))
+            self.ostream.flush()
+
+        vis_drv.compute(cubic_grid, molecule, basis, dens_DA, 1, 'alpha')
+
+        if self.rank == mpi_master():
+            attach_cube_name = '{:s}_S{:d}_attach.cube'.format(
+                self.filename, root + 1)
+            vis_drv.write_data(attach_cube_name, cubic_grid, molecule,
+                               'density', 1, 'alpha')
+
+            self.ostream.print_info(
+                '  Cube file (attachment) : {:s}'.format(attach_cube_name))
+            self.ostream.flush()
 
         self.ostream.print_blank()

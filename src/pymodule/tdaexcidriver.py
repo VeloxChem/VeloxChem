@@ -37,6 +37,7 @@ class TDAExciDriver(LinearSolver):
         - nstates: The number of excited states determined by driver.
         - solver: The eigenvalues solver.
         - nto: The flag for natural transition orbital analysis.
+        - detach_attach: The flag for detachment/attachment density analysis.
     """
 
     def __init__(self, comm, ostream):
@@ -52,8 +53,9 @@ class TDAExciDriver(LinearSolver):
         # solver setup
         self.solver = None
 
-        # NTO
+        # NTO and detachment/attachment density
         self.nto = False
+        self.detach_attach = False
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -77,6 +79,10 @@ class TDAExciDriver(LinearSolver):
         if 'nto' in rsp_dict:
             key = rsp_dict['nto'].lower()
             self.nto = True if key == 'yes' else False
+
+        if 'detach_attach' in rsp_dict:
+            key = rsp_dict['detach_attach'].lower()
+            self.detach_attach = True if key == 'yes' else False
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -286,6 +292,28 @@ class TDAExciDriver(LinearSolver):
                 nto_mo.broadcast(self.rank, self.comm)
 
                 self.write_nto_cubes(molecule, basis, s, lam_diag, nto_mo)
+
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        # detachment and attachment densities
+
+        if self.detach_attach and self.is_converged:
+            for s in range(self.nstates):
+                self.ostream.print_info(
+                    'Running detachment/attachment analysis for S{:d}...'.
+                    format(s + 1))
+                self.ostream.flush()
+
+                if self.rank == mpi_master():
+                    dens_D, dens_A = self.get_detach_attach_densities(
+                        s, eigvecs, mo_occ, mo_vir)
+                    dens_DA = AODensityMatrix([dens_D, dens_A], denmat.rest)
+                else:
+                    dens_DA = AODensityMatrix()
+                dens_DA.broadcast(self.rank, self.comm)
+
+                self.write_detach_attach_cubes(molecule, basis, s, dens_DA)
 
             self.ostream.print_blank()
             self.ostream.flush()
