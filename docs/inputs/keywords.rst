@@ -4,54 +4,61 @@ Details of the input keywords
 The jobs group
 --------------
 
-The ``jobs`` group specifies the type of calculation with the following
-keyword(s).
+- **task**
 
-- task
+  .. csv-table::
+    :widths: 1, 3
 
-  - The type of calculation
-  - scf | response | pulses | mp2 | visualization | loprop
+    "``scf``", "Run self-consistent field calculation."
+    "``response``", "Run response calculation."
+    "``pulses``", "Run response calculation for pulses."
+    "``mp2``", "Run second-order Møller–Plesset perturbation theory."
+    "``visualization``", "Generate cube files for visualization."
+    "``loprop``", "Run LoProp calculation."
 
 The method settings group
 -------------------------
 
-The ``method settings`` group specifies the method of calculation with the
-following keyword(s).
+- **xcfun**
 
-- xcfun
+  .. csv-table::
+    :widths: 1, 3
 
-  - The density functional
-  - Case insensitive
-  - SLDA | BLYP | B3LYP | BHandH | BHandHLYP
+    "``SLDA``", "Local density exchange-correlation functional"
+    "``BLYP``", "Becke Lee-Yang-Parr exchange-correlation functional"
+    "``B3LYP``", "Becke three-parameter Lee-Yang-Parr hybrid exchange-correlation functional"
+    "``...``", ""
 
-- basis
+- **basis**
 
-  - The basis set
-  - Case insensitive
-  - cc-pVDZ | aug-cc-pVDZ | def2-SVP | def2-SVPD | Sadlej-pVTZ | ...
+  .. csv-table::
+    :widths: 1, 3
+
+    "``cc-pVDZ``", "Dunning basis set, double-zeta"
+    "``aug-cc-pVDZ``", "Dunning basis set, double-zeta with diffuse functions"
+    "``def2-SVP``", "Karlsruhe basis set, split valence polarization"
+    "``def2-SVPD``", "Karlsruhe basis set, split valence polarization with diffuse functions"
+    "``...``", ""
 
 The molecule group
 ------------------
 
-The ``molecule`` group specifies the molecule with the following keyword(s):
+- **charge**
 
-- charge
+  - net charge, default 0
 
-  - The net charge of the molecule
-  - Default: 0
+- **multiplicity**
 
-- multiplicity
+  - spin multiplicity, default 1
 
-  - The spin multiplicity of the molecule
-  - Default: 1
+- **units**
 
-- units:
+  .. csv-table::
+    :widths: 1, 3
 
-  - The unit of molecular geometry input
-  - Default: angs (Angstroms)
-  - [angs | au]
+    "``angs``", "Angstroms (default)"
+    "``au``", "Atomic unit"
 
-- xyz
+- **xyz**
 
-  - the xyz string (multiple lines)
-
+  - xyz string (multiple lines)
