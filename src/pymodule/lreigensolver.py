@@ -6,9 +6,11 @@ import math
 import sys
 
 from .veloxchemlib import ExcitationVector
+from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import szblock
+from .veloxchemlib import denmat
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
@@ -31,6 +33,7 @@ class LinearResponseEigenSolver(LinearSolver):
     Instance variables
         - nstates: Number of excited states.
         - nto: The flag for natural transition orbital analysis.
+        - detach_attach: The flag for detachment/attachment density analysis.
     """
 
     def __init__(self, comm, ostream):
@@ -43,6 +46,7 @@ class LinearResponseEigenSolver(LinearSolver):
         self.nstates = 3
 
         self.nto = False
+        self.detach_attach = False
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -65,6 +69,10 @@ class LinearResponseEigenSolver(LinearSolver):
         if 'nto' in rsp_dict:
             key = rsp_dict['nto'].lower()
             self.nto = True if key == 'yes' else False
+
+        if 'detach_attach' in rsp_dict:
+            key = rsp_dict['detach_attach'].lower()
+            self.detach_attach = True if key == 'yes' else False
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -402,6 +410,32 @@ class LinearResponseEigenSolver(LinearSolver):
                     nto_mo.broadcast(self.rank, self.comm)
 
                     self.write_nto_cubes(molecule, basis, s, lam_diag, nto_mo)
+
+                if self.detach_attach:
+                    self.ostream.print_info(
+                        'Running detachment/attachment analysis for S{:d}...'.
+                        format(s + 1))
+                    self.ostream.flush()
+
+                    if self.rank == mpi_master():
+                        half_eigvec_size = eigvec.shape[0] // 2
+                        eigvec_z = eigvec[:half_eigvec_size].reshape(
+                            half_eigvec_size, 1) * np.sqrt(2.0)
+                        eigvec_y = eigvec[half_eigvec_size:].reshape(
+                            half_eigvec_size, 1) * np.sqrt(2.0)
+                        mo_occ = scf_tensors['C'][:, :nocc]
+                        mo_vir = scf_tensors['C'][:, nocc:]
+                        dens_Dz, dens_Az = self.get_detach_attach_densities(
+                            0, eigvec_z, mo_occ, mo_vir)
+                        dens_Dy, dens_Ay = self.get_detach_attach_densities(
+                            0, eigvec_y, mo_occ, mo_vir)
+                        dens_DA = AODensityMatrix(
+                            [dens_Dz + dens_Dy, dens_Az + dens_Ay], denmat.rest)
+                    else:
+                        dens_DA = AODensityMatrix()
+                    dens_DA.broadcast(self.rank, self.comm)
+
+                    self.write_detach_attach_cubes(molecule, basis, s, dens_DA)
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
