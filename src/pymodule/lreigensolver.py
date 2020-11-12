@@ -391,13 +391,12 @@ class LinearResponseEigenSolver(LinearSolver):
                 eigvec = self.get_full_solution_vector(excitations[s][1])
 
                 if self.rank == mpi_master():
-                    half_eigvec_size = eigvec.shape[0] // 2
                     mo_occ = scf_tensors['C'][:, :nocc]
                     mo_vir = scf_tensors['C'][:, nocc:]
-                    z_mat = eigvec[:half_eigvec_size].reshape(
-                        half_eigvec_size, 1) * np.sqrt(2.0)
-                    y_mat = eigvec[half_eigvec_size:].reshape(
-                        half_eigvec_size, 1) * np.sqrt(2.0)
+                    z_mat = eigvec[:eigvec.shape[0] // 2].reshape(
+                        mo_occ.shape[1], mo_vir.shape[1]) * np.sqrt(2.0)
+                    y_mat = eigvec[eigvec.shape[0] // 2:].reshape(
+                        mo_occ.shape[1], mo_vir.shape[1]) * np.sqrt(2.0)
 
                 if self.nto:
                     self.ostream.print_info(
@@ -447,6 +446,10 @@ class LinearResponseEigenSolver(LinearSolver):
                                                  'S{:d}'.format(s + 1), eigvec)
                     else:
                         eigvecs[:, s] = eigvec[:]
+
+            if self.nto or self.detach_attach:
+                self.ostream.print_blank()
+                self.ostream.flush()
 
             if self.rank == mpi_master():
                 osc = (2.0 / 3.0) * np.sum(elec_trans_dipoles**2,

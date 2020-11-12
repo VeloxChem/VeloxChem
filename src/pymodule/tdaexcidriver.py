@@ -312,6 +312,7 @@ class TDAExciDriver(LinearSolver):
 
                 self.write_detach_attach_cubes(molecule, basis, s, dens_DA)
 
+        if (self.nto or self.detach_attach) and self.is_converged:
             self.ostream.print_blank()
             self.ostream.flush()
 
