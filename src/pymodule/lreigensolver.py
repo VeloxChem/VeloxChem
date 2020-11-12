@@ -390,19 +390,22 @@ class LinearResponseEigenSolver(LinearSolver):
             for s in range(self.nstates):
                 eigvec = self.get_full_solution_vector(excitations[s][1])
 
+                if self.rank == mpi_master():
+                    half_eigvec_size = eigvec.shape[0] // 2
+                    mo_occ = scf_tensors['C'][:, :nocc]
+                    mo_vir = scf_tensors['C'][:, nocc:]
+                    z_mat = eigvec[:half_eigvec_size].reshape(
+                        half_eigvec_size, 1) * np.sqrt(2.0)
+                    y_mat = eigvec[half_eigvec_size:].reshape(
+                        half_eigvec_size, 1) * np.sqrt(2.0)
+
                 if self.nto:
                     self.ostream.print_info(
                         'Running NTO analysis for S{:d}...'.format(s + 1))
                     self.ostream.flush()
 
                     if self.rank == mpi_master():
-                        half_eigvec_size = eigvec.shape[0] // 2
-                        eigvec_x = eigvec[:half_eigvec_size].reshape(
-                            half_eigvec_size, 1) * np.sqrt(2.0)
-                        mo_occ = scf_tensors['C'][:, :nocc]
-                        mo_vir = scf_tensors['C'][:, nocc:]
-                        lam_diag, nto_mo = self.get_nto(0, eigvec_x, mo_occ,
-                                                        mo_vir)
+                        lam_diag, nto_mo = self.get_nto(z_mat, mo_occ, mo_vir)
                     else:
                         lam_diag = None
                         nto_mo = MolecularOrbitals()
@@ -418,17 +421,10 @@ class LinearResponseEigenSolver(LinearSolver):
                     self.ostream.flush()
 
                     if self.rank == mpi_master():
-                        half_eigvec_size = eigvec.shape[0] // 2
-                        eigvec_z = eigvec[:half_eigvec_size].reshape(
-                            half_eigvec_size, 1) * np.sqrt(2.0)
-                        eigvec_y = eigvec[half_eigvec_size:].reshape(
-                            half_eigvec_size, 1) * np.sqrt(2.0)
-                        mo_occ = scf_tensors['C'][:, :nocc]
-                        mo_vir = scf_tensors['C'][:, nocc:]
                         dens_Dz, dens_Az = self.get_detach_attach_densities(
-                            0, eigvec_z, mo_occ, mo_vir)
+                            z_mat, mo_occ, mo_vir)
                         dens_Dy, dens_Ay = self.get_detach_attach_densities(
-                            0, eigvec_y, mo_occ, mo_vir)
+                            y_mat, mo_occ, mo_vir)
                         dens_DA = AODensityMatrix(
                             [dens_Dz + dens_Dy, dens_Az + dens_Ay], denmat.rest)
                     else:

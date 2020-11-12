@@ -47,7 +47,8 @@ class TestNTO(unittest.TestCase):
 
         for s in range(ref_eig_vals.shape[0]):
             if task.mpi_rank == mpi_master():
-                lam_diag, nto_mo = rsp_drv.get_nto(s, eig_vecs, mo_occ, mo_vir)
+                t_mat = eig_vecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
+                lam_diag, nto_mo = rsp_drv.get_nto(t_mat, mo_occ, mo_vir)
             else:
                 lam_diag = None
                 nto_mo = MolecularOrbitals()

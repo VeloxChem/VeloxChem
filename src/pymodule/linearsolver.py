@@ -1670,14 +1670,12 @@ class LinearSolver:
 
         return ediag, sdiag
 
-    def get_nto(self, s, eigvecs, mo_occ, mo_vir):
+    def get_nto(self, t_mat, mo_occ, mo_vir):
         """
         Gets the natural transition orbitals.
 
-        :param s:
-            The index of the root (0-based).
-        :param eigvecs:
-            The eigenvectors.
+        :param t_mat:
+            The excitation vector in matrix form (N_occ x N_virt).
         :param mo_occ:
             The MO coefficients of occupied orbitals.
         :param mo_vir:
@@ -1688,7 +1686,6 @@ class LinearSolver:
         """
 
         # SVD
-        t_mat = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
         u_mat, s_diag, vh_mat = np.linalg.svd(t_mat, full_matrices=True)
         lam_diag = s_diag**2
 
@@ -1771,14 +1768,12 @@ class LinearSolver:
 
         self.ostream.print_blank()
 
-    def get_detach_attach_densities(self, s, eigvecs, mo_occ, mo_vir):
+    def get_detach_attach_densities(self, t_mat, mo_occ, mo_vir):
         """
         Gets the detachment and attachment densities.
 
-        :param s:
-            The index of the root (0-based).
-        :param eigvecs:
-            The eigenvectors.
+        :param t_mat:
+            The (de)excitation vector in matrix form (N_occ x N_virt).
         :param mo_occ:
             The MO coefficients of occupied orbitals.
         :param mo_vir:
@@ -1792,7 +1787,6 @@ class LinearSolver:
         nocc = mo_occ.shape[1]
         nvir = mo_vir.shape[1]
 
-        t_mat = eigvecs[:, s].reshape(nocc, nvir)
         exc_D = np.matmul(t_mat, t_mat.T) * (-1.0)
         exc_A = np.matmul(t_mat.T, t_mat)
 

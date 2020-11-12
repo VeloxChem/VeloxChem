@@ -275,16 +275,19 @@ class TDAExciDriver(LinearSolver):
                 trans_dipoles['velocity'] * trans_dipoles['magnetic'],
                 axis=1) * rotatory_strength_in_cgs()
 
-        # natural transition orbitals
+        # natural transition orbitals and detachment/attachment densities
 
-        if self.nto and self.is_converged:
-            for s in range(self.nstates):
+        for s in range(self.nstates):
+            if self.rank == mpi_master():
+                t_mat = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
+
+            if self.nto and self.is_converged:
                 self.ostream.print_info(
                     'Running NTO analysis for S{:d}...'.format(s + 1))
                 self.ostream.flush()
 
                 if self.rank == mpi_master():
-                    lam_diag, nto_mo = self.get_nto(s, eigvecs, mo_occ, mo_vir)
+                    lam_diag, nto_mo = self.get_nto(t_mat, mo_occ, mo_vir)
                 else:
                     lam_diag = None
                     nto_mo = MolecularOrbitals()
@@ -293,13 +296,7 @@ class TDAExciDriver(LinearSolver):
 
                 self.write_nto_cubes(molecule, basis, s, lam_diag, nto_mo)
 
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-        # detachment and attachment densities
-
-        if self.detach_attach and self.is_converged:
-            for s in range(self.nstates):
+            if self.detach_attach and self.is_converged:
                 self.ostream.print_info(
                     'Running detachment/attachment analysis for S{:d}...'.
                     format(s + 1))
@@ -307,7 +304,7 @@ class TDAExciDriver(LinearSolver):
 
                 if self.rank == mpi_master():
                     dens_D, dens_A = self.get_detach_attach_densities(
-                        s, eigvecs, mo_occ, mo_vir)
+                        t_mat, mo_occ, mo_vir)
                     dens_DA = AODensityMatrix([dens_D, dens_A], denmat.rest)
                 else:
                     dens_DA = AODensityMatrix()

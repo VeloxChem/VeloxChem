@@ -49,15 +49,15 @@ class TestDetachAttach(unittest.TestCase):
                 eigvec = eig_vecs[:, s].copy()
                 half_eigvec_size = eigvec.shape[0] // 2
 
-                eigvec_z = eigvec[:half_eigvec_size].reshape(
-                    half_eigvec_size, 1) * np.sqrt(2.0)
-                eigvec_y = eigvec[half_eigvec_size:].reshape(
-                    half_eigvec_size, 1) * np.sqrt(2.0)
+                z_mat = eigvec[:half_eigvec_size].reshape(
+                    mo_occ.shape[1], mo_vir.shape[1]) * np.sqrt(2.0)
+                y_mat = eigvec[half_eigvec_size:].reshape(
+                    mo_occ.shape[1], mo_vir.shape[1]) * np.sqrt(2.0)
 
                 dens_Dz, dens_Az = rsp_drv.get_detach_attach_densities(
-                    0, eigvec_z, mo_occ, mo_vir)
+                    z_mat, mo_occ, mo_vir)
                 dens_Dy, dens_Ay = rsp_drv.get_detach_attach_densities(
-                    0, eigvec_y, mo_occ, mo_vir)
+                    y_mat, mo_occ, mo_vir)
 
                 dens_DA = AODensityMatrix(
                     [dens_Dz + dens_Dy, dens_Az + dens_Ay], denmat.rest)
