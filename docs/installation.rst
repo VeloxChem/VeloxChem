@@ -50,6 +50,13 @@ With Anaconda (x86-64 or POWER processor)
     python3 config/generate_setup.py
     python3 setup.py install
 
+- Use VeloxChem in Jupyter notebook ::
+
+    conda install jupyter
+    ipython kernel install --name vlx
+    jupyter notebook
+    # choose "vlx" in the drop-down menu under "New"
+
 Cray platform (x86-64 or ARM processor)
 +++++++++++++++++++++++++++++++++++++++
 
