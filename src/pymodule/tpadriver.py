@@ -185,10 +185,14 @@ class TpaDriver:
             da = scf_tensors['D'][0]
             mo = scf_tensors['C']
             d_a_mo = np.linalg.multi_dot([mo.T, S, da, S, mo])
-            nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
         else:
             d_a_mo = None
+            norb = None
+        d_a_mo = self.comm.bcast(d_a_mo, root=mpi_master())
+        norb = self.comm.bcast(norb, root=mpi_master())
+
+        nocc = molecule.number_of_alpha_electrons()
 
         # Computing first-order gradient vectors
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
@@ -204,7 +208,6 @@ class TpaDriver:
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
         if self.rank == mpi_master():
-
             v1 = {(op, w): v for op, v in zip(component, b_rhs)
                   for w in self.frequencies}
             X = {
@@ -217,6 +220,8 @@ class TpaDriver:
             v1 = None
             X = None
             self.comp = None
+        X = self.comm.bcast(X, root=mpi_master())
+        self.comp = self.comm.bcast(self.comp, root=mpi_master())
 
         # Computing the first-order response vectors (3 per frequency)
         Nb_drv = ComplexResponse(self.comm, self.ostream)
@@ -244,47 +249,46 @@ class TpaDriver:
         kX = {}
         Focks = {}
 
-        if self.rank == mpi_master():
-            Nx['Nb'] = Nb_results['solutions']
-            kX['Nb'] = Nb_results['kappas']
-            Focks['Fb'] = Nb_results['focks']
+        Nx['Nb'] = Nb_results['solutions']
+        kX['Nb'] = Nb_results['kappas']
+        Focks['Fb'] = Nb_results['focks']
 
-            Nx['Nc'] = {}
-            kX['Nc'] = {}
-            Focks['Fc'] = {}
-            Focks['Fd'] = {}
+        Nx['Nc'] = {}
+        kX['Nc'] = {}
+        Focks['Fc'] = {}
+        Focks['Fd'] = {}
 
-            # The first-order response vectors with negative frequency are
-            # obtained from the first-order response vectors with positive
-            # frequency by using flip_zy, see article.
+        # The first-order response vectors with negative frequency are
+        # obtained from the first-order response vectors with positive
+        # frequency by using flip_zy, see article.
 
-            for (op, w) in Nx['Nb']:
-                Nx['Nc'][(op, -w)] = self.flip_yz(Nx['Nb'][(op, w)])
+        for (op, w) in Nx['Nb']:
+            Nx['Nc'][(op, -w)] = self.flip_yz(Nx['Nb'][(op, w)])
 
-                # Creating the response matrix for the negative first-order
-                # response vectors
+            # Creating the response matrix for the negative first-order
+            # response vectors
 
-                kX['Nc'][(op, -w)] = (
-                    LinearSolver.lrvec2mat(Nx['Nc'][(op, -w)].real, nocc,
-                                           norb) + 1j *
-                    LinearSolver.lrvec2mat(Nx['Nc'][(op, -w)].imag, nocc, norb))
+            kX['Nc'][(op, -w)] = (
+                LinearSolver.lrvec2mat(Nx['Nc'][(op, -w)].real, nocc, norb) +
+                1j *
+                LinearSolver.lrvec2mat(Nx['Nc'][(op, -w)].imag, nocc, norb))
 
-                # The first-order Fock matrices with positive and negative
-                # wuencies are each other complex conjugates
+            # The first-order Fock matrices with positive and negative
+            # frequencies are each other complex conjugates
 
-                Focks['Fc'][(op, -w)] = Focks['Fb'][(op, w)]
-                Focks['Fd'][(op, w)] = np.conjugate(Focks['Fb'][(op, w)]).T
+            Focks['Fc'][(op, -w)] = Focks['Fb'][(op, w)]
+            Focks['Fd'][(op, w)] = np.conjugate(Focks['Fb'][(op, w)]).T
 
-            # For cubic-response with all operators being the dipole μ Nb=Na=Nd
-            # Likewise, Fb=Fd
+        # For cubic-response with all operators being the dipole μ Nb=Na=Nd
+        # Likewise, Fb=Fd
 
-            Focks['Fb'].update(Focks['Fd'])
+        Focks['Fb'].update(Focks['Fd'])
 
-            Nx['Na'] = Nx['Nb']
-            kX['Na'] = kX['Nb']
+        Nx['Na'] = Nx['Nb']
+        kX['Na'] = kX['Nb']
 
-            Nx['Nd'] = Nx['Nb']
-            kX['Nd'] = kX['Nb']
+        Nx['Nd'] = Nx['Nb']
+        kX['Nd'] = kX['Nb']
 
         profiler.check_memory_usage('1st CPP')
 
@@ -346,14 +350,17 @@ class TpaDriver:
             D0 = scf_tensors['D'][0]
             mo = scf_tensors['C']
             F0 = np.linalg.multi_dot([mo.T, scf_tensors['F'][0], mo])
-            nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
         else:
+            S = None
             D0 = None
             mo = None
             F0 = None
-            nocc = None
             norb = None
+        F0 = self.comm.bcast(F0, root=mpi_master())
+        norb = self.comm.bcast(norb, root=mpi_master())
+
+        nocc = molecule.number_of_alpha_electrons()
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
@@ -367,11 +374,13 @@ class TpaDriver:
         fock_dict = self.get_fock_dict(w, density_list, F0, mo, molecule,
                                        ao_basis)
 
+        profiler.check_memory_usage('1st Focks')
+
         if self.rank == mpi_master():
             fock_dict.update(Focks)
             e4_dict = self.get_e4(w, kX, fock_dict, nocc, norb)
 
-        profiler.check_memory_usage('1st Focks')
+        profiler.check_memory_usage('E[4]')
 
         # computing all the compounded second-order response vectors and
         # extracting some of the second-order Fock matrices from the subspace
@@ -407,23 +416,28 @@ class TpaDriver:
             e3_dict = self.get_e3(w, kX, kxy_dict, fock_dict, fock_dict_two,
                                   nocc, norb)
 
-            # computing the X[3],A[3],X[2],A[2] contractions for the isotropic
-            # cubic response function
-            other_dict = self.get_other_terms(w, track, Nx, n_xy_dict, X, kX,
-                                              kxy_dict, d_a_mo, nocc, norb)
+        profiler.check_memory_usage('E[3]')
 
-        profiler.check_memory_usage('Other terms')
+        # computing the X[3],A[3],X[2],A[2] contractions for the isotropic
+        # cubic response function
+        other_dict = self.get_other_terms(w, track, Nx, n_xy_dict, X, kX,
+                                          kxy_dict, d_a_mo, nocc, norb)
+
+        profiler.check_memory_usage('X[3],A[3],X[2],A[2]')
 
         # Combining all the terms to evaluate the iso-tropic cubic response
         # function. For TPA Full and reduced, see article
-
-        result = {}
 
         if self.rank == mpi_master():
             t4_dict = self.get_t4(self.frequencies, e4_dict, Nx, kX, self.comp,
                                   d_a_mo, nocc, norb)
             t3_dict = self.get_t3(self.frequencies, e3_dict, Nx, self.comp)
 
+        profiler.check_memory_usage('T[4],T[3]')
+
+        result = {}
+
+        if self.rank == mpi_master():
             gamma = {}
 
             for w in self.frequencies:

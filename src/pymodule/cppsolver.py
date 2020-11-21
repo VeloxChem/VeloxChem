@@ -481,11 +481,18 @@ class ComplexResponse(LinearSolver):
                         fock_realung = self.dist_fock_ung.matmul_AB(c_realung)
                         fock_imagung = self.dist_fock_ung.matmul_AB(c_imagung)
 
-                        if self.rank == mpi_master():
-                            focks[(op, w)] = (
-                                fock_realger + fock_realung - 1j *
-                                (fock_imagger + fock_imagung)).reshape(
-                                    norb, norb)
+                        fock_realger = self.comm.bcast(fock_realger,
+                                                       root=mpi_master())
+                        fock_imagger = self.comm.bcast(fock_imagger,
+                                                       root=mpi_master())
+                        fock_realung = self.comm.bcast(fock_realung,
+                                                       root=mpi_master())
+                        fock_imagung = self.comm.bcast(fock_imagung,
+                                                       root=mpi_master())
+
+                        fock_full = (fock_realger + fock_realung - 1j *
+                                     (fock_imagger + fock_imagung))
+                        focks[(op, w)] = fock_full.reshape(norb, norb)
 
                     # calculating the residual components
 
@@ -693,25 +700,22 @@ class ComplexResponse(LinearSolver):
 
         else:
             if self.is_converged:
-                if self.rank == mpi_master():
-                    kappas = {}
-
                 full_solutions = {}
+                kappas = {}
+
                 for op, w in solutions:
                     x = self.get_full_solution_vector(solutions[(op, w)])
-                    full_solutions[(op, w)] = x
+                    x = self.comm.bcast(x, root=mpi_master())
 
-                    if self.rank == mpi_master():
-                        kappas[(op,
-                                w)] = (self.lrvec2mat(x.real, nocc, norb) +
+                    full_solutions[(op, w)] = x
+                    kappas[(op, w)] = (self.lrvec2mat(x.real, nocc, norb) +
                                        1j * self.lrvec2mat(x.imag, nocc, norb))
 
-                if self.rank == mpi_master():
-                    return {
-                        'focks': focks,
-                        'solutions': full_solutions,
-                        'kappas': kappas
-                    }
+                return {
+                    'focks': focks,
+                    'solutions': full_solutions,
+                    'kappas': kappas
+                }
 
         return {}
 

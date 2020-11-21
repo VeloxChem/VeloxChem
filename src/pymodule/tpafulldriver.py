@@ -532,14 +532,11 @@ class TpaFullDriver(TpaDriver):
         N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
                                               xy_dict)
 
-        if self.rank == mpi_master():
-            n_xy_dict = N_total_results['solutions']
-            kxy_dict = N_total_results['kappas']
-            FXY_2_dict = N_total_results['focks']
+        n_xy_dict = N_total_results['solutions']
+        kxy_dict = N_total_results['kappas']
+        FXY_2_dict = N_total_results['focks']
 
-            return (n_xy_dict, kxy_dict, FXY_2_dict, xy_dict)
-        else:
-            return (None, None, None, None)
+        return (n_xy_dict, kxy_dict, FXY_2_dict, xy_dict)
 
     def get_xy(self, d_a_mo, X, wi, Fock, kX, nocc, norb):
         """
@@ -1139,10 +1136,9 @@ class TpaFullDriver(TpaDriver):
 
         comp_per_freq = len(track) // len(wi)
 
-        for j in range(len(wi)):
-            na_x3_ny_nz = 0
-            na_a3_nx_ny = 0
+        inp_list = []
 
+        for j in range(len(wi)):
             for i in range(j * comp_per_freq, (j + 1) * comp_per_freq):
                 comp_i = track[i]
 
@@ -1166,38 +1162,47 @@ class TpaFullDriver(TpaDriver):
                 C = X[comp_i[2]]
                 D = X[comp_i[3]]
 
-                # Na X[3]NyNz
+                inp_list.append({
+                    'freq': wi[j],
+                    'Na': Na,
+                    'Nb': Nb,
+                    'Nc': Nc,
+                    'Nd': Nd,
+                    'kb': kb,
+                    'kc': kc,
+                    'kd': kd,
+                    'A': A,
+                    'B': B,
+                    'C': C,
+                    'D': D,
+                    'da': da,
+                    'nocc': nocc,
+                    'norb': norb,
+                })
 
-                na_x3_ny_nz += -np.matmul(
-                    Na.T, self.x3_contract(kc, kd, B, da, nocc, norb))
-                na_x3_ny_nz += -np.matmul(
-                    Na.T, self.x3_contract(kd, kc, B, da, nocc, norb))
-                na_x3_ny_nz += -np.matmul(
-                    Na.T, self.x3_contract(kd, kb, C, da, nocc, norb))
-                na_x3_ny_nz += -np.matmul(
-                    Na.T, self.x3_contract(kb, kd, C, da, nocc, norb))
-                na_x3_ny_nz += -np.matmul(
-                    Na.T, self.x3_contract(kb, kc, D, da, nocc, norb))
-                na_x3_ny_nz += -np.matmul(
-                    Na.T, self.x3_contract(kc, kb, D, da, nocc, norb))
+        ave, res = divmod(len(inp_list), self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+        starts = [sum(counts[:p]) for p in range(self.nodes)]
+        ends = [sum(counts[:p + 1]) for p in range(self.nodes)]
 
-                # NaA[3]n_xNy
+        scatter_inp = inp_list[starts[self.rank]:ends[self.rank]]
 
-                na_a3_nx_ny += np.matmul(
-                    self.a3_contract(kb, kc, A, da, nocc, norb), Nd)
-                na_a3_nx_ny += np.matmul(
-                    self.a3_contract(kb, kd, A, da, nocc, norb), Nc)
-                na_a3_nx_ny += np.matmul(
-                    self.a3_contract(kc, kb, A, da, nocc, norb), Nd)
-                na_a3_nx_ny += np.matmul(
-                    self.a3_contract(kc, kd, A, da, nocc, norb), Nb)
-                na_a3_nx_ny += np.matmul(
-                    self.a3_contract(kd, kb, A, da, nocc, norb), Nc)
-                na_a3_nx_ny += np.matmul(
-                    self.a3_contract(kd, kc, A, da, nocc, norb), Nb)
+        list_x3_a3 = [self.get_x3_a3(inp) for inp in scatter_inp]
 
-            na_a3_nx_ny_dict[(wi[j], -wi[j], wi[j])] = (1. / 15) * na_a3_nx_ny
-            na_x3_ny_nz_dict[(wi[j], -wi[j], wi[j])] = (1. / 15) * na_x3_ny_nz
+        list_x3_a3 = self.comm.gather(list_x3_a3, root=mpi_master())
+
+        if self.rank == mpi_master():
+            for terms in list_x3_a3:
+                for term in terms:
+                    key = term['key']
+                    if key not in na_x3_ny_nz_dict:
+                        na_x3_ny_nz_dict[key] = 0.0
+                    if key not in na_a3_nx_ny_dict:
+                        na_a3_nx_ny_dict[key] = 0.0
+                    na_x3_ny_nz_dict[key] += term['x3']
+                    na_a3_nx_ny_dict[key] += term['a3']
+
+        inp_list = []
 
         for i in range(len(wi)):
             vals = track[i * comp_per_freq].split(',')
@@ -1210,69 +1215,102 @@ class TpaFullDriver(TpaDriver):
             wcd = 0
             wbd = wb + wd
 
-            na_x2_nyz = 0
-            nx_a2_nyz = 0
-
             # CD
             # x
+
             kcd = kXY[(('N_lamtau_xx', w), wcd)]
             Ncd = n_xy[(('N_lamtau_xx', w), wcd)]
-
             Na = n_x['Na'][('x', wa)]
             Nb = n_x['Nb'][('x', w)]
             kb = kX['Nb'][('x', w)]
             A = X['x']
             B = X['x']
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kcd, B, da, nocc, norb))
 
-            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
+            inp_list.append({
+                'freq': w,
+                'flag': 'CD',
+                'kcd': kcd,
+                'Ncd': Ncd,
+                'Na': Na,
+                'Nb': Nb,
+                'kb': kb,
+                'A': A,
+                'B': B,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             kcd = kXY[(('N_lamtau_xy', w), wcd)]
             Ncd = n_xy[(('N_lamtau_xy', w), wcd)]
-
+            Na = n_x['Na'][('x', wa)]
             Nb = n_x['Nb'][('y', w)]
             kb = kX['Nb'][('y', w)]
-            Na = n_x['Na'][('x', wa)]
             A = X['x']
             B = X['y']
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kcd, B, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
+            inp_list.append({
+                'freq': w,
+                'flag': 'CD',
+                'kcd': kcd,
+                'Ncd': Ncd,
+                'Na': Na,
+                'Nb': Nb,
+                'kb': kb,
+                'A': A,
+                'B': B,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             kcd = kXY[(('N_lamtau_xz', w), wcd)]
             Ncd = n_xy[(('N_lamtau_xz', w), wcd)]
+            Na = n_x['Na'][('x', wa)]
             Nb = n_x['Nb'][('z', w)]
             kb = kX['Nb'][('z', w)]
-            Na = n_x['Na'][('x', wa)]
             A = X['x']
             B = X['z']
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kcd, B, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
+            inp_list.append({
+                'freq': w,
+                'flag': 'CD',
+                'kcd': kcd,
+                'Ncd': Ncd,
+                'Na': Na,
+                'Nb': Nb,
+                'kb': kb,
+                'A': A,
+                'B': B,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             # y
 
             kcd = kXY[(('N_lamtau_xy', w), wcd)]
             Ncd = n_xy[(('N_lamtau_xy', w), wcd)]
+            Na = n_x['Na'][('y', wa)]
             Nb = n_x['Nb'][('x', w)]
             kb = kX['Nb'][('x', w)]
             A = X['y']
             B = X['x']
-            Na = n_x['Na'][('y', wa)]
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kcd, B, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
+            inp_list.append({
+                'freq': w,
+                'flag': 'CD',
+                'kcd': kcd,
+                'Ncd': Ncd,
+                'Na': Na,
+                'Nb': Nb,
+                'kb': kb,
+                'A': A,
+                'B': B,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             kcd = kXY[(('N_lamtau_yy', w), wcd)]
             Ncd = n_xy[(('N_lamtau_yy', w), wcd)]
@@ -1282,42 +1320,68 @@ class TpaFullDriver(TpaDriver):
             A = X['y']
             B = X['y']
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kcd, B, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
+            inp_list.append({
+                'freq': w,
+                'flag': 'CD',
+                'kcd': kcd,
+                'Ncd': Ncd,
+                'Na': Na,
+                'Nb': Nb,
+                'kb': kb,
+                'A': A,
+                'B': B,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             kcd = kXY[(('N_lamtau_yz', w), wcd)]
             Ncd = n_xy[(('N_lamtau_yz', w), wcd)]
+            Na = n_x['Na'][('y', wa)]
             Nb = n_x['Nb'][('z', w)]
             kb = kX['Nb'][('z', w)]
-
             A = X['y']
             B = X['z']
-            Na = n_x['Na'][('y', wa)]
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kcd, B, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
+            inp_list.append({
+                'freq': w,
+                'flag': 'CD',
+                'kcd': kcd,
+                'Ncd': Ncd,
+                'Na': Na,
+                'Nb': Nb,
+                'kb': kb,
+                'A': A,
+                'B': B,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             # z
 
             kcd = kXY[(('N_lamtau_xz', w), wcd)]
             Ncd = n_xy[(('N_lamtau_xz', w), wcd)]
+            Na = n_x['Na'][('z', wa)]
             Nb = n_x['Nb'][('x', w)]
             kb = kX['Nb'][('x', w)]
-            Na = n_x['Na'][('z', wa)]
             A = X['z']
             B = X['x']
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kcd, B, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
+            inp_list.append({
+                'freq': w,
+                'flag': 'CD',
+                'kcd': kcd,
+                'Ncd': Ncd,
+                'Na': Na,
+                'Nb': Nb,
+                'kb': kb,
+                'A': A,
+                'B': B,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             kcd = kXY[(('N_lamtau_yz', w), wcd)]
             Ncd = n_xy[(('N_lamtau_yz', w), wcd)]
@@ -1327,25 +1391,43 @@ class TpaFullDriver(TpaDriver):
             A = X['z']
             B = X['y']
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kcd, B, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
+            inp_list.append({
+                'freq': w,
+                'flag': 'CD',
+                'kcd': kcd,
+                'Ncd': Ncd,
+                'Na': Na,
+                'Nb': Nb,
+                'kb': kb,
+                'A': A,
+                'B': B,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             kcd = kXY[(('N_lamtau_zz', w), wcd)]
             Ncd = n_xy[(('N_lamtau_zz', w), wcd)]
-            Nb = n_x['Nb'][('z', w)]
             Na = n_x['Na'][('z', wa)]
+            Nb = n_x['Nb'][('z', w)]
             kb = kX['Nb'][('z', w)]
             A = X['z']
             B = X['z']
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kcd, B, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
+            inp_list.append({
+                'freq': w,
+                'flag': 'CD',
+                'kcd': kcd,
+                'Ncd': Ncd,
+                'Na': Na,
+                'Nb': Nb,
+                'kb': kb,
+                'A': A,
+                'B': B,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             # BD
 
@@ -1357,11 +1439,20 @@ class TpaFullDriver(TpaDriver):
             A = X['x']
             C = X['x']
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kbd, C, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
+            inp_list.append({
+                'freq': w,
+                'flag': 'BD',
+                'kbd': kbd,
+                'Nbd': Nbd,
+                'Na': Na,
+                'Nc': Nc,
+                'kc': kc,
+                'A': A,
+                'C': C,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             kbd = kXY[(('N_sig_xy', w), wbd)]
             Nbd = n_xy[(('N_sig_xy', w), wbd)]
@@ -1371,25 +1462,43 @@ class TpaFullDriver(TpaDriver):
             A = X['x']
             C = X['y']
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kbd, C, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
+            inp_list.append({
+                'freq': w,
+                'flag': 'BD',
+                'kbd': kbd,
+                'Nbd': Nbd,
+                'Na': Na,
+                'Nc': Nc,
+                'kc': kc,
+                'A': A,
+                'C': C,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             kbd = kXY[(('N_sig_xz', w), wbd)]
             Nbd = n_xy[(('N_sig_xz', w), wbd)]
+            Na = n_x['Na'][('x', wa)]
             Nc = n_x['Nc'][('z', wc)]
             kc = kX['Nc'][('z', wc)]
-            Na = n_x['Na'][('x', wa)]
             A = X['x']
             C = X['z']
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kbd, C, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
+            inp_list.append({
+                'freq': w,
+                'flag': 'BD',
+                'kbd': kbd,
+                'Nbd': Nbd,
+                'Na': Na,
+                'Nc': Nc,
+                'kc': kc,
+                'A': A,
+                'C': C,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             # y
 
@@ -1401,92 +1510,271 @@ class TpaFullDriver(TpaDriver):
             A = X['y']
             C = X['x']
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kbd, C, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
+            inp_list.append({
+                'freq': w,
+                'flag': 'BD',
+                'kbd': kbd,
+                'Nbd': Nbd,
+                'Na': Na,
+                'Nc': Nc,
+                'kc': kc,
+                'A': A,
+                'C': C,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             kbd = kXY[(('N_sig_yy', w), wbd)]
             Nbd = n_xy[(('N_sig_yy', w), wbd)]
-            Nc = n_x['Nc'][('y', wc)]
             Na = n_x['Na'][('y', wa)]
+            Nc = n_x['Nc'][('y', wc)]
             kc = kX['Nc'][('y', wc)]
             A = X['y']
             C = X['y']
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kbd, C, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
+            inp_list.append({
+                'freq': w,
+                'flag': 'BD',
+                'kbd': kbd,
+                'Nbd': Nbd,
+                'Na': Na,
+                'Nc': Nc,
+                'kc': kc,
+                'A': A,
+                'C': C,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             kbd = kXY[(('N_sig_yz', w), wbd)]
             Nbd = n_xy[(('N_sig_yz', w), wbd)]
-            Nc = n_x['Nc'][('z', wc)]
             Na = n_x['Na'][('y', wa)]
+            Nc = n_x['Nc'][('z', wc)]
             kc = kX['Nc'][('z', wc)]
             A = X['y']
             C = X['z']
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kbd, C, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
+            inp_list.append({
+                'freq': w,
+                'flag': 'BD',
+                'kbd': kbd,
+                'Nbd': Nbd,
+                'Na': Na,
+                'Nc': Nc,
+                'kc': kc,
+                'A': A,
+                'C': C,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             # z
 
             kbd = kXY[(('N_sig_xz', w), wbd)]
             Nbd = n_xy[(('N_sig_xz', w), wbd)]
+            Na = n_x['Na'][('z', wa)]
             Nc = n_x['Nc'][('x', wc)]
             kc = kX['Nc'][('x', wc)]
-            Na = n_x['Na'][('z', wa)]
             A = X['z']
             C = X['x']
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kbd, C, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
+            inp_list.append({
+                'freq': w,
+                'flag': 'BD',
+                'kbd': kbd,
+                'Nbd': Nbd,
+                'Na': Na,
+                'Nc': Nc,
+                'kc': kc,
+                'A': A,
+                'C': C,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             kbd = kXY[(('N_sig_yz', w), wbd)]
             Nbd = n_xy[(('N_sig_yz', w), wbd)]
+            Na = n_x['Na'][('z', wa)]
             Nc = n_x['Nc'][('y', wc)]
             kc = kX['Nc'][('y', wc)]
-            Na = n_x['Na'][('z', wa)]
             A = X['z']
             C = X['y']
 
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kbd, C, da, nocc, norb))
-
-            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
+            inp_list.append({
+                'freq': w,
+                'flag': 'BD',
+                'kbd': kbd,
+                'Nbd': Nbd,
+                'Na': Na,
+                'Nc': Nc,
+                'kc': kc,
+                'A': A,
+                'C': C,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
 
             kbd = kXY[(('N_sig_zz', w), wbd)]
             Nbd = n_xy[(('N_sig_zz', w), wbd)]
-            Nc = n_x['Nc'][('z', wc)]
             Na = n_x['Na'][('z', wa)]
+            Nc = n_x['Nc'][('z', wc)]
             kc = kX['Nc'][('z', wc)]
             A = X['z']
             C = X['z']
 
+            inp_list.append({
+                'freq': w,
+                'flag': 'BD',
+                'kbd': kbd,
+                'Nbd': Nbd,
+                'Na': Na,
+                'Nc': Nc,
+                'kc': kc,
+                'A': A,
+                'C': C,
+                'da': da,
+                'nocc': nocc,
+                'norb': norb,
+            })
+
+        ave, res = divmod(len(inp_list), self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+        starts = [sum(counts[:p]) for p in range(self.nodes)]
+        ends = [sum(counts[:p + 1]) for p in range(self.nodes)]
+
+        scatter_inp = inp_list[starts[self.rank]:ends[self.rank]]
+
+        list_x2_a2 = [self.get_x2_a2(inp) for inp in scatter_inp]
+
+        list_x2_a2 = self.comm.gather(list_x2_a2, root=mpi_master())
+
+        if self.rank == mpi_master():
+            for terms in list_x2_a2:
+                for term in terms:
+                    key = term['key']
+                    if key not in na_x2_nyz_dict:
+                        na_x2_nyz_dict[key] = 0.0
+                    if key not in nx_a2_nyz_dict:
+                        nx_a2_nyz_dict[key] = 0.0
+                    na_x2_nyz_dict[key] += term['x2']
+                    nx_a2_nyz_dict[key] += term['a2']
+
+            return {
+                'NaX3NyNz': na_x3_ny_nz_dict,
+                'NaA3NxNy': na_a3_nx_ny_dict,
+                'NaX2Nyz': na_x2_nyz_dict,
+                'NxA2Nyz': nx_a2_nyz_dict,
+            }
+
+        return None
+
+    def get_x3_a3(self, inp_dict):
+
+        na_x3_ny_nz = 0.0
+        na_a3_nx_ny = 0.0
+
+        w = inp_dict['freq']
+        Na = inp_dict['Na']
+        Nb = inp_dict['Nb']
+        Nc = inp_dict['Nc']
+        Nd = inp_dict['Nd']
+        kb = inp_dict['kb']
+        kc = inp_dict['kc']
+        kd = inp_dict['kd']
+        A = inp_dict['A']
+        B = inp_dict['B']
+        C = inp_dict['C']
+        D = inp_dict['D']
+
+        da = inp_dict['da']
+        nocc = inp_dict['nocc']
+        norb = inp_dict['norb']
+
+        # Na X[3]NyNz
+
+        na_x3_ny_nz += -np.matmul(Na.T,
+                                  self.x3_contract(kc, kd, B, da, nocc, norb))
+        na_x3_ny_nz += -np.matmul(Na.T,
+                                  self.x3_contract(kd, kc, B, da, nocc, norb))
+        na_x3_ny_nz += -np.matmul(Na.T,
+                                  self.x3_contract(kd, kb, C, da, nocc, norb))
+        na_x3_ny_nz += -np.matmul(Na.T,
+                                  self.x3_contract(kb, kd, C, da, nocc, norb))
+        na_x3_ny_nz += -np.matmul(Na.T,
+                                  self.x3_contract(kb, kc, D, da, nocc, norb))
+        na_x3_ny_nz += -np.matmul(Na.T,
+                                  self.x3_contract(kc, kb, D, da, nocc, norb))
+
+        # NaA[3]n_xNy
+
+        na_a3_nx_ny += np.matmul(self.a3_contract(kb, kc, A, da, nocc, norb),
+                                 Nd)
+        na_a3_nx_ny += np.matmul(self.a3_contract(kb, kd, A, da, nocc, norb),
+                                 Nc)
+        na_a3_nx_ny += np.matmul(self.a3_contract(kc, kb, A, da, nocc, norb),
+                                 Nd)
+        na_a3_nx_ny += np.matmul(self.a3_contract(kc, kd, A, da, nocc, norb),
+                                 Nb)
+        na_a3_nx_ny += np.matmul(self.a3_contract(kd, kb, A, da, nocc, norb),
+                                 Nc)
+        na_a3_nx_ny += np.matmul(self.a3_contract(kd, kc, A, da, nocc, norb),
+                                 Nb)
+
+        return {
+            'key': (w, -w, w),
+            'x3': (1. / 15) * na_x3_ny_nz,
+            'a3': (1. / 15) * na_a3_nx_ny,
+        }
+
+    def get_x2_a2(self, inp_dict):
+
+        na_x2_nyz = 0.0
+        nx_a2_nyz = 0.0
+
+        w = inp_dict['freq']
+        flag = inp_dict['flag']
+
+        if flag == 'CD':
+            kcd = inp_dict['kcd']
+            Ncd = inp_dict['Ncd']
+            Na = inp_dict['Na']
+            Nb = inp_dict['Nb']
+            kb = inp_dict['kb']
+            A = inp_dict['A']
+            B = inp_dict['B']
+        elif flag == 'BD':
+            kbd = inp_dict['kbd']
+            Nbd = inp_dict['Nbd']
+            Na = inp_dict['Na']
+            Nc = inp_dict['Nc']
+            kc = inp_dict['kc']
+            A = inp_dict['A']
+            C = inp_dict['C']
+
+        da = inp_dict['da']
+        nocc = inp_dict['nocc']
+        norb = inp_dict['norb']
+
+        if flag == 'CD':
+            na_x2_nyz += np.matmul(Na.T,
+                                   self.x2_contract(kcd, B, da, nocc, norb))
+            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
+            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
+        elif flag == 'BD':
             na_x2_nyz += np.matmul(Na.T,
                                    self.x2_contract(kbd, C, da, nocc, norb))
-
             nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
             nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
 
-            na_x2_nyz_dict[(w, -w, w)] = -(1. / 15) * na_x2_nyz
-            nx_a2_nyz_dict[(w, -w, w)] = -(1. / 15) * nx_a2_nyz
-
         return {
-            'NaX3NyNz': na_x3_ny_nz_dict,
-            'NaA3NxNy': na_a3_nx_ny_dict,
-            'NaX2Nyz': na_x2_nyz_dict,
-            'NxA2Nyz': nx_a2_nyz_dict,
+            'key': (w, -w, w),
+            'x2': -(1. / 15) * na_x2_nyz,
+            'a2': -(1. / 15) * nx_a2_nyz,
         }
 
     def get_t4(self, wi, e4_dict, n_x, kX, track, da, nocc, norb):
