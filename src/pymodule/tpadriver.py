@@ -663,7 +663,7 @@ class TpaDriver:
         :param kXY:
             A dictonary containing all the two-index response matricies
         :param da:
-            The SCF density matrix in MO bassi
+            The SCF density matrix in MO basis
         :param nocc:
             The number of occupied orbitals
         :param norb:
@@ -743,6 +743,77 @@ class TpaDriver:
             t3_term[(w, -w, w)] = 1. / 15 * t3term
 
         return t3_term
+
+    def get_x3_a3(self, inp_dict, da, nocc, norb):
+        """
+        Computes X[3] and A[3] contributions.
+
+        :param inp_dict:
+            A dictionary containing input data for computing X[3] and A[3].
+        :param da:
+            The SCF density matrix in MO basis
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The total number of orbitals
+
+        :return:
+            A dictionary containing frequencies, X[3] and A[3].
+        """
+
+        return None
+
+    def get_x2_a2(self, inp_dict, da, nocc, norb):
+        """
+        Computes X[2] and A[2] contributions.
+
+        :param inp_dict:
+            A dictionary containing input data for computing X[2] and A[2].
+        :param da:
+            The SCF density matrix in MO basis
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The total number of orbitals
+
+        :return:
+            A dictionary containing frequencies, X[2] and A[2].
+        """
+
+        na_x2_nyz = 0.0
+        nx_a2_nyz = 0.0
+
+        w = inp_dict['freq']
+        Na = inp_dict['Na']
+        A = inp_dict['A']
+
+        if inp_dict['flag'] == 'CD':
+            kcd = inp_dict['kcd']
+            Ncd = inp_dict['Ncd']
+            Nb = inp_dict['Nb']
+            kb = inp_dict['kb']
+            B = inp_dict['B']
+
+            na_x2_nyz += np.dot(Na.T, self.x2_contract(kcd, B, da, nocc, norb))
+            nx_a2_nyz += np.dot(self.a2_contract(kb, A, da, nocc, norb), Ncd)
+            nx_a2_nyz += np.dot(self.a2_contract(kcd, A, da, nocc, norb), Nb)
+
+        elif inp_dict['flag'] == 'BD':
+            kbd = inp_dict['kbd']
+            Nbd = inp_dict['Nbd']
+            Nc = inp_dict['Nc']
+            kc = inp_dict['kc']
+            C = inp_dict['C']
+
+            na_x2_nyz += np.dot(Na.T, self.x2_contract(kbd, C, da, nocc, norb))
+            nx_a2_nyz += np.dot(self.a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.dot(self.a2_contract(kbd, A, da, nocc, norb), Nc)
+
+        return {
+            'key': (w, -w, w),
+            'x2': -(1. / 15) * na_x2_nyz,
+            'a2': -(1. / 15) * nx_a2_nyz,
+        }
 
     def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
         """

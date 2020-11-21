@@ -646,227 +646,41 @@ class TpaReducedDriver(TpaDriver):
 
             wbd = wb + wd
 
-            # BD
+            for op_a in 'xyz':
+                Na = n_x['Na'][(op_a, wa)]
+                A = X[op_a]
 
-            kbd = kXY[(('N_sig_xx', w), wbd)]
-            Nbd = n_xy[(('N_sig_xx', w), wbd)]
-            Na = n_x['Na'][('x', wa)]
-            Nc = n_x['Nc'][('x', wc)]
-            kc = kX['Nc'][('x', wc)]
-            A = X['x']
-            C = X['x']
+                for op_c in 'xyz':
+                    op_ac = op_a + op_c if op_a <= op_c else op_c + op_a
 
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
+                    # BD
+                    kbd = kXY[(('N_sig_' + op_ac, w), wbd)]
+                    Nbd = n_xy[(('N_sig_' + op_ac, w), wbd)]
+                    Nc = n_x['Nc'][(op_c, wc)]
+                    kc = kX['Nc'][(op_c, wc)]
+                    C = X[op_c]
 
-            kbd = kXY[(('N_sig_xy', w), wbd)]
-            Nbd = n_xy[(('N_sig_xy', w), wbd)]
-            Na = n_x['Na'][('x', wa)]
-            Nc = n_x['Nc'][('y', wc)]
-            kc = kX['Nc'][('y', wc)]
-            A = X['x']
-            C = X['y']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            kbd = kXY[(('N_sig_xz', w), wbd)]
-            Nbd = n_xy[(('N_sig_xz', w), wbd)]
-            Nc = n_x['Nc'][('z', wc)]
-            kc = kX['Nc'][('z', wc)]
-            Na = n_x['Na'][('x', wa)]
-            A = X['x']
-            C = X['z']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            # y
-
-            kbd = kXY[(('N_sig_xy', w), wbd)]
-            Nbd = n_xy[(('N_sig_xy', w), wbd)]
-            Na = n_x['Na'][('y', wa)]
-            Nc = n_x['Nc'][('x', wc)]
-            kc = kX['Nc'][('x', wc)]
-            A = X['y']
-            C = X['x']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            kbd = kXY[(('N_sig_yy', w), wbd)]
-            Nbd = n_xy[(('N_sig_yy', w), wbd)]
-            Nc = n_x['Nc'][('y', wc)]
-            Na = n_x['Na'][('y', wa)]
-            kc = kX['Nc'][('y', wc)]
-            A = X['y']
-            C = X['y']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            kbd = kXY[(('N_sig_yz', w), wbd)]
-            Nbd = n_xy[(('N_sig_yz', w), wbd)]
-            Nc = n_x['Nc'][('z', wc)]
-            Na = n_x['Na'][('y', wa)]
-            kc = kX['Nc'][('z', wc)]
-            A = X['y']
-            C = X['z']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            # z
-
-            kbd = kXY[(('N_sig_xz', w), wbd)]
-            Nbd = n_xy[(('N_sig_xz', w), wbd)]
-            Nc = n_x['Nc'][('x', wc)]
-            kc = kX['Nc'][('x', wc)]
-            Na = n_x['Na'][('z', wa)]
-            A = X['z']
-            C = X['x']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            kbd = kXY[(('N_sig_yz', w), wbd)]
-            Nbd = n_xy[(('N_sig_yz', w), wbd)]
-            Nc = n_x['Nc'][('y', wc)]
-            kc = kX['Nc'][('y', wc)]
-            Na = n_x['Na'][('z', wa)]
-            A = X['z']
-            C = X['y']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            kbd = kXY[(('N_sig_zz', w), wbd)]
-            Nbd = n_xy[(('N_sig_zz', w), wbd)]
-            Nc = n_x['Nc'][('z', wc)]
-            Na = n_x['Na'][('z', wa)]
-            kc = kX['Nc'][('z', wc)]
-            A = X['z']
-            C = X['z']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
+                    inp_list.append({
+                        'flag': 'BD',
+                        'freq': w,
+                        'kbd': kbd,
+                        'Nbd': Nbd,
+                        'Na': Na,
+                        'Nc': Nc,
+                        'kc': kc,
+                        'A': A,
+                        'C': C,
+                    })
 
         ave, res = divmod(len(inp_list), self.nodes)
         counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
         starts = [sum(counts[:p]) for p in range(self.nodes)]
         ends = [sum(counts[:p + 1]) for p in range(self.nodes)]
 
-        scatter_inp = inp_list[starts[self.rank]:ends[self.rank]]
-
-        list_x2_a2 = [self.get_x2_a2(inp) for inp in scatter_inp]
+        list_x2_a2 = [
+            self.get_x2_a2(inp, da, nocc, norb)
+            for inp in inp_list[starts[self.rank]:ends[self.rank]]
+        ]
 
         list_x2_a2 = self.comm.gather(list_x2_a2, root=mpi_master())
 
@@ -887,39 +701,6 @@ class TpaReducedDriver(TpaDriver):
             }
 
         return None
-
-    def get_x2_a2(self, inp_dict):
-
-        na_x2_nyz = 0.0
-        nx_a2_nyz = 0.0
-
-        w = inp_dict['freq']
-        flag = inp_dict['flag']
-
-        if flag == 'BD':
-            kbd = inp_dict['kbd']
-            Nbd = inp_dict['Nbd']
-            Na = inp_dict['Na']
-            Nc = inp_dict['Nc']
-            kc = inp_dict['kc']
-            A = inp_dict['A']
-            C = inp_dict['C']
-
-        da = inp_dict['da']
-        nocc = inp_dict['nocc']
-        norb = inp_dict['norb']
-
-        if flag == 'BD':
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kbd, C, da, nocc, norb))
-            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
-
-        return {
-            'key': (w, -w, w),
-            'x2': -(1. / 15) * na_x2_nyz,
-            'a2': -(1. / 15) * nx_a2_nyz,
-        }
 
     def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, other_dict):
         """

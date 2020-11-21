@@ -1119,7 +1119,7 @@ class TpaFullDriver(TpaDriver):
         :param kXY:
             A dictonary containing all the two-index response matricies
         :param da:
-            The SCF density matrix in MO bassi
+            The SCF density matrix in MO basis
         :param nocc:
             The number of occupied orbitals
         :param norb:
@@ -1143,41 +1143,26 @@ class TpaFullDriver(TpaDriver):
                 comp_i = track[i]
 
                 vals = comp_i.split(',')
-                w1 = float(vals[1])
-                w2 = float(vals[2])
-                w3 = float(vals[3])
-
-                Na = n_x['Na'][(comp_i[0], w1)]
-                Nb = n_x['Nb'][(comp_i[1], w1)]
-
-                Nc = n_x['Nc'][(comp_i[2], w2)]
-                Nd = n_x['Nd'][(comp_i[3], w3)]
-
-                kb = kX['Nb'][(comp_i[1], w1)]
-                kc = kX['Nc'][(comp_i[2], w2)]
-                kd = kX['Nd'][(comp_i[3], w3)]
-
-                A = X[comp_i[0]]
-                B = X[comp_i[1]]
-                C = X[comp_i[2]]
-                D = X[comp_i[3]]
+                op_a, op_b, op_c, op_d = vals[0]
+                w = float(vals[1])
+                wa = float(vals[1])
+                wb = float(vals[1])
+                wc = float(vals[2])
+                wd = float(vals[3])
 
                 inp_list.append({
-                    'freq': wi[j],
-                    'Na': Na,
-                    'Nb': Nb,
-                    'Nc': Nc,
-                    'Nd': Nd,
-                    'kb': kb,
-                    'kc': kc,
-                    'kd': kd,
-                    'A': A,
-                    'B': B,
-                    'C': C,
-                    'D': D,
-                    'da': da,
-                    'nocc': nocc,
-                    'norb': norb,
+                    'freq': w,
+                    'Na': n_x['Na'][(op_a, wa)],
+                    'Nb': n_x['Nb'][(op_b, wb)],
+                    'Nc': n_x['Nc'][(op_c, wc)],
+                    'Nd': n_x['Nd'][(op_d, wd)],
+                    'kb': kX['Nb'][(op_b, wb)],
+                    'kc': kX['Nc'][(op_c, wc)],
+                    'kd': kX['Nd'][(op_d, wd)],
+                    'A': X[op_a],
+                    'B': X[op_b],
+                    'C': X[op_c],
+                    'D': X[op_d],
                 })
 
         ave, res = divmod(len(inp_list), self.nodes)
@@ -1185,9 +1170,10 @@ class TpaFullDriver(TpaDriver):
         starts = [sum(counts[:p]) for p in range(self.nodes)]
         ends = [sum(counts[:p + 1]) for p in range(self.nodes)]
 
-        scatter_inp = inp_list[starts[self.rank]:ends[self.rank]]
-
-        list_x3_a3 = [self.get_x3_a3(inp) for inp in scatter_inp]
+        list_x3_a3 = [
+            self.get_x3_a3(inp, da, nocc, norb)
+            for inp in inp_list[starts[self.rank]:ends[self.rank]]
+        ]
 
         list_x3_a3 = self.comm.gather(list_x3_a3, root=mpi_master())
 
@@ -1215,441 +1201,62 @@ class TpaFullDriver(TpaDriver):
             wcd = 0
             wbd = wb + wd
 
-            # CD
-            # x
+            for op_a in 'xyz':
+                Na = n_x['Na'][(op_a, wa)]
+                A = X[op_a]
 
-            kcd = kXY[(('N_lamtau_xx', w), wcd)]
-            Ncd = n_xy[(('N_lamtau_xx', w), wcd)]
-            Na = n_x['Na'][('x', wa)]
-            Nb = n_x['Nb'][('x', w)]
-            kb = kX['Nb'][('x', w)]
-            A = X['x']
-            B = X['x']
+                for op_b in 'xyz':
+                    op_ab = op_a + op_b if op_a <= op_b else op_b + op_a
 
-            inp_list.append({
-                'freq': w,
-                'flag': 'CD',
-                'kcd': kcd,
-                'Ncd': Ncd,
-                'Na': Na,
-                'Nb': Nb,
-                'kb': kb,
-                'A': A,
-                'B': B,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
+                    # CD
+                    kcd = kXY[(('N_lamtau_' + op_ab, w), wcd)]
+                    Ncd = n_xy[(('N_lamtau_' + op_ab, w), wcd)]
+                    Nb = n_x['Nb'][(op_b, w)]
+                    kb = kX['Nb'][(op_b, w)]
+                    B = X[op_b]
 
-            kcd = kXY[(('N_lamtau_xy', w), wcd)]
-            Ncd = n_xy[(('N_lamtau_xy', w), wcd)]
-            Na = n_x['Na'][('x', wa)]
-            Nb = n_x['Nb'][('y', w)]
-            kb = kX['Nb'][('y', w)]
-            A = X['x']
-            B = X['y']
+                    inp_list.append({
+                        'flag': 'CD',
+                        'freq': w,
+                        'kcd': kcd,
+                        'Ncd': Ncd,
+                        'Na': Na,
+                        'Nb': Nb,
+                        'kb': kb,
+                        'A': A,
+                        'B': B,
+                    })
 
-            inp_list.append({
-                'freq': w,
-                'flag': 'CD',
-                'kcd': kcd,
-                'Ncd': Ncd,
-                'Na': Na,
-                'Nb': Nb,
-                'kb': kb,
-                'A': A,
-                'B': B,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
+                    # BD
+                    op_c = op_b
+                    op_ac = op_ab
+                    kbd = kXY[(('N_sig_' + op_ac, w), wbd)]
+                    Nbd = n_xy[(('N_sig_' + op_ac, w), wbd)]
+                    Nc = n_x['Nc'][(op_c, wc)]
+                    kc = kX['Nc'][(op_c, wc)]
+                    C = X[op_c]
 
-            kcd = kXY[(('N_lamtau_xz', w), wcd)]
-            Ncd = n_xy[(('N_lamtau_xz', w), wcd)]
-            Na = n_x['Na'][('x', wa)]
-            Nb = n_x['Nb'][('z', w)]
-            kb = kX['Nb'][('z', w)]
-            A = X['x']
-            B = X['z']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'CD',
-                'kcd': kcd,
-                'Ncd': Ncd,
-                'Na': Na,
-                'Nb': Nb,
-                'kb': kb,
-                'A': A,
-                'B': B,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            # y
-
-            kcd = kXY[(('N_lamtau_xy', w), wcd)]
-            Ncd = n_xy[(('N_lamtau_xy', w), wcd)]
-            Na = n_x['Na'][('y', wa)]
-            Nb = n_x['Nb'][('x', w)]
-            kb = kX['Nb'][('x', w)]
-            A = X['y']
-            B = X['x']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'CD',
-                'kcd': kcd,
-                'Ncd': Ncd,
-                'Na': Na,
-                'Nb': Nb,
-                'kb': kb,
-                'A': A,
-                'B': B,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            kcd = kXY[(('N_lamtau_yy', w), wcd)]
-            Ncd = n_xy[(('N_lamtau_yy', w), wcd)]
-            Na = n_x['Na'][('y', wa)]
-            Nb = n_x['Nb'][('y', w)]
-            kb = kX['Nb'][('y', w)]
-            A = X['y']
-            B = X['y']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'CD',
-                'kcd': kcd,
-                'Ncd': Ncd,
-                'Na': Na,
-                'Nb': Nb,
-                'kb': kb,
-                'A': A,
-                'B': B,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            kcd = kXY[(('N_lamtau_yz', w), wcd)]
-            Ncd = n_xy[(('N_lamtau_yz', w), wcd)]
-            Na = n_x['Na'][('y', wa)]
-            Nb = n_x['Nb'][('z', w)]
-            kb = kX['Nb'][('z', w)]
-            A = X['y']
-            B = X['z']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'CD',
-                'kcd': kcd,
-                'Ncd': Ncd,
-                'Na': Na,
-                'Nb': Nb,
-                'kb': kb,
-                'A': A,
-                'B': B,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            # z
-
-            kcd = kXY[(('N_lamtau_xz', w), wcd)]
-            Ncd = n_xy[(('N_lamtau_xz', w), wcd)]
-            Na = n_x['Na'][('z', wa)]
-            Nb = n_x['Nb'][('x', w)]
-            kb = kX['Nb'][('x', w)]
-            A = X['z']
-            B = X['x']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'CD',
-                'kcd': kcd,
-                'Ncd': Ncd,
-                'Na': Na,
-                'Nb': Nb,
-                'kb': kb,
-                'A': A,
-                'B': B,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            kcd = kXY[(('N_lamtau_yz', w), wcd)]
-            Ncd = n_xy[(('N_lamtau_yz', w), wcd)]
-            Na = n_x['Na'][('z', wa)]
-            Nb = n_x['Nb'][('y', w)]
-            kb = kX['Nb'][('y', w)]
-            A = X['z']
-            B = X['y']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'CD',
-                'kcd': kcd,
-                'Ncd': Ncd,
-                'Na': Na,
-                'Nb': Nb,
-                'kb': kb,
-                'A': A,
-                'B': B,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            kcd = kXY[(('N_lamtau_zz', w), wcd)]
-            Ncd = n_xy[(('N_lamtau_zz', w), wcd)]
-            Na = n_x['Na'][('z', wa)]
-            Nb = n_x['Nb'][('z', w)]
-            kb = kX['Nb'][('z', w)]
-            A = X['z']
-            B = X['z']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'CD',
-                'kcd': kcd,
-                'Ncd': Ncd,
-                'Na': Na,
-                'Nb': Nb,
-                'kb': kb,
-                'A': A,
-                'B': B,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            # BD
-
-            kbd = kXY[(('N_sig_xx', w), wbd)]
-            Nbd = n_xy[(('N_sig_xx', w), wbd)]
-            Na = n_x['Na'][('x', wa)]
-            Nc = n_x['Nc'][('x', wc)]
-            kc = kX['Nc'][('x', wc)]
-            A = X['x']
-            C = X['x']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            kbd = kXY[(('N_sig_xy', w), wbd)]
-            Nbd = n_xy[(('N_sig_xy', w), wbd)]
-            Na = n_x['Na'][('x', wa)]
-            Nc = n_x['Nc'][('y', wc)]
-            kc = kX['Nc'][('y', wc)]
-            A = X['x']
-            C = X['y']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            kbd = kXY[(('N_sig_xz', w), wbd)]
-            Nbd = n_xy[(('N_sig_xz', w), wbd)]
-            Na = n_x['Na'][('x', wa)]
-            Nc = n_x['Nc'][('z', wc)]
-            kc = kX['Nc'][('z', wc)]
-            A = X['x']
-            C = X['z']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            # y
-
-            kbd = kXY[(('N_sig_xy', w), wbd)]
-            Nbd = n_xy[(('N_sig_xy', w), wbd)]
-            Na = n_x['Na'][('y', wa)]
-            Nc = n_x['Nc'][('x', wc)]
-            kc = kX['Nc'][('x', wc)]
-            A = X['y']
-            C = X['x']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            kbd = kXY[(('N_sig_yy', w), wbd)]
-            Nbd = n_xy[(('N_sig_yy', w), wbd)]
-            Na = n_x['Na'][('y', wa)]
-            Nc = n_x['Nc'][('y', wc)]
-            kc = kX['Nc'][('y', wc)]
-            A = X['y']
-            C = X['y']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            kbd = kXY[(('N_sig_yz', w), wbd)]
-            Nbd = n_xy[(('N_sig_yz', w), wbd)]
-            Na = n_x['Na'][('y', wa)]
-            Nc = n_x['Nc'][('z', wc)]
-            kc = kX['Nc'][('z', wc)]
-            A = X['y']
-            C = X['z']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            # z
-
-            kbd = kXY[(('N_sig_xz', w), wbd)]
-            Nbd = n_xy[(('N_sig_xz', w), wbd)]
-            Na = n_x['Na'][('z', wa)]
-            Nc = n_x['Nc'][('x', wc)]
-            kc = kX['Nc'][('x', wc)]
-            A = X['z']
-            C = X['x']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            kbd = kXY[(('N_sig_yz', w), wbd)]
-            Nbd = n_xy[(('N_sig_yz', w), wbd)]
-            Na = n_x['Na'][('z', wa)]
-            Nc = n_x['Nc'][('y', wc)]
-            kc = kX['Nc'][('y', wc)]
-            A = X['z']
-            C = X['y']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
-
-            kbd = kXY[(('N_sig_zz', w), wbd)]
-            Nbd = n_xy[(('N_sig_zz', w), wbd)]
-            Na = n_x['Na'][('z', wa)]
-            Nc = n_x['Nc'][('z', wc)]
-            kc = kX['Nc'][('z', wc)]
-            A = X['z']
-            C = X['z']
-
-            inp_list.append({
-                'freq': w,
-                'flag': 'BD',
-                'kbd': kbd,
-                'Nbd': Nbd,
-                'Na': Na,
-                'Nc': Nc,
-                'kc': kc,
-                'A': A,
-                'C': C,
-                'da': da,
-                'nocc': nocc,
-                'norb': norb,
-            })
+                    inp_list.append({
+                        'flag': 'BD',
+                        'freq': w,
+                        'kbd': kbd,
+                        'Nbd': Nbd,
+                        'Na': Na,
+                        'Nc': Nc,
+                        'kc': kc,
+                        'A': A,
+                        'C': C,
+                    })
 
         ave, res = divmod(len(inp_list), self.nodes)
         counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
         starts = [sum(counts[:p]) for p in range(self.nodes)]
         ends = [sum(counts[:p + 1]) for p in range(self.nodes)]
 
-        scatter_inp = inp_list[starts[self.rank]:ends[self.rank]]
-
-        list_x2_a2 = [self.get_x2_a2(inp) for inp in scatter_inp]
+        list_x2_a2 = [
+            self.get_x2_a2(inp, da, nocc, norb)
+            for inp in inp_list[starts[self.rank]:ends[self.rank]]
+        ]
 
         list_x2_a2 = self.comm.gather(list_x2_a2, root=mpi_master())
 
@@ -1673,7 +1280,22 @@ class TpaFullDriver(TpaDriver):
 
         return None
 
-    def get_x3_a3(self, inp_dict):
+    def get_x3_a3(self, inp_dict, da, nocc, norb):
+        """
+        Computes X[3] and A[3] contributions.
+
+        :param inp_dict:
+            A dictionary containing input data for computing X[3] and A[3].
+        :param da:
+            The SCF density matrix in MO basis
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The total number of orbitals
+
+        :return:
+            A dictionary containing frequencies, X[3] and A[3].
+        """
 
         na_x3_ny_nz = 0.0
         na_a3_nx_ny = 0.0
@@ -1691,90 +1313,28 @@ class TpaFullDriver(TpaDriver):
         C = inp_dict['C']
         D = inp_dict['D']
 
-        da = inp_dict['da']
-        nocc = inp_dict['nocc']
-        norb = inp_dict['norb']
-
         # Na X[3]NyNz
 
-        na_x3_ny_nz += -np.matmul(Na.T,
-                                  self.x3_contract(kc, kd, B, da, nocc, norb))
-        na_x3_ny_nz += -np.matmul(Na.T,
-                                  self.x3_contract(kd, kc, B, da, nocc, norb))
-        na_x3_ny_nz += -np.matmul(Na.T,
-                                  self.x3_contract(kd, kb, C, da, nocc, norb))
-        na_x3_ny_nz += -np.matmul(Na.T,
-                                  self.x3_contract(kb, kd, C, da, nocc, norb))
-        na_x3_ny_nz += -np.matmul(Na.T,
-                                  self.x3_contract(kb, kc, D, da, nocc, norb))
-        na_x3_ny_nz += -np.matmul(Na.T,
-                                  self.x3_contract(kc, kb, D, da, nocc, norb))
+        na_x3_ny_nz -= np.dot(Na.T, self.x3_contract(kc, kd, B, da, nocc, norb))
+        na_x3_ny_nz -= np.dot(Na.T, self.x3_contract(kd, kc, B, da, nocc, norb))
+        na_x3_ny_nz -= np.dot(Na.T, self.x3_contract(kd, kb, C, da, nocc, norb))
+        na_x3_ny_nz -= np.dot(Na.T, self.x3_contract(kb, kd, C, da, nocc, norb))
+        na_x3_ny_nz -= np.dot(Na.T, self.x3_contract(kb, kc, D, da, nocc, norb))
+        na_x3_ny_nz -= np.dot(Na.T, self.x3_contract(kc, kb, D, da, nocc, norb))
 
         # NaA[3]n_xNy
 
-        na_a3_nx_ny += np.matmul(self.a3_contract(kb, kc, A, da, nocc, norb),
-                                 Nd)
-        na_a3_nx_ny += np.matmul(self.a3_contract(kb, kd, A, da, nocc, norb),
-                                 Nc)
-        na_a3_nx_ny += np.matmul(self.a3_contract(kc, kb, A, da, nocc, norb),
-                                 Nd)
-        na_a3_nx_ny += np.matmul(self.a3_contract(kc, kd, A, da, nocc, norb),
-                                 Nb)
-        na_a3_nx_ny += np.matmul(self.a3_contract(kd, kb, A, da, nocc, norb),
-                                 Nc)
-        na_a3_nx_ny += np.matmul(self.a3_contract(kd, kc, A, da, nocc, norb),
-                                 Nb)
+        na_a3_nx_ny += np.dot(self.a3_contract(kb, kc, A, da, nocc, norb), Nd)
+        na_a3_nx_ny += np.dot(self.a3_contract(kb, kd, A, da, nocc, norb), Nc)
+        na_a3_nx_ny += np.dot(self.a3_contract(kc, kb, A, da, nocc, norb), Nd)
+        na_a3_nx_ny += np.dot(self.a3_contract(kc, kd, A, da, nocc, norb), Nb)
+        na_a3_nx_ny += np.dot(self.a3_contract(kd, kb, A, da, nocc, norb), Nc)
+        na_a3_nx_ny += np.dot(self.a3_contract(kd, kc, A, da, nocc, norb), Nb)
 
         return {
             'key': (w, -w, w),
             'x3': (1. / 15) * na_x3_ny_nz,
             'a3': (1. / 15) * na_a3_nx_ny,
-        }
-
-    def get_x2_a2(self, inp_dict):
-
-        na_x2_nyz = 0.0
-        nx_a2_nyz = 0.0
-
-        w = inp_dict['freq']
-        flag = inp_dict['flag']
-
-        if flag == 'CD':
-            kcd = inp_dict['kcd']
-            Ncd = inp_dict['Ncd']
-            Na = inp_dict['Na']
-            Nb = inp_dict['Nb']
-            kb = inp_dict['kb']
-            A = inp_dict['A']
-            B = inp_dict['B']
-        elif flag == 'BD':
-            kbd = inp_dict['kbd']
-            Nbd = inp_dict['Nbd']
-            Na = inp_dict['Na']
-            Nc = inp_dict['Nc']
-            kc = inp_dict['kc']
-            A = inp_dict['A']
-            C = inp_dict['C']
-
-        da = inp_dict['da']
-        nocc = inp_dict['nocc']
-        norb = inp_dict['norb']
-
-        if flag == 'CD':
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kcd, B, da, nocc, norb))
-            nx_a2_nyz += np.matmul(self.a2_contract(kb, A, da, nocc, norb), Ncd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kcd, A, da, nocc, norb), Nb)
-        elif flag == 'BD':
-            na_x2_nyz += np.matmul(Na.T,
-                                   self.x2_contract(kbd, C, da, nocc, norb))
-            nx_a2_nyz += np.matmul(self.a2_contract(kc, A, da, nocc, norb), Nbd)
-            nx_a2_nyz += np.matmul(self.a2_contract(kbd, A, da, nocc, norb), Nc)
-
-        return {
-            'key': (w, -w, w),
-            'x2': -(1. / 15) * na_x2_nyz,
-            'a2': -(1. / 15) * nx_a2_nyz,
         }
 
     def get_t4(self, wi, e4_dict, n_x, kX, track, da, nocc, norb):
