@@ -184,73 +184,48 @@ c_matmul(const py::array_t<double>& A, const py::array_t<double>& B)
     return C;
 }
 
-static py::array_t<double>
+static void
 c_dgemm(const std::string layout_str,
         const std::string trans_A_str,
         const std::string trans_B_str,
+        const int32_t m,
+        const int32_t n,
+        const int32_t k,
+        const double alpha,
         const py::array_t<double>& A,
-        const py::array_t<double>& B,
         const int32_t lda_A,
-        const int32_t lda_B)
+        const py::array_t<double>& B,
+        const int32_t lda_B,
+        const double beta,
+        py::array_t<double>& C,
+        const int32_t lda_C)
 {
-    // check dimension and shape
+    auto layout = CblasRowMajor;
 
-    errors::assertMsgCritical(A.ndim() == 2, "matmul - Invalid shape of matrix A");
-
-    errors::assertMsgCritical(B.ndim() == 2, "matmul - Invalid shape of matrix B");
-
-    auto nrow_A = A.shape(0);
-
-    auto ncol_A = A.shape(1);
-
-    auto nrow_B = B.shape(0);
-
-    auto ncol_B = B.shape(1);
-
-    errors::assertMsgCritical(ncol_A == nrow_B, "matmul - Inconsistent sizes");
-
-    // check transpose
+    if (fstr::upcase(layout_str) == std::string("COL-MAJOR")) layout = CblasColMajor;
 
     auto trans_A = CblasNoTrans;
 
+    if (fstr::upcase(trans_A_str) == std::string("T")) trans_A = CblasTrans;
+
     auto trans_B = CblasNoTrans;
 
-    if (fstr::upcase(layout_str) == std::string("ROW-MAJOR"))
-    {
-        if (fstr::upcase(trans_A_str) == std::string("T")) trans_A = CblasTrans;
+    if (fstr::upcase(trans_B_str) == std::string("T")) trans_B = CblasTrans;
 
-        if (fstr::upcase(trans_B_str) == std::string("T")) trans_B = CblasTrans;
-    }
-
-    if (fstr::upcase(layout_str) == std::string("COL-MAJOR"))
-    {
-        if (fstr::upcase(trans_A_str) == std::string("N")) trans_A = CblasTrans;
-
-        if (fstr::upcase(trans_B_str) == std::string("N")) trans_B = CblasTrans;
-    }
-
-    // compute matrix-matrix multiplication
-
-    py::array_t<double> C({nrow_A, ncol_B});
-
-    auto lda_C = ncol_B;
-
-    cblas_dgemm(CblasRowMajor,
+    cblas_dgemm(layout,
                 trans_A,
                 trans_B,
-                nrow_A,
-                ncol_B,
-                ncol_A,
-                1.0,
+                m,
+                n,
+                k,
+                alpha,
                 A.data(),
                 lda_A,
                 B.data(),
                 lda_B,
-                0.0,
+                beta,
                 C.mutable_data(),
                 lda_C);
-
-    return C;
 }
 
 static py::array_t<double>
