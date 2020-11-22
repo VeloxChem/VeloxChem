@@ -3,6 +3,7 @@ import unittest
 
 from veloxchem.veloxchemlib import DenseMatrix
 from veloxchem.veloxchemlib import c_matmul
+from veloxchem.veloxchemlib import c_dgemm
 from veloxchem.veloxchemlib import c_multi_dot
 from veloxchem.veloxchemlib import c_outer
 from veloxchem.veloxchemlib import c_eigh
@@ -96,6 +97,35 @@ class TestMath(unittest.TestCase):
         self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
 
         mat_C = c_matmul(mat_A.T.copy(), mat_B.T.copy())
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+    def test_dgemm(self):
+
+        mat_A = np.arange(90.).reshape(9, 10)[:5, :5]
+        mat_B = np.arange(56.).reshape(7, 8)[:5, :5]
+
+        ref_C = np.matmul(mat_A, mat_B)
+        mat_C = c_dgemm('row-major', 'n', 'n', mat_A, mat_B, 10, 8)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+        mat_C = c_dgemm('col-major', 't', 't', mat_A, mat_B, 10, 8)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        ref_C = np.matmul(mat_A.T, mat_B)
+        mat_C = c_dgemm('row-major', 't', 'n', mat_A.T, mat_B, 10, 8)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+        mat_C = c_dgemm('col-major', 'n', 't', mat_A.T, mat_B, 10, 8)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        ref_C = np.matmul(mat_A, mat_B.T)
+        mat_C = c_dgemm('row-major', 'n', 't', mat_A, mat_B.T, 10, 8)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+        mat_C = c_dgemm('col-major', 't', 'n', mat_A, mat_B.T, 10, 8)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        ref_C = np.matmul(mat_A.T, mat_B.T)
+        mat_C = c_dgemm('row-major', 't', 't', mat_A.T, mat_B.T, 10, 8)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+        mat_C = c_dgemm('col-major', 'n', 'n', mat_A.T, mat_B.T, 10, 8)
         self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
 
     def test_multi_dot(self):

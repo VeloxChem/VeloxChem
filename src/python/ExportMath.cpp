@@ -27,6 +27,7 @@
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "MathConst.hpp"
+#include "StringFormat.hpp"
 #include "TwoIndexes.hpp"
 
 namespace py = pybind11;
@@ -157,6 +158,75 @@ c_matmul(const py::array_t<double>& A, const py::array_t<double>& B)
         trans_B = CblasTrans;
 
         lda_B = nrow_B;
+    }
+
+    // compute matrix-matrix multiplication
+
+    py::array_t<double> C({nrow_A, ncol_B});
+
+    auto lda_C = ncol_B;
+
+    cblas_dgemm(CblasRowMajor,
+                trans_A,
+                trans_B,
+                nrow_A,
+                ncol_B,
+                ncol_A,
+                1.0,
+                A.data(),
+                lda_A,
+                B.data(),
+                lda_B,
+                0.0,
+                C.mutable_data(),
+                lda_C);
+
+    return C;
+}
+
+static py::array_t<double>
+c_dgemm(const std::string layout_str,
+        const std::string trans_A_str,
+        const std::string trans_B_str,
+        const py::array_t<double>& A,
+        const py::array_t<double>& B,
+        const int32_t lda_A,
+        const int32_t lda_B)
+{
+    // check dimension and shape
+
+    errors::assertMsgCritical(A.ndim() == 2, "matmul - Invalid shape of matrix A");
+
+    errors::assertMsgCritical(B.ndim() == 2, "matmul - Invalid shape of matrix B");
+
+    auto nrow_A = A.shape(0);
+
+    auto ncol_A = A.shape(1);
+
+    auto nrow_B = B.shape(0);
+
+    auto ncol_B = B.shape(1);
+
+    errors::assertMsgCritical(ncol_A == nrow_B, "matmul - Inconsistent sizes");
+
+    // check transpose
+
+    auto trans_A = CblasNoTrans;
+
+    auto trans_B = CblasNoTrans;
+
+    if (fstr::upcase(layout_str) == std::string("ROW-MAJOR"))
+    {
+        if (fstr::upcase(trans_A_str) == std::string("T")) trans_A = CblasTrans;
+
+        if (fstr::upcase(trans_B_str) == std::string("T")) trans_B = CblasTrans;
+    }
+
+    if (fstr::upcase(layout_str) == std::string("COL-MAJOR"))
+    {
+        if (fstr::upcase(trans_A_str) == std::string("N")) trans_A = CblasTrans;
+
+        if (fstr::upcase(trans_B_str) == std::string("N")) trans_B = CblasTrans;
     }
 
     // compute matrix-matrix multiplication
@@ -343,6 +413,8 @@ export_math(py::module& m)
     m.def("mathconst_pi", &mathconst::getPiValue);
 
     m.def("c_matmul", &c_matmul);
+
+    m.def("c_dgemm", &c_dgemm);
 
     m.def("c_multi_dot", &c_multi_dot);
 
