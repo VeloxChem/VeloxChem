@@ -215,8 +215,8 @@ def plot_pulsed_response(args, is_this_a_test=False):
 
             # Show or don't show plot
             try:
-                arg = [str(i).startswith('show=') for i in rest_of_args
-                       ].index(True)
+                arg_lst = [str(i).startswith('show=') for i in rest_of_args]
+                arg = arg_lst.index(True)
 
                 if (str(rest_of_args[arg])[5].lower() == 'y'):
                     show_plot = True
@@ -237,8 +237,8 @@ def plot_pulsed_response(args, is_this_a_test=False):
 
             # Save or don't save plot to file
             try:
-                arg = [str(i).startswith('save=') for i in rest_of_args
-                       ].index(True)
+                arg_lst = [str(i).startswith('save=') for i in rest_of_args]
+                arg = arg_lst.index(True)
 
                 if (str(rest_of_args[arg])[5].lower() == 'y'):
                     save_plot = True
@@ -258,8 +258,8 @@ def plot_pulsed_response(args, is_this_a_test=False):
 
             # Resolution of plot image to be saved
             try:
-                arg = [str(i).startswith('dpi=') for i in rest_of_args
-                       ].index(True)
+                arg_lst = [str(i).startswith('dpi=') for i in rest_of_args]
+                arg = arg_lst.index(True)
 
                 try:
                     plot_dpi = int(str(rest_of_args[arg])[4:])
@@ -277,8 +277,8 @@ def plot_pulsed_response(args, is_this_a_test=False):
 
             # Thickness of lines in plot curves
             try:
-                arg = [str(i).startswith('lw=') for i in rest_of_args
-                       ].index(True)
+                arg_lst = [str(i).startswith('lw=') for i in rest_of_args]
+                arg = arg_lst.index(True)
 
                 try:
                     lw = float(str(rest_of_args[arg])[3:])
@@ -296,16 +296,17 @@ def plot_pulsed_response(args, is_this_a_test=False):
 
             # Name of output file to save plot image to
             try:
-                arg = [str(i).startswith('save_to=') for i in rest_of_args
-                       ].index(True)
+                arg_lst = [str(i).startswith('save_to=') for i in rest_of_args]
+                arg = arg_lst.index(True)
 
                 try:
                     out_filename = str(rest_of_args[arg])[8:]
 
                     if not (save_plot):
-                        print(
-                            'WARNING: Plot output filename was specified but it was also specified to not save plot image to file. Plot output filename keyword will be ineffectual.'
-                               )
+                        print('WARNING: Plot output filename was specified but '
+                              'it was also specified to not save plot image to '
+                              'file. Plot output filename keyword will be '
+                              'ineffectual.')
 
                 except ValueError:
                     sys.exit("ERROR: Invalid value",
@@ -319,8 +320,8 @@ def plot_pulsed_response(args, is_this_a_test=False):
 
             # Maximum frequency value to plot
             try:
-                arg = [str(i).startswith('freq_max=') for i in rest_of_args
-                       ].index(True)
+                arg_lst = [str(i).startswith('freq_max=') for i in rest_of_args]
+                arg = arg_lst.index(True)
 
                 try:
                     freq_max = float(str(rest_of_args[arg])[9:])
@@ -339,8 +340,10 @@ def plot_pulsed_response(args, is_this_a_test=False):
 
             # Choice of units of frequency values in plot
             try:
-                arg = [str(i).startswith('freq_units=') for i in rest_of_args
-                       ].index(True)
+                arg_lst = [
+                    str(i).startswith('freq_units=') for i in rest_of_args
+                ]
+                arg = arg_lst.index(True)
 
                 if (str(rest_of_args[arg])[11:].lower() == 'au'):
                     freq_units = 'au'
@@ -363,8 +366,8 @@ def plot_pulsed_response(args, is_this_a_test=False):
 
             # Maximum time value to plot
             try:
-                arg = [str(i).startswith('time_max=') for i in rest_of_args
-                       ].index(True)
+                arg_lst = [str(i).startswith('time_max=') for i in rest_of_args]
+                arg = arg_lst.index(True)
 
                 try:
                     time_max = float(str(rest_of_args[arg])[9:])
@@ -383,8 +386,10 @@ def plot_pulsed_response(args, is_this_a_test=False):
 
             # Choice of units of time values in plot
             try:
-                arg = [str(i).startswith('time_units=') for i in rest_of_args
-                       ].index(True)
+                arg_lst = [
+                    str(i).startswith('time_units=') for i in rest_of_args
+                ]
+                arg = arg_lst.index(True)
 
                 if (str(rest_of_args[arg])[11:].lower() == 'au'):
                     time_units = 'au'
@@ -406,10 +411,9 @@ def plot_pulsed_response(args, is_this_a_test=False):
                 pass
 
             if (not (num_args_recogn) == tgt_args_recogn):
-                sys.exit(
-                    'ERROR: ' + str(tgt_args_recogn - num_args_recogn) +
-                    ' command-line argument(s) not recognized by parser. Please check input again.'
-                         )
+                sys.exit('ERROR: ' + str(tgt_args_recogn - num_args_recogn) +
+                         ' command-line argument(s) not recognized by parser.' +
+                         ' Please check input again.')
 
     # Potentially change value of plot maximum if units chosen as non-default
     # but max was default
@@ -522,23 +526,30 @@ def plot_pulsed_response(args, is_this_a_test=False):
     # Plotting time-domain response
     dipmom_t_real_plot = np.real(dipmom_plot) * (10.0**(-1.0 * dip_exp))
 
-    leg_t_real, = ax12.plot(
-        t, dipmom_t_real_plot, color='r', linewidth=lw, label='real_t')
+    leg_t_real, = ax12.plot(t,
+                            dipmom_t_real_plot,
+                            color='r',
+                            linewidth=lw,
+                            label='real_t')
 
     # Test if imaginary data is always zero (or close to it)
     imag_test = np.imag(dipmom_plot)
     zero_thres = 1.0e-15
     for i in range(len(imag_test)):
         if not (abs(imag_test[i]) < zero_thres):
-            err_str = 'ERROR: Imaginary part of time-domain response was expected to be zero (or practically zero) but value ' + str(
-                i + 1) + ' was ' + str(imag_test[i])
+            err_str = 'ERROR: Imaginary part of time-domain response was '
+            err_str += 'expected to be zero (or practically zero) but value '
+            err_str += str(i + 1) + ' was ' + str(imag_test[i])
             sys.exit(err_str)
 
     # Plotting time-domain field
     field_t_real_plot = np.real(field_t_plot) * (10.0**(-1.0 * field_exp))
 
-    leg_t_field, = ax11.plot(
-        t, field_t_real_plot, color='k', linewidth=lw, label='f_t')
+    leg_t_field, = ax11.plot(t,
+                             field_t_real_plot,
+                             color='k',
+                             linewidth=lw,
+                             label='f_t')
 
     # Adding labels
     ax11.text(0.01, 1.01, field_str, transform=ax11.transAxes)
@@ -563,8 +574,8 @@ def plot_pulsed_response(args, is_this_a_test=False):
     ax22 = ax21.twinx()
 
     # Second axis plot limit data for frequency-domain response
-    alphamax = max(
-        np.max((np.abs(np.real(alphas)))), np.max((np.abs(np.imag(alphas)))))
+    alphamax = max(np.max((np.abs(np.real(alphas)))),
+                   np.max((np.abs(np.imag(alphas)))))
     alpha_base, alpha_exp, alpha_str = get_plot_ceil(plot_air * alphamax)
 
     # Second axis plot limit data for frequency-domain field
@@ -575,24 +586,32 @@ def plot_pulsed_response(args, is_this_a_test=False):
     alpha_real_plot = np.real(alphas) * (10.0**(-1.0 * alpha_exp))
     alpha_imag_plot = np.imag(alphas) * (10.0**(-1.0 * alpha_exp))
 
-    leg_real, = ax22.plot(
-        xfreqs, alpha_real_plot, color='b', linewidth=lw, label='real_w')
-    leg_imag, = ax22.plot(
-        xfreqs,
-        alpha_imag_plot,
-        color='b',
-        linestyle='--',
-        linewidth=lw,
-        label='imag_w')
+    leg_real, = ax22.plot(xfreqs,
+                          alpha_real_plot,
+                          color='b',
+                          linewidth=lw,
+                          label='real_w')
+    leg_imag, = ax22.plot(xfreqs,
+                          alpha_imag_plot,
+                          color='b',
+                          linestyle='--',
+                          linewidth=lw,
+                          label='imag_w')
 
     # Plotting frequency-domain field
     field_w_real_plot = np.real(field_w) * (10.0**(-1.0 * field_exp))
     field_w_env_plot = np.abs(field_w) * (10.0**(-1.0 * field_exp))
 
-    leg_field, = ax21.plot(
-        xfreqs, field_w_real_plot, color='k', linewidth=lw * 0.5, label='f_w')
-    ax21.plot(
-        xfreqs, field_w_env_plot, color='k', linestyle=':', linewidth=lw * 0.5)
+    leg_field, = ax21.plot(xfreqs,
+                           field_w_real_plot,
+                           color='k',
+                           linewidth=lw * 0.5,
+                           label='f_w')
+    ax21.plot(xfreqs,
+              field_w_env_plot,
+              color='k',
+              linestyle=':',
+              linewidth=lw * 0.5)
 
     # Add label
     ax21.text(0.94, 1.01, alpha_str, transform=ax21.transAxes)
@@ -635,7 +654,8 @@ def plot_pulsed_response(args, is_this_a_test=False):
     # If this run was done for testing purposes, return various data to be
     # tested
     if (is_this_a_test):
-        return xfreqs, alpha_real_plot, alpha_imag_plot, field_w_real_plot, field_w_env_plot, t, dipmom_t_real_plot, field_t_real_plot
+        return (xfreqs, alpha_real_plot, alpha_imag_plot, field_w_real_plot,
+                field_w_env_plot, t, dipmom_t_real_plot, field_t_real_plot)
 
     else:
         return True

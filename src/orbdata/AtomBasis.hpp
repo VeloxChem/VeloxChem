@@ -185,13 +185,91 @@ class CAtomBasis
     void broadcast(int32_t rank, MPI_Comm comm);
 
     /**
-     Converts atom basis object to text output and insert it into output
-     text stream.
-
-     @param output the output text stream.
-     @param source the atom basis object.
+     Converts atom basis object to text output
      */
-    friend std::ostream& operator<<(std::ostream& output, const CAtomBasis& source);
+    std::string repr() const;
+
+    /** @{ Iterators */
+    using store_type     = std::vector<CBasisFunction>;
+    using iterator       = typename store_type::iterator;
+    using const_iterator = typename store_type::const_iterator;
+
+    iterator
+    begin() noexcept
+    {
+        return _basisFunctions.begin();
+    }
+    const_iterator
+    begin() const noexcept
+    {
+        return _basisFunctions.begin();
+    }
+    const_iterator
+    cbegin() const noexcept
+    {
+        return _basisFunctions.cbegin();
+    }
+
+    iterator
+    end() noexcept
+    {
+        return _basisFunctions.end();
+    }
+    const_iterator
+    end() const noexcept
+    {
+        return _basisFunctions.end();
+    }
+    const_iterator
+    cend() const noexcept
+    {
+        return _basisFunctions.cend();
+    }
+
+    using reverse_iterator       = typename store_type::reverse_iterator;
+    using const_reverse_iterator = typename store_type::const_reverse_iterator;
+
+    reverse_iterator
+    rbegin() noexcept
+    {
+        return _basisFunctions.rbegin();
+    }
+    const_reverse_iterator
+    rbegin() const noexcept
+    {
+        return _basisFunctions.rbegin();
+    }
+    const_reverse_iterator
+    crbegin() const noexcept
+    {
+        return _basisFunctions.crbegin();
+    }
+
+    reverse_iterator
+    rend() noexcept
+    {
+        return _basisFunctions.rend();
+    }
+    const_reverse_iterator
+    rend() const noexcept
+    {
+        return _basisFunctions.rend();
+    }
+    const_reverse_iterator
+    crend() const noexcept
+    {
+        return _basisFunctions.crend();
+    }
+    /** @}*/
 };
+
+/**
+ Converts atom basis object to text output and insert it into output
+ text stream.
+
+ @param output the output text stream.
+ @param source the atom basis object.
+ */
+std::ostream& operator<<(std::ostream& output, const CAtomBasis& source);
 
 #endif /* AtomBasis_hpp */

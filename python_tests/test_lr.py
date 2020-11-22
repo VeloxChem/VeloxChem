@@ -4,7 +4,7 @@ import unittest
 import random
 import pytest
 import sys
-import os
+from pathlib import Path
 try:
     import cppe
 except ImportError:
@@ -15,6 +15,7 @@ from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lrsolver import LinearResponseSolver
 
+
 class TestLR(unittest.TestCase):
 
     def run_lr(self, inpfile, potfile, xcfun_label, raw_data):
@@ -23,7 +24,7 @@ class TestLR(unittest.TestCase):
         task.input_dict['scf']['checkpoint_file'] = None
 
         if potfile is not None:
-            task.input_dict['method_settings']['potfile'] = potfile
+            task.input_dict['method_settings']['potfile'] = str(potfile)
 
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
@@ -55,9 +56,8 @@ class TestLR(unittest.TestCase):
 
     def test_lr_hf(self):
 
-        inpfile = os.path.join('inputs', 'water.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -79,9 +79,8 @@ class TestLR(unittest.TestCase):
 
     def test_lr_dft(self):
 
-        inpfile = os.path.join('inputs', 'water.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -103,9 +102,8 @@ class TestLR(unittest.TestCase):
 
     def test_lr_dft_slda(self):
 
-        inpfile = os.path.join('inputs', 'water.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -128,13 +126,9 @@ class TestLR(unittest.TestCase):
     @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_lr_hf_pe(self):
 
-        inpfile = os.path.join('inputs', 'pe_water.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
-
-        potfile = os.path.join('inputs', 'pe_water.pot')
-        if not os.path.isfile(potfile):
-            potfile = os.path.join('python_tests', potfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'pe_water.inp')
+        potfile = str(here / 'inputs' / 'pe_water.pot')
 
         xcfun_label = None
 
@@ -155,13 +149,9 @@ class TestLR(unittest.TestCase):
     @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_lr_dft_pe(self):
 
-        inpfile = os.path.join('inputs', 'pe_water.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
-
-        potfile = os.path.join('inputs', 'pe_water.pot')
-        if not os.path.isfile(potfile):
-            potfile = os.path.join('python_tests', potfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'pe_water.inp')
+        potfile = str(here / 'inputs' / 'pe_water.pot')
 
         xcfun_label = 'b3lyp'
 

@@ -6,13 +6,16 @@ import math
 import sys
 
 from .veloxchemlib import ExcitationVector
+from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import szblock
+from .veloxchemlib import denmat
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
+from .molecularorbitals import MolecularOrbitals
 from .errorhandler import assert_msg_critical
 from .checkpoint import check_rsp_hdf5
 from .checkpoint import append_rsp_solution_hdf5
@@ -29,6 +32,8 @@ class LinearResponseEigenSolver(LinearSolver):
 
     Instance variables
         - nstates: Number of excited states.
+        - nto: The flag for natural transition orbital analysis.
+        - detach_attach: The flag for detachment/attachment density analysis.
     """
 
     def __init__(self, comm, ostream):
@@ -39,6 +44,9 @@ class LinearResponseEigenSolver(LinearSolver):
         super().__init__(comm, ostream)
 
         self.nstates = 3
+
+        self.nto = False
+        self.detach_attach = False
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -57,6 +65,14 @@ class LinearResponseEigenSolver(LinearSolver):
 
         if 'nstates' in rsp_dict:
             self.nstates = int(rsp_dict['nstates'])
+
+        if 'nto' in rsp_dict:
+            key = rsp_dict['nto'].lower()
+            self.nto = True if key == 'yes' else False
+
+        if 'detach_attach' in rsp_dict:
+            key = rsp_dict['detach_attach'].lower()
+            self.detach_attach = True if key == 'yes' else False
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -356,18 +372,18 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # calculate properties
         if self.is_converged:
-            dipole_rhs = self.get_rhs('dipole', 'xyz', molecule, basis,
-                                      scf_tensors)
-            linmom_rhs = self.get_rhs('linear_momentum', 'xyz', molecule, basis,
-                                      scf_tensors)
-            angmom_rhs = self.get_rhs('angular_momentum', 'xyz', molecule,
-                                      basis, scf_tensors)
+            edip_rhs = self.get_prop_grad('electric dipole', 'xyz', molecule,
+                                          basis, scf_tensors)
+            lmom_rhs = self.get_prop_grad('linear momentum', 'xyz', molecule,
+                                          basis, scf_tensors)
+            mdip_rhs = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
+                                          basis, scf_tensors)
 
             eigvals = np.array([excitations[s][0] for s in range(self.nstates)])
 
-            elec_trans_dipoles = [np.zeros(3) for s in range(self.nstates)]
-            velo_trans_dipoles = [np.zeros(3) for s in range(self.nstates)]
-            magn_trans_dipoles = [np.zeros(3) for s in range(self.nstates)]
+            elec_trans_dipoles = np.zeros((self.nstates, 3))
+            velo_trans_dipoles = np.zeros((self.nstates, 3))
+            magn_trans_dipoles = np.zeros((self.nstates, 3))
 
             key_0 = list(excitations.keys())[0]
             x_0 = self.get_full_solution_vector(excitations[key_0][1])
@@ -383,13 +399,55 @@ class LinearResponseEigenSolver(LinearSolver):
                 eigvec = self.get_full_solution_vector(excitations[s][1])
 
                 if self.rank == mpi_master():
+                    mo_occ = scf_tensors['C'][:, :nocc]
+                    mo_vir = scf_tensors['C'][:, nocc:]
+                    z_mat = eigvec[:eigvec.shape[0] // 2].reshape(
+                        mo_occ.shape[1], mo_vir.shape[1]) * np.sqrt(2.0)
+                    y_mat = eigvec[eigvec.shape[0] // 2:].reshape(
+                        mo_occ.shape[1], mo_vir.shape[1]) * np.sqrt(2.0)
+
+                if self.nto:
+                    self.ostream.print_info(
+                        'Running NTO analysis for S{:d}...'.format(s + 1))
+                    self.ostream.flush()
+
+                    if self.rank == mpi_master():
+                        lam_diag, nto_mo = self.get_nto(z_mat, mo_occ, mo_vir)
+                    else:
+                        lam_diag = None
+                        nto_mo = MolecularOrbitals()
+                    lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
+                    nto_mo.broadcast(self.rank, self.comm)
+
+                    self.write_nto_cubes(molecule, basis, s, lam_diag, nto_mo)
+
+                if self.detach_attach:
+                    self.ostream.print_info(
+                        'Running detachment/attachment analysis for S{:d}...'.
+                        format(s + 1))
+                    self.ostream.flush()
+
+                    if self.rank == mpi_master():
+                        dens_Dz, dens_Az = self.get_detach_attach_densities(
+                            z_mat, mo_occ, mo_vir)
+                        dens_Dy, dens_Ay = self.get_detach_attach_densities(
+                            y_mat, mo_occ, mo_vir)
+                        dens_DA = AODensityMatrix(
+                            [dens_Dz + dens_Dy, dens_Az + dens_Ay], denmat.rest)
+                    else:
+                        dens_DA = AODensityMatrix()
+                    dens_DA.broadcast(self.rank, self.comm)
+
+                    self.write_detach_attach_cubes(molecule, basis, s, dens_DA)
+
+                if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
-                        edip = np.dot(dipole_rhs[ind], eigvec)
-                        vdip = np.dot(linmom_rhs[ind], eigvec) / (-eigvals[s])
-                        mdip = np.dot(angmom_rhs[ind], eigvec) * 0.5
-                        elec_trans_dipoles[s][ind] = edip
-                        velo_trans_dipoles[s][ind] = vdip
-                        magn_trans_dipoles[s][ind] = mdip
+                        elec_trans_dipoles[s, ind] = np.vdot(
+                            edip_rhs[ind], eigvec)
+                        velo_trans_dipoles[s, ind] = np.vdot(
+                            lmom_rhs[ind], eigvec) / (-eigvals[s])
+                        magn_trans_dipoles[s, ind] = np.vdot(
+                            mdip_rhs[ind], eigvec)
 
                     if write_solution_to_file:
                         append_rsp_solution_hdf5(self.checkpoint_file,
@@ -397,16 +455,16 @@ class LinearResponseEigenSolver(LinearSolver):
                     else:
                         eigvecs[:, s] = eigvec[:]
 
-            if self.rank == mpi_master():
-                osc = np.zeros(self.nstates)
-                rot_vel = np.zeros(self.nstates)
+            if self.nto or self.detach_attach:
+                self.ostream.print_blank()
+                self.ostream.flush()
 
-                for s in range(self.nstates):
-                    osc[s] = (2.0 / 3.0 * eigvals[s] *
-                              sum(elec_trans_dipoles[s]**2))
-                    rot_vel[s] = np.dot(
-                        velo_trans_dipoles[s],
-                        magn_trans_dipoles[s]) * rotatory_strength_in_cgs()
+            if self.rank == mpi_master():
+                osc = (2.0 / 3.0) * np.sum(elec_trans_dipoles**2,
+                                           axis=1) * eigvals
+                rot_vel = (-1.0) * np.sum(
+                    velo_trans_dipoles * magn_trans_dipoles,
+                    axis=1) * rotatory_strength_in_cgs()
 
                 ret_dict = {
                     'eigenvalues': eigvals,
@@ -625,3 +683,99 @@ class LinearResponseEigenSolver(LinearSolver):
             DistributedArray(v, self.comm, distribute=False)
             for v in [v_out_rg, v_out_ru]
         ])
+
+    def get_e2(self, molecule, basis, scf_tensors):
+        """
+        Calculates the E[2] matrix.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+
+        :return:
+            The E[2] matrix as numpy array.
+        """
+
+        self.dist_bger = None
+        self.dist_bung = None
+        self.dist_e2bger = None
+        self.dist_e2bung = None
+
+        # sanity check
+        nalpha = molecule.number_of_alpha_electrons()
+        nbeta = molecule.number_of_beta_electrons()
+        assert_msg_critical(
+            nalpha == nbeta,
+            'LinearResponseEigenSolver: not implemented for unrestricted case')
+
+        if self.rank == mpi_master():
+            orb_ene = scf_tensors['E']
+        else:
+            orb_ene = None
+        orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
+        norb = orb_ene.shape[0]
+        nocc = molecule.number_of_alpha_electrons()
+
+        # ERI information
+        eri_dict = self.init_eri(molecule, basis)
+
+        # DFT information
+        dft_dict = self.init_dft(molecule, scf_tensors)
+
+        # PE information
+        pe_dict = self.init_pe(molecule, basis)
+
+        timing_dict = {}
+
+        # generate initial guess from scratch
+
+        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
+        excitations = list(
+            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
+
+        igs = {}
+        n_exc = len(excitations)
+
+        for i in range(2 * n_exc):
+            Xn = np.zeros(2 * n_exc)
+            Xn[i] = 1.0
+
+            Xn_T = np.zeros(2 * n_exc)
+            Xn_T[:n_exc] = Xn[n_exc:]
+            Xn_T[n_exc:] = Xn[:n_exc]
+
+            Xn_ger = 0.5 * (Xn + Xn_T)[:n_exc]
+            Xn_ung = 0.5 * (Xn - Xn_T)[:n_exc]
+
+            dist_x_ger = DistributedArray(Xn_ger, self.comm)
+            dist_x_ung = DistributedArray(Xn_ung, self.comm)
+
+            igs[i] = (1.0, (dist_x_ger, dist_x_ung))
+
+        bger, bung = self.setup_trials(igs, precond=None, renormalize=False)
+
+        self.e2n_half_size(bger, bung, molecule, basis, scf_tensors, eri_dict,
+                           dft_dict, pe_dict, timing_dict)
+
+        if self.rank == mpi_master():
+            E2 = np.zeros((2 * n_exc, 2 * n_exc))
+
+        for i in range(2 * n_exc):
+            e2bger = DistributedArray(self.dist_e2bger.data[:, i],
+                                      self.comm,
+                                      distribute=False)
+            e2bung = DistributedArray(self.dist_e2bung.data[:, i],
+                                      self.comm,
+                                      distribute=False)
+            sigma = self.get_full_solution_vector((e2bger, e2bung))
+
+            if self.rank == mpi_master():
+                E2[:, i] = sigma[:]
+
+        if self.rank == mpi_master():
+            return E2
+        else:
+            return None

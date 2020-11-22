@@ -1,5 +1,5 @@
 import sys
-import os
+from pathlib import Path
 
 from .veloxchemlib import mpi_master
 from .inputparser import InputParser
@@ -60,7 +60,7 @@ class MpiTask:
                             output_fname = sys.stdout
 
             assert_msg_critical(
-                os.path.isfile(input_fname),
+                Path(input_fname).is_file(),
                 'MpiTask: input file {} does not exist'.format(input_fname))
 
             assert_msg_critical(
@@ -112,22 +112,24 @@ class MpiTask:
             self.ostream.print_info('...done.')
             self.ostream.print_blank()
 
-            basis_path = '.'
-            if 'basis_path' in self.input_dict['method_settings']:
-                basis_path = self.input_dict['method_settings']['basis_path']
+            if 'xtb' not in self.input_dict['method_settings']:
+                basis_path = '.'
+                if 'basis_path' in self.input_dict['method_settings']:
+                    basis_path = self.input_dict['method_settings'][
+                        'basis_path']
 
-            basis_name = self.input_dict['method_settings']['basis'].upper()
+                basis_name = self.input_dict['method_settings']['basis'].upper()
 
-            self.ao_basis = MolecularBasis.read(self.molecule, basis_name,
-                                                basis_path, self.ostream)
+                self.ao_basis = MolecularBasis.read(self.molecule, basis_name,
+                                                    basis_path, self.ostream)
 
-            self.min_basis = MolecularBasis.read(self.molecule, 'MIN-CC-PVDZ',
-                                                 basis_path)
+                self.min_basis = MolecularBasis.read(self.molecule,
+                                                     'MIN-CC-PVDZ', basis_path)
 
-            self.ostream.print_block(
-                self.ao_basis.get_string('Atomic Basis', self.molecule))
+                self.ostream.print_block(
+                    self.ao_basis.get_string('Atomic Basis', self.molecule))
 
-            self.ostream.flush()
+                self.ostream.flush()
 
         # broadcast input dictionary
 

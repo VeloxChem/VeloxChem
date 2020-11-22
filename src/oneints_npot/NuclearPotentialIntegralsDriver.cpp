@@ -32,12 +32,11 @@ CNuclearPotentialIntegralsDriver::CNuclearPotentialIntegralsDriver(MPI_Comm comm
 
     _locNodes = mpi::nodes(comm);
 
-    mpi::duplicate(comm, &_locComm);
+    _locComm = comm;
 }
 
 CNuclearPotentialIntegralsDriver::~CNuclearPotentialIntegralsDriver()
 {
-    mpi::destroy(&_locComm);
 }
 
 CNuclearPotentialMatrix

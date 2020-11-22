@@ -36,11 +36,11 @@ class Polarizability(ResponseProperty):
         if 'complex' not in rsp_dict:
             rsp_dict['complex'] = 'no'
 
-        rsp_dict['a_operator'] = 'dipole'
+        rsp_dict['a_operator'] = 'electric dipole'
         if 'a_components' not in rsp_dict:
             rsp_dict['a_components'] = 'xyz'
 
-        rsp_dict['b_operator'] = 'dipole'
+        rsp_dict['b_operator'] = 'electric dipole'
         if 'b_components' not in rsp_dict:
             rsp_dict['b_components'] = 'xyz'
 

@@ -10,6 +10,7 @@
 
 #include <cmath>
 #include <limits>
+#include <sstream>
 #include <utility>
 
 #include "MathConst.hpp"
@@ -335,32 +336,40 @@ CBasisFunction::broadcast(int32_t rank, MPI_Comm comm)
     }
 }
 
+std::string
+CBasisFunction::repr() const
+{
+    std::ostringstream os;
+
+    os << std::endl;
+
+    os << "[CBasisFunction (Object):" << this << "]" << std::endl;
+
+    os << "_angularMomentum: " << _angularMomentum << std::endl;
+
+    os << "_exponents: " << std::endl;
+
+    for (size_t i = 0; i < _exponents.size(); i++)
+    {
+        os << "_exponents[" << i << "]: " << std::endl;
+
+        os << _exponents[i] << std::endl;
+    }
+
+    os << "_normFactors: " << std::endl;
+
+    for (size_t i = 0; i < _normFactors.size(); i++)
+    {
+        os << "_normFactors[" << i << "]: " << std::endl;
+
+        os << _normFactors[i] << std::endl;
+    }
+
+    return os.str();
+}
+
 std::ostream&
 operator<<(std::ostream& output, const CBasisFunction& source)
 {
-    output << std::endl;
-
-    output << "[CBasisFunction (Object):" << &source << "]" << std::endl;
-
-    output << "_angularMomentum: " << source._angularMomentum << std::endl;
-
-    output << "_exponents: " << std::endl;
-
-    for (size_t i = 0; i < source._exponents.size(); i++)
-    {
-        output << "_exponents[" << i << "]: " << std::endl;
-
-        output << source._exponents[i] << std::endl;
-    }
-
-    output << "_normFactors: " << std::endl;
-
-    for (size_t i = 0; i < source._normFactors.size(); i++)
-    {
-        output << "_normFactors[" << i << "]: " << std::endl;
-
-        output << source._normFactors[i] << std::endl;
-    }
-
-    return output;
+    return (output << source.repr());
 }

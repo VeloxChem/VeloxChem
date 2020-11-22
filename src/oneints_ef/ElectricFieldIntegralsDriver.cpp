@@ -35,12 +35,11 @@ CElectricFieldIntegralsDriver::CElectricFieldIntegralsDriver(MPI_Comm comm)
 
     _locNodes = mpi::nodes(comm);
 
-    mpi::duplicate(comm, &_locComm);
+    _locComm = comm;
 }
 
 CElectricFieldIntegralsDriver::~CElectricFieldIntegralsDriver()
 {
-    mpi::destroy(&_locComm);
 }
 
 CElectricFieldMatrix

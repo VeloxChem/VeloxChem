@@ -24,7 +24,7 @@ CDensityGridDriver::CDensityGridDriver(MPI_Comm comm)
 
     _locNodes = mpi::nodes(comm);
 
-    mpi::duplicate(comm, &_locComm);
+    _locComm = comm;
 
     _thresholdOfDensity = 1.0e-13;
 

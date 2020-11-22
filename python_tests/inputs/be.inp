@@ -1,0 +1,14 @@
+@jobs
+task: scf
+@end
+
+@method settings
+basis: 6-31g
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyz:  
+Be  0.0   0.0   0.0
+@end 

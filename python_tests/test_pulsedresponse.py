@@ -1,8 +1,8 @@
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
 import h5py
-import os
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -70,14 +70,13 @@ class TestComplexResponse(unittest.TestCase):
             subsequent tests
         """
 
-        cls.h5fname = "pulsed"
+        cls.h5fname = 'pulsed'
 
-        inpfile = os.path.join('inputs', 'pulsed_water.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
-        outfile = inpfile.replace('.inp', '.out')
+        here = Path(__file__).parent
+        inpfile = here / 'inputs' / 'pulsed_water.inp'
+        outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
 
         # scf
         pulse_input = task.input_dict['pulses']
@@ -88,10 +87,10 @@ class TestComplexResponse(unittest.TestCase):
         pulse_input['number_pulses'] = 1
         pulse_input['centers'] = 300
         pulse_input['field_cutoff_ratio'] = 1e-5
-        pulse_input['frequency_range'] = "0.2-0.4(0.007)"
+        pulse_input['frequency_range'] = '0.2-0.4(0.007)'
         pulse_input['carrier_frequencies'] = 0.325
         pulse_input['pulse_widths'] = 50
-        pulse_input['pol_dir'] = "xyz"
+        pulse_input['pol_dir'] = 'xyz'
 
         cpp_input = {}
 
@@ -111,14 +110,14 @@ class TestComplexResponse(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
 
-        h5_file = '{}.h5'.format(cls.h5fname)
-        txt_file = '{}.txt'.format(cls.h5fname)
+        h5_file = Path('{}.h5'.format(cls.h5fname))
+        txt_file = Path('{}.txt'.format(cls.h5fname))
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            if os.path.isfile(h5_file):
-                os.remove(h5_file)
-            if os.path.isfile(txt_file):
-                os.remove(txt_file)
+            if h5_file.is_file():
+                h5_file.unlink()
+            if txt_file.is_file():
+                txt_file.unlink()
 
     def test_center_freq_peak(self):
 
@@ -143,7 +142,7 @@ class TestComplexResponse(unittest.TestCase):
 
             if not calc_frequencies[max_index] == cloest_freq:
                 self.fail(
-                    "Amplitude max did not match center freq: {} != {}".format(
+                    'Amplitude max did not match center freq: {} != {}'.format(
                         cloest_freq, 0.325))
 
     def test_filesave(self):
@@ -169,7 +168,7 @@ class TestComplexResponse(unittest.TestCase):
             self.assertTrue(
                 len(hf.get('amplitudes')[()]) == len(hf.get('frequencies')[()]))
 
-            primary_key = "frequencies"
+            primary_key = 'frequencies'
 
             for key in directions:
                 try:
@@ -179,7 +178,7 @@ class TestComplexResponse(unittest.TestCase):
                     self.assertTrue(
                         len(hf.get(primary_key)[()]) == len(hf.get(key)[()]))
                 except ValueError:
-                    self.fail("Len of {}[{}] did not match data length {}!= {}".
+                    self.fail('Len of {}[{}] did not match data length {}!= {}'.
                               format(primary_key, key,
                                      len(hf.get('zero_padded_frequencies')[()]),
                                      len(hf.get(key)[()])))

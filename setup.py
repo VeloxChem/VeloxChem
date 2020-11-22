@@ -5,13 +5,15 @@ from config.generate_setup import generate_setup
 import multiprocessing
 import subprocess
 import sys
-import os
+from pathlib import PurePath
+from pathlib import Path
+from os import environ
 
 
 class MyBuildPy(SetuptoolsBuildPy):
 
     def run(self):
-        self.check_setup_file()
+        self.update_setup_file()
         python_exe = 'python{}.{}'.format(sys.version_info[0],
                                           sys.version_info[1])
         self.update_vlx_script(python_exe)
@@ -21,8 +23,8 @@ class MyBuildPy(SetuptoolsBuildPy):
 
     def make_veloxchem(self):
         cmd = 'make -C src -s -j '
-        if 'OMP_NUM_THREADS' in os.environ:
-            cmd += os.environ['OMP_NUM_THREADS']
+        if 'OMP_NUM_THREADS' in environ:
+            cmd += environ['OMP_NUM_THREADS']
         else:
             cmd += str(multiprocessing.cpu_count())
         cmd += ' release'
@@ -33,16 +35,15 @@ class MyBuildPy(SetuptoolsBuildPy):
             print('Error: failed to build veloxchem')
             sys.exit(1)
 
-    def check_setup_file(self):
-        setup_file = os.path.join('src', 'Makefile.setup')
-        if not os.path.isfile(setup_file):
-            template_file = os.path.join('config', 'Setup.template')
-            print('*** Generating Makefile.setup...')
-            generate_setup(template_file, setup_file)
+    def update_setup_file(self):
+        setup_file = Path('src', 'Makefile.setup')
+        if not setup_file.is_file():
+            template_file = Path('config', 'Setup.template')
+            generate_setup(str(template_file), str(setup_file))
 
     def update_vlx_script(self, python_exe):
-        vlx_file = os.path.join('src', 'vlx')
-        with open(vlx_file, 'w', encoding='utf-8') as f_vlx:
+        vlx_file = Path('src', 'vlx')
+        with open(str(vlx_file), 'w', encoding='utf-8') as f_vlx:
             print('#!/usr/bin/env {}'.format(python_exe), file=f_vlx)
             print('from veloxchem.main import main', file=f_vlx)
             print('main()', file=f_vlx)
@@ -61,20 +62,20 @@ setup(
         'veloxchem',
     ],
     package_dir={
-        'veloxchem': os.path.join('src', 'pymodule'),
+        'veloxchem': str(PurePath('src', 'pymodule')),
     },
     package_data={
         'veloxchem': [
             'veloxchemlib.so',
-            os.path.join('basis', '*'),
+            str(PurePath('basis', '*')),
         ],
     },
     scripts=[
-        os.path.join('src', 'vlx'),
+        str(PurePath('src', 'vlx')),
     ],
     python_requires='>=3.5',
     install_requires=[
-        'pybind11>=2.3.0',
+        'pybind11>=2.5.0',
         'mpi4py>=3.0',
         'numpy>=1.13',
         'h5py>=2.8',

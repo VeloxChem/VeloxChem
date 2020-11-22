@@ -1,7 +1,7 @@
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
-import os
 
 from veloxchem.veloxchemlib import DenseMatrix
 from veloxchem.veloxchemlib import OverlapMatrix
@@ -45,12 +45,11 @@ class TestExciton(unittest.TestCase):
 
     def test_assemble_matrices(self):
 
-        inpfile = os.path.join('inputs', 'dimer.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
-        outfile = inpfile.replace('.inp', '.out')
+        here = Path(__file__).parent
+        inpfile = here / 'inputs' / 'dimer.inp'
+        outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
 
         molecule = task.molecule
         basis = task.ao_basis
@@ -120,9 +119,8 @@ class TestExciton(unittest.TestCase):
 
     def run_exciton_model(self, method_dict, ref_H, threshold):
 
-        inpfile = os.path.join('inputs', 'exciton.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'exciton.inp')
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['exciton']['checkpoint_file'] = None
@@ -147,12 +145,12 @@ class TestExciton(unittest.TestCase):
             self.assertTrue(eigval_diff < threshold)
 
             for ind in range(len(exciton_drv.monomers)):
-                scf_h5 = 'monomer_{:d}.scf.h5'.format(ind + 1)
-                rsp_h5 = 'monomer_{:d}.rsp.h5'.format(ind + 1)
-                if os.path.isfile(scf_h5):
-                    os.remove(scf_h5)
-                if os.path.isfile(rsp_h5):
-                    os.remove(rsp_h5)
+                scf_h5 = Path('monomer_{:d}.scf.h5'.format(ind + 1))
+                rsp_h5 = Path('monomer_{:d}.rsp.h5'.format(ind + 1))
+                if scf_h5.is_file():
+                    scf_h5.unlink()
+                if rsp_h5.is_file():
+                    rsp_h5.unlink()
 
     def test_exciton_model_rhf(self):
 

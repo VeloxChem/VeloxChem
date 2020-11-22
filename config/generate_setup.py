@@ -2,7 +2,6 @@
 
 import subprocess
 import platform
-import site
 import sys
 import os
 import re
@@ -159,7 +158,7 @@ def generate_setup(template_file, setup_file, user_flag=None):
         sys.exit(1)
 
     use_intel = (cxxname == 'icpc')
-    use_gnu = (cxxname == 'g++' or re.match(r'.*-gnu-c\+\+', cxxname))
+    use_gnu = re.match(r"(.*(c|g|gnu-c)\+\+)", cxxname)
     use_clang = (cxxname in ['clang++', 'Crayclang'] or
                  re.match(r'.*-clang\+\+', cxxname))
 
@@ -280,17 +279,30 @@ def generate_setup(template_file, setup_file, user_flag=None):
     if use_gnu:
         lto_flag = '-fno-lto'
 
-    # pybind11
+    # xtb package
 
-    try:
-        import pybind11
-    except ImportError:
-        print()
-        print('*** Error: Unable to find pybind11!')
-        print('***        Please install via \"pip install pybind11 [--user]\"')
-        sys.exit(1)
+    use_xtb = 'XTBHOME' in os.environ
 
-    python_user_base = site.getuserbase()
+    if use_xtb:
+
+        xtb_inc = os.path.join(os.environ['XTBHOME'], 'include', 'xtb')
+        check_dir(xtb_inc, 'xtb include')
+
+        xtb_dir = os.path.join(os.environ['XTBHOME'], 'lib64')
+        check_dir(xtb_dir, 'xtb lib')
+
+        xtb_path = os.path.join(os.environ['XTBHOME'], 'share', 'xtb')
+        check_file(os.path.join(xtb_path, 'param_gfn0-xtb.txt'),
+                   'GFN0-XTB Parameters')
+        check_file(os.path.join(xtb_path, 'param_gfn1-xtb.txt'),
+                   'GFN1-XTB Parameters')
+        check_file(os.path.join(xtb_path, 'param_gfn2-xtb.txt'),
+                   'GFN2-XTB Parameters')
+
+        xtb_lib = 'XTB_INC := -I{}'.format(xtb_inc)
+        xtb_lib += os.linesep + 'XTB_LIB := -L{}'.format(xtb_dir)
+        xtb_lib += os.linesep + 'XTB_LIB += -Wl,-rpath,{} -lxtb'.format(xtb_dir)
+        xtb_lib += os.linesep + 'XTB_PATH := {}'.format(xtb_path)
 
     # google test lib
 
@@ -321,6 +333,8 @@ def generate_setup(template_file, setup_file, user_flag=None):
                 print('USE_MPI := true', file=f_mkfile)
                 print('USE_MKL := {}'.format('true' if use_mkl else 'false'),
                       file=f_mkfile)
+                print('USE_XTB := {}'.format('true' if use_xtb else 'false'),
+                      file=f_mkfile)
                 print('', file=f_mkfile)
 
                 print(math_lib, file=f_mkfile)
@@ -329,12 +343,6 @@ def generate_setup(template_file, setup_file, user_flag=None):
                 print('PYTHON :=',
                       'python{}.{}'.format(sys.version_info[0],
                                            sys.version_info[1]),
-                      file=f_mkfile)
-                python_version = 'python{}.{}{}'.format(sys.version_info[0],
-                                                        sys.version_info[1],
-                                                        sys.abiflags)
-                print('PYTHON_USER_INC :=',
-                      os.path.join(python_user_base, 'include', python_version),
                       file=f_mkfile)
                 print('', file=f_mkfile)
 
@@ -350,6 +358,10 @@ def generate_setup(template_file, setup_file, user_flag=None):
 
                 print('LTOFLAG :=', lto_flag, file=f_mkfile)
                 print('', file=f_mkfile)
+
+                if use_xtb:
+                    print(xtb_lib, file=f_mkfile)
+                    print('', file=f_mkfile)
 
                 if gtest_root is not None and gtest_lib is not None:
                     print('GST_ROOT :=', gtest_root, file=f_mkfile)

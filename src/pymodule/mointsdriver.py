@@ -41,7 +41,7 @@ class MOIntegralsDriver:
         """
 
         # screening scheme
-        self.qq_type = "QQ_DEN"
+        self.qq_type = 'QQ_DEN'
         self.eri_thresh = 1.0e-12
 
         # Fock matrices
@@ -256,19 +256,19 @@ class MOIntegralsDriver:
 
         self.ostream.print_blank()
         self.ostream.print_header(
-            "Integrals Transformation (AO->MO) Driver Setup")
-        self.ostream.print_header(46 * "=")
+            'Integrals Transformation (AO->MO) Driver Setup')
+        self.ostream.print_header(46 * '=')
         self.ostream.print_blank()
 
         str_width = 80
-        cur_str = "Number of Fock Matrices      : " + str(self.num_matrices)
+        cur_str = 'Number of Fock Matrices      : ' + str(self.num_matrices)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "Size of Fock Matrices Batch  : " + str(self.batch_size)
+        cur_str = 'Size of Fock Matrices Batch  : ' + str(self.batch_size)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "ERI Screening Scheme         : " + get_qq_type(self.qq_type)
+        cur_str = 'ERI Screening Scheme         : ' + get_qq_type(self.qq_type)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = "ERI Screening Threshold      : " + \
-            "{:.1e}".format(self.eri_thresh)
+        cur_str = 'ERI Screening Threshold      : {:.1e}'.format(
+            self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
         self.ostream.print_blank()
         self.ostream.flush()
@@ -281,8 +281,8 @@ class MOIntegralsDriver:
             The starting time of the calculation.
         """
 
-        valstr = "*** Integrals transformation (AO->MO) done in "
-        valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
+        valstr = '*** Integrals transformation (AO->MO) done in '
+        valstr += '{:.2f}'.format(tm.time() - start_time) + ' sec.'
         self.ostream.print_blank()
         self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_blank()
@@ -366,24 +366,24 @@ class MOIntegralsDriver:
         ket_dim = (0, nocc)
 
         # case: ovvv
-        if mints_type == "OVVV":
+        if mints_type == 'OVVV':
             ket_dim = (nocc, nocc + nvirt)
 
         # case: vvvv
-        if mints_type == "VVVV":
+        if mints_type == 'VVVV':
             bra_dim = (nocc, nocc + nvirt)
             ket_dim = (nocc, nocc + nvirt)
 
         # case: asym_ovov
-        if mints_type == "ASYM_OVOV":
+        if mints_type == 'ASYM_OVOV':
             ket_dim = (nocc, nocc + nvirt)
 
         # case: asym_ovvv
-        if mints_type == "ASYM_OVVV":
+        if mints_type == 'ASYM_OVVV':
             ket_dim = (nocc, nocc + nvirt)
 
         # case: asym_vvvv
-        if mints_type == "ASYM_VVVV":
+        if mints_type == 'ASYM_VVVV':
             bra_dim = (nocc, nocc + nvirt)
             ket_dim = (nocc, nocc + nvirt)
 
@@ -426,25 +426,25 @@ class MOIntegralsDriver:
         ymat = mol_orbs.alpha_orbitals(nocc, nvirt)
 
         # case: oooo
-        if mints_type == "OOOO":
+        if mints_type == 'OOOO':
             xmat = mol_orbs.alpha_orbitals(0, nocc)
             ymat = mol_orbs.alpha_orbitals(0, nocc)
 
         # case: ooov
-        if mints_type == "OOOV":
+        if mints_type == 'OOOV':
             xmat = mol_orbs.alpha_orbitals(0, nocc)
 
         # case: asym_oooo
-        if mints_type == "ASYM_OOOO":
+        if mints_type == 'ASYM_OOOO':
             xmat = mol_orbs.alpha_orbitals(0, nocc)
             ymat = mol_orbs.alpha_orbitals(0, nocc)
 
         # case: asym_ooov
-        if mints_type == "ASYM_OOOV":
+        if mints_type == 'ASYM_OOOV':
             xmat = mol_orbs.alpha_orbitals(0, nocc)
 
         # case: asym_ovov
-        if mints_type == "ASYM_OVOV":
+        if mints_type == 'ASYM_OVOV':
             xmat = mol_orbs.alpha_orbitals(0, nocc)
 
         return (xmat, ymat)
@@ -459,13 +459,13 @@ class MOIntegralsDriver:
             The Fock matrices.
         """
 
-        if mints_type.startswith("ASYM"):
+        if mints_type.startswith('ASYM'):
             nfock = fock_matrices.number_of_fock_matrices()
             for i in range(nfock):
                 fock_matrices.set_fock_type(fockmat.rgenk, i)
             return
 
-        if mints_type != "OOVV":
+        if mints_type != 'OOVV':
             nfock = fock_matrices.number_of_fock_matrices()
             for i in range(nfock):
                 fock_matrices.set_fock_type(fockmat.rgenj, i)
@@ -481,25 +481,25 @@ class MOIntegralsDriver:
             The external indices.
         """
 
-        if mints_type == "OOVV":
+        if mints_type == 'OOVV':
             return TwoIndexes(2, 3)
 
-        if mints_type == "ASYM_OOOO":
+        if mints_type == 'ASYM_OOOO':
             return TwoIndexes(2, 3)
 
-        if mints_type == "ASYM_OOOV":
+        if mints_type == 'ASYM_OOOV':
             return TwoIndexes(2, 3)
 
-        if mints_type == "ASYM_OVOV":
+        if mints_type == 'ASYM_OVOV':
             return TwoIndexes(2, 3)
 
-        if mints_type == "ASYM_OOVV":
+        if mints_type == 'ASYM_OOVV':
             return TwoIndexes(2, 3)
 
-        if mints_type == "ASYM_OVVV":
+        if mints_type == 'ASYM_OVVV':
             return TwoIndexes(2, 3)
 
-        if mints_type == "ASYM_VVVV":
+        if mints_type == 'ASYM_VVVV':
             return TwoIndexes(2, 3)
 
         return TwoIndexes(1, 3)
@@ -515,40 +515,40 @@ class MOIntegralsDriver:
             The MO integrals type.
         """
 
-        if mints_type == "OOOO":
+        if mints_type == 'OOOO':
             return moints.oooo
 
-        if mints_type == "OOOV":
+        if mints_type == 'OOOV':
             return moints.ooov
 
-        if mints_type == "OOVV":
+        if mints_type == 'OOVV':
             return moints.oovv
 
-        if mints_type == "OVOV":
+        if mints_type == 'OVOV':
             return moints.ovov
 
-        if mints_type == "OVVV":
+        if mints_type == 'OVVV':
             return moints.ovvv
 
-        if mints_type == "VVVV":
+        if mints_type == 'VVVV':
             return moints.vvvv
 
-        if mints_type == "ASYM_OOOO":
+        if mints_type == 'ASYM_OOOO':
             return moints.asym_oooo
 
-        if mints_type == "ASYM_OOOV":
+        if mints_type == 'ASYM_OOOV':
             return moints.asym_ooov
 
-        if mints_type == "ASYM_OVOV":
+        if mints_type == 'ASYM_OVOV':
             return moints.asym_ovov
 
-        if mints_type == "ASYM_OOVV":
+        if mints_type == 'ASYM_OOVV':
             return moints.asym_oovv
 
-        if mints_type == "ASYM_OVVV":
+        if mints_type == 'ASYM_OVVV':
             return moints.asym_ovvv
 
-        if mints_type == "ASYM_VVVV":
+        if mints_type == 'ASYM_VVVV':
             return moints.asym_vvvv
 
         return None
@@ -564,16 +564,16 @@ class MOIntegralsDriver:
             Whether symmetry is used.
         """
 
-        if mints_type == "ASYM_OOOO":
+        if mints_type == 'ASYM_OOOO':
             return True
 
-        if mints_type == "ASYM_OOOV":
+        if mints_type == 'ASYM_OOOV':
             return True
 
-        if mints_type == "ASYM_OOVV":
+        if mints_type == 'ASYM_OOVV':
             return True
 
-        if mints_type == "ASYM_VVVV":
+        if mints_type == 'ASYM_VVVV':
             return True
 
         return False

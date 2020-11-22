@@ -3,6 +3,7 @@ import numpy as np
 import unittest
 import random
 import os
+from pathlib import Path
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
@@ -94,9 +95,8 @@ class TestC6(unittest.TestCase):
 
     def test_c6_hf(self):
 
-        inpfile = os.path.join('inputs', 'water.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -169,9 +169,8 @@ class TestC6(unittest.TestCase):
 
     def test_c6_dft(self):
 
-        inpfile = os.path.join('inputs', 'water.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 
@@ -244,9 +243,8 @@ class TestC6(unittest.TestCase):
 
     def test_c6_dft_slda(self):
 
-        inpfile = os.path.join('inputs', 'water.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water.inp')
 
         potfile = None
 

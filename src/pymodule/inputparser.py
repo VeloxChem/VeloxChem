@@ -12,7 +12,7 @@ class InputParser:
     input files into a format, which passes the needed information to the rest
     of the program.
 
-    :param filename:
+    :param inpname:
         The name of the input file.
     :param outname:
         The name of the output file.
@@ -20,12 +20,12 @@ class InputParser:
     Instance variables
         - input_dict: The input dictionary.
         - success_monitor: The monitor for successful parsing.
-        - filename: The name of the input file.
+        - inpname: The name of the input file.
         - is_basis_set: The flag for parsing a basis set file.
         - basis_set_name: The name of the basis set.
     """
 
-    def __init__(self, filename, outname=None):
+    def __init__(self, inpname, outname=None):
         """
         Initializes the parser and parses the input file.
         """
@@ -33,7 +33,7 @@ class InputParser:
         self.input_dict = {}
         self.success_monitor = True
 
-        self.filename = filename
+        self.inpname = inpname
         self.outname = outname
         self.is_basis_set = False
         self.basis_set_name = ''
@@ -63,12 +63,12 @@ class InputParser:
             self.empty_group_check()
 
         except FileNotFoundError:
-            errmsg = 'InputParser: cannot open file {}'.format(self.filename)
+            errmsg = 'InputParser: cannot open file {}'.format(self.inpname)
             self.success_monitor = False
 
         except SyntaxError:
             errmsg = 'InputParser: bad syntax in file '
-            errmsg += self.filename + os.linesep + '     '
+            errmsg += self.inpname + os.linesep + '     '
             errmsg += 'You may check for incorrect, '
             errmsg += 'incomplete or empty groups.'
             self.success_monitor = False
@@ -103,7 +103,7 @@ class InputParser:
         """
 
         self.content = ''
-        with open(self.filename, 'r') as f_inp:
+        with open(self.inpname, 'r') as f_inp:
             for line in f_inp:
 
                 # remove comment and extra white spaces
@@ -178,17 +178,31 @@ class InputParser:
             local_dict = {}
             local_list = []
 
+            xyz_flag, constr_flag = False, False
+
             for entry in group[1:]:
                 if ':' in entry:
                     # save input settings in local_dict
                     # except for xyz strings and atomic basis functions
                     key = entry.split(':')[0].strip()
                     key = '_'.join(key.split())
-                    val = entry.split(':')[1].strip()
-                    if key.lower() != 'xyz':
+                    if key.lower() == 'xyz':
+                        xyz_flag, constr_flag = True, False
+                    elif key.lower() == 'constraints':
+                        xyz_flag, constr_flag = False, True
+                        local_dict['constraints'] = []
+                    else:
+                        xyz_flag, constr_flag = False, False
+                        val = entry.split(':')[1].strip()
                         local_dict[key.lower()] = val
+                elif constr_flag:
+                    # save constraints
+                    local_dict['constraints'].append(entry)
+                elif xyz_flag:
+                    # save xyz strings
+                    local_list.append(entry)
                 else:
-                    # save xyz strings or atomic basis functions in local_list
+                    # save atomic basis functions
                     local_list.append(entry)
 
             group_key = group[0]
@@ -213,16 +227,16 @@ class InputParser:
             self.input_dict['basis_set_name'] = self.basis_set_name
 
         else:
-            # for input file, save input file name
-            self.input_dict['input_file'] = self.filename
-
-            # save checkpoint file name (based on output file name)
+            # process filename
             if self.outname not in [None, sys.stdout]:
                 fname = self.outname
             else:
-                fname = self.filename
+                fname = self.inpname
             if '.' in fname:
                 fname = '.'.join(fname.split('.')[:-1])
+            self.input_dict['filename'] = fname
+
+            # update checkpoint filename
             fchkp = fname + '.scf.h5'
             frsp = fname + '.rsp.h5'
             fexciton = fname + '.exciton.h5'
