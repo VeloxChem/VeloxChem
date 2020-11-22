@@ -202,8 +202,9 @@ class TpaDriver:
         component = 'xyz'
 
         linear_solver = LinearSolver(self.comm, self.ostream)
-        b_rhs = linear_solver.get_complex_rhs(operator, component, molecule,
-                                              ao_basis, scf_tensors)
+        b_rhs = linear_solver.get_complex_prop_grad(operator, component,
+                                                    molecule, ao_basis,
+                                                    scf_tensors)
 
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
