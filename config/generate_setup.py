@@ -5,6 +5,9 @@ import platform
 import sys
 import os
 import re
+from pathlib import Path
+
+from distutils.sysconfig import get_config_var
 
 
 def find_exe(executables):
@@ -97,7 +100,11 @@ def check_file(filename, label):
         sys.exit(1)
 
 
-def generate_setup(template_file, setup_file, user_flag=None):
+def generate_setup(template_file, setup_file, user_flag=None, build_lib=Path("build/lib")):
+
+    template_file = Path(template_file) if isinstance(template_file, str) else template_file
+    setup_file = Path(setup_file) if isinstance(setup_file, str) else setup_file
+    ext_suffix = get_config_var('EXT_SUFFIX') or get_config_var('SO')
 
     # OS information
 
@@ -186,13 +193,21 @@ def generate_setup(template_file, setup_file, user_flag=None):
     print('*** Checking math library... ', end='')
 
     # check conda environment
+    is_conda = os.path.exists(os.path.join(sys.prefix, 'conda-meta'))
+
+    # check whether MKL is in conda environment
     if 'MKLROOT' not in os.environ:
-        is_conda = os.path.exists(os.path.join(sys.prefix, 'conda-meta'))
-        mkl_core = os.path.join(sys.prefix, 'lib', 'libmkl_core')
-        has_mkl_core = (os.path.isfile(mkl_core + '.so') or
-                        os.path.isfile(mkl_core + '.dylib'))
-        if is_conda and has_mkl_core:
+        has_lib = Path(sys.prefix, "lib/libmkl_core.so").is_file() or Path(sys.prefix, "lib/libmkl_core.dylib").is_file()
+        has_header = Path(sys.prefix, "include/mkl.h").is_file()
+        if is_conda and has_lib and has_header:
             os.environ['MKLROOT'] = sys.prefix
+
+    # check whether OpenBLAS is in conda environment
+    if 'OPENBLASROOT' not in os.environ:
+        has_lib = Path(sys.prefix, "lib/libopenblas.so").is_file() or Path(sys.prefix, "lib/libopenblas.dylib").is_file()
+        has_header = Path(sys.prefix, "include/lapacke.h").is_file() or Path(sys.prefix, "include/cblas.h").is_file()
+        if is_conda and has_lib and has_header:
+            os.environ['OPENBLASROOT'] = sys.prefix
 
     use_mkl = 'MKLROOT' in os.environ
     use_openblas = 'OPENBLASROOT' in os.environ
@@ -321,14 +336,16 @@ def generate_setup(template_file, setup_file, user_flag=None):
 
     # print Makefile.setup
 
-    with open(template_file, 'r', encoding='utf-8') as f_temp:
+    with template_file.open('r') as f_temp:
         lines = f_temp.readlines()
 
-    with open(setup_file, 'w', encoding='utf-8') as f_mkfile:
+    with setup_file.open('w') as f_mkfile:
         for line in lines:
             if '====placeholder====' in line:
-                print('# Automatically generated settings', file=f_mkfile)
-                print('', file=f_mkfile)
+                f_mkfile.write('# Automatically generated settings\n')
+
+                f_mkfile.write(f'BUILD_LIB := {(build_lib / "veloxchem").resolve()}\n')
+                f_mkfile.write(f'VLX_TARGET := $(BUILD_LIB)/veloxchemlib{ext_suffix}\n\n')
 
                 print('USE_MPI := true', file=f_mkfile)
                 print('USE_MKL := {}'.format('true' if use_mkl else 'false'),
