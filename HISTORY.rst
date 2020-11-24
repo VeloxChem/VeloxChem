@@ -1,0 +1,16 @@
+=======
+History
+=======
+
+All notable changes to this project will be documented in this file.
+
+The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_, 
+and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
+
+1.0-rc_ (2020-02-28)
+--------------------
+
+First release candidate
+
+.. _Unreleased: https://gitlab.com/veloxchem/veloxchem/-/compare/v1.0-rc...master
+.. _1.0-rc: https://gitlab.com/veloxchem/veloxchem/-/tree/v1.0-rc

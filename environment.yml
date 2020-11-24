@@ -1,0 +1,17 @@
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - cxx-compiler
+  - geometric
+  - h5py
+  - numpy
+  - pip
+  - psutil
+  - pybind11>=2.6
+  - pytest
+  - python>=3.6
+  - xtb-python
+  - pip:
+    - cppe
+    - loprop
