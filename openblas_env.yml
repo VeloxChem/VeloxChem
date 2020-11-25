@@ -6,6 +6,7 @@ dependencies:
   - geometric
   - h5py
   - numpy
+  - openblas=*=*openmp*
   - pip
   - psutil
   - pybind11>=2.6

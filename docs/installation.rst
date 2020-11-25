@@ -59,26 +59,20 @@ greatly simplify the installation of VeloxChem.
 
 - Install standard build dependencies::
 
-    $ conda env update --file environment.yml --prune
+    $ conda env update --file <environment> --prune
 
   This will install, among other, the C++ compiler and NumPy. The
   ``environment.yml`` file specifies the packages needed.  They will be
   installed from the ``conda-forge`` channel.
+  VeloxChem can use different linear algebra backends and we provide two
+  environment files you can use to set up your conda environment:
+
+    - ``mkl_env.yml`` which installs the Intel Math Kernel Library,
+    - ``openblas_env.yml`` which installs the OpenBLAS library.
+
   Add-on dependencies such as
   `XTB Python <https://xtb-python.readthedocs.io/>`_
   and `CPPE <https://github.com/maxscheurer/cppe>`_ will be installed too.
-
-- Install linear algebra library. We can use the ``blas`` metapackage on
-  ``conda-forge`` to correctly handle the dependencies of previously installed
-  libraries in the Conda environment.
-
-  - To use the Intel Math Kernel Library::
-
-      $ conda install blas=*=*mkl* mkl-include -c conda-forge
-
-  - To use OpenBLAS::
-
-      $ conda install blas=*=*openblas* -c conda-forge
 
 - Install MPI and `Mpi4Py <https://mpi4py.readthedocs.io/>`_.
 
