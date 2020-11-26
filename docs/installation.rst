@@ -35,6 +35,8 @@ Optional, add-on dependencies:
   - `CPPE <https://github.com/maxscheurer/cppe>`_
   - `XTB Python <https://xtb-python.readthedocs.io/>`_
 
+See :ref:`external-dependencies` for instructions on how to get these add-ons.
+
 We recommend to always use a `virtual enviroment
 <https://docs.python.org/3.6/tutorial/venv.html>`_, in order to avoid clashes
 between dependencies.
@@ -69,10 +71,6 @@ greatly simplify the installation of VeloxChem.
 
     - ``mkl_env.yml`` which installs the Intel Math Kernel Library,
     - ``openblas_env.yml`` which installs the OpenBLAS library.
-
-  Add-on dependencies such as
-  `XTB Python <https://xtb-python.readthedocs.io/>`_
-  and `CPPE <https://github.com/maxscheurer/cppe>`_ will be installed too.
 
 - Install MPI and `Mpi4Py <https://mpi4py.readthedocs.io/>`_.
 
@@ -241,15 +239,36 @@ on `Docker Hub <https://hub.docker.com/r/veloxchem/veloxchem>`_.
     # root@fcc794d899c7:/veloxchem# which vlx
     /usr/local/bin/vlx
 
+.. _external-dependencies:
+
 Dependencies
 ^^^^^^^^^^^^
+
+If you wish to use functionality offered through interfaces with other software
+packages, you will first need to install them.  Currently, interfaces to add-on
+dependencies `XTB <https://xtb-docs.readthedocs.io/>`_ and `CPPE
+<https://github.com/maxscheurer/cppe>`_  are available.
+
 
 The CPPE library for polarizable embedding
 ++++++++++++++++++++++++++++++++++++++++++
 
-If you are interested in using the CPPE library for polarizable embedding,
-please install it according to the instructions below. Note that CMake is
-needed to build the CPPE library.
+There are few ways to install the CPPE library for polarizable embedding. Note
+that you will need a C++ compiler compliant with th C++14 standard and CMake.
+
+You can install it *via* ``pip`` in your virtual environment:
+
+.. code-block:: bash
+
+   $ python -m pip install cppe
+
+or as an extra during compilation of VeloxChem:
+
+.. code-block:: bash
+
+   $ python -m pip install .[qmmm]
+
+Alternatively, you can compile it without using ``pip``:
 
 .. code-block:: bash
 
@@ -264,3 +283,13 @@ needed to build the CPPE library.
 
     # Make sure that cppe can be imported
     $ python3 -c 'import cppe'
+
+
+The XTB package for semiempirical methods
++++++++++++++++++++++++++++++++++++++++++
+
+It is recommended to install the XTB package in a conda environment:
+
+.. code-block:: bash
+
+   $ conda install xtb -c conda-forge
