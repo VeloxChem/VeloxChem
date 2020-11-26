@@ -52,14 +52,14 @@ class TestMolData(unittest.TestCase):
         mol_3 = Molecule(labels, array, 'au')
         mol_4 = Molecule(labels, arrayT.T, 'au')
 
-        array_angs = array * bohr_in_angstroms()
+        array_ang = array * bohr_in_angstroms()
 
-        mol_5 = Molecule(labels, array_angs)
-        mol_6 = Molecule(labels, array_angs, 'angs')
+        mol_5 = Molecule(labels, array_ang)
+        mol_6 = Molecule(labels, array_ang, 'angstrom')
 
         mol_7 = Molecule([7, 1, 1, 1], array, 'au')
-        mol_8 = Molecule([7, 1, 1, 1], array_angs, 'angs')
-        mol_9 = Molecule([7, 1, 1, 1], array_angs)
+        mol_8 = Molecule([7, 1, 1, 1], array_ang, 'angstrom')
+        mol_9 = Molecule([7, 1, 1, 1], array_ang)
 
         self.assertEqual(mol_1, mol_2)
         self.assertEqual(mol_1, mol_3)

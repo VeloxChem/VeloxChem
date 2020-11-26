@@ -47,11 +47,21 @@ CMolecule_from_coords(const std::vector<std::string>& labels,
 
     // scaling factor
 
-    auto scale = 1.0 / units::getBohrValueInAngstroms();
+    auto scale = 1.0;
 
-    if (fstr::upcase(units) == "AU" || fstr::upcase(units) == "BOHR" || fstr::upcase(units) == "BOHRS")
+    if ((units.length() >= 3) && (fstr::upcase(units) == std::string("ANGSTROM").substr(0, units.length())))
+    {
+        scale = 1.0 / units::getBohrValueInAngstroms();
+    }
+    else if ((fstr::upcase(units) == std::string("AU")) || (fstr::upcase(units) == std::string("BOHR")))
     {
         scale = 1.0;
+    }
+    else
+    {
+        std::string errunit("CMolecule_from_coords - Invalid unit for coordinates");
+
+        errors::assertMsgCritical(false, errunit);
     }
 
     std::vector<double> coords_au(coords_raw.size());
@@ -96,7 +106,7 @@ CMolecule_from_coords(const std::vector<std::string>& labels,
 static std::shared_ptr<CMolecule>
 CMolecule_from_array(const std::vector<std::string>&                labels,
                      const py::array_t<double, py::array::f_style>& py_coords,
-                     const std::string&                             units = std::string("angs"))
+                     const std::string&                             units = std::string("angstrom"))
 {
     // NOTE:
     // The Python Molecule constructor expects the coordinates as a 2d numpy array,
@@ -122,7 +132,7 @@ CMolecule_from_array(const std::vector<std::string>&                labels,
 static std::shared_ptr<CMolecule>
 CMolecule_from_array_2(const std::vector<int32_t>& idselem,
                        const py::array_t<double>&  py_coords,
-                       const std::string&          units = std::string("angs"))
+                       const std::string&          units = std::string("angstrom"))
 {
     std::vector<std::string> labels;
 
@@ -282,8 +292,8 @@ export_moldata(py::module& m)
         .def(py::init<>())
         .def(py::init<const CMolecule&>())
         .def(py::init<const CMolecule&, const CMolecule&>())
-        .def(py::init(&CMolecule_from_array), py::arg(), py::arg(), py::arg("units") = std::string("angs"))
-        .def(py::init(&CMolecule_from_array_2), py::arg(), py::arg(), py::arg("units") = std::string("angs"))
+        .def(py::init(&CMolecule_from_array), py::arg(), py::arg(), py::arg("units") = std::string("angstrom"))
+        .def(py::init(&CMolecule_from_array_2), py::arg(), py::arg(), py::arg("units") = std::string("angstrom"))
         .def("set_charge", &CMolecule::setCharge)
         .def("get_charge", &CMolecule::getCharge)
         .def("set_multiplicity", &CMolecule::setMultiplicity)
