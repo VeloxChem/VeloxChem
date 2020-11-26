@@ -99,7 +99,7 @@ class TestMath(unittest.TestCase):
         mat_C = c_matmul(mat_A.T.copy(), mat_B.T.copy())
         self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
 
-    def test_dgemm(self):
+    def test_dgemm_square_matrix(self):
 
         mat_A = np.arange(90.).reshape(9, 10)[:5, :5]
         mat_B = np.arange(56.).reshape(7, 8)[:5, :5]
@@ -123,6 +123,42 @@ class TestMath(unittest.TestCase):
 
         ref_C += np.matmul(mat_A.T, mat_B.T)
         c_dgemm('row-major', 't', 't', 5, 5, 5, 1.0, mat_A, 10, mat_B, 8, 1.0,
+                mat_C, 5)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+    def test_dgemm_rectanglar_matrix(self):
+
+        mat_A = np.arange(90.).reshape(9, 10)[:3, :4]
+        mat_B = np.arange(56.).reshape(7, 8)[:4, :5]
+        mat_C = np.zeros((3, 5))
+
+        ref_C = np.matmul(mat_A, mat_B)
+        c_dgemm('row-major', 'n', 'n', 3, 5, 4, 1.0, mat_A, 10, mat_B, 8, 0.0,
+                mat_C, 5)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_A = np.arange(90.).reshape(9, 10)[:3, :4]
+        mat_B = np.arange(56.).reshape(7, 8)[:5, :4]
+
+        ref_C += 2.0 * np.matmul(mat_A, mat_B.T)
+        c_dgemm('row-major', 'n', 't', 3, 5, 4, 2.0, mat_A, 10, mat_B, 8, 1.0,
+                mat_C, 5)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_A = np.arange(90.).reshape(9, 10)[:4, :3]
+        mat_B = np.arange(56.).reshape(7, 8)[:4, :5]
+
+        ref_C *= 2.0
+        ref_C += 3.0 * np.matmul(mat_A.T, mat_B)
+        c_dgemm('row-major', 't', 'n', 3, 5, 4, 3.0, mat_A, 10, mat_B, 8, 2.0,
+                mat_C, 5)
+        self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
+
+        mat_A = np.arange(90.).reshape(9, 10)[:4, :3]
+        mat_B = np.arange(56.).reshape(7, 8)[:5, :4]
+
+        ref_C += np.matmul(mat_A.T, mat_B.T)
+        c_dgemm('row-major', 't', 't', 3, 5, 4, 1.0, mat_A, 10, mat_B, 8, 1.0,
                 mat_C, 5)
         self.assertTrue(np.max(np.abs(mat_C - ref_C)) < 1.0e-13)
 
