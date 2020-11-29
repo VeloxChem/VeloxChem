@@ -58,13 +58,13 @@ basis: build_folder
 # Debug
 debug: $(VLX_LIBS) basis
 	@echo ====== Linking debug version of $(VLX_TARGET)...
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -fuse-ld=gold -o $(VLX_TARGET) \
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
 
 # Release
 release: $(VLX_LIBS) basis
 	@echo ====== Linking release version of $(VLX_TARGET)...
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -fuse-ld=gold -o $(VLX_TARGET) \
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
 
 # Clean up
