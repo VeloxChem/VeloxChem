@@ -11,7 +11,7 @@ file(
   CONFIGURE_DEPENDS
   RELATIVE
     ${CMAKE_CURRENT_LIST_DIR}
-  *.py
+  test_*.py
   )
 
 # link the Python files under the build folder
@@ -31,7 +31,7 @@ foreach(_f IN LISTS _vlx_pytests)
     NAME
       ${_name}
     COMMAND
-      ${Python3_EXECUTABLE} -m pytest -v -s ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/../tests/${_f}
+      ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 1 ${Python_EXECUTABLE} -m pytest -v -s ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/../tests/${_f}
     WORKING_DIRECTORY
       ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/..
     )
@@ -55,9 +55,10 @@ file(
 # install the current folder
 install(
   DIRECTORY
-    ${CMAKE_CURRENT_LIST_DIR}
+    ${CMAKE_CURRENT_LIST_DIR}/
   DESTINATION
-    ${PYMOD_INSTALL_FULLDIR}/..
+    ${PYMOD_INSTALL_FULLDIR}/tests
+  PATTERN "py_plot_comb.py" EXCLUDE
   PATTERN "CMakeLists.txt" EXCLUDE
   PATTERN "Makefile" EXCLUDE
   )

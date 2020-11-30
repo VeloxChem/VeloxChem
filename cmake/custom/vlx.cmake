@@ -9,20 +9,18 @@ find_package(OpenMP REQUIRED COMPONENTS CXX)
 include(${CMAKE_CURRENT_LIST_DIR}/FindMKL.cmake)
 
 # figure out where to put the Python module
-if(NOT DEFINED PYMOD_INSTALL_LIBDIR)
-  message(STATUS "Setting (unspecified) option PYMOD_INSTALL_LIBDIR: python")
-  set(PYMOD_INSTALL_LIBDIR "python" CACHE STRING "Location within CMAKE_INSTALL_LIBDIR to which Python modules are installed" FORCE)
-else()
-  message(STATUS "Setting option PYMOD_INSTALL_LIBDIR: ${PYMOD_INSTALL_LIBDIR}")
-  set(PYMOD_INSTALL_LIBDIR "${PYMOD_INSTALL_LIBDIR}" CACHE STRING "Location within CMAKE_INSTALL_LIBDIR to which Python modules are installed" FORCE)
+if(NOT DEFINED PYMOD_INSTALL_FULLDIR)
+  # install Python module under CMAKE_INSTALL_LIBDIR
+  # if that is "lib64", the use just "lib"
+  set(_lib "${CMAKE_INSTALL_LIBDIR}")
+  if(CMAKE_INSTALL_LIBDIR STREQUAL "lib64")
+    set(_lib "lib")
+  endif()
+  set(PYMOD_INSTALL_FULLDIR 
+        "${_lib}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/veloxchem"
+      CACHE STRING "Location within CMAKE_INSTALL_LIBDIR to which Python modules are installed" FORCE)
 endif()
-# install Python module under CMAKE_INSTALL_LIBDIR
-# if that is "lib64", the use just "lib"
-set(_lib "${CMAKE_INSTALL_LIBDIR}")
-if(CMAKE_INSTALL_LIBDIR STREQUAL "lib64")
-  set(_lib "lib")
-endif()
-file(TO_NATIVE_PATH "${_lib}/${PYMOD_INSTALL_LIBDIR}/veloxchem" PYMOD_INSTALL_FULLDIR)
+message(STATUS "Setting PYMOD_INSTALL_FULLDIR: ${PYMOD_INSTALL_FULLDIR}")
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR})
 
 # we glob the Python files in src/pymodule and let CMake add a rule such that
@@ -36,17 +34,16 @@ file(
   LIST_DIRECTORIES
     FALSE
   CONFIGURE_DEPENDS
-  RELATIVE
-    ${PROJECT_SOURCE_DIR}/src/pymodule
   ${PROJECT_SOURCE_DIR}/src/pymodule/*.py
   )
 
 # link the Python files under the build folder
-foreach(_f IN LISTS _veloxchemlib_pys)
+foreach(_py IN LISTS _veloxchemlib_pys)
+  get_filename_component(__py ${_py} NAME)
   file(
     CREATE_LINK
-      ${PROJECT_SOURCE_DIR}/src/pymodule/${_f}
-      ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/${_f}
+      ${_py}
+      ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/${__py}
     COPY_ON_ERROR
     SYMBOLIC
     )

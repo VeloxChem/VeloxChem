@@ -11,14 +11,6 @@ target_compile_definitions(vlxobjs
     $<BUILD_INTERFACE:ENABLE_MKL=$<BOOL:$<TARGET_EXISTS:MKL>>>
   )
 
-# NOTE we only add the OpenMP flag for the selected compiler, but do not link
-# against the runtime explicitly.  This avoids conflicts between what the
-# compiled and MKL think
-target_compile_options(vlxobjs
-  PUBLIC
-    $<BUILD_INTERFACE:${OpenMP_CXX_FLAGS}>
-  )
-
 # FIXME the includes should be relative to the source folder:
 # that is: #include "dft/AOKohnShamMatrix.hpp", rather than: #include "AOKohnShamMatrix.hpp"
 target_include_directories(vlxobjs
@@ -30,6 +22,7 @@ target_include_directories(vlxobjs
 
 target_link_libraries(vlxobjs
   PUBLIC
+    OpenMP::OpenMP_CXX
     MPI::MPI_CXX
     MKL
   )

@@ -53,8 +53,17 @@ include(${PROJECT_SOURCE_DIR}/cmake/compiler_flags/CXXFlags.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_default_build_paths.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_safeguards.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/alignment.cmake)
+
+# Currently, scikit-build does not support FindPython, so we convert the
+# provided hints ourselves.
+if(SKBUILD)
+  set(Python_EXECUTABLE "${PYTHON_EXECUTABLE}")
+  set(Python_INCLUDE_DIR "${PYTHON_INCLUDE_DIR}")
+  set(Python_LIBRARY "${PYTHON_LIBRARY}")
+  set(DUMMY "${PYTHON_VERSION_STRING}")  # Not needed, silences a warning
+endif()
+find_package(Python 3.6 REQUIRED COMPONENTS Interpreter Development NumPy)
 # download pybind11 if not available on the system
-find_package(Python3 3.6 REQUIRED COMPONENTS Interpreter Development NumPy)
 include(${PROJECT_SOURCE_DIR}/external/upstream/fetch_pybind11.cmake)
 # TODO code coverage
 include(${PROJECT_SOURCE_DIR}/cmake/custom/vlx.cmake)

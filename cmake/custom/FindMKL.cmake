@@ -14,7 +14,7 @@ find_path(MKL_INCLUDE_DIRS
 # With this list we choose to **always** link against the Intel OpenMP runtime,
 # rather than the one provided by GNU
 set(MKL_LIBRARIES)
-foreach(_l IN ITEMS mkl_intel_lp64 mkl_intel_thread mkl_core iomp5)
+foreach(_l IN ITEMS mkl_rt)
   find_library(_x
     NAMES
       ${_l}
