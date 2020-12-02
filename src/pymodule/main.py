@@ -25,6 +25,7 @@ from .visualizationdriver import VisualizationDriver
 from .loprop import LoPropDriver
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_maximum_hours
+from .onelectronprop import OneElectronProperties
 
 
 def select_scf_driver(task, scf_type):

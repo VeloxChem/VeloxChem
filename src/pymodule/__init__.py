@@ -66,6 +66,7 @@ from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
+from .oneelectronprop import OneElectronProperties   #MH
 
 # Python functions
 from .errorhandler import assert_msg_critical
