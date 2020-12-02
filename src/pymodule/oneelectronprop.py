@@ -37,6 +37,7 @@ class OneElectronProperties:
         self.scf_tensors = scf_tensors
 
         self.dipole_moment = None
+        self.au2debye = 2.541746229
         #TODO more things to add
 
     def update_settings(self, scf_dict, method_dict=None):
@@ -126,9 +127,8 @@ class OneElectronProperties:
         #print("dipole_ints = ", dipole_ints)
 
         # Get the AO density matrix
-        # TODO: perhaps there is a factor of 2 missing, since it only takes
-        # the alpha part of the density!?
-        D = self.scf_tensors['D'][0]
+        # Total density = alpha + beta part
+        D = self.scf_tensors['D'][0] + self.scf_tensors['D'][1]
 
         # Calculate the electronic contribution
         electronic_dipole = []
@@ -142,13 +142,13 @@ class OneElectronProperties:
 
         nuclear_dipole = self.comp_nuclear_dipole_moment(molecule)
 
-        # Element-wise add nuclear and electronic contributions
-        #dipole_moment = [a + b for a, b in zip(nuclear_dipole, elec_dipole)]
-        dipole_moment = [electronic_dipole[i] + nuclear_dipole[i] for i in range(3)]
+        # Element-wise add (or subtract because of the electrons' negative charge)
+        # the nuclear and electronic contributions
+        dipole_moment = [a - b for a, b in zip(nuclear_dipole, electronic_dipole)]
+        #dipole_moment = [nuclear_dipole[i] - electronic_dipole[i] for i in range(3)]
 
-        au2debye = 2.541746229
         total_dipole = np.linalg.norm(dipole_moment)
-        print("Total dipole =", total_dipole, "a.u. =", total_dipole * au2debye, "D")
+        print("Total dipole =", total_dipole, "a.u. =", total_dipole * self.au2debye, "D")
 
         return dipole_moment
 
