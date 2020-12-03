@@ -21,7 +21,11 @@ class OneElectronProperties:
 
     Instance variables:
         - scf_tensors: The tensors from the converged SCF result.
+        - density: The AO density matrix.
         - dipole_moment: The electric dipole moment.
+        - total_dipole: The total electric dipole moment.
+        - au2debye: Conversion factor from atomic units to Debye.
+
         - TODO: what else?
     """
 
@@ -33,24 +37,16 @@ class OneElectronProperties:
         self.comm = comm
         self.ostream = ostream
 
-        #self.scf_drv = ScfDriver(self.comm, OutputStream()) #Restricted
         self.scf_tensors = scf_tensors
 
+        # Get the SCF density matrix in the AO basis
+        # Total density = alpha + beta part
+        self.density = self.scf_tensors['D'][0] + self.scf_tensors['D'][1]
+
         self.dipole_moment = None
+        self.total_dipole = 0.0
         self.au2debye = 2.541746229
         #TODO more things to add
-
-    def update_settings(self, scf_dict, method_dict=None):
-        """
-        Updates settings in gradient driver.
-
-        :param scf_dict:
-            The input dictionary of scf group.
-        :param method_dict:
-            The input dicitonary of method settings group.
-        """
-
-        self.scf_drv.update_settings(scf_dict, method_dict)
 
     def comp_nuclear_dipole_moment(self, molecule):
         """
@@ -63,27 +59,18 @@ class OneElectronProperties:
             The Cartesian components of the nuclear contribution
             to the electric dipole moment.
         """
-        #nuc_dipmom = []
-        
-        # Get the Cartesian coordinates and nuclear charges
-        #x_coords = molecule.x_to_numpy()
-        #y_coords = molecule.y_to_numpy()
-        #z_coords = molecule.z_to_numpy()
-        #coords = np.vstack(
-        #            (molecule.x_to_numpy(),
-        #            molecule.y_to_numpy(),
-        #            molecule.z_to_numpy())).T
+        # Atomic coordinates (nx3)
         coords = molecule.get_coordinates()
+        # Nuclear charges
         nuc_charges = molecule.elem_ids_to_numpy()
 
         # Calculate nuclear dipole moment components
         nuc_dipmom = np.einsum('i,ix->x', nuc_charges, coords)
-        #for coords in x_coords, y_coords, z_coords:
-        #    nuc_dipmoms = np.dot(nuc_charges, coords)
-        #    nuc_dipmom.append(nuc_dipmoms)
-
-        print("Nuclear dipole moment contribution: ", nuc_dipmom)
-        return nuc_dipmom
+        
+        if self.comm.Get_rank() == mpi_master():
+            return nuc_dipmom
+        else:
+            return np.array([])
 
     #MH (from tdaexcidriver.py)
     def comp_dipole_ints(self, molecule, ao_basis):
@@ -108,7 +95,6 @@ class OneElectronProperties:
         else:
             return ()
 
-    #MH Compute the ground-state dipole moment
     def compute_dipole_moment(self, molecule, basis):
         """
         Computes the SCF ground-state dipole moment
@@ -124,31 +110,81 @@ class OneElectronProperties:
         """
         # Calculate the dipole integrals in the AO basis
         dipole_ints = self.comp_dipole_ints(molecule, basis)
-        #print("dipole_ints = ", dipole_ints)
-
-        # Get the AO density matrix
-        # Total density = alpha + beta part
-        D = self.scf_tensors['D'][0] + self.scf_tensors['D'][1]
 
         # Calculate the electronic contribution
         electronic_dipole = []
         
         for d in range(3):
-            elec_dipole = np.sum(dipole_ints[d] * D)
-            #elec_dipole = np.trace(D.dot(dipole_ints[d]))
+            elec_dipole = np.sum(dipole_ints[d] * self.density)
             electronic_dipole.append(elec_dipole)
-
-        print("Electronic contribution to dipole moment: ", electronic_dipole)
 
         nuclear_dipole = self.comp_nuclear_dipole_moment(molecule)
 
         # Element-wise add (or subtract because of the electrons' negative charge)
         # the nuclear and electronic contributions
-        dipole_moment = [a - b for a, b in zip(nuclear_dipole, electronic_dipole)]
+        self.dipole_moment = [a - b for a, b in zip(nuclear_dipole, electronic_dipole)]
         #dipole_moment = [nuclear_dipole[i] - electronic_dipole[i] for i in range(3)]
 
-        total_dipole = np.linalg.norm(dipole_moment)
-        print("Total dipole =", total_dipole, "a.u. =", total_dipole * self.au2debye, "D")
+        self.total_dipole = np.linalg.norm(self.dipole_moment)
 
-        return dipole_moment
+        if self.comm.Get_rank() == mpi_master():
+            return np.array(self.dipole_moment)
+        else:
+            return np.array([])
+
+    def get_dipole_moment(self):
+        """
+        Gets the electric dipole moment (in atomic units).
+
+        :return:
+            The electric dipole moment.
+        """
+
+        return self.dipole_moment
+
+    def get_total_dipole(self):
+        """
+        Gets the total electric dipole moment (in atomic units).
+
+        :return:
+            The total electric dipole moment.
+        """
+
+        return self.total_dipole
+
+    def compute(self, molecule, basis):
+        """
+        Computes SCF ground-state properties.
+        So far this includes only the electric dipole moment.
+
+        :param molecule:
+            The molecule
+        :param basis:
+            The AO basis set.
+        """
+        
+        self.ostream.print_blank()
+
+        self.ostream.print_header("Ground-State Properties".ljust(92))
+        self.ostream.print_header("------------------------".ljust(92))
+       
+        # Check if the system is charged. If so, print a warning
+        chg = molecule.get_charge()
+        if chg != 0:
+            self.ostream.print_header("""
+                *** Warning: The dipole moment for charged molecules is ill-defined.""".ljust(92))
+            self.ostream.flush()
+
+        # Compute the electric dipole moment
+        dipmom = self.compute_dipole_moment(molecule, basis)
+        fmtd_dipmom = [float('{:.4f}'.format(d)) for d in dipmom]
+
+        # Print the results
+        valstr = "Dipole Moment [a.u.]      : {}".format(fmtd_dipmom)
+        self.ostream.print_header(valstr.ljust(92))
+        valstr = "Total Dipole [Debye]      :{:7.4f}".format(self.total_dipole * self.au2debye)
+        self.ostream.print_header(valstr.ljust(92))
+        
+        self.ostream.print_blank()
+        self.ostream.flush()
 
