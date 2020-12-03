@@ -215,6 +215,12 @@ def main():
             if not scf_drv.is_converged:
                 return
 
+    # SCF one-electron properties
+
+    if scf_drv.is_converged:
+        oe_prop = OneElectronProperties(task.mpi_comm, task.ostream, scf_tensors)
+        oe_prop.compute(task.molecule, task.ao_basis)
+
     # Gradient
 
     if task_type == 'gradient':
