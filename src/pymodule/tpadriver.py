@@ -1226,21 +1226,17 @@ class TpaDriver:
             f_total = self.get_two_el_fock_mod_r(mo, molecule, ao_basis,
                                                  D_total)
 
-            if self.rank == mpi_master():
-                ff = []
-                for i in range(len(f_total) // 2):
-                    ff.append(f_total[2 * i] + 1j * f_total[2 * i + 1])
-                return ff
-            else:
-                return None
+            ff = []
+            for i in range(len(f_total) // 2):
+                f_total_data = (f_total[2 * i].data +
+                                1j * f_total[2 * i + 1].data)
+                ff.append(
+                    DistributedArray(f_total_data, self.comm, distribute=False))
+            return ff
 
         elif fock_flag == 'real':
             f_total = self.get_two_el_fock_mod_r(mo, molecule, ao_basis, D)
-
-            if self.rank == mpi_master():
-                return f_total
-            else:
-                return None
+            return f_total
 
         else:
             return None
@@ -1317,16 +1313,16 @@ class TpaDriver:
             eri_driver.compute(fock, dens, molecule, ao_basis, screening)
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
-            if self.rank == mpi_master():
-                for i in range(fock.number_of_fock_matrices()):
-                    fabs.append(self.ao2mo(mo, fock.to_numpy(i).T))
+            for i in range(fock.number_of_fock_matrices()):
+                if self.rank == mpi_master():
+                    fmo = self.ao2mo(mo, fock.to_numpy(i).T).reshape(-1)
+                else:
+                    fmo = None
+                fabs.append(DistributedArray(fmo, self.comm))
 
         self.ostream.print_blank()
 
-        if self.rank == mpi_master():
-            return tuple(fabs)
-        else:
-            return None
+        return tuple(fabs)
 
     def print_fock_header(self):
         """

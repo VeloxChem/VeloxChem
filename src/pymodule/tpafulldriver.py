@@ -216,62 +216,61 @@ class TpaFullDriver(TpaDriver):
 
         Fock = {}
 
-        if self.rank == mpi_master():
-            f_sig_xx = {}
-            f_sig_yy = {}
-            f_sig_zz = {}
-            f_sig_xy = {}
-            f_sig_xz = {}
-            f_sig_yz = {}
+        f_sig_xx = {}
+        f_sig_yy = {}
+        f_sig_zz = {}
+        f_sig_xy = {}
+        f_sig_xz = {}
+        f_sig_yz = {}
 
-            f_lamtau_xx = {}
-            f_lamtau_yy = {}
-            f_lamtau_zz = {}
-            f_lamtau_xy = {}
-            f_lamtau_xz = {}
-            f_lamtau_yz = {}
+        f_lamtau_xx = {}
+        f_lamtau_yy = {}
+        f_lamtau_zz = {}
+        f_lamtau_xy = {}
+        f_lamtau_xz = {}
+        f_lamtau_yz = {}
 
-            f_lam_sig_tau_x = {}
-            f_lam_sig_tau_y = {}
-            f_lam_sig_tau_z = {}
+        f_lam_sig_tau_x = {}
+        f_lam_sig_tau_y = {}
+        f_lam_sig_tau_z = {}
 
-            for count, w in enumerate(wi):
-                f_sig_xx[w] = fock_list[15 * count]
-                f_sig_yy[w] = fock_list[15 * count + 1]
-                f_sig_zz[w] = fock_list[15 * count + 2]
-                f_sig_xy[w] = fock_list[15 * count + 3]
-                f_sig_xz[w] = fock_list[15 * count + 4]
-                f_sig_yz[w] = fock_list[15 * count + 5]
+        for count, w in enumerate(wi):
+            f_sig_xx[w] = fock_list[15 * count]
+            f_sig_yy[w] = fock_list[15 * count + 1]
+            f_sig_zz[w] = fock_list[15 * count + 2]
+            f_sig_xy[w] = fock_list[15 * count + 3]
+            f_sig_xz[w] = fock_list[15 * count + 4]
+            f_sig_yz[w] = fock_list[15 * count + 5]
 
-                f_lamtau_xx[w] = fock_list[15 * count + 6]
-                f_lamtau_yy[w] = fock_list[15 * count + 7]
-                f_lamtau_zz[w] = fock_list[15 * count + 8]
-                f_lamtau_xy[w] = fock_list[15 * count + 9]
-                f_lamtau_xz[w] = fock_list[15 * count + 10]
-                f_lamtau_yz[w] = fock_list[15 * count + 11]
+            f_lamtau_xx[w] = fock_list[15 * count + 6]
+            f_lamtau_yy[w] = fock_list[15 * count + 7]
+            f_lamtau_zz[w] = fock_list[15 * count + 8]
+            f_lamtau_xy[w] = fock_list[15 * count + 9]
+            f_lamtau_xz[w] = fock_list[15 * count + 10]
+            f_lamtau_yz[w] = fock_list[15 * count + 11]
 
-                f_lam_sig_tau_x[w] = fock_list[15 * count + 12]
-                f_lam_sig_tau_y[w] = fock_list[15 * count + 13]
-                f_lam_sig_tau_z[w] = fock_list[15 * count + 14]
+            f_lam_sig_tau_x[w] = fock_list[15 * count + 12]
+            f_lam_sig_tau_y[w] = fock_list[15 * count + 13]
+            f_lam_sig_tau_z[w] = fock_list[15 * count + 14]
 
-            Fock = {
-                'F0': F0_a,
-                'f_sig_xx': f_sig_xx,
-                'f_sig_yy': f_sig_yy,
-                'f_sig_zz': f_sig_zz,
-                'f_sig_xy': f_sig_xy,
-                'f_sig_xz': f_sig_xz,
-                'f_sig_yz': f_sig_yz,
-                'f_lamtau_xx': f_lamtau_xx,
-                'f_lamtau_yy': f_lamtau_yy,
-                'f_lamtau_zz': f_lamtau_zz,
-                'f_lamtau_xy': f_lamtau_xy,
-                'f_lamtau_xz': f_lamtau_xz,
-                'f_lamtau_yz': f_lamtau_yz,
-                'F123_x': f_lam_sig_tau_x,
-                'F123_y': f_lam_sig_tau_y,
-                'F123_z': f_lam_sig_tau_z
-            }
+        Fock = {
+            'F0': F0_a,
+            'f_sig_xx': f_sig_xx,
+            'f_sig_yy': f_sig_yy,
+            'f_sig_zz': f_sig_zz,
+            'f_sig_xy': f_sig_xy,
+            'f_sig_xz': f_sig_xz,
+            'f_sig_yz': f_sig_yz,
+            'f_lamtau_xx': f_lamtau_xx,
+            'f_lamtau_yy': f_lamtau_yy,
+            'f_lamtau_zz': f_lamtau_zz,
+            'f_lamtau_xy': f_lamtau_xy,
+            'f_lamtau_xz': f_lamtau_xz,
+            'f_lamtau_yz': f_lamtau_yz,
+            'F123_x': f_lam_sig_tau_x,
+            'F123_y': f_lam_sig_tau_y,
+            'F123_z': f_lam_sig_tau_z
+        }
 
         return Fock
 
@@ -311,6 +310,26 @@ class TpaFullDriver(TpaDriver):
             Fy_ = fo['Fc'][('y', -w)].get_full_vector()
             Fz_ = fo['Fc'][('z', -w)].get_full_vector()
 
+            f_lamtau_xx = fo['f_lamtau_xx'][w].get_full_vector()
+            f_lamtau_yy = fo['f_lamtau_yy'][w].get_full_vector()
+            f_lamtau_zz = fo['f_lamtau_zz'][w].get_full_vector()
+
+            f_lamtau_xy = fo['f_lamtau_xy'][w].get_full_vector()
+            f_lamtau_xz = fo['f_lamtau_xz'][w].get_full_vector()
+            f_lamtau_yz = fo['f_lamtau_yz'][w].get_full_vector()
+
+            f_sig_xx = fo['f_sig_xx'][w].get_full_vector()
+            f_sig_yy = fo['f_sig_yy'][w].get_full_vector()
+            f_sig_zz = fo['f_sig_zz'][w].get_full_vector()
+
+            f_sig_xy = fo['f_sig_xy'][w].get_full_vector()
+            f_sig_xz = fo['f_sig_xz'][w].get_full_vector()
+            f_sig_yz = fo['f_sig_yz'][w].get_full_vector()
+
+            f_x = fo['F123_x'][w].get_full_vector()
+            f_y = fo['F123_y'][w].get_full_vector()
+            f_z = fo['F123_z'][w].get_full_vector()
+
             if self.rank != mpi_master():
                 continue
 
@@ -322,6 +341,26 @@ class TpaFullDriver(TpaDriver):
             Fy_ = Fy_.reshape(norb, norb)
             Fz_ = Fz_.reshape(norb, norb)
 
+            f_lamtau_xx = 3 * f_lamtau_xx.reshape(norb, norb)
+            f_lamtau_yy = 3 * f_lamtau_yy.reshape(norb, norb)
+            f_lamtau_zz = 3 * f_lamtau_zz.reshape(norb, norb)
+
+            f_lamtau_xy = 3 * f_lamtau_xy.reshape(norb, norb)
+            f_lamtau_xz = 3 * f_lamtau_xz.reshape(norb, norb)
+            f_lamtau_yz = 3 * f_lamtau_yz.reshape(norb, norb)
+
+            f_sig_xx = 3 * f_sig_xx.reshape(norb, norb)
+            f_sig_yy = 3 * f_sig_yy.reshape(norb, norb)
+            f_sig_zz = 3 * f_sig_zz.reshape(norb, norb)
+
+            f_sig_xy = 3 * f_sig_xy.reshape(norb, norb)
+            f_sig_xz = 3 * f_sig_xz.reshape(norb, norb)
+            f_sig_yz = 3 * f_sig_yz.reshape(norb, norb)
+
+            f_x = f_x.reshape(norb, norb)
+            f_y = f_y.reshape(norb, norb)
+            f_z = f_z.reshape(norb, norb)
+
             F0 = fo['F0']
 
             # Get all the response matrices and Fock matrices
@@ -332,22 +371,6 @@ class TpaFullDriver(TpaDriver):
             kx_ = kX['Nc'][('x', -w)].T
             ky_ = kX['Nc'][('y', -w)].T
             kz_ = kX['Nc'][('z', -w)].T
-
-            f_lamtau_xx = 3 * fo['f_lamtau_xx'][w]
-            f_lamtau_yy = 3 * fo['f_lamtau_yy'][w]
-            f_lamtau_zz = 3 * fo['f_lamtau_zz'][w]
-
-            f_lamtau_xy = 3 * fo['f_lamtau_xy'][w]
-            f_lamtau_xz = 3 * fo['f_lamtau_xz'][w]
-            f_lamtau_yz = 3 * fo['f_lamtau_yz'][w]
-
-            f_sig_xx = 3 * fo['f_sig_xx'][w]
-            f_sig_yy = 3 * fo['f_sig_yy'][w]
-            f_sig_zz = 3 * fo['f_sig_zz'][w]
-
-            f_sig_xy = 3 * fo['f_sig_xy'][w]
-            f_sig_xz = 3 * fo['f_sig_xz'][w]
-            f_sig_yz = 3 * fo['f_sig_yz'][w]
 
             # computes all the compounded Φ_αβ, see article, where small phi
             # here is defined as:
@@ -414,9 +437,6 @@ class TpaFullDriver(TpaDriver):
             # x
 
             # Creating the transformed total Fock matrices
-
-            f_x = fo['F123_x'][w]
-
             f_x += (self.commut(kx, Phi_lamtau_xx + f_lamtau_xx) +
                     self.commut(ky, Phi_lamtau_xy + f_lamtau_xy) +
                     self.commut(kz, Phi_lamtau_xz + f_lamtau_xz))
@@ -434,8 +454,6 @@ class TpaFullDriver(TpaDriver):
             # y
 
             # Creating the transformed total Fock matrices
-            f_y = fo['F123_y'][w]
-
             f_y += (self.commut(kx, Phi_lamtau_xy + f_lamtau_xy) +
                     self.commut(ky, Phi_lamtau_yy + f_lamtau_yy) +
                     self.commut(kz, Phi_lamtau_yz + f_lamtau_yz))
@@ -453,8 +471,6 @@ class TpaFullDriver(TpaDriver):
             # z
 
             # Creating the transformed total Fock matrices
-            f_z = fo['F123_z'][w]
-
             f_z += (self.commut(kx, Phi_lamtau_xz + f_lamtau_xz) +
                     self.commut(ky, Phi_lamtau_yz + f_lamtau_yz) +
                     self.commut(kz, Phi_lamtau_zz + f_lamtau_zz))
@@ -586,6 +602,22 @@ class TpaFullDriver(TpaDriver):
             f_y_ = Fock['Fc'][('y', -w)].get_full_vector()
             f_z_ = Fock['Fc'][('z', -w)].get_full_vector()
 
+            f_sig_xx = Fock['f_sig_xx'][w].get_full_vector()
+            f_sig_yy = Fock['f_sig_yy'][w].get_full_vector()
+            f_sig_zz = Fock['f_sig_zz'][w].get_full_vector()
+
+            f_sig_xy = Fock['f_sig_xy'][w].get_full_vector()
+            f_sig_xz = Fock['f_sig_xz'][w].get_full_vector()
+            f_sig_yz = Fock['f_sig_yz'][w].get_full_vector()
+
+            f_lamtau_xx = Fock['f_lamtau_xx'][w].get_full_vector()
+            f_lamtau_yy = Fock['f_lamtau_yy'][w].get_full_vector()
+            f_lamtau_zz = Fock['f_lamtau_zz'][w].get_full_vector()
+
+            f_lamtau_xy = Fock['f_lamtau_xy'][w].get_full_vector()
+            f_lamtau_xz = Fock['f_lamtau_xz'][w].get_full_vector()
+            f_lamtau_yz = Fock['f_lamtau_yz'][w].get_full_vector()
+
             if self.rank != mpi_master():
                 continue
 
@@ -596,6 +628,22 @@ class TpaFullDriver(TpaDriver):
             f_x_ = f_x_.reshape(norb, norb)
             f_y_ = f_y_.reshape(norb, norb)
             f_z_ = f_z_.reshape(norb, norb)
+
+            f_sig_xx = f_sig_xx.reshape(norb, norb)
+            f_sig_yy = f_sig_yy.reshape(norb, norb)
+            f_sig_zz = f_sig_zz.reshape(norb, norb)
+
+            f_sig_xy = f_sig_xy.reshape(norb, norb)
+            f_sig_xz = f_sig_xz.reshape(norb, norb)
+            f_sig_yz = f_sig_yz.reshape(norb, norb)
+
+            f_lamtau_xx = f_lamtau_xx.reshape(norb, norb)
+            f_lamtau_yy = f_lamtau_yy.reshape(norb, norb)
+            f_lamtau_zz = f_lamtau_zz.reshape(norb, norb)
+
+            f_lamtau_xy = f_lamtau_xy.reshape(norb, norb)
+            f_lamtau_xz = f_lamtau_xz.reshape(norb, norb)
+            f_lamtau_yz = f_lamtau_yz.reshape(norb, norb)
 
             mu_x = X['x']
             mu_y = X['y']
@@ -617,7 +665,7 @@ class TpaFullDriver(TpaDriver):
             xi_zz = self.xi(kz, kz, f_z, f_z, F0)
 
             key = (('N_sig_xx', w), 2 * w)
-            mat = (3 * xi_xx + xi_yy + xi_zz + 0.5 * Fock['f_sig_xx'][w]).T
+            mat = (3 * xi_xx + xi_yy + xi_zz + 0.5 * f_sig_xx).T
             xy_dict[key] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
             xy_dict[key] -= 6 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
@@ -625,7 +673,7 @@ class TpaFullDriver(TpaDriver):
             xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
 
             key = (('N_sig_yy', w), 2 * w)
-            mat = (xi_xx + 3 * xi_yy + xi_zz + 0.5 * Fock['f_sig_yy'][w]).T
+            mat = (xi_xx + 3 * xi_yy + xi_zz + 0.5 * f_sig_yy).T
             xy_dict[key] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
             xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
@@ -633,7 +681,7 @@ class TpaFullDriver(TpaDriver):
             xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
 
             key = (('N_sig_zz', w), 2 * w)
-            mat = (xi_xx + xi_yy + 3 * xi_zz + 0.5 * Fock['f_sig_zz'][w]).T
+            mat = (xi_xx + xi_yy + 3 * xi_zz + 0.5 * f_sig_zz).T
             xy_dict[key] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
             xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
@@ -642,7 +690,7 @@ class TpaFullDriver(TpaDriver):
 
             key = (('N_sig_xy', w), 2 * w)
             mat = (self.xi(ky, kx, f_y, f_x, F0) +
-                   self.xi(kx, ky, f_x, f_y, F0) + 0.5 * Fock['f_sig_xy'][w]).T
+                   self.xi(kx, ky, f_x, f_y, F0) + 0.5 * f_sig_xy).T
             xy_dict[key] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
             xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_x, d_a_mo, nocc, norb)
@@ -650,7 +698,7 @@ class TpaFullDriver(TpaDriver):
 
             key = (('N_sig_xz', w), 2 * w)
             mat = (self.xi(kz, kx, f_z, f_x, F0) +
-                   self.xi(kx, kz, f_x, f_z, F0) + 0.5 * Fock['f_sig_xz'][w]).T
+                   self.xi(kx, kz, f_x, f_z, F0) + 0.5 * f_sig_xz).T
             xy_dict[key] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
             xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_x, d_a_mo, nocc, norb)
@@ -658,7 +706,7 @@ class TpaFullDriver(TpaDriver):
 
             key = (('N_sig_yz', w), 2 * w)
             mat = (self.xi(kz, ky, f_z, f_y, F0) +
-                   self.xi(ky, kz, f_y, f_z, F0) + 0.5 * Fock['f_sig_yz'][w]).T
+                   self.xi(ky, kz, f_y, f_z, F0) + 0.5 * f_sig_yz).T
             xy_dict[key] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
             xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_y, d_a_mo, nocc, norb)
@@ -671,8 +719,7 @@ class TpaFullDriver(TpaDriver):
             xi_zz = self.xi(kz_, kz, f_z_, f_z, F0)
 
             key = (('N_lamtau_xx', w), 0)
-            mat = (6 * xi_xx + 2 * xi_yy + 2 * xi_zz +
-                   0.5 * Fock['f_lamtau_xx'][w]).T
+            mat = (6 * xi_xx + 2 * xi_yy + 2 * xi_zz + 0.5 * f_lamtau_xx).T
             xy_dict[key] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
             xy_dict[key] -= 6 * self.x2_contract(kx_.T, mu_x, d_a_mo, nocc,
@@ -686,8 +733,7 @@ class TpaFullDriver(TpaDriver):
             xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
 
             key = (('N_lamtau_yy', w), 0)
-            mat = (2 * xi_xx + 6 * xi_yy + 2 * xi_zz +
-                   0.5 * Fock['f_lamtau_yy'][w]).T
+            mat = (2 * xi_xx + 6 * xi_yy + 2 * xi_zz + 0.5 * f_lamtau_yy).T
             xy_dict[key] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
             xy_dict[key] -= 2 * self.x2_contract(kx_.T, mu_x, d_a_mo, nocc,
@@ -701,8 +747,7 @@ class TpaFullDriver(TpaDriver):
             xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
 
             key = (('N_lamtau_zz', w), 0)
-            mat = (2 * xi_xx + 2 * xi_yy + 6 * xi_zz +
-                   0.5 * Fock['f_lamtau_zz'][w]).T
+            mat = (2 * xi_xx + 2 * xi_yy + 6 * xi_zz + 0.5 * f_lamtau_zz).T
             xy_dict[key] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
             xy_dict[key] -= 2 * self.x2_contract(kx_.T, mu_x, d_a_mo, nocc,
@@ -717,8 +762,7 @@ class TpaFullDriver(TpaDriver):
 
             key = (('N_lamtau_xy', w), 0)
             mat = (2 * self.xi(ky_, kx, f_y_, f_x, F0) +
-                   2 * self.xi(kx_, ky, f_x_, f_y, F0) +
-                   0.5 * Fock['f_lamtau_xy'][w]).T
+                   2 * self.xi(kx_, ky, f_x_, f_y, F0) + 0.5 * f_lamtau_xy).T
             xy_dict[key] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
             xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_x, d_a_mo, nocc, norb)
@@ -730,8 +774,7 @@ class TpaFullDriver(TpaDriver):
 
             key = (('N_lamtau_xz', w), 0)
             mat = (2 * self.xi(kz_, kx, f_z_, f_x, F0) +
-                   2 * self.xi(kx_, kz, f_x_, f_z, F0) +
-                   0.5 * Fock['f_lamtau_xz'][w]).T
+                   2 * self.xi(kx_, kz, f_x_, f_z, F0) + 0.5 * f_lamtau_xz).T
             xy_dict[key] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
             xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_x, d_a_mo, nocc, norb)
@@ -743,8 +786,7 @@ class TpaFullDriver(TpaDriver):
 
             key = (('N_lamtau_yz', w), 0)
             mat = (2 * self.xi(kz_, ky, f_z_, f_y, F0) +
-                   2 * self.xi(ky_, kz, f_y_, f_z, F0) +
-                   0.5 * Fock['f_lamtau_yz'][w]).T
+                   2 * self.xi(ky_, kz, f_y_, f_z, F0) + 0.5 * f_lamtau_yz).T
             xy_dict[key] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
             xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_y, d_a_mo, nocc, norb)
@@ -927,17 +969,16 @@ class TpaFullDriver(TpaDriver):
 
         fock_dict = {}
 
-        if self.rank == mpi_master():
-            F123_x = {}
-            F123_y = {}
-            F123_z = {}
+        F123_x = {}
+        F123_y = {}
+        F123_z = {}
 
-            for count, w in enumerate(wi):
-                F123_x[w] = fock_list[3 * count]
-                F123_y[w] = fock_list[3 * count + 1]
-                F123_z[w] = fock_list[3 * count + 2]
+        for count, w in enumerate(wi):
+            F123_x[w] = fock_list[3 * count]
+            F123_y[w] = fock_list[3 * count + 1]
+            F123_z[w] = fock_list[3 * count + 2]
 
-            fock_dict = {'F123_x': F123_x, 'F123_y': F123_y, 'F123_z': F123_z}
+        fock_dict = {'F123_x': F123_x, 'F123_y': F123_y, 'F123_z': F123_z}
 
         return fock_dict
 
@@ -995,6 +1036,10 @@ class TpaFullDriver(TpaDriver):
             f_lamtau_xz = fo2[(('N_lamtau_xz', w), 0)].get_full_vector()
             f_lamtau_yz = fo2[(('N_lamtau_yz', w), 0)].get_full_vector()
 
+            F123_x = fo2['F123_x'][w].get_full_vector()
+            F123_y = fo2['F123_y'][w].get_full_vector()
+            F123_z = fo2['F123_z'][w].get_full_vector()
+
             if self.rank != mpi_master():
                 continue
 
@@ -1021,6 +1066,10 @@ class TpaFullDriver(TpaDriver):
             f_lamtau_xy = f_lamtau_xy.reshape(norb, norb).T.conj()
             f_lamtau_xz = f_lamtau_xz.reshape(norb, norb).T.conj()
             f_lamtau_yz = f_lamtau_yz.reshape(norb, norb).T.conj()
+
+            F123_x = F123_x.reshape(norb, norb)
+            F123_y = F123_y.reshape(norb, norb)
+            F123_z = F123_z.reshape(norb, norb)
 
             F0_a = fo['F0']
 
@@ -1068,9 +1117,9 @@ class TpaFullDriver(TpaDriver):
             zeta_lamtau_xy = self.xi(k_y, k_lamtau_xy, f_y, f_lamtau_xy, F0_a)
             zeta_lamtau_xz = self.xi(k_z, k_lamtau_xz, f_z, f_lamtau_xz, F0_a)
 
-            X_terms = (zeta_sig_xx + zeta_sig_xy + zeta_sig_xz).T + (
-                zeta_lamtau_xx + zeta_lamtau_xy +
-                zeta_lamtau_xz).T + (0.5 * fo2['F123_x'][w]).T
+            X_terms = (zeta_sig_xx + zeta_sig_xy +
+                       zeta_sig_xz).T + (zeta_lamtau_xx + zeta_lamtau_xy +
+                                         zeta_lamtau_xz).T + (0.5 * F123_x).T
             Ff_x = -2 * LinearSolver.lrmat2vec(X_terms, nocc, norb)
             Ff_x = self.anti_sym(Ff_x)
             f_iso_x[w] = Ff_x
@@ -1085,9 +1134,9 @@ class TpaFullDriver(TpaDriver):
             zeta_lamtau_yy = self.xi(k_y, k_lamtau_yy, f_y, f_lamtau_yy, F0_a)
             zeta_lamtau_yz = self.xi(k_z, k_lamtau_yz, f_z, f_lamtau_yz, F0_a)
 
-            Y_terms = (zeta_sig_yx + zeta_sig_yy + zeta_sig_yz).T + (
-                zeta_lamtau_yx + zeta_lamtau_yy +
-                zeta_lamtau_yz).T + (0.5 * fo2['F123_y'][w]).T
+            Y_terms = (zeta_sig_yx + zeta_sig_yy +
+                       zeta_sig_yz).T + (zeta_lamtau_yx + zeta_lamtau_yy +
+                                         zeta_lamtau_yz).T + (0.5 * F123_y).T
             Ff_y = -2 * LinearSolver.lrmat2vec(Y_terms, nocc, norb)
             Ff_y = self.anti_sym(Ff_y)
             f_iso_y[w] = Ff_y
@@ -1102,9 +1151,9 @@ class TpaFullDriver(TpaDriver):
             zeta_lamtau_zy = self.xi(k_y, k_lamtau_yz, f_y, f_lamtau_yz, F0_a)
             zeta_lamtau_zz = self.xi(k_z, k_lamtau_zz, f_z, f_lamtau_zz, F0_a)
 
-            Z_terms = (zeta_sig_zx + zeta_sig_zy + zeta_sig_zz).T + (
-                zeta_lamtau_zx + zeta_lamtau_zy +
-                zeta_lamtau_zz).T + (0.5 * fo2['F123_z'][w]).T
+            Z_terms = (zeta_sig_zx + zeta_sig_zy +
+                       zeta_sig_zz).T + (zeta_lamtau_zx + zeta_lamtau_zy +
+                                         zeta_lamtau_zz).T + (0.5 * F123_z).T
             Ff_z = -2 * LinearSolver.lrmat2vec(Z_terms, nocc, norb)
             Ff_z = self.anti_sym(Ff_z)
             f_iso_z[w] = Ff_z
