@@ -301,9 +301,29 @@ class TpaFullDriver(TpaDriver):
         f_iso_y = {}
         f_iso_z = {}
 
-        F0 = fo['F0']
-
         for w in wi:
+
+            Fx = fo['Fb'][('x', w)].get_full_vector()
+            Fy = fo['Fb'][('y', w)].get_full_vector()
+            Fz = fo['Fb'][('z', w)].get_full_vector()
+
+            Fx_ = fo['Fc'][('x', -w)].get_full_vector()
+            Fy_ = fo['Fc'][('y', -w)].get_full_vector()
+            Fz_ = fo['Fc'][('z', -w)].get_full_vector()
+
+            if self.rank != mpi_master():
+                continue
+
+            Fx = Fx.reshape(norb, norb)
+            Fy = Fy.reshape(norb, norb)
+            Fz = Fz.reshape(norb, norb)
+
+            Fx_ = Fx_.reshape(norb, norb)
+            Fy_ = Fy_.reshape(norb, norb)
+            Fz_ = Fz_.reshape(norb, norb)
+
+            F0 = fo['F0']
+
             # Get all the response matrices and Fock matrices
             kx = kX['Nb'][('x', w)].T
             ky = kX['Nb'][('y', w)].T
@@ -312,14 +332,6 @@ class TpaFullDriver(TpaDriver):
             kx_ = kX['Nc'][('x', -w)].T
             ky_ = kX['Nc'][('y', -w)].T
             kz_ = kX['Nc'][('z', -w)].T
-
-            Fx = fo['Fb'][('x', w)]
-            Fy = fo['Fb'][('y', w)]
-            Fz = fo['Fb'][('z', w)]
-
-            Fx_ = fo['Fc'][('x', -w)]
-            Fy_ = fo['Fc'][('y', -w)]
-            Fz_ = fo['Fc'][('z', -w)]
 
             f_lamtau_xx = 3 * fo['f_lamtau_xx'][w]
             f_lamtau_yy = 3 * fo['f_lamtau_yy'][w]
@@ -494,10 +506,10 @@ class TpaFullDriver(TpaDriver):
         xy_dict = {}
         freq = None
 
-        if self.rank == mpi_master():
+        # Get second-order gradients
+        xy_dict = self.get_xy(d_a_mo, X, w, fock_dict, kX, nocc, norb)
 
-            # Get second-order gradients
-            xy_dict = self.get_xy(d_a_mo, X, w, fock_dict, kX, nocc, norb)
+        if self.rank == mpi_master():
 
             # Frequencies to compute
             wbd = [sum(x) for x in zip(w, w)]
@@ -536,7 +548,7 @@ class TpaFullDriver(TpaDriver):
         kxy_dict = N_total_results['kappas']
         FXY_2_dict = N_total_results['focks']
 
-        return (n_xy_dict, kxy_dict, FXY_2_dict, xy_dict)
+        return (n_xy_dict, kxy_dict, FXY_2_dict)
 
     def get_xy(self, d_a_mo, X, wi, Fock, kX, nocc, norb):
         """
@@ -564,8 +576,29 @@ class TpaFullDriver(TpaDriver):
 
         xy_dict = {}
 
-        if self.rank == mpi_master():
+        if True:
+
             for w in wi:
+
+                f_x = Fock['Fb'][('x', w)].get_full_vector()
+                f_y = Fock['Fb'][('y', w)].get_full_vector()
+                f_z = Fock['Fb'][('z', w)].get_full_vector()
+
+                f_x_ = Fock['Fc'][('x', -w)].get_full_vector()
+                f_y_ = Fock['Fc'][('y', -w)].get_full_vector()
+                f_z_ = Fock['Fc'][('z', -w)].get_full_vector()
+
+                if self.rank != mpi_master():
+                    continue
+
+                f_x = f_x.reshape(norb, norb)
+                f_y = f_y.reshape(norb, norb)
+                f_z = f_z.reshape(norb, norb)
+
+                f_x_ = f_x_.reshape(norb, norb)
+                f_y_ = f_y_.reshape(norb, norb)
+                f_z_ = f_z_.reshape(norb, norb)
+
                 mu_x = X['x']
                 mu_y = X['y']
                 mu_z = X['z']
@@ -578,13 +611,6 @@ class TpaFullDriver(TpaDriver):
                 kz_ = kX['Nc'][('z', -w)].T
 
                 F0 = Fock['F0']
-                f_x = Fock['Fb'][('x', w)]
-                f_y = Fock['Fb'][('y', w)]
-                f_z = Fock['Fb'][('z', w)]
-
-                f_x_ = Fock['Fc'][('x', -w)]
-                f_y_ = Fock['Fc'][('y', -w)]
-                f_z_ = Fock['Fc'][('z', -w)]
 
                 # BD σ gradients #
 
@@ -985,10 +1011,63 @@ class TpaFullDriver(TpaDriver):
         f_iso_y = {}
         f_iso_z = {}
 
-        F0_a = fo['F0']
-
         for w in wi:
+
+            f_x_ = fo['Fc'][('x', -w)].get_full_vector()
+            f_y_ = fo['Fc'][('y', -w)].get_full_vector()
+            f_z_ = fo['Fc'][('z', -w)].get_full_vector()
+
+            f_x = fo['Fb'][('x', w)].get_full_vector()
+            f_y = fo['Fb'][('y', w)].get_full_vector()
+            f_z = fo['Fb'][('z', w)].get_full_vector()
+
+            f_sig_xx = fo2[(('N_sig_xx', w), 2 * w)].get_full_vector()
+            f_sig_yy = fo2[(('N_sig_yy', w), 2 * w)].get_full_vector()
+            f_sig_zz = fo2[(('N_sig_zz', w), 2 * w)].get_full_vector()
+
+            f_sig_xy = fo2[(('N_sig_xy', w), 2 * w)].get_full_vector()
+            f_sig_xz = fo2[(('N_sig_xz', w), 2 * w)].get_full_vector()
+            f_sig_yz = fo2[(('N_sig_yz', w), 2 * w)].get_full_vector()
+
+            f_lamtau_xx = fo2[(('N_lamtau_xx', w), 0)].get_full_vector()
+            f_lamtau_yy = fo2[(('N_lamtau_yy', w), 0)].get_full_vector()
+            f_lamtau_zz = fo2[(('N_lamtau_zz', w), 0)].get_full_vector()
+
+            f_lamtau_xy = fo2[(('N_lamtau_xy', w), 0)].get_full_vector()
+            f_lamtau_xz = fo2[(('N_lamtau_xz', w), 0)].get_full_vector()
+            f_lamtau_yz = fo2[(('N_lamtau_yz', w), 0)].get_full_vector()
+
+            if self.rank != mpi_master():
+                continue
+
+            f_x_ = f_x_.reshape(norb, norb)
+            f_y_ = f_y_.reshape(norb, norb)
+            f_z_ = f_z_.reshape(norb, norb)
+
+            f_x = f_x.reshape(norb, norb)
+            f_y = f_y.reshape(norb, norb)
+            f_z = f_z.reshape(norb, norb)
+
+            f_sig_xx = f_sig_xx.reshape(norb, norb).T.conj()
+            f_sig_yy = f_sig_yy.reshape(norb, norb).T.conj()
+            f_sig_zz = f_sig_zz.reshape(norb, norb).T.conj()
+
+            f_sig_xy = f_sig_xy.reshape(norb, norb).T.conj()
+            f_sig_xz = f_sig_xz.reshape(norb, norb).T.conj()
+            f_sig_yz = f_sig_yz.reshape(norb, norb).T.conj()
+
+            f_lamtau_xx = f_lamtau_xx.reshape(norb, norb).T.conj()
+            f_lamtau_yy = f_lamtau_yy.reshape(norb, norb).T.conj()
+            f_lamtau_zz = f_lamtau_zz.reshape(norb, norb).T.conj()
+
+            f_lamtau_xy = f_lamtau_xy.reshape(norb, norb).T.conj()
+            f_lamtau_xz = f_lamtau_xz.reshape(norb, norb).T.conj()
+            f_lamtau_yz = f_lamtau_yz.reshape(norb, norb).T.conj()
+
+            F0_a = fo['F0']
+
             # Response
+
             k_x_ = kX['Nc'][('x', -w)].T
             k_y_ = kX['Nc'][('y', -w)].T
             k_z_ = kX['Nc'][('z', -w)].T
@@ -1014,30 +1093,6 @@ class TpaFullDriver(TpaDriver):
             k_lamtau_yz = kXY[(('N_lamtau_yz', w), 0)].T
 
             # Focks #
-
-            f_x_ = fo['Fc'][('x', -w)]
-            f_y_ = fo['Fc'][('y', -w)]
-            f_z_ = fo['Fc'][('z', -w)]
-
-            f_x = fo['Fb'][('x', w)]
-            f_y = fo['Fb'][('y', w)]
-            f_z = fo['Fb'][('z', w)]
-
-            f_sig_xx = np.conjugate(fo2[(('N_sig_xx', w), 2 * w)]).T
-            f_sig_yy = np.conjugate(fo2[(('N_sig_yy', w), 2 * w)]).T
-            f_sig_zz = np.conjugate(fo2[(('N_sig_zz', w), 2 * w)]).T
-
-            f_sig_xy = np.conjugate(fo2[(('N_sig_xy', w), 2 * w)]).T
-            f_sig_xz = np.conjugate(fo2[(('N_sig_xz', w), 2 * w)]).T
-            f_sig_yz = np.conjugate(fo2[(('N_sig_yz', w), 2 * w)]).T
-
-            f_lamtau_xx = np.conjugate(fo2[(('N_lamtau_xx', w), 0)]).T
-            f_lamtau_yy = np.conjugate(fo2[(('N_lamtau_yy', w), 0)]).T
-            f_lamtau_zz = np.conjugate(fo2[(('N_lamtau_zz', w), 0)]).T
-
-            f_lamtau_xy = np.conjugate(fo2[(('N_lamtau_xy', w), 0)]).T
-            f_lamtau_xz = np.conjugate(fo2[(('N_lamtau_xz', w), 0)]).T
-            f_lamtau_yz = np.conjugate(fo2[(('N_lamtau_yz', w), 0)]).T
 
             # x
 

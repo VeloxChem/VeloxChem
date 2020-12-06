@@ -13,6 +13,7 @@ from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
+from .distributedarray import DistributedArray
 from .inputparser import InputParser
 from .errorhandler import assert_msg_critical
 from .batchsize import get_batch_size
@@ -277,8 +278,20 @@ class TpaDriver:
             # The first-order Fock matrices with positive and negative
             # frequencies are each other complex conjugates
 
-            Focks['Fc'][(op, -w)] = Focks['Fb'][(op, w)]
-            Focks['Fd'][(op, w)] = np.conjugate(Focks['Fb'][(op, w)]).T
+            Focks_Fb_op_w = Focks['Fb'][(op, w)].get_full_vector()
+
+            if self.rank == mpi_master():
+                Focks['Fc'][(op, -w)] = Focks_Fb_op_w
+                Focks['Fd'][(op, w)] = Focks_Fb_op_w.reshape(
+                    norb, norb).T.conj().reshape(-1)
+            else:
+                Focks['Fc'][(op, -w)] = None
+                Focks['Fd'][(op, w)] = None
+
+            Focks['Fc'][(op, -w)] = DistributedArray(Focks['Fc'][(op, -w)],
+                                                     self.comm)
+            Focks['Fd'][(op, w)] = DistributedArray(Focks['Fd'][(op, w)],
+                                                    self.comm)
 
         # For cubic-response with all operators being the dipole μ Nb=Na=Nd
         # Likewise, Fb=Fd
@@ -377,17 +390,16 @@ class TpaDriver:
 
         profiler.check_memory_usage('1st Focks')
 
-        if self.rank == mpi_master():
-            fock_dict.update(Focks)
-            e4_dict = self.get_e4(w, kX, fock_dict, nocc, norb)
+        fock_dict.update(Focks)
+        e4_dict = self.get_e4(w, kX, fock_dict, nocc, norb)
 
         profiler.check_memory_usage('E[4]')
 
         # computing all the compounded second-order response vectors and
         # extracting some of the second-order Fock matrices from the subspace
-        (n_xy_dict, kxy_dict, Focks_xy,
-         XΥ_dict) = self.get_n_xy(w, d_a_mo, X, fock_dict, kX, nocc, norb,
-                                  molecule, ao_basis, scf_tensors)
+        (n_xy_dict, kxy_dict,
+         Focks_xy) = self.get_n_xy(w, d_a_mo, X, fock_dict, kX, nocc, norb,
+                                   molecule, ao_basis, scf_tensors)
 
         profiler.check_memory_usage('2nd CPP')
 
@@ -407,15 +419,14 @@ class TpaDriver:
 
         profiler.check_memory_usage('2nd Focks')
 
-        if self.rank == mpi_master():
-            # Adding the Fock matrices extracted from the second-order response
-            # vector subspace to the fock_dict's.
-            fock_dict_two.update(Focks_xy)
+        # Adding the Fock matrices extracted from the second-order response
+        # vector subspace to the fock_dict's.
+        fock_dict_two.update(Focks_xy)
 
-            # computing the compounded E[3] contractions for the isotropic
-            # cubic response function
-            e3_dict = self.get_e3(w, kX, kxy_dict, fock_dict, fock_dict_two,
-                                  nocc, norb)
+        # computing the compounded E[3] contractions for the isotropic
+        # cubic response function
+        e3_dict = self.get_e3(w, kX, kxy_dict, fock_dict, fock_dict_two, nocc,
+                              norb)
 
         profiler.check_memory_usage('E[3]')
 

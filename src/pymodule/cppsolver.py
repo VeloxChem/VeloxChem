@@ -477,23 +477,22 @@ class ComplexResponse(LinearSolver):
                     e2imagung = self.dist_e2bung.matmul_AB_no_gather(c_imagung)
 
                     if nonlinear_flag:
-                        fock_realger = self.dist_fock_ger.matmul_AB(c_realger)
-                        fock_imagger = self.dist_fock_ger.matmul_AB(c_imagger)
-                        fock_realung = self.dist_fock_ung.matmul_AB(c_realung)
-                        fock_imagung = self.dist_fock_ung.matmul_AB(c_imagung)
+                        fock_realger = self.dist_fock_ger.matmul_AB_no_gather(
+                            c_realger)
+                        fock_imagger = self.dist_fock_ger.matmul_AB_no_gather(
+                            c_imagger)
+                        fock_realung = self.dist_fock_ung.matmul_AB_no_gather(
+                            c_realung)
+                        fock_imagung = self.dist_fock_ung.matmul_AB_no_gather(
+                            c_imagung)
 
-                        fock_realger = self.comm.bcast(fock_realger,
-                                                       root=mpi_master())
-                        fock_imagger = self.comm.bcast(fock_imagger,
-                                                       root=mpi_master())
-                        fock_realung = self.comm.bcast(fock_realung,
-                                                       root=mpi_master())
-                        fock_imagung = self.comm.bcast(fock_imagung,
-                                                       root=mpi_master())
+                        fock_full_data = (
+                            fock_realger.data + fock_realung.data - 1j *
+                            (fock_imagger.data + fock_imagung.data))
 
-                        fock_full = (fock_realger + fock_realung - 1j *
-                                     (fock_imagger + fock_imagung))
-                        focks[(op, w)] = fock_full.reshape(norb, norb)
+                        focks[(op, w)] = DistributedArray(fock_full_data,
+                                                          self.comm,
+                                                          distribute=False)
 
                     # calculating the residual components
 
