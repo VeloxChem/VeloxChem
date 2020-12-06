@@ -1235,8 +1235,7 @@ class TpaDriver:
             return ff
 
         elif fock_flag == 'real':
-            f_total = self.get_two_el_fock_mod_r(mo, molecule, ao_basis, D)
-            return f_total
+            return self.get_two_el_fock_mod_r(mo, molecule, ao_basis, D)
 
         else:
             return None
@@ -1322,7 +1321,7 @@ class TpaDriver:
 
         self.ostream.print_blank()
 
-        return tuple(fabs)
+        return fabs
 
     def print_fock_header(self):
         """

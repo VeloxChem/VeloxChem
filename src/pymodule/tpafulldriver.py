@@ -67,7 +67,9 @@ class TpaFullDriver(TpaDriver):
         density_list = []
 
         for w in wi:
+
             # convert response matrix to ao basis #
+
             kx = self.mo2ao(mo, kX['Nb'][('x', w)]).T
             ky = self.mo2ao(mo, kX['Nb'][('y', w)]).T
             kz = self.mo2ao(mo, kX['Nb'][('z', w)]).T
@@ -75,7 +77,9 @@ class TpaFullDriver(TpaDriver):
             kx_ = self.mo2ao(mo, kX['Nc'][('x', -w)]).T
             ky_ = self.mo2ao(mo, kX['Nc'][('y', -w)]).T
             kz_ = self.mo2ao(mo, kX['Nc'][('z', -w)]).T
+
             # create the first order single indexed densiteies #
+
             Dx = self.transform_dens(kx, D0, S)
             Dy = self.transform_dens(ky, D0, S)
             Dz = self.transform_dens(kz, D0, S)
@@ -83,17 +87,18 @@ class TpaFullDriver(TpaDriver):
             Dx_ = self.transform_dens(kx_, D0, S)
             Dy_ = self.transform_dens(ky_, D0, S)
             Dz_ = self.transform_dens(kz_, D0, S)
+
             # create the first order two indexed densities #
+
             # σ terms #
-            D_sig_xx = 2 * (3 * self.transform_dens(kx, Dx, S) +
-                            self.transform_dens(ky, Dy, S) +
-                            self.transform_dens(kz, Dz, S))
-            D_sig_yy = 2 * (self.transform_dens(kx, Dx, S) +
-                            3 * self.transform_dens(ky, Dy, S) +
-                            self.transform_dens(kz, Dz, S))
-            D_sig_zz = 2 * (self.transform_dens(kx, Dx, S) +
-                            self.transform_dens(ky, Dy, S) +
-                            3 * self.transform_dens(kz, Dz, S))
+
+            Dxx = self.transform_dens(kx, Dx, S)
+            Dyy = self.transform_dens(ky, Dy, S)
+            Dzz = self.transform_dens(kz, Dz, S)
+
+            D_sig_xx = 2 * (3 * Dxx + Dyy + Dzz)
+            D_sig_yy = 2 * (Dxx + 3 * Dyy + Dzz)
+            D_sig_zz = 2 * (Dxx + Dyy + 3 * Dzz)
 
             D_sig_xy = 2 * (self.transform_dens(ky, Dx, S) +
                             self.transform_dens(kx, Dy, S))
@@ -101,27 +106,19 @@ class TpaFullDriver(TpaDriver):
                             self.transform_dens(kz, Dx, S))
             D_sig_yz = 2 * (self.transform_dens(ky, Dz, S) +
                             self.transform_dens(kz, Dy, S))
+
             # λ+τ terms #
-            D_lamtau_xx = 2 * (3 * self.transform_dens(kx_, Dx, S) +
-                               self.transform_dens(ky_, Dy, S) +
-                               self.transform_dens(kz_, Dz, S))
-            D_lamtau_xx += 2 * (3 * self.transform_dens(kx, Dx_, S) +
-                                self.transform_dens(ky, Dy_, S) +
-                                self.transform_dens(kz, Dz_, S))
 
-            D_lamtau_yy = 2 * (self.transform_dens(kx_, Dx, S) +
-                               3 * self.transform_dens(ky_, Dy, S) +
-                               self.transform_dens(kz_, Dz, S))
-            D_lamtau_yy += 2 * (self.transform_dens(kx, Dx_, S) +
-                                3 * self.transform_dens(ky, Dy_, S) +
-                                self.transform_dens(kz, Dz_, S))
+            Dxx = (self.transform_dens(kx_, Dx, S) +
+                   self.transform_dens(kx, Dx_, S))
+            Dyy = (self.transform_dens(ky_, Dy, S) +
+                   self.transform_dens(ky, Dy_, S))
+            Dzz = (self.transform_dens(kz_, Dz, S) +
+                   self.transform_dens(kz, Dz_, S))
 
-            D_lamtau_zz = 2 * (self.transform_dens(kx_, Dx, S) +
-                               self.transform_dens(ky_, Dy, S) +
-                               3 * self.transform_dens(kz_, Dz, S))
-            D_lamtau_zz += 2 * (self.transform_dens(kx, Dx_, S) +
-                                self.transform_dens(ky, Dy_, S) +
-                                3 * self.transform_dens(kz, Dz_, S))
+            D_lamtau_xx = 2 * (3 * Dxx + Dyy + Dzz)
+            D_lamtau_yy = 2 * (Dxx + 3 * Dyy + Dzz)
+            D_lamtau_zz = 2 * (Dxx + Dyy + 3 * Dzz)
 
             D_lamtau_xy = 2 * (self.transform_dens(ky_, Dx, S) +
                                self.transform_dens(kx_, Dy, S))
@@ -214,63 +211,33 @@ class TpaFullDriver(TpaDriver):
         total_time_fock = time_end_fock - time_start_fock
         self.print_fock_time(total_time_fock)
 
-        Fock = {}
+        keys = [
+            'f_sig_xx',
+            'f_sig_yy',
+            'f_sig_zz',
+            'f_sig_xy',
+            'f_sig_xz',
+            'f_sig_yz',
+            'f_lamtau_xx',
+            'f_lamtau_yy',
+            'f_lamtau_zz',
+            'f_lamtau_xy',
+            'f_lamtau_xz',
+            'f_lamtau_yz',
+            'F123_x',
+            'F123_y',
+            'F123_z',
+        ]
 
-        f_sig_xx = {}
-        f_sig_yy = {}
-        f_sig_zz = {}
-        f_sig_xy = {}
-        f_sig_xz = {}
-        f_sig_yz = {}
+        Fock = {'F0': F0_a}
+        for key in keys:
+            Fock[key] = {}
 
-        f_lamtau_xx = {}
-        f_lamtau_yy = {}
-        f_lamtau_zz = {}
-        f_lamtau_xy = {}
-        f_lamtau_xz = {}
-        f_lamtau_yz = {}
-
-        f_lam_sig_tau_x = {}
-        f_lam_sig_tau_y = {}
-        f_lam_sig_tau_z = {}
-
-        for count, w in enumerate(wi):
-            f_sig_xx[w] = fock_list[15 * count]
-            f_sig_yy[w] = fock_list[15 * count + 1]
-            f_sig_zz[w] = fock_list[15 * count + 2]
-            f_sig_xy[w] = fock_list[15 * count + 3]
-            f_sig_xz[w] = fock_list[15 * count + 4]
-            f_sig_yz[w] = fock_list[15 * count + 5]
-
-            f_lamtau_xx[w] = fock_list[15 * count + 6]
-            f_lamtau_yy[w] = fock_list[15 * count + 7]
-            f_lamtau_zz[w] = fock_list[15 * count + 8]
-            f_lamtau_xy[w] = fock_list[15 * count + 9]
-            f_lamtau_xz[w] = fock_list[15 * count + 10]
-            f_lamtau_yz[w] = fock_list[15 * count + 11]
-
-            f_lam_sig_tau_x[w] = fock_list[15 * count + 12]
-            f_lam_sig_tau_y[w] = fock_list[15 * count + 13]
-            f_lam_sig_tau_z[w] = fock_list[15 * count + 14]
-
-        Fock = {
-            'F0': F0_a,
-            'f_sig_xx': f_sig_xx,
-            'f_sig_yy': f_sig_yy,
-            'f_sig_zz': f_sig_zz,
-            'f_sig_xy': f_sig_xy,
-            'f_sig_xz': f_sig_xz,
-            'f_sig_yz': f_sig_yz,
-            'f_lamtau_xx': f_lamtau_xx,
-            'f_lamtau_yy': f_lamtau_yy,
-            'f_lamtau_zz': f_lamtau_zz,
-            'f_lamtau_xy': f_lamtau_xy,
-            'f_lamtau_xz': f_lamtau_xz,
-            'f_lamtau_yz': f_lamtau_yz,
-            'F123_x': f_lam_sig_tau_x,
-            'F123_y': f_lam_sig_tau_y,
-            'F123_z': f_lam_sig_tau_z
-        }
+        fock_index = 0
+        for w in wi:
+            for key in keys:
+                Fock[key][w] = fock_list[fock_index]
+                fock_index += 1
 
         return Fock
 
@@ -967,18 +934,17 @@ class TpaFullDriver(TpaDriver):
         total_time_fock = time_end_fock - time_start_fock
         self.print_fock_time(total_time_fock)
 
+        keys = ['F123_x', 'F123_y', 'F123_z']
+
         fock_dict = {}
+        for key in keys:
+            fock_dict[key] = {}
 
-        F123_x = {}
-        F123_y = {}
-        F123_z = {}
-
-        for count, w in enumerate(wi):
-            F123_x[w] = fock_list[3 * count]
-            F123_y[w] = fock_list[3 * count + 1]
-            F123_z[w] = fock_list[3 * count + 2]
-
-        fock_dict = {'F123_x': F123_x, 'F123_y': F123_y, 'F123_z': F123_z}
+        fock_index = 0
+        for w in wi:
+            for key in keys:
+                fock_dict[key][w] = fock_list[fock_index]
+                fock_index += 1
 
         return fock_dict
 
