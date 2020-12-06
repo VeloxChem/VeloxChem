@@ -281,15 +281,11 @@ class TpaDriver:
             Focks_Fb_op_w = Focks['Fb'][(op, w)].get_full_vector()
 
             if self.rank == mpi_master():
-                Focks['Fc'][(op, -w)] = Focks_Fb_op_w
                 Focks['Fd'][(op, w)] = Focks_Fb_op_w.reshape(
                     norb, norb).T.conj().reshape(-1)
             else:
-                Focks['Fc'][(op, -w)] = None
                 Focks['Fd'][(op, w)] = None
 
-            Focks['Fc'][(op, -w)] = DistributedArray(Focks['Fc'][(op, -w)],
-                                                     self.comm)
             Focks['Fd'][(op, w)] = DistributedArray(Focks['Fd'][(op, w)],
                                                     self.comm)
 

@@ -269,44 +269,45 @@ class TpaFullDriver(TpaDriver):
 
         for w in wi:
 
-            Fx = fo['Fb'][('x', w)].get_full_vector()
-            Fy = fo['Fb'][('y', w)].get_full_vector()
-            Fz = fo['Fb'][('z', w)].get_full_vector()
+            vec_pack = np.array([
+                fo['Fb'][('x', w)].data,
+                fo['Fb'][('y', w)].data,
+                fo['Fb'][('z', w)].data,
+                fo['f_lamtau_xx'][w].data,
+                fo['f_lamtau_yy'][w].data,
+                fo['f_lamtau_zz'][w].data,
+                fo['f_lamtau_xy'][w].data,
+                fo['f_lamtau_xz'][w].data,
+                fo['f_lamtau_yz'][w].data,
+                fo['f_sig_xx'][w].data,
+                fo['f_sig_yy'][w].data,
+                fo['f_sig_zz'][w].data,
+                fo['f_sig_xy'][w].data,
+                fo['f_sig_xz'][w].data,
+                fo['f_sig_yz'][w].data,
+                fo['F123_x'][w].data,
+                fo['F123_y'][w].data,
+                fo['F123_z'][w].data,
+            ])
 
-            Fx_ = fo['Fc'][('x', -w)].get_full_vector()
-            Fy_ = fo['Fc'][('y', -w)].get_full_vector()
-            Fz_ = fo['Fc'][('z', -w)].get_full_vector()
-
-            f_lamtau_xx = fo['f_lamtau_xx'][w].get_full_vector()
-            f_lamtau_yy = fo['f_lamtau_yy'][w].get_full_vector()
-            f_lamtau_zz = fo['f_lamtau_zz'][w].get_full_vector()
-
-            f_lamtau_xy = fo['f_lamtau_xy'][w].get_full_vector()
-            f_lamtau_xz = fo['f_lamtau_xz'][w].get_full_vector()
-            f_lamtau_yz = fo['f_lamtau_yz'][w].get_full_vector()
-
-            f_sig_xx = fo['f_sig_xx'][w].get_full_vector()
-            f_sig_yy = fo['f_sig_yy'][w].get_full_vector()
-            f_sig_zz = fo['f_sig_zz'][w].get_full_vector()
-
-            f_sig_xy = fo['f_sig_xy'][w].get_full_vector()
-            f_sig_xz = fo['f_sig_xz'][w].get_full_vector()
-            f_sig_yz = fo['f_sig_yz'][w].get_full_vector()
-
-            f_x = fo['F123_x'][w].get_full_vector()
-            f_y = fo['F123_y'][w].get_full_vector()
-            f_z = fo['F123_z'][w].get_full_vector()
+            vec_pack = self.comm.gather(vec_pack, root=mpi_master())
 
             if self.rank != mpi_master():
                 continue
+
+            vec_pack = np.hstack(vec_pack)
+
+            (Fx, Fy, Fz, f_lamtau_xx, f_lamtau_yy, f_lamtau_zz, f_lamtau_xy,
+             f_lamtau_xz, f_lamtau_yz, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy,
+             f_sig_xz, f_sig_yz, f_x, f_y, f_z) = vec_pack
 
             Fx = Fx.reshape(norb, norb)
             Fy = Fy.reshape(norb, norb)
             Fz = Fz.reshape(norb, norb)
 
-            Fx_ = Fx_.reshape(norb, norb)
-            Fy_ = Fy_.reshape(norb, norb)
-            Fz_ = Fz_.reshape(norb, norb)
+            Fx_ = Fx.T.conj()  # fo['Fc'][('x', -w)]
+            Fy_ = Fy.T.conj()  # fo['Fc'][('y', -w)]
+            Fz_ = Fz.T.conj()  # fo['Fc'][('z', -w)]
 
             f_lamtau_xx = 3 * f_lamtau_xx.reshape(norb, norb)
             f_lamtau_yy = 3 * f_lamtau_yy.reshape(norb, norb)
@@ -561,40 +562,42 @@ class TpaFullDriver(TpaDriver):
 
         for w in wi:
 
-            f_x = Fock['Fb'][('x', w)].get_full_vector()
-            f_y = Fock['Fb'][('y', w)].get_full_vector()
-            f_z = Fock['Fb'][('z', w)].get_full_vector()
+            vec_pack = np.array([
+                Fock['Fb'][('x', w)].data,
+                Fock['Fb'][('y', w)].data,
+                Fock['Fb'][('z', w)].data,
+                Fock['f_sig_xx'][w].data,
+                Fock['f_sig_yy'][w].data,
+                Fock['f_sig_zz'][w].data,
+                Fock['f_sig_xy'][w].data,
+                Fock['f_sig_xz'][w].data,
+                Fock['f_sig_yz'][w].data,
+                Fock['f_lamtau_xx'][w].data,
+                Fock['f_lamtau_yy'][w].data,
+                Fock['f_lamtau_zz'][w].data,
+                Fock['f_lamtau_xy'][w].data,
+                Fock['f_lamtau_xz'][w].data,
+                Fock['f_lamtau_yz'][w].data,
+            ])
 
-            f_x_ = Fock['Fc'][('x', -w)].get_full_vector()
-            f_y_ = Fock['Fc'][('y', -w)].get_full_vector()
-            f_z_ = Fock['Fc'][('z', -w)].get_full_vector()
-
-            f_sig_xx = Fock['f_sig_xx'][w].get_full_vector()
-            f_sig_yy = Fock['f_sig_yy'][w].get_full_vector()
-            f_sig_zz = Fock['f_sig_zz'][w].get_full_vector()
-
-            f_sig_xy = Fock['f_sig_xy'][w].get_full_vector()
-            f_sig_xz = Fock['f_sig_xz'][w].get_full_vector()
-            f_sig_yz = Fock['f_sig_yz'][w].get_full_vector()
-
-            f_lamtau_xx = Fock['f_lamtau_xx'][w].get_full_vector()
-            f_lamtau_yy = Fock['f_lamtau_yy'][w].get_full_vector()
-            f_lamtau_zz = Fock['f_lamtau_zz'][w].get_full_vector()
-
-            f_lamtau_xy = Fock['f_lamtau_xy'][w].get_full_vector()
-            f_lamtau_xz = Fock['f_lamtau_xz'][w].get_full_vector()
-            f_lamtau_yz = Fock['f_lamtau_yz'][w].get_full_vector()
+            vec_pack = self.comm.gather(vec_pack, root=mpi_master())
 
             if self.rank != mpi_master():
                 continue
+
+            vec_pack = np.hstack(vec_pack)
+
+            (f_x, f_y, f_z, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy, f_sig_xz,
+             f_sig_yz, f_lamtau_xx, f_lamtau_yy, f_lamtau_zz, f_lamtau_xy,
+             f_lamtau_xz, f_lamtau_yz) = vec_pack
 
             f_x = f_x.reshape(norb, norb)
             f_y = f_y.reshape(norb, norb)
             f_z = f_z.reshape(norb, norb)
 
-            f_x_ = f_x_.reshape(norb, norb)
-            f_y_ = f_y_.reshape(norb, norb)
-            f_z_ = f_z_.reshape(norb, norb)
+            f_x_ = f_x.T.conj()  # Fock['Fc'][('x', -w)]
+            f_y_ = f_y.T.conj()  # Fock['Fc'][('y', -w)]
+            f_z_ = f_z.T.conj()  # Fock['Fc'][('z', -w)]
 
             f_sig_xx = f_sig_xx.reshape(norb, norb)
             f_sig_yy = f_sig_yy.reshape(norb, norb)
@@ -978,44 +981,45 @@ class TpaFullDriver(TpaDriver):
 
         for w in wi:
 
-            f_x_ = fo['Fc'][('x', -w)].get_full_vector()
-            f_y_ = fo['Fc'][('y', -w)].get_full_vector()
-            f_z_ = fo['Fc'][('z', -w)].get_full_vector()
+            vec_pack = np.array([
+                fo['Fb'][('x', w)].data,
+                fo['Fb'][('y', w)].data,
+                fo['Fb'][('z', w)].data,
+                fo2[(('N_sig_xx', w), 2 * w)].data,
+                fo2[(('N_sig_yy', w), 2 * w)].data,
+                fo2[(('N_sig_zz', w), 2 * w)].data,
+                fo2[(('N_sig_xy', w), 2 * w)].data,
+                fo2[(('N_sig_xz', w), 2 * w)].data,
+                fo2[(('N_sig_yz', w), 2 * w)].data,
+                fo2[(('N_lamtau_xx', w), 0)].data,
+                fo2[(('N_lamtau_yy', w), 0)].data,
+                fo2[(('N_lamtau_zz', w), 0)].data,
+                fo2[(('N_lamtau_xy', w), 0)].data,
+                fo2[(('N_lamtau_xz', w), 0)].data,
+                fo2[(('N_lamtau_yz', w), 0)].data,
+                fo2['F123_x'][w].data,
+                fo2['F123_y'][w].data,
+                fo2['F123_z'][w].data,
+            ])
 
-            f_x = fo['Fb'][('x', w)].get_full_vector()
-            f_y = fo['Fb'][('y', w)].get_full_vector()
-            f_z = fo['Fb'][('z', w)].get_full_vector()
-
-            f_sig_xx = fo2[(('N_sig_xx', w), 2 * w)].get_full_vector()
-            f_sig_yy = fo2[(('N_sig_yy', w), 2 * w)].get_full_vector()
-            f_sig_zz = fo2[(('N_sig_zz', w), 2 * w)].get_full_vector()
-
-            f_sig_xy = fo2[(('N_sig_xy', w), 2 * w)].get_full_vector()
-            f_sig_xz = fo2[(('N_sig_xz', w), 2 * w)].get_full_vector()
-            f_sig_yz = fo2[(('N_sig_yz', w), 2 * w)].get_full_vector()
-
-            f_lamtau_xx = fo2[(('N_lamtau_xx', w), 0)].get_full_vector()
-            f_lamtau_yy = fo2[(('N_lamtau_yy', w), 0)].get_full_vector()
-            f_lamtau_zz = fo2[(('N_lamtau_zz', w), 0)].get_full_vector()
-
-            f_lamtau_xy = fo2[(('N_lamtau_xy', w), 0)].get_full_vector()
-            f_lamtau_xz = fo2[(('N_lamtau_xz', w), 0)].get_full_vector()
-            f_lamtau_yz = fo2[(('N_lamtau_yz', w), 0)].get_full_vector()
-
-            F123_x = fo2['F123_x'][w].get_full_vector()
-            F123_y = fo2['F123_y'][w].get_full_vector()
-            F123_z = fo2['F123_z'][w].get_full_vector()
+            vec_pack = self.comm.gather(vec_pack, root=mpi_master())
 
             if self.rank != mpi_master():
                 continue
 
-            f_x_ = f_x_.reshape(norb, norb)
-            f_y_ = f_y_.reshape(norb, norb)
-            f_z_ = f_z_.reshape(norb, norb)
+            vec_pack = np.hstack(vec_pack)
+
+            (f_x, f_y, f_z, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy, f_sig_xz,
+             f_sig_yz, f_lamtau_xx, f_lamtau_yy, f_lamtau_zz, f_lamtau_xy,
+             f_lamtau_xz, f_lamtau_yz, F123_x, F123_y, F123_z) = vec_pack
 
             f_x = f_x.reshape(norb, norb)
             f_y = f_y.reshape(norb, norb)
             f_z = f_z.reshape(norb, norb)
+
+            f_x_ = f_x.T.conj()  # fo['Fc'][('x', -w)]
+            f_y_ = f_y.T.conj()  # fo['Fc'][('y', -w)]
+            f_z_ = f_z.T.conj()  # fo['Fc'][('z', -w)]
 
             f_sig_xx = f_sig_xx.reshape(norb, norb).T.conj()
             f_sig_yy = f_sig_yy.reshape(norb, norb).T.conj()
