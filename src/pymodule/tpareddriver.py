@@ -139,33 +139,24 @@ class TpaReducedDriver(TpaDriver):
         total_time_fock = time_end_fock - time_start_fock
         self.print_fock_time(total_time_fock)
 
-        Fock = {}
+        keys = [
+            'f_sig_xx',
+            'f_sig_yy',
+            'f_sig_zz',
+            'f_sig_xy',
+            'f_sig_xz',
+            'f_sig_yz',
+        ]
 
-        if self.rank == mpi_master():
-            f_sig_xx = {}
-            f_sig_yy = {}
-            f_sig_zz = {}
-            f_sig_xy = {}
-            f_sig_xz = {}
-            f_sig_yz = {}
+        Fock = {'F0': F0_a}
+        for key in keys:
+            Fock[key] = {}
 
-            for count, w in enumerate(wi):
-                f_sig_xx[w] = fock_list[6 * count]
-                f_sig_yy[w] = fock_list[6 * count + 1]
-                f_sig_zz[w] = fock_list[6 * count + 2]
-                f_sig_xy[w] = fock_list[6 * count + 3]
-                f_sig_xz[w] = fock_list[6 * count + 4]
-                f_sig_yz[w] = fock_list[6 * count + 5]
-
-            Fock = {
-                'F0': F0_a,
-                'f_sig_xx': f_sig_xx,
-                'f_sig_yy': f_sig_yy,
-                'f_sig_zz': f_sig_zz,
-                'f_sig_xy': f_sig_xy,
-                'f_sig_xz': f_sig_xz,
-                'f_sig_yz': f_sig_yz
-            }
+        fock_index = 0
+        for w in wi:
+            for key in keys:
+                Fock[key][w] = fock_list[fock_index]
+                fock_index += 1
 
         return Fock
 
@@ -204,9 +195,10 @@ class TpaReducedDriver(TpaDriver):
         xy_dict = {}
         freq = None
 
+        # Get the second-order gradiants
+        xy_dict = self.get_xy(d_a_mo, X, w, fock_dict, kX, nocc, norb)
+
         if self.rank == mpi_master():
-            # Get the second-order gradiants
-            xy_dict = self.get_xy(d_a_mo, X, w, fock_dict, kX, nocc, norb)
 
             wbd = [sum(x) for x in zip(w, w)]
 
@@ -243,7 +235,7 @@ class TpaReducedDriver(TpaDriver):
         kxy_dict = N_total_results['kappas']
         FXY_2_dict = N_total_results['focks']
 
-        return (n_xy_dict, kxy_dict, FXY_2_dict, xy_dict)
+        return (n_xy_dict, kxy_dict, FXY_2_dict)
 
     def get_xy(self, d_a_mo, X, wi, Fock, kX, nocc, norb):
         """
@@ -271,98 +263,106 @@ class TpaReducedDriver(TpaDriver):
 
         xy_dict = {}
 
-        if self.rank == mpi_master():
-            for w in wi:
-                mu_x = X['x']
-                mu_y = X['y']
-                mu_z = X['z']
+        for w in wi:
 
-                kx = kX['Nb'][('x', w)].T
-                ky = kX['Nb'][('y', w)].T
-                kz = kX['Nb'][('z', w)].T
+            vec_pack = np.array([
+                Fock['Fb'][('x', w)].data,
+                Fock['Fb'][('y', w)].data,
+                Fock['Fb'][('z', w)].data,
+                Fock['f_sig_xx'][w].data,
+                Fock['f_sig_yy'][w].data,
+                Fock['f_sig_zz'][w].data,
+                Fock['f_sig_xy'][w].data,
+                Fock['f_sig_xz'][w].data,
+                Fock['f_sig_yz'][w].data,
+            ])
 
-                # REAL PART #
-                F0 = Fock['F0']
-                f_x = Fock['Fb'][('x', w)]
-                f_y = Fock['Fb'][('y', w)]
-                f_z = Fock['Fb'][('z', w)]
+            vec_pack = self.comm.gather(vec_pack, root=mpi_master())
 
-                # BD σ gradients #
+            if self.rank != mpi_master():
+                continue
 
-                key = (('N_sig_xx', w), 2 * w)
-                mat = (3 * self.xi(kx, kx, f_x, f_x, F0) +
-                       self.xi(ky, ky, f_y, f_y, F0) +
-                       self.xi(kz, kz, f_z, f_z, F0) +
-                       0.5 * Fock['f_sig_xx'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 6 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc,
-                                                     norb)
+            vec_pack = np.hstack(vec_pack)
 
-                key = (('N_sig_yy', w), 2 * w)
-                mat = (self.xi(kx, kx, f_x, f_x, F0) +
-                       3 * self.xi(ky, ky, f_y, f_y, F0) +
-                       self.xi(kz, kz, f_z, f_z, F0) +
-                       0.5 * Fock['f_sig_yy'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 6 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc,
-                                                     norb)
+            (f_x, f_y, f_z, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy, f_sig_xz,
+             f_sig_yz) = vec_pack
 
-                key = (('N_sig_zz', w), 2 * w)
-                mat = (self.xi(kx, kx, f_x, f_x, F0) +
-                       self.xi(ky, ky, f_y, f_y, F0) +
-                       3 * self.xi(kz, kz, f_z, f_z, F0) +
-                       0.5 * Fock['f_sig_zz'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 6 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc,
-                                                     norb)
+            f_x = f_x.reshape(norb, norb)
+            f_y = f_y.reshape(norb, norb)
+            f_z = f_z.reshape(norb, norb)
 
-                key = (('N_sig_xy', w), 2 * w)
-                mat = (self.xi(ky, kx, f_y, f_x, F0) +
-                       self.xi(kx, ky, f_x, f_y, F0) +
-                       0.5 * Fock['f_sig_xy'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_y, d_a_mo, nocc,
-                                                     norb)
+            f_sig_xx = f_sig_xx.reshape(norb, norb)
+            f_sig_yy = f_sig_yy.reshape(norb, norb)
+            f_sig_zz = f_sig_zz.reshape(norb, norb)
 
-                key = (('N_sig_xz', w), 2 * w)
-                mat = (self.xi(kz, kx, f_z, f_x, F0) +
-                       self.xi(kx, kz, f_x, f_z, F0) +
-                       0.5 * Fock['f_sig_xz'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_z, d_a_mo, nocc,
-                                                     norb)
+            f_sig_xy = f_sig_xy.reshape(norb, norb)
+            f_sig_xz = f_sig_xz.reshape(norb, norb)
+            f_sig_yz = f_sig_yz.reshape(norb, norb)
 
-                key = (('N_sig_yz', w), 2 * w)
-                mat = (self.xi(kz, ky, f_z, f_y, F0) +
-                       self.xi(ky, kz, f_y, f_z, F0) +
-                       0.5 * Fock['f_sig_yz'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_z, d_a_mo, nocc,
-                                                     norb)
+            mu_x = X['x']
+            mu_y = X['y']
+            mu_z = X['z']
+
+            kx = kX['Nb'][('x', w)].T
+            ky = kX['Nb'][('y', w)].T
+            kz = kX['Nb'][('z', w)].T
+
+            # REAL PART #
+            F0 = Fock['F0']
+
+            # BD σ gradients #
+
+            xi_xx = self.xi(kx, kx, f_x, f_x, F0)
+            xi_yy = self.xi(ky, ky, f_y, f_y, F0)
+            xi_zz = self.xi(kz, kz, f_z, f_z, F0)
+
+            key = (('N_sig_xx', w), 2 * w)
+            mat = (3 * xi_xx + xi_yy + xi_zz + 0.5 * f_sig_xx).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 6 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
+
+            key = (('N_sig_yy', w), 2 * w)
+            mat = (xi_xx + 3 * xi_yy + xi_zz + 0.5 * f_sig_yy).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= 6 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
+
+            key = (('N_sig_zz', w), 2 * w)
+            mat = (xi_xx + xi_yy + 3 * xi_zz + 0.5 * f_sig_zz).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= 6 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
+
+            key = (('N_sig_xy', w), 2 * w)
+            mat = (self.xi(ky, kx, f_y, f_x, F0) +
+                   self.xi(kx, ky, f_x, f_y, F0) + 0.5 * f_sig_xy).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_y, d_a_mo, nocc, norb)
+
+            key = (('N_sig_xz', w), 2 * w)
+            mat = (self.xi(kz, kx, f_z, f_x, F0) +
+                   self.xi(kx, kz, f_x, f_z, F0) + 0.5 * f_sig_xz).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_z, d_a_mo, nocc, norb)
+
+            key = (('N_sig_yz', w), 2 * w)
+            mat = (self.xi(kz, ky, f_z, f_y, F0) +
+                   self.xi(ky, kz, f_y, f_z, F0) + 0.5 * f_sig_yz).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_z, d_a_mo, nocc, norb)
 
         return xy_dict
 
@@ -485,19 +485,17 @@ class TpaReducedDriver(TpaDriver):
         total_time_fock = time_end_fock - time_start_fock
         self.print_fock_time(total_time_fock)
 
+        keys = ['F123_x', 'F123_y', 'F123_z']
+
         fock_dict = {}
+        for key in keys:
+            fock_dict[key] = {}
 
-        if self.rank == mpi_master():
-            F123_x = {}
-            F123_y = {}
-            F123_z = {}
-
-            for count, w in enumerate(wi):
-                F123_x[w] = fock_list[3 * count]
-                F123_y[w] = fock_list[3 * count + 1]
-                F123_z[w] = fock_list[3 * count + 2]
-
-            fock_dict = {'F123_x': F123_x, 'F123_y': F123_y, 'F123_z': F123_z}
+        fock_index = 0
+        for w in wi:
+            for key in keys:
+                fock_dict[key][w] = fock_list[fock_index]
+                fock_index += 1
 
         return fock_dict
 
@@ -531,10 +529,57 @@ class TpaReducedDriver(TpaDriver):
         f_iso_y = {}
         f_iso_z = {}
 
-        F0_a = fo['F0']
-
         for w in wi:
+
+            vec_pack = np.array([
+                fo['Fb'][('x', w)].data,
+                fo['Fb'][('y', w)].data,
+                fo['Fb'][('z', w)].data,
+                fo2[(('N_sig_xx', w), 2 * w)].data,
+                fo2[(('N_sig_yy', w), 2 * w)].data,
+                fo2[(('N_sig_zz', w), 2 * w)].data,
+                fo2[(('N_sig_xy', w), 2 * w)].data,
+                fo2[(('N_sig_xz', w), 2 * w)].data,
+                fo2[(('N_sig_yz', w), 2 * w)].data,
+                fo2['F123_x'][w].data,
+                fo2['F123_y'][w].data,
+                fo2['F123_z'][w].data,
+            ])
+
+            vec_pack = self.comm.gather(vec_pack, root=mpi_master())
+
+            if self.rank != mpi_master():
+                continue
+
+            vec_pack = np.hstack(vec_pack)
+
+            (f_x, f_y, f_z, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy, f_sig_xz,
+             f_sig_yz, F123_x, F123_y, F123_z) = vec_pack
+
+            f_x = f_x.reshape(norb, norb)
+            f_y = f_y.reshape(norb, norb)
+            f_z = f_z.reshape(norb, norb)
+
+            f_x_ = f_x.T.conj()  # fo['Fc'][('x', -w)]
+            f_y_ = f_y.T.conj()  # fo['Fc'][('y', -w)]
+            f_z_ = f_z.T.conj()  # fo['Fc'][('z', -w)]
+
+            f_sig_xx = f_sig_xx.reshape(norb, norb).T.conj()
+            f_sig_yy = f_sig_yy.reshape(norb, norb).T.conj()
+            f_sig_zz = f_sig_zz.reshape(norb, norb).T.conj()
+
+            f_sig_xy = f_sig_xy.reshape(norb, norb).T.conj()
+            f_sig_xz = f_sig_xz.reshape(norb, norb).T.conj()
+            f_sig_yz = f_sig_yz.reshape(norb, norb).T.conj()
+
+            F123_x = F123_x.reshape(norb, norb)
+            F123_y = F123_y.reshape(norb, norb)
+            F123_z = F123_z.reshape(norb, norb)
+
+            F0_a = fo['F0']
+
             # Response #
+
             k_x_ = kX['Nc'][('x', -w)].T
             k_y_ = kX['Nc'][('y', -w)].T
             k_z_ = kX['Nc'][('z', -w)].T
@@ -547,20 +592,8 @@ class TpaReducedDriver(TpaDriver):
             k_sig_xz = kXY[(('N_sig_xz', w), 2 * w)].T
             k_sig_yz = kXY[(('N_sig_yz', w), 2 * w)].T
 
-            # Focks #
-            f_x_ = fo['Fc'][('x', -w)]
-            f_y_ = fo['Fc'][('y', -w)]
-            f_z_ = fo['Fc'][('z', -w)]
-
-            f_sig_xx = np.conjugate(fo2[(('N_sig_xx', w), 2 * w)]).T
-            f_sig_yy = np.conjugate(fo2[(('N_sig_yy', w), 2 * w)]).T
-            f_sig_zz = np.conjugate(fo2[(('N_sig_zz', w), 2 * w)]).T
-
-            f_sig_xy = np.conjugate(fo2[(('N_sig_xy', w), 2 * w)]).T
-            f_sig_xz = np.conjugate(fo2[(('N_sig_xz', w), 2 * w)]).T
-            f_sig_yz = np.conjugate(fo2[(('N_sig_yz', w), 2 * w)]).T
-
             # x #
+
             zeta_sig_xx = self.xi(k_x_, k_sig_xx, f_x_, f_sig_xx, F0_a)
             zeta_sig_yy = self.xi(k_x_, k_sig_yy, f_x_, f_sig_yy, F0_a)
             zeta_sig_zz = self.xi(k_x_, k_sig_zz, f_x_, f_sig_zz, F0_a)
@@ -568,30 +601,32 @@ class TpaReducedDriver(TpaDriver):
             zeta_sig_xy = self.xi(k_y_, k_sig_xy, f_y_, f_sig_xy, F0_a)
             zeta_sig_xz = self.xi(k_z_, k_sig_xz, f_z_, f_sig_xz, F0_a)
 
-            X_terms = (zeta_sig_xx + zeta_sig_xy +
-                       zeta_sig_xz).T + (0.5 * fo2['F123_x'][w]).T
+            X_terms = (zeta_sig_xx + zeta_sig_xy + zeta_sig_xz).T + (0.5 *
+                                                                     F123_x).T
             ff_x = -2 * LinearSolver.lrmat2vec(X_terms, nocc, norb)
             ff_x = self.anti_sym(ff_x)
             f_iso_x[w] = ff_x
 
             # y #
+
             zeta_sig_yx = self.xi(k_x_, k_sig_xy, f_x_, f_sig_xy, F0_a)
             zeta_sig_yy = self.xi(k_y_, k_sig_yy, f_y_, f_sig_yy, F0_a)
             zeta_sig_yz = self.xi(k_z_, k_sig_yz, f_z_, f_sig_yz, F0_a)
 
-            Y_terms = (zeta_sig_yx + zeta_sig_yy +
-                       zeta_sig_yz).T + (0.5 * fo2['F123_y'][w]).T
+            Y_terms = (zeta_sig_yx + zeta_sig_yy + zeta_sig_yz).T + (0.5 *
+                                                                     F123_y).T
             ff_y = -2 * LinearSolver.lrmat2vec(Y_terms, nocc, norb)
             ff_y = self.anti_sym(ff_y)
             f_iso_y[w] = ff_y
 
             # z #
+
             zeta_sig_zx = self.xi(k_x_, k_sig_xz, f_x_, f_sig_xz, F0_a)
             zeta_sig_zy = self.xi(k_y_, k_sig_yz, f_y_, f_sig_yz, F0_a)
             zeta_sig_zz = self.xi(k_z_, k_sig_zz, f_z_, f_sig_zz, F0_a)
 
-            Z_terms = (zeta_sig_zx + zeta_sig_zy +
-                       zeta_sig_zz).T + (0.5 * fo2['F123_z'][w]).T
+            Z_terms = (zeta_sig_zx + zeta_sig_zy + zeta_sig_zz).T + (0.5 *
+                                                                     F123_z).T
             ff_z = -2 * LinearSolver.lrmat2vec(Z_terms, nocc, norb)
             ff_z = self.anti_sym(ff_z)
             f_iso_z[w] = ff_z
