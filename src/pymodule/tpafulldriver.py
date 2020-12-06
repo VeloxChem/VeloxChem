@@ -576,225 +576,183 @@ class TpaFullDriver(TpaDriver):
 
         xy_dict = {}
 
-        if True:
+        for w in wi:
 
-            for w in wi:
+            f_x = Fock['Fb'][('x', w)].get_full_vector()
+            f_y = Fock['Fb'][('y', w)].get_full_vector()
+            f_z = Fock['Fb'][('z', w)].get_full_vector()
 
-                f_x = Fock['Fb'][('x', w)].get_full_vector()
-                f_y = Fock['Fb'][('y', w)].get_full_vector()
-                f_z = Fock['Fb'][('z', w)].get_full_vector()
+            f_x_ = Fock['Fc'][('x', -w)].get_full_vector()
+            f_y_ = Fock['Fc'][('y', -w)].get_full_vector()
+            f_z_ = Fock['Fc'][('z', -w)].get_full_vector()
 
-                f_x_ = Fock['Fc'][('x', -w)].get_full_vector()
-                f_y_ = Fock['Fc'][('y', -w)].get_full_vector()
-                f_z_ = Fock['Fc'][('z', -w)].get_full_vector()
+            if self.rank != mpi_master():
+                continue
 
-                if self.rank != mpi_master():
-                    continue
+            f_x = f_x.reshape(norb, norb)
+            f_y = f_y.reshape(norb, norb)
+            f_z = f_z.reshape(norb, norb)
 
-                f_x = f_x.reshape(norb, norb)
-                f_y = f_y.reshape(norb, norb)
-                f_z = f_z.reshape(norb, norb)
+            f_x_ = f_x_.reshape(norb, norb)
+            f_y_ = f_y_.reshape(norb, norb)
+            f_z_ = f_z_.reshape(norb, norb)
 
-                f_x_ = f_x_.reshape(norb, norb)
-                f_y_ = f_y_.reshape(norb, norb)
-                f_z_ = f_z_.reshape(norb, norb)
+            mu_x = X['x']
+            mu_y = X['y']
+            mu_z = X['z']
 
-                mu_x = X['x']
-                mu_y = X['y']
-                mu_z = X['z']
+            kx = kX['Nb'][('x', w)].T
+            ky = kX['Nb'][('y', w)].T
+            kz = kX['Nb'][('z', w)].T
+            kx_ = kX['Nc'][('x', -w)].T
+            ky_ = kX['Nc'][('y', -w)].T
+            kz_ = kX['Nc'][('z', -w)].T
 
-                kx = kX['Nb'][('x', w)].T
-                ky = kX['Nb'][('y', w)].T
-                kz = kX['Nb'][('z', w)].T
-                kx_ = kX['Nc'][('x', -w)].T
-                ky_ = kX['Nc'][('y', -w)].T
-                kz_ = kX['Nc'][('z', -w)].T
+            F0 = Fock['F0']
 
-                F0 = Fock['F0']
+            # BD σ gradients #
 
-                # BD σ gradients #
+            xi_xx = self.xi(kx, kx, f_x, f_x, F0)
+            xi_yy = self.xi(ky, ky, f_y, f_y, F0)
+            xi_zz = self.xi(kz, kz, f_z, f_z, F0)
 
-                key = (('N_sig_xx', w), 2 * w)
-                mat = (3 * self.xi(kx, kx, f_x, f_x, F0) +
-                       self.xi(ky, ky, f_y, f_y, F0) +
-                       self.xi(kz, kz, f_z, f_z, F0) +
-                       0.5 * Fock['f_sig_xx'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 6 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc,
-                                                     norb)
+            key = (('N_sig_xx', w), 2 * w)
+            mat = (3 * xi_xx + xi_yy + xi_zz + 0.5 * Fock['f_sig_xx'][w]).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 6 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
 
-                key = (('N_sig_yy', w), 2 * w)
-                mat = (self.xi(kx, kx, f_x, f_x, F0) +
-                       3 * self.xi(ky, ky, f_y, f_y, F0) +
-                       self.xi(kz, kz, f_z, f_z, F0) +
-                       0.5 * Fock['f_sig_yy'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 6 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc,
-                                                     norb)
+            key = (('N_sig_yy', w), 2 * w)
+            mat = (xi_xx + 3 * xi_yy + xi_zz + 0.5 * Fock['f_sig_yy'][w]).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= 6 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
 
-                key = (('N_sig_zz', w), 2 * w)
-                mat = (self.xi(kx, kx, f_x, f_x, F0) +
-                       self.xi(ky, ky, f_y, f_y, F0) +
-                       3 * self.xi(kz, kz, f_z, f_z, F0) +
-                       0.5 * Fock['f_sig_zz'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 6 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc,
-                                                     norb)
+            key = (('N_sig_zz', w), 2 * w)
+            mat = (xi_xx + xi_yy + 3 * xi_zz + 0.5 * Fock['f_sig_zz'][w]).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= 6 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
 
-                key = (('N_sig_xy', w), 2 * w)
-                mat = (self.xi(ky, kx, f_y, f_x, F0) +
-                       self.xi(kx, ky, f_x, f_y, F0) +
-                       0.5 * Fock['f_sig_xy'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_y, d_a_mo, nocc,
-                                                     norb)
+            key = (('N_sig_xy', w), 2 * w)
+            mat = (self.xi(ky, kx, f_y, f_x, F0) +
+                   self.xi(kx, ky, f_x, f_y, F0) + 0.5 * Fock['f_sig_xy'][w]).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_y, d_a_mo, nocc, norb)
 
-                key = (('N_sig_xz', w), 2 * w)
-                mat = (self.xi(kz, kx, f_z, f_x, F0) +
-                       self.xi(kx, kz, f_x, f_z, F0) +
-                       0.5 * Fock['f_sig_xz'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_z, d_a_mo, nocc,
-                                                     norb)
+            key = (('N_sig_xz', w), 2 * w)
+            mat = (self.xi(kz, kx, f_z, f_x, F0) +
+                   self.xi(kx, kz, f_x, f_z, F0) + 0.5 * Fock['f_sig_xz'][w]).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_z, d_a_mo, nocc, norb)
 
-                key = (('N_sig_yz', w), 2 * w)
-                mat = (self.xi(kz, ky, f_z, f_y, F0) +
-                       self.xi(ky, kz, f_y, f_z, F0) +
-                       0.5 * Fock['f_sig_yz'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_z, d_a_mo, nocc,
-                                                     norb)
+            key = (('N_sig_yz', w), 2 * w)
+            mat = (self.xi(kz, ky, f_z, f_y, F0) +
+                   self.xi(ky, kz, f_y, f_z, F0) + 0.5 * Fock['f_sig_yz'][w]).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_z, d_a_mo, nocc, norb)
 
-                # BC CD λ+τ gradients #
+            # BC CD λ+τ gradients #
 
-                key = (('N_lamtau_xx', w), 0)
-                mat = (3 * 2 * self.xi(kx_, kx, f_x_, f_x, F0) +
-                       2 * self.xi(ky_, ky, f_y_, f_y, F0) +
-                       2 * self.xi(kz_, kz, f_z_, f_z, F0) +
-                       0.5 * Fock['f_lamtau_xx'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 6 * self.x2_contract(kx_.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(ky_.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kz_.T, mu_z, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 6 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc,
-                                                     norb)
+            xi_xx = self.xi(kx_, kx, f_x_, f_x, F0)
+            xi_yy = self.xi(ky_, ky, f_y_, f_y, F0)
+            xi_zz = self.xi(kz_, kz, f_z_, f_z, F0)
 
-                key = (('N_lamtau_yy', w), 0)
-                mat = (2 * self.xi(kx_, kx, f_x_, f_x, F0) +
-                       3 * 2 * self.xi(ky_, ky, f_y_, f_y, F0) +
-                       2 * self.xi(kz_, kz, f_z_, f_z, F0) +
-                       0.5 * Fock['f_lamtau_yy'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 2 * self.x2_contract(kx_.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 6 * self.x2_contract(ky_.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kz_.T, mu_z, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 6 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc,
-                                                     norb)
+            key = (('N_lamtau_xx', w), 0)
+            mat = (6 * xi_xx + 2 * xi_yy + 2 * xi_zz +
+                   0.5 * Fock['f_lamtau_xx'][w]).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 6 * self.x2_contract(kx_.T, mu_x, d_a_mo, nocc,
+                                                 norb)
+            xy_dict[key] -= 2 * self.x2_contract(ky_.T, mu_y, d_a_mo, nocc,
+                                                 norb)
+            xy_dict[key] -= 2 * self.x2_contract(kz_.T, mu_z, d_a_mo, nocc,
+                                                 norb)
+            xy_dict[key] -= 6 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
 
-                key = (('N_lamtau_zz', w), 0)
-                mat = (2 * self.xi(kx_, kx, f_x_, f_x, F0) +
-                       2 * self.xi(ky_, ky, f_y_, f_y, F0) +
-                       3 * 2 * self.xi(kz_, kz, f_z_, f_z, F0) +
-                       0.5 * Fock['f_lamtau_zz'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 2 * self.x2_contract(kx_.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(ky_.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 6 * self.x2_contract(kz_.T, mu_z, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 6 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc,
-                                                     norb)
+            key = (('N_lamtau_yy', w), 0)
+            mat = (2 * xi_xx + 6 * xi_yy + 2 * xi_zz +
+                   0.5 * Fock['f_lamtau_yy'][w]).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 2 * self.x2_contract(kx_.T, mu_x, d_a_mo, nocc,
+                                                 norb)
+            xy_dict[key] -= 6 * self.x2_contract(ky_.T, mu_y, d_a_mo, nocc,
+                                                 norb)
+            xy_dict[key] -= 2 * self.x2_contract(kz_.T, mu_z, d_a_mo, nocc,
+                                                 norb)
+            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= 6 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
 
-                key = (('N_lamtau_xy', w), 0)
-                mat = (2 * self.xi(ky_, kx, f_y_, f_x, F0) +
-                       2 * self.xi(kx_, ky, f_x_, f_y, F0) +
-                       0.5 * Fock['f_lamtau_xy'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(ky_.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kx_.T, mu_y, d_a_mo, nocc,
-                                                     norb)
+            key = (('N_lamtau_zz', w), 0)
+            mat = (2 * xi_xx + 2 * xi_yy + 6 * xi_zz +
+                   0.5 * Fock['f_lamtau_zz'][w]).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 2 * self.x2_contract(kx_.T, mu_x, d_a_mo, nocc,
+                                                 norb)
+            xy_dict[key] -= 2 * self.x2_contract(ky_.T, mu_y, d_a_mo, nocc,
+                                                 norb)
+            xy_dict[key] -= 6 * self.x2_contract(kz_.T, mu_z, d_a_mo, nocc,
+                                                 norb)
+            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= 6 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
 
-                key = (('N_lamtau_xz', w), 0)
-                mat = (2 * self.xi(kz_, kx, f_z_, f_x, F0) +
-                       2 * self.xi(kx_, kz, f_x_, f_z, F0) +
-                       0.5 * Fock['f_lamtau_xz'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_z, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kz_.T, mu_x, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kx_.T, mu_z, d_a_mo, nocc,
-                                                     norb)
+            key = (('N_lamtau_xy', w), 0)
+            mat = (2 * self.xi(ky_, kx, f_y_, f_x, F0) +
+                   2 * self.xi(kx_, ky, f_x_, f_y, F0) +
+                   0.5 * Fock['f_lamtau_xy'][w]).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(ky_.T, mu_x, d_a_mo, nocc,
+                                                 norb)
+            xy_dict[key] -= 2 * self.x2_contract(kx_.T, mu_y, d_a_mo, nocc,
+                                                 norb)
 
-                key = (('N_lamtau_yz', w), 0)
-                mat = (2 * self.xi(kz_, ky, f_z_, f_y, F0) +
-                       2 * self.xi(ky_, kz, f_y_, f_z, F0) +
-                       0.5 * Fock['f_lamtau_yz'][w]).T
-                xy_dict[key] = self.anti_sym(
-                    -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-                xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_z, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(kz_.T, mu_y, d_a_mo, nocc,
-                                                     norb)
-                xy_dict[key] -= 2 * self.x2_contract(ky_.T, mu_z, d_a_mo, nocc,
-                                                     norb)
+            key = (('N_lamtau_xz', w), 0)
+            mat = (2 * self.xi(kz_, kx, f_z_, f_x, F0) +
+                   2 * self.xi(kx_, kz, f_x_, f_z, F0) +
+                   0.5 * Fock['f_lamtau_xz'][w]).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_z, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(kz_.T, mu_x, d_a_mo, nocc,
+                                                 norb)
+            xy_dict[key] -= 2 * self.x2_contract(kx_.T, mu_z, d_a_mo, nocc,
+                                                 norb)
+
+            key = (('N_lamtau_yz', w), 0)
+            mat = (2 * self.xi(kz_, ky, f_z_, f_y, F0) +
+                   2 * self.xi(ky_, kz, f_y_, f_z, F0) +
+                   0.5 * Fock['f_lamtau_yz'][w]).T
+            xy_dict[key] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_z, d_a_mo, nocc, norb)
+            xy_dict[key] -= 2 * self.x2_contract(kz_.T, mu_y, d_a_mo, nocc,
+                                                 norb)
+            xy_dict[key] -= 2 * self.x2_contract(ky_.T, mu_z, d_a_mo, nocc,
+                                                 norb)
 
         return xy_dict
 
