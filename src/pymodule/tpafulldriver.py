@@ -325,13 +325,10 @@ class TpaFullDriver(TpaDriver):
             f_sig_xz = 3 * f_sig_xz.reshape(norb, norb)
             f_sig_yz = 3 * f_sig_yz.reshape(norb, norb)
 
-            f_x = f_x.reshape(norb, norb)
-            f_y = f_y.reshape(norb, norb)
-            f_z = f_z.reshape(norb, norb)
-
             F0 = fo['F0']
 
             # Get all the response matrices and Fock matrices
+
             kx = kX['Nb'][('x', w)].T
             ky = kX['Nb'][('y', w)].T
             kz = kX['Nb'][('z', w)].T
@@ -346,17 +343,15 @@ class TpaFullDriver(TpaDriver):
             #   Φ_αα^σ = φ(κα,κα,Fα,F0) + φ(κα,κα,Fα,F0) +
             #            Σ_{ρ}^{x,y,z}[φ(κρ,κρ,Fρ,F0)] (for α=β)
             #   Φ_αβ^σ = φ(κa,κa,Fb,F0) + φ(κb,κb,Fb,F0) (for α≠β)
-            #  For the Φ_{αβ}^{λ+τ} component see article.
+            # For the Φ_{αβ}^{λ+τ} component see article.
 
-            Phi_sig_xx = 2 * (3 * self.phi(kx, kx, Fx, F0) + self.phi(
-                ky, ky, Fy, F0) + self.phi(kz, kz, Fz, F0))
+            Pxx = self.phi(kx, kx, Fx, F0)
+            Pyy = self.phi(ky, ky, Fy, F0)
+            Pzz = self.phi(kz, kz, Fz, F0)
 
-            Phi_sig_yy = 2 * (self.phi(kx, kx, Fx, F0) +
-                              3 * self.phi(ky, ky, Fy, F0) +
-                              self.phi(kz, kz, Fz, F0))
-
-            Phi_sig_zz = 2 * (self.phi(kx, kx, Fx, F0) + self.phi(
-                ky, ky, Fy, F0) + 3 * self.phi(kz, kz, Fz, F0))
+            Phi_sig_xx = 2 * (3 * Pxx + Pyy + Pzz)
+            Phi_sig_yy = 2 * (Pxx + 3 * Pyy + Pzz)
+            Phi_sig_zz = 2 * (Pxx + Pyy + 3 * Pzz)
 
             Phi_sig_xy = (2 * self.phi(kx, ky, Fy, F0) +
                           2 * self.phi(ky, kx, Fx, F0))
@@ -367,20 +362,13 @@ class TpaFullDriver(TpaDriver):
             Phi_sig_yz = (2 * self.phi(ky, kz, Fz, F0) +
                           2 * self.phi(kz, ky, Fy, F0))
 
-            Phi_lamtau_xx = 2 * (
-                3 * self.phi(kx, kx_, Fx_, F0) + 3 * self.phi(kx_, kx, Fx, F0) +
-                self.phi(ky, ky_, Fy_, F0) + self.phi(ky_, ky, Fy, F0) +
-                self.phi(kz, kz_, Fz_, F0) + self.phi(kz_, kz, Fz, F0))
+            Pxx = self.phi(kx, kx_, Fx_, F0) + self.phi(kx_, kx, Fx, F0)
+            Pyy = self.phi(ky, ky_, Fy_, F0) + self.phi(ky_, ky, Fy, F0)
+            Pzz = self.phi(kz, kz_, Fz_, F0) + self.phi(kz_, kz, Fz, F0)
 
-            Phi_lamtau_yy = 2 * (
-                self.phi(kx, kx_, Fx_, F0) + self.phi(kx_, kx, Fx, F0) +
-                3 * self.phi(ky, ky_, Fy_, F0) + 3 * self.phi(ky_, ky, Fy, F0) +
-                self.phi(kz, kz_, Fz_, F0) + self.phi(kz_, kz, Fz, F0))
-
-            Phi_lamtau_zz = 2 * (
-                self.phi(kx, kx_, Fx_, F0) + self.phi(kx_, kx, Fx, F0) +
-                self.phi(ky, ky_, Fy_, F0) + self.phi(ky_, ky, Fy, F0) +
-                3 * self.phi(kz, kz_, Fz_, F0) + 3 * self.phi(kz_, kz, Fz, F0))
+            Phi_lamtau_xx = 2 * (3 * Pxx + Pyy + Pzz)
+            Phi_lamtau_yy = 2 * (Pxx + 3 * Pyy + Pzz)
+            Phi_lamtau_zz = 2 * (Pxx + Pyy + 3 * Pzz)
 
             Phi_lamtau_xy = 2 * (
                 self.phi(kx_, ky, Fy, F0) + self.phi(ky, kx_, Fx_, F0) +
@@ -405,6 +393,8 @@ class TpaFullDriver(TpaDriver):
             # x
 
             # Creating the transformed total Fock matrices
+            f_x = f_x.reshape(norb, norb)
+
             f_x += (self.commut(kx, Phi_lamtau_xx + f_lamtau_xx) +
                     self.commut(ky, Phi_lamtau_xy + f_lamtau_xy) +
                     self.commut(kz, Phi_lamtau_xz + f_lamtau_xz))
@@ -415,13 +405,15 @@ class TpaFullDriver(TpaDriver):
 
             # Taking the non redundant matrix elements {i,s} and forming the
             # anti-symmetric Fock vector
-            f_x = -2 * 1. / 6 * LinearSolver.lrmat2vec(f_x.T, nocc, norb)
+            f_x = -2. / 6 * LinearSolver.lrmat2vec(f_x.T, nocc, norb)
             f_x = self.anti_sym(f_x)
             f_iso_x[w] = f_x
 
             # y
 
             # Creating the transformed total Fock matrices
+            f_y = f_y.reshape(norb, norb)
+
             f_y += (self.commut(kx, Phi_lamtau_xy + f_lamtau_xy) +
                     self.commut(ky, Phi_lamtau_yy + f_lamtau_yy) +
                     self.commut(kz, Phi_lamtau_yz + f_lamtau_yz))
@@ -432,13 +424,15 @@ class TpaFullDriver(TpaDriver):
 
             # Taking the non redundant matrix elements {i,s} and forming the
             # anti-symmetric Fock vector
-            f_y = -2 * 1. / 6 * LinearSolver.lrmat2vec(f_y.T, nocc, norb)
+            f_y = -2. / 6 * LinearSolver.lrmat2vec(f_y.T, nocc, norb)
             f_y = self.anti_sym(f_y)
             f_iso_y[w] = f_y
 
             # z
 
             # Creating the transformed total Fock matrices
+            f_z = f_z.reshape(norb, norb)
+
             f_z += (self.commut(kx, Phi_lamtau_xz + f_lamtau_xz) +
                     self.commut(ky, Phi_lamtau_yz + f_lamtau_yz) +
                     self.commut(kz, Phi_lamtau_zz + f_lamtau_zz))
@@ -449,7 +443,7 @@ class TpaFullDriver(TpaDriver):
 
             # Taking the non redundant matrix elements {i,s} and forming the
             # anti-symmetric Fock vector
-            f_z = -2 * 1. / 6 * LinearSolver.lrmat2vec(f_z.T, nocc, norb)
+            f_z = -2. / 6 * LinearSolver.lrmat2vec(f_z.T, nocc, norb)
             f_z = self.anti_sym(f_z)
             f_iso_z[w] = f_z
 
