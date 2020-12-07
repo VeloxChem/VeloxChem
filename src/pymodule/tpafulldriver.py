@@ -1181,10 +1181,10 @@ class TpaFullDriver(TpaDriver):
                     'freq': w,
                     'Na': Nx['Na'][(op_a, wa)],
                     'Nb': Nx['Nb'][(op_b, wb)],
-                    'Nc': Nx['Nc'][(op_c, wc)],
+                    'Nc_Nb': Nx['Nb'][(op_c, -wc)],
                     'Nd': Nx['Nd'][(op_d, wd)],
                     'kb': kX['Nb'][(op_b, wb)],
-                    'kc': -kX['Nb'][(op_c, -wc)].T.conj(),
+                    'kc_kb': kX['Nb'][(op_c, -wc)],
                     'kd': kX['Nd'][(op_d, wd)],
                     'A': X[op_a],
                     'B': X[op_b],
@@ -1259,8 +1259,8 @@ class TpaFullDriver(TpaDriver):
                     op_ac = op_ab
                     kbd = kXY[(('N_sig_' + op_ac, w), wbd)]
                     Nbd = Nxy[(('N_sig_' + op_ac, w), wbd)]
-                    Nc = Nx['Nc'][(op_c, wc)]
-                    kc = -kX['Nb'][(op_c, -wc)].T.conj()
+                    Nc_Nb = Nx['Nb'][(op_c, -wc)]
+                    kc_kb = kX['Nb'][(op_c, -wc)]
                     C = X[op_c]
 
                     inp_list.append({
@@ -1269,8 +1269,8 @@ class TpaFullDriver(TpaDriver):
                         'kbd': kbd,
                         'Nbd': Nbd,
                         'Na': Na,
-                        'Nc': Nc,
-                        'kc': kc,
+                        'Nc_Nb': Nc_Nb,
+                        'kc_kb': kc_kb,
                         'A': A,
                         'C': C,
                     })
@@ -1330,10 +1330,10 @@ class TpaFullDriver(TpaDriver):
         w = inp_dict['freq']
         Na = inp_dict['Na']
         Nb = inp_dict['Nb']
-        Nc = inp_dict['Nc']
+        Nc = self.flip_yz(inp_dict['Nc_Nb'])  # gets Nc from Nb
         Nd = inp_dict['Nd']
         kb = inp_dict['kb']
-        kc = inp_dict['kc']
+        kc = -inp_dict['kc_kb'].T.conj()  # gets kc from kb
         kd = inp_dict['kd']
         A = inp_dict['A']
         B = inp_dict['B']
@@ -1587,11 +1587,11 @@ class TpaFullDriver(TpaDriver):
 
                 # Na = Nx['Na'][(comp_i[0], w_s)]
                 Nb = Nx['Nb'][(comp_i[1], w1)]
-                Nc = Nx['Nc'][(comp_i[2], w2)]
+                Nc = self.flip_yz(Nx['Nb'][(comp_i[2], -w2)])  # gets Nc from Nb
                 Nd = Nx['Nd'][(comp_i[3], w3)]
                 kA = kX['Na'][(comp_i[0], w_s)]
                 kB = kX['Nb'][(comp_i[1], w1)]
-                kC = -kX['Nb'][(comp_i[2], -w2)].T.conj()
+                kC = -kX['Nb'][(comp_i[2], -w2)].T.conj()  # gets kc from kb
                 kD = kX['Nd'][(comp_i[3], w3)]
 
                 Nb_h = self.flip_xy(Nb)

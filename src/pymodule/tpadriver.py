@@ -252,8 +252,6 @@ class TpaDriver:
         Nx['Nb'] = Nb_results['solutions']
         kX['Nb'] = Nb_results['kappas']
         Focks['Fb'] = Nb_results['focks']
-
-        Nx['Nc'] = {}
         Focks['Fd'] = {}
 
         # The first-order response vectors with negative frequency are
@@ -261,7 +259,6 @@ class TpaDriver:
         # frequency by using flip_zy, see article.
 
         for (op, w) in Nx['Nb']:
-            Nx['Nc'][(op, -w)] = self.flip_yz(Nx['Nb'][(op, w)])
 
             # The first-order Fock matrices with positive and negative
             # frequencies are each other complex conjugates
@@ -797,8 +794,8 @@ class TpaDriver:
         elif inp_dict['flag'] == 'BD':
             kbd = inp_dict['kbd']
             Nbd = inp_dict['Nbd']
-            Nc = inp_dict['Nc']
-            kc = inp_dict['kc']
+            Nc = self.flip_yz(inp_dict['Nc_Nb'])  # gets Nc from Nb
+            kc = -inp_dict['kc_kb'].T.conj()  # gets kc from kb
             C = inp_dict['C']
 
             na_x2_nyz += np.dot(Na.T, self.x2_contract(kbd, C, da, nocc, norb))

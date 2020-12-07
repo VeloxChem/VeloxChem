@@ -699,8 +699,8 @@ class TpaReducedDriver(TpaDriver):
                     # BD
                     kbd = kXY[(('N_sig_' + op_ac, w), wbd)]
                     Nbd = Nxy[(('N_sig_' + op_ac, w), wbd)]
-                    Nc = Nx['Nc'][(op_c, wc)]
-                    kc = -kX['Nb'][(op_c, -wc)].T.conj()
+                    Nc_Nb = Nx['Nb'][(op_c, -wc)]
+                    kc_kb = kX['Nb'][(op_c, -wc)]
                     C = X[op_c]
 
                     inp_list.append({
@@ -709,8 +709,8 @@ class TpaReducedDriver(TpaDriver):
                         'kbd': kbd,
                         'Nbd': Nbd,
                         'Na': Na,
-                        'Nc': Nc,
-                        'kc': kc,
+                        'Nc_Nb': Nc_Nb,
+                        'kc_kb': kc_kb,
                         'A': A,
                         'C': C,
                     })
