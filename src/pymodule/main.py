@@ -25,7 +25,7 @@ from .visualizationdriver import VisualizationDriver
 from .loprop import LoPropDriver
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_maximum_hours
-from .oneelectronprop import OneElectronProperties
+from .scfproperties import ScfProperties
 
 
 def select_scf_driver(task, scf_type):
@@ -215,11 +215,11 @@ def main():
             if not scf_drv.is_converged:
                 return
 
-    # SCF one-electron properties
+            # SCF first-order properties
 
-    if scf_drv.is_converged:
-        oe_prop = OneElectronProperties(task.mpi_comm, task.ostream, scf_tensors)
-        oe_prop.compute(task.molecule, task.ao_basis)
+            scf_prop = ScfProperties(task.mpi_comm, task.ostream)
+            scf_prop.compute(task.molecule, task.ao_basis, scf_tensors)
+            scf_prop.print_scf_properties(task.molecule)
 
     # Gradient
 
