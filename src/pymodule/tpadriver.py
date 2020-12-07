@@ -193,8 +193,6 @@ class TpaDriver:
         d_a_mo = self.comm.bcast(d_a_mo, root=mpi_master())
         norb = self.comm.bcast(norb, root=mpi_master())
 
-        nocc = molecule.number_of_alpha_electrons()
-
         # Computing first-order gradient vectors
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
         dipole_mats = dipole_drv.compute(molecule, ao_basis)
@@ -256,8 +254,6 @@ class TpaDriver:
         Focks['Fb'] = Nb_results['focks']
 
         Nx['Nc'] = {}
-        kX['Nc'] = {}
-        Focks['Fc'] = {}
         Focks['Fd'] = {}
 
         # The first-order response vectors with negative frequency are
@@ -266,14 +262,6 @@ class TpaDriver:
 
         for (op, w) in Nx['Nb']:
             Nx['Nc'][(op, -w)] = self.flip_yz(Nx['Nb'][(op, w)])
-
-            # Creating the response matrix for the negative first-order
-            # response vectors
-
-            kX['Nc'][(op, -w)] = (
-                LinearSolver.lrvec2mat(Nx['Nc'][(op, -w)].real, nocc, norb) +
-                1j *
-                LinearSolver.lrvec2mat(Nx['Nc'][(op, -w)].imag, nocc, norb))
 
             # The first-order Fock matrices with positive and negative
             # frequencies are each other complex conjugates

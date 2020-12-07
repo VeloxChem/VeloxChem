@@ -74,9 +74,9 @@ class TpaFullDriver(TpaDriver):
             ky = self.mo2ao(mo, kX['Nb'][('y', w)]).T
             kz = self.mo2ao(mo, kX['Nb'][('z', w)]).T
 
-            kx_ = self.mo2ao(mo, kX['Nc'][('x', -w)]).T
-            ky_ = self.mo2ao(mo, kX['Nc'][('y', -w)]).T
-            kz_ = self.mo2ao(mo, kX['Nc'][('z', -w)]).T
+            kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
+            ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
+            kz_ = -kz.conj().T  # self.mo2ao(mo, kX['Nc'][('z', -w)]).T
 
             # create the first order single indexed densiteies #
 
@@ -333,9 +333,9 @@ class TpaFullDriver(TpaDriver):
             ky = kX['Nb'][('y', w)].T
             kz = kX['Nb'][('z', w)].T
 
-            kx_ = kX['Nc'][('x', -w)].T
-            ky_ = kX['Nc'][('y', -w)].T
-            kz_ = kX['Nc'][('z', -w)].T
+            kx_ = -kx.conj().T  # kX['Nc'][('x', -w)].T
+            ky_ = -ky.conj().T  # kX['Nc'][('y', -w)].T
+            kz_ = -kz.conj().T  # kX['Nc'][('z', -w)].T
 
             # computes all the compounded Φ_αβ, see article, where small phi
             # here is defined as:
@@ -616,9 +616,10 @@ class TpaFullDriver(TpaDriver):
             kx = kX['Nb'][('x', w)].T
             ky = kX['Nb'][('y', w)].T
             kz = kX['Nb'][('z', w)].T
-            kx_ = kX['Nc'][('x', -w)].T
-            ky_ = kX['Nc'][('y', -w)].T
-            kz_ = kX['Nc'][('z', -w)].T
+
+            kx_ = -kx.conj().T  # kX['Nc'][('x', -w)].T
+            ky_ = -ky.conj().T  # kX['Nc'][('y', -w)].T
+            kz_ = -kz.conj().T  # kX['Nc'][('z', -w)].T
 
             F0 = Fock['F0']
 
@@ -804,13 +805,13 @@ class TpaFullDriver(TpaDriver):
             k_lamtau_xz = self.mo2ao(mo, kXY[(('N_lamtau_xz', w), 0)]).T
             k_lamtau_yz = self.mo2ao(mo, kXY[(('N_lamtau_yz', w), 0)]).T
 
-            kx_ = self.mo2ao(mo, kX['Nc'][('x', -w)]).T
-            ky_ = self.mo2ao(mo, kX['Nc'][('y', -w)]).T
-            kz_ = self.mo2ao(mo, kX['Nc'][('z', -w)]).T
-
             kx = self.mo2ao(mo, kX['Nb'][('x', w)]).T
             ky = self.mo2ao(mo, kX['Nb'][('y', w)]).T
             kz = self.mo2ao(mo, kX['Nb'][('z', w)]).T
+
+            kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
+            ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
+            kz_ = -kz.conj().T  # self.mo2ao(mo, kX['Nc'][('z', -w)]).T
 
             # SIGMA contributiatons #
             Dc_x_ = self.transform_dens(kx_, D0, S)
@@ -1039,13 +1040,13 @@ class TpaFullDriver(TpaDriver):
 
             # Response
 
-            k_x_ = kX['Nc'][('x', -w)].T
-            k_y_ = kX['Nc'][('y', -w)].T
-            k_z_ = kX['Nc'][('z', -w)].T
-
             k_x = kX['Nb'][('x', w)].T
             k_y = kX['Nb'][('y', w)].T
             k_z = kX['Nb'][('z', w)].T
+
+            k_x_ = -k_x.conj().T  # kX['Nc'][('x', -w)].T
+            k_y_ = -k_y.conj().T  # kX['Nc'][('y', -w)].T
+            k_z_ = -k_z.conj().T  # kX['Nc'][('z', -w)].T
 
             k_sig_xx = kXY[(('N_sig_xx', w), 2 * w)].T
             k_sig_yy = kXY[(('N_sig_yy', w), 2 * w)].T
@@ -1183,7 +1184,7 @@ class TpaFullDriver(TpaDriver):
                     'Nc': n_x['Nc'][(op_c, wc)],
                     'Nd': n_x['Nd'][(op_d, wd)],
                     'kb': kX['Nb'][(op_b, wb)],
-                    'kc': kX['Nc'][(op_c, wc)],
+                    'kc': -kX['Nb'][(op_c, -wc)].T.conj(),
                     'kd': kX['Nd'][(op_d, wd)],
                     'A': X[op_a],
                     'B': X[op_b],
@@ -1259,7 +1260,7 @@ class TpaFullDriver(TpaDriver):
                     kbd = kXY[(('N_sig_' + op_ac, w), wbd)]
                     Nbd = n_xy[(('N_sig_' + op_ac, w), wbd)]
                     Nc = n_x['Nc'][(op_c, wc)]
-                    kc = kX['Nc'][(op_c, wc)]
+                    kc = -kX['Nb'][(op_c, -wc)].T.conj()
                     C = X[op_c]
 
                     inp_list.append({
@@ -1459,7 +1460,7 @@ class TpaFullDriver(TpaDriver):
                 comp_i = track[i]
 
                 kB = kX['Nb'][(comp_i[1], w1)]
-                kC = kX['Nc'][(comp_i[2], w2)]
+                kC = -kX['Nb'][(comp_i[2], -w2)].T.conj()
                 kD = kX['Nd'][(comp_i[3], w3)]
 
                 if comp_i[0] in 'x':
@@ -1590,7 +1591,7 @@ class TpaFullDriver(TpaDriver):
                 Nd = n_x['Nd'][(comp_i[3], w3)]
                 kA = kX['Na'][(comp_i[0], w_s)]
                 kB = kX['Nb'][(comp_i[1], w1)]
-                kC = kX['Nc'][(comp_i[2], w2)]
+                kC = -kX['Nb'][(comp_i[2], -w2)].T.conj()
                 kD = kX['Nd'][(comp_i[3], w3)]
 
                 Nb_h = self.flip_xy(Nb)

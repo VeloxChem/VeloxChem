@@ -401,9 +401,13 @@ class TpaReducedDriver(TpaDriver):
             k_sig_xz = self.mo2ao(mo, kXY[(('N_sig_xz', w), 2 * w)]).T
             k_sig_yz = self.mo2ao(mo, kXY[(('N_sig_yz', w), 2 * w)]).T
 
-            kx_ = self.mo2ao(mo, kX['Nc'][('x', -w)]).T
-            ky_ = self.mo2ao(mo, kX['Nc'][('y', -w)]).T
-            kz_ = self.mo2ao(mo, kX['Nc'][('z', -w)]).T
+            kx = self.mo2ao(mo, kX['Nb'][('x', w)]).T
+            ky = self.mo2ao(mo, kX['Nb'][('y', w)]).T
+            kz = self.mo2ao(mo, kX['Nb'][('z', w)]).T
+
+            kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
+            ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
+            kz_ = -kz.conj().T  # self.mo2ao(mo, kX['Nc'][('z', -w)]).T
 
             # SIGMA contributiatons #
             Dc_x_ = self.transform_dens(kx_, D0, S)
@@ -580,9 +584,13 @@ class TpaReducedDriver(TpaDriver):
 
             # Response #
 
-            k_x_ = kX['Nc'][('x', -w)].T
-            k_y_ = kX['Nc'][('y', -w)].T
-            k_z_ = kX['Nc'][('z', -w)].T
+            k_x = kX['Nb'][('x', w)].T
+            k_y = kX['Nb'][('y', w)].T
+            k_z = kX['Nb'][('z', w)].T
+
+            k_x_ = -k_x.conj().T  # kX['Nc'][('x', -w)].T
+            k_y_ = -k_y.conj().T  # kX['Nc'][('y', -w)].T
+            k_z_ = -k_z.conj().T  # kX['Nc'][('z', -w)].T
 
             k_sig_xx = kXY[(('N_sig_xx', w), 2 * w)].T
             k_sig_yy = kXY[(('N_sig_yy', w), 2 * w)].T
@@ -692,7 +700,7 @@ class TpaReducedDriver(TpaDriver):
                     kbd = kXY[(('N_sig_' + op_ac, w), wbd)]
                     Nbd = n_xy[(('N_sig_' + op_ac, w), wbd)]
                     Nc = n_x['Nc'][(op_c, wc)]
-                    kc = kX['Nc'][(op_c, wc)]
+                    kc = -kX['Nb'][(op_c, -wc)].T.conj()
                     C = X[op_c]
 
                     inp_list.append({
