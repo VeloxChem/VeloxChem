@@ -282,22 +282,10 @@ class TpaReducedDriver(TpaDriver):
             if self.rank != mpi_master():
                 continue
 
-            vec_pack = np.hstack(vec_pack)
+            vec_pack = np.hstack(vec_pack).reshape(-1, norb, norb)
 
             (f_x, f_y, f_z, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy, f_sig_xz,
              f_sig_yz) = vec_pack
-
-            f_x = f_x.reshape(norb, norb)
-            f_y = f_y.reshape(norb, norb)
-            f_z = f_z.reshape(norb, norb)
-
-            f_sig_xx = f_sig_xx.reshape(norb, norb)
-            f_sig_yy = f_sig_yy.reshape(norb, norb)
-            f_sig_zz = f_sig_zz.reshape(norb, norb)
-
-            f_sig_xy = f_sig_xy.reshape(norb, norb)
-            f_sig_xz = f_sig_xz.reshape(norb, norb)
-            f_sig_yz = f_sig_yz.reshape(norb, norb)
 
             mu_x = X['x']
             mu_y = X['y']
@@ -555,30 +543,22 @@ class TpaReducedDriver(TpaDriver):
             if self.rank != mpi_master():
                 continue
 
-            vec_pack = np.hstack(vec_pack)
+            vec_pack = np.hstack(vec_pack).reshape(-1, norb, norb)
 
             (f_x, f_y, f_z, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy, f_sig_xz,
              f_sig_yz, F123_x, F123_y, F123_z) = vec_pack
-
-            f_x = f_x.reshape(norb, norb)
-            f_y = f_y.reshape(norb, norb)
-            f_z = f_z.reshape(norb, norb)
 
             f_x_ = f_x.T.conj()  # fo['Fc'][('x', -w)]
             f_y_ = f_y.T.conj()  # fo['Fc'][('y', -w)]
             f_z_ = f_z.T.conj()  # fo['Fc'][('z', -w)]
 
-            f_sig_xx = f_sig_xx.reshape(norb, norb).T.conj()
-            f_sig_yy = f_sig_yy.reshape(norb, norb).T.conj()
-            f_sig_zz = f_sig_zz.reshape(norb, norb).T.conj()
+            f_sig_xx = f_sig_xx.T.conj()
+            f_sig_yy = f_sig_yy.T.conj()
+            f_sig_zz = f_sig_zz.T.conj()
 
-            f_sig_xy = f_sig_xy.reshape(norb, norb).T.conj()
-            f_sig_xz = f_sig_xz.reshape(norb, norb).T.conj()
-            f_sig_yz = f_sig_yz.reshape(norb, norb).T.conj()
-
-            F123_x = F123_x.reshape(norb, norb)
-            F123_y = F123_y.reshape(norb, norb)
-            F123_z = F123_z.reshape(norb, norb)
+            f_sig_xy = f_sig_xy.T.conj()
+            f_sig_xz = f_sig_xz.T.conj()
+            f_sig_yz = f_sig_yz.T.conj()
 
             F0_a = fo['F0']
 

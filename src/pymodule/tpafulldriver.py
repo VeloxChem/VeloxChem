@@ -273,18 +273,18 @@ class TpaFullDriver(TpaDriver):
                 fo['Fb'][('x', w)].data,
                 fo['Fb'][('y', w)].data,
                 fo['Fb'][('z', w)].data,
-                fo['f_lamtau_xx'][w].data,
-                fo['f_lamtau_yy'][w].data,
-                fo['f_lamtau_zz'][w].data,
-                fo['f_lamtau_xy'][w].data,
-                fo['f_lamtau_xz'][w].data,
-                fo['f_lamtau_yz'][w].data,
-                fo['f_sig_xx'][w].data,
-                fo['f_sig_yy'][w].data,
-                fo['f_sig_zz'][w].data,
-                fo['f_sig_xy'][w].data,
-                fo['f_sig_xz'][w].data,
-                fo['f_sig_yz'][w].data,
+                fo['f_lamtau_xx'][w].data * 3,
+                fo['f_lamtau_yy'][w].data * 3,
+                fo['f_lamtau_zz'][w].data * 3,
+                fo['f_lamtau_xy'][w].data * 3,
+                fo['f_lamtau_xz'][w].data * 3,
+                fo['f_lamtau_yz'][w].data * 3,
+                fo['f_sig_xx'][w].data * 3,
+                fo['f_sig_yy'][w].data * 3,
+                fo['f_sig_zz'][w].data * 3,
+                fo['f_sig_xy'][w].data * 3,
+                fo['f_sig_xz'][w].data * 3,
+                fo['f_sig_yz'][w].data * 3,
                 fo['F123_x'][w].data,
                 fo['F123_y'][w].data,
                 fo['F123_z'][w].data,
@@ -295,35 +295,15 @@ class TpaFullDriver(TpaDriver):
             if self.rank != mpi_master():
                 continue
 
-            vec_pack = np.hstack(vec_pack)
+            vec_pack = np.hstack(vec_pack).reshape(-1, norb, norb)
 
             (Fx, Fy, Fz, f_lamtau_xx, f_lamtau_yy, f_lamtau_zz, f_lamtau_xy,
              f_lamtau_xz, f_lamtau_yz, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy,
              f_sig_xz, f_sig_yz, f_x, f_y, f_z) = vec_pack
 
-            Fx = Fx.reshape(norb, norb)
-            Fy = Fy.reshape(norb, norb)
-            Fz = Fz.reshape(norb, norb)
-
             Fx_ = Fx.T.conj()  # fo['Fc'][('x', -w)]
             Fy_ = Fy.T.conj()  # fo['Fc'][('y', -w)]
             Fz_ = Fz.T.conj()  # fo['Fc'][('z', -w)]
-
-            f_lamtau_xx = 3 * f_lamtau_xx.reshape(norb, norb)
-            f_lamtau_yy = 3 * f_lamtau_yy.reshape(norb, norb)
-            f_lamtau_zz = 3 * f_lamtau_zz.reshape(norb, norb)
-
-            f_lamtau_xy = 3 * f_lamtau_xy.reshape(norb, norb)
-            f_lamtau_xz = 3 * f_lamtau_xz.reshape(norb, norb)
-            f_lamtau_yz = 3 * f_lamtau_yz.reshape(norb, norb)
-
-            f_sig_xx = 3 * f_sig_xx.reshape(norb, norb)
-            f_sig_yy = 3 * f_sig_yy.reshape(norb, norb)
-            f_sig_zz = 3 * f_sig_zz.reshape(norb, norb)
-
-            f_sig_xy = 3 * f_sig_xy.reshape(norb, norb)
-            f_sig_xz = 3 * f_sig_xz.reshape(norb, norb)
-            f_sig_yz = 3 * f_sig_yz.reshape(norb, norb)
 
             F0 = fo['F0']
 
@@ -393,12 +373,9 @@ class TpaFullDriver(TpaDriver):
             # x
 
             # Creating the transformed total Fock matrices
-            f_x = f_x.reshape(norb, norb)
-
             f_x += (self.commut(kx, Phi_lamtau_xx + f_lamtau_xx) +
                     self.commut(ky, Phi_lamtau_xy + f_lamtau_xy) +
                     self.commut(kz, Phi_lamtau_xz + f_lamtau_xz))
-
             f_x += (self.commut(kx_, Phi_sig_xx + f_sig_xx) +
                     self.commut(ky_, Phi_sig_xy + f_sig_xy) +
                     self.commut(kz_, Phi_sig_xz + f_sig_xz))
@@ -412,12 +389,9 @@ class TpaFullDriver(TpaDriver):
             # y
 
             # Creating the transformed total Fock matrices
-            f_y = f_y.reshape(norb, norb)
-
             f_y += (self.commut(kx, Phi_lamtau_xy + f_lamtau_xy) +
                     self.commut(ky, Phi_lamtau_yy + f_lamtau_yy) +
                     self.commut(kz, Phi_lamtau_yz + f_lamtau_yz))
-
             f_y += (self.commut(kx_, Phi_sig_xy + f_sig_xy) +
                     self.commut(ky_, Phi_sig_yy + f_sig_yy) +
                     self.commut(kz_, Phi_sig_yz + f_sig_yz))
@@ -431,12 +405,9 @@ class TpaFullDriver(TpaDriver):
             # z
 
             # Creating the transformed total Fock matrices
-            f_z = f_z.reshape(norb, norb)
-
             f_z += (self.commut(kx, Phi_lamtau_xz + f_lamtau_xz) +
                     self.commut(ky, Phi_lamtau_yz + f_lamtau_yz) +
                     self.commut(kz, Phi_lamtau_zz + f_lamtau_zz))
-
             f_z += (self.commut(kx_, Phi_sig_xz + f_sig_xz) +
                     self.commut(ky_, Phi_sig_yz + f_sig_yz) +
                     self.commut(kz_, Phi_sig_zz + f_sig_zz))
@@ -579,35 +550,15 @@ class TpaFullDriver(TpaDriver):
             if self.rank != mpi_master():
                 continue
 
-            vec_pack = np.hstack(vec_pack)
+            vec_pack = np.hstack(vec_pack).reshape(-1, norb, norb)
 
             (f_x, f_y, f_z, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy, f_sig_xz,
              f_sig_yz, f_lamtau_xx, f_lamtau_yy, f_lamtau_zz, f_lamtau_xy,
              f_lamtau_xz, f_lamtau_yz) = vec_pack
 
-            f_x = f_x.reshape(norb, norb)
-            f_y = f_y.reshape(norb, norb)
-            f_z = f_z.reshape(norb, norb)
-
             f_x_ = f_x.T.conj()  # Fock['Fc'][('x', -w)]
             f_y_ = f_y.T.conj()  # Fock['Fc'][('y', -w)]
             f_z_ = f_z.T.conj()  # Fock['Fc'][('z', -w)]
-
-            f_sig_xx = f_sig_xx.reshape(norb, norb)
-            f_sig_yy = f_sig_yy.reshape(norb, norb)
-            f_sig_zz = f_sig_zz.reshape(norb, norb)
-
-            f_sig_xy = f_sig_xy.reshape(norb, norb)
-            f_sig_xz = f_sig_xz.reshape(norb, norb)
-            f_sig_yz = f_sig_yz.reshape(norb, norb)
-
-            f_lamtau_xx = f_lamtau_xx.reshape(norb, norb)
-            f_lamtau_yy = f_lamtau_yy.reshape(norb, norb)
-            f_lamtau_zz = f_lamtau_zz.reshape(norb, norb)
-
-            f_lamtau_xy = f_lamtau_xy.reshape(norb, norb)
-            f_lamtau_xz = f_lamtau_xz.reshape(norb, norb)
-            f_lamtau_yz = f_lamtau_yz.reshape(norb, norb)
 
             mu_x = X['x']
             mu_y = X['y']
@@ -1002,39 +953,31 @@ class TpaFullDriver(TpaDriver):
             if self.rank != mpi_master():
                 continue
 
-            vec_pack = np.hstack(vec_pack)
+            vec_pack = np.hstack(vec_pack).reshape(-1, norb, norb)
 
             (f_x, f_y, f_z, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy, f_sig_xz,
              f_sig_yz, f_lamtau_xx, f_lamtau_yy, f_lamtau_zz, f_lamtau_xy,
              f_lamtau_xz, f_lamtau_yz, F123_x, F123_y, F123_z) = vec_pack
 
-            f_x = f_x.reshape(norb, norb)
-            f_y = f_y.reshape(norb, norb)
-            f_z = f_z.reshape(norb, norb)
-
             f_x_ = f_x.T.conj()  # fo['Fc'][('x', -w)]
             f_y_ = f_y.T.conj()  # fo['Fc'][('y', -w)]
             f_z_ = f_z.T.conj()  # fo['Fc'][('z', -w)]
 
-            f_sig_xx = f_sig_xx.reshape(norb, norb).T.conj()
-            f_sig_yy = f_sig_yy.reshape(norb, norb).T.conj()
-            f_sig_zz = f_sig_zz.reshape(norb, norb).T.conj()
+            f_sig_xx = f_sig_xx.T.conj()
+            f_sig_yy = f_sig_yy.T.conj()
+            f_sig_zz = f_sig_zz.T.conj()
 
-            f_sig_xy = f_sig_xy.reshape(norb, norb).T.conj()
-            f_sig_xz = f_sig_xz.reshape(norb, norb).T.conj()
-            f_sig_yz = f_sig_yz.reshape(norb, norb).T.conj()
+            f_sig_xy = f_sig_xy.T.conj()
+            f_sig_xz = f_sig_xz.T.conj()
+            f_sig_yz = f_sig_yz.T.conj()
 
-            f_lamtau_xx = f_lamtau_xx.reshape(norb, norb).T.conj()
-            f_lamtau_yy = f_lamtau_yy.reshape(norb, norb).T.conj()
-            f_lamtau_zz = f_lamtau_zz.reshape(norb, norb).T.conj()
+            f_lamtau_xx = f_lamtau_xx.T.conj()
+            f_lamtau_yy = f_lamtau_yy.T.conj()
+            f_lamtau_zz = f_lamtau_zz.T.conj()
 
-            f_lamtau_xy = f_lamtau_xy.reshape(norb, norb).T.conj()
-            f_lamtau_xz = f_lamtau_xz.reshape(norb, norb).T.conj()
-            f_lamtau_yz = f_lamtau_yz.reshape(norb, norb).T.conj()
-
-            F123_x = F123_x.reshape(norb, norb)
-            F123_y = F123_y.reshape(norb, norb)
-            F123_z = F123_z.reshape(norb, norb)
+            f_lamtau_xy = f_lamtau_xy.T.conj()
+            f_lamtau_xz = f_lamtau_xz.T.conj()
+            f_lamtau_yz = f_lamtau_yz.T.conj()
 
             F0_a = fo['F0']
 

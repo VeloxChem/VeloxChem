@@ -263,16 +263,14 @@ class TpaDriver:
             # The first-order Fock matrices with positive and negative
             # frequencies are each other complex conjugates
 
-            Focks_Fb_op_w = Focks['Fb'][(op, w)].get_full_vector()
+            Fb_op_w = Focks['Fb'][(op, w)].get_full_vector()
 
             if self.rank == mpi_master():
-                Focks['Fd'][(op, w)] = Focks_Fb_op_w.reshape(
-                    norb, norb).T.conj().reshape(-1)
+                Fd_op_w = Fb_op_w.reshape(norb, norb).T.conj().reshape(-1)
             else:
-                Focks['Fd'][(op, w)] = None
+                Fd_op_w = None
 
-            Focks['Fd'][(op, w)] = DistributedArray(Focks['Fd'][(op, w)],
-                                                    self.comm)
+            Focks['Fd'][(op, w)] = DistributedArray(Fd_op_w, self.comm)
 
         # For cubic-response with all operators being the dipole μ Nb=Na=Nd
         # Likewise, Fb=Fd
