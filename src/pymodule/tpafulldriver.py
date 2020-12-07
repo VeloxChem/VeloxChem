@@ -243,7 +243,7 @@ class TpaFullDriver(TpaDriver):
 
     def get_e4(self, wi, kX, fo, nocc, norb):
         """
-        Contracts E[4]n_xNyNz for the isotropic cubic response function. Takes
+        Contracts E[4]NxNyNz for the isotropic cubic response function. Takes
         the Fock matrices from fock_dict and contracts them with the response
         vectors.
 
@@ -449,8 +449,8 @@ class TpaFullDriver(TpaDriver):
 
         return {'f_iso_x': f_iso_x, 'f_iso_y': f_iso_y, 'f_iso_z': f_iso_z}
 
-    def get_n_xy(self, w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule,
-                 ao_basis, scf_tensors):
+    def get_Nxy(self, w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule,
+                ao_basis, scf_tensors):
         """
         Computes all the second-order response vectors needed for the isotropic
         cubic response computation
@@ -522,11 +522,11 @@ class TpaFullDriver(TpaDriver):
         N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
                                               xy_dict)
 
-        n_xy_dict = N_total_results['solutions']
-        kxy_dict = N_total_results['kappas']
+        Nxy_dict = N_total_results['solutions']
+        kXY_dict = N_total_results['kappas']
         FXY_2_dict = N_total_results['focks']
 
-        return (n_xy_dict, kxy_dict, FXY_2_dict)
+        return (Nxy_dict, kXY_dict, FXY_2_dict)
 
     def get_xy(self, d_a_mo, X, wi, Fock, kX, nocc, norb):
         """
@@ -1125,7 +1125,7 @@ class TpaFullDriver(TpaDriver):
 
         return {'f_iso_x': f_iso_x, 'f_iso_y': f_iso_y, 'f_iso_z': f_iso_z}
 
-    def get_other_terms(self, wi, track, n_x, n_xy, X, kX, kXY, da, nocc, norb):
+    def get_other_terms(self, wi, track, Nx, Nxy, X, kX, kXY, da, nocc, norb):
         """
         Computes the terms involving X[3],A[3],X[2],A[2] in the isotropic cubic
         response function
@@ -1135,9 +1135,9 @@ class TpaFullDriver(TpaDriver):
         :param track:
             A list that contains information about what γ components that are
             to be computed and which freqs
-        :param n_x:
+        :param Nx:
             A dictonary containing all the single-index response vectors
-        :param n_xy:
+        :param Nxy:
             A dictonary containing all the two-index response vectors
         :param X:
             A dictonray with all the property integral matricies
@@ -1179,10 +1179,10 @@ class TpaFullDriver(TpaDriver):
 
                 inp_list.append({
                     'freq': w,
-                    'Na': n_x['Na'][(op_a, wa)],
-                    'Nb': n_x['Nb'][(op_b, wb)],
-                    'Nc': n_x['Nc'][(op_c, wc)],
-                    'Nd': n_x['Nd'][(op_d, wd)],
+                    'Na': Nx['Na'][(op_a, wa)],
+                    'Nb': Nx['Nb'][(op_b, wb)],
+                    'Nc': Nx['Nc'][(op_c, wc)],
+                    'Nd': Nx['Nd'][(op_d, wd)],
                     'kb': kX['Nb'][(op_b, wb)],
                     'kc': -kX['Nb'][(op_c, -wc)].T.conj(),
                     'kd': kX['Nd'][(op_d, wd)],
@@ -1229,7 +1229,7 @@ class TpaFullDriver(TpaDriver):
             wbd = wb + wd
 
             for op_a in 'xyz':
-                Na = n_x['Na'][(op_a, wa)]
+                Na = Nx['Na'][(op_a, wa)]
                 A = X[op_a]
 
                 for op_b in 'xyz':
@@ -1237,8 +1237,8 @@ class TpaFullDriver(TpaDriver):
 
                     # CD
                     kcd = kXY[(('N_lamtau_' + op_ab, w), wcd)]
-                    Ncd = n_xy[(('N_lamtau_' + op_ab, w), wcd)]
-                    Nb = n_x['Nb'][(op_b, w)]
+                    Ncd = Nxy[(('N_lamtau_' + op_ab, w), wcd)]
+                    Nb = Nx['Nb'][(op_b, w)]
                     kb = kX['Nb'][(op_b, w)]
                     B = X[op_b]
 
@@ -1258,8 +1258,8 @@ class TpaFullDriver(TpaDriver):
                     op_c = op_b
                     op_ac = op_ab
                     kbd = kXY[(('N_sig_' + op_ac, w), wbd)]
-                    Nbd = n_xy[(('N_sig_' + op_ac, w), wbd)]
-                    Nc = n_x['Nc'][(op_c, wc)]
+                    Nbd = Nxy[(('N_sig_' + op_ac, w), wbd)]
+                    Nc = Nx['Nc'][(op_c, wc)]
                     kc = -kX['Nb'][(op_c, -wc)].T.conj()
                     C = X[op_c]
 
@@ -1349,7 +1349,7 @@ class TpaFullDriver(TpaDriver):
         na_x3_ny_nz -= np.dot(Na.T, self.x3_contract(kb, kc, D, da, nocc, norb))
         na_x3_ny_nz -= np.dot(Na.T, self.x3_contract(kc, kb, D, da, nocc, norb))
 
-        # NaA[3]n_xNy
+        # NaA[3]NxNy
 
         na_a3_nx_ny += np.dot(self.a3_contract(kb, kc, A, da, nocc, norb), Nd)
         na_a3_nx_ny += np.dot(self.a3_contract(kb, kd, A, da, nocc, norb), Nc)
@@ -1364,17 +1364,17 @@ class TpaFullDriver(TpaDriver):
             'a3': (1. / 15) * na_a3_nx_ny,
         }
 
-    def get_t4(self, wi, e4_dict, n_x, kX, track, da, nocc, norb):
+    def get_t4(self, wi, e4_dict, Nx, kX, track, da, nocc, norb):
         """
         Computes the contraction of the E[4] tensor with that of the S[4] and
         R[4] tensors to return the contraction of T[4] as a dictonary of
-        vectors. T[4]n_xNyNz = (E^[4]-ω_1S^[4]-ω_1S^[4]-ω_3S^[4]-γiR^[4])
+        vectors. T[4]NxNyNz = (E^[4]-ω_1S^[4]-ω_1S^[4]-ω_3S^[4]-γiR^[4])
 
         :param wi:
             A list of all the freqs
         :param e4_dict:
             A dictonary of all the E[4] contraction
-        :param n_x:
+        :param Nx:
             A dictonary with all the single index response vectors
         :param kX:
             A dictonray containng all the response matricies
@@ -1396,7 +1396,7 @@ class TpaFullDriver(TpaDriver):
         S4 = self.S4_dict(wi, kX, track, da, nocc, norb)
 
         if self.damping > 0:
-            R4term = self.get_r4(wi, kX, n_x, track, da, nocc, norb)
+            R4term = self.get_r4(wi, kX, Nx, track, da, nocc, norb)
 
         comp_per_freq = len(track) // len(wi)
 
@@ -1405,11 +1405,11 @@ class TpaFullDriver(TpaDriver):
             w = float(vals[1])
             ww = float(vals[1])
 
-            t4term = (np.matmul(n_x['Na'][('x', w)],
+            t4term = (np.matmul(Nx['Na'][('x', w)],
                                 e4_dict['f_iso_x'][ww] - S4[('x', ww)]) +
-                      np.matmul(n_x['Na'][('y', w)],
+                      np.matmul(Nx['Na'][('y', w)],
                                 e4_dict['f_iso_y'][ww] - S4[('y', ww)]) +
-                      np.matmul(n_x['Na'][('z', w)],
+                      np.matmul(Nx['Na'][('z', w)],
                                 e4_dict['f_iso_z'][ww] - S4[('z', ww)]))
 
             if self.damping > 0:
@@ -1540,7 +1540,7 @@ class TpaFullDriver(TpaDriver):
         S4N1N2N3_c = S4N1N2N3[0] + 1j * S4N1N2N3[1]
         return (2. / 6) * S4N1N2N3_c
 
-    def get_r4(self, freqs, kX, n_x, track, d_a_mo, nocc, norb):
+    def get_r4(self, freqs, kX, Nx, track, d_a_mo, nocc, norb):
         """
         Returns a dict with all the R[4]NxNyNz contractions for the subsequent
         T[4] contraction
@@ -1549,7 +1549,7 @@ class TpaFullDriver(TpaDriver):
             A list of all the frequencies
         :param kX:
             A dictonary of all the first-order response matrices
-        :param n_x:
+        :param Nx:
             A dictonary of all the first-order response vectors
         :param track:
             A list of all the cubic response function components that are to be
@@ -1585,10 +1585,10 @@ class TpaFullDriver(TpaDriver):
             for i in range(j * comp_per_freq, (j + 1) * comp_per_freq):
                 comp_i = track[i]
 
-                # Na = n_x['Na'][(comp_i[0], w_s)]
-                Nb = n_x['Nb'][(comp_i[1], w1)]
-                Nc = n_x['Nc'][(comp_i[2], w2)]
-                Nd = n_x['Nd'][(comp_i[3], w3)]
+                # Na = Nx['Na'][(comp_i[0], w_s)]
+                Nb = Nx['Nb'][(comp_i[1], w1)]
+                Nc = Nx['Nc'][(comp_i[2], w2)]
+                Nd = Nx['Nd'][(comp_i[3], w3)]
                 kA = kX['Na'][(comp_i[0], w_s)]
                 kB = kX['Nb'][(comp_i[1], w1)]
                 kC = -kX['Nb'][(comp_i[2], -w2)].T.conj()

@@ -381,16 +381,16 @@ class TpaDriver:
 
         # computing all the compounded second-order response vectors and
         # extracting some of the second-order Fock matrices from the subspace
-        (n_xy_dict, kxy_dict,
-         Focks_xy) = self.get_n_xy(w, d_a_mo, X, fock_dict, kX, nocc, norb,
-                                   molecule, ao_basis, scf_tensors)
+        (Nxy_dict, kXY_dict, Focks_xy) = self.get_Nxy(w, d_a_mo, X, fock_dict,
+                                                      kX, nocc, norb, molecule,
+                                                      ao_basis, scf_tensors)
 
         profiler.check_memory_usage('2nd CPP')
 
         # computing all second-order compounded densities based on the
         # second-order response vectors
         if self.rank == mpi_master():
-            density_list_two = self.get_densities_II(w, kX, kxy_dict, S, D0, mo)
+            density_list_two = self.get_densities_II(w, kX, kXY_dict, S, D0, mo)
         else:
             density_list_two = None
 
@@ -409,15 +409,15 @@ class TpaDriver:
 
         # computing the compounded E[3] contractions for the isotropic
         # cubic response function
-        e3_dict = self.get_e3(w, kX, kxy_dict, fock_dict, fock_dict_two, nocc,
+        e3_dict = self.get_e3(w, kX, kXY_dict, fock_dict, fock_dict_two, nocc,
                               norb)
 
         profiler.check_memory_usage('E[3]')
 
         # computing the X[3],A[3],X[2],A[2] contractions for the isotropic
         # cubic response function
-        other_dict = self.get_other_terms(w, track, Nx, n_xy_dict, X, kX,
-                                          kxy_dict, d_a_mo, nocc, norb)
+        other_dict = self.get_other_terms(w, track, Nx, Nxy_dict, X, kX,
+                                          kXY_dict, d_a_mo, nocc, norb)
 
         profiler.check_memory_usage('X[3],A[3],X[2],A[2]')
 
@@ -509,7 +509,7 @@ class TpaDriver:
 
     def get_e4(self, wi, kX, fo, nocc, norb):
         """
-        Contracts E[4]n_xNyNz for the isotropic cubic response function. Takes
+        Contracts E[4]NxNyNz for the isotropic cubic response function. Takes
         the Fock matrices from fock_dict and contracts them with the response
         vectors.
 
@@ -531,8 +531,8 @@ class TpaDriver:
 
         return None
 
-    def get_n_xy(self, w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule,
-                 ao_basis, scf_tensors):
+    def get_Nxy(self, w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule,
+                ao_basis, scf_tensors):
         """
         Computes all the second-order response vectors needed for the isotropic
         cubic response computation
@@ -638,7 +638,7 @@ class TpaDriver:
 
         return None
 
-    def get_other_terms(self, wi, track, n_x, n_xy, X, kX, kXY, da, nocc, norb):
+    def get_other_terms(self, wi, track, Nx, Nxy, X, kX, kXY, da, nocc, norb):
         """
         Computes the terms involving X[3],A[3],X[2],A[2] in the isotropic cubic
         response function
@@ -648,9 +648,9 @@ class TpaDriver:
         :param track:
             A list that contains information about what γ components that are
             to be computed and which freqs
-        :param n_x:
+        :param Nx:
             A dictonary containing all the single-index response vectors
-        :param n_xy:
+        :param Nxy:
             A dictonary containing all the two-index response vectors
         :param X:
             A dictonray with all the property integral matricies
@@ -671,17 +671,17 @@ class TpaDriver:
 
         return None
 
-    def get_t4(self, wi, e4_dict, n_x, kX, track, da, nocc, norb):
+    def get_t4(self, wi, e4_dict, Nx, kX, track, da, nocc, norb):
         """
         Computes the contraction of the E[4] tensor with that of the S[4] and
         R[4] tensors to return the contraction of T[4] as a dictonary of
-        vectors. T[4]n_xNyNz = (E^[4]-ω_1S^[4]-ω_1S^[4]-ω_3S^[4]-γiR^[4])
+        vectors. T[4]NxNyNz = (E^[4]-ω_1S^[4]-ω_1S^[4]-ω_3S^[4]-γiR^[4])
 
         :param wi:
             A list of all the freqs
         :param e4_dict:
             A dictonary of all the E[4] contraction
-        :param n_x:
+        :param Nx:
             A dictonary with all the single index response vectors
         :param kX:
             A dictonray containng all the response matricies
@@ -701,7 +701,7 @@ class TpaDriver:
 
         return None
 
-    def get_t3(self, freqs, e3_dict, n_x, track):
+    def get_t3(self, freqs, e3_dict, Nx, track):
         """
         Computes the T[3] contraction, for HF S[3] = 0, R[3] = 0 such that
         the T[3] contraction for the isotropic cubic response function in terms
@@ -716,8 +716,8 @@ class TpaDriver:
             List of frequencies of the pertubations
         :param e3_dict:
             A dictonary that contains the contractions of E[3]
-        :param n_x:
-            A dictonary containing the response vectors n_x = (E[2]-wS[2])^-1
+        :param Nx:
+            A dictonary containing the response vectors Nx = (E[2]-wS[2])^-1
             X[1]
         :param track:
             A list containing information about what tensor components that are
@@ -732,9 +732,9 @@ class TpaDriver:
         for i in range(len(freqs)):
             w = float(track[i * (len(track) // len(freqs))].split(",")[1])
 
-            t3term = (np.matmul(n_x['Na'][('x', w)], e3_dict['f_iso_x'][w]) +
-                      np.matmul(n_x['Na'][('y', w)], e3_dict['f_iso_y'][w]) +
-                      np.matmul(n_x['Na'][('z', w)], e3_dict['f_iso_z'][w]))
+            t3term = (np.matmul(Nx['Na'][('x', w)], e3_dict['f_iso_x'][w]) +
+                      np.matmul(Nx['Na'][('y', w)], e3_dict['f_iso_y'][w]) +
+                      np.matmul(Nx['Na'][('z', w)], e3_dict['f_iso_z'][w]))
 
             t3_term[(w, -w, w)] = 1. / 15 * t3term
 
@@ -1019,10 +1019,10 @@ class TpaDriver:
             Returns a matrix
         """
 
-        Xn_x = self.commut(self.commut(k, X), D.T)
-        X2n_x_c = (LinearSolver.lrmat2vec(Xn_x.real, nocc, norb) +
-                   1j * LinearSolver.lrmat2vec(Xn_x.imag, nocc, norb))
-        return X2n_x_c
+        XNx = self.commut(self.commut(k, X), D.T)
+        X2Nx_c = (LinearSolver.lrmat2vec(XNx.real, nocc, norb) +
+                  1j * LinearSolver.lrmat2vec(XNx.imag, nocc, norb))
+        return X2Nx_c
 
     def x3_contract(self, k1, k2, X, D, nocc, norb):
         """
@@ -1046,13 +1046,10 @@ class TpaDriver:
             Returns a matrix
         """
 
-        X3n_xNy = self.commut(self.commut(k2, self.commut(k1, X)), D.T)
-        X3n_xNy = [
-            LinearSolver.lrmat2vec(X3n_xNy.real, nocc, norb),
-            LinearSolver.lrmat2vec(X3n_xNy.imag, nocc, norb)
-        ]
-        X3n_xNy_c = X3n_xNy[0] + 1j * X3n_xNy[1]
-        return (1. / 2) * X3n_xNy_c
+        X3NxNy = self.commut(self.commut(k2, self.commut(k1, X)), D.T)
+        X3NxNy_c = (LinearSolver.lrmat2vec(X3NxNy.real, nocc, norb) +
+                    1j * LinearSolver.lrmat2vec(X3NxNy.imag, nocc, norb))
+        return (1. / 2) * X3NxNy_c
 
     def a3_contract(self, k1, k2, A, D, nocc, norb):
         """
@@ -1076,13 +1073,10 @@ class TpaDriver:
             Returns a matrix
         """
 
-        A3n_xNy = self.commut(self.commut(k2.T, self.commut(k1.T, A)), D.T)
-        A3n_xNy = [
-            LinearSolver.lrmat2vec(A3n_xNy.real, nocc, norb),
-            LinearSolver.lrmat2vec(A3n_xNy.imag, nocc, norb)
-        ]
-        A3n_xNy_c = A3n_xNy[0] + 1j * A3n_xNy[1]
-        return -(1. / 6) * A3n_xNy_c
+        A3NxNy = self.commut(self.commut(k2.T, self.commut(k1.T, A)), D.T)
+        A3NxNy_c = (LinearSolver.lrmat2vec(A3NxNy.real, nocc, norb) +
+                    1j * LinearSolver.lrmat2vec(A3NxNy.imag, nocc, norb))
+        return -(1. / 6) * A3NxNy_c
 
     def a2_contract(self, k, A, D, nocc, norb):
         """
@@ -1106,13 +1100,10 @@ class TpaDriver:
             Returns a matrix
         """
 
-        An_x = self.commut(self.commut(k.T, A), D.T)
-        A2n_x = [
-            LinearSolver.lrmat2vec(An_x.real, nocc, norb),
-            LinearSolver.lrmat2vec(An_x.imag, nocc, norb)
-        ]
-        A2n_x_c = A2n_x[0] + 1j * A2n_x[1]
-        return -(1. / 2) * A2n_x_c
+        ANx = self.commut(self.commut(k.T, A), D.T)
+        A2Nx_c = (LinearSolver.lrmat2vec(ANx.real, nocc, norb) +
+                  1j * LinearSolver.lrmat2vec(ANx.imag, nocc, norb))
+        return -(1. / 2) * A2Nx_c
 
     def xi(self, kA, kB, Fa, Fb, F0):
         """
