@@ -45,8 +45,10 @@ def sample():
 
 @patch('veloxchem.main.ScfUnrestrictedDriver')
 @patch('veloxchem.main.ScfRestrictedDriver')
+@patch('veloxchem.main.ScfProperties')
 @patch('veloxchem.main.MpiTask')
-def test_loprop_called_from_main(mock_mpi, mock_scf, mock_uscf, sample, tmpdir):
+def test_loprop_called_from_main(mock_mpi, mock_scf_prop, mock_scf, mock_uscf,
+                                 sample, tmpdir):
     """
     Verify that LoPropDriver is called from main, loprop task in input
     """
@@ -76,8 +78,10 @@ def test_loprop_called_from_main(mock_mpi, mock_scf, mock_uscf, sample, tmpdir):
 
 @patch('veloxchem.main.ScfUnrestrictedDriver')
 @patch('veloxchem.main.ScfRestrictedDriver')
+@patch('veloxchem.main.ScfProperties')
 @patch('veloxchem.main.MpiTask')
-def test_scf_called_from_main(mock_mpi, mock_scf, mock_uscf, sample, tmpdir):
+def test_scf_called_from_main(mock_mpi, mock_scf_prop, mock_scf, mock_uscf,
+                              sample, tmpdir):
     """
     Verify that SCF is called from main, loprop task in input
     """
