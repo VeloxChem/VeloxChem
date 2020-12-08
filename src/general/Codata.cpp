@@ -42,6 +42,18 @@ getHartreeValueInKiloCaloriePerMole()
 }
 
 double
+getDipoleInDebye()
+{
+    // atomic unit of electric dipole mom.: 8.478 353 26 e-30 [C m]
+    // ea0 = 8.47835326e-30 * 299792458*10 * 100 [statC cm]
+    // Debye = 1e-18 [statC cm]
+
+    // 1 [a.u.] = 2.54174636 Debye
+
+    return 2.54174636;
+}
+
+double
 getRotatoryStrengthInCGS()
 {
     // atomic unit of electric dipole mom.: 8.478 353 26 e-30 [C m]

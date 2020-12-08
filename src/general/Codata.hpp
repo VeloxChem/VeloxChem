@@ -33,6 +33,13 @@ double getHartreeValueInElectronVolts();
 double getHartreeValueInKiloCaloriePerMole();
 
 /**
+ Gets convertion factor for dipole moment (a.u.->Debye)
+
+ @return the conversion factor.
+ */
+double getDipoleInDebye();
+
+/**
  Gets convertion factor for rotatory strength (a.u.->cgs)
 
  @return the conversion factor.

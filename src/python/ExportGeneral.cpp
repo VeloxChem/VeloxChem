@@ -180,6 +180,8 @@ export_general(py::module& m)
 
     m.def("hartree_in_kcalpermol", &units::getHartreeValueInKiloCaloriePerMole);
 
+    m.def("dipole_in_debye", &units::getDipoleInDebye);
+
     m.def("rotatory_strength_in_cgs", &units::getRotatoryStrengthInCGS);
 
     m.def("to_angular_momentum", &string_to_angular_momentum);

@@ -2,6 +2,7 @@ import numpy as np
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
+from .veloxchemlib import dipole_in_debye
 
 
 class ScfProperties:
@@ -16,7 +17,6 @@ class ScfProperties:
 
     Instance variables:
         - dipole_moment: The electric dipole moment.
-        - au2debye: Conversion factor from atomic units to Debye.
     """
 
     def __init__(self, comm, ostream):
@@ -30,8 +30,6 @@ class ScfProperties:
         self.ostream = ostream
 
         self.dipole_moment = None
-
-        self.au2debye = 2.541746229  # keep it for the moment
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -93,7 +91,7 @@ class ScfProperties:
         self.ostream.print_blank()
 
         dip_au = list(self.dipole_moment) + [np.linalg.norm(self.dipole_moment)]
-        dip_debye = [m * self.au2debye for m in dip_au]
+        dip_debye = [m * dipole_in_debye() for m in dip_au]
 
         for i, a in enumerate(['  X', '  Y', '  Z', 'Total']):
             valstr = '{:<5s} :'.format(a)
