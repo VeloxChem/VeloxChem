@@ -12,11 +12,12 @@ except ImportError:
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfproperties import ScfProperties
 
 
 class TestSCF(unittest.TestCase):
 
-    def run_scf(self, inpfile, potfile, xcfun_label, ref_e_scf):
+    def run_scf(self, inpfile, potfile, xcfun_label, ref_e_scf, ref_dip):
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
@@ -32,10 +33,17 @@ class TestSCF(unittest.TestCase):
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+        scf_prop = ScfProperties(task.mpi_comm, task.ostream)
+        scf_prop.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors)
+
         if task.mpi_rank == mpi_master():
             e_scf = scf_drv.get_scf_energy()
             tol = 1.0e-5 if xcfun_label is not None else 1.0e-6
             self.assertTrue(np.max(np.abs(e_scf - ref_e_scf)) < tol)
+
+            dip = np.linalg.norm(scf_prop.get_property('dipole moment'))
+            if ref_dip is not None:
+                self.assertTrue(np.max(np.abs(dip - ref_dip)) < tol)
 
     def test_scf_hf(self):
 
@@ -49,7 +57,9 @@ class TestSCF(unittest.TestCase):
         #    Final HF energy:             -76.041697549811
         ref_e_scf = -76.041697549811
 
-        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
+        ref_dip = 0.7867699  # a.u.
+
+        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
 
     def test_scf_dft(self):
 
@@ -63,7 +73,9 @@ class TestSCF(unittest.TestCase):
         #    Final DFT energy:            -76.443545741524
         ref_e_scf = -76.443545741524
 
-        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
+        ref_dip = 0.7312569  # a.u.
+
+        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
 
     def test_scf_dft_slda(self):
 
@@ -77,7 +89,9 @@ class TestSCF(unittest.TestCase):
         #    Final DFT energy:            -76.074208234637
         ref_e_scf = -76.074208234637
 
-        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
+        ref_dip = 0.7312887  # a.u.
+
+        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
 
     @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_scf_hf_pe(self):
@@ -91,7 +105,9 @@ class TestSCF(unittest.TestCase):
         #    Final HF energy:             -76.067159426565
         ref_e_scf = -76.067159426565
 
-        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
+        ref_dip = None
+
+        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
 
     @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_scf_dft_pe(self):
@@ -105,7 +121,9 @@ class TestSCF(unittest.TestCase):
         #    Final DFT energy:            -76.468733754150
         ref_e_scf = -76.468733754150
 
-        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
+        ref_dip = None
+
+        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
 
 
 if __name__ == "__main__":
