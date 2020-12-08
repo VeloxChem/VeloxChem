@@ -16,7 +16,7 @@ class ScfProperties:
         The output stream.
 
     Instance variables:
-        - dipole_moment: The electric dipole moment.
+        - properties: The dictionary of properties.
     """
 
     def __init__(self, comm, ostream):
@@ -29,7 +29,7 @@ class ScfProperties:
 
         self.ostream = ostream
 
-        self.dipole_moment = None
+        self.properties = {}
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -61,13 +61,23 @@ class ScfProperties:
             nuclear_charges = molecule.elem_ids_to_numpy()
             nuclear_dipole = np.sum(coords.T * nuclear_charges, axis=1)
 
-            self.dipole_moment = nuclear_dipole - electronic_dipole
+            self.properties['dipole moment'] = (nuclear_dipole -
+                                                electronic_dipole)
 
-            return {'dipole moment': self.dipole_moment}
+    def get_property(self, key):
+        """
+        Gets SCF ground-state property.
 
-        return {}
+        :param key:
+            The name of the property.
 
-    def print_scf_properties(self, molecule):
+        :return:
+            The property.
+        """
+
+        return self.properties[key]
+
+    def print_properties(self, molecule):
         """
         Prints SCF ground-state properties.
 
@@ -90,7 +100,8 @@ class ScfProperties:
 
         self.ostream.print_blank()
 
-        dip_au = list(self.dipole_moment) + [np.linalg.norm(self.dipole_moment)]
+        dip = self.properties['dipole moment']
+        dip_au = list(dip) + [np.linalg.norm(dip)]
         dip_debye = [m * dipole_in_debye() for m in dip_au]
 
         for i, a in enumerate(['  X', '  Y', '  Z', 'Total']):

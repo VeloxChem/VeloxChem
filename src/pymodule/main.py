@@ -220,7 +220,7 @@ def main():
             scf_prop = ScfProperties(task.mpi_comm, task.ostream)
             scf_prop.compute(task.molecule, task.ao_basis, scf_tensors)
             if task.mpi_rank == mpi_master():
-                scf_prop.print_scf_properties(task.molecule)
+                scf_prop.print_properties(task.molecule)
 
     # Gradient
 
