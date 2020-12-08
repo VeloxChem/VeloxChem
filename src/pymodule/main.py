@@ -8,6 +8,7 @@ from .veloxchemlib import mpi_master
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
+from .scfproperties import ScfProperties
 from .scfgradientdriver import ScfGradientDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
@@ -25,7 +26,6 @@ from .visualizationdriver import VisualizationDriver
 from .loprop import LoPropDriver
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_maximum_hours
-from .scfproperties import ScfProperties
 
 
 def select_scf_driver(task, scf_type):
@@ -219,7 +219,8 @@ def main():
 
             scf_prop = ScfProperties(task.mpi_comm, task.ostream)
             scf_prop.compute(task.molecule, task.ao_basis, scf_tensors)
-            scf_prop.print_scf_properties(task.molecule)
+            if task.mpi_rank == mpi_master():
+                scf_prop.print_scf_properties(task.molecule)
 
     # Gradient
 
