@@ -99,8 +99,7 @@ class ScfProperties:
             Cartesian components of the ground-state dipole moment
         """
         # Calculate the dipole integrals in the AO basis on the master node
-        if self.comm.Get_rank() == mpi_master:
-            dipole_ints = self.comp_dipole_ints(molecule, basis)
+        dipole_ints = self.comp_dipole_ints(molecule, basis)
 
         # The total electron density is the alpha plus the beta part
         self.density = scf_tensors['D'][0] + scf_tensors['D'][1]
@@ -158,9 +157,12 @@ class ScfProperties:
 
         # Format the electric dipole moment to have only four decimal digits
         fmtd_dipmom = [float('{:.4f}'.format(d)) for d in self.dipole_moment]
+        dipmom_debye = [float('{:.4f}'.format(d * self.au2debye)) for d in fmtd_dipmom]
 
         # Print the results
         valstr = "Dipole Moment [a.u.]      : {}".format(fmtd_dipmom)
+        self.ostream.print_header(valstr.ljust(92))
+        valstr = "Dipole Moment [Debye]     : {}".format(dipmom_debye)
         self.ostream.print_header(valstr.ljust(92))
         total_dipole = np.linalg.norm(self.dipole_moment)
         valstr = "Total Dipole [Debye]      :{:7.4f}".format(total_dipole * self.au2debye)
