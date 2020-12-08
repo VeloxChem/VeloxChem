@@ -62,4 +62,4 @@ Rinkevicius, Z.; Li, X.; Vahtras, O.; Ahmadzadeh, K.; Brand, M.; Ringholm, M.;
 List, N. H.; Scheurer, M.; Scott, M.; Dreuw, A.; Norman, P. 
 **VeloxChem: A Python‐driven Density‐functional Theory Program for Spectroscopy Simulations in
 High‐performance Computing Environments.**
-WIREs Comput Mol Sci 2020, 10 (5).
+WIREs Comput Mol Sci 2020, 10 (5), e1457.
