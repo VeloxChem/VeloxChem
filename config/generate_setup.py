@@ -100,10 +100,17 @@ def check_file(filename, label):
         sys.exit(1)
 
 
-def generate_setup(template_file, setup_file, user_flag=None, build_lib=Path("build/lib")):
+def generate_setup(template_file,
+                   setup_file,
+                   user_flag=None,
+                   build_lib=Path('build/lib')):
 
-    template_file = Path(template_file) if isinstance(template_file, str) else template_file
-    setup_file = Path(setup_file) if isinstance(setup_file, str) else setup_file
+    if isinstance(template_file, str):
+        template_file = Path(template_file)
+
+    if isinstance(setup_file, str):
+        setup_file = Path(setup_file)
+
     ext_suffix = get_config_var('EXT_SUFFIX') or get_config_var('SO')
 
     # OS information
@@ -165,7 +172,7 @@ def generate_setup(template_file, setup_file, user_flag=None, build_lib=Path("bu
         sys.exit(1)
 
     use_intel = (cxxname == 'icpc')
-    use_gnu = re.match(r"(.*(c|g|gnu-c)\+\+)", cxxname)
+    use_gnu = re.match(r'(.*(c|g|gnu-c)\+\+)', cxxname)
     use_clang = (cxxname in ['clang++', 'Crayclang'] or
                  re.match(r'.*-clang\+\+', cxxname))
 
@@ -197,15 +204,18 @@ def generate_setup(template_file, setup_file, user_flag=None, build_lib=Path("bu
 
     # check whether MKL is in conda environment
     if 'MKLROOT' not in os.environ:
-        has_lib = Path(sys.prefix, "lib/libmkl_core.so").is_file() or Path(sys.prefix, "lib/libmkl_core.dylib").is_file()
-        has_header = Path(sys.prefix, "include/mkl.h").is_file()
+        has_lib = (Path(sys.prefix, 'lib/libmkl_core.so').is_file() or
+                   Path(sys.prefix, 'lib/libmkl_core.dylib').is_file())
+        has_header = Path(sys.prefix, 'include/mkl.h').is_file()
         if is_conda and has_lib and has_header:
             os.environ['MKLROOT'] = sys.prefix
 
     # check whether OpenBLAS is in conda environment
     if 'OPENBLASROOT' not in os.environ:
-        has_lib = Path(sys.prefix, "lib/libopenblas.so").is_file() or Path(sys.prefix, "lib/libopenblas.dylib").is_file()
-        has_header = Path(sys.prefix, "include/lapacke.h").is_file() or Path(sys.prefix, "include/cblas.h").is_file()
+        has_lib = (Path(sys.prefix, 'lib/libopenblas.so').is_file() or
+                   Path(sys.prefix, 'lib/libopenblas.dylib').is_file())
+        has_header = (Path(sys.prefix, 'include/lapacke.h').is_file() and
+                      Path(sys.prefix, 'include/cblas.h').is_file())
         if is_conda and has_lib and has_header:
             os.environ['OPENBLASROOT'] = sys.prefix
 
@@ -342,10 +352,14 @@ def generate_setup(template_file, setup_file, user_flag=None, build_lib=Path("bu
     with setup_file.open('w') as f_mkfile:
         for line in lines:
             if '====placeholder====' in line:
-                f_mkfile.write('# Automatically generated settings\n')
+                print('# Automatically generated settings', file=f_mkfile)
+                print('', file=f_mkfile)
 
-                f_mkfile.write(f'BUILD_LIB := {(build_lib / "veloxchem").resolve()}\n')
-                f_mkfile.write(f'VLX_TARGET := $(BUILD_LIB)/veloxchemlib{ext_suffix}\n\n')
+                build_lib_str = (build_lib / 'veloxchem').resolve()
+                vlx_target_str = '$(BUILD_LIB)/veloxchemlib' + ext_suffix
+                print('BUILD_LIB := {}'.format(build_lib_str), file=f_mkfile)
+                print('VLX_TARGET := {}'.format(vlx_target_str), file=f_mkfile)
+                print('', file=f_mkfile)
 
                 print('USE_MPI := true', file=f_mkfile)
                 print('USE_MKL := {}'.format('true' if use_mkl else 'false'),
@@ -390,6 +404,7 @@ def generate_setup(template_file, setup_file, user_flag=None, build_lib=Path("bu
                 print(line, end='', file=f_mkfile)
 
     print('*** Successfully generated {}'.format(setup_file))
+    sys.stdout.flush()
 
 
 if __name__ == '__main__':

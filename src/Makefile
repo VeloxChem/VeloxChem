@@ -55,14 +55,19 @@ basis: build_folder
 	@echo ====== Copying basis set files...
 	$(CP) -r $(VLX_BAS) $(BUILD_LIB)
 
+# Copy module files
+pymodule: build_folder
+	@echo ====== Copying module files...
+	$(CP) -r $(VLX_MODULE) $(BUILD_LIB)
+
 # Debug
-debug: $(VLX_LIBS) basis
+debug: $(VLX_LIBS) basis pymodule
 	@echo ====== Linking debug version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
 
 # Release
-release: $(VLX_LIBS) basis
+release: $(VLX_LIBS) basis pymodule
 	@echo ====== Linking release version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
