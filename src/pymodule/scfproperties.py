@@ -145,8 +145,8 @@ class ScfProperties:
         
         self.ostream.print_blank()
 
-        self.ostream.print_header("Ground-State Properties".ljust(92))
-        self.ostream.print_header("------------------------".ljust(92))
+        self.ostream.print_header("SCF Ground-State Properties".ljust(92))
+        self.ostream.print_header("----------------------------".ljust(92))
        
         # Check if the system is charged. If so, print a warning
         if molecule.get_charge() != 0:
@@ -165,7 +165,7 @@ class ScfProperties:
         valstr = "Dipole Moment [Debye]     : {}".format(dipmom_debye)
         self.ostream.print_header(valstr.ljust(92))
         total_dipole = np.linalg.norm(self.dipole_moment)
-        valstr = "Total Dipole [Debye]      :{:7.4f}".format(total_dipole * self.au2debye)
+        valstr = "Total Dipole  [Debye]     :{:7.4f}".format(total_dipole * self.au2debye)
         self.ostream.print_header(valstr.ljust(92))
         
         self.ostream.print_blank()
