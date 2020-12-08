@@ -39,7 +39,7 @@ assertMsgCritical(const bool condition, const std::string& label)
 
         if (mpi::initialized() && mpi::nodes(MPI_COMM_WORLD) > 1)
         {
-            MPI_Abort(MPI_COMM_WORLD, MPI_ERR_UNKNOWN);
+            MPI_Abort(MPI_COMM_WORLD, MPI_ERR_OTHER);
         }
 
         std::abort();
