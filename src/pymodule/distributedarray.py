@@ -1,7 +1,6 @@
 from mpi4py import MPI
 import numpy as np
 import time as tm
-import ctypes
 import h5py
 
 from .veloxchemlib import mpi_master
@@ -34,29 +33,57 @@ class DistributedArray:
         self.rank = comm.Get_rank()
         self.nodes = comm.Get_size()
 
-        if self.rank == mpi_master() and distribute:
+        if not distribute:
+            self.data = array.copy()
+            return
+
+        if self.rank == mpi_master():
+            dtype = array.dtype
+            ncols = None
+            if array.ndim == 1:
+                ncols = 1
+            elif array.ndim == 2:
+                # note that ncols may be 0
+                ncols = array.shape[1]
+
             ave, res = divmod(array.shape[0], self.nodes)
             counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+            if ncols > 1:
+                counts = [x * ncols for x in counts]
             displacements = [sum(counts[:p]) for p in range(self.nodes)]
-
-            if array.ndim == 1:
-                array_list = [
-                    array[displacements[p]:displacements[p] + counts[p]]
-                    for p in range(self.nodes)
-                ]
-
-            elif array.ndim == 2:
-                array_list = [
-                    array[displacements[p]:displacements[p] + counts[p], :]
-                    for p in range(self.nodes)
-                ]
+            pack_list = [dtype, ncols, array.ndim] + counts
         else:
-            array_list = None
+            counts = None
+            displacements = None
+            pack_list = None
 
-        if distribute:
-            self.data = comm.scatter(array_list, root=mpi_master())
-        else:
-            self.data = array.copy()
+        pack_list = self.comm.bcast(pack_list, root=mpi_master())
+        dtype, ncols, ndim = pack_list[:3]
+        counts = pack_list[3:]
+
+        if ndim == 1:
+            self.data = np.zeros(counts[self.rank], dtype=dtype)
+        elif ndim == 2:
+            # note that ncols may be 0
+            local_rows = counts[self.rank]
+            if ncols != 0:
+                local_rows = counts[self.rank] // ncols
+            self.data = np.zeros((local_rows, ncols), dtype=dtype)
+
+        if ncols == 0:
+            return
+
+        mpi_data_type = None
+        if dtype == np.int:
+            mpi_data_type = MPI.INT
+        elif dtype == np.float:
+            mpi_data_type = MPI.DOUBLE
+        elif dtype == np.complex:
+            mpi_data_type = MPI.C_DOUBLE_COMPLEX
+
+        self.comm.Scatterv([array, counts, displacements, mpi_data_type],
+                           self.data,
+                           root=mpi_master())
 
     def __sizeof__(self):
         """
@@ -67,7 +94,7 @@ class DistributedArray:
             The esitmated size of the distributed array.
         """
 
-        return self.data.size * ctypes.sizeof(ctypes.c_double)
+        return self.data.size * self.data.itemsize
 
     def array(self):
         """

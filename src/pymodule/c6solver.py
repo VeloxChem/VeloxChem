@@ -269,8 +269,8 @@ class C6Solver(LinearSolver):
         for key in op_imagfreq_keys:
             if self.rank == mpi_master():
                 gradger, gradung = self.decomp_grad(v1[key])
-                grad_ru = gradung.real
-                grad_ig = gradger.imag
+                grad_ru = gradung.real.copy()
+                grad_ig = gradger.imag.copy()
             else:
                 grad_ru, grad_ig = None, None
             dist_v1[key] = (DistributedArray(grad_ru, self.comm),

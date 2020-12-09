@@ -296,10 +296,10 @@ class ComplexResponse(LinearSolver):
         for key in op_freq_keys:
             if self.rank == mpi_master():
                 gradger, gradung = self.decomp_grad(v1[key])
-                grad_rg = gradger.real
-                grad_ru = gradung.real
-                grad_iu = gradung.imag
-                grad_ig = gradger.imag
+                grad_rg = gradger.real.copy()
+                grad_ru = gradung.real.copy()
+                grad_iu = gradung.imag.copy()
+                grad_ig = gradger.imag.copy()
             else:
                 grad_rg, grad_ru = None, None
                 grad_iu, grad_ig = None, None
