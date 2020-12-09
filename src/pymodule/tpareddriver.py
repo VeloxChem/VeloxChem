@@ -275,14 +275,14 @@ class TpaReducedDriver(TpaDriver):
                 Fock['f_sig_xy'][w].data,
                 Fock['f_sig_xz'][w].data,
                 Fock['f_sig_yz'][w].data,
-            ])
+            ]).T.copy()
 
-            vec_pack = self.comm.gather(vec_pack, root=mpi_master())
+            vec_pack = self.collect_vectors_in_columns(vec_pack)
 
             if self.rank != mpi_master():
                 continue
 
-            vec_pack = np.hstack(vec_pack).reshape(-1, norb, norb)
+            vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
 
             (f_x, f_y, f_z, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy, f_sig_xz,
              f_sig_yz) = vec_pack
@@ -536,14 +536,14 @@ class TpaReducedDriver(TpaDriver):
                 fo2['F123_x'][w].data,
                 fo2['F123_y'][w].data,
                 fo2['F123_z'][w].data,
-            ])
+            ]).T.copy()
 
-            vec_pack = self.comm.gather(vec_pack, root=mpi_master())
+            vec_pack = self.collect_vectors_in_columns(vec_pack)
 
             if self.rank != mpi_master():
                 continue
 
-            vec_pack = np.hstack(vec_pack).reshape(-1, norb, norb)
+            vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
 
             (f_x, f_y, f_z, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy, f_sig_xz,
              f_sig_yz, F123_x, F123_y, F123_z) = vec_pack

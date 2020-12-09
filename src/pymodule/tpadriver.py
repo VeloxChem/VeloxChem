@@ -1,3 +1,4 @@
+from mpi4py import MPI
 import numpy as np
 import time
 import re
@@ -805,6 +806,37 @@ class TpaDriver:
             'x2': -(1. / 15) * na_x2_nyz,
             'a2': -(1. / 15) * nx_a2_nyz,
         }
+
+    def collect_vectors_in_columns(self, sendbuf):
+        """
+        Collects vectors into 2d array (column-wise).
+
+        :param sendbuf:
+            The 2d array containing the vector segments in columns.
+
+        :return:
+            A 2d array containing the full vectors in columns.
+        """
+
+        counts = self.comm.gather(sendbuf.size, root=mpi_master())
+        if self.rank == mpi_master():
+            displacements = [sum(counts[:p]) for p in range(self.nodes)]
+            recvbuf = np.zeros(sum(counts), dtype=sendbuf.dtype).reshape(
+                -1, sendbuf.shape[1])
+        else:
+            displacements = None
+            recvbuf = None
+
+        if sendbuf.dtype == np.float:
+            mpi_data_type = MPI.DOUBLE
+        elif sendbuf.dtype == np.complex:
+            mpi_data_type = MPI.C_DOUBLE_COMPLEX
+
+        self.comm.Gatherv(sendbuf,
+                          [recvbuf, counts, displacements, mpi_data_type],
+                          root=mpi_master())
+
+        return recvbuf
 
     def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
         """

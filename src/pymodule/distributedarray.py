@@ -39,16 +39,14 @@ class DistributedArray:
 
         if self.rank == mpi_master():
             dtype = array.dtype
-            ncols = None
             if array.ndim == 1:
                 ncols = 1
             elif array.ndim == 2:
-                # note that ncols may be 0
                 ncols = array.shape[1]
 
             ave, res = divmod(array.shape[0], self.nodes)
             counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
-            if ncols > 1:
+            if ncols != 0:  # note that ncols can be 0
                 counts = [x * ncols for x in counts]
             displacements = [sum(counts[:p]) for p in range(self.nodes)]
             pack_list = [dtype, ncols, array.ndim] + counts
@@ -64,16 +62,14 @@ class DistributedArray:
         if ndim == 1:
             self.data = np.zeros(counts[self.rank], dtype=dtype)
         elif ndim == 2:
-            # note that ncols may be 0
             local_rows = counts[self.rank]
-            if ncols != 0:
+            if ncols != 0:  # note that ncols can be 0
                 local_rows = counts[self.rank] // ncols
             self.data = np.zeros((local_rows, ncols), dtype=dtype)
 
         if ncols == 0:
             return
 
-        mpi_data_type = None
         if dtype == np.int:
             mpi_data_type = MPI.INT
         elif dtype == np.float:
