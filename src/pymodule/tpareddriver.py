@@ -7,6 +7,9 @@ from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .tpadriver import TpaDriver
+from .checkpoint import check_distributed_focks
+from .checkpoint import read_distributed_focks
+from .checkpoint import write_distributed_focks
 
 
 class TpaReducedDriver(TpaDriver):
@@ -132,14 +135,6 @@ class TpaReducedDriver(TpaDriver):
         if self.rank == mpi_master():
             self.print_fock_header()
 
-        time_start_fock = time.time()
-        dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
-                                     'real')
-        time_end_fock = time.time()
-
-        total_time_fock = time_end_fock - time_start_fock
-        self.print_fock_time(total_time_fock)
-
         keys = [
             'f_sig_xx',
             'f_sig_yy',
@@ -149,19 +144,48 @@ class TpaReducedDriver(TpaDriver):
             'f_sig_yz',
         ]
 
-        Fock = {'F0': F0_a}
+        if self.checkpoint_file is not None:
+            fock_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
+            fock_file += '_tpa_fock_1_red.h5'
+        else:
+            fock_file = None
+
+        if self.rank == mpi_master():
+            valid_checkpoint = check_distributed_focks(fock_file, keys, wi)
+        else:
+            valid_checkpoint = None
+        valid_checkpoint = self.comm.bcast(valid_checkpoint, mpi_master())
+
+        if valid_checkpoint:
+            focks = read_distributed_focks(fock_file, keys, wi, self.comm,
+                                           self.ostream)
+            focks['F0'] = F0_a
+            return focks
+
+        time_start_fock = time.time()
+        dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
+                                     'real')
+        time_end_fock = time.time()
+
+        total_time_fock = time_end_fock - time_start_fock
+        self.print_fock_time(total_time_fock)
+
+        focks = {'F0': F0_a}
         for key in keys:
-            Fock[key] = {}
+            focks[key] = {}
 
         fock_index = 0
         for w in wi:
             for key in keys:
-                Fock[key][w] = DistributedArray(dist_focks.data[:, fock_index],
-                                                self.comm,
-                                                distribute=False)
+                focks[key][w] = DistributedArray(dist_focks.data[:, fock_index],
+                                                 self.comm,
+                                                 distribute=False)
                 fock_index += 1
 
-        return Fock
+        write_distributed_focks(fock_file, focks, keys, wi, self.comm,
+                                self.ostream)
+
+        return focks
 
     def get_Nxy(self, w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule,
                 ao_basis, scf_tensors):
@@ -472,6 +496,24 @@ class TpaReducedDriver(TpaDriver):
         if self.rank == mpi_master():
             self.print_fock_header()
 
+        keys = ['F123_x', 'F123_y', 'F123_z']
+
+        if self.checkpoint_file is not None:
+            fock_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
+            fock_file += '_tpa_fock_2_red.h5'
+        else:
+            fock_file = None
+
+        if self.rank == mpi_master():
+            valid_checkpoint = check_distributed_focks(fock_file, keys, wi)
+        else:
+            valid_checkpoint = None
+        valid_checkpoint = self.comm.bcast(valid_checkpoint, mpi_master())
+
+        if valid_checkpoint:
+            return read_distributed_focks(fock_file, keys, wi, self.comm,
+                                          self.ostream)
+
         time_start_fock = time.time()
         dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
                                      'real_and_imag')
@@ -480,20 +522,22 @@ class TpaReducedDriver(TpaDriver):
         total_time_fock = time_end_fock - time_start_fock
         self.print_fock_time(total_time_fock)
 
-        keys = ['F123_x', 'F123_y', 'F123_z']
-
-        fock_dict = {}
+        focks = {}
         for key in keys:
-            fock_dict[key] = {}
+            focks[key] = {}
 
         fock_index = 0
         for w in wi:
             for key in keys:
-                fock_dict[key][w] = DistributedArray(
-                    dist_focks.data[:, fock_index], self.comm, distribute=False)
+                focks[key][w] = DistributedArray(dist_focks.data[:, fock_index],
+                                                 self.comm,
+                                                 distribute=False)
                 fock_index += 1
 
-        return fock_dict
+        write_distributed_focks(fock_file, focks, keys, wi, self.comm,
+                                self.ostream)
+
+        return focks
 
     def get_e3(self, wi, kX, kXY, fo, fo2, nocc, norb):
         """
