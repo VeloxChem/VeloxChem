@@ -3,6 +3,7 @@ import time
 import re
 
 from .veloxchemlib import mpi_master
+from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .tpadriver import TpaDriver
@@ -132,8 +133,8 @@ class TpaReducedDriver(TpaDriver):
             self.print_fock_header()
 
         time_start_fock = time.time()
-        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis,
-                                    'real')
+        dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
+                                     'real')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -155,7 +156,9 @@ class TpaReducedDriver(TpaDriver):
         fock_index = 0
         for w in wi:
             for key in keys:
-                Fock[key][w] = fock_list[fock_index]
+                Fock[key][w] = DistributedArray(dist_focks.data[:, fock_index],
+                                                self.comm,
+                                                distribute=False)
                 fock_index += 1
 
         return Fock
@@ -470,8 +473,8 @@ class TpaReducedDriver(TpaDriver):
             self.print_fock_header()
 
         time_start_fock = time.time()
-        fock_list = self.get_fock_r(mo, density_list, molecule, ao_basis,
-                                    'real_and_imag')
+        dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
+                                     'real_and_imag')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -486,7 +489,8 @@ class TpaReducedDriver(TpaDriver):
         fock_index = 0
         for w in wi:
             for key in keys:
-                fock_dict[key][w] = fock_list[fock_index]
+                fock_dict[key][w] = DistributedArray(
+                    dist_focks.data[:, fock_index], self.comm, distribute=False)
                 fock_index += 1
 
         return fock_dict

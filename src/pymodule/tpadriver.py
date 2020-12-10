@@ -1228,13 +1228,13 @@ class TpaDriver:
             f_total = self.get_two_el_fock_mod_r(mo, molecule, ao_basis,
                                                  D_total)
 
-            ff = []
-            for i in range(len(f_total) // 2):
-                f_total_data = (f_total[2 * i].data +
-                                1j * f_total[2 * i + 1].data)
-                ff.append(
-                    DistributedArray(f_total_data, self.comm, distribute=False))
-            return ff
+            nrows = f_total.data.shape[0]
+            half_ncols = f_total.data.shape[1] // 2
+            ff_data = np.zeros((nrows, half_ncols), dtype=np.complex)
+            for i in range(half_ncols):
+                ff_data[:, i] = (f_total.data[:, 2 * i] +
+                                 1j * f_total.data[:, 2 * i + 1])
+            return DistributedArray(ff_data, self.comm, distribute=False)
 
         elif fock_flag == 'real':
             return self.get_two_el_fock_mod_r(mo, molecule, ao_basis, D)
@@ -1269,6 +1269,7 @@ class TpaDriver:
         if self.rank == mpi_master():
             n_total = len(dabs)
             n_ao = dabs[0].shape[0]
+            norb = mo.shape[1]
         else:
             n_total = None
             n_ao = None
@@ -1278,7 +1279,7 @@ class TpaDriver:
 
         # go through batches
 
-        fabs = []
+        dist_fabs = None
 
         if self.rank == mpi_master():
             batch_str = 'Processing Fock builds...'
@@ -1314,16 +1315,27 @@ class TpaDriver:
             eri_driver.compute(fock, dens, molecule, ao_basis, screening)
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
-            for i in range(fock.number_of_fock_matrices()):
-                if self.rank == mpi_master():
-                    fmo = self.ao2mo(mo, fock.to_numpy(i).T).reshape(-1)
-                else:
-                    fmo = None
-                fabs.append(DistributedArray(fmo, self.comm))
+            if self.rank == mpi_master():
+                nfocks = fock.number_of_fock_matrices()
+                fock_mo = np.zeros((norb**2, nfocks))
+                for i in range(nfocks):
+                    fock_mo[:, i] = self.ao2mo(mo,
+                                               fock.to_numpy(i).T).reshape(-1)
+            else:
+                fock_mo = None
+
+            dist_fock_mo = DistributedArray(fock_mo, self.comm)
+
+            if dist_fabs is None:
+                dist_fabs = DistributedArray(dist_fock_mo.data,
+                                             self.comm,
+                                             distribute=False)
+            else:
+                dist_fabs.append(dist_fock_mo, axis=1)
 
         self.ostream.print_blank()
 
-        return fabs
+        return dist_fabs
 
     def print_fock_header(self):
         """
