@@ -45,7 +45,7 @@ def sample():
 
 @patch('veloxchem.main.ScfUnrestrictedDriver')
 @patch('veloxchem.main.ScfRestrictedDriver')
-@patch('veloxchem.main.ScfProperties')
+@patch('veloxchem.main.ScfFirstOrderProperties')
 @patch('veloxchem.main.MpiTask')
 def test_loprop_called_from_main(mock_mpi, mock_scf_prop, mock_scf, mock_uscf,
                                  sample, tmpdir):
@@ -78,7 +78,7 @@ def test_loprop_called_from_main(mock_mpi, mock_scf_prop, mock_scf, mock_uscf,
 
 @patch('veloxchem.main.ScfUnrestrictedDriver')
 @patch('veloxchem.main.ScfRestrictedDriver')
-@patch('veloxchem.main.ScfProperties')
+@patch('veloxchem.main.ScfFirstOrderProperties')
 @patch('veloxchem.main.MpiTask')
 def test_scf_called_from_main(mock_mpi, mock_scf_prop, mock_scf, mock_uscf,
                               sample, tmpdir):
