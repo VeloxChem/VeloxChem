@@ -234,11 +234,10 @@ class TestMolData(unittest.TestCase):
             [0.3223621934107e-05, -0.1066567298349e-04, 0.8186076710362e-05],
         ])
 
-        inpfile = os.path.join('inputs', 'dimer.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = here / 'inputs' / 'dimer.inp'
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), None], MPI.COMM_WORLD)
         molecule = task.molecule
 
         disp = DispersionModel()
