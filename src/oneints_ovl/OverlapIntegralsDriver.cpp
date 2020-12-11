@@ -31,12 +31,11 @@ COverlapIntegralsDriver::COverlapIntegralsDriver(MPI_Comm comm)
 
     _locNodes = mpi::nodes(comm);
 
-    mpi::duplicate(comm, &_locComm);
+    _locComm = comm;
 }
 
 COverlapIntegralsDriver::~COverlapIntegralsDriver()
 {
-    mpi::destroy(&_locComm);
 }
 
 COverlapMatrix

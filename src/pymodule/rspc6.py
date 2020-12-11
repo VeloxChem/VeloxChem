@@ -37,10 +37,10 @@ class C6(ResponseProperty):
         rsp_dict['onlystatic'] = 'yes'
         rsp_dict['complex'] = 'yes'
 
-        rsp_dict['a_operator'] = 'dipole'
+        rsp_dict['a_operator'] = 'electric dipole'
         rsp_dict['a_components'] = 'xyz'
 
-        rsp_dict['b_operator'] = 'dipole'
+        rsp_dict['b_operator'] = 'electric dipole'
         rsp_dict['b_components'] = 'xyz'
 
         if 'n_points' not in rsp_dict:

@@ -38,12 +38,12 @@ class CustomProperty(ResponseProperty):
             rsp_dict['complex'] = 'no'
 
         if 'a_operator' not in rsp_dict:
-            rsp_dict['a_operator'] = 'dipole'
+            rsp_dict['a_operator'] = 'electric dipole'
         if 'a_components' not in rsp_dict:
             rsp_dict['a_components'] = 'xyz'
 
         if 'b_operator' not in rsp_dict:
-            rsp_dict['b_operator'] = 'dipole'
+            rsp_dict['b_operator'] = 'electric dipole'
         if 'b_components' not in rsp_dict:
             rsp_dict['b_components'] = 'xyz'
 

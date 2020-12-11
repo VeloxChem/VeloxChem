@@ -1,197 +1,231 @@
-Install
-=======
+Installation
+============
 
-From source
-^^^^^^^^^^^
+Obtaining the source code
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Get the source code
+The source code can be downloaded from the `GitLab repository <https://gitlab.com/veloxchem/veloxchem>`_::
+
+   $ git clone https://gitlab.com/veloxchem/veloxchem
+
+Installing from source
+^^^^^^^^^^^^^^^^^^^^^^
+
+Build prerequisites
 +++++++++++++++++++
 
-The source code can be downloaded from this repository
+- A C++ compiler fully compliant with the C++11 standard.
+- A installation of Python >=3.6 that includes the interpreter, the development
+  header files, and the development libraries.
+- A build tool providing the ``make`` utility.
+- The `pybind11 <https://pybind11.readthedocs.io>`_ (>=2.6) header-only library
+- A library implementing the MPI standard.
+- Linear algebra libraries implementing the BLAS and LAPACK interfaces.
+- The following Python modules:
 
-.. code-block:: bash
+  - `h5py <https://www.h5py.org/>`_
+  - `psutil <https://psutil.readthedocs.io/en/latest/>`_
+  - `Mpi4Py <https://mpi4py.readthedocs.io/>`_
+  - `NumPy <https://numpy.org>`_
+  - `LoProp <https://pypi.org/project/LoProp/>`_
+  - `geomeTRIC <https://github.com/leeping/geomeTRIC>`_
 
-    https://gitlab.com/veloxchem/veloxchem
+Optional, add-on dependencies:
 
-Debian based Linux
+  - `CPPE <https://github.com/maxscheurer/cppe>`_
+  - `XTB Python <https://xtb-python.readthedocs.io/>`_
+
+See :ref:`external-dependencies` for instructions on how to get these add-ons.
+
+We recommend to always use a `virtual enviroment
+<https://docs.python.org/3.6/tutorial/venv.html>`_, in order to avoid clashes
+between dependencies.
+
+With Anaconda
++++++++++++++
+
+`Anaconda <https://www.anaconda.com/products/individual>`_ and the software
+packaged on the `conda-forge <https://conda-forge.org/>`_ channel provide build isolation and
+greatly simplify the installation of VeloxChem.
+
+- Move to the folder containing the source code::
+
+    $ cd veloxchem
+
+- Create and activate the Conda environment::
+
+    $ conda create --name <name> python=3.x
+    $ conda activate <name>
+
+  VeloxChem requires at least Python 3.6
+
+- Install standard build dependencies::
+
+    $ conda env update --file <environment> --prune
+
+  This will install, among other, the C++ compiler and NumPy. The
+  ``environment.yml`` file specifies the packages needed.  They will be
+  installed from the ``conda-forge`` channel.
+  VeloxChem can use different linear algebra backends and we provide two
+  environment files you can use to set up your conda environment:
+
+    - ``mkl_env.yml`` which installs the Intel Math Kernel Library,
+    - ``openblas_env.yml`` which installs the OpenBLAS library.
+
+- Install MPI and `Mpi4Py <https://mpi4py.readthedocs.io/>`_.
+
+  - To use `OpenMPI <https://www.open-mpi.org/>`_::
+
+      $ conda install openmpi mpi4py -c conda-forge
+
+  - To use `MPICH <https://www.mpich.org/>`_::
+
+      $ conda install mpich mpi4py -c conda-forge
+
+- Build and install VeloxChem in the Conda environment::
+
+    $ python -m pip install .
+
+  By default, the build process will use *all* available cores to compile the
+  C++ sources in parallel. This behavior can be controlled *via* the
+  ``VLX_NUM_BUILD_JOBS`` environment variable::
+
+    $ env VLX_NUM_BUILD_JOBS=N python -m pip install .
+
+  will install VeloxChem using ``N`` parallel processes.
+
+- The environment now contains all that is necessary to run VeloxChem. You can deactivate it by issuing::
+
+    $ conda deactivate
+
+
+- Use VeloxChem in Jupyter notebook ::
+
+    conda install jupyter
+    ipython kernel install --name vlx
+    jupyter notebook
+    # choose "vlx" in the drop-down menu under "New"
+
+Cray platform (x86-64 or ARM processor)
++++++++++++++++++++++++++++++++++++++++
+
+- Load cray modules::
+
+    $ module swap PrgEnv-cray PrgEnv-gnu
+    $ module load cray-hdf5
+    $ module load cray-python/3.6.5.7
+
+- Create and activate a `virtual enviroment <https://docs.python.org/3.6/tutorial/venv.html>`_::
+
+    $ python3 -m venv vlx
+    $ source vlx/bin/activate
+    $ python -m pip install -U pip
+
+  Once the virtual environment is activated, you can just use ``python`` to invoke the interpreter.
+
+- Install `Mpi4Py <https://mpi4py.readthedocs.io/>`_.
+
+    1. Download a recent version of the source distribution::
+
+         $ curl -LO https://bitbucket.org/mpi4py/mpi4py/downloads/mpi4py-X.Y.Z.tar.gz
+
+    2. Unzip the archive::
+
+         $ tar xf mpi4py-X.Y.Z.tar.gz
+         $ cd mpi4py-X.Y.Z
+
+    3. Append the following lines to ``mpi.cfg``::
+
+        [cray]
+        mpicc         = cc
+        mpicxx        = CC
+        extra_compile_args   = -shared
+        extra_link_args      = -Wl,-rpath,/opt/cray/pe/mpt/7.7.9/gni/mpich-gnu/8.2/lib
+
+    4. Build and install Mpi4Py::
+
+        $ python setup.py build --mpi=cray
+        $ python setup.py install
+
+- Use the compiler wrapper to compile VeloxChem ::
+
+    $ export CXX=CC
+    $ cd veloxchem
+    $ python -m pip install .
+
+  This will also take care of installing the additional necessary Python modules.
+
+Debian-based Linux
 ++++++++++++++++++
 
-.. code-block:: bash
+- Install Intel Math Kernel Library from https://software.intel.com/en-us/articles/installing-intel-free-libs-and-python-apt-repo Note that this requires superuser privileges::
 
-    # Install MKL from
-    # https://software.intel.com/en-us/articles/installing-intel-free-libs-and-python-apt-repo
+    $ wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
+    $ apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
+    $ sudo sh -c 'echo deb https://apt.repos.intel.com/mkl all main > /etc/apt/sources.list.d/intel-mkl.list'
+    $ sudo apt-get update
+    $ sudo apt-get install intel-mkl-64bit
 
-    # For example:
-    # wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
-    # apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
-    # sudo sh -c 'echo deb https://apt.repos.intel.com/mkl all main > /etc/apt/sources.list.d/intel-mkl.list'
-    # sudo apt-get update
-    # sudo apt-get install intel-mkl-2018.2-046
+- Install MPI and Python::
 
-    # Install MPICH (or OpenMPI) and Python
+    $ sudo apt-get install mpich python3 python3-dev python3-pip
 
-    sudo apt-get install mpich python3 python3-dev python3-pip
+- Create and activate a `virtual enviroment <https://docs.python.org/3.6/tutorial/venv.html>`_::
 
-    # Install python modules
+    $ python3 -m venv vlx
+    $ source vlx/bin/activate
+    $ python -m pip install -U pip
 
-    sudo pip3 install numpy h5py pybind11 pytest loprop psutil
-    sudo pip3 install --no-binary=mpi4py mpi4py
+- Install VeloxChem ::
 
-    # Install VeloxChem
+    $ cd veloxchem
+    $ python -m pip install .
 
-    cd VeloxChem
-    python3 config/generate_setup.py
-    python3 setup.py install
-
-RPM based Linux
+RPM-based Linux
 +++++++++++++++
 
-.. code-block:: bash
+- Install Math Kernel Library from https://software.intel.com/en-us/articles/installing-intel-free-libs-and-python-yum-repo Note that this requires superuser privileges::
 
-    # Install MKL from
-    # https://software.intel.com/en-us/articles/installing-intel-free-libs-and-python-yum-repo
+    $ sudo yum-config-manager --add-repo https://yum.repos.intel.com/mkl/setup/intel-mkl.repo
+    $ sudo rpm --import https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
+    $ sudo yum install intel-mkl-64bit
 
-    # For example:
-    # sudo yum-config-manager --add-repo https://yum.repos.intel.com/mkl/setup/intel-mkl.repo
-    # sudo rpm --import https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
-    # sudo yum install intel-mkl-2018.2-046
+- Install MPI and Python::
 
-    # Install MPICH (or OpenMPI) and Python
-    # Note: need to manually link MPI executables
+    $ sudo yum install mpich-3.2-devel python3-devel
+    $ sudo ln -s /usr/lib64/mpich-3.2/bin/mpirun /usr/bin/mpirun
+    $ sudo ln -s /usr/lib64/mpich-3.2/bin/mpicxx /usr/bin/mpicxx
+    $ sudo ln -s /usr/lib64/mpich-3.2/bin/mpicc /usr/bin/mpicc
 
-    sudo yum install mpich-3.2-devel python3-devel
-    sudo ln -s /usr/lib64/mpich-3.2/bin/mpirun /usr/bin/mpirun
-    sudo ln -s /usr/lib64/mpich-3.2/bin/mpicxx /usr/bin/mpicxx
-    sudo ln -s /usr/lib64/mpich-3.2/bin/mpicc /usr/bin/mpicc
+- Create and activate a `virtual enviroment <https://docs.python.org/3.6/tutorial/venv.html>`_::
 
-    # Install python modules
+    $ python3 -m venv vlx
+    $ source vlx/bin/activate
+    $ python -m pip install -U pip
 
-    sudo pip3 install numpy h5py pybind11 pytest loprop psutil
-    sudo pip3 install --no-binary=mpi4py mpi4py
+- Install VeloxChem ::
 
-    # Install VeloxChem
-
-    cd VeloxChem
-    python3 config/generate_setup.py
-    python3 setup.py install
+    $ cd veloxchem
+    $ python -m pip install .
 
 PowerLinux
 ++++++++++
 
-.. code-block:: bash
+- See installation instructions `With Anaconda`_
 
-    # Install OpenBLAS
-
-    wget https://github.com/xianyi/OpenBLAS/archive/v0.3.4.tar.gz
-    tar xf v0.3.4.tar.gz
-    cd OpenBLAS-0.3.4
-    make TARGET=POWER8 CC=gcc FC=gfortran USE_OPENMP=1
-    make PREFIX=<path-to-your-openblas> install
-    export OPENBLASROOT=<path-to-your-openblas>
-
-    # Install MPICH (or OpenMPI)
-
-    wget http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz
-    tar xf mpich-3.2.1.tar.gz
-    cd mpich-3.2.1
-    ./configure --disable-fortran --prefix=<path-to-your-mpich> CC=gcc CXX=g++
-    make && make install
-    export PATH=<path-to-your-mpich>/bin:$PATH
-    export LD_LIBRARY_PATH=<path-to-your-mpich>/lib:$LD_LIBRARY_PATH
-
-    # Install Anaconda (Python 3.7 version) for Power8 and Power9 from
-    # https://www.anaconda.com/distribution/
-
-    # For example:
-    # wget https://repo.anaconda.com/archive/Anaconda3-2019.10-Linux-ppc64le.sh
-    # bash Anaconda3-2019.10-Linux-ppc64le.sh
-
-    # Install python modules
-
-    pip install numpy h5py pybind11 pytest loprop psutil
-    pip install --no-binary=mpi4py mpi4py
-
-    # Install VeloxChem
-
-    cd VeloxChem
-    python3 config/generate_setup.py
-    python3 setup.py install
-
-Arm (Isambard Cray XC50 system)
-+++++++++++++++++++++++++++++++
-
-.. code-block:: bash
-
-    # Load cray modules
-
-    module swap PrgEnv-cray PrgEnv-gnu
-    module load cray-hdf5
-    module load cray-python/3.6.5.7
-
-    # Install python modules
-
-    python3 -m pip install pybind11 --user
-    python3 -m pip install h5py --user
-    python3 -m pip install loprop psutil --user
-
-    # Manually install mpi4py
-
-    # 1. Download mpi4py-3.0.3.tar.gz from https://pypi.org/project/mpi4py/#files
-    # 2. tar xf mpi4py-3.0.3.tar.gz && cd mpi4py-3.0.3
-    # 3. Add the following lines to mpi.cfg
-    # [cray]
-    # mpicc         = cc
-    # mpicxx        = CC
-    # extra_compile_args   = -shared
-    # extra_link_args      = -Wl,-rpath,/opt/cray/pe/mpt/7.7.9/gni/mpich-gnu/8.2/lib
-    python3 setup.py build --mpi=cray
-    python3 setup.py install --prefix=<path-to-your-mpi4py>
-    export PYTHONPATH=<path-to-your-mpi4py>/lib/python3.6/site-packages:$PYTHONPATH
-
-    # Setup compiler wrapper
-
-    export CXX=CC
-
-    # Install VeloxChem
-
-    cd VeloxChem
-    python3 config/generate_setup.py
-    python3 setup.py install
-
-MacOS
+macOS
 +++++
 
-.. code-block:: bash
-
-    # Download and install MKL from
-    # https://software.intel.com/en-us/mkl
-
-    # Install libomp, MPICH and Python
-
-    brew install libomp
-    brew install mpich
-    brew install python
-
-    # Install python modules
-
-    pip3 install numpy h5py pybind11 pytest loprop psutil
-    pip3 install --no-binary=mpi4py mpi4py
-
-    # Install VeloxChem
-
-    cd VeloxChem
-    python3 config/generate_setup.py
-    python3 setup.py install
-
+- See installation instructions `With Anaconda`_
 
 Windows
 +++++++
 
-Soon to come!
+- Soon to come!
 
 
-Binaries
-^^^^^^^^
+Installing binaries
+^^^^^^^^^^^^^^^^^^^
 
 Docker
 ++++++
@@ -205,24 +239,57 @@ on `Docker Hub <https://hub.docker.com/r/veloxchem/veloxchem>`_.
     # root@fcc794d899c7:/veloxchem# which vlx
     /usr/local/bin/vlx
 
-The CPPE library for polarizable embedding
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _external-dependencies:
 
-If you are interested in using the CPPE library for polarizable embedding,
-please install it according to the instructions below. Note that cmake is
-needed to build the CPPE library.
+Dependencies
+^^^^^^^^^^^^
+
+If you wish to use functionality offered through interfaces with other software
+packages, you will first need to install them.  Currently, interfaces to add-on
+dependencies `XTB <https://xtb-docs.readthedocs.io/>`_ and `CPPE
+<https://github.com/maxscheurer/cppe>`_  are available.
+
+
+The CPPE library for polarizable embedding
+++++++++++++++++++++++++++++++++++++++++++
+
+There are few ways to install the CPPE library for polarizable embedding. Note
+that you will need a C++ compiler compliant with th C++14 standard and CMake.
+
+You can install it *via* ``pip`` in your virtual environment:
+
+.. code-block:: bash
+
+   $ python -m pip install cppe
+
+or as an extra during compilation of VeloxChem:
+
+.. code-block:: bash
+
+   $ python -m pip install .[qmmm]
+
+Alternatively, you can compile it without using ``pip``:
 
 .. code-block:: bash
 
     # Build CPPE
-    git clone https://github.com/maxscheurer/cppe
-    cd cppe; mkdir build; cd build
-    cmake -DENABLE_PYTHON_INTERFACE=ON ..
-    make
+    $ git clone https://github.com/maxscheurer/cppe
+    $ cd cppe; mkdir build; cd build
+    $ cmake -DENABLE_PYTHON_INTERFACE=ON ..
+    $ make
 
     # Set up python path
-    export PYTHONPATH=<path-to-your-cppe>/build/stage/lib:$PYTHONPATH
+    $ export PYTHONPATH=/path/to/your/cppe/build/stage/lib:$PYTHONPATH
 
     # Make sure that cppe can be imported
-    python3 -c 'import cppe'
+    $ python3 -c 'import cppe'
 
+
+The XTB package for semiempirical methods
++++++++++++++++++++++++++++++++++++++++++
+
+It is recommended to install the XTB package in a conda environment:
+
+.. code-block:: bash
+
+   $ conda install xtb -c conda-forge

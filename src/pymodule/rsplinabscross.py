@@ -38,10 +38,10 @@ class LinearAbsorptionCrossSection(ResponseProperty):
         rsp_dict['onlystatic'] = 'no'
         rsp_dict['complex'] = 'yes'
 
-        rsp_dict['a_operator'] = 'dipole'
+        rsp_dict['a_operator'] = 'electric dipole'
         rsp_dict['a_components'] = 'xyz'
 
-        rsp_dict['b_operator'] = 'dipole'
+        rsp_dict['b_operator'] = 'electric dipole'
         rsp_dict['b_components'] = 'xyz'
 
         if 'frequencies' not in rsp_dict:

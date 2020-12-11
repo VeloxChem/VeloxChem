@@ -27,6 +27,7 @@
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "MathConst.hpp"
+#include "StringFormat.hpp"
 #include "TwoIndexes.hpp"
 
 namespace py = pybind11;
@@ -181,6 +182,50 @@ c_matmul(const py::array_t<double>& A, const py::array_t<double>& B)
                 lda_C);
 
     return C;
+}
+
+static void
+c_dgemm(const std::string layout_str,
+        const std::string trans_A_str,
+        const std::string trans_B_str,
+        const int32_t m,
+        const int32_t n,
+        const int32_t k,
+        const double alpha,
+        const py::array_t<double>& A,
+        const int32_t lda_A,
+        const py::array_t<double>& B,
+        const int32_t lda_B,
+        const double beta,
+        py::array_t<double>& C,
+        const int32_t lda_C)
+{
+    auto layout = CblasRowMajor;
+
+    if (fstr::upcase(layout_str) == std::string("COL-MAJOR")) layout = CblasColMajor;
+
+    auto trans_A = CblasNoTrans;
+
+    if (fstr::upcase(trans_A_str) == std::string("T")) trans_A = CblasTrans;
+
+    auto trans_B = CblasNoTrans;
+
+    if (fstr::upcase(trans_B_str) == std::string("T")) trans_B = CblasTrans;
+
+    cblas_dgemm(layout,
+                trans_A,
+                trans_B,
+                m,
+                n,
+                k,
+                alpha,
+                A.data(),
+                lda_A,
+                B.data(),
+                lda_B,
+                beta,
+                C.mutable_data(),
+                lda_C);
 }
 
 static py::array_t<double>
@@ -343,6 +388,8 @@ export_math(py::module& m)
     m.def("mathconst_pi", &mathconst::getPiValue);
 
     m.def("c_matmul", &c_matmul);
+
+    m.def("c_dgemm", &c_dgemm);
 
     m.def("c_multi_dot", &c_multi_dot);
 

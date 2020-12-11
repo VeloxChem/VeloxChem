@@ -26,6 +26,20 @@ double getBohrValueInAngstroms();
 double getHartreeValueInElectronVolts();
 
 /**
+ Gets a Hartree value in kcal/mol.
+
+ @return the conversion factor.
+ */
+double getHartreeValueInKiloCaloriePerMole();
+
+/**
+ Gets convertion factor for dipole moment (a.u.->Debye)
+
+ @return the conversion factor.
+ */
+double getDipoleInDebye();
+
+/**
  Gets convertion factor for rotatory strength (a.u.->cgs)
 
  @return the conversion factor.

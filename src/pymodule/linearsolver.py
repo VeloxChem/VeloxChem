@@ -21,10 +21,13 @@ from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
+from .veloxchemlib import molorb
 from .veloxchemlib import szblock
 from .veloxchemlib import parse_xc_func
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
+from .molecularorbitals import MolecularOrbitals
+from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
@@ -71,6 +74,7 @@ class LinearSolver:
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation.
+        - filename: The filename.
         - dist_bger: The distributed gerade trial vectors.
         - dist_bung: The distributed ungerade trial vectors.
         - dist_e2bger: The distributed gerade sigma vectors.
@@ -129,6 +133,9 @@ class LinearSolver:
         self.profiling = False
         self.memory_profiling = False
         self.memory_tracing = False
+
+        # filename
+        self.filename = None
 
         self.dist_bger = None
         self.dist_bung = None
@@ -220,6 +227,9 @@ class LinearSolver:
         if 'memory_tracing' in rsp_dict:
             key = rsp_dict['memory_tracing'].lower()
             self.memory_tracing = True if key in ['yes', 'y'] else False
+
+        if 'filename' in rsp_dict:
+            self.filename = rsp_dict['filename']
 
     def init_eri(self, molecule, basis):
         """
@@ -954,19 +964,19 @@ class LinearSolver:
 
         cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Convergence Threshold           : ' + \
-            '{:.1e}'.format(self.conv_thresh)
+        cur_str = 'Convergence Threshold           : {:.1e}'.format(
+            self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = 'ERI Screening Scheme            : ' + get_qq_type(
             self.qq_type)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'ERI Screening Threshold         : ' + \
-            '{:.1e}'.format(self.eri_thresh)
+        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
+            self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
         if self.batch_size is not None:
-            cur_str = 'Batch Size of Fock Matrices     : ' + \
-                '{:d}'.format(self.batch_size)
+            cur_str = 'Batch Size of Fock Matrices     : {:d}'.format(
+                self.batch_size)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.dft:
@@ -1003,6 +1013,7 @@ class LinearSolver:
         self.ostream.print_header(output_conv.ljust(width))
         self.ostream.print_blank()
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def check_convergence(self, relative_residual_norm):
         """
@@ -1141,9 +1152,9 @@ class LinearSolver:
 
         return dist_new_ger, dist_new_ung
 
-    def get_rhs(self, operator, components, molecule, basis, scf_tensors):
+    def get_prop_grad(self, operator, components, molecule, basis, scf_tensors):
         """
-        Creates right-hand side of linear response equations.
+        Computes property gradients for linear response equations.
 
         :param operator:
             The string for the operator.
@@ -1157,18 +1168,19 @@ class LinearSolver:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
-            The right-hand sides (gradients).
+            The property gradients.
         """
 
         # compute 1e integral
 
         assert_msg_critical(
             operator in [
-                'dipole', 'linear_momentum', 'linear momentum',
-                'angular_momentum', 'angular momentum'
-            ], 'get_rhs: unsupported operator {}'.format(operator))
+                'dipole', 'electric dipole', 'electric_dipole',
+                'linear_momentum', 'linear momentum', 'angular_momentum',
+                'angular momentum', 'magnetic dipole', 'magnetic_dipole'
+            ], 'get_prop_grad: unsupported operator {}'.format(operator))
 
-        if operator == 'dipole':
+        if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
             dipole_mats = dipole_drv.compute(molecule, basis)
 
@@ -1198,6 +1210,17 @@ class LinearSolver:
             else:
                 integrals = tuple()
 
+        elif operator in ['magnetic_dipole', 'magnetic dipole']:
+            angmom_drv = AngularMomentumIntegralsDriver(self.comm)
+            angmom_mats = angmom_drv.compute(molecule, basis)
+
+            if self.rank == mpi_master():
+                integrals = (-0.5 * angmom_mats.x_to_numpy(),
+                             -0.5 * angmom_mats.y_to_numpy(),
+                             -0.5 * angmom_mats.z_to_numpy())
+            else:
+                integrals = tuple()
+
         # compute right-hand side
 
         if self.rank == mpi_master():
@@ -1224,10 +1247,10 @@ class LinearSolver:
         else:
             return tuple()
 
-    def get_complex_rhs(self, operator, components, molecule, basis,
-                        scf_tensors):
+    def get_complex_prop_grad(self, operator, components, molecule, basis,
+                              scf_tensors):
         """
-        Creates right-hand side of linear response equations.
+        Computes complex property gradients for linear response equations.
 
         :param operator:
             The string for the operator.
@@ -1241,18 +1264,20 @@ class LinearSolver:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
-            The right-hand sides (gradients).
+            The complex property gradients.
         """
 
         # compute 1e integral
 
         assert_msg_critical(
             operator in [
-                'dipole', 'linear_momentum', 'linear momentum',
-                'angular_momentum', 'angular momentum'
-            ], 'get_rhs: unsupported operator {}'.format(operator))
+                'dipole', 'electric dipole', 'electric_dipole',
+                'linear_momentum', 'linear momentum', 'angular_momentum',
+                'angular momentum'
+            ],
+            'get_complex_prop_grad: unsupported operator {}'.format(operator))
 
-        if operator == 'dipole':
+        if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
             dipole_mats = dipole_drv.compute(molecule, basis)
 
@@ -1644,3 +1669,182 @@ class LinearSolver:
         sdiag = 2.0 * np.ones(lz)
 
         return ediag, sdiag
+
+    def get_nto(self, t_mat, mo_occ, mo_vir):
+        """
+        Gets the natural transition orbitals.
+
+        :param t_mat:
+            The excitation vector in matrix form (N_occ x N_virt).
+        :param mo_occ:
+            The MO coefficients of occupied orbitals.
+        :param mo_vir:
+            The MO coefficients of virtual orbitals.
+
+        :return:
+            The lambda values (1D array) and the NTO coefficients (2D array).
+        """
+
+        # SVD
+        u_mat, s_diag, vh_mat = np.linalg.svd(t_mat, full_matrices=True)
+        lam_diag = s_diag**2
+
+        # holes in increasing order of lambda
+        # particles in decreasing order of lambda
+        nto_occ = np.flip(np.matmul(mo_occ, u_mat), axis=1)
+        nto_vir = np.matmul(mo_vir, vh_mat.T)
+
+        # NTOs including holes and particles
+        nto_orbs = np.concatenate((nto_occ, nto_vir), axis=1)
+        nto_ener = np.zeros(nto_orbs.shape[1])
+        nto_mo = MolecularOrbitals([nto_orbs], [nto_ener], molorb.rest)
+
+        return lam_diag, nto_mo
+
+    def write_nto_cubes(self,
+                        molecule,
+                        basis,
+                        root,
+                        lam_diag,
+                        nto_mo,
+                        nto_thresh=0.1):
+        """
+        Writes cube files for natural transition orbitals.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param root:
+            The index of the root (0-based).
+        :param lam_diag:
+            The lambda values (1D array).
+        :param nto_mo:
+            The NTO coefficients (2D array).
+        :param nto_thresh:
+            The threshold for writing NTO to cube file.
+        """
+
+        vis_drv = VisualizationDriver(self.comm)
+        cubic_grid = vis_drv.gen_cubic_grid(molecule)
+
+        nocc = molecule.number_of_alpha_electrons()
+
+        for i_nto in range(lam_diag.size):
+            if lam_diag[i_nto] < nto_thresh:
+                continue
+
+            self.ostream.print_info('  lambda: {:.4f}'.format(lam_diag[i_nto]))
+
+            # hole
+            ind_occ = nocc - i_nto - 1
+            vis_drv.compute(cubic_grid, molecule, basis, nto_mo, ind_occ,
+                            'alpha')
+
+            if self.rank == mpi_master():
+                occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(
+                    self.filename, root + 1, i_nto + 1)
+                vis_drv.write_data(occ_cube_name, cubic_grid, molecule, 'nto',
+                                   ind_occ, 'alpha')
+
+                self.ostream.print_info(
+                    '    Cube file (hole)     : {:s}'.format(occ_cube_name))
+                self.ostream.flush()
+
+            # electron
+            ind_vir = nocc + i_nto
+            vis_drv.compute(cubic_grid, molecule, basis, nto_mo, ind_vir,
+                            'alpha')
+
+            if self.rank == mpi_master():
+                vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(
+                    self.filename, root + 1, i_nto + 1)
+                vis_drv.write_data(vir_cube_name, cubic_grid, molecule, 'nto',
+                                   ind_vir, 'alpha')
+
+                self.ostream.print_info(
+                    '    Cube file (particle) : {:s}'.format(vir_cube_name))
+                self.ostream.flush()
+
+        self.ostream.print_blank()
+
+    def get_detach_attach_densities(self, t_mat, mo_occ, mo_vir):
+        """
+        Gets the detachment and attachment densities.
+
+        :param t_mat:
+            The (de)excitation vector in matrix form (N_occ x N_virt).
+        :param mo_occ:
+            The MO coefficients of occupied orbitals.
+        :param mo_vir:
+            The MO coefficients of virtual orbitals.
+
+        :return:
+            The detachment and attachment densities.
+        """
+
+        mo = np.hstack((mo_occ, mo_vir))
+        nocc = mo_occ.shape[1]
+        nvir = mo_vir.shape[1]
+
+        exc_D = np.matmul(t_mat, t_mat.T) * (-1.0)
+        exc_A = np.matmul(t_mat.T, t_mat)
+
+        delta = np.zeros((nocc + nvir, nocc + nvir))
+        delta[:nocc, :nocc] = exc_D[:, :]
+        delta[nocc:, nocc:] = exc_A[:, :]
+
+        t_evals, t_evecs = np.linalg.eigh(delta)
+        diag_D = t_evals * (t_evals < 0.0) * (-1.0)
+        diag_A = t_evals * (t_evals > 0.0)
+
+        dens_D = np.linalg.multi_dot(
+            [mo, t_evecs, np.diag(diag_D), t_evecs.T, mo.T])
+        dens_A = np.linalg.multi_dot(
+            [mo, t_evecs, np.diag(diag_A), t_evecs.T, mo.T])
+
+        return dens_D, dens_A
+
+    def write_detach_attach_cubes(self, molecule, basis, root, dens_DA):
+        """
+        Writes cube files for detachment and attachment densities.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param root:
+            The index of the root (0-based).
+        :param dens_DA:
+            The AODensityMatrix object containing detachment and attachment
+            densities.
+        """
+
+        vis_drv = VisualizationDriver(self.comm)
+        cubic_grid = vis_drv.gen_cubic_grid(molecule)
+
+        vis_drv.compute(cubic_grid, molecule, basis, dens_DA, 0, 'alpha')
+
+        if self.rank == mpi_master():
+            detach_cube_name = '{:s}_S{:d}_detach.cube'.format(
+                self.filename, root + 1)
+            vis_drv.write_data(detach_cube_name, cubic_grid, molecule,
+                               'density', 0, 'alpha')
+
+            self.ostream.print_info(
+                '  Cube file (detachment) : {:s}'.format(detach_cube_name))
+            self.ostream.flush()
+
+        vis_drv.compute(cubic_grid, molecule, basis, dens_DA, 1, 'alpha')
+
+        if self.rank == mpi_master():
+            attach_cube_name = '{:s}_S{:d}_attach.cube'.format(
+                self.filename, root + 1)
+            vis_drv.write_data(attach_cube_name, cubic_grid, molecule,
+                               'density', 1, 'alpha')
+
+            self.ostream.print_info(
+                '  Cube file (attachment) : {:s}'.format(attach_cube_name))
+            self.ostream.flush()
+
+        self.ostream.print_blank()

@@ -1,10 +1,10 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
-import os
+from pathlib import Path
 
-from veloxchem.veloxchemlib import CubicGrid
 from veloxchem.veloxchemlib import mpi_master
+from veloxchem.cubicgrid import CubicGrid
 from veloxchem.visualizationdriver import VisualizationDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.mpitask import MpiTask
@@ -14,9 +14,8 @@ class TestVisualization(unittest.TestCase):
 
     def test_visualization_driver(self):
 
-        inpfile = os.path.join('inputs', 'h2se.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'h2se.inp')
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
@@ -96,5 +95,5 @@ class TestVisualization(unittest.TestCase):
         self.assertEqual(grid.values_to_numpy().shape, tuple(num_points))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

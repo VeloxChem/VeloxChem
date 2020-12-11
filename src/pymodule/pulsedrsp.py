@@ -1,6 +1,7 @@
 import numpy as np
 import h5py
 import sys
+import os
 
 from .veloxchemlib import mpi_master
 from .cppsolver import ComplexResponse
@@ -294,7 +295,8 @@ class PulsedResponse:
         with open(fname, 'w') as f:
             for xyz1 in ['x', 'y', 'z']:
                 for xyz2 in ['x', 'y', 'z']:
-                    f.write('Frequency   Amplitude   {}{}\n'.format(xyz1, xyz2))
+                    f.write('Frequency   Amplitude   {}{}'.format(xyz1, xyz2) +
+                            os.linesep)
                     for freq, amp in zip(self.truncated_freqs, self.amplitudes):
                         cur_str = [
                             '{0:12.6f} {1:>12.8f}{2:>+12.8f}j'.format(
@@ -303,7 +305,7 @@ class PulsedResponse:
                         cur_str.append('{0.real:12.8f}{0.imag:+.8f}j'.format(
                             self.results['properties_zeropad'][(xyz1, xyz2,
                                                                 freq)]))
-                        f.write(' '.join(cur_str) + '\n')
+                        f.write(' '.join(cur_str) + os.linesep)
 
     def write_hdf5(self, fname):
         """

@@ -17,7 +17,7 @@ def test_input_dict(mock_parse):
     ip = InputParser('foo.inp')
 
     assert mock_parse.called
-    assert ip.filename == 'foo.inp'
+    assert ip.inpname == 'foo.inp'
     assert ip.outname is None
     assert ip.input_dict == {}
     assert ip.get_dict() is ip.input_dict
@@ -191,7 +191,7 @@ def test_convert_dict(mock_parse, grouped, todict):
 
         ip = InputParser('foo.inp')
         expected = {
-            'input_file': 'foo.inp',
+            'filename': 'foo',
             'scf': {
                 'checkpoint_file': 'foo.scf.h5'
             },
@@ -244,7 +244,7 @@ def test_convert_dict_with_output_file(mock_parse, grouped, todict):
 
     ip = InputParser('bar.inp', 'foo.out')
     expected = {
-        'input_file': 'bar.inp',
+        'filename': 'foo',
         'scf': {
             'checkpoint_file': 'foo.scf.h5'
         },
@@ -293,7 +293,7 @@ def test_full_input(tmpdir):
         ip = InputParser(str(tmpdir / 'h2o.inp'))
 
         expected = {
-            'input_file': str(tmpdir / 'h2o.inp'),
+            'filename': str(tmpdir / 'h2o'),
             'scf': {
                 'checkpoint_file': str(tmpdir / 'h2o.scf.h5')
             },
@@ -317,7 +317,7 @@ def test_missing_file():
         with pytest.raises(AssertionError) as nofileinfo:
             InputParser('no_file')
 
-        assert str(nofileinfo.value) == 'input parser: cannot open file no_file'
+        assert str(nofileinfo.value) == 'InputParser: cannot open file no_file'
 
 
 def test_error_in_input(tmpdir):
@@ -350,17 +350,19 @@ def test_error_in_input(tmpdir):
         assert 'bad syntax' in str(info.value)
 
 
-@pytest.mark.parametrize('input_frequencies, expected',
-                         [([], []), ([1.0, 2.0], [1.0, 2.0]),
-                          (np.array([1.0, 2.0]), [1.0, 2.0]),
-                          (
-                              "0.0 - 0.1 (0.05), 0.5 - 1.0 (0.1), 2.0",
-                              [0.0, 0.05, 0.5, 0.6, 0.7, 0.8, 0.9, 2.0],
-                          ),
-                          (
-                              "0.0-0.1-0.05, 0.5-1.0-0.1, 2.0",
-                              [0.0, 0.05, 0.5, 0.6, 0.7, 0.8, 0.9, 2.0],
-                          )])
+@pytest.mark.parametrize('input_frequencies, expected', [
+    ([], []),
+    ([1.0, 2.0], [1.0, 2.0]),
+    (np.array([1.0, 2.0]), [1.0, 2.0]),
+    (
+        "0.0 - 0.1 (0.05), 0.5 - 1.0 (0.1), 2.0",
+        [0.0, 0.05, 0.1, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 2.0],
+    ),
+    (
+        "0.0-0.1-0.05, 0.5-1.0-0.1, 2.0",
+        [0.0, 0.05, 0.1, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 2.0],
+    ),
+])
 def test_parse_frequencies(input_frequencies, expected):
     if MPI.COMM_WORLD.Get_rank() == mpi_master():
         npt.assert_allclose(InputParser.parse_frequencies(input_frequencies),

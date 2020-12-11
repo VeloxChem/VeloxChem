@@ -37,12 +37,11 @@ CKineticEnergyIntegralsDriver::CKineticEnergyIntegralsDriver(MPI_Comm comm)
 
     _locNodes = mpi::nodes(comm);
 
-    mpi::duplicate(comm, &_locComm);
+    _locComm = comm;
 }
 
 CKineticEnergyIntegralsDriver::~CKineticEnergyIntegralsDriver()
 {
-    mpi::destroy(&_locComm);
 }
 
 CKineticEnergyMatrix

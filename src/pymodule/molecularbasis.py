@@ -1,4 +1,5 @@
-import os
+from os import environ
+from pathlib import Path
 
 from .veloxchemlib import MolecularBasis
 from .veloxchemlib import AtomBasis
@@ -39,20 +40,19 @@ def _MolecularBasis_read(mol,
     # 2. current directory
     # 3. VLXBASISPATH
 
-    basis_file = os.path.join(basis_path, basis_name.upper())
+    basis_file = Path(basis_path, basis_name.upper())
 
-    if not os.path.isfile(basis_file) and basis_path != '.':
-        basis_file = os.path.join('.', basis_name.upper())
+    if not basis_file.is_file() and basis_path != '.':
+        basis_file = Path('.', basis_name.upper())
 
-    if not os.path.isfile(basis_file) and 'VLXBASISPATH' in os.environ:
-        basis_file = os.path.join(os.environ['VLXBASISPATH'],
-                                  basis_name.upper())
+    if not basis_file.is_file() and 'VLXBASISPATH' in environ:
+        basis_file = Path(environ['VLXBASISPATH'], basis_name.upper())
 
-    basis_info = "Reading basis set: " + basis_file
+    basis_info = "Reading basis set: " + str(basis_file)
     ostream.print_info(basis_info)
     ostream.print_blank()
 
-    basis_dict = InputParser(basis_file).input_dict
+    basis_dict = InputParser(str(basis_file)).input_dict
 
     assert_msg_critical(
         basis_name.upper() == basis_dict['basis_set_name'].upper(),

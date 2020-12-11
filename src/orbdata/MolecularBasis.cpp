@@ -8,8 +8,8 @@
 
 #include "MolecularBasis.hpp"
 
-#include <sstream>
 #include <array>
+#include <sstream>
 
 #include "AngularMomentum.hpp"
 #include "ChemicalElement.hpp"
@@ -578,27 +578,35 @@ CMolecularBasis::broadcast(int32_t rank, MPI_Comm comm)
     }
 }
 
+std::string
+CMolecularBasis::repr() const
+{
+    std::ostringstream os;
+
+    os << std::endl;
+
+    os << "[CMolecularBasis (Object):" << this << "]" << std::endl;
+
+    os << "_label: " << _label << std::endl;
+
+    os << "_maxAngularMomentum: " << _maxAngularMomentum;
+
+    os << std::endl;
+
+    os << "_atomicBasisSets: " << std::endl;
+
+    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
+    {
+        os << "_atomicBasisSets[" << i << "]: " << std::endl;
+
+        os << _atomicBasisSets[i] << std::endl;
+    }
+
+    return os.str();
+}
+
 std::ostream&
 operator<<(std::ostream& output, const CMolecularBasis& source)
 {
-    output << std::endl;
-
-    output << "[CMolecularBasis (Object):" << &source << "]" << std::endl;
-
-    output << "_label: " << source._label << std::endl;
-
-    output << "_maxAngularMomentum: " << source._maxAngularMomentum;
-
-    output << std::endl;
-
-    output << "_atomicBasisSets: " << std::endl;
-
-    for (size_t i = 0; i < source._atomicBasisSets.size(); i++)
-    {
-        output << "_atomicBasisSets[" << i << "]: " << std::endl;
-
-        output << source._atomicBasisSets[i] << std::endl;
-    }
-
-    return output;
+    return (output << source.repr());
 }

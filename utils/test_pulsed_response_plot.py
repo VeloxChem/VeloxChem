@@ -1,7 +1,8 @@
+from pathlib import Path
 import unittest
-import pulsed_response_plot as prp
 import h5py
-import os
+
+import pulsed_response_plot as prp
 
 
 class TestPulsedRspPlot(unittest.TestCase):
@@ -13,8 +14,8 @@ class TestPulsedRspPlot(unittest.TestCase):
         zp_test_a = [0, 0, 0]
         exp_ans_a = [0, 0, 0, 3, 2, 1, 0, 1, 2, 3, 0, 0, 0]
 
-        self.assertEqual(
-            prp.mirror_and_zeropad(probe_arr_a, zp_test_a), exp_ans_a)
+        self.assertEqual(prp.mirror_and_zeropad(probe_arr_a, zp_test_a),
+                         exp_ans_a)
 
         # More elaborate test using complex numbers
         probe_arr_b = [0.0, 4.0 + 3.0j, 1.5, 1.0 - 5.0j, -2.0j]
@@ -24,8 +25,8 @@ class TestPulsedRspPlot(unittest.TestCase):
             1.0 - 5.0j, -2.0j, 0.0, 0.0
         ]
 
-        self.assertEqual(
-            prp.mirror_and_zeropad(probe_arr_b, zp_test_b), exp_ans_b)
+        self.assertEqual(prp.mirror_and_zeropad(probe_arr_b, zp_test_b),
+                         exp_ans_b)
 
     def test_get_txt_exp(self):
 
@@ -114,20 +115,18 @@ class TestPulsedRspPlot(unittest.TestCase):
 
     def test_plot_pulsed_response(self):
 
-        ref_file = os.path.join('test_data',
-                                'water_near_monochr_vlx_outp_ref.h5')
-        if not os.path.isfile(ref_file):
-            ref_file = os.path.join('utils', ref_file)
+        here = Path(__file__).parent
+        ref_file = str(here / 'test_data' /
+                       'water_near_monochr_vlx_outp_ref.h5')
+        res_ref_file = str(here / 'test_data' /
+                           'water_near_monochr_plot_result_ref.h5')
 
         # "Bootstrap-style" test using water data under assumption that this
         # data was correct
-        xfreqs, alpha_real_plot, alpha_imag_plot, field_w_real_plot, field_w_env_plot, t, dipmom_t_real_plot, field_t_real_plot = prp.plot_pulsed_response(
-            ['dummy', ref_file, 'save=n'], is_this_a_test=True)
-
-        res_ref_file = os.path.join('test_data',
-                                    'water_near_monochr_plot_result_ref.h5')
-        if not os.path.isfile(res_ref_file):
-            res_ref_file = os.path.join('utils', res_ref_file)
+        (xfreqs, alpha_real_plot, alpha_imag_plot, field_w_real_plot,
+         field_w_env_plot, t, dipmom_t_real_plot,
+         field_t_real_plot) = prp.plot_pulsed_response(
+             ['dummy', ref_file, 'save=n'], is_this_a_test=True)
 
         hf = h5py.File(res_ref_file, 'r')
 
@@ -139,26 +138,30 @@ class TestPulsedRspPlot(unittest.TestCase):
         alpha_real_plot_ref = hf.get('alpha_real_plot')[()]
         self.assertEqual(alpha_real_plot.size, alpha_real_plot_ref.size)
         for i in range(alpha_real_plot.size):
-            self.assertAlmostEqual(
-                alpha_real_plot[i], alpha_real_plot_ref[i], places=12)
+            self.assertAlmostEqual(alpha_real_plot[i],
+                                   alpha_real_plot_ref[i],
+                                   places=12)
 
         alpha_imag_plot_ref = hf.get('alpha_imag_plot')[()]
         self.assertEqual(alpha_imag_plot.size, alpha_imag_plot_ref.size)
         for i in range(alpha_imag_plot.size):
-            self.assertAlmostEqual(
-                alpha_imag_plot[i], alpha_imag_plot_ref[i], places=12)
+            self.assertAlmostEqual(alpha_imag_plot[i],
+                                   alpha_imag_plot_ref[i],
+                                   places=12)
 
         field_w_real_plot_ref = hf.get('field_w_real_plot')[()]
         self.assertEqual(field_w_real_plot.size, field_w_real_plot_ref.size)
         for i in range(field_w_real_plot.size):
-            self.assertAlmostEqual(
-                field_w_real_plot[i], field_w_real_plot_ref[i], places=12)
+            self.assertAlmostEqual(field_w_real_plot[i],
+                                   field_w_real_plot_ref[i],
+                                   places=12)
 
         field_w_env_plot_ref = hf.get('field_w_env_plot')[()]
         self.assertEqual(field_w_env_plot.size, field_w_env_plot_ref.size)
         for i in range(field_w_env_plot.size):
-            self.assertAlmostEqual(
-                field_w_env_plot[i], field_w_env_plot_ref[i], places=12)
+            self.assertAlmostEqual(field_w_env_plot[i],
+                                   field_w_env_plot_ref[i],
+                                   places=12)
 
         t_ref = hf.get('t')[()]
         self.assertEqual(t.size, t_ref.size)
@@ -168,18 +171,21 @@ class TestPulsedRspPlot(unittest.TestCase):
         dipmom_t_real_plot_ref = hf.get('dipmom_t_real_plot')[()]
         self.assertEqual(dipmom_t_real_plot.size, dipmom_t_real_plot_ref.size)
         for i in range(dipmom_t_real_plot.size):
-            self.assertAlmostEqual(
-                dipmom_t_real_plot[i], dipmom_t_real_plot_ref[i], places=12)
+            self.assertAlmostEqual(dipmom_t_real_plot[i],
+                                   dipmom_t_real_plot_ref[i],
+                                   places=12)
 
         field_t_real_plot_ref = hf.get('field_t_real_plot')[()]
         self.assertEqual(field_t_real_plot.size, field_t_real_plot_ref.size)
         for i in range(field_t_real_plot.size):
-            self.assertAlmostEqual(
-                field_t_real_plot[i], field_t_real_plot_ref[i], places=12)
+            self.assertAlmostEqual(field_t_real_plot[i],
+                                   field_t_real_plot_ref[i],
+                                   places=12)
 
         # To do:
         # - Add tests, data for various command-line arguments concerning
         # plotting
+
 
 if __name__ == "__main__":
 

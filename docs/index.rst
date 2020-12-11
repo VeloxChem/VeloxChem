@@ -10,8 +10,12 @@ Welcome to VeloxChem's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   introduction.rst
    installation.rst
-   start.rst
+   gettingstarted.rst
+
+   history.rst
+   authors.rst
 
    api/modules.rst
 

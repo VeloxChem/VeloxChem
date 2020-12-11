@@ -9,6 +9,7 @@
 #include <pybind11/pybind11.h>
 
 #include "ExportDFT.hpp"
+#include "ExportXTB.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "ExportMolData.hpp"
@@ -37,4 +38,6 @@ PYBIND11_MODULE(veloxchemlib, m)
     vlx_response::export_response(m);
 
     vlx_dft::export_dft(m);
+
+    vlx_xtb::export_xtb(m);
 }

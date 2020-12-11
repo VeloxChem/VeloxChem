@@ -1,7 +1,7 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
-import os
+from pathlib import Path
 
 from veloxchem.veloxchemlib import ChemicalElement
 from veloxchem.veloxchemlib import DispersionModel
@@ -14,7 +14,7 @@ class TestMolData(unittest.TestCase):
 
     def nh3_labels(self):
 
-        return ["N", "H", "H", "H"]
+        return ['N', 'H', 'H', 'H']
 
     def nh3_coords(self):
 
@@ -53,14 +53,14 @@ class TestMolData(unittest.TestCase):
         mol_3 = Molecule(labels, array, 'au')
         mol_4 = Molecule(labels, arrayT.T, 'au')
 
-        array_angs = array * bohr_in_angstroms()
+        array_ang = array * bohr_in_angstroms()
 
-        mol_5 = Molecule(labels, array_angs)
-        mol_6 = Molecule(labels, array_angs, 'angs')
+        mol_5 = Molecule(labels, array_ang)
+        mol_6 = Molecule(labels, array_ang, 'angstrom')
 
         mol_7 = Molecule([7, 1, 1, 1], array, 'au')
-        mol_8 = Molecule([7, 1, 1, 1], array_angs, 'angs')
-        mol_9 = Molecule([7, 1, 1, 1], array_angs)
+        mol_8 = Molecule([7, 1, 1, 1], array_ang, 'angstrom')
+        mol_9 = Molecule([7, 1, 1, 1], array_ang)
 
         self.assertEqual(mol_1, mol_2)
         self.assertEqual(mol_1, mol_3)
@@ -73,12 +73,11 @@ class TestMolData(unittest.TestCase):
 
     def test_get_sub_molecule(self):
 
-        inpfile = os.path.join('inputs', 'dimer.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
-        outfile = inpfile.replace('.inp', '.out')
+        here = Path(__file__).parent
+        inpfile = here / 'inputs' / 'dimer.inp'
+        outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
         molecule = task.molecule
 
         mol_1 = molecule.get_sub_molecule(0, 4)
@@ -179,13 +178,13 @@ class TestMolData(unittest.TestCase):
     def test_chemical_element(self):
 
         elem = ChemicalElement()
-        self.assertEqual("", elem.get_name())
-        elem.set_atom_type("BR")
-        self.assertEqual("Br", elem.get_name())
+        self.assertEqual('', elem.get_name())
+        elem.set_atom_type('BR')
+        self.assertEqual('Br', elem.get_name())
 
         elem2 = ChemicalElement()
         elem2.set_atom_type(35)
-        self.assertEqual("Br", elem2.get_name())
+        self.assertEqual('Br', elem2.get_name())
 
         self.assertEqual(elem, elem2)
 

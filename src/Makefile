@@ -11,11 +11,8 @@
 include Makefile.setup
 
 # Set TARGET and linker flags for VeloxChem shared library
-
 VLX_BAS := ../basis
-VLX_TARGET := ../build/lib/veloxchem/veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
-PYVLX_MAIN := vlx
 
 LIB_LIST += -shared $(LTOFLAG)
 
@@ -48,18 +45,29 @@ VLX_LIBS_DEPS = $(foreach d,$(VLX_LIBS_DIR),$(addprefix $d/,*.d))
 VLX_LIBS_OPTS = $(foreach d,$(VLX_LIBS_DIR),$(addprefix $d/,*.optrpt))
 VLX_LIBS_LIST = $(foreach d,$(VLX_LIBS_DIR),$(addprefix -L$d -l,$d))
 
+# Create build folder (if it doesn't exist already)
+build_folder:
+	@echo ====== Creating build folder...
+	mkdir -p $(BUILD_LIB)
+
+# Copy basis set files
+basis: build_folder
+	@echo ====== Copying basis set files...
+	$(CP) -r $(VLX_BAS) $(BUILD_LIB)
+
+# Copy module files
+pymodule: build_folder
+	@echo ====== Copying module files...
+	$(CP) -r $(VLX_MODULE) $(BUILD_LIB)
+
 # Debug
-debug: $(VLX_LIBS)
-	mkdir -p $(CURDIR)/../build/lib/veloxchem
-	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/lib/veloxchem
+debug: $(VLX_LIBS) basis pymodule
 	@echo ====== Linking debug version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
 
 # Release
-release: $(VLX_LIBS)
-	mkdir -p $(CURDIR)/../build/lib/veloxchem
-	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/lib/veloxchem
+release: $(VLX_LIBS) basis pymodule
 	@echo ====== Linking release version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)

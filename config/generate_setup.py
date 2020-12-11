@@ -2,10 +2,12 @@
 
 import subprocess
 import platform
-import site
 import sys
 import os
 import re
+from pathlib import Path
+
+from distutils.sysconfig import get_config_var
 
 
 def find_exe(executables):
@@ -98,7 +100,18 @@ def check_file(filename, label):
         sys.exit(1)
 
 
-def generate_setup(template_file, setup_file, user_flag=None):
+def generate_setup(template_file,
+                   setup_file,
+                   user_flag=None,
+                   build_lib=Path('build/lib')):
+
+    if isinstance(template_file, str):
+        template_file = Path(template_file)
+
+    if isinstance(setup_file, str):
+        setup_file = Path(setup_file)
+
+    ext_suffix = get_config_var('EXT_SUFFIX') or get_config_var('SO')
 
     # OS information
 
@@ -159,7 +172,7 @@ def generate_setup(template_file, setup_file, user_flag=None):
         sys.exit(1)
 
     use_intel = (cxxname == 'icpc')
-    use_gnu = (cxxname == 'g++' or re.match(r'.*-gnu-c\+\+', cxxname))
+    use_gnu = re.match(r'(.*(c|g|gnu-c)\+\+)', cxxname)
     use_clang = (cxxname in ['clang++', 'Crayclang'] or
                  re.match(r'.*-clang\+\+', cxxname))
 
@@ -187,13 +200,24 @@ def generate_setup(template_file, setup_file, user_flag=None):
     print('*** Checking math library... ', end='')
 
     # check conda environment
+    is_conda = os.path.exists(os.path.join(sys.prefix, 'conda-meta'))
+
+    # check whether MKL is in conda environment
     if 'MKLROOT' not in os.environ:
-        is_conda = os.path.exists(os.path.join(sys.prefix, 'conda-meta'))
-        mkl_core = os.path.join(sys.prefix, 'lib', 'libmkl_core')
-        has_mkl_core = (os.path.isfile(mkl_core + '.so') or
-                        os.path.isfile(mkl_core + '.dylib'))
-        if is_conda and has_mkl_core:
+        has_lib = (Path(sys.prefix, 'lib/libmkl_core.so').is_file() or
+                   Path(sys.prefix, 'lib/libmkl_core.dylib').is_file())
+        has_header = Path(sys.prefix, 'include/mkl.h').is_file()
+        if is_conda and has_lib and has_header:
             os.environ['MKLROOT'] = sys.prefix
+
+    # check whether OpenBLAS is in conda environment
+    if 'OPENBLASROOT' not in os.environ:
+        has_lib = (Path(sys.prefix, 'lib/libopenblas.so').is_file() or
+                   Path(sys.prefix, 'lib/libopenblas.dylib').is_file())
+        has_header = (Path(sys.prefix, 'include/lapacke.h').is_file() and
+                      Path(sys.prefix, 'include/cblas.h').is_file())
+        if is_conda and has_lib and has_header:
+            os.environ['OPENBLASROOT'] = sys.prefix
 
     use_mkl = 'MKLROOT' in os.environ
     use_openblas = 'OPENBLASROOT' in os.environ
@@ -280,17 +304,30 @@ def generate_setup(template_file, setup_file, user_flag=None):
     if use_gnu:
         lto_flag = '-fno-lto'
 
-    # pybind11
+    # xtb package
 
-    try:
-        import pybind11
-    except ImportError:
-        print()
-        print('*** Error: Unable to find pybind11!')
-        print('***        Please install via \"pip install pybind11 [--user]\"')
-        sys.exit(1)
+    use_xtb = 'XTBHOME' in os.environ
 
-    python_user_base = site.getuserbase()
+    if use_xtb:
+
+        xtb_inc = os.path.join(os.environ['XTBHOME'], 'include', 'xtb')
+        check_dir(xtb_inc, 'xtb include')
+
+        xtb_dir = os.path.join(os.environ['XTBHOME'], 'lib64')
+        check_dir(xtb_dir, 'xtb lib')
+
+        xtb_path = os.path.join(os.environ['XTBHOME'], 'share', 'xtb')
+        check_file(os.path.join(xtb_path, 'param_gfn0-xtb.txt'),
+                   'GFN0-XTB Parameters')
+        check_file(os.path.join(xtb_path, 'param_gfn1-xtb.txt'),
+                   'GFN1-XTB Parameters')
+        check_file(os.path.join(xtb_path, 'param_gfn2-xtb.txt'),
+                   'GFN2-XTB Parameters')
+
+        xtb_lib = 'XTB_INC := -I{}'.format(xtb_inc)
+        xtb_lib += os.linesep + 'XTB_LIB := -L{}'.format(xtb_dir)
+        xtb_lib += os.linesep + 'XTB_LIB += -Wl,-rpath,{} -lxtb'.format(xtb_dir)
+        xtb_lib += os.linesep + 'XTB_PATH := {}'.format(xtb_path)
 
     # google test lib
 
@@ -309,17 +346,25 @@ def generate_setup(template_file, setup_file, user_flag=None):
 
     # print Makefile.setup
 
-    with open(template_file, 'r', encoding='utf-8') as f_temp:
+    with template_file.open('r') as f_temp:
         lines = f_temp.readlines()
 
-    with open(setup_file, 'w', encoding='utf-8') as f_mkfile:
+    with setup_file.open('w') as f_mkfile:
         for line in lines:
             if '====placeholder====' in line:
                 print('# Automatically generated settings', file=f_mkfile)
                 print('', file=f_mkfile)
 
+                build_lib_str = (build_lib / 'veloxchem').resolve()
+                vlx_target_str = '$(BUILD_LIB)/veloxchemlib' + ext_suffix
+                print('BUILD_LIB := {}'.format(build_lib_str), file=f_mkfile)
+                print('VLX_TARGET := {}'.format(vlx_target_str), file=f_mkfile)
+                print('', file=f_mkfile)
+
                 print('USE_MPI := true', file=f_mkfile)
                 print('USE_MKL := {}'.format('true' if use_mkl else 'false'),
+                      file=f_mkfile)
+                print('USE_XTB := {}'.format('true' if use_xtb else 'false'),
                       file=f_mkfile)
                 print('', file=f_mkfile)
 
@@ -329,12 +374,6 @@ def generate_setup(template_file, setup_file, user_flag=None):
                 print('PYTHON :=',
                       'python{}.{}'.format(sys.version_info[0],
                                            sys.version_info[1]),
-                      file=f_mkfile)
-                python_version = 'python{}.{}{}'.format(sys.version_info[0],
-                                                        sys.version_info[1],
-                                                        sys.abiflags)
-                print('PYTHON_USER_INC :=',
-                      os.path.join(python_user_base, 'include', python_version),
                       file=f_mkfile)
                 print('', file=f_mkfile)
 
@@ -351,6 +390,10 @@ def generate_setup(template_file, setup_file, user_flag=None):
                 print('LTOFLAG :=', lto_flag, file=f_mkfile)
                 print('', file=f_mkfile)
 
+                if use_xtb:
+                    print(xtb_lib, file=f_mkfile)
+                    print('', file=f_mkfile)
+
                 if gtest_root is not None and gtest_lib is not None:
                     print('GST_ROOT :=', gtest_root, file=f_mkfile)
                     print('GST_LIB :=', gtest_lib, file=f_mkfile)
@@ -361,6 +404,7 @@ def generate_setup(template_file, setup_file, user_flag=None):
                 print(line, end='', file=f_mkfile)
 
     print('*** Successfully generated {}'.format(setup_file))
+    sys.stdout.flush()
 
 
 if __name__ == '__main__':
