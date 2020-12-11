@@ -216,7 +216,6 @@ def main():
                 return
 
             # SCF first-order properties
-
             scf_prop = ScfFirstOrderProperties(task.mpi_comm, task.ostream)
             scf_prop.compute(task.molecule, task.ao_basis, scf_tensors)
             if task.mpi_rank == mpi_master():

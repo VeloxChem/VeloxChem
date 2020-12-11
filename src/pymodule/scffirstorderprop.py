@@ -52,7 +52,7 @@ class ScfFirstOrderProperties:
 
             # electronic contribution
             total_density = scf_tensors['D'][0] + scf_tensors['D'][1]
-            electronic_dipole = np.array(
+            electronic_dipole = -1.0 * np.array(
                 [np.sum(dipole_ints[d] * total_density) for d in range(3)])
 
             # nuclear contribution
@@ -60,7 +60,7 @@ class ScfFirstOrderProperties:
             nuclear_charges = molecule.elem_ids_to_numpy()
             nuclear_dipole = np.sum(coords.T * nuclear_charges, axis=1)
 
-            self.properties['dipole moment'] = (nuclear_dipole -
+            self.properties['dipole moment'] = (nuclear_dipole +
                                                 electronic_dipole)
 
     def get_property(self, key):
