@@ -350,17 +350,19 @@ def test_error_in_input(tmpdir):
         assert 'bad syntax' in str(info.value)
 
 
-@pytest.mark.parametrize('input_frequencies, expected',
-                         [([], []), ([1.0, 2.0], [1.0, 2.0]),
-                          (np.array([1.0, 2.0]), [1.0, 2.0]),
-                          (
-                              "0.0 - 0.1 (0.05), 0.5 - 1.0 (0.1), 2.0",
-                              [0.0, 0.05, 0.5, 0.6, 0.7, 0.8, 0.9, 2.0],
-                          ),
-                          (
-                              "0.0-0.1-0.05, 0.5-1.0-0.1, 2.0",
-                              [0.0, 0.05, 0.5, 0.6, 0.7, 0.8, 0.9, 2.0],
-                          )])
+@pytest.mark.parametrize('input_frequencies, expected', [
+    ([], []),
+    ([1.0, 2.0], [1.0, 2.0]),
+    (np.array([1.0, 2.0]), [1.0, 2.0]),
+    (
+        "0.0 - 0.1 (0.05), 0.5 - 1.0 (0.1), 2.0",
+        [0.0, 0.05, 0.1, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 2.0],
+    ),
+    (
+        "0.0-0.1-0.05, 0.5-1.0-0.1, 2.0",
+        [0.0, 0.05, 0.1, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 2.0],
+    ),
+])
 def test_parse_frequencies(input_frequencies, expected):
     if MPI.COMM_WORLD.Get_rank() == mpi_master():
         npt.assert_allclose(InputParser.parse_frequencies(input_frequencies),

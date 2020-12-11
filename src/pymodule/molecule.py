@@ -10,7 +10,7 @@ from .veloxchemlib import mathconst_pi
 
 
 @staticmethod
-def _Molecule_read_str(xyzstr, units='angs'):
+def _Molecule_read_str(xyzstr, units='angstrom'):
     """
     Reads molecule from xyz string.
 
@@ -55,7 +55,7 @@ def _Molecule_read_xyz(xyzfile):
         for a in range(natoms):
             xyzstr += f_xyz.readline().strip() + os.linesep
 
-    return Molecule.read_str(xyzstr, 'angs')
+    return Molecule.read_str(xyzstr, 'angstrom')
 
 
 @staticmethod
@@ -72,7 +72,7 @@ def _Molecule_from_dict(mol_dict):
 
     xyzstr = mol_dict['xyzstr']
 
-    units = 'angs'
+    units = 'angstrom'
     if 'units' in mol_dict:
         units = mol_dict['units'].lower()
 

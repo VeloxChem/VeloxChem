@@ -220,7 +220,7 @@ class InputParser:
                     self.input_dict['molecule']['xyzstr'] = xyzstr
                     # also set the default value for units
                     if 'units' not in self.input_dict['molecule']:
-                        self.input_dict['molecule']['units'] = 'angs'
+                        self.input_dict['molecule']['units'] = 'angstrom'
 
         if self.is_basis_set:
             # for basis set, save basis set file name
@@ -320,12 +320,11 @@ class InputParser:
                 assert_msg_critical(m is not None,
                                     'InputParser: failed to read frequencies')
 
-                frequencies += list(
-                    np.arange(
-                        float(m.group(1)),
-                        float(m.group(2)),
-                        float(m.group(3)),
-                    ))
+                start, stop, step = (float(m.group(1)), float(m.group(2)),
+                                     float(m.group(3)))
+                stop += 0.01 * step
+
+                frequencies += list(np.arange(start, stop, step))
             elif w:
                 frequencies.append(float(w))
         return frequencies

@@ -14,6 +14,9 @@ Welcome to VeloxChem's documentation!
    installation.rst
    gettingstarted.rst
 
+   history.rst
+   authors.rst
+
    api/modules.rst
 
 

@@ -89,8 +89,9 @@ The molecule group
   .. csv-table::
     :widths: 1, 3
 
-    "``angs``", "Angstroms (default)"
+    "``angstrom``", "Angstrom (default)"
     "``au``", "Atomic unit"
+    "``bohr``", "Atomic unit"
 
 The scf group
 -------------
@@ -145,7 +146,7 @@ The response group
 - **frequencies**
 
   - frequencies for polarizability or CPP calculations, in atomic unit
-  - format: start-end (step)
+  - format: start-stop (step)
   - example::
 
       frequencies: 0.1-0.2 (0.01)
