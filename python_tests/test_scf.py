@@ -12,7 +12,7 @@ except ImportError:
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.scfproperties import ScfProperties
+from veloxchem.scffirstorderprop import ScfFirstOrderProperties
 
 
 class TestSCF(unittest.TestCase):
@@ -33,7 +33,7 @@ class TestSCF(unittest.TestCase):
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        scf_prop = ScfProperties(task.mpi_comm, task.ostream)
+        scf_prop = ScfFirstOrderProperties(task.mpi_comm, task.ostream)
         scf_prop.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors)
 
         if task.mpi_rank == mpi_master():

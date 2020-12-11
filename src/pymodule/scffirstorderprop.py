@@ -5,10 +5,9 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import dipole_in_debye
 
 
-class ScfProperties:
+class ScfFirstOrderProperties:
     """
-    Implements the calculation of first-order properties for the SCF ground
-    state, such as the dipole moment.
+    Implements SCF first-order properties.
 
     :param comm:
         The MPI communicator.
@@ -21,7 +20,7 @@ class ScfProperties:
 
     def __init__(self, comm, ostream):
         """
-        Initializes the SCF properties.
+        Initializes SCF first-order properties.
         """
 
         self.comm = comm
@@ -33,7 +32,7 @@ class ScfProperties:
 
     def compute(self, molecule, basis, scf_tensors):
         """
-        Computes the SCF ground-state dipole moment.
+        Computes SCF first-order properties.
 
         :param molecule:
             The molecule
@@ -66,7 +65,7 @@ class ScfProperties:
 
     def get_property(self, key):
         """
-        Gets SCF ground-state property.
+        Gets SCF first-order property.
 
         :param key:
             The name of the property.
@@ -79,7 +78,7 @@ class ScfProperties:
 
     def print_properties(self, molecule):
         """
-        Prints SCF ground-state properties.
+        Prints SCF first-order properties.
 
         :param molecule:
             The molecule.

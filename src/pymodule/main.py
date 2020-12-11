@@ -8,7 +8,7 @@ from .veloxchemlib import mpi_master
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
-from .scfproperties import ScfProperties
+from .scffirstorderprop import ScfFirstOrderProperties
 from .scfgradientdriver import ScfGradientDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
@@ -217,7 +217,7 @@ def main():
 
             # SCF first-order properties
 
-            scf_prop = ScfProperties(task.mpi_comm, task.ostream)
+            scf_prop = ScfFirstOrderProperties(task.mpi_comm, task.ostream)
             scf_prop.compute(task.molecule, task.ao_basis, scf_tensors)
             if task.mpi_rank == mpi_master():
                 scf_prop.print_properties(task.molecule)
