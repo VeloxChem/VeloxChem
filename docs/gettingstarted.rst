@@ -76,7 +76,7 @@ Running in Jupyter notebook
     comm = MPI.COMM_WORLD
     ostream = vlx.OutputStream(sys.stdout)
 
-    molecule = vlx.Molecule.read_str(molecule_string, units='angs')
+    molecule = vlx.Molecule.read_str(molecule_string, units='angstrom')
     basis = vlx.MolecularBasis.read(molecule, basis_set_label)
 
     ostream.print_block(molecule.get_string())
