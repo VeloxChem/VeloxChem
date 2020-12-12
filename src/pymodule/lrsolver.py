@@ -73,7 +73,7 @@ class LinearResponseSolver(LinearSolver):
             self.frequencies = InputParser.parse_frequencies(
                 rsp_dict['frequencies'])
 
-    def compute(self, molecule, basis, scf_tensors, v1=None):
+    def compute(self, molecule, basis, scf_tensors):
         """
         Performs linear response calculation for a molecule and a basis set.
 
@@ -83,9 +83,6 @@ class LinearResponseSolver(LinearSolver):
             The AO basis set.
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
-        :param v1:
-            The gradients on the right-hand side. If not provided, v1 will be
-            computed for the B operator.
 
         :return:
             A dictionary containing response functions, solutions and a
@@ -137,20 +134,11 @@ class LinearResponseSolver(LinearSolver):
         timing_dict = {}
 
         # right-hand side (gradient)
-        valid_v1 = False
+        b_rhs = self.get_prop_grad(self.b_operator, self.b_components, molecule,
+                                   basis, scf_tensors)
         if self.rank == mpi_master():
-            valid_v1 = (v1 is not None)
-        valid_v1 = self.comm.bcast(valid_v1, root=mpi_master())
-
-        if not valid_v1:
-            nonlinear_flag = False
-            b_rhs = self.get_prop_grad(self.b_operator, self.b_components,
-                                       molecule, basis, scf_tensors)
-            if self.rank == mpi_master():
-                v1 = {(op, w): v for op, v in zip(self.b_components, b_rhs)
-                      for w in self.frequencies}
-        else:
-            nonlinear_flag = True
+            v1 = {(op, w): v for op, v in zip(self.b_components, b_rhs)
+                  for w in self.frequencies}
 
         # operators, frequencies and preconditioners
         if self.rank == mpi_master():
@@ -388,59 +376,44 @@ class LinearResponseSolver(LinearSolver):
         profiler.print_memory_usage(self.ostream)
 
         # calculate response functions
-        if not nonlinear_flag:
-            a_rhs = self.get_prop_grad(self.a_operator, self.a_components,
-                                       molecule, basis, scf_tensors)
+        a_rhs = self.get_prop_grad(self.a_operator, self.a_components, molecule,
+                                   basis, scf_tensors)
 
-            if self.is_converged:
-                key_0 = list(solutions.keys())[0]
-                x_0 = self.get_full_solution_vector(solutions[key_0])
+        if self.is_converged:
+            key_0 = list(solutions.keys())[0]
+            x_0 = self.get_full_solution_vector(solutions[key_0])
 
-                if self.rank == mpi_master():
-                    avail_mem = psutil.virtual_memory().available
-                    write_solution_to_file = (
-                        avail_mem < sys.getsizeof(x_0) * len(solutions) * 2)
-                    full_solutions = {}
+            if self.rank == mpi_master():
+                avail_mem = psutil.virtual_memory().available
+                write_solution_to_file = (
+                    avail_mem < sys.getsizeof(x_0) * len(solutions) * 2)
+                full_solutions = {}
 
-                    va = {op: v for op, v in zip(self.a_components, a_rhs)}
-                    rsp_funcs = {}
+                va = {op: v for op, v in zip(self.a_components, a_rhs)}
+                rsp_funcs = {}
 
-                for bop, w in solutions:
-                    x = self.get_full_solution_vector(solutions[(bop, w)])
-
-                    if self.rank == mpi_master():
-                        for aop in self.a_components:
-                            rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
-
-                            if write_solution_to_file:
-                                append_rsp_solution_hdf5(
-                                    self.checkpoint_file,
-                                    '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
-                            else:
-                                full_solutions[(bop, w)] = x
+            for bop, w in solutions:
+                x = self.get_full_solution_vector(solutions[(bop, w)])
 
                 if self.rank == mpi_master():
-                    if write_solution_to_file:
-                        return {'response_functions': rsp_funcs}
-                    else:
-                        return {
-                            'response_functions': rsp_funcs,
-                            'solutions': full_solutions
-                        }
+                    for aop in self.a_components:
+                        rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
 
-        else:
-            if self.is_converged:
-                if self.rank == mpi_master():
-                    kappas = {}
+                        if write_solution_to_file:
+                            append_rsp_solution_hdf5(
+                                self.checkpoint_file,
+                                '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
+                        else:
+                            full_solutions[(bop, w)] = x
 
-                for op, w in solutions:
-                    x = self.get_full_solution_vector(solutions[(op, w)])
-
-                    if self.rank == mpi_master():
-                        kappas[(op, w)] = self.lrvec2mat(x, nocc, norb)
-
-                if self.rank == mpi_master():
-                    return {'kappas': kappas}
+            if self.rank == mpi_master():
+                if write_solution_to_file:
+                    return {'response_functions': rsp_funcs}
+                else:
+                    return {
+                        'response_functions': rsp_funcs,
+                        'solutions': full_solutions
+                    }
 
         return {}
 
