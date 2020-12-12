@@ -49,6 +49,8 @@ class TpaDriver:
         - ostream: The output stream.
         - restart: The flag for restarting from checkpoint file.
         - checkpoint_file: The name of checkpoint file.
+        - program_start_time: The start time of the program.
+        - maximum_hours: The timelimit in hours.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
@@ -87,6 +89,10 @@ class TpaDriver:
         # restart information
         self.restart = True
         self.checkpoint_file = None
+
+        # information for graceful exit
+        self.program_start_time = None
+        self.maximum_hours = None
 
         # timing and profiling
         self.timing = False
@@ -132,6 +138,11 @@ class TpaDriver:
             self.restart = True if key == 'yes' else False
         if 'checkpoint_file' in rsp_dict:
             self.checkpoint_file = rsp_dict['checkpoint_file']
+
+        if 'program_start_time' in rsp_dict:
+            self.program_start_time = rsp_dict['program_start_time']
+        if 'maximum_hours' in rsp_dict:
+            self.maximum_hours = rsp_dict['maximum_hours']
 
         if 'timing' in rsp_dict:
             key = rsp_dict['timing'].lower()
@@ -240,6 +251,8 @@ class TpaDriver:
         Nb_drv.memory_profiling = self.memory_profiling
         Nb_drv.batch_size = self.batch_size
         Nb_drv.restart = self.restart
+        Nb_drv.program_start_time = self.program_start_time
+        Nb_drv.maximum_hours = self.maximum_hours
         if self.checkpoint_file is not None:
             Nb_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
             Nb_drv.checkpoint_file += '_tpa_1.h5'

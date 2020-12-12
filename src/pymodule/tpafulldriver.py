@@ -231,13 +231,12 @@ class TpaFullDriver(TpaDriver):
         else:
             fock_file = None
 
-        if self.rank == mpi_master():
-            valid_checkpoint = check_distributed_focks(fock_file, keys, wi)
-        else:
-            valid_checkpoint = None
-        valid_checkpoint = self.comm.bcast(valid_checkpoint, mpi_master())
+        if self.restart:
+            if self.rank == mpi_master():
+                self.restart = check_distributed_focks(fock_file, keys, wi)
+            self.restart = self.comm.bcast(self.restart, mpi_master())
 
-        if valid_checkpoint:
+        if self.restart:
             focks = read_distributed_focks(fock_file, keys, wi, self.comm,
                                            self.ostream)
             focks['F0'] = F0_a
@@ -511,6 +510,8 @@ class TpaFullDriver(TpaDriver):
         N_total_drv.memory_profiling = self.memory_profiling
         N_total_drv.batch_size = self.batch_size
         N_total_drv.restart = self.restart
+        N_total_drv.program_start_time = self.program_start_time
+        N_total_drv.maximum_hours = self.maximum_hours
         if self.checkpoint_file is not None:
             N_total_drv.checkpoint_file = re.sub(r'\.h5$', r'',
                                                  self.checkpoint_file)
@@ -910,13 +911,12 @@ class TpaFullDriver(TpaDriver):
         else:
             fock_file = None
 
-        if self.rank == mpi_master():
-            valid_checkpoint = check_distributed_focks(fock_file, keys, wi)
-        else:
-            valid_checkpoint = None
-        valid_checkpoint = self.comm.bcast(valid_checkpoint, mpi_master())
+        if self.restart:
+            if self.rank == mpi_master():
+                self.restart = check_distributed_focks(fock_file, keys, wi)
+            self.restart = self.comm.bcast(self.restart, mpi_master())
 
-        if valid_checkpoint:
+        if self.restart:
             return read_distributed_focks(fock_file, keys, wi, self.comm,
                                           self.ostream)
 
