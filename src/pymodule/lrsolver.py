@@ -190,8 +190,7 @@ class LinearResponseSolver(LinearSolver):
 
         # read initial guess from restart file
         if self.restart:
-            (self.dist_bger, self.dist_bung, self.dist_e2bger,
-             self.dist_e2bung) = self.read_vectors(rsp_vector_labels)
+            self.read_vectors(rsp_vector_labels)
 
         # generate initial guess from scratch
         else:
@@ -375,14 +374,7 @@ class LinearResponseSolver(LinearSolver):
 
         signal_handler.remove_sigterm_function()
 
-        dist_arrays = [
-            self.dist_bger,
-            self.dist_bung,
-            self.dist_e2bger,
-            self.dist_e2bung,
-        ]
-
-        self.write_checkpoint(molecule, basis, dft_dict, pe_dict, dist_arrays,
+        self.write_checkpoint(molecule, basis, dft_dict, pe_dict,
                               rsp_vector_labels)
 
         # converged?

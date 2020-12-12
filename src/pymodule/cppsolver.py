@@ -331,13 +331,7 @@ class ComplexResponse(LinearSolver):
 
         # read initial guess from restart file
         if self.restart:
-            if not nonlinear_flag:
-                (self.dist_bger, self.dist_bung, self.dist_e2bger,
-                 self.dist_e2bung) = self.read_vectors(rsp_vector_labels)
-            else:
-                (self.dist_bger, self.dist_bung, self.dist_e2bger,
-                 self.dist_e2bung, self.dist_fock_ger,
-                 self.dist_fock_ung) = self.read_vectors(rsp_vector_labels)
+            self.read_vectors(rsp_vector_labels, nonlinear_flag)
 
         # generate initial guess from scratch
         else:
@@ -631,21 +625,8 @@ class ComplexResponse(LinearSolver):
 
         signal_handler.remove_sigterm_function()
 
-        dist_arrays = [
-            self.dist_bger,
-            self.dist_bung,
-            self.dist_e2bger,
-            self.dist_e2bung,
-        ]
-
-        if nonlinear_flag:
-            dist_arrays += [
-                self.dist_fock_ger,
-                self.dist_fock_ung,
-            ]
-
-        self.write_checkpoint(molecule, basis, dft_dict, pe_dict, dist_arrays,
-                              rsp_vector_labels)
+        self.write_checkpoint(molecule, basis, dft_dict, pe_dict,
+                              rsp_vector_labels, nonlinear_flag)
 
         # converged?
         if self.rank == mpi_master():

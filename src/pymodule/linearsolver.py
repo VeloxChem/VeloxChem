@@ -352,15 +352,14 @@ class LinearSolver:
             'potfile_text': potfile_text,
         }
 
-    def read_vectors(self, rsp_vector_labels):
+    def read_vectors(self, rsp_vector_labels, nonlinear_flag=False):
         """
         Reads vectors from checkpoint file.
 
         :param rsp_vector_labels:
             The list of labels of vectors.
-
-        :return:
-            A tuple containing the vectors.
+        :param nonlinear_flag:
+            The flag for running in nonlinear response.
         """
 
         dist_arrays = [
@@ -369,12 +368,17 @@ class LinearSolver:
             for label in rsp_vector_labels
         ]
 
+        if not nonlinear_flag:
+            (self.dist_bger, self.dist_bung, self.dist_e2bger,
+             self.dist_e2bung) = dist_arrays
+        else:
+            (self.dist_bger, self.dist_bung, self.dist_e2bger, self.dist_e2bung,
+             self.dist_fock_ger, self.dist_fock_ung) = dist_arrays
+
         checkpoint_text = 'Restarting from checkpoint file: '
         checkpoint_text += self.checkpoint_file
         self.ostream.print_info(checkpoint_text)
         self.ostream.print_blank()
-
-        return tuple(dist_arrays)
 
     def append_trial_vectors(self, bger, bung):
         """
@@ -887,8 +891,13 @@ class LinearSolver:
         self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
                                                 root=mpi_master())
 
-    def write_checkpoint(self, molecule, basis, dft_dict, pe_dict, dist_arrays,
-                         labels):
+    def write_checkpoint(self,
+                         molecule,
+                         basis,
+                         dft_dict,
+                         pe_dict,
+                         labels,
+                         nonlinear_flag=False):
         """
         Writes checkpoint file.
 
@@ -900,10 +909,10 @@ class LinearSolver:
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
-        :param dist_arrays:
-            The list of distributed arrays to write to checkpoint.
         :param labels:
             The list of labels.
+        :param nonlinear_flag:
+            The flag for running in nonlinear response.
         """
 
         if self.checkpoint_file is None:
@@ -917,6 +926,17 @@ class LinearSolver:
         success = self.comm.bcast(success, root=mpi_master())
 
         if success:
+            if not nonlinear_flag:
+                dist_arrays = [
+                    self.dist_bger, self.dist_bung, self.dist_e2bger,
+                    self.dist_e2bung
+                ]
+            else:
+                dist_arrays = [
+                    self.dist_bger, self.dist_bung, self.dist_e2bger,
+                    self.dist_e2bung, self.dist_fock_ger, self.dist_fock_ung
+                ]
+
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
 
