@@ -79,6 +79,7 @@ class LinearSolver:
         - dist_bung: The distributed ungerade trial vectors.
         - dist_e2bger: The distributed gerade sigma vectors.
         - dist_e2bung: The distributed ungerade sigma vectors.
+        - nonlinear: The flag for running linear solver in nonlinear response.
         - dist_fock_ger: The distributed gerade Fock matrices in MO.
         - dist_fock_ung: The distributed ungerade Fock matrices in MO.
     """
@@ -143,6 +144,8 @@ class LinearSolver:
         self.dist_bung = None
         self.dist_e2bger = None
         self.dist_e2bung = None
+
+        self.nonlinear = False
         self.dist_fock_ger = None
         self.dist_fock_ung = None
 
@@ -352,14 +355,12 @@ class LinearSolver:
             'potfile_text': potfile_text,
         }
 
-    def read_vectors(self, rsp_vector_labels, nonlinear_flag=False):
+    def read_vectors(self, rsp_vector_labels):
         """
         Reads vectors from checkpoint file.
 
         :param rsp_vector_labels:
             The list of labels of vectors.
-        :param nonlinear_flag:
-            The flag for running in nonlinear response.
         """
 
         dist_arrays = [
@@ -368,12 +369,12 @@ class LinearSolver:
             for label in rsp_vector_labels
         ]
 
-        if not nonlinear_flag:
-            (self.dist_bger, self.dist_bung, self.dist_e2bger,
-             self.dist_e2bung) = dist_arrays
-        else:
+        if self.nonlinear:
             (self.dist_bger, self.dist_bung, self.dist_e2bger, self.dist_e2bung,
              self.dist_fock_ger, self.dist_fock_ung) = dist_arrays
+        else:
+            (self.dist_bger, self.dist_bung, self.dist_e2bger,
+             self.dist_e2bung) = dist_arrays
 
         checkpoint_text = 'Restarting from checkpoint file: '
         checkpoint_text += self.checkpoint_file
@@ -472,17 +473,8 @@ class LinearSolver:
 
         return None
 
-    def e2n_half_size(self,
-                      vecs_ger,
-                      vecs_ung,
-                      molecule,
-                      basis,
-                      scf_tensors,
-                      eri_dict,
-                      dft_dict,
-                      pe_dict,
-                      timing_dict,
-                      nonlinear_flag=False):
+    def e2n_half_size(self, vecs_ger, vecs_ung, molecule, basis, scf_tensors,
+                      eri_dict, dft_dict, pe_dict, timing_dict):
         """
         Computes the E2 b matrix vector product.
 
@@ -504,8 +496,6 @@ class LinearSolver:
             The dictionary containing PE information.
         :param timing_dict:
             The dictionary containing timing information.
-        :param nonlinear_flag:
-            The flag for running in nonlinear response.
 
         :return:
             The gerade and ungerade E2 b matrix vector product in half-size.
@@ -621,7 +611,7 @@ class LinearSolver:
                 e2_ger = np.zeros((half_size, batch_ger))
                 e2_ung = np.zeros((half_size, batch_ung))
 
-                if nonlinear_flag:
+                if self.nonlinear:
                     fock_ger = np.zeros((norb**2, batch_ger))
                     fock_ung = np.zeros((norb**2, batch_ung))
 
@@ -649,13 +639,13 @@ class LinearSolver:
                     if ifock < batch_ger:
                         e2_ger[:, ifock] = -self.lrmat2vec(gmo, nocc,
                                                            norb)[:half_size]
-                        if nonlinear_flag:
+                        if self.nonlinear:
                             fock_ger[:, ifock] = np.linalg.multi_dot(
                                 [mo.T, fak.T, mo]).reshape(norb**2)
                     else:
                         e2_ung[:, ifock - batch_ger] = -self.lrmat2vec(
                             gmo, nocc, norb)[:half_size]
-                        if nonlinear_flag:
+                        if self.nonlinear:
                             fock_ung[:,
                                      ifock - batch_ger] = np.linalg.multi_dot(
                                          [mo.T, fak.T, mo]).reshape(norb**2)
@@ -664,7 +654,7 @@ class LinearSolver:
             vecs_e2_ung = DistributedArray(e2_ung, self.comm)
             self.append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
 
-            if nonlinear_flag:
+            if self.nonlinear:
                 dist_fock_ger = DistributedArray(fock_ger, self.comm)
                 dist_fock_ung = DistributedArray(fock_ung, self.comm)
                 self.append_fock_matrices(dist_fock_ger, dist_fock_ung)
@@ -891,13 +881,7 @@ class LinearSolver:
         self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
                                                 root=mpi_master())
 
-    def write_checkpoint(self,
-                         molecule,
-                         basis,
-                         dft_dict,
-                         pe_dict,
-                         labels,
-                         nonlinear_flag=False):
+    def write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
         Writes checkpoint file.
 
@@ -911,8 +895,6 @@ class LinearSolver:
             The dictionary containing PE information.
         :param labels:
             The list of labels.
-        :param nonlinear_flag:
-            The flag for running in nonlinear response.
         """
 
         if self.checkpoint_file is None:
@@ -926,27 +908,21 @@ class LinearSolver:
         success = self.comm.bcast(success, root=mpi_master())
 
         if success:
-            if not nonlinear_flag:
+            if self.nonlinear:
                 dist_arrays = [
                     self.dist_bger, self.dist_bung, self.dist_e2bger,
-                    self.dist_e2bung
+                    self.dist_e2bung, self.dist_fock_ger, self.dist_fock_ung
                 ]
             else:
                 dist_arrays = [
                     self.dist_bger, self.dist_bung, self.dist_e2bger,
-                    self.dist_e2bung, self.dist_fock_ger, self.dist_fock_ung
+                    self.dist_e2bung
                 ]
 
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
 
-    def graceful_exit(self,
-                      molecule,
-                      basis,
-                      dft_dict,
-                      pe_dict,
-                      labels,
-                      nonlinear_flag=False):
+    def graceful_exit(self, molecule, basis, dft_dict, pe_dict, labels):
         """
         Gracefully exits the program.
 
@@ -960,8 +936,6 @@ class LinearSolver:
             The dictionary containing PE information.
         :param labels:
             The list of labels.
-        :param nonlinear_flag:
-            The flag for running in nonlinear response.
 
         :return:
             The return code.
@@ -972,8 +946,7 @@ class LinearSolver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        self.write_checkpoint(molecule, basis, dft_dict, pe_dict, labels,
-                              nonlinear_flag)
+        self.write_checkpoint(molecule, basis, dft_dict, pe_dict, labels)
 
         self.ostream.print_info('...done.')
         self.ostream.print_blank()

@@ -222,6 +222,10 @@ class ComplexResponse(LinearSolver):
         self.dist_e2bger = None
         self.dist_e2bung = None
 
+        self.nonlinear = False
+        self.dist_fock_ger = None
+        self.dist_fock_ung = None
+
         profiler = Profiler({
             'timing': self.timing,
             'profiling': self.profiling,
@@ -261,21 +265,17 @@ class ComplexResponse(LinearSolver):
         timing_dict = {}
 
         # right-hand side (gradient)
-        valid_v1 = False
         if self.rank == mpi_master():
-            valid_v1 = (v1 is not None)
-        valid_v1 = self.comm.bcast(valid_v1, root=mpi_master())
+            self.nonlinear = (v1 is not None)
+        self.nonlinear = self.comm.bcast(self.nonlinear, root=mpi_master())
 
-        if not valid_v1:
-            nonlinear_flag = False
+        if not self.nonlinear:
             b_rhs = self.get_complex_prop_grad(self.b_operator,
                                                self.b_components, molecule,
                                                basis, scf_tensors)
             if self.rank == mpi_master():
                 v1 = {(op, w): v for op, v in zip(self.b_components, b_rhs)
                       for w in self.frequencies}
-        else:
-            nonlinear_flag = True
 
         # operators, frequencies and preconditioners
         if self.rank == mpi_master():
@@ -308,17 +308,16 @@ class ComplexResponse(LinearSolver):
                             DistributedArray(grad_iu, self.comm),
                             DistributedArray(grad_ig, self.comm))
 
-        rsp_vector_labels = [
-            'CLR_bger_half_size',
-            'CLR_bung_half_size',
-            'CLR_e2bger_half_size',
-            'CLR_e2bung_half_size',
-        ]
-
-        if nonlinear_flag:
-            rsp_vector_labels += [
-                'CLR_Fock_ger',
-                'CLR_Fock_ung',
+        if self.nonlinear:
+            rsp_vector_labels = [
+                'CLR_bger_half_size', 'CLR_bung_half_size',
+                'CLR_e2bger_half_size', 'CLR_e2bung_half_size', 'CLR_Fock_ger',
+                'CLR_Fock_ung'
+            ]
+        else:
+            rsp_vector_labels = [
+                'CLR_bger_half_size', 'CLR_bung_half_size',
+                'CLR_e2bger_half_size', 'CLR_e2bung_half_size'
             ]
 
         # check validity of checkpoint file
@@ -331,15 +330,14 @@ class ComplexResponse(LinearSolver):
 
         # read initial guess from restart file
         if self.restart:
-            self.read_vectors(rsp_vector_labels, nonlinear_flag)
+            self.read_vectors(rsp_vector_labels)
 
         # generate initial guess from scratch
         else:
             bger, bung = self.setup_trials(dist_v1, precond)
 
             self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                               eri_dict, dft_dict, pe_dict, timing_dict,
-                               nonlinear_flag)
+                               eri_dict, dft_dict, pe_dict, timing_dict)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -351,7 +349,7 @@ class ComplexResponse(LinearSolver):
         signal_handler = SignalHandler()
         signal_handler.add_sigterm_function(self.graceful_exit, molecule, basis,
                                             dft_dict, pe_dict,
-                                            rsp_vector_labels, nonlinear_flag)
+                                            rsp_vector_labels)
 
         iter_per_trail_in_hours = None
         sqrt_2 = math.sqrt(2.0)
@@ -470,7 +468,7 @@ class ComplexResponse(LinearSolver):
                     e2realung = self.dist_e2bung.matmul_AB_no_gather(c_realung)
                     e2imagung = self.dist_e2bung.matmul_AB_no_gather(c_imagung)
 
-                    if nonlinear_flag:
+                    if self.nonlinear:
                         fock_realger = self.dist_fock_ger.matmul_AB_no_gather(
                             c_realger)
                         fock_imagger = self.dist_fock_ger.matmul_AB_no_gather(
@@ -570,8 +568,7 @@ class ComplexResponse(LinearSolver):
 
                 profiler.print_memory_tracing(self.ostream)
 
-                self.print_iteration(relative_residual_norm, xvs,
-                                     nonlinear_flag)
+                self.print_iteration(relative_residual_norm, xvs)
 
             profiler.stop_timer(iteration, 'ReducedSpace')
 
@@ -611,7 +608,7 @@ class ComplexResponse(LinearSolver):
 
             self.e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
                                scf_tensors, eri_dict, dft_dict, pe_dict,
-                               timing_dict, nonlinear_flag)
+                               timing_dict)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trail_in_hours = iter_in_hours / n_new_trials
@@ -626,7 +623,7 @@ class ComplexResponse(LinearSolver):
         signal_handler.remove_sigterm_function()
 
         self.write_checkpoint(molecule, basis, dft_dict, pe_dict,
-                              rsp_vector_labels, nonlinear_flag)
+                              rsp_vector_labels)
 
         # converged?
         if self.rank == mpi_master():
@@ -639,7 +636,7 @@ class ComplexResponse(LinearSolver):
         profiler.print_memory_usage(self.ostream)
 
         # calculate response functions
-        if not nonlinear_flag:
+        if not self.nonlinear:
             a_rhs = self.get_complex_prop_grad(self.a_operator,
                                                self.a_components, molecule,
                                                basis, scf_tensors)
@@ -732,7 +729,7 @@ class ComplexResponse(LinearSolver):
         else:
             return None
 
-    def print_iteration(self, relative_residual_norm, xvs, nonlinear_flag):
+    def print_iteration(self, relative_residual_norm, xvs):
         """
         Prints information of the iteration.
 
@@ -741,8 +738,6 @@ class ComplexResponse(LinearSolver):
         :param xvs:
             A list of tuples containing operator component, frequency, and
             property.
-        :param nonlinear_flag:
-            The flag for running cppsolver in nonlinear response.
         """
 
         width = 92
@@ -755,7 +750,7 @@ class ComplexResponse(LinearSolver):
         self.ostream.print_header(output_header.ljust(width))
         self.ostream.print_blank()
 
-        if not nonlinear_flag:
+        if not self.nonlinear:
             output_header = 'Operator:  {} ({})'.format(self.b_operator,
                                                         self.b_components)
             self.ostream.print_header(output_header.ljust(width))
