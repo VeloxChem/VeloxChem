@@ -940,7 +940,13 @@ class LinearSolver:
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
 
-    def graceful_exit(self, molecule, basis, dft_dict, pe_dict, labels):
+    def graceful_exit(self,
+                      molecule,
+                      basis,
+                      dft_dict,
+                      pe_dict,
+                      labels,
+                      nonlinear_flag=False):
         """
         Gracefully exits the program.
 
@@ -954,6 +960,8 @@ class LinearSolver:
             The dictionary containing PE information.
         :param labels:
             The list of labels.
+        :param nonlinear_flag:
+            The flag for running in nonlinear response.
 
         :return:
             The return code.
@@ -964,7 +972,8 @@ class LinearSolver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        self.write_checkpoint(molecule, basis, dft_dict, pe_dict, labels)
+        self.write_checkpoint(molecule, basis, dft_dict, pe_dict, labels,
+                              nonlinear_flag)
 
         self.ostream.print_info('...done.')
         self.ostream.print_blank()

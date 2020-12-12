@@ -351,7 +351,7 @@ class ComplexResponse(LinearSolver):
         signal_handler = SignalHandler()
         signal_handler.add_sigterm_function(self.graceful_exit, molecule, basis,
                                             dft_dict, pe_dict,
-                                            rsp_vector_labels)
+                                            rsp_vector_labels, nonlinear_flag)
 
         iter_per_trail_in_hours = None
         sqrt_2 = math.sqrt(2.0)
