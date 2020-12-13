@@ -56,7 +56,8 @@ class MpiTask:
                 elif isinstance(fname_list[1], str):
                     if fname_list[1].strip().split():
                         output_fname = fname_list[1].strip()
-                        if ('\0' in output_fname or output_fname == '-'):
+                        if ('\0' in output_fname or output_fname == '-' or
+                                output_fname == '.'):
                             output_fname = sys.stdout
 
             assert_msg_critical(
