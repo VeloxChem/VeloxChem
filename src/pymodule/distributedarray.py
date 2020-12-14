@@ -308,17 +308,39 @@ class DistributedArray:
             ave, res = divmod(dset.shape[0], nodes)
             counts = [ave + 1 if p < res else ave for p in range(nodes)]
             displacements = [sum(counts[:p]) for p in range(nodes)]
+        else:
+            counts = None
+        counts = comm.bcast(counts, root=mpi_master())
 
+        bytes_limit = 2**30 // 5 * 9  # below 2 GB
+
+        if rank == mpi_master():
             data = np.array(dset[displacements[0]:displacements[0] + counts[0]])
 
             for i in range(1, nodes):
-                send_data = np.array(dset[displacements[i]:displacements[i] +
-                                          counts[i]])
-                comm.send(send_data, dest=i, tag=i)
+                batch_size = bytes_limit // data.itemsize
+                if data.ndim == 2 and data.shape[1] != 0:
+                    batch_size //= data.shape[1]
+                batch_size = min(max(1, batch_size), counts[i])
+                for row_start in range(displacements[i],
+                                       displacements[i] + counts[i],
+                                       batch_size):
+                    row_end = min(row_start + batch_size,
+                                  displacements[i] + counts[i])
+                    comm.send(np.array(dset[row_start:row_end]), dest=i, tag=i)
 
             hf.close()
         else:
-            data = comm.recv(source=mpi_master(), tag=rank)
+            data = None
+
+            row_count = 0
+            while row_count < counts[rank]:
+                recv_data = comm.recv(source=mpi_master(), tag=rank)
+                if data is None:
+                    data = recv_data.copy()
+                else:
+                    data = np.vstack((data, recv_data))
+                row_count += recv_data.shape[0]
 
         return cls(data, comm, distribute=False)
 
@@ -341,6 +363,8 @@ class DistributedArray:
 
         t0 = tm.time()
 
+        bytes_limit = 2**30 // 5 * 9  # below 2 GB
+
         if self.rank == mpi_master():
             hf = h5py.File(fname, 'a')
 
@@ -351,11 +375,24 @@ class DistributedArray:
             dset[displacements[0]:displacements[0] + counts[0]] = self.data[:]
 
             for i in range(1, self.nodes):
-                data = self.comm.recv(source=i, tag=i)
-                dset[displacements[i]:displacements[i] + counts[i]] = data[:]
+                row_count = 0
+                while row_count < counts[i]:
+                    recv_data = self.comm.recv(source=i, tag=i)
+                    row_start = displacements[i] + row_count
+                    row_end = row_start + recv_data.shape[0]
+                    dset[row_start:row_end] = recv_data[:]
+                    row_count += recv_data.shape[0]
 
             hf.close()
         else:
-            self.comm.send(self.data, dest=mpi_master(), tag=self.rank)
+            batch_size = bytes_limit // self.data.itemsize
+            if self.data.ndim == 2 and self.shape(1) != 0:
+                batch_size //= self.shape(1)
+            batch_size = min(max(1, batch_size), self.shape(0))
+            for row_start in range(0, self.shape(0), batch_size):
+                row_end = min(row_start + batch_size, self.shape(0))
+                self.comm.send(self.data[row_start:row_end],
+                               dest=mpi_master(),
+                               tag=self.rank)
 
         return tm.time() - t0
