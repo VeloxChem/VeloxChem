@@ -4,6 +4,7 @@ import time as tm
 import h5py
 
 from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_size_limit
 
 
 class DistributedArray:
@@ -312,13 +313,11 @@ class DistributedArray:
             counts = None
         counts = comm.bcast(counts, root=mpi_master())
 
-        bytes_limit = 2**30 // 5 * 9  # below 2 GB
-
         if rank == mpi_master():
             data = np.array(dset[displacements[0]:displacements[0] + counts[0]])
 
             for i in range(1, nodes):
-                batch_size = bytes_limit // data.itemsize
+                batch_size = mpi_size_limit() // data.itemsize
                 if data.ndim == 2 and data.shape[1] != 0:
                     batch_size //= data.shape[1]
                 batch_size = min(max(1, batch_size), counts[i])
@@ -363,8 +362,6 @@ class DistributedArray:
 
         t0 = tm.time()
 
-        bytes_limit = 2**30 // 5 * 9  # below 2 GB
-
         if self.rank == mpi_master():
             hf = h5py.File(fname, 'a')
 
@@ -385,7 +382,7 @@ class DistributedArray:
 
             hf.close()
         else:
-            batch_size = bytes_limit // self.data.itemsize
+            batch_size = mpi_size_limit() // self.data.itemsize
             if self.data.ndim == 2 and self.shape(1) != 0:
                 batch_size //= self.shape(1)
             batch_size = min(max(1, batch_size), self.shape(0))

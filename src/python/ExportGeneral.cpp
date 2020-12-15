@@ -39,6 +39,14 @@ get_mpi_comm(py::object py_comm)
     return comm_ptr;
 }
 
+// Helper function for getting the size limit in MPI communication
+
+static int32_t
+mpi_size_limit()
+{
+    return static_cast<int32_t>(1<<30) / 5 * 9;
+}
+
 // Helper functions for getting shape and strides from int32_t dimension
 
 static std::vector<ssize_t>
@@ -169,6 +177,8 @@ export_general(py::module& m)
     // exposing functions
 
     m.def("mpi_master", &mpi::master);
+
+    m.def("mpi_size_limit", &mpi_size_limit);
 
     m.def("mpi_initialized", &mpi::initialized);
 
