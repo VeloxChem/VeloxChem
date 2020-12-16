@@ -1383,11 +1383,8 @@ class TpaFullDriver(TpaDriver):
             A dictonary of final T[4] contraction values
         """
 
-        T4term = {}
-        S4 = self.S4_dict(wi, kX, track, da, nocc, norb)
-
-        if self.damping > 0:
-            R4term = self.get_r4(wi, kX, Nx, track, da, nocc, norb)
+        T4 = {}
+        S4, R4 = self.get_s4_and_r4(wi, Nx, kX, track, da, nocc, norb)
 
         comp_per_freq = len(track) // len(wi)
 
@@ -1396,27 +1393,28 @@ class TpaFullDriver(TpaDriver):
             w = float(vals[1])
             ww = float(vals[1])
 
-            t4term = (np.matmul(Nx['Na'][('x', w)],
-                                e4_dict['f_iso_x'][ww] - S4[('x', ww)]) +
-                      np.matmul(Nx['Na'][('y', w)],
-                                e4_dict['f_iso_y'][ww] - S4[('y', ww)]) +
-                      np.matmul(Nx['Na'][('z', w)],
-                                e4_dict['f_iso_z'][ww] - S4[('z', ww)]))
+            t4term = (np.dot(Nx['Na'][('x', w)],
+                             e4_dict['f_iso_x'][ww] - S4[('x', ww)]) +
+                      np.dot(Nx['Na'][('y', w)],
+                             e4_dict['f_iso_y'][ww] - S4[('y', ww)]) +
+                      np.dot(Nx['Na'][('z', w)],
+                             e4_dict['f_iso_z'][ww] - S4[('z', ww)]))
 
             if self.damping > 0:
-                t4term += (R4term[('x', ww)] + R4term[('y', ww)] +
-                           R4term[('z', ww)])
+                t4term += (R4[('x', ww)] + R4[('y', ww)] + R4[('z', ww)])
 
-            T4term[(ww, -ww, ww)] = -(1. / 15) * t4term
+            T4[(ww, -ww, ww)] = -(1. / 15) * t4term
 
-        return T4term
+        return T4
 
-    def S4_dict(self, wi, kX, track, D0, nocc, norb):
+    def get_s4_and_r4(self, wi, Nx, kX, track, D0, nocc, norb):
         """
         Computes the S4 contractions
 
         :param wi:
             A list of all the freqs
+        :param Nx:
+            A dictonary of all the first-order response vectors
         :param kX:
             A dict with all the response matricies in MO basis
         :param track:
@@ -1433,7 +1431,9 @@ class TpaFullDriver(TpaDriver):
             A dictonary of final S[4] contraction values
         """
 
-        S4terms = {}
+        S4 = {}
+        R4 = {}
+
         comp_per_freq = len(track) // len(wi)
 
         for j in range(len(wi)):
@@ -1442,38 +1442,58 @@ class TpaFullDriver(TpaDriver):
             w1 = float(vals[1])
             w2 = float(vals[2])
             w3 = float(vals[3])
+            w_s = w1 + w2 + w3
 
-            S4_term_x = 0
-            S4_term_y = 0
-            S4_term_z = 0
+            S4[('x', w)] = 0
+            S4[('y', w)] = 0
+            S4[('z', w)] = 0
+
+            if self.damping > 0:
+                R4[('x', w1)] = 0
+                R4[('y', w1)] = 0
+                R4[('z', w1)] = 0
 
             for i in range(j * comp_per_freq, (j + 1) * comp_per_freq):
                 comp_i = track[i]
+                op = comp_i[0]
 
                 kB = kX['Nb'][(comp_i[1], w1)]
                 kC = -kX['Nb'][(comp_i[2], -w2)].T.conj()
                 kD = kX['Nd'][(comp_i[3], w3)]
 
-                if comp_i[0] in 'x':
-                    S4_term_x += w1 * self.s4(kB, kC, kD, D0, nocc, norb)
-                    S4_term_x += w2 * self.s4(kC, kB, kD, D0, nocc, norb)
-                    S4_term_x += w3 * self.s4(kD, kB, kC, D0, nocc, norb)
+                S4[(op, w)] -= w1 * self.s4(kB, kC, kD, D0, nocc, norb)
+                S4[(op, w)] -= w2 * self.s4(kC, kB, kD, D0, nocc, norb)
+                S4[(op, w)] -= w3 * self.s4(kD, kB, kC, D0, nocc, norb)
 
-                elif comp_i[0] in 'y':
-                    S4_term_y += w1 * self.s4(kB, kC, kD, D0, nocc, norb)
-                    S4_term_y += w2 * self.s4(kC, kB, kD, D0, nocc, norb)
-                    S4_term_y += w3 * self.s4(kD, kB, kC, D0, nocc, norb)
+                if self.damping > 0:
+                    # Na = Nx['Na'][(comp_i[0], w_s)]
+                    Nb = Nx['Nb'][(comp_i[1], w1)]
+                    Nc = self.flip_yz(Nx['Nb'][(comp_i[2],
+                                                -w2)])  # gets Nc from Nb
+                    Nd = Nx['Nd'][(comp_i[3], w3)]
+                    kA = kX['Na'][(comp_i[0], w_s)]
+                    kB = kX['Nb'][(comp_i[1], w1)]
+                    kC = -kX['Nb'][(comp_i[2], -w2)].T.conj()  # gets kc from kb
+                    kD = kX['Nd'][(comp_i[3], w3)]
 
-                elif comp_i[0] == 'z':
-                    S4_term_z += w1 * self.s4(kB, kC, kD, D0, nocc, norb)
-                    S4_term_z += w2 * self.s4(kC, kB, kD, D0, nocc, norb)
-                    S4_term_z += w3 * self.s4(kD, kB, kC, D0, nocc, norb)
+                    Nb_h = self.flip_xy(Nb)
+                    Nc_h = self.flip_xy(Nc)
+                    Nd_h = self.flip_xy(Nd)
 
-            S4terms[('x', w)] = -S4_term_x
-            S4terms[('y', w)] = -S4_term_y
-            S4terms[('z', w)] = -S4_term_z
+                    R4[(op, w1)] += 1j * self.damping * np.dot(
+                        Nd_h, self.s4_for_r4(kA.T, kB, kC, D0, nocc, norb))
+                    R4[(op, w1)] += 1j * self.damping * np.dot(
+                        Nc_h, self.s4_for_r4(kA.T, kB, kD, D0, nocc, norb))
+                    R4[(op, w1)] += 1j * self.damping * np.dot(
+                        Nd_h, self.s4_for_r4(kA.T, kC, kB, D0, nocc, norb))
+                    R4[(op, w1)] += 1j * self.damping * np.dot(
+                        Nb_h, self.s4_for_r4(kA.T, kC, kD, D0, nocc, norb))
+                    R4[(op, w1)] += 1j * self.damping * np.dot(
+                        Nc_h, self.s4_for_r4(kA.T, kD, kB, D0, nocc, norb))
+                    R4[(op, w1)] += 1j * self.damping * np.dot(
+                        Nb_h, self.s4_for_r4(kA.T, kD, kC, D0, nocc, norb))
 
-        return S4terms
+        return S4, R4
 
     def s4(self, k1, k2, k3, D, nocc, norb):
         """
@@ -1496,13 +1516,12 @@ class TpaFullDriver(TpaDriver):
             The contraction of S[4] for S[4] dict
         """
 
-        S4_123 = self.S4contract(k1, k2, k3, D, nocc, norb)
-        S4_132 = self.S4contract(k1, k3, k2, D, nocc, norb)
-        A = S4_123 + S4_132
+        S4_123 = self.s4_contract(k1, k2, k3, D, nocc, norb)
+        S4_132 = self.s4_contract(k1, k3, k2, D, nocc, norb)
 
-        return A
+        return S4_123 + S4_132
 
-    def S4contract(self, k1, k2, k3, D, nocc, norb):
+    def s4_contract(self, k1, k2, k3, D, nocc, norb):
         """
         Returns the contraction of S[4] for S[4] dict
 
@@ -1524,118 +1543,9 @@ class TpaFullDriver(TpaDriver):
         """
 
         S4N1N2N3 = self.commut(self.commut(k3, self.commut(k2, k1)), D.T)
-        S4N1N2N3 = [
-            LinearSolver.lrmat2vec(S4N1N2N3.real, nocc, norb),
-            LinearSolver.lrmat2vec(S4N1N2N3.imag, nocc, norb)
-        ]
-        S4N1N2N3_c = S4N1N2N3[0] + 1j * S4N1N2N3[1]
+        S4N1N2N3_c = (LinearSolver.lrmat2vec(S4N1N2N3.real, nocc, norb) +
+                      1j * LinearSolver.lrmat2vec(S4N1N2N3.imag, nocc, norb))
         return (2. / 6) * S4N1N2N3_c
-
-    def get_r4(self, freqs, kX, Nx, track, d_a_mo, nocc, norb):
-        """
-        Returns a dict with all the R[4]NxNyNz contractions for the subsequent
-        T[4] contraction
-
-        :param freqs:
-            A list of all the frequencies
-        :param kX:
-            A dictonary of all the first-order response matrices
-        :param Nx:
-            A dictonary of all the first-order response vectors
-        :param track:
-            A list of all the cubic response function components that are to be
-            computed for the isotropic
-        :param d_a_mo:
-            The zeroth-order density in MO basis
-        :param nocc:
-            The number of occupied orbitals
-        :param norb:
-            The total number of orbitals
-
-        :return:
-            A dict with all the R[4]NxNyNz contractions for the subsequent
-            T[4] contraction
-        """
-
-        R4terms = {}
-
-        damp = self.damping
-        comp_per_freq = len(track) // len(freqs)
-
-        for j in range(len(freqs)):
-            vals = track[j * comp_per_freq].split(',')
-            w1 = float(vals[1])
-            w2 = float(vals[2])
-            w3 = float(vals[3])
-            w_s = w1 + w2 + w3
-
-            R4x = 0
-            R4y = 0
-            R4z = 0
-
-            for i in range(j * comp_per_freq, (j + 1) * comp_per_freq):
-                comp_i = track[i]
-
-                # Na = Nx['Na'][(comp_i[0], w_s)]
-                Nb = Nx['Nb'][(comp_i[1], w1)]
-                Nc = self.flip_yz(Nx['Nb'][(comp_i[2], -w2)])  # gets Nc from Nb
-                Nd = Nx['Nd'][(comp_i[3], w3)]
-                kA = kX['Na'][(comp_i[0], w_s)]
-                kB = kX['Nb'][(comp_i[1], w1)]
-                kC = -kX['Nb'][(comp_i[2], -w2)].T.conj()  # gets kc from kb
-                kD = kX['Nd'][(comp_i[3], w3)]
-
-                Nb_h = self.flip_xy(Nb)
-                Nc_h = self.flip_xy(Nc)
-                Nd_h = self.flip_xy(Nd)
-
-                if comp_i[0] == 'x':
-                    R4x += -1j * damp * np.matmul(
-                        Nd_h, self.s4_for_r4(kA.T, kB, kC, d_a_mo, nocc, norb))
-                    R4x += -1j * damp * np.matmul(
-                        Nc_h, self.s4_for_r4(kA.T, kB, kD, d_a_mo, nocc, norb))
-                    R4x += -1j * damp * np.matmul(
-                        Nd_h, self.s4_for_r4(kA.T, kC, kB, d_a_mo, nocc, norb))
-                    R4x += -1j * damp * np.matmul(
-                        Nb_h, self.s4_for_r4(kA.T, kC, kD, d_a_mo, nocc, norb))
-                    R4x += -1j * damp * np.matmul(
-                        Nc_h, self.s4_for_r4(kA.T, kD, kB, d_a_mo, nocc, norb))
-                    R4x += -1j * damp * np.matmul(
-                        Nb_h, self.s4_for_r4(kA.T, kD, kC, d_a_mo, nocc, norb))
-
-                elif comp_i[0] == 'y':
-                    R4y += -1j * damp * np.matmul(
-                        Nd_h, self.s4_for_r4(kA.T, kB, kC, d_a_mo, nocc, norb))
-                    R4y += -1j * damp * np.matmul(
-                        Nc_h, self.s4_for_r4(kA.T, kB, kD, d_a_mo, nocc, norb))
-                    R4y += -1j * damp * np.matmul(
-                        Nd_h, self.s4_for_r4(kA.T, kC, kB, d_a_mo, nocc, norb))
-                    R4y += -1j * damp * np.matmul(
-                        Nb_h, self.s4_for_r4(kA.T, kC, kD, d_a_mo, nocc, norb))
-                    R4y += -1j * damp * np.matmul(
-                        Nc_h, self.s4_for_r4(kA.T, kD, kB, d_a_mo, nocc, norb))
-                    R4y += -1j * damp * np.matmul(
-                        Nb_h, self.s4_for_r4(kA.T, kD, kC, d_a_mo, nocc, norb))
-
-                elif comp_i[0] == 'z':
-                    R4z += -1j * damp * np.matmul(
-                        Nd_h, self.s4_for_r4(kA.T, kB, kC, d_a_mo, nocc, norb))
-                    R4z += -1j * damp * np.matmul(
-                        Nc_h, self.s4_for_r4(kA.T, kB, kD, d_a_mo, nocc, norb))
-                    R4z += -1j * damp * np.matmul(
-                        Nd_h, self.s4_for_r4(kA.T, kC, kB, d_a_mo, nocc, norb))
-                    R4z += -1j * damp * np.matmul(
-                        Nb_h, self.s4_for_r4(kA.T, kC, kD, d_a_mo, nocc, norb))
-                    R4z += -1j * damp * np.matmul(
-                        Nc_h, self.s4_for_r4(kA.T, kD, kB, d_a_mo, nocc, norb))
-                    R4z += -1j * damp * np.matmul(
-                        Nb_h, self.s4_for_r4(kA.T, kD, kC, d_a_mo, nocc, norb))
-
-            R4terms[('x', w1)] = -R4x
-            R4terms[('y', w1)] = -R4y
-            R4terms[('z', w1)] = -R4z
-
-        return R4terms
 
     def s4_for_r4(self, k1, k2, k3, D, nocc, norb):
         """
@@ -1658,7 +1568,7 @@ class TpaFullDriver(TpaDriver):
             The contraction of S[4] for the contraction of R[4]
         """
 
-        S4_123 = self.S4contract(k1, k2, k3, D, nocc, norb)
+        S4_123 = self.s4_contract(k1, k2, k3, D, nocc, norb)
         return S4_123
 
     def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
