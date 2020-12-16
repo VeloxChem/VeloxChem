@@ -13,6 +13,7 @@ from .scfgradientdriver import ScfGradientDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
 from .optimizationdriver import OptimizationDriver
+from .qmmmdriver import QMMMDriver
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
@@ -178,6 +179,20 @@ def main():
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
         exciton_drv.update_settings(exciton_dict, method_dict)
         exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+    # QMMM spectrum
+
+    if task_type == 'qmmm':
+        if 'qmmm' in task.input_dict:
+            qmmm_dict = dict(task.input_dict['qmmm'])
+        else:
+            qmmm_dict = {}
+
+        qmmm_dict['filename'] = task.input_dict['filename']
+
+        qmmm_drv = QMMMDriver(task.mpi_comm, task.ostream)
+        qmmm_drv.update_settings(qmmm_dict, method_dict)
+        qmmm_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Self-consistent field
 
