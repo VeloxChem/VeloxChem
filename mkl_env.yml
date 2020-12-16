@@ -5,6 +5,7 @@ dependencies:
   - blas=*=*mkl*
   - cxx-compiler
   - geometric
+  - MDAnalysis
   - h5py
   - mkl-include
   - numpy
