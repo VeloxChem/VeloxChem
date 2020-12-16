@@ -41,9 +41,8 @@ class TestSCF(unittest.TestCase):
             tol = 1.0e-5 if xcfun_label is not None else 1.0e-6
             self.assertTrue(np.max(np.abs(e_scf - ref_e_scf)) < tol)
 
-            dip = np.linalg.norm(scf_prop.get_property('dipole moment'))
-            if ref_dip is not None:
-                self.assertTrue(np.max(np.abs(dip - ref_dip)) < tol)
+            dip = scf_prop.get_property('dipole moment')
+            self.assertTrue(np.max(np.abs(dip - ref_dip)) < 1.0e-5)
 
     def test_scf_hf(self):
 
@@ -57,7 +56,7 @@ class TestSCF(unittest.TestCase):
         #    Final HF energy:             -76.041697549811
         ref_e_scf = -76.041697549811
 
-        ref_dip = 0.7867699  # a.u.
+        ref_dip = np.array([0.000000, 0.000000, 0.786770])
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
 
@@ -73,7 +72,7 @@ class TestSCF(unittest.TestCase):
         #    Final DFT energy:            -76.443545741524
         ref_e_scf = -76.443545741524
 
-        ref_dip = 0.7312569  # a.u.
+        ref_dip = np.array([0.000000, 0.000000, 0.731257])
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
 
@@ -89,7 +88,7 @@ class TestSCF(unittest.TestCase):
         #    Final DFT energy:            -76.074208234637
         ref_e_scf = -76.074208234637
 
-        ref_dip = 0.7312887  # a.u.
+        ref_dip = np.array([0.000000, 0.000000, 0.731291])
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
 
@@ -105,7 +104,7 @@ class TestSCF(unittest.TestCase):
         #    Final HF energy:             -76.067159426565
         ref_e_scf = -76.067159426565
 
-        ref_dip = None
+        ref_dip = np.array([-0.039715, 0.098785, 0.945128])
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
 
@@ -121,7 +120,7 @@ class TestSCF(unittest.TestCase):
         #    Final DFT energy:            -76.468733754150
         ref_e_scf = -76.468733754150
 
-        ref_dip = None
+        ref_dip = np.array([-0.048195, 0.098715, 0.902822])
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
 
