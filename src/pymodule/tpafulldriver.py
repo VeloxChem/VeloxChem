@@ -1116,7 +1116,7 @@ class TpaFullDriver(TpaDriver):
 
         return {'f_iso_x': f_iso_x, 'f_iso_y': f_iso_y, 'f_iso_z': f_iso_z}
 
-    def get_other_terms(self, wi, track, Nx, Nxy, X, kX, kXY, da, nocc, norb):
+    def get_other_terms(self, wi, track, X, kX, kXY, da, nocc, norb):
         """
         Computes the terms involving X[3],A[3],X[2],A[2] in the isotropic cubic
         response function
@@ -1126,10 +1126,6 @@ class TpaFullDriver(TpaDriver):
         :param track:
             A list that contains information about what γ components that are
             to be computed and which freqs
-        :param Nx:
-            A dictonary containing all the single-index response vectors
-        :param Nxy:
-            A dictonary containing all the two-index response vectors
         :param X:
             A dictonray with all the property integral matricies
         :param kX:
@@ -1170,10 +1166,10 @@ class TpaFullDriver(TpaDriver):
 
                 inp_list.append({
                     'freq': w,
-                    'Na': Nx['Na'][(op_a, wa)],
-                    'Nb': Nx['Nb'][(op_b, wb)],
-                    'Nc_Nb': Nx['Nb'][(op_c, -wc)],
-                    'Nd': Nx['Nd'][(op_d, wd)],
+                    'Na_ka': kX['Na'][(op_a, wa)],
+                    'Nb_kb': kX['Nb'][(op_b, wb)],
+                    'Nc_Nb_kb': kX['Nb'][(op_c, -wc)],
+                    'Nd_kd': kX['Nd'][(op_d, wd)],
                     'kb': kX['Nb'][(op_b, wb)],
                     'kc_kb': kX['Nb'][(op_c, -wc)],
                     'kd': kX['Nd'][(op_d, wd)],
@@ -1220,7 +1216,7 @@ class TpaFullDriver(TpaDriver):
             wbd = wb + wd
 
             for op_a in 'xyz':
-                Na = Nx['Na'][(op_a, wa)]
+                Na_ka = kX['Na'][(op_a, wa)]
                 A = X[op_a]
 
                 for op_b in 'xyz':
@@ -1228,8 +1224,6 @@ class TpaFullDriver(TpaDriver):
 
                     # CD
                     kcd = kXY[(('N_lamtau_' + op_ab, w), wcd)]
-                    Ncd = Nxy[(('N_lamtau_' + op_ab, w), wcd)]
-                    Nb = Nx['Nb'][(op_b, w)]
                     kb = kX['Nb'][(op_b, w)]
                     B = X[op_b]
 
@@ -1237,9 +1231,7 @@ class TpaFullDriver(TpaDriver):
                         'flag': 'CD',
                         'freq': w,
                         'kcd': kcd,
-                        'Ncd': Ncd,
-                        'Na': Na,
-                        'Nb': Nb,
+                        'Na_ka': Na_ka,
                         'kb': kb,
                         'A': A,
                         'B': B,
@@ -1249,8 +1241,6 @@ class TpaFullDriver(TpaDriver):
                     op_c = op_b
                     op_ac = op_ab
                     kbd = kXY[(('N_sig_' + op_ac, w), wbd)]
-                    Nbd = Nxy[(('N_sig_' + op_ac, w), wbd)]
-                    Nc_Nb = Nx['Nb'][(op_c, -wc)]
                     kc_kb = kX['Nb'][(op_c, -wc)]
                     C = X[op_c]
 
@@ -1258,9 +1248,7 @@ class TpaFullDriver(TpaDriver):
                         'flag': 'BD',
                         'freq': w,
                         'kbd': kbd,
-                        'Nbd': Nbd,
-                        'Na': Na,
-                        'Nc_Nb': Nc_Nb,
+                        'Na_ka': Na_ka,
                         'kc_kb': kc_kb,
                         'A': A,
                         'C': C,
@@ -1319,13 +1307,27 @@ class TpaFullDriver(TpaDriver):
         na_a3_nx_ny = 0.0
 
         w = inp_dict['freq']
-        Na = inp_dict['Na']
-        Nb = inp_dict['Nb']
-        Nc = self.flip_yz(inp_dict['Nc_Nb'])  # gets Nc from Nb
-        Nd = inp_dict['Nd']
+
+        ka_na = inp_dict['Na_ka']
+        kb_nb = inp_dict['Nb_kb']
+        kb_nb_nc = inp_dict['Nc_Nb_kb']
+        kd_nd = inp_dict['Nd_kd']
+
+        Na = (LinearSolver.lrmat2vec(ka_na.real, nocc, norb) +
+              1j * LinearSolver.lrmat2vec(ka_na.imag, nocc, norb))
+        Nb = (LinearSolver.lrmat2vec(kb_nb.real, nocc, norb) +
+              1j * LinearSolver.lrmat2vec(kb_nb.imag, nocc, norb))
+        Nc_Nb = (LinearSolver.lrmat2vec(kb_nb_nc.real, nocc, norb) +
+                 1j * LinearSolver.lrmat2vec(kb_nb_nc.imag, nocc, norb))
+        Nd = (LinearSolver.lrmat2vec(kd_nd.real, nocc, norb) +
+              1j * LinearSolver.lrmat2vec(kd_nd.imag, nocc, norb))
+
+        Nc = self.flip_yz(Nc_Nb)  # gets Nc from Nb
+
         kb = inp_dict['kb']
         kc = -inp_dict['kc_kb'].T.conj()  # gets kc from kb
         kd = inp_dict['kd']
+
         A = inp_dict['A']
         B = inp_dict['B']
         C = inp_dict['C']
@@ -1355,7 +1357,7 @@ class TpaFullDriver(TpaDriver):
             'a3': (1. / 15) * na_a3_nx_ny,
         }
 
-    def get_t4(self, wi, e4_dict, Nx, kX, track, da, nocc, norb):
+    def get_t4(self, wi, e4_dict, kX, track, da, nocc, norb):
         """
         Computes the contraction of the E[4] tensor with that of the S[4] and
         R[4] tensors to return the contraction of T[4] as a dictonary of
@@ -1365,8 +1367,6 @@ class TpaFullDriver(TpaDriver):
             A list of all the freqs
         :param e4_dict:
             A dictonary of all the E[4] contraction
-        :param Nx:
-            A dictonary with all the single index response vectors
         :param kX:
             A dictonray containng all the response matricies
         :param track:
@@ -1384,7 +1384,7 @@ class TpaFullDriver(TpaDriver):
         """
 
         T4 = {}
-        S4, R4 = self.get_s4_and_r4(wi, Nx, kX, track, da, nocc, norb)
+        S4, R4 = self.get_s4_and_r4(wi, kX, track, da, nocc, norb)
 
         if self.rank == mpi_master():
             comp_per_freq = len(track) // len(wi)
@@ -1394,12 +1394,20 @@ class TpaFullDriver(TpaDriver):
                 w = float(vals[1])
                 ww = float(vals[1])
 
-                t4term = (np.dot(Nx['Na'][('x', w)],
-                                 e4_dict['f_iso_x'][ww] - S4[('x', ww)]) +
-                          np.dot(Nx['Na'][('y', w)],
-                                 e4_dict['f_iso_y'][ww] - S4[('y', ww)]) +
-                          np.dot(Nx['Na'][('z', w)],
-                                 e4_dict['f_iso_z'][ww] - S4[('z', ww)]))
+                ka_x = kX['Na'][('x', w)]
+                ka_y = kX['Na'][('y', w)]
+                ka_z = kX['Na'][('z', w)]
+
+                na_x = (LinearSolver.lrmat2vec(ka_x.real, nocc, norb) +
+                        1j * LinearSolver.lrmat2vec(ka_x.imag, nocc, norb))
+                na_y = (LinearSolver.lrmat2vec(ka_y.real, nocc, norb) +
+                        1j * LinearSolver.lrmat2vec(ka_y.imag, nocc, norb))
+                na_z = (LinearSolver.lrmat2vec(ka_z.real, nocc, norb) +
+                        1j * LinearSolver.lrmat2vec(ka_z.imag, nocc, norb))
+
+                t4term = (np.dot(na_x, e4_dict['f_iso_x'][ww] - S4[('x', ww)]) +
+                          np.dot(na_y, e4_dict['f_iso_y'][ww] - S4[('y', ww)]) +
+                          np.dot(na_z, e4_dict['f_iso_z'][ww] - S4[('z', ww)]))
 
                 if self.damping > 0:
                     t4term += (R4[('x', ww)] + R4[('y', ww)] + R4[('z', ww)])
@@ -1408,14 +1416,12 @@ class TpaFullDriver(TpaDriver):
 
         return T4
 
-    def get_s4_and_r4(self, wi, Nx, kX, track, D0, nocc, norb):
+    def get_s4_and_r4(self, wi, kX, track, D0, nocc, norb):
         """
         Computes the S4 contractions
 
         :param wi:
             A list of all the freqs
-        :param Nx:
-            A dictonary of all the first-order response vectors
         :param kX:
             A dict with all the response matricies in MO basis
         :param track:
@@ -1464,9 +1470,9 @@ class TpaFullDriver(TpaDriver):
 
                 if self.damping > 0:
                     inp_list[-1].update({
-                        'Nb': Nx['Nb'][(comp_i[1], w1)],
-                        'Nc_Nb': Nx['Nb'][(comp_i[2], -w2)],
-                        'Nd': Nx['Nd'][(comp_i[3], w3)],
+                        'Nb_kb': kX['Nb'][(comp_i[1], w1)],
+                        'Nc_Nb_kb': kX['Nb'][(comp_i[2], -w2)],
+                        'Nd_kd': kX['Nd'][(comp_i[3], w3)],
                         'kA': kX['Na'][(comp_i[0], w_s)],
                         'kB': kX['Nb'][(comp_i[1], w1)],
                         'kC_kB': kX['Nb'][(comp_i[2], -w2)],
@@ -1539,9 +1545,18 @@ class TpaFullDriver(TpaDriver):
         if self.damping > 0:
             kA = inp_dict['kA']
 
-            Nb = inp_dict['Nb']
-            Nc = self.flip_yz(inp_dict['Nc_Nb'])  # gets Nc from Nb
-            Nd = inp_dict['Nd']
+            kb_nb = inp_dict['Nb_kb']
+            kb_nb_nc = inp_dict['Nc_Nb_kb']
+            kd_nd = inp_dict['Nd_kd']
+
+            Nb = (LinearSolver.lrmat2vec(kb_nb.real, nocc, norb) +
+                  1j * LinearSolver.lrmat2vec(kb_nb.imag, nocc, norb))
+            Nc_Nb = (LinearSolver.lrmat2vec(kb_nb_nc.real, nocc, norb) +
+                     1j * LinearSolver.lrmat2vec(kb_nb_nc.imag, nocc, norb))
+            Nd = (LinearSolver.lrmat2vec(kd_nd.real, nocc, norb) +
+                  1j * LinearSolver.lrmat2vec(kd_nd.imag, nocc, norb))
+
+            Nc = self.flip_yz(Nc_Nb)  # gets Nc from Nb
 
             Nb_h = self.flip_xy(Nb)
             Nc_h = self.flip_xy(Nc)
