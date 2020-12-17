@@ -433,9 +433,9 @@ class TpaDriver:
         # Combining all the terms to evaluate the iso-tropic cubic response
         # function. For TPA Full and reduced, see article
 
+        t4_dict = self.get_t4(self.frequencies, e4_dict, Nx, kX, self.comp,
+                              d_a_mo, nocc, norb)
         if self.rank == mpi_master():
-            t4_dict = self.get_t4(self.frequencies, e4_dict, Nx, kX, self.comp,
-                                  d_a_mo, nocc, norb)
             t3_dict = self.get_t3(self.frequencies, e3_dict, Nx, self.comp)
 
         profiler.check_memory_usage('T[4],T[3]')
@@ -741,9 +741,9 @@ class TpaDriver:
         for i in range(len(freqs)):
             w = float(track[i * (len(track) // len(freqs))].split(",")[1])
 
-            t3term = (np.matmul(Nx['Na'][('x', w)], e3_dict['f_iso_x'][w]) +
-                      np.matmul(Nx['Na'][('y', w)], e3_dict['f_iso_y'][w]) +
-                      np.matmul(Nx['Na'][('z', w)], e3_dict['f_iso_z'][w]))
+            t3term = (np.dot(Nx['Na'][('x', w)], e3_dict['f_iso_x'][w]) +
+                      np.dot(Nx['Na'][('y', w)], e3_dict['f_iso_y'][w]) +
+                      np.dot(Nx['Na'][('z', w)], e3_dict['f_iso_z'][w]))
 
             t3_term[(w, -w, w)] = 1. / 15 * t3term
 

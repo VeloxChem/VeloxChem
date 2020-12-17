@@ -1357,7 +1357,7 @@ class TpaFullDriver(TpaDriver):
 
     def get_t4(self, wi, e4_dict, Nx, kX, track, da, nocc, norb):
         """
-        Computes the contraction of the E[4] tensor with that of the S[4] and
+        Computes the contraction of the E[4] tensor with that of the S[4] and
         R[4] tensors to return the contraction of T[4] as a dictonary of
         vectors. T[4]NxNyNz = (E^[4]-ω_1S^[4]-ω_1S^[4]-ω_3S^[4]-γiR^[4])
 
@@ -1386,24 +1386,25 @@ class TpaFullDriver(TpaDriver):
         T4 = {}
         S4, R4 = self.get_s4_and_r4(wi, Nx, kX, track, da, nocc, norb)
 
-        comp_per_freq = len(track) // len(wi)
+        if self.rank == mpi_master():
+            comp_per_freq = len(track) // len(wi)
 
-        for i in range(len(wi)):
-            vals = track[i * comp_per_freq].split(',')
-            w = float(vals[1])
-            ww = float(vals[1])
+            for i in range(len(wi)):
+                vals = track[i * comp_per_freq].split(',')
+                w = float(vals[1])
+                ww = float(vals[1])
 
-            t4term = (np.dot(Nx['Na'][('x', w)],
-                             e4_dict['f_iso_x'][ww] - S4[('x', ww)]) +
-                      np.dot(Nx['Na'][('y', w)],
-                             e4_dict['f_iso_y'][ww] - S4[('y', ww)]) +
-                      np.dot(Nx['Na'][('z', w)],
-                             e4_dict['f_iso_z'][ww] - S4[('z', ww)]))
+                t4term = (np.dot(Nx['Na'][('x', w)],
+                                 e4_dict['f_iso_x'][ww] - S4[('x', ww)]) +
+                          np.dot(Nx['Na'][('y', w)],
+                                 e4_dict['f_iso_y'][ww] - S4[('y', ww)]) +
+                          np.dot(Nx['Na'][('z', w)],
+                                 e4_dict['f_iso_z'][ww] - S4[('z', ww)]))
 
-            if self.damping > 0:
-                t4term += (R4[('x', ww)] + R4[('y', ww)] + R4[('z', ww)])
+                if self.damping > 0:
+                    t4term += (R4[('x', ww)] + R4[('y', ww)] + R4[('z', ww)])
 
-            T4[(ww, -ww, ww)] = -(1. / 15) * t4term
+                T4[(ww, -ww, ww)] = -(1. / 15) * t4term
 
         return T4
 
@@ -1436,6 +1437,8 @@ class TpaFullDriver(TpaDriver):
 
         comp_per_freq = len(track) // len(wi)
 
+        inp_list = []
+
         for j in range(len(wi)):
             vals = track[j * comp_per_freq].split(',')
             w = float(vals[1])
@@ -1444,56 +1447,125 @@ class TpaFullDriver(TpaDriver):
             w3 = float(vals[3])
             w_s = w1 + w2 + w3
 
-            S4[('x', w)] = 0
-            S4[('y', w)] = 0
-            S4[('z', w)] = 0
-
-            if self.damping > 0:
-                R4[('x', w1)] = 0
-                R4[('y', w1)] = 0
-                R4[('z', w1)] = 0
-
             for i in range(j * comp_per_freq, (j + 1) * comp_per_freq):
                 comp_i = track[i]
                 op = comp_i[0]
 
-                kB = kX['Nb'][(comp_i[1], w1)]
-                kC = -kX['Nb'][(comp_i[2], -w2)].T.conj()
-                kD = kX['Nd'][(comp_i[3], w3)]
-
-                S4[(op, w)] -= w1 * self.s4(kB, kC, kD, D0, nocc, norb)
-                S4[(op, w)] -= w2 * self.s4(kC, kB, kD, D0, nocc, norb)
-                S4[(op, w)] -= w3 * self.s4(kD, kB, kC, D0, nocc, norb)
+                inp_list.append({
+                    'w': w,
+                    'w1': w1,
+                    'w2': w2,
+                    'w3': w3,
+                    'op': op,
+                    'kB': kX['Nb'][(comp_i[1], w1)],
+                    'kC_kB': kX['Nb'][(comp_i[2], -w2)],
+                    'kD': kX['Nd'][(comp_i[3], w3)],
+                })
 
                 if self.damping > 0:
-                    # Na = Nx['Na'][(comp_i[0], w_s)]
-                    Nb = Nx['Nb'][(comp_i[1], w1)]
-                    Nc = self.flip_yz(Nx['Nb'][(comp_i[2],
-                                                -w2)])  # gets Nc from Nb
-                    Nd = Nx['Nd'][(comp_i[3], w3)]
-                    kA = kX['Na'][(comp_i[0], w_s)]
-                    kB = kX['Nb'][(comp_i[1], w1)]
-                    kC = -kX['Nb'][(comp_i[2], -w2)].T.conj()  # gets kc from kb
-                    kD = kX['Nd'][(comp_i[3], w3)]
+                    inp_list[-1].update({
+                        'Nb': Nx['Nb'][(comp_i[1], w1)],
+                        'Nc_Nb': Nx['Nb'][(comp_i[2], -w2)],
+                        'Nd': Nx['Nd'][(comp_i[3], w3)],
+                        'kA': kX['Na'][(comp_i[0], w_s)],
+                        'kB': kX['Nb'][(comp_i[1], w1)],
+                        'kC_kB': kX['Nb'][(comp_i[2], -w2)],
+                        'kD': kX['Nd'][(comp_i[3], w3)],
+                    })
 
-                    Nb_h = self.flip_xy(Nb)
-                    Nc_h = self.flip_xy(Nc)
-                    Nd_h = self.flip_xy(Nd)
+        ave, res = divmod(len(inp_list), self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+        starts = [sum(counts[:p]) for p in range(self.nodes)]
+        ends = [sum(counts[:p + 1]) for p in range(self.nodes)]
 
-                    R4[(op, w1)] += 1j * self.damping * np.dot(
-                        Nd_h, self.s4_for_r4(kA.T, kB, kC, D0, nocc, norb))
-                    R4[(op, w1)] += 1j * self.damping * np.dot(
-                        Nc_h, self.s4_for_r4(kA.T, kB, kD, D0, nocc, norb))
-                    R4[(op, w1)] += 1j * self.damping * np.dot(
-                        Nd_h, self.s4_for_r4(kA.T, kC, kB, D0, nocc, norb))
-                    R4[(op, w1)] += 1j * self.damping * np.dot(
-                        Nb_h, self.s4_for_r4(kA.T, kC, kD, D0, nocc, norb))
-                    R4[(op, w1)] += 1j * self.damping * np.dot(
-                        Nc_h, self.s4_for_r4(kA.T, kD, kB, D0, nocc, norb))
-                    R4[(op, w1)] += 1j * self.damping * np.dot(
-                        Nb_h, self.s4_for_r4(kA.T, kD, kC, D0, nocc, norb))
+        list_s4_r4 = [
+            self.get_s4_and_r4_terms(inp, D0, nocc, norb)
+            for inp in inp_list[starts[self.rank]:ends[self.rank]]
+        ]
+
+        list_s4_r4 = self.comm.gather(list_s4_r4, root=mpi_master())
+
+        if self.rank == mpi_master():
+            for terms in list_s4_r4:
+                for term in terms:
+                    s4_key = term['s4_key']
+                    r4_key = term['r4_key']
+                    if s4_key not in S4:
+                        S4[s4_key] = 0.0
+                    if r4_key not in R4:
+                        R4[r4_key] = 0.0
+                    S4[s4_key] += term['s4']
+                    R4[r4_key] += term['r4']
 
         return S4, R4
+
+    def get_s4_and_r4_terms(self, inp_dict, D0, nocc, norb):
+        """
+        Computes S[4] and R[4] contributions.
+
+        :param inp_dict:
+            A dictionary containing input data for computing S[4] and R[4].
+        :param D0:
+            The SCF density matrix in MO basis
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The total number of orbitals
+
+        :return:
+            Dictionaries containing S[4] and R[4].
+        """
+
+        s4_term = 0.0
+        r4_term = 0.0
+
+        w = inp_dict['w']
+        w1 = inp_dict['w1']
+        w2 = inp_dict['w2']
+        w3 = inp_dict['w3']
+        op = inp_dict['op']
+
+        s4_key = (op, w)
+        r4_key = (op, w1)
+
+        kB = inp_dict['kB']
+        kC = -inp_dict['kC_kB'].T.conj()  # gets kC from kB
+        kD = inp_dict['kD']
+
+        s4_term -= w1 * self.s4(kB, kC, kD, D0, nocc, norb)
+        s4_term -= w2 * self.s4(kC, kB, kD, D0, nocc, norb)
+        s4_term -= w3 * self.s4(kD, kB, kC, D0, nocc, norb)
+
+        if self.damping > 0:
+            kA = inp_dict['kA']
+
+            Nb = inp_dict['Nb']
+            Nc = self.flip_yz(inp_dict['Nc_Nb'])  # gets Nc from Nb
+            Nd = inp_dict['Nd']
+
+            Nb_h = self.flip_xy(Nb)
+            Nc_h = self.flip_xy(Nc)
+            Nd_h = self.flip_xy(Nd)
+
+            r4_term += 1j * self.damping * np.dot(
+                Nd_h, self.s4_for_r4(kA.T, kB, kC, D0, nocc, norb))
+            r4_term += 1j * self.damping * np.dot(
+                Nc_h, self.s4_for_r4(kA.T, kB, kD, D0, nocc, norb))
+            r4_term += 1j * self.damping * np.dot(
+                Nd_h, self.s4_for_r4(kA.T, kC, kB, D0, nocc, norb))
+            r4_term += 1j * self.damping * np.dot(
+                Nb_h, self.s4_for_r4(kA.T, kC, kD, D0, nocc, norb))
+            r4_term += 1j * self.damping * np.dot(
+                Nc_h, self.s4_for_r4(kA.T, kD, kB, D0, nocc, norb))
+            r4_term += 1j * self.damping * np.dot(
+                Nb_h, self.s4_for_r4(kA.T, kD, kC, D0, nocc, norb))
+
+        return {
+            's4_key': s4_key,
+            'r4_key': r4_key,
+            's4': s4_term,
+            'r4': r4_term,
+        }
 
     def s4(self, k1, k2, k3, D, nocc, norb):
         """
