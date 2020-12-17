@@ -259,11 +259,10 @@ class TpaReducedDriver(TpaDriver):
         N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
                                               xy_dict)
 
-        Nxy_dict = N_total_results['solutions']
         kXY_dict = N_total_results['kappas']
         FXY_2_dict = N_total_results['focks']
 
-        return (Nxy_dict, kXY_dict, FXY_2_dict)
+        return (kXY_dict, FXY_2_dict)
 
     def get_xy(self, d_a_mo, X, wi, Fock, kX, nocc, norb):
         """

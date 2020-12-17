@@ -383,9 +383,9 @@ class TpaDriver:
 
         # computing all the compounded second-order response vectors and
         # extracting some of the second-order Fock matrices from the subspace
-        (Nxy_dict, kXY_dict, Focks_xy) = self.get_Nxy(w, d_a_mo, X, fock_dict,
-                                                      kX, nocc, norb, molecule,
-                                                      ao_basis, scf_tensors)
+        (kXY_dict, Focks_xy) = self.get_Nxy(w, d_a_mo, X, fock_dict, kX, nocc,
+                                            norb, molecule, ao_basis,
+                                            scf_tensors)
 
         profiler.check_memory_usage('2nd CPP')
 
