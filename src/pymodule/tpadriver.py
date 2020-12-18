@@ -259,11 +259,9 @@ class TpaDriver:
 
         Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v1)
 
-        Nx = {}
         kX = {}
         Focks = {}
 
-        Nx['Nb'] = Nb_results['solutions']
         kX['Nb'] = Nb_results['kappas']
         Focks['Fb'] = Nb_results['focks']
         Focks['Fd'] = {}
@@ -272,7 +270,7 @@ class TpaDriver:
         # obtained from the first-order response vectors with positive
         # frequency by using flip_zy, see article.
 
-        for (op, w) in Nx['Nb']:
+        for (op, w) in kX['Nb']:
 
             # The first-order Fock matrices with positive and negative
             # frequencies are each other complex conjugates
@@ -291,10 +289,7 @@ class TpaDriver:
 
         Focks['Fb'].update(Focks['Fd'])
 
-        Nx['Na'] = Nx['Nb']
         kX['Na'] = kX['Nb']
-
-        Nx['Nd'] = Nx['Nb']
         kX['Nd'] = kX['Nb']
 
         profiler.check_memory_usage('1st CPP')
@@ -303,7 +298,7 @@ class TpaDriver:
         # A[3] and A[2] which formally are not part of the third-order gradient
         # but which are used for the cubic response function
 
-        tpa_dict = self.compute_tpa_components(Focks, Nx, self.frequencies, X,
+        tpa_dict = self.compute_tpa_components(Focks, self.frequencies, X,
                                                d_a_mo, kX, self.comp,
                                                scf_tensors, molecule, ao_basis,
                                                profiler)
@@ -320,13 +315,11 @@ class TpaDriver:
 
         return tpa_dict
 
-    def compute_tpa_components(self, Focks, Nx, w, X, d_a_mo, kX, track,
+    def compute_tpa_components(self, Focks, w, X, d_a_mo, kX, track,
                                scf_tensors, molecule, ao_basis, profiler):
         """
         Computes all the relevent terms to third-order isotropic gradient
 
-        :param Nx:
-            A dictonary containing all the single index response vectors
         :param w:
             A list of all the frequencies
         :param X:
@@ -390,9 +383,9 @@ class TpaDriver:
 
         # computing all the compounded second-order response vectors and
         # extracting some of the second-order Fock matrices from the subspace
-        (Nxy_dict, kXY_dict, Focks_xy) = self.get_Nxy(w, d_a_mo, X, fock_dict,
-                                                      kX, nocc, norb, molecule,
-                                                      ao_basis, scf_tensors)
+        (kXY_dict, Focks_xy) = self.get_Nxy(w, d_a_mo, X, fock_dict, kX, nocc,
+                                            norb, molecule, ao_basis,
+                                            scf_tensors)
 
         profiler.check_memory_usage('2nd CPP')
 
@@ -425,18 +418,19 @@ class TpaDriver:
 
         # computing the X[3],A[3],X[2],A[2] contractions for the isotropic
         # cubic response function
-        other_dict = self.get_other_terms(w, track, Nx, Nxy_dict, X, kX,
-                                          kXY_dict, d_a_mo, nocc, norb)
+        other_dict = self.get_other_terms(w, track, X, kX, kXY_dict, d_a_mo,
+                                          nocc, norb)
 
         profiler.check_memory_usage('X[3],A[3],X[2],A[2]')
 
         # Combining all the terms to evaluate the iso-tropic cubic response
         # function. For TPA Full and reduced, see article
 
+        t4_dict = self.get_t4(self.frequencies, e4_dict, kX, self.comp, d_a_mo,
+                              nocc, norb)
         if self.rank == mpi_master():
-            t4_dict = self.get_t4(self.frequencies, e4_dict, Nx, kX, self.comp,
-                                  d_a_mo, nocc, norb)
-            t3_dict = self.get_t3(self.frequencies, e3_dict, Nx, self.comp)
+            t3_dict = self.get_t3(self.frequencies, e3_dict, kX, self.comp,
+                                  nocc, norb)
 
         profiler.check_memory_usage('T[4],T[3]')
 
@@ -647,7 +641,7 @@ class TpaDriver:
 
         return None
 
-    def get_other_terms(self, wi, track, Nx, Nxy, X, kX, kXY, da, nocc, norb):
+    def get_other_terms(self, wi, track, X, kX, kXY, da, nocc, norb):
         """
         Computes the terms involving X[3],A[3],X[2],A[2] in the isotropic cubic
         response function
@@ -657,10 +651,6 @@ class TpaDriver:
         :param track:
             A list that contains information about what γ components that are
             to be computed and which freqs
-        :param Nx:
-            A dictonary containing all the single-index response vectors
-        :param Nxy:
-            A dictonary containing all the two-index response vectors
         :param X:
             A dictonray with all the property integral matricies
         :param kX:
@@ -680,7 +670,7 @@ class TpaDriver:
 
         return None
 
-    def get_t4(self, wi, e4_dict, Nx, kX, track, da, nocc, norb):
+    def get_t4(self, wi, e4_dict, kX, track, da, nocc, norb):
         """
         Computes the contraction of the E[4] tensor with that of the S[4] and
         R[4] tensors to return the contraction of T[4] as a dictonary of
@@ -690,8 +680,6 @@ class TpaDriver:
             A list of all the freqs
         :param e4_dict:
             A dictonary of all the E[4] contraction
-        :param Nx:
-            A dictonary with all the single index response vectors
         :param kX:
             A dictonray containng all the response matricies
         :param track:
@@ -710,9 +698,9 @@ class TpaDriver:
 
         return None
 
-    def get_t3(self, freqs, e3_dict, Nx, track):
+    def get_t3(self, freqs, e3_dict, kX, track, nocc, norb):
         """
-        Computes the T[3] contraction, for HF S[3] = 0, R[3] = 0 such that
+        Computes the T[3] contraction, for HF S[3] = 0, R[3] = 0 such that
         the T[3] contraction for the isotropic cubic response function in terms
         of compounded Fock matrices is given as:
 
@@ -725,12 +713,15 @@ class TpaDriver:
             List of frequencies of the pertubations
         :param e3_dict:
             A dictonary that contains the contractions of E[3]
-        :param Nx:
-            A dictonary containing the response vectors Nx = (E[2]-wS[2])^-1
-            X[1]
+        :param kX:
+            A dictonray containng all the response matricies
         :param track:
             A list containing information about what tensor components that are
             being computed
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The total number of orbitals
 
         :return:
             A dictonary of the final values for the NaT[3]NxNyz contractions
@@ -741,9 +732,20 @@ class TpaDriver:
         for i in range(len(freqs)):
             w = float(track[i * (len(track) // len(freqs))].split(",")[1])
 
-            t3term = (np.matmul(Nx['Na'][('x', w)], e3_dict['f_iso_x'][w]) +
-                      np.matmul(Nx['Na'][('y', w)], e3_dict['f_iso_y'][w]) +
-                      np.matmul(Nx['Na'][('z', w)], e3_dict['f_iso_z'][w]))
+            ka_x = kX['Na'][('x', w)]
+            ka_y = kX['Na'][('y', w)]
+            ka_z = kX['Na'][('z', w)]
+
+            na_x = (LinearSolver.lrmat2vec(ka_x.real, nocc, norb) +
+                    1j * LinearSolver.lrmat2vec(ka_x.imag, nocc, norb))
+            na_y = (LinearSolver.lrmat2vec(ka_y.real, nocc, norb) +
+                    1j * LinearSolver.lrmat2vec(ka_y.imag, nocc, norb))
+            na_z = (LinearSolver.lrmat2vec(ka_z.real, nocc, norb) +
+                    1j * LinearSolver.lrmat2vec(ka_z.imag, nocc, norb))
+
+            t3term = (np.dot(na_x, e3_dict['f_iso_x'][w]) +
+                      np.dot(na_y, e3_dict['f_iso_y'][w]) +
+                      np.dot(na_z, e3_dict['f_iso_z'][w]))
 
             t3_term[(w, -w, w)] = 1. / 15 * t3term
 
@@ -789,15 +791,21 @@ class TpaDriver:
         nx_a2_nyz = 0.0
 
         w = inp_dict['freq']
-        Na = inp_dict['Na']
+        ka_na = inp_dict['Na_ka']
         A = inp_dict['A']
+
+        Na = (LinearSolver.lrmat2vec(ka_na.real, nocc, norb) +
+              1j * LinearSolver.lrmat2vec(ka_na.imag, nocc, norb))
 
         if inp_dict['flag'] == 'CD':
             kcd = inp_dict['kcd']
-            Ncd = inp_dict['Ncd']
-            Nb = inp_dict['Nb']
             kb = inp_dict['kb']
             B = inp_dict['B']
+
+            Ncd = (LinearSolver.lrmat2vec(kcd.real, nocc, norb) +
+                   1j * LinearSolver.lrmat2vec(kcd.imag, nocc, norb))
+            Nb = (LinearSolver.lrmat2vec(kb.real, nocc, norb) +
+                  1j * LinearSolver.lrmat2vec(kb.imag, nocc, norb))
 
             na_x2_nyz += np.dot(Na.T, self.x2_contract(kcd, B, da, nocc, norb))
             nx_a2_nyz += np.dot(self.a2_contract(kb, A, da, nocc, norb), Ncd)
@@ -805,10 +813,13 @@ class TpaDriver:
 
         elif inp_dict['flag'] == 'BD':
             kbd = inp_dict['kbd']
-            Nbd = inp_dict['Nbd']
-            Nc = self.flip_yz(inp_dict['Nc_Nb'])  # gets Nc from Nb
             kc = -inp_dict['kc_kb'].T.conj()  # gets kc from kb
             C = inp_dict['C']
+
+            Nbd = (LinearSolver.lrmat2vec(kbd.real, nocc, norb) +
+                   1j * LinearSolver.lrmat2vec(kbd.imag, nocc, norb))
+            Nc = (LinearSolver.lrmat2vec(kc.real, nocc, norb) +
+                  1j * LinearSolver.lrmat2vec(kc.imag, nocc, norb))
 
             na_x2_nyz += np.dot(Na.T, self.x2_contract(kbd, C, da, nocc, norb))
             nx_a2_nyz += np.dot(self.a2_contract(kc, A, da, nocc, norb), Nbd)

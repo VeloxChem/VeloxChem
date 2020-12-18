@@ -42,8 +42,17 @@ class ScfFirstOrderProperties:
             The tensors from the converged SCF calculation.
         """
 
+        if molecule.get_charge() != 0:
+            coords = molecule.get_coordinates()
+            nuclear_charges = molecule.elem_ids_to_numpy()
+            origin = np.sum(coords.T * nuclear_charges,
+                            axis=1) / np.sum(nuclear_charges)
+        else:
+            origin = np.zeros(3)
+
         # dipole integrals
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+        dipole_drv.set_origin(*list(origin))
         dipole_mats = dipole_drv.compute(molecule, basis)
 
         if self.rank == mpi_master():
@@ -58,7 +67,8 @@ class ScfFirstOrderProperties:
             # nuclear contribution
             coords = molecule.get_coordinates()
             nuclear_charges = molecule.elem_ids_to_numpy()
-            nuclear_dipole = np.sum(coords.T * nuclear_charges, axis=1)
+            nuclear_dipole = np.sum((coords - origin).T * nuclear_charges,
+                                    axis=1)
 
             self.properties['dipole moment'] = (nuclear_dipole +
                                                 electronic_dipole)
@@ -92,10 +102,12 @@ class ScfFirstOrderProperties:
 
         # prints warning if the molecule is charged
         if molecule.get_charge() != 0:
-            warn_msg = '*** Warning: Molecule has non-zero charge.'
-            self.ostream.print_header(warn_msg)
-            warn_msg = '*** Dipole moment will be gauge-dependent.'
-            self.ostream.print_header(warn_msg)
+            warn_msg = '*** Warning: Molecule has non-zero charge. Dipole'
+            self.ostream.print_header(warn_msg.ljust(56))
+            warn_msg = '    moment will be dependent on the choice of origin.'
+            self.ostream.print_header(warn_msg.ljust(56))
+            warn_msg = '    Center of nulcear charge is chosen as the origin.'
+            self.ostream.print_header(warn_msg.ljust(56))
 
         self.ostream.print_blank()
 

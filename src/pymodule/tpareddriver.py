@@ -259,11 +259,10 @@ class TpaReducedDriver(TpaDriver):
         N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
                                               xy_dict)
 
-        Nxy_dict = N_total_results['solutions']
         kXY_dict = N_total_results['kappas']
         FXY_2_dict = N_total_results['focks']
 
-        return (Nxy_dict, kXY_dict, FXY_2_dict)
+        return (kXY_dict, FXY_2_dict)
 
     def get_xy(self, d_a_mo, X, wi, Fock, kX, nocc, norb):
         """
@@ -669,7 +668,7 @@ class TpaReducedDriver(TpaDriver):
 
         return {'f_iso_x': f_iso_x, 'f_iso_y': f_iso_y, 'f_iso_z': f_iso_z}
 
-    def get_other_terms(self, wi, track, Nx, Nxy, X, kX, kXY, da, nocc, norb):
+    def get_other_terms(self, wi, track, X, kX, kXY, da, nocc, norb):
         """
         Computes the terms involving X[2],A[2] in the reduced isotropic cubic
         response function
@@ -679,10 +678,6 @@ class TpaReducedDriver(TpaDriver):
         :param track:
             A list that contains information about what γ components that are
             to be computed and which freqs
-        :param Nx:
-            A dictonary containing all the single-index response vectors
-        :param Nxy:
-            A dictonary containing all the two-index response vectors
         :param X:
             A dictonray with all the property integral matricies
         :param kX:
@@ -718,7 +713,7 @@ class TpaReducedDriver(TpaDriver):
             wbd = wb + wd
 
             for op_a in 'xyz':
-                Na = Nx['Na'][(op_a, wa)]
+                Na_ka = kX['Na'][(op_a, wa)]
                 A = X[op_a]
 
                 for op_c in 'xyz':
@@ -726,8 +721,6 @@ class TpaReducedDriver(TpaDriver):
 
                     # BD
                     kbd = kXY[(('N_sig_' + op_ac, w), wbd)]
-                    Nbd = Nxy[(('N_sig_' + op_ac, w), wbd)]
-                    Nc_Nb = Nx['Nb'][(op_c, -wc)]
                     kc_kb = kX['Nb'][(op_c, -wc)]
                     C = X[op_c]
 
@@ -735,9 +728,7 @@ class TpaReducedDriver(TpaDriver):
                         'flag': 'BD',
                         'freq': w,
                         'kbd': kbd,
-                        'Nbd': Nbd,
-                        'Na': Na,
-                        'Nc_Nb': Nc_Nb,
+                        'Na_ka': Na_ka,
                         'kc_kb': kc_kb,
                         'A': A,
                         'C': C,
