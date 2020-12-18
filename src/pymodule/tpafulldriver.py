@@ -1456,7 +1456,7 @@ class TpaFullDriver(TpaDriver):
                 comp_i = track[i]
                 op = comp_i[0]
 
-                inp_list.append({
+                inp_dict = {
                     'w': w,
                     'w1': w1,
                     'w2': w2,
@@ -1465,10 +1465,10 @@ class TpaFullDriver(TpaDriver):
                     'kB': kX['Nb'][(comp_i[1], w1)],
                     'kC_kB': kX['Nb'][(comp_i[2], -w2)],
                     'kD': kX['Nd'][(comp_i[3], w3)],
-                })
+                }
 
                 if self.damping > 0:
-                    inp_list[-1].update({
+                    inp_dict.update({
                         'Nb_kb': kX['Nb'][(comp_i[1], w1)],
                         'Nc_Nb_kb': kX['Nb'][(comp_i[2], -w2)],
                         'Nd_kd': kX['Nd'][(comp_i[3], w3)],
@@ -1478,15 +1478,38 @@ class TpaFullDriver(TpaDriver):
                         'kD': kX['Nd'][(comp_i[3], w3)],
                     })
 
+                inp_list.append(inp_dict)
+
         ave, res = divmod(len(inp_list), self.nodes)
         counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
         starts = [sum(counts[:p]) for p in range(self.nodes)]
         ends = [sum(counts[:p + 1]) for p in range(self.nodes)]
 
-        list_s4_r4 = [
-            self.get_s4_and_r4_terms(inp, D0, nocc, norb)
-            for inp in inp_list[starts[self.rank]:ends[self.rank]]
-        ]
+        local_s4_dict = {}
+        local_r4_dict = {}
+
+        for inp in inp_list[starts[self.rank]:ends[self.rank]]:
+            local_term = self.get_s4_and_r4_terms(inp, D0, nocc, norb)
+
+            s4_key = local_term['s4_key']
+            if s4_key not in local_s4_dict:
+                local_s4_dict[s4_key] = 0.0
+            local_s4_dict[s4_key] += local_term['s4']
+
+            r4_key = local_term['r4_key']
+            if r4_key not in local_r4_dict:
+                local_r4_dict[r4_key] = 0.0
+            local_r4_dict[r4_key] += local_term['r4']
+
+        list_s4_r4 = []
+        for s4_key, r4_key in zip(list(local_s4_dict.keys()),
+                                  list(local_r4_dict.keys())):
+            list_s4_r4.append({
+                's4_key': s4_key,
+                's4': local_s4_dict[s4_key],
+                'r4_key': r4_key,
+                'r4': local_r4_dict[r4_key],
+            })
 
         list_s4_r4 = self.comm.gather(list_s4_r4, root=mpi_master())
 
