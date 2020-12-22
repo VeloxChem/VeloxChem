@@ -25,11 +25,13 @@ AOKohnShamMatrix = Mock()
 XTBDriver = Mock()
 
 mpi_master = Mock()
+mpi_size_limit = Mock()
 mpi_initialized = Mock()
 mathconst_pi = Mock()
 bohr_in_angstroms = Mock()
 hartree_in_ev = Mock()
 hartree_in_kcalpermol = Mock()
+dipole_in_debye = Mock()
 rotatory_strength_in_cgs = Mock()
 
 denmat = Mock()
