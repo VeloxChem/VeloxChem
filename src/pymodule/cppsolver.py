@@ -687,10 +687,7 @@ class ComplexResponse(LinearSolver):
                     kappas[(op, w)] = (self.lrvec2mat(x.real, nocc, norb) +
                                        1j * self.lrvec2mat(x.imag, nocc, norb))
 
-                return {
-                    'focks': focks,
-                    'kappas': kappas
-                }
+                return {'focks': focks, 'kappas': kappas}
 
         return {}
 
