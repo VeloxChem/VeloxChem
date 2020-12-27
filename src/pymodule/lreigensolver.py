@@ -1,15 +1,12 @@
-import itertools
 import numpy as np
 import time as tm
 import psutil
 import math
 import sys
 
-from .veloxchemlib import ExcitationVector
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import rotatory_strength_in_cgs
-from .veloxchemlib import szblock
 from .veloxchemlib import denmat
 from .profiler import Profiler
 from .distributedarray import DistributedArray
@@ -544,19 +541,16 @@ class LinearResponseEigenSolver(LinearSolver):
             vector).
         """
 
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
-
+        excitations = [(i, a) for i in range(nocc) for a in range(nocc, norb)]
         excitation_energies = [ea[a] - ea[i] for i, a in excitations]
 
         w = {ia: w for ia, w in zip(excitations, excitation_energies)}
+        n_exc = nocc * (norb - nocc)
 
         final = {}
         for k, (i, a) in enumerate(sorted(w, key=w.get)[:nstates]):
             if self.rank == mpi_master():
                 ia = excitations.index((i, a))
-                n_exc = len(excitations)
 
                 Xn = np.zeros(2 * n_exc)
                 Xn[ia] = 1.0
@@ -724,12 +718,8 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # generate initial guess from scratch
 
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
-
         igs = {}
-        n_exc = len(excitations)
+        n_exc = nocc * (norb - nocc)
 
         for i in range(2 * n_exc):
             Xn = np.zeros(2 * n_exc)

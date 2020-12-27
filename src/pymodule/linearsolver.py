@@ -1,6 +1,5 @@
 import numpy as np
 import time as tm
-import itertools
 import sys
 import os
 
@@ -11,7 +10,6 @@ from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import DenseMatrix
-from .veloxchemlib import ExcitationVector
 from .veloxchemlib import GridDriver
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import XCIntegrator
@@ -20,7 +18,6 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import molorb
-from .veloxchemlib import szblock
 from .veloxchemlib import parse_xc_func
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
@@ -1391,23 +1388,15 @@ class LinearSolver:
             The matrices.
         """
 
-        zlen = len(vec) // 2
-        z, y = vec[:zlen], vec[zlen:]
+        nvir = norb - nocc
+        n_ov = nocc * nvir
+        mat = np.zeros((norb, norb), dtype=vec.dtype)
 
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        xv.set_yzcoefficients(z, y)
+        # excitation and de-excitation
+        mat[:nocc, nocc:] = vec[:n_ov].reshape(nocc, nvir)
+        mat[nocc:, :nocc] = vec[n_ov:].reshape(nocc, nvir).T
 
-        kz = xv.get_zmatrix()
-        ky = xv.get_ymatrix()
-
-        rows = kz.number_of_rows() + ky.number_of_rows()
-        cols = kz.number_of_columns() + ky.number_of_columns()
-
-        kzy = np.zeros((rows, cols))
-        kzy[:kz.number_of_rows(), ky.number_of_columns():] = kz.to_numpy()
-        kzy[kz.number_of_rows():, :ky.number_of_columns()] = ky.to_numpy()
-
-        return kzy
+        return mat
 
     @staticmethod
     def lrmat2vec(mat, nocc, norb):
@@ -1425,13 +1414,15 @@ class LinearSolver:
             The vectors.
         """
 
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
+        nvir = norb - nocc
+        n_ov = nocc * nvir
+        vec = np.zeros(n_ov * 2, dtype=mat.dtype)
 
-        z = [mat[i, j] for i, j in excitations]
-        y = [mat[j, i] for i, j in excitations]
-        return np.array(z + y)
+        # excitation and de-excitation
+        vec[:n_ov] = mat[:nocc, nocc:].reshape(n_ov)
+        vec[n_ov:] = mat[nocc:, :nocc].T.reshape(n_ov)
+
+        return vec
 
     @staticmethod
     def remove_linear_dependence(basis, threshold):
@@ -1668,16 +1659,17 @@ class LinearSolver:
             The E0 and S0 diagonal elements as numpy arrays.
         """
 
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
+        nvir = norb - nocc
+        n_ov = nocc * nvir
 
-        z = [2.0 * (orb_ene[j] - orb_ene[i]) for i, j in excitations]
-        ediag = np.array(z + z)
+        eocc = orb_ene[:nocc]
+        evir = orb_ene[nocc:]
 
-        lz = len(excitations)
-        sdiag = 2.0 * np.ones(2 * lz)
-        sdiag[lz:] = -2.0
+        ediag = 2.0 * (-eocc.reshape(-1, 1) + evir).reshape(n_ov)
+        ediag = np.hstack((ediag, ediag))
+
+        sdiag = 2.0 * np.ones(ediag.shape)
+        sdiag[n_ov:] = -2.0
 
         return ediag, sdiag
 
@@ -1697,15 +1689,14 @@ class LinearSolver:
             The upper half of E0 and S0 diagonal elements as numpy arrays.
         """
 
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
+        nvir = norb - nocc
+        n_ov = nocc * nvir
 
-        z = [2.0 * (orb_ene[j] - orb_ene[i]) for i, j in excitations]
-        ediag = np.array(z)
+        eocc = orb_ene[:nocc]
+        evir = orb_ene[nocc:]
 
-        lz = len(excitations)
-        sdiag = 2.0 * np.ones(lz)
+        ediag = 2.0 * (-eocc.reshape(-1, 1) + evir).reshape(n_ov)
+        sdiag = 2.0 * np.ones(ediag.shape)
 
         return ediag, sdiag
 
