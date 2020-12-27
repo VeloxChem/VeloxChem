@@ -796,8 +796,13 @@ class TpaReducedDriver(TpaDriver):
         self.ostream.print_header(w_str.ljust(width))
         self.ostream.print_blank()
 
+        w_str = ''
         for a in range(len(comp) // len(freqs)):
-            w_str = str(a + 1) + '. ' + str(comp[a].split(',')[0])
+            w_str += '{:>3d}. {:<6s}'.format(a + 1, comp[a].split(',')[0])
+            if len(w_str) >= width // 2:
+                self.ostream.print_header(w_str.ljust(width))
+                w_str = ''
+        if w_str:
             self.ostream.print_header(w_str.ljust(width))
 
         self.ostream.print_blank()
