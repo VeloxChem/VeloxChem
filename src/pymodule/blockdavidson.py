@@ -163,9 +163,7 @@ class BlockDavidsonSolver:
 
         tvecs = self.residual_matrices.copy()
         for i in range(self.neigenpairs):
-            pmat = np.full(diag_mat.shape, self.residual_eigs[i]) - diag_mat
-            pmat[:, 0] = 1.0 / pmat[:, 0]
-            tvecs[:, i] *= pmat[:, 0]
+            tvecs[:, i] /= (self.residual_eigs[i] - diag_mat)
 
         tvecs = LinearSolver.normalize(tvecs)
 

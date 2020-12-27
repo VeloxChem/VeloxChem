@@ -354,13 +354,13 @@ class TDAExciDriver(LinearSolver):
             w = {ia: w for ia, w in zip(excitations, excitation_energies)}
             n_exc = nocc * (norb - nocc)
 
-            diag_mat = np.array(excitation_energies).reshape(n_exc, 1)
+            diag_mat = np.array(excitation_energies)
             trial_mat = np.zeros((n_exc, self.nstates))
 
-            for k, (i, a) in enumerate(sorted(w, key=w.get)[:self.nstates]):
+            for s, (i, a) in enumerate(sorted(w, key=w.get)[:self.nstates]):
                 if self.rank == mpi_master():
                     ia = excitations.index((i, a))
-                    trial_mat[ia, k] = 1.0
+                    trial_mat[ia, s] = 1.0
 
             return diag_mat, trial_mat
 
