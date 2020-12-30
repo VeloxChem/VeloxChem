@@ -298,7 +298,7 @@ class TDAExciDriver(LinearSolver):
 
                 if self.rank == mpi_master():
                     dens_D, dens_A = self.get_detach_attach_densities(
-                        t_mat, mo_occ, mo_vir)
+                        t_mat, None, mo_occ, mo_vir)
                     dens_DA = AODensityMatrix([dens_D, dens_A], denmat.rest)
                 else:
                     dens_DA = AODensityMatrix()

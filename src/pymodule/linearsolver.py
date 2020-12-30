@@ -1798,12 +1798,14 @@ class LinearSolver:
 
         self.ostream.print_blank()
 
-    def get_detach_attach_densities(self, t_mat, mo_occ, mo_vir):
+    def get_detach_attach_densities(self, z_mat, y_mat, mo_occ, mo_vir):
         """
         Gets the detachment and attachment densities.
 
-        :param t_mat:
-            The (de)excitation vector in matrix form (N_occ x N_virt).
+        :param z_mat:
+            The excitation vector in matrix form (N_occ x N_virt).
+        :param y_mat:
+            The de-excitation vector in matrix form (N_occ x N_virt).
         :param mo_occ:
             The MO coefficients of occupied orbitals.
         :param mo_vir:
@@ -1813,25 +1815,12 @@ class LinearSolver:
             The detachment and attachment densities.
         """
 
-        mo = np.hstack((mo_occ, mo_vir))
-        nocc = mo_occ.shape[1]
-        nvir = mo_vir.shape[1]
+        dens_D = -np.linalg.multi_dot([mo_occ, z_mat, z_mat.T, mo_occ.T])
+        dens_A = np.linalg.multi_dot([mo_vir, z_mat.T, z_mat, mo_vir.T])
 
-        exc_D = np.matmul(t_mat, t_mat.T) * (-1.0)
-        exc_A = np.matmul(t_mat.T, t_mat)
-
-        delta = np.zeros((nocc + nvir, nocc + nvir))
-        delta[:nocc, :nocc] = exc_D[:, :]
-        delta[nocc:, nocc:] = exc_A[:, :]
-
-        t_evals, t_evecs = np.linalg.eigh(delta)
-        diag_D = t_evals * (t_evals < 0.0) * (-1.0)
-        diag_A = t_evals * (t_evals > 0.0)
-
-        dens_D = np.linalg.multi_dot(
-            [mo, t_evecs, np.diag(diag_D), t_evecs.T, mo.T])
-        dens_A = np.linalg.multi_dot(
-            [mo, t_evecs, np.diag(diag_A), t_evecs.T, mo.T])
+        if y_mat is not None:
+            dens_D += np.linalg.multi_dot([mo_occ, y_mat, y_mat.T, mo_occ.T])
+            dens_A -= np.linalg.multi_dot([mo_vir, y_mat.T, y_mat, mo_vir.T])
 
         return dens_D, dens_A
 

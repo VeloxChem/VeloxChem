@@ -417,12 +417,9 @@ class LinearResponseEigenSolver(LinearSolver):
                     self.ostream.flush()
 
                     if self.rank == mpi_master():
-                        dens_Dz, dens_Az = self.get_detach_attach_densities(
-                            z_mat, mo_occ, mo_vir)
-                        dens_Dy, dens_Ay = self.get_detach_attach_densities(
-                            y_mat, mo_occ, mo_vir)
-                        dens_DA = AODensityMatrix(
-                            [dens_Dz + dens_Dy, dens_Az + dens_Ay], denmat.rest)
+                        dens_D, dens_A = self.get_detach_attach_densities(
+                            z_mat, y_mat, mo_occ, mo_vir)
+                        dens_DA = AODensityMatrix([dens_D, dens_A], denmat.rest)
                     else:
                         dens_DA = AODensityMatrix()
                     dens_DA.broadcast(self.rank, self.comm)

@@ -4,8 +4,10 @@ import unittest
 from pathlib import Path
 
 from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import denmat
 from veloxchem.mpitask import MpiTask
 from veloxchem.cubicgrid import CubicGrid
+from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.molecularorbitals import MolecularOrbitals
 from veloxchem.visualizationdriver import VisualizationDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -16,7 +18,7 @@ from veloxchem.lreigensolver import LinearResponseEigenSolver
 class TestNTO(unittest.TestCase):
 
     def run_nto(self, inpfile, xcfun_label, ref_eig_vals, ref_nto_lambdas,
-                ref_nto_cube_vals, flag):
+                ref_nto_cube_vals, ref_dens_cube_vals, flag):
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
@@ -42,9 +44,9 @@ class TestNTO(unittest.TestCase):
         rsp_results = rsp_drv.compute(task.molecule, task.ao_basis,
                                       scf_drv.scf_tensors)
 
-        nocc = task.molecule.number_of_alpha_electrons()
-
         # get eigenvalues and eigenvectors
+
+        nocc = task.molecule.number_of_alpha_electrons()
 
         if task.mpi_rank == mpi_master():
             mo = scf_drv.scf_tensors['C']
@@ -59,37 +61,60 @@ class TestNTO(unittest.TestCase):
 
             nto_lambdas = []
             nto_cube_vals = []
+            dens_cube_vals = []
 
         for s in range(ref_eig_vals.shape[0]):
 
-            # calculate lambdas and NTOs
+            # calculate NTOs and densities
 
             if task.mpi_rank == mpi_master():
                 eig_vec = eig_vecs[:, s].copy()
+
                 if flag == 'tda':
-                    t_mat = eig_vec.reshape(nocc, nvir)
+                    z_mat = eig_vec.reshape(nocc, nvir)
+                    dens_D, dens_A = rsp_drv.get_detach_attach_densities(
+                        z_mat, None, mo_occ, mo_vir)
+
                 elif flag == 'rpa':
-                    t_mat = eig_vec[:eig_vec.shape[0] // 2].reshape(
+                    z_mat = eig_vec[:eig_vec.shape[0] // 2].reshape(
                         nocc, nvir) * np.sqrt(2.0)
-                lam_diag, nto_mo = rsp_drv.get_nto(t_mat, mo_occ, mo_vir)
+                    y_mat = eig_vec[eig_vec.shape[0] // 2:].reshape(
+                        nocc, nvir) * np.sqrt(2.0)
+                    dens_D, dens_A = rsp_drv.get_detach_attach_densities(
+                        z_mat, y_mat, mo_occ, mo_vir)
+
+                lam_diag, nto_mo = rsp_drv.get_nto(z_mat, mo_occ, mo_vir)
+                dens_DA = AODensityMatrix([dens_D, dens_A], denmat.rest)
+
             else:
                 lam_diag = None
                 nto_mo = MolecularOrbitals()
+                dens_DA = AODensityMatrix()
+
             lam_diag = task.mpi_comm.bcast(lam_diag, root=mpi_master())
             nto_mo.broadcast(task.mpi_rank, task.mpi_comm)
+            dens_DA.broadcast(task.mpi_rank, task.mpi_comm)
 
-            # check sum of lambdas for TDA
+            # check sum of lambdas and number of electrons
 
-            if flag == 'tda':
-                self.assertAlmostEqual(np.sum(lam_diag), 1.0, 8)
+            if task.mpi_rank == mpi_master():
+                nto_lambdas.append(lam_diag[0])
 
-            nto_lambdas.append(lam_diag[0])
+                if flag == 'tda':
+                    self.assertAlmostEqual(np.sum(lam_diag), 1.0, 8)
 
-            # compute NTO on grid points
+                self.assertAlmostEqual(
+                    np.sum(dens_D * scf_drv.scf_tensors['S']), -1.0, 8)
+                self.assertAlmostEqual(
+                    np.sum(dens_A * scf_drv.scf_tensors['S']), 1.0, 8)
+
+            # set up grid points
 
             grid = CubicGrid([-0.1, -0.1, -0.1], [0.3, 0.3, 0.2], [2, 2, 3])
 
             vis_drv = VisualizationDriver(task.mpi_comm)
+
+            # compute NTOs on grid points
 
             ind_occ = nocc - 1
             vis_drv.compute(grid, task.molecule, task.ao_basis, nto_mo, ind_occ,
@@ -103,11 +128,24 @@ class TestNTO(unittest.TestCase):
             if task.mpi_rank == mpi_master():
                 nto_cube_vals.append(grid.values_to_numpy().flatten())
 
-        # compare NTO on grid points with reference
+            # compute densities on grid points
+
+            vis_drv.compute(grid, task.molecule, task.ao_basis, dens_DA, 0,
+                            'alpha')
+            if task.mpi_rank == mpi_master():
+                dens_cube_vals.append(grid.values_to_numpy().flatten())
+
+            vis_drv.compute(grid, task.molecule, task.ao_basis, dens_DA, 1,
+                            'alpha')
+            if task.mpi_rank == mpi_master():
+                dens_cube_vals.append(grid.values_to_numpy().flatten())
+
+        # compare NTO and densities on grid points with reference
 
         if task.mpi_rank == mpi_master():
             nto_lambdas = np.array(nto_lambdas)
             nto_cube_vals = np.array(nto_cube_vals)
+            dens_cube_vals = np.array(dens_cube_vals)
 
             thresh = 1.0e-6 if xcfun_label is None else 1.0e-5
             self.assertTrue(np.max(np.abs(eig_vals - ref_eig_vals)) < thresh)
@@ -119,8 +157,13 @@ class TestNTO(unittest.TestCase):
             for s in range(nto_cube_vals.shape[0]):
                 if np.vdot(nto_cube_vals[s, :], ref_nto_cube_vals[s, :]) < 0.0:
                     nto_cube_vals[s, :] *= -1.0
+                if np.vdot(dens_cube_vals[s, :],
+                           ref_dens_cube_vals[s, :]) < 0.0:
+                    dens_cube_vals[s, :] *= -1.0
             self.assertTrue(
                 np.max(np.abs(nto_cube_vals - ref_nto_cube_vals)) < 1.0e-4)
+            self.assertTrue(
+                np.max(np.abs(dens_cube_vals - ref_dens_cube_vals)) < 1.0e-4)
 
     def test_nto_tda(self):
 
@@ -188,8 +231,53 @@ class TestNTO(unittest.TestCase):
         nto_cube_vals = np.array([float(x) for x in raw_vals.split()])
         nto_cube_vals = nto_cube_vals.reshape(nstates * 2, -1)
 
+        raw_vals = """
+           -3.81621e-03  -3.81621e-03  -4.09509e-03
+           -3.66394e-03  -3.66394e-03  -3.91786e-03
+           -6.23259e-03  -6.23259e-03  -7.04599e-03
+           -5.98682e-03  -5.98682e-03  -6.73525e-03
+            1.51129e-04   1.51129e-04   1.20872e-03
+            1.46478e-04   1.46478e-04   1.14244e-03
+            1.88781e-04   1.88781e-04   1.60112e-03
+            1.81843e-04   1.81843e-04   1.50992e-03
+           -3.39078e-04  -3.39078e-04  -4.73343e-04
+           -3.45303e-04  -3.45303e-04  -6.38456e-04
+           -1.25629e-03  -1.25629e-03  -1.58539e-03
+           -1.22529e-03  -1.22529e-03  -1.68720e-03
+            2.57158e-04   2.57158e-04   4.24425e-04
+            9.43715e-04   9.43715e-04   1.21507e-03
+            2.86828e-04   2.86828e-04   7.91893e-04
+            9.43174e-04   9.43174e-04   1.52054e-03
+           -9.71119e-04  -9.71119e-04  -1.18837e-03
+           -9.32354e-04  -9.32354e-04  -1.13312e-03
+           -3.66594e-03  -3.66594e-03  -4.46763e-03
+           -3.52138e-03  -3.52138e-03  -4.26279e-03
+            6.01344e-05   6.01344e-05   1.45026e-04
+            5.44916e-05   5.44916e-05   1.22518e-04
+            4.57288e-05   4.57288e-05   1.08057e-04
+            4.16791e-05   4.16791e-05   9.10495e-05
+           -6.31689e-04  -6.31689e-04  -8.06054e-04
+           -6.16541e-04  -6.16541e-04  -8.64765e-04
+           -2.41362e-03  -2.41362e-03  -2.97229e-03
+           -2.32789e-03  -2.32789e-03  -2.92570e-03
+            4.61014e-04   4.61014e-04   6.05328e-04
+            1.74446e-03   1.74446e-03   2.10302e-03
+            4.62356e-04   4.62356e-04   7.70773e-04
+            1.69191e-03   1.69191e-03   2.18564e-03
+           -7.10253e-02  -7.10253e-02  -7.33318e-02
+           -6.77306e-02  -6.77306e-02  -6.95517e-02
+           -6.90265e-02  -6.90265e-02  -7.11074e-02
+           -6.58643e-02  -6.58643e-02  -6.74921e-02
+            2.76857e-05   2.76857e-05   2.41246e-04
+            2.77213e-05   2.77213e-05   2.41045e-04
+            7.21540e-05   7.21540e-05   6.80185e-04
+            6.94721e-05   6.94721e-05   6.51147e-04
+        """
+        dens_cube_vals = np.array([float(x) for x in raw_vals.split()])
+        dens_cube_vals = dens_cube_vals.reshape(nstates * 2, -1)
+
         self.run_nto(inpfile, xcfun_label, eig_vals, nto_lambdas, nto_cube_vals,
-                     'tda')
+                     dens_cube_vals, 'tda')
 
     def test_nto_rpa(self):
 
@@ -257,8 +345,53 @@ class TestNTO(unittest.TestCase):
         nto_cube_vals = np.array([float(x) for x in raw_vals.split()])
         nto_cube_vals = nto_cube_vals.reshape(nstates * 2, -1)
 
+        raw_vals = """
+           -2.90190e-05  -2.90190e-05  -1.28491e-04
+           -5.62718e-05  -5.62718e-05  -4.15115e-04
+           -7.67176e-05  -7.67176e-05  -1.81100e-04
+           -1.00246e-04  -1.00246e-04  -4.45388e-04
+            3.38531e-05   3.38531e-05   2.42054e-04
+            6.48336e-05   6.48336e-05   2.64405e-04
+            9.49380e-05   9.49380e-05   8.65055e-04
+            1.20815e-04   1.20815e-04   8.44361e-04
+           -2.55384e-03  -2.55384e-03  -2.82839e-03
+           -2.45412e-03  -2.45412e-03  -2.70607e-03
+           -5.04742e-03  -5.04742e-03  -5.92456e-03
+           -4.84917e-03  -4.84917e-03  -5.65868e-03
+            7.37806e-05   7.37806e-05   6.50915e-04
+            7.71850e-05   7.71850e-05   6.20781e-04
+            1.20455e-04   1.20455e-04   1.12571e-03
+            1.20853e-04   1.20853e-04   1.06480e-03
+           -9.35000e-04  -9.35000e-04  -1.16864e-03
+           -8.97194e-04  -8.97194e-04  -1.11320e-03
+           -3.57282e-03  -3.57282e-03  -4.43632e-03
+           -3.43012e-03  -3.43012e-03  -4.22891e-03
+            3.16751e-04   3.16751e-04   5.19480e-04
+            2.89827e-04   2.89827e-04   4.56550e-04
+            2.67603e-04   2.67603e-04   4.29115e-04
+            2.45298e-04   2.45298e-04   3.77157e-04
+           -9.15314e-04  -9.15314e-04  -1.14688e-03
+           -8.78782e-04  -8.78782e-04  -1.09781e-03
+           -3.51135e-03  -3.51135e-03  -4.36264e-03
+           -3.37155e-03  -3.37155e-03  -4.16365e-03
+            5.56773e-04   5.56773e-04   6.75673e-04
+            2.13204e-03   2.13204e-03   2.55907e-03
+            5.34839e-04   5.34839e-04   6.54947e-04
+            2.04606e-03   2.04606e-03   2.44922e-03
+           -1.00391e-02  -1.00391e-02  -1.06531e-02
+           -9.55977e-03  -9.55977e-03  -1.00809e-02
+           -1.19952e-02  -1.19952e-02  -1.31019e-02
+           -1.14461e-02  -1.14461e-02  -1.24258e-02
+            1.06293e-05   1.06293e-05   7.21569e-05
+            1.22848e-05   1.22848e-05   8.65397e-05
+            1.85298e-05   1.85298e-05   1.51190e-04
+            1.98236e-05   1.98236e-05   1.62052e-04
+        """
+        dens_cube_vals = np.array([float(x) for x in raw_vals.split()])
+        dens_cube_vals = dens_cube_vals.reshape(nstates * 2, -1)
+
         self.run_nto(inpfile, xcfun_label, eig_vals, nto_lambdas, nto_cube_vals,
-                     'rpa')
+                     dens_cube_vals, 'rpa')
 
 
 if __name__ == "__main__":
