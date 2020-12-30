@@ -95,8 +95,8 @@ def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
             -natoms, x0, y0, z0, 1)
         print(line, file=f_cube)
 
-    elif flag == 'density':
-        print('Electron density ({:s})'.format(spin), file=f_cube)
+    elif flag in ['density', 'detachment', 'attachment']:
+        print('Electron {:s} ({:s})'.format(flag, spin), file=f_cube)
         line = '{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}'.format(
             natoms, x0, y0, z0, 1)
         print(line, file=f_cube)
@@ -177,13 +177,11 @@ def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
                 spin = 'beta'
                 nelec = molecule.number_of_beta_electrons()
 
-            homo = nelec - 1
-            lumo = nelec
-
+            # Note: the input MO index should be 1-based
             cube_value = m.group(2).strip().lower()
-            cube_value = cube_value.replace('homo', str(homo))
-            cube_value = cube_value.replace('lumo', str(lumo))
-            orb_id = eval(cube_value)
+            cube_value = cube_value.replace('homo', str(nelec))
+            cube_value = cube_value.replace('lumo', str(nelec + 1))
+            orb_id = eval(cube_value) - 1
 
             self.compute(cubic_grid, molecule, basis, mol_orbs, orb_id, spin)
 

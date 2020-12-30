@@ -1848,7 +1848,7 @@ class LinearSolver:
             detach_cube_name = '{:s}_S{:d}_detach.cube'.format(
                 self.filename, root + 1)
             vis_drv.write_data(detach_cube_name, cubic_grid, molecule,
-                               'density', 0, 'alpha')
+                               'detachment', 0, 'alpha')
 
             self.ostream.print_info(
                 '  Cube file (detachment) : {:s}'.format(detach_cube_name))
@@ -1860,7 +1860,7 @@ class LinearSolver:
             attach_cube_name = '{:s}_S{:d}_attach.cube'.format(
                 self.filename, root + 1)
             vis_drv.write_data(attach_cube_name, cubic_grid, molecule,
-                               'density', 1, 'alpha')
+                               'attachment', 1, 'alpha')
 
             self.ostream.print_info(
                 '  Cube file (attachment) : {:s}'.format(attach_cube_name))
