@@ -31,6 +31,7 @@ class LinearResponseEigenSolver(LinearSolver):
         - nstates: Number of excited states.
         - nto: The flag for natural transition orbital analysis.
         - detach_attach: The flag for detachment/attachment density analysis.
+        - cube_points: The number of cubic grid points in X, Y and Z directions.
     """
 
     def __init__(self, comm, ostream):
@@ -44,6 +45,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         self.nto = False
         self.detach_attach = False
+        self.cube_points = [80, 80, 80]
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -70,6 +72,14 @@ class LinearResponseEigenSolver(LinearSolver):
         if 'detach_attach' in rsp_dict:
             key = rsp_dict['detach_attach'].lower()
             self.detach_attach = True if key == 'yes' else False
+
+        if 'cube_points' in rsp_dict:
+            self.cube_points = [
+                int(x)
+                for x in rsp_dict['cube_points'].replace(',', ' ').split()
+            ]
+            assert_msg_critical(
+                len(self.cube_points) == 3, 'cube points: Need 3 integers')
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -408,7 +418,8 @@ class LinearResponseEigenSolver(LinearSolver):
                     lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
                     nto_mo.broadcast(self.rank, self.comm)
 
-                    self.write_nto_cubes(molecule, basis, s, lam_diag, nto_mo)
+                    self.write_nto_cubes(self.cube_points, molecule, basis, s,
+                                         lam_diag, nto_mo)
 
                 if self.detach_attach:
                     self.ostream.print_info(
@@ -424,7 +435,8 @@ class LinearResponseEigenSolver(LinearSolver):
                         dens_DA = AODensityMatrix()
                     dens_DA.broadcast(self.rank, self.comm)
 
-                    self.write_detach_attach_cubes(molecule, basis, s, dens_DA)
+                    self.write_detach_attach_cubes(self.cube_points, molecule,
+                                                   basis, s, dens_DA)
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):

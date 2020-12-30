@@ -1732,6 +1732,7 @@ class LinearSolver:
         return lam_diag, nto_mo
 
     def write_nto_cubes(self,
+                        cube_points,
                         molecule,
                         basis,
                         root,
@@ -1741,6 +1742,8 @@ class LinearSolver:
         """
         Writes cube files for natural transition orbitals.
 
+        :param cube_points:
+            The list containing number of grid points in X, Y and Z directions.
         :param molecule:
             The molecule.
         :param basis:
@@ -1756,7 +1759,7 @@ class LinearSolver:
         """
 
         vis_drv = VisualizationDriver(self.comm)
-        cubic_grid = vis_drv.gen_cubic_grid(molecule)
+        cubic_grid = vis_drv.gen_cubic_grid(molecule, cube_points)
 
         nocc = molecule.number_of_alpha_electrons()
 
@@ -1824,10 +1827,13 @@ class LinearSolver:
 
         return dens_D, dens_A
 
-    def write_detach_attach_cubes(self, molecule, basis, root, dens_DA):
+    def write_detach_attach_cubes(self, cube_points, molecule, basis, root,
+                                  dens_DA):
         """
         Writes cube files for detachment and attachment densities.
 
+        :param cube_points:
+            The list containing number of grid points in X, Y and Z directions.
         :param molecule:
             The molecule.
         :param basis:
@@ -1840,7 +1846,7 @@ class LinearSolver:
         """
 
         vis_drv = VisualizationDriver(self.comm)
-        cubic_grid = vis_drv.gen_cubic_grid(molecule)
+        cubic_grid = vis_drv.gen_cubic_grid(molecule, cube_points)
 
         vis_drv.compute(cubic_grid, molecule, basis, dens_DA, 0, 'alpha')
 
