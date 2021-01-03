@@ -130,6 +130,11 @@ class LinearResponseEigenSolver(LinearSolver):
         norb = orb_ene.shape[0]
         nocc = molecule.number_of_alpha_electrons()
 
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                self.nstates <= nocc * (norb - nocc),
+                'LinearResponseEigenSolver: too many excited states')
+
         # ERI information
         eri_dict = self.init_eri(molecule, basis)
 

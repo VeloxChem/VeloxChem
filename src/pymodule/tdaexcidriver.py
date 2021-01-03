@@ -138,6 +138,12 @@ class TDAExciDriver(LinearSolver):
         else:
             mol_orbs = MolecularOrbitals()
 
+        if self.rank == mpi_master():
+            nocc = molecule.number_of_alpha_electrons()
+            norb = mol_orbs.number_mos()
+            assert_msg_critical(self.nstates <= nocc * (norb - nocc),
+                                'TDAExciDriver: too many excited states')
+
         # ERI information
         eri_dict = self.init_eri(molecule, basis)
 
