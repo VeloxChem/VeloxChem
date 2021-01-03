@@ -35,7 +35,7 @@ CCubicGrid::CCubicGrid(const std::vector<double>& origin, const std::vector<doub
 
     , _numPoints(numPoints)
 {
-    std::string errmsg("CubicGrid - Incorrect dimension");
+    std::string errmsg("CubicGrid: Incorrect dimension");
 
     errors::assertMsgCritical(_origin.size() == 3, errmsg);
 
@@ -195,7 +195,7 @@ CCubicGrid::values()
 void
 CCubicGrid::setValues(const std::vector<double> vals)
 {
-    std::string errmsg("CubicGrid.set_values - Inconsistent number of grid points");
+    std::string errmsg("CubicGrid.set_values: Inconsistent number of grid points");
 
     auto npoints = _numPoints[0] * _numPoints[1] * _numPoints[2];
 

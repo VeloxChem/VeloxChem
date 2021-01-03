@@ -244,7 +244,7 @@ class ComplexResponse(LinearSolver):
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'ComplexResponseSolver: not implemented for unrestricted case')
+            'ComplexResponse: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             orb_ene = scf_tensors['E']

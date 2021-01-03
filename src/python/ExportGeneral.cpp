@@ -162,7 +162,7 @@ export_general(py::module& m)
 
     auto err = import_mpi4py();
 
-    std::string errmpi4py("mpi4py: failed to import mpi4py");
+    std::string errmpi4py("Failed to import mpi4py");
 
     errors::assertMsgCritical(err == 0, errmpi4py);
 

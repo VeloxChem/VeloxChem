@@ -81,7 +81,7 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
         nocc = task.molecule.number_of_alpha_electrons()
         n_ov = nocc * (mol_orbs.number_mos() - nocc)
         assert_msg_critical(task.mpi_size == 1 or task.mpi_size <= n_ov,
-                            'response: too many MPI processes')
+                            'Response: too many MPI processes')
 
     if 'property' in rsp_dict:
         prop_type = rsp_dict['property'].lower()
@@ -137,7 +137,7 @@ def main():
 
     program_start_time = tm.time()
 
-    assert_msg_critical(mpi_initialized(), "MPI: Initialized")
+    assert_msg_critical(mpi_initialized(), "MPI not initialized")
 
     if len(sys.argv) <= 1 or sys.argv[1] in ['-h', '--help']:
         info_txt = [

@@ -30,7 +30,7 @@ malloc(const size_t size)
 
     int ierr = ::posix_memalign(&ptr, VLX_ALIGN, size);
 
-    errors::assertMsgCritical(ierr == 0, "malloc: posix_memalign failed!");
+    errors::assertMsgCritical(ierr == 0, "malloc: posix_memalign failed");
 
     return ptr;
 

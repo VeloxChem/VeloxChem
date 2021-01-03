@@ -345,8 +345,7 @@ CElectricFieldIntegralsDirver_compute(const CElectricFieldIntegralsDriver&      
 
     // sanity check
 
-    std::string errdims(
-        "ElectricFieldIntegralsDirver.compute - Inconsistent size of dipoles and/or their coordinates");
+    std::string errdims("ElectricFieldIntegralsDirver.compute: Inconsistent size of dipoles and/or their coordinates");
 
     errors::assertMsgCritical(py_coords.shape(0) == py_dipoles.shape(0), errdims);
 
