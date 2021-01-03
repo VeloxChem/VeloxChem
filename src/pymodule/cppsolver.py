@@ -234,7 +234,8 @@ class ComplexResponse(LinearSolver):
         })
 
         if self.rank == mpi_master():
-            self.print_header('Complex Response Solver')
+            self.print_header('Complex Response Solver',
+                              n_freqs=len(self.frequencies))
 
         self.start_time = tm.time()
 

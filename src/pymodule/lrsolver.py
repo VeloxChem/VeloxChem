@@ -103,7 +103,8 @@ class LinearResponseSolver(LinearSolver):
         })
 
         if self.rank == mpi_master():
-            self.print_header('Linear Response Solver')
+            self.print_header('Linear Response Solver',
+                              n_freqs=len(self.frequencies))
 
         self.start_time = tm.time()
 

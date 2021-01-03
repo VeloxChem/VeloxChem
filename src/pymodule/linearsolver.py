@@ -973,14 +973,18 @@ class LinearSolver:
                 return True
         return False
 
-    def print_header(self, title, nstates=None, n_points=None):
+    def print_header(self, title, nstates=None, n_freqs=None, n_points=None):
         """
         Prints linear response solver setup header to output stream.
 
         :param title:
             The name of the solver.
         :param nstates:
-            The number of excited states.
+            The number of excited states (TDA/RPA).
+        :param n_freqs:
+            The number of frequencies (LR/CPP).
+        :param n_points:
+            The number of integration points (C6).
         """
 
         self.ostream.print_blank()
@@ -990,13 +994,19 @@ class LinearSolver:
 
         str_width = 60
 
+        # print solver-specific info
+
         if nstates is not None:
             cur_str = 'Number of States                : ' + str(nstates)
             self.ostream.print_header(cur_str.ljust(str_width))
-
-        if n_points is not None:
-            cur_str = 'Number of integration points    : ' + str(n_points)
+        if n_freqs is not None:
+            cur_str = 'Number of Frequencies           : ' + str(n_freqs)
             self.ostream.print_header(cur_str.ljust(str_width))
+        if n_points is not None:
+            cur_str = 'Number of Integration Points    : ' + str(n_points)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
+        # print general info
 
         cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
