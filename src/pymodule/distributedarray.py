@@ -115,6 +115,20 @@ class DistributedArray:
 
         return self.data.shape[axis]
 
+    def squared_norm(self, axis=None):
+        """
+        Returns the squared norm of the distributed array along axis.
+
+        :param axis:
+            The axis.
+        :return:
+            The squared norm along axis.
+        """
+
+        n2 = np.linalg.norm(self.data, axis=axis)**2
+        n2 = self.comm.allreduce(n2, op=MPI.SUM)
+        return n2
+
     def norm(self, axis=None):
         """
         Returns the norm of the distributed array along axis.
@@ -281,6 +295,21 @@ class DistributedArray:
         """
 
         self.data = np.append(self.data, dist_array.data, axis=axis)
+
+    def get_column(self, col_index):
+        """
+        Gets a column as a distributed 1D array.
+
+        :param col_index:
+            The index of the column.
+
+        :return:
+            A distributed 1D array.
+        """
+
+        return DistributedArray(self.data[:, col_index],
+                                self.comm,
+                                distribute=False)
 
     @classmethod
     def read_from_hdf5_file(cls, fname, label, comm):
