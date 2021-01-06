@@ -1,7 +1,6 @@
 import numpy as np
 import time as tm
 import psutil
-import math
 import sys
 
 from .veloxchemlib import mpi_master
@@ -112,8 +111,12 @@ class C6Solver(LinearSolver):
         pa_diag = p_diag * a_diag
         pc_diag = p_diag * c_diag
 
-        return tuple(
-            [DistributedArray(p, self.comm) for p in [pa_diag, pc_diag]])
+        p_mat = np.hstack((
+            pa_diag.reshape(-1, 1),
+            pc_diag.reshape(-1, 1),
+        ))
+
+        return DistributedArray(p_mat, self.comm)
 
     def preconditioning(self, precond, v_in):
         """
@@ -128,17 +131,21 @@ class C6Solver(LinearSolver):
             A tuple of distributed trail vectors after preconditioning.
         """
 
-        pa, pc = [p.data for p in precond]
+        pa = precond.data[:, 0]
+        pc = precond.data[:, 1]
 
-        v_in_ru, v_in_ig = [v.data for v in v_in]
+        v_in_ru = v_in.data[:, 0]
+        v_in_ig = v_in.data[:, 1]
 
         v_out_ru = pa * v_in_ru + pc * v_in_ig
         v_out_ig = pc * v_in_ru - pa * v_in_ig
 
-        return tuple([
-            DistributedArray(v, self.comm, distribute=False)
-            for v in [v_out_ru, v_out_ig]
-        ])
+        v_mat = np.hstack((
+            v_out_ru.reshape(-1, 1),
+            v_out_ig.reshape(-1, 1),
+        ))
+
+        return DistributedArray(v_mat, self.comm, distribute=False)
 
     def precond_trials(self, vectors, precond):
         """
@@ -155,20 +162,20 @@ class C6Solver(LinearSolver):
 
         trials_ger = []
         trials_ung = []
-        sqrt_2 = math.sqrt(2.0)
 
         for (op, w), vec in vectors.items():
             v = self.preconditioning(precond[w], vec)
-            norms = [sqrt_2 * p.norm() for p in v]
-            vn = math.sqrt(sum([n**2 for n in norms]))
+            norms_2 = 2.0 * v.squared_norm(axis=0)
+            vn = np.sqrt(np.sum(norms_2))
 
             if vn > self.small_thresh:
+                norms = np.sqrt(norms_2)
                 # real ungerade
                 if norms[0] > self.small_thresh:
-                    trials_ung.append(v[0].data)
+                    trials_ung.append(v.data[:, 0])
                 # imaginary gerade
                 if norms[1] > self.small_thresh:
-                    trials_ger.append(v[1].data)
+                    trials_ger.append(v.data[:, 1])
 
         new_ger = np.array(trials_ger).T
         new_ung = np.array(trials_ung).T
@@ -269,12 +276,13 @@ class C6Solver(LinearSolver):
         for key in op_imagfreq_keys:
             if self.rank == mpi_master():
                 gradger, gradung = self.decomp_grad(v1[key])
-                grad_ru = gradung.real
-                grad_ig = gradger.imag
+                grad_mat = np.hstack((
+                    gradung.real.reshape(-1, 1),
+                    gradger.imag.reshape(-1, 1),
+                ))
             else:
-                grad_ru, grad_ig = None, None
-            dist_v1[key] = (DistributedArray(grad_ru, self.comm),
-                            DistributedArray(grad_ig, self.comm))
+                grad_mat = None
+            dist_v1[key] = DistributedArray(grad_mat, self.comm)
 
         rsp_vector_labels = [
             'C6_bger_half_size',
@@ -315,7 +323,6 @@ class C6Solver(LinearSolver):
                                             rsp_vector_labels)
 
         iter_per_trail_in_hours = None
-        sqrt_2 = math.sqrt(2.0)
 
         # start iterations
         for iteration in range(self.max_iter):
@@ -338,7 +345,8 @@ class C6Solver(LinearSolver):
                 if (iteration == 0 or
                         relative_residual_norm[(op, iw)] > self.conv_thresh):
 
-                    grad_ru, grad_ig = dist_v1[(op, iw)]
+                    grad_ru = dist_v1[(op, iw)].get_column(0)
+                    grad_ig = dist_v1[(op, iw)].get_column(1)
 
                     # projections onto gerade and ungerade subspaces:
 
@@ -397,29 +405,33 @@ class C6Solver(LinearSolver):
                     r_imagger = (-e2imagger.data + iw * s2realung +
                                  grad_ig.data)
 
-                    r_realung = DistributedArray(r_realung,
-                                                 self.comm,
-                                                 distribute=False)
-                    r_imagger = DistributedArray(r_imagger,
-                                                 self.comm,
-                                                 distribute=False)
+                    r_data = np.hstack((
+                        r_realung.reshape(-1, 1),
+                        r_imagger.reshape(-1, 1),
+                    ))
+
+                    r = DistributedArray(r_data, self.comm, distribute=False)
 
                     # calculating relative residual norm
                     # for convergence check
 
-                    r = (r_realung, r_imagger)
-                    x = (x_realung, x_imagger)
+                    x_data = np.hstack((
+                        x_realung.data.reshape(-1, 1),
+                        x_imagger.data.reshape(-1, 1),
+                    ))
+
+                    x = DistributedArray(x_data, self.comm, distribute=False)
 
                     x_full = self.get_full_solution_vector(x)
                     if self.rank == mpi_master():
                         xv = np.dot(x_full, v1[(op, iw)])
                         xvs.append((op, iw, xv))
 
-                    r_norms = [sqrt_2 * p.norm() for p in r]
-                    x_norms = [sqrt_2 * p.norm() for p in x]
+                    r_norms_2 = 2.0 * r.squared_norm(axis=0)
+                    x_norms_2 = 2.0 * x.squared_norm(axis=0)
 
-                    rn = math.sqrt(sum([n**2 for n in r_norms]))
-                    xn = math.sqrt(sum([n**2 for n in x_norms]))
+                    rn = np.sqrt(np.sum(r_norms_2))
+                    xn = np.sqrt(np.sum(x_norms_2))
 
                     if xn != 0:
                         relative_residual_norm[(op, iw)] = rn / xn
@@ -577,10 +589,8 @@ class C6Solver(LinearSolver):
             The full solution vector.
         """
 
-        (dist_x_realung, dist_x_imagger) = solution
-
-        x_realung = dist_x_realung.get_full_vector()
-        x_imagger = dist_x_imagger.get_full_vector()
+        x_realung = solution.get_full_vector(0)
+        x_imagger = solution.get_full_vector(1)
 
         if self.rank == mpi_master():
             x_real = np.hstack((x_realung, -x_realung))

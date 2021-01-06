@@ -162,7 +162,7 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     diagdrv.diagonalize(Amat);
 
-    std::string err_diag("PartialCharges - Matrix diagonalization failed");
+    std::string err_diag("parchg::getPartialCharges: Matrix diagonalization failed");
 
     errors::assertMsgCritical(diagdrv.getState(), err_diag);
 

@@ -5,12 +5,10 @@ import math
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
-from .veloxchemlib import ExcitationVector
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import rotatory_strength_in_cgs
-from .veloxchemlib import szblock
 from .veloxchemlib import molorb
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
@@ -38,6 +36,7 @@ class TDAExciDriver(LinearSolver):
         - solver: The eigenvalues solver.
         - nto: The flag for natural transition orbital analysis.
         - detach_attach: The flag for detachment/attachment density analysis.
+        - cube_points: The number of cubic grid points in X, Y and Z directions.
     """
 
     def __init__(self, comm, ostream):
@@ -56,6 +55,7 @@ class TDAExciDriver(LinearSolver):
         # NTO and detachment/attachment density
         self.nto = False
         self.detach_attach = False
+        self.cube_points = [80, 80, 80]
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -83,6 +83,14 @@ class TDAExciDriver(LinearSolver):
         if 'detach_attach' in rsp_dict:
             key = rsp_dict['detach_attach'].lower()
             self.detach_attach = True if key == 'yes' else False
+
+        if 'cube_points' in rsp_dict:
+            self.cube_points = [
+                int(x)
+                for x in rsp_dict['cube_points'].replace(',', ' ').split()
+            ]
+            assert_msg_critical(
+                len(self.cube_points) == 3, 'cube points: Need 3 integers')
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -130,6 +138,12 @@ class TDAExciDriver(LinearSolver):
         else:
             mol_orbs = MolecularOrbitals()
 
+        if self.rank == mpi_master():
+            nocc = molecule.number_of_alpha_electrons()
+            norb = mol_orbs.number_mos()
+            assert_msg_critical(self.nstates <= nocc * (norb - nocc),
+                                'TDAExciDriver: too many excited states')
+
         # ERI information
         eri_dict = self.init_eri(molecule, basis)
 
@@ -143,7 +157,7 @@ class TDAExciDriver(LinearSolver):
 
         # set up trial excitation vectors on master node
 
-        diag_mat, trial_vecs = self.gen_trial_vectors(mol_orbs, molecule)
+        diag_mat, trial_mat = self.gen_trial_vectors(mol_orbs, molecule)
 
         # block Davidson algorithm setup
 
@@ -182,7 +196,7 @@ class TDAExciDriver(LinearSolver):
 
             if i >= n_restart_iterations:
                 fock, tdens, gsdens = self.get_densities(
-                    trial_vecs, scf_tensors, molecule)
+                    trial_mat, scf_tensors, molecule)
 
                 self.comp_lr_fock(fock, tdens, molecule, basis, eri_dict,
                                   dft_dict, pe_dict, timing_dict)
@@ -195,7 +209,6 @@ class TDAExciDriver(LinearSolver):
             if self.rank == mpi_master():
 
                 if i >= n_restart_iterations:
-                    trial_mat = self.convert_to_trial_matrix(trial_vecs)
                     sig_mat = self.get_sigmas(fock, scf_tensors, molecule,
                                               trial_mat)
                 else:
@@ -208,12 +221,9 @@ class TDAExciDriver(LinearSolver):
 
                 self.solver.add_iteration_data(sig_mat, trial_mat, i)
 
-                zvecs = self.solver.compute(diag_mat)
+                trial_mat = self.solver.compute(diag_mat)
 
                 self.print_iter_data(i)
-
-                trial_vecs = self.convert_to_trial_vectors(
-                    mol_orbs, molecule, zvecs)
 
             profiler.stop_timer(i, 'ReducedSpace')
             if self.dft or self.pe:
@@ -294,7 +304,8 @@ class TDAExciDriver(LinearSolver):
                 lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
                 nto_mo.broadcast(self.rank, self.comm)
 
-                self.write_nto_cubes(molecule, basis, s, lam_diag, nto_mo)
+                self.write_nto_cubes(self.cube_points, molecule, basis, s,
+                                     lam_diag, nto_mo)
 
             if self.detach_attach and self.is_converged:
                 self.ostream.print_info(
@@ -304,13 +315,14 @@ class TDAExciDriver(LinearSolver):
 
                 if self.rank == mpi_master():
                     dens_D, dens_A = self.get_detach_attach_densities(
-                        t_mat, mo_occ, mo_vir)
+                        t_mat, None, mo_occ, mo_vir)
                     dens_DA = AODensityMatrix([dens_D, dens_A], denmat.rest)
                 else:
                     dens_DA = AODensityMatrix()
                 dens_DA.broadcast(self.rank, self.comm)
 
-                self.write_detach_attach_cubes(molecule, basis, s, dens_DA)
+                self.write_detach_attach_cubes(self.cube_points, molecule,
+                                               basis, s, dens_DA)
 
         if (self.nto or self.detach_attach) and self.is_converged:
             self.ostream.print_blank()
@@ -350,21 +362,27 @@ class TDAExciDriver(LinearSolver):
 
             nocc = molecule.number_of_alpha_electrons()
             norb = mol_orbs.number_mos()
+            ea = mol_orbs.ea_to_numpy()
 
-            zvec = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-            exci_list = zvec.small_energy_identifiers(mol_orbs, self.nstates)
+            excitations = [
+                (i, a) for i in range(nocc) for a in range(nocc, norb)
+            ]
+            excitation_energies = [ea[a] - ea[i] for i, a in excitations]
 
-            diag_mat = zvec.diagonal_to_numpy(mol_orbs)
+            w = {ia: w for ia, w in zip(excitations, excitation_energies)}
+            n_exc = nocc * (norb - nocc)
 
-            trial_vecs = []
-            for i in exci_list:
-                trial_vecs.append(
-                    ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True))
-                trial_vecs[-1].set_zcoefficient(1.0, i)
+            diag_mat = np.array(excitation_energies)
+            trial_mat = np.zeros((n_exc, self.nstates))
 
-            return diag_mat, trial_vecs
+            for s, (i, a) in enumerate(sorted(w, key=w.get)[:self.nstates]):
+                if self.rank == mpi_master():
+                    ia = excitations.index((i, a))
+                    trial_mat[ia, s] = 1.0
 
-        return None, []
+            return diag_mat, trial_mat
+
+        return None, None
 
     def check_convergence(self, iteration):
         """
@@ -385,66 +403,13 @@ class TDAExciDriver(LinearSolver):
         self.is_converged = self.comm.bcast(self.is_converged,
                                             root=mpi_master())
 
-    def convert_to_trial_matrix(self, trial_vecs):
-        """
-        Converts set of Z vectors from std::vector<CExcitationVector> to numpy
-        2D array.
-
-        :param trial_vecs:
-            The Z vectors as std::vector<CExcitationVector>.
-
-        :return:
-            The 2D Numpy array.
-        """
-
-        nvecs = len(trial_vecs)
-
-        if nvecs > 0:
-
-            trial_mat = trial_vecs[0].zvector_to_numpy()
-            for i in range(1, nvecs):
-                trial_mat = np.hstack(
-                    (trial_mat, trial_vecs[i].zvector_to_numpy()))
-
-            return trial_mat
-
-        return None
-
-    def convert_to_trial_vectors(self, mol_orbs, molecule, zvecs):
-        """
-        Converts set of Z vectors from numpy 2D array to
-        std::vector<CExcitationVector>.
-
-        :param mol_orbs:
-            The molecular orbitals.
-        :param molecule:
-            The molecule.
-        :param zvecs:
-            The Z vectors as 2D Numpy array.
-
-        :return:
-            The Z vectors as std::vector<CExcitationVector>.
-        """
-
-        nocc = molecule.number_of_alpha_electrons()
-        norb = mol_orbs.number_mos()
-
-        trial_vecs = []
-        for i in range(zvecs.shape[1]):
-            trial_vecs.append(
-                ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True))
-            for j in range(zvecs.shape[0]):
-                trial_vecs[i].set_zcoefficient(zvecs[j, i], j)
-
-        return trial_vecs
-
-    def get_densities(self, trial_vecs, tensors, molecule):
+    def get_densities(self, trial_mat, tensors, molecule):
         """
         Computes the ground-state and transition densities, and initializes the
         Fock matrix.
 
-        :param trial_vecs:
-            The Z vectors as std::vector<CExcitationVector>.
+        :param trial_mat:
+            The matrix containing the Z vectors as columns.
         :param tensors:
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
@@ -464,8 +429,8 @@ class TDAExciDriver(LinearSolver):
             mo_occ = tensors['C'][:, :nocc].copy()
             mo_vir = tensors['C'][:, nocc:].copy()
             ao_mats = []
-            for vec in trial_vecs:
-                mat = vec.zvector_to_numpy().reshape(nocc, nvir)
+            for k in range(trial_mat.shape[1]):
+                mat = trial_mat[:, k].reshape(nocc, nvir)
                 mat = np.matmul(mo_occ, np.matmul(mat, mo_vir.T))
                 ao_mats.append(mat)
             tdens = AODensityMatrix(ao_mats, denmat.rest)

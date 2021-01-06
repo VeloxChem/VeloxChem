@@ -21,3 +21,4 @@ def set_omp_num_threads(ncores=None):
                   file=stdout)
             print('* Warning * Setting OMP_NUM_THREADS to {:d}.'.format(ncores),
                   file=stdout)
+            stdout.flush()

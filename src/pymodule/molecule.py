@@ -283,9 +283,9 @@ def _Molecule_write_xyz(self, xyz_filename):
         for elem_id, x, y, z in zip(elem_ids, xs, ys, zs):
             elem = ChemicalElement()
             elem.set_atom_type(elem_id)
-            print('{:<6s} {:22.12f} {:22.12f} {:22.12f}'.format(
-                elem.get_name(), x, y, z),
-                  file=fh)
+            line = '{:<6s} {:22.12f} {:22.12f} {:22.12f}'.format(
+                elem.get_name(), x, y, z)
+            print(line, file=fh)
 
 
 Molecule.read_str = _Molecule_read_str

@@ -324,11 +324,11 @@ CVisualizationDriver::compute_omp(CCubicGrid&               grid,
 
     // sanity check
 
-    std::string erridx("VisualizationDriver - Invalid index of MO");
+    std::string erridx("VisualizationDriver.compute: Invalid index of MO");
 
-    std::string errspin("VisualizationDriver - Invalid spin of MO");
+    std::string errspin("VisualizationDriver.compute: Invalid spin of MO");
 
-    std::string errnao("VisualizationDriver - Inconsistent number of AOs");
+    std::string errnao("VisualizationDriver.compute: Inconsistent number of AOs");
 
     auto morows = mo.getNumberOfRows();
 
@@ -410,11 +410,11 @@ CVisualizationDriver::compute_omp(CCubicGrid&             grid,
 
     // sanity check
 
-    std::string erridx("VisualizationDriver.compute - Invalid index of density matrix");
+    std::string erridx("VisualizationDriver.compute: Invalid index of density matrix");
 
-    std::string errspin("VisualizationDriver.compute - Invalid spin of density matrix");
+    std::string errspin("VisualizationDriver.compute: Invalid spin of density matrix");
 
-    std::string errnao("VisualizationDriver.compute - Inconsistent number of AOs");
+    std::string errnao("VisualizationDriver.compute: Inconsistent number of AOs");
 
     auto numdens = density.getNumberOfDensityMatrices();
 

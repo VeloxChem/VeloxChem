@@ -3,6 +3,8 @@ from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .c6solver import C6Solver
 from .tdaexcidriver import TDAExciDriver
+from .tpafulldriver import TpaFullDriver
+from .tpareddriver import TpaReducedDriver
 
 
 class ResponseDriver:
@@ -155,6 +157,27 @@ class ResponseDriver:
             self.is_converged = c6_solver.is_converged
 
             return c6_result
+
+        # TPA
+
+        if (self.rsp_dict['response'] == 'cubic' and
+                self.rsp_dict['complex'] == 'yes'):
+
+            if ('tpa_type' not in self.rsp_dict or
+                    self.rsp_dict['tpa_type'].lower() == 'full'):
+                tpa_solver = TpaFullDriver(self.comm, self.ostream)
+
+            elif ('tpa_type' in self.rsp_dict and
+                  self.rsp_dict['tpa_type'].lower() == 'reduced'):
+                tpa_solver = TpaReducedDriver(self.comm, self.ostream)
+
+            tpa_solver.update_settings(self.rsp_dict, self.method_dict)
+
+            tpa_result = tpa_solver.compute(molecule, ao_basis, scf_tensors)
+
+            self.is_converged = tpa_solver.is_converged
+
+            return tpa_result
 
     def prop_str(self):
         """

@@ -26,6 +26,7 @@ from .visualizationdriver import VisualizationDriver
 from .loprop import LoPropDriver
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_maximum_hours
+from .rsptpa import TPA
 
 
 def select_scf_driver(task, scf_type):
@@ -41,6 +42,12 @@ def select_scf_driver(task, scf_type):
         The SCF driver object.
     """
 
+    # check number of MPI nodes
+    if task.mpi_rank == mpi_master():
+        n_ao = task.ao_basis.get_dimensions_of_basis(task.molecule)
+        assert_msg_critical(task.mpi_size == 1 or task.mpi_size <= n_ao,
+                            'SCF: too many MPI processes')
+
     nalpha = task.molecule.number_of_alpha_electrons()
     nbeta = task.molecule.number_of_beta_electrons()
 
@@ -52,12 +59,14 @@ def select_scf_driver(task, scf_type):
     return scf_drv
 
 
-def select_rsp_property(task, rsp_dict, method_dict):
+def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     """
     Selects response property.
 
     :param task:
         The MPI task.
+    :param mol_orbs:
+        The molecular orbitals.
     :param rsp_dict:
         The dictionary of response dict.
     :param method_dict:
@@ -66,6 +75,13 @@ def select_rsp_property(task, rsp_dict, method_dict):
     :return:
         The response property object.
     """
+
+    # check number of MPI nodes
+    if task.mpi_rank == mpi_master():
+        nocc = task.molecule.number_of_alpha_electrons()
+        n_ov = nocc * (mol_orbs.number_mos() - nocc)
+        assert_msg_critical(task.mpi_size == 1 or task.mpi_size <= n_ov,
+                            'Response: too many MPI processes')
 
     if 'property' in rsp_dict:
         prop_type = rsp_dict['property'].lower()
@@ -105,6 +121,9 @@ def select_rsp_property(task, rsp_dict, method_dict):
     elif prop_type == 'custom':
         rsp_prop = CustomProperty(rsp_dict, method_dict)
 
+    elif prop_type == 'tpa':
+        rsp_prop = TPA(rsp_dict, method_dict)
+
     else:
         assert_msg_critical(False, 'input file: invalid response property')
 
@@ -118,7 +137,7 @@ def main():
 
     program_start_time = tm.time()
 
-    assert_msg_critical(mpi_initialized(), "MPI: Initialized")
+    assert_msg_critical(mpi_initialized(), "MPI not initialized")
 
     if len(sys.argv) <= 1 or sys.argv[1] in ['-h', '--help']:
         info_txt = [
@@ -271,7 +290,7 @@ def main():
         if not scf_drv.restart:
             rsp_dict['restart'] = 'no'
 
-        rsp_prop = select_rsp_property(task, rsp_dict, method_dict)
+        rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
         rsp_prop.init_driver(task.mpi_comm, task.ostream)
         rsp_prop.compute(task.molecule, task.ao_basis, scf_tensors)
         if not rsp_prop.converged():

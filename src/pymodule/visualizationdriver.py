@@ -13,22 +13,20 @@ from .errorhandler import assert_msg_critical
 
 
 @staticmethod
-def _VisualizationDriver_gen_cubic_grid(molecule, n_x=80, n_y=80, n_z=80):
+def _VisualizationDriver_gen_cubic_grid(molecule, grid_points):
     """
     Creates cubic grid for a molecule.
 
     :param molecule:
         The molecule.
-    :param n_x:
-        Number of grid points in X direction.
-    :param n_y:
-        Number of grid points in Y direction.
-    :param n_z:
-        Number of grid points in Z direction.
+    :param grid_points:
+        The list containing number of grid points in X, Y and Z directions.
 
     :return:
         The cubic grid.
     """
+
+    n_x, n_y, n_z = grid_points[:3]
 
     x = molecule.x_to_numpy()
     y = molecule.y_to_numpy()
@@ -91,24 +89,24 @@ def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
     if flag in ['mo', 'nto']:
         print('{:s} {:d} ({:s})'.format(flag.upper(), index + 1, spin),
               file=f_cube)
-        print('{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}'.format(
-            -natoms, x0, y0, z0, 1),
-              file=f_cube)
+        line = '{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}'.format(
+            -natoms, x0, y0, z0, 1)
+        print(line, file=f_cube)
 
-    elif flag == 'density':
-        print('Electron density ({:s})'.format(spin), file=f_cube)
-        print('{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}'.format(
-            natoms, x0, y0, z0, 1),
-              file=f_cube)
+    elif flag in ['density', 'detachment', 'attachment']:
+        print('Electron {:s} ({:s})'.format(flag, spin), file=f_cube)
+        line = '{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}'.format(
+            natoms, x0, y0, z0, 1)
+        print(line, file=f_cube)
 
     print('{:5d}{:12.6f}{:12.6f}{:12.6f}'.format(nx, dx, 0, 0), file=f_cube)
     print('{:5d}{:12.6f}{:12.6f}{:12.6f}'.format(ny, 0, dy, 0), file=f_cube)
     print('{:5d}{:12.6f}{:12.6f}{:12.6f}'.format(nz, 0, 0, dz), file=f_cube)
 
     for a in range(natoms):
-        print('{:5d}{:12.6f}{:12.6f}{:12.6f}{:12.6f}'.format(
-            elem_ids[a], float(elem_ids[a]), x[a], y[a], z[a]),
-              file=f_cube)
+        line = '{:5d}{:12.6f}{:12.6f}{:12.6f}{:12.6f}'.format(
+            elem_ids[a], float(elem_ids[a]), x[a], y[a], z[a])
+        print(line, file=f_cube)
 
     if flag in ['mo', 'nto']:
         print('{:5d}{:5d}'.format(1, index + 1), file=f_cube)
@@ -144,10 +142,12 @@ def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
     """
 
     if 'grid' in cube_dict:
-        grid = [int(x) for x in cube_dict['grid'].split(',')]
+        grid_points = [
+            int(x) for x in cube_dict['grid'].replace(',', ' ').split()
+        ]
     else:
-        grid = [80, 80, 80]
-    cubic_grid = self.gen_cubic_grid(molecule, *grid[:3])
+        grid_points = [80, 80, 80]
+    cubic_grid = self.gen_cubic_grid(molecule, grid_points)
 
     cubes = [x.strip() for x in cube_dict['cubes'].split(',')]
     if 'files' in cube_dict:
@@ -177,13 +177,11 @@ def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
                 spin = 'beta'
                 nelec = molecule.number_of_beta_electrons()
 
-            homo = nelec - 1
-            lumo = nelec
-
+            # Note: the input MO index should be 1-based
             cube_value = m.group(2).strip().lower()
-            cube_value = cube_value.replace('homo', str(homo))
-            cube_value = cube_value.replace('lumo', str(lumo))
-            orb_id = eval(cube_value)
+            cube_value = cube_value.replace('homo', str(nelec))
+            cube_value = cube_value.replace('lumo', str(nelec + 1))
+            orb_id = eval(cube_value) - 1
 
             self.compute(cubic_grid, molecule, basis, mol_orbs, orb_id, spin)
 

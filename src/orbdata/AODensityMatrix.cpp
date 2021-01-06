@@ -25,7 +25,7 @@ CAODensityMatrix::CAODensityMatrix(const std::vector<CDenseMatrix>& denMatrices,
 {
     if (denType == denmat::unrest)
     {
-        errors::assertMsgCritical(denMatrices.size() % 2 == 0, "AODensityMatrix - Odd number of matrices for unrestricted density");
+        errors::assertMsgCritical(denMatrices.size() % 2 == 0, "AODensityMatrix: Odd number of matrices for unrestricted density");
     }
 }
 

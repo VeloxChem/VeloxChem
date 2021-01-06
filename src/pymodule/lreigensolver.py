@@ -1,15 +1,11 @@
-import itertools
 import numpy as np
 import time as tm
 import psutil
-import math
 import sys
 
-from .veloxchemlib import ExcitationVector
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import rotatory_strength_in_cgs
-from .veloxchemlib import szblock
 from .veloxchemlib import denmat
 from .profiler import Profiler
 from .distributedarray import DistributedArray
@@ -34,6 +30,7 @@ class LinearResponseEigenSolver(LinearSolver):
         - nstates: Number of excited states.
         - nto: The flag for natural transition orbital analysis.
         - detach_attach: The flag for detachment/attachment density analysis.
+        - cube_points: The number of cubic grid points in X, Y and Z directions.
     """
 
     def __init__(self, comm, ostream):
@@ -47,6 +44,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         self.nto = False
         self.detach_attach = False
+        self.cube_points = [80, 80, 80]
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -73,6 +71,14 @@ class LinearResponseEigenSolver(LinearSolver):
         if 'detach_attach' in rsp_dict:
             key = rsp_dict['detach_attach'].lower()
             self.detach_attach = True if key == 'yes' else False
+
+        if 'cube_points' in rsp_dict:
+            self.cube_points = [
+                int(x)
+                for x in rsp_dict['cube_points'].replace(',', ' ').split()
+            ]
+            assert_msg_critical(
+                len(self.cube_points) == 3, 'cube points: Need 3 integers')
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -122,6 +128,11 @@ class LinearResponseEigenSolver(LinearSolver):
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
         nocc = molecule.number_of_alpha_electrons()
+
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                self.nstates <= nocc * (norb - nocc),
+                'LinearResponseEigenSolver: too many excited states')
 
         # ERI information
         eri_dict = self.init_eri(molecule, basis)
@@ -173,7 +184,6 @@ class LinearResponseEigenSolver(LinearSolver):
                                             rsp_vector_labels)
 
         iter_per_trail_in_hours = None
-        sqrt_2 = math.sqrt(2.0)
 
         # start iterations
         for iteration in range(self.max_iter):
@@ -247,17 +257,25 @@ class LinearResponseEigenSolver(LinearSolver):
                 r_ger = e2x_ger.data - w * s2x_ung
                 r_ung = e2x_ung.data - w * s2x_ger
 
-                r_ger = DistributedArray(r_ger, self.comm, distribute=False)
-                r_ung = DistributedArray(r_ung, self.comm, distribute=False)
+                r_data = np.hstack((
+                    r_ger.reshape(-1, 1),
+                    r_ung.reshape(-1, 1),
+                ))
 
-                r = (r_ger, r_ung)
-                x = (x_ger, x_ung)
+                r = DistributedArray(r_data, self.comm, distribute=False)
 
-                r_norms = [sqrt_2 * p.norm() for p in r]
-                x_norms = [sqrt_2 * p.norm() for p in x]
+                x_data = np.hstack((
+                    x_ger.data.reshape(-1, 1),
+                    x_ung.data.reshape(-1, 1),
+                ))
 
-                rn = math.sqrt(sum([n**2 for n in r_norms]))
-                xn = math.sqrt(sum([n**2 for n in x_norms]))
+                x = DistributedArray(x_data, self.comm, distribute=False)
+
+                r_norms_2 = 2.0 * r.squared_norm(axis=0)
+                x_norms_2 = 2.0 * x.squared_norm(axis=0)
+
+                rn = np.sqrt(np.sum(r_norms_2))
+                xn = np.sqrt(np.sum(x_norms_2))
 
                 if xn != 0:
                     relative_residual_norm[k] = rn / xn
@@ -411,7 +429,8 @@ class LinearResponseEigenSolver(LinearSolver):
                     lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
                     nto_mo.broadcast(self.rank, self.comm)
 
-                    self.write_nto_cubes(molecule, basis, s, lam_diag, nto_mo)
+                    self.write_nto_cubes(self.cube_points, molecule, basis, s,
+                                         lam_diag, nto_mo)
 
                 if self.detach_attach:
                     self.ostream.print_info(
@@ -420,17 +439,15 @@ class LinearResponseEigenSolver(LinearSolver):
                     self.ostream.flush()
 
                     if self.rank == mpi_master():
-                        dens_Dz, dens_Az = self.get_detach_attach_densities(
-                            z_mat, mo_occ, mo_vir)
-                        dens_Dy, dens_Ay = self.get_detach_attach_densities(
-                            y_mat, mo_occ, mo_vir)
-                        dens_DA = AODensityMatrix(
-                            [dens_Dz + dens_Dy, dens_Az + dens_Ay], denmat.rest)
+                        dens_D, dens_A = self.get_detach_attach_densities(
+                            z_mat, y_mat, mo_occ, mo_vir)
+                        dens_DA = AODensityMatrix([dens_D, dens_A], denmat.rest)
                     else:
                         dens_DA = AODensityMatrix()
                     dens_DA.broadcast(self.rank, self.comm)
 
-                    self.write_detach_attach_cubes(molecule, basis, s, dens_DA)
+                    self.write_detach_attach_cubes(self.cube_points, molecule,
+                                                   basis, s, dens_DA)
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
@@ -485,10 +502,8 @@ class LinearResponseEigenSolver(LinearSolver):
             The full solution vector.
         """
 
-        (dist_x_ger, dist_x_ung) = solution
-
-        x_ger = dist_x_ger.get_full_vector()
-        x_ung = dist_x_ung.get_full_vector()
+        x_ger = solution.get_full_vector(0)
+        x_ung = solution.get_full_vector(1)
 
         if self.rank == mpi_master():
             x_ger_full = np.hstack((x_ger, x_ger))
@@ -544,19 +559,16 @@ class LinearResponseEigenSolver(LinearSolver):
             vector).
         """
 
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
-
+        excitations = [(i, a) for i in range(nocc) for a in range(nocc, norb)]
         excitation_energies = [ea[a] - ea[i] for i, a in excitations]
 
         w = {ia: w for ia, w in zip(excitations, excitation_energies)}
+        n_exc = nocc * (norb - nocc)
 
         final = {}
         for k, (i, a) in enumerate(sorted(w, key=w.get)[:nstates]):
             if self.rank == mpi_master():
                 ia = excitations.index((i, a))
-                n_exc = len(excitations)
 
                 Xn = np.zeros(2 * n_exc)
                 Xn[ia] = 1.0
@@ -568,12 +580,14 @@ class LinearResponseEigenSolver(LinearSolver):
                 Xn_ger = 0.5 * (Xn + Xn_T)[:n_exc]
                 Xn_ung = 0.5 * (Xn - Xn_T)[:n_exc]
 
-                X = (Xn_ger, Xn_ung)
+                X = np.hstack((
+                    Xn_ger.reshape(-1, 1),
+                    Xn_ung.reshape(-1, 1),
+                ))
             else:
-                X = (None, None)
+                X = None
 
-            final[k] = ((w[(i, a)],
-                         tuple([DistributedArray(v, self.comm) for v in X])))
+            final[k] = (w[(i, a)], DistributedArray(X, self.comm))
 
         return final
 
@@ -592,23 +606,23 @@ class LinearResponseEigenSolver(LinearSolver):
 
         trials_ger = []
         trials_ung = []
-        sqrt_2 = math.sqrt(2.0)
 
         for k, (w, X) in excitations.items():
             if precond is not None:
                 v = self.preconditioning(precond[k], X)
             else:
                 v = X
-            norms = [sqrt_2 * p.norm() for p in v]
-            vn = math.sqrt(sum([n**2 for n in norms]))
+            norms_2 = 2.0 * v.squared_norm(axis=0)
+            vn = np.sqrt(np.sum(norms_2))
 
             if vn > self.small_thresh:
+                norms = np.sqrt(norms_2)
                 # gerade
                 if norms[0] > self.small_thresh:
-                    trials_ger.append(v[0].data)
+                    trials_ger.append(v.data[:, 0])
                 # ungerade
                 if norms[1] > self.small_thresh:
-                    trials_ung.append(v[1].data)
+                    trials_ung.append(v.data[:, 1])
 
         new_ger = np.array(trials_ger).T
         new_ung = np.array(trials_ung).T
@@ -648,8 +662,12 @@ class LinearResponseEigenSolver(LinearSolver):
         pa_diag = ediag / (ediag_sq - w_sq * sdiag_sq)
         pb_diag = (w * sdiag) / (ediag_sq - w_sq * sdiag_sq)
 
-        return tuple(
-            [DistributedArray(p, self.comm) for p in [pa_diag, pb_diag]])
+        p_mat = np.hstack((
+            pa_diag.reshape(-1, 1),
+            pb_diag.reshape(-1, 1),
+        ))
+
+        return DistributedArray(p_mat, self.comm)
 
     def preconditioning(self, precond, v_in):
         """
@@ -664,17 +682,21 @@ class LinearResponseEigenSolver(LinearSolver):
             A tuple of distributed trail vectors after preconditioning.
         """
 
-        pa, pb = [p.data for p in precond]
+        pa = precond.data[:, 0]
+        pb = precond.data[:, 1]
 
-        v_in_rg, v_in_ru = [v.data for v in v_in]
+        v_in_rg = v_in.data[:, 0]
+        v_in_ru = v_in.data[:, 1]
 
         v_out_rg = pa * v_in_rg + pb * v_in_ru
         v_out_ru = pb * v_in_rg + pa * v_in_ru
 
-        return tuple([
-            DistributedArray(v, self.comm, distribute=False)
-            for v in [v_out_rg, v_out_ru]
-        ])
+        v_mat = np.hstack((
+            v_out_rg.reshape(-1, 1),
+            v_out_ru.reshape(-1, 1),
+        ))
+
+        return DistributedArray(v_mat, self.comm, distribute=False)
 
     def get_e2(self, molecule, basis, scf_tensors):
         """
@@ -724,12 +746,8 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # generate initial guess from scratch
 
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
-
         igs = {}
-        n_exc = len(excitations)
+        n_exc = nocc * (norb - nocc)
 
         for i in range(2 * n_exc):
             Xn = np.zeros(2 * n_exc)
@@ -742,10 +760,12 @@ class LinearResponseEigenSolver(LinearSolver):
             Xn_ger = 0.5 * (Xn + Xn_T)[:n_exc]
             Xn_ung = 0.5 * (Xn - Xn_T)[:n_exc]
 
-            dist_x_ger = DistributedArray(Xn_ger, self.comm)
-            dist_x_ung = DistributedArray(Xn_ung, self.comm)
+            X = np.hstack((
+                Xn_ger.reshape(-1, 1),
+                Xn_ung.reshape(-1, 1),
+            ))
 
-            igs[i] = (1.0, (dist_x_ger, dist_x_ung))
+            igs[i] = (1.0, DistributedArray(X, self.comm))
 
         bger, bung = self.setup_trials(igs, precond=None, renormalize=False)
 
@@ -756,13 +776,14 @@ class LinearResponseEigenSolver(LinearSolver):
             E2 = np.zeros((2 * n_exc, 2 * n_exc))
 
         for i in range(2 * n_exc):
-            e2bger = DistributedArray(self.dist_e2bger.data[:, i],
-                                      self.comm,
-                                      distribute=False)
-            e2bung = DistributedArray(self.dist_e2bung.data[:, i],
-                                      self.comm,
-                                      distribute=False)
-            sigma = self.get_full_solution_vector((e2bger, e2bung))
+            e2b_data = np.hstack((
+                self.dist_e2bger.data[:, i:i + 1],
+                self.dist_e2bung.data[:, i:i + 1],
+            ))
+
+            e2b = DistributedArray(e2b_data, self.comm, distribute=False)
+
+            sigma = self.get_full_solution_vector(e2b)
 
             if self.rank == mpi_master():
                 E2[:, i] = sigma[:]

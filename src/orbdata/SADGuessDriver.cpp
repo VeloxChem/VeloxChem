@@ -334,7 +334,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     // sanity checks
 
-    std::string err_ovl_size("SADGuessDriver - Mismatch between overlap matrices");
+    std::string err_ovl_size("SADGuessDriver.compute: Mismatch between overlap matrices");
 
     errors::assertMsgCritical(nao_2 == S22.getNumberOfRows(), err_ovl_size);
 
@@ -359,7 +359,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
         count_ao_2 += static_cast<int32_t>(aoinds_atoms_2[atomidx].size());
     }
 
-    std::string err_bas_size("SADGuessDriver - Mismatch between basis set & overlap matrix");
+    std::string err_bas_size("SADGuessDriver.compute: Mismatch between basis set and overlap matrix");
 
     errors::assertMsgCritical(count_ao_1 == nao_1 && count_ao_2 == nao_2, err_bas_size);
 
@@ -408,7 +408,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
         // size checking
 
-        std::string err_ao_size("SADGuessDriver - Mismatch between basis set & occupation number");
+        std::string err_ao_size("SADGuessDriver.compute: Mismatch between basis set and occupation number");
 
         errors::assertMsgCritical(alpha_occ[atomidx].size() == aoinds_1.size(), err_ao_size);
 
@@ -463,7 +463,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
         diagdrv.diagonalize(block_22);
 
-        std::string err_diag("SADGuessDriver - Matrix diagonalization failed");
+        std::string err_diag("SADGuessDriver.compute: Matrix diagonalization failed");
 
         errors::assertMsgCritical(diagdrv.getState(), err_diag);
 

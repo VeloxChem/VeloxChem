@@ -1,8 +1,5 @@
 import numpy as np
 import time as tm
-import itertools
-import ctypes
-import psutil
 import sys
 import os
 
@@ -13,7 +10,6 @@ from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import DenseMatrix
-from .veloxchemlib import ExcitationVector
 from .veloxchemlib import GridDriver
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import XCIntegrator
@@ -22,7 +18,6 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import molorb
-from .veloxchemlib import szblock
 from .veloxchemlib import parse_xc_func
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
@@ -32,6 +27,8 @@ from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .checkpoint import write_rsp_hdf5
+from .batchsize import get_batch_size
+from .batchsize import get_number_of_batches
 
 
 class LinearSolver:
@@ -79,6 +76,9 @@ class LinearSolver:
         - dist_bung: The distributed ungerade trial vectors.
         - dist_e2bger: The distributed gerade sigma vectors.
         - dist_e2bung: The distributed ungerade sigma vectors.
+        - nonlinear: The flag for running linear solver in nonlinear response.
+        - dist_fock_ger: The distributed gerade Fock matrices in MO.
+        - dist_fock_ung: The distributed ungerade Fock matrices in MO.
     """
 
     def __init__(self, comm, ostream):
@@ -141,6 +141,10 @@ class LinearSolver:
         self.dist_bung = None
         self.dist_e2bger = None
         self.dist_e2bung = None
+
+        self.nonlinear = False
+        self.dist_fock_ger = None
+        self.dist_fock_ung = None
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -353,14 +357,22 @@ class LinearSolver:
         Reads vectors from checkpoint file.
 
         :param rsp_vector_labels:
-            The list of labels of response vectors.
+            The list of labels of vectors.
         """
 
-        self.dist_bger, self.dist_bung, self.dist_e2bger, self.dist_e2bung = [
+        dist_arrays = [
             DistributedArray.read_from_hdf5_file(self.checkpoint_file, label,
                                                  self.comm)
             for label in rsp_vector_labels
         ]
+
+        if self.nonlinear:
+            (self.dist_bger, self.dist_bung, self.dist_e2bger, self.dist_e2bung,
+             self.dist_fock_ger, self.dist_fock_ung) = dist_arrays
+        else:
+            (self.dist_bger, self.dist_bung, self.dist_e2bger,
+             self.dist_e2bung) = dist_arrays
+
         checkpoint_text = 'Restarting from checkpoint file: '
         checkpoint_text += self.checkpoint_file
         self.ostream.print_info(checkpoint_text)
@@ -413,6 +425,30 @@ class LinearSolver:
                                                 distribute=False)
         else:
             self.dist_e2bung.append(e2bung, axis=1)
+
+    def append_fock_matrices(self, fock_ger, fock_ung):
+        """
+        Appends distributed Fock matrices in MO.
+
+        :param fock_ger:
+            The distributed gerade Fock matrices in MO.
+        :param fock_ung:
+            The distributed ungerade Fock matrices in MO.
+        """
+
+        if self.dist_fock_ger is None:
+            self.dist_fock_ger = DistributedArray(fock_ger.data,
+                                                  self.comm,
+                                                  distribute=False)
+        else:
+            self.dist_fock_ger.append(fock_ger, axis=1)
+
+        if self.dist_fock_ung is None:
+            self.dist_fock_ung = DistributedArray(fock_ung.data,
+                                                  self.comm,
+                                                  distribute=False)
+        else:
+            self.dist_fock_ung.append(fock_ung, axis=1)
 
     def compute(self, molecule, basis, scf_tensors, v1=None):
         """
@@ -489,36 +525,10 @@ class LinearSolver:
 
         # determine number of batches
 
-        num_batches = 0
-        batch_size = None
+        n_ao = mo.shape[0] if self.rank == mpi_master() else None
 
-        total_mem = psutil.virtual_memory().total
-        total_mem_list = self.comm.gather(total_mem, root=mpi_master())
-
-        if self.rank == mpi_master():
-            # check if master node has larger memory
-            mem_adjust = 0.0
-            if total_mem > min(total_mem_list):
-                mem_adjust = total_mem - min(total_mem_list)
-
-            # compute maximum batch size from available memory
-            avail_mem = psutil.virtual_memory().available - mem_adjust
-            mem_per_mat = mo.shape[0]**2 * ctypes.sizeof(ctypes.c_double)
-            nthreads = int(os.environ['OMP_NUM_THREADS'])
-            max_batch_size = int(avail_mem / mem_per_mat / (0.625 * nthreads))
-            max_batch_size = max(1, max_batch_size)
-
-            # set batch size
-            batch_size = self.batch_size
-            if batch_size is None:
-                batch_size = min(100, n_total, max_batch_size)
-
-            # get number of batches
-            num_batches = n_total // batch_size
-            if n_total % batch_size != 0:
-                num_batches += 1
-        batch_size = self.comm.bcast(batch_size, root=mpi_master())
-        num_batches = self.comm.bcast(num_batches, root=mpi_master())
+        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
+        num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         # go through batches
 
@@ -580,6 +590,12 @@ class LinearSolver:
             self.comp_lr_fock(fock, dens, molecule, basis, eri_dict, dft_dict,
                               pe_dict, timing_dict)
 
+            e2_ger = None
+            e2_ung = None
+
+            fock_ger = None
+            fock_ung = None
+
             if self.rank == mpi_master():
 
                 batch_ger, batch_ung = 0, 0
@@ -591,6 +607,10 @@ class LinearSolver:
 
                 e2_ger = np.zeros((half_size, batch_ger))
                 e2_ung = np.zeros((half_size, batch_ung))
+
+                if self.nonlinear:
+                    fock_ger = np.zeros((norb**2, batch_ger))
+                    fock_ung = np.zeros((norb**2, batch_ung))
 
                 for ifock in range(batch_ger + batch_ung):
                     fak = fock.alpha_to_numpy(ifock).T
@@ -616,16 +636,25 @@ class LinearSolver:
                     if ifock < batch_ger:
                         e2_ger[:, ifock] = -self.lrmat2vec(gmo, nocc,
                                                            norb)[:half_size]
+                        if self.nonlinear:
+                            fock_ger[:, ifock] = np.linalg.multi_dot(
+                                [mo.T, fak.T, mo]).reshape(norb**2)
                     else:
                         e2_ung[:, ifock - batch_ger] = -self.lrmat2vec(
                             gmo, nocc, norb)[:half_size]
-            else:
-                e2_ger = None
-                e2_ung = None
+                        if self.nonlinear:
+                            fock_ung[:,
+                                     ifock - batch_ger] = np.linalg.multi_dot(
+                                         [mo.T, fak.T, mo]).reshape(norb**2)
+
             vecs_e2_ger = DistributedArray(e2_ger, self.comm)
             vecs_e2_ung = DistributedArray(e2_ung, self.comm)
-
             self.append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+
+            if self.nonlinear:
+                dist_fock_ger = DistributedArray(fock_ger, self.comm)
+                dist_fock_ung = DistributedArray(fock_ung, self.comm)
+                self.append_fock_matrices(dist_fock_ger, dist_fock_ung)
 
         self.append_trial_vectors(vecs_ger, vecs_ung)
 
@@ -876,10 +905,17 @@ class LinearSolver:
         success = self.comm.bcast(success, root=mpi_master())
 
         if success:
-            dist_arrays = [
-                self.dist_bger, self.dist_bung, self.dist_e2bger,
-                self.dist_e2bung
-            ]
+            if self.nonlinear:
+                dist_arrays = [
+                    self.dist_bger, self.dist_bung, self.dist_e2bger,
+                    self.dist_e2bung, self.dist_fock_ger, self.dist_fock_ung
+                ]
+            else:
+                dist_arrays = [
+                    self.dist_bger, self.dist_bung, self.dist_e2bger,
+                    self.dist_e2bung
+                ]
+
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
 
@@ -937,14 +973,18 @@ class LinearSolver:
                 return True
         return False
 
-    def print_header(self, title, nstates=None, n_points=None):
+    def print_header(self, title, nstates=None, n_freqs=None, n_points=None):
         """
         Prints linear response solver setup header to output stream.
 
         :param title:
             The name of the solver.
         :param nstates:
-            The number of excited states.
+            The number of excited states (TDA/RPA).
+        :param n_freqs:
+            The number of frequencies (LR/CPP).
+        :param n_points:
+            The number of integration points (C6).
         """
 
         self.ostream.print_blank()
@@ -954,13 +994,19 @@ class LinearSolver:
 
         str_width = 60
 
+        # print solver-specific info
+
         if nstates is not None:
             cur_str = 'Number of States                : ' + str(nstates)
             self.ostream.print_header(cur_str.ljust(str_width))
-
-        if n_points is not None:
-            cur_str = 'Number of integration points    : ' + str(n_points)
+        if n_freqs is not None:
+            cur_str = 'Number of Frequencies           : ' + str(n_freqs)
             self.ostream.print_header(cur_str.ljust(str_width))
+        if n_points is not None:
+            cur_str = 'Number of Integration Points    : ' + str(n_points)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
+        # print general info
 
         cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
@@ -1352,23 +1398,15 @@ class LinearSolver:
             The matrices.
         """
 
-        zlen = len(vec) // 2
-        z, y = vec[:zlen], vec[zlen:]
+        nvir = norb - nocc
+        n_ov = nocc * nvir
+        mat = np.zeros((norb, norb), dtype=vec.dtype)
 
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        xv.set_yzcoefficients(z, y)
+        # excitation and de-excitation
+        mat[:nocc, nocc:] = vec[:n_ov].reshape(nocc, nvir)
+        mat[nocc:, :nocc] = vec[n_ov:].reshape(nocc, nvir).T
 
-        kz = xv.get_zmatrix()
-        ky = xv.get_ymatrix()
-
-        rows = kz.number_of_rows() + ky.number_of_rows()
-        cols = kz.number_of_columns() + ky.number_of_columns()
-
-        kzy = np.zeros((rows, cols))
-        kzy[:kz.number_of_rows(), ky.number_of_columns():] = kz.to_numpy()
-        kzy[kz.number_of_rows():, :ky.number_of_columns()] = ky.to_numpy()
-
-        return kzy
+        return mat
 
     @staticmethod
     def lrmat2vec(mat, nocc, norb):
@@ -1386,13 +1424,15 @@ class LinearSolver:
             The vectors.
         """
 
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
+        nvir = norb - nocc
+        n_ov = nocc * nvir
+        vec = np.zeros(n_ov * 2, dtype=mat.dtype)
 
-        z = [mat[i, j] for i, j in excitations]
-        y = [mat[j, i] for i, j in excitations]
-        return np.array(z + y)
+        # excitation and de-excitation
+        vec[:n_ov] = mat[:nocc, nocc:].reshape(n_ov)
+        vec[n_ov:] = mat[nocc:, :nocc].T.reshape(n_ov)
+
+        return vec
 
     @staticmethod
     def remove_linear_dependence(basis, threshold):
@@ -1629,16 +1669,17 @@ class LinearSolver:
             The E0 and S0 diagonal elements as numpy arrays.
         """
 
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
+        nvir = norb - nocc
+        n_ov = nocc * nvir
 
-        z = [2.0 * (orb_ene[j] - orb_ene[i]) for i, j in excitations]
-        ediag = np.array(z + z)
+        eocc = orb_ene[:nocc]
+        evir = orb_ene[nocc:]
 
-        lz = len(excitations)
-        sdiag = 2.0 * np.ones(2 * lz)
-        sdiag[lz:] = -2.0
+        ediag = 2.0 * (-eocc.reshape(-1, 1) + evir).reshape(n_ov)
+        ediag = np.hstack((ediag, ediag))
+
+        sdiag = 2.0 * np.ones(ediag.shape)
+        sdiag[n_ov:] = -2.0
 
         return ediag, sdiag
 
@@ -1658,15 +1699,14 @@ class LinearSolver:
             The upper half of E0 and S0 diagonal elements as numpy arrays.
         """
 
-        xv = ExcitationVector(szblock.aa, 0, nocc, nocc, norb, True)
-        excitations = list(
-            itertools.product(xv.bra_unique_indexes(), xv.ket_unique_indexes()))
+        nvir = norb - nocc
+        n_ov = nocc * nvir
 
-        z = [2.0 * (orb_ene[j] - orb_ene[i]) for i, j in excitations]
-        ediag = np.array(z)
+        eocc = orb_ene[:nocc]
+        evir = orb_ene[nocc:]
 
-        lz = len(excitations)
-        sdiag = 2.0 * np.ones(lz)
+        ediag = 2.0 * (-eocc.reshape(-1, 1) + evir).reshape(n_ov)
+        sdiag = 2.0 * np.ones(ediag.shape)
 
         return ediag, sdiag
 
@@ -1702,6 +1742,7 @@ class LinearSolver:
         return lam_diag, nto_mo
 
     def write_nto_cubes(self,
+                        cube_points,
                         molecule,
                         basis,
                         root,
@@ -1711,6 +1752,8 @@ class LinearSolver:
         """
         Writes cube files for natural transition orbitals.
 
+        :param cube_points:
+            The list containing number of grid points in X, Y and Z directions.
         :param molecule:
             The molecule.
         :param basis:
@@ -1726,7 +1769,7 @@ class LinearSolver:
         """
 
         vis_drv = VisualizationDriver(self.comm)
-        cubic_grid = vis_drv.gen_cubic_grid(molecule)
+        cubic_grid = vis_drv.gen_cubic_grid(molecule, cube_points)
 
         nocc = molecule.number_of_alpha_electrons()
 
@@ -1768,12 +1811,14 @@ class LinearSolver:
 
         self.ostream.print_blank()
 
-    def get_detach_attach_densities(self, t_mat, mo_occ, mo_vir):
+    def get_detach_attach_densities(self, z_mat, y_mat, mo_occ, mo_vir):
         """
         Gets the detachment and attachment densities.
 
-        :param t_mat:
-            The (de)excitation vector in matrix form (N_occ x N_virt).
+        :param z_mat:
+            The excitation vector in matrix form (N_occ x N_virt).
+        :param y_mat:
+            The de-excitation vector in matrix form (N_occ x N_virt).
         :param mo_occ:
             The MO coefficients of occupied orbitals.
         :param mo_vir:
@@ -1783,32 +1828,22 @@ class LinearSolver:
             The detachment and attachment densities.
         """
 
-        mo = np.hstack((mo_occ, mo_vir))
-        nocc = mo_occ.shape[1]
-        nvir = mo_vir.shape[1]
+        dens_D = -np.linalg.multi_dot([mo_occ, z_mat, z_mat.T, mo_occ.T])
+        dens_A = np.linalg.multi_dot([mo_vir, z_mat.T, z_mat, mo_vir.T])
 
-        exc_D = np.matmul(t_mat, t_mat.T) * (-1.0)
-        exc_A = np.matmul(t_mat.T, t_mat)
-
-        delta = np.zeros((nocc + nvir, nocc + nvir))
-        delta[:nocc, :nocc] = exc_D[:, :]
-        delta[nocc:, nocc:] = exc_A[:, :]
-
-        t_evals, t_evecs = np.linalg.eigh(delta)
-        diag_D = t_evals * (t_evals < 0.0) * (-1.0)
-        diag_A = t_evals * (t_evals > 0.0)
-
-        dens_D = np.linalg.multi_dot(
-            [mo, t_evecs, np.diag(diag_D), t_evecs.T, mo.T])
-        dens_A = np.linalg.multi_dot(
-            [mo, t_evecs, np.diag(diag_A), t_evecs.T, mo.T])
+        if y_mat is not None:
+            dens_D += np.linalg.multi_dot([mo_occ, y_mat, y_mat.T, mo_occ.T])
+            dens_A -= np.linalg.multi_dot([mo_vir, y_mat.T, y_mat, mo_vir.T])
 
         return dens_D, dens_A
 
-    def write_detach_attach_cubes(self, molecule, basis, root, dens_DA):
+    def write_detach_attach_cubes(self, cube_points, molecule, basis, root,
+                                  dens_DA):
         """
         Writes cube files for detachment and attachment densities.
 
+        :param cube_points:
+            The list containing number of grid points in X, Y and Z directions.
         :param molecule:
             The molecule.
         :param basis:
@@ -1821,7 +1856,7 @@ class LinearSolver:
         """
 
         vis_drv = VisualizationDriver(self.comm)
-        cubic_grid = vis_drv.gen_cubic_grid(molecule)
+        cubic_grid = vis_drv.gen_cubic_grid(molecule, cube_points)
 
         vis_drv.compute(cubic_grid, molecule, basis, dens_DA, 0, 'alpha')
 
@@ -1829,7 +1864,7 @@ class LinearSolver:
             detach_cube_name = '{:s}_S{:d}_detach.cube'.format(
                 self.filename, root + 1)
             vis_drv.write_data(detach_cube_name, cubic_grid, molecule,
-                               'density', 0, 'alpha')
+                               'detachment', 0, 'alpha')
 
             self.ostream.print_info(
                 '  Cube file (detachment) : {:s}'.format(detach_cube_name))
@@ -1841,7 +1876,7 @@ class LinearSolver:
             attach_cube_name = '{:s}_S{:d}_attach.cube'.format(
                 self.filename, root + 1)
             vis_drv.write_data(attach_cube_name, cubic_grid, molecule,
-                               'density', 1, 'alpha')
+                               'attachment', 1, 'alpha')
 
             self.ostream.print_info(
                 '  Cube file (attachment) : {:s}'.format(attach_cube_name))

@@ -44,7 +44,7 @@ CMolecule_from_coords(const std::vector<std::string>& labels,
 
     // sanity check
 
-    std::string errmol("CMolecule_from_coords - Inconsistent lengths of lists");
+    std::string errmol("Molecule: Inconsistent lengths of lists");
 
     errors::assertMsgCritical(coords_raw.size() == labels.size() * 3, errmol);
 
@@ -62,7 +62,7 @@ CMolecule_from_coords(const std::vector<std::string>& labels,
     }
     else
     {
-        std::string errunit("CMolecule_from_coords - Invalid unit for coordinates");
+        std::string errunit("Molecule: Invalid unit for coordinates");
 
         errors::assertMsgCritical(false, errunit);
     }
@@ -76,7 +76,7 @@ CMolecule_from_coords(const std::vector<std::string>& labels,
 
     // form charge, mass, label and elemental ID vectors
 
-    std::string errelm("CMolecule_from_coords: Unsupported chemical element");
+    std::string errelm("Molecule: Unsupported chemical element");
 
     std::vector<double> charges;
 
@@ -117,7 +117,7 @@ CMolecule_from_array(const std::vector<std::string>&                labels,
 
     // sanity check
 
-    std::string errmol("CMolecule_from_array - Inconsistent size");
+    std::string errmol("Molecule: Inconsistent size");
 
     errors::assertMsgCritical(py_coords.shape(0) == static_cast<ssize_t>(labels.size()), errmol);
 
@@ -139,7 +139,7 @@ CMolecule_from_array_2(const std::vector<int32_t>& idselem,
 {
     std::vector<std::string> labels;
 
-    std::string errelm("CMolecule_from_array - Unsupported element id");
+    std::string errelm("Molecule: Unsupported element id");
 
     for (size_t i = 0; i < idselem.size(); i++)
     {
@@ -277,9 +277,7 @@ CMolecule_check_multiplicity(const CMolecule& self)
 
     if ((multip == 1) && (nelec != 0)) flag = false;
 
-    std::string errmult("Molecule.check_multiplicity - ");
-
-    errmult += "Incompatble multiplicity & number of electrons";
+    std::string errmult("Molecule.check_multiplicity: Incompatible multiplicity and number of electrons");
 
     errors::assertMsgCritical(flag, errmult);
 }
@@ -289,7 +287,7 @@ CMolecule_check_multiplicity(const CMolecule& self)
 static void
 CMolecule_check_proximity(const CMolecule& self, const double minDistance)
 {
-    std::string errproxi("Molecule.check_proximity - Atoms too close");
+    std::string errproxi("Molecule.check_proximity: Atoms too close");
 
     errors::assertMsgCritical(self.checkProximity(minDistance), errproxi);
 }
