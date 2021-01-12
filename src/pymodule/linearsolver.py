@@ -192,12 +192,21 @@ class LinearSolver:
                 self.pe = True
 
         if self.pe:
+            from .polembed import PolEmbed
+
             if ('potfile' in method_dict and
                     'potfile' not in method_dict['pe_options']):
                 method_dict['pe_options']['potfile'] = method_dict['potfile']
             assert_msg_critical('potfile' in method_dict['pe_options'],
                                 'SCF driver: No potential file defined')
             self.pe_options = dict(method_dict['pe_options'])
+
+            cppe_potfile = None
+            if self.rank == mpi_master():
+                potfile = self.pe_options['potfile']
+                cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
+            cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
+            self.pe_options['potfile'] = cppe_potfile
 
         if 'use_split_comm' in method_dict:
             key = method_dict['use_split_comm'].lower()

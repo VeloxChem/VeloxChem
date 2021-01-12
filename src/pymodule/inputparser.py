@@ -221,6 +221,11 @@ class InputParser:
                     # also set the default value for units
                     if 'units' not in self.input_dict['molecule']:
                         self.input_dict['molecule']['units'] = 'angstrom'
+                else:
+                    if local_list:
+                        key = group_key.lower()
+                        self.input_dict[key]['unsorted_lines'] = list(
+                            local_list)
 
         if self.is_basis_set:
             # for basis set, save basis set file name

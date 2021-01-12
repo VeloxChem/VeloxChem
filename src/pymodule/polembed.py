@@ -1,5 +1,6 @@
 import numpy as np
 import os
+from pathlib import Path
 try:
     import cppe
 except ImportError:
@@ -12,7 +13,10 @@ except ImportError:
 
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricFieldIntegralsDriver
+from .veloxchemlib import bohr_in_angstroms
+from .inputparser import InputParser
 from .subcommunicators import SubCommunicators
+from .errorhandler import assert_msg_critical
 from .veloxchemlib import mpi_master
 
 
@@ -324,3 +328,162 @@ class PolEmbed:
             elec_field = elec_field.reshape(self.polarizable_coords.shape)
 
         return elec_field
+
+    @staticmethod
+    def write_cppe_potfile(potfile):
+        """
+        Writes potential file for the CPPE module.
+
+        :param potfile:
+            The name of the potential file.
+
+        :return:
+            The name of the temporary potential file.
+        """
+
+        with open(potfile) as f_pot:
+            first_line = f_pot.readline()
+
+        if first_line.split()[0] == '@COORDINATES':
+            return potfile
+
+        # read potential file (new format)
+
+        pe_inp = InputParser(potfile).input_dict
+        natoms = len(pe_inp['environment']['unsorted_lines'])
+
+        # process units
+
+        if 'units' in pe_inp['environment']:
+            units = pe_inp['environment']['units'].lower()
+            if len(units) >= 3 and units == 'angstrom'[:len(units)]:
+                prefac = 1.0
+            elif units in ['au', 'bohr']:
+                prefac = bohr_in_angstroms()
+            else:
+                assert_msg_critical(False, 'potential file: invalid units')
+        else:
+            prefac = 1.0
+
+        # process residues (a dictionary with residue ID as key)
+
+        residues = {}
+        for line in pe_inp['environment']['unsorted_lines']:
+            val = line.split()
+            resname = val[4]
+            resid = int(val[5])
+            if resid not in residues:
+                residues[resid] = {'resname': resname, 'atoms': []}
+            residues[resid]['atoms'].append([
+                val[0],
+                float(val[1]) * prefac,
+                float(val[2]) * prefac,
+                float(val[3]) * prefac,
+            ])
+
+        # process charges (a dictionary with residue name as key)
+
+        charges = {}
+        for line in pe_inp['charges']['unsorted_lines']:
+            val = line.split()
+            resname = val[2]
+            if resname not in charges:
+                charges[resname] = []
+            charges[resname].append(val[1])
+
+        # process polarizabilities (a dictionary with residue name as key)
+
+        polarizabilities = {}
+        for line in pe_inp['polarizabilities']['unsorted_lines']:
+            val = line.split()
+            resname = val[7]
+            if resname not in polarizabilities:
+                polarizabilities[resname] = []
+            polarizabilities[resname].append(val[1:7])
+
+        # write potential file (old format)
+
+        cppe_potfile = Path(potfile).with_suffix('.cppe.pot')
+
+        with open(str(cppe_potfile), 'w') as f_tmp:
+
+            # coordinates
+
+            f_tmp.write('@COORDINATES' + os.linesep)
+            f_tmp.write('{:d}'.format(natoms) + os.linesep)
+            f_tmp.write('AA' + os.linesep)
+
+            for resid in sorted(list(residues.keys())):
+                for atom in residues[resid]['atoms']:
+                    f_tmp.write('{:<2s}{:12.7f}{:12.7f}{:12.7f}'.format(
+                        atom[0], atom[1], atom[2], atom[3]))
+                    f_tmp.write(os.linesep)
+
+            # charges
+
+            q_lines = ''
+            q_num = 0
+
+            ind = 0
+            for resid in sorted(list(residues.keys())):
+                resname = residues[resid]['resname']
+                if resname in charges:
+                    for k, q in enumerate(charges[resname]):
+                        q_lines += '{:<5d}{:13.8f}'.format(
+                            ind + k + 1, float(q))
+                        q_lines += os.linesep
+                        q_num += 1
+                ind += len(residues[resid]['atoms'])
+
+            f_tmp.write('@MULTIPOLES' + os.linesep)
+            f_tmp.write('ORDER 0' + os.linesep)
+            f_tmp.write('{:d}'.format(q_num) + os.linesep)
+            f_tmp.write(q_lines)
+
+            # polarizabilities
+
+            alpha_lines = ''
+            alpha_num = 0
+
+            ind = 0
+            for resid in sorted(list(residues.keys())):
+                resname = residues[resid]['resname']
+                if resname in polarizabilities:
+                    for k, alpha in enumerate(polarizabilities[resname]):
+                        alpha_lines += '{:<5d}'.format(ind + k + 1)
+                        for a in alpha:
+                            alpha_lines += '{:13.8f}'.format(float(a))
+                        alpha_lines += os.linesep
+                        alpha_num += 1
+                ind += len(residues[resid]['atoms'])
+
+            f_tmp.write('@POLARIZABILITIES' + os.linesep)
+            f_tmp.write('ORDER 1 1' + os.linesep)
+            f_tmp.write('{:d}'.format(alpha_num) + os.linesep)
+            f_tmp.write(alpha_lines)
+
+            # exclusions
+
+            max_natoms_res = 0
+            for resid in sorted(list(residues.keys())):
+                if max_natoms_res < len(residues[resid]['atoms']):
+                    max_natoms_res = len(residues[resid]['atoms'])
+
+            f_tmp.write('EXCLISTS' + os.linesep)
+            f_tmp.write('{:<6d}{:<6d}'.format(natoms, max_natoms_res) +
+                        os.linesep)
+
+            ind = 0
+            for resid in sorted(list(residues.keys())):
+                natoms_res = len(residues[resid]['atoms'])
+                for k in range(natoms_res):
+                    f_tmp.write('{:<6d}'.format(ind + k + 1))
+                    for j in range(natoms_res):
+                        if j != k:
+                            f_tmp.write('{:<6d}'.format(ind + j + 1))
+                    for j in range(max_natoms_res - natoms_res):
+                        f_tmp.write('{:<6d}'.format(0))
+                    f_tmp.write(os.linesep)
+                ind += natoms_res
+
+        return str(cppe_potfile)
