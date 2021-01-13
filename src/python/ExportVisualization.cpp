@@ -85,7 +85,10 @@ export_visualization(py::module& m)
                                              const CAODensityMatrix&,
                                              const int32_t,
                                              const std::string&) const) &
-                 CVisualizationDriver::compute);
+                 CVisualizationDriver::compute)
+        .def("get_mo", &CVisualizationDriver::getMO)
+        .def("get_density", &CVisualizationDriver::getDensity)
+        .def("get_two_particle_density", &CVisualizationDriver::getTwoParticleDensity);
 }
 
 }  // namespace vlx_visualization

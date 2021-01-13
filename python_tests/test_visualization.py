@@ -34,6 +34,9 @@ class TestVisualization(unittest.TestCase):
         vis_drv.compute(grid, task.molecule, task.ao_basis, mol_orbs, homo,
                         'alpha')
 
+        mo_val = vis_drv.get_mo([[0.3, 0.6, 0.9]], task.molecule, task.ao_basis,
+                                mol_orbs, homo, 'alpha')
+
         if task.mpi_rank == mpi_master():
             homo_values = grid.values_to_numpy()
 
@@ -48,7 +51,12 @@ class TestVisualization(unittest.TestCase):
             homo_diff_rel = homo_diff / np.abs(homo_ref)
             self.assertTrue(np.max(homo_diff_rel) < 1.0e-5)
 
+            self.assertAlmostEqual(homo_values[0, 0, 0], mo_val[0], 8)
+
         vis_drv.compute(grid, task.molecule, task.ao_basis, density, 0, 'alpha')
+
+        den_val = vis_drv.get_density([[0.3, 0.6, 0.9]], task.molecule,
+                                      task.ao_basis, density, 0, 'alpha')
 
         if task.mpi_rank == mpi_master():
             dens_alpha = grid.values_to_numpy()
@@ -64,6 +72,24 @@ class TestVisualization(unittest.TestCase):
             dens_diff = dens_total - dens_ref
             dens_diff_rel = dens_diff / np.abs(dens_ref)
             self.assertTrue(np.max(dens_diff_rel) < 1.0e-5)
+
+            self.assertAlmostEqual(dens_alpha[0, 0, 0], den_val[0], 8)
+
+        twoe_val_aa = vis_drv.get_two_particle_density([[0.3, 0.6, 0.9]],
+                                                       [[0.3, 0.6, 0.9]],
+                                                       task.molecule,
+                                                       task.ao_basis, density,
+                                                       0, 'alpha', 'alpha')
+
+        twoe_val_ab = vis_drv.get_two_particle_density([[0.3, 0.6, 0.9]],
+                                                       [[0.3, 0.6, 0.9]],
+                                                       task.molecule,
+                                                       task.ao_basis, density,
+                                                       0, 'alpha', 'beta')
+
+        if task.mpi_rank == mpi_master():
+            self.assertAlmostEqual(twoe_val_aa[0], 0.0, 8)
+            self.assertAlmostEqual(twoe_val_ab[0], den_val[0]**2, 8)
 
         task.finish()
 
