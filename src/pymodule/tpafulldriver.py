@@ -1705,32 +1705,19 @@ class TpaFullDriver(TpaDriver):
         NaX2Nyz = tpa_dict['NaX2Nyz']
         NxA2Nyz = tpa_dict['NxA2Nyz']
 
-        width = 94
-
-        w_str = 'Gamma tensor components computed per frequency'
-        self.ostream.print_blank()
-        self.ostream.print_header(w_str.ljust(width))
         self.ostream.print_blank()
 
-        w_str = ''
-        for a in range(len(comp) // len(freqs)):
-            w_str += '{:>3d}. {:<6s}'.format(a + 1, comp[a].split(',')[0])
-            if len(w_str) >= width // 2:
-                self.ostream.print_header(w_str.ljust(width))
-                w_str = ''
-        if w_str:
-            self.ostream.print_header(w_str.ljust(width))
-
-        self.ostream.print_blank()
-        self.ostream.print_blank()
-
-        w_str = 'Gamma Tensor Components at Given Frequencies'
-        self.ostream.print_header(w_str.ljust(width))
+        w_str = 'The Isotropic Average gamma Tensor and Its'
+        self.ostream.print_header(w_str)
+        w_str = 'Isotropic Contributions at Given Frequencies'
+        self.ostream.print_header(w_str)
+        self.ostream.print_header('=' * (len(w_str) + 2))
         self.ostream.print_blank()
 
         for w in freqs:
             title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
                 'Component', 'Frequency', 'Real', 'Imaginary')
+            width = len(title)
             self.ostream.print_header(title.ljust(width))
             self.ostream.print_header(('-' * len(title)).ljust(width))
 
@@ -1740,8 +1727,16 @@ class TpaFullDriver(TpaDriver):
             self.print_component('X3', w, NaX3NyNz[w, -w, w], width)
             self.print_component('A2', w, NxA2Nyz[w, -w, w], width)
             self.print_component('A3', w, NaA3NxNy[w, -w, w], width)
-            self.print_component('Gamma', w, gamma[w, -w, w], width)
+            self.print_component('gamma', w, gamma[w, -w, w], width)
 
             self.ostream.print_blank()
+
+        title = 'Reference: '
+        title += 'K. Ahmadzadeh, M. Scott, M. Brand, O. Vahtras, X. Li, '
+        self.ostream.print_header(title.ljust(width))
+        title = 'Z. Rinkevicius, and P. Norman, '
+        title += 'J. Chem. Phys. 154, 024111 (2021)'
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_blank()
 
         self.ostream.print_blank()
