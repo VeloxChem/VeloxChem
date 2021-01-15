@@ -56,11 +56,41 @@ set(_la_compiler_flags "")
 if(VLX_LA_VENDOR MATCHES "MKL")
   set(BLA_VENDOR "Intel10_64_dyn")
   # locate mkl.h
+  # MKL uses a multitude of partially platform-specific subdirectories:
+  if(WIN32)
+    set(LAPACK_mkl_OS_NAME "win")
+  elseif(APPLE)
+    set(LAPACK_mkl_OS_NAME "mac")
+  else()
+    set(LAPACK_mkl_OS_NAME "lin")
+  endif()
+  if(DEFINED ENV{MKLROOT})
+    file(TO_CMAKE_PATH "$ENV{MKLROOT}" _mkl_root)
+    # If MKLROOT points to the subdirectory 'mkl', use the parent directory instead
+    # so we can better detect other relevant libraries in 'compiler' or 'tbb':
+    get_filename_component(_mkl_root_last_dir "${_mkl_root}" NAME)
+    if(_mkl_root_last_dir STREQUAL "mkl")
+      get_filename_component(_mkl_root "${_mkl_root}" DIRECTORY)
+    endif()
+  endif()
+  list(APPEND _mkl_path_suffixes
+    "compiler/include"
+    "compiler/include/intel64_${LAPACK_mkl_OS_NAME}"
+    "compiler/include/intel64"
+    "mkl/include" "mkl/include/intel64_${LAPACK_mkl_OS_NAME}"
+    "mkl/include/intel64"
+    "include/intel64_${LAPACK_mkl_OS_NAME}"
+    )
+
   find_path(_la_include_dirs
     NAMES
       mkl.h
     HINTS
       ${CMAKE_INSTALL_PREFIX}/include
+    PATHS
+      ${_mkl_root}
+    PATH_SUFFIXES
+      "${_mkl_path_suffixes}"
     )
   if(CXX_COMPILER_ID MATCHES GNU OR CXX_COMPILER_ID MATCHES AppleClang)
     set(_la_compiler_flags "-m64")
