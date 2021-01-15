@@ -1,5 +1,5 @@
 # set minimum cmake version
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.17)
 
 # project name
 project(VeloxChem LANGUAGES CXX)
@@ -53,6 +53,7 @@ include(${PROJECT_SOURCE_DIR}/cmake/compiler_flags/CXXFlags.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_default_build_paths.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_safeguards.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/alignment.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/custom/math.cmake)
 
 # Currently, scikit-build does not support FindPython, so we convert the
 # provided hints ourselves.

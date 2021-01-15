@@ -6,8 +6,6 @@ find_package(MPI REQUIRED COMPONENTS CXX)
 
 find_package(OpenMP REQUIRED COMPONENTS CXX)
 
-include(${CMAKE_CURRENT_LIST_DIR}/FindMKL.cmake)
-
 # figure out where to put the Python module
 if(NOT DEFINED PYMOD_INSTALL_FULLDIR)
   # install Python module under CMAKE_INSTALL_LIBDIR

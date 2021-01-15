@@ -7,8 +7,6 @@ target_compile_definitions(vlxobjs
     # TODO should probably be namespaced, like VLX_HAS_MPI or similar
     $<BUILD_INTERFACE:ENABLE_MPI=$<BOOL:$<TARGET_EXISTS:MPI::MPI_CXX>>>
     $<BUILD_INTERFACE:VLX_ALIGN=${VLX_ALIGN}>
-    # TODO should probably be namespaced, like VLX_HAS_MKL or similar
-    $<BUILD_INTERFACE:ENABLE_MKL=$<BOOL:$<TARGET_EXISTS:MKL>>>
   )
 
 # FIXME the includes should be relative to the source folder:
@@ -24,7 +22,7 @@ target_link_libraries(vlxobjs
   PUBLIC
     OpenMP::OpenMP_CXX
     MPI::MPI_CXX
-    MKL
+    Math::LA
   )
 
 set_target_properties(vlxobjs
