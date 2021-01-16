@@ -795,9 +795,15 @@ class TpaReducedDriver(TpaDriver):
         self.ostream.print_header(w_str)
         w_str = 'Isotropic Contributions at Given Frequencies'
         self.ostream.print_header(w_str)
-        w_str = '(Reduced expression in one-photon off-resonance regions)'
-        self.ostream.print_header(w_str)
         self.ostream.print_header('=' * (len(w_str) + 2))
+        self.ostream.print_blank()
+
+        w_str = '*** Note: The reduced expression is an approximation to the  '
+        self.ostream.print_header(w_str)
+        w_str = '    second-order nonlinear hyperpolarizability (gamma) and is'
+        self.ostream.print_header(w_str)
+        w_str = '    intended for use in one-photon off-resonance regions.    '
+        self.ostream.print_header(w_str)
         self.ostream.print_blank()
 
         for w in freqs:
