@@ -350,14 +350,32 @@ CMolecularOrbitals::getAODensity(const int32_t nAlphaElectrons, const int32_t nB
 
     if ((ndima <= ncola) && (ndimb <= ncolb))
     {
-        auto cmoa = _orbitals[0].slice(0, 0, nrowa, ndima);
+        CDenseMatrix dena(nrowa, nrowa);
+        
+        CDenseMatrix denb(nrowb, nrowb);
+        
+        if (nAlphaElectrons > 0)
+        {
+            auto cmoa = _orbitals[0].slice(0, 0, nrowa, ndima);
+        
+            dena = denblas::multABt(cmoa, cmoa);
+        }
+        else
+        {
+            dena.zero();
+        }
 
-        auto dena = denblas::multABt(cmoa, cmoa);
+        if (nBetaElectrons > 0)
+        {
+            auto cmob = _orbitals[1].slice(0, 0, nrowb, ndimb);
 
-        auto cmob = _orbitals[1].slice(0, 0, nrowb, ndimb);
-
-        auto denb = denblas::multABt(cmob, cmob);
-
+            denb = denblas::multABt(cmob, cmob);
+        }
+        else
+        {
+            denb.zero();
+        }
+    
         return CAODensityMatrix({dena, denb}, denmat::unrest);
     }
 
