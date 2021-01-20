@@ -26,6 +26,7 @@ enum class denmat
 {
     rest,
     unrest,
+    osrest,
     rmoij,
     umoij,
     rgen
