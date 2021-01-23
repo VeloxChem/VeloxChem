@@ -44,3 +44,4 @@ veloxchem_test:
     - python3 -m pytest -v --cov=veloxchem python_tests/
     - python3 config/generate_setup.py
     - make -C unit_tests -s -j 6 release && ./build/bin/UnitTestVeloxChem.x
+    - deactivate
