@@ -35,6 +35,7 @@ veloxchem_test:
     - vlx-test
   stage: test
   script:
+    - rmvirtualenv venv
     - python3.6 -m venv --without-pip venv
     - source venv/bin/activate
     - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
