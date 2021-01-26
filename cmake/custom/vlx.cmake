@@ -4,7 +4,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(MPI REQUIRED COMPONENTS CXX)
 
-find_package(OpenMP REQUIRED COMPONENTS CXX)
+find_package(OpenMP 4.5 REQUIRED COMPONENTS CXX)
 
 # figure out where to put the Python module
 if(NOT DEFINED PYMOD_INSTALL_FULLDIR)
@@ -50,14 +50,31 @@ endforeach()
 add_subdirectory(src)
 
 # handle folder with basis sets
-# 1. symlink under the build tree
+file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/basis)
+# we glob the basis set files in basis and let CMake add a rule such that
+# the glob is repeated every time we rebuild.
+# This is NOT RECOMMENDED by CMake
+# (https://cmake.org/cmake/help/v3.16/command/file.html#filesystem) but you only
+# live once!
 file(
-  CREATE_LINK
-    ${PROJECT_SOURCE_DIR}/basis
-    ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/basis
-  COPY_ON_ERROR
-  SYMBOLIC
+  GLOB
+    _vlx_basis_sets
+  LIST_DIRECTORIES
+    FALSE
+  CONFIGURE_DEPENDS
+  ${PROJECT_SOURCE_DIR}/basis/*
   )
+# 1. symlink under the build tree
+foreach(_basis IN LISTS _vlx_basis_sets)
+ get_filename_component(__basis ${_basis} NAME)
+ file(
+   CREATE_LINK
+     ${_basis}
+     ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/basis/${__basis}
+   COPY_ON_ERROR
+   SYMBOLIC
+   )
+endforeach()
 # 2. install rules for basis sets folder
 install(
   DIRECTORY
