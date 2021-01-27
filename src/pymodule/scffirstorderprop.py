@@ -106,7 +106,7 @@ class ScfFirstOrderProperties:
             self.ostream.print_header(warn_msg.ljust(56))
             warn_msg = '    moment will be dependent on the choice of origin.'
             self.ostream.print_header(warn_msg.ljust(56))
-            warn_msg = '    Center of nulcear charge is chosen as the origin.'
+            warn_msg = '    Center of nuclear charge is chosen as the origin.'
             self.ostream.print_header(warn_msg.ljust(56))
 
         self.ostream.print_blank()
