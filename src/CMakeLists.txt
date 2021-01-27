@@ -8,6 +8,15 @@ target_compile_definitions(vlxobjs
     $<BUILD_INTERFACE:ENABLE_MPI=$<BOOL:$<TARGET_EXISTS:MPI::MPI_CXX>>>
     $<BUILD_INTERFACE:VLX_ALIGN=${VLX_ALIGN}>
   )
+  
+if(WIN32)
+  target_compile_definitions(vlxobjs
+    PUBLIC
+      _USE_MATH_DEFINES
+      _CRT_SECURE_NO_WARNINGS
+      _SILENCE_TR1_NAMESPACE_DEPRECATION_WARNING
+    )
+endif()
 
 # FIXME the includes should be relative to the source folder:
 # that is: #include "dft/AOKohnShamMatrix.hpp", rather than: #include "AOKohnShamMatrix.hpp"

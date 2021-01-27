@@ -13,7 +13,7 @@
 
 option(ENABLE_ARCH_FLAGS "Enable architecture-specific compiler flags" ON)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_CXX_EXTENSIONS FALSE)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
@@ -23,7 +23,11 @@ if(ENABLE_ARCH_FLAGS)
     set(_arch_flag "-march=native")
   endif()
   if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
-    set(_arch_flag "-march=native")
+    if(WIN32) # use AVX2 on Windows
+      set(_arch_flag "/arch:AVX2")
+    else()
+      set(_arch_flag "-march=native")
+    endif()
   endif()
   if(CMAKE_CXX_COMPILER_ID MATCHES Intel)
     set(_arch_flag "-xHost")
