@@ -3,12 +3,11 @@ find_package(PkgConfig QUIET)
 if(PKG_CONFIG_FOUND)
   pkg_search_module(xTB
     IMPORTED_TARGET
-    libxtb
+    xtb
     )
   
-  if(TARGET PkgConfig::xTB)
-    pkg_get_variable(xTB_VERSION libxtb Version)
-    message(STATUS "Found xTB ${xTB_VERSION}")
+  if(TARGET PkgConfig::xTB) 
+    message(STATUS "Found xTB ${xTB_VERSION}: ${xTB_LINK_LIBRARIES}")
     set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/XTBDriver.cpp
       PROPERTIES
         COMPILE_DEFINITIONS ENABLE_XTB
