@@ -12,6 +12,8 @@ target_compile_definitions(vlxobjs
 if(WIN32)
   target_compile_definitions(vlxobjs
     PUBLIC
+      # see here: https://github.com/mpi4py/mpi4py/issues/19#issuecomment-768143143 
+      PyMPI_HAVE_MPI_Message=1
       _USE_MATH_DEFINES
       _CRT_SECURE_NO_WARNINGS
       _SILENCE_TR1_NAMESPACE_DEPRECATION_WARNING
