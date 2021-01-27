@@ -12,7 +12,6 @@ before_script:
   - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/intelpython3/lib
   - export OMP_NUM_THREADS=6
   - export GTESTROOT=/home/xinli/software/googletest/googletest
-  - export GTESTLIB=/home/xinli/software/googletest/googletest/lib/libgtest.a
   - export MPICC=$I_MPI_ROOT/intel64/mpi/mpiicc
 
 after_script:

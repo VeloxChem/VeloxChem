@@ -8,6 +8,8 @@
 
 #include "MemBlockTest.hpp"
 
+#include <mpi.h>
+
 #include "MemBlock.hpp"
 
 TEST_F(CMemBlockTest, DefaultConstructor)

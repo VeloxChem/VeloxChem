@@ -14,6 +14,8 @@
 #include <string>
 #include <sstream>
 
+#include <mpi.h>
+
 CMolecularGrid::CMolecularGrid()
 
     : _isDistributed(false)

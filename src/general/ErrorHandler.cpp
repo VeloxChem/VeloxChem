@@ -7,12 +7,15 @@
 //  Contact: https://veloxchem.org/contact
 
 #include "ErrorHandler.hpp"
-#include "MpiFunc.hpp"
 
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <string>
+
+#include <mpi.h>
+
+#include "MpiFunc.hpp"
 
 namespace errors {  // errors namespace
 

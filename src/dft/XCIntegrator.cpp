@@ -10,6 +10,8 @@
 
 #include <cmath>
 
+#include <mpi.h>
+
 #include "MpiFunc.hpp"
 #include "DensityGridDriver.hpp"
 #include "FunctionalParser.hpp"

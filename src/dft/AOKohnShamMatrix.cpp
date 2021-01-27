@@ -8,8 +8,11 @@
 
 #include <string>
 
+#include <mpi.h>
+
 #include "AOKohnShamMatrix.hpp"
 #include "ErrorHandler.hpp"
+#include "MpiFunc.hpp"
 
 CAOKohnShamMatrix::CAOKohnShamMatrix()
     : _xcMatrices(std::vector<CDenseMatrix>())

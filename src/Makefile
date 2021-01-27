@@ -60,14 +60,19 @@ pymodule: build_folder
 	@echo ====== Copying module files...
 	$(CP) -r $(VLX_MODULE) $(BUILD_LIB)
 
+# Copy pytest files
+pytests: build_folder
+	@echo ====== Copying Python test files...
+	rsync -a --force --exclude='Makefile' --exclude='__pycache__' ../python_tests/ $(BUILD_LIB)/tests
+
 # Debug
-debug: $(VLX_LIBS) basis pymodule
+debug: $(VLX_LIBS) basis pymodule pytests
 	@echo ====== Linking debug version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
 
 # Release
-release: $(VLX_LIBS) basis pymodule
+release: $(VLX_LIBS) basis pymodule pytests
 	@echo ====== Linking release version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)

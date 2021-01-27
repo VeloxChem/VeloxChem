@@ -13,6 +13,8 @@
 #include <sstream>
 #include <utility>
 
+#include <mpi.h>
+
 #include "MathConst.hpp"
 #include "MpiFunc.hpp"
 

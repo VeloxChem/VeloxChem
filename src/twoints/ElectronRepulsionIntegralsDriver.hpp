@@ -11,7 +11,7 @@
 
 #include <cstdint>
 
-#include "mpi.h"
+#include <mpi.h>
 
 #ifdef MAC_OS_OMP
 #include "/opt/intel/compilers_and_libraries/mac/include/omp.h"

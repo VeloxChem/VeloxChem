@@ -10,11 +10,14 @@
 
 #include <sstream>
 
+#include <mpi.h>
+
 #include "GtoPairsContainer.hpp"
 #include "SphericalMomentum.hpp"
 #include "GenFunc.hpp"
 #include "TwoIntsFunc.hpp"
 #include "AngularMomentum.hpp"
+#include "MpiFunc.hpp"
 #include "StringFormat.hpp"
 #include "TwoCentersRecursionFunctions.hpp"
 #include "GenIntsFunc.hpp"

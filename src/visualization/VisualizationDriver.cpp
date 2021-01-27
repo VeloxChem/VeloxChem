@@ -11,11 +11,14 @@
 #include <cmath>
 #include <cstring>
 
+#include <mpi.h>
+
 #include "BasisFunction.hpp"
 #include "CubicGrid.hpp"
 #include "ErrorHandler.hpp"
 #include "MemBlock.hpp"
 #include "MolecularBasis.hpp"
+#include "MpiFunc.hpp"
 #include "SphericalMomentum.hpp"
 #include "StringFormat.hpp"
 

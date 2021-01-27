@@ -13,6 +13,8 @@
 #include <ostream>
 #include <array>
 
+#include <mpi.h>
+
 #include "MemBlock2D.hpp"
 
 /**

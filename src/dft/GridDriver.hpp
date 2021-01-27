@@ -11,11 +11,14 @@
 
 #include <cstdint>
 
-#include "mpi.h"
+#include <mpi.h>
 
 #include "ExecMode.hpp"
-#include "MolecularGrid.hpp"
-#include "Molecule.hpp"
+
+template <typename T>
+class CMemBlock2D;
+class CMolecularGrid;
+class CMolecule;
 
 /**
  Class CGridDriver generates grid points data for usage in numerical

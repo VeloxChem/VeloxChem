@@ -19,6 +19,9 @@
 #include "MpiFunc.hpp"
 #include "SpinBlock.hpp"
 #include "StringFormat.hpp"
+#ifdef ENABLE_MKL
+#include "ConfigMKL.hpp"
+#endif
 
 namespace py = pybind11;
 
@@ -158,6 +161,11 @@ integer_to_angular_momentum(const std::string& label)
 void
 export_general(py::module& m)
 {
+    // configure MKL single dynamic library
+#ifdef ENABLE_MKL
+    configure_mkl_rt();
+#endif
+
     // initialize mpi4py's C-API
 
     auto err = import_mpi4py();

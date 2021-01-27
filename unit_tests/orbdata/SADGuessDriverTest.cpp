@@ -8,6 +8,8 @@
 
 #include "SADGuessDriverTest.hpp"
 
+#include <mpi.h>
+
 #include "AODensityMatrix.hpp"
 #include "DenseMatrix.hpp"
 #include "DensityMatrixType.hpp"

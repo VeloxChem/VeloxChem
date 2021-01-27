@@ -18,6 +18,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 
 
+@pytest.mark.solvers
 class TestRPA(unittest.TestCase):
 
     def run_rpa(self, inpfile, potfile, xcfun_label, data_lines):

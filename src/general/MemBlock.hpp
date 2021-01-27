@@ -14,6 +14,8 @@
 #include <cstdlib>
 #include <iostream>
 
+#include <mpi.h>
+
 #include "MathFunc.hpp"
 #include "MemAlloc.hpp"
 #include "MpiFunc.hpp"

@@ -12,6 +12,8 @@
 #include <cstdint>
 #include <vector>
 
+#include <mpi.h>
+
 #include "MpiFunc.hpp"
 #include "DenseMatrix.hpp"
 #include "FockMatrixType.hpp"

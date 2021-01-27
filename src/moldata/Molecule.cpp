@@ -11,6 +11,8 @@
 #include <cmath>
 #include <sstream>
 
+#include <mpi.h>
+
 #include "Codata.hpp"
 #include "MathFunc.hpp"
 #include "StringFormat.hpp"

@@ -1,9 +1,9 @@
 [build-system]
-# additional build requirements, e.g. numpy and mpi4py, come from setup.py
-# through the PEP 517 interface
 requires = [
+  "mpi4py>=3.0",
+  "numpy>=1.13.0",
+  "pybind11>=2.6",
   "setuptools>=42", 
   "wheel",
-  "pybind11>=2.6",
 ]
 build-backend = "setuptools.build_meta"

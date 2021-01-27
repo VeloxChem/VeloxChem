@@ -13,7 +13,7 @@
 #include <ostream>
 #include <vector>
 
-#include "mpi.h"
+#include <mpi.h>
 
 /**
  Class CBasisFunction stores data about single contracted basis function and

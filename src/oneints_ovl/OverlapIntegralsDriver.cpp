@@ -8,10 +8,13 @@
 
 #include "OverlapIntegralsDriver.hpp"
 
+#include <mpi.h>
+
 #include "AngularMomentum.hpp"
 #include "GenFunc.hpp"
 #include "GenIntsFunc.hpp"
 #include "MemBlock.hpp"
+#include "MpiFunc.hpp"
 #include "OneIntsFunc.hpp"
 #include "RecursionFunctionsList.hpp"
 #include "StringFormat.hpp"

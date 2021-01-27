@@ -13,7 +13,7 @@
 #include <string>
 #include <tuple>
 
-#include "mpi.h"
+#include <mpi.h>
 
 #include "AODensityMatrix.hpp"
 #include "Molecule.hpp"
