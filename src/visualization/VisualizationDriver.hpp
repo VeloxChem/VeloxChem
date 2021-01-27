@@ -11,6 +11,8 @@
 
 #include <vector>
 
+#include <mpi.h>
+
 #include "AODensityMatrix.hpp"
 #include "CubicGrid.hpp"
 #include "MemBlock.hpp"

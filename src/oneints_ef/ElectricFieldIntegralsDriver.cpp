@@ -8,9 +8,12 @@
 
 #include "ElectricFieldIntegralsDriver.hpp"
 
+#include <mpi.h>
+
 #include "AngularMomentum.hpp"
 #include "GenFunc.hpp"
 #include "GenIntsFunc.hpp"
+#include "MpiFunc.hpp"
 #include "OneIntsFunc.hpp"
 #include "RecursionFunctionsList.hpp"
 #include "TwoCentersRecursionFunctions.hpp"

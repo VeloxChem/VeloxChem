@@ -12,18 +12,20 @@
 #include <cstdint>
 #include <vector>
 
-#include "mpi.h"
+#include <mpi.h>
 
 #include "ExecMode.hpp"
-#include "GtoContainer.hpp"
-#include "MolecularBasis.hpp"
-#include "MolecularGrid.hpp"
-#include "Molecule.hpp"
-#include "SphericalMomentum.hpp"
-#include "VecMemBlocks.hpp"
 #include "XCFuncType.hpp"
-#include "AODensityMatrix.hpp"
-#include "DensityGrid.hpp"
+
+class CAODensityMatrix;
+class CDensityGrid;
+class CGtoContainer;
+template <typename T>
+class CMemBlock2D;
+class CMolecularBasis;
+class CMolecularGrid;
+class CMolecule;
+class CSphericalMomentum;
 
 /**
  Class CDensityGridDriver generates density grid for usage in numerical

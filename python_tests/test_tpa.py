@@ -1,12 +1,13 @@
-from mpi4py import MPI
-import unittest
 import os
+import unittest
+from pathlib import Path
 
-from veloxchem.veloxchemlib import mpi_master
+from mpi4py import MPI
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tpafulldriver import TpaFullDriver
 from veloxchem.tpareddriver import TpaReducedDriver
+from veloxchem.veloxchemlib import mpi_master
 
 
 class TestTPA(unittest.TestCase):
@@ -74,9 +75,8 @@ class TestTPA(unittest.TestCase):
             'gamma': 401.92066716 + 2.58015589j,
         }
 
-        inpfile = os.path.join('inputs', 'water_tpa.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water_tpa.inp')
 
         self.run_tpa(inpfile, 'full', w, ref_result)
 
@@ -91,9 +91,8 @@ class TestTPA(unittest.TestCase):
             'gamma': 177.54359664 + 2.04772438j,
         }
 
-        inpfile = os.path.join('inputs', 'water_tpa.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water_tpa.inp')
 
         self.run_tpa(inpfile, 'reduced', w, ref_result)
 

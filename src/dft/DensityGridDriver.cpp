@@ -10,13 +10,24 @@
 
 #include <cmath>
 
-#include "GenFunc.hpp"
-#include "OMPTasks.hpp"
-#include "MpiFunc.hpp"
-#include "AngularMomentum.hpp"
-#include "GtoFunc.hpp"
-#include "DenseLinearAlgebra.hpp"
+#include <mpi.h>
 
+#include "AODensityMatrix.hpp"
+#include "AngularMomentum.hpp"
+#include "DenseLinearAlgebra.hpp"
+#include "DensityGrid.hpp"
+#include "ExecMode.hpp"
+#include "GenFunc.hpp"
+#include "GtoContainer.hpp"
+#include "GtoFunc.hpp"
+#include "MolecularBasis.hpp"
+#include "MolecularGrid.hpp"
+#include "Molecule.hpp"
+#include "MpiFunc.hpp"
+#include "OMPTasks.hpp"
+#include "SphericalMomentum.hpp"
+#include "VecMemBlocks.hpp"
+#include "XCFuncType.hpp"
 
 CDensityGridDriver::CDensityGridDriver(MPI_Comm comm)
 {

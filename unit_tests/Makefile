@@ -34,12 +34,14 @@ VLX_INCLUDES := ${shell find * -type d -print}
 # Update CXX flags & includes path
 CXXFLAGS += $(addprefix -I $(CURDIR)/,$(VLX_INCLUDES))
 vpath %.hpp $(VLX_INCLUDES)
+# Add includes from source folder
+CXXFLAGS += -I../src/general
 
 # Add MKL includes
 CXXFLAGS += $(MATH_INC)
 
 # Add Google Test includes
-CXXFLAGS += -I $(GST_ROOT)/include
+CXXFLAGS += -isystem $(GST_ROOT)/include
 
 # Add list of internal libraries
 VST_LIBS_DIR := ${shell find * -type d -print}

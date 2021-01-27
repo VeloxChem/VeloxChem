@@ -10,6 +10,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <mpi.h>
+
 #include "CubicGrid.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportVisualization.hpp"

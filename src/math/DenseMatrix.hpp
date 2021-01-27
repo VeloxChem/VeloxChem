@@ -14,6 +14,8 @@
 #include <string>
 #include <vector>
 
+#include <mpi.h>
+
 #include "MemBlock.hpp"
 #include "MpiFunc.hpp"
 #include "NumaPolicy.hpp"

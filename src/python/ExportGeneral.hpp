@@ -9,10 +9,10 @@
 #ifndef ExportGeneral_hpp
 #define ExportGeneral_hpp
 
+#include <mpi.h>
+
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
-
-#include <mpi.h>
 
 namespace py = pybind11;
 

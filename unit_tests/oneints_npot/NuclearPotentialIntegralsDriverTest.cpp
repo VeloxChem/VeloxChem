@@ -8,6 +8,8 @@
 
 #include "NuclearPotentialIntegralsDriverTest.hpp"
 
+#include <mpi.h>
+
 #include "MolecularBasisSetter.hpp"
 #include "MoleculeSetter.hpp"
 #include "NuclearPotentialIntegralsDriver.hpp"

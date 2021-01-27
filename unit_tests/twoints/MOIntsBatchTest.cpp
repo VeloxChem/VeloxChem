@@ -8,13 +8,12 @@
 
 #include "MOIntsBatchTest.hpp"
 
-#include "MOIntsBatch.hpp"
-
-#include "mpi.h"
+#include <mpi.h>
 
 #include "ElectronRepulsionIntegralsDriver.hpp"
 #include "AODensityMatrixSetter.hpp"
 #include "MolecularBasisSetter.hpp"
+#include "MOIntsBatch.hpp"
 #include "MoleculeSetter.hpp"
 #include "CheckFunctions.hpp"
 #include "EriScreenerType.hpp"

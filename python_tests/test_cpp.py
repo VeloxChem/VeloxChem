@@ -17,6 +17,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.cppsolver import ComplexResponse
 
 
+@pytest.mark.solvers
 class TestCPP(unittest.TestCase):
 
     def run_cpp(self, inpfile, potfile, xcfun_label, data_lines):

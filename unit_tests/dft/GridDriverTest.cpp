@@ -10,10 +10,13 @@
 
 #include <cmath>
 
+#include <mpi.h>
+
 #include "GridDriver.hpp"
 #include "MathConst.hpp"
 #include "MoleculeSetter.hpp"
 #include "MpiFunc.hpp"
+#include "MolecularGrid.hpp"
 
 TEST_F(CGridDriverTest, DefaultConstructor)
 {

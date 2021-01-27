@@ -8,11 +8,14 @@
 
 #include "SADGuessDriver.hpp"
 
+#include <mpi.h>
+
 #include "AODensityMatrix.hpp"
 #include "DenseDiagonalizer.hpp"
 #include "DenseLinearAlgebra.hpp"
 #include "DensityMatrixType.hpp"
 #include "ErrorHandler.hpp"
+#include "MpiFunc.hpp"
 #include "PartialCharges.hpp"
 #include "StringFormat.hpp"
 

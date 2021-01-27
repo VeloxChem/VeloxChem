@@ -8,6 +8,8 @@
 
 #include "MemBlock2DTest.hpp"
 
+#include <mpi.h>
+
 #include "MatOrder.hpp"
 #include "MemBlock2D.hpp"
 

@@ -8,16 +8,18 @@
 
 #include "ExportXTB.hpp"
 
+#include <memory>
+
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
 #include <mpi.h>
-#include <memory>
 
-#include "XTBDriver.hpp"
 #include "ExportGeneral.hpp"
+#include "Molecule.hpp"
+#include "XTBDriver.hpp"
 
 namespace py = pybind11;
 
@@ -30,9 +32,9 @@ namespace vlx_xtb {  // vlx_xtb namespace
 static std::shared_ptr<CXTBDriver>
 CXTBDriver_create(py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    auto comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<CXTBDriver>(new CXTBDriver(*comm_ptr));
+    return std::make_shared<CXTBDriver>(*comm_ptr);
 }
 
 static py::array_t<double>

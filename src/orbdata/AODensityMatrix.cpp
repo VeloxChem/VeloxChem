@@ -8,8 +8,11 @@
 
 #include "AODensityMatrix.hpp"
 
+#include <mpi.h>
+
 #include "DenseLinearAlgebra.hpp"
 #include "ErrorHandler.hpp"
+#include "MpiFunc.hpp"
 
 CAODensityMatrix::CAODensityMatrix()
 

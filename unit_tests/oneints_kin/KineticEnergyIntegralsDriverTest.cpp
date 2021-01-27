@@ -8,6 +8,8 @@
 
 #include "KineticEnergyIntegralsDriverTest.hpp"
 
+#include <mpi.h>
+
 #include "KineticEnergyIntegralsDriver.hpp"
 #include "MolecularBasisSetter.hpp"
 #include "MoleculeSetter.hpp"

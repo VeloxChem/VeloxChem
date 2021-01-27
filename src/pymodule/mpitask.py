@@ -14,7 +14,7 @@ class MpiTask:
     Implements the MPI task.
 
     :param fname_list:
-        List of the intput/output filenames.
+        List of the input/output filenames.
     :param mpi_comm:
         The MPI communicator.
 

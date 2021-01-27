@@ -8,6 +8,8 @@
 
 #include "ElectricFieldIntegralsDriverTest.hpp"
 
+#include <mpi.h>
+
 #include "ElectricFieldIntegralsDriver.hpp"
 #include "MolecularBasisSetter.hpp"
 #include "MoleculeSetter.hpp"

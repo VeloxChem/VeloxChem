@@ -10,6 +10,8 @@
 
 #include <cmath>
 
+#include <mpi.h>
+
 #include "DenseLinearAlgebra.hpp"
 #include "NumaPolicy.hpp"
 

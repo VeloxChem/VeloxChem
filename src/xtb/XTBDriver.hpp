@@ -13,12 +13,13 @@
 #include <string>
 #include <vector>
 
-#include "mpi.h"
-#include "Molecule.hpp"
+#include <mpi.h>
 
 #ifdef ENABLE_XTB
-#include "xtb.h"
+#include <xtb.h>
 #endif
+
+class CMolecule;
 
 /**
  Class CXTBDriver enables DFT-B computations using XTB package from Grimme group.
@@ -41,22 +42,22 @@ class CXTBDriver
      The MPI communicator.
      */
     MPI_Comm _locComm;
-    
+
     /**
      The name of the XTB output file.
      */
     std::string _outputFilename;
-    
+
     /**
      The XTB method.
      */
     std::string _xtbMethod;
-    
+
     /**
     The electronic temperature.
     */
     double _electronicTemp;
-    
+
     /**
     The maximum number of SCF iterations.
     */
@@ -65,19 +66,19 @@ class CXTBDriver
     /**
      The number of atoms in XTB molecular system.
     */
-    int _natoms; 
-    
+    int _natoms;
+
 #ifdef ENABLE_XTB
     /**
      The XTB package environment.
     */
     xtb_TEnvironment _environment;
-    
+
     /**
      The DFT-B calculator.
     */
     xtb_TCalculator _calculator;
-    
+
     /**
      The DFT-B results data.
     */
@@ -85,7 +86,7 @@ class CXTBDriver
 
     /**
      Converts VeloxChem molecule to XTB molecular system data structure.
-      
+
      @param molecule the molecule.
      @returm the XTB  molecular system data structure.
     */
@@ -104,33 +105,33 @@ class CXTBDriver
      Destroys a XTB driver object.
      */
     ~CXTBDriver();
-    
-    /**
-     Sets maximum number of SCF iterations. 
 
-     @param maxIterations the maximum number of iterations. 
-     */ 
-    void setMaxIterations(const int maxIterations); 
+    /**
+     Sets maximum number of SCF iterations.
+
+     @param maxIterations the maximum number of iterations.
+     */
+    void setMaxIterations(const int maxIterations);
 
     /**
      Sets electronic temperature for electron smearing.
-     
-     @param electronicTemp the electronic temperature in Kelvins.   
-     */ 
+
+     @param electronicTemp the electronic temperature in Kelvins.
+     */
     void setElectronicTemp(const double electronicTemp);
 
     /**
      Sets XTB method.
-     
+
      @param method the XTB method.
-     */ 
+     */
     void setMethod(const std::string method);
 
     /**
      Sets output filename.
-     
+
      @param filename the output filename.
-     */ 
+     */
     void setOutputFilename(const std::string filename);
 
     /**
@@ -138,39 +139,39 @@ class CXTBDriver
 
      @param molecule the molecule.
      */
-    void compute(const CMolecule&   molecule);
+    void compute(const CMolecule& molecule);
 
     /**
-     Checks if XTB package is available. 
-     
-     @return true if XTB package available, false otherwise.  
-     */ 
+     Checks if XTB package is available.
+
+     @return true if XTB package available, false otherwise.
+     */
     bool isAvailable() const;
 
     /**
-     Checks if XTB driver is running on master node. 
-     
-     @return true if XTB driver is running on master node, false otherwise.  
+     Checks if XTB driver is running on master node.
+
+     @return true if XTB driver is running on master node, false otherwise.
      */
-    bool isMasterNode() const; 
-    
+    bool isMasterNode() const;
+
     /**
      Gets state of XTB environment.
-    
+
      @return the state of XTB environment.
     */
     bool getState();
 
     /**
      Gets XTB output as a vector of strings.
-    
+
      @return a vector of strings.
     */
     std::vector<std::string> getOutput();
 
     /**
      Gets XTB output filename.
-    
+
      @return the output filename.
     */
     std::string getOutputFilename();
@@ -184,10 +185,10 @@ class CXTBDriver
 
     /**
      Gets molecular gradient as vector (order: natoms x 3).
-    
+
      @return the molecular gradient.
     */
-    std::vector<double> getGradient(); 
+    std::vector<double> getGradient();
 };
 
 #endif /* XTBDriver_hpp */

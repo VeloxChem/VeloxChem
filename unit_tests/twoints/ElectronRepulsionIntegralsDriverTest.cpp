@@ -8,7 +8,7 @@
 
 #include "ElectronRepulsionIntegralsDriverTest.hpp"
 
-#include "mpi.h"
+#include <mpi.h>
 
 #include "ElectronRepulsionIntegralsDriver.hpp"
 #include "AODensityMatrixSetter.hpp"

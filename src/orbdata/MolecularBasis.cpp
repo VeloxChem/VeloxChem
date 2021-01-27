@@ -11,6 +11,8 @@
 #include <array>
 #include <sstream>
 
+#include <mpi.h>
+
 #include "AngularMomentum.hpp"
 #include "ChemicalElement.hpp"
 #include "MpiFunc.hpp"

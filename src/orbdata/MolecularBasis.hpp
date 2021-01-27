@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "mpi.h"
+#include <mpi.h>
 
 #include "AtomBasis.hpp"
 #include "Molecule.hpp"

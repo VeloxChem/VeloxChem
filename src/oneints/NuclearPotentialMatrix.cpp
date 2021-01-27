@@ -8,6 +8,8 @@
 
 #include "NuclearPotentialMatrix.hpp"
 
+#include <mpi.h>
+
 #include "DenseLinearAlgebra.hpp"
 
 CNuclearPotentialMatrix::CNuclearPotentialMatrix()

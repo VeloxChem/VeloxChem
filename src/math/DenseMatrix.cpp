@@ -7,11 +7,14 @@
 //  Contact: https://veloxchem.org/contact
 
 #include "DenseMatrix.hpp"
-#include "StringFormat.hpp"
 
 #include <cmath>
 #include <sstream>
 #include <utility>
+
+#include <mpi.h>
+
+#include "StringFormat.hpp"
 
 CDenseMatrix::CDenseMatrix()
 

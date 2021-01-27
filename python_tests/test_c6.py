@@ -1,17 +1,19 @@
-from mpi4py import MPI
-import numpy as np
-import unittest
-import random
 import os
+import random
+import unittest
 from pathlib import Path
 
-from veloxchem.veloxchemlib import mpi_master
-from veloxchem.mpitask import MpiTask
-from veloxchem.scfrestdriver import ScfRestrictedDriver
+import numpy as np
+import pytest
+from mpi4py import MPI
 from veloxchem.c6solver import C6Solver
+from veloxchem.mpitask import MpiTask
 from veloxchem.rspc6 import C6
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.veloxchemlib import mpi_master
 
 
+@pytest.mark.solvers
 class TestC6(unittest.TestCase):
 
     def run_c6(self, inpfile, potfile, xcfun_label, data_lines, ref_c6_value):
