@@ -74,6 +74,7 @@ if(VLX_LA_VENDOR MATCHES "MKL")
     endif()
   endif()
   list(APPEND _mkl_path_suffixes
+    "include"
     "compiler/include"
     "compiler/include/intel64_${LAPACK_mkl_OS_NAME}"
     "compiler/include/intel64"
@@ -90,7 +91,7 @@ if(VLX_LA_VENDOR MATCHES "MKL")
     PATHS
       ${_mkl_root}
     PATH_SUFFIXES
-      "${_mkl_path_suffixes}"
+      ${_mkl_path_suffixes}
     )
   if(CXX_COMPILER_ID MATCHES GNU OR CXX_COMPILER_ID MATCHES AppleClang)
     set(_la_compiler_flags "-m64")
