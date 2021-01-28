@@ -2237,9 +2237,7 @@ CXCIntegrator::_distUnrestrictedBatchForLdaB(      CAOKohnShamMatrix*   aoKohnSh
 
                 xcBufferb.at(idx) = fvxcb;
                 
-                idxa++;
-
-                idxb++;
+                idx++;
             }
         }
         
