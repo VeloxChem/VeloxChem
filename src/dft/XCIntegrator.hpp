@@ -70,7 +70,6 @@ class CXCIntegrator
                                                  const CDensityGrid&      densityGrid,
                                                  const CMolecularGrid&    molecularGrid) const;
     
-    
     /**
      Computes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
      for spin-restricted LDA case.
@@ -141,7 +140,6 @@ class CXCIntegrator
                                            const CDensityGrid&      rwDensityGrid,
                                            const CMolecularGrid&    molecularGrid) const;
     
-    
     /**
         Computes exchange-correlation contribution to Kohn-Sham matrix for spin-unrestricted LDA case.
         
@@ -173,7 +171,6 @@ class CXCIntegrator
                                            const CDensityGrid&      densityGrid,
                                            const CMolecularGrid&    molecularGrid) const;
     
-
     /**
      Computes exchange-correlation contribution to Kohn-Sham matrix for spin-unrestricted GGA case.
      
@@ -189,7 +186,6 @@ class CXCIntegrator
                                              const CDensityGrid&      densityGrid,
                                              const CMolecularGrid&    molecularGrid) const;
     
-
     /**
      Computes exchange-correlation contribution to perturbed Kohn-Sham matrix for spin-restricted GGA case.
      
@@ -258,8 +254,6 @@ class CXCIntegrator
                                     const double*            gridWeights,
                                     const int32_t            gridOffset,
                                     const int32_t            nGridPoints) const;
-    
-    
     
     /**
      Computes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
@@ -473,30 +467,30 @@ class CXCIntegrator
                                           const int32_t              nGridPoints) const;
     
     /**
-        Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
-        for spin-unrestricted LDA case.
+      Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
+      for spin-unrestricted LDA case.
 
-        @param aoKohnShamMatrix the pointer to Kohn-Sham matrix.
-        @param xcBuffer_alpha the exchange-correlation buffer.
-        @param xcGradient_alpha the pointer to exchange-correlation gradient grid.
-        @param xcBuffer_beta the exchange-correlation buffer.
-        @param xcGradient_beta the pointer to exchange-correlation gradient grid.
-        @param gtoValues the pointer to GTOS values on grid.
-        @param gridWeights the pointer to grid weights.
-        @param gridOffset the offset of grids batch in density grid.
-        @param gridBlockPosition the block position in grids batch.
-        @param nGridPoints the number of grid points in grid block.
-        */
-       void _distUnrestrictedBatchForLdaB(      CAOKohnShamMatrix*   aoKohnShamMatrix,
-                                                CMemBlock<double>&   xcBuffer_alpha,
-                                                CMemBlock<double>&   xcBuffer_beta,
-                                          const double*              xcGradient_alpha,
-                                          const double*              xcGradient_beta,
-                                          const CMemBlock2D<double>& gtoValues,
-                                          const double*              gridWeights,
-                                          const int32_t              gridOffset,
-                                          const int32_t              gridBlockPosition,
-                                          const int32_t              nGridPoints) const;
+      @param aoKohnShamMatrix the pointer to Kohn-Sham matrix.
+      @param xcBuffer_alpha the exchange-correlation buffer.
+      @param xcGradient_alpha the pointer to exchange-correlation gradient grid.
+      @param xcBuffer_beta the exchange-correlation buffer.
+      @param xcGradient_beta the pointer to exchange-correlation gradient grid.
+      @param gtoValues the pointer to GTOS values on grid.
+      @param gridWeights the pointer to grid weights.
+      @param gridOffset the offset of grids batch in density grid.
+      @param gridBlockPosition the block position in grids batch.
+      @param nGridPoints the number of grid points in grid block.
+      */
+      void _distUnrestrictedBatchForLdaB(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+                                               CMemBlock<double>&   xcBuffer_alpha,
+                                               CMemBlock<double>&   xcBuffer_beta,
+                                         const double*              xcGradient_alpha,
+                                         const double*              xcGradient_beta,
+                                         const CMemBlock2D<double>& gtoValues,
+                                         const double*              gridWeights,
+                                         const int32_t              gridOffset,
+                                         const int32_t              gridBlockPosition,
+                                         const int32_t              nGridPoints) const;
     
     /**
      Distributes exchange-correlation contribution to perturbed Kohn-Sham matrix from batch of grid points
@@ -582,9 +576,6 @@ class CXCIntegrator
                                     const int32_t              gridBlockPosition,
                                     const int32_t              nGridPoints) const;
     
-
-
-
      /**
      Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
      for spin-unrestricted GGA case.
@@ -616,10 +607,6 @@ class CXCIntegrator
                                       const int32_t              gridOffset,
                                       const int32_t              gridBlockPosition,
                                       const int32_t              nGridPoints) const;
-
-
-
-
 
      /**
      Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
@@ -653,8 +640,6 @@ class CXCIntegrator
                                        const int32_t              gridBlockPosition,
                                        const int32_t              nGridPoints) const;
 
-
-
      /**
      Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
      for spin-unrestricted GGA case.
@@ -686,7 +671,6 @@ class CXCIntegrator
                                     const int32_t              gridOffset,
                                     const int32_t              gridBlockPosition,
                                     const int32_t              nGridPoints) const;
-
 
     /**
      Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
@@ -770,7 +754,6 @@ class CXCIntegrator
                                       const int32_t              gridBlockPosition,
                                       const int32_t              nGridPoints) const;
 
-
     /**
      Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
      for spin-unrestricted GGA case.
@@ -813,8 +796,6 @@ class CXCIntegrator
                                        const int32_t              gridBlockPosition,
                                        const int32_t              nGridPoints) const;
 
-
-
     /**
      Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
      for spin-unrestricted GGA case.
@@ -856,7 +837,6 @@ class CXCIntegrator
                                        const int32_t              gridOffset,
                                        const int32_t              gridBlockPosition,
                                        const int32_t              nGridPoints) const;
-
 
     /**
      Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
@@ -1012,7 +992,6 @@ class CXCIntegrator
                                             const int32_t              gridOffset,
                                             const xcfun                xcFunctional) const;
     
-    
     /**
      Distributes exchange-correlation functional contribution from pair of spherical contracted GTOs into Kohn-Sham matrix.
 
@@ -1105,7 +1084,6 @@ class CXCIntegrator
      @return the screening pattern.
      */
     CMemBlock<int32_t> _getScreeningPattern(const CMemBlock2D<double>& gtoValues) const;
-    
     
     /**
      Creates reduced integration grid with given screening pattern.
