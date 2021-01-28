@@ -32,6 +32,7 @@ CXCGradientGrid::CXCGradientGrid(const CMemBlock2D<double>& xcValues,
     
 }
 
+
 CXCGradientGrid::CXCGradientGrid(const int32_t nGridPoints,
                                  const dengrid densityGridType,
                                  const xcfun   xcGridType)
@@ -42,9 +43,9 @@ CXCGradientGrid::CXCGradientGrid(const int32_t nGridPoints,
     
     int32_t ncomp = 0;
     
-    if (_xcGridType == xcfun::lda) ncomp = (_densityGridType == dengrid::ab) ? 3 : 2;
+    if (_xcGridType == xcfun::lda) ncomp = 3;
     
-    if (_xcGridType == xcfun::gga) ncomp = (_densityGridType == dengrid::ab) ? 6 : 3;
+    if (_xcGridType == xcfun::gga) ncomp = 6;
     
     // NOTE: this needs to be checked with mgga functionals implementation
     if (_xcGridType == xcfun::mgga) ncomp = (_densityGridType == dengrid::ab) ? 8 : 4;
@@ -151,47 +152,28 @@ CXCGradientGrid::xcGradientValues(const xcvars gradientType) const
 {
     if (gradientType == xcvars::rhoa)
     {
-        if (_densityGridType == dengrid::ab) return _xcValues.data(1);
-        
-        if (_densityGridType == dengrid::lima) return nullptr;
-        
-        if (_densityGridType == dengrid::limb) return _xcValues.data(1);
+        return _xcValues.data(1);
     }
     
     if (gradientType == xcvars::rhob)
     {
-        if (_densityGridType == dengrid::ab) return _xcValues.data(2);
-        
-        if (_densityGridType == dengrid::lima) return _xcValues.data(1);
-        
-        if (_densityGridType == dengrid::limb) return nullptr;
+        return _xcValues.data(2);
     }
     
     if (gradientType == xcvars::grada)
     {
-        if (_densityGridType == dengrid::ab) return _xcValues.data(3);
-        
-        if (_densityGridType == dengrid::lima) return nullptr;
-        
-        if (_densityGridType == dengrid::limb) return _xcValues.data(2);
+        return _xcValues.data(3);
     }
     
     if (gradientType == xcvars::gradb)
     {
-        if (_densityGridType == dengrid::ab) return _xcValues.data(4);
-        
-        if (_densityGridType == dengrid::lima) return _xcValues.data(2);
-        
-        if (_densityGridType == dengrid::limb) return nullptr;
+        return _xcValues.data(4);
+
     }
     
     if (gradientType == xcvars::gradab)
     {
-        if (_densityGridType == dengrid::ab) return _xcValues.data(5);
-        
-        if (_densityGridType == dengrid::lima) return nullptr;
-        
-        if (_densityGridType == dengrid::limb) return nullptr;
+        return _xcValues.data(5);
     }
     
     return nullptr;
@@ -202,50 +184,37 @@ CXCGradientGrid::xcGradientValues(const xcvars gradientType)
 {
     if (gradientType == xcvars::rhoa)
     {
-        if (_densityGridType == dengrid::ab) return _xcValues.data(1);
-        
-        if (_densityGridType == dengrid::lima) return nullptr;
-        
-        if (_densityGridType == dengrid::limb) return _xcValues.data(1);
+        return _xcValues.data(1);
     }
     
     if (gradientType == xcvars::rhob)
     {
-        if (_densityGridType == dengrid::ab) return _xcValues.data(2);
-        
-        if (_densityGridType == dengrid::lima) return _xcValues.data(1);
-        
-        if (_densityGridType == dengrid::limb) return nullptr;
+         return _xcValues.data(2);
     }
     
     if (gradientType == xcvars::grada)
     {
-        if (_densityGridType == dengrid::ab) return _xcValues.data(3);
-        
-        if (_densityGridType == dengrid::lima) return nullptr;
-        
-        if (_densityGridType == dengrid::limb) return _xcValues.data(2);
+         return _xcValues.data(3);
     }
     
     if (gradientType == xcvars::gradb)
     {
-        if (_densityGridType == dengrid::ab) return _xcValues.data(4);
-        
-        if (_densityGridType == dengrid::lima) return _xcValues.data(2);
-        
-        if (_densityGridType == dengrid::limb) return nullptr;
+       return _xcValues.data(4);
     }
     
     if (gradientType == xcvars::gradab)
     {
-        if (_densityGridType == dengrid::ab) return _xcValues.data(5);
-        
-        if (_densityGridType == dengrid::lima) return nullptr;
-        
-        if (_densityGridType == dengrid::limb) return nullptr;
+        return _xcValues.data(5);
+
     }
     
     return nullptr;
+}
+
+dengrid
+CXCGradientGrid::getDensityGridType() const
+{
+    return _densityGridType;
 }
 
 std::ostream&

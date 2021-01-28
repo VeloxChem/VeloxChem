@@ -30,11 +30,11 @@ TEST_F(CXCGradientGridTest, ConstructorWithFunctionalType)
     
     CXCGradientGrid dgridb(5, dengrid::lima, xcfun::lda);
     
-    ASSERT_EQ(dgridb, CXCGradientGrid(CMemBlock2D<double>(5, 2), dengrid::lima, xcfun::lda));
+    ASSERT_EQ(dgridb, CXCGradientGrid(CMemBlock2D<double>(5, 3), dengrid::lima, xcfun::lda));
     
     CXCGradientGrid dgridc(5, dengrid::limb, xcfun::lda);
     
-    ASSERT_EQ(dgridc, CXCGradientGrid(CMemBlock2D<double>(5, 2), dengrid::limb, xcfun::lda));
+    ASSERT_EQ(dgridc, CXCGradientGrid(CMemBlock2D<double>(5, 3), dengrid::limb, xcfun::lda));
     
     CXCGradientGrid dgride(5, dengrid::ab, xcfun::gga);
     
@@ -42,11 +42,11 @@ TEST_F(CXCGradientGridTest, ConstructorWithFunctionalType)
     
     CXCGradientGrid dgridf(5, dengrid::lima, xcfun::gga);
     
-    ASSERT_EQ(dgridf, CXCGradientGrid(CMemBlock2D<double>(5, 3), dengrid::lima, xcfun::gga));
+    ASSERT_EQ(dgridf, CXCGradientGrid(CMemBlock2D<double>(5, 6), dengrid::lima, xcfun::gga));
     
     CXCGradientGrid dgridg(5, dengrid::limb, xcfun::gga);
     
-    ASSERT_EQ(dgridg, CXCGradientGrid(CMemBlock2D<double>(5, 3), dengrid::limb, xcfun::gga));
+    ASSERT_EQ(dgridg, CXCGradientGrid(CMemBlock2D<double>(5, 6), dengrid::limb, xcfun::gga));
     
     CXCGradientGrid dgridk(5, dengrid::ab, xcfun::mgga);
     
@@ -189,15 +189,11 @@ TEST_F(CXCGradientGridTest, XCGradientValuesConstant)
 {
     CMemBlock2D<double> mblockab({1.0, 2.0, 3.0, 6.0, 1.0, 7.0}, 2, 3);
     
-    CMemBlock2D<double> mblocka({3.0, 6.0, 3.0, 5.0}, 2, 2);
-    
-    CMemBlock2D<double> mblockb({1.0, 2.0, 4.0, 7.0}, 2, 2);
-    
     const CXCGradientGrid dgridab(mblockab, dengrid::ab, xcfun::lda);
     
-    const CXCGradientGrid dgridla(mblockb, dengrid::lima, xcfun::lda);
+    const CXCGradientGrid dgridla(mblockab, dengrid::lima, xcfun::lda);
     
-    const CXCGradientGrid dgridlb(mblocka, dengrid::limb, xcfun::lda);
+    const CXCGradientGrid dgridlb(mblockab, dengrid::limb, xcfun::lda);
     
     // rho_ab case
     
@@ -212,10 +208,10 @@ TEST_F(CXCGradientGridTest, XCGradientValuesConstant)
     ASSERT_TRUE(dgridab.xcGradientValues(xcvars::gradab) == nullptr);
     
     // lim_a case
-    
-    ASSERT_TRUE(dgridla.xcGradientValues(xcvars::rhoa) == nullptr);
-    
-    vlxtest::compare({4.0, 7.0}, dgridla.xcGradientValues(xcvars::rhob));
+
+    vlxtest::compare({3.0, 6.0}, dgridla.xcGradientValues(xcvars::rhoa));
+
+    vlxtest::compare({1.0, 7.0}, dgridla.xcGradientValues(xcvars::rhob));
     
     ASSERT_TRUE(dgridla.xcGradientValues(xcvars::grada) == nullptr);
     
@@ -225,30 +221,27 @@ TEST_F(CXCGradientGridTest, XCGradientValuesConstant)
     
     // lim_b case
     
-     vlxtest::compare({3.0, 5.0}, dgridlb.xcGradientValues(xcvars::rhoa));
+    vlxtest::compare({3.0, 6.0}, dgridlb.xcGradientValues(xcvars::rhoa));
+
+    vlxtest::compare({1.0, 7.0}, dgridlb.xcGradientValues(xcvars::rhob));
+        
+    ASSERT_TRUE(dgridlb.xcGradientValues(xcvars::grada) == nullptr);
     
-    ASSERT_TRUE(dgridlb.xcGradientValues(xcvars::rhob) == nullptr);
+    ASSERT_TRUE(dgridlb.xcGradientValues(xcvars::gradb) == nullptr);
     
-    ASSERT_TRUE(dgridla.xcGradientValues(xcvars::grada) == nullptr);
-    
-    ASSERT_TRUE(dgridla.xcGradientValues(xcvars::gradb) == nullptr);
-    
-    ASSERT_TRUE(dgridla.xcGradientValues(xcvars::gradab) == nullptr);
+    ASSERT_TRUE(dgridlb.xcGradientValues(xcvars::gradab) == nullptr);
 }
 
 TEST_F(CXCGradientGridTest, XCGradientValues)
 {
     CMemBlock2D<double> mblockab({1.0, 2.0, 3.0, 6.0, 1.0, 7.0}, 2, 3);
-    
-    CMemBlock2D<double> mblocka({3.0, 6.0, 3.0, 5.0}, 2, 2);
-    
-    CMemBlock2D<double> mblockb({1.0, 2.0, 4.0, 7.0}, 2, 2);
+
     
     CXCGradientGrid dgridab(mblockab, dengrid::ab, xcfun::lda);
     
-    CXCGradientGrid dgridla(mblockb, dengrid::lima, xcfun::lda);
+    CXCGradientGrid dgridla(mblockab, dengrid::lima, xcfun::lda);
     
-    CXCGradientGrid dgridlb(mblocka, dengrid::limb, xcfun::lda);
+    CXCGradientGrid dgridlb(mblockab, dengrid::limb, xcfun::lda);
     
     // rho_ab case
     
@@ -274,15 +267,19 @@ TEST_F(CXCGradientGridTest, XCGradientValues)
     
     // lim_a case
     
+    auto vxa_a = dgridla.xcGradientValues(xcvars::rhoa);
+    
     auto vxa_b = dgridla.xcGradientValues(xcvars::rhob);
     
-    ASSERT_TRUE(dgridla.xcGradientValues(xcvars::rhoa) == nullptr);
+    vlxtest::compare({3.0, 6.0}, vxa_a);
     
-    vlxtest::compare({4.0, 7.0}, vxa_b);
+    vlxtest::compare({1.0, 7.0}, vxa_b);
     
-    vxa_b[0] = 7.1;
+    vxa_a[1] = 9.0;
     
-    ASSERT_EQ(dgridla, CXCGradientGrid(CMemBlock2D<double>({1.0, 2.0, 7.1, 7.0}, 2, 2), dengrid::lima, xcfun::lda));
+    vxa_b[0] = 1.5;
+    
+    ASSERT_EQ(dgridla, CXCGradientGrid(CMemBlock2D<double>({1.0, 2.0, 3.0, 9.0, 1.5, 7.0}, 2, 3), dengrid::lima, xcfun::lda));
     
     ASSERT_TRUE(dgridla.xcGradientValues(xcvars::grada) == nullptr);
     
@@ -294,13 +291,17 @@ TEST_F(CXCGradientGridTest, XCGradientValues)
     
     auto vxb_a = dgridlb.xcGradientValues(xcvars::rhoa);
     
-    vlxtest::compare({3.0, 5.0}, dgridlb.xcGradientValues(xcvars::rhoa));
+    auto vxb_b = dgridlb.xcGradientValues(xcvars::rhob);
     
-    vxb_a[1] = 2.5;
+    vlxtest::compare({3.0, 6.0}, vxb_a);
     
-    ASSERT_EQ(dgridlb, CXCGradientGrid(CMemBlock2D<double>({3.0, 6.0, 3.0, 2.5}, 2, 2), dengrid::limb, xcfun::lda));
+    vlxtest::compare({1.0, 7.0}, vxb_b);
     
-    ASSERT_TRUE(dgridlb.xcGradientValues(xcvars::rhob) == nullptr);
+    vxb_a[1] = 9.0;
+    
+    vxb_b[0] = 1.5;
+    
+    ASSERT_EQ(dgridlb, CXCGradientGrid(CMemBlock2D<double>({1.0, 2.0, 3.0, 9.0, 1.5, 7.0}, 2, 3), dengrid::limb, xcfun::lda));
     
     ASSERT_TRUE(dgridla.xcGradientValues(xcvars::grada) == nullptr);
     

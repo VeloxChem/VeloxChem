@@ -41,6 +41,8 @@ enum class fockmat
     rgenk,
     rgenkx,
     unrestjk,
+    unrestj,
+    unrestjkx
 };
 
 /**
@@ -105,6 +107,18 @@ inline std::string to_string(const fockmat fockMatrix)
     {
         return std::string("Unrestricted 2J + K Matrix");
     }
+
+    if (fockMatrix == fockmat::unrestj)
+    {
+        return std::string("Unrestricted 2JMatrix");
+    }
+    
+    if (fockMatrix == fockmat::unrestjkx)
+    {
+        return std::string("Unrestricted 2J + xK Matrix");
+    }
+    
+
     
     return std::string("UNKNOWN");
 }
