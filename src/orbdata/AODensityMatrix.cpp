@@ -348,6 +348,16 @@ CAODensityMatrix::isRestricted() const
     return true;
 }
 
+bool
+CAODensityMatrix::isUnrestricted() const
+{
+    if (_denType == denmat::unrest) return true;
+
+    if (_denType == denmat::umoij) return false;
+
+    return false;
+}
+
 void
 CAODensityMatrix::broadcast(int32_t rank, MPI_Comm comm)
 {

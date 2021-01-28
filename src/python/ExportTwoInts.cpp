@@ -296,7 +296,9 @@ export_twoints(py::module& m)
         .value("rgenj", fockmat::rgenj)
         .value("rgenk", fockmat::rgenk)
         .value("rgenkx", fockmat::rgenkx)
-        .value("unrestjk", fockmat::unrestjk);
+        .value("unrestjk", fockmat::unrestjk)
+        .value("unrestj", fockmat::unrestj)
+        .value("unrestjkx", fockmat::unrestjkx);
 
     // ericut enum class
 

@@ -48,10 +48,51 @@ class CDensityGrid
      @param densityThreshold the threshold for density variable.
      @return true if valid density grid point, false otherwise.
      */
-    bool _isValidGridPointForLDA(const double alphaDensity,
+    bool _isValidGridPointForLda(const double alphaDensity,
                                  const double betaDensity,
                                  const double densityThreshold) const;
     
+    
+    
+    /**
+     Checks if density grid point is within range of allowe density values for LDA case.
+
+     @param alphaDensity the value of alpha density at grid point.
+     @param betaDensity the value of beta density at grid point.
+     @param densityThreshold the threshold for density variable.
+     @return true if valid density grid point, false otherwise.
+     */
+    bool _isValidGridPointForLdaUnrestricted(const double alphaDensity,
+                                       const double betaDensity,
+                                       const double densityThreshold) const;
+
+   /**
+     Checks if density grid point is within range of allowe density values for LDA case.
+     Only valid if beta density is greater than the threshhold but not the alpha density.
+
+     @param alphaDensity the value of alpha density at grid point.
+     @param betaDensity the value of beta density at grid point.
+     @param densityThreshold the threshold for density variable.
+     @return true if valid density grid point, false otherwise.
+     */
+    bool _isValidGridPointForLdaA(const double alphaDensity,
+                                  const double betaDensity,
+                                  const double densityThreshold) const;
+
+    /**
+     Checks if density grid point is within range of allowe density values for LDA case.
+     Only valid if alpha density is greater than the threshhold but not the beta density.
+
+     @param alphaDensity the value of alpha density at grid point.
+     @param betaDensity the value of beta density at grid point.
+     @param densityThreshold the threshold for density variable.
+     @return true if valid density grid point, false otherwise.
+     */
+    bool _isValidGridPointForLdaB(const double alphaDensity,
+                                 const double betaDensity,
+                                 const double densityThreshold) const;
+
+
     /**
      Checks if density grid point is within range of allowe density values for GGA case.
      
@@ -62,11 +103,62 @@ class CDensityGrid
      @param densityThreshold the threshold for density variable.
      @return true if valid density grid point, false otherwise.
      */
-    bool _isValidGridPointForGGA(const double alphaDensity,
+    bool _isValidGridPointForGga(const double alphaDensity,
                                  const double betaDensity,
                                  const double alphaDensityGradient,
                                  const double betaDensityGradient,
                                  const double densityThreshold) const;
+
+
+    /**
+     Checks if density grid point is within range of allowe density values for GGA case.
+     
+     @param alphaDensity the value of alpha density at grid point.
+     @param betaDensity the value of beta density at grid point.
+     @param alphaDensityGradient the value of alpha density gradient at grid point.
+     @param betaDensityGradient the value of beta density gradient at grid point.
+     @param densityThreshold the threshold for density variable.
+     @return true if valid density grid point, false otherwise.
+     */
+    bool _isValidGridPointForGgaUnrestrictedAB(const double alphaDensity,
+                                               const double betaDensity,
+                                               const double alphaDensityGradient,
+                                               const double betaDensityGradient,
+                                               const double densityThreshold) const;
+
+
+    /**
+     Checks if density grid point is within range of allowe density values for GGA case.
+     
+     @param alphaDensity the value of alpha density at grid point.
+     @param betaDensity the value of beta density at grid point.
+     @param alphaDensityGradient the value of alpha density gradient at grid point.
+     @param betaDensityGradient the value of beta density gradient at grid point.
+     @param densityThreshold the threshold for density variable.
+     @return true if valid density grid point, false otherwise.
+     */
+    bool _isValidGridPointForGgaUnrestrictedA(const double alphaDensity,
+                                              const double betaDensity,
+                                              const double alphaDensityGradient,
+                                              const double betaDensityGradient,
+                                              const double densityThreshold) const;
+
+
+    /**
+     Checks if density grid point is within range of allowe density values for GGA case.
+     
+     @param alphaDensity the value of alpha density at grid point.
+     @param betaDensity the value of beta density at grid point.
+     @param alphaDensityGradient the value of alpha density gradient at grid point.
+     @param betaDensityGradient the value of beta density gradient at grid point.
+     @param densityThreshold the threshold for density variable.
+     @return true if valid density grid point, false otherwise.
+     */
+    bool _isValidGridPointForGgaUnrestrictedB(const double alphaDensity,
+                                              const double betaDensity,
+                                              const double alphaDensityGradient,
+                                              const double betaDensityGradient,
+                                              const double densityThreshold) const;
     
 public:
     /**
@@ -368,17 +460,40 @@ public:
      Generates pair of screened molecular and density grids by removing grid points with specific density/density
      gradient values bellow given threshold. NOTE: This method is exclusive to dengrid::ab type.
      
-     @param densityGrid the screened density grid.
-     @param molecularGrid the screened molecular grid.
+     @param densityGridab the screened density grid.
+     @param molecularGridab the screened molecular grid.
      @param iDensityMatrix the index of density matrix.
      @param densityThreshold the screening threshold for density values.
      @param xcFuncType the type of exchange-correlation functional.
      */
-    void getScreenedGridsPair(      CDensityGrid&   densityGrid,
-                                    CMolecularGrid& molecularGrid,
+    void getScreenedGridsPair(      CDensityGrid&   densityGridab,
+                                    CMolecularGrid& molecularGridab,
                               const int32_t         iDensityMatrix,
                               const double          densityThreshold,
                               const xcfun           xcFuncType) const;
+
+
+    /**
+     Generates pair of screened molecular and density grids by removing grid points with specific density/density
+     gradient values bellow given threshold. Extends to other types of densities than dengrid::ab
+
+     @param densityGridab the screened density grid, a and b type.
+     @param densityGrida the screened density grid lima .
+     @param densityGridb the screened density grid limb.
+     @param molecularGridab the screened molecular grid.
+     @param iDensityMatrix the index of density matrix.
+     @param densityThreshold the screening threshold for density values.
+     @param xcFuncType the type of exchange-correlation functional.
+     */
+    void getScreenedGridPairUnrestricted(       CDensityGrid&   densityGridab,
+                                                CDensityGrid&   densityGrida,
+                                                CDensityGrid&   densityGridb,
+                                                CMolecularGrid& molecularGridab,
+                                                CMolecularGrid& molecularGrida,
+                                                CMolecularGrid& molecularGridb,
+                                          const int32_t         iDensityMatrix,
+                                          const double          densityThreshold,
+                                          const xcfun           xcFuncType) const;
     
     /**
      Generates screened molecular grid from given molecular grid by removing grid points with specific density/density
@@ -394,6 +509,25 @@ public:
                                    const int32_t         iDensityMatrix,
                                    const double          densityThreshold,
                                    const xcfun           xcFuncType) const;
+
+    /**
+    Generates screened molecular grid from given molecular grid by removing grid points with specific density/density
+    gradient values bellow given threshold.
+
+    @param molecularGridsAB the molecular grid for ab.
+    @param molecularGridsA the molecular grid for lima.
+    @param molecularGridsB the molecular grid for limb.
+    @param densityThreshold the density/density gradient screening threshold.
+    @param iDensityMatrix the index of density matrix.
+    @param xcFuncType the type of exchange-correlation functional.
+    @return the screened molecular grid.
+    */
+    void getScreenedGridUnrestricted(      CMolecularGrid& molecularGridsAB,
+                                           CMolecularGrid& molecularGridsA,
+                                           CMolecularGrid& molecularGridsB,
+                                     const int32_t         iDensityMatrix,
+                                     const double          densityThreshold,
+                                     const xcfun           xcFuncType) const;
     
     /**
      Converts density grid object to text and insert it into output text

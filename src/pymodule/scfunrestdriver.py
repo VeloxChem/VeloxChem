@@ -5,6 +5,7 @@ from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import molorb
 from .scfdriver import ScfDriver
 from .c2diis import CTwoDiis
+from .veloxchemlib import fockmat
 
 
 class ScfUnrestrictedDriver(ScfDriver):
@@ -278,3 +279,24 @@ class ScfUnrestrictedDriver(ScfDriver):
             return "Spin-Unrestricted Kohn-Sham" + pe_type
 
         return "Spin-Unrestricted Hartree-Fock" + pe_type
+
+
+    def update_fock_type(self, fock_mat):
+        """
+        Updates Fock matrix to fit selected functional in Kohn-Sham
+        calculations.
+
+        :param fock_mat:
+            The Fock/Kohn-Sham matrix.
+        """
+
+        if self.xcfun.is_hybrid():
+            fock_mat.set_fock_type(fockmat.unrestjkx, 0)
+            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0)
+            fock_mat.set_fock_type(fockmat.unrestjkx, 0,True)
+            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0,True)
+        else:
+            fock_mat.set_fock_type(fockmat.unrestj, 0)
+            fock_mat.set_fock_type(fockmat.unrestj, 0, True)
+
+        return
