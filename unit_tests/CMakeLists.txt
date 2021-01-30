@@ -1,10 +1,20 @@
-find_package(GTest CONFIG REQUIRED)
+find_package(GTest QUIET)
+if(TARGET GTest::GTest)
+  message(STATUS "Found GTest: ${GTEST_LIBRARIES}")
+else()
+  message(STATUS "Suitable Google Test could not be located. Fetching and building!")
+  include(FetchContent)
+  FetchContent_Declare(_gtest
+    QUIET
+    URL https://github.com/google/googletest/archive/release-1.10.0.tar.gz
+  )
+  # Prevent Google Test from using PThreads
+  set(gtest_disable_pthreads ON CACHE BOOL "" FORCE)
+  FetchContent_MakeAvailable(_gtest)
 
-# Add targets mapping the same library names as defined in
-# older versions of CMake's FindGTest
-if(NOT TARGET GTest::GTest)
-  add_library(GTest::GTest INTERFACE IMPORTED)
-  target_link_libraries(GTest::GTest INTERFACE GTest::gtest)
+  # Provide an alias, so linking to GTest looks the same regardless if it was
+  # found on the system or if it was fetched at configuration
+  add_library(GTest::GTest ALIAS gtest)
 endif()
 
 add_executable(utests UnitTestVeloxChem.cpp)

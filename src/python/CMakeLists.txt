@@ -41,7 +41,7 @@ endif()
 # * use pybind11 header files with -isystem
 # * explicitly disable LTO, even for release builds
 pybind11_add_module(veloxchemlib
-  MODULE NO_EXTRAS
+  NO_EXTRAS
     ${CMAKE_CURRENT_LIST_DIR}/ExportDFT.cpp
     ${CMAKE_CURRENT_LIST_DIR}/ExportGeneral.cpp
     ${CMAKE_CURRENT_LIST_DIR}/ExportMath.cpp
@@ -99,14 +99,10 @@ install(
     veloxchemlib
   ARCHIVE
     DESTINATION ${PYMOD_INSTALL_FULLDIR}
-    COMPONENT lib
   LIBRARY
     DESTINATION ${PYMOD_INSTALL_FULLDIR}
-    COMPONENT lib
   RUNTIME
     DESTINATION ${PYMOD_INSTALL_FULLDIR}
-    COMPONENT lib
   RESOURCE
     DESTINATION ${PYMOD_INSTALL_FULLDIR}
-    COMPONENT lib
   )
