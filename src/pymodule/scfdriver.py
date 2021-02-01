@@ -1180,7 +1180,8 @@ class ScfDriver:
 
             if self.dft and not self.first_step:
                 fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
-                fock_mat.add_matrix(vxc_mat.get_matrix(True), 1)
+                if not self.restricted:
+                    fock_mat.add_matrix(vxc_mat.get_matrix(True), 1)
 
             if self.pe and not self.first_step:
                 fock_mat.add_matrix(DenseMatrix(pe_mat), 0)
