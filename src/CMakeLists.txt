@@ -1,6 +1,6 @@
 # we compile everything as object files, then we link to the Python module and
 # the unit test executable
-add_library(vlxobjs OBJECT "")
+add_library(vlxobjs OBJECT)
 
 target_compile_definitions(vlxobjs
   PUBLIC

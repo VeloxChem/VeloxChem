@@ -16,8 +16,8 @@ file(
 # append conftest.py to the list
 list(APPEND _vlx_pytests conftest.py)
 
-# link the Python files under the build folder
 foreach(_f IN LISTS _vlx_pytests)
+  # link the Python files under the build folder
   file(
     CREATE_LINK
       ${CMAKE_CURRENT_LIST_DIR}/${_f}
@@ -25,6 +25,10 @@ foreach(_f IN LISTS _vlx_pytests)
     COPY_ON_ERROR
     SYMBOLIC
     )
+
+  if(${_f} MATCHES "conftest.py")
+    break()
+  endif()
 
   # extract the name and label for the test from the file name
   # by removing the "test_" prefix and the ".py" suffix
