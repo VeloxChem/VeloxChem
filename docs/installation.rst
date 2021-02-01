@@ -11,17 +11,32 @@ The source code can be downloaded from the `GitLab repository <https://gitlab.co
 Installing from source
 ^^^^^^^^^^^^^^^^^^^^^^
 
+You can build the code from sources on Linux, macOS, or Windows. On Linux and
+macOS, you can use either our custom build system or `CMake <https://cmake.org/cmake/help/v3.17/>`_.
+For Windows, only the CMake-based build system will work.
+
+
 Build prerequisites
 +++++++++++++++++++
 
 - Build tool providing the ``make`` utility
-- C++ compiler fully compliant with the C++11 standard
-- Linear algebra libraries implementing the BLAS and LAPACK interfaces (e.g. 
+- C++ compiler fully compliant with the C++11 standard and with full support for OpenMP >=4.5 [#f1]_
+- Linear algebra libraries implementing the BLAS and LAPACK interfaces (*e.g.* 
   Intel MKL, OpenBLAS or Cray LibSci)
-- MPI library (e.g. MPICH, Intel MPI or Open MPI)
+- MPI library (*e.g.* MPICH, Intel MPI or Open MPI)
 - Installation of Python >=3.6 that includes the interpreter, the development
   header files, and the development libraries.
-- The `MPI4Py <https://mpi4py.readthedocs.io/>`_ module for Python
+- The `pybind11 <https://pybind11.readthedocs.io>`_ (>=2.6) header-only library
+- The following Python modules:
+
+  - `h5py <https://www.h5py.org/>`_
+  - `psutil <https://psutil.readthedocs.io/en/latest/>`_
+  - `MPI4Py <https://mpi4py.readthedocs.io/>`_
+  - `NumPy <https://numpy.org>`_
+  - `LoProp <https://pypi.org/project/LoProp/>`_
+  - `geomeTRIC <https://github.com/leeping/geomeTRIC>`_
+
+- If you plan to take advantage of our CMake-based build system, you will need CMake >=3.17
 
 Optional, add-on dependencies:
 
@@ -45,7 +60,7 @@ greatly simplify the installation of VeloxChem.
 
     $ cd veloxchem
 
-- Create and activate the conda environment::
+- Create and activate the Conda environment::
 
     $ conda env create -f <environment_file>
     $ conda activate vlxenv
@@ -61,7 +76,7 @@ greatly simplify the installation of VeloxChem.
   - ``openblas_env.yml`` which installs the OpenBLAS library.
 
   Note that the MPICH library will be installed by the ``yml`` file. If you prefer
-  another MPI library such as Open MPI, you can edit the ``yml`` file and replace
+  another MPI library such as OpenMPI, you can edit the ``yml`` file and replace
   ``mpich`` by ``openmpi``. Read more about the yml file in 
   `this page 
   <https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#create-env-file-manually>`__.
@@ -116,7 +131,7 @@ Cray platform (x86-64 or ARM processor)
     $ salloc -N 1 ...
     $ CXX=CC VLX_NUM_BUILD_JOBS=N srun -n 1 python3 -m pip install .
 
-  where *N* is the number of cores on the node.
+  where ``N`` is the number of cores on the node.
 
 Debian-based Linux
 ++++++++++++++++++
@@ -224,6 +239,10 @@ Alternatively, you can compile it without using ``pip``:
     # Set up python path
     $ export PYTHONPATH=/path/to/your/cppe/build/stage/lib:$PYTHONPATH
 
+    # Make sure that cppe can be imported
+    $ python3 -c 'import cppe'
+
+
 The XTB package for semiempirical methods
 +++++++++++++++++++++++++++++++++++++++++
 
@@ -241,8 +260,9 @@ Alternatively, you can compile it using ``cmake``:
     $ git clone -b v6.3.3 https://github.com/grimme-lab/xtb
     $ cd xtb; mkdir build; cd build
     $ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=/path/to/your/xtb ..
-    $ make
-    $ make install
+    $ cmake --build . --target install
 
     # Set XTBHOME prior to installing VeloxChem
     $ export XTBHOME=/path/to/your/xtb
+
+.. [#f1] On Windows, this means using ``clang-cl``: the `Clang compiler front-end for MSVC <https://clang.llvm.org/docs/UsersManual.html#clang-cl>`_
