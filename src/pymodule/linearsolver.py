@@ -1748,6 +1748,7 @@ class LinearSolver:
                         root,
                         lam_diag,
                         nto_mo,
+                        nto_pairs=None,
                         nto_thresh=0.1):
         """
         Writes cube files for natural transition orbitals.
@@ -1764,6 +1765,8 @@ class LinearSolver:
             The lambda values (1D array).
         :param nto_mo:
             The NTO coefficients (2D array).
+        :param nto_pairs:
+            The number of NTO pairs.
         :param nto_thresh:
             The threshold for writing NTO to cube file.
         """
@@ -1775,6 +1778,9 @@ class LinearSolver:
 
         for i_nto in range(lam_diag.size):
             if lam_diag[i_nto] < nto_thresh:
+                continue
+
+            if (nto_pairs is not None) and (i_nto >= nto_pairs):
                 continue
 
             self.ostream.print_info('  lambda: {:.4f}'.format(lam_diag[i_nto]))
