@@ -1,8 +1,5 @@
-import os
-import sys
-import time as tm
-
 from mpi4py import MPI
+import time as tm
 
 from .cli import cli
 from .errorhandler import assert_msg_critical

@@ -28,8 +28,6 @@ from .denguess import DensityGuess
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
-from .veloxchemlib import denmat
-
 
 
 class ScfDriver:
@@ -496,7 +494,6 @@ class ScfDriver:
         den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
                                           ovl_mat)
 
-
         den_mat.broadcast(self.rank, self.comm)
 
         self.density = AODensityMatrix(den_mat)
@@ -553,7 +550,6 @@ class ScfDriver:
 
             vxc_mat, e_pe, V_pe = self.comp_2e_fock(fock_mat, den_mat, molecule,
                                                     ao_basis, qq_data, e_grad)
-
 
             profiler.stop_timer(self.num_iter, 'FockBuild')
             profiler.start_timer(self.num_iter, 'CompEnergy')

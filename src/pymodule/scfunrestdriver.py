@@ -280,7 +280,6 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         return "Spin-Unrestricted Hartree-Fock" + pe_type
 
-
     def update_fock_type(self, fock_mat):
         """
         Updates Fock matrix to fit selected functional in Kohn-Sham
@@ -293,8 +292,9 @@ class ScfUnrestrictedDriver(ScfDriver):
         if self.xcfun.is_hybrid():
             fock_mat.set_fock_type(fockmat.unrestjkx, 0)
             fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0)
-            fock_mat.set_fock_type(fockmat.unrestjkx, 0,True)
-            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0,True)
+            fock_mat.set_fock_type(fockmat.unrestjkx, 0, True)
+            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0,
+                                      True)
         else:
             fock_mat.set_fock_type(fockmat.unrestj, 0)
             fock_mat.set_fock_type(fockmat.unrestj, 0, True)
