@@ -53,4 +53,6 @@ include(GoogleTest)
 gtest_discover_tests(utests
   PROPERTIES
     LABELS "unit"
+  DISCOVERY_TIMEOUT  # how long to wait (in seconds) before crashing
+    240
   )
