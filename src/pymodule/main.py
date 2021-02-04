@@ -182,18 +182,25 @@ def main():
 
     # QMMM spectrum
 
-    if task_type == 'qmmm':
-        if 'qmmm' in task.input_dict:
-            qmmm_dict = dict(task.input_dict['qmmm'])
+    if task_type == 'trajectory':
+        if 'trajectory' in task.input_dict:
+            qmmm_dict = dict(task.input_dict['trajectory'])
         else:
             qmmm_dict = {}
+        if 'spectrum_settings' in task.input_dict:
+            spect_dict = dict(task.input_dict['spectrum_settings'])
+        else:
+            spect_dict = {}
+        if 'response' in task.input_dict:
+            rsp_dict = dict(task.input_dict['response'])
+        else:
+            rsp_dict = {}
 
         qmmm_dict['filename'] = task.input_dict['filename']
-
         qmmm_drv = QMMMDriver(task.mpi_comm, task.ostream)
-        qmmm_drv.update_settings(qmmm_dict, method_dict)
+        qmmm_drv.update_settings(qmmm_dict, spect_dict,rsp_dict,method_dict)
         qmmm_drv.compute(task.molecule, task.ao_basis, task.min_basis)
-
+    
     # Self-consistent field
 
     run_scf = task_type in [
