@@ -1,11 +1,14 @@
+from mpi4py import MPI
 import numpy as np
+import sys
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import molorb
+from .veloxchemlib import fockmat
+from .outputstream import OutputStream
 from .scfdriver import ScfDriver
 from .c2diis import CTwoDiis
-from .veloxchemlib import fockmat
 
 
 class ScfUnrestrictedDriver(ScfDriver):
@@ -19,12 +22,18 @@ class ScfUnrestrictedDriver(ScfDriver):
         The output stream.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes spin unrestricted open shell SCF driver to default setup
         (convergence threshold, initial guess, etc) by calling base class
         constructor.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 
