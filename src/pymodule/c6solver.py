@@ -1,9 +1,11 @@
+from mpi4py import MPI
 import numpy as np
 import time as tm
 import psutil
 import sys
 
 from .veloxchemlib import mpi_master
+from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
@@ -31,10 +33,16 @@ class C6Solver(LinearSolver):
         - w0: The transformation function prefactor.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes C6 solver to default setup.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 

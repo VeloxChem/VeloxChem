@@ -1,6 +1,8 @@
+from mpi4py import MPI
 import numpy as np
 import time as tm
 import math
+import sys
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import LinearMomentumIntegralsDriver
@@ -12,6 +14,7 @@ from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import molorb
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
+from .outputstream import OutputStream
 from .profiler import Profiler
 from .linearsolver import LinearSolver
 from .blockdavidson import BlockDavidsonSolver
@@ -40,10 +43,16 @@ class TDAExciDriver(LinearSolver):
         - cube_points: The number of cubic grid points in X, Y and Z directions.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes TDA excited states computation drived to default setup.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 
