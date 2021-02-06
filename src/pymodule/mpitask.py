@@ -89,11 +89,21 @@ class MpiTask:
             # read input file
 
             self.input_dict = InputParser(input_fname, output_fname).get_dict()
-
-            self.ostream.print_info('Found {} control groups.'.format(
-                len(self.input_dict)))
-            self.ostream.print_info('...done.')
             self.ostream.print_blank()
+
+            for key in self.input_dict:
+                if key == 'molecule':
+                    continue
+                if not isinstance(self.input_dict[key], dict):
+                    continue
+                if list(self.input_dict[key].keys()) == ['checkpoint_file']:
+                    continue
+                self.ostream.print_info('@{:s}'.format(key))
+                for key_2 in self.input_dict[key]:
+                    self.ostream.print_info('{:s}: {:s}'.format(
+                        key_2, self.input_dict[key][key_2]))
+                self.ostream.print_info('@end')
+                self.ostream.print_blank()
 
             # create molecule
 
