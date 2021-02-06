@@ -45,9 +45,16 @@ namespace vlx_oneints {  // vlx_oneints namespace
 static std::shared_ptr<COverlapIntegralsDriver>
 COverlapIntegralsDriver_create(py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    if (py_comm.is_none())
+    {
+        return std::shared_ptr<COverlapIntegralsDriver>(new COverlapIntegralsDriver(MPI_COMM_WORLD));
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<COverlapIntegralsDriver>(new COverlapIntegralsDriver(*comm_ptr));
+        return std::shared_ptr<COverlapIntegralsDriver>(new COverlapIntegralsDriver(*comm_ptr));
+    }
 }
 
 // Helper function for printing COverlapMatrix
@@ -81,9 +88,16 @@ COverlapMatrix_from_numpy(const py::array_t<double>& arr)
 static std::shared_ptr<CKineticEnergyIntegralsDriver>
 CKineticEnergyIntegralsDriver_create(py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    if (py_comm.is_none())
+    {
+        return std::shared_ptr<CKineticEnergyIntegralsDriver>(new CKineticEnergyIntegralsDriver(MPI_COMM_WORLD));
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<CKineticEnergyIntegralsDriver>(new CKineticEnergyIntegralsDriver(*comm_ptr));
+        return std::shared_ptr<CKineticEnergyIntegralsDriver>(new CKineticEnergyIntegralsDriver(*comm_ptr));
+    }
 }
 
 // Helper function for printing CKineticEnergyMatrix
@@ -117,9 +131,16 @@ CKineticEnergyMatrix_from_numpy(const py::array_t<double>& arr)
 static std::shared_ptr<CNuclearPotentialIntegralsDriver>
 CNuclearPotentialIntegralsDriver_create(py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    if (py_comm.is_none())
+    {
+        return std::shared_ptr<CNuclearPotentialIntegralsDriver>(new CNuclearPotentialIntegralsDriver(MPI_COMM_WORLD));
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<CNuclearPotentialIntegralsDriver>(new CNuclearPotentialIntegralsDriver(*comm_ptr));
+        return std::shared_ptr<CNuclearPotentialIntegralsDriver>(new CNuclearPotentialIntegralsDriver(*comm_ptr));
+    }
 }
 
 // Helper function for printing CNuclearPotentialMatrix
@@ -183,9 +204,16 @@ CNuclearPotentialIntegralsDriver_compute(CNuclearPotentialIntegralsDriver&      
 static std::shared_ptr<CElectricDipoleIntegralsDriver>
 CElectricDipoleIntegralsDriver_create(py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    if (py_comm.is_none())
+    {
+        return std::shared_ptr<CElectricDipoleIntegralsDriver>(new CElectricDipoleIntegralsDriver(MPI_COMM_WORLD));
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<CElectricDipoleIntegralsDriver>(new CElectricDipoleIntegralsDriver(*comm_ptr));
+        return std::shared_ptr<CElectricDipoleIntegralsDriver>(new CElectricDipoleIntegralsDriver(*comm_ptr));
+    }
 }
 
 // Helper function for printing CElectricDipoleMatrix
@@ -221,9 +249,16 @@ CElectricDipoleMatrix_z_to_numpy(const CElectricDipoleMatrix& self)
 static std::shared_ptr<CLinearMomentumIntegralsDriver>
 CLinearMomentumIntegralsDriver_create(py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    if (py_comm.is_none())
+    {
+        return std::shared_ptr<CLinearMomentumIntegralsDriver>(new CLinearMomentumIntegralsDriver(MPI_COMM_WORLD));
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<CLinearMomentumIntegralsDriver>(new CLinearMomentumIntegralsDriver(*comm_ptr));
+        return std::shared_ptr<CLinearMomentumIntegralsDriver>(new CLinearMomentumIntegralsDriver(*comm_ptr));
+    }
 }
 
 // Helper function for printing CLinearMomentumMatrix
@@ -259,9 +294,16 @@ CLinearMomentumMatrix_z_to_numpy(const CLinearMomentumMatrix& self)
 static std::shared_ptr<CAngularMomentumIntegralsDriver>
 CAngularMomentumIntegralsDriver_create(py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    if (py_comm.is_none())
+    {
+        return std::shared_ptr<CAngularMomentumIntegralsDriver>(new CAngularMomentumIntegralsDriver(MPI_COMM_WORLD));
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<CAngularMomentumIntegralsDriver>(new CAngularMomentumIntegralsDriver(*comm_ptr));
+        return std::shared_ptr<CAngularMomentumIntegralsDriver>(new CAngularMomentumIntegralsDriver(*comm_ptr));
+    }
 }
 
 // Helper function for printing CAngularMomentumMatrix
@@ -297,9 +339,16 @@ CAngularMomentumMatrix_z_to_numpy(const CAngularMomentumMatrix& self)
 static std::shared_ptr<CElectricFieldIntegralsDriver>
 CElectricFieldIntegralsDriver_create(py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    if (py_comm.is_none())
+    {
+        return std::shared_ptr<CElectricFieldIntegralsDriver>(new CElectricFieldIntegralsDriver(MPI_COMM_WORLD));
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<CElectricFieldIntegralsDriver>(new CElectricFieldIntegralsDriver(*comm_ptr));
+        return std::shared_ptr<CElectricFieldIntegralsDriver>(new CElectricFieldIntegralsDriver(*comm_ptr));
+    }
 }
 
 // Helper function for printing CElectricDipoleMatrix
@@ -394,7 +443,7 @@ export_oneints(py::module& m)
     // COverlapIntegralsDriver class
 
     py::class_<COverlapIntegralsDriver, std::shared_ptr<COverlapIntegralsDriver>>(m, "OverlapIntegralsDriver")
-        .def(py::init(&COverlapIntegralsDriver_create))
+        .def(py::init(&COverlapIntegralsDriver_create), py::arg("py_comm") = py::none())
         .def("compute",
              (COverlapMatrix(COverlapIntegralsDriver::*)(const CMolecule&, const CMolecularBasis&) const) &
                  COverlapIntegralsDriver::compute)
@@ -427,7 +476,7 @@ export_oneints(py::module& m)
 
     py::class_<CKineticEnergyIntegralsDriver, std::shared_ptr<CKineticEnergyIntegralsDriver>>(
         m, "KineticEnergyIntegralsDriver")
-        .def(py::init(&CKineticEnergyIntegralsDriver_create))
+        .def(py::init(&CKineticEnergyIntegralsDriver_create), py::arg("py_comm") = py::none())
         .def("compute",
              (CKineticEnergyMatrix(CKineticEnergyIntegralsDriver::*)(const CMolecule&, const CMolecularBasis&) const) &
                  CKineticEnergyIntegralsDriver::compute)
@@ -461,7 +510,7 @@ export_oneints(py::module& m)
 
     py::class_<CNuclearPotentialIntegralsDriver, std::shared_ptr<CNuclearPotentialIntegralsDriver>>(
         m, "NuclearPotentialIntegralsDriver")
-        .def(py::init(&CNuclearPotentialIntegralsDriver_create))
+        .def(py::init(&CNuclearPotentialIntegralsDriver_create), py::arg("py_comm") = py::none())
         .def("compute",
              (CNuclearPotentialMatrix(CNuclearPotentialIntegralsDriver::*)(const CMolecule&, const CMolecularBasis&)
                   const) &
@@ -506,7 +555,7 @@ export_oneints(py::module& m)
 
     py::class_<CElectricDipoleIntegralsDriver, std::shared_ptr<CElectricDipoleIntegralsDriver>>(
         m, "ElectricDipoleIntegralsDriver")
-        .def(py::init(&CElectricDipoleIntegralsDriver_create))
+        .def(py::init(&CElectricDipoleIntegralsDriver_create), py::arg("py_comm") = py::none())
         .def("set_origin", &CElectricDipoleIntegralsDriver::setElectricDipoleOrigin)
         .def(
             "compute",
@@ -541,7 +590,7 @@ export_oneints(py::module& m)
 
     py::class_<CLinearMomentumIntegralsDriver, std::shared_ptr<CLinearMomentumIntegralsDriver>>(
         m, "LinearMomentumIntegralsDriver")
-        .def(py::init(&CLinearMomentumIntegralsDriver_create))
+        .def(py::init(&CLinearMomentumIntegralsDriver_create), py::arg("py_comm") = py::none())
         .def(
             "compute",
             (CLinearMomentumMatrix(CLinearMomentumIntegralsDriver::*)(const CMolecule&, const CMolecularBasis&) const) &
@@ -580,7 +629,7 @@ export_oneints(py::module& m)
 
     py::class_<CAngularMomentumIntegralsDriver, std::shared_ptr<CAngularMomentumIntegralsDriver>>(
         m, "AngularMomentumIntegralsDriver")
-        .def(py::init(&CAngularMomentumIntegralsDriver_create))
+        .def(py::init(&CAngularMomentumIntegralsDriver_create), py::arg("py_comm") = py::none())
         .def("set_origin", &CAngularMomentumIntegralsDriver::setAngularMomentumOrigin)
         .def("compute",
              (CAngularMomentumMatrix(CAngularMomentumIntegralsDriver::*)(const CMolecule&, const CMolecularBasis&)
@@ -615,7 +664,7 @@ export_oneints(py::module& m)
 
     py::class_<CElectricFieldIntegralsDriver, std::shared_ptr<CElectricFieldIntegralsDriver>>(
         m, "ElectricFieldIntegralsDriver")
-        .def(py::init(&CElectricFieldIntegralsDriver_create))
+        .def(py::init(&CElectricFieldIntegralsDriver_create), py::arg("py_comm") = py::none())
         .def("compute",
              (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(
                  const CMolecule&, const CMolecularBasis&, const double, const double, const double) const) &
