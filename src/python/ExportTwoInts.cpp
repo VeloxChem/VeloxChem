@@ -78,7 +78,7 @@ CAOFockMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
         fmat.push_back(*mp);
     }
 
-    return std::shared_ptr<CAOFockMatrix>(new CAOFockMatrix(fmat, types, factors, ids));
+    return std::make_shared<CAOFockMatrix>(fmat, types, factors, ids);
 }
 
 // Helper function for CElectronRepulsionIntegralsDriver constructor
@@ -88,13 +88,13 @@ CElectronRepulsionIntegralsDriver_create(py::object py_comm)
 {
     if (py_comm.is_none())
     {
-        return std::shared_ptr<CElectronRepulsionIntegralsDriver>(new CElectronRepulsionIntegralsDriver(MPI_COMM_WORLD));
+        return std::make_shared<CElectronRepulsionIntegralsDriver>(MPI_COMM_WORLD);
     }
     else
     {
         MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-        return std::shared_ptr<CElectronRepulsionIntegralsDriver>(new CElectronRepulsionIntegralsDriver(*comm_ptr));
+        return std::make_shared<CElectronRepulsionIntegralsDriver>(*comm_ptr);
     }
 }
 

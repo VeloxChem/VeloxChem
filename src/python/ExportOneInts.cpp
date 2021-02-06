@@ -47,13 +47,13 @@ COverlapIntegralsDriver_create(py::object py_comm)
 {
     if (py_comm.is_none())
     {
-        return std::shared_ptr<COverlapIntegralsDriver>(new COverlapIntegralsDriver(MPI_COMM_WORLD));
+        return std::make_shared<COverlapIntegralsDriver>(MPI_COMM_WORLD);
     }
     else
     {
         MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-        return std::shared_ptr<COverlapIntegralsDriver>(new COverlapIntegralsDriver(*comm_ptr));
+        return std::make_shared<COverlapIntegralsDriver>(*comm_ptr);
     }
 }
 
@@ -80,7 +80,7 @@ COverlapMatrix_from_numpy(const py::array_t<double>& arr)
 {
     auto mp = vlx_math::CDenseMatrix_from_numpy(arr);
 
-    return std::shared_ptr<COverlapMatrix>(new COverlapMatrix(*mp));
+    return std::make_shared<COverlapMatrix>(*mp);
 }
 
 // Helper function for CKineticEnergyIntegralsDriver constructor
@@ -90,13 +90,13 @@ CKineticEnergyIntegralsDriver_create(py::object py_comm)
 {
     if (py_comm.is_none())
     {
-        return std::shared_ptr<CKineticEnergyIntegralsDriver>(new CKineticEnergyIntegralsDriver(MPI_COMM_WORLD));
+        return std::make_shared<CKineticEnergyIntegralsDriver>(MPI_COMM_WORLD);
     }
     else
     {
         MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-        return std::shared_ptr<CKineticEnergyIntegralsDriver>(new CKineticEnergyIntegralsDriver(*comm_ptr));
+        return std::make_shared<CKineticEnergyIntegralsDriver>(*comm_ptr);
     }
 }
 
@@ -123,7 +123,7 @@ CKineticEnergyMatrix_from_numpy(const py::array_t<double>& arr)
 {
     auto mp = vlx_math::CDenseMatrix_from_numpy(arr);
 
-    return std::shared_ptr<CKineticEnergyMatrix>(new CKineticEnergyMatrix(*mp));
+    return std::make_shared<CKineticEnergyMatrix>(*mp);
 }
 
 // Helper function for CNuclearPotentialIntegralsDriver constructor
@@ -133,13 +133,13 @@ CNuclearPotentialIntegralsDriver_create(py::object py_comm)
 {
     if (py_comm.is_none())
     {
-        return std::shared_ptr<CNuclearPotentialIntegralsDriver>(new CNuclearPotentialIntegralsDriver(MPI_COMM_WORLD));
+        return std::make_shared<CNuclearPotentialIntegralsDriver>(MPI_COMM_WORLD);
     }
     else
     {
         MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-        return std::shared_ptr<CNuclearPotentialIntegralsDriver>(new CNuclearPotentialIntegralsDriver(*comm_ptr));
+        return std::make_shared<CNuclearPotentialIntegralsDriver>(*comm_ptr);
     }
 }
 
@@ -166,7 +166,7 @@ CNuclearPotentialMatrix_from_numpy(const py::array_t<double>& arr)
 {
     auto mp = vlx_math::CDenseMatrix_from_numpy(arr);
 
-    return std::shared_ptr<CNuclearPotentialMatrix>(new CNuclearPotentialMatrix(*mp));
+    return std::make_shared<CNuclearPotentialMatrix>(*mp);
 }
 
 // Helper function for reduce_sum CNuclearPotentialMatrix object
@@ -206,13 +206,13 @@ CElectricDipoleIntegralsDriver_create(py::object py_comm)
 {
     if (py_comm.is_none())
     {
-        return std::shared_ptr<CElectricDipoleIntegralsDriver>(new CElectricDipoleIntegralsDriver(MPI_COMM_WORLD));
+        return std::make_shared<CElectricDipoleIntegralsDriver>(MPI_COMM_WORLD);
     }
     else
     {
         MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-        return std::shared_ptr<CElectricDipoleIntegralsDriver>(new CElectricDipoleIntegralsDriver(*comm_ptr));
+        return std::make_shared<CElectricDipoleIntegralsDriver>(*comm_ptr);
     }
 }
 
@@ -251,13 +251,13 @@ CLinearMomentumIntegralsDriver_create(py::object py_comm)
 {
     if (py_comm.is_none())
     {
-        return std::shared_ptr<CLinearMomentumIntegralsDriver>(new CLinearMomentumIntegralsDriver(MPI_COMM_WORLD));
+        return std::make_shared<CLinearMomentumIntegralsDriver>(MPI_COMM_WORLD);
     }
     else
     {
         MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-        return std::shared_ptr<CLinearMomentumIntegralsDriver>(new CLinearMomentumIntegralsDriver(*comm_ptr));
+        return std::make_shared<CLinearMomentumIntegralsDriver>(*comm_ptr);
     }
 }
 
@@ -296,13 +296,13 @@ CAngularMomentumIntegralsDriver_create(py::object py_comm)
 {
     if (py_comm.is_none())
     {
-        return std::shared_ptr<CAngularMomentumIntegralsDriver>(new CAngularMomentumIntegralsDriver(MPI_COMM_WORLD));
+        return std::make_shared<CAngularMomentumIntegralsDriver>(MPI_COMM_WORLD);
     }
     else
     {
         MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-        return std::shared_ptr<CAngularMomentumIntegralsDriver>(new CAngularMomentumIntegralsDriver(*comm_ptr));
+        return std::make_shared<CAngularMomentumIntegralsDriver>(*comm_ptr);
     }
 }
 
@@ -341,13 +341,13 @@ CElectricFieldIntegralsDriver_create(py::object py_comm)
 {
     if (py_comm.is_none())
     {
-        return std::shared_ptr<CElectricFieldIntegralsDriver>(new CElectricFieldIntegralsDriver(MPI_COMM_WORLD));
+        return std::make_shared<CElectricFieldIntegralsDriver>(MPI_COMM_WORLD);
     }
     else
     {
         MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-        return std::shared_ptr<CElectricFieldIntegralsDriver>(new CElectricFieldIntegralsDriver(*comm_ptr));
+        return std::make_shared<CElectricFieldIntegralsDriver>(*comm_ptr);
     }
 }
 

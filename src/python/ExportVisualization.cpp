@@ -28,13 +28,13 @@ CVisualizationDriver_create(py::object py_comm)
 {
     if (py_comm.is_none())
     {
-        return std::shared_ptr<CVisualizationDriver>(new CVisualizationDriver(MPI_COMM_WORLD));
+        return std::make_shared<CVisualizationDriver>(MPI_COMM_WORLD);
     }
     else
     {
         MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-        return std::shared_ptr<CVisualizationDriver>(new CVisualizationDriver(*comm_ptr));
+        return std::make_shared<CVisualizationDriver>(*comm_ptr);
     }
 }
 
