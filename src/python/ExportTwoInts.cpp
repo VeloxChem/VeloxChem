@@ -86,9 +86,16 @@ CAOFockMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
 static std::shared_ptr<CElectronRepulsionIntegralsDriver>
 CElectronRepulsionIntegralsDriver_create(py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    if (py_comm.is_none())
+    {
+        return std::shared_ptr<CElectronRepulsionIntegralsDriver>(new CElectronRepulsionIntegralsDriver(MPI_COMM_WORLD));
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<CElectronRepulsionIntegralsDriver>(new CElectronRepulsionIntegralsDriver(*comm_ptr));
+        return std::shared_ptr<CElectronRepulsionIntegralsDriver>(new CElectronRepulsionIntegralsDriver(*comm_ptr));
+    }
 }
 
 // Helper function for exporting CElectronRepulsionIntegralsDriver.compute
@@ -373,7 +380,7 @@ export_twoints(py::module& m)
 
     py::class_<CElectronRepulsionIntegralsDriver, std::shared_ptr<CElectronRepulsionIntegralsDriver>>(
         m, "ElectronRepulsionIntegralsDriver")
-        .def(py::init(&CElectronRepulsionIntegralsDriver_create))
+        .def(py::init(&CElectronRepulsionIntegralsDriver_create), py::arg("py_comm") = py::none())
         .def("compute",
              (CScreeningContainer(CElectronRepulsionIntegralsDriver::*)(
                  const ericut, const double, const CMolecule&, const CMolecularBasis&) const) &
