@@ -11,6 +11,9 @@
 #include <iostream>
 #include <fstream>
 
+#include <mpi.h>
+
+#include "Molecule.hpp"
 #include "MpiFunc.hpp"
 
 CXTBDriver::CXTBDriver(MPI_Comm comm)

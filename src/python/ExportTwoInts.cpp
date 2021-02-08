@@ -78,7 +78,7 @@ CAOFockMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
         fmat.push_back(*mp);
     }
 
-    return std::shared_ptr<CAOFockMatrix>(new CAOFockMatrix(fmat, types, factors, ids));
+    return std::make_shared<CAOFockMatrix>(fmat, types, factors, ids);
 }
 
 // Helper function for CElectronRepulsionIntegralsDriver constructor
@@ -86,9 +86,16 @@ CAOFockMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
 static std::shared_ptr<CElectronRepulsionIntegralsDriver>
 CElectronRepulsionIntegralsDriver_create(py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    if (py_comm.is_none())
+    {
+        return std::make_shared<CElectronRepulsionIntegralsDriver>(MPI_COMM_WORLD);
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<CElectronRepulsionIntegralsDriver>(new CElectronRepulsionIntegralsDriver(*comm_ptr));
+        return std::make_shared<CElectronRepulsionIntegralsDriver>(*comm_ptr);
+    }
 }
 
 // Helper function for exporting CElectronRepulsionIntegralsDriver.compute
@@ -112,13 +119,13 @@ CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegra
                                                  const CMolecularBasis&                   basis,
                                                        py::array_t<double>&               eri)
 {
-    std::string errsrc("compute_in_mem - Expect a c_style contiguous numpy array");
+    std::string errsrc("ElectronRepulsionIntegralsDriver.compute_in_mem: Expecting a c_style contiguous numpy array");
 
     auto c_style = py::detail::check_flags(eri.ptr(), py::array::c_style);
 
     errors::assertMsgCritical(c_style, errsrc);
 
-    std::string errshape("compute_in_mem - Invalid shape");
+    std::string errshape("ElectronRepulsionIntegralsDriver.compute_in_mem: Invalid shape");
 
     errors::assertMsgCritical(eri.ndim() == 4, errshape);
 
@@ -141,7 +148,7 @@ CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegra
         }
     }
 
-    std::string errsize("compute_in_mem - Inconsistent size");
+    std::string errsize("ElectronRepulsionIntegralsDriver.compute_in_mem: Inconsistent size");
 
     errors::assertMsgCritical(eri.shape(0) == nao, errsize);
 
@@ -296,7 +303,9 @@ export_twoints(py::module& m)
         .value("rgenj", fockmat::rgenj)
         .value("rgenk", fockmat::rgenk)
         .value("rgenkx", fockmat::rgenkx)
-        .value("unrestjk", fockmat::unrestjk);
+        .value("unrestjk", fockmat::unrestjk)
+        .value("unrestj", fockmat::unrestj)
+        .value("unrestjkx", fockmat::unrestjkx);
 
     // ericut enum class
 
@@ -371,7 +380,7 @@ export_twoints(py::module& m)
 
     py::class_<CElectronRepulsionIntegralsDriver, std::shared_ptr<CElectronRepulsionIntegralsDriver>>(
         m, "ElectronRepulsionIntegralsDriver")
-        .def(py::init(&CElectronRepulsionIntegralsDriver_create))
+        .def(py::init(&CElectronRepulsionIntegralsDriver_create), py::arg("py_comm") = py::none())
         .def("compute",
              (CScreeningContainer(CElectronRepulsionIntegralsDriver::*)(
                  const ericut, const double, const CMolecule&, const CMolecularBasis&) const) &

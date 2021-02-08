@@ -2,6 +2,9 @@
 VeloxChem
 =========
 
+.. image:: https://anaconda.org/veloxchem/veloxchem/badges/installer/conda.svg   
+        :alt: Install with Conda
+        :target: https://conda.anaconda.org/veloxchem
 
 .. image:: https://img.shields.io/pypi/v/veloxchem.svg
         :alt: PyPI package   
@@ -14,6 +17,7 @@ VeloxChem
 .. image:: https://img.shields.io/gitlab/pipeline/veloxchem/veloxchem   
         :alt: GitLab pipeline   
         :target: https://gitlab.com/veloxchem/veloxchem/builds
+
 
 VeloxChem: A Python‐driven density‐functional theory program for spectroscopy simulations in high‐performance computing environments.
 

@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "mpi.h"
+#include <mpi.h>
 
 #include "BasisFunction.hpp"
 

@@ -343,6 +343,31 @@ CTwoIntsDistribution::getMaxDensityElements(      CMemBlock<double>& maxDensityE
                                           braGtoPairsBlock, ketGtoPairsBlock,
                                           nKetContrPairs, iContrPair);
         }
+        
+        // open shell unrestricted Hartree-Fock: 2J
+        
+        if (fcktyp == fockmat::unrestj)
+        {
+            distmaxden::getMaxUnrestDenJ(maxDensityElements,
+                                         _aoDensity->alphaDensity(idden),
+                                         _aoDensity->betaDensity(idden),
+                                         _aoDensity->getNumberOfColumns(idden),
+                                         braGtoPairsBlock, ketGtoPairsBlock,
+                                         nKetContrPairs, iContrPair);
+        }
+        
+        // open shell unrestricted Hartree-Fock: 2J + xK
+        
+        if (fcktyp == fockmat::unrestjkx)
+        {
+            distmaxden::getMaxUnrestDenJKX(maxDensityElements,
+                                         _aoDensity->alphaDensity(idden),
+                                         _aoDensity->betaDensity(idden),
+                                         _aoDensity->getNumberOfColumns(idden),
+                                         _aoFock->getScaleFactor(i),
+                                         braGtoPairsBlock, ketGtoPairsBlock,
+                                         nKetContrPairs, iContrPair);
+        }
     }
 }
 
@@ -545,6 +570,31 @@ CTwoIntsDistribution::_distSpherIntsIntoFock(const CMemBlock2D<double>& spherInt
                                    _aoDensity->getNumberOfColumns(idden),
                                    spherInts, braGtoPairsBlock, ketGtoPairsBlock,
                                    nKetContrPairs, iContrPair);
+        }
+               
+        // open shell unrestricted Hatree-Fock: 2J
+        
+        if (fcktyp == fockmat::unrestj)
+        {
+            distfock::distUnrestJ(_fockContainer, i,
+                                  _aoDensity->alphaDensity(idden),
+                                  _aoDensity->betaDensity(idden),
+                                  _aoDensity->getNumberOfColumns(idden),
+                                  spherInts, braGtoPairsBlock, ketGtoPairsBlock,
+                                  nKetContrPairs, iContrPair);
+        }
+        
+        // open shell unrestricted Hartree-Fock: 2J + xK
+        
+        if (fcktyp == fockmat::unrestjkx)
+        {
+            distfock::distUnrestJKX(_fockContainer, i,
+                                    _aoDensity->alphaDensity(idden),
+                                    _aoDensity->betaDensity(idden),
+                                    _aoDensity->getNumberOfColumns(idden),
+                                    _aoFock->getScaleFactor(i),
+                                    spherInts, braGtoPairsBlock, ketGtoPairsBlock,
+                                    nKetContrPairs, iContrPair);
         }
     }
 }

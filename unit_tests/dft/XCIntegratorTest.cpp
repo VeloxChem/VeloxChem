@@ -8,6 +8,8 @@
 
 #include "XCIntegratorTest.hpp"
 
+#include <mpi.h>
+
 #include "GridDriver.hpp"
 #include "XCIntegrator.hpp"
 #include "MoleculeSetter.hpp"

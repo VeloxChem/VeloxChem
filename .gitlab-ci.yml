@@ -12,7 +12,6 @@ before_script:
   - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/intelpython3/lib
   - export OMP_NUM_THREADS=6
   - export GTESTROOT=/home/xinli/software/googletest/googletest
-  - export GTESTLIB=/home/xinli/software/googletest/googletest/lib/libgtest.a
   - export MPICC=$I_MPI_ROOT/intel64/mpi/mpiicc
 
 after_script:
@@ -35,7 +34,7 @@ veloxchem_test:
     - vlx-test
   stage: test
   script:
-    - python3.6 -m venv --without-pip venv
+    - python3.6 -m venv --without-pip --clear venv
     - source venv/bin/activate
     - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
     - python3 get-pip.py

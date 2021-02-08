@@ -11,6 +11,8 @@
 #include <cmath>
 #include <vector>
 
+#include <mpi.h>
+
 #include "AODensityMatrix.hpp"
 #include "CubicGrid.hpp"
 #include "MathConst.hpp"

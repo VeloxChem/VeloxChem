@@ -10,6 +10,8 @@
 
 #include <cmath>
 
+#include <mpi.h>
+
 #include "DenseLinearAlgebra.hpp"
 #include "NumaPolicy.hpp"
 
@@ -663,6 +665,12 @@ CAOFockMatrix::isSymmetric(const int32_t iFockMatrix) const
         if (fcktyp == fockmat::restkx) return true;
 
         if (fcktyp == fockmat::unrestjk) return true;
+            
+        if (fcktyp == fockmat::unrestj) return true;
+        
+        if (fcktyp == fockmat::unrestjkx) return true;
+
+
     }
     
     return false;

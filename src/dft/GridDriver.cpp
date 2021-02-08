@@ -12,10 +12,14 @@
 #include <cmath>
 #include <sstream>
 
+#include <mpi.h>
+
 #include "ChemicalElement.hpp"
 #include "LebedevLaikovQuadrature.hpp"
 #include "Log3Quadrature.hpp"
 #include "MathConst.hpp"
+#include "MolecularGrid.hpp"
+#include "Molecule.hpp"
 #include "MpiFunc.hpp"
 #include "PartitionFunc.hpp"
 #include "StringFormat.hpp"

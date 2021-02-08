@@ -1,10 +1,11 @@
+from mpi4py import MPI
 import numpy as np
 import time as tm
 import psutil
-import math
 import sys
 
 from .veloxchemlib import mpi_master
+from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
@@ -33,10 +34,16 @@ class ComplexResponse(LinearSolver):
         - damping: The damping parameter.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes complex linear response solver to default setup.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 
@@ -120,10 +127,14 @@ class ComplexResponse(LinearSolver):
         pc_diag = p_diag * c_diag
         pd_diag = p_diag * d_diag
 
-        return tuple([
-            DistributedArray(p, self.comm)
-            for p in [pa_diag, pb_diag, pc_diag, pd_diag]
-        ])
+        p_mat = np.hstack((
+            pa_diag.reshape(-1, 1),
+            pb_diag.reshape(-1, 1),
+            pc_diag.reshape(-1, 1),
+            pd_diag.reshape(-1, 1),
+        ))
+
+        return DistributedArray(p_mat, self.comm)
 
     def preconditioning(self, precond, v_in):
         """
@@ -138,19 +149,29 @@ class ComplexResponse(LinearSolver):
             A tuple of distributed trail vectors after preconditioning.
         """
 
-        pa, pb, pc, pd = [p.data for p in precond]
+        pa = precond.data[:, 0]
+        pb = precond.data[:, 1]
+        pc = precond.data[:, 2]
+        pd = precond.data[:, 3]
 
-        v_in_rg, v_in_ru, v_in_iu, v_in_ig = [v.data for v in v_in]
+        v_in_rg = v_in.data[:, 0]
+        v_in_ru = v_in.data[:, 1]
+        v_in_iu = v_in.data[:, 2]
+        v_in_ig = v_in.data[:, 3]
 
         v_out_rg = pa * v_in_rg + pb * v_in_ru + pc * v_in_iu + pd * v_in_ig
         v_out_ru = pb * v_in_rg + pa * v_in_ru + pd * v_in_iu + pc * v_in_ig
         v_out_iu = pc * v_in_rg + pd * v_in_ru - pa * v_in_iu - pb * v_in_ig
         v_out_ig = pd * v_in_rg + pc * v_in_ru - pb * v_in_iu - pa * v_in_ig
 
-        return tuple([
-            DistributedArray(v, self.comm, distribute=False)
-            for v in [v_out_rg, v_out_ru, v_out_iu, v_out_ig]
-        ])
+        v_mat = np.hstack((
+            v_out_rg.reshape(-1, 1),
+            v_out_ru.reshape(-1, 1),
+            v_out_iu.reshape(-1, 1),
+            v_out_ig.reshape(-1, 1),
+        ))
+
+        return DistributedArray(v_mat, self.comm, distribute=False)
 
     def precond_trials(self, vectors, precond):
         """
@@ -167,26 +188,26 @@ class ComplexResponse(LinearSolver):
 
         trials_ger = []
         trials_ung = []
-        sqrt_2 = math.sqrt(2.0)
 
         for (op, w), vec in vectors.items():
             v = self.preconditioning(precond[w], vec)
-            norms = [sqrt_2 * p.norm() for p in v]
-            vn = math.sqrt(sum([n**2 for n in norms]))
+            norms_2 = 2.0 * v.squared_norm(axis=0)
+            vn = np.sqrt(np.sum(norms_2))
 
             if vn > self.small_thresh:
+                norms = np.sqrt(norms_2)
                 # real gerade
                 if norms[0] > self.small_thresh:
-                    trials_ger.append(v[0].data)
+                    trials_ger.append(v.data[:, 0])
                 # real ungerade
                 if norms[1] > self.small_thresh:
-                    trials_ung.append(v[1].data)
+                    trials_ung.append(v.data[:, 1])
                 # imaginary ungerade
                 if norms[2] > self.small_thresh:
-                    trials_ung.append(v[2].data)
+                    trials_ung.append(v.data[:, 2])
                 # imaginary gerade
                 if norms[3] > self.small_thresh:
-                    trials_ger.append(v[3].data)
+                    trials_ger.append(v.data[:, 3])
 
         new_ger = np.array(trials_ger).T
         new_ung = np.array(trials_ung).T
@@ -234,7 +255,8 @@ class ComplexResponse(LinearSolver):
         })
 
         if self.rank == mpi_master():
-            self.print_header('Complex Response Solver')
+            self.print_header('Complex Response Solver',
+                              n_freqs=len(self.frequencies))
 
         self.start_time = tm.time()
 
@@ -243,7 +265,7 @@ class ComplexResponse(LinearSolver):
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'ComplexResponseSolver: not implemented for unrestricted case')
+            'ComplexResponse: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             orb_ene = scf_tensors['E']
@@ -296,17 +318,15 @@ class ComplexResponse(LinearSolver):
         for key in op_freq_keys:
             if self.rank == mpi_master():
                 gradger, gradung = self.decomp_grad(v1[key])
-                grad_rg = gradger.real.copy()
-                grad_ru = gradung.real.copy()
-                grad_iu = gradung.imag.copy()
-                grad_ig = gradger.imag.copy()
+                grad_mat = np.hstack((
+                    gradger.real.reshape(-1, 1),
+                    gradung.real.reshape(-1, 1),
+                    gradung.imag.reshape(-1, 1),
+                    gradger.imag.reshape(-1, 1),
+                ))
             else:
-                grad_rg, grad_ru = None, None
-                grad_iu, grad_ig = None, None
-            dist_v1[key] = (DistributedArray(grad_rg, self.comm),
-                            DistributedArray(grad_ru, self.comm),
-                            DistributedArray(grad_iu, self.comm),
-                            DistributedArray(grad_ig, self.comm))
+                grad_mat = None
+            dist_v1[key] = DistributedArray(grad_mat, self.comm)
 
         if self.nonlinear:
             rsp_vector_labels = [
@@ -352,7 +372,6 @@ class ComplexResponse(LinearSolver):
                                             rsp_vector_labels)
 
         iter_per_trail_in_hours = None
-        sqrt_2 = math.sqrt(2.0)
 
         # start iterations
         for iteration in range(self.max_iter):
@@ -375,7 +394,10 @@ class ComplexResponse(LinearSolver):
                 if (iteration == 0 or
                         relative_residual_norm[(op, w)] > self.conv_thresh):
 
-                    grad_rg, grad_ru, grad_iu, grad_ig = dist_v1[(op, w)]
+                    grad_rg = dist_v1[(op, w)].get_column(0)
+                    grad_ru = dist_v1[(op, w)].get_column(1)
+                    grad_iu = dist_v1[(op, w)].get_column(2)
+                    grad_ig = dist_v1[(op, w)].get_column(3)
 
                     # projections onto gerade and ungerade subspaces:
 
@@ -502,35 +524,37 @@ class ComplexResponse(LinearSolver):
                     r_imagger = (-e2imagger.data + w * s2imagung +
                                  d * s2realung + grad_ig.data)
 
-                    r_realger = DistributedArray(r_realger,
-                                                 self.comm,
-                                                 distribute=False)
-                    r_realung = DistributedArray(r_realung,
-                                                 self.comm,
-                                                 distribute=False)
-                    r_imagung = DistributedArray(r_imagung,
-                                                 self.comm,
-                                                 distribute=False)
-                    r_imagger = DistributedArray(r_imagger,
-                                                 self.comm,
-                                                 distribute=False)
+                    r_data = np.hstack((
+                        r_realger.reshape(-1, 1),
+                        r_realung.reshape(-1, 1),
+                        r_imagung.reshape(-1, 1),
+                        r_imagger.reshape(-1, 1),
+                    ))
+
+                    r = DistributedArray(r_data, self.comm, distribute=False)
 
                     # calculating relative residual norm
                     # for convergence check
 
-                    r = (r_realger, r_realung, r_imagung, r_imagger)
-                    x = (x_realger, x_realung, x_imagung, x_imagger)
+                    x_data = np.hstack((
+                        x_realger.data.reshape(-1, 1),
+                        x_realung.data.reshape(-1, 1),
+                        x_imagung.data.reshape(-1, 1),
+                        x_imagger.data.reshape(-1, 1),
+                    ))
+
+                    x = DistributedArray(x_data, self.comm, distribute=False)
 
                     x_full = self.get_full_solution_vector(x)
                     if self.rank == mpi_master():
                         xv = np.dot(x_full, v1[(op, w)])
                         xvs.append((op, w, xv))
 
-                    r_norms = [sqrt_2 * p.norm() for p in r]
-                    x_norms = [sqrt_2 * p.norm() for p in x]
+                    r_norms_2 = 2.0 * r.squared_norm(axis=0)
+                    x_norms_2 = 2.0 * x.squared_norm(axis=0)
 
-                    rn = math.sqrt(sum([n**2 for n in r_norms]))
-                    xn = math.sqrt(sum([n**2 for n in x_norms]))
+                    rn = np.sqrt(np.sum(r_norms_2))
+                    xn = np.sqrt(np.sum(x_norms_2))
 
                     if xn != 0:
                         relative_residual_norm[(op, w)] = rn / xn
@@ -687,10 +711,7 @@ class ComplexResponse(LinearSolver):
                     kappas[(op, w)] = (self.lrvec2mat(x.real, nocc, norb) +
                                        1j * self.lrvec2mat(x.imag, nocc, norb))
 
-                return {
-                    'focks': focks,
-                    'kappas': kappas
-                }
+                return {'focks': focks, 'kappas': kappas}
 
         return {}
 
@@ -705,22 +726,16 @@ class ComplexResponse(LinearSolver):
             The full solution vector.
         """
 
-        (dist_x_realger, dist_x_realung, dist_x_imagung,
-         dist_x_imagger) = solution
-
-        x_realger = dist_x_realger.get_full_vector()
-        x_realung = dist_x_realung.get_full_vector()
-        x_imagung = dist_x_imagung.get_full_vector()
-        x_imagger = dist_x_imagger.get_full_vector()
+        x_realger = solution.get_full_vector(0)
+        x_realung = solution.get_full_vector(1)
+        x_imagung = solution.get_full_vector(2)
+        x_imagger = solution.get_full_vector(3)
 
         if self.rank == mpi_master():
-            x_realger_full = np.hstack((x_realger, x_realger))
-            x_realung_full = np.hstack((x_realung, -x_realung))
-            x_imagung_full = np.hstack((x_imagung, -x_imagung))
-            x_imagger_full = np.hstack((x_imagger, x_imagger))
-
-            x_real = x_realger_full + x_realung_full
-            x_imag = x_imagung_full + x_imagger_full
+            x_real = np.hstack((x_realger, x_realger)) + np.hstack(
+                (x_realung, -x_realung))
+            x_imag = np.hstack((x_imagung, -x_imagung)) + np.hstack(
+                (x_imagger, x_imagger))
             return x_real + 1j * x_imag
         else:
             return None

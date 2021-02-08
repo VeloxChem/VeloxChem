@@ -1,10 +1,11 @@
+from mpi4py import MPI
 import numpy as np
 import time as tm
 import psutil
-import math
 import sys
 
 from .veloxchemlib import mpi_master
+from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
@@ -32,10 +33,16 @@ class LinearResponseSolver(LinearSolver):
         - frequencies: The frequencies.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes linear response solver to default setup.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 
@@ -103,7 +110,8 @@ class LinearResponseSolver(LinearSolver):
         })
 
         if self.rank == mpi_master():
-            self.print_header('Linear Response Solver')
+            self.print_header('Linear Response Solver',
+                              n_freqs=len(self.frequencies))
 
         self.start_time = tm.time()
 
@@ -156,10 +164,13 @@ class LinearResponseSolver(LinearSolver):
         for key in op_freq_keys:
             if self.rank == mpi_master():
                 gradger, gradung = self.decomp_grad(v1[key])
+                grad_mat = np.hstack((
+                    gradger.reshape(-1, 1),
+                    gradung.reshape(-1, 1),
+                ))
             else:
-                gradger, gradung = None, None
-            dist_v1[key] = (DistributedArray(gradger, self.comm),
-                            DistributedArray(gradung, self.comm))
+                grad_mat = None
+            dist_v1[key] = DistributedArray(grad_mat, self.comm)
 
         rsp_vector_labels = [
             'LR_bger_half_size',
@@ -199,7 +210,6 @@ class LinearResponseSolver(LinearSolver):
                                             rsp_vector_labels)
 
         iter_per_trail_in_hours = None
-        sqrt_2 = math.sqrt(2.0)
 
         # start iterations
         for iteration in range(self.max_iter):
@@ -223,7 +233,8 @@ class LinearResponseSolver(LinearSolver):
                         relative_residual_norm[(op, freq)] < self.conv_thresh):
                     continue
 
-                gradger, gradung = dist_v1[(op, freq)]
+                gradger = dist_v1[(op, freq)].get_column(0)
+                gradung = dist_v1[(op, freq)].get_column(1)
 
                 g_ger = self.dist_bger.matmul_AtB(gradger, 2.0)
                 g_ung = self.dist_bung.matmul_AtB(gradung, 2.0)
@@ -259,11 +270,19 @@ class LinearResponseSolver(LinearSolver):
                 r_ger = e2x_ger.data - freq * s2x_ung - gradger.data
                 r_ung = e2x_ung.data - freq * s2x_ger - gradung.data
 
-                r_ger = DistributedArray(r_ger, self.comm, distribute=False)
-                r_ung = DistributedArray(r_ung, self.comm, distribute=False)
+                r_data = np.hstack((
+                    r_ger.reshape(-1, 1),
+                    r_ung.reshape(-1, 1),
+                ))
 
-                r = (r_ger, r_ung)
-                x = (x_ger, x_ung)
+                r = DistributedArray(r_data, self.comm, distribute=False)
+
+                x_data = np.hstack((
+                    x_ger.data.reshape(-1, 1),
+                    x_ung.data.reshape(-1, 1),
+                ))
+
+                x = DistributedArray(x_data, self.comm, distribute=False)
 
                 x_full = self.get_full_solution_vector(x)
 
@@ -271,11 +290,11 @@ class LinearResponseSolver(LinearSolver):
                     xv = np.dot(x_full, v1[(op, freq)])
                     xvs.append((op, freq, xv))
 
-                r_norms = [sqrt_2 * p.norm() for p in r]
-                x_norms = [sqrt_2 * p.norm() for p in x]
+                r_norms_2 = 2.0 * r.squared_norm(axis=0)
+                x_norms_2 = 2.0 * x.squared_norm(axis=0)
 
-                rn = math.sqrt(sum([n**2 for n in r_norms]))
-                xn = math.sqrt(sum([n**2 for n in x_norms]))
+                rn = np.sqrt(np.sum(r_norms_2))
+                xn = np.sqrt(np.sum(x_norms_2))
 
                 if xn != 0:
                     relative_residual_norm[(op, freq)] = rn / xn
@@ -428,10 +447,8 @@ class LinearResponseSolver(LinearSolver):
             The full solution vector.
         """
 
-        (dist_x_ger, dist_x_ung) = solution
-
-        x_ger = dist_x_ger.get_full_vector()
-        x_ung = dist_x_ung.get_full_vector()
+        x_ger = solution.get_full_vector(0)
+        x_ung = solution.get_full_vector(1)
 
         if self.rank == mpi_master():
             x_ger_full = np.hstack((x_ger, x_ger))
@@ -498,8 +515,12 @@ class LinearResponseSolver(LinearSolver):
         pa_diag = ediag / (ediag_sq - w_sq * sdiag_sq)
         pb_diag = (w * sdiag) / (ediag_sq - w_sq * sdiag_sq)
 
-        return tuple(
-            [DistributedArray(p, self.comm) for p in [pa_diag, pb_diag]])
+        p_mat = np.hstack((
+            pa_diag.reshape(-1, 1),
+            pb_diag.reshape(-1, 1),
+        ))
+
+        return DistributedArray(p_mat, self.comm)
 
     def preconditioning(self, precond, v_in):
         """
@@ -514,17 +535,21 @@ class LinearResponseSolver(LinearSolver):
             A tuple of distributed trail vectors after preconditioning.
         """
 
-        pa, pb = [p.data for p in precond]
+        pa = precond.data[:, 0]
+        pb = precond.data[:, 1]
 
-        v_in_rg, v_in_ru = [v.data for v in v_in]
+        v_in_rg = v_in.data[:, 0]
+        v_in_ru = v_in.data[:, 1]
 
         v_out_rg = pa * v_in_rg + pb * v_in_ru
         v_out_ru = pb * v_in_rg + pa * v_in_ru
 
-        return tuple([
-            DistributedArray(v, self.comm, distribute=False)
-            for v in [v_out_rg, v_out_ru]
-        ])
+        v_mat = np.hstack((
+            v_out_rg.reshape(-1, 1),
+            v_out_ru.reshape(-1, 1),
+        ))
+
+        return DistributedArray(v_mat, self.comm, distribute=False)
 
     def precond_trials(self, vectors, precond):
         """
@@ -541,20 +566,20 @@ class LinearResponseSolver(LinearSolver):
 
         trials_ger = []
         trials_ung = []
-        sqrt_2 = math.sqrt(2.0)
 
         for (op, w), vec in vectors.items():
             v = self.preconditioning(precond[w], vec)
-            norms = [sqrt_2 * p.norm() for p in v]
-            vn = math.sqrt(sum([n**2 for n in norms]))
+            norms_2 = 2.0 * v.squared_norm(axis=0)
+            vn = np.sqrt(np.sum(norms_2))
 
             if vn > self.small_thresh:
+                norms = np.sqrt(norms_2)
                 # gerade
                 if norms[0] > self.small_thresh:
-                    trials_ger.append(v[0].data)
+                    trials_ger.append(v.data[:, 0])
                 # ungerade
                 if norms[1] > self.small_thresh:
-                    trials_ung.append(v[1].data)
+                    trials_ung.append(v.data[:, 1])
 
         new_ger = np.array(trials_ger).T
         new_ung = np.array(trials_ung).T

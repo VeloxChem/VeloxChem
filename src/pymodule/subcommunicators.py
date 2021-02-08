@@ -24,7 +24,7 @@ class SubCommunicators:
 
         global_rank = global_comm.Get_rank()
         assert_msg_critical(global_comm.Get_size() == len(grps),
-                            'split_comm: inconsistent size')
+                            'SubCommunicators: inconsistent size')
 
         local_group = grps[global_rank]
         self.local_comm = global_comm.Split(local_group, global_rank)

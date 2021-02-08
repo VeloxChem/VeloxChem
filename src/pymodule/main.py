@@ -1,33 +1,31 @@
 from mpi4py import MPI
 import time as tm
-import sys
-import os
 
-from .veloxchemlib import mpi_initialized
-from .veloxchemlib import mpi_master
+from .cli import cli
+from .errorhandler import assert_msg_critical
+from .excitondriver import ExcitonModelDriver
+from .loprop import LoPropDriver
+from .mp2driver import Mp2Driver
 from .mpitask import MpiTask
-from .scfrestdriver import ScfRestrictedDriver
-from .scfunrestdriver import ScfUnrestrictedDriver
-from .scffirstorderprop import ScfFirstOrderProperties
-from .scfgradientdriver import ScfGradientDriver
-from .xtbdriver import XTBDriver
-from .xtbgradientdriver import XTBGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .qmmmdriver import QMMMDriver
-from .rsplinabscross import LinearAbsorptionCrossSection
-from .rspcdspec import CircularDichroismSpectrum
-from .rsppolarizability import Polarizability
+from .pulsedrsp import PulsedResponse
 from .rspabsorption import Absorption
 from .rspc6 import C6
+from .rspcdspec import CircularDichroismSpectrum
 from .rspcustomproperty import CustomProperty
-from .pulsedrsp import PulsedResponse
-from .mp2driver import Mp2Driver
-from .excitondriver import ExcitonModelDriver
-from .visualizationdriver import VisualizationDriver
-from .loprop import LoPropDriver
-from .errorhandler import assert_msg_critical
-from .slurminfo import get_slurm_maximum_hours
+from .rsplinabscross import LinearAbsorptionCrossSection
+from .rsppolarizability import Polarizability
 from .rsptpa import TPA
+from .scffirstorderprop import ScfFirstOrderProperties
+from .scfgradientdriver import ScfGradientDriver
+from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
+from .slurminfo import get_slurm_maximum_hours
+from .veloxchemlib import mpi_initialized, mpi_master
+from .visualizationdriver import VisualizationDriver
+from .xtbdriver import XTBDriver
+from .xtbgradientdriver import XTBGradientDriver
 
 
 def select_scf_driver(task, scf_type):
@@ -43,6 +41,12 @@ def select_scf_driver(task, scf_type):
         The SCF driver object.
     """
 
+    # check number of MPI nodes
+    if task.mpi_rank == mpi_master():
+        n_ao = task.ao_basis.get_dimensions_of_basis(task.molecule)
+        assert_msg_critical(task.mpi_size == 1 or task.mpi_size <= n_ao,
+                            'SCF: too many MPI processes')
+
     nalpha = task.molecule.number_of_alpha_electrons()
     nbeta = task.molecule.number_of_beta_electrons()
 
@@ -54,12 +58,14 @@ def select_scf_driver(task, scf_type):
     return scf_drv
 
 
-def select_rsp_property(task, rsp_dict, method_dict):
+def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     """
     Selects response property.
 
     :param task:
         The MPI task.
+    :param mol_orbs:
+        The molecular orbitals.
     :param rsp_dict:
         The dictionary of response dict.
     :param method_dict:
@@ -68,6 +74,13 @@ def select_rsp_property(task, rsp_dict, method_dict):
     :return:
         The response property object.
     """
+
+    # check number of MPI nodes
+    if task.mpi_rank == mpi_master():
+        nocc = task.molecule.number_of_alpha_electrons()
+        n_ov = nocc * (mol_orbs.number_mos() - nocc)
+        assert_msg_critical(task.mpi_size == 1 or task.mpi_size <= n_ov,
+                            'Response: too many MPI processes')
 
     if 'property' in rsp_dict:
         prop_type = rsp_dict['property'].lower()
@@ -123,24 +136,14 @@ def main():
 
     program_start_time = tm.time()
 
-    assert_msg_critical(mpi_initialized(), "MPI: Initialized")
+    assert_msg_critical(mpi_initialized(), "MPI not initialized")
 
-    if len(sys.argv) <= 1 or sys.argv[1] in ['-h', '--help']:
-        info_txt = [
-            '',
-            '=================   VeloxChem   =================',
-            '',
-            'Usage:',
-            '    python3 -m veloxchem input_file [output_file]',
-            '',
-        ]
-        if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            print(os.linesep.join(info_txt), file=sys.stdout)
-        sys.exit(0)
+    # Parse command line
+    args = cli()
 
     # MPI task
 
-    task = MpiTask(sys.argv[1:], MPI.COMM_WORLD)
+    task = MpiTask([args.input_file, args.output_file], MPI.COMM_WORLD)
     task_type = task.input_dict['jobs']['task'].lower()
 
     # Timelimit in hours
@@ -297,7 +300,7 @@ def main():
         if not scf_drv.restart:
             rsp_dict['restart'] = 'no'
 
-        rsp_prop = select_rsp_property(task, rsp_dict, method_dict)
+        rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
         rsp_prop.init_driver(task.mpi_comm, task.ostream)
         rsp_prop.compute(task.molecule, task.ao_basis, scf_tensors)
         if not rsp_prop.converged():

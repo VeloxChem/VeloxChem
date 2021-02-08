@@ -14,7 +14,7 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "mpi.h"
+#include <mpi.h>
 
 #include "MatOrder.hpp"
 #include "MemAlloc.hpp"

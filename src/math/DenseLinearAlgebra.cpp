@@ -34,7 +34,7 @@ multAB(const CDenseMatrix& matrixA,
     auto nbcol = matrixB.getNumberOfColumns();
 
     errors::assertMsgCritical(nacol == nbrow,
-                              "denblas::multAB - Inconsistent sizes in matrix multiplication");
+                              "denblas::multAB: Inconsistent sizes in matrix multiplication");
 
     // allocate dense matrix
 
@@ -77,7 +77,7 @@ multABt(const CDenseMatrix& matrixA,
     auto nbcol = matrixB.getNumberOfColumns();
 
     errors::assertMsgCritical(nacol == nbcol,
-                              "denblas::multABt - Inconsistent sizes in matrix multiplication");
+                              "denblas::multABt: Inconsistent sizes in matrix multiplication");
 
     // allocate dense matrix
 
@@ -120,7 +120,7 @@ multAtB(const CDenseMatrix& matrixA,
     auto nbcol = matrixB.getNumberOfColumns();
 
     errors::assertMsgCritical(narow == nbrow,
-                              "denblas::multAtB - Inconsistent sizes in matrix multiplication");
+                              "denblas::multAtB: Inconsistent sizes in matrix multiplication");
 
     // allocate dense matrix
 
@@ -232,7 +232,7 @@ subAB(const CDenseMatrix& matrixA,
       const CDenseMatrix& matrixB)
 {
     errors::assertMsgCritical(matrixA.getNumberOfElements() == matrixB.getNumberOfElements(),
-                              "denblas::subAB - Inconsistent sizes in matrix subtraction");
+                              "denblas::subAB: Inconsistent sizes in matrix subtraction");
 
     // copy matrix
 
@@ -251,7 +251,7 @@ addAB(const CDenseMatrix& matrixA,
       const double        factor)
 {
     errors::assertMsgCritical(matrixA.getNumberOfElements() == matrixB.getNumberOfElements(),
-                              "denblas::addAB - Inconsistent sizes in matrix addition");
+                              "denblas::addAB: Inconsistent sizes in matrix addition");
 
     // copy matrix
 
@@ -284,13 +284,13 @@ multABt(      CDenseMatrix& matrixC,
     auto nbcol = matrixB.getNumberOfColumns();
 
     errors::assertMsgCritical(nacol == nbcol,
-                              "denblas::multABt - Inconsistent sizes in matrix multiplication");
+                              "denblas::multABt: Inconsistent sizes in matrix multiplication");
 
     errors::assertMsgCritical(narow == matrixC.getNumberOfRows(),
-                              "denblas::multABt - Inconsistent sizes in matrix multiplication");
+                              "denblas::multABt: Inconsistent sizes in matrix multiplication");
 
     errors::assertMsgCritical(nbrow == matrixC.getNumberOfColumns(),
-                              "denblas::multABt - Inconsistent sizes in matrix multiplication");
+                              "denblas::multABt: Inconsistent sizes in matrix multiplication");
 
     cblas_dgemm(CblasRowMajor,
                 CblasNoTrans,
@@ -328,7 +328,7 @@ multABt(      double*       matrixC,
     auto nbcol = matrixB.getNumberOfColumns();
 
     errors::assertMsgCritical(nacol == nbcol,
-                              "denblas::multABt - Inconsistent sizes in matrix multiplication");
+                              "denblas::multABt: Inconsistent sizes in matrix multiplication");
 
     cblas_dgemm(CblasRowMajor,
                 CblasNoTrans,
@@ -366,7 +366,7 @@ multAtB(      double*       matrixC,
     auto nbcol = matrixB.getNumberOfColumns();
     
     errors::assertMsgCritical(narow == nbrow,
-                              "denblas::multAtB - Inconsistent sizes in matrix multiplication");
+                              "denblas::multAtB: Inconsistent sizes in matrix multiplication");
     
     // allocate dense matrix
     
@@ -408,7 +408,7 @@ multAB(      double*       matrixC,
     auto nbcol = matrixB.getNumberOfColumns();
     
     errors::assertMsgCritical(nacol == nbrow,
-                              "denblas::multAB - Inconsistent sizes in matrix multiplication");
+                              "denblas::multAB: Inconsistent sizes in matrix multiplication");
     
     // compute matrix-matrix multiplication
     
@@ -433,7 +433,7 @@ dot(const CMemBlock<double>& vectorA,
     const CMemBlock<double>& vectorB)
 {
     errors::assertMsgCritical(vectorA.size() == vectorB.size(),
-                              "denblas::dot - Inconsistent sizes in dot product of vectors");
+                              "denblas::dot: Inconsistent sizes in dot product of vectors");
 
     return cblas_ddot(vectorA.size(), vectorA.data(), 1, vectorB.data(), 1);
 }
@@ -443,7 +443,7 @@ dot(const CMemBlock<double>& vectorA,
     const CDenseMatrix&      matrixB)
 {
     errors::assertMsgCritical(vectorA.size() == matrixB.getNumberOfElements(),
-                              "denblas::dot - Inconsistent sizes in dot product of vector and column matrix");
+                              "denblas::dot: Inconsistent sizes in dot product of vector and column matrix");
 
     return cblas_ddot(vectorA.size(), vectorA.data(), 1, matrixB.values(), 1);
 }
@@ -452,7 +452,7 @@ double
 trace(const CDenseMatrix& matrix)
 {
     errors::assertMsgCritical(matrix.getNumberOfColumns() == matrix.getNumberOfRows(),
-                              "denblas::trace - Non-square matrix");
+                              "denblas::trace: Expecting a square matrix");
 
     auto pvals = matrix.values();
 

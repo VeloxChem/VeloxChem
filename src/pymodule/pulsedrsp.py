@@ -1,9 +1,11 @@
+from mpi4py import MPI
 import numpy as np
 import h5py
 import sys
 import os
 
 from .veloxchemlib import mpi_master
+from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
 from .inputparser import InputParser
 
@@ -49,10 +51,16 @@ class PulsedResponse:
         - ascii: String - optional - name of requested ASCII formatted file.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes pulsed response.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         # mpi information
         self.comm = comm

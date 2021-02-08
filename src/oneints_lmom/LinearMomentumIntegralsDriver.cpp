@@ -8,10 +8,13 @@
 
 #include "LinearMomentumIntegralsDriver.hpp"
 
+#include <mpi.h>
+
 #include "AngularMomentum.hpp"
 #include "GenFunc.hpp"
 #include "GenIntsFunc.hpp"
 #include "MemBlock.hpp"
+#include "MpiFunc.hpp"
 #include "OneIntsDistributor.hpp"
 #include "OneIntsFunc.hpp"
 #include "RecursionFunctionsList.hpp"

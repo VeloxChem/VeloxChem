@@ -1,5 +1,7 @@
+from mpi4py import MPI
 import numpy as np
 import time as tm
+import sys
 
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
@@ -7,6 +9,7 @@ from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
+from .outputstream import OutputStream
 from .mointsdriver import MOIntegralsDriver
 from .subcommunicators import SubCommunicators
 from .qqscheme import get_qq_scheme
@@ -37,11 +40,18 @@ class Mp2Driver:
           integral transformation.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes MP2 driver.
         """
 
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
+
+        # mp2 energy
         self.e_mp2 = None
 
         # mpi information

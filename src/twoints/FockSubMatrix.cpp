@@ -282,7 +282,7 @@ CFockSubMatrix::accumulate(      double* aoFockMatrix,
     // restricted/unrestricted Coulomb + exchange matrix
     
     if ((fockType == fockmat::restjk) || (fockType == fockmat::restjkx) ||
-        (fockType == fockmat::unrestjk))
+        (fockType == fockmat::unrestjk) || (fockType == fockmat::unrestjkx))
     {
         _addContribution(aoFockMatrix, nColumns, 0,
                          _startPositionsA, _startPositionsB,
@@ -311,7 +311,7 @@ CFockSubMatrix::accumulate(      double* aoFockMatrix,
     
     // restricted Coulomb matrix
     
-    if (fockType == fockmat::restj)
+    if ((fockType == fockmat::restj) || (fockType == fockmat::unrestj))
     {
         _addContribution(aoFockMatrix, nColumns, 0,
                          _startPositionsA, _startPositionsB,
@@ -519,7 +519,7 @@ CFockSubMatrix::_allocSubMatrices(const fockmat fockType,
 {
     // restricted Coulomb matrix
     
-    if (fockType == fockmat::restj)
+    if ((fockType == fockmat::restj) || (fockType == fockmat::unrestj))
     {
         auto matdim = _dimSubMatrixA * _dimSubMatrixB;
         
@@ -566,7 +566,7 @@ CFockSubMatrix::_allocSubMatrices(const fockmat fockType,
     // restricted/unrestricted Coulomb + exchange matrix
     
     if ((fockType == fockmat::restjk) || (fockType == fockmat::restjkx) ||
-        (fockType == fockmat::unrestjk))
+        (fockType == fockmat::unrestjk) || (fockType == fockmat::unrestjkx))
     {
         auto matdim = _dimSubMatrixA * _dimSubMatrixB;
         

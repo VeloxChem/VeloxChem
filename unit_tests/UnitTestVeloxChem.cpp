@@ -6,8 +6,11 @@
 //  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
 //  Contact: https://veloxchem.org/contact
 
-#include "gtest/gtest.h"
-#include "../src/general/MpiFunc.hpp"
+#include <gtest/gtest.h>
+
+#include <mpi.h>
+
+#include "MpiFunc.hpp"
 
 int main(int argc, char** argv)
 {

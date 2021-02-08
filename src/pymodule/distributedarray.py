@@ -34,53 +34,53 @@ class DistributedArray:
         self.rank = comm.Get_rank()
         self.nodes = comm.Get_size()
 
+        self.data = None
+
         if not distribute:
             self.data = array.copy()
             return
 
         if self.rank == mpi_master():
-            dtype = array.dtype
-            if array.ndim == 1:
-                ncols = 1
-            elif array.ndim == 2:
-                ncols = array.shape[1]
+            # determine batch size for scatter
+            batch_size = mpi_size_limit() // array.itemsize
+            if array.ndim == 2 and array.shape[1] != 0:
+                batch_size //= array.shape[1]
+            batch_size //= self.nodes
+            batch_size = max(1, batch_size)
 
+            # determine counts and displacements for scatter
             ave, res = divmod(array.shape[0], self.nodes)
             counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
-            if ncols != 0:  # note that ncols can be 0
-                counts = [x * ncols for x in counts]
             displacements = [sum(counts[:p]) for p in range(self.nodes)]
-            pack_list = [dtype, ncols, array.ndim] + counts
+
+            # determine number of batches for scatter
+            num_batches = max(counts) // batch_size
+            if max(counts) % batch_size != 0:
+                num_batches += 1
         else:
-            counts = None
-            displacements = None
-            pack_list = None
+            num_batches = None
 
-        pack_list = self.comm.bcast(pack_list, root=mpi_master())
-        dtype, ncols, ndim = pack_list[:3]
-        counts = pack_list[3:]
+        num_batches = comm.bcast(num_batches, root=mpi_master())
 
-        if ndim == 1:
-            self.data = np.zeros(counts[self.rank], dtype=dtype)
-        elif ndim == 2:
-            local_rows = counts[self.rank]
-            if ncols != 0:  # note that ncols can be 0
-                local_rows = counts[self.rank] // ncols
-            self.data = np.zeros((local_rows, ncols), dtype=dtype)
+        for batch_ind in range(num_batches):
+            if self.rank == mpi_master():
+                array_list = []
+                for p in range(self.nodes):
+                    row_start = batch_size * batch_ind + displacements[p]
+                    row_end = min(row_start + batch_size,
+                                  counts[p] + displacements[p])
+                    array_list.append(array[row_start:row_end])
+            else:
+                array_list = None
 
-        if ncols == 0:
-            return
+            recv_data = comm.scatter(array_list, root=mpi_master())
 
-        if dtype == np.int:
-            mpi_data_type = MPI.INT
-        elif dtype == np.float:
-            mpi_data_type = MPI.DOUBLE
-        elif dtype == np.complex:
-            mpi_data_type = MPI.C_DOUBLE_COMPLEX
-
-        self.comm.Scatterv([array, counts, displacements, mpi_data_type],
-                           self.data,
-                           root=mpi_master())
+            if self.data is None:
+                self.data = recv_data.copy()
+            elif self.data.ndim == 1:
+                self.data = np.hstack((self.data, recv_data))
+            elif self.data.ndim == 2:
+                self.data = np.vstack((self.data, recv_data))
 
     def __sizeof__(self):
         """
@@ -114,6 +114,20 @@ class DistributedArray:
         """
 
         return self.data.shape[axis]
+
+    def squared_norm(self, axis=None):
+        """
+        Returns the squared norm of the distributed array along axis.
+
+        :param axis:
+            The axis.
+        :return:
+            The squared norm along axis.
+        """
+
+        n2 = np.linalg.norm(self.data, axis=axis)**2
+        n2 = self.comm.allreduce(n2, op=MPI.SUM)
+        return n2
 
     def norm(self, axis=None):
         """
@@ -281,6 +295,21 @@ class DistributedArray:
         """
 
         self.data = np.append(self.data, dist_array.data, axis=axis)
+
+    def get_column(self, col_index):
+        """
+        Gets a column as a distributed 1D array.
+
+        :param col_index:
+            The index of the column.
+
+        :return:
+            A distributed 1D array.
+        """
+
+        return DistributedArray(self.data[:, col_index],
+                                self.comm,
+                                distribute=False)
 
     @classmethod
     def read_from_hdf5_file(cls, fname, label, comm):

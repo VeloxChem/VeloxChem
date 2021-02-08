@@ -8,8 +8,11 @@
 
 #include <string>
 
+#include <mpi.h>
+
 #include "AOKohnShamMatrix.hpp"
 #include "ErrorHandler.hpp"
+#include "MpiFunc.hpp"
 
 CAOKohnShamMatrix::CAOKohnShamMatrix()
     : _xcMatrices(std::vector<CDenseMatrix>())
@@ -211,7 +214,7 @@ CAOKohnShamMatrix::collect(int32_t rank, int32_t nodes, MPI_Comm comm, int32_t s
 {
     if (ENABLE_MPI)
     {
-        std::string errsource("CAOKohnShamMatrix.collect: invalid rank for the source");
+        std::string errsource("AOKohnShamMatrix.collect: Invalid rank for the source");
 
         errors::assertMsgCritical(0 <= source && source < nodes, errsource);
 

@@ -11,6 +11,8 @@
 #include <iostream>
 #include <sstream>
 
+#include <mpi.h>
+
 #include "MathFunc.hpp"
 
 namespace mpi {  // mpi namespace

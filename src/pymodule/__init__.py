@@ -78,3 +78,5 @@ from .environ import set_vlxbasispath, set_omp_num_threads
 
 set_vlxbasispath()
 set_omp_num_threads()
+
+__version__ = "1.0rc1.post1"

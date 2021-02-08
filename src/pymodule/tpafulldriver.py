@@ -1,8 +1,11 @@
+from mpi4py import MPI
 import numpy as np
 import time
+import sys
 import re
 
 from .veloxchemlib import mpi_master
+from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
@@ -23,11 +26,17 @@ class TpaFullDriver(TpaDriver):
         The output stream.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes the full isotropic cubic response driver for two-photon
         absorption (TPA)
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 
@@ -1705,27 +1714,19 @@ class TpaFullDriver(TpaDriver):
         NaX2Nyz = tpa_dict['NaX2Nyz']
         NxA2Nyz = tpa_dict['NxA2Nyz']
 
-        width = 94
-
-        w_str = 'Gamma tensor components computed per frequency'
-        self.ostream.print_blank()
-        self.ostream.print_header(w_str.ljust(width))
         self.ostream.print_blank()
 
-        for a in range(len(comp) // len(freqs)):
-            w_str = str(a + 1) + '. ' + str(comp[a].split(',')[0])
-            self.ostream.print_header(w_str.ljust(width))
-
-        self.ostream.print_blank()
-        self.ostream.print_blank()
-
-        w_str = 'Gamma Tensor Components at Given Frequencies'
-        self.ostream.print_header(w_str.ljust(width))
+        w_str = 'The Isotropic Average gamma Tensor and Its'
+        self.ostream.print_header(w_str)
+        w_str = 'Isotropic Contributions at Given Frequencies'
+        self.ostream.print_header(w_str)
+        self.ostream.print_header('=' * (len(w_str) + 2))
         self.ostream.print_blank()
 
         for w in freqs:
             title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
                 'Component', 'Frequency', 'Real', 'Imaginary')
+            width = len(title)
             self.ostream.print_header(title.ljust(width))
             self.ostream.print_header(('-' * len(title)).ljust(width))
 
@@ -1735,8 +1736,16 @@ class TpaFullDriver(TpaDriver):
             self.print_component('X3', w, NaX3NyNz[w, -w, w], width)
             self.print_component('A2', w, NxA2Nyz[w, -w, w], width)
             self.print_component('A3', w, NaA3NxNy[w, -w, w], width)
-            self.print_component('Gamma', w, gamma[w, -w, w], width)
+            self.print_component('gamma', w, gamma[w, -w, w], width)
 
             self.ostream.print_blank()
+
+        title = 'Reference: '
+        title += 'K. Ahmadzadeh, M. Scott, M. Brand, O. Vahtras, X. Li, '
+        self.ostream.print_header(title.ljust(width))
+        title = 'Z. Rinkevicius, and P. Norman, '
+        title += 'J. Chem. Phys. 154, 024111 (2021)'
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_blank()
 
         self.ostream.print_blank()

@@ -15,7 +15,7 @@ from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lrsolver import LinearResponseSolver
 
-
+@pytest.mark.solvers
 class TestLR(unittest.TestCase):
 
     def run_lr(self, inpfile, potfile, xcfun_label, raw_data):

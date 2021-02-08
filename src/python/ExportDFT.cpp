@@ -35,7 +35,7 @@ namespace vlx_dft {  // vlx_dft namespace
 static std::shared_ptr<CAOKohnShamMatrix>
 CAOKohnShamMatrix_from_dimensions(const int32_t nrows, const int32_t ncols, const bool is_rest)
 {
-    return std::shared_ptr<CAOKohnShamMatrix>(new CAOKohnShamMatrix(nrows, ncols, is_rest));
+    return std::make_shared<CAOKohnShamMatrix>(nrows, ncols, is_rest);
 }
     
 // Helper function for printing CAOKohnShamkMatrix
@@ -117,9 +117,16 @@ CMolecularGrid_broadcast(CMolecularGrid& self, int32_t rank, py::object py_comm)
 static std::shared_ptr<CGridDriver>
 CGridDriver_create(py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    if (py_comm.is_none())
+    {
+        return std::make_shared<CGridDriver>(MPI_COMM_WORLD);
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<CGridDriver>(new CGridDriver(*comm_ptr));
+        return std::make_shared<CGridDriver>(*comm_ptr);
+    }
 }
 
 // Helper function for CDensityGridDriver constructor
@@ -127,9 +134,16 @@ CGridDriver_create(py::object py_comm)
 static std::shared_ptr<CDensityGridDriver>
 CDensityGridDriver_create(py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    if (py_comm.is_none())
+    {
+        return std::make_shared<CDensityGridDriver>(MPI_COMM_WORLD);
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<CDensityGridDriver>(new CDensityGridDriver(*comm_ptr));
+        return std::make_shared<CDensityGridDriver>(*comm_ptr);
+    }
 }
     
 // Helper function for CXCIntegrator constructor
@@ -137,9 +151,16 @@ CDensityGridDriver_create(py::object py_comm)
 static std::shared_ptr<CXCIntegrator>
 CXCIntegrator_create(py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    if (py_comm.is_none())
+    {
+        return std::make_shared<CXCIntegrator>(MPI_COMM_WORLD);
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<CXCIntegrator>(new CXCIntegrator(*comm_ptr));
+        return std::make_shared<CXCIntegrator>(*comm_ptr);
+    }
 }
 
 void
@@ -190,20 +211,20 @@ export_dft(py::module& m)
     // CGridDriver class
 
     py::class_<CGridDriver, std::shared_ptr<CGridDriver>>(m, "GridDriver")
-        .def(py::init(&CGridDriver_create))
+        .def(py::init(&CGridDriver_create), py::arg("py_comm") = py::none())
         .def("generate", &CGridDriver::generate)
         .def("set_level", &CGridDriver::setLevel);
 
     // CDensityGridDriver class
 
     py::class_<CDensityGridDriver, std::shared_ptr<CDensityGridDriver>>(m, "DensityGridDriver")
-        .def(py::init(&CDensityGridDriver_create))
+        .def(py::init(&CDensityGridDriver_create), py::arg("py_comm") = py::none())
         .def("generate", &CDensityGridDriver::generate);
 
     // CXCIntegrator class
 
     py::class_<CXCIntegrator, std::shared_ptr<CXCIntegrator>>(m, "XCIntegrator")
-        .def(py::init(&CXCIntegrator_create))
+        .def(py::init(&CXCIntegrator_create), py::arg("py_comm") = py::none())
         .def("integrate", (CAOKohnShamMatrix (CXCIntegrator::*)(const CAODensityMatrix&,
                                                                 const CMolecule&,
                                                                 const CMolecularBasis&,

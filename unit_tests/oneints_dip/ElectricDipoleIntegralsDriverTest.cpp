@@ -8,6 +8,8 @@
 
 #include "ElectricDipoleIntegralsDriverTest.hpp"
 
+#include <mpi.h>
+
 #include "ElectricDipoleIntegralsDriver.hpp"
 #include "MolecularBasisSetter.hpp"
 #include "MoleculeSetter.hpp"

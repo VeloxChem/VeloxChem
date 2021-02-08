@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from veloxchem.inputparser import InputParser
+from veloxchem.molecularbasis import MolecularBasis
 
 
 class TestBasis(unittest.TestCase):
@@ -63,6 +64,25 @@ class TestBasis(unittest.TestCase):
             # verify md5
 
             self.assertEqual(expected_md5, calculated_md5)
+
+    def test_avail_basis(self):
+
+        h_basis = [
+            '6-311++G(2D,2P)', 'AUG-CC-PVTZ', 'DEF2-SVPD', 'MIN-CC-PVDZ',
+            'STO-6G'
+        ]
+        c_basis = [
+            '6-31G', '6-31G(2DF,P)', 'AUG-CC-PVDZ', 'D-AUG-CC-PVQZ',
+            'SADLEJ-PVTZ'
+        ]
+        zn_basis = ['CC-PVTZ', 'MIN-CC-PVDZ', 'STO-3G']
+
+        for bas in h_basis:
+            self.assertTrue(bas in MolecularBasis.get_avail_basis('H'))
+        for bas in c_basis:
+            self.assertTrue(bas in MolecularBasis.get_avail_basis('c'))
+        for bas in zn_basis:
+            self.assertTrue(bas in MolecularBasis.get_avail_basis('Zn'))
 
 
 if __name__ == "__main__":

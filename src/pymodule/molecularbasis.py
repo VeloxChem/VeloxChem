@@ -1,4 +1,5 @@
 from os import environ
+from os import walk
 from pathlib import Path
 
 from .veloxchemlib import MolecularBasis
@@ -114,4 +115,36 @@ def _MolecularBasis_read(mol,
     return mol_basis
 
 
+@staticmethod
+def _MolecularBasis_get_avail_basis(element_label):
+    """
+    Gets the names of available basis sets for an element.
+
+    :param element_label:
+        The label of the chemical element.
+
+    :return:
+        The tuple of basis sets.
+    """
+
+    avail_basis = set()
+
+    basis_path = environ['VLXBASISPATH']
+
+    for root, dirs, files in walk(basis_path, topdown=True):
+        for filename in files:
+            basis_file = Path(basis_path, filename)
+            basis_dict = InputParser(str(basis_file)).input_dict
+            for key in list(basis_dict.keys()):
+                if 'atombasis_' in key:
+                    elem = key.replace('atombasis_', '')
+                    if element_label.upper() == elem.upper():
+                        avail_basis.add(filename)
+        # skip subfolder
+        break
+
+    return sorted(list(avail_basis))
+
+
 MolecularBasis.read = _MolecularBasis_read
+MolecularBasis.get_avail_basis = _MolecularBasis_get_avail_basis

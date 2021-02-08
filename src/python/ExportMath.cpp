@@ -58,18 +58,18 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr)
 {
     // check dimension
 
-    std::string errdim("Matrix_from_numpy - Expect a 2D numpy array");
+    std::string errdim("DenseMatrix: Expecting a 2D numpy array");
 
     errors::assertMsgCritical(arr.ndim() == 2, errdim);
 
     if (arr.data() == nullptr || arr.size() == 0)
     {
-        return std::shared_ptr<CDenseMatrix>(new CDenseMatrix());
+        return std::make_shared<CDenseMatrix>();
     }
 
     // check that the numpy array is c-style contiguous
 
-    std::string errsrc("Matrix_from_numpy - Expect a contiguous numpy array");
+    std::string errsrc("DenseMatrix: Expecting a contiguous numpy array");
 
     auto c_style = py::detail::check_flags(arr.ptr(), py::array::c_style);
 
@@ -100,7 +100,7 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr)
 
     int32_t ncols = static_cast<int32_t>(arr.shape(1));
 
-    return std::shared_ptr<CDenseMatrix>(new CDenseMatrix(vec, nrows, ncols));
+    return std::make_shared<CDenseMatrix>(vec, nrows, ncols);
 }
 
 static py::array_t<double>
@@ -108,9 +108,9 @@ c_matmul(const py::array_t<double>& A, const py::array_t<double>& B)
 {
     // check dimension and shape
 
-    errors::assertMsgCritical(A.ndim() == 2, "matmul - Invalid shape of matrix A");
+    errors::assertMsgCritical(A.ndim() == 2, "c_matmul: Invalid shape of matrix A");
 
-    errors::assertMsgCritical(B.ndim() == 2, "matmul - Invalid shape of matrix B");
+    errors::assertMsgCritical(B.ndim() == 2, "c_matmul: Invalid shape of matrix B");
 
     auto nrow_A = A.shape(0);
 
@@ -120,7 +120,7 @@ c_matmul(const py::array_t<double>& A, const py::array_t<double>& B)
 
     auto ncol_B = B.shape(1);
 
-    errors::assertMsgCritical(ncol_A == nrow_B, "matmul - Inconsistent sizes");
+    errors::assertMsgCritical(ncol_A == nrow_B, "c_matmul: Inconsistent sizes");
 
     // check layout
 
@@ -128,13 +128,13 @@ c_matmul(const py::array_t<double>& A, const py::array_t<double>& B)
 
     auto f_style_A = py::detail::check_flags(A.ptr(), py::array::f_style);
 
-    errors::assertMsgCritical(c_style_A | f_style_A, "matmul - Matrix A is noncontiguous");
+    errors::assertMsgCritical(c_style_A | f_style_A, "c_matmul: Matrix A is noncontiguous");
 
     auto c_style_B = py::detail::check_flags(B.ptr(), py::array::c_style);
 
     auto f_style_B = py::detail::check_flags(B.ptr(), py::array::f_style);
 
-    errors::assertMsgCritical(c_style_B | f_style_B, "matmul - Matrix B is noncontiguous");
+    errors::assertMsgCritical(c_style_B | f_style_B, "c_matmul: Matrix B is noncontiguous");
 
     // check transpose
 
@@ -248,9 +248,9 @@ c_outer(const py::array_t<double>& A, const py::array_t<double>& B)
 {
     // check dimension and shape
 
-    errors::assertMsgCritical(A.ndim() == 1, "outer - Invalid shape of vector A");
+    errors::assertMsgCritical(A.ndim() == 1, "c_outer: Invalid shape of vector A");
 
-    errors::assertMsgCritical(B.ndim() == 1, "outer - Invalid shape of vector B");
+    errors::assertMsgCritical(B.ndim() == 1, "c_outer: Invalid shape of vector B");
 
     auto m = A.shape(0);
 
@@ -262,13 +262,13 @@ c_outer(const py::array_t<double>& A, const py::array_t<double>& B)
 
     auto f_style_A = py::detail::check_flags(A.ptr(), py::array::f_style);
 
-    errors::assertMsgCritical(c_style_A & f_style_A, "outer - Vector A is noncontiguous");
+    errors::assertMsgCritical(c_style_A & f_style_A, "c_outer: Vector A is noncontiguous");
 
     auto c_style_B = py::detail::check_flags(B.ptr(), py::array::c_style);
 
     auto f_style_B = py::detail::check_flags(B.ptr(), py::array::f_style);
 
-    errors::assertMsgCritical(c_style_B & f_style_B, "outer - Vector B is noncontiguous");
+    errors::assertMsgCritical(c_style_B & f_style_B, "c_outer: Vector B is noncontiguous");
 
     // compute outer
 
@@ -288,13 +288,13 @@ c_eigh(const py::array_t<double>& A)
 {
     // check dimension and shape
 
-    errors::assertMsgCritical(A.ndim() == 2, "eigh - Invalid shape of matrix A");
+    errors::assertMsgCritical(A.ndim() == 2, "c_eigh: Invalid shape of matrix A");
 
     auto nrow_A = A.shape(0);
 
     auto ncol_A = A.shape(1);
 
-    errors::assertMsgCritical(ncol_A == nrow_A, "eigh - Matrix A is not symmetric");
+    errors::assertMsgCritical(ncol_A == nrow_A, "c_eigh: Matrix A is not symmetric");
 
     // check layout
 
@@ -302,7 +302,7 @@ c_eigh(const py::array_t<double>& A)
 
     auto f_style_A = py::detail::check_flags(A.ptr(), py::array::f_style);
 
-    errors::assertMsgCritical(c_style_A | f_style_A, "matmul - Matrix A is noncontiguous");
+    errors::assertMsgCritical(c_style_A | f_style_A, "c_eigh: Matrix A is noncontiguous");
 
     auto layout_A = LAPACK_ROW_MAJOR;
 
@@ -343,7 +343,7 @@ c_eigh(const py::array_t<double>& A)
     auto st = LAPACKE_dsyevr(
         layout_A, 'V', 'A', 'U', dim, mat, dim, 0.0, 0.0, 0, 0, 1.0e-13, &nval, evals, evecs, dim, idx.data());
 
-    errors::assertMsgCritical(st == 0, "eigh - Diagonalization failed");
+    errors::assertMsgCritical(st == 0, "c_eigh: Diagonalization failed");
 
     py::list result;
 

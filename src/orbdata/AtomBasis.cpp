@@ -10,6 +10,8 @@
 
 #include <sstream>
 
+#include <mpi.h>
+
 #include "ChemicalElement.hpp"
 #include "MpiFunc.hpp"
 #include "StringFormat.hpp"

@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "mpi.h"
+#include <mpi.h>
 
 namespace mpi {  // mpi namespace
 

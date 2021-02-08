@@ -8,8 +8,11 @@
 
 #include "AODensityMatrix.hpp"
 
+#include <mpi.h>
+
 #include "DenseLinearAlgebra.hpp"
 #include "ErrorHandler.hpp"
+#include "MpiFunc.hpp"
 
 CAODensityMatrix::CAODensityMatrix()
 
@@ -25,7 +28,7 @@ CAODensityMatrix::CAODensityMatrix(const std::vector<CDenseMatrix>& denMatrices,
 {
     if (denType == denmat::unrest)
     {
-        errors::assertMsgCritical(denMatrices.size() % 2 == 0, "AODensityMatrix - Odd number of matrices for unrestricted density");
+        errors::assertMsgCritical(denMatrices.size() % 2 == 0, "AODensityMatrix: Odd number of matrices for unrestricted density");
     }
 }
 
@@ -343,6 +346,16 @@ CAODensityMatrix::isRestricted() const
     if (_denType == denmat::umoij) return false;
     
     return true;
+}
+
+bool
+CAODensityMatrix::isUnrestricted() const
+{
+    if (_denType == denmat::unrest) return true;
+
+    if (_denType == denmat::umoij) return false;
+
+    return false;
 }
 
 void

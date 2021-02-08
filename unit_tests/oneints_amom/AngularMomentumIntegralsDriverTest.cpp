@@ -8,6 +8,8 @@
 
 #include "AngularMomentumIntegralsDriverTest.hpp"
 
+#include <mpi.h>
+
 #include "AngularMomentumIntegralsDriver.hpp"
 #include "MolecularBasisSetter.hpp"
 #include "MoleculeSetter.hpp"
