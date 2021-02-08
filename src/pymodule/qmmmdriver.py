@@ -286,6 +286,9 @@ class QMMMDriver:
         for item1, item2 in zip(list_ex_energy, list_osci_strength):
             if n == 0:
                 json_data.write('[')
+                json_data.write("%s,\n" % item1)
+                json_data.write("%s\n" % item2)
+                json_data.write(']')
                 n += 1
             else:
                 json_data.write(',[')
@@ -325,7 +328,7 @@ class QMMMDriver:
                      self.mm_nonpol_region)
 
         lines.append('Spect Line Profile       :    ' + self.line_profile)
-        lines.append('Broadening parameter(eV) :    ' + str(self.param))
+        lines.append('Broadening parameter     :    ' + str(self.param))
 
         maxlen = max([len(line) for line in lines])
         for line in lines:
@@ -427,7 +430,7 @@ class QMMMDriver:
                             y[i][xp] += f * np.exp(-(((
                             (e - x[xp]) * hartree_in_ev()) / self.param)**2))                           
                          #check formula   
-                        elif self.spect_unit == 'au':
+                        elif self.spect_unit == 'au' or 'a.u.':
                             y[i][xp] += f * np.exp(-(((
                             (e - x[xp]) ) / self.param)**2))
 
@@ -437,7 +440,7 @@ class QMMMDriver:
                             ((x[xp] - e) * hartree_in_ev())**2 +
                             0.25 * self.param**2))
                             
-                        elif self.spect_unit == 'au':
+                        elif self.spect_unit == 'au' or 'a.u.':
                             y[i][xp] += 0.5 * self.param * f / (np.pi * (
                             ((x[xp] - e) **2 +
                             0.25 * self.param**2)))
@@ -448,7 +451,7 @@ class QMMMDriver:
 
         # Decide which frames to be deleted 
         # Depending on whether the first absorption lies too far away from average
-        for i in range(len(list_ex_energy)):
+        for i in range(len(y)):
             if np.abs(list_ex_energy[i][0] - x_max) >= self.difference * x_max:
                 np.delete(y, i, 0)
                 frame = int(frame_numbers[i])
@@ -465,6 +468,8 @@ class QMMMDriver:
             x value (energy) for the largest(first) excitation
         :param: absorption_max
             y value (absorption)  for the largest(first) excitation
+            
+        :return x_max, absorption_max
         """
         
         #calculate the average spectrum
