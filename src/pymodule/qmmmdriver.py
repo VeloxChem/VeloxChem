@@ -36,11 +36,11 @@ class QMMMDriver:
         - filename: The filename for the calculation.
         - nstates: The number of excited states.
         - difference: if the first excitation energy is not too far away from
-          averaged spectrum that np.abs(excitation energy - average ) 
-          >= difference* average
+          averaged spectrum that np.abs(excitation energy - average)
+          >= difference * average
         - traj_unit: trajectory unit
         - line profile: either Gaussian or Lorentzian
-        - param: line broadening parameter 
+        - param: line broadening parameter
         - spect_unit: either eV or au
 
     """
@@ -62,18 +62,20 @@ class QMMMDriver:
         self.filename = None
         self.method_dict = None
         self.description = 'Na'
-        
-        #I need help to extract nstates 
+
         self.nstates = 3
-        
+
         self.difference = 0.4
 
         self.line_profile = 'Gaussian'
         self.param = 0.4  # unit eV
         self.spect_unit = 'eV'
-        
 
-    def update_settings(self, qmmm_dict, spect_dict, rsp_dict, method_dict=None):
+    def update_settings(self,
+                        qmmm_dict,
+                        spect_dict,
+                        rsp_dict,
+                        method_dict=None):
         """
         Updates settings in qmmm driver.
 
@@ -100,42 +102,42 @@ class QMMMDriver:
         if 'classical_polarizable_region' in qmmm_dict:
             self.mm_pol_region = qmmm_dict['classical_polarizable_region']
         if 'classical_non-polarizable_region' in qmmm_dict:
-            self.mm_nonpol_region = qmmm_dict['classical_non-polarizable_region']
+            self.mm_nonpol_region = qmmm_dict[
+                'classical_non-polarizable_region']
 
         if 'filename' in qmmm_dict:
             self.filename = qmmm_dict['filename']
         if 'description' in qmmm_dict:
             self.description = qmmm_dict['description']
-            
+
         if method_dict is not None:
             self.method_dict = dict(method_dict)
 
         if 'line_profile' in spect_dict:
             self.line_profile = str(spect_dict['line_profile'])
-            
+
         if 'broadening_parameter' in spect_dict:
             self.param = float(spect_dict['broadening_parameter'])
-        
+
         if 'units' in spect_dict:
             self.spec_unit = spect_dict['units']
-            
+
         if 'nstates' in rsp_dict:
             self.nstates = int(rsp_dict['nstates'])
-            
 
     def compute(self, molecule, basis, min_basis):
         """
         Performs QMMM calculation.
-        
+
         :param frame_numbers:
             a list contains the frame numbers
         :param list_ex_energy:
-           excitation energies in the follwoing format
-           (frame1(S1,S2..Sn), frame2(S1,S2...Sn) ....frame_n(S1,S2...Sn)
+            excitation energies in the follwoing format (frame1(S1,S2..Sn),
+            frame2(S1,S2...Sn) ....frame_n(S1,S2...Sn)
         :param list_osci_strength:
             as above but for scillator strengths
-            
         """
+
         self.print_header()
 
         start_time = tm.time()
@@ -150,18 +152,18 @@ class QMMMDriver:
         u = mda.Universe(self.tpr_file, self.xtc_file, refresh_offsets=True)
 
         # set up variables for average spectrum calculations
-        frame_numbers = []  
+        frame_numbers = []
         list_ex_energy = []
         list_osci_strength = []
 
-        #define json file name
+        # define json file name
         spectrum_json_fname = str(output_dir / "spectrum.json")
 
         # create json file for spectra data
         json_data = open(spectrum_json_fname, 'w+')
         json_data.write('{"' + self.qm_region + '":{ "Description":' +
-                            self.description +
-                            ', "excitation energies&ocillator strength&SCF":[')
+                        self.description +
+                        ', "excitation energies&ocillator strength&SCF":[')
 
         # go through frames in trajectory
         for ts in u.trajectory:
@@ -169,14 +171,15 @@ class QMMMDriver:
             if np.min(np.abs(self.sampling_time - u.trajectory.time)) > 1e-6:
                 continue
             self.print_frame_and_time(ts.frame, u.trajectory.time)
-            
+
             # select QM, MM_pol and MM_nonpol regions
             qm = u.select_atoms(self.qm_region)
-            mm_pol_select = "byres around " + self.mm_pol_region + " "+ self.qm_region
+            mm_pol_select = "byres around " + self.mm_pol_region + " " + self.qm_region
             mm_pol = u.select_atoms(mm_pol_select)
-            
+
             if int(self.mm_nonpol_region) >= int(self.mm_pol_region):
-                mm_nonpol_select = "byres around " + self.mm_nonpol_region + " "+ self.qm_region
+                mm_nonpol_select = ("byres around " + self.mm_nonpol_region +
+                                    " " + self.qm_region)
                 mm_nonpol = u.select_atoms(mm_nonpol_select)
                 mm_nonpol = mm_nonpol - mm_pol
 
@@ -219,12 +222,10 @@ class QMMMDriver:
                     else:
                         atom_label = 'H'
                     f_pot.write(
-                        f"{atom_label:5}" +
-                        f"{mm_pol.positions[i][0]:10.5f}" +
-                        f"{mm_pol.positions[i][1]:10.5f} {mm_pol.positions[i][2]:10.5f}" +
-                        f"\t water {mol_number:5} \n"
-                    )
-                    
+                        f"{atom_label:5}" + f"{mm_pol.positions[i][0]:10.5f}" +
+                        f"{mm_pol.positions[i][1]:10.5f} {mm_pol.positions[i][2]:10.5f}"
+                        + f"\t water {mol_number:5} \n")
+
                 # write coordinate for the non-polarisable region
                 for i in range(len(mm_nonpol.names)):
                     mol_number = 1 + i // 3
@@ -234,17 +235,17 @@ class QMMMDriver:
                         atom_label = 'H'
                     f_pot.write(
                         f"{atom_label:5} {mm_nonpol.positions[i][0]:10.5f}" +
-                        f"{mm_nonpol.positions[i][1]:10.5f} {mm_nonpol.positions[i][2]:10.5f}" + 
-                        f"\t water-n {mol_number:5} \n"
-                    )
+                        f"{mm_nonpol.positions[i][1]:10.5f}" +
+                        f"{mm_nonpol.positions[i][2]:10.5f}" +
+                        f"\t water-n {mol_number:5} \n")
                 f_pot.write("@end \n")
-                
+
                 # copy charges and polarisabilities from trajectory.inp
                 with open('trajectory.inp', 'r') as w_pot:
-                        lines = w_pot.readlines()
-                        water_lines = lines[-16:]
-                        for item in water_lines:
-                            f_pot.write(item)
+                    lines = w_pot.readlines()
+                    water_lines = lines[-16:]
+                    for item in water_lines:
+                        f_pot.write(item)
 
             # update method_dict with potential file
             if Path(potfile).is_file():
@@ -271,17 +272,17 @@ class QMMMDriver:
             abs_spec.init_driver(self.comm, ostream)
             abs_spec.compute(qm_mol, basis, scf_drv.scf_tensors)
             abs_spec.print_property(ostream)
-            
+
             excitation_energies = abs_spec.get_property('eigenvalues')
             oscillator_strengths = abs_spec.get_property('oscillator_strengths')
             self.print_excited_states(excitation_energies, oscillator_strengths)
 
-            #save frame number, excitation energies& oscillator strength
+            # save frame number, excitation energies& oscillator strength
             frame_numbers.append(ts.frame)
             list_ex_energy.append(excitation_energies)
             list_osci_strength.append(oscillator_strengths)
 
-            #save spectra data to the json file
+        # save spectra data to the json file
         n = 0
         for item1, item2 in zip(list_ex_energy, list_osci_strength):
             if n == 0:
@@ -295,12 +296,13 @@ class QMMMDriver:
                 json_data.write("%s,\n" % item1)
                 json_data.write("%s\n" % item2)
                 json_data.write(']')
-            
+
         json_data.write(']}}')
         json_data.close()
-        #run spectrum broadening
+
+        # run spectrum broadening
         self.spectrum_broadening(list_ex_energy, list_osci_strength,
-                                 frame_numbers,output_dir)
+                                 frame_numbers, output_dir)
 
         # print time spent in QMMM
         valstr = '*** Time spent in QMMM calculation: '
@@ -324,8 +326,7 @@ class QMMMDriver:
         lines.append('XTC file                 :    ' + self.xtc_file)
         lines.append('QM region                :    ' + self.qm_region)
         lines.append('Pol. MM Region           :    ' + self.mm_pol_region)
-        lines.append('Non-Pol. MM Region       :    ' +
-                     self.mm_nonpol_region)
+        lines.append('Non-Pol. MM Region       :    ' + self.mm_nonpol_region)
 
         lines.append('Spect Line Profile       :    ' + self.line_profile)
         lines.append('Broadening parameter     :    ' + str(self.param))
@@ -406,10 +407,10 @@ class QMMMDriver:
                             frame_numbers, output_dir):
         """
         Calculate the spectrum with either a Gaussian or Lourenzian line profile
-        
-        :param Xmin-Xmax: 
+
+        :param Xmin-Xmax:
             the range for x-axis (Energy in Hartees).
-        :param x: 
+        :param x:
             data for x axis.
         :param y:
             data for y axis.
@@ -419,37 +420,35 @@ class QMMMDriver:
         Xmax = np.amax(list_ex_energy) + 0.02
         x = np.arange(Xmin, Xmax, 0.001)
         y = np.zeros((len(list_ex_energy), len(x)))
-        
-        
-        #go through the frames and calculate the spectrum for each frame
+
+        # go through the frames and calculate the spectrum for each frame
         for i in range(len(list_ex_energy)):
             for xp in range(len(x)):
                 for e, f in zip(list_ex_energy[i], list_osci_strength[i]):
                     if self.line_profile == 'Gaussian':
                         if self.spect_unit == 'eV':
-                            y[i][xp] += f * np.exp(-(((
-                            (e - x[xp]) * hartree_in_ev()) / self.param)**2))                           
-                         #check formula   
+                            y[i][xp] += f * np.exp(-(
+                                (e - x[xp]) * hartree_in_ev() / self.param)**2)
+                        # check formula
                         elif self.spect_unit == 'au' or 'a.u.':
-                            y[i][xp] += f * np.exp(-(((
-                            (e - x[xp]) ) / self.param)**2))
+                            y[i][xp] += f * np.exp(-(
+                                (e - x[xp]) / self.param)**2)
 
                     elif self.line_profile == 'Lorentzian':
                         if self.spect_unit == 'eV':
                             y[i][xp] += 0.5 * self.param * f / (np.pi * (
-                            ((x[xp] - e) * hartree_in_ev())**2 +
-                            0.25 * self.param**2))
-                            
+                                ((x[xp] - e) * hartree_in_ev())**2 +
+                                0.25 * self.param**2))
+
                         elif self.spect_unit == 'au' or 'a.u.':
-                            y[i][xp] += 0.5 * self.param * f / (np.pi * (
-                            ((x[xp] - e) **2 +
-                            0.25 * self.param**2)))
+                            y[i][xp] += 0.5 * self.param * f / (np.pi * ((
+                                (x[xp] - e)**2 + 0.25 * self.param**2)))
 
         # x_max: the corresponding excitation energy
         # absorption_max: the largest peak
-        x_max, absorption_max = self.plot_spectra(x, y,output_dir, 'initial')
+        x_max, absorption_max = self.plot_spectra(x, y, output_dir, 'initial')
 
-        # Decide which frames to be deleted 
+        # Decide which frames to be deleted
         # Depending on whether the first absorption lies too far away from average
         for i in range(len(y)):
             if np.abs(list_ex_energy[i][0] - x_max) >= self.difference * x_max:
@@ -463,16 +462,17 @@ class QMMMDriver:
     def plot_spectra(self, x, y, output_dir, label):
         """
         calculate & plot averaged spectra, return peak value
-        
+
         :param: x_max
             x value (energy) for the largest(first) excitation
         :param: absorption_max
             y value (absorption)  for the largest(first) excitation
-            
-        :return x_max, absorption_max
+
+        :return:
+            x_max, absorption_max
         """
-        
-        #calculate the average spectrum
+
+        # calculate the average spectrum
         y_averaged = []
         for i in range(len(x)):
             tot = 0
@@ -480,7 +480,7 @@ class QMMMDriver:
                 tot += y[j][i]
             y_averaged.append(tot / len(y))
 
-        #obtain absorption_max and x_max            
+        # obtain absorption_max and x_max
         absorption_max = max(y_averaged)
         x_max = None
         for a, b in zip(x, y_averaged):
@@ -488,13 +488,13 @@ class QMMMDriver:
                 x_max = a
 
         hartee_to_nm = 45.563
-        
-        #plot spectra in output_dir folder
+
+        # plot spectra in output_dir folder
         plt.figure(figsize=(8, 4))
         plt.plot(hartee_to_nm / x, y_averaged)
         plt.ylabel('Absorption')
         plt.xlabel('Wavelength (nm)')
-        plt.savefig (output_dir /'average-spec_{}nm-{}.pdf'.format(
+        plt.savefig(output_dir / 'average-spec_{}nm-{}.pdf'.format(
             round(hartee_to_nm / x_max, 2), label))
 
         return x_max, absorption_max
