@@ -92,11 +92,11 @@ class QMMMDriver:
         Updates settings in qmmm driver.
 
         :param traj_dict:
-            The input dictionary of qmmm group.
+            The input dictionary of trajectory group.
         :param spect_dict:
-            The input dictionary of spectrum settings
+            The input dictionary of spectrum settings group.
         :param rsp_dict:
-            The input dictionary of response settings
+            The input dictionary of response settings group.
         :param method_dict:
             The input dicitonary of method settings group.
         """
@@ -169,13 +169,12 @@ class QMMMDriver:
         """
         Performs QMMM calculation.
 
-        :param frame_numbers:
-            a list contains the frame numbers
-        :param list_ex_energy:
-            excitation energies in the follwoing format (frame1(S1,S2..Sn),
-            frame2(S1,S2...Sn) ....frame_n(S1,S2...Sn)
-        :param list_osci_strength:
-            as above but for scillator strengths
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param min_basis:
+            The minimal AO basis set.
         """
 
         self.print_header()
@@ -295,10 +294,10 @@ class QMMMDriver:
                     f_pot.write('@end' + os.linesep + os.linesep)
 
             # update method_dict with potential file
-            if Path(potfile).is_file():
-                self.method_dict['potfile'] = str(potfile)
+            if 'pe_options' in self.method_dict:
+                self.method_dict['pe_options']['potfile'] = str(potfile)
             else:
-                self.method_dict.pop('potfile', None)
+                self.method_dict['potfile'] = str(potfile)
 
             # setup output stream
             output = output_dir / '{}_frame_{}.out'.format(
@@ -496,14 +495,16 @@ class QMMMDriver:
             if np.abs(list_ex_energy[i][0] - x_max) >= self.diff_tol * x_max:
                 del_indicies.append(i)
 
-        self.ostream.print_blank()
-        for i in del_indicies:
-            self.ostream.print_info(
-                f'Frame {frame_numbers[i]} is very distorted, check geometry')
-        self.ostream.print_blank()
-        self.ostream.flush()
+        if del_indicies:
+            self.ostream.print_blank()
+            for i in del_indicies:
+                self.ostream.print_info(
+                    f'Frame {frame_numbers[i]} is very distorted, check geometry'
+                )
+            self.ostream.print_blank()
+            self.ostream.flush()
 
-        y = np.delete(y, del_indicies, axis=0)
+            y = np.delete(y, del_indicies, axis=0)
 
         self.plot_spectra(x, y, output_dir, 'final')
 
@@ -511,28 +512,23 @@ class QMMMDriver:
         """
         calculate & plot averaged spectra, return peak value
 
-        :param: x_max
-            x value (energy) for the largest(first) excitation
-        :param: absorption_max
-            y value (absorption)  for the largest(first) excitation
+        :param x:
+            The array for the horizontal axis.
+        :param y:
+            The multi-line array for the vertical axis.
 
         :return:
-            x_max, absorption_max
+            The excitation energy and absorption at the peak.
         """
 
         # calculate the average spectrum
-        y_averaged = []
-        for i in range(len(x)):
-            tot = 0
-            for j in range(len(y)):
-                tot += y[j][i]
-            y_averaged.append(tot / len(y))
+        y_averaged = np.sum(y, axis=0) / y.shape[0]
 
         # obtain absorption_max and x_max
-        absorption_max = max(y_averaged)
-        x_max = None
+        x_max, absorption_max = x[0], y_averaged[0]
         for a, b in zip(x, y_averaged):
-            if b == absorption_max:
+            if b > absorption_max:
+                absorption_max = b
                 x_max = a
 
         hartee_to_nm = 45.563
