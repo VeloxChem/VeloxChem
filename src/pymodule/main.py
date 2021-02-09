@@ -200,10 +200,14 @@ def main():
             rsp_dict = {}
 
         qmmm_dict['filename'] = task.input_dict['filename']
+        qmmm_dict['charges'] = task.input_dict['charges']['unsorted_lines']
+        qmmm_dict['polarizabilities'] = task.input_dict['polarizabilities'][
+            'unsorted_lines']
+
         qmmm_drv = QMMMDriver(task.mpi_comm, task.ostream)
-        qmmm_drv.update_settings(qmmm_dict, spect_dict,rsp_dict,method_dict)
+        qmmm_drv.update_settings(qmmm_dict, spect_dict, rsp_dict, method_dict)
         qmmm_drv.compute(task.molecule, task.ao_basis, task.min_basis)
-    
+
     # Self-consistent field
 
     run_scf = task_type in [

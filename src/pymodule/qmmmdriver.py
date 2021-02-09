@@ -1,8 +1,13 @@
+from mpi4py import MPI
 import numpy as np
 import time as tm
+import contextlib
+import sys
+import os
+from pathlib import Path
 import matplotlib.pyplot as plt
 import MDAnalysis as mda
-from pathlib import Path
+from MDAnalysis.topology.guessers import guess_atom_element
 
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
@@ -31,45 +36,52 @@ class QMMMDriver:
           trajectory.
         - qm_region: The string for selecting QM region.
         - mm_pol_region: The string for selecting polarizable MM region.
-        - mm_nonpol_region: The string for selecting non-polarizable MM
-          region.
+        - mm_nonpol_region: The string for selecting non-polarizable MM region.
         - filename: The filename for the calculation.
         - nstates: The number of excited states.
-        - difference: if the first excitation energy is not too far away from
+        - diff_tol: if the first excitation energy is not too far away from
           averaged spectrum that np.abs(excitation energy - average)
-          >= difference * average
+          >= diff_tol * average
         - traj_unit: trajectory unit
         - line profile: either Gaussian or Lorentzian
-        - param: line broadening parameter
-        - spect_unit: either eV or au
-
+        - line_param: line broadening parameter
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes QMMM driver.
         """
 
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
+
         self.comm = comm
-        self.rank = comm.Get_rank()
         self.ostream = ostream
+
         self.tpr_file = None
         self.xtc_file = None
         self.sampling_time = np.zeros(1)
+
         self.qm_region = None
         self.mm_pol_region = None
         self.mm_nonpol_region = None
+
         self.filename = None
         self.method_dict = None
-        self.description = 'Na'
+        self.description = 'N/A'
 
         self.nstates = 3
 
-        self.difference = 0.4
+        self.diff_tol = 0.4
 
         self.line_profile = 'Gaussian'
-        self.param = 0.4  # unit eV
-        self.spect_unit = 'eV'
+        self.line_param = 0.1
+
+        self.charges = None
+        self.polarizabilities = None
 
     def update_settings(self,
                         qmmm_dict,
@@ -110,6 +122,11 @@ class QMMMDriver:
         if 'description' in qmmm_dict:
             self.description = qmmm_dict['description']
 
+        if 'charges' in qmmm_dict:
+            self.charges = qmmm_dict['charges']
+        if 'polarizabilities' in qmmm_dict:
+            self.polarizabilities = qmmm_dict['polarizabilities']
+
         if method_dict is not None:
             self.method_dict = dict(method_dict)
 
@@ -117,10 +134,9 @@ class QMMMDriver:
             self.line_profile = str(spect_dict['line_profile'])
 
         if 'broadening_parameter' in spect_dict:
-            self.param = float(spect_dict['broadening_parameter'])
-
-        if 'units' in spect_dict:
-            self.spec_unit = spect_dict['units']
+            self.line_param = float(spect_dict['broadening_parameter'])
+            if 'units' in spect_dict and spect_dict['units'].lower() == 'ev':
+                self.line_param /= hartree_in_ev()
 
         if 'nstates' in rsp_dict:
             self.nstates = int(rsp_dict['nstates'])
@@ -156,15 +172,6 @@ class QMMMDriver:
         list_ex_energy = []
         list_osci_strength = []
 
-        # define json file name
-        spectrum_json_fname = str(output_dir / "spectrum.json")
-
-        # create json file for spectra data
-        json_data = open(spectrum_json_fname, 'w+')
-        json_data.write('{"' + self.qm_region + '":{ "Description":' +
-                        self.description +
-                        ', "excitation energies&ocillator strength&SCF":[')
-
         # go through frames in trajectory
         for ts in u.trajectory:
             # skip frames that are not in sampling_time
@@ -174,17 +181,20 @@ class QMMMDriver:
 
             # select QM, MM_pol and MM_nonpol regions
             qm = u.select_atoms(self.qm_region)
-            mm_pol_select = "byres around " + self.mm_pol_region + " " + self.qm_region
+            mm_pol_select = 'byres around ' + self.mm_pol_region + ' ' + self.qm_region
             mm_pol = u.select_atoms(mm_pol_select)
 
             if int(self.mm_nonpol_region) >= int(self.mm_pol_region):
-                mm_nonpol_select = ("byres around " + self.mm_nonpol_region +
-                                    " " + self.qm_region)
+                mm_nonpol_select = ('byres around ' + self.mm_nonpol_region +
+                                    ' ' + self.qm_region)
                 mm_nonpol = u.select_atoms(mm_nonpol_select)
                 mm_nonpol = mm_nonpol - mm_pol
 
             # crate pdb files
-            qm.write(output_dir / f"{self.filename}_frame_{ts.frame}.pdb")
+            with open(os.devnull, 'w') as f_devnull:
+                with contextlib.redirect_stderr(f_devnull):
+                    qm.write(output_dir /
+                             f'{self.filename}_frame_{ts.frame}.pdb')
 
             # make QM molecule whole
             qm.unwrap()
@@ -208,44 +218,56 @@ class QMMMDriver:
             qm_mol.set_multiplicity(qm_multiplicity)
 
             # create potential file
-            potfile = output_dir / f"{self.filename}_frame_{ts.frame}.pot"
+            potfile = output_dir / f'{self.filename}_frame_{ts.frame}.pot'
 
-            # write potential file for MM region
             with open(str(potfile), 'w') as f_pot:
-                f_pot.write("@environment \nunits: angstrom \nxyz: \n")
-                # write coordinates for the polarisable region
-                for i in range(len(mm_pol.names)):
-                    mol_number = 1 + i // 3
-                    atom_label = ' '
-                    if mm_pol.names[i] == 'OW':
-                        atom_label = 'O'
-                    else:
-                        atom_label = 'H'
-                    f_pot.write(
-                        f"{atom_label:5}" + f"{mm_pol.positions[i][0]:10.5f}" +
-                        f"{mm_pol.positions[i][1]:10.5f} {mm_pol.positions[i][2]:10.5f}"
-                        + f"\t water {mol_number:5} \n")
+                f_pot.write('@environment' + os.linesep)
+                f_pot.write('units: angstrom' + os.linesep)
+                f_pot.write('xyz:' + os.linesep)
 
-                # write coordinate for the non-polarisable region
-                for i in range(len(mm_nonpol.names)):
-                    mol_number = 1 + i // 3
-                    if mm_nonpol.names[i] == 'OW':
-                        atom_label = 'O'
-                    else:
-                        atom_label = 'H'
-                    f_pot.write(
-                        f"{atom_label:5} {mm_nonpol.positions[i][0]:10.5f}" +
-                        f"{mm_nonpol.positions[i][1]:10.5f}" +
-                        f"{mm_nonpol.positions[i][2]:10.5f}" +
-                        f"\t water-n {mol_number:5} \n")
-                f_pot.write("@end \n")
+                res_count = 0
 
-                # copy charges and polarisabilities from trajectory.inp
-                with open('trajectory.inp', 'r') as w_pot:
-                    lines = w_pot.readlines()
-                    water_lines = lines[-16:]
-                    for item in water_lines:
-                        f_pot.write(item)
+                # write coordinates for the polarizable region
+                res_name = 'water'
+                for res in mm_pol.residues:
+                    res_count += 1
+                    for atom in res.atoms:
+                        atom_label = guess_atom_element(atom.name)
+                        f_pot.write(f'{atom_label:<5s}' +
+                                    f'{atom.position[0]:15.8f}' +
+                                    f'{atom.position[1]:15.8f}' +
+                                    f'{atom.position[2]:15.8f}' +
+                                    f'{res_name:>10s}' + f'{res_count:8d}' +
+                                    os.linesep)
+
+                # write coordinate for the non-polarizable region
+                res_name = 'water-n'
+                for res in mm_nonpol.residues:
+                    res_count += 1
+                    for atom in res.atoms:
+                        atom_label = guess_atom_element(atom.name)
+                        f_pot.write(f'{atom_label:<5s}' +
+                                    f'{atom.position[0]:15.8f}' +
+                                    f'{atom.position[1]:15.8f}' +
+                                    f'{atom.position[2]:15.8f}' +
+                                    f'{res_name:>10s}' + f'{res_count:8d}' +
+                                    os.linesep)
+
+                f_pot.write('@end' + os.linesep + os.linesep)
+
+                # charges
+                if self.charges:
+                    f_pot.write('@charges' + os.linesep)
+                    for line in self.charges:
+                        f_pot.write(line + os.linesep)
+                    f_pot.write('@end' + os.linesep + os.linesep)
+
+                # polarizabilities
+                if self.polarizabilities:
+                    f_pot.write('@polarizabilities' + os.linesep)
+                    for line in self.polarizabilities:
+                        f_pot.write(line + os.linesep)
+                    f_pot.write('@end' + os.linesep + os.linesep)
 
             # update method_dict with potential file
             if Path(potfile).is_file():
@@ -282,22 +304,23 @@ class QMMMDriver:
             list_ex_energy.append(excitation_energies)
             list_osci_strength.append(oscillator_strengths)
 
-        # save spectra data to the json file
-        n = 0
-        for item1, item2 in zip(list_ex_energy, list_osci_strength):
-            if n == 0:
-                json_data.write('[')
-                json_data.write("%s,\n" % item1)
-                json_data.write("%s\n" % item2)
-                json_data.write(']')
-                n += 1
-            else:
-                json_data.write(',[')
-                json_data.write("%s,\n" % item1)
-                json_data.write("%s\n" % item2)
-                json_data.write(']')
+        # create json file for spectra data
+        json_data = open(str(output_dir / 'spectrum.json'), 'w+')
+        json_data.write('{' + os.linesep)
+        json_data.write(f'  "{self.qm_region}":' + '{' + os.linesep)
+        json_data.write(f'    "description": {self.description},' + os.linesep)
+        json_data.write('    "excitation energies & ocillator strength": [' +
+                        os.linesep)
 
-        json_data.write(']}}')
+        for item1, item2 in zip(list_ex_energy, list_osci_strength):
+            ene_str = ','.join([str(x) for x in item1])
+            osc_str = ','.join([str(x) for x in item2])
+            json_data.write(f'      [[{ene_str}],' + os.linesep)
+            json_data.write(f'       [{osc_str}]],' + os.linesep)
+
+        json_data.write('    ]' + os.linesep)
+        json_data.write('  }' + os.linesep)
+        json_data.write('}' + os.linesep)
         json_data.close()
 
         # run spectrum broadening
@@ -329,7 +352,7 @@ class QMMMDriver:
         lines.append('Non-Pol. MM Region       :    ' + self.mm_nonpol_region)
 
         lines.append('Spect Line Profile       :    ' + self.line_profile)
-        lines.append('Broadening parameter     :    ' + str(self.param))
+        lines.append('Broadening parameter     :    ' + str(self.line_param))
 
         maxlen = max([len(line) for line in lines])
         for line in lines:
@@ -416,9 +439,9 @@ class QMMMDriver:
             data for y axis.
         """
 
-        Xmin = np.amin(list_ex_energy) - 0.02
-        Xmax = np.amax(list_ex_energy) + 0.02
-        x = np.arange(Xmin, Xmax, 0.001)
+        x_min = np.amin(list_ex_energy) - 0.02
+        x_max = np.amax(list_ex_energy) + 0.02
+        x = np.arange(x_min, x_max, 0.001)
         y = np.zeros((len(list_ex_energy), len(x)))
 
         # go through the frames and calculate the spectrum for each frame
@@ -426,23 +449,11 @@ class QMMMDriver:
             for xp in range(len(x)):
                 for e, f in zip(list_ex_energy[i], list_osci_strength[i]):
                     if self.line_profile == 'Gaussian':
-                        if self.spect_unit == 'eV':
-                            y[i][xp] += f * np.exp(-(
-                                (e - x[xp]) * hartree_in_ev() / self.param)**2)
-                        # check formula
-                        elif self.spect_unit == 'au' or 'a.u.':
-                            y[i][xp] += f * np.exp(-(
-                                (e - x[xp]) / self.param)**2)
-
+                        y[i][xp] += f * np.exp(-(
+                            (e - x[xp]) / self.line_param)**2)
                     elif self.line_profile == 'Lorentzian':
-                        if self.spect_unit == 'eV':
-                            y[i][xp] += 0.5 * self.param * f / (np.pi * (
-                                ((x[xp] - e) * hartree_in_ev())**2 +
-                                0.25 * self.param**2))
-
-                        elif self.spect_unit == 'au' or 'a.u.':
-                            y[i][xp] += 0.5 * self.param * f / (np.pi * ((
-                                (x[xp] - e)**2 + 0.25 * self.param**2)))
+                        y[i][xp] += 0.5 * self.line_param * f / (np.pi * (
+                            (x[xp] - e)**2 + 0.25 * self.line_param**2))
 
         # x_max: the corresponding excitation energy
         # absorption_max: the largest peak
@@ -451,7 +462,7 @@ class QMMMDriver:
         # Decide which frames to be deleted
         # Depending on whether the first absorption lies too far away from average
         for i in range(len(y)):
-            if np.abs(list_ex_energy[i][0] - x_max) >= self.difference * x_max:
+            if np.abs(list_ex_energy[i][0] - x_max) >= self.diff_tol * x_max:
                 np.delete(y, i, 0)
                 frame = int(frame_numbers[i])
                 self.ostream.print_info(

@@ -98,6 +98,8 @@ class MpiTask:
                     continue
                 if list(self.input_dict[key].keys()) == ['checkpoint_file']:
                     continue
+                if list(self.input_dict[key].keys()) == ['unsorted_lines']:
+                    continue
                 self.ostream.print_info('@{:s}'.format(key))
                 for key_2 in self.input_dict[key]:
                     self.ostream.print_info('{:s}: {:s}'.format(
