@@ -222,6 +222,9 @@ def main():
     scf_type = 'unrestricted' if task_type in ['uhf', 'uscf'] else 'restricted'
 
     if run_scf:
+        assert_msg_critical(task.molecule.number_of_atoms(),
+                            'Molecule: no atoms found in molecule')
+
         if 'scf' in task.input_dict:
             scf_dict = task.input_dict['scf']
         else:

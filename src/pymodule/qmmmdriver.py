@@ -12,6 +12,7 @@ from MDAnalysis.topology.guessers import guess_atom_element
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import hartree_in_ev
 from .molecule import Molecule
+from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .inputparser import InputParser
 from .outputstream import OutputStream
@@ -181,7 +182,6 @@ class QMMMDriver:
 
         start_time = tm.time()
 
-        qm_elems = molecule.get_labels()
         qm_charge = molecule.get_charge()
         qm_multiplicity = molecule.get_multiplicity()
 
@@ -237,9 +237,17 @@ class QMMMDriver:
             mm_nonpol.positions -= box_center
 
             # create molecule
+            qm_elems = [guess_atom_element(name) for name in qm.names]
             qm_mol = Molecule(qm_elems, qm.positions, 'angstrom')
             qm_mol.set_charge(qm_charge)
             qm_mol.set_multiplicity(qm_multiplicity)
+
+            # create basis set
+            basis_path = '.'
+            if 'basis_path' in self.method_dict:
+                basis_path = self.method_dict['basis_path']
+            basis_name = self.method_dict['basis'].upper()
+            qm_basis = MolecularBasis.read(qm_mol, basis_name, basis_path)
 
             # create potential file
             potfile = output_dir / f'{self.filename}_frame_{ts.frame}.pot'
@@ -303,12 +311,12 @@ class QMMMDriver:
             output = output_dir / '{}_frame_{}.out'.format(
                 self.filename, ts.frame)
             ostream = OutputStream(str(output))
-            self.print_molecule_and_basis(qm_mol, basis, ostream)
+            self.print_molecule_and_basis(qm_mol, qm_basis, ostream)
 
             # run SCF
             scf_drv = ScfRestrictedDriver(self.comm, ostream)
             scf_drv.update_settings({}, self.method_dict)
-            scf_drv.compute(qm_mol, basis)
+            scf_drv.compute(qm_mol, qm_basis)
 
             scf_energy = scf_drv.get_scf_energy()
             self.print_scf_energy(scf_energy)
@@ -316,7 +324,7 @@ class QMMMDriver:
             # run response for spectrum
             abs_spec = Absorption({'nstates': self.nstates}, self.method_dict)
             abs_spec.init_driver(self.comm, ostream)
-            abs_spec.compute(qm_mol, basis, scf_drv.scf_tensors)
+            abs_spec.compute(qm_mol, qm_basis, scf_drv.scf_tensors)
             abs_spec.print_property(ostream)
 
             excitation_energies = abs_spec.get_property('eigenvalues')
@@ -342,8 +350,8 @@ class QMMMDriver:
             json_data.write(f'      [[{ene_str}],' + os.linesep)
             json_data.write(f'       [{osc_str}]],' + os.linesep)
 
-        json_data.write('    ]' + os.linesep)
-        json_data.write('  }' + os.linesep)
+        json_data.write('    ],' + os.linesep)
+        json_data.write('  },' + os.linesep)
         json_data.write('}' + os.linesep)
         json_data.close()
 
@@ -447,7 +455,7 @@ class QMMMDriver:
         for s in range(self.nstates):
             e = excitation_energies[s] * hartree_in_ev()
             f = oscillator_strengths[s]
-            valstr = 'excited state S{:d}:'.format(s + 1)
+            valstr = 'Excited state S{:d}:'.format(s + 1)
             valstr += '{:12.6f} eV     Osc.Str. {:10.4f}'.format(e, f)
             self.ostream.print_info(valstr)
         self.ostream.print_blank()
