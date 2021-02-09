@@ -42,6 +42,15 @@ getHartreeValueInKiloCaloriePerMole()
 }
 
 double
+getHartreeValueInInverseNanometer()
+{
+    // hartree-inverse meter relationship: 2.194 746 313 708 e7 m^-1
+    //                                     2.194 746 313 708 e-2 nm^-1
+
+    return 2.194746313708e-2;
+}
+
+double
 getDipoleInDebye()
 {
     // atomic unit of electric dipole mom.: 8.478 353 26 e-30 [C m]

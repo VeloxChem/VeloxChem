@@ -33,6 +33,13 @@ double getHartreeValueInElectronVolts();
 double getHartreeValueInKiloCaloriePerMole();
 
 /**
+ Gets a Hartree value in inverse nanometer.
+
+ @return the conversion factor.
+ */
+double getHartreeValueInInverseNanometer();
+
+/**
  Gets convertion factor for dipole moment (a.u.->Debye)
 
  @return the conversion factor.

@@ -12,12 +12,14 @@ from MDAnalysis.topology.guessers import guess_atom_element
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import hartree_in_ev
+from .veloxchemlib import hartree_in_inverse_nm
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .inputparser import InputParser
 from .outputstream import OutputStream
 from .rspabsorption import Absorption
+from .subcommunicators import SubCommunicators
 
 
 class QMMMDriver:
@@ -32,6 +34,7 @@ class QMMMDriver:
     Instance variables
         - comm: The MPI communicator.
         - rank: The rank of MPI process.
+        - nodes: The number of MPI processes.
         - ostream: The output stream.
         - topology_file: The topology filename.
         - trajectory_file: The trajectory filename.
@@ -63,6 +66,7 @@ class QMMMDriver:
 
         self.comm = comm
         self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
 
         self.ostream = ostream
 
@@ -192,24 +196,34 @@ class QMMMDriver:
         output_dir = Path(self.filename + '_files')
         if self.rank == mpi_master():
             output_dir.mkdir(parents=True, exist_ok=True)
+        self.comm.barrier()
 
         u = mda.Universe(self.topology_file,
                          self.trajectory_file,
                          refresh_offsets=True)
 
-        # set up variables for average spectrum calculations
-        frame_numbers = []
-        list_ex_energy = []
-        list_osci_strength = []
+        grps = [p for p in range(self.nodes)]
+        subcomm = SubCommunicators(self.comm, grps)
+        local_comm = subcomm.local_comm
+        cross_comm = subcomm.cross_comm
+        local_rank = local_comm.Get_rank()
+
+        local_sampling_time = self.sampling_time[self.rank::self.nodes]
+
+        local_result = []
 
         # go through frames in trajectory
         for ts in u.trajectory:
             # skip frames that are not in sampling_time
-            if np.min(np.abs(self.sampling_time - u.trajectory.time)) > 1e-6:
+            if np.min(np.abs(local_sampling_time - u.trajectory.time)) > 1e-6:
                 continue
-            self.print_frame_and_time(ts.frame, u.trajectory.time)
 
-            if self.rank == mpi_master():
+            info_text = f'Processing frame {ts.frame} '
+            info_text += f'({u.trajectory.time:.3f} ps) on master node...'
+            self.ostream.print_info(info_text)
+            self.ostream.flush()
+
+            if local_rank == mpi_master():
 
                 # select QM, MM_pol and MM_nonpol regions
                 qm = u.select_atoms(self.qm_region)
@@ -264,7 +278,7 @@ class QMMMDriver:
             # create potential file
             potfile = output_dir / f'{self.filename}_frame_{ts.frame}.pot'
 
-            if self.rank == mpi_master():
+            if local_rank == mpi_master():
 
                 with open(str(potfile), 'w') as f_pot:
                     f_pot.write('@environment' + os.linesep)
@@ -322,8 +336,8 @@ class QMMMDriver:
                 self.method_dict['potfile'] = str(potfile)
 
             # broadcast molecule and basis set
-            qm_mol.broadcast(self.rank, self.comm)
-            qm_basis.broadcast(self.rank, self.comm)
+            qm_mol.broadcast(local_rank, local_comm)
+            qm_basis.broadcast(local_rank, local_comm)
 
             # setup output stream
             output = output_dir / '{}_frame_{}.out'.format(
@@ -332,32 +346,62 @@ class QMMMDriver:
             self.print_molecule_and_basis(qm_mol, qm_basis, ostream)
 
             # run SCF
-            scf_drv = ScfRestrictedDriver(self.comm, ostream)
+            scf_drv = ScfRestrictedDriver(local_comm, ostream)
             scf_drv.update_settings({}, self.method_dict)
             scf_drv.compute(qm_mol, qm_basis)
 
-            if self.rank == mpi_master():
+            if local_rank == mpi_master():
                 scf_energy = scf_drv.get_scf_energy()
-                self.print_scf_energy(scf_energy)
 
             # run response for spectrum
             abs_spec = Absorption({'nstates': self.nstates}, self.method_dict)
-            abs_spec.init_driver(self.comm, ostream)
+            abs_spec.init_driver(local_comm, ostream)
             abs_spec.compute(qm_mol, qm_basis, scf_drv.scf_tensors)
 
-            if self.rank == mpi_master():
+            if local_rank == mpi_master():
                 abs_spec.print_property(ostream)
 
                 excitation_energies = abs_spec.get_property('eigenvalues')
                 oscillator_strengths = abs_spec.get_property(
                     'oscillator_strengths')
-                self.print_excited_states(excitation_energies,
-                                          oscillator_strengths)
 
-                # save frame number, excitation energies& oscillator strength
-                frame_numbers.append(ts.frame)
+                local_result.append((
+                    ts.frame,
+                    {
+                        'trajectory_time': u.trajectory.time,
+                        'scf_energy': scf_energy,
+                        'excitation_energies': excitation_energies,
+                        'oscillator_strengths': oscillator_strengths,
+                    },
+                ))
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        if local_rank == mpi_master():
+            results = cross_comm.gather(local_result, root=mpi_master())
+
+        frame_numbers = []
+        list_ex_energy = []
+        list_osci_strength = []
+
+        if self.rank == mpi_master():
+            flatten_results = [tup for result in results for tup in result]
+            for tup in sorted(flatten_results):
+                frame = tup[0]
+                time = tup[1]['trajectory_time']
+                scf_energy = tup[1]['scf_energy']
+                excitation_energies = tup[1]['excitation_energies']
+                oscillator_strengths = tup[1]['oscillator_strengths']
+
+                frame_numbers.append(frame)
                 list_ex_energy.append(excitation_energies)
                 list_osci_strength.append(oscillator_strengths)
+
+                self.print_frame_and_time(frame, time)
+                self.print_scf_energy(scf_energy)
+                self.print_excited_states(excitation_energies,
+                                          oscillator_strengths)
 
         if self.rank == mpi_master():
 
@@ -434,9 +478,7 @@ class QMMMDriver:
         """
 
         info_text = 'Frame: {:d}  (Time: {:.3f} ps)'.format(frame, time)
-        self.ostream.print_blank()
         self.ostream.print_info(info_text)
-        self.ostream.print_blank()
         self.ostream.flush()
 
     def print_molecule_and_basis(self, molecule, basis, ostream):
@@ -466,7 +508,6 @@ class QMMMDriver:
         """
 
         self.ostream.print_info('SCF energy: {:.10f} a.u.'.format(scf_energy))
-        self.ostream.print_blank()
         self.ostream.flush()
 
     def print_excited_states(self, excitation_energies, oscillator_strengths):
@@ -566,7 +607,7 @@ class QMMMDriver:
                 absorption_max = b
                 x_max = a
 
-        hartee_to_nm = 45.563
+        hartee_to_nm = 1.0 / hartree_in_inverse_nm()
 
         # plot spectra in output_dir folder
         plt.figure(figsize=(8, 4))
