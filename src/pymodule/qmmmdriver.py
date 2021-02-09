@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import MDAnalysis as mda
 from MDAnalysis.topology.guessers import guess_atom_element
 
+from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import hartree_in_ev
 from .molecule import Molecule
@@ -30,6 +31,7 @@ class QMMMDriver:
 
     Instance variables
         - comm: The MPI communicator.
+        - rank: The rank of MPI process.
         - ostream: The output stream.
         - topology_file: The topology filename.
         - trajectory_file: The trajectory filename.
@@ -60,6 +62,8 @@ class QMMMDriver:
             ostream = OutputStream(sys.stdout)
 
         self.comm = comm
+        self.rank = self.comm.Get_rank()
+
         self.ostream = ostream
 
         self.topology_file = None
@@ -186,7 +190,8 @@ class QMMMDriver:
         qm_multiplicity = molecule.get_multiplicity()
 
         output_dir = Path(self.filename + '_files')
-        output_dir.mkdir(parents=True, exist_ok=True)
+        if self.rank == mpi_master():
+            output_dir.mkdir(parents=True, exist_ok=True)
 
         u = mda.Universe(self.topology_file,
                          self.trajectory_file,
@@ -204,108 +209,121 @@ class QMMMDriver:
                 continue
             self.print_frame_and_time(ts.frame, u.trajectory.time)
 
-            # select QM, MM_pol and MM_nonpol regions
-            qm = u.select_atoms(self.qm_region)
+            if self.rank == mpi_master():
 
-            mm_pol_select = f'byres around {self.mm_pol_region} group qm'
-            mm_pol = u.select_atoms(mm_pol_select, qm=qm)
+                # select QM, MM_pol and MM_nonpol regions
+                qm = u.select_atoms(self.qm_region)
 
-            mm_nonpol_select = f'byres around {self.mm_nonpol_region} group qm'
-            mm_nonpol = u.select_atoms(mm_nonpol_select, qm=qm)
-            mm_nonpol = mm_nonpol - mm_pol
+                mm_pol_select = f'byres around {self.mm_pol_region} group qm'
+                mm_pol = u.select_atoms(mm_pol_select, qm=qm)
 
-            # crate pdb files
-            with open(os.devnull, 'w') as f_devnull:
-                with contextlib.redirect_stderr(f_devnull):
-                    qm.write(output_dir /
-                             f'{self.filename}_frame_{ts.frame}.pdb')
+                mm_nonpol_select = f'byres around {self.mm_nonpol_region} group qm'
+                mm_nonpol = u.select_atoms(mm_nonpol_select, qm=qm)
+                mm_nonpol = mm_nonpol - mm_pol
 
-            # make QM molecule whole
-            qm.unwrap()
-            # shift QM, MM_pol and MM_nonpol to center of the box
-            box_center = 0.5 * np.sum(ts.triclinic_dimensions, axis=0)
-            shift = box_center - qm.center_of_geometry()
-            qm.positions += shift
-            mm_pol.positions += shift
-            mm_nonpol.positions += shift
-            # apply periodic boundary condition for MM
-            mm_pol.pack_into_box()
-            mm_nonpol.pack_into_box()
-            # shift QM, MM_pol and MM_nonpol to (0,0,0)
-            qm.positions -= box_center
-            mm_pol.positions -= box_center
-            mm_nonpol.positions -= box_center
+                # crate pdb files
+                with open(os.devnull, 'w') as f_devnull:
+                    with contextlib.redirect_stderr(f_devnull):
+                        qm.write(output_dir /
+                                 f'{self.filename}_frame_{ts.frame}.pdb')
 
-            # create molecule
-            qm_elems = [guess_atom_element(name) for name in qm.names]
-            qm_mol = Molecule(qm_elems, qm.positions, 'angstrom')
-            qm_mol.set_charge(qm_charge)
-            qm_mol.set_multiplicity(qm_multiplicity)
+                # make QM molecule whole
+                qm.unwrap()
+                # shift QM, MM_pol and MM_nonpol to center of the box
+                box_center = 0.5 * np.sum(ts.triclinic_dimensions, axis=0)
+                shift = box_center - qm.center_of_geometry()
+                qm.positions += shift
+                mm_pol.positions += shift
+                mm_nonpol.positions += shift
+                # apply periodic boundary condition for MM
+                mm_pol.pack_into_box()
+                mm_nonpol.pack_into_box()
+                # shift QM, MM_pol and MM_nonpol to (0,0,0)
+                qm.positions -= box_center
+                mm_pol.positions -= box_center
+                mm_nonpol.positions -= box_center
 
-            # create basis set
-            basis_path = '.'
-            if 'basis_path' in self.method_dict:
-                basis_path = self.method_dict['basis_path']
-            basis_name = self.method_dict['basis'].upper()
-            qm_basis = MolecularBasis.read(qm_mol, basis_name, basis_path)
+                # create molecule
+                qm_elems = [guess_atom_element(name) for name in qm.names]
+                qm_mol = Molecule(qm_elems, qm.positions, 'angstrom')
+                qm_mol.set_charge(qm_charge)
+                qm_mol.set_multiplicity(qm_multiplicity)
+
+                # create basis set
+                basis_path = '.'
+                if 'basis_path' in self.method_dict:
+                    basis_path = self.method_dict['basis_path']
+                basis_name = self.method_dict['basis'].upper()
+                qm_basis = MolecularBasis.read(qm_mol, basis_name, basis_path)
+
+            else:
+
+                qm_mol = Molecule()
+                qm_basis = MolecularBasis()
 
             # create potential file
             potfile = output_dir / f'{self.filename}_frame_{ts.frame}.pot'
 
-            with open(str(potfile), 'w') as f_pot:
-                f_pot.write('@environment' + os.linesep)
-                f_pot.write('units: angstrom' + os.linesep)
-                f_pot.write('xyz:' + os.linesep)
+            if self.rank == mpi_master():
 
-                res_count = 0
+                with open(str(potfile), 'w') as f_pot:
+                    f_pot.write('@environment' + os.linesep)
+                    f_pot.write('units: angstrom' + os.linesep)
+                    f_pot.write('xyz:' + os.linesep)
 
-                # write coordinates for the polarizable region
-                res_name = 'water'
-                for res in mm_pol.residues:
-                    res_count += 1
-                    for atom in res.atoms:
-                        atom_label = guess_atom_element(atom.name)
-                        f_pot.write(f'{atom_label:<5s}' +
-                                    f'{atom.position[0]:15.8f}' +
-                                    f'{atom.position[1]:15.8f}' +
-                                    f'{atom.position[2]:15.8f}' +
-                                    f'{res_name:>10s}' + f'{res_count:8d}' +
-                                    os.linesep)
+                    res_count = 0
 
-                # write coordinate for the non-polarizable region
-                res_name = 'water-n'
-                for res in mm_nonpol.residues:
-                    res_count += 1
-                    for atom in res.atoms:
-                        atom_label = guess_atom_element(atom.name)
-                        f_pot.write(f'{atom_label:<5s}' +
-                                    f'{atom.position[0]:15.8f}' +
-                                    f'{atom.position[1]:15.8f}' +
-                                    f'{atom.position[2]:15.8f}' +
-                                    f'{res_name:>10s}' + f'{res_count:8d}' +
-                                    os.linesep)
+                    # write coordinates for the polarizable region
+                    res_name = 'water'
+                    for res in mm_pol.residues:
+                        res_count += 1
+                        for atom in res.atoms:
+                            atom_label = guess_atom_element(atom.name)
+                            f_pot.write(f'{atom_label:<5s}' +
+                                        f'{atom.position[0]:15.8f}' +
+                                        f'{atom.position[1]:15.8f}' +
+                                        f'{atom.position[2]:15.8f}' +
+                                        f'{res_name:>10s}' + f'{res_count:8d}' +
+                                        os.linesep)
 
-                f_pot.write('@end' + os.linesep + os.linesep)
+                    # write coordinate for the non-polarizable region
+                    res_name = 'water-n'
+                    for res in mm_nonpol.residues:
+                        res_count += 1
+                        for atom in res.atoms:
+                            atom_label = guess_atom_element(atom.name)
+                            f_pot.write(f'{atom_label:<5s}' +
+                                        f'{atom.position[0]:15.8f}' +
+                                        f'{atom.position[1]:15.8f}' +
+                                        f'{atom.position[2]:15.8f}' +
+                                        f'{res_name:>10s}' + f'{res_count:8d}' +
+                                        os.linesep)
 
-                # charges
-                if self.charges:
-                    f_pot.write('@charges' + os.linesep)
-                    for line in self.charges:
-                        f_pot.write(line + os.linesep)
                     f_pot.write('@end' + os.linesep + os.linesep)
 
-                # polarizabilities
-                if self.polarizabilities:
-                    f_pot.write('@polarizabilities' + os.linesep)
-                    for line in self.polarizabilities:
-                        f_pot.write(line + os.linesep)
-                    f_pot.write('@end' + os.linesep + os.linesep)
+                    # charges
+                    if self.charges:
+                        f_pot.write('@charges' + os.linesep)
+                        for line in self.charges:
+                            f_pot.write(line + os.linesep)
+                        f_pot.write('@end' + os.linesep + os.linesep)
+
+                    # polarizabilities
+                    if self.polarizabilities:
+                        f_pot.write('@polarizabilities' + os.linesep)
+                        for line in self.polarizabilities:
+                            f_pot.write(line + os.linesep)
+                        f_pot.write('@end' + os.linesep + os.linesep)
 
             # update method_dict with potential file
             if 'pe_options' in self.method_dict:
                 self.method_dict['pe_options']['potfile'] = str(potfile)
             else:
                 self.method_dict['potfile'] = str(potfile)
+
+            # broadcast molecule and basis set
+            qm_mol.broadcast(self.rank, self.comm)
+            qm_basis.broadcast(self.rank, self.comm)
 
             # setup output stream
             output = output_dir / '{}_frame_{}.out'.format(
@@ -318,46 +336,55 @@ class QMMMDriver:
             scf_drv.update_settings({}, self.method_dict)
             scf_drv.compute(qm_mol, qm_basis)
 
-            scf_energy = scf_drv.get_scf_energy()
-            self.print_scf_energy(scf_energy)
+            if self.rank == mpi_master():
+                scf_energy = scf_drv.get_scf_energy()
+                self.print_scf_energy(scf_energy)
 
             # run response for spectrum
             abs_spec = Absorption({'nstates': self.nstates}, self.method_dict)
             abs_spec.init_driver(self.comm, ostream)
             abs_spec.compute(qm_mol, qm_basis, scf_drv.scf_tensors)
-            abs_spec.print_property(ostream)
 
-            excitation_energies = abs_spec.get_property('eigenvalues')
-            oscillator_strengths = abs_spec.get_property('oscillator_strengths')
-            self.print_excited_states(excitation_energies, oscillator_strengths)
+            if self.rank == mpi_master():
+                abs_spec.print_property(ostream)
 
-            # save frame number, excitation energies& oscillator strength
-            frame_numbers.append(ts.frame)
-            list_ex_energy.append(excitation_energies)
-            list_osci_strength.append(oscillator_strengths)
+                excitation_energies = abs_spec.get_property('eigenvalues')
+                oscillator_strengths = abs_spec.get_property(
+                    'oscillator_strengths')
+                self.print_excited_states(excitation_energies,
+                                          oscillator_strengths)
 
-        # create json file for spectra data
-        json_data = open(str(output_dir / 'spectrum.json'), 'w+')
-        json_data.write('{' + os.linesep)
-        json_data.write(f'  "{self.qm_region}":' + '{' + os.linesep)
-        json_data.write(f'    "description": {self.description},' + os.linesep)
-        json_data.write('    "excitation energies & ocillator strength": [' +
-                        os.linesep)
+                # save frame number, excitation energies& oscillator strength
+                frame_numbers.append(ts.frame)
+                list_ex_energy.append(excitation_energies)
+                list_osci_strength.append(oscillator_strengths)
 
-        for item1, item2 in zip(list_ex_energy, list_osci_strength):
-            ene_str = ','.join([str(x) for x in item1])
-            osc_str = ','.join([str(x) for x in item2])
-            json_data.write(f'      [[{ene_str}],' + os.linesep)
-            json_data.write(f'       [{osc_str}]],' + os.linesep)
+        if self.rank == mpi_master():
 
-        json_data.write('    ],' + os.linesep)
-        json_data.write('  },' + os.linesep)
-        json_data.write('}' + os.linesep)
-        json_data.close()
+            # create json file for spectra data
+            json_data = open(str(output_dir / 'spectrum.json'), 'w+')
+            json_data.write('{' + os.linesep)
+            json_data.write(f'  "{self.qm_region}":' + '{' + os.linesep)
+            json_data.write(f'    "description": {self.description},' +
+                            os.linesep)
+            json_data.write(
+                '    "excitation energies & ocillator strength": [' +
+                os.linesep)
 
-        # run spectrum broadening
-        self.spectrum_broadening(list_ex_energy, list_osci_strength,
-                                 frame_numbers, output_dir)
+            for item1, item2 in zip(list_ex_energy, list_osci_strength):
+                ene_str = ','.join([str(x) for x in item1])
+                osc_str = ','.join([str(x) for x in item2])
+                json_data.write(f'      [[{ene_str}],' + os.linesep)
+                json_data.write(f'       [{osc_str}]],' + os.linesep)
+
+            json_data.write('    ],' + os.linesep)
+            json_data.write('  },' + os.linesep)
+            json_data.write('}' + os.linesep)
+            json_data.close()
+
+            # run spectrum broadening
+            self.spectrum_broadening(list_ex_energy, list_osci_strength,
+                                     frame_numbers, output_dir)
 
         # print time spent in QMMM
         valstr = '*** Time spent in QMMM calculation: '
