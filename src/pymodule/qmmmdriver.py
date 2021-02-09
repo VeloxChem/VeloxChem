@@ -9,12 +9,13 @@ import matplotlib.pyplot as plt
 import MDAnalysis as mda
 from MDAnalysis.topology.guessers import guess_atom_element
 
+from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import hartree_in_ev
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
 from .inputparser import InputParser
 from .outputstream import OutputStream
 from .rspabsorption import Absorption
-from .veloxchemlib import hartree_in_ev
 
 
 class QMMMDriver:
@@ -28,22 +29,21 @@ class QMMMDriver:
 
     Instance variables
         - comm: The MPI communicator.
-        - rank: The rank of MPI process.
         - ostream: The output stream.
-        - tpr_file: The tpr filename.
-        - xtc_file: The xtc filename.
-        - sampling_time: The time (in picosecond) for extracting frames from
-          trajectory.
+        - topology_file: The topology filename.
+        - trajectory_file: The trajectory filename.
+        - sampling_time: The time for extracting frames from trajectory
+          (default unit: picosecond).
         - qm_region: The string for selecting QM region.
-        - mm_pol_region: The string for selecting polarizable MM region.
-        - mm_nonpol_region: The string for selecting non-polarizable MM region.
+        - mm_pol_region: The cutoff radius for selecting polarizable MM region.
+        - mm_nonpol_region: The cutoff radius for selecting non-polarizable MM
+          region.
         - filename: The filename for the calculation.
         - nstates: The number of excited states.
         - diff_tol: if the first excitation energy is not too far away from
-          averaged spectrum that np.abs(excitation energy - average)
-          >= diff_tol * average
-        - traj_unit: trajectory unit
-        - line profile: either Gaussian or Lorentzian
+          averaged spectrum that np.abs(excitation energy - average) >=
+          diff_tol * average
+        - line_profile: Gaussian or Lorentzian
         - line_param: line broadening parameter
     """
 
@@ -61,8 +61,8 @@ class QMMMDriver:
         self.comm = comm
         self.ostream = ostream
 
-        self.tpr_file = None
-        self.xtc_file = None
+        self.topology_file = None
+        self.trajectory_file = None
         self.sampling_time = np.zeros(1)
 
         self.qm_region = None
@@ -78,20 +78,20 @@ class QMMMDriver:
         self.diff_tol = 0.4
 
         self.line_profile = 'Gaussian'
-        self.line_param = 0.1
+        self.line_param = 0.015
 
         self.charges = None
         self.polarizabilities = None
 
     def update_settings(self,
-                        qmmm_dict,
+                        traj_dict,
                         spect_dict,
                         rsp_dict,
                         method_dict=None):
         """
         Updates settings in qmmm driver.
 
-        :param qmmm_dict:
+        :param traj_dict:
             The input dictionary of qmmm group.
         :param spect_dict:
             The input dictionary of spectrum settings
@@ -101,38 +101,59 @@ class QMMMDriver:
             The input dicitonary of method settings group.
         """
 
-        if 'topology_file' in qmmm_dict:
-            self.tpr_file = qmmm_dict['topology_file']
-        if 'trajectory_file' in qmmm_dict:
-            self.xtc_file = qmmm_dict['trajectory_file']
-        if 'sampling_time' in qmmm_dict:
+        time_factor = 1.0
+        length_factor = 1.0
+
+        if 'units' in traj_dict:
+            units = traj_dict['units'].replace(',', ' ').split()
+            # unit for time
+            if 'ps' in units:
+                time_factor = 1.0
+            elif 'fs' in units:
+                time_factor = 1.0e-3
+            elif 'ns' in units:
+                time_factor = 1.0e+3
+            # unit for length
+            if 'angstrom' in units:
+                length_factor = 1.0
+            elif 'bohr' in units:
+                length_factor = bohr_in_angstroms()
+            elif 'nm' in units:
+                length_factor = 10.0
+
+        if 'topology_file' in traj_dict:
+            self.topology_file = traj_dict['topology_file']
+        if 'trajectory_file' in traj_dict:
+            self.trajectory_file = traj_dict['trajectory_file']
+
+        if 'sampling_time' in traj_dict:
             self.sampling_time = np.array(
-                InputParser.parse_frequencies(qmmm_dict['sampling_time']))
+                InputParser.parse_frequencies(traj_dict['sampling_time']))
+            self.sampling_time *= time_factor
 
-        if 'quantum_region' in qmmm_dict:
-            self.qm_region = qmmm_dict['quantum_region']
-        if 'classical_polarizable_region' in qmmm_dict:
-            self.mm_pol_region = qmmm_dict['classical_polarizable_region']
-        if 'classical_non-polarizable_region' in qmmm_dict:
-            self.mm_nonpol_region = qmmm_dict[
-                'classical_non-polarizable_region']
+        if 'quantum_region' in traj_dict:
+            self.qm_region = traj_dict['quantum_region']
+        if 'classical_polarizable_region' in traj_dict:
+            self.mm_pol_region = float(
+                traj_dict['classical_polarizable_region'])
+            self.mm_pol_region *= length_factor
+        if 'classical_non-polarizable_region' in traj_dict:
+            self.mm_nonpol_region = float(
+                traj_dict['classical_non-polarizable_region'])
+            self.mm_nonpol_region *= length_factor
 
-        if 'filename' in qmmm_dict:
-            self.filename = qmmm_dict['filename']
-        if 'description' in qmmm_dict:
-            self.description = qmmm_dict['description']
+        if 'filename' in traj_dict:
+            self.filename = traj_dict['filename']
+        if 'description' in traj_dict:
+            self.description = traj_dict['description']
 
-        if 'charges' in qmmm_dict:
-            self.charges = qmmm_dict['charges']
-        if 'polarizabilities' in qmmm_dict:
-            self.polarizabilities = qmmm_dict['polarizabilities']
-
-        if method_dict is not None:
-            self.method_dict = dict(method_dict)
+        if 'charges' in traj_dict:
+            self.charges = traj_dict['charges']
+        if 'polarizabilities' in traj_dict:
+            self.polarizabilities = traj_dict['polarizabilities']
 
         if 'line_profile' in spect_dict:
-            self.line_profile = str(spect_dict['line_profile'])
-
+            self.line_profile = spect_dict['line_profile'].capitalize()
         if 'broadening_parameter' in spect_dict:
             self.line_param = float(spect_dict['broadening_parameter'])
             if 'units' in spect_dict and spect_dict['units'].lower() == 'ev':
@@ -140,6 +161,9 @@ class QMMMDriver:
 
         if 'nstates' in rsp_dict:
             self.nstates = int(rsp_dict['nstates'])
+
+        if method_dict is not None:
+            self.method_dict = dict(method_dict)
 
     def compute(self, molecule, basis, min_basis):
         """
@@ -165,7 +189,9 @@ class QMMMDriver:
         output_dir = Path(self.filename + '_files')
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        u = mda.Universe(self.tpr_file, self.xtc_file, refresh_offsets=True)
+        u = mda.Universe(self.topology_file,
+                         self.trajectory_file,
+                         refresh_offsets=True)
 
         # set up variables for average spectrum calculations
         frame_numbers = []
@@ -181,14 +207,13 @@ class QMMMDriver:
 
             # select QM, MM_pol and MM_nonpol regions
             qm = u.select_atoms(self.qm_region)
-            mm_pol_select = 'byres around ' + self.mm_pol_region + ' ' + self.qm_region
-            mm_pol = u.select_atoms(mm_pol_select)
 
-            if int(self.mm_nonpol_region) >= int(self.mm_pol_region):
-                mm_nonpol_select = ('byres around ' + self.mm_nonpol_region +
-                                    ' ' + self.qm_region)
-                mm_nonpol = u.select_atoms(mm_nonpol_select)
-                mm_nonpol = mm_nonpol - mm_pol
+            mm_pol_select = f'byres around {self.mm_pol_region} group qm'
+            mm_pol = u.select_atoms(mm_pol_select, qm=qm)
+
+            mm_nonpol_select = f'byres around {self.mm_nonpol_region} group qm'
+            mm_nonpol = u.select_atoms(mm_nonpol_select, qm=qm)
+            mm_nonpol = mm_nonpol - mm_pol
 
             # crate pdb files
             with open(os.devnull, 'w') as f_devnull:
@@ -345,14 +370,17 @@ class QMMMDriver:
         self.ostream.print_blank()
 
         lines = []
-        lines.append('TPR file                 :    ' + self.tpr_file)
-        lines.append('XTC file                 :    ' + self.xtc_file)
-        lines.append('QM region                :    ' + self.qm_region)
-        lines.append('Pol. MM Region           :    ' + self.mm_pol_region)
-        lines.append('Non-Pol. MM Region       :    ' + self.mm_nonpol_region)
+        lines.append(f'Topology file            :    {self.topology_file}')
+        lines.append(f'Trajectory file          :    {self.trajectory_file}')
+        lines.append(f'QM region                :    {self.qm_region}')
+        lines.append(
+            f'Pol. MM Region           :    {self.mm_pol_region:.3f} Angstrom')
+        lines.append(
+            f'Non-Pol. MM Region       :    {self.mm_nonpol_region:.3f} Angstrom'
+        )
 
-        lines.append('Spect Line Profile       :    ' + self.line_profile)
-        lines.append('Broadening parameter     :    ' + str(self.line_param))
+        lines.append(f'Spect. Line Profile      :    {self.line_profile}')
+        lines.append(f'Broadening parameter     :    {self.line_param:.5f} au')
 
         maxlen = max([len(line) for line in lines])
         for line in lines:
@@ -431,12 +459,14 @@ class QMMMDriver:
         """
         Calculate the spectrum with either a Gaussian or Lourenzian line profile
 
-        :param Xmin-Xmax:
-            the range for x-axis (Energy in Hartees).
-        :param x:
-            data for x axis.
-        :param y:
-            data for y axis.
+        :param list_ex_energy:
+            The list of excitation energies in each frame.
+        :param list_osci_strength:
+            The list of oscillator strengths in each frame.
+        :param frame_numbers:
+            The list of frame indices.
+        :param output_dir:
+            Path of the output directory.
         """
 
         x_min = np.amin(list_ex_energy) - 0.02
@@ -461,12 +491,19 @@ class QMMMDriver:
 
         # Decide which frames to be deleted
         # Depending on whether the first absorption lies too far away from average
+        del_indicies = []
         for i in range(len(y)):
             if np.abs(list_ex_energy[i][0] - x_max) >= self.diff_tol * x_max:
-                np.delete(y, i, 0)
-                frame = int(frame_numbers[i])
-                self.ostream.print_info(
-                    'frame {} is very distorted, check geometry'.format(frame))
+                del_indicies.append(i)
+
+        self.ostream.print_blank()
+        for i in del_indicies:
+            self.ostream.print_info(
+                f'Frame {frame_numbers[i]} is very distorted, check geometry')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        y = np.delete(y, del_indicies, axis=0)
 
         self.plot_spectra(x, y, output_dir, 'final')
 

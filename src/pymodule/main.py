@@ -187,9 +187,9 @@ def main():
 
     if task_type == 'trajectory':
         if 'trajectory' in task.input_dict:
-            qmmm_dict = dict(task.input_dict['trajectory'])
+            traj_dict = dict(task.input_dict['trajectory'])
         else:
-            qmmm_dict = {}
+            traj_dict = {}
         if 'spectrum_settings' in task.input_dict:
             spect_dict = dict(task.input_dict['spectrum_settings'])
         else:
@@ -199,13 +199,13 @@ def main():
         else:
             rsp_dict = {}
 
-        qmmm_dict['filename'] = task.input_dict['filename']
-        qmmm_dict['charges'] = task.input_dict['charges']['unsorted_lines']
-        qmmm_dict['polarizabilities'] = task.input_dict['polarizabilities'][
+        traj_dict['filename'] = task.input_dict['filename']
+        traj_dict['charges'] = task.input_dict['charges']['unsorted_lines']
+        traj_dict['polarizabilities'] = task.input_dict['polarizabilities'][
             'unsorted_lines']
 
         qmmm_drv = QMMMDriver(task.mpi_comm, task.ostream)
-        qmmm_drv.update_settings(qmmm_dict, spect_dict, rsp_dict, method_dict)
+        qmmm_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
         qmmm_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Self-consistent field
