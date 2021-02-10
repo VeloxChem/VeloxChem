@@ -338,8 +338,8 @@ class ScfDriver:
         # set up polarizable embedding
         if self.pe:
             from .polembed import PolEmbed
-            self.pe_drv = PolEmbed(molecule, ao_basis, self.comm,
-                                   self.pe_options)
+            self.pe_drv = PolEmbed(molecule, ao_basis, self.pe_options,
+                                   self.comm)
             self.V_es = self.pe_drv.compute_multipole_potential_integrals()
 
             pot_info = 'Reading polarizable embedding potential: {}'.format(
@@ -1061,7 +1061,7 @@ class ScfDriver:
         # calculate e_pe and V_pe on PE nodes
         if pe_comm:
             from .polembed import PolEmbed
-            self.pe_drv = PolEmbed(molecule, basis, local_comm, self.pe_options)
+            self.pe_drv = PolEmbed(molecule, basis, self.pe_options, local_comm)
             self.pe_drv.V_es = self.V_es.copy()
             dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
             e_pe, V_pe = self.pe_drv.get_pe_contribution(dm)
