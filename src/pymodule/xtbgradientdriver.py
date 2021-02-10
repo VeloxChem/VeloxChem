@@ -1,11 +1,17 @@
+from mpi4py import MPI
+import sys
+
 from .veloxchemlib import mpi_master
 from .gradientdriver import GradientDriver
+from .outputstream import OutputStream
 
 
 class XTBGradientDriver(GradientDriver):
     """
     Implements XTB gradient driver.
 
+    :param xtb_drv:
+        The XTB driver.
     :param comm:
         The MPI communicator.
     :param ostream:
@@ -15,10 +21,16 @@ class XTBGradientDriver(GradientDriver):
         - xtb_drv: The XTB driver.
     """
 
-    def __init__(self, comm, ostream, xtb_drv):
+    def __init__(self, xtb_drv, comm=None, ostream=None):
         """
         Initializes XTB gradient driver.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 
