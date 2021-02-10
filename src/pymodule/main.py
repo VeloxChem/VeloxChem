@@ -138,11 +138,12 @@ def main():
     assert_msg_critical(mpi_initialized(), "MPI not initialized")
 
     # Parse command line
+
     args = cli()
 
     # MPI task
 
-    task = MpiTask([args.input_file, args.output_file], MPI.COMM_WORLD)
+    task = MpiTask(args.input_output_files, MPI.COMM_WORLD)
     task_type = task.input_dict['jobs']['task'].lower()
 
     # Timelimit in hours
