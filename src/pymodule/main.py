@@ -2,6 +2,7 @@ from mpi4py import MPI
 import time as tm
 
 from .cli import cli
+from .cli import print_help
 from .errorhandler import assert_msg_critical
 from .excitondriver import ExcitonModelDriver
 from .loprop import LoPropDriver
@@ -140,6 +141,9 @@ def main():
     # Parse command line
 
     args = cli()
+
+    if not args.input_output_files:
+        print_help()
 
     # MPI task
 
