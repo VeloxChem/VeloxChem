@@ -409,20 +409,24 @@ class QMMMDriver:
             json_data = open(str(output_dir / 'spectrum.json'), 'w+')
             json_data.write('{' + os.linesep)
             json_data.write(f'  "{self.qm_region}":' + '{' + os.linesep)
-            json_data.write(f'    "description": {self.description},' +
+            json_data.write(f'    "description": "{self.description}",' +
                             os.linesep)
             json_data.write(
                 '    "excitation energies & ocillator strength": [' +
                 os.linesep)
 
+            lines = []
             for item1, item2 in zip(list_ex_energy, list_osci_strength):
                 ene_str = ','.join([str(x) for x in item1])
                 osc_str = ','.join([str(x) for x in item2])
-                json_data.write(f'      [[{ene_str}],' + os.linesep)
-                json_data.write(f'       [{osc_str}]],' + os.linesep)
+                lines.append('      [')
+                lines.append(f'        [{ene_str}],')
+                lines.append(f'        [{osc_str}]')
+                lines.append('      ],')
+            json_data.write(os.linesep.join(lines)[:-1] + os.linesep)
 
-            json_data.write('    ],' + os.linesep)
-            json_data.write('  },' + os.linesep)
+            json_data.write('    ]' + os.linesep)
+            json_data.write('  }' + os.linesep)
             json_data.write('}' + os.linesep)
             json_data.close()
 
