@@ -21,7 +21,7 @@ class TestGrad(unittest.TestCase):
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream, scf_drv)
+        grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
         grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         if task.mpi_rank == mpi_master():

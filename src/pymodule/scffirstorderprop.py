@@ -1,8 +1,11 @@
+from mpi4py import MPI
 import numpy as np
+import sys
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import dipole_in_debye
+from .outputstream import OutputStream
 
 
 class ScfFirstOrderProperties:
@@ -18,10 +21,16 @@ class ScfFirstOrderProperties:
         - properties: The dictionary of properties.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes SCF first-order properties.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         self.comm = comm
         self.rank = comm.Get_rank()

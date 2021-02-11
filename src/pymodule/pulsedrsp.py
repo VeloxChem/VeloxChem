@@ -319,6 +319,7 @@ class PulsedResponse:
         """
         Writes the Pulsed response vectors to the specified output file in h5
         format. The h5 file saved contains the following datasets:
+
         - amplitudes
             The pulse amplitudes for the calculated truncated_freqs
         - zero_padded

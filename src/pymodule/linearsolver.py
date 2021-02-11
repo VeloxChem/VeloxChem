@@ -340,7 +340,7 @@ class LinearSolver:
         # set up polarizable embedding
         if self.pe:
             from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, self.comm, self.pe_options)
+            pe_drv = PolEmbed(molecule, basis, self.pe_options, self.comm)
             V_es = pe_drv.compute_multipole_potential_integrals()
 
             pot_info = "Reading polarizable embedding potential: {}".format(
@@ -853,7 +853,7 @@ class LinearSolver:
         # calculate e_pe and V_pe on PE nodes
         if pe_comm:
             from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, local_comm, self.pe_options)
+            pe_drv = PolEmbed(molecule, basis, self.pe_options, local_comm)
             pe_drv.V_es = V_es.copy()
             for ifock in range(fock.number_of_fock_matrices()):
                 dm = dens.alpha_to_numpy(ifock) + dens.beta_to_numpy(ifock)

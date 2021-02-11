@@ -1,3 +1,4 @@
+from mpi4py import MPI
 import numpy as np
 import os
 from pathlib import Path
@@ -14,10 +15,10 @@ except ImportError:
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricFieldIntegralsDriver
 from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import mpi_master
 from .inputparser import InputParser
 from .subcommunicators import SubCommunicators
 from .errorhandler import assert_msg_critical
-from .veloxchemlib import mpi_master
 
 
 class PolEmbed:
@@ -28,10 +29,10 @@ class PolEmbed:
         The molecule.
     :param basis:
         The AO basis set.
-    :param comm:
-        The MPI communicator.
     :param pe_dict:
         The dictionary with options for CPPE.
+    :param comm:
+        The MPI communicator.
 
     Instance variables
         - molecule: The molecule.
@@ -45,10 +46,13 @@ class PolEmbed:
         - polarizable_coords: The coordinates of the polarizable sites.
     """
 
-    def __init__(self, molecule, basis, comm, pe_dict):
+    def __init__(self, molecule, basis, pe_dict, comm=None):
         """
         Initializes interface to the CPPE library.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
 
         self.molecule = molecule
         self.basis = basis
