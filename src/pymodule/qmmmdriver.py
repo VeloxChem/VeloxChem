@@ -2,6 +2,7 @@ from mpi4py import MPI
 import numpy as np
 import time as tm
 import contextlib
+import json
 import sys
 import os
 from pathlib import Path
@@ -406,29 +407,20 @@ class QMMMDriver:
         if self.rank == mpi_master():
 
             # create json file for spectra data
-            json_data = open(str(output_dir / 'spectrum.json'), 'w+')
-            json_data.write('{' + os.linesep)
-            json_data.write(f'  "{self.qm_region}":' + '{' + os.linesep)
-            json_data.write(f'    "description": "{self.description}",' +
-                            os.linesep)
-            json_data.write(
-                '    "excitation energies & ocillator strength": [' +
-                os.linesep)
+            json_dict = {self.qm_region: {}}
 
-            lines = []
-            for item1, item2 in zip(list_ex_energy, list_osci_strength):
-                ene_str = ','.join([str(x) for x in item1])
-                osc_str = ','.join([str(x) for x in item2])
-                lines.append('      [')
-                lines.append(f'        [{ene_str}],')
-                lines.append(f'        [{osc_str}]')
-                lines.append('      ],')
-            json_data.write(os.linesep.join(lines)[:-1] + os.linesep)
+            key_1 = 'description'
+            json_dict[self.qm_region][key_1] = self.description
 
-            json_data.write('    ]' + os.linesep)
-            json_data.write('  }' + os.linesep)
-            json_data.write('}' + os.linesep)
-            json_data.close()
+            key_2 = 'excitation energies and ocillator strengths'
+            json_dict[self.qm_region][key_2] = []
+
+            for item_1, item_2 in zip(list_ex_energy, list_osci_strength):
+                json_dict[self.qm_region][key_2].append(
+                    [list(item_1), list(item_2)])
+
+            with open(str(output_dir / 'spectrum.json'), 'w') as f_json:
+                f_json.write(json.dumps(json_dict, indent=4))
 
             # run spectrum broadening
             self.spectrum_broadening(list_ex_energy, list_osci_strength,
