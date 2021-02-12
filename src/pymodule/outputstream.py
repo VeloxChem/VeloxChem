@@ -1,6 +1,7 @@
 import time as tm
 import sys
 import os
+from pathlib import Path
 
 from .errorhandler import assert_msg_critical
 
@@ -21,7 +22,7 @@ class OutputStream:
         - state: The flag for writing to the stream.
     """
 
-    def __init__(self, filename=None, width=122):
+    def __init__(self, stream=sys.stdout, width=122):
         """
         Initializes the output stream.
         """
@@ -29,31 +30,27 @@ class OutputStream:
         self.width = width
         self.buffer_lines = []
 
-        # filename is...
-        #   None:        stream is None
-        #   sys.stdout:  stream is sys.stdout
-        #   string:      stream is file handle
-
-        if filename is None:
+        if stream is None:
             self.stream = None
             self.state = False
 
-        elif filename is sys.stdout:
+        elif stream is sys.stdout:
             self.stream = sys.stdout
             self.state = True
 
-        elif isinstance(filename, str) and filename:
+        elif (isinstance(stream, str) and stream) or isinstance(stream, Path):
+            fname = str(stream)
             try:
-                self.stream = open(filename, 'w')
+                self.stream = open(fname, 'w')
                 self.state = True
             except OSError:
                 self.state = False
-            errio = 'OutputStream: cannot open output file {}'.format(filename)
+            errio = 'OutputStream: cannot open output file {}'.format(fname)
             assert_msg_critical(self.state, errio)
 
         else:
             self.state = False
-            errio = 'OutputStream: invalid argument {}'.format(filename)
+            errio = 'OutputStream: invalid argument {}'.format(stream)
             assert_msg_critical(self.state, errio)
 
     def __del__(self):

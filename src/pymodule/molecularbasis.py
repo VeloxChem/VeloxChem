@@ -13,10 +13,7 @@ from .errorhandler import assert_msg_critical
 
 
 @staticmethod
-def _MolecularBasis_read(mol,
-                         basis_name,
-                         basis_path='.',
-                         ostream=OutputStream()):
+def _MolecularBasis_read(mol, basis_name, basis_path='.', ostream=None):
     """
     Reads AO basis set from file.
 
@@ -32,6 +29,9 @@ def _MolecularBasis_read(mol,
     :return:
         The AO basis set.
     """
+
+    if ostream is None:
+        ostream = OutputStream(None)
 
     err_gc = "MolcularBasis.read_file: "
     err_gc += "General contraction currently is not supported"
