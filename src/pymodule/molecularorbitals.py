@@ -14,7 +14,7 @@ def _MolecularOrbitals_print_orbitals(self,
                                       molecule,
                                       ao_basis,
                                       all_orbs=False,
-                                      ostream=OutputStream(sys.stdout)):
+                                      ostream=None):
     """
     Prints molecular orbitals to output stream.
 
@@ -27,6 +27,9 @@ def _MolecularOrbitals_print_orbitals(self,
     :param ostream:
         The output stream.
     """
+
+    if ostream is None:
+        ostream = OutputStream(sys.stdout)
 
     norb = self.number_mos()
 
