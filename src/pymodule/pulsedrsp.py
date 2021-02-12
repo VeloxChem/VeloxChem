@@ -300,7 +300,7 @@ class PulsedResponse:
         if not fname[-3:] == '.txt':
             fname += '.txt'
 
-        with open(fname, 'w') as f:
+        with open(str(fname), 'w') as f:
             for xyz1 in ['x', 'y', 'z']:
                 for xyz2 in ['x', 'y', 'z']:
                     f.write('Frequency   Amplitude   {}{}'.format(xyz1, xyz2) +

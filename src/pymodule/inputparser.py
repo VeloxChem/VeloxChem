@@ -103,7 +103,7 @@ class InputParser:
         """
 
         self.content = ''
-        with open(self.inpname, 'r') as f_inp:
+        with open(str(self.inpname), 'r') as f_inp:
             for line in f_inp:
 
                 # remove comment and extra white spaces
