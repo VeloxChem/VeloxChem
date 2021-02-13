@@ -49,7 +49,7 @@ def _Molecule_read_xyz(xyzfile):
 
     xyzstr = ''
 
-    with open(xyzfile, 'r') as f_xyz:
+    with open(str(xyzfile), 'r') as f_xyz:
         natoms = int(f_xyz.readline().split()[0])
         f_xyz.readline()
         for a in range(natoms):
@@ -275,7 +275,7 @@ def _Molecule_write_xyz(self, xyz_filename):
     ys = self.y_to_numpy() * bohr_in_angstroms()
     zs = self.z_to_numpy() * bohr_in_angstroms()
 
-    with open(xyz_filename, 'w') as fh:
+    with open(str(xyz_filename), 'w') as fh:
 
         print('{:d}'.format(self.number_of_atoms()), file=fh)
         print('', file=fh)

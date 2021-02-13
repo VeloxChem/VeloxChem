@@ -16,7 +16,7 @@ def _CubicGrid_read_cube(cube_file):
         The cubic grid.
     """
 
-    f_cube = open(cube_file, 'r')
+    f_cube = open(str(cube_file), 'r')
 
     f_cube.readline()
     f_cube.readline()

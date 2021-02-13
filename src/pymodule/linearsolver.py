@@ -348,7 +348,7 @@ class LinearSolver:
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
 
-            with open(self.pe_options['potfile'], 'r') as f_pot:
+            with open(str(self.pe_options['potfile']), 'r') as f_pot:
                 potfile_text = os.linesep.join(f_pot.readlines())
         else:
             pe_drv = None

@@ -1706,11 +1706,12 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         mult = molecule.get_multiplicity()
-        valstr = "Multiplicity (2S+1)           :{:5.1f}".format(mult)
-        self.ostream.print_header(valstr.ljust(92))
+        if self.restricted:
+            valstr = "Multiplicity (2S+1)           :{:5.1f}".format(mult)
+            self.ostream.print_header(valstr.ljust(92))
 
         sz = 0.5 * (mult - 1.0)
-        valstr = "Magnetic Quantum Number (S_z) :{:5.1f}".format(sz)
+        valstr = "Magnetic Quantum Number (M_S) :{:5.1f}".format(sz)
         self.ostream.print_header(valstr.ljust(92))
 
         if not self.restricted:
