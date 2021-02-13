@@ -1,8 +1,6 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
-import pytest
-import sys
 from pathlib import Path
 try:
     import cppe
@@ -41,7 +39,6 @@ class TestSCF(unittest.TestCase):
             tol = 1.0e-5 if xcfun_label is not None else 1.0e-6
             self.assertTrue(np.max(np.abs(e_scf - ref_e_scf)) < tol)
 
-
     def test_scf_dft_blyp(self):
 
         here = Path(__file__).parent
@@ -52,11 +49,10 @@ class TestSCF(unittest.TestCase):
         xcfun_label = 'blyp'
 
         ref_e_scf = -76.119729
-        
-        ref_dip = 0 # needs to be added later 
+
+        ref_dip = None  # needs to be added later
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
-
 
     def test_scf_dft_b3lyp(self):
 
@@ -68,12 +64,10 @@ class TestSCF(unittest.TestCase):
         xcfun_label = 'b3lyp'
 
         ref_e_scf = -76.140226
-        
-        ref_dip = 0 # needs to be added later 
+
+        ref_dip = None  # needs to be added later
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
-
-
 
     def test_scf_dft_slda(self):
 
@@ -85,11 +79,10 @@ class TestSCF(unittest.TestCase):
         xcfun_label = 'slda'
 
         ref_e_scf = -75.75613
-        
-        ref_dip = 0 # needs to be added later
+
+        ref_dip = None  # needs to be added later
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
-
 
     def test_scf_dft_b88x(self):
 
@@ -101,10 +94,11 @@ class TestSCF(unittest.TestCase):
         xcfun_label = 'B88X'
 
         ref_e_scf = -75.80179
-        
-        ref_dip = 0 # needs to be added later
+
+        ref_dip = None  # needs to be added later
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
- 
+
+
 if __name__ == "__main__":
     unittest.main()
