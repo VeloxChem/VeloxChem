@@ -33,7 +33,7 @@ def _MolecularBasis_read(mol, basis_name, basis_path='.', ostream=None):
     if ostream is None:
         ostream = OutputStream(None)
 
-    err_gc = "MolcularBasis.read_file: "
+    err_gc = "MolcularBasis.read: "
     err_gc += "General contraction currently is not supported"
 
     # searching order:
@@ -57,7 +57,7 @@ def _MolecularBasis_read(mol, basis_name, basis_path='.', ostream=None):
 
     assert_msg_critical(
         basis_name.upper() == basis_dict['basis_set_name'].upper(),
-        "MolecularBasis.read_file: Inconsistent basis set name")
+        "MolecularBasis.read: Inconsistent basis set name")
 
     mol_basis = MolecularBasis()
 
