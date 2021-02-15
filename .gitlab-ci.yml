@@ -10,7 +10,7 @@ before_script:
   - set +e && source /opt/intel/bin/compilervars.sh intel64 && set -e
   - export PATH=/opt/intel/intelpython3/bin:$PATH
   - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/intelpython3/lib
-  - export OMP_NUM_THREADS=6
+  - export OMP_NUM_THREADS=2
   - export GTESTROOT=/home/xinli/software/googletest/googletest
   - export MPICC=$I_MPI_ROOT/intel64/mpi/mpiicc
 
@@ -27,7 +27,7 @@ velxochem_build:
   stage: build
   script:
     - python3 config/generate_setup.py
-    - make -j 6 -C src release && make -j 6 -C unit_tests release
+    - make -j 2 -C src release && make -j 2 -C unit_tests release
 
 veloxchem_test:
   tags:
@@ -42,4 +42,4 @@ veloxchem_test:
     - python3 -m pip install .
     - python3 -m pytest -v --cov=veloxchem python_tests/
     - python3 config/generate_setup.py
-    - make -C unit_tests -s -j 6 release && ./build/bin/UnitTestVeloxChem.x
+    - make -C unit_tests -s -j 2 release && ./build/bin/UnitTestVeloxChem.x
