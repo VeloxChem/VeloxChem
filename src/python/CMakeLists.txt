@@ -55,15 +55,6 @@ pybind11_add_module(veloxchemlib
     ${CMAKE_CURRENT_LIST_DIR}/ExportXTB.cpp
   )
 
-target_precompile_headers(veloxchemlib
-  PRIVATE
-    <mpi4py/mpi4py.h>
-    <pybind11/numpy.h>
-    <pybind11/operators.h>
-    <pybind11/pybind11.h>
-    <pybind11/stl.h>
-  )
-
 target_include_directories(veloxchemlib
   SYSTEM PRIVATE
     ${mpi4py_INCLUDE_DIRS}
