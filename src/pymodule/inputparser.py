@@ -132,7 +132,7 @@ class InputParser:
             f_path = PurePath(self.outname)
         else:
             f_path = PurePath(self.inpname)
-        self.input_dict['filename'] = str(f_path.parent / f_path.stem)
+        self.input_dict['filename'] = str(f_path.with_name(f_path.stem))
 
         # update checkpoint filename
         abbrev = {
@@ -147,8 +147,7 @@ class InputParser:
                 self.input_dict[job_type] = {}
             if 'checkpoint_file' not in self.input_dict[job_type]:
                 checkpoint_file = str(
-                    (f_path.parent /
-                     f_path.stem).with_suffix(f'.{abbrev[job_type]}.h5'))
+                    f_path.with_suffix(f'.{abbrev[job_type]}.h5'))
                 self.input_dict[job_type]['checkpoint_file'] = checkpoint_file
 
         # verify options for loprop
