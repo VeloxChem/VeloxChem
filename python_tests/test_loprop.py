@@ -62,7 +62,7 @@ def test_loprop_called_from_main(mock_mpi, mock_scf_prop, mock_scf, mock_uscf,
         },
         'loprop': {}
     }
-    input_file = f'{tmpdir/"water.inp"}'
+    input_file = f'{tmpdir}/water.inp'
     with open(input_file, 'w') as f:
         f.write(sample)
     sys.argv[1:] = [input_file]
@@ -95,7 +95,7 @@ def test_scf_called_from_main(mock_mpi, mock_scf_prop, mock_scf, mock_uscf,
         },
         'loprop': {}
     }
-    input_file = f'{tmpdir/"water.inp"}'
+    input_file = f'{tmpdir}/water.inp'
     with open(input_file, 'w') as f:
         f.write(sample)
     sys.argv[1:] = [input_file]
@@ -172,7 +172,7 @@ def test_input_dict(sample, tmpdir):
     Verify that input parser sets a loprop key
     """
     # given
-    input_file = f'{tmpdir/"water.inp"}'
+    input_file = f'{tmpdir}/water.inp'
     with open(input_file, 'w') as f:
         f.write(sample)
 
@@ -188,7 +188,7 @@ def test_input_settings(tmpdir):
     """
     Verify loprop options
     """
-    input_file = f'{tmpdir/"water.inp"}'
+    input_file = f'{tmpdir}/water.inp'
     input_content = textwrap.dedent("""
         @jobs
         task: 'loprop'
@@ -210,7 +210,7 @@ def test_wrong_input(tmpdir):
     """
     Verify loprop options
     """
-    input_file = f'{tmpdir/"water.inp"}'
+    input_file = f'{tmpdir}/water.inp'
     input_content = textwrap.dedent("""
         @jobs
         task: loprop
@@ -234,7 +234,7 @@ def test_cpa(sample, tmpdir):
     Verify count of orbitals per atom
     """
     # given
-    input_file = f'{tmpdir/"water.inp"}'
+    input_file = f'{tmpdir}/water.inp'
     with open(input_file, 'w') as f:
         f.write(sample)
 
@@ -253,7 +253,7 @@ def test_opa(sample, tmpdir):
     """
 
     # given
-    input_file = f'{tmpdir/"water.inp"}'
+    input_file = f'{tmpdir}/water.inp'
     with open(input_file, 'w') as f:
         f.write(sample)
 
@@ -369,7 +369,7 @@ class TestIntegrations:
                 H   0.0  -1.4   1.1
                 @end
                 """)
-            input_file = f'{tmpdir/"water.inp"}'
+            input_file = f'{tmpdir}/water.inp'
             with open(input_file, 'w') as f:
                 f.write(inp)
 
