@@ -70,7 +70,7 @@ def _Molecule_from_dict(mol_dict):
         The molecule.
     """
 
-    xyzstr = mol_dict['xyzstr']
+    xyzstr = os.linesep.join(mol_dict['xyz'])
 
     units = 'angstrom'
     if 'units' in mol_dict:
