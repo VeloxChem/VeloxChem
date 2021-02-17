@@ -62,7 +62,7 @@ class OrbitalResponse(LinearSolver):
         driver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response settings.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -172,7 +172,7 @@ class OrbitalResponse(LinearSolver):
         ovlp = scf_tensors['S']
 
         # Take vector of interest and convert to matrix form
-        exc_vec = excitation_vecs[:,self.n_state_deriv].copy().reshape(nocc, nvir)
+        exc_vec = excitation_vecs[:, self.n_state_deriv].copy().reshape(nocc, nvir)
 
         # TODO: These densities are correct only for TDA! Needs to be adapted for RPA.
         # Calcuate the unrelaxed one-particle density matrix in MO basis
