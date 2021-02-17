@@ -13,8 +13,10 @@ dependencies:
   - mpi4py
   - ninja
   - numpy
+  - pkg-config
   - psutil
   - pybind11
   - pytest
   - python>=3.6
   - requests
+  - xtb

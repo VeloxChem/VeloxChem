@@ -81,3 +81,40 @@ monkey:python_tests:
     - python -c "import veloxchem; print(veloxchem.__version__)"
     - mpiexec -n 2 python -m pytest -v --pyargs veloxchem -m "solvers"
     - python -m pytest -v --cov=veloxchem --pyargs veloxchem
+
+.windows:setup:
+  tags:
+    - shared-windows
+    - windows
+    - windows-1809
+  before_script:
+    - cmd /c '"C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" amd64 > nul 2>&1 && set' | .{process{ if ($_ -match '^([^=]+)=(.*)') { [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2])}}}
+    - choco install llvm miniconda3 --yes
+    - refreshenv
+    - $env:Path += ";C:\Program Files\LLVM\bin;C:\tools\miniconda3\Scripts;C:\tools\miniconda3;C:\tools\miniconda3\Library\bin"
+    - conda init powershell
+    - invoke-expression -Command "$env:userprofile\Documents\WindowsPowerShell\profile.ps1"
+    - conda config --set always_yes yes
+    - conda env create -f .gitlab/win-env.yml
+    - conda activate vlx
+
+windows:build:
+  extends: .windows:setup
+  stage: build
+  script:
+    - cmake -S. -Bbuild -GNinja -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=Release
+    - cmake --build build --config Release -- -v -d stats
+  artifacts:
+    paths:
+      - build
+    expire_in: 2 hours
+
+windows:test:
+  extends: .windows:setup
+  stage: test
+  needs: ["windows:build"]
+  variables:
+    KMP_DUPLICATE_LIB_OK: "TRUE"
+  script:
+    - cd build
+    - ctest --output-on-failure
