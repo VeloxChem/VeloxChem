@@ -46,12 +46,12 @@ class InputParser:
         Parses the input file.
         """
 
-        self.input_dict = {}
-
         errmsg = f'InputParser: bad syntax in file {self.inpname}' + os.linesep
         errmsg += '    You may check for incorrect, incomplete or empty groups.'
 
         group = None
+
+        input_groups = {}
 
         with open(str(self.inpname), 'r') as f_inp:
 
@@ -76,52 +76,51 @@ class InputParser:
                 if line[0] == '@' and line.lower() != '@end':
                     assert_msg_critical(group is None, errmsg)
                     group = '_'.join(line[1:].strip().lower().split())
-                    if self.is_basis_set:
-                        self.input_dict[group] = []
-                    else:
-                        self.input_dict[group] = {}
+                    input_groups[group] = []
 
                 # end of group
                 elif line.lower() == '@end':
                     assert_msg_critical(group is not None, errmsg)
                     group = None
 
-                # inside a group
+                # inside group
+                elif group is not None:
+                    input_groups[group].append(line)
+
+                # outside group
                 else:
+                    assert_msg_critical(self.is_basis_set, errmsg)
 
-                    # for basis set
-                    if self.is_basis_set:
-                        if group is not None:
-                            self.input_dict[group].append(line)
-                        continue
+        self.input_dict = {}
 
-                    # for input file
-                    assert_msg_critical(group is not None, errmsg)
+        for group in input_groups:
+            self.input_dict[group] = {}
 
-                    if ':' in line:
-                        key, value = line.split(':')
-                        key = '_'.join(key.strip().lower().split())
-                        value = value.strip()
-                        if value:
-                            # single-line input
-                            # key and value are in the same line
-                            self.input_dict[group][key] = value
-                        else:
-                            # multi-line input
-                            # key is followed by multiple lines
-                            self.input_dict[group][key] = []
+            key = None
+            lines_without_key = []
+
+            for line in input_groups[group]:
+                if ':' in line:
+                    key, value = line.split(':')
+                    key = '_'.join(key.strip().lower().split())
+                    value = value.strip()
+                    if value:
+                        self.input_dict[group][key] = value
                     else:
-                        # multi-line input
-                        # key is followed by multiple lines
+                        self.input_dict[group][key] = []
+                else:
+                    if key is not None:
                         self.input_dict[group][key].append(line)
+                    else:
+                        lines_without_key.append(line)
+
+            if key is None:
+                self.input_dict[group] = lines_without_key
 
         # save basis set name
         if self.is_basis_set:
             self.input_dict['basis_set_name'] = self.basis_set_name
             return
-
-        # check incomplete group
-        assert_msg_critical(group is None, errmsg)
 
         # check empty group
         for group in self.input_dict:

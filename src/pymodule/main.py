@@ -205,9 +205,8 @@ def main():
             rsp_dict = {}
 
         traj_dict['filename'] = task.input_dict['filename']
-        traj_dict['charges'] = task.input_dict['charges']['unsorted_lines']
-        traj_dict['polarizabilities'] = task.input_dict['polarizabilities'][
-            'unsorted_lines']
+        traj_dict['charges'] = task.input_dict['charges']
+        traj_dict['polarizabilities'] = task.input_dict['polarizabilities']
 
         qmmm_drv = QMMMDriver(task.mpi_comm, task.ostream)
         qmmm_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)

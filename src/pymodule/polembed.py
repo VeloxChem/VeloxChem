@@ -354,7 +354,7 @@ class PolEmbed:
         # read potential file (new format)
 
         pe_inp = InputParser(potfile).input_dict
-        natoms = len(pe_inp['environment']['unsorted_lines'])
+        natoms = len(pe_inp['environment']['xyz'])
 
         # process units
 
@@ -372,7 +372,7 @@ class PolEmbed:
         # process residues (a dictionary with residue ID as key)
 
         residues = {}
-        for line in pe_inp['environment']['unsorted_lines']:
+        for line in pe_inp['environment']['xyz']:
             val = line.split()
             resname = val[4]
             resid = int(val[5])
@@ -388,7 +388,7 @@ class PolEmbed:
         # process charges (a dictionary with residue name as key)
 
         charges = {}
-        for line in pe_inp['charges']['unsorted_lines']:
+        for line in pe_inp['charges']:
             val = line.split()
             resname = val[2]
             if resname not in charges:
@@ -398,7 +398,7 @@ class PolEmbed:
         # process polarizabilities (a dictionary with residue name as key)
 
         polarizabilities = {}
-        for line in pe_inp['polarizabilities']['unsorted_lines']:
+        for line in pe_inp['polarizabilities']:
             val = line.split()
             resname = val[7]
             if resname not in polarizabilities:

@@ -98,11 +98,9 @@ class MpiTask:
                     continue
                 if list(self.input_dict[key].keys()) == ['checkpoint_file']:
                     continue
-                if list(self.input_dict[key].keys()) == ['unsorted_lines']:
-                    continue
                 self.ostream.print_info('@{:s}'.format(key))
                 for key_2 in self.input_dict[key]:
-                    if key_2 in ['checkpoint_file', 'unsorted_lines']:
+                    if key_2 == 'checkpoint_file':
                         continue
                     if isinstance(self.input_dict[key][key_2], str):
                         self.ostream.print_info('{:s}: {:s}'.format(
@@ -120,7 +118,7 @@ class MpiTask:
             self.ostream.print_info('...done.')
             self.ostream.print_blank()
 
-            if self.input_dict['molecule']['xyzstr']:
+            if 'xyz' in self.input_dict['molecule']:
                 self.molecule = Molecule.from_dict(self.input_dict['molecule'])
 
                 self.ostream.print_block(self.molecule.get_string())
@@ -141,7 +139,7 @@ class MpiTask:
 
                 basis_name = self.input_dict['method_settings']['basis'].upper()
 
-                if self.input_dict['molecule']['xyzstr']:
+                if 'xyz' in self.input_dict['molecule']:
                     self.ao_basis = MolecularBasis.read(self.molecule,
                                                         basis_name, basis_path,
                                                         self.ostream)
@@ -159,7 +157,7 @@ class MpiTask:
 
         # broadcast molecule and basis set
 
-        if self.input_dict['molecule']['xyzstr']:
+        if 'xyz' in self.input_dict['molecule']:
             self.molecule.broadcast(self.mpi_rank, self.mpi_comm)
             self.ao_basis.broadcast(self.mpi_rank, self.mpi_comm)
             self.min_basis.broadcast(self.mpi_rank, self.mpi_comm)
