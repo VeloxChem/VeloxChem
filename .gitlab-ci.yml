@@ -26,6 +26,7 @@
 stages:
   - build
   - test
+  - deploy
 
 .monkey:setup:
   tags:
@@ -118,3 +119,20 @@ windows:test:
   script:
     - cd build
     - ctest --output-on-failure
+
+deploy:
+  extends: .linux:setup
+  stage: deploy
+  variables:
+    TARBALL: "build/veloxchem.tar.bz2"
+  rules:
+    - if: '$CI_COMMIT_TITLE =~ /\[conda-build\]/i'
+  script:
+    - cmake --build build --target package_source
+    - python .gitlab/trigger.py
+        --tarball "$TARBALL"
+        --url "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/$TARBALL"
+  artifacts:
+    paths:
+      - "$TARBALL"
+    expire_in: 1 week
