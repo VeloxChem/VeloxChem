@@ -169,7 +169,7 @@ class OrbitalResponse(LinearSolver):
         mo_occ = scf_tensors['C'][:, :nocc] # occupied MO coefficients
         mo_vir = scf_tensors['C'][:, nocc:] # virtual MO coefficients
         nvir = mo_vir.shape[1]
-        ovlp = scf_tensors['S']
+        ovlp = scf_tensors['S']	# overlap matrix
 
         # Take vector of interest and convert to matrix form
         exc_vec = excitation_vecs[:, self.n_state_deriv].copy().reshape(nocc, nvir)
@@ -277,6 +277,72 @@ class OrbitalResponse(LinearSolver):
 
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
+
+        # Calculate the overlap matrix multipliers
+        omega_VV = -(np.einsum('ta,tb->ab', mo_vir, 
+                        np.einsum('rb,tr->tb', mo_vir,  
+                                (np.einsum('zr,tz->tr', ovlp,
+                                         np.einsum('nz,tn->tz',
+                                                  exc_vec_ao,
+                                                  0.5*fock_ao_rhs.alpha_to_numpy(1).T
+                                                 )
+                                        )
+                                )
+                           )
+                        )
+                      + np.einsum('a,ab->ab', evir, 0.5*dm_vv)
+                     )
+
+        omega_OV = -(np.einsum('mi,ma->ia', mo_occ, 
+                        np.einsum('za,mz->ma', mo_vir,  
+                                (np.einsum('rz,mr->mz', ovlp,
+                                         np.einsum('tr,mt->mr',
+                                                  exc_vec_ao,
+                                                 0.5*fock_ao_rhs.alpha_to_numpy(1).T
+                                                )
+                                        )
+                                )
+                           )
+                        )
+                      + np.einsum('i,ia->ia', eocc, lambda_multipliers.reshape(nocc,nvir))
+                     )
+
+		#TODO: We need the object from inside the matrix-vector product.
+		# We recompute it here. Should it be defined outside the function instead?
+        # Transform to AO
+        lambda_ao = np.matmul(mo_occ, np.matmul(lambda_multipliers.reshape(nocc,nvir), mo_vir.T))
+            
+        #Create AODensityMatrix object from lambda in AO
+        ao_density_lambda = AODensityMatrix([lambda_ao], denmat.rest)
+        
+        #Create a Fock Matrix Object (initialized with zeros)    
+        fock_lambda = AOFockMatrix(ao_density_lambda)
+        fock_lambda.set_fock_type(fock_flag, 0)
+        eri_drv.compute(fock_lambda, ao_density_lambda, molecule, basis, screening) 
+            
+        omega_OO = -(np.einsum('mi,mj->ij', mo_occ, 
+                        np.einsum('zj,mz->mj', mo_occ,  
+                                (np.einsum('zr,mr->mz', ovlp,
+                                         np.einsum('rp,mp->mr',
+                                                  exc_vec_ao,
+                                                 0.5*fock_ao_rhs.alpha_to_numpy(1)
+                                                )
+                                        )
+                                )
+                               )
+                        )
+                    + np.einsum('pi,pj->ij', mo_occ,
+                        np.einsum('tj,pt->pj', mo_occ, 0.5*fock_ao_rhs.alpha_to_numpy(0)))
+                    + np.matmul(mo_occ.T, np.matmul(fock_lambda.alpha_to_numpy(0), mo_occ)) 
+                    + np.matmul(mo_occ.T, np.matmul(fock_lambda.alpha_to_numpy(0), mo_occ)).T
+                    + np.diag(eocc) + np.einsum('i,ij->ij', eocc, 0.5*dm_oo)
+                  )
+
+        omega_ao = (np.matmul(mo_occ, np.matmul(omega_OO, mo_occ.T))
+                    + np.matmul(mo_vir, np.matmul(omega_VV, mo_vir.T))
+                    + np.matmul(mo_occ, np.matmul(omega_OV, mo_vir.T))
+                    + np.matmul(mo_vir, np.matmul(omega_OV.T, mo_occ.T))
+                   )
         
         profiler.check_memory_usage('End of Orbital Response Driver')
         profiler.print_memory_usage(self.ostream) 
@@ -289,6 +355,7 @@ class OrbitalResponse(LinearSolver):
                 'lambda_multipliers': lambda_multipliers.reshape(nocc,nvir),
                 'relaxed_density': dm_rel_ao,
                 'unrelaxed_density': dm_unrel_ao,
+                'omega_multipliers': omega_ao,
             }
                 
 
@@ -306,7 +373,7 @@ class OrbitalResponse(LinearSolver):
         # print solver-specific info
 
         if n_state_deriv is not None:
-            cur_str = 'State of interest           : ' + str(n_state_deriv + 1)
+            cur_str = 'Excited State of Interest       : ' + str(n_state_deriv + 1)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         # print general info
@@ -363,4 +430,33 @@ class OrbitalResponse(LinearSolver):
         exc_vec_ao = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
 
         return dm_unrel_ao, exc_vec_ao
+
+##    def compute_omega_mult(self, molecule, scf_tensors, exc_vectors):
+##        """
+##        Calculates the Lagrange multipliers for the overlap matrix.
+##
+##        :param molecule:
+##            The molecule.
+##        :param scf_tensors:
+##            The tensors from the converged SCF calculation.
+##        :param exc_vectors:
+##            The excitation vectors from the TDA calculation.
+##
+##        :return:
+##            A dictionary containing the Lagrange multipliers.
+##        """
+##        # Orbital information 
+##        nocc = molecule.number_of_alpha_electrons() 
+##        mo_occ = scf_tensors['C'][:, :nocc] # occupied MO coefficients
+##        mo_vir = scf_tensors['C'][:, nocc:] # virtual MO coefficients
+##        nvir = mo_vir.shape[1]
+##        ovlp = scf_tensors['S'] # overlap matrix
+##        eocc = scf_tensors['E'][:nocc]
+##        evir = scf_tensors['E'][nocc:]
+##
+##        # Take vector of interest and convert to matrix form
+##        exc_vec = exc_vectors[:, self.n_state_deriv].copy().reshape(nocc, nvir)
+##
+##        #TODO: to be continued...
+
 

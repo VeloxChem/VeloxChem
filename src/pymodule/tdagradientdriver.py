@@ -7,6 +7,7 @@ from .orbitalresponse import OrbitalResponse
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import dipole_in_debye
+from .errorhandler import assert_msg_critical
 
 
 class TdaGradientDriver(GradientDriver):
@@ -50,13 +51,19 @@ class TdaGradientDriver(GradientDriver):
         :param method_dict:
             The input dicitonary of method settings group.
         """
+        if method_dict is None:
+            method_dict = {}
+
         # TODO: what needs to be updated here?
         # n_state_deriv?
         if 'n_state_deriv' in rsp_dict:
             # user gives '1' for first excited state, but internal index is 0
             self.n_state_deriv = int(rsp_dict['n_state_deriv']) - 1
 
-        return
+		# how should this be resolved?
+        self.rsp_dict = rsp_dict
+        self.method_dict = method_dict
+
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
@@ -69,6 +76,15 @@ class TdaGradientDriver(GradientDriver):
         :param min_basis:
             The minimal AO basis set.
         """
+
+		# sanity check for number of state
+        n_exc_states = len(self.tda_results['eigenvalues'])
+        if self.n_state_deriv > n_exc_states:
+            print("SHIT WILL GO WRONG HERE NOW!!!")
+        #assert_msg_critical(
+        #    self.n_state_deriv > n_exc_states,
+        #    'TdaGradientDriver: not enough states calculated')
+            
 
         self.print_header()
         start_time = tm.time()
@@ -83,15 +99,12 @@ class TdaGradientDriver(GradientDriver):
 
         # orbital response driver
         orbrsp_drv = OrbitalResponse(self.comm, self.ostream)
-        orbrsp_drv.update_settings(rsp_dict, method_dict) # where does he know those from?
+        orbrsp_drv.update_settings(self.rsp_dict, self.method_dict) # where should he know those from?
         
         print("Calculating orbital response.")
         orbrsp_results = orbrsp_drv.compute(molecule, basis,
                                     scf_tensors, exc_vectors)
         print("Orbital response calculation done.")
-
-        # Calculate the omega multipliers (only if nuclear gradient is requested?)
-        #omega = self.compute_omega_mult(molecule, scf_tensors, exc_vectors)
 
         # Calculate the relaxed and unrelaxed excited-state dipole moment
         dipole_moments = self.compute_properties(molecule, scf_tensors, orbrsp_results)
@@ -179,35 +192,6 @@ class TdaGradientDriver(GradientDriver):
                 'relaxed_dipole_moment': (nuclear_dipole +
                                                 rel_electronic_dipole),
             }
-
-    def compute_omega_mult(self, molecule, scf_tensors, exc_vectors):
-        """
-        Calculates the Lagrange multipliers for the overlap matrix.
-
-        :param molecule:
-            The molecule.
-        :param scf_tensors:
-            The tensors from the converged SCF calculation.
-        :param exc_vectors:
-            The excitation vectors from the TDA calculation.
-
-        :return:
-            A dictionary containing the Lagrange multipliers.
-        """
-        # Orbital information 
-        nocc = molecule.number_of_alpha_electrons() 
-        mo_occ = scf_tensors['C'][:, :nocc] # occupied MO coefficients
-        mo_vir = scf_tensors['C'][:, nocc:] # virtual MO coefficients
-        nvir = mo_vir.shape[1]
-        ovlp = scf_tensors['S'] # overlap matrix
-        eocc = scf_tensors['E'][:nocc]
-        evir = scf_tensors['E'][nocc:]
-
-        # Take vector of interest and convert to matrix form
-        exc_vec = exc_vectors[:, self.n_state_deriv].copy().reshape(nocc, nvir)
-
-        #TODO: to be continued...
-
 
 
     def print_properties(self, molecule, properties):
