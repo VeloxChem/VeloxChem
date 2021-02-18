@@ -23,9 +23,9 @@ from .rspabsorption import Absorption
 from .subcommunicators import SubCommunicators
 
 
-class QMMMDriver:
+class TrajectoryDriver:
     """
-    Implements QMMM driver.
+    Implements trajectory driver.
 
     :param comm:
         The MPI communicator.
@@ -56,7 +56,7 @@ class QMMMDriver:
 
     def __init__(self, comm=None, ostream=None):
         """
-        Initializes QMMM driver.
+        Initializes trajectory driver.
         """
 
         if comm is None:
@@ -99,7 +99,7 @@ class QMMMDriver:
                         rsp_dict,
                         method_dict=None):
         """
-        Updates settings in qmmm driver.
+        Updates settings in trajectory driver.
 
         :param traj_dict:
             The input dictionary of trajectory group.
@@ -177,7 +177,7 @@ class QMMMDriver:
 
     def compute(self, molecule, basis, min_basis):
         """
-        Performs QMMM calculation.
+        Performs trajectory calculation.
 
         :param molecule:
             The molecule.
@@ -426,8 +426,8 @@ class QMMMDriver:
             self.spectrum_broadening(list_ex_energy, list_osci_strength,
                                      frame_numbers, output_dir)
 
-        # print time spent in QMMM
-        valstr = '*** Time spent in QMMM calculation: '
+        # print time spent in trajectory
+        valstr = '*** Time spent in trajectory calculation: '
         valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
@@ -435,11 +435,11 @@ class QMMMDriver:
 
     def print_header(self):
         """
-        Prints header for QMMM driver.
+        Prints header for trajectory driver.
         """
 
         self.ostream.print_blank()
-        self.ostream.print_header('QMMM Driver Setup')
+        self.ostream.print_header('Trajectory Driver Setup')
         self.ostream.print_header(19 * '=')
         self.ostream.print_blank()
 

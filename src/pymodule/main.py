@@ -9,7 +9,7 @@ from .loprop import LoPropDriver
 from .mp2driver import Mp2Driver
 from .mpitask import MpiTask
 from .optimizationdriver import OptimizationDriver
-from .qmmmdriver import QMMMDriver
+from .trajectorydriver import TrajectoryDriver
 from .pulsedrsp import PulsedResponse
 from .rspabsorption import Absorption
 from .rspc6 import C6
@@ -188,7 +188,7 @@ def main():
         exciton_drv.update_settings(exciton_dict, method_dict)
         exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-    # QMMM spectrum
+    # Spectrum from trajectory
 
     if task_type == 'trajectory':
         if 'trajectory' in task.input_dict:
@@ -208,9 +208,9 @@ def main():
         traj_dict['charges'] = task.input_dict['charges']
         traj_dict['polarizabilities'] = task.input_dict['polarizabilities']
 
-        qmmm_drv = QMMMDriver(task.mpi_comm, task.ostream)
-        qmmm_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
-        qmmm_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        traj_drv = TrajectoryDriver(task.mpi_comm, task.ostream)
+        traj_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
+        traj_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Self-consistent field
 
