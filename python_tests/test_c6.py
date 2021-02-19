@@ -16,17 +16,10 @@ from veloxchem.veloxchemlib import mpi_master
 @pytest.mark.solvers
 class TestC6(unittest.TestCase):
 
-    def run_c6(self, inpfile, potfile, xcfun_label, data_lines, ref_c6_value):
+    def run_c6(self, inpfile, xcfun_label, data_lines, ref_c6_value):
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
-
-        # if potfile is not None:
-        #     task.input_dict['method_settings']['potfile'] = potfile
-        #     try:
-        #         import cppe
-        #     except ImportError:
-        #         return
 
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
@@ -100,8 +93,6 @@ class TestC6(unittest.TestCase):
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
 
-        potfile = None
-
         xcfun_label = None
 
         #   --------------------------------------------------
@@ -167,14 +158,12 @@ class TestC6(unittest.TestCase):
 
         ref_c6_value = 36.230454
 
-        self.run_c6(inpfile, potfile, xcfun_label, data_lines, ref_c6_value)
+        self.run_c6(inpfile, xcfun_label, data_lines, ref_c6_value)
 
     def test_c6_dft(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
-
-        potfile = None
 
         xcfun_label = 'b3lyp'
 
@@ -241,14 +230,12 @@ class TestC6(unittest.TestCase):
 
         ref_c6_value = 42.315098
 
-        self.run_c6(inpfile, potfile, xcfun_label, data_lines, ref_c6_value)
+        self.run_c6(inpfile, xcfun_label, data_lines, ref_c6_value)
 
     def test_c6_dft_slda(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
-
-        potfile = None
 
         xcfun_label = 'slda'
 
@@ -315,7 +302,7 @@ class TestC6(unittest.TestCase):
 
         ref_c6_value = 44.494604
 
-        self.run_c6(inpfile, potfile, xcfun_label, data_lines, ref_c6_value)
+        self.run_c6(inpfile, xcfun_label, data_lines, ref_c6_value)
 
 
 if __name__ == "__main__":

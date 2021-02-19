@@ -13,9 +13,9 @@ from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.scffirstorderprop import ScfFirstOrderProperties
 
 
-class TestUSCF(unittest.TestCase):
+class TestTripletH2(unittest.TestCase):
 
-    def run_uscf(self, inpfile, potfile, xcfun_label, ref_e_scf, ref_dip):
+    def run_scf(self, inpfile, potfile, xcfun_label, ref_e_scf, ref_dip):
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
@@ -55,7 +55,7 @@ class TestUSCF(unittest.TestCase):
 
         ref_dip = np.array([0.000000, 0.000000, 0.000000])
 
-        self.run_uscf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
+        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
 
 
 if __name__ == "__main__":

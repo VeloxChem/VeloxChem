@@ -15,7 +15,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scffirstorderprop import ScfFirstOrderProperties
 
 
-class TestSCF(unittest.TestCase):
+class TestScfRestricted(unittest.TestCase):
 
     def run_scf(self, inpfile, potfile, xcfun_label, ref_e_scf, ref_dip):
 

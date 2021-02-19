@@ -13,7 +13,7 @@ from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.scffirstorderprop import ScfFirstOrderProperties
 
 
-class TestSCF(unittest.TestCase):
+class TestScfUnrestricted(unittest.TestCase):
 
     def run_scf(self, inpfile, potfile, xcfun_label, ref_e_scf, ref_dip):
 
