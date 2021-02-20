@@ -232,38 +232,6 @@ class DistributedArray:
 
         return mat
 
-    def matmul_AB(self, array, factor=None):
-        """
-        Computes matrix-matrix multiplication between self and a numpy array
-        that is available on all nodes.
-
-        :param array:
-            The numpy array.
-        :param factor:
-            The factor to be multiplied to the result.
-        :return:
-            A numpy array on the master node, None on other nodes.
-        """
-
-        seg_mat = np.matmul(self.data, array)
-
-        if factor is not None:
-            seg_mat *= factor
-
-        seg_mat = self.comm.gather(seg_mat, root=mpi_master())
-
-        if self.rank == mpi_master():
-            full_shape_0 = sum([m.shape[0] for m in seg_mat])
-
-            if array.ndim == 1:
-                return np.hstack(seg_mat).reshape(full_shape_0)
-
-            elif array.ndim == 2:
-                return np.vstack(seg_mat).reshape(full_shape_0, array.shape[1])
-
-        else:
-            return None
-
     def matmul_AB_no_gather(self, array, factor=None):
         """
         Computes matrix-matrix multiplication between self and a numpy array

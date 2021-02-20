@@ -1,16 +1,15 @@
-import os
-import random
-import unittest
 from pathlib import Path
-
 import numpy as np
+import unittest
+import random
 import pytest
-from mpi4py import MPI
-from veloxchem.c6solver import C6Solver
+import os
+
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
-from veloxchem.rspc6 import C6
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.c6solver import C6Solver
+from veloxchem.rspc6 import C6
 
 
 @pytest.mark.solvers
@@ -18,7 +17,7 @@ class TestC6(unittest.TestCase):
 
     def run_c6(self, inpfile, xcfun_label, data_lines, ref_c6_value):
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
 
         if xcfun_label is not None:
@@ -41,9 +40,9 @@ class TestC6(unittest.TestCase):
         c6_results = c6_solver.compute(task.molecule, task.ao_basis,
                                        scf_drv.scf_tensors)
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             freqs = set()
-            for apo, bop, iw in c6_results['response_functions']:
+            for aop, bop, iw in c6_results['response_functions']:
                 freqs.add(iw)
             freqs = sorted(list(freqs), reverse=True)[:-1]
             diff_freq = np.max(np.abs(np.array(freqs) - np.array(ref_freqs)))

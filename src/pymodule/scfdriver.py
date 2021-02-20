@@ -54,8 +54,6 @@ class ScfDriver:
         - eri_thresh: The electron repulsion integrals screening threshold.
         - ovl_thresh: The atomic orbitals linear dependency threshold.
         - diis_thresh: The C2-DIIS switch on threshold.
-        - use_level_shift: The flag for usage of level shifting in SCF
-          iterations.
         - iter_data: The list of SCF iteration data (electronic energy,
           electronic energy change, gradient, density change).
         - is_converged: The flag for SCF convergence.
@@ -113,9 +111,6 @@ class ScfDriver:
         self.diis_thresh = 1000.0
         self.eri_thresh = 1.0e-12
         self.eri_thresh_tight = 1.0e-15
-
-        # level shifting
-        self.use_level_shift = False
 
         # iterations data
         self.iter_data = []
@@ -278,8 +273,6 @@ class ScfDriver:
         """
 
         profiler = Profiler()
-
-        self.scf_start_time = tm.time()
 
         if min_basis is None:
             if self.rank == mpi_master():
@@ -829,8 +822,6 @@ class ScfDriver:
         :param e_grad:
             The electronic gradient at current SCF iteration.
         """
-
-        self.use_level_shift = False
 
         if e_grad < self.diis_thresh:
             self.skip_iter = False
@@ -1616,24 +1607,6 @@ class ScfDriver:
         """
 
         return
-
-    def need_min_basis(self):
-        """
-        Determines if minimal AO basis is needed in SCF calculation. Usage of
-        two level DIIS accelerator or superposition of atomic densities initial
-        guess requires minimal AO basis.
-
-        :return:
-            The flag for need of minimal AO basis.
-        """
-
-        if self.acc_type == "L2_DIIS":
-            return True
-
-        if self.den_guess.guess_type == "SAD":
-            return True
-
-        return False
 
     def delete_mos(self, mol_orbs, mol_eigs):
         """

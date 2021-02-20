@@ -42,6 +42,23 @@ get_mpi_comm(py::object py_comm)
     return comm_ptr;
 }
 
+// Helper function for checking master node
+
+static bool
+is_mpi_master(py::object py_comm)
+{
+    if (py_comm.is_none())
+    {
+        return (mpi::rank(MPI_COMM_WORLD) == mpi::master());
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+        return (mpi::rank(*comm_ptr) == mpi::master());
+    }
+}
+
 // Helper function for getting the size limit in MPI communication
 
 static int32_t
@@ -185,6 +202,8 @@ export_general(py::module& m)
     // exposing functions
 
     m.def("mpi_master", &mpi::master);
+
+    m.def("is_mpi_master", &is_mpi_master, py::arg("py_comm") = py::none());
 
     m.def("mpi_size_limit", &mpi_size_limit);
 

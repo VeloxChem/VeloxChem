@@ -1077,10 +1077,6 @@ class LinearSolver:
         self.is_converged = self.comm.bcast(self.is_converged,
                                             root=mpi_master())
 
-    def initial_guess(self, v1, precond):
-
-        return None
-
     def decomp_grad(self, grad):
         """
         Decomposes gradient into gerade and ungerade parts.
@@ -1454,26 +1450,6 @@ class LinearSolver:
         mask = l > b_norm * threshold
         return np.matmul(basis, T[:, mask])
 
-    @staticmethod
-    def remove_linear_dependence_half(basis, threshold):
-        """
-        Removes linear dependence in a set of symmetrized vectors.
-
-        :param basis:
-            The set of upper parts of symmetrized vectors.
-        :param threshold:
-            The threshold for removing linear dependence.
-
-        :return:
-            The new set of vectors.
-        """
-
-        Sb = 2 * np.matmul(basis.T, basis)
-        l, T = np.linalg.eigh(Sb)
-        b_norm = np.sqrt(Sb.diagonal())
-        mask = l > b_norm * threshold
-        return np.matmul(basis, T[:, mask])
-
     def remove_linear_dependence_half_distributed(self, basis, threshold):
         """
         Removes linear dependence in a set of symmetrized vectors.
@@ -1524,35 +1500,6 @@ class LinearSolver:
                         tvecs[:, j], tvecs[:, j])
                     tvecs[:, i] -= f * tvecs[:, j]
                 f = 1.0 / np.linalg.norm(tvecs[:, i])
-                tvecs[:, i] *= f
-
-        return tvecs
-
-    @staticmethod
-    def orthogonalize_gram_schmidt_half(tvecs):
-        """
-        Applies modified Gram Schmidt orthogonalization to trial vectors.
-
-        :param tvecs:
-            The trial vectors.
-
-        :return:
-            The orthogonalized trial vectors.
-        """
-
-        invsqrt2 = 1.0 / np.sqrt(2.0)
-
-        if tvecs.shape[1] > 0:
-
-            f = invsqrt2 / np.linalg.norm(tvecs[:, 0])
-            tvecs[:, 0] *= f
-
-            for i in range(1, tvecs.shape[1]):
-                for j in range(i):
-                    f = np.dot(tvecs[:, i], tvecs[:, j]) / np.dot(
-                        tvecs[:, j], tvecs[:, j])
-                    tvecs[:, i] -= f * tvecs[:, j]
-                f = invsqrt2 / np.linalg.norm(tvecs[:, i])
                 tvecs[:, i] *= f
 
         return tvecs
@@ -1610,30 +1557,6 @@ class LinearSolver:
 
         return vecs
 
-    @staticmethod
-    def normalize_half(vecs):
-        """
-        Normalizes half-sized vectors by dividing by vector norm.
-
-        :param vecs:
-            The half-sized vectors.
-
-        :param Retruns:
-            The normalized vectors.
-        """
-
-        invsqrt2 = 1.0 / np.sqrt(2.0)
-
-        if len(vecs.shape) != 1:
-            for vec in range(vecs.shape[1]):
-                invnorm = invsqrt2 / np.linalg.norm(vecs[:, vec])
-                vecs[:, vec] *= invnorm
-        else:
-            invnorm = invsqrt2 / np.linalg.norm(vecs)
-            vecs *= invnorm
-
-        return vecs
-
     def normalize_half_distributed(self, vecs):
         """
         Normalizes half-sized vectors by dividing by vector norm.
@@ -1652,36 +1575,6 @@ class LinearSolver:
         vecs.data *= invnorm
 
         return vecs
-
-    @staticmethod
-    def construct_ed_sd(orb_ene, nocc, norb):
-        """
-        Gets the E0 and S0 diagonal elements as arrays.
-
-        :param orb_ene:
-            Orbital energies.
-        :param nocc:
-            Number of occupied orbitals.
-        :param norb:
-            Number of orbitals.
-
-        :return:
-            The E0 and S0 diagonal elements as numpy arrays.
-        """
-
-        nvir = norb - nocc
-        n_ov = nocc * nvir
-
-        eocc = orb_ene[:nocc]
-        evir = orb_ene[nocc:]
-
-        ediag = 2.0 * (-eocc.reshape(-1, 1) + evir).reshape(n_ov)
-        ediag = np.hstack((ediag, ediag))
-
-        sdiag = 2.0 * np.ones(ediag.shape)
-        sdiag[n_ov:] = -2.0
-
-        return ediag, sdiag
 
     @staticmethod
     def construct_ed_sd_half(orb_ene, nocc, norb):
