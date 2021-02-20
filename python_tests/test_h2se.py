@@ -21,13 +21,26 @@ class TestH2Se(unittest.TestCase):
         outfile = inpfile.with_suffix('.out')
 
         task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
+
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
+        scf_drv.update_settings(task.input_dict['scf'],
+                                task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         e_scf = scf_drv.get_scf_energy()
 
+        scf_drv.restart = True
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        e_scf_restart = scf_drv.get_scf_energy()
+
+        scf_h5 = Path(task.input_dict['scf']['checkpoint_file'])
+        if scf_h5.is_file():
+            scf_h5.unlink()
+
         self.assertAlmostEqual(-2400.70461320, e_scf, 8)
+        self.assertAlmostEqual(-2400.70461320, e_scf_restart, 8)
 
         # unrestricted scf
 

@@ -123,7 +123,6 @@ class TestExciton(unittest.TestCase):
         inpfile = str(here / 'inputs' / 'exciton.inp')
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['exciton']['checkpoint_file'] = None
         exciton_dict = task.input_dict['exciton']
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
@@ -144,6 +143,14 @@ class TestExciton(unittest.TestCase):
             eigval_diff = np.max(np.abs(eigvals - ref_eigvals))
             self.assertTrue(eigval_diff < threshold)
 
+            backup_H = np.array(exciton_drv.H)
+
+        exciton_drv.restart = True
+        exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        if task.mpi_rank == mpi_master():
+            self.assertTrue(np.max(np.abs(backup_H - exciton_drv.H)) < 1.0e-10)
+
             for ind in range(len(exciton_drv.monomers)):
                 scf_h5 = Path('monomer_{:d}.scf.h5'.format(ind + 1))
                 rsp_h5 = Path('monomer_{:d}.rsp.h5'.format(ind + 1))
@@ -151,6 +158,10 @@ class TestExciton(unittest.TestCase):
                     scf_h5.unlink()
                 if rsp_h5.is_file():
                     rsp_h5.unlink()
+
+            exciton_h5 = Path(exciton_dict['checkpoint_file'])
+            if exciton_h5.is_file():
+                exciton_h5.unlink()
 
     def test_exciton_model_rhf(self):
 
