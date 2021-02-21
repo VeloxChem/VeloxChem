@@ -42,9 +42,15 @@ class TestMOIntegralsDriver(unittest.TestCase):
         mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
 
         if task.mpi_rank == mpi_master():
-            e_mp2 = mp2_drv.e_mp2
             e_ref = -0.28529088
+            e_mp2 = mp2_drv.e_mp2
             self.assertAlmostEqual(e_ref, e_mp2, 8)
+
+        mp2_drv.update_settings({'conventional': 'yes'})
+        mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
+
+        if task.mpi_rank == mpi_master():
+            self.assertAlmostEqual(e_mp2, mp2_drv.e_mp2, 12)
 
         # extra test: collect moints batches to master node
         moints_drv = MOIntegralsDriver(task.mpi_comm, task.ostream)

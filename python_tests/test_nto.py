@@ -1,7 +1,8 @@
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
-from pathlib import Path
+import tempfile
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.veloxchemlib import denmat
@@ -9,7 +10,6 @@ from veloxchem.mpitask import MpiTask
 from veloxchem.cubicgrid import CubicGrid
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.molecularorbitals import MolecularOrbitals
-from veloxchem.visualizationdriver import VisualizationDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaexcidriver import TDAExciDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
@@ -112,33 +112,28 @@ class TestNTO(unittest.TestCase):
 
             grid = CubicGrid([-0.1, -0.1, -0.1], [0.3, 0.3, 0.2], [2, 2, 3])
 
-            vis_drv = VisualizationDriver(task.mpi_comm)
-
             # compute NTOs on grid points
 
-            ind_occ = nocc - 1
-            vis_drv.compute(grid, task.molecule, task.ao_basis, nto_mo, ind_occ,
-                            'alpha')
-            if task.mpi_rank == mpi_master():
-                nto_cube_vals.append(grid.values_to_numpy().flatten())
+            with tempfile.TemporaryDirectory() as temp_dir:
+                rsp_drv.filename = str(Path(temp_dir, 'test'))
 
-            ind_vir = nocc
-            vis_drv.compute(grid, task.molecule, task.ao_basis, nto_mo, ind_vir,
-                            'alpha')
-            if task.mpi_rank == mpi_master():
-                nto_cube_vals.append(grid.values_to_numpy().flatten())
+                nto_cube_fnames = rsp_drv.write_nto_cubes(
+                    grid, task.molecule, task.ao_basis, s, lam_diag, nto_mo, 1)
 
-            # compute densities on grid points
+                dens_cube_fnames = rsp_drv.write_detach_attach_cubes(
+                    grid, task.molecule, task.ao_basis, s, dens_DA)
 
-            vis_drv.compute(grid, task.molecule, task.ao_basis, dens_DA, 0,
-                            'alpha')
-            if task.mpi_rank == mpi_master():
-                dens_cube_vals.append(grid.values_to_numpy().flatten())
+                if task.mpi_rank == mpi_master():
 
-            vis_drv.compute(grid, task.molecule, task.ao_basis, dens_DA, 1,
-                            'alpha')
-            if task.mpi_rank == mpi_master():
-                dens_cube_vals.append(grid.values_to_numpy().flatten())
+                    for fname in nto_cube_fnames:
+                        read_grid = CubicGrid.read_cube(fname)
+                        nto_cube_vals.append(
+                            read_grid.values_to_numpy().flatten())
+
+                    for fname in dens_cube_fnames:
+                        read_grid = CubicGrid.read_cube(fname)
+                        dens_cube_vals.append(
+                            read_grid.values_to_numpy().flatten())
 
         # compare NTO and densities on grid points with reference
 

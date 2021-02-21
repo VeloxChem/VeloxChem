@@ -58,11 +58,19 @@ class OutputStream:
         Deletes the output stream.
         """
 
+        self.close()
+
+    def close(self):
+        """
+        Closes the output stream.
+        """
+
         if self.state:
             if self.buffer_lines:
                 self.flush()
             if self.stream is not sys.stdout:
                 self.stream.close()
+            self.state = False
 
     def get_state(self):
         """

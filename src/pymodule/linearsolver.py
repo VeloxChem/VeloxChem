@@ -1635,7 +1635,7 @@ class LinearSolver:
         return lam_diag, nto_mo
 
     def write_nto_cubes(self,
-                        cube_points,
+                        cubic_grid,
                         molecule,
                         basis,
                         root,
@@ -1646,8 +1646,8 @@ class LinearSolver:
         """
         Writes cube files for natural transition orbitals.
 
-        :param cube_points:
-            The list containing number of grid points in X, Y and Z directions.
+        :param cubic_grid:
+            The cubic grid.
         :param molecule:
             The molecule.
         :param basis:
@@ -1662,10 +1662,14 @@ class LinearSolver:
             The number of NTO pairs.
         :param nto_thresh:
             The threshold for writing NTO to cube file.
+
+        :return:
+            The list containing the names of the cube files.
         """
 
+        filenames = []
+
         vis_drv = VisualizationDriver(self.comm)
-        cubic_grid = vis_drv.gen_cubic_grid(molecule, cube_points)
 
         nocc = molecule.number_of_alpha_electrons()
 
@@ -1688,6 +1692,7 @@ class LinearSolver:
                     self.filename, root + 1, i_nto + 1)
                 vis_drv.write_data(occ_cube_name, cubic_grid, molecule, 'nto',
                                    ind_occ, 'alpha')
+                filenames.append(occ_cube_name)
 
                 self.ostream.print_info(
                     '    Cube file (hole)     : {:s}'.format(occ_cube_name))
@@ -1703,12 +1708,15 @@ class LinearSolver:
                     self.filename, root + 1, i_nto + 1)
                 vis_drv.write_data(vir_cube_name, cubic_grid, molecule, 'nto',
                                    ind_vir, 'alpha')
+                filenames.append(vir_cube_name)
 
                 self.ostream.print_info(
                     '    Cube file (particle) : {:s}'.format(vir_cube_name))
                 self.ostream.flush()
 
         self.ostream.print_blank()
+
+        return filenames
 
     def get_detach_attach_densities(self, z_mat, y_mat, mo_occ, mo_vir):
         """
@@ -1736,13 +1744,13 @@ class LinearSolver:
 
         return dens_D, dens_A
 
-    def write_detach_attach_cubes(self, cube_points, molecule, basis, root,
+    def write_detach_attach_cubes(self, cubic_grid, molecule, basis, root,
                                   dens_DA):
         """
         Writes cube files for detachment and attachment densities.
 
-        :param cube_points:
-            The list containing number of grid points in X, Y and Z directions.
+        :param cubic_grid:
+            The cubic grid.
         :param molecule:
             The molecule.
         :param basis:
@@ -1752,10 +1760,14 @@ class LinearSolver:
         :param dens_DA:
             The AODensityMatrix object containing detachment and attachment
             densities.
+
+        :return:
+            The list containing the names of the cube files.
         """
 
+        filenames = []
+
         vis_drv = VisualizationDriver(self.comm)
-        cubic_grid = vis_drv.gen_cubic_grid(molecule, cube_points)
 
         vis_drv.compute(cubic_grid, molecule, basis, dens_DA, 0, 'alpha')
 
@@ -1764,6 +1776,7 @@ class LinearSolver:
                 self.filename, root + 1)
             vis_drv.write_data(detach_cube_name, cubic_grid, molecule,
                                'detachment', 0, 'alpha')
+            filenames.append(detach_cube_name)
 
             self.ostream.print_info(
                 '  Cube file (detachment) : {:s}'.format(detach_cube_name))
@@ -1776,9 +1789,12 @@ class LinearSolver:
                 self.filename, root + 1)
             vis_drv.write_data(attach_cube_name, cubic_grid, molecule,
                                'attachment', 1, 'alpha')
+            filenames.append(attach_cube_name)
 
             self.ostream.print_info(
                 '  Cube file (attachment) : {:s}'.format(attach_cube_name))
             self.ostream.flush()
 
         self.ostream.print_blank()
+
+        return filenames

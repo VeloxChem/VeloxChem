@@ -1,10 +1,11 @@
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
-from pathlib import Path
+import tempfile
 
-from veloxchem.veloxchemlib import ChemicalElement
 from veloxchem.veloxchemlib import bohr_in_angstroms
+from veloxchem.veloxchemlib import ChemicalElement
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
 
@@ -186,6 +187,83 @@ class TestMolData(unittest.TestCase):
         self.assertEqual('Br', elem2.get_name())
 
         self.assertEqual(elem, elem2)
+
+    def test_get_ic_rmsd(self):
+
+        init_xyz_str = """
+            C          -2.723479309037        0.388400197499       -0.032041680121
+            C          -1.198591674506        0.292402159666       -0.001957955680
+            H          -3.161468702971        0.002148459476        0.916810101463
+            H          -3.113340035638       -0.249559972670       -0.853012496915
+            O          -3.131199766507        1.709538730510       -0.265228909885
+            H          -0.880032285304       -0.767190536848        0.124520689502
+            O          -0.670239980035        1.084030100114        1.027238801838
+            H          -0.785679988597        0.645580322006       -0.970638007358
+            H          -0.821288323120        0.587492539563        1.873631291844
+            H          -3.112122928053        2.174373284354        0.611781773545
+        """
+
+        final_xyz_str = """
+            C          -2.760169377434        0.322719976286       -0.001925407564
+            C          -1.228941816065        0.304680448557       -0.002845411826
+            H          -3.128135202340       -0.132424338111        0.933568102246
+            H          -3.149271541311       -0.251138690089       -0.845341019529
+            O          -3.252173881237        1.631288380215       -0.127670008266
+            H          -0.863067365090       -0.729220194991        0.037102867132
+            O          -0.717621604087        1.071775860470        1.064783463761
+            H          -0.854080755853        0.782453035355       -0.910452256526
+            H          -0.974559560638        0.659440589631        1.897920584004
+            H          -2.669421889714        2.207640216349        0.385962694800
+        """
+
+        init_mol = Molecule.read_str(init_xyz_str, units='angstrom')
+        final_mol = Molecule.read_str(final_xyz_str, units='angstrom')
+
+        ic_rmsd = final_mol.get_ic_rmsd(init_mol)
+        ref_ic_rmsd = {
+            'bonds': {
+                'rms': 0.017,
+                'max': 0.028,
+                'unit': 'Angstrom'
+            },
+            'angles': {
+                'rms': 1.463,
+                'max': 3.234,
+                'unit': 'degree'
+            },
+            'dihedrals': {
+                'rms': 20.573,
+                'max': 45.089,
+                'unit': 'degree'
+            }
+        }
+
+        for ic in ['bonds', 'angles', 'dihedrals']:
+            for val in ['rms', 'max']:
+                self.assertTrue(
+                    abs(ic_rmsd[ic][val] - ref_ic_rmsd[ic][val]) < 1.0e-3)
+
+    def test_write_xyz(self):
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fname = str(Path(temp_dir, 'mol.xyz'))
+
+            mol = self.nh3_molecule()
+            mol.write_xyz(fname)
+
+            with open(fname, 'r') as f_xyz:
+                lines = f_xyz.readlines()
+
+                labels = [line.split()[0] for line in lines[2:]]
+                coords = np.array([
+                    [float(x) for x in line.split()[1:]] for line in lines[2:]
+                ])
+
+                for a, b in zip(labels, mol.get_labels()):
+                    self.assertEqual(a.lower(), b.lower())
+
+                ref_coords = mol.get_coordinates() * bohr_in_angstroms()
+                self.assertTrue(np.max(np.abs(coords - ref_coords)) < 1.0e-10)
 
 
 if __name__ == "__main__":
