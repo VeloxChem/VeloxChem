@@ -86,6 +86,9 @@ class TestBasis(unittest.TestCase):
         basis_dir = here / 'basis'
 
         for basis in basis_dir.iterdir():
+            if not is_mpi_master():
+                continue
+
             if not basis.is_file():
                 continue
             if basis.name == 'MIN-CC-PVDZ':

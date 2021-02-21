@@ -188,14 +188,16 @@ class TestVisualization(unittest.TestCase):
 
             vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, density,
                             0, 'alpha')
-            read_grid = CubicGrid.read_cube(dens_cube_fname)
-            self.assertTrue(read_grid.compare(cubic_grid) < 1e-6)
+            if task.mpi_rank == mpi_master():
+                read_grid = CubicGrid.read_cube(dens_cube_fname)
+                self.assertTrue(read_grid.compare(cubic_grid) < 1e-6)
 
             vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, mol_orbs,
                             task.molecule.number_of_alpha_electrons() - 1,
                             'alpha')
-            read_grid = CubicGrid.read_cube(homo_cube_fname)
-            self.assertTrue(read_grid.compare(cubic_grid) < 1e-6)
+            if task.mpi_rank == mpi_master():
+                read_grid = CubicGrid.read_cube(homo_cube_fname)
+                self.assertTrue(read_grid.compare(cubic_grid) < 1e-6)
 
 
 if __name__ == "__main__":

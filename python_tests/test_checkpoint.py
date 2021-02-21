@@ -4,6 +4,7 @@ import numpy as np
 import unittest
 import tempfile
 
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.outputstream import OutputStream
@@ -44,6 +45,9 @@ class TestCheckpoint(unittest.TestCase):
         mol, bas = self.get_molecule_and_basis()
 
         with tempfile.TemporaryDirectory() as temp_dir:
+            if not is_mpi_master():
+                return
+
             fname = str(Path(temp_dir, 'rsp.h5'))
 
             # test writing
@@ -148,17 +152,22 @@ class TestCheckpoint(unittest.TestCase):
                 for w in freqs:
                     a = read_focks[key][w].get_full_vector()
                     b = focks[key][w].get_full_vector()
-                    self.assertTrue(np.max(np.abs(a - b)) < 1.0e-12)
+                    if is_mpi_master(comm):
+                        self.assertTrue(np.max(np.abs(a - b)) < 1.0e-12)
 
             # test hdf5
-            valid_checkpoint = check_distributed_focks(fname, keys, freqs)
-            self.assertTrue(valid_checkpoint)
+            if is_mpi_master(comm):
 
-            valid_checkpoint = check_distributed_focks(fname, ['x', 'y'], freqs)
-            self.assertFalse(valid_checkpoint)
+                valid_checkpoint = check_distributed_focks(fname, keys, freqs)
+                self.assertTrue(valid_checkpoint)
 
-            valid_checkpoint = check_distributed_focks(fname, keys, [0.1, 0.2])
-            self.assertFalse(valid_checkpoint)
+                valid_checkpoint = check_distributed_focks(
+                    fname, ['x', 'y'], freqs)
+                self.assertFalse(valid_checkpoint)
+
+                valid_checkpoint = check_distributed_focks(
+                    fname, keys, [0.1, 0.2])
+                self.assertFalse(valid_checkpoint)
 
     def test_distributed_array(self):
 
@@ -178,7 +187,8 @@ class TestCheckpoint(unittest.TestCase):
             for col in range(dist_array.shape(1)):
                 a = dist_array.get_full_vector(col)
                 b = read_array.get_full_vector(col)
-                self.assertTrue(np.max(np.abs(a - b)) < 1.0e-12)
+                if is_mpi_master(comm):
+                    self.assertTrue(np.max(np.abs(a - b)) < 1.0e-12)
 
 
 if __name__ == "__main__":

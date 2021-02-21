@@ -4,6 +4,7 @@ import numpy as np
 import unittest
 import tempfile
 
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.veloxchemlib import bohr_in_angstroms
 from veloxchem.veloxchemlib import ChemicalElement
 from veloxchem.mpitask import MpiTask
@@ -246,6 +247,9 @@ class TestMolData(unittest.TestCase):
     def test_write_xyz(self):
 
         with tempfile.TemporaryDirectory() as temp_dir:
+            if not is_mpi_master():
+                return
+
             fname = str(Path(temp_dir, 'mol.xyz'))
 
             mol = self.nh3_molecule()

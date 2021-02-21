@@ -3,6 +3,7 @@ import unittest
 import tempfile
 import os
 
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.cubicgrid import CubicGrid
 
 
@@ -38,6 +39,9 @@ class TestCheckpoint(unittest.TestCase):
     def test_cube(self):
 
         with tempfile.TemporaryDirectory() as temp_dir:
+            if not is_mpi_master():
+                return
+
             fname = str(Path(temp_dir, 'test.cube'))
             self.write_cube(fname)
 

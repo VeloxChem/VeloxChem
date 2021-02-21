@@ -1,11 +1,11 @@
-from mpi4py import MPI
 from unittest.mock import patch
 import numpy.testing as npt
 import numpy as np
 import textwrap
 import pytest
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.veloxchemlib import is_single_node
 from veloxchem.inputparser import InputParser
 
 
@@ -22,6 +22,9 @@ def test_input_dict(mock_parse):
 
 
 def test_full_input(tmpdir):
+
+    if not is_mpi_master():
+        return
 
     with open(tmpdir / 'h2o.inp', 'w') as f:
         f.write(
@@ -80,7 +83,7 @@ def test_full_input(tmpdir):
 
 def test_error_in_input(tmpdir):
 
-    if MPI.COMM_WORLD.Get_size() == 1:
+    if is_single_node():
 
         with open(tmpdir / 'h2o.inp', 'w') as f:
             f.write(
@@ -124,6 +127,6 @@ def test_error_in_input(tmpdir):
 ])
 def test_parse_frequencies(input_frequencies, expected):
 
-    if MPI.COMM_WORLD.Get_rank() == mpi_master():
+    if is_mpi_master():
         npt.assert_allclose(InputParser.parse_frequencies(input_frequencies),
                             expected)
