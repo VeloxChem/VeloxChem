@@ -1,17 +1,16 @@
-from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
 import tempfile
 import random
 import pytest
 import sys
-from pathlib import Path
 try:
     import cppe
 except ImportError:
     pass
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -32,7 +31,7 @@ class TestLR(unittest.TestCase):
 
     def run_lr(self, inpfile, potfile, xcfun_label, raw_data):
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
 
         if potfile is not None:
@@ -55,7 +54,7 @@ class TestLR(unittest.TestCase):
         lr_prop.init_driver(task.mpi_comm, task.ostream)
         lr_prop.compute(task.molecule, task.ao_basis, scf_tensors)
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             self.check_printout(lr_prop)
             lr_results = lr_prop.rsp_property
 

@@ -1,10 +1,10 @@
-from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import unittest
 import tempfile
 
 from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.veloxchemlib import denmat
 from veloxchem.mpitask import MpiTask
 from veloxchem.cubicgrid import CubicGrid
@@ -20,7 +20,7 @@ class TestNTO(unittest.TestCase):
     def run_nto(self, inpfile, xcfun_label, ref_eig_vals, ref_nto_lambdas,
                 ref_nto_cube_vals, ref_dens_cube_vals, flag):
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
 
         if xcfun_label is not None:
@@ -48,7 +48,7 @@ class TestNTO(unittest.TestCase):
 
         nocc = task.molecule.number_of_alpha_electrons()
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             mo = scf_drv.scf_tensors['C']
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
@@ -67,7 +67,7 @@ class TestNTO(unittest.TestCase):
 
             # calculate NTOs and densities
 
-            if task.mpi_rank == mpi_master():
+            if is_mpi_master(task.mpi_comm):
                 eig_vec = eig_vecs[:, s].copy()
 
                 if flag == 'tda':
@@ -97,7 +97,7 @@ class TestNTO(unittest.TestCase):
 
             # check sum of lambdas and number of electrons
 
-            if task.mpi_rank == mpi_master():
+            if is_mpi_master(task.mpi_comm):
                 nto_lambdas.append(lam_diag[0])
 
                 if flag == 'tda':
@@ -123,7 +123,7 @@ class TestNTO(unittest.TestCase):
                 dens_cube_fnames = rsp_drv.write_detach_attach_cubes(
                     grid, task.molecule, task.ao_basis, s, dens_DA)
 
-                if task.mpi_rank == mpi_master():
+                if is_mpi_master(task.mpi_comm):
 
                     for fname in nto_cube_fnames:
                         read_grid = CubicGrid.read_cube(fname)
@@ -137,7 +137,7 @@ class TestNTO(unittest.TestCase):
 
         # compare NTO and densities on grid points with reference
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             nto_lambdas = np.array(nto_lambdas)
             nto_cube_vals = np.array(nto_cube_vals)
             dens_cube_vals = np.array(dens_cube_vals)

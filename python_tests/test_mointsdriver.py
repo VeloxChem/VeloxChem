@@ -1,22 +1,20 @@
-from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
-from pathlib import Path
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.veloxchemlib import moints
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.mointsdriver import MOIntegralsDriver
 from veloxchem.mp2driver import Mp2Driver
 from veloxchem.mpitask import MpiTask
-from veloxchem.outputstream import OutputStream
 
 
 class TestMOIntegralsDriver(unittest.TestCase):
 
     def test_moints_type(self):
 
-        moints_drv = MOIntegralsDriver(MPI.COMM_WORLD, OutputStream())
+        moints_drv = MOIntegralsDriver()
 
         self.assertEqual(moints_drv.get_moints_type("OOOO"), moints.oooo)
         self.assertEqual(moints_drv.get_moints_type("OOOV"), moints.ooov)
@@ -31,7 +29,7 @@ class TestMOIntegralsDriver(unittest.TestCase):
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'h2se.inp')
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task = MpiTask([inpfile, None])
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
@@ -41,7 +39,7 @@ class TestMOIntegralsDriver(unittest.TestCase):
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
         mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             e_ref = -0.28529088
             e_mp2 = mp2_drv.e_mp2
             self.assertAlmostEqual(e_ref, e_mp2, 8)
@@ -49,7 +47,7 @@ class TestMOIntegralsDriver(unittest.TestCase):
         mp2_drv.update_settings({'conventional': 'yes'})
         mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             self.assertAlmostEqual(e_mp2, mp2_drv.e_mp2, 12)
 
         # extra test: collect moints batches to master node
@@ -59,7 +57,7 @@ class TestMOIntegralsDriver(unittest.TestCase):
                                   "OOVV", grps)
         moints_drv.collect_moints_batches(oovv, grps)
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             orb_ene = mol_orbs.ea_to_numpy()
             nocc = task.molecule.number_of_alpha_electrons()
             eocc = orb_ene[:nocc]
@@ -80,7 +78,7 @@ class TestMOIntegralsDriver(unittest.TestCase):
         in_mem_oovv = moints_drv.compute_in_mem(task.molecule, task.ao_basis,
                                                 mol_orbs, "OOVV")
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             in_mem_e_mp2 = 0.0
             for i in range(in_mem_oovv.shape[0]):
                 for j in range(in_mem_oovv.shape[1]):

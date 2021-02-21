@@ -1,4 +1,3 @@
-from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import unittest
@@ -78,7 +77,7 @@ class TestMolData(unittest.TestCase):
         inpfile = here / 'inputs' / 'dimer.inp'
         outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)])
         molecule = task.molecule
 
         mol_1 = molecule.get_sub_molecule(0, 4)

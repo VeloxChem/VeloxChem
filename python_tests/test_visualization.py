@@ -3,7 +3,7 @@ import numpy as np
 import unittest
 import tempfile
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.cubicgrid import CubicGrid
 from veloxchem.visualizationdriver import VisualizationDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -53,7 +53,7 @@ class TestVisualization(unittest.TestCase):
         mo_val = vis_drv.get_mo(points, task.molecule, task.ao_basis, mol_orbs,
                                 homo, 'alpha')
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             homo_values = grid.values_to_numpy()
 
             homo_ref = np.array([
@@ -76,7 +76,7 @@ class TestVisualization(unittest.TestCase):
         den_val = vis_drv.get_density(points, task.molecule, task.ao_basis,
                                       density, 0, 'alpha')
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             dens_alpha = grid.values_to_numpy()
             dens_total = dens_alpha * 2.0
 
@@ -104,7 +104,7 @@ class TestVisualization(unittest.TestCase):
                                                        task.ao_basis, density,
                                                        0, 'alpha', 'beta')
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             twoe_val_aa = np.array(twoe_val_aa).reshape(2, 3, 3)
             twoe_val_ab = np.array(twoe_val_ab).reshape(2, 3, 3)
 
@@ -188,14 +188,14 @@ class TestVisualization(unittest.TestCase):
 
             vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, density,
                             0, 'alpha')
-            if task.mpi_rank == mpi_master():
+            if is_mpi_master(task.mpi_comm):
                 read_grid = CubicGrid.read_cube(dens_cube_fname)
                 self.assertTrue(read_grid.compare(cubic_grid) < 1e-6)
 
             vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, mol_orbs,
                             task.molecule.number_of_alpha_electrons() - 1,
                             'alpha')
-            if task.mpi_rank == mpi_master():
+            if is_mpi_master(task.mpi_comm):
                 read_grid = CubicGrid.read_cube(homo_cube_fname)
                 self.assertTrue(read_grid.compare(cubic_grid) < 1e-6)
 

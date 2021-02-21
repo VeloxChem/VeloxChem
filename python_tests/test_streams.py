@@ -1,6 +1,6 @@
+from pathlib import Path
 import unittest
 import sys
-from pathlib import Path
 
 from veloxchem.outputstream import OutputStream
 

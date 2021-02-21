@@ -1,7 +1,7 @@
+from pathlib import Path
 import tempfile
 import unittest
 import hashlib
-from pathlib import Path
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.veloxchemlib import BasisFunction

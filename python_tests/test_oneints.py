@@ -1,8 +1,7 @@
-from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
 import h5py
-from pathlib import Path
 
 from veloxchem.veloxchemlib import OverlapMatrix
 from veloxchem.veloxchemlib import KineticEnergyMatrix
@@ -10,7 +9,7 @@ from veloxchem.veloxchemlib import NuclearPotentialMatrix
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
 from veloxchem.veloxchemlib import KineticEnergyIntegralsDriver
 from veloxchem.veloxchemlib import NuclearPotentialIntegralsDriver
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -54,31 +53,29 @@ class TestOneInts(unittest.TestCase):
         inpfile = here / 'inputs' / 'h2se.inp'
         outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)])
 
         molecule = task.molecule
         basis = task.ao_basis
 
-        comm = task.mpi_comm
-        rank = task.mpi_rank
-
         # compute 1e integrals
 
-        ovldrv = OverlapIntegralsDriver(comm)
+        ovldrv = OverlapIntegralsDriver(task.mpi_comm)
         S = ovldrv.compute(molecule, basis)
         S1 = S.to_numpy()
 
-        kindrv = KineticEnergyIntegralsDriver(comm)
+        kindrv = KineticEnergyIntegralsDriver(task.mpi_comm)
         T = kindrv.compute(molecule, basis)
         T1 = T.to_numpy()
 
-        npotdrv = NuclearPotentialIntegralsDriver(comm)
+        npotdrv = NuclearPotentialIntegralsDriver(task.mpi_comm)
         V = npotdrv.compute(molecule, basis)
         V1 = V.to_numpy()
 
         # compare with reference
 
-        if rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
+
             h5file = here / 'inputs' / 'h2se.onee.h5'
 
             hf = h5py.File(h5file, 'r')
@@ -97,12 +94,9 @@ class TestOneInts(unittest.TestCase):
 
     def test_mixed_basis_1e(self):
 
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-
-        ovldrv = OverlapIntegralsDriver(comm)
-        kindrv = KineticEnergyIntegralsDriver(comm)
-        npotdrv = NuclearPotentialIntegralsDriver(comm)
+        ovldrv = OverlapIntegralsDriver()
+        kindrv = KineticEnergyIntegralsDriver()
+        npotdrv = NuclearPotentialIntegralsDriver()
 
         here = Path(__file__).parent
         h2ofile = here / 'inputs' / 'h2o.xyz'
@@ -123,7 +117,7 @@ class TestOneInts(unittest.TestCase):
         V11p = npotdrv.compute(mol_1, bas_1, mol_1)
         self.assertTrue((V11.to_numpy() == V11p.to_numpy()).all())
 
-        if rank == mpi_master():
+        if is_mpi_master():
 
             hf = h5py.File(h5file, 'r')
             ref_S11 = np.array(hf.get("S_h2o_def2-svp"))
@@ -149,7 +143,7 @@ class TestOneInts(unittest.TestCase):
         T12 = kindrv.compute(mol_1, bas_1, bas_2)
         V12 = npotdrv.compute(mol_1, bas_1, bas_2, mol_1)
 
-        if rank == mpi_master():
+        if is_mpi_master():
 
             hf = h5py.File(h5file, 'r')
             ref_S12 = np.array(hf.get("S_h2o_def2-svp_cc-pvdz"))
@@ -176,7 +170,7 @@ class TestOneInts(unittest.TestCase):
         T12 = kindrv.compute(mol_1, mol_2, bas)
         V12 = npotdrv.compute(mol_1, mol_2, bas, mol)
 
-        if rank == mpi_master():
+        if is_mpi_master():
 
             hf = h5py.File(h5file, 'r')
             ref_S12 = np.array(hf.get("S_h2o_nh3_def2-svp"))
@@ -204,7 +198,7 @@ class TestOneInts(unittest.TestCase):
         T12 = kindrv.compute(mol_1, mol_2, bas_1, bas_2)
         V12 = npotdrv.compute(mol_1, mol_2, bas_1, bas_2, mol)
 
-        if rank == mpi_master():
+        if is_mpi_master():
 
             hf = h5py.File(h5file, 'r')
             ref_S12 = np.array(hf.get("S_h2o_def2-svp_nh3_cc-pvdz"))

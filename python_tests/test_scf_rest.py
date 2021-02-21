@@ -1,15 +1,15 @@
+from pathlib import Path
 import numpy as np
 import unittest
 import pytest
 import sys
-from pathlib import Path
 try:
     import cppe
 except ImportError:
     pass
 
 from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.veloxchemlib import denmat
 from veloxchem.mpitask import MpiTask
 from veloxchem.aodensitymatrix import AODensityMatrix
@@ -41,7 +41,7 @@ class TestScfRestricted(unittest.TestCase):
         scf_prop = ScfFirstOrderProperties(task.mpi_comm, task.ostream)
         scf_prop.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors)
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             e_scf = scf_drv.get_scf_energy()
             tol = 1.0e-5 if xcfun_label is not None else 1.0e-6
             self.assertTrue(np.max(np.abs(e_scf - ref_e_scf)) < tol)

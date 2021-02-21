@@ -1,4 +1,3 @@
-from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import unittest
@@ -10,7 +9,7 @@ from veloxchem.veloxchemlib import KineticEnergyMatrix
 from veloxchem.veloxchemlib import KineticEnergyIntegralsDriver
 from veloxchem.veloxchemlib import NuclearPotentialMatrix
 from veloxchem.veloxchemlib import NuclearPotentialIntegralsDriver
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.veloxchemlib import get_dimer_ao_indices
 from veloxchem.mpitask import MpiTask
 from veloxchem.excitondriver import ExcitonModelDriver
@@ -49,13 +48,10 @@ class TestExciton(unittest.TestCase):
         inpfile = here / 'inputs' / 'dimer.inp'
         outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)])
 
         molecule = task.molecule
         basis = task.ao_basis
-
-        comm = task.mpi_comm
-        rank = task.mpi_rank
 
         # build sub molecules
 
@@ -68,14 +64,14 @@ class TestExciton(unittest.TestCase):
 
         # compute overlap
 
-        ovldrv = OverlapIntegralsDriver(comm)
+        ovldrv = OverlapIntegralsDriver(task.mpi_comm)
         S = ovldrv.compute(molecule, basis)
         S11 = ovldrv.compute(mol_1, basis)
         S22 = ovldrv.compute(mol_2, basis)
         S12 = ovldrv.compute(mol_1, mol_2, basis)
         S21 = ovldrv.compute(mol_2, mol_1, basis)
 
-        if rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
 
             smat = self.assemble_matrices(ao_inds_1, ao_inds_2, S11.to_numpy(),
                                           S12.to_numpy(), S21.to_numpy(),
@@ -85,14 +81,14 @@ class TestExciton(unittest.TestCase):
 
         # compute kinetic energy
 
-        kindrv = KineticEnergyIntegralsDriver(comm)
+        kindrv = KineticEnergyIntegralsDriver(task.mpi_comm)
         T = kindrv.compute(molecule, basis)
         T11 = kindrv.compute(mol_1, basis)
         T22 = kindrv.compute(mol_2, basis)
         T12 = kindrv.compute(mol_1, mol_2, basis)
         T21 = kindrv.compute(mol_2, mol_1, basis)
 
-        if rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
 
             tmat = self.assemble_matrices(ao_inds_1, ao_inds_2, T11.to_numpy(),
                                           T12.to_numpy(), T21.to_numpy(),
@@ -102,14 +98,14 @@ class TestExciton(unittest.TestCase):
 
         # compute nuclear potential
 
-        npotdrv = NuclearPotentialIntegralsDriver(comm)
+        npotdrv = NuclearPotentialIntegralsDriver(task.mpi_comm)
         V = npotdrv.compute(molecule, basis)
         V11 = npotdrv.compute(mol_1, basis, molecule)
         V22 = npotdrv.compute(mol_2, basis, molecule)
         V12 = npotdrv.compute(mol_1, mol_2, basis, molecule)
         V21 = npotdrv.compute(mol_2, mol_1, basis, molecule)
 
-        if rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
 
             vmat = self.assemble_matrices(ao_inds_1, ao_inds_2, V11.to_numpy(),
                                           V12.to_numpy(), V21.to_numpy(),
@@ -122,14 +118,14 @@ class TestExciton(unittest.TestCase):
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'exciton.inp')
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task = MpiTask([inpfile, None])
         exciton_dict = task.input_dict['exciton']
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
         exciton_drv.update_settings(exciton_dict, method_dict)
         exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
 
             diag_diff = np.max(np.abs(np.diag(exciton_drv.H) - np.diag(ref_H)))
             abs_diff = np.max(np.abs(np.abs(exciton_drv.H) - np.abs(ref_H)))
@@ -148,7 +144,7 @@ class TestExciton(unittest.TestCase):
         exciton_drv.restart = True
         exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             self.assertTrue(np.max(np.abs(backup_H - exciton_drv.H)) < 1.0e-10)
 
             for ind in range(len(exciton_drv.monomers)):
