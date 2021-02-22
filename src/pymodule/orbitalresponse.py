@@ -353,6 +353,7 @@ class OrbitalResponse(LinearSolver):
             
             return {
                 'lambda_multipliers': lambda_multipliers.reshape(nocc,nvir),
+                'lambda_multipliers_ao': lambda_ao,
                 'relaxed_density': dm_rel_ao,
                 'unrelaxed_density': dm_unrel_ao,
                 'omega_multipliers': omega_ao,
