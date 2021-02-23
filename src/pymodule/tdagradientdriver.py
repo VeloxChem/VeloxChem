@@ -64,7 +64,6 @@ class TdaGradientDriver(GradientDriver):
         self.rsp_dict = rsp_dict
         self.method_dict = method_dict
 
-
     def compute(self, molecule, ao_basis, min_basis=None):
         """
         Performs calculation of analytical gradient.
@@ -77,14 +76,13 @@ class TdaGradientDriver(GradientDriver):
             The minimal AO basis set.
         """
 
-		# sanity check for number of state
+        # sanity check for number of state
         n_exc_states = len(self.tda_results['eigenvalues'])
         if self.n_state_deriv > n_exc_states:
             print("SHIT WILL GO WRONG HERE NOW!!!")
         #assert_msg_critical(
         #    self.n_state_deriv > n_exc_states,
         #    'TdaGradientDriver: not enough states calculated')
-            
 
         self.print_header()
         start_time = tm.time()
@@ -99,15 +97,17 @@ class TdaGradientDriver(GradientDriver):
 
         # orbital response driver
         orbrsp_drv = OrbitalResponse(self.comm, self.ostream)
-        orbrsp_drv.update_settings(self.rsp_dict, self.method_dict) # where should he know those from?
-        
+        orbrsp_drv.update_settings(
+            self.rsp_dict, self.method_dict)  # where should he know those from?
+
         print("Calculating orbital response.")
-        orbrsp_results = orbrsp_drv.compute(molecule, basis,
-                                    scf_tensors, exc_vectors)
+        orbrsp_results = orbrsp_drv.compute(molecule, basis, scf_tensors,
+                                            exc_vectors)
         print("Orbital response calculation done.")
 
         # Calculate the relaxed and unrelaxed excited-state dipole moment
-        dipole_moments = self.compute_properties(molecule, scf_tensors, orbrsp_results)
+        dipole_moments = self.compute_properties(molecule, scf_tensors,
+                                                 orbrsp_results)
 
         # atom labels
         #labels = molecule.get_labels()
@@ -171,10 +171,10 @@ class TdaGradientDriver(GradientDriver):
                            dipole_mats.z_to_numpy())
 
             # electronic contribution
-            unrel_density = (scf_tensors['D'][0] + scf_tensors['D'][1]
-                                + orbrsp_results['unrelaxed_density'])
-            rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1]
-                                + orbrsp_results['relaxed_density'])
+            unrel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
+                             orbrsp_results['unrelaxed_density'])
+            rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
+                           orbrsp_results['relaxed_density'])
             unrel_electronic_dipole = -1.0 * np.array(
                 [np.sum(dipole_ints[d] * unrel_density) for d in range(3)])
             rel_electronic_dipole = -1.0 * np.array(
@@ -185,14 +185,13 @@ class TdaGradientDriver(GradientDriver):
             nuclear_charges = molecule.elem_ids_to_numpy()
             nuclear_dipole = np.sum((coords - origin).T * nuclear_charges,
                                     axis=1)
-    
-            return {
-                'unrelaxed_dipole_moment': (nuclear_dipole +
-                                                unrel_electronic_dipole),
-                'relaxed_dipole_moment': (nuclear_dipole +
-                                                rel_electronic_dipole),
-            }
 
+            return {
+                'unrelaxed_dipole_moment':
+                    (nuclear_dipole + unrel_electronic_dipole),
+                'relaxed_dipole_moment':
+                    (nuclear_dipole + rel_electronic_dipole),
+            }
 
     def print_properties(self, molecule, properties):
         """
