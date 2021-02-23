@@ -3,7 +3,7 @@ import time as tm
 
 from .molecule import Molecule
 from .gradientdriver import GradientDriver
-from .orbitalresponse import OrbitalResponse
+from .tdaorbitalresponse import TdaOrbitalResponse
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import dipole_in_debye
@@ -12,7 +12,7 @@ from .errorhandler import assert_msg_critical
 
 class TdaGradientDriver(GradientDriver):
     """
-    Implements the gradient driver for excited states at the
+    Implements the analytic gradient driver for excited states at the
     Tamm-Dancoff approximation (TDA) level based on a Hartree-Fock
     ground state. DFT references will be implemented in the future.
 
@@ -78,11 +78,11 @@ class TdaGradientDriver(GradientDriver):
 
         # sanity check for number of state
         n_exc_states = len(self.tda_results['eigenvalues'])
-        if self.n_state_deriv > n_exc_states:
-            print("SHIT WILL GO WRONG HERE NOW!!!")
-        #assert_msg_critical(
-        #    self.n_state_deriv > n_exc_states,
-        #    'TdaGradientDriver: not enough states calculated')
+        #if self.n_state_deriv > n_exc_states:
+        #    print("SHIT WILL GO WRONG HERE NOW!!!")
+        assert_msg_critical(
+            self.n_state_deriv > n_exc_states,
+            'TdaGradientDriver: not enough states calculated')
 
         self.print_header()
         start_time = tm.time()
@@ -96,18 +96,18 @@ class TdaGradientDriver(GradientDriver):
         exc_vectors = self.tda_results["eigenvectors"]
 
         # orbital response driver
-        orbrsp_drv = OrbitalResponse(self.comm, self.ostream)
+        orbrsp_drv = TdaOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(
             self.rsp_dict, self.method_dict)  # where should he know those from?
 
         print("Calculating orbital response.")
-        orbrsp_results = orbrsp_drv.compute(molecule, basis, scf_tensors,
+        orbrsp_drv.compute(molecule, basis, scf_tensors,
                                             exc_vectors)
         print("Orbital response calculation done.")
 
         # Calculate the relaxed and unrelaxed excited-state dipole moment
         dipole_moments = self.compute_properties(molecule, scf_tensors,
-                                                 orbrsp_results)
+                                                 orbrsp_drv)
 
         # atom labels
         #labels = molecule.get_labels()
@@ -136,7 +136,7 @@ class TdaGradientDriver(GradientDriver):
         ##self.ostream.print_blank()
         ##self.ostream.flush()
 
-    def compute_properties(self, molecule, basis, scf_tensors, orbrsp_results):
+    def compute_properties(self, molecule, basis, scf_tensors, orbrsp_drv):
         """
         Calculates first-order properties of TDA excited states
         using the results of the orbital response calculation.
@@ -147,8 +147,8 @@ class TdaGradientDriver(GradientDriver):
 			The AO basis set.
         :param scf_tensors:
             The tensors from the converged SCF calculation.
-        :param orbrsp_results:
-            The results from orbital response.
+        :param orbrsp_drv:
+            The orbital response driver containing its results.
 
         :return:
             A dictionary containing the properties.
@@ -172,9 +172,9 @@ class TdaGradientDriver(GradientDriver):
 
             # electronic contribution
             unrel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
-                             orbrsp_results['unrelaxed_density'])
+                             orbrsp_drv.unrel_dm_ao)
             rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
-                           orbrsp_results['relaxed_density'])
+                           orbrsp_drv.rel_dm_ao)
             unrel_electronic_dipole = -1.0 * np.array(
                 [np.sum(dipole_ints[d] * unrel_density) for d in range(3)])
             rel_electronic_dipole = -1.0 * np.array(

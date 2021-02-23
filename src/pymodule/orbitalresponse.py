@@ -32,7 +32,6 @@ class OrbitalResponse(LinearSolver):
         - solver: The linear equations solver.
         - unrel_dm_ao: The unrelaxed density matrix in AO basis.
         - rel_dm_ao: The relaxed density matrix in AO basis.
-        - lambda_guess: The guess for the lambda multipliers in MO basis.
         - rhs_mo: The right-hand side of orbital response equation in MO basis.
         - lambda_ao: The converged lambda multipliers in AO basis.
         - omega_ao: The omega multipliers in AO basis.
@@ -57,7 +56,6 @@ class OrbitalResponse(LinearSolver):
         # More instance variables
         self.unrel_dm_ao = None
         self.rel_dm_ao = None
-        self.lambda_guess = None
         self.rhs_mo = None
         self.lambda_ao = None
         self.omega_ao = None
@@ -179,7 +177,7 @@ class OrbitalResponse(LinearSolver):
         evir = scf_tensors['E'][nocc:]
         eov = eocc.reshape(-1, 1) - evir
 
-        lambda_guess = rhs_mo / eov
+        lambda_guess = self.rhs_mo / eov
 
         # Transform to AO
         lambda_ao = np.matmul(mo_occ,
@@ -187,6 +185,11 @@ class OrbitalResponse(LinearSolver):
 
         # Create AODensityMatrix object from lambda in AO
         ao_density_lambda = AODensityMatrix([lambda_ao], denmat.rest)
+
+		# ERI driver
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                    self.eri_thresh, molecule, basis)
 
         # Create a Fock Matrix Object (initialized with zeros)
         fock_flag = fockmat.rgenjk
@@ -230,10 +233,10 @@ class OrbitalResponse(LinearSolver):
         profiler.start_timer(0, 'Conjugate Gradient')
         lambda_multipliers, cg_conv = linalg.cg(
             A=LinOp,
-            b=rhs_mo.reshape(nocc * nvir),
+            b=self.rhs_mo.reshape(nocc * nvir),
             x0=lambda_guess.reshape(nocc * nvir),
-            tol=1e-8,
-            maxiter=50)  # take from some variables
+            tol=self.conv_thresh,
+            maxiter=self.max_iter)
 
         if cg_conv == 0:
             self.is_converged = True
@@ -246,13 +249,14 @@ class OrbitalResponse(LinearSolver):
         self.lambda_ao = np.matmul(
             mo_occ, np.matmul(lambda_multipliers.reshape(nocc, nvir), mo_vir.T))
 
+		# Calculate the relaxed one-particle density matrix
         # Factor 4: (ov + vo)*(alpha + beta)
-        self.dm_rel_ao = self.dm_unrel_ao + 4 * self.lambda_ao
+        self.rel_dm_ao = self.unrel_dm_ao + 4 * self.lambda_ao
 
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
 
-        return lambda_multipliers.reshape(nocc, nvirt)
+        return lambda_multipliers.reshape(nocc, nvir)
 
     def print_orbrsp_header(self, title, n_state_deriv):
         self.ostream.print_blank()

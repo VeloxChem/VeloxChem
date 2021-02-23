@@ -85,10 +85,6 @@ class TdaOrbitalResponse(OrbitalResponse):
             'memory_tracing': self.memory_tracing,
         })
 
-        if self.rank == mpi_master():
-            self.print_orbrsp_header('Orbital Response Driver',
-                                     self.n_state_deriv)
-
         # set start time
 
         self.start_time = tm.time()
@@ -154,6 +150,8 @@ class TdaOrbitalResponse(OrbitalResponse):
         mo_vir = scf_tensors['C'][:, nocc:]  # virtual MO coefficients
         nvir = mo_vir.shape[1]
         ovlp = scf_tensors['S']  # overlap matrix
+        eocc = scf_tensors['E'][:nocc]
+        evir = scf_tensors['E'][nocc:]
 
         # Take vector of interest and convert to matrix form
         exc_vec = excitation_vecs[:, self.n_state_deriv].copy().reshape(
@@ -164,14 +162,14 @@ class TdaOrbitalResponse(OrbitalResponse):
         dm_vv = np.einsum('ia,ib->ab', exc_vec, exc_vec)
 
         # Transform unrelaxed one-particle density matrix to the AO basis
-        self.dm_unrel_ao = (np.matmul(mo_occ, np.matmul(dm_oo, mo_occ.T)) +
+        self.unrel_dm_ao = (np.matmul(mo_occ, np.matmul(dm_oo, mo_occ.T)) +
                        np.matmul(mo_vir, np.matmul(dm_vv, mo_vir.T)))
 
         # Transform the excitation vectors to the AO basis
         exc_vec_ao = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
 
         # 2) Construct the right-hand side
-        dm_ao_rhs = AODensityMatrix([dm_unrel_ao, exc_vec_ao], denmat.rest)
+        dm_ao_rhs = AODensityMatrix([self.unrel_dm_ao, exc_vec_ao], denmat.rest)
         fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
         fock_flag = fockmat.rgenjk
         fock_ao_rhs.set_fock_type(fock_flag, 1)
@@ -203,6 +201,7 @@ class TdaOrbitalResponse(OrbitalResponse):
         # Calculate the lambda multipliers and the relaxed one-particle density
 		# in the parent class
         lambda_multipliers = self.compute_lambda(molecule, basis, scf_tensors)
+
 
         profiler.stop_timer(0, 'Orbital Response')
         profiler.print_timing(self.ostream)
