@@ -10,8 +10,25 @@ set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
 set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
 set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
 
+list(APPEND _to_ignore
+  ${PROJECT_BINARY_DIR}
+  "/\.git/"
+  "\.gitignore"
+  "/config/"
+  "Makefile*"
+  "/build*/"
+  "/nix/"
+  "shell.nix"
+  "poetry.lock"
+  "primitive_scf.py"
+  "todo.org"
+  "/\.ccls-cache/"
+  "/\.pytest_cache/"
+  "__pycache__"
+  "[A-Za-z0-9_]*\.[ado]$"
+  )
 set(CPACK_SOURCE_IGNORE_FILES
-  "${PROJECT_BINARY_DIR};/\.git/;\.gitignore;/config/;Makefile\*;/build\*/;/nix/;shell.nix;poetry.lock;primitive_scf.py;todo.org;/\.ccls-cache/;/\.pytest_cache/;__pycache__;"
+  ${_to_ignore}
   )
 set(CPACK_SOURCE_GENERATOR "TBZ2")
 set(CPACK_GENERATOR "TBZ2")

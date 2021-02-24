@@ -79,7 +79,7 @@ def main():
         print(f"No additional configuration from commit description")
 
     # read contents of __init__.py
-    init_py = Path(__file__).parents[1] / "src/python/__init__.py"
+    init_py = Path(__file__).parents[1] / "src/pymodule/__init__.py"
     with init_py.open("r") as f:
         contents = f.read()
 
@@ -111,7 +111,7 @@ def main():
     # set permissions to 644 for all Python files in project
     _ = [
         _.chmod(0o644)
-        for _ in (Path(__file__).parents[1] / "src/python").iterdir()
+        for _ in (Path(__file__).parents[1] / "src/pymodule").iterdir()
         if (_.is_file() and _.suffix == ".py")
     ]
 
