@@ -56,7 +56,7 @@ class TdaOrbitalResponse(OrbitalResponse):
         if method_dict is None:
             method_dict = {}
 
-		# Update setting in parent class
+        # Update setting in parent class
         super().update_settings(rsp_dict, method_dict)
 
 
@@ -199,7 +199,7 @@ class TdaOrbitalResponse(OrbitalResponse):
 
 
         # Calculate the lambda multipliers and the relaxed one-particle density
-		# in the parent class
+        # in the parent class
         lambda_multipliers = self.compute_lambda(molecule, basis, scf_tensors)
 
 
@@ -208,58 +208,31 @@ class TdaOrbitalResponse(OrbitalResponse):
         profiler.print_profiling_summary(self.ostream)
 
         # Calculate the overlap matrix multipliers
+        # 1. compute an energy-weighted density matrix
+        # (needed to compute omega)
+        epsilon_dm_ao = (np.matmul(mo_occ,
+                                   np.matmul((np.einsum("i,ij->ij",eocc,0.5*dm_oo)
+                                              +np.diag(eocc)),
+                                              mo_occ.T))
+                        +np.matmul(mo_vir,
+                                   np.matmul(np.einsum("a,ab->ab",evir,0.5*dm_vv),
+                                             mo_vir.T)
+                                    )
+                        +np.matmul(mo_occ,
+                                   np.matmul(np.einsum("i,ia->ia",eocc,
+                                                        lambda_multipliers),
+                                             mo_vir.T))
+                        +np.matmul(mo_occ,
+                                   np.matmul(np.einsum("i,ia->ia",eocc,
+                                                        lambda_multipliers),
+                                             mo_vir.T)).T
 
-		# TODO: As soon as we figured out how to do everything in AO basis,
-		# this should be put in a separate routine
-        omega_VV = -(np.einsum(
-            'ta,tb->ab', mo_vir,
-            np.einsum('rb,tr->tb', mo_vir, (np.einsum(
-                'zr,tz->tr', ovlp,
-                np.einsum('nz,tn->tz', exc_vec_ao,
-                          0.5 * fock_ao_rhs.alpha_to_numpy(1).T))))) +
-                     np.einsum('a,ab->ab', evir, 0.5 * dm_vv))
+                        )
 
-        omega_OV = -(
-            np.einsum(
-                'mi,ma->ia', mo_occ,
-                np.einsum('za,mz->ma', mo_vir, (np.einsum(
-                    'rz,mr->mz', ovlp,
-                    np.einsum('tr,mt->mr', exc_vec_ao,
-                              0.5 * fock_ao_rhs.alpha_to_numpy(1).T))))) +
-            np.einsum('i,ia->ia', eocc, lambda_multipliers))
-
-        #TODO: We need the object from inside the matrix-vector product.
-        # We recompute it here. Should it be defined outside the function instead?
-
-        #Create AODensityMatrix object from lambda in AO
-        ao_density_lambda = AODensityMatrix([self.lambda_ao], denmat.rest)
-
-        #Create a Fock Matrix Object (initialized with zeros)
-        fock_lambda = AOFockMatrix(ao_density_lambda)
-        fock_lambda.set_fock_type(fock_flag, 0)
-        eri_drv.compute(fock_lambda, ao_density_lambda, molecule, basis,
-                        screening)
-
-        omega_OO = -(
-            np.einsum(
-                'mi,mj->ij', mo_occ,
-                np.einsum('zj,mz->mj', mo_occ, (np.einsum(
-                    'zr,mr->mz', ovlp,
-                    np.einsum('rp,mp->mr', exc_vec_ao, 0.5 *
-                              fock_ao_rhs.alpha_to_numpy(1)))))) + np.einsum(
-                                  'pi,pj->ij', mo_occ,
-                                  np.einsum('tj,pt->pj', mo_occ, 0.5 *
-                                            fock_ao_rhs.alpha_to_numpy(0))) +
-            np.matmul(mo_occ.T, np.matmul(fock_lambda.alpha_to_numpy(0),
-                                          mo_occ)) +
-            np.matmul(mo_occ.T, np.matmul(fock_lambda.alpha_to_numpy(0),
-                                          mo_occ)).T + np.diag(eocc) +
-            np.einsum('i,ij->ij', eocc, 0.5 * dm_oo))
-
-        self.omega_ao = (np.matmul(mo_occ, np.matmul(omega_OO, mo_occ.T)) +
-                    np.matmul(mo_vir, np.matmul(omega_VV, mo_vir.T)) +
-                    np.matmul(mo_occ, np.matmul(omega_OV, mo_vir.T)) +
-                    np.matmul(mo_vir, np.matmul(omega_OV.T, mo_occ.T)))
+        # 2. compute the omega multipliers in AO basis:
+        self.omega_ao = self.compute_omega(molecule, basis, scf_tensors,
+                                           epsilon_dm_ao,
+                                           exc_vec_ao, fock_ao_rhs) 
 
         profiler.check_memory_usage('End of Orbital Response Driver')
         profiler.print_memory_usage(self.ostream)
@@ -270,30 +243,85 @@ class TdaOrbitalResponse(OrbitalResponse):
 
 
 
-##    def compute_omega_mult(self, molecule, scf_tensors, exc_vectors):
-##        """
-##        Calculates the Lagrange multipliers for the overlap matrix.
-##
-##        :param molecule:
-##            The molecule.
-##        :param scf_tensors:
-##            The tensors from the converged SCF calculation.
-##        :param exc_vectors:
-##            The excitation vectors from the TDA calculation.
-##
-##        :return:
-##            A dictionary containing the Lagrange multipliers.
-##        """
-##        # Orbital information
-##        nocc = molecule.number_of_alpha_electrons()
-##        mo_occ = scf_tensors['C'][:, :nocc] # occupied MO coefficients
-##        mo_vir = scf_tensors['C'][:, nocc:] # virtual MO coefficients
-##        nvir = mo_vir.shape[1]
-##        ovlp = scf_tensors['S'] # overlap matrix
-##        eocc = scf_tensors['E'][:nocc]
-##        evir = scf_tensors['E'][nocc:]
-##
-##        # Take vector of interest and convert to matrix form
-##        exc_vec = exc_vectors[:, self.n_state_deriv].copy().reshape(nocc, nvir)
-##
-##        #TODO: to be continued...
+    def compute_omega(self, molecule, basis, scf_tensors,
+                      epsilon_dm_ao, exc_vec_ao, fock_ao_rhs):
+        """
+        Calculates the Lagrange multipliers for the overlap matrix.
+
+        :param molecule:
+            The molecule
+        :param basis:
+            The basis set
+        :param epsilon_dm_ao:
+            The energy-weighted relaxed density matrix
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param exc_vec_ao:
+            The excitation vector of interest in AO basis
+        :param fock_ao_rhs:
+            The AOFockMatrix from the right-hand side of the orbital response eq. 
+
+        :return:
+            a numpy array containing the Lagrange multipliers in AO basis.
+        """
+
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                    self.eri_thresh, molecule, basis)
+
+        ao_density_lambda = AODensityMatrix([self.lambda_ao], denmat.rest)
+
+        #Create a Fock Matrix Object (initialized with zeros)
+        fock_flag = fockmat.rgenjk
+        fock_lambda = AOFockMatrix(ao_density_lambda)
+        fock_lambda.set_fock_type(fock_flag, 0)
+        eri_drv.compute(fock_lambda, ao_density_lambda, molecule, basis,
+                        screening)
+
+        nocc = molecule.number_of_alpha_electrons()
+        mo_vir = scf_tensors['C'][:, nocc:]  # virtual MO coefficients
+        ovlp = scf_tensors['S']
+
+        # The density matrix; only alpha block;
+        # Only works for the restricted case
+        D_occ = scf_tensors['D'][0]
+        D_vir = np.matmul(mo_vir, mo_vir.T) 
+
+        # Because the excitation vector is not symmetric,
+        # we need both the matrix (OO block in omega, and probably VO)
+        # and its transpose (VV, OV blocks)
+        # this comes from the transformation of the 2PDM contribution
+        # from MO to AO basis
+        Ft = ( np.einsum('zr,tz->tr', ovlp,
+                  np.einsum('nz,tn->tz', exc_vec_ao, 
+                               0.5*fock_ao_rhs.alpha_to_numpy(1).T
+                            )
+                 )
+            )
+
+        F = ( np.einsum('zr,mr->mz', ovlp,
+                   np.einsum('rp,mp->mr', exc_vec_ao, 
+                                 0.5*fock_ao_rhs.alpha_to_numpy(1)
+                                )
+                    )
+            )
+                        
+ 
+        # Compute the contributions from the 2PDM and the relaxed 1PDM
+        # to the omega Lagrange multipliers:
+        O_1pdm_2pdm_contribs = (np.matmul(D_occ, np.matmul(F, D_occ))
+                                +np.matmul(D_occ, np.matmul(Ft, D_vir))
+                                +np.matmul(D_occ, np.matmul(Ft, D_vir)).T
+                                +np.matmul(D_vir, np.matmul(Ft, D_vir))
+                                +np.matmul(D_occ,
+                                           np.matmul((fock_lambda.alpha_to_numpy(0)
+                                             +fock_lambda.alpha_to_numpy(0).T
+                                             +0.5*fock_ao_rhs.alpha_to_numpy(0)),
+                                             D_occ)
+                                    )
+                                )
+
+        omega = -epsilon_dm_ao - O_1pdm_2pdm_contribs
+
+        return omega
+
