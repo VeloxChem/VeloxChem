@@ -1,13 +1,13 @@
 target_sources(vlxobjs
   PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/OverlapIntegralsDriver.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/OverlapRecFuncForDX.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/OverlapRecFuncForFF.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/OverlapRecFuncForFG.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/OverlapRecFuncForGF.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/OverlapRecFuncForGG.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/OverlapRecFuncForPX.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/OverlapRecFuncForSX.cpp
+    OverlapIntegralsDriver.cpp
+    OverlapRecFuncForDX.cpp
+    OverlapRecFuncForFF.cpp
+    OverlapRecFuncForFG.cpp
+    OverlapRecFuncForGF.cpp
+    OverlapRecFuncForGG.cpp
+    OverlapRecFuncForPX.cpp
+    OverlapRecFuncForSX.cpp
   )
 
 target_include_directories(vlxobjs

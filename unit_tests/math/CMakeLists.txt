@@ -1,10 +1,10 @@
 target_sources(utests
   PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/DenseDiagonalizerTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/DenseLinearAlgebraTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/DenseMatrixTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/MathConstTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/MathFuncTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/SparseMatrixTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/SparseVectorTest.cpp
+    DenseDiagonalizerTest.cpp
+    DenseLinearAlgebraTest.cpp
+    DenseMatrixTest.cpp
+    MathConstTest.cpp
+    MathFuncTest.cpp
+    SparseMatrixTest.cpp
+    SparseVectorTest.cpp
   )

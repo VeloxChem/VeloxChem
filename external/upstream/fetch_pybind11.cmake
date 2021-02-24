@@ -5,6 +5,8 @@ execute_process(
   OUTPUT_VARIABLE
     _tmp_dir
   OUTPUT_STRIP_TRAILING_WHITESPACE
+  OUTPUT_QUIET
+  ERROR_QUIET
   )
 
 find_package(pybind11 2.6 CONFIG QUIET

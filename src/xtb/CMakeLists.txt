@@ -8,7 +8,7 @@ if(PKG_CONFIG_FOUND)
   
   if(TARGET PkgConfig::xTB) 
     message(STATUS "Found xTB ${xTB_VERSION}: ${xTB_LINK_LIBRARIES}")
-    set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/XTBDriver.cpp
+    set_source_files_properties(XTBDriver.cpp
       PROPERTIES
         COMPILE_DEFINITIONS ENABLE_XTB
       )
@@ -23,7 +23,7 @@ endif()
 
 target_sources(vlxobjs
   PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/XTBDriver.cpp
+    XTBDriver.cpp
   )
 
 target_include_directories(vlxobjs

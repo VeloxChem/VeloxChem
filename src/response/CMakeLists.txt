@@ -1,6 +1,6 @@
 target_sources(vlxobjs
   PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/ExcitationVector.cpp
+    ExcitationVector.cpp
   )
 
 target_include_directories(vlxobjs

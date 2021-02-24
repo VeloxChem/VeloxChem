@@ -1,7 +1,7 @@
 target_sources(vlxobjs
   PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/CubicGrid.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/VisualizationDriver.cpp
+    CubicGrid.cpp
+    VisualizationDriver.cpp
   )
 
 target_include_directories(vlxobjs

@@ -1,21 +1,21 @@
 target_sources(vlxobjs
   PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/AOKohnShamMatrix.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/DensityGrid.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/DensityGridDriver.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/GridDriver.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/GtoFunc.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/GtoFuncForGGA.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/GtoFuncForLDA.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/LebedevLaikovQuadrature.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/Log3Quadrature.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/MolecularGrid.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/PartitionFunc.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/PrimitiveFunctional.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/XCFunctional.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/XCGradientGrid.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/XCHessianGrid.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/XCIntegrator.cpp
+    AOKohnShamMatrix.cpp
+    DensityGrid.cpp
+    DensityGridDriver.cpp
+    GridDriver.cpp
+    GtoFunc.cpp
+    GtoFuncForGGA.cpp
+    GtoFuncForLDA.cpp
+    LebedevLaikovQuadrature.cpp
+    Log3Quadrature.cpp
+    MolecularGrid.cpp
+    PartitionFunc.cpp
+    PrimitiveFunctional.cpp
+    XCFunctional.cpp
+    XCGradientGrid.cpp
+    XCHessianGrid.cpp
+    XCIntegrator.cpp
   )
 
 target_include_directories(vlxobjs

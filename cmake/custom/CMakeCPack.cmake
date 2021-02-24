@@ -14,18 +14,22 @@ list(APPEND _to_ignore
   ${PROJECT_BINARY_DIR}
   "/\.git/"
   "\.gitignore"
+  "/\.gitlab/"
+  "\.gitlab-ci\.yml"
   "/config/"
   "Makefile*"
   "/build*/"
+  "/\.pytest_cache/"
+  "__pycache__"
+  "[A-Za-z0-9_]\.[ado]$"
+  "ConfigMKL\.hpp$"
   "/nix/"
   "shell.nix"
   "poetry.lock"
   "primitive_scf.py"
   "todo.org"
+  "\.envrc"
   "/\.ccls-cache/"
-  "/\.pytest_cache/"
-  "__pycache__"
-  "[A-Za-z0-9_]*\.[ado]$"
   )
 set(CPACK_SOURCE_IGNORE_FILES
   ${_to_ignore}

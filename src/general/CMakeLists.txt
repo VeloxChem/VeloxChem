@@ -1,19 +1,20 @@
 target_sources(vlxobjs
   PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/Codata.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ErrorHandler.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/FourIndexes.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/MemAlloc.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/MpiFunc.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/OMPTasks.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/StringFormat.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ThreeIndexes.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/TwoIndexes.cpp
+    Codata.cpp
+    ErrorHandler.cpp
+    FourIndexes.cpp
+    MemAlloc.cpp
+    MpiFunc.cpp
+    OMPTasks.cpp
+    StringFormat.cpp
+    ThreeIndexes.cpp
+    TwoIndexes.cpp
   )
 
 target_include_directories(vlxobjs
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
   )
 
 if(VLX_LA_VENDOR MATCHES MKL)
@@ -30,8 +31,8 @@ if(VLX_LA_VENDOR MATCHES MKL)
 
   # generate MKL configuration header file
   configure_file(
-    ${CMAKE_CURRENT_LIST_DIR}/ConfigMKL.hpp.in
-    ${CMAKE_CURRENT_LIST_DIR}/ConfigMKL.hpp
+    ConfigMKL.hpp.in
+    ConfigMKL.hpp
     @ONLY
     )
 endif()

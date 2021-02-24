@@ -1,8 +1,8 @@
 target_sources(utests
   PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/CheckFunctions.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/DummyFunctionals.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/DummyFunctions.cpp
+    CheckFunctions.cpp
+    DummyFunctionals.cpp
+    DummyFunctions.cpp
   )
 
 target_include_directories(utests

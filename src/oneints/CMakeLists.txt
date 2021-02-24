@@ -1,22 +1,22 @@
 target_sources(vlxobjs
   PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/AngularMomentumMatrix.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ElectricDipoleMatrix.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ElectricFieldGradientMatrix.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ElectricFieldMatrix.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ElectronicPotentialMatrix.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/GenIntsFunc.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/KineticEnergyMatrix.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/LinearMomentumMatrix.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/NuclearPotentialMatrix.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/OneIntsDistributor.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/OneIntsFunc.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/OverlapMatrix.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/RecursionFunction.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/RecursionFunctionsList.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/RecursionMap.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/RecursionTerm.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/TwoCentersRecursionFunctions.cpp
+    AngularMomentumMatrix.cpp
+    ElectricDipoleMatrix.cpp
+    ElectricFieldGradientMatrix.cpp
+    ElectricFieldMatrix.cpp
+    ElectronicPotentialMatrix.cpp
+    GenIntsFunc.cpp
+    KineticEnergyMatrix.cpp
+    LinearMomentumMatrix.cpp
+    NuclearPotentialMatrix.cpp
+    OneIntsDistributor.cpp
+    OneIntsFunc.cpp
+    OverlapMatrix.cpp
+    RecursionFunction.cpp
+    RecursionFunctionsList.cpp
+    RecursionMap.cpp
+    RecursionTerm.cpp
+    TwoCentersRecursionFunctions.cpp
   )
 
 target_include_directories(vlxobjs

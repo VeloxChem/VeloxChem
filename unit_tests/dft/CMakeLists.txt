@@ -1,15 +1,15 @@
 target_sources(utests
   PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/AOKohnShamMatrixTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/DensityGridDriverTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/DensityGridTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/GridDriverTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/LebedevLaikovQuadratureTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/Log3QuadratureTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/MolecularGridTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/PrimitiveFunctionalTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/XCFunctionalTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/XCGradientGridTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/XCHessianGridTest.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/XCIntegratorTest.cpp
+    AOKohnShamMatrixTest.cpp
+    DensityGridDriverTest.cpp
+    DensityGridTest.cpp
+    GridDriverTest.cpp
+    LebedevLaikovQuadratureTest.cpp
+    Log3QuadratureTest.cpp
+    MolecularGridTest.cpp
+    PrimitiveFunctionalTest.cpp
+    XCFunctionalTest.cpp
+    XCGradientGridTest.cpp
+    XCHessianGridTest.cpp
+    XCIntegratorTest.cpp
   )

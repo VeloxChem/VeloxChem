@@ -42,17 +42,17 @@ endif()
 # * explicitly disable LTO, even for release builds
 pybind11_add_module(veloxchemlib
   NO_EXTRAS
-    ${CMAKE_CURRENT_LIST_DIR}/ExportDFT.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ExportGeneral.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ExportMath.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ExportMolData.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ExportOneInts.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ExportOrbData.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ExportResponse.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ExportTwoInts.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ExportVeloxChemLib.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ExportVisualization.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ExportXTB.cpp
+    ExportDFT.cpp
+    ExportGeneral.cpp
+    ExportMath.cpp
+    ExportMolData.cpp
+    ExportOneInts.cpp
+    ExportOrbData.cpp
+    ExportResponse.cpp
+    ExportTwoInts.cpp
+    ExportVeloxChemLib.cpp
+    ExportVisualization.cpp
+    ExportXTB.cpp
   )
 
 target_include_directories(veloxchemlib

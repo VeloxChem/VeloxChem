@@ -1,20 +1,20 @@
 target_sources(vlxobjs
   PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/AngularMomentum.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/AODensityMatrix.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/AOIndices.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/AtomBasis.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/BasisFunction.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/GenFunc.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/GtoBlock.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/GtoContainer.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/GtoPairsBlock.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/GtoPairsContainer.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/GtoTransform.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/MolecularBasis.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/MolecularOrbitals.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/SADGuessDriver.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/SphericalMomentum.cpp
+    AngularMomentum.cpp
+    AODensityMatrix.cpp
+    AOIndices.cpp
+    AtomBasis.cpp
+    BasisFunction.cpp
+    GenFunc.cpp
+    GtoBlock.cpp
+    GtoContainer.cpp
+    GtoPairsBlock.cpp
+    GtoPairsContainer.cpp
+    GtoTransform.cpp
+    MolecularBasis.cpp
+    MolecularOrbitals.cpp
+    SADGuessDriver.cpp
+    SphericalMomentum.cpp
   )
 
 target_include_directories(vlxobjs

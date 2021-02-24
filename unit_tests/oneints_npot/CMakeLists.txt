@@ -1,4 +1,4 @@
 target_sources(utests
   PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/NuclearPotentialIntegralsDriverTest.cpp
+    NuclearPotentialIntegralsDriverTest.cpp
   )

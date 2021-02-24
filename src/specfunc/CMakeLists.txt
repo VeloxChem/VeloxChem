@@ -1,6 +1,6 @@
 target_sources(vlxobjs
   PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/BoysFunction.cpp
+    BoysFunction.cpp
   )
 
 target_include_directories(vlxobjs

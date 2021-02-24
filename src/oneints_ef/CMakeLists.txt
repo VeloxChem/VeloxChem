@@ -1,13 +1,13 @@
 target_sources(vlxobjs
   PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/ElectricFieldIntegralsDriver.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ElectricFieldRecFuncForDX.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ElectricFieldRecFuncForFF.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ElectricFieldRecFuncForFG.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ElectricFieldRecFuncForGF.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ElectricFieldRecFuncForGG.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ElectricFieldRecFuncForPX.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ElectricFieldRecFuncForSX.cpp
+    ElectricFieldIntegralsDriver.cpp
+    ElectricFieldRecFuncForDX.cpp
+    ElectricFieldRecFuncForFF.cpp
+    ElectricFieldRecFuncForFG.cpp
+    ElectricFieldRecFuncForGF.cpp
+    ElectricFieldRecFuncForGG.cpp
+    ElectricFieldRecFuncForPX.cpp
+    ElectricFieldRecFuncForSX.cpp
   )
 
 target_include_directories(vlxobjs
