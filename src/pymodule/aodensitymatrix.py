@@ -36,8 +36,6 @@ def _AODensityMatrix_write_hdf5(self, fname):
             elif density_type == denmat.osrest:
                 denstring = 'osrest'
 
-            print(denstring)
-
             name = f'{matrix_count}_{denstring}.alpha_{density_id}'
             array = self.alpha_to_numpy(density_id)
             hf.create_dataset(name, data=array, compression='gzip')
@@ -84,8 +82,6 @@ def _AODensityMatrix_read_hdf5(fname):
     ]
 
     hf.close()
-
-    print(matrix_id_and_keys)
 
     assert_msg_critical(
         len(set(types)) == 1,
