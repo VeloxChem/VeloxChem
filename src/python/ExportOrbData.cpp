@@ -262,8 +262,10 @@ export_orbdata(py::module& m)
     py::enum_<denmat>(m, "denmat")
         .value("rest", denmat::rest)
         .value("unrest", denmat::unrest)
+        .value("osrest", denmat::osrest)
         .value("rmoij", denmat::rmoij)
-        .value("umoij", denmat::umoij);
+        .value("umoij", denmat::umoij)
+        .value("rgen", denmat::rgen);
 
     // CAODensityMatrix class
 

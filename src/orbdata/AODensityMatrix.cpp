@@ -26,9 +26,10 @@ CAODensityMatrix::CAODensityMatrix(const std::vector<CDenseMatrix>& denMatrices,
 
     , _denType(denType)
 {
-    if (denType == denmat::unrest)
+    if ((denType == denmat::unrest) || (denType == denmat::umoij) || (denType == denmat::osrest))
     {
-        errors::assertMsgCritical(denMatrices.size() % 2 == 0, "AODensityMatrix: Odd number of matrices for unrestricted density");
+        errors::assertMsgCritical(denMatrices.size() % 2 == 0,
+                                  "AODensityMatrix: Odd number of matrices for unrestricted or restricted open-shell density");
     }
 }
 
@@ -131,32 +132,13 @@ CAODensityMatrix::sub(const CAODensityMatrix& other) const
 int32_t
 CAODensityMatrix::getNumberOfDensityMatrices() const
 {
-    // restricted density matrix
-
-    if (_denType == denmat::rest)
+    if (isClosedShell())
     {
         return static_cast<int32_t>(_denMatrices.size());
     }
-
-    // unrestricted density matrix
-
-    if (_denType == denmat::unrest)
+    else
     {
         return static_cast<int32_t>(_denMatrices.size()) / 2;
-    }
-
-    // restricted pair density matrix
-
-    if (_denType == denmat::rmoij)
-    {
-        return static_cast<int32_t>(_denMatrices.size());
-    }
-
-    // general non-symmetric restricted density matrix
-
-    if (_denType == denmat::rgen)
-    {
-        return static_cast<int32_t>(_denMatrices.size());
     }
 
     return 0;
@@ -177,30 +159,16 @@ CAODensityMatrix::getDensityType() const
 int32_t
 CAODensityMatrix::getNumberOfRows(const int32_t iDensityMatrix) const
 {
-    // restricted density matrix
-
-    if (_denType == denmat::rest && iDensityMatrix < getNumberOfDensityMatrices())
+    if (iDensityMatrix < getNumberOfDensityMatrices())
     {
-        return _denMatrices[iDensityMatrix].getNumberOfRows();
-    }
-
-    // unrestricted density matrix
-
-    if (_denType == denmat::unrest && iDensityMatrix < getNumberOfDensityMatrices())
-    {
-        return _denMatrices[2 * iDensityMatrix].getNumberOfRows();
-    }
-
-    if (_denType == denmat::rmoij && iDensityMatrix < getNumberOfDensityMatrices())
-    {
-        return _denMatrices[iDensityMatrix].getNumberOfRows();
-    }
-
-    // general non-symmetric restricted density matrix
-
-    if (_denType == denmat::rgen && iDensityMatrix < getNumberOfDensityMatrices())
-    {
-        return _denMatrices[iDensityMatrix].getNumberOfRows();
+        if (isClosedShell())
+        {
+            return _denMatrices[iDensityMatrix].getNumberOfRows();
+        }
+        else
+        {
+            return _denMatrices[2 * iDensityMatrix].getNumberOfRows();
+        }
     }
 
     return 0;
@@ -209,32 +177,16 @@ CAODensityMatrix::getNumberOfRows(const int32_t iDensityMatrix) const
 int32_t
 CAODensityMatrix::getNumberOfColumns(const int32_t iDensityMatrix) const
 {
-    // restricted density matrix
-
-    if (_denType == denmat::rest && iDensityMatrix < getNumberOfDensityMatrices())
+    if (iDensityMatrix < getNumberOfDensityMatrices())
     {
-        return _denMatrices[iDensityMatrix].getNumberOfColumns();
-    }
-
-    // unrestricted density matrix
-
-    if (_denType == denmat::unrest && iDensityMatrix < getNumberOfDensityMatrices())
-    {
-        return _denMatrices[2 * iDensityMatrix].getNumberOfColumns();
-    }
-
-    // restricted pair density matrix
-
-    if (_denType == denmat::rmoij && iDensityMatrix < getNumberOfDensityMatrices())
-    {
-        return _denMatrices[iDensityMatrix].getNumberOfColumns();
-    }
-
-    // general non-symmetric restricted density matrix
-
-    if (_denType == denmat::rgen && iDensityMatrix < getNumberOfDensityMatrices())
-    {
-        return _denMatrices[iDensityMatrix].getNumberOfColumns();
+        if (isClosedShell())
+        {
+            return _denMatrices[iDensityMatrix].getNumberOfColumns();
+        }
+        else
+        {
+            return _denMatrices[2 * iDensityMatrix].getNumberOfColumns();
+        }
     }
 
     return 0;
@@ -243,32 +195,16 @@ CAODensityMatrix::getNumberOfColumns(const int32_t iDensityMatrix) const
 int32_t
 CAODensityMatrix::getNumberOfElements(const int32_t iDensityMatrix) const
 {
-    // restricted density matrix
-
-    if (_denType == denmat::rest && iDensityMatrix < getNumberOfDensityMatrices())
+    if (iDensityMatrix < getNumberOfDensityMatrices())
     {
-        return _denMatrices[iDensityMatrix].getNumberOfElements();
-    }
-
-    // unrestricted density matrix
-
-    if (_denType == denmat::unrest && iDensityMatrix < getNumberOfDensityMatrices())
-    {
-        return _denMatrices[2 * iDensityMatrix].getNumberOfElements();
-    }
-
-    // restricted pair density matrix
-
-    if (_denType == denmat::rmoij && iDensityMatrix < getNumberOfDensityMatrices())
-    {
-        return _denMatrices[iDensityMatrix].getNumberOfElements();
-    }
-
-    // general non-symmetric restricted density matrix
-
-    if (_denType == denmat::rgen && iDensityMatrix < getNumberOfDensityMatrices())
-    {
-        return _denMatrices[iDensityMatrix].getNumberOfElements();
+        if (isClosedShell())
+        {
+            return _denMatrices[iDensityMatrix].getNumberOfElements();
+        }
+        else
+        {
+            return _denMatrices[2 * iDensityMatrix].getNumberOfElements();
+        }
     }
 
     return 0;
@@ -277,14 +213,16 @@ CAODensityMatrix::getNumberOfElements(const int32_t iDensityMatrix) const
 const double*
 CAODensityMatrix::alphaDensity(const int32_t iDensityMatrix) const
 {
-    if (_denType == denmat::rest && iDensityMatrix < getNumberOfDensityMatrices())
+    if (iDensityMatrix < getNumberOfDensityMatrices())
     {
-        return _denMatrices[iDensityMatrix].values();
-    }
-
-    if (_denType == denmat::unrest && iDensityMatrix < getNumberOfDensityMatrices())
-    {
-        return _denMatrices[2 * iDensityMatrix].values();
+        if (isClosedShell())
+        {
+            return _denMatrices[iDensityMatrix].values();
+        }
+        else
+        {
+            return _denMatrices[2 * iDensityMatrix].values();
+        }
     }
 
     return nullptr;
@@ -293,14 +231,16 @@ CAODensityMatrix::alphaDensity(const int32_t iDensityMatrix) const
 const double*
 CAODensityMatrix::betaDensity(const int32_t iDensityMatrix) const
 {
-    if (_denType == denmat::rest && iDensityMatrix < getNumberOfDensityMatrices())
+    if (iDensityMatrix < getNumberOfDensityMatrices())
     {
-        return _denMatrices[iDensityMatrix].values();
-    }
-
-    if (_denType == denmat::unrest && iDensityMatrix < getNumberOfDensityMatrices())
-    {
-        return _denMatrices[2 * iDensityMatrix + 1].values();
+        if (isClosedShell())
+        {
+            return _denMatrices[iDensityMatrix].values();
+        }
+        else
+        {
+            return _denMatrices[2 * iDensityMatrix + 1].values();
+        }
     }
 
     return nullptr;
@@ -341,9 +281,10 @@ CAODensityMatrix::getString() const
 bool
 CAODensityMatrix::isRestricted() const
 {
-    if (_denType == denmat::unrest) return false;
-    
-    if (_denType == denmat::umoij) return false;
+    if ((_denType == denmat::unrest) || (_denType == denmat::umoij))
+    {
+        return false;
+    }
     
     return true;
 }
@@ -351,11 +292,24 @@ CAODensityMatrix::isRestricted() const
 bool
 CAODensityMatrix::isUnrestricted() const
 {
-    if (_denType == denmat::unrest) return true;
+    return !isRestricted();
+}
 
-    if (_denType == denmat::umoij) return false;
+bool
+CAODensityMatrix::isClosedShell() const
+{
+    if ((_denType == denmat::rest) || (_denType == denmat::rmoij) || (_denType == denmat::rgen))
+    {
+        return true;
+    }
 
     return false;
+}
+
+bool
+CAODensityMatrix::isOpenShell() const
+{
+    return !isClosedShell();
 }
 
 void

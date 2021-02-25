@@ -222,12 +222,26 @@ class CAODensityMatrix
      */
     bool isRestricted() const;
 
-        /**
-     Checks if AO density matrix of spin restricted type.
+    /**
+     Checks if AO density matrix of spin unrestricted type.
 
-     @return true if AO density of spin restricted type.
+     @return true if AO density of spin unrestricted type.
      */
     bool isUnrestricted() const;
+
+    /**
+     Checks if AO density matrix of closed-shell type.
+
+     @return true if AO density of closed-shell type.
+     */
+    bool isClosedShell() const;
+
+    /**
+     Checks if AO density matrix of open-shell type.
+
+     @return true if AO density of open-shell type.
+     */
+    bool isOpenShell() const;
 
     /**
      Broadcasts AO density matrix object within domain of MPI communicator.
