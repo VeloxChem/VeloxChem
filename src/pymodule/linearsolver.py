@@ -121,7 +121,7 @@ class LinearSolver:
         self.ostream = ostream
 
         # restart information
-        self.restart = True
+        self.restart = False
         self.checkpoint_file = None
 
         # information for graceful exit

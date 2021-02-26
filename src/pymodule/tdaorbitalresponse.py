@@ -56,8 +56,10 @@ class TdaOrbitalResponse(OrbitalResponse):
         if method_dict is None:
             method_dict = {}
 
+        print("self.restart before update_settings in linearsolver:\n", self.restart)
         # Update setting in parent class
         super().update_settings(rsp_dict, method_dict)
+        print("self.restart after update_settings in linearsolver:\n", self.restart)
 
 
     def compute(self, molecule, basis, scf_tensors, excitation_vecs):
@@ -71,7 +73,7 @@ class TdaOrbitalResponse(OrbitalResponse):
         :param scf_tensors:
             The dictionary of tensors from converged SCF calculation.
         :param excitation_vecs:
-            The excitation vectors from converged RPA or TDA calculation.
+            The excitation vectors from converged TDA calculation.
 
         :return:
             A dictionary containing the Lagrange multipliers and relaxed
@@ -157,6 +159,9 @@ class TdaOrbitalResponse(OrbitalResponse):
         exc_vec = excitation_vecs[:, self.n_state_deriv].copy().reshape(
             nocc, nvir)
 
+        # Transform the excitation vectors to the AO basis
+        exc_vec_ao = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
+
         # Calcuate the unrelaxed one-particle density matrix in MO basis
         dm_oo = -np.einsum('ia,ja->ij', exc_vec, exc_vec)
         dm_vv = np.einsum('ia,ib->ab', exc_vec, exc_vec)
@@ -164,9 +169,6 @@ class TdaOrbitalResponse(OrbitalResponse):
         # Transform unrelaxed one-particle density matrix to the AO basis
         self.unrel_dm_ao = (np.matmul(mo_occ, np.matmul(dm_oo, mo_occ.T)) +
                        np.matmul(mo_vir, np.matmul(dm_vv, mo_vir.T)))
-
-        # Transform the excitation vectors to the AO basis
-        exc_vec_ao = np.matmul(mo_occ, np.matmul(exc_vec, mo_vir.T))
 
         # 2) Construct the right-hand side
         dm_ao_rhs = AODensityMatrix([self.unrel_dm_ao, exc_vec_ao], denmat.rest)
@@ -180,32 +182,34 @@ class TdaOrbitalResponse(OrbitalResponse):
 
         eri_drv.compute(fock_ao_rhs, dm_ao_rhs, molecule, basis, screening)
 
-        # Calculate the RHS and transform it to the MO basis
-        self.rhs_mo = (np.einsum(
-            'pi,pa->ia', mo_occ,
-            np.einsum('ta,pt->pa', mo_vir, 0.5 * fock_ao_rhs.alpha_to_numpy(0)))
-                  + np.einsum(
-                      'mi,ma->ia', mo_occ,
-                      np.einsum(
-                          'za,mz->ma', mo_vir,
+        print("tdaorbitalresponse.py:")
+        #TODO: save RHS in checkpoint file or not?
+        if not self.restart:
+            print("self.restart was false, calculating the RHS")
+            # Calculate the RHS and transform it to the MO basis
+            self.rhs_mo = (np.einsum(
+                'pi,pa->ia', mo_occ,
+                np.einsum('ta,pt->pa', mo_vir, 0.5 * fock_ao_rhs.alpha_to_numpy(0)))
+                      + np.einsum(
+                          'mi,ma->ia', mo_occ,
                           np.einsum(
-                              'mr,rz->mz', ovlp,
-                              np.einsum('rp,zp->rz', exc_vec_ao,
-                                        0.5 * fock_ao_rhs.alpha_to_numpy(1))) -
-                          np.einsum(
-                              'rz,mr->mz', ovlp,
-                              np.einsum('pr,mp->mr', exc_vec_ao, 0.5 *
-                                        fock_ao_rhs.alpha_to_numpy(1).T)))))
+                              'za,mz->ma', mo_vir,
+                              np.einsum(
+                                  'mr,rz->mz', ovlp,
+                                  np.einsum('rp,zp->rz', exc_vec_ao,
+                                            0.5 * fock_ao_rhs.alpha_to_numpy(1))) -
+                              np.einsum(
+                                  'rz,mr->mz', ovlp,
+                                  np.einsum('pr,mp->mr', exc_vec_ao, 0.5 *
+                                            fock_ao_rhs.alpha_to_numpy(1).T)))))
+        else:
+            print("self.restart was true, so RHS not calculated")
 
 
         # Calculate the lambda multipliers and the relaxed one-particle density
         # in the parent class
         lambda_multipliers = self.compute_lambda(molecule, basis, scf_tensors)
 
-
-        profiler.stop_timer(0, 'Orbital Response')
-        profiler.print_timing(self.ostream)
-        profiler.print_profiling_summary(self.ostream)
 
         # Calculate the overlap matrix multipliers
         # 1. compute an energy-weighted density matrix
@@ -234,8 +238,13 @@ class TdaOrbitalResponse(OrbitalResponse):
                                            epsilon_dm_ao,
                                            exc_vec_ao, fock_ao_rhs) 
 
+        profiler.stop_timer(0, 'Orbital Response')
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
+
         profiler.check_memory_usage('End of Orbital Response Driver')
         profiler.print_memory_usage(self.ostream)
+        profiler.print_memory_tracing(self.ostream)
 
         if self.rank == mpi_master() and self.is_converged:
             self.ostream.print_blank()

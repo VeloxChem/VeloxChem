@@ -123,15 +123,15 @@ class OrbitalResponse(LinearSolver):
             'OrbitalResponse: not implemented for unrestricted case')
 
         # ERI information
-        # eri_dict = self.init_eri(molecule, basis)
+        eri_dict = self.init_eri(molecule, basis)
 
         # DFT information
-        # dft_dict = self.init_dft(molecule, scf_tensors)
+        dft_dict = self.init_dft(molecule, scf_tensors)
 
         # PE information
-        # pe_dict = self.init_pe(molecule, basis)
+        pe_dict = self.init_pe(molecule, basis)
 
-        # timing_dict = {}
+        timing_dict = {}
 
         # block Davidson algorithm setup
 
@@ -141,24 +141,28 @@ class OrbitalResponse(LinearSolver):
 
         # It might be possible to restart by using the current lambda
         # and the right-hand side
-        #n_restart_vectors = 0
-        #n_restart_iterations = 0
+        # Restart iterations number
+        n_restart_iterations = 5
 
-        #if self.restart:
-        #    if self.rank == mpi_master():
-        #        rst_trial_mat, rst_sig_mat = read_rsp_hdf5(
-        #            self.checkpoint_file, ['TDA_trials', 'TDA_sigmas'],
-        #            molecule, basis, dft_dict, pe_dict, self.ostream)
-        #        self.restart = (rst_trial_mat is not None and
-        #                        rst_sig_mat is not None)
-        #        if rst_trial_mat is not None:
-        #            n_restart_vectors = rst_trial_mat.shape[1]
-        #    self.restart = self.comm.bcast(self.restart, root=mpi_master())
-        #    n_restart_vectors = self.comm.bcast(n_restart_vectors,
-        #                                        root=mpi_master())
-        #    n_restart_iterations = n_restart_vectors // self.nstates
-        #    if n_restart_vectors % self.nstates != 0:
-        #        n_restart_iterations += 1
+        # count variable for conjugate gradient iterations
+        self.iter_count = 0
+        print("After initializing: iter_count =", self.iter_count)
+
+        if self.restart:
+            if self.rank == mpi_master():
+                self.rhs_mo, rst_orbrsp_lambda = read_rsp_hdf5(
+                    self.checkpoint_file, ['OrbRsp_RHS', 'OrbRsp_lambda'],
+                    molecule, basis, dft_dict, pe_dict, self.ostream)
+                # What does this do??
+                self.restart = (self.rhs_mo is not None and
+                                rst_orbrsp_lambda is not None)
+        else:
+            # Write RHS to checkpoint file
+            if self.rank == mpi_master():
+                write_rsp_hdf5(self.checkpoint_file, [self.rhs_mo],
+                               ['OrbRsp_RHS'], molecule, basis,
+                               dft_dict, pe_dict, self.ostream)
+
 
         # TODO
         # 1) Construct the necessary density matrices => in child classes
@@ -177,16 +181,19 @@ class OrbitalResponse(LinearSolver):
         evir = scf_tensors['E'][nocc:]
         eov = eocc.reshape(-1, 1) - evir
 
-        lambda_guess = self.rhs_mo / eov
+        if self.restart:
+            lambda_guess = rst_orbrsp_lambda
+        else:
+            lambda_guess = self.rhs_mo / eov
 
         # Transform to AO
         lambda_ao = np.matmul(mo_occ,
-                              np.matmul(lambda_guess.reshape(nocc, nvir), mo_vir.T))
+                              np.matmul(lambda_guess, mo_vir.T))
 
         # Create AODensityMatrix object from lambda in AO
         ao_density_lambda = AODensityMatrix([lambda_ao], denmat.rest)
 
-		# ERI driver
+        # ERI driver
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                     self.eri_thresh, molecule, basis)
@@ -224,23 +231,36 @@ class OrbitalResponse(LinearSolver):
                              np.matmul(fock_lambda.alpha_to_numpy(0), mo_occ)).T)
                  + v.reshape(nocc, nvir) * eov)
 
+             # increase iteration counter every time this function is called
+             self.iter_count += 1
+
+             # Write current lambda to checkpoint file
+             if (self.rank == mpi_master() and self.iter_count % n_restart_iterations == 0):
+                 write_rsp_hdf5(self.checkpoint_file, [lambda_mo],
+                                ['OrbRsp_lambda'], molecule, basis,
+                                dft_dict, pe_dict, self.ostream)
+
              return lambda_mo.reshape(nocc * nvir)
 
         # 5) Define the linear operator and run conjugate gradient
+        print("Before defining LinOp: iter_count =", self.iter_count)
         LinOp = linalg.LinearOperator((nocc * nvir, nocc * nvir),
                                       matvec=OrbRsp_MatVec)
+        print("After defining LinOp, before CG: iter_count =", self.iter_count)
 
         profiler.start_timer(0, 'Conjugate Gradient')
+
         lambda_multipliers, cg_conv = linalg.cg(
             A=LinOp,
             b=self.rhs_mo.reshape(nocc * nvir),
             x0=lambda_guess.reshape(nocc * nvir),
             tol=self.conv_thresh,
             maxiter=self.max_iter)
+        print("After CG: iter_count =", self.iter_count)
 
         if cg_conv == 0:
             self.is_converged = True
-		# TODO: print warning or something if not converged
+        # TODO: print warning or something if not converged
 
         profiler.check_memory_usage('Conjugate Gradient')
         profiler.stop_timer(0, 'Conjugate Gradient')
@@ -249,7 +269,7 @@ class OrbitalResponse(LinearSolver):
         self.lambda_ao = np.matmul(
             mo_occ, np.matmul(lambda_multipliers.reshape(nocc, nvir), mo_vir.T))
 
-		# Calculate the relaxed one-particle density matrix
+        # Calculate the relaxed one-particle density matrix
         # Factor 4: (ov + vo)*(alpha + beta)
         self.rel_dm_ao = self.unrel_dm_ao + 4 * self.lambda_ao
 
