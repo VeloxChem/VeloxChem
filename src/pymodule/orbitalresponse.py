@@ -148,20 +148,35 @@ class OrbitalResponse(LinearSolver):
         self.iter_count = 0
         print("After initializing: iter_count =", self.iter_count)
 
+        #TODO: remove print once checkpoint is figured out
         if self.restart:
+            print("Restarting orbital response compute lambda:")
             if self.rank == mpi_master():
+                rhs_mo_from_chk = read_rsp_hdf5(
+                    self.checkpoint_file, ['OrbRsp_RHS'],
+                    molecule, basis, dft_dict, pe_dict, self.ostream)
                 self.rhs_mo, rst_orbrsp_lambda = read_rsp_hdf5(
                     self.checkpoint_file, ['OrbRsp_RHS', 'OrbRsp_lambda'],
                     molecule, basis, dft_dict, pe_dict, self.ostream)
+
+                print("This is what I'm reading from checkpoint:\n")
+                print("RHS:\n",self.rhs_mo)
+                print("\nLambda\n", rst_orbrsp_lambda)
+                print("\nrhs_mo_from_chk:\n", rhs_mo_from_chk)
                 # What does this do??
-                self.restart = (self.rhs_mo is not None and
-                                rst_orbrsp_lambda is not None)
+                #self.restart = (self.rhs_mo is not None and
+                #                rst_orbrsp_lambda is not None)
         else:
             # Write RHS to checkpoint file
             if self.rank == mpi_master():
+                print("Writing checkpoint file, RHS")
                 write_rsp_hdf5(self.checkpoint_file, [self.rhs_mo],
                                ['OrbRsp_RHS'], molecule, basis,
                                dft_dict, pe_dict, self.ostream)
+                rhs_mo_from_chk = read_rsp_hdf5(
+                    self.checkpoint_file, ['OrbRsp_RHS'],
+                    molecule, basis, dft_dict, pe_dict, self.ostream)
+                print(rhs_mo_from_chk)
 
 
         # TODO
