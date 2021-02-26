@@ -100,15 +100,15 @@ class TdaOrbitalResponse(OrbitalResponse):
             'OrbitalResponse: not implemented for unrestricted case')
 
         # ERI information
-        # eri_dict = self.init_eri(molecule, basis)
+        eri_dict = self.init_eri(molecule, basis)
 
         # DFT information
-        # dft_dict = self.init_dft(molecule, scf_tensors)
+        dft_dict = self.init_dft(molecule, scf_tensors)
 
         # PE information
-        # pe_dict = self.init_pe(molecule, basis)
+        pe_dict = self.init_pe(molecule, basis)
 
-        # timing_dict = {}
+        timing_dict = {}
 
         # block Davidson algorithm setup
 
@@ -204,12 +204,15 @@ class TdaOrbitalResponse(OrbitalResponse):
                                             fock_ao_rhs.alpha_to_numpy(1).T)))))
         else:
             print("self.restart was true, so RHS not calculated")
+            self.rhs_mo = read_rsp_hdf5(
+                self.checkpoint_file, ['OrbRsp_RHS'],
+                molecule, basis, dft_dict, pe_dict, self.ostream)
+            print("I read from the chk, rhs_mo =\n", self.rhs_mo)
 
 
         # Calculate the lambda multipliers and the relaxed one-particle density
         # in the parent class
         lambda_multipliers = self.compute_lambda(molecule, basis, scf_tensors)
-
 
         # Calculate the overlap matrix multipliers
         # 1. compute an energy-weighted density matrix
@@ -234,22 +237,29 @@ class TdaOrbitalResponse(OrbitalResponse):
                         )
 
         # 2. compute the omega multipliers in AO basis:
+        print("tdaorbitalresponse.py, before compute_omega, self.restart =", self.restart)
         self.omega_ao = self.compute_omega(molecule, basis, scf_tensors,
                                            epsilon_dm_ao,
                                            exc_vec_ao, fock_ao_rhs) 
+        print("tdaorbitalresponse.py, compute_omega, self.restart =", self.restart)
 
         profiler.stop_timer(0, 'Orbital Response')
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
 
+        print("tdaorbitalresponse.py, check 1, self.restart =", self.restart)
+
         profiler.check_memory_usage('End of Orbital Response Driver')
         profiler.print_memory_usage(self.ostream)
         profiler.print_memory_tracing(self.ostream)
+
+        print("tdaorbitalresponse.py, check 2, self.restart =", self.restart)
 
         if self.rank == mpi_master() and self.is_converged:
             self.ostream.print_blank()
             self.ostream.flush()
 
+        print("tdaorbitalresponse.py, last line, self.restart =", self.restart)
 
 
     def compute_omega(self, molecule, basis, scf_tensors,

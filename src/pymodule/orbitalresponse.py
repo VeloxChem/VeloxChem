@@ -110,6 +110,8 @@ class OrbitalResponse(LinearSolver):
             self.print_orbrsp_header('Orbital Response Driver',
                                      self.n_state_deriv)
 
+        print("Now we are in compute_lambda, self.restart =", self.restart)
+
         # set start time
 
         self.start_time = tm.time()
@@ -146,11 +148,11 @@ class OrbitalResponse(LinearSolver):
 
         # count variable for conjugate gradient iterations
         self.iter_count = 0
-        print("After initializing: iter_count =", self.iter_count)
 
         #TODO: remove print once checkpoint is figured out
         if self.restart:
-            print("Restarting orbital response compute lambda:")
+            print("Restarting orbital response in compute_lambda:")
+            print("checkpoint file =", self.checkpoint)
             if self.rank == mpi_master():
                 rhs_mo_from_chk = read_rsp_hdf5(
                     self.checkpoint_file, ['OrbRsp_RHS'],
@@ -258,10 +260,8 @@ class OrbitalResponse(LinearSolver):
              return lambda_mo.reshape(nocc * nvir)
 
         # 5) Define the linear operator and run conjugate gradient
-        print("Before defining LinOp: iter_count =", self.iter_count)
         LinOp = linalg.LinearOperator((nocc * nvir, nocc * nvir),
                                       matvec=OrbRsp_MatVec)
-        print("After defining LinOp, before CG: iter_count =", self.iter_count)
 
         profiler.start_timer(0, 'Conjugate Gradient')
 
@@ -271,7 +271,6 @@ class OrbitalResponse(LinearSolver):
             x0=lambda_guess.reshape(nocc * nvir),
             tol=self.conv_thresh,
             maxiter=self.max_iter)
-        print("After CG: iter_count =", self.iter_count)
 
         if cg_conv == 0:
             self.is_converged = True
