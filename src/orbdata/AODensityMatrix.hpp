@@ -9,10 +9,10 @@
 #ifndef AODensityMatrix_hpp
 #define AODensityMatrix_hpp
 
+#include <mpi.h>
+
 #include <cstdint>
 #include <vector>
-
-#include <mpi.h>
 
 #include "DenseMatrix.hpp"
 #include "DensityMatrixType.hpp"
@@ -213,8 +213,7 @@ class CAODensityMatrix
      @return the string representation.
      */
     std::string getString() const;
-    
-    
+
     /**
      Checks if AO density matrix of spin restricted type.
 

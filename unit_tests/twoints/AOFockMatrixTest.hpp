@@ -13,11 +13,10 @@
 
 class CAOFockMatrixTest : public ::testing::Test
 {
-protected:
-    
-    CAOFockMatrixTest() {};
-    
-    virtual ~CAOFockMatrixTest() {};
+   protected:
+    CAOFockMatrixTest(){};
+
+    virtual ~CAOFockMatrixTest(){};
 };
 
 #endif /* AOFockMatrixTest_hpp */

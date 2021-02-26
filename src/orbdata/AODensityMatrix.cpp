@@ -285,7 +285,7 @@ CAODensityMatrix::isRestricted() const
     {
         return false;
     }
-    
+
     return true;
 }
 

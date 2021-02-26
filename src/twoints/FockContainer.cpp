@@ -47,7 +47,7 @@ CFockContainer::CFockContainer(const CAOFockMatrix*  aoFockMatrix,
 
             _subFockMatrices.push_back(CFockSubMatrix(braGtoPairsBlock,
                                                       ketGtoPairsBlock,
-                                                      aoFockMatrix->getFockType(i, true)));
+                                                      aoFockMatrix->getFockType(i, "beta")));
         }
     }
 }
@@ -135,9 +135,9 @@ CFockContainer::accumulate(CAOFockMatrix* aoFockMatrix)
                                                aoFockMatrix->getNumberOfColumns(i),
                                                aoFockMatrix->getFockType(i));
 
-            _subFockMatrices[2 * i + 1].accumulate(aoFockMatrix->getFock(i, true),
+            _subFockMatrices[2 * i + 1].accumulate(aoFockMatrix->getFock(i, "beta"),
                                                    aoFockMatrix->getNumberOfColumns(i),
-                                                   aoFockMatrix->getFockType(i, true));
+                                                   aoFockMatrix->getFockType(i, "beta"));
         }
     }
 }

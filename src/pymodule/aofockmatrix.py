@@ -25,20 +25,46 @@ def _AOFockMatrix_write_hdf5(self, fname):
         fockmat.rgenj: 'rgenj',
         fockmat.rgenk: 'rgenk',
         fockmat.rgenkx: 'rgenkx',
+        fockmat.unrestjk: 'unrestjk',
+        fockmat.unrestjkx: 'unrestjkx',
+        fockmat.unrestj: 'unrestj',
     }
 
     hf = h5py.File(fname, 'w')
 
     factors = []
-    for i in range(self.number_of_fock_matrices()):
-        factors.append(self.get_scale_factor(i))
-    hf.create_dataset('factors', data=factors, compression='gzip')
 
-    for i in range(self.number_of_fock_matrices()):
-        index = self.get_density_identifier(i)
-        name = '{}_{}_{}'.format(i, focktype[self.get_fock_type(i)], index)
-        array = self.to_numpy(i)
+    matrix_count = 0
+
+    restricted = self.is_restricted()
+
+    for fock_id in range(self.number_of_fock_matrices()):
+
+        factors.append(self.get_scale_factor(fock_id, 'alpha'))
+
+        fock_type_str = focktype[self.get_fock_type(fock_id,
+                                                    'alpha')] + '.alpha'
+        density_id = self.get_density_identifier(fock_id)
+        name = f'{matrix_count}_{fock_type_str}_{density_id}'
+        array = self.alpha_to_numpy(fock_id)
         hf.create_dataset(name, data=array, compression='gzip')
+
+        matrix_count += 1
+
+        if not restricted:
+
+            factors.append(self.get_scale_factor(fock_id, 'beta'))
+
+            fock_type_str = focktype[self.get_fock_type(fock_id,
+                                                        'beta')] + '.beta'
+            density_id = self.get_density_identifier(fock_id)
+            name = f'{matrix_count}_{fock_type_str}_{density_id}'
+            array = self.beta_to_numpy(fock_id)
+            hf.create_dataset(name, data=array, compression='gzip')
+
+            matrix_count += 1
+
+    hf.create_dataset('factors', data=factors, compression='gzip')
 
     hf.close()
 
@@ -66,6 +92,9 @@ def _AOFockMatrix_read_hdf5(fname):
         'rgenj': fockmat.rgenj,
         'rgenk': fockmat.rgenk,
         'rgenkx': fockmat.rgenkx,
+        'unrestjk': fockmat.unrestjk,
+        'unrestjkx': fockmat.unrestjkx,
+        'unrestj': fockmat.unrestj,
     }
 
     hf = h5py.File(fname, 'r')
@@ -73,21 +102,19 @@ def _AOFockMatrix_read_hdf5(fname):
     focks = []
     types = []
     factors = list(hf.get('factors'))
-    indices = []
+    density_ids = []
 
-    ordered_keys = []
+    matrix_id_and_keys = []
     for key in list(hf.keys()):
-        if key == 'factors':
-            continue
-        i = int(key.split('_')[0])
-        ordered_keys.append((i, key))
-    ordered_keys.sort()
+        if key != 'factors':
+            matrix_id_and_keys.append((int(key.split('_')[0]), key))
+    matrix_id_and_keys = sorted(matrix_id_and_keys)
 
-    for i, key in ordered_keys:
-        type_str, index_str = key.split('_')[1:]
+    for i, key in matrix_id_and_keys:
+        type_str, id_str = key.split('_')[1:]
         focks.append(np.array(hf.get(key)))
-        types.append(focktype[type_str])
-        indices.append(int(index_str))
+        types.append(focktype[type_str.split('.')[0]])
+        density_ids.append(int(id_str))
 
     hf.close()
 
@@ -95,7 +122,7 @@ def _AOFockMatrix_read_hdf5(fname):
         assert_msg_critical(ftype in list(focktype.values()),
                             'AOFockMatrix.read_hdf5: invalid Fock types')
 
-    return AOFockMatrix(focks, types, factors, indices)
+    return AOFockMatrix(focks, types, factors, density_ids)
 
 
 AOFockMatrix.write_hdf5 = _AOFockMatrix_write_hdf5

@@ -337,15 +337,15 @@ TEST_F(CAODensityMatrixTest, GetReferenceToDensity)
 TEST_F(CAODensityMatrixTest, IsRestricted)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
-    
+
     CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 1.0, 4.0, 3.0, 7.0}, 2, 4);
-    
+
     CAODensityMatrix dmata({ma, ma, mb, mb}, denmat::unrest);
-    
+
     CAODensityMatrix dmatb({mb}, denmat::rest);
 
     CAODensityMatrix dmatc({ma, ma, mb, mb}, denmat::osrest);
-    
+
     ASSERT_FALSE(dmata.isRestricted());
 
     ASSERT_TRUE(dmata.isUnrestricted());
