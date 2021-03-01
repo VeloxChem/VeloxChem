@@ -21,7 +21,8 @@ from veloxchem.tdaorbitalresponse import TdaOrbitalResponse
 class TestOrbitalResponse(unittest.TestCase):
 
     # TODO: this will have to be more general once RPA gradients are implemented
-    def run_orbitalresponse(self, inpfile, potfile, xcfun_label, ref_lambda_ao):
+    def run_orbitalresponse(self, inpfile, potfile, xcfun_label,
+                            ref_lambda_ao, ref_omega_ao):
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
@@ -59,21 +60,24 @@ class TestOrbitalResponse(unittest.TestCase):
             omega_ao = orb_resp.omega_ao
 
             self.assertTrue(np.max(np.abs(lambda_ao - ref_lambda_ao)) < 5.0e-4)
-            #self.assertTrue(np.max(np.abs(omega_ao - ref_omega_ao)) < 5.0e-4)
+            self.assertTrue(np.max(np.abs(omega_ao - ref_omega_ao)) < 5.0e-4)
 
     def test_tda_hf(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water_orbrsp.inp')
         lambda_ref_file = str(here / 'inputs' / 'lambda_ao_ref.txt')
+        omega_ref_file = str(here / 'inputs' / 'omega_ao_ref.txt')
 
         potfile = None
 
         xcfun_label = None
 
         ref_lambda_ao = np.loadtxt(lambda_ref_file, delimiter=' ')
+        ref_omega_ao = np.loadtxt(omega_ref_file, delimiter=' ')
 
-        self.run_orbitalresponse(inpfile, potfile, xcfun_label, ref_lambda_ao)
+        self.run_orbitalresponse(inpfile, potfile, xcfun_label,
+                                 ref_lambda_ao, ref_omega_ao)
 
     @pytest.mark.skipif(True, reason='DFT gradients not available')
     def test_tda_dft(self):
