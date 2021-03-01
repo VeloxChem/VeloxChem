@@ -11,8 +11,8 @@ from .profiler import Profiler
 from .orbitalresponse import OrbitalResponse
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
-from .checkpoint import read_rsp_hdf5
-from .checkpoint import write_rsp_hdf5
+#from .checkpoint import read_rsp_hdf5
+#from .checkpoint import write_rsp_hdf5
 
 
 class TdaOrbitalResponse(OrbitalResponse):
@@ -56,10 +56,8 @@ class TdaOrbitalResponse(OrbitalResponse):
         if method_dict is None:
             method_dict = {}
 
-        print("self.restart before update_settings in linearsolver:\n", self.restart)
         # Update setting in parent class
         super().update_settings(rsp_dict, method_dict)
-        print("self.restart after update_settings in linearsolver:\n", self.restart)
 
 
     def compute(self, molecule, basis, scf_tensors, excitation_vecs):
@@ -99,43 +97,16 @@ class TdaOrbitalResponse(OrbitalResponse):
             nalpha == nbeta,
             'OrbitalResponse: not implemented for unrestricted case')
 
-        # ERI information
-        eri_dict = self.init_eri(molecule, basis)
+        ## ERI information
+        #eri_dict = self.init_eri(molecule, basis)
 
-        # DFT information
-        dft_dict = self.init_dft(molecule, scf_tensors)
+        ## DFT information
+        #dft_dict = self.init_dft(molecule, scf_tensors)
 
-        # PE information
-        pe_dict = self.init_pe(molecule, basis)
+        ## PE information
+        #pe_dict = self.init_pe(molecule, basis)
 
-        timing_dict = {}
-
-        # block Davidson algorithm setup
-
-        #self.solver = BlockDavidsonSolver() # something with linalg.cg?
-
-        # read initial guess from restart file
-
-        # It might be possible to restart by using the current lambda
-        # and the right-hand side
-        #n_restart_vectors = 0
-        #n_restart_iterations = 0
-
-        #if self.restart:
-        #    if self.rank == mpi_master():
-        #        rst_trial_mat, rst_sig_mat = read_rsp_hdf5(
-        #            self.checkpoint_file, ['TDA_trials', 'TDA_sigmas'],
-        #            molecule, basis, dft_dict, pe_dict, self.ostream)
-        #        self.restart = (rst_trial_mat is not None and
-        #                        rst_sig_mat is not None)
-        #        if rst_trial_mat is not None:
-        #            n_restart_vectors = rst_trial_mat.shape[1]
-        #    self.restart = self.comm.bcast(self.restart, root=mpi_master())
-        #    n_restart_vectors = self.comm.bcast(n_restart_vectors,
-        #                                        root=mpi_master())
-        #    n_restart_iterations = n_restart_vectors // self.nstates
-        #    if n_restart_vectors % self.nstates != 0:
-        #        n_restart_iterations += 1
+        #timing_dict = {}
 
         # TODO
         # 1) Construct the necessary density matrices
@@ -182,32 +153,30 @@ class TdaOrbitalResponse(OrbitalResponse):
 
         eri_drv.compute(fock_ao_rhs, dm_ao_rhs, molecule, basis, screening)
 
-        print("tdaorbitalresponse.py:")
-        #TODO: save RHS in checkpoint file or not?
-        if not self.restart:
-            print("self.restart was false, calculating the RHS")
-            # Calculate the RHS and transform it to the MO basis
-            self.rhs_mo = (np.einsum(
-                'pi,pa->ia', mo_occ,
-                np.einsum('ta,pt->pa', mo_vir, 0.5 * fock_ao_rhs.alpha_to_numpy(0)))
-                      + np.einsum(
-                          'mi,ma->ia', mo_occ,
+        #if not self.restart:
+
+        # Calculate the RHS and transform it to the MO basis
+        self.rhs_mo = (np.einsum(
+            'pi,pa->ia', mo_occ,
+            np.einsum('ta,pt->pa', mo_vir, 0.5 * fock_ao_rhs.alpha_to_numpy(0)))
+                  + np.einsum(
+                      'mi,ma->ia', mo_occ,
+                      np.einsum(
+                          'za,mz->ma', mo_vir,
                           np.einsum(
-                              'za,mz->ma', mo_vir,
-                              np.einsum(
-                                  'mr,rz->mz', ovlp,
-                                  np.einsum('rp,zp->rz', exc_vec_ao,
-                                            0.5 * fock_ao_rhs.alpha_to_numpy(1))) -
-                              np.einsum(
-                                  'rz,mr->mz', ovlp,
-                                  np.einsum('pr,mp->mr', exc_vec_ao, 0.5 *
-                                            fock_ao_rhs.alpha_to_numpy(1).T)))))
-        else:
-            print("self.restart was true, so RHS not calculated")
-            self.rhs_mo = read_rsp_hdf5(
-                self.checkpoint_file, ['OrbRsp_RHS'],
-                molecule, basis, dft_dict, pe_dict, self.ostream)
-            print("I read from the chk, rhs_mo =\n", self.rhs_mo)
+                              'mr,rz->mz', ovlp,
+                              np.einsum('rp,zp->rz', exc_vec_ao,
+                                        0.5 * fock_ao_rhs.alpha_to_numpy(1))) -
+                          np.einsum(
+                              'rz,mr->mz', ovlp,
+                              np.einsum('pr,mp->mr', exc_vec_ao, 0.5 *
+                                        fock_ao_rhs.alpha_to_numpy(1).T)))))
+        #else:
+        #    print("self.restart was true, so RHS not calculated")
+        #    self.rhs_mo = read_rsp_hdf5(
+        #        self.checkpoint_file, ['OrbRsp_RHS'],
+        #        molecule, basis, dft_dict, pe_dict, self.ostream)
+        #    print("I read from the chk, rhs_mo =\n", self.rhs_mo)
 
 
         # Calculate the lambda multipliers and the relaxed one-particle density
@@ -237,29 +206,21 @@ class TdaOrbitalResponse(OrbitalResponse):
                         )
 
         # 2. compute the omega multipliers in AO basis:
-        print("tdaorbitalresponse.py, before compute_omega, self.restart =", self.restart)
         self.omega_ao = self.compute_omega(molecule, basis, scf_tensors,
                                            epsilon_dm_ao,
                                            exc_vec_ao, fock_ao_rhs) 
-        print("tdaorbitalresponse.py, compute_omega, self.restart =", self.restart)
 
         profiler.stop_timer(0, 'Orbital Response')
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
 
-        print("tdaorbitalresponse.py, check 1, self.restart =", self.restart)
-
         profiler.check_memory_usage('End of Orbital Response Driver')
         profiler.print_memory_usage(self.ostream)
         profiler.print_memory_tracing(self.ostream)
 
-        print("tdaorbitalresponse.py, check 2, self.restart =", self.restart)
-
         if self.rank == mpi_master() and self.is_converged:
             self.ostream.print_blank()
             self.ostream.flush()
-
-        print("tdaorbitalresponse.py, last line, self.restart =", self.restart)
 
 
     def compute_omega(self, molecule, basis, scf_tensors,

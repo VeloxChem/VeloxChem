@@ -74,7 +74,7 @@ class OrbitalResponse(LinearSolver):
         if method_dict is None:
             method_dict = {}
 
-        # many settings updated in LinearSolver, ok for now!?
+        # Many settings updated in LinearSolver
         super().update_settings(rsp_dict, method_dict)
 
         if 'n_state_deriv' in rsp_dict:
@@ -110,8 +110,6 @@ class OrbitalResponse(LinearSolver):
             self.print_orbrsp_header('Orbital Response Driver',
                                      self.n_state_deriv)
 
-        print("Now we are in compute_lambda, self.restart =", self.restart)
-
         # set start time
 
         self.start_time = tm.time()
@@ -144,41 +142,42 @@ class OrbitalResponse(LinearSolver):
         # It might be possible to restart by using the current lambda
         # and the right-hand side
         # Restart iterations number
-        n_restart_iterations = 5
+        #n_restart_iterations = 4
 
         # count variable for conjugate gradient iterations
         self.iter_count = 0
 
-        #TODO: remove print once checkpoint is figured out
-        if self.restart:
-            print("Restarting orbital response in compute_lambda:")
-            print("checkpoint file =", self.checkpoint)
-            if self.rank == mpi_master():
-                rhs_mo_from_chk = read_rsp_hdf5(
-                    self.checkpoint_file, ['OrbRsp_RHS'],
-                    molecule, basis, dft_dict, pe_dict, self.ostream)
-                self.rhs_mo, rst_orbrsp_lambda = read_rsp_hdf5(
-                    self.checkpoint_file, ['OrbRsp_RHS', 'OrbRsp_lambda'],
-                    molecule, basis, dft_dict, pe_dict, self.ostream)
+		# => Reading from checkpoint files does not improve convergence
+		#    when using scipy's conjugate gradient, it would probably
+		#    need information from two previous iterations...
+        #if self.restart:
+        #    print("Restarting orbital response in compute_lambda:")
+        #    print("checkpoint file =", self.checkpoint_file)
+        #    if self.rank == mpi_master():
+        #        #rhs_mo_from_chk = read_rsp_hdf5(
+        #        #    self.checkpoint_file, ['OrbRsp_RHS'],
+        #        #    molecule, basis, dft_dict, pe_dict, self.ostream)
+        #        self.rhs_mo, rst_orbrsp_lambda = read_rsp_hdf5(
+        #            self.checkpoint_file, ['OrbRsp_RHS', 'OrbRsp_lambda'],
+        #            molecule, basis, dft_dict, pe_dict, self.ostream)
 
-                print("This is what I'm reading from checkpoint:\n")
-                print("RHS:\n",self.rhs_mo)
-                print("\nLambda\n", rst_orbrsp_lambda)
-                print("\nrhs_mo_from_chk:\n", rhs_mo_from_chk)
-                # What does this do??
-                #self.restart = (self.rhs_mo is not None and
-                #                rst_orbrsp_lambda is not None)
-        else:
-            # Write RHS to checkpoint file
-            if self.rank == mpi_master():
-                print("Writing checkpoint file, RHS")
-                write_rsp_hdf5(self.checkpoint_file, [self.rhs_mo],
-                               ['OrbRsp_RHS'], molecule, basis,
-                               dft_dict, pe_dict, self.ostream)
-                rhs_mo_from_chk = read_rsp_hdf5(
-                    self.checkpoint_file, ['OrbRsp_RHS'],
-                    molecule, basis, dft_dict, pe_dict, self.ostream)
-                print(rhs_mo_from_chk)
+        #        print("This is what I'm reading from checkpoint:\n")
+        #        print("RHS:\n", self.rhs_mo)
+        #        print("\nLambda\n", rst_orbrsp_lambda)
+        #        # What does this do??
+        #        #self.restart = (self.rhs_mo is not None and
+        #        #                rst_orbrsp_lambda is not None)
+        #else:
+        #    # Write RHS to checkpoint file
+        #    if self.rank == mpi_master():
+        #        print("Writing checkpoint file, RHS")
+        #        write_rsp_hdf5(self.checkpoint_file, [self.rhs_mo],
+        #                       ['OrbRsp_RHS'], molecule, basis,
+        #                       dft_dict, pe_dict, self.ostream)
+        #        rhs_mo_from_chk = read_rsp_hdf5(
+        #            self.checkpoint_file, ['OrbRsp_RHS'],
+        #            molecule, basis, dft_dict, pe_dict, self.ostream)
+        #        print(rhs_mo_from_chk)
 
 
         # TODO
@@ -198,10 +197,10 @@ class OrbitalResponse(LinearSolver):
         evir = scf_tensors['E'][nocc:]
         eov = eocc.reshape(-1, 1) - evir
 
-        if self.restart:
-            lambda_guess = rst_orbrsp_lambda
-        else:
-            lambda_guess = self.rhs_mo / eov
+        #if self.restart:
+        #    lambda_guess = rst_orbrsp_lambda
+        #else:
+        lambda_guess = self.rhs_mo / eov
 
         # Transform to AO
         lambda_ao = np.matmul(mo_occ,
@@ -252,10 +251,14 @@ class OrbitalResponse(LinearSolver):
              self.iter_count += 1
 
              # Write current lambda to checkpoint file
-             if (self.rank == mpi_master() and self.iter_count % n_restart_iterations == 0):
-                 write_rsp_hdf5(self.checkpoint_file, [lambda_mo],
-                                ['OrbRsp_lambda'], molecule, basis,
-                                dft_dict, pe_dict, self.ostream)
+             #if (self.rank == mpi_master() and self.iter_count % n_restart_iterations == 0):
+             #    print("What we write to the checkpoint file:")
+             #    print("self.iter_count =", self.iter_count)
+             #    print("self.rhs_mo =\n", self.rhs_mo)
+             #    print("lambda_mo =\n", lambda_mo)
+             #    write_rsp_hdf5(self.checkpoint_file, [self.rhs_mo, lambda_mo],
+             #                   ['OrbRsp_RHS', 'OrbRsp_lambda'], molecule, basis,
+             #                   dft_dict, pe_dict, self.ostream)
 
              return lambda_mo.reshape(nocc * nvir)
 
@@ -269,7 +272,7 @@ class OrbitalResponse(LinearSolver):
             A=LinOp,
             b=self.rhs_mo.reshape(nocc * nvir),
             x0=lambda_guess.reshape(nocc * nvir),
-            tol=self.conv_thresh,
+            tol=self.conv_thresh, atol=0,
             maxiter=self.max_iter)
 
         if cg_conv == 0:
