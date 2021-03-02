@@ -1,3 +1,4 @@
+from mpi4py import MPI
 import numpy as np
 import time as tm
 import psutil
@@ -7,11 +8,13 @@ from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import denmat
+from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .molecularorbitals import MolecularOrbitals
+from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
 from .checkpoint import check_rsp_hdf5
 from .checkpoint import append_rsp_solution_hdf5
@@ -29,20 +32,28 @@ class LinearResponseEigenSolver(LinearSolver):
     Instance variables
         - nstates: Number of excited states.
         - nto: The flag for natural transition orbital analysis.
+        - nto_pairs: The number of NTO pairs in NTO analysis.
         - detach_attach: The flag for detachment/attachment density analysis.
         - cube_points: The number of cubic grid points in X, Y and Z directions.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes linear response eigensolver to default setup.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 
         self.nstates = 3
 
         self.nto = False
+        self.nto_pairs = None
         self.detach_attach = False
         self.cube_points = [80, 80, 80]
 
@@ -67,6 +78,8 @@ class LinearResponseEigenSolver(LinearSolver):
         if 'nto' in rsp_dict:
             key = rsp_dict['nto'].lower()
             self.nto = True if key == 'yes' else False
+        if 'nto_pairs' in rsp_dict:
+            self.nto_pairs = int(rsp_dict['nto_pairs'])
 
         if 'detach_attach' in rsp_dict:
             key = rsp_dict['detach_attach'].lower()
@@ -416,6 +429,11 @@ class LinearResponseEigenSolver(LinearSolver):
                     y_mat = eigvec[eigvec.shape[0] // 2:].reshape(
                         mo_occ.shape[1], mo_vir.shape[1]) * np.sqrt(2.0)
 
+                if self.nto or self.detach_attach:
+                    vis_drv = VisualizationDriver(self.comm)
+                    cubic_grid = vis_drv.gen_cubic_grid(molecule,
+                                                        *self.cube_points)
+
                 if self.nto:
                     self.ostream.print_info(
                         'Running NTO analysis for S{:d}...'.format(s + 1))
@@ -429,8 +447,8 @@ class LinearResponseEigenSolver(LinearSolver):
                     lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
                     nto_mo.broadcast(self.rank, self.comm)
 
-                    self.write_nto_cubes(self.cube_points, molecule, basis, s,
-                                         lam_diag, nto_mo)
+                    self.write_nto_cubes(cubic_grid, molecule, basis, s,
+                                         lam_diag, nto_mo, self.nto_pairs)
 
                 if self.detach_attach:
                     self.ostream.print_info(
@@ -446,8 +464,8 @@ class LinearResponseEigenSolver(LinearSolver):
                         dens_DA = AODensityMatrix()
                     dens_DA.broadcast(self.rank, self.comm)
 
-                    self.write_detach_attach_cubes(self.cube_points, molecule,
-                                                   basis, s, dens_DA)
+                    self.write_detach_attach_cubes(cubic_grid, molecule, basis,
+                                                   s, dens_DA)
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):

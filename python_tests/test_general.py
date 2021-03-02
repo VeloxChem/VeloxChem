@@ -20,7 +20,7 @@ class TestGeneral(unittest.TestCase):
 
     def test_assert_msg_critical(self):
 
-        assert_msg_critical(True, "")
+        assert_msg_critical(True, '')
 
     def test_constants(self):
 
@@ -29,7 +29,7 @@ class TestGeneral(unittest.TestCase):
 
     def test_angular_momentum(self):
 
-        angmoms = "SPDFGH"
+        angmoms = 'SPDFGH'
 
         for ind, ang in enumerate(angmoms):
             self.assertEqual(to_angular_momentum(ind), ang)

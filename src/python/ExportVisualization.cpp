@@ -26,9 +26,16 @@ namespace vlx_visualization {  // vlx_visualization namespace
 static std::shared_ptr<CVisualizationDriver>
 CVisualizationDriver_create(py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    if (py_comm.is_none())
+    {
+        return std::make_shared<CVisualizationDriver>(MPI_COMM_WORLD);
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<CVisualizationDriver>(new CVisualizationDriver(*comm_ptr));
+        return std::make_shared<CVisualizationDriver>(*comm_ptr);
+    }
 }
 
 // Helper function for converting cubic grid values to 3d numpy array
@@ -70,7 +77,7 @@ export_visualization(py::module& m)
     // CVisualizationDriver class
 
     py::class_<CVisualizationDriver, std::shared_ptr<CVisualizationDriver>>(m, "VisualizationDriver")
-        .def(py::init(&CVisualizationDriver_create))
+        .def(py::init(&CVisualizationDriver_create), py::arg("py_comm") = py::none())
         .def("get_rank", &CVisualizationDriver::getRank)
         .def("compute",
              (void (CVisualizationDriver::*)(CCubicGrid&,

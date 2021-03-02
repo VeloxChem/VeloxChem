@@ -32,9 +32,16 @@ namespace vlx_xtb {  // vlx_xtb namespace
 static std::shared_ptr<CXTBDriver>
 CXTBDriver_create(py::object py_comm)
 {
-    auto comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    if (py_comm.is_none())
+    {
+        return std::make_shared<CXTBDriver>(MPI_COMM_WORLD);
+    }
+    else
+    {
+        auto comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::make_shared<CXTBDriver>(*comm_ptr);
+        return std::make_shared<CXTBDriver>(*comm_ptr);
+    }
 }
 
 static py::array_t<double>
@@ -51,7 +58,7 @@ export_xtb(py::module& m)
     // CXTBDriver class
 
     py::class_<CXTBDriver, std::shared_ptr<CXTBDriver>>(m, "XTBDriver")
-        .def(py::init(&CXTBDriver_create))
+        .def(py::init(&CXTBDriver_create), py::arg("py_comm") = py::none())
         .def("is_master_node", &CXTBDriver::isMasterNode)
         .def("set_max_iter", &CXTBDriver::setMaxIterations)
         .def("set_elec_temp", &CXTBDriver::setElectronicTemp)

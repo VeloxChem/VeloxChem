@@ -1,6 +1,8 @@
+from mpi4py import MPI
 import numpy as np
 import time as tm
 import math
+import sys
 
 from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
@@ -17,6 +19,7 @@ from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import get_dimer_ao_indices
 from .veloxchemlib import parse_xc_func
+from .outputstream import OutputStream
 from .molecule import Molecule
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
@@ -71,17 +74,24 @@ class ExcitonModelDriver:
         - checkpoint_file: Name of the exciton model checkpoint file.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes exciton model driver to default setup.
         """
 
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
+
+        # exciton Hamiltonian matrix and transition dipoles
         self.H = None
         self.trans_dipoles = None
         self.velo_trans_dipoles = None
         self.magn_trans_dipoles = None
-        self.center_of_mass = None
 
+        self.center_of_mass = None
         self.state_info = None
 
         # exciton monomers

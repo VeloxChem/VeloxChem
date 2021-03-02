@@ -1,25 +1,30 @@
-from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
 import pytest
 import sys
-from pathlib import Path
 try:
     import cppe
 except ImportError:
     pass
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver
+from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.veloxchemlib import denmat
 from veloxchem.mpitask import MpiTask
+from veloxchem.aodensitymatrix import AODensityMatrix
+from veloxchem.aofockmatrix import AOFockMatrix
+from veloxchem.scfdriver import ScfDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scffirstorderprop import ScfFirstOrderProperties
+from veloxchem.qqscheme import get_qq_scheme
 
 
-class TestSCF(unittest.TestCase):
+class TestScfRestricted(unittest.TestCase):
 
     def run_scf(self, inpfile, potfile, xcfun_label, ref_e_scf, ref_dip):
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
 
         if potfile is not None:
@@ -36,7 +41,7 @@ class TestSCF(unittest.TestCase):
         scf_prop = ScfFirstOrderProperties(task.mpi_comm, task.ostream)
         scf_prop.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors)
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             e_scf = scf_drv.get_scf_energy()
             tol = 1.0e-5 if xcfun_label is not None else 1.0e-6
             self.assertTrue(np.max(np.abs(e_scf - ref_e_scf)) < tol)
@@ -123,6 +128,28 @@ class TestSCF(unittest.TestCase):
         ref_dip = np.array([-0.048195, 0.098715, 0.902822])
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
+
+    def test_comp_fock_split_comm(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water.inp')
+        task = MpiTask([inpfile, None])
+
+        mol = task.molecule
+        bas = task.ao_basis
+        nao = bas.get_dimensions_of_basis(mol)
+
+        dmat = np.diag(np.ones(nao))
+        dens = AODensityMatrix([dmat], denmat.rest)
+        fock = AOFockMatrix(dens)
+
+        eri_drv = ElectronRepulsionIntegralsDriver(task.mpi_comm)
+        screening = eri_drv.compute(get_qq_scheme('QQ_DEN'), 1.0e-12, mol, bas)
+
+        solver = ScfDriver(task.mpi_comm, task.ostream)
+        solver.comp_2e_fock_split_comm(fock, dens, mol, bas, screening)
+
+        self.assertEqual(fock.alpha_to_numpy(0).shape, dmat.shape)
 
 
 if __name__ == "__main__":

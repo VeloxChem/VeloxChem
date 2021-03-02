@@ -222,6 +222,13 @@ class CAODensityMatrix
      */
     bool isRestricted() const;
 
+        /**
+     Checks if AO density matrix of spin restricted type.
+
+     @return true if AO density of spin restricted type.
+     */
+    bool isUnrestricted() const;
+
     /**
      Broadcasts AO density matrix object within domain of MPI communicator.
 

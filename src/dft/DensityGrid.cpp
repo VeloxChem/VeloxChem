@@ -139,7 +139,7 @@ CDensityGrid::slice(const int32_t nGridPoints)
     }
 }
 
- void
+void
 CDensityGrid::updateBetaDensities()
 {
     if (_gridType != dengrid::ab) return;
@@ -191,7 +191,6 @@ CDensityGrid::updateBetaDensities()
     }
 }
 
-
 void
 CDensityGrid::computeDensityNorms()
 {
@@ -229,6 +228,52 @@ CDensityGrid::computeDensityNorms()
                     gradb[j] = std::sqrt(gradb_x[j] * gradb_x[j] + gradb_y[j] * gradb_y[j] + gradb_z[j] * gradb_z[j]);
             
                     gradab[j] = grada_x[j] * gradb_x[j] + grada_y[j] * gradb_y[j] + grada_z[j] * gradb_z[j];
+                }
+            }
+        }
+    }
+
+    if (_gridType == dengrid::lima)
+    {
+        if ((5 * _nDensityMatrices) == _densityValues.blocks())
+        {
+            for (int32_t i = 0; i < _nDensityMatrices; i++)
+            {
+                auto gradb_x = betaDensityGradientX(i);
+
+                auto gradb_y = betaDensityGradientY(i);
+                                
+                auto gradb_z = betaDensityGradientZ(i);
+                                
+                auto gradb = betaDensityGradient(i);
+                                
+                #pragma omp simd aligned(gradb_x, gradb_y, gradb_z: VLX_ALIGN)
+                for (int32_t j = 0; j < ngpoints; j++)
+                {
+                    gradb[j] = std::sqrt(gradb_x[j] * gradb_x[j] + gradb_y[j] * gradb_y[j] + gradb_z[j] * gradb_z[j]);
+                }
+            }
+        }
+    }
+    
+    if (_gridType == dengrid::limb)
+    {
+        if ((5 * _nDensityMatrices) == _densityValues.blocks())
+        {
+            for (int32_t i = 0; i < _nDensityMatrices; i++)
+            {
+                auto grada_x = alphaDensityGradientX(i);
+                
+                auto grada_y = alphaDensityGradientY(i);
+                
+                auto grada_z = alphaDensityGradientZ(i);
+                
+                auto grada = alphaDensityGradient(i);
+                
+                #pragma omp simd aligned(grada_x, grada_y, grada_z: VLX_ALIGN)
+                for (int32_t j = 0; j < ngpoints; j++)
+                {
+                    grada[j] = std::sqrt(grada_x[j] * grada_x[j] + grada_y[j] * grada_y[j] + grada_z[j] * grada_z[j]);   
                 }
             }
         }
@@ -333,7 +378,7 @@ const double*
 CDensityGrid::mixedDensityGradient(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(4 * _nDensityMatrices + iDensityMatrix);
-    
+
     return nullptr;
 }
 
@@ -466,23 +511,21 @@ CDensityGrid::betaDensityGradientZ(const int32_t iDensityMatrix)
 }
 
 void
-CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGrid,
-                                         CMolecularGrid& molecularGrid,
+CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGridAB,
+                                         CMolecularGrid& molecularGridab,
                                    const int32_t         iDensityMatrix,
                                    const double          densityThreshold,
                                    const xcfun           xcFuncType) const
-{
-    // FIX ME: Implement for general case
-    
+{    
     if (_gridType != dengrid::ab) return;
     
     // create density grid
     
-    densityGrid = CDensityGrid(getNumberOfGridPoints(), 1, xcFuncType, _gridType);
+    densityGridAB = CDensityGrid(getNumberOfGridPoints(), 1, xcFuncType, _gridType);
     
     // generate screened molecular grid
     
-    molecularGrid = getScreenedGrid(molecularGrid, iDensityMatrix, densityThreshold, xcFuncType);
+    molecularGridab = getScreenedGrid(molecularGridab, iDensityMatrix, densityThreshold, xcFuncType);
     
     // set grid points data
     
@@ -498,9 +541,9 @@ CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGrid,
     
     // set up pointers to destination density
     
-    auto drhoa = densityGrid.alphaDensity(0);
+    auto drhoa = densityGridAB.alphaDensity(0);
     
-    auto drhob = densityGrid.betaDensity(0);
+    auto drhob = densityGridAB.betaDensity(0);
     
     // density screening for LDA
     
@@ -508,7 +551,7 @@ CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGrid,
     {
         for (int32_t i = 0; i < npoints; i++)
         {
-            if (_isValidGridPointForLDA(srhoa[i], srhob[i], densityThreshold))
+            if (_isValidGridPointForLda(srhoa[i], srhob[i], densityThreshold))
             {
                 drhoa[ipoints] = srhoa[i]; drhob[ipoints] = srhob[i];
                 
@@ -539,23 +582,23 @@ CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGrid,
     
     // set up pointers to destination density gradient
     
-    auto dgrada = densityGrid.alphaDensityGradient(0);
+    auto dgrada = densityGridAB.alphaDensityGradient(0);
     
-    auto dgradb = densityGrid.betaDensityGradient(0);
+    auto dgradb = densityGridAB.betaDensityGradient(0);
     
-    auto dgradab = densityGrid.mixedDensityGradient(0);
+    auto dgradab = densityGridAB.mixedDensityGradient(0);
     
-    auto dgrada_x = densityGrid.alphaDensityGradientX(0);
+    auto dgrada_x = densityGridAB.alphaDensityGradientX(0);
     
-    auto dgrada_y = densityGrid.alphaDensityGradientY(0);
+    auto dgrada_y = densityGridAB.alphaDensityGradientY(0);
     
-    auto dgrada_z = densityGrid.alphaDensityGradientZ(0);
+    auto dgrada_z = densityGridAB.alphaDensityGradientZ(0);
     
-    auto dgradb_x = densityGrid.betaDensityGradientX(0);
+    auto dgradb_x = densityGridAB.betaDensityGradientX(0);
     
-    auto dgradb_y = densityGrid.betaDensityGradientY(0);
+    auto dgradb_y = densityGridAB.betaDensityGradientY(0);
     
-    auto dgradb_z = densityGrid.betaDensityGradientZ(0);
+    auto dgradb_z = densityGridAB.betaDensityGradientZ(0);
     
     // density screening for GGA
     
@@ -563,7 +606,7 @@ CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGrid,
     {
         for (int32_t i = 0; i < npoints; i++)
         {
-            if (_isValidGridPointForGGA(srhoa[i], srhob[i], sgrada[i], sgradb[i], densityThreshold))
+            if (_isValidGridPointForGga(srhoa[i], srhob[i], sgrada[i], sgradb[i], densityThreshold))
             {
                 drhoa[ipoints] = srhoa[i]; drhob[ipoints] = srhob[i];
                 
@@ -580,16 +623,405 @@ CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGrid,
 
     // compress screened density grid size
     
-    densityGrid.slice(ipoints);
+    densityGridAB.slice(ipoints);
 }
 
+void
+CDensityGrid::getScreenedGridPairUnrestricted(       CDensityGrid&   densityGridAB,
+                                                      CDensityGrid&   densityGridA,
+                                                      CDensityGrid&   densityGridB,
+                                                      CMolecularGrid& molecularGridab,
+                                                      CMolecularGrid& molecularGrida,
+                                                      CMolecularGrid& molecularGridb,
+                                                const int32_t   iDensityMatrix,
+                                                const double    densityThreshold,
+                                                const xcfun     xcFuncType) const
+{
+    // create density grid
+
+    densityGridAB      = CDensityGrid(getNumberOfGridPoints(), 1, xcFuncType, dengrid::ab);
+
+    densityGridA = CDensityGrid(getNumberOfGridPoints(), 1, xcFuncType, dengrid::lima);
+
+    densityGridB = CDensityGrid(getNumberOfGridPoints(), 1, xcFuncType, dengrid::limb);
+
+    // generate screened molecular grid
+
+    getScreenedGridUnrestricted(molecularGridab, molecularGrida, molecularGridb, iDensityMatrix, densityThreshold, xcFuncType);
+
+    // set grid points data
+
+    auto npoints = getNumberOfGridPoints();
+
+    int32_t ipoints  = 0;
+
+    int32_t ipointsa = 0;
+
+    int32_t ipointsb = 0;
+
+    // set up pointers to source density
+
+    auto srhoa = alphaDensity(iDensityMatrix);
+
+    auto srhob = betaDensity(iDensityMatrix);
+
+    // set up pointers to destination density
+
+    auto drhoa = densityGridAB.alphaDensity(0);
+
+    auto drhob = densityGridAB.betaDensity(0);
+
+    auto drhobA = densityGridA.betaDensity(0);
+
+    auto drhoaB = densityGridB.alphaDensity(0);
+
+    // density screening for LDA
+
+    if (xcFuncType == xcfun::lda)
+    {
+        for (int32_t i = 0; i < npoints; i++)
+        {
+            double srhoA = srhoa[i];
+
+            double srhoB = srhob[i];
+
+            if (_isValidGridPointForLdaUnrestricted(srhoa[i], srhob[i], densityThreshold))
+            {
+                drhoa[ipoints] = srhoA;
+
+                drhob[ipoints] = srhoB;
+
+                ipoints++;
+
+                continue;
+            }
+
+            if (_isValidGridPointForLdaA(srhoa[i], srhob[i], densityThreshold))
+            {
+                drhobA[ipointsa] = srhoB;
+
+                ipointsa++;
+
+                continue;
+            }
+
+            if (_isValidGridPointForLdaB(srhoa[i], srhob[i], densityThreshold))
+            {
+                drhoaB[ipointsb] = srhoA;
+
+                ipointsb++;
+                
+            }
+        }
+    }
+
+    // set up pointers to source density gradient
+
+    auto sgrada = alphaDensityGradient(iDensityMatrix);
+
+    auto sgradb = betaDensityGradient(iDensityMatrix);
+
+    auto sgradab = mixedDensityGradient(iDensityMatrix);
+
+    auto sgrada_x = alphaDensityGradientX(iDensityMatrix);
+
+    auto sgrada_y = alphaDensityGradientY(iDensityMatrix);
+
+    auto sgrada_z = alphaDensityGradientZ(iDensityMatrix);
+
+    auto sgradb_x = betaDensityGradientX(iDensityMatrix);
+
+    auto sgradb_y = betaDensityGradientY(iDensityMatrix);
+
+    auto sgradb_z = betaDensityGradientZ(iDensityMatrix);
+
+    // set up pointers to destination density gradient
+
+    auto dgrada = densityGridAB.alphaDensityGradient(0);
+
+    auto dgradb = densityGridAB.betaDensityGradient(0);
+
+    auto dgradab = densityGridAB.mixedDensityGradient(0);
+    
+    auto dgrada_x = densityGridAB.alphaDensityGradientX(0);
+
+    auto dgrada_y = densityGridAB.alphaDensityGradientY(0);
+
+    auto dgrada_z = densityGridAB.alphaDensityGradientZ(0);
+
+    auto dgradb_x = densityGridAB.betaDensityGradientX(0);
+
+    auto dgradb_y = densityGridAB.betaDensityGradientY(0);
+
+    auto dgradb_z = densityGridAB.betaDensityGradientZ(0);
+
+    auto dgradbA = densityGridA.betaDensityGradient(0);
+
+    auto dgradbA_x = densityGridA.betaDensityGradientX(0);
+
+    auto dgradbA_y = densityGridA.betaDensityGradientY(0);
+
+    auto dgradbA_z = densityGridA.betaDensityGradientZ(0);
+
+    auto dgradbB = densityGridB.alphaDensityGradient(0);
+
+    auto dgradbB_x = densityGridB.alphaDensityGradientX(0);
+
+    auto dgradbB_y = densityGridB.alphaDensityGradientY(0);
+
+    auto dgradbB_z = densityGridB.alphaDensityGradientZ(0);
+
+    // density screening for GGA
+
+    if (xcFuncType == xcfun::gga)
+    {
+        for (int32_t i = 0; i < npoints; i++)
+        {
+            if (_isValidGridPointForGgaUnrestrictedAB(srhoa[i], srhob[i], sgrada[i], sgradb[i], densityThreshold))
+            {
+                drhoa[ipoints] = srhoa[i];
+
+                drhob[ipoints] = srhob[i];
+
+                dgrada[ipoints]  = sgrada[i];
+
+                dgradb[ipoints]  = sgradb[i];
+
+                dgradab[ipoints] = sgradab[i];
+
+                dgrada_x[ipoints] = sgrada_x[i];
+
+                dgrada_y[ipoints] = sgrada_y[i];
+
+                dgrada_z[ipoints] = sgrada_z[i];
+
+                dgradb_x[ipoints] = sgradb_x[i];
+
+                dgradb_y[ipoints] = sgradb_y[i];
+
+                dgradb_z[ipoints] = sgradb_z[i];
+
+                ipoints++;
+            }
+
+            if  (_isValidGridPointForGgaUnrestrictedA(srhoa[i], srhob[i], sgrada[i], sgradb[i], densityThreshold))
+            {
+                drhobA[ipointsa] = srhob[i];
+
+                dgradbA[ipointsa]  = sgradb[i];
+
+                dgradbA_x[ipointsa] = sgradb_x[i];
+
+                dgradbA_y[ipointsa] = sgradb_y[i];
+
+                dgradbA_z[ipointsa] = sgradb_z[i];
+
+                ipointsa++;
+            }
+
+            if  (_isValidGridPointForGgaUnrestrictedB(srhoa[i], srhob[i], sgrada[i], sgradb[i], densityThreshold))
+            {
+                drhoaB[ipointsb] = srhoa[i];
+
+                dgradbB[ipointsb]  = sgrada[i];
+
+                dgradbB_x[ipointsb] = sgrada_x[i];
+
+                dgradbB_y[ipointsb] = sgrada_y[i];
+
+                dgradbB_z[ipointsb] = sgrada_z[i];
+
+                ipointsb++;
+            }
+        }
+    }
+
+    // compress screened density grid size
+
+    densityGridAB.slice(ipoints);
+
+    densityGridA.slice(ipointsa);
+
+    densityGridB.slice(ipointsb);
+}
+
+
+void
+CDensityGrid::getScreenedGridUnrestricted(      CMolecularGrid& molecularGridsAB,
+                                                CMolecularGrid& molecularGridsA,
+                                                CMolecularGrid& molecularGridsB,
+                                          const int32_t   iDensityMatrix,
+                                          const double    densityThreshold,
+                                          const xcfun     xcFuncType) const
+{
+    
+    // set up pointers to molecular grid data
+
+    auto gx = molecularGridsAB.getCoordinatesX();
+
+    auto gy = molecularGridsAB.getCoordinatesY();
+
+    auto gz = molecularGridsAB.getCoordinatesZ();
+
+    auto gw = molecularGridsAB.getWeights();
+    
+    auto gxA = molecularGridsA.getCoordinatesX();
+
+    auto gyA = molecularGridsA.getCoordinatesY();
+
+    auto gzA = molecularGridsA.getCoordinatesZ();
+
+    auto gwA = molecularGridsA.getWeights();
+
+    auto gxB = molecularGridsB.getCoordinatesX();
+
+    auto gyB = molecularGridsB.getCoordinatesY();
+
+    auto gzB = molecularGridsB.getCoordinatesZ();
+
+    auto gwB = molecularGridsB.getWeights();
+
+    // set grid points data
+
+    auto npoints = getNumberOfGridPoints();
+
+    int32_t ipoints  = 0;
+
+    int32_t ipointsA = 0;
+
+    int32_t ipointsB = 0;
+
+    // set up pointers to density data
+
+    auto rhoa = alphaDensity(iDensityMatrix);
+
+    auto rhob = betaDensity(iDensityMatrix);
+
+    // screening for LDA
+
+    if (xcFuncType == xcfun::lda)
+    {
+        for (int32_t i = 0; i < npoints; i++)
+        {
+            if (_isValidGridPointForLdaUnrestricted(rhoa[i], rhob[i], densityThreshold))
+            {
+                gx[ipoints] = gx[i];
+
+                gy[ipoints] = gy[i];
+
+                gz[ipoints] = gz[i];
+
+                gw[ipoints] = gw[i];
+
+                ipoints++;
+
+                continue;
+            }
+
+            if (_isValidGridPointForLdaA(rhoa[i], rhob[i], densityThreshold))
+            {
+                gxA[ipointsA] = gxA[i];
+
+                gyA[ipointsA] = gyA[i];
+
+                gzA[ipointsA] = gzA[i];
+
+                gwA[ipointsA] = gwA[i];
+
+                ipointsA++;
+
+                continue;
+            }
+
+            if (_isValidGridPointForLdaB(rhoa[i], rhob[i], densityThreshold))
+            {
+                gxB[ipointsB] = gxB[i];
+
+                gyB[ipointsB] = gyB[i];
+
+                gzB[ipointsB] = gzB[i];
+
+                gwB[ipointsB] = gwB[i];
+
+                ipointsB++;
+            }
+        }
+    }
+
+    // set up pointers to density gradient data
+
+    auto grada = alphaDensityGradient(iDensityMatrix);
+
+    auto gradb = betaDensityGradient(iDensityMatrix);
+
+    // screening for GGA
+
+    if (xcFuncType == xcfun::gga)
+    {
+        for (int32_t i = 0; i < npoints; i++)
+        {
+            if (_isValidGridPointForGgaUnrestrictedAB(rhoa[i], rhob[i], grada[i], gradb[i], densityThreshold))
+            {
+                gx[ipoints] = gx[i];
+
+                gy[ipoints] = gy[i];
+
+                gz[ipoints] = gz[i];
+                
+                gw[ipoints] = gw[i];
+
+                ipoints++;
+
+                continue;
+            }
+
+            if (_isValidGridPointForGgaUnrestrictedA(rhoa[i], rhob[i], grada[i], gradb[i], densityThreshold))
+            {
+                gxA[ipointsA] = gxA[i];
+
+                gyA[ipointsA] = gyA[i];
+
+                gzA[ipointsA] = gzA[i];
+
+                gwA[ipointsA] = gwA[i];
+
+                ipointsA++;
+
+                continue;
+            }
+            
+            if (_isValidGridPointForGgaUnrestrictedB(rhoa[i], rhob[i], grada[i], gradb[i], densityThreshold))
+            {
+                gxB[ipointsB] = gxB[i];
+
+                gyB[ipointsB] = gyB[i];
+
+                gzB[ipointsB] = gzB[i];
+
+                gwB[ipointsB] = gwB[i];
+
+                ipointsB++;
+            }
+        }
+    }
+
+    // compress molecular grid size
+
+    molecularGridsAB.slice(ipoints);
+
+    molecularGridsA.slice(ipointsA);
+
+    molecularGridsB.slice(ipointsB);
+}
+
+
 CMolecularGrid
-CDensityGrid::getScreenedGrid(      CMolecularGrid& molecularGrids,
+CDensityGrid::getScreenedGrid(      CMolecularGrid& molecularGridsAB,
                               const int32_t         iDensityMatrix, 
                               const double          densityThreshold,
                               const xcfun           xcFuncType) const
 {
-    auto mgrid = molecularGrids;
+    auto mgrid = molecularGridsAB;
     
     // FIX ME: Implement for general case
     
@@ -623,7 +1055,7 @@ CDensityGrid::getScreenedGrid(      CMolecularGrid& molecularGrids,
     {
         for (int32_t i = 0; i < npoints; i++)
         {
-            if (_isValidGridPointForLDA(rhoa[i], rhob[i], densityThreshold))
+            if (_isValidGridPointForLda(rhoa[i], rhob[i], densityThreshold))
             {
                 gx[ipoints] = gx[i]; gy[ipoints] = gy[i]; gz[ipoints] = gz[i]; gw[ipoints] = gw[i];
                 
@@ -644,7 +1076,7 @@ CDensityGrid::getScreenedGrid(      CMolecularGrid& molecularGrids,
     {
         for (int32_t i = 0; i < npoints; i++)
         {
-            if (_isValidGridPointForGGA(rhoa[i], rhob[i], grada[i], gradb[i], densityThreshold))
+            if (_isValidGridPointForGga(rhoa[i], rhob[i], grada[i], gradb[i], densityThreshold))
             {
                 gx[ipoints] = gx[i]; gy[ipoints] = gy[i]; gz[ipoints] = gz[i]; gw[ipoints] = gw[i];
                 
@@ -661,7 +1093,7 @@ CDensityGrid::getScreenedGrid(      CMolecularGrid& molecularGrids,
 }
 
 bool
-CDensityGrid::_isValidGridPointForLDA(const double alphaDensity,
+CDensityGrid::_isValidGridPointForLda(const double alphaDensity,
                                       const double betaDensity,
                                       const double densityThreshold) const
 {
@@ -672,8 +1104,45 @@ CDensityGrid::_isValidGridPointForLDA(const double alphaDensity,
     return true;
 }
 
+
 bool
-CDensityGrid::_isValidGridPointForGGA(const double alphaDensity,
+CDensityGrid::_isValidGridPointForLdaUnrestricted(const double alphaDensity,
+                                            const double betaDensity,
+                                            const double densityThreshold) const
+{
+    if ((std::fabs(alphaDensity) > densityThreshold) && 
+        (std::fabs(betaDensity) > densityThreshold)) return true;
+    
+    return false;
+}
+
+bool
+CDensityGrid::_isValidGridPointForLdaA(const double alphaDensity,
+                                       const double betaDensity,
+                                       const double densityThreshold) const
+{
+    if ((std::fabs(alphaDensity) < densityThreshold)  && 
+       (std::fabs(betaDensity) > densityThreshold) ) return true;
+    
+    return false;
+}
+
+
+bool
+CDensityGrid::_isValidGridPointForLdaB(const double alphaDensity,
+                                       const double betaDensity,
+                                       const double densityThreshold) const
+{
+    if ((std::fabs(alphaDensity) > densityThreshold) && 
+       (std::fabs(betaDensity) < densityThreshold) ) return true;
+    
+    return false;
+}
+
+
+
+bool
+CDensityGrid::_isValidGridPointForGga(const double alphaDensity,
                                       const double betaDensity,
                                       const double alphaDensityGradient,
                                       const double betaDensityGradient,
@@ -688,6 +1157,52 @@ CDensityGrid::_isValidGridPointForGGA(const double alphaDensity,
     if (std::fabs(betaDensityGradient) < densityThreshold) return false;
     
     return true;
+}
+
+
+bool
+CDensityGrid::_isValidGridPointForGgaUnrestrictedAB(const double alphaDensity,
+                                                    const double betaDensity,
+                                                    const double alphaDensityGradient,
+                                                    const double betaDensityGradient,
+                                                    const double densityThreshold) const
+{
+    if ((std::fabs(alphaDensity) > densityThreshold)  && 
+    (std::fabs(alphaDensityGradient) > densityThreshold) &&  
+    (std::fabs(betaDensity) > densityThreshold)  && 
+    (std::fabs(betaDensityGradient) > densityThreshold)) return true;
+
+    return false;
+}
+
+bool
+CDensityGrid::_isValidGridPointForGgaUnrestrictedA(const double alphaDensity,
+                                                   const double betaDensity,
+                                                   const double alphaDensityGradient,
+                                                   const double betaDensityGradient,
+                                                   const double densityThreshold) const
+{   
+    if ((std::fabs(alphaDensity) < densityThreshold)  && 
+       (std::fabs(alphaDensityGradient) < densityThreshold) && 
+       (std::fabs(betaDensity) > densityThreshold)  &&
+       (std::fabs(betaDensityGradient) > densityThreshold)) return true;
+    return false;
+}
+
+bool
+CDensityGrid::_isValidGridPointForGgaUnrestrictedB(const double alphaDensity,
+                                                   const double betaDensity,
+                                                   const double alphaDensityGradient,
+                                                   const double betaDensityGradient,
+                                                   const double densityThreshold) const
+{
+
+    if ((std::fabs(alphaDensity) > densityThreshold)  && 
+       (std::fabs(alphaDensityGradient) > densityThreshold) &&  
+       (std::fabs(betaDensity) < densityThreshold)  && 
+       (std::fabs(betaDensityGradient) < densityThreshold)) return true;
+
+    return false;
 }
 
 std::ostream&

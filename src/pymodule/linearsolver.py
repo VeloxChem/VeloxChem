@@ -331,7 +331,7 @@ class LinearSolver:
         # set up polarizable embedding
         if self.pe:
             from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, self.comm, self.pe_options)
+            pe_drv = PolEmbed(molecule, basis, self.pe_options, self.comm)
             V_es = pe_drv.compute_multipole_potential_integrals()
 
             pot_info = "Reading polarizable embedding potential: {}".format(
@@ -339,7 +339,7 @@ class LinearSolver:
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
 
-            with open(self.pe_options['potfile'], 'r') as f_pot:
+            with open(str(self.pe_options['potfile']), 'r') as f_pot:
                 potfile_text = os.linesep.join(f_pot.readlines())
         else:
             pe_drv = None
@@ -844,7 +844,7 @@ class LinearSolver:
         # calculate e_pe and V_pe on PE nodes
         if pe_comm:
             from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, local_comm, self.pe_options)
+            pe_drv = PolEmbed(molecule, basis, self.pe_options, local_comm)
             pe_drv.V_es = V_es.copy()
             for ifock in range(fock.number_of_fock_matrices()):
                 dm = dens.alpha_to_numpy(ifock) + dens.beta_to_numpy(ifock)
@@ -1076,10 +1076,6 @@ class LinearSolver:
 
         self.is_converged = self.comm.bcast(self.is_converged,
                                             root=mpi_master())
-
-    def initial_guess(self, v1, precond):
-
-        return None
 
     def decomp_grad(self, grad):
         """
@@ -1454,26 +1450,6 @@ class LinearSolver:
         mask = l > b_norm * threshold
         return np.matmul(basis, T[:, mask])
 
-    @staticmethod
-    def remove_linear_dependence_half(basis, threshold):
-        """
-        Removes linear dependence in a set of symmetrized vectors.
-
-        :param basis:
-            The set of upper parts of symmetrized vectors.
-        :param threshold:
-            The threshold for removing linear dependence.
-
-        :return:
-            The new set of vectors.
-        """
-
-        Sb = 2 * np.matmul(basis.T, basis)
-        l, T = np.linalg.eigh(Sb)
-        b_norm = np.sqrt(Sb.diagonal())
-        mask = l > b_norm * threshold
-        return np.matmul(basis, T[:, mask])
-
     def remove_linear_dependence_half_distributed(self, basis, threshold):
         """
         Removes linear dependence in a set of symmetrized vectors.
@@ -1524,35 +1500,6 @@ class LinearSolver:
                         tvecs[:, j], tvecs[:, j])
                     tvecs[:, i] -= f * tvecs[:, j]
                 f = 1.0 / np.linalg.norm(tvecs[:, i])
-                tvecs[:, i] *= f
-
-        return tvecs
-
-    @staticmethod
-    def orthogonalize_gram_schmidt_half(tvecs):
-        """
-        Applies modified Gram Schmidt orthogonalization to trial vectors.
-
-        :param tvecs:
-            The trial vectors.
-
-        :return:
-            The orthogonalized trial vectors.
-        """
-
-        invsqrt2 = 1.0 / np.sqrt(2.0)
-
-        if tvecs.shape[1] > 0:
-
-            f = invsqrt2 / np.linalg.norm(tvecs[:, 0])
-            tvecs[:, 0] *= f
-
-            for i in range(1, tvecs.shape[1]):
-                for j in range(i):
-                    f = np.dot(tvecs[:, i], tvecs[:, j]) / np.dot(
-                        tvecs[:, j], tvecs[:, j])
-                    tvecs[:, i] -= f * tvecs[:, j]
-                f = invsqrt2 / np.linalg.norm(tvecs[:, i])
                 tvecs[:, i] *= f
 
         return tvecs
@@ -1610,30 +1557,6 @@ class LinearSolver:
 
         return vecs
 
-    @staticmethod
-    def normalize_half(vecs):
-        """
-        Normalizes half-sized vectors by dividing by vector norm.
-
-        :param vecs:
-            The half-sized vectors.
-
-        :param Retruns:
-            The normalized vectors.
-        """
-
-        invsqrt2 = 1.0 / np.sqrt(2.0)
-
-        if len(vecs.shape) != 1:
-            for vec in range(vecs.shape[1]):
-                invnorm = invsqrt2 / np.linalg.norm(vecs[:, vec])
-                vecs[:, vec] *= invnorm
-        else:
-            invnorm = invsqrt2 / np.linalg.norm(vecs)
-            vecs *= invnorm
-
-        return vecs
-
     def normalize_half_distributed(self, vecs):
         """
         Normalizes half-sized vectors by dividing by vector norm.
@@ -1652,36 +1575,6 @@ class LinearSolver:
         vecs.data *= invnorm
 
         return vecs
-
-    @staticmethod
-    def construct_ed_sd(orb_ene, nocc, norb):
-        """
-        Gets the E0 and S0 diagonal elements as arrays.
-
-        :param orb_ene:
-            Orbital energies.
-        :param nocc:
-            Number of occupied orbitals.
-        :param norb:
-            Number of orbitals.
-
-        :return:
-            The E0 and S0 diagonal elements as numpy arrays.
-        """
-
-        nvir = norb - nocc
-        n_ov = nocc * nvir
-
-        eocc = orb_ene[:nocc]
-        evir = orb_ene[nocc:]
-
-        ediag = 2.0 * (-eocc.reshape(-1, 1) + evir).reshape(n_ov)
-        ediag = np.hstack((ediag, ediag))
-
-        sdiag = 2.0 * np.ones(ediag.shape)
-        sdiag[n_ov:] = -2.0
-
-        return ediag, sdiag
 
     @staticmethod
     def construct_ed_sd_half(orb_ene, nocc, norb):
@@ -1742,18 +1635,19 @@ class LinearSolver:
         return lam_diag, nto_mo
 
     def write_nto_cubes(self,
-                        cube_points,
+                        cubic_grid,
                         molecule,
                         basis,
                         root,
                         lam_diag,
                         nto_mo,
+                        nto_pairs=None,
                         nto_thresh=0.1):
         """
         Writes cube files for natural transition orbitals.
 
-        :param cube_points:
-            The list containing number of grid points in X, Y and Z directions.
+        :param cubic_grid:
+            The cubic grid.
         :param molecule:
             The molecule.
         :param basis:
@@ -1764,17 +1658,26 @@ class LinearSolver:
             The lambda values (1D array).
         :param nto_mo:
             The NTO coefficients (2D array).
+        :param nto_pairs:
+            The number of NTO pairs.
         :param nto_thresh:
             The threshold for writing NTO to cube file.
+
+        :return:
+            The list containing the names of the cube files.
         """
 
+        filenames = []
+
         vis_drv = VisualizationDriver(self.comm)
-        cubic_grid = vis_drv.gen_cubic_grid(molecule, cube_points)
 
         nocc = molecule.number_of_alpha_electrons()
 
         for i_nto in range(lam_diag.size):
             if lam_diag[i_nto] < nto_thresh:
+                continue
+
+            if (nto_pairs is not None) and (i_nto >= nto_pairs):
                 continue
 
             self.ostream.print_info('  lambda: {:.4f}'.format(lam_diag[i_nto]))
@@ -1789,6 +1692,7 @@ class LinearSolver:
                     self.filename, root + 1, i_nto + 1)
                 vis_drv.write_data(occ_cube_name, cubic_grid, molecule, 'nto',
                                    ind_occ, 'alpha')
+                filenames.append(occ_cube_name)
 
                 self.ostream.print_info(
                     '    Cube file (hole)     : {:s}'.format(occ_cube_name))
@@ -1804,12 +1708,15 @@ class LinearSolver:
                     self.filename, root + 1, i_nto + 1)
                 vis_drv.write_data(vir_cube_name, cubic_grid, molecule, 'nto',
                                    ind_vir, 'alpha')
+                filenames.append(vir_cube_name)
 
                 self.ostream.print_info(
                     '    Cube file (particle) : {:s}'.format(vir_cube_name))
                 self.ostream.flush()
 
         self.ostream.print_blank()
+
+        return filenames
 
     def get_detach_attach_densities(self, z_mat, y_mat, mo_occ, mo_vir):
         """
@@ -1837,13 +1744,13 @@ class LinearSolver:
 
         return dens_D, dens_A
 
-    def write_detach_attach_cubes(self, cube_points, molecule, basis, root,
+    def write_detach_attach_cubes(self, cubic_grid, molecule, basis, root,
                                   dens_DA):
         """
         Writes cube files for detachment and attachment densities.
 
-        :param cube_points:
-            The list containing number of grid points in X, Y and Z directions.
+        :param cubic_grid:
+            The cubic grid.
         :param molecule:
             The molecule.
         :param basis:
@@ -1853,10 +1760,14 @@ class LinearSolver:
         :param dens_DA:
             The AODensityMatrix object containing detachment and attachment
             densities.
+
+        :return:
+            The list containing the names of the cube files.
         """
 
+        filenames = []
+
         vis_drv = VisualizationDriver(self.comm)
-        cubic_grid = vis_drv.gen_cubic_grid(molecule, cube_points)
 
         vis_drv.compute(cubic_grid, molecule, basis, dens_DA, 0, 'alpha')
 
@@ -1865,6 +1776,7 @@ class LinearSolver:
                 self.filename, root + 1)
             vis_drv.write_data(detach_cube_name, cubic_grid, molecule,
                                'detachment', 0, 'alpha')
+            filenames.append(detach_cube_name)
 
             self.ostream.print_info(
                 '  Cube file (detachment) : {:s}'.format(detach_cube_name))
@@ -1877,9 +1789,12 @@ class LinearSolver:
                 self.filename, root + 1)
             vis_drv.write_data(attach_cube_name, cubic_grid, molecule,
                                'attachment', 1, 'alpha')
+            filenames.append(attach_cube_name)
 
             self.ostream.print_info(
                 '  Cube file (attachment) : {:s}'.format(attach_cube_name))
             self.ostream.flush()
 
         self.ostream.print_blank()
+
+        return filenames

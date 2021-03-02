@@ -54,8 +54,6 @@ class ScfDriver:
         - eri_thresh: The electron repulsion integrals screening threshold.
         - ovl_thresh: The atomic orbitals linear dependency threshold.
         - diis_thresh: The C2-DIIS switch on threshold.
-        - use_level_shift: The flag for usage of level shifting in SCF
-          iterations.
         - iter_data: The list of SCF iteration data (electronic energy,
           electronic energy change, gradient, density change).
         - is_converged: The flag for SCF convergence.
@@ -113,9 +111,6 @@ class ScfDriver:
         self.diis_thresh = 1000.0
         self.eri_thresh = 1.0e-12
         self.eri_thresh_tight = 1.0e-15
-
-        # level shifting
-        self.use_level_shift = False
 
         # iterations data
         self.iter_data = []
@@ -279,8 +274,6 @@ class ScfDriver:
 
         profiler = Profiler()
 
-        self.scf_start_time = tm.time()
-
         if min_basis is None:
             if self.rank == mpi_master():
                 min_basis = MolecularBasis.read(molecule, 'MIN-CC-PVDZ')
@@ -338,8 +331,8 @@ class ScfDriver:
         # set up polarizable embedding
         if self.pe:
             from .polembed import PolEmbed
-            self.pe_drv = PolEmbed(molecule, ao_basis, self.comm,
-                                   self.pe_options)
+            self.pe_drv = PolEmbed(molecule, ao_basis, self.pe_options,
+                                   self.comm)
             self.V_es = self.pe_drv.compute_multipole_potential_integrals()
 
             pot_info = 'Reading polarizable embedding potential: {}'.format(
@@ -830,8 +823,6 @@ class ScfDriver:
             The electronic gradient at current SCF iteration.
         """
 
-        self.use_level_shift = False
-
         if e_grad < self.diis_thresh:
             self.skip_iter = False
         else:
@@ -919,7 +910,10 @@ class ScfDriver:
 
         if self.dft and not self.first_step:
             if not self.xcfun.is_hybrid():
-                fock_mat.scale(2.0, 0)
+                if self.restricted is True:
+                    fock_mat.scale(2.0, 0)
+                else:
+                    fock_mat.scale(1.0, 0)
 
             self.molgrid.distribute(self.rank, self.nodes, self.comm)
             vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self.molgrid,
@@ -1038,7 +1032,10 @@ class ScfDriver:
             fock_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
                                 local_comm)
             if self.dft and (not self.xcfun.is_hybrid()):
-                fock_mat.scale(2.0, 0)
+                if self.restricted is True:
+                    fock_mat.scale(2.0, 0)
+                else:
+                    fock_mat.scale(1.0, 0)
 
         # calculate Vxc on DFT nodes
         if dft_comm:
@@ -1055,7 +1052,7 @@ class ScfDriver:
         # calculate e_pe and V_pe on PE nodes
         if pe_comm:
             from .polembed import PolEmbed
-            self.pe_drv = PolEmbed(molecule, basis, local_comm, self.pe_options)
+            self.pe_drv = PolEmbed(molecule, basis, self.pe_options, local_comm)
             self.pe_drv.V_es = self.V_es.copy()
             dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
             e_pe, V_pe = self.pe_drv.get_pe_contribution(dm)
@@ -1167,8 +1164,12 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             fock_mat.add_hcore(kin_mat, npot_mat, 0)
+
             if self.dft and not self.first_step:
                 fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
+                if not self.restricted:
+                    fock_mat.add_matrix(vxc_mat.get_matrix(True), 1)
+
             if self.pe and not self.first_step:
                 fock_mat.add_matrix(DenseMatrix(pe_mat), 0)
 
@@ -1607,24 +1608,6 @@ class ScfDriver:
 
         return
 
-    def need_min_basis(self):
-        """
-        Determines if minimal AO basis is needed in SCF calculation. Usage of
-        two level DIIS accelerator or superposition of atomic densities initial
-        guess requires minimal AO basis.
-
-        :return:
-            The flag for need of minimal AO basis.
-        """
-
-        if self.acc_type == "L2_DIIS":
-            return True
-
-        if self.den_guess.guess_type == "SAD":
-            return True
-
-        return False
-
     def delete_mos(self, mol_orbs, mol_eigs):
         """
         Generates trimmed molecular orbital by deleting MOs with coeficients
@@ -1687,11 +1670,12 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         mult = molecule.get_multiplicity()
-        valstr = "Multiplicity (2S+1)           :{:5.1f}".format(mult)
-        self.ostream.print_header(valstr.ljust(92))
+        if self.restricted:
+            valstr = "Multiplicity (2S+1)           :{:5.1f}".format(mult)
+            self.ostream.print_header(valstr.ljust(92))
 
         sz = 0.5 * (mult - 1.0)
-        valstr = "Magnetic Quantum Number (S_z) :{:5.1f}".format(sz)
+        valstr = "Magnetic Quantum Number (M_S) :{:5.1f}".format(sz)
         self.ostream.print_header(valstr.ljust(92))
 
         if not self.restricted:

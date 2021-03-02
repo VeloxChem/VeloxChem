@@ -71,7 +71,7 @@ def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
         Spin of the molecular orbital or density.
     """
 
-    f_cube = open(cubefile, 'w')
+    f_cube = open(str(cubefile), 'w')
 
     x = molecule.x_to_numpy()
     y = molecule.y_to_numpy()

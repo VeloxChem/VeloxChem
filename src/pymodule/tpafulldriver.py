@@ -1,8 +1,11 @@
+from mpi4py import MPI
 import numpy as np
 import time
+import sys
 import re
 
 from .veloxchemlib import mpi_master
+from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
@@ -23,11 +26,17 @@ class TpaFullDriver(TpaDriver):
         The output stream.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes the full isotropic cubic response driver for two-photon
         absorption (TPA)
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 

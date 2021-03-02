@@ -13,10 +13,7 @@ from .errorhandler import assert_msg_critical
 
 
 @staticmethod
-def _MolecularBasis_read(mol,
-                         basis_name,
-                         basis_path='.',
-                         ostream=OutputStream()):
+def _MolecularBasis_read(mol, basis_name, basis_path='.', ostream=None):
     """
     Reads AO basis set from file.
 
@@ -33,7 +30,10 @@ def _MolecularBasis_read(mol,
         The AO basis set.
     """
 
-    err_gc = "MolcularBasis.read_file: "
+    if ostream is None:
+        ostream = OutputStream(None)
+
+    err_gc = "MolcularBasis.read: "
     err_gc += "General contraction currently is not supported"
 
     # searching order:
@@ -57,7 +57,7 @@ def _MolecularBasis_read(mol,
 
     assert_msg_critical(
         basis_name.upper() == basis_dict['basis_set_name'].upper(),
-        "MolecularBasis.read_file: Inconsistent basis set name")
+        "MolecularBasis.read: Inconsistent basis set name")
 
     mol_basis = MolecularBasis()
 
