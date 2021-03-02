@@ -11,8 +11,6 @@ from .profiler import Profiler
 from .orbitalresponse import OrbitalResponse
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
-# from .checkpoint import read_rsp_hdf5
-# from .checkpoint import write_rsp_hdf5
 
 
 class TdaOrbitalResponse(OrbitalResponse):
@@ -31,8 +29,6 @@ class TdaOrbitalResponse(OrbitalResponse):
         - solver: The linear equations solver.
     """
 
-    # Give number of state of interest and all vectors in compute function?
-    # Or only the specific vector in compute function?
     def __init__(self, comm, ostream):
         """
         Initializes orbital response computation driver to default setup.
@@ -96,23 +92,12 @@ class TdaOrbitalResponse(OrbitalResponse):
             nalpha == nbeta,
             'OrbitalResponse: not implemented for unrestricted case')
 
-        # ERI information
-        # eri_dict = self.init_eri(molecule, basis)
-
-        # DFT information
-        # dft_dict = self.init_dft(molecule, scf_tensors)
-
-        # PE information
-        # pe_dict = self.init_pe(molecule, basis)
-
-        # timing_dict = {}
-
-        # TODO
+        # Workflow:
         # 1) Construct the necessary density matrices
         # 2) Construct the RHS
-        # 3) Construct the initial guess
-        # 4) Write the linear operator for matrix-vector product
-        # 5) Run the conjugate gradient
+        # 3) Construct the initial guess => in parent class
+        # 4) Write the linear operator for matrix-vector product => in parent class
+        # 5) Run the conjugate gradient => in parent class
 
         profiler.start_timer(0, 'Orbital Response')
 
@@ -152,8 +137,6 @@ class TdaOrbitalResponse(OrbitalResponse):
 
         eri_drv.compute(fock_ao_rhs, dm_ao_rhs, molecule, basis, screening)
 
-        # if not self.restart:
-
         # Calculate the RHS and transform it to the MO basis
         self.rhs_mo = (
             np.einsum(
@@ -172,12 +155,6 @@ class TdaOrbitalResponse(OrbitalResponse):
                         'rz,mr->mz', ovlp,
                         np.einsum('pr,mp->mr', exc_vec_ao,
                                   0.5 * fock_ao_rhs.alpha_to_numpy(1).T)))))
-        # else:
-        #    print("self.restart was true, so RHS not calculated")
-        #    self.rhs_mo = read_rsp_hdf5(
-        #        self.checkpoint_file, ['OrbRsp_RHS'],
-        #        molecule, basis, dft_dict, pe_dict, self.ostream)
-        #    print("I read from the chk, rhs_mo =\n", self.rhs_mo)
 
         # Calculate the lambda multipliers and the relaxed one-particle density
         # in the parent class

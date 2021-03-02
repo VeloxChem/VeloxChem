@@ -1,14 +1,11 @@
 import numpy as np
-# import time as tm
 
-# from .molecule import Molecule
 from .gradientdriver import GradientDriver
 from .tdaorbitalresponse import TdaOrbitalResponse
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import dipole_in_debye
 from .errorhandler import assert_msg_critical
-# from .profiler import Profiler
 
 
 class TdaGradientDriver(GradientDriver):
@@ -55,13 +52,10 @@ class TdaGradientDriver(GradientDriver):
         if method_dict is None:
             method_dict = {}
 
-        # TODO: what needs to be updated here?
-        # n_state_deriv?
         if 'n_state_deriv' in rsp_dict:
             # user gives '1' for first excited state, but internal index is 0
             self.n_state_deriv = int(rsp_dict['n_state_deriv']) - 1
 
-        # how should this be resolved?
         self.rsp_dict = rsp_dict
         self.method_dict = method_dict
 
@@ -77,15 +71,6 @@ class TdaGradientDriver(GradientDriver):
             The minimal AO basis set.
         """
 
-        # TODO: add profiler when we can actually
-        # calculate the gradient
-        # profiler = Profiler({
-        #     'timing': self.timing,
-        #     'profiling': self.profiling,
-        #     'memory_profiling': self.memory_profiling,
-        #     'memory_tracing': self.memory_tracing,
-        # })
-
         # sanity check for number of state
         n_exc_states = len(self.tda_results['eigenvalues'])
         assert_msg_critical(self.n_state_deriv < n_exc_states,
@@ -93,62 +78,21 @@ class TdaGradientDriver(GradientDriver):
 
         self.print_header()
 
-        # ostream.state can be used to avoid printing a lot of info,
-        # e.g. when calculating numerical gradient.
-        # scf_ostream_state = self.scf_drv.ostream.state
-        # self.scf_drv.ostream.state = False
         scf_tensors = self.scf_drv.scf_tensors
 
-        # excitation energies and vectors
-        # exc_energies = self.tda_results["eigenvalues"]
+        # excitation vectors
         exc_vectors = self.tda_results["eigenvectors"]
 
         # orbital response driver
         orbrsp_drv = TdaOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.rsp_dict, self.method_dict)
-
-        # profiler.start_timer(0, 'Orbital Response')
         orbrsp_drv.compute(molecule, basis, scf_tensors, exc_vectors)
-        # profiler.check_memory_usage('Orbital Response')
-        # profiler.stop_timer(0, 'Orbital Response')
 
-        # profiler.start_timer(0, 'Excited State Properties')
-        # Calculate the relaxed and unrelaxed excited-state dipole moment
+        # calculate the relaxed and unrelaxed excited-state dipole moment
         dipole_moments = self.compute_properties(molecule, basis, scf_tensors,
                                                  orbrsp_drv)
-        # profiler.stop_timer(0, 'Excited State Properties')
-
-        # profiler.print_timing(self.ostream)
-        # profiler.print_profiling_summary(self.ostream)
 
         self.print_properties(molecule, dipole_moments)
-
-        # atom labels
-        # labels = molecule.get_labels()
-
-        # atom coordinates (nx3)
-        # coords = molecule.get_coordinates()
-
-        # analytical gradient
-        # self.gradient = np.zeros((molecule.number_of_atoms(), 3))
-
-        # TODO: Contract densities and Lagrange multipliers
-        #   with the integral derivatives ...
-
-        # self.ostream.print_blank()
-
-        # self.scf_drv.compute(molecule, ao_basis, min_basis)
-        # self.scf_drv.ostream.state = scf_ostream_state
-
-        # print gradient
-        # self.print_geometry(molecule)
-        # self.print_gradient(molecule, labels)
-
-        # valstr = '*** Time spent in gradient calculation: '
-        # valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
-        # self.ostream.print_header(valstr)
-        # self.ostream.print_blank()
-        # self.ostream.flush()
 
     def compute_properties(self, molecule, basis, scf_tensors, orbrsp_drv):
         """

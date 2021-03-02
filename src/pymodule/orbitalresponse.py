@@ -11,8 +11,6 @@ from .profiler import Profiler
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
-# from .checkpoint import read_rsp_hdf5
-# from .checkpoint import write_rsp_hdf5
 from scipy.sparse import linalg
 
 
@@ -37,8 +35,6 @@ class OrbitalResponse(LinearSolver):
         - omega_ao: The omega multipliers in AO basis.
     """
 
-    # Give number of state of interest and all vectors in compute function?
-    # Or only the specific vector in compute function?
     def __init__(self, comm, ostream):
         """
         Initializes orbital response computation driver to default setup.
@@ -83,7 +79,8 @@ class OrbitalResponse(LinearSolver):
 
     def compute_lambda(self, molecule, basis, scf_tensors):
         """
-        Performs orbital response Lagrange multipliers calculation using molecular data.
+        Performs orbital response Lagrange multipliers calculation
+        for the occupied-virtual alpha block using molecular data.
 
         :param molecule:
             The molecule.
@@ -122,83 +119,28 @@ class OrbitalResponse(LinearSolver):
             nalpha == nbeta,
             'OrbitalResponse: not implemented for unrestricted case')
 
-        # ERI information
-        # eri_dict = self.init_eri(molecule, basis)
-
-        # DFT information
-        # dft_dict = self.init_dft(molecule, scf_tensors)
-
-        # PE information
-        # pe_dict = self.init_pe(molecule, basis)
-
-        # timing_dict = {}
-
-        # block Davidson algorithm setup
-
-        # self.solver = BlockDavidsonSolver() # something with linalg.cg?
-
-        # read initial guess from restart file
-
-        # It might be possible to restart by using the current lambda
-        # and the right-hand side
-        # Restart iterations number
-        # n_restart_iterations = 4
-
         # count variable for conjugate gradient iterations
         self.iter_count = 0
 
-        # => Reading from checkpoint files does not improve convergence
-        #    when using scipy's conjugate gradient, it would probably
-        #    need information from two previous iterations...
-        # if self.restart:
-        #    print("Restarting orbital response in compute_lambda:")
-        #    print("checkpoint file =", self.checkpoint_file)
-        #    if self.rank == mpi_master():
-        #        #rhs_mo_from_chk = read_rsp_hdf5(
-        #        #    self.checkpoint_file, ['OrbRsp_RHS'],
-        #        #    molecule, basis, dft_dict, pe_dict, self.ostream)
-        #        self.rhs_mo, rst_orbrsp_lambda = read_rsp_hdf5(
-        #            self.checkpoint_file, ['OrbRsp_RHS', 'OrbRsp_lambda'],
-        #            molecule, basis, dft_dict, pe_dict, self.ostream)
 
-        #        print("This is what I'm reading from checkpoint:\n")
-        #        print("RHS:\n", self.rhs_mo)
-        #        print("\nLambda\n", rst_orbrsp_lambda)
-        #        # What does this do??
-        #        #self.restart = (self.rhs_mo is not None and
-        #        #                rst_orbrsp_lambda is not None)
-        # else:
-        #    # Write RHS to checkpoint file
-        #    if self.rank == mpi_master():
-        #        print("Writing checkpoint file, RHS")
-        #        write_rsp_hdf5(self.checkpoint_file, [self.rhs_mo],
-        #                       ['OrbRsp_RHS'], molecule, basis,
-        #                       dft_dict, pe_dict, self.ostream)
-        #        rhs_mo_from_chk = read_rsp_hdf5(
-        #            self.checkpoint_file, ['OrbRsp_RHS'],
-        #            molecule, basis, dft_dict, pe_dict, self.ostream)
-        #        print(rhs_mo_from_chk)
-
-        # TODO
+        # Workflow:
         # 1) Construct the necessary density matrices => in child classes
-        # 2) Construct the RH => in child classesS
+        # 2) Construct the RH => in child classes
         # 3) Construct the initial gues
         # 4) Write the linear operator for matrix-vector product
         # 5) Run the conjugate gradient
 
-        # 3) Calculate the initial guess for the Lagrange multipliers
-        #   given by the RHS divided by orbital-energy differences
+        # Necessary variables
         nocc = molecule.number_of_alpha_electrons()
         mo_occ = scf_tensors['C'][:, :nocc]  # occupied MO coefficients
         mo_vir = scf_tensors['C'][:, nocc:]  # virtual MO coefficients
         nvir = mo_vir.shape[1]
         eocc = scf_tensors['E'][:nocc]
         evir = scf_tensors['E'][nocc:]
-        eov = eocc.reshape(-1, 1) - evir
+        eov = eocc.reshape(-1, 1) - evir	# occ-virt delta Fock matrix
 
-        # if self.restart:
-        #    lambda_guess = rst_orbrsp_lambda
-        # else:
+        # 3) Calculate the initial guess for the Lagrange multipliers
+        #    given by the RHS divided by orbital-energy differences
         lambda_guess = self.rhs_mo / eov
 
         # Transform to AO
@@ -248,17 +190,6 @@ class OrbitalResponse(LinearSolver):
 
             # increase iteration counter every time this function is called
             self.iter_count += 1
-
-            # Write current lambda to checkpoint file
-            # if (self.rank == mpi_master()
-            # and self.iter_count % n_restart_iterations == 0) :
-            #    print("What we write to the checkpoint file:")
-            #    print("self.iter_count =", self.iter_count)
-            #    print("self.rhs_mo =\n", self.rhs_mo)
-            #    print("lambda_mo =\n", lambda_mo)
-            #    write_rsp_hdf5(self.checkpoint_file, [self.rhs_mo, lambda_mo],
-            #                   ['OrbRsp_RHS', 'OrbRsp_lambda'], molecule, basis,
-            #                   dft_dict, pe_dict, self.ostream)
 
             return lambda_mo.reshape(nocc * nvir)
 
