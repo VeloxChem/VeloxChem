@@ -11,7 +11,6 @@ except ImportError:
     pass
 
 from veloxchem.veloxchemlib import mpi_master
-from veloxchem.veloxchemlib import hartree_in_ev
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaexcidriver import TDAExciDriver
@@ -21,8 +20,8 @@ from veloxchem.tdaorbitalresponse import TdaOrbitalResponse
 class TestOrbitalResponse(unittest.TestCase):
 
     # TODO: this will have to be more general once RPA gradients are implemented
-    def run_orbitalresponse(self, inpfile, potfile, xcfun_label,
-                            ref_lambda_ao, ref_omega_ao):
+    def run_orbitalresponse(self, inpfile, potfile, xcfun_label, ref_lambda_ao,
+                            ref_omega_ao):
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
@@ -49,11 +48,12 @@ class TestOrbitalResponse(unittest.TestCase):
         tda_eig_vecs = tda_results['eigenvectors']
 
         orb_resp = TdaOrbitalResponse(task.mpi_comm, task.ostream)
-        orb_resp.update_settings({'nstates': 3,
-                                 'n_state_deriv': 1},
-                                 task.input_dict['method_settings'])
-        orb_resp.compute(task.molecule, task.ao_basis,
-                         scf_drv.scf_tensors, tda_eig_vecs)
+        orb_resp.update_settings({
+            'nstates': 3,
+            'n_state_deriv': 1
+        }, task.input_dict['method_settings'])
+        orb_resp.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors,
+                         tda_eig_vecs)
 
         if task.mpi_rank == mpi_master():
             lambda_ao = orb_resp.lambda_ao
@@ -76,17 +76,17 @@ class TestOrbitalResponse(unittest.TestCase):
         ref_lambda_ao = np.loadtxt(lambda_ref_file, delimiter=' ')
         ref_omega_ao = np.loadtxt(omega_ref_file, delimiter=' ')
 
-        self.run_orbitalresponse(inpfile, potfile, xcfun_label,
-                                 ref_lambda_ao, ref_omega_ao)
+        self.run_orbitalresponse(inpfile, potfile, xcfun_label, ref_lambda_ao,
+                                 ref_omega_ao)
 
     @pytest.mark.skipif(True, reason='DFT gradients not available')
     def test_tda_dft(self):
 
         here = Path(__file__).parent
 
-        #TODO: replace files with appropriate input data and
+        # TODO: replace files with appropriate input data and
         # reference values, once (TD)DFT is available
-        # (current files are for TDHF/TDA)  
+        # (current files are for TDHF/TDA)
         inpfile = str(here / 'inputs' / 'water.inp')
         lambda_ref_file = str(here / 'inputs' / 'lambda_ao_ref.txt')
         omega_ref_file = str(here / 'inputs' / 'omega_ao_ref.txt')
@@ -97,18 +97,17 @@ class TestOrbitalResponse(unittest.TestCase):
         ref_lambda_ao = np.loadtxt(lambda_ref_file, delimiter=' ')
         ref_omega_ao = np.loadtxt(omega_ref_file, delimiter=' ')
 
-        self.run_orbitalresponse(inpfile, potfile, xcfun_label,
-                                 ref_lambda_ao, ref_omega_ao)
- 
+        self.run_orbitalresponse(inpfile, potfile, xcfun_label, ref_lambda_ao,
+                                 ref_omega_ao)
 
     @pytest.mark.skipif(True, reason='DFT gradients not available')
     def test_tda_dft_slda(self):
 
         here = Path(__file__).parent
 
-        #TODO: replace files with appropriate input data and
+        # TODO: replace files with appropriate input data and
         # reference values, once (TD)DFT is available
-        # (current files are for TDHF/TDA)  
+        # (current files are for TDHF/TDA)
         inpfile = str(here / 'inputs' / 'water.inp')
         lambda_ref_file = str(here / 'inputs' / 'lambda_ao_ref.txt')
         omega_ref_file = str(here / 'inputs' / 'omega_ao_ref.txt')
@@ -119,18 +118,18 @@ class TestOrbitalResponse(unittest.TestCase):
         ref_lambda_ao = np.loadtxt(lambda_ref_file, delimiter=' ')
         ref_omega_ao = np.loadtxt(omega_ref_file, delimiter=' ')
 
-        self.run_orbitalresponse(inpfile, potfile, xcfun_label,
-                                 ref_lambda_ao, ref_omega_ao)
+        self.run_orbitalresponse(inpfile, potfile, xcfun_label, ref_lambda_ao,
+                                 ref_omega_ao)
 
-    #@pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    # @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     @pytest.mark.skipif(True, reason='cppe not available')
     def test_tda_hf_pe(self):
 
         here = Path(__file__).parent
 
-        #TODO: replace files with appropriate input data and
+        # TODO: replace files with appropriate input data and
         # reference values, once (TD)HF with PE is available
-        # (current files are for TDHF/TDA) 
+        # (current files are for TDHF/TDA)
         inpfile = str(here / 'inputs' / 'pe_water.inp')
         potfile = str(here / 'inputs' / 'pe_water.pot')
 
@@ -142,18 +141,18 @@ class TestOrbitalResponse(unittest.TestCase):
         ref_lambda_ao = np.loadtxt(lambda_ref_file, delimiter=' ')
         ref_omega_ao = np.loadtxt(omega_ref_file, delimiter=' ')
 
-        self.run_orbitalresponse(inpfile, potfile, xcfun_label,
-                                 ref_lambda_ao, ref_omega_ao)
+        self.run_orbitalresponse(inpfile, potfile, xcfun_label, ref_lambda_ao,
+                                 ref_omega_ao)
 
-    #@pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    # @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     @pytest.mark.skipif(True, reason='cppe not available')
     def test_tda_dft_pe(self):
 
         here = Path(__file__).parent
 
-        #TODO: replace files with appropriate input data and
+        # TODO: replace files with appropriate input data and
         # reference values, once (TD)DFT with PE is available
-        # (current files are for TDHF/TDA) 
+        # (current files are for TDHF/TDA)
         inpfile = str(here / 'inputs' / 'pe_water.inp')
         potfile = str(here / 'inputs' / 'pe_water.pot')
 
@@ -165,8 +164,8 @@ class TestOrbitalResponse(unittest.TestCase):
         ref_lambda_ao = np.loadtxt(lambda_ref_file, delimiter=' ')
         ref_omega_ao = np.loadtxt(omega_ref_file, delimiter=' ')
 
-        self.run_orbitalresponse(inpfile, potfile, xcfun_label,
-                                 ref_lambda_ao, ref_omega_ao)
+        self.run_orbitalresponse(inpfile, potfile, xcfun_label, ref_lambda_ao,
+                                 ref_omega_ao)
 
 
 if __name__ == "__main__":
