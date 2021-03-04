@@ -88,7 +88,7 @@ class PolEmbed:
         """
 
         from pkg_resources import parse_version
-        min_cppe_version = '0.2.0'
+        min_cppe_version = '0.3.1'
 
         if parse_version(cppe.__version__) < parse_version(min_cppe_version):
             err_str = 'cppe version {} or higher is required.'.format(
@@ -119,6 +119,10 @@ class PolEmbed:
             'border_nredist': 'int',
             'border_redist_order': 'int',
             'border_redist_pol': 'bool',
+            'summation_induced_fields': 'string',
+            'tree_ncrit': 'int',
+            'tree_expansion_order': 'int',
+            'theta': 'float',
         }
 
         self.options = {}
