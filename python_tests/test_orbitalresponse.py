@@ -15,13 +15,12 @@ from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaexcidriver import TDAExciDriver
 from veloxchem.tdaorbitalresponse import TdaOrbitalResponse
+from veloxchem.checkpoint import read_rsp_hdf5
 
 
 class TestOrbitalResponse(unittest.TestCase):
 
-    # TODO: this will have to be more general once RPA gradients are implemented
-    def run_orbitalresponse(self, inpfile, potfile, xcfun_label, ref_lambda_ao,
-                            ref_omega_ao):
+    def run_tdaorbitalresponse(self, inpfile, potfile, xcfun_label, orbrsp_ref_file):
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
@@ -55,6 +54,15 @@ class TestOrbitalResponse(unittest.TestCase):
         orb_resp.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors,
                          tda_eig_vecs)
 
+		# Can this be solved differently?
+        dft_dict = orb_resp.init_dft(task.molecule, scf_drv.scf_tensors)
+        pe_dict = orb_resp.init_pe(task.molecule, task.ao_basis)
+
+        ref_lambda_ao, ref_omega_ao = read_rsp_hdf5(orbrsp_ref_file,
+                                          ['lambda_tda', 'omega_tda'],
+                                          task.molecule, task.ao_basis,
+                                          dft_dict, pe_dict, task.ostream)
+
         if task.mpi_rank == mpi_master():
             lambda_ao = orb_resp.lambda_ao
             omega_ao = orb_resp.omega_ao
@@ -66,106 +74,13 @@ class TestOrbitalResponse(unittest.TestCase):
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water_orbrsp.inp')
-        lambda_ref_file = str(here / 'inputs' / 'lambda_ao_ref.txt')
-        omega_ref_file = str(here / 'inputs' / 'omega_ao_ref.txt')
+        orbrsp_ref_file = str(here / 'inputs' / 'orbital_response_hf_ref.h5')
 
         potfile = None
 
         xcfun_label = None
 
-        ref_lambda_ao = np.loadtxt(lambda_ref_file, delimiter=' ')
-        ref_omega_ao = np.loadtxt(omega_ref_file, delimiter=' ')
-
-        self.run_orbitalresponse(inpfile, potfile, xcfun_label, ref_lambda_ao,
-                                 ref_omega_ao)
-
-    @pytest.mark.skipif(True, reason='DFT gradients not available')
-    def test_tda_dft(self):
-
-        here = Path(__file__).parent
-
-        # TODO: replace files with appropriate input data and
-        # reference values, once (TD)DFT is available
-        # (current files are for TDHF/TDA)
-        inpfile = str(here / 'inputs' / 'water.inp')
-        lambda_ref_file = str(here / 'inputs' / 'lambda_ao_ref.txt')
-        omega_ref_file = str(here / 'inputs' / 'omega_ao_ref.txt')
-        potfile = None
-
-        xcfun_label = 'b3lyp'
-
-        ref_lambda_ao = np.loadtxt(lambda_ref_file, delimiter=' ')
-        ref_omega_ao = np.loadtxt(omega_ref_file, delimiter=' ')
-
-        self.run_orbitalresponse(inpfile, potfile, xcfun_label, ref_lambda_ao,
-                                 ref_omega_ao)
-
-    @pytest.mark.skipif(True, reason='DFT gradients not available')
-    def test_tda_dft_slda(self):
-
-        here = Path(__file__).parent
-
-        # TODO: replace files with appropriate input data and
-        # reference values, once (TD)DFT is available
-        # (current files are for TDHF/TDA)
-        inpfile = str(here / 'inputs' / 'water.inp')
-        lambda_ref_file = str(here / 'inputs' / 'lambda_ao_ref.txt')
-        omega_ref_file = str(here / 'inputs' / 'omega_ao_ref.txt')
-        potfile = None
-
-        xcfun_label = 'slda'
-
-        ref_lambda_ao = np.loadtxt(lambda_ref_file, delimiter=' ')
-        ref_omega_ao = np.loadtxt(omega_ref_file, delimiter=' ')
-
-        self.run_orbitalresponse(inpfile, potfile, xcfun_label, ref_lambda_ao,
-                                 ref_omega_ao)
-
-    # @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
-    @pytest.mark.skipif(True, reason='cppe not available')
-    def test_tda_hf_pe(self):
-
-        here = Path(__file__).parent
-
-        # TODO: replace files with appropriate input data and
-        # reference values, once (TD)HF with PE is available
-        # (current files are for TDHF/TDA)
-        inpfile = str(here / 'inputs' / 'pe_water.inp')
-        potfile = str(here / 'inputs' / 'pe_water.pot')
-
-        lambda_ref_file = str(here / 'inputs' / 'lambda_ao_ref.txt')
-        omega_ref_file = str(here / 'inputs' / 'omega_ao_ref.txt')
-
-        xcfun_label = None
-
-        ref_lambda_ao = np.loadtxt(lambda_ref_file, delimiter=' ')
-        ref_omega_ao = np.loadtxt(omega_ref_file, delimiter=' ')
-
-        self.run_orbitalresponse(inpfile, potfile, xcfun_label, ref_lambda_ao,
-                                 ref_omega_ao)
-
-    # @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
-    @pytest.mark.skipif(True, reason='cppe not available')
-    def test_tda_dft_pe(self):
-
-        here = Path(__file__).parent
-
-        # TODO: replace files with appropriate input data and
-        # reference values, once (TD)DFT with PE is available
-        # (current files are for TDHF/TDA)
-        inpfile = str(here / 'inputs' / 'pe_water.inp')
-        potfile = str(here / 'inputs' / 'pe_water.pot')
-
-        lambda_ref_file = str(here / 'inputs' / 'lambda_ao_ref.txt')
-        omega_ref_file = str(here / 'inputs' / 'omega_ao_ref.txt')
-
-        xcfun_label = 'b3lyp'
-
-        ref_lambda_ao = np.loadtxt(lambda_ref_file, delimiter=' ')
-        ref_omega_ao = np.loadtxt(omega_ref_file, delimiter=' ')
-
-        self.run_orbitalresponse(inpfile, potfile, xcfun_label, ref_lambda_ao,
-                                 ref_omega_ao)
+        self.run_tdaorbitalresponse(inpfile, potfile, xcfun_label, orbrsp_ref_file)
 
 
 if __name__ == "__main__":
