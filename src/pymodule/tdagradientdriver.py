@@ -78,7 +78,6 @@ class TdaGradientDriver(GradientDriver):
 
         self.print_header()
 
-
         # excitation vectors
         exc_vectors = self.tda_results["eigenvectors"]
 
@@ -88,8 +87,8 @@ class TdaGradientDriver(GradientDriver):
         orbrsp_drv.compute(molecule, basis, self.scf_tensors, exc_vectors)
 
         # calculate the relaxed and unrelaxed excited-state dipole moment
-        dipole_moments = self.compute_properties(molecule, basis, self.scf_tensors,
-                                                 orbrsp_drv)
+        dipole_moments = self.compute_properties(molecule, basis,
+                                                 self.scf_tensors, orbrsp_drv)
 
         self.print_properties(molecule, dipole_moments)
 
@@ -171,12 +170,13 @@ class TdaGradientDriver(GradientDriver):
             warn_msg = '    Center of nuclear charge is chosen as the origin.'
             self.ostream.print_header(warn_msg.ljust(56))
 
-		# Remove warning once DFT orbital response is implemented
-        if self.method_dict['xcfun'] is not None:
-            warn_msg = '*** Warning: Orbital response for DFT is not yet fully'
-            self.ostream.print_header(warn_msg.ljust(56))
-            warn_msg = '    implemented. Relaxed dipole moment will be wrong.'
-            self.ostream.print_header(warn_msg.ljust(56))
+        # Remove warning once DFT orbital response is implemented
+        if 'xcfun' in self.method_dict:
+            if self.method_dict['xcfun'] is not None:
+                warn_msg = '*** Warning: Orbital response for DFT is not yet fully'
+                self.ostream.print_header(warn_msg.ljust(56))
+                warn_msg = '    implemented. Relaxed dipole moment will be wrong.'
+                self.ostream.print_header(warn_msg.ljust(56))
 
         self.ostream.print_blank()
 

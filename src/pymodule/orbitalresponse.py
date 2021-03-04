@@ -122,7 +122,6 @@ class OrbitalResponse(LinearSolver):
         # count variable for conjugate gradient iterations
         self.iter_count = 0
 
-
         # Workflow:
         # 1) Construct the necessary density matrices => in child classes
         # 2) Construct the RH => in child classes
@@ -137,7 +136,7 @@ class OrbitalResponse(LinearSolver):
         nvir = mo_vir.shape[1]
         eocc = scf_tensors['E'][:nocc]
         evir = scf_tensors['E'][nocc:]
-        eov = eocc.reshape(-1, 1) - evir	# occ-virt delta Fock matrix
+        eov = eocc.reshape(-1, 1) - evir  # occ-virt delta Fock matrix
 
         # 3) Calculate the initial guess for the Lagrange multipliers
         #    given by the RHS divided by orbital-energy differences
