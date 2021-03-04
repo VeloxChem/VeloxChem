@@ -26,6 +26,7 @@ from .veloxchemlib import mpi_initialized, mpi_master
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
+from .tdagradientdriver import TdaGradientDriver
 
 
 def select_scf_driver(task, scf_type):
@@ -291,6 +292,15 @@ def main():
 
         if task.mpi_rank == mpi_master():
             rsp_prop.print_property(task.ostream)
+
+        # Calculate the excited-state gradient (for now only
+        # CIS relaxed dipole moments)
+        if ('n_state_deriv' in rsp_dict and 'tamm_dancoff' in rsp_dict):
+            if rsp_dict['tamm_dancoff'] == 'yes':
+                tdagrad_drv = TdaGradientDriver(task.mpi_comm, task.ostream,
+                                                scf_tensors, rsp_prop.rsp_property)
+                tdagrad_drv.update_settings(rsp_dict, method_dict)
+                tdagrad_drv.compute(task.molecule, task.ao_basis)
 
     # Pulsed Linear Response Theory
 
