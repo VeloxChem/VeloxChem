@@ -1,9 +1,6 @@
 from mpi4py import MPI
 import numpy as np
 import unittest
-import pytest
-import sys
-import os
 from pathlib import Path
 try:
     import cppe
@@ -20,7 +17,8 @@ from veloxchem.checkpoint import read_rsp_hdf5
 
 class TestOrbitalResponse(unittest.TestCase):
 
-    def run_tdaorbitalresponse(self, inpfile, potfile, xcfun_label, orbrsp_ref_file):
+    def run_tdaorbitalresponse(self, inpfile, potfile, xcfun_label,
+                               orbrsp_ref_file):
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
@@ -44,28 +42,27 @@ class TestOrbitalResponse(unittest.TestCase):
                                    task.input_dict['method_settings'])
         tda_results = tda_solver.compute(task.molecule, task.ao_basis,
                                          scf_drv.scf_tensors)
-        tda_eig_vecs = tda_results['eigenvectors']
 
         orb_resp = TdaOrbitalResponse(task.mpi_comm, task.ostream)
         orb_resp.update_settings({
             'nstates': 3,
             'n_state_deriv': 1
         }, task.input_dict['method_settings'])
-        orb_resp.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors,
-                         tda_eig_vecs)
+        orb_resp_result = orb_resp.compute(task.molecule, task.ao_basis,
+                                           scf_drv.scf_tensors, tda_results)
 
-		# Can this be solved differently?
-        dft_dict = orb_resp.init_dft(task.molecule, scf_drv.scf_tensors)
-        pe_dict = orb_resp.init_pe(task.molecule, task.ao_basis)
+        dft_dict = {'dft_func_label': 'HF'}
+        pe_dict = {'potfile_text': ''}
 
         ref_lambda_ao, ref_omega_ao = read_rsp_hdf5(orbrsp_ref_file,
-                                          ['lambda_tda', 'omega_tda'],
-                                          task.molecule, task.ao_basis,
-                                          dft_dict, pe_dict, task.ostream)
+                                                    ['lambda_tda', 'omega_tda'],
+                                                    task.molecule,
+                                                    task.ao_basis, dft_dict,
+                                                    pe_dict, task.ostream)
 
         if task.mpi_rank == mpi_master():
-            lambda_ao = orb_resp.lambda_ao
-            omega_ao = orb_resp.omega_ao
+            lambda_ao = orb_resp_result['lambda_ao']
+            omega_ao = orb_resp_result['omega_ao']
 
             self.assertTrue(np.max(np.abs(lambda_ao - ref_lambda_ao)) < 5.0e-4)
             self.assertTrue(np.max(np.abs(omega_ao - ref_omega_ao)) < 5.0e-4)
@@ -80,7 +77,8 @@ class TestOrbitalResponse(unittest.TestCase):
 
         xcfun_label = None
 
-        self.run_tdaorbitalresponse(inpfile, potfile, xcfun_label, orbrsp_ref_file)
+        self.run_tdaorbitalresponse(inpfile, potfile, xcfun_label,
+                                    orbrsp_ref_file)
 
 
 if __name__ == "__main__":

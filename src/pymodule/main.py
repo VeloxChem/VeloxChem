@@ -297,10 +297,10 @@ def main():
         # CIS relaxed dipole moments)
         if ('n_state_deriv' in rsp_dict and 'tamm_dancoff' in rsp_dict):
             if rsp_dict['tamm_dancoff'] == 'yes':
-                tdagrad_drv = TdaGradientDriver(task.mpi_comm, task.ostream,
-                                                scf_tensors, rsp_prop.rsp_property)
+                tdagrad_drv = TdaGradientDriver(task.mpi_comm, task.ostream)
                 tdagrad_drv.update_settings(rsp_dict, method_dict)
-                tdagrad_drv.compute(task.molecule, task.ao_basis)
+                tdagrad_drv.compute(task.molecule, task.ao_basis, scf_tensors,
+                                    rsp_prop.rsp_property)
 
     # Pulsed Linear Response Theory
 

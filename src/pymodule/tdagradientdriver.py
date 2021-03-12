@@ -21,24 +21,21 @@ class TdaGradientDriver(GradientDriver):
 
     Instance variables
         - scf_tensors: The results from the converged SCF calculation.
-        - tda_results: Results from the TDA driver.
         - n_state_deriv: The excited state of interest.
     """
 
-    def __init__(self, comm, ostream, scf_tensors, tda_results):
+    def __init__(self, comm, ostream):
         """
         Initializes gradient driver.
         """
 
         super().__init__(comm, ostream)
-        self.rank = comm.Get_rank()
+        self.rank = self.comm.Get_rank()
+
+        self.flag = 'TDA Gradient Driver'
 
         # excited state information, default to first excited state
         self.n_state_deriv = 0
-
-        self.flag = 'TDA Gradient Driver'
-        self.scf_tensors = scf_tensors
-        self.tda_results = tda_results
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -49,8 +46,12 @@ class TdaGradientDriver(GradientDriver):
         :param method_dict:
             The input dicitonary of method settings group.
         """
+
         if method_dict is None:
             method_dict = {}
+
+        # TODO: 'n_state_deriv' can be interpreted as the number of states, not
+        # the index of the state. Perhaps 'state_deriv' is a better keyword.
 
         if 'n_state_deriv' in rsp_dict:
             # user gives '1' for first excited state, but internal index is 0
@@ -59,7 +60,7 @@ class TdaGradientDriver(GradientDriver):
         self.rsp_dict = rsp_dict
         self.method_dict = method_dict
 
-    def compute(self, molecule, basis, min_basis=None):
+    def compute(self, molecule, basis, scf_tensors, tda_results):
         """
         Performs calculation of analytical gradient.
 
@@ -67,32 +68,30 @@ class TdaGradientDriver(GradientDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
         """
 
         # sanity check for number of state
-        n_exc_states = len(self.tda_results['eigenvalues'])
-        assert_msg_critical(self.n_state_deriv < n_exc_states,
-                            'TdaGradientDriver: not enough states calculated')
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                self.n_state_deriv < tda_results['eigenvalues'].size,
+                'TdaGradientDriver: not enough states calculated')
 
         self.print_header()
-
-        # excitation vectors
-        exc_vectors = self.tda_results["eigenvectors"]
 
         # orbital response driver
         orbrsp_drv = TdaOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.rsp_dict, self.method_dict)
-        orbrsp_drv.compute(molecule, basis, self.scf_tensors, exc_vectors)
+        orbrsp_results = orbrsp_drv.compute(molecule, basis, scf_tensors,
+                                            tda_results)
 
         # calculate the relaxed and unrelaxed excited-state dipole moment
-        dipole_moments = self.compute_properties(molecule, basis,
-                                                 self.scf_tensors, orbrsp_drv)
+        dipole_moments = self.compute_properties(molecule, basis, scf_tensors,
+                                                 orbrsp_results)
 
-        self.print_properties(molecule, dipole_moments)
+        if self.rank == mpi_master():
+            self.print_properties(molecule, dipole_moments)
 
-    def compute_properties(self, molecule, basis, scf_tensors, orbrsp_drv):
+    def compute_properties(self, molecule, basis, scf_tensors, orbrsp_results):
         """
         Calculates first-order properties of TDA excited states
         using the results of the orbital response calculation.
@@ -103,12 +102,13 @@ class TdaGradientDriver(GradientDriver):
             The AO basis set.
         :param scf_tensors:
             The tensors from the converged SCF calculation.
-        :param orbrsp_drv:
-            The orbital response driver containing its results.
+        :param orbrsp_results:
+            The orbital response results.
 
         :return:
             A dictionary containing the properties.
         """
+
         if molecule.get_charge() != 0:
             coords = molecule.get_coordinates()
             nuclear_charges = molecule.elem_ids_to_numpy()
@@ -128,9 +128,9 @@ class TdaGradientDriver(GradientDriver):
 
             # electronic contribution
             unrel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
-                             orbrsp_drv.unrel_dm_ao)
+                             orbrsp_results['unrel_dm_ao'])
             rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
-                           orbrsp_drv.rel_dm_ao)
+                           orbrsp_results['rel_dm_ao'])
             unrel_electronic_dipole = -1.0 * np.array(
                 [np.sum(dipole_ints[d] * unrel_density) for d in range(3)])
             rel_electronic_dipole = -1.0 * np.array(
@@ -148,6 +148,8 @@ class TdaGradientDriver(GradientDriver):
                 'relaxed_dipole_moment':
                     (nuclear_dipole + rel_electronic_dipole),
             }
+        else:
+            return {}
 
     def print_properties(self, molecule, properties):
         """
