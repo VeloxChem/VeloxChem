@@ -1,56 +1,59 @@
-import os
-import random
-import unittest
 from pathlib import Path
-
 import numpy as np
+import unittest
+import tempfile
+import random
 import pytest
-from mpi4py import MPI
-from veloxchem.c6solver import C6Solver
+import os
+
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
-from veloxchem.rspc6 import C6
+from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.rspc6 import C6
 
 
 @pytest.mark.solvers
 class TestC6(unittest.TestCase):
 
-    def run_c6(self, inpfile, potfile, xcfun_label, data_lines, ref_c6_value):
-
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
-
-        # if potfile is not None:
-        #     task.input_dict['method_settings']['potfile'] = potfile
-        #     try:
-        #         import cppe
-        #     except ImportError:
-        #         return
-
-        if xcfun_label is not None:
-            task.input_dict['method_settings']['xcfun'] = xcfun_label
+    def run_scf(self, task):
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+        return scf_drv.scf_tensors
+
+    def run_c6(self, inpfile, xcfun_label, data_lines, ref_c6_value):
+
         ref_freqs, ref_results = self.get_ref_data(data_lines)
         ref_n_points = len(ref_freqs)
 
-        c6_solver = C6Solver(task.mpi_comm, task.ostream)
-        c6_solver.update_settings(
+        task = MpiTask([inpfile, None])
+        task.input_dict['scf']['checkpoint_file'] = None
+
+        if xcfun_label is not None:
+            task.input_dict['method_settings']['xcfun'] = xcfun_label
+
+        scf_tensors = self.run_scf(task)
+
+        c6_prop = C6(
             {
                 'n_points': ref_n_points,
                 'batch_size': random.choice([1, 10, 100])
             }, task.input_dict['method_settings'])
-        c6_results = c6_solver.compute(task.molecule, task.ao_basis,
-                                       scf_drv.scf_tensors)
+        c6_prop.init_driver(task.mpi_comm, task.ostream)
+        c6_prop.compute(task.molecule, task.ao_basis, scf_tensors)
 
-        if task.mpi_rank == mpi_master():
+        self.assertTrue(c6_prop.rsp_driver.is_converged)
+
+        if is_mpi_master(task.mpi_comm):
+            self.check_printout(c6_prop)
+            c6_results = c6_prop.rsp_property
+
             freqs = set()
-            for apo, bop, iw in c6_results['response_functions']:
+            for aop, bop, iw in c6_results['response_functions']:
                 freqs.add(iw)
             freqs = sorted(list(freqs), reverse=True)[:-1]
             diff_freq = np.max(np.abs(np.array(freqs) - np.array(ref_freqs)))
@@ -95,12 +98,38 @@ class TestC6(unittest.TestCase):
 
         return ref_freqs, ref_results
 
+    def check_printout(self, c6_prop):
+
+        rsp_func = c6_prop.rsp_property['response_functions']
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fname = str(Path(temp_dir, 'c6.out'))
+
+            ostream = OutputStream(fname)
+            c6_prop.print_property(ostream)
+            ostream.close()
+
+            with open(fname, 'r') as f_out:
+                lines = f_out.readlines()
+
+            for key, val in rsp_func.items():
+                key_found = False
+                for line in lines:
+                    if f'{key[0]}  ;  {key[1]}' in line:
+                        content = line.split('>>')[1].split()
+                        print_freq = float(content[0])
+                        if abs(key[2] - print_freq) < 1e-4:
+                            key_found = True
+                            print_real = float(content[1])
+                            print_imag = float(content[2].replace('j', ''))
+                            self.assertAlmostEqual(val.real, print_real, 6)
+                            self.assertAlmostEqual(val.imag, print_imag, 6)
+                self.assertTrue(key_found)
+
     def test_c6_hf(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
-
-        potfile = None
 
         xcfun_label = None
 
@@ -167,14 +196,12 @@ class TestC6(unittest.TestCase):
 
         ref_c6_value = 36.230454
 
-        self.run_c6(inpfile, potfile, xcfun_label, data_lines, ref_c6_value)
+        self.run_c6(inpfile, xcfun_label, data_lines, ref_c6_value)
 
     def test_c6_dft(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
-
-        potfile = None
 
         xcfun_label = 'b3lyp'
 
@@ -241,14 +268,12 @@ class TestC6(unittest.TestCase):
 
         ref_c6_value = 42.315098
 
-        self.run_c6(inpfile, potfile, xcfun_label, data_lines, ref_c6_value)
+        self.run_c6(inpfile, xcfun_label, data_lines, ref_c6_value)
 
     def test_c6_dft_slda(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
-
-        potfile = None
 
         xcfun_label = 'slda'
 
@@ -315,7 +340,7 @@ class TestC6(unittest.TestCase):
 
         ref_c6_value = 44.494604
 
-        self.run_c6(inpfile, potfile, xcfun_label, data_lines, ref_c6_value)
+        self.run_c6(inpfile, xcfun_label, data_lines, ref_c6_value)
 
 
 if __name__ == "__main__":

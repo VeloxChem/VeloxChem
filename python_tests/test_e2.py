@@ -1,9 +1,8 @@
-from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import unittest
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
@@ -17,7 +16,7 @@ class TestE2(unittest.TestCase):
         inpfile = str(here / 'inputs' / 'be.inp')
         outfile = str(here / 'inputs' / 'be.out')
 
-        task = MpiTask([inpfile, outfile], MPI.COMM_WORLD)
+        task = MpiTask([inpfile, outfile])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
@@ -28,7 +27,7 @@ class TestE2(unittest.TestCase):
         lreig_solver = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
         E2 = lreig_solver.get_e2(task.molecule, task.ao_basis, scf_tensors)
 
-        if task.mpi_comm.Get_rank() == mpi_master():
+        if is_mpi_master(task.mpi_comm):
 
             n = E2.shape[0] // 2
 

@@ -1,5 +1,6 @@
-import sys
+from mpi4py import MPI
 from pathlib import Path
+import sys
 
 from .veloxchemlib import mpi_master
 from .inputparser import InputParser
@@ -30,13 +31,16 @@ class MpiTask:
         - start_time: The start time of the task.
     """
 
-    def __init__(self, fname_list, mpi_comm):
+    def __init__(self, fname_list, mpi_comm=None):
         """
         Initializes the MPI task.
         """
 
         # mpi settings
-        self.mpi_comm = mpi_comm
+        if mpi_comm is None:
+            self.mpi_comm = MPI.COMM_WORLD
+        else:
+            self.mpi_comm = mpi_comm
         self.mpi_rank = self.mpi_comm.Get_rank()
         self.mpi_size = self.mpi_comm.Get_size()
 

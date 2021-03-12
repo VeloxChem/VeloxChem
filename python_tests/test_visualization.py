@@ -1,23 +1,37 @@
-from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
-from pathlib import Path
+import tempfile
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.cubicgrid import CubicGrid
 from veloxchem.visualizationdriver import VisualizationDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.mpitask import MpiTask
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
 
 
 class TestVisualization(unittest.TestCase):
+
+    def get_molecule_and_basis(self):
+
+        mol_str = """
+            O   0.0   0.0   0.0
+            H   0.0   1.4   1.1
+            H   0.0  -1.4   1.1
+        """
+        mol = Molecule.read_str(mol_str, units='bohr')
+        bas = MolecularBasis.read(mol, 'aug-cc-pvdz')
+
+        return mol, bas
 
     def test_visualization_driver(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'h2se.inp')
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
@@ -39,7 +53,7 @@ class TestVisualization(unittest.TestCase):
         mo_val = vis_drv.get_mo(points, task.molecule, task.ao_basis, mol_orbs,
                                 homo, 'alpha')
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             homo_values = grid.values_to_numpy()
 
             homo_ref = np.array([
@@ -62,7 +76,7 @@ class TestVisualization(unittest.TestCase):
         den_val = vis_drv.get_density(points, task.molecule, task.ao_basis,
                                       density, 0, 'alpha')
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             dens_alpha = grid.values_to_numpy()
             dens_total = dens_alpha * 2.0
 
@@ -90,7 +104,7 @@ class TestVisualization(unittest.TestCase):
                                                        task.ao_basis, density,
                                                        0, 'alpha', 'beta')
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             twoe_val_aa = np.array(twoe_val_aa).reshape(2, 3, 3)
             twoe_val_ab = np.array(twoe_val_ab).reshape(2, 3, 3)
 
@@ -125,6 +139,65 @@ class TestVisualization(unittest.TestCase):
              grid.z_num_points()])
 
         self.assertEqual(grid.values_to_numpy().shape, tuple(num_points))
+
+    def test_gen_cubic_grid(self):
+
+        mol, bas = self.get_molecule_and_basis()
+
+        num_points = [2, 3, 5]
+
+        vis_drv = VisualizationDriver()
+        grid = vis_drv.gen_cubic_grid(mol, num_points)
+
+        self.assertEqual(
+            num_points,
+            [grid.x_num_points(),
+             grid.y_num_points(),
+             grid.z_num_points()])
+
+    def test_gen_cubes(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water.inp')
+
+        task = MpiTask([inpfile, None])
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        mol_orbs = scf_drv.mol_orbs
+        density = scf_drv.density
+
+        mol_orbs.broadcast(task.mpi_rank, task.mpi_comm)
+        density.broadcast(task.mpi_rank, task.mpi_comm)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dens_cube_fname = str(Path(temp_dir, 'density.cube'))
+            homo_cube_fname = str(Path(temp_dir, 'homo.cube'))
+
+            cube_dict = {
+                'grid': '2, 3, 5',
+                'cubes': 'density(alpha), mo(homo)',
+                'files': f'{dens_cube_fname}, {homo_cube_fname}',
+            }
+
+            vis_drv = VisualizationDriver()
+            vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
+                              density)
+
+            cubic_grid = vis_drv.gen_cubic_grid(task.molecule, [2, 3, 5])
+
+            vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, density,
+                            0, 'alpha')
+            if is_mpi_master(task.mpi_comm):
+                read_grid = CubicGrid.read_cube(dens_cube_fname)
+                self.assertTrue(read_grid.compare(cubic_grid) < 1e-6)
+
+            vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, mol_orbs,
+                            task.molecule.number_of_alpha_electrons() - 1,
+                            'alpha')
+            if is_mpi_master(task.mpi_comm):
+                read_grid = CubicGrid.read_cube(homo_cube_fname)
+                self.assertTrue(read_grid.compare(cubic_grid) < 1e-6)
 
 
 if __name__ == "__main__":

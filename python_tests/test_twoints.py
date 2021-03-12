@@ -1,8 +1,7 @@
-from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
 import math
-from pathlib import Path
 
 from veloxchem.veloxchemlib import KineticEnergyMatrix
 from veloxchem.veloxchemlib import NuclearPotentialMatrix
@@ -10,7 +9,7 @@ from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver
 from veloxchem.veloxchemlib import denmat
 from veloxchem.veloxchemlib import fockmat
 from veloxchem.veloxchemlib import ericut
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.aofockmatrix import AOFockMatrix
@@ -144,7 +143,7 @@ class TestTwoInts(unittest.TestCase):
 
         # hdf5 read/write tests
 
-        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+        if is_mpi_master():
 
             here = Path(__file__).parent
             h5file = here / 'inputs' / 'dummy.h5'
@@ -159,7 +158,7 @@ class TestTwoInts(unittest.TestCase):
         inpfile = here / 'inputs' / 'h2se.inp'
         outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)])
 
         molecule = task.molecule
         ao_basis = task.ao_basis
@@ -180,7 +179,7 @@ class TestTwoInts(unittest.TestCase):
 
         # read density
 
-        if rank == mpi_master():
+        if is_mpi_master(comm):
             densfile = str(here / 'inputs' / 'h2se.dens.h5')
 
             dmat = AODensityMatrix.read_hdf5(densfile)
@@ -217,7 +216,7 @@ class TestTwoInts(unittest.TestCase):
 
         # compare with unrestricted Fock
 
-        if rank == mpi_master():
+        if is_mpi_master(comm):
             da = dmat.alpha_to_numpy(0)
             db = dmat.beta_to_numpy(0)
             d2 = AODensityMatrix([da, db], denmat.unrest)
@@ -242,7 +241,7 @@ class TestTwoInts(unittest.TestCase):
 
         # compare with reference
 
-        if rank == mpi_master():
+        if is_mpi_master(comm):
 
             twoefile = str(here / 'inputs' / 'h2se.twoe.h5')
 

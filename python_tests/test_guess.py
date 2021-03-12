@@ -1,11 +1,10 @@
-from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
-from pathlib import Path
 
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
 from veloxchem.veloxchemlib import SADGuessDriver
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 
 
@@ -17,24 +16,21 @@ class TestInitialGuess(unittest.TestCase):
         inpfile = here / 'inputs' / 'water.inp'
         outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)])
 
         molecule = task.molecule
         ao_basis = task.ao_basis
         min_basis = task.min_basis
 
-        comm = task.mpi_comm
-        rank = task.mpi_rank
-
         # compute overlap
 
-        ovldrv = OverlapIntegralsDriver(comm)
+        ovldrv = OverlapIntegralsDriver(task.mpi_comm)
         S12 = ovldrv.compute(molecule, min_basis, ao_basis)
         S22 = ovldrv.compute(molecule, ao_basis)
 
         # compute initial guess
 
-        saddrv = SADGuessDriver(comm)
+        saddrv = SADGuessDriver(task.mpi_comm)
         D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, True)
 
         # matrix to numpy
@@ -42,7 +38,7 @@ class TestInitialGuess(unittest.TestCase):
         overlap = S22.to_numpy()
         density = D.alpha_to_numpy(0)
 
-        if (rank == mpi_master()):
+        if is_mpi_master(task.mpi_comm):
 
             self.assertEqual(density.ndim, 2)
             self.assertEqual(density.shape[0], 41)
@@ -70,7 +66,7 @@ class TestInitialGuess(unittest.TestCase):
 
         density_a = D.alpha_to_numpy(0)
 
-        if (rank == mpi_master()):
+        if is_mpi_master(task.mpi_comm):
 
             self.assertEqual(molecule.number_of_electrons(), 8)
             self.assertEqual(molecule.number_of_alpha_electrons(), 4)
@@ -87,7 +83,7 @@ class TestInitialGuess(unittest.TestCase):
 
         density_a = D.alpha_to_numpy(0)
 
-        if (rank == mpi_master()):
+        if is_mpi_master(task.mpi_comm):
 
             self.assertEqual(molecule.number_of_electrons(), 12)
             self.assertEqual(molecule.number_of_alpha_electrons(), 6)
@@ -105,7 +101,7 @@ class TestInitialGuess(unittest.TestCase):
         density_a = D.alpha_to_numpy(0)
         density_b = D.beta_to_numpy(0)
 
-        if (rank == mpi_master()):
+        if is_mpi_master(task.mpi_comm):
 
             self.assertEqual(molecule.number_of_electrons(), 9)
             self.assertEqual(molecule.number_of_alpha_electrons(), 5)
@@ -124,7 +120,7 @@ class TestInitialGuess(unittest.TestCase):
         density_a = D.alpha_to_numpy(0)
         density_b = D.beta_to_numpy(0)
 
-        if (rank == mpi_master()):
+        if is_mpi_master(task.mpi_comm):
 
             self.assertEqual(molecule.number_of_electrons(), 11)
             self.assertEqual(molecule.number_of_alpha_electrons(), 6)
@@ -143,7 +139,7 @@ class TestInitialGuess(unittest.TestCase):
         density_a = D.alpha_to_numpy(0)
         density_b = D.beta_to_numpy(0)
 
-        if (rank == mpi_master()):
+        if is_mpi_master(task.mpi_comm):
 
             self.assertEqual(molecule.number_of_electrons(), 10)
             self.assertEqual(molecule.number_of_alpha_electrons(), 6)

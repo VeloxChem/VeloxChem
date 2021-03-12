@@ -1,4 +1,3 @@
-from mpi4py import MPI
 from unittest.mock import patch
 from unittest.mock import MagicMock
 import numpy.testing as npt
@@ -7,6 +6,7 @@ import pytest
 import sys
 import os
 
+from veloxchem.veloxchemlib import is_single_node
 from veloxchem.main import main
 from veloxchem.mpitask import MpiTask
 from veloxchem.inputparser import InputParser
@@ -239,7 +239,7 @@ def test_cpa(sample, tmpdir):
         f.write(sample)
 
     # when
-    task = MpiTask([input_file], MPI.COMM_WORLD)
+    task = MpiTask([input_file])
     loprop_driver = LoPropDriver(task)
 
     # then
@@ -258,7 +258,7 @@ def test_opa(sample, tmpdir):
         f.write(sample)
 
     # when
-    task = MpiTask([input_file], MPI.COMM_WORLD)
+    task = MpiTask([input_file])
     loprop_driver = LoPropDriver(task)
 
     # then
@@ -347,7 +347,8 @@ def test_get_lib_basis_file():
 class TestIntegrations:
 
     def test_h2o_only_charges(self, capsys, tmpdir):
-        if MPI.COMM_WORLD.Get_size() == 1:
+
+        if is_single_node():
 
             inp = textwrap.dedent("""
                 @jobs
