@@ -53,10 +53,7 @@ monkey:unit_tests:
 monkey:python_tests:
   extends: .monkey:setup
   stage: test
-  needs: ["monkey:build"]
+  needs: ["monkey:pip_install"]
   script:
-    - cd build/lib
     - python3 -m pytest -v --cov=veloxchem --pyargs veloxchem
     - mpiexec -n 2 python3 -m pytest -v --pyargs veloxchem -m "solvers"
-
-
