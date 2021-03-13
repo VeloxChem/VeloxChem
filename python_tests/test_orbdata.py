@@ -2,9 +2,13 @@ from pathlib import Path
 import numpy as np
 import unittest
 
+from veloxchem.veloxchemlib import OverlapIntegralsDriver
+from veloxchem.veloxchemlib import DenseMatrix
 from veloxchem.veloxchemlib import denmat
 from veloxchem.veloxchemlib import molorb
 from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.veloxchemlib import ao_matrix_to_dalton
+from veloxchem.veloxchemlib import get_basis_function_indices_for_atom
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
 from veloxchem.aodensitymatrix import AODensityMatrix
@@ -196,6 +200,28 @@ class TestOrbData(unittest.TestCase):
 
         self.assertTrue((den_ref_a == den_a).all())
         self.assertTrue((den_ref_b == den_b).all())
+
+    def test_basis_function_indices(self):
+
+        here = Path(__file__).parent
+        inpfile = here / 'inputs' / 'h2se.inp'
+
+        task = MpiTask([str(inpfile), None])
+
+        indices = []
+        for i in range(task.molecule.number_of_atoms()):
+            indices += get_basis_function_indices_for_atom(
+                task.molecule, task.ao_basis, i)
+
+        ovldrv = OverlapIntegralsDriver()
+        S = ovldrv.compute(task.molecule, task.ao_basis)
+        smat = S.to_numpy()
+
+        if is_mpi_master():
+            sdal = ao_matrix_to_dalton(DenseMatrix(smat), task.ao_basis,
+                                       task.molecule).to_numpy()
+            self.assertTrue(
+                np.max(np.abs(sdal - smat[indices, :][:, indices])) < 1.0e-12)
 
 
 if __name__ == "__main__":
