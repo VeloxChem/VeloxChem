@@ -43,7 +43,7 @@ CDenseMatrix to_dalton(const CDenseMatrix& matrix, const CMolecularBasis& basis,
  @param atomIdx the (0-based) index of the atom in the molecule.
  @return the list of basis function indices.
  */
-std::vector<int32_t> getBasisFunctionIndicesForAtom(const CMolecule& molecule, const CMolecularBasis& basis, const int32_t atomIdx);
+std::vector<std::vector<int32_t>> getBasisFunctionIndicesForAtom(const CMolecule& molecule, const CMolecularBasis& basis, const int32_t atomIdx);
 
 }  // namespace gtotra
 

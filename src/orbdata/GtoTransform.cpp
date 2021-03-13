@@ -80,7 +80,7 @@ to_dalton(const CDenseMatrix& matrix, const CMolecularBasis& basis, const CMolec
     return dalmat;
 }
 
-std::vector<int32_t>
+std::vector<std::vector<int32_t>>
 getBasisFunctionIndicesForAtom(const CMolecule& molecule, const CMolecularBasis& basis, const int32_t atomIdx)
 {
     auto idsmap = basis.getIndexMapForDalton(molecule);
@@ -93,6 +93,8 @@ getBasisFunctionIndicesForAtom(const CMolecule& molecule, const CMolecularBasis&
 
     int32_t basisFunctionEnd = 0;
 
+    std::vector<int32_t> angularMomentum;
+
     for (int32_t i = 0; i <= atomIdx; i++)
     {
         auto atmbas = basis.getAtomBasis(idselm[i]);
@@ -104,18 +106,27 @@ getBasisFunctionIndicesForAtom(const CMolecule& molecule, const CMolecularBasis&
                 if (i < atomIdx) basisFunctionStart += angmom::to_SphericalComponents(j);
 
                 basisFunctionEnd += angmom::to_SphericalComponents(j);
+
+                for (int32_t l = 0; l < angmom::to_SphericalComponents(j); l++)
+                {
+                    angularMomentum.push_back(j);
+                }
             }
         }
     }
 
     std::vector<int32_t> basisFunctionIndices(basisFunctionEnd - basisFunctionStart);
 
+    std::vector<int32_t> basisFunctionAngularMomentum(basisFunctionEnd - basisFunctionStart);
+
     for (int32_t j = basisFunctionStart; j < basisFunctionEnd; j++)
     {
         basisFunctionIndices[j - basisFunctionStart] = vlxidx[j];
+
+        basisFunctionAngularMomentum[j - basisFunctionStart] = angularMomentum[j];
     }
 
-    return basisFunctionIndices;
+    return std::vector<std::vector<int32_t>>({basisFunctionIndices, basisFunctionAngularMomentum});
 }
 
 }  // namespace gtotra

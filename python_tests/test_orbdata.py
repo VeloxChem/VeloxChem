@@ -208,10 +208,20 @@ class TestOrbData(unittest.TestCase):
 
         task = MpiTask([str(inpfile), None])
 
-        indices = []
+        bf_indices = []
+        bf_angmoms = []
+
         for i in range(task.molecule.number_of_atoms()):
-            indices += get_basis_function_indices_for_atom(
+            indices, angmoms = get_basis_function_indices_for_atom(
                 task.molecule, task.ao_basis, i)
+            bf_indices += indices
+            bf_angmoms += angmoms
+
+        ref_angmoms = [
+            0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2,
+            2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1
+        ]
+        self.assertEqual(bf_angmoms, ref_angmoms)
 
         ovldrv = OverlapIntegralsDriver()
         S = ovldrv.compute(task.molecule, task.ao_basis)
@@ -221,7 +231,8 @@ class TestOrbData(unittest.TestCase):
             sdal = ao_matrix_to_dalton(DenseMatrix(smat), task.ao_basis,
                                        task.molecule).to_numpy()
             self.assertTrue(
-                np.max(np.abs(sdal - smat[indices, :][:, indices])) < 1.0e-12)
+                np.max(np.abs(sdal -
+                              smat[bf_indices, :][:, bf_indices])) < 1.0e-12)
 
 
 if __name__ == "__main__":
