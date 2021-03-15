@@ -2,17 +2,19 @@ import numpy as np
 
 from .gradientdriver import GradientDriver
 from .tdaorbitalresponse import TdaOrbitalResponse
+from .rpaorbitalresponse import RpaOrbitalResponse
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import dipole_in_debye
 from .errorhandler import assert_msg_critical
 
 
-class TdaGradientDriver(GradientDriver):
+class TdhfGradientDriver(GradientDriver):
     """
     Implements the analytic gradient driver for excited states at the
-    Tamm-Dancoff approximation (TDA) level based on a Hartree-Fock
-    ground state. DFT references will be implemented in the future.
+    Tamm-Dancoff approximation (TDA) and random phase approximation (RPA)
+    level based on a Hartree-Fock ground state.
+	DFT references will be implemented in the future.
 
     :param comm:
         The MPI communicator.
@@ -21,6 +23,7 @@ class TdaGradientDriver(GradientDriver):
 
     Instance variables
         - scf_tensors: The results from the converged SCF calculation.
+		- is_tda: Flag if Tamm-Dancoff approximation is employed.
         - n_state_deriv: The excited state of interest.
     """
 
@@ -32,7 +35,10 @@ class TdaGradientDriver(GradientDriver):
         super().__init__(comm, ostream)
         self.rank = self.comm.Get_rank()
 
-        self.flag = 'TDA Gradient Driver'
+        self.flag = 'RPA Gradient Driver'
+
+		# flag on whether RPA or TDA is calculated
+        self.is_tda = False
 
         # excited state information, default to first excited state
         self.n_state_deriv = 0
@@ -50,6 +56,11 @@ class TdaGradientDriver(GradientDriver):
         if method_dict is None:
             method_dict = {}
 
+        if 'tamm_dancoff' in rsp_dict:
+            if rsp_dict['tamm_dancoff'] == 'yes':
+                self.is_tda = True
+                self.flag = 'TDA Gradient Driver'
+
         # TODO: 'n_state_deriv' can be interpreted as the number of states, not
         # the index of the state. Perhaps 'state_deriv' is a better keyword.
 
@@ -60,29 +71,37 @@ class TdaGradientDriver(GradientDriver):
         self.rsp_dict = rsp_dict
         self.method_dict = method_dict
 
-    def compute(self, molecule, basis, scf_tensors, tda_results):
+    def compute(self, molecule, basis, scf_tensors, rsp_results):
         """
         Performs calculation of analytical gradient.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
+        :param basis:
             The AO basis set.
+		:param scf_tensors:
+			The tensors from the converged SCF calculation.
+		:param rsp_results:
+			The results of the RPA or TDA calculation.
         """
 
         # sanity check for number of state
         if self.rank == mpi_master():
             assert_msg_critical(
-                self.n_state_deriv < tda_results['eigenvalues'].size,
-                'TdaGradientDriver: not enough states calculated')
+                self.n_state_deriv < rsp_results['eigenvalues'].size,
+                'TdhfGradientDriver: not enough states calculated')
 
         self.print_header()
 
         # orbital response driver
-        orbrsp_drv = TdaOrbitalResponse(self.comm, self.ostream)
+        if self.is_tda:
+            orbrsp_drv = TdaOrbitalResponse(self.comm, self.ostream)
+        else:
+            orbrsp_drv = RpaOrbitalResponse(self.comm, self.ostream)
+
         orbrsp_drv.update_settings(self.rsp_dict, self.method_dict)
         orbrsp_results = orbrsp_drv.compute(molecule, basis, scf_tensors,
-                                            tda_results)
+                                            rsp_results)
 
         # calculate the relaxed and unrelaxed excited-state dipole moment
         dipole_moments = self.compute_properties(molecule, basis, scf_tensors,
@@ -153,7 +172,7 @@ class TdaGradientDriver(GradientDriver):
 
     def print_properties(self, molecule, properties):
         """
-        Prints TDA excited-state properties.
+        Prints RPA/TDA excited-state properties.
 
         :param molecule:
             The molecule.
@@ -175,14 +194,19 @@ class TdaGradientDriver(GradientDriver):
         # Remove warning once DFT orbital response is implemented
         if 'xcfun' in self.method_dict:
             if self.method_dict['xcfun'] is not None:
-                warn_msg = '*** Warning: Orbital response for DFT is not yet fully'
+                warn_msg = '*** Warning: Orbital response for TDDFT is not yet fully'
                 self.ostream.print_header(warn_msg.ljust(56))
                 warn_msg = '    implemented. Relaxed dipole moment will be wrong.'
                 self.ostream.print_header(warn_msg.ljust(56))
 
         self.ostream.print_blank()
 
-        title = 'Unrelaxed Dipole Moment'
+        if self.is_tda:
+            title = 'TDA '
+        else:
+            title = 'RPA '
+
+        title += 'Unrelaxed Dipole Moment'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * (len(title) + 2))
 
@@ -199,7 +223,12 @@ class TdaGradientDriver(GradientDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-        title = 'Relaxed Dipole Moment'
+        if self.is_tda:
+            title = 'TDA '
+        else:
+            title = 'RPA '
+
+        title += 'Relaxed Dipole Moment'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * (len(title) + 2))
 

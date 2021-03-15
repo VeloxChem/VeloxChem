@@ -111,14 +111,14 @@ class OrbitalResponse(LinearSolver):
 
         if self.rank == mpi_master():
             mo = scf_tensors['C']
-            ea = scf_tensors['E']
+            mo_energies = scf_tensors['E']
 
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
             nvir = mo_vir.shape[1]
 
-            eocc = ea[:nocc]
-            evir = ea[nocc:]
+            eocc = mo_energies[:nocc]
+            evir = mo_energies[nocc:]
             eov = eocc.reshape(-1, 1) - evir
         else:
             nvir = None
@@ -152,7 +152,7 @@ class OrbitalResponse(LinearSolver):
         # matrix-vector product
         def orb_rsp_matvec(v):
             """
-            Function to carry out matrix multiplication of Lagrange multipier
+            Function to carry out matrix multiplication of Lagrange multiplier
             vector with orbital Hessian matrix
             """
 
