@@ -166,9 +166,6 @@ class RpaOrbitalResponse(OrbitalResponse):
             fmo_rhs_1dm = np.linalg.multi_dot(
                 [mo_occ.T, 0.5 * fock_ao_rhs_1dm, mo_vir])
 
-            print("\n1PDM contribution RHS, MO basis:\n")
-            print(fmo_rhs_1dm)
-
 			# factor out overlap matrix?
             sdp_pds = 0.5 * (
                 np.linalg.multi_dot([ovlp, xpy_ao, 0.5 * fock_ao_rhs_xpy.T]) +
@@ -180,9 +177,6 @@ class RpaOrbitalResponse(OrbitalResponse):
                 np.linalg.multi_dot([0.5 * fock_ao_rhs_xpy, xpy_ao, ovlp]) -
                 np.linalg.multi_dot([0.5 * fock_ao_rhs_xmy, xmy_ao, ovlp])
                 )
-
-            print("\n2PDM contributions RHS, MO basis:\n")
-            print(np.linalg.multi_dot([mo_occ.T, sdp_pds, mo_vir]))
 
             rhs_mo = fmo_rhs_1dm + np.linalg.multi_dot(
                 [mo_occ.T, sdp_pds, mo_vir])

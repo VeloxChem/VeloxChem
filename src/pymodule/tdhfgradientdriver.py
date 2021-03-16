@@ -112,7 +112,7 @@ class TdhfGradientDriver(GradientDriver):
 
     def compute_properties(self, molecule, basis, scf_tensors, orbrsp_results):
         """
-        Calculates first-order properties of TDA excited states
+        Calculates first-order properties of RPA or TDA excited states
         using the results of the orbital response calculation.
 
         :param molecule:
