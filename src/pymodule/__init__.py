@@ -68,7 +68,7 @@ from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .scffirstorderprop import ScfFirstOrderProperties
 from .orbitalresponse import OrbitalResponse
-from .tdagradientdriver import TdaGradientDriver
+from .tdhfgradientdriver import TdhfGradientDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical
