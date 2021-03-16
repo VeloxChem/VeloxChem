@@ -103,7 +103,7 @@ class OrbitalResponse(LinearSolver):
         # Workflow:
         # 1) Construct the necessary density matrices => in child classes
         # 2) Construct the RH => in child classes
-        # 3) Construct the initial gues
+        # 3) Construct the initial guess
         # 4) Write the linear operator for matrix-vector product
         # 5) Run the conjugate gradient
 
@@ -212,7 +212,17 @@ class OrbitalResponse(LinearSolver):
 
         self.is_converged = (cg_conv == 0)
 
-        # TODO: print warning or something if not converged
+        # print warning if not converged
+        if not self.is_converged:
+            warn_msg = '*** Warning: Orbital response did not converge.'
+            self.ostream.print_header(warn_msg.ljust(56))
+            #warn_msg = '    implemented. Relaxed dipole moment will be wrong.'
+            #self.ostream.print_header(warn_msg.ljust(56))
+        else:
+            self.ostream.print_info(
+                'Orbital response converged after {:d} iterations.'.format(self.iter_count))
+
+        self.ostream.flush()
 
         return lambda_multipliers.reshape(nocc, nvir)
 

@@ -59,13 +59,13 @@ class TdaOrbitalResponse(OrbitalResponse):
         :param basis:
             The AO basis set.
         :param scf_tensors:
-            The dictionary of tensors from converged SCF calculation.
+            The dictionary of tensors from the converged SCF calculation.
         :param tda_results:
-            The results from converged TDA calculation.
+            The results from the converged TDA calculation.
 
         :return:
-            A dictionary containing the Lagrange multipliers and relaxed
-            one-particle density.
+            A dictionary containing the Lagrange multipliers and
+			(un)relaxed one-particle density.
         """
 
         profiler = Profiler({

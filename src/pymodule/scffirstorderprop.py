@@ -105,7 +105,7 @@ class ScfFirstOrderProperties:
 
         self.ostream.print_blank()
 
-        title = 'Ground-State Dipole Moment'
+        title = 'SCF Ground-State Dipole Moment'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * (len(title) + 2))
 

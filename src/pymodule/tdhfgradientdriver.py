@@ -201,6 +201,13 @@ class TdhfGradientDriver(GradientDriver):
 
         self.ostream.print_blank()
 
+        prop_header = 'First-Order Properties for Excited State S'
+        prop_header += str(self.n_state_deriv + 1)
+        self.ostream.print_header(prop_header)
+        self.ostream.print_header('-' * (len(prop_header) + 2))
+
+        self.ostream.print_blank()
+
         if self.is_tda:
             title = 'TDA '
         else:
