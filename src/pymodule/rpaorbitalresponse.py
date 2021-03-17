@@ -243,16 +243,20 @@ class RpaOrbitalResponse(OrbitalResponse):
         profiler.check_memory_usage('End of CG')
         profiler.print_memory_usage(self.ostream)
 
-        if self.rank == mpi_master() and self.is_converged:
-            # Calculate the relaxed one-particle density matrix
-            # Factor 4: (ov + vo)*(alpha + beta)
-            rel_dm_ao = unrel_dm_ao + 4 * lambda_ao
-            return {
-                'lambda_ao': lambda_ao,
-                'omega_ao': omega_ao,
-                'unrel_dm_ao': unrel_dm_ao,
-                'rel_dm_ao': rel_dm_ao,
-            }
+        if self.rank == mpi_master():
+            if self.is_converged:
+                # Calculate the relaxed one-particle density matrix
+                # Factor 4: (ov + vo)*(alpha + beta)
+                rel_dm_ao = unrel_dm_ao + 4 * lambda_ao
+                return {
+                    'lambda_ao': lambda_ao,
+                    'omega_ao': omega_ao,
+                    'unrel_dm_ao': unrel_dm_ao,
+                    'rel_dm_ao': rel_dm_ao,
+                }
+            else:
+                # return only unrelaxed density matrix if not converged
+                return {'unrel_dm_ao': unrel_dm_ao}
         else:
             return {}
 

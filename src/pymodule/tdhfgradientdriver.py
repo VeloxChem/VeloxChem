@@ -148,12 +148,15 @@ class TdhfGradientDriver(GradientDriver):
             # electronic contribution
             unrel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
                              orbrsp_results['unrel_dm_ao'])
-            rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
-                           orbrsp_results['rel_dm_ao'])
             unrel_electronic_dipole = -1.0 * np.array(
                 [np.sum(dipole_ints[d] * unrel_density) for d in range(3)])
-            rel_electronic_dipole = -1.0 * np.array(
-                [np.sum(dipole_ints[d] * rel_density) for d in range(3)])
+
+			# relaxed density only available if orbital response converged
+            if 'rel_dm_ao' in orbrsp_results:
+                rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
+                               orbrsp_results['rel_dm_ao'])
+                rel_electronic_dipole = -1.0 * np.array(
+                    [np.sum(dipole_ints[d] * rel_density) for d in range(3)])
 
             # nuclear contribution
             coords = molecule.get_coordinates()
@@ -161,12 +164,18 @@ class TdhfGradientDriver(GradientDriver):
             nuclear_dipole = np.sum((coords - origin).T * nuclear_charges,
                                     axis=1)
 
-            return {
-                'unrelaxed_dipole_moment':
-                    (nuclear_dipole + unrel_electronic_dipole),
-                'relaxed_dipole_moment':
-                    (nuclear_dipole + rel_electronic_dipole),
-            }
+            if 'rel_dm_ao' in orbrsp_results:
+                return {
+                    'unrelaxed_dipole_moment':
+                        (nuclear_dipole + unrel_electronic_dipole),
+                    'relaxed_dipole_moment':
+                        (nuclear_dipole + rel_electronic_dipole),
+                }
+            else:
+                return {
+                    'unrelaxed_dipole_moment':
+                        (nuclear_dipole + unrel_electronic_dipole),
+                }
         else:
             return {}
 
@@ -230,24 +239,32 @@ class TdhfGradientDriver(GradientDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-        if self.is_tda:
-            title = 'TDA '
+        if 'relaxed_dipole_moment' in properties:
+            if self.is_tda:
+                title = 'TDA '
+            else:
+                title = 'RPA '
+
+            title += 'Relaxed Dipole Moment'
+            self.ostream.print_header(title)
+            self.ostream.print_header('-' * (len(title) + 2))
+
+            rel_dip = properties['relaxed_dipole_moment']
+            rel_dip_au = list(rel_dip) + [np.linalg.norm(rel_dip)]
+            rel_dip_debye = [m * dipole_in_debye() for m in rel_dip_au]
+
+            for i, a in enumerate(['  X', '  Y', '  Z', 'Total']):
+                valstr = '{:<5s} :'.format(a)
+                valstr += '{:17.6f} a.u.'.format(rel_dip_au[i])
+                valstr += '{:17.6f} Debye   '.format(rel_dip_debye[i])
+                self.ostream.print_header(valstr)
+
+            self.ostream.print_blank()
+            self.ostream.flush()
         else:
-            title = 'RPA '
+            warn_msg = '*** Warning: Orbital response did not converge.'
+            self.ostream.print_header(warn_msg.ljust(56))
+            warn_msg = '    Relaxed dipole moment could not be calculated.'
+            self.ostream.print_header(warn_msg.ljust(56))
+            self.ostream.print_blank()
 
-        title += 'Relaxed Dipole Moment'
-        self.ostream.print_header(title)
-        self.ostream.print_header('-' * (len(title) + 2))
-
-        rel_dip = properties['relaxed_dipole_moment']
-        rel_dip_au = list(rel_dip) + [np.linalg.norm(rel_dip)]
-        rel_dip_debye = [m * dipole_in_debye() for m in rel_dip_au]
-
-        for i, a in enumerate(['  X', '  Y', '  Z', 'Total']):
-            valstr = '{:<5s} :'.format(a)
-            valstr += '{:17.6f} a.u.'.format(rel_dip_au[i])
-            valstr += '{:17.6f} Debye   '.format(rel_dip_debye[i])
-            self.ostream.print_header(valstr)
-
-        self.ostream.print_blank()
-        self.ostream.flush()
