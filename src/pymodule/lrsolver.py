@@ -223,7 +223,7 @@ class LinearResponseSolver(LinearSolver):
 
             e2gg = self.dist_bger.matmul_AtB(self.dist_e2bger, 2.0)
             e2uu = self.dist_bung.matmul_AtB(self.dist_e2bung, 2.0)
-            s2ug = self.dist_bung.matmul_AtB(self.dist_bger, 4.0)
+            s2ug = self.dist_bung.matmul_AtB(self.dist_bger, 2.0)
 
             xvs = []
             self.cur_iter = iteration
@@ -264,8 +264,8 @@ class LinearResponseSolver(LinearSolver):
                 e2x_ger = self.dist_e2bger.matmul_AB_no_gather(c_ger)
                 e2x_ung = self.dist_e2bung.matmul_AB_no_gather(c_ung)
 
-                s2x_ger = 2.0 * x_ger.data
-                s2x_ung = 2.0 * x_ung.data
+                s2x_ger = x_ger.data
+                s2x_ung = x_ung.data
 
                 r_ger = e2x_ger.data - freq * s2x_ung - gradger.data
                 r_ung = e2x_ung.data - freq * s2x_ger - gradung.data

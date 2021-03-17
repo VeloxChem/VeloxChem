@@ -29,61 +29,17 @@ class TestE2(unittest.TestCase):
 
         if is_mpi_master(task.mpi_comm):
 
-            n = E2.shape[0] // 2
-
-            # 1s->3s, 2s->3s
-
-            s_mat = np.zeros((4, 4))
-            for ind_i, i in enumerate([4, 11, 4 + n, 11 + n]):
-                for ind_k, k in enumerate([4, 11, 4 + n, 11 + n]):
-                    s_mat[ind_i, ind_k] = E2[i - 1, k - 1]
-
-            ref_s_mat = np.array([
-                [9.52482128, -0.00864730, -0.04135515, 0.00944951],
-                [-0.00864730, 1.06134246, 0.00944951, -0.09537676],
-                [-0.04135515, 0.00944951, 9.52482128, -0.00864730],
-                [0.00944951, -0.09537676, -0.00864730, 1.06134246],
-            ])
-
-            s_diag = np.diag(s_mat)
-            ref_s_diag = np.diag(ref_s_mat)
-            self.assertTrue(np.max(np.abs(s_diag - ref_s_diag)) < 1e-6)
-
-            s_offdiag = s_mat - np.diag(s_diag)
-            ref_s_offdiag = ref_s_mat - np.diag(ref_s_diag)
-            self.assertTrue(
-                np.max(np.abs(np.abs(s_offdiag) -
-                              np.abs(ref_s_offdiag))) < 1e-6)
-
-            # 1s->2p, 1s->3p, 2s->2p, 2s->3p
-
-            ref_p_diag = np.array([
-                8.85773484, 9.28555595, 0.40866678, 0.96062385, 8.85773484,
-                9.28555595, 0.40866678, 0.96062385
-            ])
-
-            p_list = [1, 5, 8, 12, 1 + n, 5 + n, 8 + n, 12 + n]
-
-            for d in range(3):
-                p_diag = np.zeros(8)
-                for ind_i, i in enumerate(p_list):
-                    p_diag[ind_i] = E2[i + d - 1, i + d - 1]
-                self.assertTrue(np.max(np.abs(p_diag - ref_p_diag)) < 1e-6)
-
-            # eigenvalues
-
             ref_evals = np.array([
                 0.18956763, 0.18956763, 0.18956763, 0.47989224, 0.47989224,
                 0.47989224, 0.52851628, 4.34055925, 4.34055925, 4.34055925,
                 4.73163430, 4.73163430, 4.73163430, 4.76236576
             ])
 
-            S2 = np.zeros(E2.shape)
-            for i in range(n):
-                S2[i, i] = 1.0
-                S2[i + n, i + n] = -1.0
-            evals, evecs = np.linalg.eig((np.linalg.solve(E2 / 2.0, S2)))
-            evals = np.sort(1.0 / evals.real)[n:]
+            half_size = E2.shape[0] // 2
+            S2 = np.diag([1.0] * half_size + [-1.0] * half_size)
+
+            evals, evecs = np.linalg.eig(np.matmul(S2, E2))
+            evals = np.sort(evals.real)[half_size:]
             self.assertTrue(np.max(np.abs(evals - ref_evals)) < 1.0e-6)
 
 
