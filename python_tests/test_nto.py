@@ -76,10 +76,8 @@ class TestNTO(unittest.TestCase):
                         z_mat, None, mo_occ, mo_vir)
 
                 elif flag == 'rpa':
-                    z_mat = eig_vec[:eig_vec.shape[0] // 2].reshape(
-                        nocc, nvir) * np.sqrt(2.0)
-                    y_mat = eig_vec[eig_vec.shape[0] // 2:].reshape(
-                        nocc, nvir) * np.sqrt(2.0)
+                    z_mat = eig_vec[:eig_vec.size // 2].reshape(nocc, nvir)
+                    y_mat = eig_vec[eig_vec.size // 2:].reshape(nocc, nvir)
                     dens_D, dens_A = rsp_drv.get_detach_attach_densities(
                         z_mat, y_mat, mo_occ, mo_vir)
 

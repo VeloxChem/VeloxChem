@@ -347,7 +347,7 @@ class C6Solver(LinearSolver):
 
             e2gg = self.dist_bger.matmul_AtB(self.dist_e2bger, 2.0)
             e2uu = self.dist_bung.matmul_AtB(self.dist_e2bung, 2.0)
-            s2ug = self.dist_bung.matmul_AtB(self.dist_bger, 4.0)
+            s2ug = self.dist_bung.matmul_AtB(self.dist_bger, 2.0)
 
             for op, iw in op_imagfreq_keys:
                 if (iteration == 0 or
@@ -406,8 +406,8 @@ class C6Solver(LinearSolver):
 
                     # calculating the residual components
 
-                    s2imagger = 2.0 * x_imagger.data
-                    s2realung = 2.0 * x_realung.data
+                    s2imagger = x_imagger.data
+                    s2realung = x_realung.data
 
                     r_realung = (e2realung.data + iw * s2imagger - grad_ru.data)
                     r_imagger = (-e2imagger.data + iw * s2realung +
