@@ -196,9 +196,24 @@ class OrbitalResponse(LinearSolver):
 
             return lambda_mo.reshape(nocc * nvir)
 
-        # 5) Define the linear operator and run conjugate gradient
+        # matrix-vector product for preconditioner using the
+        # inverse of the diagonal (i.e. eocc - evir) 
+        def precond_matvec(v):
+            """
+            Function that defines the matrix-vector product
+            required by the pre-conditioner for the conjugate gradient;
+            it's an approximation for the inverse of matrix A in Ax=b.
+            """
+            current_v = v.reshape(nocc, nvir)
+            M_dot_v = current_v / eov
+
+            return M_dot_v.reshape(nocc * nvir)
+
+        # 5) Define the linear operators and run conjugate gradient
         LinOp = linalg.LinearOperator((nocc * nvir, nocc * nvir),
                                       matvec=orb_rsp_matvec)
+        PrecondOp = linalg.LinearOperator((nocc * nvir, nocc * nvir),
+                                      matvec=precond_matvec)
 
         b = rhs_mo.reshape(nocc * nvir)
         x0 = lambda_guess.reshape(nocc * nvir)
@@ -206,6 +221,7 @@ class OrbitalResponse(LinearSolver):
         lambda_multipliers, cg_conv = linalg.cg(A=LinOp,
                                                 b=b,
                                                 x0=x0,
+                                                M=PrecondOp,
                                                 tol=self.conv_thresh,
                                                 atol=0,
                                                 maxiter=self.max_iter)
