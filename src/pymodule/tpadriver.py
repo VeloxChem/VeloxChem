@@ -851,9 +851,9 @@ class TpaDriver:
             displacements = None
             recvbuf = None
 
-        if sendbuf.dtype == np.float:
+        if sendbuf.dtype == np.float64:
             mpi_data_type = MPI.DOUBLE
-        elif sendbuf.dtype == np.complex:
+        elif sendbuf.dtype == np.complex128:
             mpi_data_type = MPI.C_DOUBLE_COMPLEX
 
         self.comm.Gatherv(sendbuf,
@@ -1254,7 +1254,7 @@ class TpaDriver:
 
             nrows = f_total.data.shape[0]
             half_ncols = f_total.data.shape[1] // 2
-            ff_data = np.zeros((nrows, half_ncols), dtype=np.complex)
+            ff_data = np.zeros((nrows, half_ncols), dtype=np.complex128)
             for i in range(half_ncols):
                 ff_data[:, i] = (f_total.data[:, 2 * i] +
                                  1j * f_total.data[:, 2 * i + 1])
