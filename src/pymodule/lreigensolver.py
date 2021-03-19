@@ -209,7 +209,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
             e2gg = self.dist_bger.matmul_AtB(self.dist_e2bger, 2.0)
             e2uu = self.dist_bung.matmul_AtB(self.dist_e2bung, 2.0)
-            s2ug = self.dist_bung.matmul_AtB(self.dist_bger, 4.0)
+            s2ug = self.dist_bung.matmul_AtB(self.dist_bger, 2.0)
 
             if self.rank == mpi_master():
 
@@ -264,8 +264,8 @@ class LinearResponseEigenSolver(LinearSolver):
                 e2x_ger = self.dist_e2bger.matmul_AB_no_gather(c_ger[:, k])
                 e2x_ung = self.dist_e2bung.matmul_AB_no_gather(c_ung[:, k])
 
-                s2x_ger = 2.0 * x_ger.data
-                s2x_ung = 2.0 * x_ung.data
+                s2x_ger = x_ger.data
+                s2x_ung = x_ung.data
 
                 r_ger = e2x_ger.data - w * s2x_ung
                 r_ung = e2x_ung.data - w * s2x_ger
@@ -418,16 +418,16 @@ class LinearResponseEigenSolver(LinearSolver):
                 if not write_solution_to_file:
                     eigvecs = np.zeros((x_0.size, self.nstates))
 
+            sqrt_2 = np.sqrt(2.0)
+
             for s in range(self.nstates):
                 eigvec = self.get_full_solution_vector(excitations[s][1])
 
                 if self.rank == mpi_master():
                     mo_occ = scf_tensors['C'][:, :nocc]
                     mo_vir = scf_tensors['C'][:, nocc:]
-                    z_mat = eigvec[:eigvec.shape[0] // 2].reshape(
-                        mo_occ.shape[1], mo_vir.shape[1]) * np.sqrt(2.0)
-                    y_mat = eigvec[eigvec.shape[0] // 2:].reshape(
-                        mo_occ.shape[1], mo_vir.shape[1]) * np.sqrt(2.0)
+                    z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
+                    y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
 
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
@@ -469,11 +469,11 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
-                        elec_trans_dipoles[s, ind] = np.vdot(
+                        elec_trans_dipoles[s, ind] = sqrt_2 * np.vdot(
                             edip_rhs[ind], eigvec)
-                        velo_trans_dipoles[s, ind] = np.vdot(
+                        velo_trans_dipoles[s, ind] = sqrt_2 * np.vdot(
                             lmom_rhs[ind], eigvec) / (-eigvals[s])
-                        magn_trans_dipoles[s, ind] = np.vdot(
+                        magn_trans_dipoles[s, ind] = sqrt_2 * np.vdot(
                             mdip_rhs[ind], eigvec)
 
                     if write_solution_to_file:
