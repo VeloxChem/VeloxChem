@@ -650,9 +650,6 @@ class LinearSolver:
             if self.rank == mpi_master():
                 e2_ger *= 0.5
                 e2_ung *= 0.5
-                if self.nonlinear:
-                    fock_ger *= 0.5
-                    fock_ung *= 0.5
 
             vecs_e2_ger = DistributedArray(e2_ger, self.comm)
             vecs_e2_ung = DistributedArray(e2_ung, self.comm)
@@ -1283,12 +1280,11 @@ class LinearSolver:
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            matrices = tuple(
-                np.linalg.multi_dot([
-                    mo.T,
-                    (np.linalg.multi_dot([S, D, P.T]) -
-                     np.linalg.multi_dot([P.T, D, S])), mo
-                ]) / np.sqrt(2.0) for P in integral_comps)
+            matrices = tuple(0.5 * np.linalg.multi_dot([
+                mo.T,
+                (np.linalg.multi_dot([S, D, P.T]) -
+                 np.linalg.multi_dot([P.T, D, S])), mo
+            ]) for P in integral_comps)
 
             gradients = tuple(self.lrmat2vec(m, nocc, norb) for m in matrices)
             return gradients
@@ -1372,12 +1368,11 @@ class LinearSolver:
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            matrices = tuple(
-                np.linalg.multi_dot([
-                    mo.T,
-                    (np.linalg.multi_dot([S, D, P.conj().T]) -
-                     np.linalg.multi_dot([P.conj().T, D, S])), mo
-                ]) / np.sqrt(2.0) for P in integral_comps)
+            matrices = tuple(0.5 * np.linalg.multi_dot([
+                mo.T,
+                (np.linalg.multi_dot([S, D, P.conj().T]) -
+                 np.linalg.multi_dot([P.conj().T, D, S])), mo
+            ]) for P in integral_comps)
 
             gradients = tuple(self.lrmat2vec(m, nocc, norb) for m in matrices)
             return gradients
