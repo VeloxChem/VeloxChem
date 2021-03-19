@@ -566,7 +566,7 @@ class C6Solver(LinearSolver):
 
                 if self.rank == mpi_master():
                     for aop in self.a_components:
-                        rsp_funcs[(aop, bop, iw)] = -np.dot(va[aop], x)
+                        rsp_funcs[(aop, bop, iw)] = -2.0 * np.dot(va[aop], x)
 
                         if write_solution_to_file:
                             append_rsp_solution_hdf5(

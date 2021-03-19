@@ -418,6 +418,8 @@ class LinearResponseEigenSolver(LinearSolver):
                 if not write_solution_to_file:
                     eigvecs = np.zeros((x_0.size, self.nstates))
 
+            sqrt_2 = np.sqrt(2.0)
+
             for s in range(self.nstates):
                 eigvec = self.get_full_solution_vector(excitations[s][1])
 
@@ -467,11 +469,11 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
-                        elec_trans_dipoles[s, ind] = np.vdot(
+                        elec_trans_dipoles[s, ind] = sqrt_2 * np.vdot(
                             edip_rhs[ind], eigvec)
-                        velo_trans_dipoles[s, ind] = np.vdot(
+                        velo_trans_dipoles[s, ind] = sqrt_2 * np.vdot(
                             lmom_rhs[ind], eigvec) / (-eigvals[s])
-                        magn_trans_dipoles[s, ind] = np.vdot(
+                        magn_trans_dipoles[s, ind] = sqrt_2 * np.vdot(
                             mdip_rhs[ind], eigvec)
 
                     if write_solution_to_file:

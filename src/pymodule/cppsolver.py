@@ -683,7 +683,7 @@ class ComplexResponse(LinearSolver):
 
                     if self.rank == mpi_master():
                         for aop in self.a_components:
-                            rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
+                            rsp_funcs[(aop, bop, w)] = -2.0 * np.dot(va[aop], x)
 
                             if write_solution_to_file:
                                 append_rsp_solution_hdf5(
