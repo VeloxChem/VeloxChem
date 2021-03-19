@@ -647,6 +647,10 @@ class LinearSolver:
                                      ifock - batch_ger] = np.linalg.multi_dot(
                                          [mo.T, fak.T, mo]).reshape(norb**2)
 
+            if self.rank == mpi_master():
+                e2_ger *= 0.5
+                e2_ung *= 0.5
+
             vecs_e2_ger = DistributedArray(e2_ger, self.comm)
             vecs_e2_ung = DistributedArray(e2_ung, self.comm)
             self.append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
@@ -1276,12 +1280,11 @@ class LinearSolver:
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            matrices = tuple(
-                np.linalg.multi_dot([
-                    mo.T,
-                    (np.linalg.multi_dot([S, D, P.T]) -
-                     np.linalg.multi_dot([P.T, D, S])), mo
-                ]) for P in integral_comps)
+            matrices = tuple(0.5 * np.linalg.multi_dot([
+                mo.T,
+                (np.linalg.multi_dot([S, D, P.T]) -
+                 np.linalg.multi_dot([P.T, D, S])), mo
+            ]) for P in integral_comps)
 
             gradients = tuple(self.lrmat2vec(m, nocc, norb) for m in matrices)
             return gradients
@@ -1365,12 +1368,11 @@ class LinearSolver:
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            matrices = tuple(
-                np.linalg.multi_dot([
-                    mo.T,
-                    (np.linalg.multi_dot([S, D, P.conj().T]) -
-                     np.linalg.multi_dot([P.conj().T, D, S])), mo
-                ]) for P in integral_comps)
+            matrices = tuple(0.5 * np.linalg.multi_dot([
+                mo.T,
+                (np.linalg.multi_dot([S, D, P.conj().T]) -
+                 np.linalg.multi_dot([P.conj().T, D, S])), mo
+            ]) for P in integral_comps)
 
             gradients = tuple(self.lrmat2vec(m, nocc, norb) for m in matrices)
             return gradients
@@ -1598,8 +1600,8 @@ class LinearSolver:
         eocc = orb_ene[:nocc]
         evir = orb_ene[nocc:]
 
-        ediag = 2.0 * (-eocc.reshape(-1, 1) + evir).reshape(n_ov)
-        sdiag = 2.0 * np.ones(ediag.shape)
+        ediag = (-eocc.reshape(-1, 1) + evir).reshape(n_ov)
+        sdiag = np.ones(ediag.shape)
 
         return ediag, sdiag
 
