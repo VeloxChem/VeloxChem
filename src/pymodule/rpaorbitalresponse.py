@@ -118,8 +118,8 @@ class RpaOrbitalResponse(OrbitalResponse):
             deexc_vec = deexc_vec.reshape(nocc, nvir).copy()
 
             # TODO: remove factor once RPA vectors are properly normalized
-            exc_vec *= np.sqrt(2)
-            deexc_vec *= np.sqrt(2)
+            #exc_vec *= np.sqrt(2)
+            #deexc_vec *= np.sqrt(2)
 
             # Construct plus/minus combinations of excitation and de-excitation part
             xpy = exc_vec + deexc_vec
@@ -302,10 +302,10 @@ class RpaOrbitalResponse(OrbitalResponse):
         Fm1_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_2.T, xmy_ao, ovlp.T])
         Fp2_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, xpy_ao, ovlp.T])
         Fm2_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_2, xmy_ao, ovlp.T])
-        Fp1_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, xpy_ao, ovlp.T])
-        Fm1_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_2.T, xmy_ao, ovlp.T])
-        Fp2_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, xpy_ao, ovlp.T])
-        Fm2_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_2, xmy_ao, ovlp.T])
+        #Fp1_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, xpy_ao, ovlp.T])
+        #Fm1_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_2.T, xmy_ao, ovlp.T])
+        #Fp2_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, xpy_ao, ovlp.T])
+        #Fm2_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_2, xmy_ao, ovlp.T])
         Fp1_oo = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, xpy_ao.T, ovlp.T])
         Fm1_oo = np.linalg.multi_dot([0.5 * fock_ao_rhs_2, xmy_ao.T, ovlp.T])
         Fp2_oo = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, xpy_ao.T, ovlp.T])
@@ -325,10 +325,10 @@ class RpaOrbitalResponse(OrbitalResponse):
 
         omega_1pdm_2pdm_contribs = 0.5 * (np.linalg.multi_dot([D_vir, Fp1_vv + Fm1_vv
                                       - Fp2_vv + Fm2_vv, D_vir]) +
-                                    np.linalg.multi_dot([D_occ, Fp1_ov + Fm1_ov
-                                      - Fp2_ov + Fm2_ov, D_vir]) +
-                                    np.linalg.multi_dot([D_occ, Fp1_ov + Fm1_ov
-                                      - Fp2_ov + Fm2_ov, D_vir]).T +
+                                    np.linalg.multi_dot([D_occ, Fp1_vv + Fm1_vv
+                                      - Fp2_vv + Fm2_vv, D_vir]) +
+                                    np.linalg.multi_dot([D_occ, Fp1_vv + Fm1_vv
+                                      - Fp2_vv + Fm2_vv, D_vir]).T +
                                     np.linalg.multi_dot([D_occ, Fp1_oo + Fm1_oo
                                       - Fp2_vv + Fm2_vv, D_occ]) +
                                     2 * np.linalg.multi_dot([D_occ, fmat, D_occ])

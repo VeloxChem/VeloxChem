@@ -13,6 +13,8 @@ from .qqscheme import get_qq_scheme
 from scipy.sparse import linalg
 
 
+# TODO: do not inherit from LinearSolver.
+#		more settings (new keywords?) need to be initialized
 class OrbitalResponse(LinearSolver):
     """
     Implements orbital response Lagrange multipliers computation using a
@@ -25,6 +27,7 @@ class OrbitalResponse(LinearSolver):
         The output stream.
 
     Instance variables
+		- is_tda: Flag if Tamm-Dancoff approximation is employed.
         - n_state_deriv: The number of the excited state of interest.
         - solver: The linear equations solver.
     """
@@ -35,6 +38,9 @@ class OrbitalResponse(LinearSolver):
         """
 
         super().__init__(comm, ostream)
+
+		# flag on whether RPA or TDA is calculated
+        self.is_tda = False
 
         # excited state information, default to first excited state
         self.n_state_deriv = 0
@@ -54,7 +60,12 @@ class OrbitalResponse(LinearSolver):
             method_dict = {}
 
         # Many settings updated in LinearSolver
+		# TODO: change this when class is not derived anymore
         super().update_settings(rsp_dict, method_dict)
+
+        if 'tamm_dancoff' in rsp_dict:
+            if rsp_dict['tamm_dancoff'] == 'yes':
+                self.is_tda = True
 
         if 'n_state_deriv' in rsp_dict:
             # user gives '1' for first excited state, but internal index is 0
