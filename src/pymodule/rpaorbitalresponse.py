@@ -117,11 +117,11 @@ class RpaOrbitalResponse(OrbitalResponse):
             exc_vec = exc_vec.reshape(nocc, nvir).copy()
             deexc_vec = deexc_vec.reshape(nocc, nvir).copy()
 
-			# TODO: remove factor once RPA vectors are properly normalized
+            # TODO: remove factor once RPA vectors are properly normalized
             exc_vec *= np.sqrt(2)
             deexc_vec *= np.sqrt(2)
 
-			# Construct plus/minus combinations of excitation and de-excitation part
+            # Construct plus/minus combinations of excitation and de-excitation part
             xpy = exc_vec + deexc_vec
             xmy = exc_vec - deexc_vec
 
@@ -166,7 +166,7 @@ class RpaOrbitalResponse(OrbitalResponse):
             fmo_rhs_1dm = np.linalg.multi_dot(
                 [mo_occ.T, 0.5 * fock_ao_rhs_1dm, mo_vir])
 
-			# factor out overlap matrix?
+            # TODO: factor out overlap matrix?
             sdp_pds = 0.5 * (
                 np.linalg.multi_dot([ovlp, xpy_ao, 0.5 * fock_ao_rhs_xpy.T]) +
                 np.linalg.multi_dot([ovlp, xmy_ao, 0.5 * fock_ao_rhs_xmy.T]) -
@@ -228,9 +228,8 @@ class RpaOrbitalResponse(OrbitalResponse):
         fock_lambda.reduce_sum(self.rank, self.nodes, self.comm)
 
         if self.rank == mpi_master():
-		# TODO: adapt for RPA
             omega_ao = self.compute_omega(ovlp, mo_occ, mo_vir, epsilon_dm_ao,
-                                          xpy_ao, fock_ao_rhs, fock_lambda)
+                                          xpy_ao, xmy_ao, fock_ao_rhs, fock_lambda)
 
         self.ostream.print_blank()
         self.ostream.flush()
@@ -260,8 +259,8 @@ class RpaOrbitalResponse(OrbitalResponse):
         else:
             return {}
 
-    def compute_omega(self, ovlp, mo_occ, mo_vir, epsilon_dm_ao, exc_vec_ao,
-                      fock_ao_rhs, fock_lambda):
+    def compute_omega(self, ovlp, mo_occ, mo_vir, epsilon_dm_ao,
+                      xpy_ao, xmy_ao, fock_ao_rhs, fock_lambda):
         """
         Calculates the Lagrange multipliers for the overlap matrix.
 
@@ -272,9 +271,11 @@ class RpaOrbitalResponse(OrbitalResponse):
         :param mo_vir:
             The virtual MO coefficients.
         :param epsilon_dm_ao:
-            The energy-weighted relaxed density matrix
-        :param exc_vec_ao:
-            The excitation vector of interest in AO basis
+            The energy-weighted relaxed density matrix.
+        :param xpy_ao:
+            The sum of excitation and deexcitation vectors in AO basis.
+        :param xmy_ao:
+            The difference of excitation and deexcitation vectors in AO basis.
         :param fock_ao_rhs:
             The AOFockMatrix from the right-hand side of the orbital response eq.
         :param fock_lambda:
@@ -294,9 +295,27 @@ class RpaOrbitalResponse(OrbitalResponse):
         # and its transpose (VV, OV blocks)
         # this comes from the transformation of the 2PDM contribution
         # from MO to AO basis
-        fock_ao_rhs_1 = fock_ao_rhs.alpha_to_numpy(1)
-        Ft = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, exc_vec_ao, ovlp])
-        F = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, exc_vec_ao.T, ovlp.T])
+        fock_ao_rhs_1 = fock_ao_rhs.alpha_to_numpy(1) # xpy
+        fock_ao_rhs_2 = fock_ao_rhs.alpha_to_numpy(2) # xmy
+
+        Fp1_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, xpy_ao, ovlp.T])
+        Fm1_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_2.T, xmy_ao, ovlp.T])
+        Fp2_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, xpy_ao, ovlp.T])
+        Fm2_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_2, xmy_ao, ovlp.T])
+        Fp1_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, xpy_ao, ovlp.T])
+        Fm1_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_2.T, xmy_ao, ovlp.T])
+        Fp2_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, xpy_ao, ovlp.T])
+        Fm2_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_2, xmy_ao, ovlp.T])
+        Fp1_oo = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, xpy_ao.T, ovlp.T])
+        Fm1_oo = np.linalg.multi_dot([0.5 * fock_ao_rhs_2, xmy_ao.T, ovlp.T])
+        Fp2_oo = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, xpy_ao.T, ovlp.T])
+        Fm2_oo = np.linalg.multi_dot([0.5 * fock_ao_rhs_2.T, xmy_ao.T, ovlp.T])
+        # We see that:
+        # Fp1_vv = Fp1_ov and Fm1_vv = Fm1_ov
+        # Fp2_vv = Fp2_ov and Fm2_vv = Fm2_ov
+
+        #Ft = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, xpy_ao, ovlp])
+        #F = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, xpy_ao.T, ovlp.T])
 
         # Compute the contributions from the 2PDM and the relaxed 1PDM
         # to the omega Lagrange multipliers:
@@ -304,11 +323,23 @@ class RpaOrbitalResponse(OrbitalResponse):
                 fock_lambda.alpha_to_numpy(0).T +
                 0.5 * fock_ao_rhs.alpha_to_numpy(0))
 
-        omega_1pdm_2pdm_contribs = (np.linalg.multi_dot([D_occ, F, D_occ]) +
-                                    np.linalg.multi_dot([D_occ, Ft, D_vir]) +
-                                    np.linalg.multi_dot([D_occ, Ft, D_vir]).T +
-                                    np.linalg.multi_dot([D_vir, Ft, D_vir]) +
-                                    np.linalg.multi_dot([D_occ, fmat, D_occ]))
+        omega_1pdm_2pdm_contribs = 0.5 * (np.linalg.multi_dot([D_vir, Fp1_vv + Fm1_vv
+                                      - Fp2_vv + Fm2_vv, D_vir]) +
+                                    np.linalg.multi_dot([D_occ, Fp1_ov + Fm1_ov
+                                      - Fp2_ov + Fm2_ov, D_vir]) +
+                                    np.linalg.multi_dot([D_occ, Fp1_ov + Fm1_ov
+                                      - Fp2_ov + Fm2_ov, D_vir]).T +
+                                    np.linalg.multi_dot([D_occ, Fp1_oo + Fm1_oo
+                                      - Fp2_vv + Fm2_vv, D_occ]) +
+                                    2 * np.linalg.multi_dot([D_occ, fmat, D_occ])
+                                    )
+
+
+        #omega_1pdm_2pdm_contribs = (np.linalg.multi_dot([D_occ, F, D_occ]) +
+        #                            np.linalg.multi_dot([D_occ, Ft, D_vir]) +
+        #                            np.linalg.multi_dot([D_occ, Ft, D_vir]).T +
+        #                            np.linalg.multi_dot([D_vir, Ft, D_vir]) +
+        #                            np.linalg.multi_dot([D_occ, fmat, D_occ]))
 
         omega = -epsilon_dm_ao - omega_1pdm_2pdm_contribs
 
