@@ -75,13 +75,13 @@ class TestTwoInts(unittest.TestCase):
         self.assertTrue((fock.alpha_to_numpy(0) == arr_a).all())
         self.assertTrue((fock.beta_to_numpy(0) == arr_b).all())
 
-        self.assertEqual(fockmat.unrestjk, fock.get_fock_type(0), 'alpha')
+        self.assertEqual(fockmat.unrestjk, fock.get_fock_type(0, 'alpha'))
         self.assertEqual(fockmat.unrestjk, fock.get_fock_type(0, 'beta'))
 
-        self.assertEqual(0.7, fock.get_scale_factor(0), 'alpha')
+        self.assertEqual(0.7, fock.get_scale_factor(0, 'alpha'))
         self.assertEqual(0.6, fock.get_scale_factor(0, 'beta'))
 
-        self.assertEqual(1, fock.get_density_identifier(0), 'alpha')
+        self.assertEqual(1, fock.get_density_identifier(0, 'alpha'))
         self.assertEqual(2, fock.get_density_identifier(0, 'beta'))
 
     def test_add_hcore(self):
@@ -202,7 +202,7 @@ class TestTwoInts(unittest.TestCase):
         f2.reduce_sum(rank, size, comm)
 
         self.assertEqual(1, f2.number_of_fock_matrices())
-        self.assertEqual(fockmat.unrestjk, f2.get_fock_type(0), 'alpha')
+        self.assertEqual(fockmat.unrestjk, f2.get_fock_type(0, 'alpha'))
         self.assertEqual(fockmat.unrestjk, f2.get_fock_type(0, 'beta'))
 
         self.assertTrue(
