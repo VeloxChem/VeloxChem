@@ -11,14 +11,16 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaexcidriver import TDAExciDriver
+from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.tdaorbitalresponse import TdaOrbitalResponse
+from veloxchem.rpaorbitalresponse import RpaOrbitalResponse
 from veloxchem.checkpoint import read_rsp_hdf5
 
 
 class TestOrbitalResponse(unittest.TestCase):
 
-    def run_tdaorbitalresponse(self, inpfile, potfile, xcfun_label,
-                               orbrsp_ref_file):
+    def run_orbitalresponse(self, inpfile, potfile, xcfun_label,
+                               orbrsp_ref_file, is_tda):
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
@@ -37,28 +39,43 @@ class TestOrbitalResponse(unittest.TestCase):
 
         # Our references: lambda and omega in AO basis
 
-        tda_solver = TDAExciDriver(task.mpi_comm, task.ostream)
-        tda_solver.update_settings({'nstates': 3},
-                                   task.input_dict['method_settings'])
-        tda_results = tda_solver.compute(task.molecule, task.ao_basis,
-                                         scf_drv.scf_tensors)
+        if is_tda:
+            tda_solver = TDAExciDriver(task.mpi_comm, task.ostream)
+            tda_solver.update_settings({'nstates': 3},
+                                       task.input_dict['method_settings'])
+            rsp_results = tda_solver.compute(task.molecule, task.ao_basis,
+                                             scf_drv.scf_tensors)
 
-        orb_resp = TdaOrbitalResponse(task.mpi_comm, task.ostream)
+            orb_resp = TdaOrbitalResponse(task.mpi_comm, task.ostream)
+            lambda_ref = 'lambda_tda'
+            omega_ref = 'omega_tda'
+        else:
+            rpa_solver = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
+            rpa_solver.update_settings({'nstates': 3},
+                                       task.input_dict['method_settings'])
+            rsp_results = rpa_solver.compute(task.molecule, task.ao_basis,
+                                             scf_drv.scf_tensors)
+
+            orb_resp = RpaOrbitalResponse(task.mpi_comm, task.ostream)
+            lambda_ref = 'lambda_rpa'
+            omega_ref = 'omega_rpa'
+
         orb_resp.update_settings({
             'nstates': 3,
             'n_state_deriv': 1
         }, task.input_dict['method_settings'])
         orb_resp_result = orb_resp.compute(task.molecule, task.ao_basis,
-                                           scf_drv.scf_tensors, tda_results)
+                                           scf_drv.scf_tensors, rsp_results)
 
         dft_dict = {'dft_func_label': 'HF'}
         pe_dict = {'potfile_text': ''}
 
         ref_lambda_ao, ref_omega_ao = read_rsp_hdf5(orbrsp_ref_file,
-                                                    ['lambda_tda', 'omega_tda'],
+                                                    [lambda_ref, omega_ref],
                                                     task.molecule,
                                                     task.ao_basis, dft_dict,
                                                     pe_dict, task.ostream)
+        print("ref_lambda_ao:\n", ref_lambda_ao)
 
         if task.mpi_rank == mpi_master():
             lambda_ao = orb_resp_result['lambda_ao']
@@ -77,8 +94,21 @@ class TestOrbitalResponse(unittest.TestCase):
 
         xcfun_label = None
 
-        self.run_tdaorbitalresponse(inpfile, potfile, xcfun_label,
-                                    orbrsp_ref_file)
+        self.run_orbitalresponse(inpfile, potfile, xcfun_label,
+                                    orbrsp_ref_file, True)
+
+    def test_rpa_hf(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water_orbrsp.inp')
+        orbrsp_ref_file = str(here / 'inputs' / 'orbital_response_hf_ref.h5')
+
+        potfile = None
+
+        xcfun_label = None
+
+        self.run_orbitalresponse(inpfile, potfile, xcfun_label,
+                                    orbrsp_ref_file, False)
 
 
 if __name__ == "__main__":

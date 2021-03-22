@@ -15,6 +15,7 @@ from scipy.sparse import linalg
 
 # TODO: do not inherit from LinearSolver.
 #		more settings (new keywords?) need to be initialized
+# DFT/PE settings/dictionaries are used from LinearSolver, copy that?
 class OrbitalResponse(LinearSolver):
     """
     Implements orbital response Lagrange multipliers computation using a
@@ -113,7 +114,7 @@ class OrbitalResponse(LinearSolver):
 
         # Workflow:
         # 1) Construct the necessary density matrices => in child classes
-        # 2) Construct the RH => in child classes
+        # 2) Construct the RHS => in child classes
         # 3) Construct the initial guess
         # 4) Write the linear operator for matrix-vector product
         # 5) Run the conjugate gradient
@@ -208,7 +209,7 @@ class OrbitalResponse(LinearSolver):
             return lambda_mo.reshape(nocc * nvir)
 
         # matrix-vector product for preconditioner using the
-        # inverse of the diagonal (i.e. eocc - evir) 
+        # inverse of the diagonal (i.e. eocc - evir)
         def precond_matvec(v):
             """
             Function that defines the matrix-vector product

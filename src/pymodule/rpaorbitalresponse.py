@@ -287,6 +287,7 @@ class RpaOrbitalResponse(OrbitalResponse):
 
         # The density matrix; only alpha block;
         # Only works for the restricted case
+		# (since scf_tensors['C'] only gives alpha block...)
         D_occ = np.matmul(mo_occ, mo_occ.T)
         D_vir = np.matmul(mo_vir, mo_vir.T)
 
