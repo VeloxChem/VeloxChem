@@ -13,10 +13,7 @@ from .qqscheme import get_qq_scheme
 from scipy.sparse import linalg
 
 
-# TODO: do not inherit from LinearSolver.
-#		more settings (new keywords?) need to be initialized
-# DFT/PE settings/dictionaries are used from LinearSolver, copy that?
-class OrbitalResponse(LinearSolver):
+class OrbitalResponse:
     """
     Implements orbital response Lagrange multipliers computation using a
     conjugate gradient scheme for the time-dependent Hartree-Fock or DFT
@@ -30,7 +27,21 @@ class OrbitalResponse(LinearSolver):
     Instance variables
 		- is_tda: Flag if Tamm-Dancoff approximation is employed.
         - n_state_deriv: The number of the excited state of interest.
-        - solver: The linear equations solver.
+        - is_converged: The flag for convergence.
+        - comm: The MPI communicator.
+        - rank: The MPI rank.
+        - eri_thresh: The electron repulsion integrals screening threshold.
+        - qq_type: The electron repulsion integrals screening scheme.
+        - nodes: Number of MPI processes.
+        - ostream: The output stream.
+        - conv_thresh: The convergence threshold for the solver.
+        - max_iter: The maximum number of solver iterations.
+		- iter_count: Index of the current iteration.
+        - timing: The flag for printing timing information.
+		- start_time: The start time of the calculation.
+        - profiling: The flag for printing profiling information.
+        - memory_profiling: The flag for printing memory usage.
+        - memory_tracing: The flag for tracing memory allocation.
     """
 
     def __init__(self, comm, ostream):
@@ -38,13 +49,38 @@ class OrbitalResponse(LinearSolver):
         Initializes orbital response computation driver to default setup.
         """
 
-        super().__init__(comm, ostream)
+        #super().__init__(comm, ostream)
 
-		# flag on whether RPA or TDA is calculated
+        # ERI settings
+        self.eri_thresh = 1.0e-15
+        self.qq_type = 'QQ_DEN'
+
+        # Solver setup
+        self.conv_thresh = 1.0e-4
+        self.max_iter = 50
+        self.iter_count = 0
+        self.is_converged = False
+
+        # MPI information
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+
+        # Output stream
+        self.ostream = ostream
+
+		# Flag on whether RPA or TDA is calculated
         self.is_tda = False
 
-        # excited state information, default to first excited state
+        # Excited state information, default to first excited state
         self.n_state_deriv = 0
+
+        # Timing and profiling
+        self.timing = False
+        self.start_time = 0.0
+        self.profiling = False
+        self.memory_profiling = False
+        self.memory_tracing = False
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -60,17 +96,43 @@ class OrbitalResponse(LinearSolver):
         if method_dict is None:
             method_dict = {}
 
-        # Many settings updated in LinearSolver
-		# TODO: change this when class is not derived anymore
-        super().update_settings(rsp_dict, method_dict)
+		# ERI settings
+        if 'eri_thresh' in rsp_dict:
+            self.eri_thresh = float(rsp_dict['eri_thresh'])
+        if 'qq_type' in rsp_dict:
+            self.qq_type = rsp_dict['qq_type']
 
+		# Solver setup
+		# TODO: use specific orbital response keywords here?
+        if 'conv_thresh' in rsp_dict:
+            self.conv_thresh = float(rsp_dict['conv_thresh'])
+        if 'max_iter' in rsp_dict:
+            self.max_iter = int(rsp_dict['max_iter'])
+
+		# Use TDA or not
         if 'tamm_dancoff' in rsp_dict:
             if rsp_dict['tamm_dancoff'] == 'yes':
                 self.is_tda = True
 
+		# Excited state of interest
         if 'n_state_deriv' in rsp_dict:
             # user gives '1' for first excited state, but internal index is 0
             self.n_state_deriv = int(rsp_dict['n_state_deriv']) - 1
+
+		# Timing and profiling
+        if 'timing' in rsp_dict:
+            key = rsp_dict['timing'].lower()
+            self.timing = True if key in ['yes', 'y'] else False
+        if 'profiling' in rsp_dict:
+            key = rsp_dict['profiling'].lower()
+            self.profiling = True if key in ['yes', 'y'] else False
+        if 'memory_profiling' in rsp_dict:
+            key = rsp_dict['memory_profiling'].lower()
+            self.memory_profiling = True if key in ['yes', 'y'] else False
+        if 'memory_tracing' in rsp_dict:
+            key = rsp_dict['memory_tracing'].lower()
+            self.memory_tracing = True if key in ['yes', 'y'] else False
+
 
     def compute_lambda(self, molecule, basis, scf_tensors, rhs_mo, profiler):
         """
