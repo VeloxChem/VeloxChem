@@ -7,7 +7,7 @@ from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
-from .linearsolver import LinearSolver
+from .profiler import Profiler
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 from scipy.sparse import linalg
@@ -25,7 +25,7 @@ class OrbitalResponse:
         The output stream.
 
     Instance variables
-		- is_tda: Flag if Tamm-Dancoff approximation is employed.
+        - is_tda: Flag if Tamm-Dancoff approximation is employed.
         - n_state_deriv: The number of the excited state of interest.
         - is_converged: The flag for convergence.
         - comm: The MPI communicator.
@@ -36,9 +36,9 @@ class OrbitalResponse:
         - ostream: The output stream.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
-		- iter_count: Index of the current iteration.
+        - iter_count: Index of the current iteration.
         - timing: The flag for printing timing information.
-		- start_time: The start time of the calculation.
+        - start_time: The start time of the calculation.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation.
@@ -69,7 +69,7 @@ class OrbitalResponse:
         # Output stream
         self.ostream = ostream
 
-		# Flag on whether RPA or TDA is calculated
+        # Flag on whether RPA or TDA is calculated
         self.is_tda = False
 
         # Excited state information, default to first excited state
@@ -77,7 +77,6 @@ class OrbitalResponse:
 
         # Timing and profiling
         self.timing = False
-        self.start_time = 0.0
         self.profiling = False
         self.memory_profiling = False
         self.memory_tracing = False
@@ -96,30 +95,30 @@ class OrbitalResponse:
         if method_dict is None:
             method_dict = {}
 
-		# ERI settings
+        # ERI settings
         if 'eri_thresh' in rsp_dict:
             self.eri_thresh = float(rsp_dict['eri_thresh'])
         if 'qq_type' in rsp_dict:
             self.qq_type = rsp_dict['qq_type']
 
-		# Solver setup
-		# TODO: use specific orbital response keywords here?
+        # Solver setup
+        # TODO: use specific orbital response keywords here?
         if 'conv_thresh' in rsp_dict:
             self.conv_thresh = float(rsp_dict['conv_thresh'])
         if 'max_iter' in rsp_dict:
             self.max_iter = int(rsp_dict['max_iter'])
 
-		# Use TDA or not
+        # Use TDA or not
         if 'tamm_dancoff' in rsp_dict:
-            if rsp_dict['tamm_dancoff'] == 'yes':
-                self.is_tda = True
+            key = rsp_dict['tamm_dancoff'].lower()
+            self.is_tda = True if key in ['yes', 'y'] else False
 
-		# Excited state of interest
+        # Excited state of interest
         if 'n_state_deriv' in rsp_dict:
             # user gives '1' for first excited state, but internal index is 0
             self.n_state_deriv = int(rsp_dict['n_state_deriv']) - 1
 
-		# Timing and profiling
+        # Timing and profiling
         if 'timing' in rsp_dict:
             key = rsp_dict['timing'].lower()
             self.timing = True if key in ['yes', 'y'] else False
@@ -133,6 +132,168 @@ class OrbitalResponse:
             key = rsp_dict['memory_tracing'].lower()
             self.memory_tracing = True if key in ['yes', 'y'] else False
 
+    def compute(self, molecule, basis, scf_tensors, rsp_results):
+        """
+        Computes orbital response Lagrange multipliers and relaxed density
+        for the calculation of energy gradients.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The dictionary of tensors from the converged SCF wavefunction.
+        :param rsp_results:
+            The results from the RPA or TDA excited states calculation.
+        :param profiler:
+            The profiler.
+        """
+
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
+        if self.rank == mpi_master():
+            self.print_orbrsp_header('Orbital Response Driver',
+                                     self.n_state_deriv)
+
+        # set start time
+
+        self.start_time = tm.time()
+
+        # sanity check
+
+        nalpha = molecule.number_of_alpha_electrons()
+        nbeta = molecule.number_of_beta_electrons()
+        assert_msg_critical(
+            nalpha == nbeta,
+            'OrbitalResponse: not implemented for unrestricted case')
+
+        # Workflow:
+        # 1) Construct the necessary density matrices => in child classes
+        # 2) Construct the RHS => in child classes
+        # 3) Construct the initial guess
+        # 4) Write the linear operator for matrix-vector product
+        # 5) Run the conjugate gradient
+
+        rhs_results = self.compute_rhs(molecule, basis, scf_tensors,
+                                       rsp_results, profiler)
+
+        if self.rank == mpi_master():
+            rhs_mo = rhs_results['rhs_mo']
+            dm_oo = rhs_results['dm_oo']
+            dm_vv = rhs_results['dm_vv']
+            unrel_dm_ao = rhs_results['unrel_dm_ao']
+            fock_ao_rhs = rhs_results['fock_ao_rhs']
+        else:
+            rhs_mo = None
+
+        rhs_mo = self.comm.bcast(rhs_mo, root=mpi_master())
+
+        # Calculate the lambda multipliers in the parent class
+        lambda_multipliers = self.compute_lambda(molecule, basis, scf_tensors,
+                                                 rhs_mo, profiler)
+
+        profiler.start_timer(0, 'omega')
+
+        # Prerequesites for the overlap matrix multipliers
+        if self.rank == mpi_master():
+
+            # 1) Compute an energy-weighted density matrix
+            nocc = molecule.number_of_alpha_electrons()
+            mo = scf_tensors['C']
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+            mo_energies = scf_tensors['E']
+            eocc = mo_energies[:nocc]
+            evir = mo_energies[nocc:]
+            eo_diag = np.diag(eocc)
+            ev_diag = np.diag(evir)
+
+            epsilon_dm_ao = np.linalg.multi_dot(
+                [mo_occ,
+                 np.matmul(eo_diag, 0.5 * dm_oo) + eo_diag, mo_occ.T])
+            epsilon_dm_ao += np.linalg.multi_dot(
+                [mo_vir, np.matmul(ev_diag, 0.5 * dm_vv), mo_vir.T])
+            epsilon_dm_ao += np.linalg.multi_dot(
+                [mo_occ,
+                 np.matmul(eo_diag, lambda_multipliers), mo_vir.T])
+            epsilon_dm_ao += np.linalg.multi_dot(
+                [mo_occ,
+                 np.matmul(eo_diag, lambda_multipliers), mo_vir.T]).T
+
+            # 2) Transform the lambda multipliers to AO basis:
+            lambda_ao = np.linalg.multi_dot(
+                [mo_occ, lambda_multipliers, mo_vir.T])
+            ao_density_lambda = AODensityMatrix([lambda_ao], denmat.rest)
+        else:
+            ao_density_lambda = AODensityMatrix()
+        ao_density_lambda.broadcast(self.rank, self.comm)
+
+        fock_lambda = AOFockMatrix(ao_density_lambda)
+        fock_lambda.set_fock_type(fockmat.rgenjk, 0)
+
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                    self.eri_thresh, molecule, basis)
+        eri_drv.compute(fock_lambda, ao_density_lambda, molecule, basis,
+                        screening)
+        fock_lambda.reduce_sum(self.rank, self.nodes, self.comm)
+
+        # Compute the omega multipliers
+        if self.rank == mpi_master():
+            ovlp = scf_tensors['S']
+            omega_ao = self.compute_omega(ovlp, mo_occ, mo_vir, epsilon_dm_ao,
+                                          rsp_results, fock_ao_rhs, fock_lambda)
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        profiler.stop_timer(0, 'omega')
+
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
+
+        profiler.check_memory_usage('End of CG')
+        profiler.print_memory_usage(self.ostream)
+
+        if self.rank == mpi_master():
+            # print warning if Lambda did not converge
+            if not self.is_converged:
+                warn_msg = '*** Warning: Orbital response did not converge.'
+                self.ostream.print_header(warn_msg.ljust(56))
+                #warn_msg = '    implemented. Relaxed dipole moment will be wrong.'
+                #self.ostream.print_header(warn_msg.ljust(56))
+            else:
+                orbrsp_time = tm.time() - self.start_time
+                self.ostream.print_info(
+                    'Orbital response converged after {:d} iterations.'.format(
+                        self.iter_count))
+                self.ostream.print_info(
+                    'Total time needed for orbital response: {:5.2f} s.'.format(
+                        orbrsp_time))
+
+            self.ostream.flush()
+
+        if self.rank == mpi_master():
+            if self.is_converged:
+                # Calculate the relaxed one-particle density matrix
+                # Factor 4: (ov + vo)*(alpha + beta)
+                rel_dm_ao = unrel_dm_ao + 4 * lambda_ao
+                return {
+                    'lambda_ao': lambda_ao,
+                    'omega_ao': omega_ao,
+                    'unrel_dm_ao': unrel_dm_ao,
+                    'rel_dm_ao': rel_dm_ao,
+                }
+            else:
+                # return only unrelaxed density matrix if not converged
+                return {'unrel_dm_ao': unrel_dm_ao}
+        else:
+            return {}
 
     def compute_lambda(self, molecule, basis, scf_tensors, rhs_mo, profiler):
         """
@@ -154,22 +315,6 @@ class OrbitalResponse:
             A dictionary containing the Lagrange multipliers and relaxed
             one-particle density.
         """
-
-        if self.rank == mpi_master():
-            self.print_orbrsp_header('Orbital Response Driver',
-                                     self.n_state_deriv)
-
-        # set start time
-
-        self.start_time = tm.time()
-
-        # sanity check
-
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'OrbitalResponse: not implemented for unrestricted case')
 
         # count variable for conjugate gradient iterations
         self.iter_count = 0
@@ -287,7 +432,7 @@ class OrbitalResponse:
         LinOp = linalg.LinearOperator((nocc * nvir, nocc * nvir),
                                       matvec=orb_rsp_matvec)
         PrecondOp = linalg.LinearOperator((nocc * nvir, nocc * nvir),
-                                      matvec=precond_matvec)
+                                          matvec=precond_matvec)
 
         b = rhs_mo.reshape(nocc * nvir)
         x0 = lambda_guess.reshape(nocc * nvir)
@@ -301,18 +446,6 @@ class OrbitalResponse:
                                                 maxiter=self.max_iter)
 
         self.is_converged = (cg_conv == 0)
-
-        # print warning if not converged
-        if not self.is_converged:
-            warn_msg = '*** Warning: Orbital response did not converge.'
-            self.ostream.print_header(warn_msg.ljust(56))
-            #warn_msg = '    implemented. Relaxed dipole moment will be wrong.'
-            #self.ostream.print_header(warn_msg.ljust(56))
-        else:
-            self.ostream.print_info(
-                'Orbital response converged after {:d} iterations.'.format(self.iter_count))
-
-        self.ostream.flush()
 
         return lambda_multipliers.reshape(nocc, nvir)
 

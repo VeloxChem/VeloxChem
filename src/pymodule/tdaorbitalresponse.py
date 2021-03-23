@@ -1,5 +1,4 @@
 import numpy as np
-import time as tm
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import AODensityMatrix
@@ -7,9 +6,7 @@ from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
-from .profiler import Profiler
 from .orbitalresponse import OrbitalResponse
-from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
 
 
@@ -23,10 +20,6 @@ class TdaOrbitalResponse(OrbitalResponse):
         The MPI communicator.
     :param ostream:
         The output stream.
-
-    Instance variables
-        - n_state_deriv: The number of the excited state of interest.
-        - solver: The linear equations solver.
     """
 
     def __init__(self, comm, ostream):
@@ -49,7 +42,7 @@ class TdaOrbitalResponse(OrbitalResponse):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def compute(self, molecule, basis, scf_tensors, tda_results):
+    def compute_rhs(self, molecule, basis, scf_tensors, tda_results, profiler):
         """
         Performs orbital response Lagrange multipliers
         calculation using molecular data.
@@ -64,28 +57,9 @@ class TdaOrbitalResponse(OrbitalResponse):
             The results from the converged TDA calculation.
 
         :return:
-            A dictionary containing the Lagrange multipliers and
-			(un)relaxed one-particle density.
+            A dictionary containing the orbital-response RHS and
+            unrelaxed one-particle density.
         """
-
-        profiler = Profiler({
-            'timing': self.timing,
-            'profiling': self.profiling,
-            'memory_profiling': self.memory_profiling,
-            'memory_tracing': self.memory_tracing,
-        })
-
-        # set start time
-
-        self.start_time = tm.time()
-
-        # sanity check
-
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'OrbitalResponse: not implemented for unrestricted case')
 
         profiler.start_timer(0, 'RHS')
 
@@ -101,15 +75,11 @@ class TdaOrbitalResponse(OrbitalResponse):
             # 1) Calculate unrelaxed one-particle and transition density matrix
             ovlp = scf_tensors['S']
             mo = scf_tensors['C']
-            ea = scf_tensors['E']
 
             nocc = molecule.number_of_alpha_electrons()
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
             nvir = mo_vir.shape[1]
-
-            eocc = ea[:nocc]
-            evir = ea[nocc:]
 
             # Take vector of interest and convert to matrix form
             exc_vec = tda_results['eigenvectors'][:, self.n_state_deriv]
@@ -136,8 +106,6 @@ class TdaOrbitalResponse(OrbitalResponse):
         fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
         fock_ao_rhs.set_fock_type(fockmat.rgenjk, 1)
 
-        # TODO: make sure that ERI settings are consistent with response solver
-
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                     self.eri_thresh, molecule, basis)
@@ -159,87 +127,21 @@ class TdaOrbitalResponse(OrbitalResponse):
 
             rhs_mo = fmo_rhs_0 + np.linalg.multi_dot(
                 [mo_occ.T, sdp_pds, mo_vir])
-        else:
-            rhs_mo = None
-        rhs_mo = self.comm.bcast(rhs_mo, root=mpi_master())
 
         profiler.stop_timer(0, 'RHS')
 
-        # Calculate the lambda multipliers and the relaxed one-particle density
-        # in the parent class
-        lambda_multipliers = self.compute_lambda(molecule, basis, scf_tensors,
-                                                 rhs_mo, profiler)
-
-        profiler.start_timer(0, 'omega')
-
-        # Calculate the overlap matrix multipliers
         if self.rank == mpi_master():
-
-            # 1. compute an energy-weighted density matrix
-            # (needed to compute omega)
-            eo_diag = np.diag(eocc)
-            ev_diag = np.diag(evir)
-
-            epsilon_dm_ao = np.linalg.multi_dot(
-                [mo_occ,
-                 np.matmul(eo_diag, 0.5 * dm_oo) + eo_diag, mo_occ.T])
-            epsilon_dm_ao += np.linalg.multi_dot(
-                [mo_vir, np.matmul(ev_diag, 0.5 * dm_vv), mo_vir.T])
-            epsilon_dm_ao += np.linalg.multi_dot(
-                [mo_occ,
-                 np.matmul(eo_diag, lambda_multipliers), mo_vir.T])
-            epsilon_dm_ao += np.linalg.multi_dot(
-                [mo_occ,
-                 np.matmul(eo_diag, lambda_multipliers), mo_vir.T]).T
-
-            # 2. compute the omega multipliers in AO basis:
-            lambda_ao = np.linalg.multi_dot(
-                [mo_occ, lambda_multipliers, mo_vir.T])
-            ao_density_lambda = AODensityMatrix([lambda_ao], denmat.rest)
-        else:
-            ao_density_lambda = AODensityMatrix()
-        ao_density_lambda.broadcast(self.rank, self.comm)
-
-        fock_lambda = AOFockMatrix(ao_density_lambda)
-        fock_lambda.set_fock_type(fockmat.rgenjk, 0)
-
-        eri_drv.compute(fock_lambda, ao_density_lambda, molecule, basis,
-                        screening)
-        fock_lambda.reduce_sum(self.rank, self.nodes, self.comm)
-
-        if self.rank == mpi_master():
-            omega_ao = self.compute_omega(ovlp, mo_occ, mo_vir, epsilon_dm_ao,
-                                          exc_vec_ao, fock_ao_rhs, fock_lambda)
-
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-        profiler.stop_timer(0, 'omega')
-
-        profiler.print_timing(self.ostream)
-        profiler.print_profiling_summary(self.ostream)
-
-        profiler.check_memory_usage('End of CG')
-        profiler.print_memory_usage(self.ostream)
-
-        if self.rank == mpi_master():
-            if self.is_converged:
-                # Calculate the relaxed one-particle density matrix
-                # Factor 4: (ov + vo)*(alpha + beta)
-                rel_dm_ao = unrel_dm_ao + 4 * lambda_ao
-                return {
-                    'lambda_ao': lambda_ao,
-                    'omega_ao': omega_ao,
-                    'unrel_dm_ao': unrel_dm_ao,
-                    'rel_dm_ao': rel_dm_ao,
-                }
-            else:
-                # return only unrelaxed density matrix if not converged
-                return {'unrel_dm_ao': unrel_dm_ao}
+            return {
+                'rhs_mo': rhs_mo,
+                'dm_oo': dm_oo,
+                'dm_vv': dm_vv,
+                'unrel_dm_ao': unrel_dm_ao,
+                'fock_ao_rhs': fock_ao_rhs,
+            }
         else:
             return {}
 
-    def compute_omega(self, ovlp, mo_occ, mo_vir, epsilon_dm_ao, exc_vec_ao,
+    def compute_omega(self, ovlp, mo_occ, mo_vir, epsilon_dm_ao, tda_results,
                       fock_ao_rhs, fock_lambda):
         """
         Calculates the Lagrange multipliers for the overlap matrix.
@@ -251,9 +153,9 @@ class TdaOrbitalResponse(OrbitalResponse):
         :param mo_vir:
             The virtual MO coefficients.
         :param epsilon_dm_ao:
-            The energy-weighted relaxed density matrix
-        :param exc_vec_ao:
-            The excitation vector of interest in AO basis
+            The energy-weighted relaxed density matrix.
+        :param tda_results:
+            The results from the TDA calculation.
         :param fock_ao_rhs:
             The AOFockMatrix from the right-hand side of the orbital response eq.
         :param fock_lambda:
@@ -262,6 +164,13 @@ class TdaOrbitalResponse(OrbitalResponse):
         :return:
             a numpy array containing the Lagrange multipliers in AO basis.
         """
+
+        # Get the excitation vector of interest and transform it to AO
+        nocc = mo_occ.shape[1]
+        nvir = mo_vir.shape[1]
+        exc_vec = tda_results['eigenvectors'][:, self.n_state_deriv]
+        exc_vec = exc_vec.reshape(nocc, nvir).copy()
+        exc_vec_ao = np.linalg.multi_dot([mo_occ, exc_vec, mo_vir.T])
 
         # The density matrix; only alpha block;
         # Only works for the restricted case
