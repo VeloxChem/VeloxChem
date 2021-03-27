@@ -8,11 +8,12 @@
 
 #include "ExportOrbData.hpp"
 
-#include <mpi.h>
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+
+#include <mpi.h>
 
 #include <fstream>
 #include <string>
@@ -83,7 +84,7 @@ CAODensityMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
         dmat.push_back(*mp);
     }
 
-    return std::shared_ptr<CAODensityMatrix>(new CAODensityMatrix(dmat, den_type));
+    return std::make_shared<CAODensityMatrix>(dmat, den_type);
 }
 
 // Helper function for broadcasting CAODensityMatrix object
@@ -158,7 +159,7 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
 
         if (arr.data() == nullptr || arr.size() == 0)
         {
-            return std::shared_ptr<CMolecularOrbitals>(new CMolecularOrbitals());
+            return std::make_shared<CMolecularOrbitals>();
         }
 
         std::vector<double> vec(arr.data(), arr.data() + arr.size());
@@ -166,7 +167,7 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
         ceigs.push_back(CMemBlock<double>(vec));
     }
 
-    return std::shared_ptr<CMolecularOrbitals>(new CMolecularOrbitals(cmos, ceigs, orbs_type));
+    return std::make_shared<CMolecularOrbitals>(cmos, ceigs, orbs_type);
 }
 
 // Helper function for broadcasting CMolecularOrbitals object
@@ -184,9 +185,16 @@ CMolecularOrbitals_broadcast(CMolecularOrbitals& self, int32_t rank, py::object 
 static std::shared_ptr<CSADGuessDriver>
 CSADGuessDriver_create(py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    if (py_comm.is_none())
+    {
+        return std::make_shared<CSADGuessDriver>(MPI_COMM_WORLD);
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
 
-    return std::shared_ptr<CSADGuessDriver>(new CSADGuessDriver(*comm_ptr));
+        return std::make_shared<CSADGuessDriver>(*comm_ptr);
+    }
 }
 
 // Exports classes/functions in src/orbdata to python
@@ -254,8 +262,10 @@ export_orbdata(py::module& m)
     py::enum_<denmat>(m, "denmat")
         .value("rest", denmat::rest)
         .value("unrest", denmat::unrest)
+        .value("osrest", denmat::osrest)
         .value("rmoij", denmat::rmoij)
-        .value("umoij", denmat::umoij);
+        .value("umoij", denmat::umoij)
+        .value("rgen", denmat::rgen);
 
     // CAODensityMatrix class
 
@@ -306,7 +316,7 @@ export_orbdata(py::module& m)
     // CSADGuessDriver class
 
     py::class_<CSADGuessDriver, std::shared_ptr<CSADGuessDriver>>(m, "SADGuessDriver")
-        .def(py::init(&CSADGuessDriver_create))
+        .def(py::init(&CSADGuessDriver_create), py::arg("py_comm") = py::none())
         .def("compute", &CSADGuessDriver::compute);
 
     // exposing functions

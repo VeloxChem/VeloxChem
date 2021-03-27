@@ -42,7 +42,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
         double cf = 0.3 * std::pow(3 * mathconst::getPiValue() * mathconst::getPiValue(), 2.0 / 3.0);
         
         // determine number of grid points
-        
+
         auto ngpoints = densityGrid.getNumberOfGridPoints();
         
         // set up pointers to density grid data
@@ -191,15 +191,184 @@ namespace vxcfuncs {  // vxcfuncs namespace
                      const double           factor,
                      const CDensityGrid&    densityGrid)
     {
+
+        double a = 0.04918, b = 0.132, c = 0.2533, d = 0.349;
         
+        double cf = 0.3 * std::pow(3 * mathconst::getPiValue() * mathconst::getPiValue(), 2.0 / 3.0);
+        
+        // determine number of grid points
+        
+        auto ngpoints = densityGrid.getNumberOfGridPoints();
+        
+        // set up pointers to density grid data
+        
+        //auto rhoa = densityGrid.alphaDensity(0);
+        
+        auto rhob = densityGrid.betaDensity(0);
+        
+        //auto grada = densityGrid.alphaDensityGradient(0);
+        
+        auto gradb = densityGrid.betaDensityGradient(0);
+        
+        //auto gradab = densityGrid.mixedDensityGradient(0);
+        
+        // set up pointers to functional data
+        
+        auto fexc = xcGradientGrid.xcFunctionalValues();
+        
+        auto grhoa = xcGradientGrid.xcGradientValues(xcvars::rhoa);
+        
+        auto grhob = xcGradientGrid.xcGradientValues(xcvars::rhob);
+                        
+        auto ggradab = xcGradientGrid.xcGradientValues(xcvars::gradab);
+        
+        #pragma omp simd aligned(rhob, gradb, fexc, grhoa, grhob, ggradab: VLX_ALIGN)
+        for (int32_t i = 0; i < ngpoints; i++)
+        {
+            double rho = rhob[i];
+            
+            double rho2 = rho * rho;
+                        
+            double ngradb2 = gradb[i] * gradb[i];
+            
+            double ngrad2 =  ngradb2 ;
+            
+            double rhom13 = std::pow(rho, -1.0 / 3.0);
+            
+            double rho13 = std::pow(rho, 1.0 / 3.0);
+            
+            double drho13 = d + rho13;
+            
+            double drho3_2 = drho13 * drho13;
+            
+            double expcr = std::exp(-c / rho13);
+                        
+            double gradb2 = ngradb2;
+            
+            double grad2 = ngrad2;
+            
+            double sA = (rhob[i] * gradb2) / rho;
+                        
+            double denom = 1.0 + d * rhom13;
+
+            double omega = std::exp(-c * rhom13) / denom * pow(rho, -11.0 / 3.0);
+            
+            double t5 = -2.0 / 3.0 * rho2 * ngrad2;
+            
+            double t6 = ((2.0 / 3.0 * rho2 ) * ngradb2 );
+            
+            fexc[i] += -factor * a * (b * omega *  (t5 + t6));
+            
+            double om = expcr * std::pow(rho, -11.0 / 3.0) / (1.0 +d / rho13);
+            
+            double om_1 = (-11.0 * rho * rho13 + rho * (c - 10.0 * d) + rho / rho13 * c * d) / (3.0 * std::pow(rho, 16.0 / 3.0) * drho3_2) * expcr;
+            
+            double dl = c / rho13 + d / (rho13 * (1 + d / rho13));
+                        
+            double f0_1000 = 4.0 * rhob[i] * (3.0 * rhob[i] * drho13) * rho13 / (3.0 * rho * rho * drho3_2);
+            
+            double f1 = std::pow(2.0, 11.0 / 3.0) * cf * (std::pow(rhob[i], 8.0 / 3.0))
+            
+                      + (47.0 - 7.0 * dl) *grad2 / 18.0 + (dl - 45.0) * (gradb2) / 18.0 + (11.0 - dl) * sA / 9.0;
+
+            double f2 = -2.0 / 3.0 * rho2 * grad2 + (2.0 / 3.0 * rho2 ) * gradb2 ;
+                      
+            double f2_00001 = -4.0 / 3.0 * rho2;
+            
+            grhoa[i] += factor * (-a * f0_1000 - a * b * om_1 * (f2) - a * b * om * (rhob[i] * f1 ));
+            
+            grhob[i] += factor * (- a * b * om_1 * f2);
+                                
+            ggradab[i] += factor * (-a * b * om * ( f2_00001));
+        }
     }
-    
+
     void
     LYPFuncGradientB(      CXCGradientGrid& xcGradientGrid,
                      const double           factor,
                      const CDensityGrid&    densityGrid)
     {
+        double a = 0.04918, b = 0.132, c = 0.2533, d = 0.349;
         
+        double cf = 0.3 * std::pow(3 * mathconst::getPiValue() * mathconst::getPiValue(), 2.0 / 3.0);
+        
+        // determine number of grid points
+        
+        auto ngpoints = densityGrid.getNumberOfGridPoints();
+        
+        // set up pointers to density grid data
+        
+        auto rhoa = densityGrid.alphaDensity(0);
+                
+        auto grada = densityGrid.alphaDensityGradient(0);
+        
+        // set up pointers to functional data
+
+        auto fexc = xcGradientGrid.xcFunctionalValues();
+        
+        auto grhoa = xcGradientGrid.xcGradientValues(xcvars::rhoa);
+        
+        auto grhob = xcGradientGrid.xcGradientValues(xcvars::rhob);
+        
+        auto ggradab = xcGradientGrid.xcGradientValues(xcvars::gradab);
+
+        #pragma omp simd aligned(rhoa, grada, fexc, grhoa, grhob,ggradab: VLX_ALIGN)
+        for (int32_t i = 0; i < ngpoints; i++)
+        {
+            double rho = rhoa[i];
+            
+            double rho2 = rho * rho;
+                                
+            double ngrada2 = grada[i] * grada[i];
+                        
+            double ngrad2 = ngrada2;
+            
+            double rhom13 = std::pow(rho, -1.0 / 3.0);
+            
+            double rho13 = std::pow(rho, 1.0 / 3.0);
+            
+            double drho13 = d + rho13;
+            
+            double drho3_2 = drho13 * drho13;
+            
+            double expcr = std::exp(-c / rho13);
+                        
+            double grada2 = ngrada2;
+                        
+            double grad2 = ngrad2;
+            
+            double sA = (rhoa[i] * grada2) / rho;
+                        
+            double denom = 1.0 + d * rhom13;
+
+            double omega = std::exp(-c * rhom13) / denom * pow(rho, -11.0 / 3.0);
+                
+            double t5 = -2.0 / 3.0 * rho2 * ngrad2;
+            
+            double t6 = ((2.0 / 3.0 * rho2) * ngrada2);
+            
+            fexc[i] += -factor * a * (b * omega * (t5 + t6));
+            
+            double om = expcr * std::pow(rho, -11.0 / 3.0) / (1.0 +d / rho13);
+            
+            double om_1 = (-11.0 * rho * rho13 + rho * (c - 10.0 * d) + rho / rho13 * c * d) / (3.0 * std::pow(rho, 16.0 / 3.0) * drho3_2) * expcr;
+            
+            double dl = c / rho13 + d / (rho13 * (1 + d / rho13));
+                        
+            double f0_0100 = 4.0 * rhoa[i] * (3.0 * rhoa[i] * drho13) * rho13 / (3.0 * rho * rho * drho3_2);
+            
+            double f1 = std::pow(2.0, 11.0 / 3.0) * cf * (std::pow(rhoa[i], 8.0 / 3.0)) + (47.0 - 7.0 * dl) *grad2 / 18.0 + (dl - 45.0) * (grada2) / 18.0 + (11.0 - dl) * sA / 9.0;
+                        
+            double f2 = -2.0 / 3.0 * rho2 * grad2 + (2.0 / 3.0 * rho2 ) * grada2;                                    
+            
+            double f2_00001 = -4.0 / 3.0 * rho2;
+            
+            grhoa[i] += factor * (- a * b * om_1 * (f2));
+            
+            grhob[i] += factor * (-a * f0_0100 - a * b * om_1 * (f2) - a * b * om * (rhoa[i] * f1 ));
+                                    
+            ggradab[i] += factor * (-a * b * om * (f2_00001));
+        }
     }
     
     void

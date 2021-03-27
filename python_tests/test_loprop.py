@@ -1,4 +1,3 @@
-from mpi4py import MPI
 from unittest.mock import patch
 from unittest.mock import MagicMock
 import numpy.testing as npt
@@ -7,6 +6,7 @@ import pytest
 import sys
 import os
 
+from veloxchem.veloxchemlib import is_single_node
 from veloxchem.main import main
 from veloxchem.mpitask import MpiTask
 from veloxchem.inputparser import InputParser
@@ -62,7 +62,7 @@ def test_loprop_called_from_main(mock_mpi, mock_scf_prop, mock_scf, mock_uscf,
         },
         'loprop': {}
     }
-    input_file = f'{tmpdir/"water.inp"}'
+    input_file = f'{tmpdir}/water.inp'
     with open(input_file, 'w') as f:
         f.write(sample)
     sys.argv[1:] = [input_file]
@@ -95,7 +95,7 @@ def test_scf_called_from_main(mock_mpi, mock_scf_prop, mock_scf, mock_uscf,
         },
         'loprop': {}
     }
-    input_file = f'{tmpdir/"water.inp"}'
+    input_file = f'{tmpdir}/water.inp'
     with open(input_file, 'w') as f:
         f.write(sample)
     sys.argv[1:] = [input_file]
@@ -172,7 +172,7 @@ def test_input_dict(sample, tmpdir):
     Verify that input parser sets a loprop key
     """
     # given
-    input_file = f'{tmpdir/"water.inp"}'
+    input_file = f'{tmpdir}/water.inp'
     with open(input_file, 'w') as f:
         f.write(sample)
 
@@ -188,7 +188,7 @@ def test_input_settings(tmpdir):
     """
     Verify loprop options
     """
-    input_file = f'{tmpdir/"water.inp"}'
+    input_file = f'{tmpdir}/water.inp'
     input_content = textwrap.dedent("""
         @jobs
         task: 'loprop'
@@ -210,7 +210,7 @@ def test_wrong_input(tmpdir):
     """
     Verify loprop options
     """
-    input_file = f'{tmpdir/"water.inp"}'
+    input_file = f'{tmpdir}/water.inp'
     input_content = textwrap.dedent("""
         @jobs
         task: loprop
@@ -234,12 +234,12 @@ def test_cpa(sample, tmpdir):
     Verify count of orbitals per atom
     """
     # given
-    input_file = f'{tmpdir/"water.inp"}'
+    input_file = f'{tmpdir}/water.inp'
     with open(input_file, 'w') as f:
         f.write(sample)
 
     # when
-    task = MpiTask([input_file], MPI.COMM_WORLD)
+    task = MpiTask([input_file])
     loprop_driver = LoPropDriver(task)
 
     # then
@@ -253,12 +253,12 @@ def test_opa(sample, tmpdir):
     """
 
     # given
-    input_file = f'{tmpdir/"water.inp"}'
+    input_file = f'{tmpdir}/water.inp'
     with open(input_file, 'w') as f:
         f.write(sample)
 
     # when
-    task = MpiTask([input_file], MPI.COMM_WORLD)
+    task = MpiTask([input_file])
     loprop_driver = LoPropDriver(task)
 
     # then
@@ -347,7 +347,8 @@ def test_get_lib_basis_file():
 class TestIntegrations:
 
     def test_h2o_only_charges(self, capsys, tmpdir):
-        if MPI.COMM_WORLD.Get_size() == 1:
+
+        if is_single_node():
 
             inp = textwrap.dedent("""
                 @jobs
@@ -369,7 +370,7 @@ class TestIntegrations:
                 H   0.0  -1.4   1.1
                 @end
                 """)
-            input_file = f'{tmpdir/"water.inp"}'
+            input_file = f'{tmpdir}/water.inp'
             with open(input_file, 'w') as f:
                 f.write(inp)
 

@@ -8,6 +8,8 @@
 
 #include "OverlapIntegralsDriverTest.hpp"
 
+#include <mpi.h>
+
 #include "MolecularBasisSetter.hpp"
 #include "MoleculeSetter.hpp"
 #include "OverlapIntegralsDriver.hpp"

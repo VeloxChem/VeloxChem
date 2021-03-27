@@ -1,8 +1,7 @@
-from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
 import math
-from pathlib import Path
 
 from veloxchem.veloxchemlib import KineticEnergyMatrix
 from veloxchem.veloxchemlib import NuclearPotentialMatrix
@@ -10,7 +9,7 @@ from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver
 from veloxchem.veloxchemlib import denmat
 from veloxchem.veloxchemlib import fockmat
 from veloxchem.veloxchemlib import ericut
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.aofockmatrix import AOFockMatrix
@@ -76,14 +75,14 @@ class TestTwoInts(unittest.TestCase):
         self.assertTrue((fock.alpha_to_numpy(0) == arr_a).all())
         self.assertTrue((fock.beta_to_numpy(0) == arr_b).all())
 
-        self.assertEqual(fockmat.unrestjk, fock.get_fock_type(0))
-        self.assertEqual(fockmat.unrestjk, fock.get_fock_type(0, True))
+        self.assertEqual(fockmat.unrestjk, fock.get_fock_type(0, 'alpha'))
+        self.assertEqual(fockmat.unrestjk, fock.get_fock_type(0, 'beta'))
 
-        self.assertEqual(0.7, fock.get_scale_factor(0))
-        self.assertEqual(0.6, fock.get_scale_factor(0, True))
+        self.assertEqual(0.7, fock.get_scale_factor(0, 'alpha'))
+        self.assertEqual(0.6, fock.get_scale_factor(0, 'beta'))
 
-        self.assertEqual(1, fock.get_density_identifier(0))
-        self.assertEqual(2, fock.get_density_identifier(0, True))
+        self.assertEqual(1, fock.get_density_identifier(0, 'alpha'))
+        self.assertEqual(2, fock.get_density_identifier(0, 'beta'))
 
     def test_add_hcore(self):
 
@@ -126,40 +125,13 @@ class TestTwoInts(unittest.TestCase):
         self.assertEqual(1.0, f_rest.get_scale_factor(0))
         self.assertEqual(0, f_rest.get_density_identifier(0))
 
-    def test_fock_hdf5(self):
-
-        data_a = [[1., .2], [.2, 1.]]
-        data_b = [[.9, .5], [.5, .9]]
-        data_c = [[.8, .6], [.6, .8]]
-        data_d = [[.7, .5], [.5, .7]]
-
-        types = [fockmat.restk, fockmat.restjkx, fockmat.restk, fockmat.restjk]
-
-        factors = [1.0, 0.2, 1.0, 1.0]
-
-        indices = [0, 0, 1, 0]
-
-        f_rest = AOFockMatrix([data_a, data_b, data_c, data_d], types, factors,
-                              indices)
-
-        # hdf5 read/write tests
-
-        if MPI.COMM_WORLD.Get_rank() == mpi_master():
-
-            here = Path(__file__).parent
-            h5file = here / 'inputs' / 'dummy.h5'
-
-            f_rest.write_hdf5(h5file)
-            f2 = AOFockMatrix.read_hdf5(h5file)
-            self.assertEqual(f_rest, f2)
-
     def test_fock_build(self):
 
         here = Path(__file__).parent
         inpfile = here / 'inputs' / 'h2se.inp'
         outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)])
 
         molecule = task.molecule
         ao_basis = task.ao_basis
@@ -180,7 +152,7 @@ class TestTwoInts(unittest.TestCase):
 
         # read density
 
-        if rank == mpi_master():
+        if is_mpi_master(comm):
             densfile = str(here / 'inputs' / 'h2se.dens.h5')
 
             dmat = AODensityMatrix.read_hdf5(densfile)
@@ -217,7 +189,7 @@ class TestTwoInts(unittest.TestCase):
 
         # compare with unrestricted Fock
 
-        if rank == mpi_master():
+        if is_mpi_master(comm):
             da = dmat.alpha_to_numpy(0)
             db = dmat.beta_to_numpy(0)
             d2 = AODensityMatrix([da, db], denmat.unrest)
@@ -230,8 +202,8 @@ class TestTwoInts(unittest.TestCase):
         f2.reduce_sum(rank, size, comm)
 
         self.assertEqual(1, f2.number_of_fock_matrices())
-        self.assertEqual(fockmat.unrestjk, f2.get_fock_type(0))
-        self.assertEqual(fockmat.unrestjk, f2.get_fock_type(0, True))
+        self.assertEqual(fockmat.unrestjk, f2.get_fock_type(0, 'alpha'))
+        self.assertEqual(fockmat.unrestjk, f2.get_fock_type(0, 'beta'))
 
         self.assertTrue(
             np.max(np.abs(fock.alpha_to_numpy(0) -
@@ -242,7 +214,7 @@ class TestTwoInts(unittest.TestCase):
 
         # compare with reference
 
-        if rank == mpi_master():
+        if is_mpi_master(comm):
 
             twoefile = str(here / 'inputs' / 'h2se.twoe.h5')
 

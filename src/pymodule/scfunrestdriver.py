@@ -1,8 +1,12 @@
+from mpi4py import MPI
 import numpy as np
+import sys
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import molorb
+from .veloxchemlib import fockmat
+from .outputstream import OutputStream
 from .scfdriver import ScfDriver
 from .c2diis import CTwoDiis
 
@@ -18,12 +22,18 @@ class ScfUnrestrictedDriver(ScfDriver):
         The output stream.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes spin unrestricted open shell SCF driver to default setup
         (convergence threshold, initial guess, etc) by calling base class
         constructor.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 
@@ -278,3 +288,25 @@ class ScfUnrestrictedDriver(ScfDriver):
             return "Spin-Unrestricted Kohn-Sham" + pe_type
 
         return "Spin-Unrestricted Hartree-Fock" + pe_type
+
+    def update_fock_type(self, fock_mat):
+        """
+        Updates Fock matrix to fit selected functional in Kohn-Sham
+        calculations.
+
+        :param fock_mat:
+            The Fock/Kohn-Sham matrix.
+        """
+
+        if self.xcfun.is_hybrid():
+            fock_mat.set_fock_type(fockmat.unrestjkx, 0, 'alpha')
+            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0,
+                                      'alpha')
+            fock_mat.set_fock_type(fockmat.unrestjkx, 0, 'beta')
+            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0,
+                                      'beta')
+        else:
+            fock_mat.set_fock_type(fockmat.unrestj, 0, 'alpha')
+            fock_mat.set_fock_type(fockmat.unrestj, 0, 'beta')
+
+        return

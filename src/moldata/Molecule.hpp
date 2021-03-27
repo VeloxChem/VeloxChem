@@ -15,6 +15,8 @@
 #include <string>
 #include <vector>
 
+#include <mpi.h>
+
 #include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
 #include "VdwRadii.hpp"

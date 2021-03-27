@@ -8,6 +8,8 @@
 
 #include "MpiFuncTest.hpp"
 
+#include <mpi.h>
+
 #include "MpiFunc.hpp"
 
 TEST_F(CMpiFuncTest, Master)

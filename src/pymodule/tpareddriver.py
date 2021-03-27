@@ -1,8 +1,11 @@
+from mpi4py import MPI
 import numpy as np
 import time
+import sys
 import re
 
 from .veloxchemlib import mpi_master
+from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
@@ -23,11 +26,17 @@ class TpaReducedDriver(TpaDriver):
         The output stream.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes the reduced isotropic cubic response driver for two-photon
         absorption (TPA)
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 
@@ -331,53 +340,51 @@ class TpaReducedDriver(TpaDriver):
             xi_yy = self.xi(ky, ky, f_y, f_y, F0)
             xi_zz = self.xi(kz, kz, f_z, f_z, F0)
 
+            x2_xx = self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
+            x2_yy = self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
+            x2_zz = self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
+
             key = (('N_sig_xx', w), 2 * w)
             mat = (3 * xi_xx + xi_yy + xi_zz + 0.5 * f_sig_xx).T
             xy_dict[key] = self.anti_sym(
-                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-            xy_dict[key] -= 6 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
-            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
-            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
+                -LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= (3 * x2_xx + x2_yy + x2_zz)
 
             key = (('N_sig_yy', w), 2 * w)
             mat = (xi_xx + 3 * xi_yy + xi_zz + 0.5 * f_sig_yy).T
             xy_dict[key] = self.anti_sym(
-                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
-            xy_dict[key] -= 6 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
-            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
+                -LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= (x2_xx + 3 * x2_yy + x2_zz)
 
             key = (('N_sig_zz', w), 2 * w)
             mat = (xi_xx + xi_yy + 3 * xi_zz + 0.5 * f_sig_zz).T
             xy_dict[key] = self.anti_sym(
-                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
-            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
-            xy_dict[key] -= 6 * self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
+                -LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= (x2_xx + x2_yy + 3 * x2_zz)
 
             key = (('N_sig_xy', w), 2 * w)
             mat = (self.xi(ky, kx, f_y, f_x, F0) +
                    self.xi(kx, ky, f_x, f_y, F0) + 0.5 * f_sig_xy).T
             xy_dict[key] = self.anti_sym(
-                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_x, d_a_mo, nocc, norb)
-            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_y, d_a_mo, nocc, norb)
+                -LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= self.x2_contract(ky.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= self.x2_contract(kx.T, mu_y, d_a_mo, nocc, norb)
 
             key = (('N_sig_xz', w), 2 * w)
             mat = (self.xi(kz, kx, f_z, f_x, F0) +
                    self.xi(kx, kz, f_x, f_z, F0) + 0.5 * f_sig_xz).T
             xy_dict[key] = self.anti_sym(
-                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_x, d_a_mo, nocc, norb)
-            xy_dict[key] -= 2 * self.x2_contract(kx.T, mu_z, d_a_mo, nocc, norb)
+                -LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= self.x2_contract(kz.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= self.x2_contract(kx.T, mu_z, d_a_mo, nocc, norb)
 
             key = (('N_sig_yz', w), 2 * w)
             mat = (self.xi(kz, ky, f_z, f_y, F0) +
                    self.xi(ky, kz, f_y, f_z, F0) + 0.5 * f_sig_yz).T
             xy_dict[key] = self.anti_sym(
-                -2 * LinearSolver.lrmat2vec(mat, nocc, norb))
-            xy_dict[key] -= 2 * self.x2_contract(kz.T, mu_y, d_a_mo, nocc, norb)
-            xy_dict[key] -= 2 * self.x2_contract(ky.T, mu_z, d_a_mo, nocc, norb)
+                -LinearSolver.lrmat2vec(mat, nocc, norb))
+            xy_dict[key] -= self.x2_contract(kz.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= self.x2_contract(ky.T, mu_z, d_a_mo, nocc, norb)
 
         return xy_dict
 
@@ -789,42 +796,43 @@ class TpaReducedDriver(TpaDriver):
         NaX2Nyz = other_dict['NaX2Nyz']
         NxA2Nyz = other_dict['NxA2Nyz']
 
-        width = 94
-
-        w_str = 'Gamma tensor components computed per frequency'
-        self.ostream.print_blank()
-        self.ostream.print_header(w_str.ljust(width))
         self.ostream.print_blank()
 
-        w_str = ''
-        for a in range(len(comp) // len(freqs)):
-            w_str += '{:>3d}. {:<6s}'.format(a + 1, comp[a].split(',')[0])
-            if len(w_str) >= width // 2:
-                self.ostream.print_header(w_str.ljust(width))
-                w_str = ''
-        if w_str:
-            self.ostream.print_header(w_str.ljust(width))
-
-        self.ostream.print_blank()
+        w_str = 'The Isotropic Average gamma Tensor and Its'
+        self.ostream.print_header(w_str)
+        w_str = 'Isotropic Contributions at Given Frequencies'
+        self.ostream.print_header(w_str)
+        self.ostream.print_header('=' * (len(w_str) + 2))
         self.ostream.print_blank()
 
-        w_str = 'Gamma Tensor Components at Given Frequencies'
-        self.ostream.print_header(w_str.ljust(width))
-        w_str = '(reduced expression in one-photon off-resonance regions)'
-        self.ostream.print_header(w_str.ljust(width))
+        w_str = '*** Note: The reduced expression is an approximation to the  '
+        self.ostream.print_header(w_str)
+        w_str = '    second-order nonlinear hyperpolarizability (gamma) and is'
+        self.ostream.print_header(w_str)
+        w_str = '    intended for use in one-photon off-resonance regions.    '
+        self.ostream.print_header(w_str)
         self.ostream.print_blank()
 
         for w in freqs:
             title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
                 'Component', 'Frequency', 'Real', 'Imaginary')
+            width = len(title)
             self.ostream.print_header(title.ljust(width))
             self.ostream.print_header(('-' * len(title)).ljust(width))
 
             self.print_component('T3', w, t3_dict[w, -w, w], width)
             self.print_component('X2', w, NaX2Nyz[w, -w, w], width)
             self.print_component('A2', w, NxA2Nyz[w, -w, w], width)
-            self.print_component('Gamma', w, gamma[w, -w, w], width)
+            self.print_component('gamma', w, gamma[w, -w, w], width)
 
             self.ostream.print_blank()
+
+        title = 'Reference: '
+        title += 'K. Ahmadzadeh, M. Scott, M. Brand, O. Vahtras, X. Li, '
+        self.ostream.print_header(title.ljust(width))
+        title = 'Z. Rinkevicius, and P. Norman, '
+        title += 'J. Chem. Phys. 154, 024111 (2021)'
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_blank()
 
         self.ostream.print_blank()

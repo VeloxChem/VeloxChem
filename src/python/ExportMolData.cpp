@@ -103,7 +103,7 @@ CMolecule_from_coords(const std::vector<std::string>& labels,
 
     // form molecule
 
-    return std::shared_ptr<CMolecule>(new CMolecule(coords_au, charges, masses, labels, idselem));
+    return std::make_shared<CMolecule>(coords_au, charges, masses, labels, idselem);
 }
 
 static std::shared_ptr<CMolecule>

@@ -1,5 +1,7 @@
+from mpi4py import MPI
 import numpy as np
 import time as tm
+import sys
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import MOIntsBatch
@@ -7,6 +9,7 @@ from .veloxchemlib import TwoIndexes
 from .veloxchemlib import mpi_master
 from .veloxchemlib import fockmat
 from .veloxchemlib import moints
+from .outputstream import OutputStream
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .subcommunicators import SubCommunicators
@@ -35,10 +38,16 @@ class MOIntegralsDriver:
         - ostream: The output stream.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes MO integrals driver  to default setup.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         # screening scheme
         self.qq_type = 'QQ_DEN'

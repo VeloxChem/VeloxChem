@@ -1,32 +1,31 @@
 from mpi4py import MPI
 import time as tm
-import sys
-import os
 
-from .veloxchemlib import mpi_initialized
-from .veloxchemlib import mpi_master
+from .cli import cli
+from .cli import print_help
+from .errorhandler import assert_msg_critical
+from .excitondriver import ExcitonModelDriver
+from .loprop import LoPropDriver
+from .mp2driver import Mp2Driver
 from .mpitask import MpiTask
-from .scfrestdriver import ScfRestrictedDriver
-from .scfunrestdriver import ScfUnrestrictedDriver
-from .scffirstorderprop import ScfFirstOrderProperties
-from .scfgradientdriver import ScfGradientDriver
-from .xtbdriver import XTBDriver
-from .xtbgradientdriver import XTBGradientDriver
 from .optimizationdriver import OptimizationDriver
-from .rsplinabscross import LinearAbsorptionCrossSection
-from .rspcdspec import CircularDichroismSpectrum
-from .rsppolarizability import Polarizability
+from .pulsedrsp import PulsedResponse
 from .rspabsorption import Absorption
 from .rspc6 import C6
+from .rspcdspec import CircularDichroismSpectrum
 from .rspcustomproperty import CustomProperty
-from .pulsedrsp import PulsedResponse
-from .mp2driver import Mp2Driver
-from .excitondriver import ExcitonModelDriver
-from .visualizationdriver import VisualizationDriver
-from .loprop import LoPropDriver
-from .errorhandler import assert_msg_critical
-from .slurminfo import get_slurm_maximum_hours
+from .rsplinabscross import LinearAbsorptionCrossSection
+from .rsppolarizability import Polarizability
 from .rsptpa import TPA
+from .scffirstorderprop import ScfFirstOrderProperties
+from .scfgradientdriver import ScfGradientDriver
+from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
+from .slurminfo import get_slurm_maximum_hours
+from .veloxchemlib import mpi_initialized, mpi_master
+from .visualizationdriver import VisualizationDriver
+from .xtbdriver import XTBDriver
+from .xtbgradientdriver import XTBGradientDriver
 
 
 def select_scf_driver(task, scf_type):
@@ -139,22 +138,16 @@ def main():
 
     assert_msg_critical(mpi_initialized(), "MPI not initialized")
 
-    if len(sys.argv) <= 1 or sys.argv[1] in ['-h', '--help']:
-        info_txt = [
-            '',
-            '=================   VeloxChem   =================',
-            '',
-            'Usage:',
-            '    python3 -m veloxchem input_file [output_file]',
-            '',
-        ]
-        if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            print(os.linesep.join(info_txt), file=sys.stdout)
-        sys.exit(0)
+    # Parse command line
+
+    args = cli()
+
+    if not args.input_output_files:
+        print_help()
 
     # MPI task
 
-    task = MpiTask(sys.argv[1:], MPI.COMM_WORLD)
+    task = MpiTask(args.input_output_files, MPI.COMM_WORLD)
     task_type = task.input_dict['jobs']['task'].lower()
 
     # Timelimit in hours
@@ -244,10 +237,10 @@ def main():
 
     if task_type == 'gradient':
         if use_xtb:
-            grad_drv = XTBGradientDriver(task.mpi_comm, task.ostream, xtb_drv)
+            grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
             grad_drv.compute(task.molecule)
         elif scf_drv.restricted:
-            grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream, scf_drv)
+            grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
             grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Geometry optimization
@@ -259,11 +252,11 @@ def main():
             opt_dict = {}
 
         if use_xtb:
-            grad_drv = XTBGradientDriver(task.mpi_comm, task.ostream, xtb_drv)
+            grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
             opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
                                          'XTB')
         elif scf_drv.restricted:
-            grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream, scf_drv)
+            grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
             opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
                                          'SCF')
 

@@ -1,3 +1,4 @@
+from mpi4py import MPI
 import numpy as np
 import os
 try:
@@ -12,8 +13,8 @@ except ImportError:
 
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricFieldIntegralsDriver
-from .subcommunicators import SubCommunicators
 from .veloxchemlib import mpi_master
+from .subcommunicators import SubCommunicators
 
 
 class PolEmbed:
@@ -24,10 +25,10 @@ class PolEmbed:
         The molecule.
     :param basis:
         The AO basis set.
-    :param comm:
-        The MPI communicator.
     :param pe_dict:
         The dictionary with options for CPPE.
+    :param comm:
+        The MPI communicator.
 
     Instance variables
         - molecule: The molecule.
@@ -41,10 +42,13 @@ class PolEmbed:
         - polarizable_coords: The coordinates of the polarizable sites.
     """
 
-    def __init__(self, molecule, basis, comm, pe_dict):
+    def __init__(self, molecule, basis, pe_dict, comm=None):
         """
         Initializes interface to the CPPE library.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
 
         self.molecule = molecule
         self.basis = basis
@@ -84,7 +88,7 @@ class PolEmbed:
         """
 
         from pkg_resources import parse_version
-        min_cppe_version = '0.2.0'
+        min_cppe_version = '0.3.1'
 
         if parse_version(cppe.__version__) < parse_version(min_cppe_version):
             err_str = 'cppe version {} or higher is required.'.format(
@@ -115,6 +119,10 @@ class PolEmbed:
             'border_nredist': 'int',
             'border_redist_order': 'int',
             'border_redist_pol': 'bool',
+            'summation_induced_fields': 'string',
+            'tree_ncrit': 'int',
+            'tree_expansion_order': 'int',
+            'theta': 'float',
         }
 
         self.options = {}

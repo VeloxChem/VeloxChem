@@ -1,9 +1,8 @@
-from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
-from pathlib import Path
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
@@ -20,14 +19,27 @@ class TestH2Se(unittest.TestCase):
         inpfile = here / 'inputs' / 'h2se.inp'
         outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)])
+
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
+        scf_drv.update_settings(task.input_dict['scf'],
+                                task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         e_scf = scf_drv.get_scf_energy()
 
+        scf_drv.restart = True
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        e_scf_restart = scf_drv.get_scf_energy()
+
+        scf_h5 = Path(task.input_dict['scf']['checkpoint_file'])
+        if scf_h5.is_file():
+            scf_h5.unlink()
+
         self.assertAlmostEqual(-2400.70461320, e_scf, 8)
+        self.assertAlmostEqual(-2400.70461320, e_scf_restart, 8)
 
         # unrestricted scf
 
@@ -41,7 +53,7 @@ class TestH2Se(unittest.TestCase):
         e_uhf = scf_unrest_drv.get_scf_energy()
         self.assertAlmostEqual(-2400.38319890, e_uhf, 8)
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             s2 = scf_unrest_drv.compute_s2(task.molecule,
                                            scf_unrest_drv.scf_tensors['S'],
                                            scf_unrest_drv.mol_orbs)
@@ -55,7 +67,7 @@ class TestH2Se(unittest.TestCase):
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'h2se.inp')
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
@@ -73,7 +85,7 @@ class TestH2Se(unittest.TestCase):
         tda_results = tda_exci.compute(task.molecule, task.ao_basis,
                                        scf_tensors)
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
 
             reigs = tda_results['eigenvalues']
             osc_strs = tda_results['oscillator_strengths']
@@ -105,7 +117,7 @@ class TestH2Se(unittest.TestCase):
 
         rpa_results = lreig.compute(task.molecule, task.ao_basis, scf_tensors)
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
 
             reigs = rpa_results['eigenvalues']
             osc_strs = rpa_results['oscillator_strengths']
@@ -138,7 +150,7 @@ class TestH2Se(unittest.TestCase):
         lr_results = lr_solver.compute(task.molecule, task.ao_basis,
                                        scf_tensors)
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
 
             ref_polar = {
                 ('x', 'x', 0): 15.26732,

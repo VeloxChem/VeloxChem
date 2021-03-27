@@ -8,6 +8,8 @@
 
 #include "LinearMomentumIntegralsDriverTest.hpp"
 
+#include <mpi.h>
+
 #include "LinearMomentumIntegralsDriver.hpp"
 #include "MolecularBasisSetter.hpp"
 #include "MoleculeSetter.hpp"

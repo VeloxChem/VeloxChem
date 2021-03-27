@@ -1,14 +1,19 @@
+from mpi4py import MPI
 import numpy as np
 import time as tm
+import sys
 
 from .molecule import Molecule
 from .gradientdriver import GradientDriver
+from .outputstream import OutputStream
 
 
 class ScfGradientDriver(GradientDriver):
     """
     Implements SCF gradient driver.
 
+    :param scf_drv:
+        The SCF driver.
     :param comm:
         The MPI communicator.
     :param ostream:
@@ -19,10 +24,16 @@ class ScfGradientDriver(GradientDriver):
         - delta_h: The displacement for finite difference.
     """
 
-    def __init__(self, comm, ostream, scf_drv):
+    def __init__(self, scf_drv, comm=None, ostream=None):
         """
         Initializes gradient driver.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 

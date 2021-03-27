@@ -8,11 +8,15 @@
 
 #include "DensityGridDriverTest.hpp"
 
-#include "GridDriver.hpp"
-#include "DensityGridDriver.hpp"
-#include "MoleculeSetter.hpp"
-#include "MolecularBasisSetter.hpp"
+#include <mpi.h>
+
 #include "AODensityMatrixSetter.hpp"
+#include "DensityGrid.hpp"
+#include "DensityGridDriver.hpp"
+#include "GridDriver.hpp"
+#include "MolecularBasisSetter.hpp"
+#include "MolecularGrid.hpp"
+#include "MoleculeSetter.hpp"
 
 TEST_F(CDensityGridDriverTest, Generate)
 {

@@ -19,6 +19,9 @@
 #include "MpiFunc.hpp"
 #include "SpinBlock.hpp"
 #include "StringFormat.hpp"
+#ifdef ENABLE_MKL
+#include "ConfigMKL.hpp"
+#endif
 
 namespace py = pybind11;
 
@@ -38,6 +41,42 @@ get_mpi_comm(py::object py_comm)
 
     return comm_ptr;
 }
+
+// Helper function for checking master node
+
+static bool
+is_mpi_master(py::object py_comm)
+{
+    if (py_comm.is_none())
+    {
+        return (mpi::rank(MPI_COMM_WORLD) == mpi::master());
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+        return (mpi::rank(*comm_ptr) == mpi::master());
+    }
+}
+
+// Helper function for checking number of nodes
+
+static bool
+is_single_node(py::object py_comm)
+{
+    if (py_comm.is_none())
+    {
+        return (mpi::nodes(MPI_COMM_WORLD) == 1);
+    }
+    else
+    {
+        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+
+        return (mpi::nodes(*comm_ptr) == 1);
+    }
+}
+
+// Helper function for checking number of nodes
 
 // Helper function for getting the size limit in MPI communication
 
@@ -158,6 +197,11 @@ integer_to_angular_momentum(const std::string& label)
 void
 export_general(py::module& m)
 {
+    // configure MKL single dynamic library
+#ifdef ENABLE_MKL
+    configure_mkl_rt();
+#endif
+
     // initialize mpi4py's C-API
 
     auto err = import_mpi4py();
@@ -177,6 +221,10 @@ export_general(py::module& m)
     // exposing functions
 
     m.def("mpi_master", &mpi::master);
+
+    m.def("is_mpi_master", &is_mpi_master, py::arg("py_comm") = py::none());
+
+    m.def("is_single_node", &is_single_node, py::arg("py_comm") = py::none());
 
     m.def("mpi_size_limit", &mpi_size_limit);
 

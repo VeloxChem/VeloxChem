@@ -1,28 +1,28 @@
-from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
 import random
 import pytest
 import sys
 import os
-from pathlib import Path
 try:
     import cppe
 except ImportError:
     pass
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.veloxchemlib import hartree_in_ev
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 
 
+@pytest.mark.solvers
 class TestRPA(unittest.TestCase):
 
     def run_rpa(self, inpfile, potfile, xcfun_label, data_lines):
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
 
         if potfile is not None:
@@ -49,7 +49,7 @@ class TestRPA(unittest.TestCase):
         rpa_results = rpa_solver.compute(task.molecule, task.ao_basis,
                                          scf_drv.scf_tensors)
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
             exc_ene = rpa_results['eigenvalues'] * hartree_in_ev()
             osc_str = rpa_results['oscillator_strengths']
             rot_str = rpa_results['rotatory_strengths']

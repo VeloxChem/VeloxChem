@@ -11,7 +11,7 @@
 
 #include <cstdint>
 
-#include "mpi.h"
+#include <mpi.h>
 
 #include "ExecMode.hpp"
 #include "GtoContainer.hpp"

@@ -14,11 +14,13 @@ PYTHONPATH = $(VLX_SOURCE):mocks
 VLX_EXCLUDE = $(VLX_SOURCE)/veloxchem/veloxchemlib.py
 VLX_EXCLUDE += $(VLX_SOURCE)/veloxchem/aodensitymatrix.py
 VLX_EXCLUDE += $(VLX_SOURCE)/veloxchem/aofockmatrix.py
+VLX_EXCLUDE += $(VLX_SOURCE)/veloxchem/cubicgrid.py
 VLX_EXCLUDE += $(VLX_SOURCE)/veloxchem/main.py
 VLX_EXCLUDE += $(VLX_SOURCE)/veloxchem/molecularbasis.py
 VLX_EXCLUDE += $(VLX_SOURCE)/veloxchem/molecularorbitals.py
 VLX_EXCLUDE += $(VLX_SOURCE)/veloxchem/molecule.py
 VLX_EXCLUDE += $(VLX_SOURCE)/veloxchem/visualizationdriver.py
+VLX_EXCLUDE += $(VLX_SOURCE)/veloxchem/xtbdriver.py
 
 # Put it first so that "make" without argument is like "make help".
 help:

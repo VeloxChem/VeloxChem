@@ -1,4 +1,5 @@
 from os import environ
+from os import walk
 from pathlib import Path
 
 from .veloxchemlib import MolecularBasis
@@ -12,10 +13,7 @@ from .errorhandler import assert_msg_critical
 
 
 @staticmethod
-def _MolecularBasis_read(mol,
-                         basis_name,
-                         basis_path='.',
-                         ostream=OutputStream()):
+def _MolecularBasis_read(mol, basis_name, basis_path='.', ostream=None):
     """
     Reads AO basis set from file.
 
@@ -32,7 +30,10 @@ def _MolecularBasis_read(mol,
         The AO basis set.
     """
 
-    err_gc = "MolcularBasis.read_file: "
+    if ostream is None:
+        ostream = OutputStream(None)
+
+    err_gc = "MolcularBasis.read: "
     err_gc += "General contraction currently is not supported"
 
     # searching order:
@@ -56,7 +57,7 @@ def _MolecularBasis_read(mol,
 
     assert_msg_critical(
         basis_name.upper() == basis_dict['basis_set_name'].upper(),
-        "MolecularBasis.read_file: Inconsistent basis set name")
+        "MolecularBasis.read: Inconsistent basis set name")
 
     mol_basis = MolecularBasis()
 
@@ -114,4 +115,36 @@ def _MolecularBasis_read(mol,
     return mol_basis
 
 
+@staticmethod
+def _MolecularBasis_get_avail_basis(element_label):
+    """
+    Gets the names of available basis sets for an element.
+
+    :param element_label:
+        The label of the chemical element.
+
+    :return:
+        The tuple of basis sets.
+    """
+
+    avail_basis = set()
+
+    basis_path = environ['VLXBASISPATH']
+
+    for root, dirs, files in walk(basis_path, topdown=True):
+        for filename in files:
+            basis_file = Path(basis_path, filename)
+            basis_dict = InputParser(str(basis_file)).input_dict
+            for key in list(basis_dict.keys()):
+                if 'atombasis_' in key:
+                    elem = key.replace('atombasis_', '')
+                    if element_label.upper() == elem.upper():
+                        avail_basis.add(filename)
+        # skip subfolder
+        break
+
+    return sorted(list(avail_basis))
+
+
 MolecularBasis.read = _MolecularBasis_read
+MolecularBasis.get_avail_basis = _MolecularBasis_get_avail_basis

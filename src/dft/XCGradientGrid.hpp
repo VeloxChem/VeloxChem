@@ -161,6 +161,16 @@ public:
     */
     double* xcGradientValues(const xcvars gradientType);
     
+    
+    
+    /**
+        Get density grid type
+
+    @return the density grid type.
+    **/
+    dengrid
+    getDensityGridType() const;
+ 
     /**
      Converts exchange-correlation gradient grid object to text and insert it into output text
      stream.
@@ -169,6 +179,7 @@ public:
      @param source the exchange-correlation gradient grid.
      */
     friend std::ostream& operator<<(std::ostream& output, const CXCGradientGrid& source);
+
 };
 
 #endif /* XCGradientGrid_hpp */

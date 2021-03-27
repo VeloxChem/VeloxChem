@@ -1,9 +1,11 @@
+from mpi4py import MPI
 import numpy as np
 import time as tm
 import psutil
 import sys
 
 from .veloxchemlib import mpi_master
+from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
@@ -31,10 +33,16 @@ class C6Solver(LinearSolver):
         - w0: The transformation function prefactor.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes C6 solver to default setup.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 
@@ -339,7 +347,7 @@ class C6Solver(LinearSolver):
 
             e2gg = self.dist_bger.matmul_AtB(self.dist_e2bger, 2.0)
             e2uu = self.dist_bung.matmul_AtB(self.dist_e2bung, 2.0)
-            s2ug = self.dist_bung.matmul_AtB(self.dist_bger, 4.0)
+            s2ug = self.dist_bung.matmul_AtB(self.dist_bger, 2.0)
 
             for op, iw in op_imagfreq_keys:
                 if (iteration == 0 or
@@ -398,8 +406,8 @@ class C6Solver(LinearSolver):
 
                     # calculating the residual components
 
-                    s2imagger = 2.0 * x_imagger.data
-                    s2realung = 2.0 * x_realung.data
+                    s2imagger = x_imagger.data
+                    s2realung = x_realung.data
 
                     r_realung = (e2realung.data + iw * s2imagger - grad_ru.data)
                     r_imagger = (-e2imagger.data + iw * s2realung +
@@ -558,7 +566,7 @@ class C6Solver(LinearSolver):
 
                 if self.rank == mpi_master():
                     for aop in self.a_components:
-                        rsp_funcs[(aop, bop, iw)] = -np.dot(va[aop], x)
+                        rsp_funcs[(aop, bop, iw)] = -2.0 * np.dot(va[aop], x)
 
                         if write_solution_to_file:
                             append_rsp_solution_hdf5(

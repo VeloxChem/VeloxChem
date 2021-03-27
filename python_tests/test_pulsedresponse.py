@@ -1,10 +1,9 @@
-from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import unittest
 import h5py
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.mpitask import MpiTask
 from veloxchem.pulsedrsp import PulsedResponse
@@ -76,7 +75,7 @@ class TestComplexResponse(unittest.TestCase):
         inpfile = here / 'inputs' / 'pulsed_water.inp'
         outfile = inpfile.with_suffix('.out')
 
-        task = MpiTask([str(inpfile), str(outfile)], MPI.COMM_WORLD)
+        task = MpiTask([str(inpfile), str(outfile)])
 
         # scf
         pulse_input = task.input_dict['pulses']
@@ -113,7 +112,7 @@ class TestComplexResponse(unittest.TestCase):
         h5_file = Path('{}.h5'.format(cls.h5fname))
         txt_file = Path('{}.txt'.format(cls.h5fname))
 
-        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+        if is_mpi_master():
             if h5_file.is_file():
                 h5_file.unlink()
             if txt_file.is_file():
@@ -131,7 +130,7 @@ class TestComplexResponse(unittest.TestCase):
 
             return best_val
 
-        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+        if is_mpi_master():
 
             hf = h5py.File('{}.h5'.format(self.h5fname), 'r')
             calc_amplitudes = hf.get('amplitudes')[()]
@@ -154,7 +153,7 @@ class TestComplexResponse(unittest.TestCase):
 
         # Test the contents of the file
 
-        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+        if is_mpi_master():
 
             hf = h5py.File('{}.h5'.format(self.h5fname), 'r')
             for key in expected_keys:
@@ -194,7 +193,7 @@ class TestComplexResponse(unittest.TestCase):
 
         expected_keys = ['properties', 'pulse_settings', 'properties_zeropad']
 
-        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+        if is_mpi_master():
 
             for key in expected_keys:
                 if key not in self.results:

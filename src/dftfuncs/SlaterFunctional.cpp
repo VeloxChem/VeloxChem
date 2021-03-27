@@ -44,7 +44,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
         double fre = 0.75 * frg;
         
         double fp = 1.0 / 3.0;
-        
+
         // determine number of grid points
         
         auto ngpoints = densityGrid.getNumberOfGridPoints();

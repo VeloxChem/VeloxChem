@@ -135,8 +135,8 @@ class OptimizationDriver:
                     PurePath(temp_dir, '{:s}_{:d}'.format(filename, self.rank)))
 
             if self.constraints:
-                constr_filename = filename + '_constr.txt'
-                with open(constr_filename, 'w') as fh:
+                constr_filename = Path(filename).with_suffix('.constr.txt')
+                with open(str(constr_filename), 'w') as fh:
                     for line in self.constraints:
                         print(line, file=fh)
             else:

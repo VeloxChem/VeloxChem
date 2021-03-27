@@ -1,27 +1,38 @@
-from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
+import tempfile
 import random
 import pytest
 import sys
 import os
-from pathlib import Path
 try:
     import cppe
 except ImportError:
     pass
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
+from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.cppsolver import ComplexResponse
+from veloxchem.rsplinabscross import LinearAbsorptionCrossSection
 
 
+@pytest.mark.solvers
 class TestCPP(unittest.TestCase):
+
+    def run_scf(self, task):
+
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.update_settings(task.input_dict['scf'],
+                                task.input_dict['method_settings'])
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        return scf_drv.scf_tensors
 
     def run_cpp(self, inpfile, potfile, xcfun_label, data_lines):
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
 
         if potfile is not None:
@@ -30,10 +41,7 @@ class TestCPP(unittest.TestCase):
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
 
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_tensors = self.run_scf(task)
 
         ref_freqs = []
         for line in data_lines:
@@ -43,16 +51,20 @@ class TestCPP(unittest.TestCase):
         ref_prop_real = [float(line.split()[4]) for line in data_lines]
         ref_prop_imag = [float(line.split()[5]) for line in data_lines]
 
-        cpp_solver = ComplexResponse(task.mpi_comm, task.ostream)
-        cpp_solver.update_settings(
+        cpp_prop = LinearAbsorptionCrossSection(
             {
                 'frequencies': ','.join(ref_freqs_str),
                 'batch_size': random.choice([1, 10, 100])
             }, task.input_dict['method_settings'])
-        cpp_results = cpp_solver.compute(task.molecule, task.ao_basis,
-                                         scf_drv.scf_tensors)
+        cpp_prop.init_driver(task.mpi_comm, task.ostream)
+        cpp_prop.compute(task.molecule, task.ao_basis, scf_tensors)
 
-        if task.mpi_rank == mpi_master():
+        self.assertTrue(cpp_prop.rsp_driver.is_converged)
+
+        if is_mpi_master(task.mpi_comm):
+            self.check_printout(cpp_prop)
+            cpp_results = cpp_prop.rsp_property
+
             prop = np.array([
                 -cpp_results['response_functions'][(a, b, w)]
                 for w in ref_freqs
@@ -60,6 +72,34 @@ class TestCPP(unittest.TestCase):
             ])
             self.assertTrue(np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4)
             self.assertTrue(np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4)
+
+    def check_printout(self, cpp_prop):
+
+        rsp_func = cpp_prop.rsp_property['response_functions']
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fname = str(Path(temp_dir, 'cpp.out'))
+
+            ostream = OutputStream(fname)
+            cpp_prop.print_property(ostream)
+            ostream.close()
+
+            with open(fname, 'r') as f_out:
+                lines = f_out.readlines()
+
+            for key, val in rsp_func.items():
+                key_found = False
+                for line in lines:
+                    if f'{key[0]}  ;  {key[1]}' in line:
+                        content = line.split('>>')[1].split()
+                        print_freq = float(content[0])
+                        if abs(key[2] - print_freq) < 1e-4:
+                            key_found = True
+                            print_real = float(content[1])
+                            print_imag = float(content[2].replace('j', ''))
+                            self.assertAlmostEqual(val.real, print_real, 6)
+                            self.assertAlmostEqual(val.imag, print_imag, 6)
+                self.assertTrue(key_found)
 
     def test_cpp_hf(self):
 

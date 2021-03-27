@@ -10,6 +10,8 @@
 
 #include <cmath>
 
+#include <mpi.h>
+
 #include "MpiFunc.hpp"
 #include "DensityGridDriver.hpp"
 #include "FunctionalParser.hpp"
@@ -19,7 +21,6 @@
 #include "GtoFunc.hpp"
 #include "DenseLinearAlgebra.hpp"
 #include "MathConst.hpp"
-
 
 CXCIntegrator::CXCIntegrator(MPI_Comm comm)
 {
@@ -45,13 +46,13 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
                          const std::string&      xcFuncLabel) const
 {
     CAOKohnShamMatrix ksmat;
-    
+
     // integrator handles single AO density only
-    
-    if (aoDensityMatrix.getNumberOfMatrices() == 1)
-    {
+
+    if (aoDensityMatrix.getNumberOfDensityMatrices() == 1)
+    {   
         // parse exchange-correlation functional data
-        
+
         auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
         
         // create GTOs container
@@ -63,8 +64,8 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
         CDensityGridDriver dgdrv(_locComm);
         
         auto refdengrid = dgdrv.generate(aoDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
-        
-        if (aoDensityMatrix.isRestricted())
+
+        if (aoDensityMatrix.isClosedShell())
         {
             // generate screened molecular and density grids
             
@@ -73,7 +74,7 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
             CDensityGrid dgrid;
             
             refdengrid.getScreenedGridsPair(dgrid, mgrid, 0, _thresholdOfDensity, fvxc.getFunctionalType());
-            
+
             // allocate XC gradient grid
             
             CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), dgrid.getDensityGridType(), fvxc.getFunctionalType());
@@ -90,19 +91,104 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
             
             if (fvxc.getFunctionalType() == xcfun::lda)
             {
-                _compRestrictedContributionForLDA(ksmat, gtovec, vxcgrid, dgrid, mgrid);
+                _compRestrictedContributionForLda(ksmat, gtovec, vxcgrid, dgrid, mgrid);
             }
             
             if (fvxc.getFunctionalType() == xcfun::gga)
             {
-                _compRestrictedContributionForGGA(ksmat, gtovec, vxcgrid, dgrid, mgrid);
+                _compRestrictedContributionForGga(ksmat, gtovec, vxcgrid, dgrid, mgrid);
             }
             
             // symmetrize Kohn-Sham matrix
             
             ksmat.symmetrize();
         }
-        
+        else
+        {
+            // generate screened molecular and density grids
+
+            CMolecularGrid mgridab(molecularGrid);
+
+            CMolecularGrid mgrida(molecularGrid);
+            
+            CMolecularGrid mgridb(molecularGrid);
+
+            CDensityGrid dgridab;
+
+            CDensityGrid dgrida;
+            
+            CDensityGrid dgridb;
+
+            // screen the molecular and density grids 
+
+            refdengrid.getScreenedGridPairUnrestricted(dgridab, dgrida, dgridb, mgridab, mgrida, mgridb, 
+                                                       0, _thresholdOfDensity, fvxc.getFunctionalType());
+            
+            // allocate XC gradient grid
+
+            CXCGradientGrid vxcgridab(mgridab.getNumberOfGridPoints(), dgridab.getDensityGridType(), fvxc.getFunctionalType());
+
+            CXCGradientGrid vxcgrida(mgrida.getNumberOfGridPoints(), dgrida.getDensityGridType(), fvxc.getFunctionalType());
+
+            CXCGradientGrid vxcgridb(mgridb.getNumberOfGridPoints(), dgridb.getDensityGridType(), fvxc.getFunctionalType());
+            
+            // compute exchange-correlation functional first derrivatives
+            
+            fvxc.compute(vxcgridab, dgridab);
+
+            fvxc.compute(vxcgrida, dgrida);
+
+            fvxc.compute(vxcgridb, dgridb);
+
+            // compute Kohn-Sham matrix
+
+            ksmat = CAOKohnShamMatrix(aoDensityMatrix.getNumberOfRows(0), aoDensityMatrix.getNumberOfColumns(0), false);
+            
+            ksmat.zero();
+            
+            if (fvxc.getFunctionalType() == xcfun::lda)
+            {
+               _compUnrestrictedContributionForLda(ksmat, gtovec, vxcgrida, dgrida, mgrida);
+
+               _compUnrestrictedContributionForLda(ksmat, gtovec, vxcgridb, dgridb, mgridb);
+
+               _compUnrestrictedContributionForLda(ksmat, gtovec, vxcgridab, dgridab, mgridab);
+
+               auto xcdata = _compEnergyAndDensityUnrestricted(vxcgrida, dgrida, mgrida);
+
+               auto xcdatb = _compEnergyAndDensityUnrestricted(vxcgridb, dgridb, mgridb);
+
+               auto xcdatab = _compEnergyAndDensityUnrestricted(vxcgridab, dgridab, mgridab);
+               
+               ksmat.setExchangeCorrelationEnergy(std::get<0>(xcdata) + std::get<0>(xcdatb) + std::get<0>(xcdatab));
+    
+               ksmat.setNumberOfElectrons(std::get<1>(xcdata) + std::get<1>(xcdatb) + std::get<1>(xcdatab));
+            }
+
+            if (fvxc.getFunctionalType() == xcfun::gga)
+            {
+                _compUnrestrictedContributionForGga(ksmat, gtovec, vxcgridab, dgridab, mgridab);
+
+                _compUnrestrictedContributionForGga(ksmat, gtovec, vxcgrida, dgrida, mgrida);
+
+                _compUnrestrictedContributionForGga(ksmat, gtovec, vxcgridb, dgridb, mgridb);
+            
+               auto xcdata = _compEnergyAndDensityUnrestricted(vxcgrida, dgrida, mgrida);
+
+               auto xcdatb = _compEnergyAndDensityUnrestricted(vxcgridb, dgridb, mgridb);
+
+               auto xcdatab = _compEnergyAndDensityUnrestricted(vxcgridab, dgridab, mgridab);
+
+               ksmat.setExchangeCorrelationEnergy(std::get<0>(xcdata) + std::get<0>(xcdatb) + std::get<0>(xcdatab));
+    
+               ksmat.setNumberOfElectrons(std::get<1>(xcdata) + std::get<1>(xcdatb) + std::get<1>(xcdatab));
+            }
+            
+            // symmetrize Kohn-Sham matrix
+            
+            ksmat.symmetrize();
+
+        }
         // delete GTOs container
         
         delete gtovec;
@@ -164,7 +250,7 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     
     auto ncol = gsDensityMatrix.getNumberOfColumns(0);
     
-    if (rwDensityMatrix.isRestricted())
+    if (rwDensityMatrix.isClosedShell())
     {
         // allocate perturbed Kohn-Sham matrix
         
@@ -172,12 +258,12 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
         
         if (fvxc.getFunctionalType() == xcfun::lda)
         {
-            _compRestrictedContributionForLDA(ksmat, gtovec, vxc2grid, rwdengrid, mgrid);
+            _compRestrictedContributionForLda(ksmat, gtovec, vxc2grid, rwdengrid, mgrid);
         }
         
         if (fvxc.getFunctionalType() == xcfun::gga)
         {
-            _compRestrictedContributionForGGA(ksmat, gtovec, vxcgrid, vxc2grid, gsdengrid, rwdengrid, mgrid);
+            _compRestrictedContributionForGga(ksmat, gtovec, vxcgrid, vxc2grid, gsdengrid, rwdengrid, mgrid);
         }
         
         // symmetrize Kohn-Sham matrix
@@ -258,7 +344,7 @@ CXCIntegrator::_compRestrictedContributionForLDAWithNL(      CAOKohnShamMatrix& 
     // compute exchange-correlation energy and number of electrons
     
     auto xcdat = _compEnergyAndDensity(xcGradientGrid, densityGrid, molecularGrid);
-    
+
     aoKohnShamMatrix.setExchangeCorrelationEnergy(std::get<0>(xcdat));
     
     aoKohnShamMatrix.setNumberOfElectrons(std::get<1>(xcdat));
@@ -487,7 +573,7 @@ CXCIntegrator::_isSignificantShellPair(const CGtoBlock&      braGtoBlock,
 }
 
 void
-CXCIntegrator::_compRestrictedContributionForLDA(      CAOKohnShamMatrix& aoKohnShamMatrix,
+CXCIntegrator::_compRestrictedContributionForLda(      CAOKohnShamMatrix& aoKohnShamMatrix,
                                                  const CGtoContainer*     gtoContainer,
                                                  const CXCGradientGrid&   xcGradientGrid,
                                                  const CDensityGrid&      densityGrid,
@@ -545,7 +631,7 @@ CXCIntegrator::_compRestrictedContributionForLDA(      CAOKohnShamMatrix& aoKohn
                 
                 #pragma omp task firstprivate(tbsize, tbposition)
                 {
-                    _compRestrictedBatchForLDA(ksmatprt, gtoContainer, xcgridptr, mgx, mgy, mgz, mgw,
+                    _compRestrictedBatchForLda(ksmatprt, gtoContainer, xcgridptr, mgx, mgy, mgz, mgw,
                                                tbposition, tbsize);
                 }
             }
@@ -557,12 +643,75 @@ CXCIntegrator::_compRestrictedContributionForLDA(      CAOKohnShamMatrix& aoKohn
     auto xcdat = _compEnergyAndDensity(xcGradientGrid, densityGrid, molecularGrid);
     
     aoKohnShamMatrix.setExchangeCorrelationEnergy(std::get<0>(xcdat));
-    
+
     aoKohnShamMatrix.setNumberOfElectrons(std::get<1>(xcdat));
 }
 
 void
-CXCIntegrator::_compRestrictedContributionForLDA(      CAOKohnShamMatrix& aoKohnShamMatrix,
+CXCIntegrator::_compUnrestrictedContributionForLda(      CAOKohnShamMatrix& aoKohnShamMatrix,
+                                                   const CGtoContainer*     gtoContainer,
+                                                   const CXCGradientGrid&   xcGradientGrid,
+                                                   const CDensityGrid&      densityGrid,
+                                                   const CMolecularGrid&    molecularGrid) const
+{      
+    // set up OMP tasks
+
+    COMPTasks omptaks(5);
+    
+    omptaks.set(molecularGrid.getNumberOfGridPoints());
+    
+    auto ntasks = omptaks.getNumberOfTasks();
+    
+    auto tbsizes = omptaks.getTaskSizes();
+    
+    auto tbpositions = omptaks.getTaskPositions();
+    
+    // set up pointer to molecular grid weigths
+    
+    auto mgx = molecularGrid.getCoordinatesX();
+    
+    auto mgy = molecularGrid.getCoordinatesY();
+    
+    auto mgz = molecularGrid.getCoordinatesZ();
+    
+    auto mgw = molecularGrid.getWeights();
+    
+    // set up pointer to density matrix
+    
+    auto xcgridptr = &xcGradientGrid;
+    
+    // set up pointer to Kohn-Sham matrix
+    
+    auto ksmatprt = &aoKohnShamMatrix;
+    
+    // compute contributions to Kohn-Sham matrix from blocks of grid points
+
+    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, mgw, xcgridptr, ksmatprt)
+    {
+        #pragma omp single nowait
+        {
+            for (int32_t i = 0; i < ntasks; i++)
+            {
+                // set up task parameters
+                
+                auto tbsize = tbsizes[i];
+                
+                auto tbposition = tbpositions[i];
+                
+                // generate task
+                
+                #pragma omp task firstprivate(tbsize, tbposition)
+                {
+                    _compUnrestrictedBatchForLda(ksmatprt, gtoContainer, xcgridptr, mgx, mgy, mgz, mgw,
+                                               tbposition, tbsize);
+                }
+            }
+        }
+    }    
+}
+
+void
+CXCIntegrator::_compRestrictedContributionForLda(      CAOKohnShamMatrix& aoKohnShamMatrix,
                                                  const CGtoContainer*     gtoContainer,
                                                  const CXCHessianGrid&    xcHessianGrid,
                                                  const CDensityGrid&      rwDensityGrid,
@@ -624,7 +773,7 @@ CXCIntegrator::_compRestrictedContributionForLDA(      CAOKohnShamMatrix& aoKohn
                 
                 #pragma omp task firstprivate(tbsize, tbposition)
                 {
-                    _compRestrictedBatchForLDA(ksmatprt, gtoContainer, xchessptr, rwdenptr, mgx, mgy, mgz, mgw,
+                    _compRestrictedBatchForLda(ksmatprt, gtoContainer, xchessptr, rwdenptr, mgx, mgy, mgz, mgw,
                                                tbposition, tbsize);
                 }
             }
@@ -633,7 +782,7 @@ CXCIntegrator::_compRestrictedContributionForLDA(      CAOKohnShamMatrix& aoKohn
 }
 
 void
-CXCIntegrator::_compRestrictedContributionForGGA(      CAOKohnShamMatrix& aoKohnShamMatrix,
+CXCIntegrator::_compRestrictedContributionForGga(      CAOKohnShamMatrix& aoKohnShamMatrix,
                                                  const CGtoContainer*     gtoContainer,
                                                  const CXCGradientGrid&   xcGradientGrid,
                                                  const CDensityGrid&      densityGrid,
@@ -715,8 +864,6 @@ CXCIntegrator::_compRestrictedContributionForGGA(      CAOKohnShamMatrix& aoKohn
                     }
                 }
             }
-                
-            
         }
     }
     
@@ -730,7 +877,90 @@ CXCIntegrator::_compRestrictedContributionForGGA(      CAOKohnShamMatrix& aoKohn
 }
 
 void
-CXCIntegrator::_compRestrictedContributionForGGA(      CAOKohnShamMatrix& aoKohnShamMatrix,
+CXCIntegrator::_compUnrestrictedContributionForGga(      CAOKohnShamMatrix& aoKohnShamMatrix,
+                                                   const CGtoContainer*     gtoContainer,
+                                                   const CXCGradientGrid&   xcGradientGrid,
+                                                   const CDensityGrid&      densityGrid,
+                                                   const CMolecularGrid&    molecularGrid) const
+{
+        
+    // set up OMP tasks
+    
+    COMPTasks omptaks(2);
+    
+    omptaks.set(molecularGrid.getNumberOfGridPoints());
+    
+    auto ntasks = omptaks.getNumberOfTasks();
+    
+    auto tbsizes = omptaks.getTaskSizes();
+    
+    auto tbpositions = omptaks.getTaskPositions();
+    
+    // set up pointer to molecular grid weigths
+    
+    auto mgx = molecularGrid.getCoordinatesX();
+    
+    auto mgy = molecularGrid.getCoordinatesY();
+    
+    auto mgz = molecularGrid.getCoordinatesZ();
+    
+    auto mgw = molecularGrid.getWeights();
+    
+    // set up pointer to density matrix
+    
+    auto xcgridptr = &xcGradientGrid;
+    
+    // set up poinet to density grid
+    
+    auto dgridptr = &densityGrid;
+    
+    // set up pointer to Kohn-Sham matrix
+    
+    auto ksmatprt = &aoKohnShamMatrix;
+    
+    // set up number of GTOs blocks
+    
+    auto nblocks = gtoContainer->getNumberOfGtoBlocks();
+    // loop over pairs of GTOs blocks
+    
+    for (int32_t i = 0; i < nblocks; i++)
+    {
+        auto bgtos = gtoContainer->getGtoBlock(i);
+        
+        for (int32_t j = i; j < nblocks; j++)
+        {
+            auto kgtos = gtoContainer->getGtoBlock(j);
+            
+            // compute contributions to Kohn-Sham matrix from blocks of grid points
+            
+            #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, mgw, dgridptr, xcgridptr, ksmatprt)
+            {
+                #pragma omp single nowait
+                {
+                    for (int32_t k = 0; k < ntasks; k++)
+                    {
+                        // set up task parameters
+                        
+                        auto tbsize = tbsizes[k];
+                        
+                        auto tbposition = tbpositions[k];
+                        
+                        // generate task
+                        
+                        #pragma omp task firstprivate(tbsize, tbposition)
+                        {
+                            _compUnrestrictedBatchForGga(ksmatprt, bgtos, kgtos, xcgridptr, dgridptr,
+                                                         mgx, mgy, mgz, mgw, tbposition, tbsize);
+                        }
+                    }
+                }
+            }
+        }
+    }  
+}
+
+void
+CXCIntegrator::_compRestrictedContributionForGga(      CAOKohnShamMatrix& aoKohnShamMatrix,
                                                  const CGtoContainer*     gtoContainer,
                                                  const CXCGradientGrid&   xcGradientGrid,
                                                  const CXCHessianGrid&    xcHessianGrid,
@@ -808,7 +1038,7 @@ CXCIntegrator::_compRestrictedContributionForGGA(      CAOKohnShamMatrix& aoKohn
 }
 
 void
-CXCIntegrator::_compRestrictedBatchForLDA(      CAOKohnShamMatrix* aoKohnShamMatrix,
+CXCIntegrator::_compRestrictedBatchForLda(      CAOKohnShamMatrix* aoKohnShamMatrix,
                                           const CGtoContainer*     gtoContainer,
                                           const CXCGradientGrid*   xcGradientGrid,
                                           const double*            gridCoordinatesX,
@@ -853,7 +1083,7 @@ CXCIntegrator::_compRestrictedBatchForLDA(      CAOKohnShamMatrix* aoKohnShamMat
             gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
                                             gridOffset, igpnt, blockdim);
             
-            _distRestrictedBatchForLDA(aoKohnShamMatrix, vxcbuf, grhoa, gaos, gridWeights, gridOffset, igpnt, blockdim);
+            _distRestrictedBatchForLda(aoKohnShamMatrix, vxcbuf, grhoa, gaos, gridWeights, gridOffset, igpnt, blockdim);
             
             igpnt += blockdim;
         }
@@ -870,12 +1100,158 @@ CXCIntegrator::_compRestrictedBatchForLDA(      CAOKohnShamMatrix* aoKohnShamMat
         gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
                                         gridOffset, igpnt, blockdim);
         
-        _distRestrictedBatchForLDA(aoKohnShamMatrix, vxcbuf, grhoa, gaos, gridWeights, gridOffset, igpnt, blockdim);
+        _distRestrictedBatchForLda(aoKohnShamMatrix, vxcbuf, grhoa, gaos, gridWeights, gridOffset, igpnt, blockdim);
     }
 }
 
 void
-CXCIntegrator::_compRestrictedBatchForLDA(      CAOKohnShamMatrix* aoKohnShamMatrix,
+CXCIntegrator::_compUnrestrictedBatchForLda(      CAOKohnShamMatrix* aoKohnShamMatrix,
+                                            const CGtoContainer*     gtoContainer,
+                                            const CXCGradientGrid*   xcGradientGrid,
+                                            const double*            gridCoordinatesX,
+                                            const double*            gridCoordinatesY,
+                                            const double*            gridCoordinatesZ,
+                                            const double*            gridWeights,
+                                            const int32_t            gridOffset,
+                                            const int32_t            nGridPoints) const
+{
+    // set up number of AOs
+    
+    auto naos = gtoContainer->getNumberOfAtomicOrbitals();
+    
+    // determine number of grid blocks
+    
+    auto blockdim = _getSizeOfBlock();
+    
+    auto nblocks = nGridPoints / blockdim;
+    
+    // set up pointer to gradient data
+    
+    auto bufdim = _getNumberOfAOsInBuffer();
+    
+    CMemBlock<double> vxcbuf_alpha(bufdim * naos);
+
+    CMemBlock<double> vxcbuf_beta(bufdim * naos);
+    
+    int32_t igpnt = 0;
+    
+    if (xcGradientGrid->getDensityGridType() == dengrid::ab)
+    {
+
+        auto grhoa = xcGradientGrid->xcGradientValues(xcvars::rhoa);
+
+        auto grhob = xcGradientGrid->xcGradientValues(xcvars::rhob);
+
+        if (nblocks > 0)
+        {
+            CMemBlock2D<double> gaos(blockdim, naos);
+            
+            for (int32_t i = 0; i < nblocks; i++)
+            {
+                gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
+                                                gridOffset, igpnt, blockdim);
+                
+                _distUnrestrictedBatchForLda(aoKohnShamMatrix, vxcbuf_alpha,vxcbuf_beta, grhoa, grhob, gaos, gridWeights, gridOffset, igpnt, blockdim);
+                
+                igpnt += blockdim;
+            }
+        }
+    
+        // compute remaining grid points block
+        
+        blockdim = nGridPoints % blockdim;
+        
+        if (blockdim > 0)
+        {
+            CMemBlock2D<double> gaos(blockdim, naos);
+            
+            gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
+                                            gridOffset, igpnt, blockdim);
+            
+            _distUnrestrictedBatchForLda(aoKohnShamMatrix, vxcbuf_alpha,vxcbuf_beta, grhoa,grhob, gaos, gridWeights, gridOffset, igpnt, blockdim);
+            
+        }
+    }
+
+    if (xcGradientGrid->getDensityGridType() == dengrid::lima)
+    {
+        auto grhob = xcGradientGrid->xcGradientValues(xcvars::rhob);
+
+        auto grhoa = xcGradientGrid->xcGradientValues(xcvars::rhoa);
+
+        if (nblocks > 0)
+        {
+            CMemBlock2D<double> gaos(blockdim, naos);
+            
+            for (int32_t i = 0; i < nblocks; i++)
+            {
+                gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
+                                                gridOffset, igpnt, blockdim);
+                
+                _distUnrestrictedBatchForLdaA(aoKohnShamMatrix, vxcbuf_alpha,vxcbuf_beta, grhoa, grhob, gaos,
+                                                 gridWeights, gridOffset, igpnt, blockdim);
+                
+                igpnt += blockdim;
+            }
+        }
+        
+        // compute remaining grid points block
+        
+        blockdim = nGridPoints % blockdim;
+        
+        if (blockdim > 0)
+        {
+            CMemBlock2D<double> gaos(blockdim, naos);
+            
+            gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
+                                            gridOffset, igpnt, blockdim);
+            
+            _distUnrestrictedBatchForLdaA(aoKohnShamMatrix, vxcbuf_alpha,vxcbuf_beta, grhoa,grhob, gaos,
+                                             gridWeights, gridOffset, igpnt, blockdim);
+            
+        }
+    }
+    
+    if (xcGradientGrid->getDensityGridType() == dengrid::limb)
+    {
+        auto grhoa = xcGradientGrid->xcGradientValues(xcvars::rhoa);
+
+        auto grhob = xcGradientGrid->xcGradientValues(xcvars::rhob);
+        
+        if (nblocks > 0)
+        {
+            CMemBlock2D<double> gaos(blockdim, naos);
+            
+            for (int32_t i = 0; i < nblocks; i++)
+            {
+                gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
+                                                gridOffset, igpnt, blockdim);
+                
+                _distUnrestrictedBatchForLdaB(aoKohnShamMatrix, vxcbuf_alpha,vxcbuf_beta, grhoa, grhob, gaos, gridWeights, gridOffset, igpnt, blockdim);
+                
+                igpnt += blockdim;
+            }
+        }
+        
+        // compute remaining grid points block
+        
+        blockdim = nGridPoints % blockdim;
+        
+        if (blockdim > 0)
+        {
+            CMemBlock2D<double> gaos(blockdim, naos);
+            
+            gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
+                                            gridOffset, igpnt, blockdim);
+            
+            _distUnrestrictedBatchForLdaB(aoKohnShamMatrix, vxcbuf_alpha,vxcbuf_beta, grhoa,grhob, gaos, gridWeights, gridOffset, igpnt, blockdim);
+            
+        }
+    }
+}
+
+void
+CXCIntegrator::_compRestrictedBatchForLda(      CAOKohnShamMatrix* aoKohnShamMatrix,
                                           const CGtoContainer*     gtoContainer,
                                           const CXCHessianGrid*    xcHessianGrid,
                                           const CDensityGrid*      rwDensityGrid,
@@ -917,7 +1293,7 @@ CXCIntegrator::_compRestrictedBatchForLDA(      CAOKohnShamMatrix* aoKohnShamMat
             gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
                                             gridOffset, igpnt, blockdim);
             
-            _distRestrictedBatchForLDA(aoKohnShamMatrix, vxcbuf, xcHessianGrid, rwDensityGrid, gaos,
+            _distRestrictedBatchForLda(aoKohnShamMatrix, vxcbuf, xcHessianGrid, rwDensityGrid, gaos,
                                        gridWeights, gridOffset, igpnt, blockdim);
             
             igpnt += blockdim;
@@ -935,7 +1311,7 @@ CXCIntegrator::_compRestrictedBatchForLDA(      CAOKohnShamMatrix* aoKohnShamMat
         gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
                                         gridOffset, igpnt, blockdim);
         
-        _distRestrictedBatchForLDA(aoKohnShamMatrix, vxcbuf, xcHessianGrid, rwDensityGrid, gaos, gridWeights,
+        _distRestrictedBatchForLda(aoKohnShamMatrix, vxcbuf, xcHessianGrid, rwDensityGrid, gaos, gridWeights,
                                    gridOffset, igpnt, blockdim);
     }
 }
@@ -953,7 +1329,7 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
                                           const int32_t            nGridPoints) const
 {
     // set up local copy of density grid
-    
+
     auto dengrid = *densityGrid;
     
     // set up local copy of exchange-correlation gradient
@@ -997,7 +1373,7 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
             gtorec::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY,
                                             gridCoordinatesZ, gridOffset, igpnt, blockdim);
             
-            _distRestrictedBatchForGGA(aoKohnShamMatrix, vxcbuf, xcgrad, dengrid, gaos, gaox, gaoy, gaoz,
+            _distRestrictedBatchForGga(aoKohnShamMatrix, vxcbuf, xcgrad, dengrid, gaos, gaox, gaoy, gaoz,
                                        gridWeights, gridOffset, igpnt, blockdim);
             
             igpnt += blockdim;
@@ -1021,7 +1397,7 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
         gtorec::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
                                         gridOffset, igpnt, blockdim);
         
-        _distRestrictedBatchForGGA(aoKohnShamMatrix, vxcbuf, xcgrad, dengrid, gaos, gaox, gaoy, gaoz,
+        _distRestrictedBatchForGga(aoKohnShamMatrix, vxcbuf, xcgrad, dengrid, gaos, gaox, gaoy, gaoz,
                                    gridWeights, gridOffset, igpnt, blockdim);
     }
 }
@@ -1040,7 +1416,7 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
                                           const int32_t            nGridPoints) const
 {
     // determine symmetry
-    
+
     auto symbk = (braGtoBlock == ketGtoBlock);
     
     // set up angular momentum data
@@ -1108,7 +1484,7 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
             
             if (symbk)
             {
-                _distRestrictedBatchForGGA(submat, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
+                _distRestrictedBatchForGga(submat, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
                                            gridWeights, gridOffset, igpnt, blockdim);
             }
             else
@@ -1116,7 +1492,7 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
                 gtorec::computeGtosValuesForGGA(kaos, kaox, kaoy, kaoz, ketGtoBlock, gridCoordinatesX, gridCoordinatesY,
                                                 gridCoordinatesZ, gridOffset, igpnt, blockdim);
                 
-                _distRestrictedBatchForGGA(submat, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
+                _distRestrictedBatchForGga(submat, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
                                            kaos, kaox, kaoy, kaoz, ketGtoBlock, gridWeights, gridOffset, igpnt,
                                            blockdim);
             }
@@ -1125,7 +1501,7 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
         }
     }
     
-    // comopute remaining grid points block
+    // compute remaining grid points block
     
     blockdim = nGridPoints % blockdim;
     
@@ -1156,7 +1532,7 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
         
         if (symbk)
         {
-            _distRestrictedBatchForGGA(submat, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
+            _distRestrictedBatchForGga(submat, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
                                        gridWeights, gridOffset, igpnt, blockdim);
         }
         else
@@ -1164,7 +1540,7 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
             gtorec::computeGtosValuesForGGA(kaos, kaox, kaoy, kaoz, ketGtoBlock, gridCoordinatesX, gridCoordinatesY,
                                             gridCoordinatesZ, gridOffset, igpnt, blockdim);
             
-            _distRestrictedBatchForGGA(submat, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
+            _distRestrictedBatchForGga(submat, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
                                        kaos, kaox, kaoy, kaoz, ketGtoBlock, gridWeights, gridOffset, igpnt,
                                        blockdim);
         }
@@ -1174,6 +1550,353 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
     
     #pragma omp critical
     _addSubMatrix(aoKohnShamMatrix, submat, braGtoBlock, ketGtoBlock);
+}
+
+void
+CXCIntegrator::_compUnrestrictedBatchForGga(       CAOKohnShamMatrix* aoKohnShamMatrix,
+                                             const CGtoBlock&         braGtoBlock,
+                                             const CGtoBlock&         ketGtoBlock,
+                                             const CXCGradientGrid*   xcGradientGrid,
+                                             const CDensityGrid*      densityGrid,
+                                             const double*            gridCoordinatesX,
+                                             const double*            gridCoordinatesY,
+                                             const double*            gridCoordinatesZ,
+                                             const double*            gridWeights,
+                                             const int32_t            gridOffset,
+                                             const int32_t            nGridPoints) const
+{
+    // determine symmetry
+    
+    auto symbk = (braGtoBlock == ketGtoBlock);
+    
+    // set up angular momentum data
+    
+    auto bang = braGtoBlock.getAngularMomentum();
+
+    auto kang = ketGtoBlock.getAngularMomentum();
+    
+    // set up number of angular components
+    
+    auto bcomps = angmom::to_SphericalComponents(bang);
+
+    auto kcomps = angmom::to_SphericalComponents(kang);
+    
+    // set up dimensions of bra anf ket sides
+    
+    auto bdim = bcomps * braGtoBlock.getNumberOfContrGtos();
+
+    auto kdim = kcomps * ketGtoBlock.getNumberOfContrGtos();
+    
+    // initializing partial Kohn-Sham matrix
+    
+    CDenseMatrix submata(bdim, kdim);
+
+    CDenseMatrix submatb(bdim,kdim);
+
+    submata.zero(); 
+
+    submatb.zero();
+    
+    // determine number of grid blocks
+    
+    auto blockdim = _getSizeOfBlock();
+    
+    auto nblocks = nGridPoints / blockdim;
+    
+    // set up current grid point
+    
+    int32_t igpnt = 0;
+    
+    // loop over grid points blocks
+
+    if (xcGradientGrid->getDensityGridType() == dengrid::ab)
+    {
+        if (nblocks > 0)
+        {
+            // bra GTOs values grid
+            
+            CMemBlock2D<double> baos(blockdim, bdim);
+            
+            CMemBlock2D<double> baox(blockdim, bdim);
+            
+            CMemBlock2D<double> baoy(blockdim, bdim);
+            
+            CMemBlock2D<double> baoz(blockdim, bdim);
+            
+            // ket GTOs values grid if needed
+            
+            auto kaos = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            auto kaox = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            auto kaoy = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            auto kaoz = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            for (int32_t i = 0; i < nblocks; i++)
+            {
+                gtorec::computeGtosValuesForGGA(baos, baox, baoy, baoz, braGtoBlock, gridCoordinatesX, gridCoordinatesY,
+                                                gridCoordinatesZ, gridOffset, igpnt, blockdim);
+                
+                if (symbk)
+                {
+                    _distUnrestrictedBatchForGga(submata, submatb,xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
+                                                 gridWeights, gridOffset, igpnt, blockdim);
+
+                }
+                else
+                {
+                    gtorec::computeGtosValuesForGGA(kaos, kaox, kaoy, kaoz, ketGtoBlock, gridCoordinatesX, gridCoordinatesY,
+                                                    gridCoordinatesZ, gridOffset, igpnt, blockdim);
+                    
+                    _distUnrestrictedBatchForGga(submata, submatb, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
+                                                 kaos, kaox, kaoy, kaoz, ketGtoBlock, gridWeights, gridOffset, igpnt,
+                                                 blockdim);
+
+                }
+                
+                igpnt += blockdim;
+            }
+        }
+    
+        // compute remaining grid points block
+    
+        blockdim = nGridPoints % blockdim;
+    
+        if (blockdim > 0)
+        {
+            // bra GTOs values grid
+        
+            CMemBlock2D<double> baos(blockdim, bdim);
+        
+            CMemBlock2D<double> baox(blockdim, bdim);
+        
+            CMemBlock2D<double> baoy(blockdim, bdim);
+        
+            CMemBlock2D<double> baoz(blockdim, bdim);
+        
+            // ket GTOs values grid if needed
+        
+            auto kaos = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+        
+            auto kaox = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+        
+            auto kaoy = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+        
+            auto kaoz = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+        
+            gtorec::computeGtosValuesForGGA(baos, baox, baoy, baoz, braGtoBlock, gridCoordinatesX, gridCoordinatesY,
+                                            gridCoordinatesZ, gridOffset, igpnt, blockdim);
+        
+            if (symbk)
+            {
+                _distUnrestrictedBatchForGga(submata, submatb, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
+                                             gridWeights, gridOffset, igpnt, blockdim);
+            }
+            else
+            {
+                gtorec::computeGtosValuesForGGA(kaos, kaox, kaoy, kaoz, ketGtoBlock, gridCoordinatesX, gridCoordinatesY,
+                                                gridCoordinatesZ, gridOffset, igpnt, blockdim);
+            
+                _distUnrestrictedBatchForGga(submata, submatb, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
+                                             kaos, kaox, kaoy, kaoz, ketGtoBlock, gridWeights, gridOffset, igpnt,
+                                             blockdim);
+            }
+        }
+    }
+
+    if (xcGradientGrid->getDensityGridType() == dengrid::lima)
+    {
+        if (nblocks > 0)
+        {
+            // bra GTOs values grid
+            
+            CMemBlock2D<double> baos(blockdim, bdim);
+            
+            CMemBlock2D<double> baox(blockdim, bdim);
+            
+            CMemBlock2D<double> baoy(blockdim, bdim);
+            
+            CMemBlock2D<double> baoz(blockdim, bdim);
+            
+            // ket GTOs values grid if needed
+            
+            auto kaos = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            auto kaox = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            auto kaoy = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            auto kaoz = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            for (int32_t i = 0; i < nblocks; i++)
+            {
+                gtorec::computeGtosValuesForGGA(baos, baox, baoy, baoz, braGtoBlock, gridCoordinatesX, gridCoordinatesY,
+                                                gridCoordinatesZ, gridOffset, igpnt, blockdim);
+                
+                if (symbk)
+                {
+                    _distUnrestrictedBatchForGgaA(submata, submatb, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
+                                                  gridWeights, gridOffset, igpnt, blockdim);
+                }
+                else
+                {
+                    gtorec::computeGtosValuesForGGA(kaos, kaox, kaoy, kaoz, ketGtoBlock, gridCoordinatesX, gridCoordinatesY,
+                                                    gridCoordinatesZ, gridOffset, igpnt, blockdim);
+                    
+                    _distUnrestrictedBatchForGgaA(submata, submatb, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
+                                                  kaos, kaox, kaoy, kaoz, ketGtoBlock, gridWeights, gridOffset, igpnt,
+                                                  blockdim);
+                }
+                
+                igpnt += blockdim;
+            }
+        }
+    
+        // compute remaining grid points block
+    
+        blockdim = nGridPoints % blockdim;
+    
+        if (blockdim > 0)
+        {
+            // bra GTOs values grid
+            
+            CMemBlock2D<double> baos(blockdim, bdim);
+            
+            CMemBlock2D<double> baox(blockdim, bdim);
+            
+            CMemBlock2D<double> baoy(blockdim, bdim);
+            
+            CMemBlock2D<double> baoz(blockdim, bdim);
+            
+            // ket GTOs values grid if needed
+            
+            auto kaos = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            auto kaox = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            auto kaoy = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            auto kaoz = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            gtorec::computeGtosValuesForGGA(baos, baox, baoy, baoz, braGtoBlock, gridCoordinatesX, gridCoordinatesY,
+                                            gridCoordinatesZ, gridOffset, igpnt, blockdim);
+            
+            if (symbk)
+            {
+                _distUnrestrictedBatchForGgaA(submata, submatb, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
+                                              gridWeights, gridOffset, igpnt, blockdim);
+            }
+            else
+            {
+                gtorec::computeGtosValuesForGGA(kaos, kaox, kaoy, kaoz, ketGtoBlock, gridCoordinatesX, gridCoordinatesY,
+                                                gridCoordinatesZ, gridOffset, igpnt, blockdim);
+                
+                _distUnrestrictedBatchForGgaA(submata, submatb, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
+                                              kaos, kaox, kaoy, kaoz, ketGtoBlock, gridWeights, gridOffset, igpnt,
+                                              blockdim);
+            }
+        }
+    }
+
+    if (xcGradientGrid->getDensityGridType() == dengrid::limb)
+    {
+        if (nblocks > 0)
+        {
+            // bra GTOs values grid
+            
+            CMemBlock2D<double> baos(blockdim, bdim);
+            
+            CMemBlock2D<double> baox(blockdim, bdim);
+            
+            CMemBlock2D<double> baoy(blockdim, bdim);
+            
+            CMemBlock2D<double> baoz(blockdim, bdim);
+            
+            // ket GTOs values grid if needed
+            
+            auto kaos = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            auto kaox = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            auto kaoy = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            auto kaoz = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            for (int32_t i = 0; i < nblocks; i++)
+            {
+                gtorec::computeGtosValuesForGGA(baos, baox, baoy, baoz, braGtoBlock, gridCoordinatesX, gridCoordinatesY,
+                                                gridCoordinatesZ, gridOffset, igpnt, blockdim);
+                
+                if (symbk)
+                {
+                    _distUnrestrictedBatchForGgaB(submata, submatb, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
+                                                  gridWeights, gridOffset, igpnt, blockdim);
+                }
+                else
+                {
+                    gtorec::computeGtosValuesForGGA(kaos, kaox, kaoy, kaoz, ketGtoBlock, gridCoordinatesX, gridCoordinatesY,
+                                                    gridCoordinatesZ, gridOffset, igpnt, blockdim);
+                    
+                    _distUnrestrictedBatchForGgaB(submata, submatb, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
+                                                  kaos, kaox, kaoy, kaoz, ketGtoBlock, gridWeights, gridOffset, igpnt,
+                                                  blockdim);
+                }
+                igpnt += blockdim;
+            }
+        }
+        
+        // compute remaining grid points block
+        
+        blockdim = nGridPoints % blockdim;
+        
+        if (blockdim > 0)
+        {
+            // bra GTOs values grid
+            
+            CMemBlock2D<double> baos(blockdim, bdim);
+            
+            CMemBlock2D<double> baox(blockdim, bdim);
+            
+            CMemBlock2D<double> baoy(blockdim, bdim);
+            
+            CMemBlock2D<double> baoz(blockdim, bdim);
+            
+            // ket GTOs values grid if needed
+            
+            auto kaos = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            auto kaox = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            auto kaoy = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            auto kaoz = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
+            
+            gtorec::computeGtosValuesForGGA(baos, baox, baoy, baoz, braGtoBlock, gridCoordinatesX, gridCoordinatesY,
+                                            gridCoordinatesZ, gridOffset, igpnt, blockdim);
+            
+            if (symbk)
+            {
+                _distUnrestrictedBatchForGgaB(submata, submatb, xcGradientGrid, densityGrid, 
+                                              baos, baox, baoy, baoz, braGtoBlock,gridWeights, gridOffset, igpnt, blockdim);
+            }
+            else
+            {
+                gtorec::computeGtosValuesForGGA(kaos, kaox, kaoy, kaoz, ketGtoBlock, gridCoordinatesX, gridCoordinatesY,
+                                                gridCoordinatesZ, gridOffset, igpnt, blockdim);
+                
+                _distUnrestrictedBatchForGgaB(submata, submatb,xcGradientGrid, densityGrid, 
+                                              baos, baox, baoy, baoz, braGtoBlock,kaos, kaox, kaoy, kaoz, ketGtoBlock, 
+                                              gridWeights, gridOffset, igpnt,
+                                              blockdim);
+            }
+        }
+    }
+
+    // add submatrix to Kohn-Sham matrix
+    
+    #pragma omp critical
+    _addSubMatrixUnRest(aoKohnShamMatrix, submata,submatb, braGtoBlock, ketGtoBlock);
 }
 
 void
@@ -1191,7 +1914,7 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
                                           const int32_t            nGridPoints) const
 {
     // set up number of AOs
-    
+
     auto naos = gtoContainer->getNumberOfAtomicOrbitals();
     
     // determine number of grid blocks
@@ -1227,7 +1950,7 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
             gtorec::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY,
                                             gridCoordinatesZ, gridOffset, igpnt, blockdim);
             
-            _distRestrictedBatchForGGA(aoKohnShamMatrix, vxcbuf, xcGradientGrid, xcHessianGrid, gsDensityGrid, rwDensityGrid,
+            _distRestrictedBatchForGga(aoKohnShamMatrix, vxcbuf, xcGradientGrid, xcHessianGrid, gsDensityGrid, rwDensityGrid,
                                        gaos, gaox, gaoy, gaoz, gridWeights, gridOffset, igpnt, blockdim);
             
             igpnt += blockdim;
@@ -1251,13 +1974,13 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
         gtorec::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
                                         gridOffset, igpnt, blockdim);
         
-        _distRestrictedBatchForGGA(aoKohnShamMatrix, vxcbuf, xcGradientGrid, xcHessianGrid, gsDensityGrid, rwDensityGrid,
+        _distRestrictedBatchForGga(aoKohnShamMatrix, vxcbuf, xcGradientGrid, xcHessianGrid, gsDensityGrid, rwDensityGrid,
                                    gaos, gaox, gaoy, gaoz, gridWeights, gridOffset, igpnt, blockdim);
     }
 }
 
 void
-CXCIntegrator::_distRestrictedBatchForLDA(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamMatrix,
                                                 CMemBlock<double>&   xcBuffer,
                                           const double*              xcGradient,
                                           const CMemBlock2D<double>& gtoValues,
@@ -1388,7 +2111,471 @@ CXCIntegrator::_distRestrictedBatchForLDA(      CAOKohnShamMatrix*   aoKohnShamM
 }
 
 void
-CXCIntegrator::_distRestrictedBatchForGGA(      CDenseMatrix&        subMatrix,
+CXCIntegrator::_distUnrestrictedBatchForLdaB(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+                                                   CMemBlock<double>&   xcBuffera,
+                                                   CMemBlock<double>&   xcBufferb,
+                                             const double*              xcGradient_alpha,
+                                             const double*              xcGradient_beta,
+                                             const CMemBlock2D<double>& gtoValues,
+                                             const double*              gridWeights,
+                                             const int32_t              gridOffset,
+                                             const int32_t              gridBlockPosition,
+                                             const int32_t              nGridPoints) const
+{
+    // set up pointer to Kohn-Sham matrix
+    
+    auto ksmata = aoKohnShamMatrix->getKohnSham(false);
+
+    auto ksmatb = aoKohnShamMatrix->getKohnSham(true);
+
+    // set up AOs blocks
+    
+    auto naos = aoKohnShamMatrix->getNumberOfRows();
+    
+    auto bufdim = _getNumberOfAOsInBuffer();
+    
+    auto nblock = naos / bufdim;
+    
+    // loop over AOs blocks
+    
+    int32_t curao = 0;
+    
+    for (int32_t i = 0; i < nblock; i++)
+    {
+        // compute block of Kohn-Sham matrix elements
+        
+        int32_t idx = 0;
+
+        for (int32_t j = curao; j < (curao + bufdim); j++)
+        {
+            auto bgaos = gtoValues.data(j);
+            
+            for (int32_t k = j; k < naos; k++)
+            {
+                auto kgaos = gtoValues.data(k);
+                
+                double fvxca = 0.0;
+
+                double fvxcb = 0.0;
+                
+                auto loff = gridOffset + gridBlockPosition;
+                
+                for (int32_t l = 0; l < nGridPoints; l++)
+                {
+                    fvxca += bgaos[l] * kgaos[l] * gridWeights[loff + l] * xcGradient_alpha[loff + l];
+
+                    fvxcb += bgaos[l] * kgaos[l] * gridWeights[loff + l] * xcGradient_beta[loff + l]; 
+                }
+                
+                xcBuffera.at(idx) = fvxca;
+
+                xcBufferb.at(idx) = fvxcb;
+                
+                idx++;
+            }
+        }
+        
+        // distribute block of Kohn-Sham matrix elements
+        
+        #pragma omp critical
+        {
+            idx = 0;
+
+            for (int32_t j = curao; j < (curao + bufdim); j++)
+            {
+                for (int32_t k = j; k < naos; k++)
+                {
+                    const auto fvxca = (j == k) ? 0.5 * xcBuffera.at(idx) : xcBuffera.at(idx);
+
+                    const auto fvxcb = (j == k) ? 0.5 * xcBufferb.at(idx) : xcBufferb.at(idx);
+
+                    ksmatb[j * naos + k] += fvxcb; 
+
+                    ksmata[j * naos + k] += fvxca;
+                    
+                    idx++;
+                }
+            }
+        }
+        
+        // update AOs counter
+        
+        curao += bufdim;
+    }
+    
+    // loop over last block
+    
+    if (naos % bufdim != 0)
+    {
+        // compute last block of Kohn-Sham matrix elements
+        
+        int32_t idx = 0;
+
+        for (int32_t i = curao; i < naos; i++)
+        {
+            auto bgaos = gtoValues.data(i);
+            
+            for (int32_t j = i; j < naos; j++)
+            {
+                auto kgaos = gtoValues.data(j);
+                
+                double fvxca = 0.0;
+
+                double fvxcb = 0.0;
+                
+                auto koff = gridOffset + gridBlockPosition;
+                
+                for (int32_t k = 0; k < nGridPoints; k++)
+                {
+                    fvxca += bgaos[k] * kgaos[k] * gridWeights[koff + k] * xcGradient_alpha[koff + k];
+
+                    fvxcb += bgaos[k] * kgaos[k] * gridWeights[koff + k] * xcGradient_beta[koff + k]; 
+                }
+                
+                xcBuffera.at(idx) = fvxca;
+
+                xcBufferb.at(idx) = fvxcb;
+                
+                idx++;
+            }
+        }
+        
+        // distribute last block of Kohn-Sham matrix elements
+        
+        #pragma omp critical
+        {
+            idx = 0;
+            
+            for (int32_t i = curao; i < naos; i++)
+            {
+                for (int32_t j = i; j < naos; j++)
+                {
+                    const auto fvxca = (i == j) ? 0.5 * xcBuffera.at(idx) : xcBuffera.at(idx);
+
+                    const auto fvxcb = (i == j) ? 0.5 * xcBufferb.at(idx) : xcBufferb.at(idx);
+                    
+                    ksmata[i * naos + j] += fvxca;
+
+                    ksmatb[i * naos + j] += fvxcb;
+                    
+                    idx++;
+                }
+            }
+        }
+    }
+}
+
+void
+CXCIntegrator::_distUnrestrictedBatchForLdaA(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+                                                   CMemBlock<double>&   xcBuffera,
+                                                   CMemBlock<double>&   xcBufferb,
+                                             const double*              xcGradient_alpha,
+                                             const double*              xcGradient_beta,
+                                             const CMemBlock2D<double>& gtoValues,
+                                             const double*              gridWeights,
+                                             const int32_t              gridOffset,
+                                             const int32_t              gridBlockPosition,
+                                             const int32_t              nGridPoints) const
+{
+    // set up pointer to Kohn-Sham matrix
+    
+    auto ksmata = aoKohnShamMatrix->getKohnSham(false);
+
+    auto ksmatb = aoKohnShamMatrix->getKohnSham(true);
+    
+    // set up AOs blocks
+    
+    auto naos = aoKohnShamMatrix->getNumberOfRows();
+    
+    auto bufdim = _getNumberOfAOsInBuffer();
+    
+    auto nblock = naos / bufdim;
+    
+    // loop over AOs blocks
+    
+    int32_t curao = 0;
+    
+    for (int32_t i = 0; i < nblock; i++)
+    {
+        // compute block of Kohn-Sham matrix elements
+        
+        int32_t idx = 0;
+
+        for (int32_t j = curao; j < (curao + bufdim); j++)
+        {
+            auto bgaos = gtoValues.data(j);
+            
+            for (int32_t k = j; k < naos; k++)
+            {
+                auto kgaos = gtoValues.data(k);
+                
+                double fvxca = 0.0;
+
+                double fvxcb = 0.0;
+                
+                auto loff = gridOffset + gridBlockPosition;
+                
+                for (int32_t l = 0; l < nGridPoints; l++)
+                {
+                    fvxcb += bgaos[l] * kgaos[l] * gridWeights[loff + l] * xcGradient_beta[loff + l];
+
+                    fvxca += bgaos[l] * kgaos[l] * gridWeights[loff + l] * xcGradient_alpha[loff + l]; 
+                }
+                
+                xcBuffera.at(idx) = fvxca;
+
+                xcBufferb.at(idx) = fvxcb;
+                
+                idx++;
+            }
+        }
+        
+        // distribute block of Kohn-Sham matrix elements
+        
+        #pragma omp critical
+        {
+            idx = 0;
+             
+            for (int32_t j = curao; j < (curao + bufdim); j++)
+            {
+                for (int32_t k = j; k < naos; k++)
+                {
+                    auto fvxcb = (j == k) ? 0.5 * xcBufferb.at(idx) : xcBufferb.at(idx);
+
+                    auto fvxca = (j == k) ? 0.5 * xcBuffera.at(idx) : xcBuffera.at(idx);
+
+                    ksmata[j * naos + k] += fvxca;
+
+                    ksmatb[j * naos + k] += fvxcb;
+                    
+                    idx++;
+                }
+            }
+        }
+        
+        // update AOs counter
+        
+        curao += bufdim;
+    }
+    
+    // loop over last block
+    
+    if (naos % bufdim != 0)
+    {
+        // compute last block of Kohn-Sham matrix elements
+        
+        int32_t idx = 0;
+
+        for (int32_t i = curao; i < naos; i++)
+        {
+            auto bgaos = gtoValues.data(i);
+            
+            for (int32_t j = i; j < naos; j++)
+            {
+                auto kgaos = gtoValues.data(j);
+                
+                double fvxcb = 0.0;
+
+                double fvxca = 0.0;
+
+                auto koff = gridOffset + gridBlockPosition;
+                
+                for (int32_t k = 0; k < nGridPoints; k++)
+                {
+                    fvxcb += bgaos[k] * kgaos[k] * gridWeights[koff + k] * xcGradient_beta[koff + k];
+                    
+                    fvxca += bgaos[k] * kgaos[k] * gridWeights[koff + k] * xcGradient_alpha[koff + k]; 
+                }
+                xcBufferb.at(idx) = fvxcb;
+
+                xcBuffera.at(idx) = fvxca;
+                
+                idx++;
+            }
+        }
+        
+        // distribute last block of Kohn-Sham matrix elements
+        
+        #pragma omp critical
+        {
+            idx = 0;
+
+            for (int32_t i = curao; i < naos; i++)
+            {
+                for (int32_t j = i; j < naos; j++)
+                {
+                    auto fvxcb = (i == j) ? 0.5 * xcBufferb.at(idx) : xcBufferb.at(idx);
+                    
+                    auto fvxca = (i == j) ? 0.5 * xcBuffera.at(idx) : xcBuffera.at(idx);
+                    
+                    ksmatb[i * naos + j] += fvxcb;
+
+                    ksmata[i * naos + j] += fvxca;
+                    
+                    idx++;
+                }
+            }
+        }
+    }
+}
+
+void
+CXCIntegrator::_distUnrestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+                                                  CMemBlock<double>&   xcBuffera,
+                                                  CMemBlock<double>&   xcBufferb,
+                                            const double*              xcGradient_alpha,
+                                            const double*              xcGradient_beta,
+                                            const CMemBlock2D<double>& gtoValues,
+                                            const double*              gridWeights,
+                                            const int32_t              gridOffset,
+                                            const int32_t              gridBlockPosition,
+                                            const int32_t              nGridPoints) const
+{
+    // set up pointer to Kohn-Sham matrix
+    
+    auto ksmata = aoKohnShamMatrix->getKohnSham(false);
+
+    auto ksmatb = aoKohnShamMatrix->getKohnSham(true);
+    
+    // set up AOs blocks
+    
+    auto naos = aoKohnShamMatrix->getNumberOfRows();
+    
+    auto bufdim = _getNumberOfAOsInBuffer();
+    
+    auto nblock = naos / bufdim;
+    
+    // loop over AOs blocks
+    
+    int32_t curao = 0;
+    
+    for (int32_t i = 0; i < nblock; i++)
+    {
+        // compute block of Kohn-Sham matrix elements
+        
+        int32_t idx = 0;
+
+        for (int32_t j = curao; j < (curao + bufdim); j++)
+        {
+            auto bgaos = gtoValues.data(j);
+            
+            for (int32_t k = j; k < naos; k++)
+            {
+                auto kgaos = gtoValues.data(k);
+                
+                double fvxca = 0.0;
+
+                double fvxcb = 0.0;
+                
+                auto loff = gridOffset + gridBlockPosition;
+                
+                for (int32_t l = 0; l < nGridPoints; l++)
+                {
+                    fvxca += bgaos[l] * kgaos[l] * gridWeights[loff + l] * xcGradient_alpha[loff + l];
+
+                    fvxcb += bgaos[l] * kgaos[l] * gridWeights[loff + l] * xcGradient_beta[loff + l];
+                }
+                
+                xcBuffera.at(idx) = fvxca;
+
+                xcBufferb.at(idx) = fvxcb;
+                
+                idx++;
+            }
+        }
+        
+        // distribute block of Kohn-Sham matrix elements
+        
+        #pragma omp critical
+        {
+            idx = 0;
+
+            for (int32_t j = curao; j < (curao + bufdim); j++)
+            {
+                for (int32_t k = j; k < naos; k++)
+                {
+                    auto fvxca = (j == k) ? 0.5 * xcBuffera.at(idx) : xcBuffera.at(idx);
+                    
+                    auto fvxcb = (j == k) ? 0.5 * xcBufferb.at(idx) : xcBufferb.at(idx);
+                    
+                    ksmatb[j * naos + k] += fvxcb;
+                
+                    ksmata[j * naos + k] += fvxca;
+                    
+                    idx++;
+                }
+            }
+        }
+        
+        // update AOs counter
+        
+        curao += bufdim;
+    }
+    
+    // loop over last block
+    
+    if (naos % bufdim != 0)
+    {
+        // compute last block of Kohn-Sham matrix elements
+        
+        int32_t idx = 0;
+
+        for (int32_t i = curao; i < naos; i++)
+        {
+            auto bgaos = gtoValues.data(i);
+            
+            for (int32_t j = i; j < naos; j++)
+            {
+                auto kgaos = gtoValues.data(j);
+                
+                double fvxca = 0.0;
+
+                double fvxcb = 0.0;
+                
+                auto koff = gridOffset + gridBlockPosition;
+                
+                for (int32_t k = 0; k < nGridPoints; k++)
+                {
+                    fvxca += bgaos[k] * kgaos[k] * gridWeights[koff + k] * xcGradient_alpha[koff + k];
+
+                    fvxcb += bgaos[k] * kgaos[k] * gridWeights[koff + k] * xcGradient_beta[koff + k];
+                }
+                
+                xcBuffera.at(idx) = fvxca;
+
+                xcBufferb.at(idx) = fvxcb;
+                
+                idx++;
+            }
+        }
+        
+        // distribute last block of Kohn-Sham matrix elements
+        
+        #pragma omp critical
+        {
+            idx = 0;
+
+            for (int32_t i = curao; i < naos; i++)
+            {
+                for (int32_t j = i; j < naos; j++)
+                {
+                    auto fvxca = (i == j) ? 0.5 * xcBuffera.at(idx) : xcBuffera.at(idx);
+
+                    auto fvxcb = (i == j) ? 0.5 * xcBufferb.at(idx) : xcBufferb.at(idx);
+                    
+                    ksmata[i * naos + j] += fvxca;
+
+                    ksmatb[i * naos + j] += fvxcb;
+                    
+                    idx++;
+                }
+            }
+        }
+    }
+}
+
+void
+CXCIntegrator::_distRestrictedBatchForGga(      CDenseMatrix&        subMatrix,
                                           const CXCGradientGrid*     xcGradientGrid,
                                           const CDensityGrid*        densityGrid,
                                           const CMemBlock2D<double>& gtoValues,
@@ -1480,7 +2667,680 @@ CXCIntegrator::_distRestrictedBatchForGGA(      CDenseMatrix&        subMatrix,
 }
 
 void
-CXCIntegrator::_distRestrictedBatchForGGA(      CDenseMatrix&        subMatrix,
+CXCIntegrator::_distUnrestrictedBatchForGga(      CDenseMatrix&        subMatrixa,
+                                                  CDenseMatrix&        subMatrixb,
+                                            const CXCGradientGrid*     xcGradientGrid,
+                                            const CDensityGrid*        densityGrid,
+                                            const CMemBlock2D<double>& gtoValues,
+                                            const CMemBlock2D<double>& gtoValuesX,
+                                            const CMemBlock2D<double>& gtoValuesY,
+                                            const CMemBlock2D<double>& gtoValuesZ,
+                                            const CGtoBlock&           gtoBlock,
+                                            const double*              gridWeights,
+                                            const int32_t              gridOffset,
+                                            const int32_t              gridBlockPosition,
+                                            const int32_t              nGridPoints) const
+{
+    // set up pointers to gradient data
+
+    auto grhoa = xcGradientGrid->xcGradientValues(xcvars::rhoa);
+
+    auto grhob = xcGradientGrid->xcGradientValues(xcvars::rhob);
+
+    auto ggrada = xcGradientGrid->xcGradientValues(xcvars::grada);
+
+    auto ggradb = xcGradientGrid->xcGradientValues(xcvars::gradb);
+    
+    auto ggradab = xcGradientGrid->xcGradientValues(xcvars::gradab);
+    
+    // set up pointers to density gradient norms
+    
+    auto ngrada = densityGrid->alphaDensityGradient(0);
+    
+    auto gradax = densityGrid->alphaDensityGradientX(0);
+    
+    auto graday = densityGrid->alphaDensityGradientY(0);
+    
+    auto gradaz = densityGrid->alphaDensityGradientZ(0);
+
+    auto ngradb = densityGrid->betaDensityGradient(0);
+    
+    auto gradbx = densityGrid->betaDensityGradientX(0);
+    
+    auto gradby = densityGrid->betaDensityGradientY(0);
+    
+    auto gradbz = densityGrid->betaDensityGradientZ(0);
+    
+    // set up dimensions of submatrix
+    
+    auto bdim = subMatrixa.getNumberOfRows();
+    
+    // set up pointer to submatrix values
+    
+    auto bmat_alpha = subMatrixa.values();
+
+    auto bmat_beta = subMatrixb.values();
+
+    for (int32_t i = 0; i < bdim; i++)
+    {
+        auto bgaos = gtoValues.data(i);
+        
+        auto bgaox = gtoValuesX.data(i);
+        
+        auto bgaoy = gtoValuesY.data(i);
+        
+        auto bgaoz = gtoValuesZ.data(i);
+        
+        for (int32_t j = i; j < bdim; j++)
+        {
+            auto kgaos = gtoValues.data(j);
+            
+            auto kgaox = gtoValuesX.data(j);
+            
+            auto kgaoy = gtoValuesY.data(j);
+            
+            auto kgaoz = gtoValuesZ.data(j);
+         
+            // sum values
+                
+            double fvxca = 0.0;
+
+            double fvxcb = 0.0;
+                
+            auto koff = gridOffset + gridBlockPosition;
+                
+            for (int32_t k = 0; k < nGridPoints; k++)
+            {
+                double w = gridWeights[koff + k];
+
+                double gxa = gradax[koff + k];
+                    
+                double gya = graday[koff + k];
+                    
+                double gza = gradaz[koff + k];
+
+                double gxb = gradbx[koff + k];
+                    
+                double gyb = gradby[koff + k];
+                    
+                double gzb = gradbz[koff + k];
+                    
+                fvxca += w * bgaos[k] * kgaos[k] * grhoa[koff + k];
+
+                fvxcb += w * bgaos[k] * kgaos[k] * grhob[koff + k];
+                    
+                double gvala = bgaos[k] * (gxa * kgaox[k] + gya * kgaoy[k] + gza * kgaoz[k]) + kgaos[k] * (gxa * bgaox[k] + gya * bgaoy[k] + gza * bgaoz[k]);
+
+                double gvalb = bgaos[k] * (gxb * kgaox[k] + gyb * kgaoy[k] + gzb * kgaoz[k]) + kgaos[k] * (gxb * bgaox[k] + gyb * bgaoy[k] + gzb * bgaoz[k]);
+
+                fvxca += w * (ggrada[koff + k] * gvala/ ngrada[koff + k] + gvalb * ggradab[koff + k]);
+
+                fvxcb += w * (ggradb[koff + k] *gvalb/ ngradb[koff + k] + gvala * ggradab[koff + k]);
+             }
+            
+            if (i == j) 
+            {
+                fvxca *= 0.5;
+
+                fvxcb *= 0.5;
+            } 
+
+            bmat_alpha[i * bdim + j] += fvxca;
+
+            bmat_beta[i * bdim + j] += fvxcb;
+        }
+    }
+}
+
+void
+CXCIntegrator::_distUnrestrictedBatchForGgaA(      CDenseMatrix&        subMatrixa,
+                                                   CDenseMatrix&        subMatrixb,
+                                             const CXCGradientGrid*     xcGradientGrid,
+                                             const CDensityGrid*        densityGrid,
+                                             const CMemBlock2D<double>& gtoValues,
+                                             const CMemBlock2D<double>& gtoValuesX,
+                                             const CMemBlock2D<double>& gtoValuesY,
+                                             const CMemBlock2D<double>& gtoValuesZ,
+                                             const CGtoBlock&           gtoBlock,
+                                             const double*              gridWeights,
+                                             const int32_t              gridOffset,
+                                             const int32_t              gridBlockPosition,
+                                             const int32_t              nGridPoints) const
+{
+    // set up pointers to gradient data
+
+    auto grhob = xcGradientGrid->xcGradientValues(xcvars::rhob);
+
+    auto ggradb = xcGradientGrid->xcGradientValues(xcvars::gradb);
+
+    auto ggradab = xcGradientGrid->xcGradientValues(xcvars::gradab);
+        
+    // set up pointers to density gradient norms
+    
+    auto ngradb = densityGrid->betaDensityGradient(0);
+    
+    auto gradbx = densityGrid->betaDensityGradientX(0);
+    
+    auto gradby = densityGrid->betaDensityGradientY(0);
+    
+    auto gradbz = densityGrid->betaDensityGradientZ(0);
+    
+    // set up dimensions of submatrix
+    
+    auto bdim = subMatrixb.getNumberOfRows();
+    
+    // set up pointer to submatrix values
+    
+    auto bmat_alpha = subMatrixa.values();
+
+    auto bmat_beta = subMatrixb.values();
+
+    for (int32_t i = 0; i < bdim; i++)
+    {
+        auto bgaos = gtoValues.data(i);
+        
+        auto bgaox = gtoValuesX.data(i);
+        
+        auto bgaoy = gtoValuesY.data(i);
+        
+        auto bgaoz = gtoValuesZ.data(i);
+        
+        for (int32_t j = i; j < bdim; j++)
+        {
+            auto kgaos = gtoValues.data(j);
+            
+            auto kgaox = gtoValuesX.data(j);
+            
+            auto kgaoy = gtoValuesY.data(j);
+            
+            auto kgaoz = gtoValuesZ.data(j);
+         
+            // sum values
+                
+            double fvxca = 0.0;
+
+            double fvxcb = 0.0;
+                
+            auto koff = gridOffset + gridBlockPosition;
+                
+            for (int32_t k = 0; k < nGridPoints; k++)
+            {
+                double w = gridWeights[koff + k];
+
+                double gxb = gradbx[koff + k];
+                    
+                double gyb = gradby[koff + k];
+                    
+                double gzb = gradbz[koff + k];
+                
+                fvxcb += w * bgaos[k] * kgaos[k] * grhob[koff + k];
+                    
+                double gvalb = bgaos[k] * (gxb * kgaox[k] + gyb * kgaoy[k] + gzb * kgaoz[k]) + kgaos[k] * (gxb * bgaox[k] + gyb * bgaoy[k] + gzb * bgaoz[k]);
+
+                fvxca += w * (gvalb * ggradab[koff + k]);
+
+                fvxcb += w * (ggradb[koff + k] *gvalb/ ngradb[koff + k]);
+            }
+            
+            if (i == j) 
+            {
+                fvxca *= 0.5;
+
+                fvxcb *= 0.5;
+            } 
+
+            bmat_alpha[i * bdim + j] += fvxca;
+
+            bmat_beta[i * bdim + j] += fvxcb;
+        }
+    }
+}
+
+void
+CXCIntegrator::_distUnrestrictedBatchForGgaB(      CDenseMatrix&        subMatrixa,
+                                                   CDenseMatrix&        subMatrixb,
+                                             const CXCGradientGrid*     xcGradientGrid,
+                                             const CDensityGrid*        densityGrid,
+                                             const CMemBlock2D<double>& gtoValues,
+                                             const CMemBlock2D<double>& gtoValuesX,
+                                             const CMemBlock2D<double>& gtoValuesY,
+                                             const CMemBlock2D<double>& gtoValuesZ,
+                                             const CGtoBlock&           gtoBlock,
+                                             const double*              gridWeights,
+                                             const int32_t              gridOffset,
+                                             const int32_t              gridBlockPosition,
+                                             const int32_t              nGridPoints) const
+{
+    // set up pointers to gradient data
+
+    auto grhoa = xcGradientGrid->xcGradientValues(xcvars::rhoa);
+
+    auto ggrada = xcGradientGrid->xcGradientValues(xcvars::grada);
+    
+    auto ggradab = xcGradientGrid->xcGradientValues(xcvars::gradab);
+    
+    // set up pointers to density gradient norms
+    
+    auto ngrada = densityGrid->alphaDensityGradient(0);
+    
+    auto gradax = densityGrid->alphaDensityGradientX(0);
+    
+    auto graday = densityGrid->alphaDensityGradientY(0);
+    
+    auto gradaz = densityGrid->alphaDensityGradientZ(0);
+
+    // set up dimensions of submatrix
+    
+    auto bdim = subMatrixa.getNumberOfRows();
+    
+    // set up pointer to submatrix values
+    
+    auto bmat_alpha = subMatrixa.values();
+
+    auto bmat_beta = subMatrixb.values();
+
+    for (int32_t i = 0; i < bdim; i++)
+    {
+        auto bgaos = gtoValues.data(i);
+        
+        auto bgaox = gtoValuesX.data(i);
+        
+        auto bgaoy = gtoValuesY.data(i);
+        
+        auto bgaoz = gtoValuesZ.data(i);
+        
+        for (int32_t j = i; j < bdim; j++)
+        {
+            auto kgaos = gtoValues.data(j);
+            
+            auto kgaox = gtoValuesX.data(j);
+            
+            auto kgaoy = gtoValuesY.data(j);
+            
+            auto kgaoz = gtoValuesZ.data(j);
+         
+            // sum values
+                
+            double fvxca = 0.0;
+
+            double fvxcb = 0.0;
+                
+            auto koff = gridOffset + gridBlockPosition;
+                
+            for (int32_t k = 0; k < nGridPoints; k++)
+            {
+                double w = gridWeights[koff + k];
+
+                double gxa = gradax[koff + k];
+                    
+                double gya = graday[koff + k];
+                    
+                double gza = gradaz[koff + k];
+
+                fvxca += w * bgaos[k] * kgaos[k] * grhoa[koff + k];
+                    
+                double gvala = bgaos[k] * (gxa * kgaox[k] + gya * kgaoy[k] + gza * kgaoz[k]) + kgaos[k] * (gxa * bgaox[k] + gya * bgaoy[k] + gza * bgaoz[k]);
+
+                fvxca += w * (ggrada[koff + k] * gvala/ ngrada[koff + k]);
+
+                fvxcb += w * (gvala * ggradab[koff + k]);
+            }
+            
+            if (i == j) 
+            {
+                fvxca *= 0.5;
+
+                fvxcb *= 0.5;
+            } 
+            
+            bmat_alpha[i * bdim + j] += fvxca;
+
+            bmat_beta[i * bdim + j] += fvxcb;
+        }
+    }
+}
+
+void
+CXCIntegrator::_distUnrestrictedBatchForGga(      CDenseMatrix&        subMatrixa,
+                                                  CDenseMatrix&        subMatrixb,
+                                            const CXCGradientGrid*     xcGradientGrid,
+                                            const CDensityGrid*        densityGrid,
+                                            const CMemBlock2D<double>& braGtoValues,
+                                            const CMemBlock2D<double>& braGtoValuesX,
+                                            const CMemBlock2D<double>& braGtoValuesY,
+                                            const CMemBlock2D<double>& braGtoValuesZ,
+                                            const CGtoBlock&           braGtoBlock,
+                                            const CMemBlock2D<double>& ketGtoValues,
+                                            const CMemBlock2D<double>& ketGtoValuesX,
+                                            const CMemBlock2D<double>& ketGtoValuesY,
+                                            const CMemBlock2D<double>& ketGtoValuesZ,
+                                            const CGtoBlock&           ketGtoBlock,
+                                            const double*              gridWeights,
+                                            const int32_t              gridOffset,
+                                            const int32_t              gridBlockPosition,
+                                            const int32_t              nGridPoints) const
+{
+    // set up pointers to gradient data
+    
+    auto grhoa = xcGradientGrid->xcGradientValues(xcvars::rhoa);
+
+    auto grhob = xcGradientGrid->xcGradientValues(xcvars::rhob);
+
+    auto ggrada = xcGradientGrid->xcGradientValues(xcvars::grada);
+
+    auto ggradb = xcGradientGrid->xcGradientValues(xcvars::gradb);
+
+    auto ggradab = xcGradientGrid->xcGradientValues(xcvars::gradab);
+    
+    // set up pointers to density gradient norms
+    
+    auto ngrada = densityGrid->alphaDensityGradient(0);
+    
+    auto gradax = densityGrid->alphaDensityGradientX(0);
+    
+    auto graday = densityGrid->alphaDensityGradientY(0);
+    
+    auto gradaz = densityGrid->alphaDensityGradientZ(0);
+
+    auto ngradb = densityGrid->betaDensityGradient(0);
+    
+    auto gradbx = densityGrid->betaDensityGradientX(0);
+    
+    auto gradby = densityGrid->betaDensityGradientY(0);
+    
+    auto gradbz = densityGrid->betaDensityGradientZ(0);
+    
+    // set up dimensions of submatrix
+    
+    auto bdim = subMatrixa.getNumberOfRows();
+    
+    auto kdim = subMatrixa.getNumberOfColumns();
+    
+    // set up pointer to submatrix values
+    
+    auto bkmata = subMatrixa.values();
+
+    auto bkmatb = subMatrixb.values();
+    
+    for (int32_t i = 0; i < bdim; i++)
+    {
+        auto bgaos = braGtoValues.data(i);
+        
+        auto bgaox = braGtoValuesX.data(i);
+        
+        auto bgaoy = braGtoValuesY.data(i);
+        
+        auto bgaoz = braGtoValuesZ.data(i);
+        
+        for (int32_t j = 0; j < kdim; j++)
+        {
+            auto kgaos = ketGtoValues.data(j);
+            
+            auto kgaox = ketGtoValuesX.data(j);
+            
+            auto kgaoy = ketGtoValuesY.data(j);
+            
+            auto kgaoz = ketGtoValuesZ.data(j);
+            
+            // sum values
+            
+            double fvxca = 0.0;
+
+            double fvxcb = 0.0;
+
+            auto koff = gridOffset + gridBlockPosition;
+            
+            for (int32_t k = 0; k < nGridPoints; k++)
+            {
+                double w = gridWeights[koff + k];
+
+                double gxa = gradax[koff + k];
+                
+                double gya = graday[koff + k];
+                
+                double gza = gradaz[koff + k];
+
+                double gxb = gradbx[koff + k];
+                
+                double gyb = gradby[koff + k];
+                
+                double gzb = gradbz[koff + k];
+
+                fvxca += w * bgaos[k] * kgaos[k] * grhoa[koff + k];
+
+                fvxcb += w * bgaos[k] * kgaos[k] * grhob[koff + k];
+                    
+                double gvala = bgaos[k] * (gxa * kgaox[k] + gya * kgaoy[k] + gza * kgaoz[k]) + kgaos[k] * (gxa * bgaox[k] + gya * bgaoy[k] + gza * bgaoz[k]);
+
+                double gvalb = bgaos[k] * (gxb * kgaox[k] + gyb * kgaoy[k] + gzb * kgaoz[k]) + kgaos[k] * (gxb * bgaox[k] + gyb * bgaoy[k] + gzb * bgaoz[k]);
+
+                fvxca += w * (ggrada[koff + k] * gvala/ ngrada[koff + k] + gvalb * ggradab[koff + k]);
+
+                fvxcb += w * (ggradb[koff + k] *gvalb/ ngradb[koff + k] + gvala * ggradab[koff + k]);
+
+            }
+            
+            bkmata[i * kdim + j] += fvxca;
+
+            bkmatb[i * kdim + j] += fvxcb;
+        }
+    }
+}
+
+void
+CXCIntegrator::_distUnrestrictedBatchForGgaA(      CDenseMatrix&        subMatrixa,
+                                                  CDenseMatrix&        subMatrixb,
+                                             const CXCGradientGrid*     xcGradientGrid,
+                                             const CDensityGrid*        densityGrid,
+                                             const CMemBlock2D<double>& braGtoValues,
+                                             const CMemBlock2D<double>& braGtoValuesX,
+                                             const CMemBlock2D<double>& braGtoValuesY,
+                                             const CMemBlock2D<double>& braGtoValuesZ,
+                                             const CGtoBlock&           braGtoBlock,
+                                             const CMemBlock2D<double>& ketGtoValues,
+                                             const CMemBlock2D<double>& ketGtoValuesX,
+                                             const CMemBlock2D<double>& ketGtoValuesY,
+                                             const CMemBlock2D<double>& ketGtoValuesZ,
+                                             const CGtoBlock&           ketGtoBlock,
+                                             const double*              gridWeights,
+                                             const int32_t              gridOffset,
+                                             const int32_t              gridBlockPosition,
+                                             const int32_t              nGridPoints) const
+{
+    // set up pointers to gradient data
+    
+    auto grhob = xcGradientGrid->xcGradientValues(xcvars::rhob);
+
+    auto ggradb = xcGradientGrid->xcGradientValues(xcvars::gradb);
+
+    auto ggradab = xcGradientGrid->xcGradientValues(xcvars::gradab);
+    
+    // set up pointers to density gradient norms
+
+    auto ngradb = densityGrid->betaDensityGradient(0);
+    
+    auto gradbx = densityGrid->betaDensityGradientX(0);
+    
+    auto gradby = densityGrid->betaDensityGradientY(0);
+    
+    auto gradbz = densityGrid->betaDensityGradientZ(0);
+    
+    // set up dimensions of submatrix
+    
+    auto bdim = subMatrixa.getNumberOfRows();
+    
+    auto kdim = subMatrixa.getNumberOfColumns();
+    
+    // set up pointer to submatrix values
+    
+    auto bkmata = subMatrixa.values();
+
+    auto bkmatb = subMatrixb.values();
+    
+    for (int32_t i = 0; i < bdim; i++)
+    {
+        auto bgaos = braGtoValues.data(i);
+        
+        auto bgaox = braGtoValuesX.data(i);
+        
+        auto bgaoy = braGtoValuesY.data(i);
+        
+        auto bgaoz = braGtoValuesZ.data(i);
+        
+        for (int32_t j = 0; j < kdim; j++)
+        {
+            auto kgaos = ketGtoValues.data(j);
+            
+            auto kgaox = ketGtoValuesX.data(j);
+            
+            auto kgaoy = ketGtoValuesY.data(j);
+            
+            auto kgaoz = ketGtoValuesZ.data(j);
+            
+            // sum values
+            
+            double fvxca = 0.0;
+
+            double fvxcb = 0.0;
+
+            auto koff = gridOffset + gridBlockPosition;
+            
+            for (int32_t k = 0; k < nGridPoints; k++)
+            {
+                const double w = gridWeights[koff + k];
+                
+                const double gxb = gradbx[koff + k];
+                
+                const double gyb = gradby[koff + k];
+                
+                const double gzb = gradbz[koff + k];
+
+                fvxcb += w * bgaos[k] * kgaos[k] * grhob[koff + k];
+                    
+                const double gvalb = bgaos[k] * (gxb * kgaox[k] + gyb * kgaoy[k] + gzb * kgaoz[k]) 
+                
+                                   + kgaos[k] * (gxb * bgaox[k] + gyb * bgaoy[k] + gzb * bgaoz[k]);
+
+                fvxca += w * (gvalb * ggradab[koff + k]);
+
+                fvxcb += w * (ggradb[koff + k] *gvalb/ ngradb[koff + k]);
+            }
+            
+            bkmata[i * kdim + j] += fvxca;
+
+            bkmatb[i * kdim + j] += fvxcb;
+        }
+    }
+}
+
+void
+CXCIntegrator::_distUnrestrictedBatchForGgaB(      CDenseMatrix&        subMatrixa,
+                                                   CDenseMatrix&        subMatrixb,
+                                             const CXCGradientGrid*     xcGradientGrid,
+                                             const CDensityGrid*        densityGrid,
+                                             const CMemBlock2D<double>& braGtoValues,
+                                             const CMemBlock2D<double>& braGtoValuesX,
+                                             const CMemBlock2D<double>& braGtoValuesY,
+                                             const CMemBlock2D<double>& braGtoValuesZ,
+                                             const CGtoBlock&           braGtoBlock,
+                                             const CMemBlock2D<double>& ketGtoValues,
+                                             const CMemBlock2D<double>& ketGtoValuesX,
+                                             const CMemBlock2D<double>& ketGtoValuesY,
+                                             const CMemBlock2D<double>& ketGtoValuesZ,
+                                             const CGtoBlock&           ketGtoBlock,
+                                             const double*              gridWeights,
+                                             const int32_t              gridOffset,
+                                             const int32_t              gridBlockPosition,
+                                             const int32_t              nGridPoints) const
+{
+    // set up pointers to gradient data
+
+    auto grhoa = xcGradientGrid->xcGradientValues(xcvars::rhoa);
+
+    auto ggrada = xcGradientGrid->xcGradientValues(xcvars::grada);
+
+    auto ggradab = xcGradientGrid->xcGradientValues(xcvars::gradab);
+    
+    // set up pointers to density gradient norms
+    
+    auto ngrada = densityGrid->alphaDensityGradient(0);
+    
+    auto gradax = densityGrid->alphaDensityGradientX(0);
+    
+    auto graday = densityGrid->alphaDensityGradientY(0);
+    
+    auto gradaz = densityGrid->alphaDensityGradientZ(0);
+
+    // set up dimensions of submatrix
+    
+    auto bdim = subMatrixa.getNumberOfRows();
+    
+    auto kdim = subMatrixa.getNumberOfColumns();
+    
+    // set up pointer to submatrix values
+    
+    auto bkmata = subMatrixa.values();
+
+    auto bkmatb = subMatrixb.values();
+    
+    for (int32_t i = 0; i < bdim; i++)
+    {
+        auto bgaos = braGtoValues.data(i);
+        
+        auto bgaox = braGtoValuesX.data(i);
+        
+        auto bgaoy = braGtoValuesY.data(i);
+        
+        auto bgaoz = braGtoValuesZ.data(i);
+        
+        for (int32_t j = 0; j < kdim; j++)
+        {
+            auto kgaos = ketGtoValues.data(j);
+            
+            auto kgaox = ketGtoValuesX.data(j);
+            
+            auto kgaoy = ketGtoValuesY.data(j);
+            
+            auto kgaoz = ketGtoValuesZ.data(j);
+            
+            // sum values
+            
+            double fvxca = 0.0;
+
+            double fvxcb = 0.0;
+
+            auto koff = gridOffset + gridBlockPosition;
+            
+            for (int32_t k = 0; k < nGridPoints; k++)
+            {
+                const double w = gridWeights[koff + k];
+                
+                const double gxa = gradax[koff + k];
+                
+                const double gya = graday[koff + k];
+                
+                const double gza = gradaz[koff + k];
+
+                fvxca += w * bgaos[k] * kgaos[k] * grhoa[koff + k];
+                    
+                const double gvala = bgaos[k] * (gxa * kgaox[k] + gya * kgaoy[k] + gza * kgaoz[k]) 
+                          
+                                   + kgaos[k] * (gxa * bgaox[k] + gya * bgaoy[k] + gza * bgaoz[k]);
+
+                fvxca += w * (ggrada[koff + k] * gvala/ ngrada[koff + k]);
+
+                fvxcb += w * (gvala * ggradab[koff + k]);
+            }
+            
+            bkmata[i * kdim + j] += fvxca;
+
+            bkmatb[i * kdim + j] += fvxcb;
+        }
+    }
+}
+
+void
+CXCIntegrator::_distRestrictedBatchForGga(      CDenseMatrix&        subMatrix,
                                           const CXCGradientGrid*     xcGradientGrid,
                                           const CDensityGrid*        densityGrid,
                                           const CMemBlock2D<double>& braGtoValues,
@@ -1574,11 +3434,10 @@ CXCIntegrator::_distRestrictedBatchForGGA(      CDenseMatrix&        subMatrix,
             bkmat[i * kdim + j] += fvxc;
         }
     }
-    
 }
 
 void
-CXCIntegrator::_distRestrictedBatchForLDA(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamMatrix,
                                                 CMemBlock<double>&   xcBuffer,
                                           const CXCHessianGrid*      xcHessianGrid,
                                           const CDensityGrid*        rwDensityGrid,
@@ -1733,7 +3592,7 @@ CXCIntegrator::_distRestrictedBatchForLDA(      CAOKohnShamMatrix*   aoKohnShamM
 }
 
 void
-CXCIntegrator::_distRestrictedBatchForGGA(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamMatrix,
                                                 CMemBlock<double>&   xcBuffer,
                                           const CXCGradientGrid&     xcGradientGrid,
                                           const CDensityGrid&        densityGrid,
@@ -1938,7 +3797,7 @@ CXCIntegrator::_distRestrictedBatchForGGA(      CAOKohnShamMatrix*   aoKohnShamM
 }
 
 void
-CXCIntegrator::_distRestrictedBatchForGGA(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamMatrix,
                                                 CMemBlock<double>&   xcBuffer,
                                           const CXCGradientGrid*     xcGradientGrid,
                                           const CXCHessianGrid*      xcHessianGrid,
@@ -2434,7 +4293,6 @@ CXCIntegrator::_compRestrictedContribution(      CAOKohnShamMatrix& aoKohnShamMa
                     _compRestrictedVXCForBatchOfGridPoints(ksmatprt, gtoContainer, xcgridptr, xcgrid2ptr, drwptr, dgsptr, mgx, mgy, mgz, mgw,
                                                            tbposition, tbsize, xcFunctional);
                     
-                    //_compRestrictedEnergyForBatchOfGridPoints(xcele, xcene, xcgridptr, drwptr, mgw, tbposition, tbsize);
                 }
             }
         }
@@ -2863,6 +4721,69 @@ CXCIntegrator::_distRestrictedVXCValues(      CAOKohnShamMatrix* aoKohnShamMatri
 }
 
 std::tuple<double, double>
+CXCIntegrator:: _compEnergyAndDensityUnrestricted(const CXCGradientGrid& xcGradientGrid,
+                                                  const CDensityGrid&    densityGrid,
+                                                  const CMolecularGrid&  molecularGrid) const
+{
+    // set up pointers to density grid
+    
+    auto rhoa = densityGrid.alphaDensity(0);
+    auto rhob = densityGrid.betaDensity(0);
+    
+    // set up pointer to exchange-correlation energy grid
+    
+    auto efunc = xcGradientGrid.xcFunctionalValues();
+    
+    // set up pointer to grid weights
+    
+    auto gw = molecularGrid.getWeights();
+    
+    // set up number of grid points
+    
+    auto gpoints = molecularGrid.getNumberOfGridPoints();
+    
+    // initialize exchange-correlation energy and gradient
+    
+    double xcene = 0.0, nele = 0.0;
+
+    if ((densityGrid.getDensityGridType() == dengrid::limb) && (densityGrid.getNumberOfGridPoints() != 0))
+    {
+        #pragma omp parallel for reduction(+:nele) reduction(+:xcene)
+        for (int32_t i = 0; i < gpoints; i++)
+        {
+            nele += gw[i] * rhoa[i];
+            
+            xcene += gw[i] * efunc[i];
+        }
+    }
+
+    if ((densityGrid.getDensityGridType() == dengrid::lima) && (densityGrid.getNumberOfGridPoints() != 0))
+    {
+        #pragma omp parallel for reduction(+:nele) reduction(+:xcene)
+        for (int32_t i = 0; i < gpoints; i++)
+        {
+            nele += gw[i] * (rhob[i]);
+            
+            xcene += gw[i] * efunc[i];
+        }
+    }
+    
+    if ((densityGrid.getDensityGridType() == dengrid::ab) && (densityGrid.getNumberOfGridPoints() != 0))
+    {
+        #pragma omp parallel for reduction(+:nele) reduction(+:xcene)
+        for (int32_t i = 0; i < gpoints; i++)
+        {
+            nele += gw[i] * (rhoa[i]+rhob[i]);
+            
+            xcene += gw[i] * efunc[i];
+        }
+    }
+    
+    
+    return std::make_tuple(xcene, nele);
+}
+
+std::tuple<double, double>
 CXCIntegrator::_compEnergyAndDensity(const CXCGradientGrid& xcGradientGrid,
                                      const CDensityGrid&    densityGrid,
                                      const CMolecularGrid&  molecularGrid) const
@@ -2889,6 +4810,7 @@ CXCIntegrator::_compEnergyAndDensity(const CXCGradientGrid& xcGradientGrid,
     
     double xcene = 0.0, nele = 0.0;
 
+    
     #pragma omp parallel for reduction(+:nele) reduction(+:xcene)
     for (int32_t i = 0; i < gpoints; i++)
     {
@@ -2949,6 +4871,53 @@ CXCIntegrator::_addSubMatrix(      CAOKohnShamMatrix* aoKohnShamMatrix,
         for (int32_t j = 0; j < kdim; j++)
         {
             ksmat[ioff + koff + j] += bkmat[i * kdim + j];
+        }
+    }
+}
+
+void
+CXCIntegrator::_addSubMatrixUnRest(      CAOKohnShamMatrix* aoKohnShamMatrix,
+                                   const CDenseMatrix&      subMatrixa,
+                                   const CDenseMatrix&      subMatrixb,
+                                   const CGtoBlock&         braGtoBlock,
+                                   const CGtoBlock&         ketGtoBlock) const
+{
+    // set up dimensions of Kohn-Sham matrix
+    
+    auto ncols = aoKohnShamMatrix->getNumberOfColumns();
+    
+    // set up submatrix dimensions
+
+    auto bdim = subMatrixa.getNumberOfRows();
+
+    auto kdim = subMatrixa.getNumberOfColumns();
+    
+    // set up submatrix offsets
+    
+    auto boff = (braGtoBlock.getIdentifiers(0))[0];
+
+    auto koff = (ketGtoBlock.getIdentifiers(0))[0];
+    
+    // set up pointers to data
+    
+    auto ksmata = aoKohnShamMatrix->getKohnSham(false);
+
+    auto ksmatb = aoKohnShamMatrix->getKohnSham(true);
+
+    auto bkmata = subMatrixa.values();
+
+    auto bkmatb = subMatrixb.values();
+    
+    // loop over submatrix
+    
+    for (int32_t i = 0; i < bdim; i++)
+    {
+        auto ioff = (boff + i) * ncols;
+        
+        for (int32_t j = 0; j < kdim; j++)
+        {
+            ksmata[ioff + koff + j] += bkmata[i * kdim + j];
+            ksmatb[ioff + koff + j] += bkmatb[i * kdim + j];
         }
     }
 }

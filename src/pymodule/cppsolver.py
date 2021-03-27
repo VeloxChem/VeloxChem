@@ -1,9 +1,11 @@
+from mpi4py import MPI
 import numpy as np
 import time as tm
 import psutil
 import sys
 
 from .veloxchemlib import mpi_master
+from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
@@ -32,10 +34,16 @@ class ComplexResponse(LinearSolver):
         - damping: The damping parameter.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes complex linear response solver to default setup.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 
@@ -380,7 +388,7 @@ class ComplexResponse(LinearSolver):
 
             e2gg = self.dist_bger.matmul_AtB(self.dist_e2bger, 2.0)
             e2uu = self.dist_bung.matmul_AtB(self.dist_e2bung, 2.0)
-            s2ug = self.dist_bung.matmul_AtB(self.dist_bger, 4.0)
+            s2ug = self.dist_bung.matmul_AtB(self.dist_bger, 2.0)
 
             for op, w in op_freq_keys:
                 if (iteration == 0 or
@@ -502,10 +510,10 @@ class ComplexResponse(LinearSolver):
 
                     # calculating the residual components
 
-                    s2realger = 2.0 * x_realger.data
-                    s2imagger = 2.0 * x_imagger.data
-                    s2realung = 2.0 * x_realung.data
-                    s2imagung = 2.0 * x_imagung.data
+                    s2realger = x_realger.data
+                    s2imagger = x_imagger.data
+                    s2realung = x_realung.data
+                    s2imagung = x_imagung.data
 
                     r_realger = (e2realger.data - w * s2realung +
                                  d * s2imagung - grad_rg.data)
@@ -675,7 +683,7 @@ class ComplexResponse(LinearSolver):
 
                     if self.rank == mpi_master():
                         for aop in self.a_components:
-                            rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
+                            rsp_funcs[(aop, bop, w)] = -2.0 * np.dot(va[aop], x)
 
                             if write_solution_to_file:
                                 append_rsp_solution_hdf5(

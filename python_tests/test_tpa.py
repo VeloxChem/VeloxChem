@@ -1,12 +1,10 @@
-from mpi4py import MPI
+from pathlib import Path
 import unittest
-import os
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.tpafulldriver import TpaFullDriver
-from veloxchem.tpareddriver import TpaReducedDriver
+from veloxchem.rsptpa import TPA
 
 
 class TestTPA(unittest.TestCase):
@@ -21,31 +19,34 @@ class TestTPA(unittest.TestCase):
     values are aug-cc-pVDZ / cc-pVDZ / def2-SVP.
     """
 
-    def run_tpa(self, inpfile, tpa_type, w, ref_result):
-
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-        task.input_dict['scf']['checkpoint_file'] = None
+    def run_scf(self, task):
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
-        scf_tensors = scf_drv.scf_tensors
 
-        if tpa_type.lower() == 'full':
-            tpa_drv = TpaFullDriver(task.mpi_comm, task.ostream)
-        elif tpa_type.lower() == 'reduced':
-            tpa_drv = TpaReducedDriver(task.mpi_comm, task.ostream)
+        return scf_drv.scf_tensors
 
-        tpa_drv.update_settings({
+    def run_tpa(self, inpfile, tpa_type, w, ref_result):
+
+        task = MpiTask([inpfile, None])
+        task.input_dict['scf']['checkpoint_file'] = None
+
+        scf_tensors = self.run_scf(task)
+
+        tpa_prop = TPA({
             'damping': task.input_dict['response']['damping'],
             'frequencies': task.input_dict['response']['frequencies'],
             'conv_thresh': '1.0e-8',
+            'tpa_type': tpa_type,
         })
+        tpa_prop.init_driver(task.mpi_comm, task.ostream)
+        tpa_prop.compute(task.molecule, task.ao_basis, scf_tensors)
 
-        tpa_result = tpa_drv.compute(task.molecule, task.ao_basis, scf_tensors)
+        if is_mpi_master(task.mpi_comm):
+            tpa_result = tpa_prop.rsp_property
 
-        if task.mpi_rank == mpi_master():
             for key in [
                     't4_dict', 't3_dict', 'NaX3NyNz', 'NaA3NxNy', 'NaX2Nyz',
                     'NxA2Nyz', 'gamma'
@@ -74,9 +75,8 @@ class TestTPA(unittest.TestCase):
             'gamma': 401.92066716 + 2.58015589j,
         }
 
-        inpfile = os.path.join('inputs', 'water_tpa.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water_tpa.inp')
 
         self.run_tpa(inpfile, 'full', w, ref_result)
 
@@ -91,9 +91,8 @@ class TestTPA(unittest.TestCase):
             'gamma': 177.54359664 + 2.04772438j,
         }
 
-        inpfile = os.path.join('inputs', 'water_tpa.inp')
-        if not os.path.isfile(inpfile):
-            inpfile = os.path.join('python_tests', inpfile)
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water_tpa.inp')
 
         self.run_tpa(inpfile, 'reduced', w, ref_result)
 

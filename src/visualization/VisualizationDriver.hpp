@@ -11,6 +11,8 @@
 
 #include <vector>
 
+#include <mpi.h>
+
 #include "AODensityMatrix.hpp"
 #include "CubicGrid.hpp"
 #include "MemBlock.hpp"
@@ -100,7 +102,7 @@ class CVisualizationDriver
      @param basis the basis set for the molecule.
      @param molorb the molecular orbitals of the molecule.
      @param moidx the index of the molecular orbital (0-based).
-     @param mospin the spin of the molecular orbital ('a' or 'b').
+     @param mospin the spin of the molecular orbital ('alpha' or 'beta').
      */
     void compute(CCubicGrid&               grid,
                  const CMolecule&          molecule,
@@ -117,7 +119,7 @@ class CVisualizationDriver
      @param basis the basis set for the molecule.
      @param density the AO density matrix.
      @param denidx the index of the density matrix (0-based).
-     @param denspin the spin of the density matrix ('a' or 'b').
+     @param denspin the spin of the density matrix ('alpha' or 'beta').
      */
     void compute(CCubicGrid&             grid,
                  const CMolecule&        molecule,
@@ -134,7 +136,7 @@ class CVisualizationDriver
      @param basis the basis set for the molecule.
      @param molorb the molecular orbitals of the molecule.
      @param moidx the index of the molecular orbital (0-based).
-     @param mospin the spin of the molecular orbital ('a' or 'b').
+     @param mospin the spin of the molecular orbital ('alpha' or 'beta').
      */
     void compute_omp(CCubicGrid&               grid,
                      const CMolecule&          molecule,
@@ -151,7 +153,7 @@ class CVisualizationDriver
      @param basis the basis set for the molecule.
      @param density the density matrix of the molecule.
      @param densityIndex the index of the density matrix (0-based).
-     @param densitySpin the spin of the density matrix ('a' or 'b').
+     @param densitySpin the spin of the density matrix ('alpha' or 'beta').
      */
     void compute_omp(CCubicGrid&             grid,
                      const CMolecule&        molecule,
@@ -159,6 +161,82 @@ class CVisualizationDriver
                      const CAODensityMatrix& density,
                      const int32_t           densityIndex,
                      const std::string&      densitySpin) const;
+
+    /**
+     Computes molecular orbital at given coordinates.
+
+     @param coords the coordinates.
+     @param molecule the molecule.
+     @param basis the basis set for the molecule.
+     @param mo the molecular orbitals of the molecule.
+     @param moidx the index of the molecular orbital (0-based).
+     @param mospin the spin of the molecular orbital ('alpha' or 'beta').
+     */
+    std::vector<double> getMO(const std::vector<std::vector<double>>& coords,
+                              const CMolecule&                        molecule,
+                              const CMolecularBasis&                  basis,
+                              const CMolecularOrbitals&               mo,
+                              const int32_t                           moidx,
+                              const std::string&                      mospin) const;
+
+    /**
+     Computes densities at given coordinates.
+
+     @param coords the coordinates.
+     @param molecule the molecule.
+     @param basis the basis set for the molecule.
+     @param density the density matrix of the molecule.
+     @param denidx the index of the density matrix (0-based).
+     @param denspin the spin of the density matrix ('alpha' or 'beta').
+     */
+    std::vector<double> getDensity(const std::vector<std::vector<double>>& coords,
+                                   const CMolecule&                        molecule,
+                                   const CMolecularBasis&                  basis,
+                                   const CAODensityMatrix&                 density,
+                                   const int32_t                           denidx,
+                                   const std::string&                      denspin) const;
+
+    /**
+     Computes one-particle density gamma(x1;x2) at given coordinates.
+
+     @param coords_1 the coordinates of x1.
+     @param coords_2 the coordinates of x2.
+     @param molecule the molecule.
+     @param basis the basis set for the molecule.
+     @param density the density matrix of the molecule.
+     @param denidx the index of the density matrix (0-based).
+     @param spin_1 the spin of x1 ('alpha' or 'beta').
+     @param spin_2 the spin of x2 ('alpha' or 'beta').
+     */
+    std::vector<double> getOneParticleDensity(const std::vector<std::vector<double>>& coords_1,
+                                              const std::vector<std::vector<double>>& coords_2,
+                                              const CMolecule&                        molecule,
+                                              const CMolecularBasis&                  basis,
+                                              const CAODensityMatrix&                 density,
+                                              const int32_t                           denidx,
+                                              const std::string&                      spin_1,
+                                              const std::string&                      spin_2) const;
+
+    /**
+     Computes two-particle density Gamma(x1,x2;x1,x2) at given coordinates.
+
+     @param coords_1 the coordinate of x1.
+     @param coords_2 the coordinate of x2.
+     @param molecule the molecule.
+     @param basis the basis set for the molecule.
+     @param density the density matrix of the molecule.
+     @param denidx the index of the density matrix (0-based).
+     @param spin_1 the spin of x1 ('alpha' or 'beta').
+     @param spin_2 the spin of x2 ('alpha' or 'beta').
+     */
+    std::vector<double> getTwoParticleDensity(const std::vector<std::vector<double>>& coord_1,
+                                              const std::vector<std::vector<double>>& coord_2,
+                                              const CMolecule&                        molecule,
+                                              const CMolecularBasis&                  basis,
+                                              const CAODensityMatrix&                 density,
+                                              const int32_t                           denidx,
+                                              const std::string&                      spin_1,
+                                              const std::string&                      spin_2) const;
 };
 
 #endif /* VisualizationDriver_hpp */

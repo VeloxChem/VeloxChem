@@ -64,7 +64,7 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr)
 
     if (arr.data() == nullptr || arr.size() == 0)
     {
-        return std::shared_ptr<CDenseMatrix>(new CDenseMatrix());
+        return std::make_shared<CDenseMatrix>();
     }
 
     // check that the numpy array is c-style contiguous
@@ -100,7 +100,7 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr)
 
     int32_t ncols = static_cast<int32_t>(arr.shape(1));
 
-    return std::shared_ptr<CDenseMatrix>(new CDenseMatrix(vec, nrows, ncols));
+    return std::make_shared<CDenseMatrix>(vec, nrows, ncols);
 }
 
 static py::array_t<double>

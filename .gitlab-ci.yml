@@ -6,41 +6,54 @@
 #  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 
-before_script:
-  - set +e && source /opt/intel/bin/compilervars.sh intel64 && set -e
-  - export PATH=/opt/intel/intelpython3/bin:$PATH
-  - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/intelpython3/lib
-  - export OMP_NUM_THREADS=6
-  - export GTESTROOT=/home/xinli/software/googletest/googletest
-  - export GTESTLIB=/home/xinli/software/googletest/googletest/lib/libgtest.a
-  - export MPICC=$I_MPI_ROOT/intel64/mpi/mpiicc
-
-after_script:
-  - echo "Done!"
-
 stages:
   - build
   - test
 
-velxochem_build:
+.monkey:setup:
   tags:
     - vlx-test
+  variables:
+    OMP_NUM_THREADS: "6"
+    GTESTROOT: "/home/xinli/software/googletest/googletest"
+    MPICC: "$I_MPI_ROOT/intel64/mpi/mpiicc"
+  before_script:
+    - set +e && source /opt/intel/bin/compilervars.sh intel64 && set -e
+    - export PATH=/opt/intel/intelpython3/bin:$PATH
+    - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/intelpython3/lib
+    - python3 -m pip install --upgrade --user pip
+
+monkey:build:
+  extends: .monkey:setup
   stage: build
   script:
     - python3 config/generate_setup.py
-    - make -j 6 -C src release && make -j 6 -C unit_tests release
+    - make -j 6 -C src release
+    - make -j 6 -C unit_tests release
+  artifacts:
+    paths:
+      - build
+    expire_in: 2 hours
 
-veloxchem_test:
-  tags:
-    - vlx-test
-  stage: test
+monkey:pip_install:
+  extends: .monkey:setup
+  stage: build
+  variables:
+    VLX_NUM_BUILD_JOBS: "6"
   script:
-    - python3.6 -m venv --without-pip venv
-    - source venv/bin/activate
-    - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-    - python3 get-pip.py
-    - python3 -m pip install -r requirements-dev.txt
     - python3 -m pip install .
-    - python3 -m pytest -v --cov=veloxchem python_tests/
-    - python3 config/generate_setup.py
-    - make -C unit_tests -s -j 6 release && ./build/bin/UnitTestVeloxChem.x
+
+monkey:unit_tests:
+  extends: .monkey:setup
+  stage: test
+  needs: ["monkey:build"]
+  script:
+    - ./build/bin/UnitTestVeloxChem.x
+
+monkey:python_tests:
+  extends: .monkey:setup
+  stage: test
+  needs: ["monkey:pip_install"]
+  script:
+    - python3 -m pytest -v --cov=veloxchem --pyargs veloxchem
+    - mpiexec -n 2 python3 -m pytest -v --pyargs veloxchem -m "solvers"

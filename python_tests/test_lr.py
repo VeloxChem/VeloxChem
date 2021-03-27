@@ -1,26 +1,37 @@
-from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
+import tempfile
 import random
 import pytest
 import sys
-from pathlib import Path
 try:
     import cppe
 except ImportError:
     pass
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
+from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.lrsolver import LinearResponseSolver
+from veloxchem.rsppolarizability import Polarizability
 
 
+@pytest.mark.solvers
 class TestLR(unittest.TestCase):
+
+    def run_scf(self, task):
+
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.update_settings(task.input_dict['scf'],
+                                task.input_dict['method_settings'])
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        return scf_drv.scf_tensors
 
     def run_lr(self, inpfile, potfile, xcfun_label, raw_data):
 
-        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
 
         if potfile is not None:
@@ -29,30 +40,60 @@ class TestLR(unittest.TestCase):
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
 
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_tensors = self.run_scf(task)
 
         ref_freqs = [0.0, 0.05, 0.1]
         ref_freqs_str = [str(x) for x in ref_freqs]
         ref_prop = np.array([float(x) for x in raw_data.split()])
 
-        lr_solver = LinearResponseSolver(task.mpi_comm, task.ostream)
-        lr_solver.update_settings(
+        lr_prop = Polarizability(
             {
                 'frequencies': ','.join(ref_freqs_str),
                 'batch_size': random.choice([1, 10, 100])
             }, task.input_dict['method_settings'])
-        lr_results = lr_solver.compute(task.molecule, task.ao_basis,
-                                       scf_drv.scf_tensors)
+        lr_prop.init_driver(task.mpi_comm, task.ostream)
+        lr_prop.compute(task.molecule, task.ao_basis, scf_tensors)
 
-        if task.mpi_rank == mpi_master():
+        if is_mpi_master(task.mpi_comm):
+            self.check_printout(lr_prop)
+            lr_results = lr_prop.rsp_property
+
             prop = np.array([
                 -lr_results['response_functions'][(a, b, w)] for w in ref_freqs
                 for a in 'xyz' for b in 'xyz'
             ])
             self.assertTrue(np.max(np.abs(prop - ref_prop)) < 1.0e-4)
+
+    def check_printout(self, lr_prop):
+
+        rsp_func = lr_prop.rsp_property['response_functions']
+
+        lr_vals = []
+        for (a, b, w), val in rsp_func.items():
+            lr_vals.append(((w, a, b), -val))
+        lr_vals = [v[1] for v in sorted(lr_vals)]
+        lr_vals = np.array(lr_vals)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fname = str(Path(temp_dir, 'lr.out'))
+
+            ostream = OutputStream(fname)
+            lr_prop.print_property(ostream)
+            ostream.close()
+
+            with open(fname, 'r') as f_out:
+                lines = f_out.readlines()
+
+            print_vals = []
+            for line in lines:
+                content = line.split()
+                if len(content) == 4 and content[0] in ['X', 'Y', 'Z']:
+                    print_vals.append(float(content[1]))
+                    print_vals.append(float(content[2]))
+                    print_vals.append(float(content[3]))
+            print_vals = np.array(print_vals)
+
+            self.assertTrue(np.max(np.abs(lr_vals - print_vals)) < 1e-6)
 
     def test_lr_hf(self):
 

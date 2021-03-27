@@ -8,7 +8,7 @@
 
 #include "ElectronRepulsionIntegralsDriverTest.hpp"
 
-#include "mpi.h"
+#include <mpi.h>
 
 #include "ElectronRepulsionIntegralsDriver.hpp"
 #include "AODensityMatrixSetter.hpp"
@@ -8562,5 +8562,5 @@ TEST_F(CElectronRepulsionIntegralsDriverTest, ComputeUnrestJKForH2O)
     
     vlxtest::compare(jkvals_alpha, fock.getFock(0), 1.0e-12);
 
-    vlxtest::compare(jkvals_beta, fock.getFock(0, true), 1.0e-12);
+    vlxtest::compare(jkvals_beta, fock.getFock(0, "beta"), 1.0e-12);
 }
