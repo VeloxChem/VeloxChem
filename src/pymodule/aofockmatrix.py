@@ -36,7 +36,7 @@ def _AOFockMatrix_write_hdf5(self, fname):
 
     matrix_count = 0
 
-    restricted = self.is_restricted()
+    restricted = self.is_closed_shell()
 
     for fock_id in range(self.number_of_fock_matrices()):
 

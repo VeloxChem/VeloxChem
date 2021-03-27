@@ -13,6 +13,7 @@
 #include "DenseLinearAlgebra.hpp"
 #include "ErrorHandler.hpp"
 #include "MpiFunc.hpp"
+#include "StringFormat.hpp"
 
 CAODensityMatrix::CAODensityMatrix()
 
@@ -96,6 +97,48 @@ bool
 CAODensityMatrix::operator!=(const CAODensityMatrix& other) const
 {
     return !(*this == other);
+}
+
+int32_t
+CAODensityMatrix::_getNumberOfMatricesPerDensity() const
+{
+    if ((_denType == denmat::rest) || (_denType == denmat::rmoij) || (_denType == denmat::rgen))
+    {
+        return 1;
+    }
+
+    if ((_denType == denmat::unrest) || (_denType == denmat::umoij) || (_denType == denmat::osrest))
+    {
+        return 2;
+    }
+
+    return 1;
+}
+
+bool
+CAODensityMatrix::isClosedShell() const
+{
+    return (_getNumberOfMatricesPerDensity() == 1);
+}
+
+int32_t
+CAODensityMatrix::_getMatrixID(const int32_t iDensityMatrix, const std::string& spin) const
+{
+    if (isClosedShell())
+    {
+        return iDensityMatrix;
+    }
+    else
+    {
+        if (fstr::upcase(spin) == std::string("ALPHA"))
+        {
+            return 2 * iDensityMatrix;
+        }
+        else
+        {
+            return 2 * iDensityMatrix + 1;
+        }
+    }
 }
 
 void
@@ -276,40 +319,6 @@ CAODensityMatrix::getString() const
     }
 
     return dmat_str;
-}
-
-bool
-CAODensityMatrix::isRestricted() const
-{
-    if ((_denType == denmat::unrest) || (_denType == denmat::umoij))
-    {
-        return false;
-    }
-
-    return true;
-}
-
-bool
-CAODensityMatrix::isUnrestricted() const
-{
-    return !isRestricted();
-}
-
-bool
-CAODensityMatrix::isClosedShell() const
-{
-    if ((_denType == denmat::rest) || (_denType == denmat::rmoij) || (_denType == denmat::rgen))
-    {
-        return true;
-    }
-
-    return false;
-}
-
-bool
-CAODensityMatrix::isOpenShell() const
-{
-    return !isClosedShell();
 }
 
 void

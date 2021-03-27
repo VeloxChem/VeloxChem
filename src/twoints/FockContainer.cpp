@@ -28,7 +28,7 @@ CFockContainer::CFockContainer(const CAOFockMatrix*  aoFockMatrix,
 {
     auto nfock = aoFockMatrix->getNumberOfFockMatrices();
     
-    if (aoFockMatrix->isRestricted())
+    if (aoFockMatrix->isClosedShell())
     {
         for (int32_t i = 0; i < nfock; i++)
         {
@@ -43,7 +43,7 @@ CFockContainer::CFockContainer(const CAOFockMatrix*  aoFockMatrix,
         {
             _subFockMatrices.push_back(CFockSubMatrix(braGtoPairsBlock,
                                                       ketGtoPairsBlock,
-                                                      aoFockMatrix->getFockType(i)));
+                                                      aoFockMatrix->getFockType(i, "alpha")));
 
             _subFockMatrices.push_back(CFockSubMatrix(braGtoPairsBlock,
                                                       ketGtoPairsBlock,
@@ -118,7 +118,7 @@ CFockContainer::accumulate(CAOFockMatrix* aoFockMatrix)
 {
     auto nfock = aoFockMatrix->getNumberOfFockMatrices();
     
-    if (aoFockMatrix->isRestricted())
+    if (aoFockMatrix->isClosedShell())
     {
         for (int32_t i = 0; i < nfock; i++)
         {
@@ -131,9 +131,9 @@ CFockContainer::accumulate(CAOFockMatrix* aoFockMatrix)
     {
         for (int32_t i = 0; i < nfock; i++)
         {
-            _subFockMatrices[2 * i].accumulate(aoFockMatrix->getFock(i),
+            _subFockMatrices[2 * i].accumulate(aoFockMatrix->getFock(i, "alpha"),
                                                aoFockMatrix->getNumberOfColumns(i),
-                                               aoFockMatrix->getFockType(i));
+                                               aoFockMatrix->getFockType(i, "alpha"));
 
             _subFockMatrices[2 * i + 1].accumulate(aoFockMatrix->getFock(i, "beta"),
                                                    aoFockMatrix->getNumberOfColumns(i),

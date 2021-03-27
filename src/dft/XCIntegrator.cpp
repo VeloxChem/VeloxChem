@@ -65,7 +65,7 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
         
         auto refdengrid = dgdrv.generate(aoDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
 
-        if (aoDensityMatrix.isRestricted())
+        if (aoDensityMatrix.isClosedShell())
         {
             // generate screened molecular and density grids
             
@@ -103,8 +103,7 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
             
             ksmat.symmetrize();
         }
-
-        if (aoDensityMatrix.isUnrestricted())
+        else
         {
             // generate screened molecular and density grids
 
@@ -251,7 +250,7 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     
     auto ncol = gsDensityMatrix.getNumberOfColumns(0);
     
-    if (rwDensityMatrix.isRestricted())
+    if (rwDensityMatrix.isClosedShell())
     {
         // allocate perturbed Kohn-Sham matrix
         

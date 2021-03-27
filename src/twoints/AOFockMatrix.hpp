@@ -51,12 +51,19 @@ class CAOFockMatrix
     std::vector<int32_t> _idDensityMatrices;
 
     /**
+     Gets number of matrices per Fock. (1: closed-shell; 2: open-shell)
+
+     @return the number of matrices per Fock.
+     */
+    int32_t _getNumberOfMatricesPerFock() const;
+
+    /**
      Gets the actual index of a matrix in _fockMatrices.
 
      @param iFockMatrix the index of Fock matrix.
      @param spin the spin of Fock matrix.
      */
-    int32_t _getFockMatrixID(const int32_t iFockMatrix, const std::string& spin) const;
+    int32_t _getMatrixID(const int32_t iFockMatrix, const std::string& spin) const;
 
    public:
     /**
@@ -135,6 +142,13 @@ class CAOFockMatrix
     bool operator!=(const CAOFockMatrix& other) const;
 
     /**
+     Checks if AO Fock matrix is of closed-shell type.
+
+     @return true if AO Fock matrix is of closed-shell type.
+     */
+    bool isClosedShell() const;
+
+    /**
      Sets type of specific Fock matrix.
 
      @param fockType the type of Fock matrix.
@@ -208,13 +222,6 @@ class CAOFockMatrix
      @param comm the MPI communicator.
      */
     void reduce_sum(int32_t rank, int32_t nodes, MPI_Comm comm);
-
-    /**
-     Checks if the Fock matrices are restricted.
-
-     @return true if the Fock matrices are restricted.
-     */
-    bool isRestricted() const;
 
     /**
      Gets number of Fock matrices.

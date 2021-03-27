@@ -85,7 +85,7 @@ CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     densityGrid,
                                          const CMolecularGrid&   molecularGrid,
                                          const xcfun             xcFunctional)
 {
-    if (aoDensityMatrix.isRestricted())
+    if (aoDensityMatrix.isClosedShell())
     {
         if (xcFunctional == xcfun::lda)
         {
@@ -101,8 +101,7 @@ CDensityGridDriver::_genDensityGridOnCPU(      CDensityGrid&     densityGrid,
             return;
         }
     }
-    
-    if (aoDensityMatrix.isUnrestricted())
+    else
     {
         if (xcFunctional == xcfun::lda)
         {

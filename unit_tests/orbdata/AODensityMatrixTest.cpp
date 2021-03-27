@@ -346,27 +346,9 @@ TEST_F(CAODensityMatrixTest, IsRestricted)
 
     CAODensityMatrix dmatc({ma, ma, mb, mb}, denmat::osrest);
 
-    ASSERT_FALSE(dmata.isRestricted());
-
-    ASSERT_TRUE(dmata.isUnrestricted());
-
     ASSERT_FALSE(dmata.isClosedShell());
-
-    ASSERT_TRUE(dmata.isOpenShell());
-
-    ASSERT_TRUE(dmatb.isRestricted());
-
-    ASSERT_FALSE(dmatb.isUnrestricted());
 
     ASSERT_TRUE(dmatb.isClosedShell());
 
-    ASSERT_FALSE(dmatb.isOpenShell());
-
-    ASSERT_TRUE(dmatc.isRestricted());
-
-    ASSERT_FALSE(dmatc.isUnrestricted());
-
     ASSERT_FALSE(dmatc.isClosedShell());
-
-    ASSERT_TRUE(dmatc.isOpenShell());
 }

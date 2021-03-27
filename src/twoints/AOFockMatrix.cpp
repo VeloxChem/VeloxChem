@@ -199,26 +199,76 @@ CAOFockMatrix::operator!=(const CAOFockMatrix& other) const
 }
 
 int32_t
-CAOFockMatrix::_getFockMatrixID(const int32_t iFockMatrix, const std::string& spin) const
+CAOFockMatrix::_getNumberOfMatricesPerFock() const
 {
-    if (isRestricted())
+    for (size_t i = 0; i < _fockMatrices.size(); i++)
+    {
+        if ((_fockTypes[i] == fockmat::restjk) ||
+
+            (_fockTypes[i] == fockmat::restjkx) ||
+
+            (_fockTypes[i] == fockmat::restj) ||
+
+            (_fockTypes[i] == fockmat::restk) ||
+
+            (_fockTypes[i] == fockmat::restkx) ||
+
+            (_fockTypes[i] == fockmat::rgenjk) ||
+
+            (_fockTypes[i] == fockmat::rgenjkx) ||
+
+            (_fockTypes[i] == fockmat::rgenj) ||
+
+            (_fockTypes[i] == fockmat::rgenk) ||
+
+            (_fockTypes[i] == fockmat::rgenkx))
+        {
+            return 1;
+        }
+
+        if ((_fockTypes[i] == fockmat::unrestjk) ||
+
+            (_fockTypes[i] == fockmat::unrestj) ||
+
+            (_fockTypes[i] == fockmat::unrestjkx))
+        {
+            return 2;
+        }
+    }
+
+    return 1;
+}
+
+bool
+CAOFockMatrix::isClosedShell() const
+{
+    return (_getNumberOfMatricesPerFock() == 1);
+}
+
+int32_t
+CAOFockMatrix::_getMatrixID(const int32_t iFockMatrix, const std::string& spin) const
+{
+    if (isClosedShell())
     {
         return iFockMatrix;
     }
-    else if (fstr::upcase(spin) == std::string("ALPHA"))
-    {
-        return 2 * iFockMatrix;
-    }
     else
     {
-        return 2 * iFockMatrix + 1;
+        if (fstr::upcase(spin) == std::string("ALPHA"))
+        {
+            return 2 * iFockMatrix;
+        }
+        else
+        {
+            return 2 * iFockMatrix + 1;
+        }
     }
 }
 
 void
 CAOFockMatrix::setFockType(const fockmat& fockType, const int32_t iFockMatrix, const std::string& spin)
 {
-    auto fockMatrixID = _getFockMatrixID(iFockMatrix, spin);
+    auto fockMatrixID = _getMatrixID(iFockMatrix, spin);
 
     _fockTypes[fockMatrixID] = fockType;
 }
@@ -226,7 +276,7 @@ CAOFockMatrix::setFockType(const fockmat& fockType, const int32_t iFockMatrix, c
 void
 CAOFockMatrix::setFockScaleFactor(const double factor, const int32_t iFockMatrix, const std::string& spin)
 {
-    auto fockMatrixID = _getFockMatrixID(iFockMatrix, spin);
+    auto fockMatrixID = _getMatrixID(iFockMatrix, spin);
 
     _scaleFactors[fockMatrixID] = factor;
 }
@@ -243,7 +293,7 @@ CAOFockMatrix::zero()
 void
 CAOFockMatrix::symmetrize()
 {
-    if (isRestricted())
+    if (isClosedShell())
     {
         for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
         {
@@ -272,7 +322,7 @@ CAOFockMatrix::symmetrize()
 void
 CAOFockMatrix::add(const CAOFockMatrix& source)
 {
-    if (isRestricted())
+    if (isClosedShell())
     {
         for (int32_t i = 0; i < getNumberOfFockMatrices(); i++)
         {
@@ -303,7 +353,7 @@ CAOFockMatrix::addCoreHamiltonian(const CKineticEnergyMatrix&    kineticEnergyMa
 
     auto pnucpot = nuclearPotentialMatrix.values();
 
-    if (isRestricted())
+    if (isClosedShell())
     {
         // set up pointer to Fock matrix
 
@@ -344,7 +394,7 @@ CAOFockMatrix::addCoreHamiltonian(const CKineticEnergyMatrix&    kineticEnergyMa
 void
 CAOFockMatrix::addOneElectronMatrix(const CDenseMatrix& oneElectronMatrix, const int32_t iFockMatrix, const std::string& spin)
 {
-    auto fockMatrixID = _getFockMatrixID(iFockMatrix, spin);
+    auto fockMatrixID = _getMatrixID(iFockMatrix, spin);
 
     // set up pointer to one electron matrix
 
@@ -368,7 +418,7 @@ CAOFockMatrix::addOneElectronMatrix(const CDenseMatrix& oneElectronMatrix, const
 void
 CAOFockMatrix::scale(const double factor, const int32_t iFockMatrix, const std::string& spin)
 {
-    auto fockMatrixID = _getFockMatrixID(iFockMatrix, spin);
+    auto fockMatrixID = _getMatrixID(iFockMatrix, spin);
 
     auto pfock = _fockMatrices[fockMatrixID].values();
 
@@ -394,45 +444,10 @@ CAOFockMatrix::reduce_sum(int32_t rank, int32_t nodes, MPI_Comm comm)
     }
 }
 
-bool
-CAOFockMatrix::isRestricted() const
-{
-    for (size_t i = 0; i < _fockMatrices.size(); i++)
-    {
-        if (_fockTypes[i] == fockmat::restjk) return true;
-   
-        if (_fockTypes[i] == fockmat::restjkx) return true;
-
-        if (_fockTypes[i] == fockmat::restj) return true;
-
-        if (_fockTypes[i] == fockmat::restk) return true;
-
-        if (_fockTypes[i] == fockmat::restkx) return true;
-
-        if (_fockTypes[i] == fockmat::rgenjk) return true;
-
-        if (_fockTypes[i] == fockmat::rgenjkx) return true;
-
-        if (_fockTypes[i] == fockmat::rgenj) return true;
-
-        if (_fockTypes[i] == fockmat::rgenk) return true;
-
-        if (_fockTypes[i] == fockmat::rgenkx) return true;
-
-        if (_fockTypes[i] == fockmat::unrestjk) return false;
-
-        if (_fockTypes[i] == fockmat::unrestj) return false;
-
-        if (_fockTypes[i] == fockmat::unrestjkx) return false;
-    }
-
-    return true;
-}
-
 int32_t
 CAOFockMatrix::getNumberOfFockMatrices() const
 {
-    if (isRestricted())
+    if (isClosedShell())
     {
         return static_cast<int32_t>(_fockMatrices.size());
     }
@@ -447,7 +462,7 @@ CAOFockMatrix::getNumberOfRows(const int32_t iFockMatrix) const
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
-        if (isRestricted())
+        if (isClosedShell())
         {
             return _fockMatrices[iFockMatrix].getNumberOfRows();
         }
@@ -465,7 +480,7 @@ CAOFockMatrix::getNumberOfColumns(const int32_t iFockMatrix) const
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
-        if (isRestricted())
+        if (isClosedShell())
         {
             return _fockMatrices[iFockMatrix].getNumberOfColumns();
         }
@@ -483,7 +498,7 @@ CAOFockMatrix::getNumberOfElements(const int32_t iFockMatrix) const
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
-        if (isRestricted())
+        if (isClosedShell())
         {
             return _fockMatrices[iFockMatrix].getNumberOfElements();
         }
@@ -501,7 +516,7 @@ CAOFockMatrix::getFock(const int32_t iFockMatrix, const std::string& spin) const
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
-        auto fockMatrixID = _getFockMatrixID(iFockMatrix, spin);
+        auto fockMatrixID = _getMatrixID(iFockMatrix, spin);
 
         return _fockMatrices[fockMatrixID].values();
     }
@@ -514,7 +529,7 @@ CAOFockMatrix::getFock(const int32_t iFockMatrix, const std::string& spin)
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
-        auto fockMatrixID = _getFockMatrixID(iFockMatrix, spin);
+        auto fockMatrixID = _getMatrixID(iFockMatrix, spin);
 
         return _fockMatrices[fockMatrixID].values();
     }
@@ -525,7 +540,7 @@ CAOFockMatrix::getFock(const int32_t iFockMatrix, const std::string& spin)
 const CDenseMatrix&
 CAOFockMatrix::getReferenceToFock(const int32_t iFockMatrix, const std::string& spin) const
 {
-    auto fockMatrixID = _getFockMatrixID(iFockMatrix, spin);
+    auto fockMatrixID = _getMatrixID(iFockMatrix, spin);
 
     return _fockMatrices[fockMatrixID];
 }
@@ -533,7 +548,7 @@ CAOFockMatrix::getReferenceToFock(const int32_t iFockMatrix, const std::string& 
 fockmat
 CAOFockMatrix::getFockType(const int32_t iFockMatrix, const std::string& spin) const
 {
-    auto fockMatrixID = _getFockMatrixID(iFockMatrix, spin);
+    auto fockMatrixID = _getMatrixID(iFockMatrix, spin);
 
     return _fockTypes[fockMatrixID];
 }
@@ -543,7 +558,7 @@ CAOFockMatrix::getScaleFactor(const int32_t iFockMatrix, const std::string& spin
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
-        auto fockMatrixID = _getFockMatrixID(iFockMatrix, spin);
+        auto fockMatrixID = _getMatrixID(iFockMatrix, spin);
 
         return _scaleFactors[fockMatrixID];
     }
@@ -556,7 +571,7 @@ CAOFockMatrix::getDensityIdentifier(const int32_t iFockMatrix, const std::string
 {
     if (iFockMatrix < getNumberOfFockMatrices())
     {
-        auto fockMatrixID = _getFockMatrixID(iFockMatrix, spin);
+        auto fockMatrixID = _getMatrixID(iFockMatrix, spin);
 
         return _idDensityMatrices[fockMatrixID];
     }
@@ -571,7 +586,7 @@ CAOFockMatrix::isSymmetric(const int32_t iFockMatrix) const
     {
         auto fockindex = iFockMatrix;
 
-        if (!isRestricted())
+        if (!isClosedShell())
         {
             fockindex = 2 * iFockMatrix;
         }
@@ -612,7 +627,7 @@ CAOFockMatrix::getElectronicEnergy(const int32_t iFockMatrix, const CAODensityMa
 {
     if ((iFockMatrix < getNumberOfFockMatrices()) && (iDensityMatrix < aoDensityMatrix.getNumberOfMatrices()))
     {
-        if (isRestricted())
+        if (isClosedShell())
         {
             return denblas::trace(_fockMatrices[iFockMatrix], aoDensityMatrix.getReferenceToDensity(iDensityMatrix));
         }
