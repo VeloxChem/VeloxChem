@@ -44,8 +44,8 @@ class RpaOrbitalResponse(OrbitalResponse):
 
     def compute_rhs(self, molecule, basis, scf_tensors, rpa_results, profiler):
         """
-        Performs orbital response Lagrange multipliers
-        calculation using molecular data.
+        Computes the right-hand side (RHS) of the RPA orbital response equation
+        including the necessary density matrices using molecular data.
 
         :param molecule:
             The molecule.
@@ -117,17 +117,18 @@ class RpaOrbitalResponse(OrbitalResponse):
 
         dm_ao_rhs.broadcast(self.rank, self.comm)
 
+        # Fock matrices with corresponding type
         fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
         fock_ao_rhs.set_fock_type(fockmat.rgenjk, 1)
         fock_ao_rhs.set_fock_type(fockmat.rgenjk, 2)
-
-        # TODO: make sure that ERI settings are consistent with response solver
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                     self.eri_thresh, molecule, basis)
 
         eri_drv.compute(fock_ao_rhs, dm_ao_rhs, molecule, basis, screening)
+		# TODO: probably at this point we will have to do another calculation
+		# for the additional contributions from the xc kernel derivative in DFT
         fock_ao_rhs.reduce_sum(self.rank, self.nodes, self.comm)
 
         # Calculate the RHS and transform it to the MO basis
@@ -169,7 +170,7 @@ class RpaOrbitalResponse(OrbitalResponse):
     def compute_omega(self, ovlp, mo_occ, mo_vir, epsilon_dm_ao, rpa_results,
                       fock_ao_rhs, fock_lambda):
         """
-        Calculates the Lagrange multipliers for the overlap matrix.
+        Calculates the RPA Lagrange multipliers for the overlap matrix.
 
         :param ovlp:
             The overlap matrix.

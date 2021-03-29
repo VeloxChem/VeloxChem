@@ -44,8 +44,8 @@ class TdaOrbitalResponse(OrbitalResponse):
 
     def compute_rhs(self, molecule, basis, scf_tensors, tda_results, profiler):
         """
-        Performs orbital response Lagrange multipliers
-        calculation using molecular data.
+        Computes the right-hand side (RHS) of the TDA orbital response equation
+        including the necessary density matrices using molecular data.
 
         :param molecule:
             The molecule.
@@ -103,6 +103,7 @@ class TdaOrbitalResponse(OrbitalResponse):
 
         dm_ao_rhs.broadcast(self.rank, self.comm)
 
+        # Fock matrices with corresponding type
         fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
         fock_ao_rhs.set_fock_type(fockmat.rgenjk, 1)
 
@@ -111,6 +112,8 @@ class TdaOrbitalResponse(OrbitalResponse):
                                     self.eri_thresh, molecule, basis)
 
         eri_drv.compute(fock_ao_rhs, dm_ao_rhs, molecule, basis, screening)
+		# TODO: probably at this point we will have to do another calculation
+		# for the additional contributions from the xc kernel derivative in DFT
         fock_ao_rhs.reduce_sum(self.rank, self.nodes, self.comm)
 
         # Calculate the RHS and transform it to the MO basis
@@ -144,7 +147,7 @@ class TdaOrbitalResponse(OrbitalResponse):
     def compute_omega(self, ovlp, mo_occ, mo_vir, epsilon_dm_ao, tda_results,
                       fock_ao_rhs, fock_lambda):
         """
-        Calculates the Lagrange multipliers for the overlap matrix.
+        Calculates the TDA Lagrange multipliers for the overlap matrix.
 
         :param ovlp:
             The overlap matrix.
