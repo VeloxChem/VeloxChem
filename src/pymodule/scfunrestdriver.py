@@ -299,13 +299,14 @@ class ScfUnrestrictedDriver(ScfDriver):
         """
 
         if self.xcfun.is_hybrid():
-            fock_mat.set_fock_type(fockmat.unrestjkx, 0)
-            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0)
-            fock_mat.set_fock_type(fockmat.unrestjkx, 0, True)
+            fock_mat.set_fock_type(fockmat.unrestjkx, 0, 'alpha')
             fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0,
-                                      True)
+                                      'alpha')
+            fock_mat.set_fock_type(fockmat.unrestjkx, 0, 'beta')
+            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0,
+                                      'beta')
         else:
-            fock_mat.set_fock_type(fockmat.unrestj, 0)
-            fock_mat.set_fock_type(fockmat.unrestj, 0, True)
+            fock_mat.set_fock_type(fockmat.unrestj, 0, 'alpha')
+            fock_mat.set_fock_type(fockmat.unrestj, 0, 'beta')
 
         return

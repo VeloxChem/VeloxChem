@@ -51,14 +51,14 @@ static py::array_t<double>
 CAOFockMatrix_alpha_to_numpy(const CAOFockMatrix& self, const int32_t iFockMatrix)
 {
     return vlx_general::pointer_to_numpy(
-        self.getFock(iFockMatrix, false), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
+        self.getFock(iFockMatrix, "alpha"), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
 }
 
 static py::array_t<double>
 CAOFockMatrix_beta_to_numpy(const CAOFockMatrix& self, const int32_t iFockMatrix)
 {
     return vlx_general::pointer_to_numpy(
-        self.getFock(iFockMatrix, true), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
+        self.getFock(iFockMatrix, "beta"), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
 }
 
 // Helper function for CAOFockMatrix constructor
@@ -342,16 +342,17 @@ export_twoints(py::module& m)
         .def("to_numpy", &CAOFockMatrix_to_numpy)
         .def("alpha_to_numpy", &CAOFockMatrix_alpha_to_numpy)
         .def("beta_to_numpy", &CAOFockMatrix_beta_to_numpy)
+        .def("is_closed_shell", &CAOFockMatrix::isClosedShell)
         .def("number_of_fock_matrices", &CAOFockMatrix::getNumberOfFockMatrices)
-        .def("set_fock_type", &CAOFockMatrix::setFockType, py::arg(), py::arg(), py::arg("beta") = false)
-        .def("set_scale_factor", &CAOFockMatrix::setFockScaleFactor, py::arg(), py::arg(), py::arg("beta") = false)
-        .def("get_fock_type", &CAOFockMatrix::getFockType, py::arg(), py::arg("beta") = false)
-        .def("get_scale_factor", &CAOFockMatrix::getScaleFactor, py::arg(), py::arg("beta") = false)
-        .def("get_density_identifier", &CAOFockMatrix::getDensityIdentifier, py::arg(), py::arg("beta") = false)
+        .def("set_fock_type", &CAOFockMatrix::setFockType, py::arg(), py::arg(), py::arg("spin") = std::string("alpha"))
+        .def("set_scale_factor", &CAOFockMatrix::setFockScaleFactor, py::arg(), py::arg(), py::arg("spin") = std::string("alpha"))
+        .def("get_fock_type", &CAOFockMatrix::getFockType, py::arg(), py::arg("spin") = std::string("alpha"))
+        .def("get_scale_factor", &CAOFockMatrix::getScaleFactor, py::arg(), py::arg("spin") = std::string("alpha"))
+        .def("get_density_identifier", &CAOFockMatrix::getDensityIdentifier, py::arg(), py::arg("spin") = std::string("alpha"))
         .def("add_hcore", &CAOFockMatrix::addCoreHamiltonian)
         .def("add", &CAOFockMatrix::add)
-        .def("add_matrix", &CAOFockMatrix::addOneElectronMatrix)
-        .def("scale", &CAOFockMatrix::scale)
+        .def("add_matrix", &CAOFockMatrix::addOneElectronMatrix, py::arg(), py::arg(), py::arg("spin") = std::string("alpha"))
+        .def("scale", &CAOFockMatrix::scale, py::arg(), py::arg(), py::arg("spin") = std::string("alpha"))
         .def("reduce_sum", &CAOFockMatrix_reduce_sum)
         .def("get_energy", &CAOFockMatrix::getElectronicEnergy)
         .def(py::self == py::self);

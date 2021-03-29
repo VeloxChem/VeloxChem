@@ -9,10 +9,10 @@
 #ifndef AODensityMatrix_hpp
 #define AODensityMatrix_hpp
 
+#include <mpi.h>
+
 #include <cstdint>
 #include <vector>
-
-#include <mpi.h>
 
 #include "DenseMatrix.hpp"
 #include "DensityMatrixType.hpp"
@@ -35,6 +35,21 @@ class CAODensityMatrix
      The type of density matrices.
      */
     denmat _denType;
+
+    /**
+     Gets number of matrices per density. (1: closed-shell; 2: open-shell)
+
+     @return the number of matrices per density.
+     */
+    int32_t _getNumberOfMatricesPerDensity() const;
+
+    /**
+     Gets the actual index of a matrix in _denMatrices.
+
+     @param iDensityMatrix the index of density matrix.
+     @param spin the spin of density matrix.
+     */
+    int32_t _getMatrixID(const int32_t iDensityMatrix, const std::string& spin) const;
 
    public:
     /**
@@ -102,6 +117,13 @@ class CAODensityMatrix
      @return true if AO density matrix objects are not equal, false otherwise.
      */
     bool operator!=(const CAODensityMatrix& other) const;
+
+    /**
+     Checks if AO density matrix is of closed-shell type.
+
+     @return true if AO density matrix is of closed-shell type.
+     */
+    bool isClosedShell() const;
 
     /**
      Sets AO density matrix type.
@@ -213,21 +235,6 @@ class CAODensityMatrix
      @return the string representation.
      */
     std::string getString() const;
-    
-    
-    /**
-     Checks if AO density matrix of spin restricted type.
-
-     @return true if AO density of spin restricted type.
-     */
-    bool isRestricted() const;
-
-        /**
-     Checks if AO density matrix of spin restricted type.
-
-     @return true if AO density of spin restricted type.
-     */
-    bool isUnrestricted() const;
 
     /**
      Broadcasts AO density matrix object within domain of MPI communicator.

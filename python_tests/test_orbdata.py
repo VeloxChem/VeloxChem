@@ -68,33 +68,6 @@ class TestOrbData(unittest.TestCase):
         diff = np.max(np.abs(den_diff.alpha_to_numpy(0) - (arr_1 - arr_2)))
         self.assertAlmostEqual(0., diff, 13)
 
-    def test_density_hdf5(self):
-
-        data_a = [[1., .2], [.2, 1.]]
-        data_b = [[.9, .5], [.5, .9]]
-        data_c = [[.8, .6], [.6, .8]]
-        data_d = [[.7, .5], [.5, .7]]
-
-        d_rest = AODensityMatrix([data_a, data_b], denmat.rest)
-
-        d_unrest = AODensityMatrix([data_a, data_b, data_c, data_d],
-                                   denmat.unrest)
-
-        # hdf5 read/write tests
-
-        if is_mpi_master():
-
-            here = Path(__file__).parent
-            h5file = str(here / 'inputs' / 'dummy.h5')
-
-            d_rest.write_hdf5(h5file)
-            dummy = AODensityMatrix.read_hdf5(h5file)
-            self.assertEqual(d_rest, dummy)
-
-            d_unrest.write_hdf5(h5file)
-            dummy = AODensityMatrix.read_hdf5(h5file)
-            self.assertEqual(d_unrest, dummy)
-
     def test_orbitals_matrix(self):
 
         data_a = [[.9, .2], [.1, .3], [.4, .9]]

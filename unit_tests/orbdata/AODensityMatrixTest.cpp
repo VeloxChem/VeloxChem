@@ -133,9 +133,13 @@ TEST_F(CAODensityMatrixTest, GetNumberOfDensityMatrices)
 
     CAODensityMatrix dmatb({ma, ma}, denmat::rest);
 
+    CAODensityMatrix dmatc({ma, ma, ma, ma}, denmat::osrest);
+
     ASSERT_EQ(1, dmata.getNumberOfDensityMatrices());
 
     ASSERT_EQ(2, dmatb.getNumberOfDensityMatrices());
+
+    ASSERT_EQ(2, dmatc.getNumberOfDensityMatrices());
 }
 
 TEST_F(CAODensityMatrixTest, GetNumberOfMatrices)
@@ -146,9 +150,13 @@ TEST_F(CAODensityMatrixTest, GetNumberOfMatrices)
 
     CAODensityMatrix dmatb({ma, ma, ma}, denmat::rest);
 
+    CAODensityMatrix dmatc({ma, ma, ma, ma}, denmat::osrest);
+
     ASSERT_EQ(2, dmata.getNumberOfMatrices());
 
     ASSERT_EQ(3, dmatb.getNumberOfMatrices());
+
+    ASSERT_EQ(4, dmatc.getNumberOfMatrices());
 }
 
 TEST_F(CAODensityMatrixTest, GetDensityType)
@@ -159,9 +167,13 @@ TEST_F(CAODensityMatrixTest, GetDensityType)
 
     CAODensityMatrix dmatb({ma, ma}, denmat::rest);
 
+    CAODensityMatrix dmatc({ma, ma}, denmat::osrest);
+
     ASSERT_TRUE(dmata.getDensityType() == denmat::unrest);
 
     ASSERT_TRUE(dmatb.getDensityType() == denmat::rest);
+
+    ASSERT_TRUE(dmatc.getDensityType() == denmat::osrest);
 }
 
 TEST_F(CAODensityMatrixTest, GetNumberOfRows)
@@ -174,11 +186,15 @@ TEST_F(CAODensityMatrixTest, GetNumberOfRows)
 
     CAODensityMatrix dmatb({ma}, denmat::rest);
 
+    CAODensityMatrix dmatc({ma, ma}, denmat::osrest);
+
     ASSERT_EQ(3, dmata.getNumberOfRows(0));
 
     ASSERT_EQ(2, dmata.getNumberOfRows(1));
 
     ASSERT_EQ(3, dmatb.getNumberOfRows(0));
+
+    ASSERT_EQ(3, dmatc.getNumberOfRows(0));
 }
 
 TEST_F(CAODensityMatrixTest, GetNumberOfColumns)
@@ -191,11 +207,15 @@ TEST_F(CAODensityMatrixTest, GetNumberOfColumns)
 
     CAODensityMatrix dmatb({mb}, denmat::rest);
 
+    CAODensityMatrix dmatc({ma, ma}, denmat::osrest);
+
     ASSERT_EQ(3, dmata.getNumberOfColumns(0));
 
     ASSERT_EQ(4, dmata.getNumberOfColumns(1));
 
     ASSERT_EQ(4, dmatb.getNumberOfColumns(0));
+
+    ASSERT_EQ(3, dmatc.getNumberOfColumns(0));
 }
 
 TEST_F(CAODensityMatrixTest, GetNumberOfElements)
@@ -208,11 +228,15 @@ TEST_F(CAODensityMatrixTest, GetNumberOfElements)
 
     CAODensityMatrix dmatb({mb}, denmat::rest);
 
+    CAODensityMatrix dmatc({ma, ma}, denmat::osrest);
+
     ASSERT_EQ(9, dmata.getNumberOfElements(0));
 
     ASSERT_EQ(8, dmata.getNumberOfElements(1));
 
     ASSERT_EQ(8, dmatb.getNumberOfElements(0));
+
+    ASSERT_EQ(9, dmatc.getNumberOfElements(0));
 }
 
 TEST_F(CAODensityMatrixTest, RestrictedDensity)
@@ -234,6 +258,16 @@ TEST_F(CAODensityMatrixTest, RestrictedDensity)
     ASSERT_TRUE(dmat.alphaDensity(2) == nullptr);
 
     ASSERT_TRUE(dmat.betaDensity(2) == nullptr);
+
+    const CAODensityMatrix dmatb({ma, mb}, denmat::osrest);
+
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 1.0, 4.0, 3.0, 7.0}, dmatb.alphaDensity(0));
+
+    vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, dmatb.betaDensity(0));
+
+    ASSERT_TRUE(dmatb.alphaDensity(1) == nullptr);
+
+    ASSERT_TRUE(dmatb.betaDensity(1) == nullptr);
 }
 
 TEST_F(CAODensityMatrixTest, UnrestrictedAlphaDensity)
@@ -303,14 +337,18 @@ TEST_F(CAODensityMatrixTest, GetReferenceToDensity)
 TEST_F(CAODensityMatrixTest, IsRestricted)
 {
     CDenseMatrix ma({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
-    
+
     CDenseMatrix mb({1.0, -1.0, -3.0, -2.0, 1.0, 4.0, 3.0, 7.0}, 2, 4);
-    
+
     CAODensityMatrix dmata({ma, ma, mb, mb}, denmat::unrest);
-    
+
     CAODensityMatrix dmatb({mb}, denmat::rest);
-    
-    ASSERT_FALSE(dmata.isRestricted());
-    
-    ASSERT_TRUE(dmatb.isRestricted());
+
+    CAODensityMatrix dmatc({ma, ma, mb, mb}, denmat::osrest);
+
+    ASSERT_FALSE(dmata.isClosedShell());
+
+    ASSERT_TRUE(dmatb.isClosedShell());
+
+    ASSERT_FALSE(dmatc.isClosedShell());
 }

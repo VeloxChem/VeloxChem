@@ -912,8 +912,6 @@ class ScfDriver:
             if not self.xcfun.is_hybrid():
                 if self.restricted is True:
                     fock_mat.scale(2.0, 0)
-                else:
-                    fock_mat.scale(1.0, 0)
 
             self.molgrid.distribute(self.rank, self.nodes, self.comm)
             vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self.molgrid,
@@ -1034,8 +1032,6 @@ class ScfDriver:
             if self.dft and (not self.xcfun.is_hybrid()):
                 if self.restricted is True:
                     fock_mat.scale(2.0, 0)
-                else:
-                    fock_mat.scale(1.0, 0)
 
         # calculate Vxc on DFT nodes
         if dft_comm:
@@ -1168,7 +1164,7 @@ class ScfDriver:
             if self.dft and not self.first_step:
                 fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
                 if not self.restricted:
-                    fock_mat.add_matrix(vxc_mat.get_matrix(True), 1)
+                    fock_mat.add_matrix(vxc_mat.get_matrix(True), 0, 'beta')
 
             if self.pe and not self.first_step:
                 fock_mat.add_matrix(DenseMatrix(pe_mat), 0)
