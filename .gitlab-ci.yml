@@ -58,7 +58,7 @@ monkey:pip_install:
   variables:
     VLX_NUM_BUILD_JOBS: "6"
   script:
-    - python3 -m pip install .
+    - python3 -m pip install .[qmmm]
 
 monkey:unit_tests:
   extends: .monkey:setup

@@ -32,7 +32,7 @@ Build prerequisites
 
 Optional, add-on dependencies:
 
-  - `CPPE <https://github.com/maxscheurer/cppe>`_
+  - `CPPE (v0.2.1) <https://github.com/maxscheurer/cppe/releases/tag/v0.2.1>`_
   - `XTB Python <https://xtb-python.readthedocs.io/>`_
 
 See :ref:`external-dependencies` for instructions on how to get these add-ons.
@@ -246,8 +246,8 @@ Dependencies
 
 If you wish to use functionality offered through interfaces with other software
 packages, you will first need to install them.  Currently, interfaces to add-on
-dependencies `XTB <https://xtb-docs.readthedocs.io/>`_ and `CPPE
-<https://github.com/maxscheurer/cppe>`_  are available.
+dependencies `XTB <https://xtb-docs.readthedocs.io/>`_ and `CPPE (v0.2.1)
+<https://github.com/maxscheurer/cppe/releases/tag/v0.2.1>`_  are available.
 
 
 The CPPE library for polarizable embedding
@@ -260,7 +260,7 @@ You can install it *via* ``pip`` in your virtual environment:
 
 .. code-block:: bash
 
-   $ python -m pip install cppe
+   $ python -m pip install cppe==0.2.1
 
 or as an extra during compilation of VeloxChem:
 
@@ -273,7 +273,7 @@ Alternatively, you can compile it without using ``pip``:
 .. code-block:: bash
 
     # Build CPPE
-    $ git clone https://github.com/maxscheurer/cppe
+    $ git clone -b v0.2.1 https://github.com/maxscheurer/cppe
     $ cd cppe; mkdir build; cd build
     $ cmake -DENABLE_PYTHON_INTERFACE=ON ..
     $ make
