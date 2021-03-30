@@ -316,9 +316,9 @@ class LinearResponseEigenSolver(LinearSolver):
                 xn = np.sqrt(np.sum(x_norms_2))
 
                 if xn != 0:
-                    relative_residual_norm[k] = rn / xn
+                    relative_residual_norm[k] = 2.0 * rn / xn
                 else:
-                    relative_residual_norm[k] = rn
+                    relative_residual_norm[k] = 2.0 * rn
 
                 if relative_residual_norm[k] < self.conv_thresh:
                     excitations[k] = (w, x)

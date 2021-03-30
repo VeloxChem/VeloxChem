@@ -312,7 +312,7 @@ class LinearResponseSolver(LinearSolver):
                 x_full = self.get_full_solution_vector(x)
 
                 if self.rank == mpi_master():
-                    xv = np.dot(x_full, v1[(op, freq)])
+                    xv = 2.0 * np.dot(x_full, v1[(op, freq)])
                     xvs.append((op, freq, xv))
 
                 r_norms_2 = 2.0 * r.squared_norm(axis=0)
@@ -322,9 +322,9 @@ class LinearResponseSolver(LinearSolver):
                 xn = np.sqrt(np.sum(x_norms_2))
 
                 if xn != 0:
-                    relative_residual_norm[(op, freq)] = rn / xn
+                    relative_residual_norm[(op, freq)] = 2.0 * rn / xn
                 else:
-                    relative_residual_norm[(op, freq)] = rn
+                    relative_residual_norm[(op, freq)] = 2.0 * rn
 
                 if relative_residual_norm[(op, freq)] < self.conv_thresh:
                     solutions[(op, freq)] = x

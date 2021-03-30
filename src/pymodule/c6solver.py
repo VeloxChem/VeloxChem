@@ -457,7 +457,7 @@ class C6Solver(LinearSolver):
 
                     x_full = self.get_full_solution_vector(x)
                     if self.rank == mpi_master():
-                        xv = np.dot(x_full, v1[(op, iw)])
+                        xv = 2.0 * np.dot(x_full, v1[(op, iw)])
                         xvs.append((op, iw, xv))
 
                     r_norms_2 = 2.0 * r.squared_norm(axis=0)
@@ -467,9 +467,9 @@ class C6Solver(LinearSolver):
                     xn = np.sqrt(np.sum(x_norms_2))
 
                     if xn != 0:
-                        relative_residual_norm[(op, iw)] = rn / xn
+                        relative_residual_norm[(op, iw)] = 2.0 * rn / xn
                     else:
-                        relative_residual_norm[(op, iw)] = rn
+                        relative_residual_norm[(op, iw)] = 2.0 * rn
 
                     if relative_residual_norm[(op, iw)] < self.conv_thresh:
                         solutions[(op, iw)] = x

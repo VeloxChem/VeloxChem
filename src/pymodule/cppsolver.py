@@ -572,7 +572,7 @@ class ComplexResponse(LinearSolver):
 
                     x_full = self.get_full_solution_vector(x)
                     if self.rank == mpi_master():
-                        xv = np.dot(x_full, v1[(op, w)])
+                        xv = 2.0 * np.dot(x_full, v1[(op, w)])
                         xvs.append((op, w, xv))
 
                     r_norms_2 = 2.0 * r.squared_norm(axis=0)
@@ -582,9 +582,9 @@ class ComplexResponse(LinearSolver):
                     xn = np.sqrt(np.sum(x_norms_2))
 
                     if xn != 0:
-                        relative_residual_norm[(op, w)] = rn / xn
+                        relative_residual_norm[(op, w)] = 2.0 * rn / xn
                     else:
-                        relative_residual_norm[(op, w)] = rn
+                        relative_residual_norm[(op, w)] = 2.0 * rn
 
                     if relative_residual_norm[(op, w)] < self.conv_thresh:
                         solutions[(op, w)] = x
