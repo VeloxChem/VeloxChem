@@ -55,8 +55,6 @@ class OptimizationDriver:
         - check_interval: The interval (number of steps) for checking
           coordinate system.
         - max_iter: The maximum number of optimization steps
-        - transition: The flag for transition state searching.
-        - hessian: The flag for computing Hessian.
         - filename: The filename that will be used by geomeTRIC.
         - grad_drv: The gradient driver.
         - flag: The type of the optimization driver.
@@ -75,9 +73,6 @@ class OptimizationDriver:
         self.constraints = None
         self.check_interval = 0
         self.max_iter = 300
-
-        self.transition = False
-        self.hessian = 'never'
 
         self.ref_xyz = None
 
@@ -108,17 +103,6 @@ class OptimizationDriver:
         elif 'maxiter' in opt_dict:
             self.max_iter = int(opt_dict['maxiter'])
 
-        if 'transition' in opt_dict:
-            key = opt_dict['transition'].lower()
-            self.transition = True if key == 'yes' else False
-
-        if 'hessian' in opt_dict:
-            self.hessian = opt_dict['hessian'].lower()
-            if self.hessian == 'only':
-                self.hessian = 'stop'
-        elif self.transition:
-            self.hessian = 'first'
-
         if 'ref_xyz' in opt_dict:
             self.ref_xyz = opt_dict['ref_xyz']
 
@@ -142,7 +126,6 @@ class OptimizationDriver:
 
         opt_engine = OptimizationEngine(molecule, ao_basis, min_basis,
                                         self.grad_drv, self.flag)
-        hessian_exit = False
 
         # filename is used by geomeTRIC to create .log and other files. On
         # master node filename is determined based on the input/output file.
@@ -156,8 +139,7 @@ class OptimizationDriver:
                 self.clean_up_file(filename + '.tmp', 'hessian', 'coords.xyz')
             else:
                 filename = PurePath(self.filename).name
-                filename = str(
-                    PurePath(temp_dir, '{:s}_{:d}'.format(filename, self.rank)))
+                filename = str(PurePath(temp_dir, f'{filename}_{self.rank}'))
 
             if self.constraints:
                 constr_filename = Path(filename).with_suffix('.constr.txt')
@@ -166,6 +148,9 @@ class OptimizationDriver:
                         print(line, file=fh)
             else:
                 constr_filename = None
+
+            log_ini = str(PurePath(temp_dir, f'log.ini_{self.rank}'))
+            self.write_log_ini(log_ini)
 
             # geomeTRIC prints information to stdout and stderr. On master node
             # this is redirected to the output stream. On other nodes this is
@@ -180,23 +165,14 @@ class OptimizationDriver:
 
                 with contextlib.redirect_stdout(f_out):
                     with contextlib.redirect_stderr(f_out):
-                        try:
-                            m = geometric.optimize.run_optimizer(
-                                customengine=opt_engine,
-                                coordsys=self.coordsys,
-                                check=self.check_interval,
-                                maxiter=self.max_iter,
-                                constraints=constr_filename,
-                                transition=self.transition,
-                                hessian=self.hessian,
-                                input=filename)
-                        except geometric.errors.HessianExit:
-                            hessian_exit = True
-
-        if hessian_exit:
-            if self.rank == mpi_master() and self.hessian == 'stop':
-                self.print_vib_analysis('vdata_first')
-            return molecule
+                        m = geometric.optimize.run_optimizer(
+                            customengine=opt_engine,
+                            coordsys=self.coordsys,
+                            check=self.check_interval,
+                            maxiter=self.max_iter,
+                            constraints=constr_filename,
+                            input=filename,
+                            logIni=log_ini)
 
         coords = m.xyzs[-1] / geometric.nifty.bohr2ang
         labels = molecule.get_labels()
@@ -222,9 +198,6 @@ class OptimizationDriver:
                 else:
                     self.print_ic_rmsd(final_mol, molecule)
 
-            if self.hessian in ['last', 'first+last', 'each']:
-                self.print_vib_analysis('vdata_last')
-
             valstr = '*** Time spent in Optimization Driver: '
             valstr += '{:.2f} sec'.format(tm.time() - start_time)
             self.ostream.print_header(valstr)
@@ -245,6 +218,36 @@ class OptimizationDriver:
 
         if extfile.is_file():
             extfile.unlink()
+
+    def write_log_ini(self, fname):
+
+        lines = [
+            '[loggers]',
+            'keys=root',
+            '[handlers]',
+            'keys=stream_handler, file_handler',
+            '[formatters]',
+            'keys=formatter',
+            '[logger_root]',
+            'level=INFO',
+            'handlers=stream_handler, file_handler',
+            '[handler_stream_handler]',
+            'class=geometric.nifty.RawStreamHandler',
+            'level=INFO',
+            'formatter=formatter',
+            'args=(sys.stderr,)',
+            '[handler_file_handler]',
+            'class=geometric.nifty.RawFileHandler',
+            'level=INFO',
+            'formatter=formatter',
+            'args=(\'%(logfilename)s\',)',
+            '[formatter_formatter]',
+            'format=%(message)s',
+        ]
+
+        with open(fname, 'w') as f_ini:
+            for line in lines:
+                print(line, file=f_ini)
 
     def print_opt_result(self, progress):
         """
@@ -272,7 +275,7 @@ class OptimizationDriver:
         for i in range(len(energies)):
             if i > 0:
                 delta_e = energies[i] - energies[i - 1]
-                rmsd, maxd = geometric.step.calc_drms_dmax(
+                rmsd, maxd = geometric.optimize.calc_drms_dmax(
                     coords[i], coords[i - 1])
             else:
                 delta_e = 0.0
@@ -450,9 +453,6 @@ class OptimizationDriver:
         lines.append('Constraints             :    ' +
                      ('Yes' if self.constraints else 'No'))
         lines.append('Max. Number of Steps    :    ' + str(self.max_iter))
-        lines.append('Transition State        :    ' +
-                     ('Yes' if self.transition else 'No'))
-        lines.append('Hessian                 :    ' + self.hessian)
 
         maxlen = max([len(line.split(':')[0]) * 2 for line in lines])
         for line in lines:

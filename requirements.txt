@@ -1,4 +1,4 @@
-git+https://github.com/leeping/geomeTRIC.git@ada165ef24b737fb1d855eb4739f6e551b48cfaf
+geometric>=0.9.7
 h5py>=2.8
 loprop>=0.3.3
 mpi4py>=3.0
