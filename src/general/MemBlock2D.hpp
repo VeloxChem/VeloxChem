@@ -26,12 +26,13 @@
 #ifndef MemBlock2D_hpp
 #define MemBlock2D_hpp
 
+#include <mpi.h>
+
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
-#include <iostream>
-
-#include <mpi.h>
+#include <sstream>
+#include <string>
 
 #include "MatOrder.hpp"
 #include "MemAlloc.hpp"
@@ -93,6 +94,14 @@ class CMemBlock2D
      */
     void _copy(const std::vector<T>& dataVector, const matorder dataOrder);
 
+    /**
+     Copies data elements from pointer to memory block.
+
+     @param source the raw pointer with data elements.
+     @param dataOrder the order for copying data elements from vector to memory.
+     */
+    void _copy(const T* source, const matorder dataOrder);
+
    public:
     /**
      Creates an empty 2D memory block object.
@@ -139,6 +148,25 @@ class CMemBlock2D
      @param nBlocks the number of data chunks.
      */
     CMemBlock2D(const std::vector<T>& dataVector, const matorder dataOrder, const int32_t nElements, const int32_t nBlocks);
+
+    /**
+     Creates an 2D memory block object.
+
+     @param source a raw pointer with data elements.
+     @param nElements the number of elements in data chunk.
+     @param nBlocks the number of data chunks.
+     */
+    CMemBlock2D(const T* source, const int32_t nElements, const int32_t nBlocks);
+
+    /**
+     Creates an 2D memory block object.
+
+     @param source a raw pointer with data elements.
+     @param dataOrder the order for copying data elements from vector to memory.
+     @param nElements the number of elements in data chunk.
+     @param nBlocks the number of data chunks.
+     */
+    CMemBlock2D(const T* source, const matorder dataOrder, const int32_t nElements, const int32_t nBlocks);
 
     /**
      Creates an 2D memory block object.
@@ -270,10 +298,10 @@ class CMemBlock2D
      @return the number of elements in data chunk.
      */
     int32_t size(const int32_t iBlock) const;
-    
+
     /**
      Gets number of elements in specific pitched data chunk.
-     
+
      @param iBlock the index of data chunk.
      @return the number of elements in pitched data chunk.
      */
@@ -317,14 +345,9 @@ class CMemBlock2D
     void scatter(int32_t rank, int32_t nodes, MPI_Comm comm);
 
     /**
-     Converts 2D memory block object to text output and insert it into output
-     text stream.
-
-     @param output the output text stream.
-     @param source the 2D memory block object.
+     Converts 2D memory block object to text output.
      */
-    template <class U>
-    friend std::ostream& operator<<(std::ostream& output, const CMemBlock2D<U>& source);
+    std::string repr() const;
 };
 
 template <class T>
@@ -393,6 +416,29 @@ CMemBlock2D<T>::CMemBlock2D(const std::vector<T>& dataVector, const matorder dat
     _data.zero();
 
     _copy(dataVector, dataOrder);
+}
+
+template <class T>
+CMemBlock2D<T>::CMemBlock2D(const T* raw, const int32_t nElements, const int32_t nBlocks)
+
+    : CMemBlock2D<T>(raw, matorder::row_major, nElements, nBlocks)
+{
+}
+
+template <class T>
+CMemBlock2D<T>::CMemBlock2D(const T* raw, const matorder dataOrder, const int32_t nElements, const int32_t nBlocks)
+
+    : _nElements(0)
+{
+    _setOriginalSizes(nElements, nBlocks);
+
+    _setDimensions();
+
+    _data = CMemBlock<T>(_nElements);
+
+    _data.zero();
+
+    _copy(raw, dataOrder);
 }
 
 template <class T>
@@ -636,7 +682,7 @@ int32_t
 CMemBlock2D<T>::pitched_size(const int32_t iBlock) const
 {
     if (iBlock < _paddedSizes.size()) return _paddedSizes.at(iBlock);
-    
+
     return 0;
 }
 
@@ -1064,27 +1110,86 @@ CMemBlock2D<T>::_copy(const std::vector<T>& dataVector, const matorder dataOrder
     }
 }
 
-template <class U>
-std::ostream&
-operator<<(std::ostream& output, const CMemBlock2D<U>& source)
+template <class T>
+void
+CMemBlock2D<T>::_copy(const T* source, const matorder dataOrder)
 {
-    output << std::endl;
+    // row major ordering of data in vector
 
-    output << "[CMemBlock2D (Object):" << &source << "]" << std::endl;
+    if (dataOrder == matorder::row_major)
+    {
+        int32_t pindex = 0;
 
-    output << "_nElements: " << source._nElements << std::endl;
+        for (int32_t i = 0; i < _originalSizes.size(); i++)
+        {
+            auto currpos = _positions.at(i);
 
-    output << "_originalSizes: " << source._originalSizes << std::endl;
+            for (int32_t j = 0; j < _originalSizes.at(i); j++)
+            {
+                _data.at(currpos + j) = source[pindex];
 
-    output << "_paddedSizes: " << source._paddedSizes << std::endl;
+                pindex++;
+            }
+        }
 
-    output << "_positions: " << source._positions << std::endl;
+        return;
+    }
 
-    output << "_data: " << source._data << std::endl;
+    // column major ordering of data in vector
 
-    output << std::endl;
+    if (dataOrder == matorder::col_major)
+    {
+        int32_t pindex = 0;
 
-    return output;
+        auto ndim = mathfunc::max(_originalSizes.data(), _originalSizes.size());
+
+        for (int32_t i = 0; i < ndim; i++)
+        {
+            for (int32_t j = 0; j < _originalSizes.size(); j++)
+            {
+                if (i < _originalSizes.at(j))
+                {
+                    auto currpos = _positions.at(j);
+
+                    _data.at(currpos + i) = source[pindex];
+
+                    pindex++;
+                }
+            }
+        }
+    }
+}
+
+template <typename T>
+std::string
+CMemBlock2D<T>::repr() const
+{
+    std::ostringstream os;
+
+    os << std::endl;
+
+    os << "[CMemBlock2D (Object):" << this << "]" << std::endl;
+
+    os << "_nElements: " << _nElements << std::endl;
+
+    os << "_originalSizes: " << _originalSizes << std::endl;
+
+    os << "_paddedSizes: " << _paddedSizes << std::endl;
+
+    os << "_positions: " << _positions << std::endl;
+
+    os << "_data: " << _data << std::endl;
+
+    os << std::endl;
+
+    return os.str();
+}
+
+template <typename T>
+std::ostream&
+operator<<(std::ostream& output, const CMemBlock2D<T>& source)
+{
+    return (output << source.repr());
 }
 
 #endif /* MemBlock2D_hpp */
