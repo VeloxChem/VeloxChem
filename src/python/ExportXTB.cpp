@@ -55,9 +55,9 @@ CXTBDriver_create(py::object py_comm)
     }
     else
     {
-        auto comm_ptr = vlx_general::get_mpi_comm(py_comm);
+        auto comm = vlx_general::get_mpi_comm(py_comm);
 
-        return std::make_shared<CXTBDriver>(*comm_ptr);
+        return std::make_shared<CXTBDriver>(comm);
     }
 }
 

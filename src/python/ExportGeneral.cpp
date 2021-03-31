@@ -55,9 +55,7 @@ namespace vlx_general {  // vlx_general namespace
 MPI_Comm*
 get_mpi_comm(py::object py_comm)
 {
-    PyObject* py_obj = py_comm.ptr();
-
-    MPI_Comm* comm_ptr = PyMPIComm_Get(py_obj);
+    auto comm_ptr = PyMPIComm_Get(py_comm.ptr());
 
     if (comm_ptr == nullptr) throw py::error_already_set();
 
@@ -75,7 +73,7 @@ is_mpi_master(py::object py_comm)
     }
     else
     {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+        auto comm_ptr = get_mpi_comm(py_comm);
 
         return (mpi::rank(*comm_ptr) == mpi::master());
     }
@@ -92,7 +90,7 @@ is_single_node(py::object py_comm)
     }
     else
     {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+        auto comm_ptr = get_mpi_comm(py_comm);
 
         return (mpi::nodes(*comm_ptr) == 1);
     }
@@ -183,8 +181,7 @@ pointer_to_numpy(const int32_t* ptr, const std::vector<int32_t>& dimension)
     }
     else
     {
-        return py::array_t<int32_t>(
-            dimension_to_shape(dimension), dimension_to_strides(dimension, sizeof(int32_t)), ptr);
+        return py::array_t<int32_t>(dimension_to_shape(dimension), dimension_to_strides(dimension, sizeof(int32_t)), ptr);
     }
 }
 

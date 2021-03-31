@@ -312,9 +312,9 @@ CMolecule_check_proximity(const CMolecule& self, const double minDistance)
 static void
 CMolecule_broadcast(CMolecule& self, int32_t rank, py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.broadcast(rank, *comm_ptr);
+    self.broadcast(rank, comm);
 }
 
 // Exports classes/functions in src/moldata to python

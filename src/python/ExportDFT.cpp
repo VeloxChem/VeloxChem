@@ -68,9 +68,9 @@ CAOKohnShamMatrix_str(const CAOKohnShamMatrix& self)
 static void
 CAOKohnShamMatrix_reduce_sum(CAOKohnShamMatrix& self, int32_t rank, int32_t nodes, py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.reduce_sum(rank, nodes, *comm_ptr);
+    self.reduce_sum(rank, nodes, comm);
 }
 
 // Helper function for collect CAOKohnShamMatrix object
@@ -78,9 +78,9 @@ CAOKohnShamMatrix_reduce_sum(CAOKohnShamMatrix& self, int32_t rank, int32_t node
 static void
 CAOKohnShamMatrix_collect(CAOKohnShamMatrix& self, int32_t rank, int32_t nodes, py::object py_comm, int32_t source)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.collect(rank, nodes, *comm_ptr, source);
+    self.collect(rank, nodes, comm, source);
 }
     
 // Helper function for getting grid coordinates and weigths as numpy array
@@ -114,9 +114,9 @@ CMolecularGrid_w_to_numpy(const CMolecularGrid& self)
 static void
 CMolecularGrid_distribute(CMolecularGrid& self, int32_t rank, int32_t nodes, py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.distribute(rank, nodes, *comm_ptr);
+    self.distribute(rank, nodes, comm);
 }
 
 // Helper function for broadcasting CMolecularGrid object
@@ -124,9 +124,9 @@ CMolecularGrid_distribute(CMolecularGrid& self, int32_t rank, int32_t nodes, py:
 static void
 CMolecularGrid_broadcast(CMolecularGrid& self, int32_t rank, py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.broadcast(rank, *comm_ptr);
+    self.broadcast(rank, comm);
 }
 
 // Helper function for CGridDriver constructor
@@ -140,9 +140,9 @@ CGridDriver_create(py::object py_comm)
     }
     else
     {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+        auto comm = vlx_general::get_mpi_comm(py_comm);
 
-        return std::make_shared<CGridDriver>(*comm_ptr);
+        return std::make_shared<CGridDriver>(comm);
     }
 }
 
@@ -157,9 +157,9 @@ CDensityGridDriver_create(py::object py_comm)
     }
     else
     {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+        auto comm = vlx_general::get_mpi_comm(py_comm);
 
-        return std::make_shared<CDensityGridDriver>(*comm_ptr);
+        return std::make_shared<CDensityGridDriver>(comm);
     }
 }
     
@@ -174,9 +174,9 @@ CXCIntegrator_create(py::object py_comm)
     }
     else
     {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+        auto comm = vlx_general::get_mpi_comm(py_comm);
 
-        return std::make_shared<CXCIntegrator>(*comm_ptr);
+        return std::make_shared<CXCIntegrator>(comm);
     }
 }
 

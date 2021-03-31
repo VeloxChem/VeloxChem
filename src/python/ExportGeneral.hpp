@@ -41,7 +41,7 @@ namespace vlx_general {  // vlx_general namespace
  @param py_comm mpi4py communicator object.
  @return the MPI_Comm pointer.
  */
-MPI_Comm* get_mpi_comm(py::object py_comm);
+MPI_Comm get_mpi_comm(py::object py_comm);
 
 /**
  Gets numpy array from double pointer and int32_t dimension.

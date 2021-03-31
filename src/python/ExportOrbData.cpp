@@ -58,9 +58,9 @@ namespace vlx_orbdata {  // vlx_orbdata namespace
 static void
 CMolecularBasis_broadcast(CMolecularBasis& self, int32_t rank, py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.broadcast(rank, *comm_ptr);
+    self.broadcast(rank, comm);
 }
 
 // Helper function for printing CAODensityMatrix
@@ -109,9 +109,9 @@ CAODensityMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
 static void
 CAODensityMatrix_broadcast(CAODensityMatrix& self, int32_t rank, py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.broadcast(rank, *comm_ptr);
+    self.broadcast(rank, comm);
 }
 
 // Helper function for printing CMolecularOrbitals
@@ -192,9 +192,9 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
 static void
 CMolecularOrbitals_broadcast(CMolecularOrbitals& self, int32_t rank, py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.broadcast(rank, *comm_ptr);
+    self.broadcast(rank, comm);
 }
 
 // Helper function for CSADGuessDriver constructor
@@ -208,9 +208,9 @@ CSADGuessDriver_create(py::object py_comm)
     }
     else
     {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+        auto comm = vlx_general::get_mpi_comm(py_comm);
 
-        return std::make_shared<CSADGuessDriver>(*comm_ptr);
+        return std::make_shared<CSADGuessDriver>(comm);
     }
 }
 
@@ -249,7 +249,8 @@ export_orbdata(py::module& m)
 
     py::class_<CMolecularBasis, std::shared_ptr<CMolecularBasis>>(m, "MolecularBasis")
         .def(py::init<>())
-        .def("get_string", &CMolecularBasis::printBasis)
+        .def("get_string", vlx_general::overload_cast_<const std::string&, const CMolecule&>()(&CMolecularBasis::printBasis, py::const_), "title"_a, "molecule"_a)
+        .def("get_string", vlx_general::overload_cast_<const CMolecule&>()(&CMolecularBasis::printBasis, py::const_), "molecule"_a)
         .def("set_label", &CMolecularBasis::setLabel)
         .def("get_label", &CMolecularBasis::getLabel)
         .def("get_ao_basis_map", &CMolecularBasis::getAOBasisMap)

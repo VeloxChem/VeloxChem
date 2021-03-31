@@ -109,9 +109,9 @@ CElectronRepulsionIntegralsDriver_create(py::object py_comm)
     }
     else
     {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+        auto comm = vlx_general::get_mpi_comm(py_comm);
 
-        return std::make_shared<CElectronRepulsionIntegralsDriver>(*comm_ptr);
+        return std::make_shared<CElectronRepulsionIntegralsDriver>(comm);
     }
 }
 
@@ -183,9 +183,9 @@ CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegra
 static void
 CAOFockMatrix_reduce_sum(CAOFockMatrix& self, int32_t rank, int32_t nodes, py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.reduce_sum(rank, nodes, *comm_ptr);
+    self.reduce_sum(rank, nodes, comm);
 }
 
 // Helper function for converting CMOIntsBatch to numpy array
@@ -220,7 +220,7 @@ CMOIntsBatchYX_to_numpy(const CMOIntsBatch& self, const int32_t iBatch)
 static void
 CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cross_nodes, py::object py_cross_comm)
 {
-    MPI_Comm* cross_comm_ptr = vlx_general::get_mpi_comm(py_cross_comm);
+    auto cross_comm = vlx_general::get_mpi_comm(py_cross_comm);
 
     int32_t nrows = self.getNumberOfRows();
 
@@ -238,7 +238,7 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
 
             int32_t numbatches = 0;
 
-            auto merror = MPI_Recv(&numbatches, 1, MPI_INT, cross_id, tag_id++, *cross_comm_ptr, &mstat);
+            auto merror = MPI_Recv(&numbatches, 1, MPI_INT, cross_id, tag_id++, cross_comm, &mstat);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -248,15 +248,15 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
             {
                 int32_t first = -1, second = -1;
 
-                merror = MPI_Recv(&first, 1, MPI_INT, cross_id, tag_id++, *cross_comm_ptr, &mstat);
+                merror = MPI_Recv(&first, 1, MPI_INT, cross_id, tag_id++, cross_comm, &mstat);
 
                 if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
-                merror = MPI_Recv(&second, 1, MPI_INT, cross_id, tag_id++, *cross_comm_ptr, &mstat);
+                merror = MPI_Recv(&second, 1, MPI_INT, cross_id, tag_id++, cross_comm, &mstat);
 
                 if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
-                merror = MPI_Recv(data.data(), nrows * ncols, MPI_DOUBLE, cross_id, tag_id++, *cross_comm_ptr, &mstat);
+                merror = MPI_Recv(data.data(), nrows * ncols, MPI_DOUBLE, cross_id, tag_id++, cross_comm, &mstat);
 
                 if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -273,7 +273,7 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
 
         auto numbatches = self.getNumberOfBatches();
 
-        auto merror = MPI_Send(&numbatches, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm_ptr);
+        auto merror = MPI_Send(&numbatches, 1, MPI_INT, mpi::master(), tag_id++, cross_comm);
 
         if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -287,15 +287,15 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
 
             auto second = genpairs[ibatch].second();
 
-            merror = MPI_Send(&first, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm_ptr);
+            merror = MPI_Send(&first, 1, MPI_INT, mpi::master(), tag_id++, cross_comm);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
-            merror = MPI_Send(&second, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm_ptr);
+            merror = MPI_Send(&second, 1, MPI_INT, mpi::master(), tag_id++, cross_comm);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
-            merror = MPI_Send(data, nrows * ncols, MPI_DOUBLE, mpi::master(), tag_id++, *cross_comm_ptr);
+            merror = MPI_Send(data, nrows * ncols, MPI_DOUBLE, mpi::master(), tag_id++, cross_comm);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
         }
