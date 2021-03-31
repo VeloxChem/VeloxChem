@@ -74,3 +74,4 @@ monkey:python_tests:
   script:
     - python3 -m pytest -v --cov=veloxchem --pyargs veloxchem
     - mpiexec -n 2 python3 -m pytest -v --pyargs veloxchem -m "solvers"
+    - echo y | python3 -m pip uninstall cppe

@@ -34,9 +34,10 @@ class TestH2Se(unittest.TestCase):
 
         e_scf_restart = scf_drv.get_scf_energy()
 
-        scf_h5 = Path(task.input_dict['scf']['checkpoint_file'])
-        if scf_h5.is_file():
-            scf_h5.unlink()
+        if is_mpi_master(task.mpi_comm):
+            scf_h5 = Path(task.input_dict['scf']['checkpoint_file'])
+            if scf_h5.is_file():
+                scf_h5.unlink()
 
         self.assertAlmostEqual(-2400.70461320, e_scf, 8)
         self.assertAlmostEqual(-2400.70461320, e_scf_restart, 8)
