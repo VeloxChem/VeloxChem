@@ -23,16 +23,19 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#include "ExportOneInts.hpp"
+
+#include <mpi.h>
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 
-#include <mpi.h>
 #include <memory>
 #include <string>
 
 #include "AngularMomentumIntegralsDriver.hpp"
 #include "AngularMomentumMatrix.hpp"
+#include "CartesianComponents.hpp"
 #include "DenseMatrix.hpp"
 #include "ElectricDipoleIntegralsDriver.hpp"
 #include "ElectricDipoleMatrix.hpp"
@@ -41,7 +44,6 @@
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
-#include "ExportOneInts.hpp"
 #include "KineticEnergyIntegralsDriver.hpp"
 #include "KineticEnergyMatrix.hpp"
 #include "LinearMomentumIntegralsDriver.hpp"
@@ -54,213 +56,9 @@
 #include "OverlapMatrix.hpp"
 
 namespace py = pybind11;
+using namespace py::literals;
 
 namespace vlx_oneints {  // vlx_oneints namespace
-
-// Helper function for COverlapIntegralsDriver constructor
-
-static std::shared_ptr<COverlapIntegralsDriver>
-COverlapIntegralsDriver_create(py::object py_comm)
-{
-    if (py_comm.is_none())
-    {
-        return std::make_shared<COverlapIntegralsDriver>(MPI_COMM_WORLD);
-    }
-    else
-    {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-        return std::make_shared<COverlapIntegralsDriver>(*comm_ptr);
-    }
-}
-
-// Helper function for printing COverlapMatrix
-
-static std::string
-COverlapMatrix_str(const COverlapMatrix& self)
-{
-    return self.getString();
-}
-
-// Helper function for converting COverlapMatrix to numpy array
-
-static py::array_t<double>
-COverlapMatrix_to_numpy(const COverlapMatrix& self)
-{
-    return vlx_general::pointer_to_numpy(self.values(), self.getNumberOfRows(), self.getNumberOfColumns());
-}
-
-// Helper function for COverlapMatrix constructor
-
-static std::shared_ptr<COverlapMatrix>
-COverlapMatrix_from_numpy(const py::array_t<double>& arr)
-{
-    auto mp = vlx_math::CDenseMatrix_from_numpy(arr);
-
-    return std::make_shared<COverlapMatrix>(*mp);
-}
-
-// Helper function for CKineticEnergyIntegralsDriver constructor
-
-static std::shared_ptr<CKineticEnergyIntegralsDriver>
-CKineticEnergyIntegralsDriver_create(py::object py_comm)
-{
-    if (py_comm.is_none())
-    {
-        return std::make_shared<CKineticEnergyIntegralsDriver>(MPI_COMM_WORLD);
-    }
-    else
-    {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-        return std::make_shared<CKineticEnergyIntegralsDriver>(*comm_ptr);
-    }
-}
-
-// Helper function for printing CKineticEnergyMatrix
-
-static std::string
-CKineticEnergyMatrix_str(const CKineticEnergyMatrix& self)
-{
-    return self.getString();
-}
-
-// Helper function for converting CKineticEnergyMatrix to numpy array
-
-static py::array_t<double>
-CKineticEnergyMatrix_to_numpy(const CKineticEnergyMatrix& self)
-{
-    return vlx_general::pointer_to_numpy(self.values(), self.getNumberOfRows(), self.getNumberOfColumns());
-}
-
-// Helper function for CKineticEnergyMatrix constructor
-
-static std::shared_ptr<CKineticEnergyMatrix>
-CKineticEnergyMatrix_from_numpy(const py::array_t<double>& arr)
-{
-    auto mp = vlx_math::CDenseMatrix_from_numpy(arr);
-
-    return std::make_shared<CKineticEnergyMatrix>(*mp);
-}
-
-// Helper function for CNuclearPotentialIntegralsDriver constructor
-
-static std::shared_ptr<CNuclearPotentialIntegralsDriver>
-CNuclearPotentialIntegralsDriver_create(py::object py_comm)
-{
-    if (py_comm.is_none())
-    {
-        return std::make_shared<CNuclearPotentialIntegralsDriver>(MPI_COMM_WORLD);
-    }
-    else
-    {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-        return std::make_shared<CNuclearPotentialIntegralsDriver>(*comm_ptr);
-    }
-}
-
-// Helper function for printing CNuclearPotentialMatrix
-
-static std::string
-CNuclearPotentialMatrix_str(const CNuclearPotentialMatrix& self)
-{
-    return self.getString();
-}
-
-// Helper function for converting CNuclearPotentialMatrix to numpy array
-
-static py::array_t<double>
-CNuclearPotentialMatrix_to_numpy(const CNuclearPotentialMatrix& self)
-{
-    return vlx_general::pointer_to_numpy(self.values(), self.getNumberOfRows(), self.getNumberOfColumns());
-}
-
-// Helper function for CNuclearPotentialMatrix constructor
-
-static std::shared_ptr<CNuclearPotentialMatrix>
-CNuclearPotentialMatrix_from_numpy(const py::array_t<double>& arr)
-{
-    auto mp = vlx_math::CDenseMatrix_from_numpy(arr);
-
-    return std::make_shared<CNuclearPotentialMatrix>(*mp);
-}
-
-// Helper function for reduce_sum CNuclearPotentialMatrix object
-
-static void
-CNuclearPotentialMatrix_reduce_sum(CNuclearPotentialMatrix& self, int32_t rank, int32_t nodes, py::object py_comm)
-{
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-    self.reduce_sum(rank, nodes, *comm_ptr);
-}
-
-// Helper function for exporting CNuclearPotentialIntegralsDriver.compute
-
-static CNuclearPotentialMatrix
-CNuclearPotentialIntegralsDriver_compute(CNuclearPotentialIntegralsDriver&              self,
-                                         const CMolecule&                               molecule,
-                                         const CMolecularBasis&                         basis,
-                                         const py::array_t<double>&                     charges,
-                                         const py::array_t<double, py::array::f_style>& coordinates)
-{
-    std::vector<double> charges_vec(charges.size());
-    std::memcpy(charges_vec.data(), charges.data(), charges.size() * sizeof(double));
-    CMemBlock<double> charges_blk(charges_vec);
-
-    std::vector<double> coords_vec(coordinates.size());
-    std::memcpy(coords_vec.data(), coordinates.data(), coordinates.size() * sizeof(double));
-    CMemBlock2D<double> coords_blk(coords_vec, coordinates.shape(0), coordinates.shape(1));
-
-    return self.compute(molecule, basis, charges_blk, coords_blk);
-}
-
-// Helper function for CElectricDipoleIntegralsDriver constructor
-
-static std::shared_ptr<CElectricDipoleIntegralsDriver>
-CElectricDipoleIntegralsDriver_create(py::object py_comm)
-{
-    if (py_comm.is_none())
-    {
-        return std::make_shared<CElectricDipoleIntegralsDriver>(MPI_COMM_WORLD);
-    }
-    else
-    {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-        return std::make_shared<CElectricDipoleIntegralsDriver>(*comm_ptr);
-    }
-}
-
-// Helper function for printing CElectricDipoleMatrix
-
-static std::string
-CElectricDipoleMatrix_str(const CElectricDipoleMatrix& self)
-{
-    return self.getStringForComponentX() + self.getStringForComponentY() + self.getStringForComponentZ();
-}
-
-// Helper function for converting CElectricDipoleMatrix to numpy array
-
-static py::array_t<double>
-CElectricDipoleMatrix_x_to_numpy(const CElectricDipoleMatrix& self)
-{
-    return vlx_general::pointer_to_numpy(self.xvalues(), self.getNumberOfRows(), self.getNumberOfColumns());
-}
-
-static py::array_t<double>
-CElectricDipoleMatrix_y_to_numpy(const CElectricDipoleMatrix& self)
-{
-    return vlx_general::pointer_to_numpy(self.yvalues(), self.getNumberOfRows(), self.getNumberOfColumns());
-}
-
-static py::array_t<double>
-CElectricDipoleMatrix_z_to_numpy(const CElectricDipoleMatrix& self)
-{
-    return vlx_general::pointer_to_numpy(self.zvalues(), self.getNumberOfRows(), self.getNumberOfColumns());
-}
-
 // Helper function for CLinearMomentumIntegralsDriver constructor
 
 static std::shared_ptr<CLinearMomentumIntegralsDriver>
@@ -272,9 +70,9 @@ CLinearMomentumIntegralsDriver_create(py::object py_comm)
     }
     else
     {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+        auto comm = vlx_general::get_mpi_comm(py_comm);
 
-        return std::make_shared<CLinearMomentumIntegralsDriver>(*comm_ptr);
+        return std::make_shared<CLinearMomentumIntegralsDriver>(comm);
     }
 }
 
@@ -317,9 +115,9 @@ CAngularMomentumIntegralsDriver_create(py::object py_comm)
     }
     else
     {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+        auto comm = vlx_general::get_mpi_comm(py_comm);
 
-        return std::make_shared<CAngularMomentumIntegralsDriver>(*comm_ptr);
+        return std::make_shared<CAngularMomentumIntegralsDriver>(comm);
     }
 }
 
@@ -362,9 +160,9 @@ CElectricFieldIntegralsDriver_create(py::object py_comm)
     }
     else
     {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+        auto comm = vlx_general::get_mpi_comm(py_comm);
 
-        return std::make_shared<CElectricFieldIntegralsDriver>(*comm_ptr);
+        return std::make_shared<CElectricFieldIntegralsDriver>(comm);
     }
 }
 
@@ -451,31 +249,42 @@ export_oneints(py::module& m)
         .def(py::init<>())
         .def(py::init<const CDenseMatrix&>())
         .def(py::init<const COverlapMatrix&>())
-        .def(py::init(&COverlapMatrix_from_numpy))
-        .def("__str__", &COverlapMatrix_str)
-        .def("to_numpy", &COverlapMatrix_to_numpy)
+        .def(py::init(&matrix_from_numpy<COverlapMatrix>))
+        .def("__str__", &COverlapMatrix::getString)
+        .def("to_numpy", &matrix_to_numpy<COverlapMatrix>)
         .def("get_ortho_matrix", &COverlapMatrix::getOrthogonalizationMatrix)
         .def(py::self == py::self);
 
     // COverlapIntegralsDriver class
 
     py::class_<COverlapIntegralsDriver, std::shared_ptr<COverlapIntegralsDriver>>(m, "OverlapIntegralsDriver")
-        .def(py::init(&COverlapIntegralsDriver_create), py::arg("py_comm") = py::none())
+        .def(py::init(&vlx_general::create<COverlapIntegralsDriver>), "comm"_a = py::none())
         .def("compute",
-             vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&>()(&COverlapIntegralsDriver::compute, py::const_) 
-                 )
+             vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&>()(&COverlapIntegralsDriver::compute, py::const_),
+             "Compute AO-basis overlap integrals for given molecule and basis",
+             "molecule"_a,
+             "basis"_a)
         .def("compute",
-             (COverlapMatrix(COverlapIntegralsDriver::*)(
-                 const CMolecule&, const CMolecularBasis&, const CMolecularBasis&) const) &
-                 COverlapIntegralsDriver::compute)
+             vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&, const CMolecularBasis&>()(&COverlapIntegralsDriver::compute,
+                                                                                                             py::const_),
+             "Compute mixed AO-basis overlap integrals for given molecule",
+             "molecule"_a,
+             "bra_basis"_a,
+             "ket_basis"_a)
         .def("compute",
-             (COverlapMatrix(COverlapIntegralsDriver::*)(const CMolecule&, const CMolecule&, const CMolecularBasis&)
-                  const) &
-                 COverlapIntegralsDriver::compute)
+             vlx_general::overload_cast_<const CMolecule&, const CMolecule&, const CMolecularBasis&>()(&COverlapIntegralsDriver::compute, py::const_),
+             "Compute AO-basis overlap integrals for two molecules in given basis",
+             "bra_molecule"_a,
+             "ket_molecule"_a,
+             "basis"_a)
         .def("compute",
-             (COverlapMatrix(COverlapIntegralsDriver::*)(
-                 const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&) const) &
-                 COverlapIntegralsDriver::compute);
+             vlx_general::overload_cast_<const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&>()(
+                 &COverlapIntegralsDriver::compute, py::const_),
+             "Compute AO-basis overlap integrals for two molecules, each with its own basis",
+             "bra_molecule"_a,
+             "ket_molecule"_a,
+             "bra_basis"_a,
+             "ket_basis"_a);
 
     // CKineticEnergyMatrix class
 
@@ -483,32 +292,43 @@ export_oneints(py::module& m)
         .def(py::init<>())
         .def(py::init<const CDenseMatrix&>())
         .def(py::init<const CKineticEnergyMatrix&>())
-        .def(py::init(&CKineticEnergyMatrix_from_numpy))
-        .def("__str__", &CKineticEnergyMatrix_str)
-        .def("to_numpy", &CKineticEnergyMatrix_to_numpy)
+        .def(py::init(&matrix_from_numpy<CKineticEnergyMatrix>))
+        .def("__str__", &CKineticEnergyMatrix::getString)
+        .def("to_numpy", &matrix_to_numpy<CKineticEnergyMatrix>)
         .def("get_energy", &CKineticEnergyMatrix::getKineticEnergy)
         .def(py::self == py::self);
 
     // CKineticEnergyIntegralsDriver class
 
-    py::class_<CKineticEnergyIntegralsDriver, std::shared_ptr<CKineticEnergyIntegralsDriver>>(
-        m, "KineticEnergyIntegralsDriver")
-        .def(py::init(&CKineticEnergyIntegralsDriver_create), py::arg("py_comm") = py::none())
+    py::class_<CKineticEnergyIntegralsDriver, std::shared_ptr<CKineticEnergyIntegralsDriver>>(m, "KineticEnergyIntegralsDriver")
+        .def(py::init(&vlx_general::create<CKineticEnergyIntegralsDriver>), "comm"_a = py::none())
         .def("compute",
-             (CKineticEnergyMatrix(CKineticEnergyIntegralsDriver::*)(const CMolecule&, const CMolecularBasis&) const) &
-                 CKineticEnergyIntegralsDriver::compute)
+             vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&>()(&CKineticEnergyIntegralsDriver::compute, py::const_),
+             "Compute AO-basis kinetic energy integrals for given molecule and basis",
+             "molecule"_a,
+             "basis"_a)
         .def("compute",
-             (CKineticEnergyMatrix(CKineticEnergyIntegralsDriver::*)(
-                 const CMolecule&, const CMolecularBasis&, const CMolecularBasis&) const) &
-                 CKineticEnergyIntegralsDriver::compute)
+             vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&, const CMolecularBasis&>()(&CKineticEnergyIntegralsDriver::compute,
+                                                                                                             py::const_),
+             "Compute mixed AO-basis kinetic energy integrals for given molecule",
+             "molecule"_a,
+             "bra_basis"_a,
+             "ket_basis"_a)
         .def("compute",
-             (CKineticEnergyMatrix(CKineticEnergyIntegralsDriver::*)(
-                 const CMolecule&, const CMolecule&, const CMolecularBasis&) const) &
-                 CKineticEnergyIntegralsDriver::compute)
+             vlx_general::overload_cast_<const CMolecule&, const CMolecule&, const CMolecularBasis&>()(&CKineticEnergyIntegralsDriver::compute,
+                                                                                                       py::const_),
+             "Compute AO-basis kinetic energy integrals for two molecules in given basis",
+             "bra_molecule"_a,
+             "ket_molecule"_a,
+             "basis"_a)
         .def("compute",
-             (CKineticEnergyMatrix(CKineticEnergyIntegralsDriver::*)(
-                 const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&) const) &
-                 CKineticEnergyIntegralsDriver::compute);
+             vlx_general::overload_cast_<const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&>()(
+                 &CKineticEnergyIntegralsDriver::compute, py::const_),
+             "Compute AO-basis kinetic energy integrals for two molecules, each with its own basis",
+             "bra_molecule"_a,
+             "ket_molecule"_a,
+             "bra_basis"_a,
+             "ket_basis"_a);
 
     // CNuclearPotentialMatrix class
 
@@ -516,80 +336,132 @@ export_oneints(py::module& m)
         .def(py::init<>())
         .def(py::init<const CDenseMatrix&>())
         .def(py::init<const CNuclearPotentialMatrix&>())
-        .def(py::init(&CNuclearPotentialMatrix_from_numpy))
-        .def("__str__", &CNuclearPotentialMatrix_str)
-        .def("to_numpy", &CNuclearPotentialMatrix_to_numpy)
-        .def("reduce_sum", &CNuclearPotentialMatrix_reduce_sum)
+        .def(py::init(&matrix_from_numpy<CNuclearPotentialMatrix>))
+        .def("__str__", &CNuclearPotentialMatrix::getString)
+        .def("to_numpy", &matrix_to_numpy<CNuclearPotentialMatrix>)
+        .def(
+            "reduce_sum",
+            [](CNuclearPotentialMatrix& obj, int32_t rank, int32_t nodes, py::object py_comm) -> void {
+                auto comm = vlx_general::get_mpi_comm(py_comm);
+                obj.reduce_sum(rank, nodes, comm);
+            },
+            "Sum-reduce nuclear potential matrix object from all MPI ranks within the communicator into nuclear potential matrix object on "
+            "master node.",
+            "rank"_a,
+            "nodes"_a,
+            "comm"_a)
         .def("get_energy", &CNuclearPotentialMatrix::getNuclearPotentialEnergy)
         .def(py::self == py::self);
 
     // CNuclearPotentialIntegralsDriver class
 
-    py::class_<CNuclearPotentialIntegralsDriver, std::shared_ptr<CNuclearPotentialIntegralsDriver>>(
-        m, "NuclearPotentialIntegralsDriver")
-        .def(py::init(&CNuclearPotentialIntegralsDriver_create), py::arg("py_comm") = py::none())
+    py::class_<CNuclearPotentialIntegralsDriver, std::shared_ptr<CNuclearPotentialIntegralsDriver>>(m, "NuclearPotentialIntegralsDriver")
+        .def(py::init(&vlx_general::create<CNuclearPotentialIntegralsDriver>), "comm"_a = py::none())
         .def("compute",
-             (CNuclearPotentialMatrix(CNuclearPotentialIntegralsDriver::*)(const CMolecule&, const CMolecularBasis&)
-                  const) &
-                 CNuclearPotentialIntegralsDriver::compute)
+             vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&>()(&CNuclearPotentialIntegralsDriver::compute, py::const_),
+             "Compute AO-basis nuclear potential integrals for given molecule and basis",
+             "molecule"_a,
+             "basis"_a)
         .def("compute",
-             (CNuclearPotentialMatrix(CNuclearPotentialIntegralsDriver::*)(
-                 const CMolecule&, const CMolecularBasis&, const CMolecule&) const) &
-                 CNuclearPotentialIntegralsDriver::compute)
+             vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&, const CMolecule&>()(&CNuclearPotentialIntegralsDriver::compute,
+                                                                                                       py::const_),
+             "Compute AO-basis nuclear potential integrals for given molecule and basis, using charges from the second molecule object as sources",
+             "molecule"_a,
+             "basis"_a,
+             "charges"_a)
         .def("compute",
-             (CNuclearPotentialMatrix(CNuclearPotentialIntegralsDriver::*)(
-                 const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const CMolecule&) const) &
-                 CNuclearPotentialIntegralsDriver::compute)
+             vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const CMolecule&>()(
+                 &CNuclearPotentialIntegralsDriver::compute, py::const_),
+             "Compute AO-basis nuclear potential integrals for given molecule and bases, using charges from the second molecule object as sources",
+             "molecule"_a,
+             "bra_basis"_a,
+             "ket_basis"_a,
+             "charges"_a)
         .def("compute",
-             (CNuclearPotentialMatrix(CNuclearPotentialIntegralsDriver::*)(
-                 const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecule&) const) &
-                 CNuclearPotentialIntegralsDriver::compute)
+             vlx_general::overload_cast_<const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecule&>()(
+                 &CNuclearPotentialIntegralsDriver::compute, py::const_),
+             "Compute AO-basis nuclear potential integrals for two molecules in given basis, using charges from the third molecule object as sources",
+             "bra_molecule"_a,
+             "ket_molecule"_a,
+             "basis"_a,
+             "charges"_a)
         .def("compute",
-             (CNuclearPotentialMatrix(CNuclearPotentialIntegralsDriver::*)(
-                 const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const CMolecule&)
-                  const) &
-                 CNuclearPotentialIntegralsDriver::compute)
-         .def("compute", &CNuclearPotentialIntegralsDriver_compute);
+             vlx_general::overload_cast_<const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const CMolecule&>()(
+                 &CNuclearPotentialIntegralsDriver::compute, py::const_),
+             "Compute AO-basis nuclear potential integrals for two molecules, each with its own basis. Use the charges from the third molecule "
+             "object as sources",
+             "bra_molecule"_a,
+             "ket_molecule"_a,
+             "bra_basis"_a,
+             "ket_basis"_a,
+             "charges"_a)
+        .def("compute",
+             [](const CNuclearPotentialIntegralsDriver&        obj,
+                const CMolecule&                               molecule,
+                const CMolecularBasis&                         basis,
+                const py::array_t<double>&                     charges,
+                const py::array_t<double, py::array::f_style>& coordinates) -> CNuclearPotentialMatrix {
+                 auto chg = vlx_general::numpy_to_memblock(charges);
+                 auto xyz = vlx_general::numpy_to_memblock2d(coordinates);
+
+                 return obj.compute(molecule, basis, chg, xyz);
+             });
+
+    // cartesians enum class
+
+    py::enum_<cartesians>(m, "cartesians")
+        .value("X", cartesians::X)
+        .value("Y", cartesians::Y)
+        .value("Z", cartesians::Z);
 
     // CElectricDipoleMatrix class
 
     py::class_<CElectricDipoleMatrix, std::shared_ptr<CElectricDipoleMatrix>>(m, "ElectricDipoleMatrix")
         .def(py::init<>())
-        .def(py::init<const CDenseMatrix&,
-                      const CDenseMatrix&,
-                      const CDenseMatrix&,
-                      const double,
-                      const double,
-                      const double>())
+        .def(py::init<const std::array<CDenseMatrix, 3>&, const std::array<double, 3>&>(), "matrices"_a, "origin"_a)
+        .def(py::init<const CDenseMatrix&, const CDenseMatrix&, const CDenseMatrix&, const double, const double, const double>(), "xMatrix"_a, "yMatrix"_a, "zMatrix"_a, "x_0"_a, "y_0"_a, "z_0"_a)
         .def(py::init<const CElectricDipoleMatrix&>())
-        .def("__str__", &CElectricDipoleMatrix_str)
-        .def("x_to_numpy", &CElectricDipoleMatrix_x_to_numpy)
-        .def("y_to_numpy", &CElectricDipoleMatrix_y_to_numpy)
-        .def("z_to_numpy", &CElectricDipoleMatrix_z_to_numpy)
+        .def_property("origin", &CElectricDipoleMatrix::getOriginCoordinates, &CElectricDipoleMatrix::setOriginCoordinates)
+        .def("__str__", &CElectricDipoleMatrix::getString)
+        .def("to_numpy", [](const CElectricDipoleMatrix& obj, cartesians cart) { return matrix_to_numpy(obj, cart); }, "component"_a)
+        .def("to_numpy", [](const CElectricDipoleMatrix& obj, int32_t cart) { auto c = static_cast<cartesians>(cart); return matrix_to_numpy(obj, c); }, "component"_a)
+        .def("x_to_numpy", &matrix_to_numpy<CElectricDipoleMatrix, cartesians::X>)
+        .def("y_to_numpy", &matrix_to_numpy<CElectricDipoleMatrix, cartesians::Y>)
+        .def("z_to_numpy", &matrix_to_numpy<CElectricDipoleMatrix, cartesians::Z>)
         .def(py::self == py::self);
 
     // CElectricDipoleIntegralsDriver class
 
-    py::class_<CElectricDipoleIntegralsDriver, std::shared_ptr<CElectricDipoleIntegralsDriver>>(
-        m, "ElectricDipoleIntegralsDriver")
-        .def(py::init(&CElectricDipoleIntegralsDriver_create), py::arg("py_comm") = py::none())
-        .def("set_origin", &CElectricDipoleIntegralsDriver::setElectricDipoleOrigin)
-        .def(
-            "compute",
-            (CElectricDipoleMatrix(CElectricDipoleIntegralsDriver::*)(const CMolecule&, const CMolecularBasis&) const) &
-                CElectricDipoleIntegralsDriver::compute)
+    py::class_<CElectricDipoleIntegralsDriver, std::shared_ptr<CElectricDipoleIntegralsDriver>>(m, "ElectricDipoleIntegralsDriver")
+        .def(py::init(&vlx_general::create<CElectricDipoleIntegralsDriver>), "comm"_a = py::none())
+        .def_property("origin", &CElectricDipoleIntegralsDriver::getElectricDipoleOrigin, &CElectricDipoleIntegralsDriver::setElectricDipoleOrigin)
         .def("compute",
-             (CElectricDipoleMatrix(CElectricDipoleIntegralsDriver::*)(
-                 const CMolecule&, const CMolecularBasis&, const CMolecularBasis&) const) &
-                 CElectricDipoleIntegralsDriver::compute)
+             vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&>()(&CElectricDipoleIntegralsDriver::compute, py::const_),
+             "Compute AO-basis electric dipole integrals for given molecule and basis",
+             "molecule"_a,
+             "basis"_a)
         .def("compute",
-             (CElectricDipoleMatrix(CElectricDipoleIntegralsDriver::*)(
-                 const CMolecule&, const CMolecule&, const CMolecularBasis&) const) &
-                 CElectricDipoleIntegralsDriver::compute)
+             vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&, const CMolecularBasis&>()(&CElectricDipoleIntegralsDriver::compute,
+                                                                                                             py::const_),
+             "Compute mixed AO-basis electric dipole integrals for given molecule",
+             "molecule"_a,
+             "bra_basis"_a,
+             "ket_basis"_a)
         .def("compute",
-             (CElectricDipoleMatrix(CElectricDipoleIntegralsDriver::*)(
-                 const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&) const) &
-                 CElectricDipoleIntegralsDriver::compute);
+             vlx_general::overload_cast_<const CMolecule&, const CMolecule&, const CMolecularBasis&>()(&CElectricDipoleIntegralsDriver::compute,
+                                                                                                       py::const_),
+             "Compute AO-basis electric dipole integrals for two molecules in given basis",
+             "bra_molecule"_a,
+             "ket_molecule"_a,
+             "basis"_a)
+        .def("compute",
+             vlx_general::overload_cast_<const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&>()(
+                 &CElectricDipoleIntegralsDriver::compute, py::const_),
+             "Compute AO-basis electric dipole integrals for two molecules, each with its own basis",
+             "bra_molecule"_a,
+             "ket_molecule"_a,
+             "bra_basis"_a,
+             "ket_basis"_a);
 
     // CLinearMomentumMatrix class
 
@@ -605,20 +477,16 @@ export_oneints(py::module& m)
 
     // CLinearMomentumIntegralsDriver class
 
-    py::class_<CLinearMomentumIntegralsDriver, std::shared_ptr<CLinearMomentumIntegralsDriver>>(
-        m, "LinearMomentumIntegralsDriver")
+    py::class_<CLinearMomentumIntegralsDriver, std::shared_ptr<CLinearMomentumIntegralsDriver>>(m, "LinearMomentumIntegralsDriver")
         .def(py::init(&CLinearMomentumIntegralsDriver_create), py::arg("py_comm") = py::none())
-        .def(
-            "compute",
-            (CLinearMomentumMatrix(CLinearMomentumIntegralsDriver::*)(const CMolecule&, const CMolecularBasis&) const) &
-                CLinearMomentumIntegralsDriver::compute)
         .def("compute",
-             (CLinearMomentumMatrix(CLinearMomentumIntegralsDriver::*)(
-                 const CMolecule&, const CMolecularBasis&, const CMolecularBasis&) const) &
+             (CLinearMomentumMatrix(CLinearMomentumIntegralsDriver::*)(const CMolecule&, const CMolecularBasis&) const) &
                  CLinearMomentumIntegralsDriver::compute)
         .def("compute",
-             (CLinearMomentumMatrix(CLinearMomentumIntegralsDriver::*)(
-                 const CMolecule&, const CMolecule&, const CMolecularBasis&) const) &
+             (CLinearMomentumMatrix(CLinearMomentumIntegralsDriver::*)(const CMolecule&, const CMolecularBasis&, const CMolecularBasis&) const) &
+                 CLinearMomentumIntegralsDriver::compute)
+        .def("compute",
+             (CLinearMomentumMatrix(CLinearMomentumIntegralsDriver::*)(const CMolecule&, const CMolecule&, const CMolecularBasis&) const) &
                  CLinearMomentumIntegralsDriver::compute)
         .def("compute",
              (CLinearMomentumMatrix(CLinearMomentumIntegralsDriver::*)(
@@ -629,12 +497,7 @@ export_oneints(py::module& m)
 
     py::class_<CAngularMomentumMatrix, std::shared_ptr<CAngularMomentumMatrix>>(m, "AngularMomentumMatrix")
         .def(py::init<>())
-        .def(py::init<const CDenseMatrix&,
-                      const CDenseMatrix&,
-                      const CDenseMatrix&,
-                      const double,
-                      const double,
-                      const double>())
+        .def(py::init<const CDenseMatrix&, const CDenseMatrix&, const CDenseMatrix&, const double, const double, const double>())
         .def(py::init<const CAngularMomentumMatrix&>())
         .def("__str__", &CAngularMomentumMatrix_str)
         .def("x_to_numpy", &CAngularMomentumMatrix_x_to_numpy)
@@ -644,21 +507,17 @@ export_oneints(py::module& m)
 
     // CAngularMomentumIntegralsDriver class
 
-    py::class_<CAngularMomentumIntegralsDriver, std::shared_ptr<CAngularMomentumIntegralsDriver>>(
-        m, "AngularMomentumIntegralsDriver")
+    py::class_<CAngularMomentumIntegralsDriver, std::shared_ptr<CAngularMomentumIntegralsDriver>>(m, "AngularMomentumIntegralsDriver")
         .def(py::init(&CAngularMomentumIntegralsDriver_create), py::arg("py_comm") = py::none())
         .def("set_origin", &CAngularMomentumIntegralsDriver::setAngularMomentumOrigin)
         .def("compute",
-             (CAngularMomentumMatrix(CAngularMomentumIntegralsDriver::*)(const CMolecule&, const CMolecularBasis&)
-                  const) &
+             (CAngularMomentumMatrix(CAngularMomentumIntegralsDriver::*)(const CMolecule&, const CMolecularBasis&) const) &
                  CAngularMomentumIntegralsDriver::compute)
         .def("compute",
-             (CAngularMomentumMatrix(CAngularMomentumIntegralsDriver::*)(
-                 const CMolecule&, const CMolecularBasis&, const CMolecularBasis&) const) &
+             (CAngularMomentumMatrix(CAngularMomentumIntegralsDriver::*)(const CMolecule&, const CMolecularBasis&, const CMolecularBasis&) const) &
                  CAngularMomentumIntegralsDriver::compute)
         .def("compute",
-             (CAngularMomentumMatrix(CAngularMomentumIntegralsDriver::*)(
-                 const CMolecule&, const CMolecule&, const CMolecularBasis&) const) &
+             (CAngularMomentumMatrix(CAngularMomentumIntegralsDriver::*)(const CMolecule&, const CMolecule&, const CMolecularBasis&) const) &
                  CAngularMomentumIntegralsDriver::compute)
         .def("compute",
              (CAngularMomentumMatrix(CAngularMomentumIntegralsDriver::*)(
@@ -679,35 +538,25 @@ export_oneints(py::module& m)
 
     // CElectricFieldIntegralsDriver class
 
-    py::class_<CElectricFieldIntegralsDriver, std::shared_ptr<CElectricFieldIntegralsDriver>>(
-        m, "ElectricFieldIntegralsDriver")
+    py::class_<CElectricFieldIntegralsDriver, std::shared_ptr<CElectricFieldIntegralsDriver>>(m, "ElectricFieldIntegralsDriver")
         .def(py::init(&CElectricFieldIntegralsDriver_create), py::arg("py_comm") = py::none())
         .def("compute",
              (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(
                  const CMolecule&, const CMolecularBasis&, const double, const double, const double) const) &
                  CElectricFieldIntegralsDriver::compute)
         .def("compute",
-             (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(const CMolecule&,
-                                                                     const CMolecularBasis&,
-                                                                     const CMolecularBasis&,
-                                                                     const double,
-                                                                     const double,
-                                                                     const double) const) &
+             (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(
+                 const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const double, const double, const double) const) &
                  CElectricFieldIntegralsDriver::compute)
         .def("compute",
              (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(
-                 const CMolecule&, const CMolecule&, const CMolecularBasis&, const double, const double, const double)
-                  const) &
+                 const CMolecule&, const CMolecule&, const CMolecularBasis&, const double, const double, const double) const) &
                  CElectricFieldIntegralsDriver::compute)
-        .def("compute",
-             (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(const CMolecule&,
-                                                                     const CMolecule&,
-                                                                     const CMolecularBasis&,
-                                                                     const CMolecularBasis&,
-                                                                     const double,
-                                                                     const double,
-                                                                     const double) const) &
-                 CElectricFieldIntegralsDriver::compute)
+        .def(
+            "compute",
+            (CElectricFieldMatrix(CElectricFieldIntegralsDriver::*)(
+                const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const double, const double, const double) const) &
+                CElectricFieldIntegralsDriver::compute)
         .def("compute", &CElectricFieldIntegralsDirver_compute);
 }
 
