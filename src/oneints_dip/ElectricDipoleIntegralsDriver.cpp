@@ -79,6 +79,12 @@ CElectricDipoleIntegralsDriver::setElectricDipoleOrigin(const double xOrigin, co
     _zOrigin = zOrigin;
 }
 
+std::array<double, 3>
+CElectricDipoleIntegralsDriver::getElectricDipoleOrigin() const noexcept
+{
+    return std::array<double, 3>{{_xOrigin, _yOrigin, _zOrigin}};
+}
+
 CElectricDipoleMatrix
 CElectricDipoleIntegralsDriver::compute(const CMolecule& molecule, const CMolecularBasis& basis) const
 {
