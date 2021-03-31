@@ -26,10 +26,13 @@
 #ifndef ExportGeneral_hpp
 #define ExportGeneral_hpp
 
-#include <mpi.h>
-
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+
+#include <mpi.h>
+
+#include "MemBlock.hpp"
+#include "MemBlock2D.hpp"
 
 namespace py = pybind11;
 
@@ -100,6 +103,30 @@ py::array_t<int32_t> pointer_to_numpy(const int32_t* ptr, const int32_t nElement
 py::array_t<int32_t> pointer_to_numpy(const int32_t* ptr, const int32_t nRows, const int32_t nColumns);
 
 /**
+ Convert NumPy array to 1-dimensional memory block, i.e. contiguous array.
+
+ @tparam T underlying scalar type.
+ @param arr NumPy array.
+ @return memory block object.
+ */
+template <typename T>
+CMemBlock<T> numpy_to_memblock(const py::array_t<T>& arr) {
+    return CMemBlock<T>(arr.data(), arr.size());
+}
+
+/**
+ Convert NumPy array to 2-dimensional memory block, i.e. contiguous storage for 2-index quantity.
+
+ @tparam T underlying scalar type.
+ @param arr NumPy array.
+ @return memory block object.
+ */
+template <typename T>
+CMemBlock2D<T> numpy_to_memblock2d(const py::array_t<T, py::array::f_style>& arr) {
+    return CMemBlock2D<T>(arr.data(), arr.shape(0), arr.shape(1));
+}
+
+/**
  Bind overloaded functions in a less verbose fashion
 
  Use as:
@@ -111,6 +138,18 @@ py::array_t<int32_t> pointer_to_numpy(const int32_t* ptr, const int32_t nRows, c
  */
 template <typename... Args>
 using overload_cast_ = py::detail::overload_cast_impl<Args...>;
+
+/** Wrapper for object constructors accepting an MPI communicator.
+ *
+ * @tparam T type of the object to wrap in a shared pointer.
+ * @param py_comm Python object wrapping an MPI communicator.
+ */
+template <typename T>
+inline std::shared_ptr<T>
+create(py::object py_comm)
+{
+    return std::make_shared<T>(get_mpi_comm(py_comm));
+}
 
 /**
  Exports classes/functions in src/general to python.
