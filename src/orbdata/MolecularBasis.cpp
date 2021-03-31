@@ -505,13 +505,9 @@ CMolecularBasis::getPositionInAngularBlock(const CMolecule& molecule,
 }
 
 std::string
-CMolecularBasis::printBasis(const char* title, const CMolecule& molecule) const
+CMolecularBasis::printBasis(const std::string& title, const CMolecule& molecule) const
 {
-    std::string str("Molecular Basis (");
-
-    str.append(title);
-
-    str.append(")");
+    std::string str = "Molecular Basis (" + title + ")";
 
     std::stringstream ss;
 

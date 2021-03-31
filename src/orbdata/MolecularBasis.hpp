@@ -308,7 +308,14 @@ class CMolecularBasis
      @param title the header line of AO basis output.
      @param molecule the molecule.
      */
-    std::string printBasis(const char* title, const CMolecule& molecule) const;
+    std::string printBasis(const std::string& title, const CMolecule& molecule) const;
+
+    /**
+     Prints AO basis information to output stream for selected molecule.
+
+     @param molecule the molecule.
+     */
+    std::string printBasis(const CMolecule& molecule) const { return printBasis(_label, molecule); }
 
     /**
      Broadcasts molecular basis object within domain of MPI communicator.
