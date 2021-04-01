@@ -649,11 +649,7 @@ CVisualizationDriver::getOneParticleDensity(const std::vector<std::vector<double
             return std::vector<double>(coords_1.size(), 0.0);
         }
 
-        // sanity check
-
         bool alphaspin = (fstr::upcase(spin_1) == std::string("ALPHA"));
-
-        bool betaspin = (fstr::upcase(spin_1) == std::string("BETA"));
 
         // compute density
 
