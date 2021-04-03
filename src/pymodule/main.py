@@ -237,8 +237,6 @@ def main():
         if use_xtb:
             xtb_drv = XTBDriver(task.mpi_comm)
             xtb_drv.set_method(method_dict['xtb'].lower())
-            xtb_drv.set_output_filename(task.input_dict['filename'] +
-                                        '_xtb.out')
             xtb_drv.compute(task.molecule, task.ostream)
         else:
             scf_drv = select_scf_driver(task, scf_type)

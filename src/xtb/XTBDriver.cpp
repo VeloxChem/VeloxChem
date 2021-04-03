@@ -34,7 +34,7 @@
 #include "MpiFunc.hpp"
 
 CXTBDriver::CXTBDriver(MPI_Comm comm)
-    : _outputFilename(std::string("xtb.scf.tempfile"))
+    : _outputFilename(std::string("STDOUT"))
 
     , _xtbMethod(std::string("gfn2"))
 {

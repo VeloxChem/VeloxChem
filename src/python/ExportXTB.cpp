@@ -76,6 +76,7 @@ export_xtb(py::module& m)
 
     py::class_<CXTBDriver, std::shared_ptr<CXTBDriver>>(m, "XTBDriver")
         .def(py::init(&CXTBDriver_create), py::arg("py_comm") = py::none())
+        .def("is_available", &CXTBDriver::isAvailable)
         .def("is_master_node", &CXTBDriver::isMasterNode)
         .def("set_max_iter", &CXTBDriver::setMaxIterations)
         .def("set_elec_temp", &CXTBDriver::setElectronicTemp)

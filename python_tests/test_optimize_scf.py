@@ -10,7 +10,7 @@ from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.optimizationdriver import OptimizationDriver
 
 
-class TestOptimization:
+class TestOptimizeSCF:
 
     def run_opt(self, inpfile, basis_label, ref_coords):
 
