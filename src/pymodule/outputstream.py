@@ -326,4 +326,19 @@ class OutputStream:
         exec_str += '{:.2f}'.format(end_time - start_time) + ' sec.'
         self.print_title(exec_str)
         self.print_separator()
+
+        ref_str = 'Rinkevicius, Z.; Li, X.; Vahtras, O.; Ahmadzadeh, K.; '
+        ref_str += 'Brand, M.; Ringholm, M.;'
+        self.print_title(ref_str)
+        ref_str = 'List, N. H.; Scheurer, M.; Scott, M.; Dreuw, A.; Norman, P.'
+        self.print_title(ref_str)
+        ref_str = 'VeloxChem: A Python‐driven Density‐functional Theory '
+        ref_str += 'Program for Spectroscopy'
+        self.print_title(ref_str)
+        ref_str = 'Simulations in High‐performance Computing Environments.'
+        self.print_title(ref_str)
+        ref_str = 'WIREs Comput Mol Sci 2020, 10 (5), e1457.'
+        self.print_title(ref_str)
+        self.print_separator()
+
         self.flush()
