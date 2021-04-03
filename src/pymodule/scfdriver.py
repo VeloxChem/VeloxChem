@@ -30,6 +30,7 @@ import math
 import sys
 import os
 
+from .veloxchemlib import DispersionModel
 from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
@@ -98,6 +99,7 @@ class ScfDriver:
         - ref_mol_orbs: The reference molecular orbitals read from checkpoint
           file.
         - restricted: The flag for restricted SCF.
+        - dispersion: The flag for calculating D4 dispersion correction.
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.
@@ -179,6 +181,10 @@ class ScfDriver:
         # restricted?
         self.restricted = True
 
+        # D4 dispersion correction
+        self.dispersion = False
+        self.d4_energy = 0.0
+
         # dft
         self.dft = False
         self.grid_level = 4
@@ -236,6 +242,10 @@ class ScfDriver:
             self.program_start_time = scf_dict['program_start_time']
         if 'maximum_hours' in scf_dict:
             self.maximum_hours = scf_dict['maximum_hours']
+
+        if 'dispersion' in method_dict:
+            key = method_dict['dispersion'].lower()
+            self.dispersion = True if key == 'yes' else False
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
@@ -338,6 +348,19 @@ class ScfDriver:
                 self.nuc_energy)
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
+
+        # D4 dispersion correction
+        if self.dispersion:
+            if self.rank == mpi_master():
+                disp = DispersionModel()
+                xc_label = self.xcfun.get_func_label() if self.dft else 'HF'
+                disp.compute(molecule, xc_label)
+                self.d4_energy = disp.get_energy()
+            else:
+                self.d4_energy = 0.0
+            self.d4_energy = self.comm.bcast(self.d4_energy, root=mpi_master())
+        else:
+            self.d4_energy = 0.0
 
         # generate integration grid
         if self.dft:
@@ -572,8 +595,8 @@ class ScfDriver:
             profiler.stop_timer(self.num_iter, 'FockBuild')
             profiler.start_timer(self.num_iter, 'CompEnergy')
 
-            e_ee, e_kin, e_en = self.comp_energy(fock_mat, vxc_mat, e_pe,
-                                                 kin_mat, npot_mat, den_mat)
+            e_el = self.comp_energy(fock_mat, vxc_mat, e_pe, kin_mat, npot_mat,
+                                    den_mat)
 
             self.comp_full_fock(fock_mat, vxc_mat, V_pe, kin_mat, npot_mat)
 
@@ -587,7 +610,7 @@ class ScfDriver:
             self.density = AODensityMatrix(den_mat)
 
             self.add_iter_data({
-                'energy': e_ee + e_kin + e_en + self.nuc_energy,
+                'energy': e_el + self.nuc_energy + self.d4_energy,
                 'gradient_norm': e_grad,
                 'max_gradient': max_grad,
                 'diff_density': diff_den,
@@ -1124,8 +1147,8 @@ class ScfDriver:
 
     def comp_energy(self, fock_mat, vxc_mat, e_pe, kin_mat, npot_mat, den_mat):
         """
-        Computes SCF energy components: electronic energy, kinetic energy, and
-        nuclear potential energy.
+        Computes the sum of SCF energy components: electronic energy, kinetic
+        energy, and nuclear potential energy.
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix (only 2e-part).
@@ -1141,13 +1164,9 @@ class ScfDriver:
             The density matrix.
 
         :return:
-            The tuple (electronic energy, kinetic energy, nuclear potential
-            energy).
+            The sum of electronic energy, kinetic energy and nuclear potential
+            energy.
         """
-
-        e_ee = 0.0
-        e_kin = 0.0
-        e_en = 0.0
 
         if self.rank == mpi_master():
             # electronic, kinetic, nuclear energy
@@ -1158,12 +1177,12 @@ class ScfDriver:
                 e_ee += vxc_mat.get_energy()
             if self.pe and not self.first_step:
                 e_ee += e_pe
+            e_sum = e_ee + e_kin + e_en
+        else:
+            e_sum = 0.0
+        e_sum = self.comm.bcast(e_sum, root=mpi_master())
 
-        e_ee = self.comm.bcast(e_ee, root=mpi_master())
-        e_kin = self.comm.bcast(e_kin, root=mpi_master())
-        e_en = self.comm.bcast(e_en, root=mpi_master())
-
-        return (e_ee, e_kin, e_en)
+        return e_sum
 
     def comp_full_fock(self, fock_mat, vxc_mat, pe_mat, kin_mat, npot_mat):
         """
@@ -1712,22 +1731,39 @@ class ScfDriver:
 
         enuc = self.nuc_energy
 
+        e_d4 = self.d4_energy
+
         etot = self.iter_data[-1]['energy']
 
-        e_el = etot - enuc
+        e_el = etot - enuc - e_d4
 
-        valstr = "Total Energy                       :{:20.10f} au".format(etot)
+        valstr = f'Total Energy                       :{etot:20.10f} au'
         self.ostream.print_header(valstr.ljust(92))
 
-        valstr = "Electronic Energy                  :{:20.10f} au".format(e_el)
+        valstr = f'Electronic Energy                  :{e_el:20.10f} au'
         self.ostream.print_header(valstr.ljust(92))
 
-        valstr = "Nuclear Repulsion Energy           :{:20.10f} au".format(enuc)
+        valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} au'
         self.ostream.print_header(valstr.ljust(92))
+
+        if self.dispersion:
+            valstr = f'D4 Dispersion Correction           :{e_d4:20.10f} au'
+            self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_header(
-            "------------------------------------".ljust(92))
+            '------------------------------------'.ljust(92))
 
         grad = self.iter_data[-1]['gradient_norm']
-        valstr = "Gradient Norm                      :{:20.10f} au".format(grad)
+        valstr = 'Gradient Norm                      :{:20.10f} au'.format(grad)
         self.ostream.print_header(valstr.ljust(92))
+
+        self.ostream.print_blank()
+
+        if self.dispersion:
+            valstr = '*** Reference for D4 dispersion correction: '
+            self.ostream.print_header(valstr.ljust(92))
+            valstr = 'E. Caldeweyher, S. Ehlert, A. Hansen, H. Neugebauer, '
+            valstr += 'S. Spicher, C. Bannwarth'
+            self.ostream.print_header(valstr.ljust(92))
+            valstr = 'and S. Grimme, J. Chem Phys, 2019, 150, 154122.'
+            self.ostream.print_header(valstr.ljust(92))

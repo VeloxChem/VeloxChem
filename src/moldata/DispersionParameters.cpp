@@ -28,6 +28,7 @@
 
 #include "DispersionParameters.hpp"
 
+#include "ErrorHandler.hpp"
 #include "StringFormat.hpp"
 
 CDispersionParameters::CDispersionParameters()
@@ -80,6 +81,12 @@ CDispersionParameters::_setFunctionalParameters(const std::string& xcLabel)
     else if (fstr::upcase(xcLabel) == "B3LYP")
     {
         _setFourParameters(1.0000, 2.02929367, 0.40868035, 4.53807137);
+    }
+    else
+    {
+        std::string errmsg("DispersionParameters: D4 dispersion model not implemented for functional ");
+
+        errors::assertMsgCritical(false, errmsg + xcLabel);
     }
 }
 
