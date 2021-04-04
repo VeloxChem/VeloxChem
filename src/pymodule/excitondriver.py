@@ -1017,6 +1017,15 @@ class ExcitonModelDriver:
         if self.rank == mpi_master():
             self.print_banner('Summary')
 
+            valstr = '*** Reference for ab initio exciton model:'
+            self.ostream.print_header(valstr.ljust(80))
+            valstr = 'X. Li, R.M. Parrish, F. Liu, S.I.L. Kokkila '
+            valstr += 'Schumacher and T.J. Martinez,'
+            self.ostream.print_header(valstr.ljust(80))
+            valstr = 'J. Chem. Theory Comput. 2017, 13, 8, 3493-3504.'
+            self.ostream.print_header(valstr.ljust(80))
+            self.ostream.print_blank()
+
             eigvals, eigvecs = np.linalg.eigh(self.H)
             adia_trans_dipoles = np.matmul(eigvecs.T, self.trans_dipoles)
             adia_velo_trans_dipoles = np.matmul(eigvecs.T,
