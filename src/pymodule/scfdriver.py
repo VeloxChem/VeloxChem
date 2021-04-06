@@ -383,6 +383,11 @@ class ScfDriver:
                                    self.comm)
             self.V_es = self.pe_drv.compute_multipole_potential_integrals()
 
+            cppe_info = 'Using CPPE {} for polarizable embedding.'.format(
+                self.pe_drv.get_cppe_version())
+            self.ostream.print_info(cppe_info)
+            self.ostream.print_blank()
+
             pot_info = 'Reading polarizable embedding potential: {}'.format(
                 self.pe_options['potfile'])
             self.ostream.print_info(pot_info)

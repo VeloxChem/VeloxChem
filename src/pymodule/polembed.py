@@ -29,12 +29,8 @@ import os
 try:
     import cppe
 except ImportError:
-    raise ImportError(
-        'Unable to import cppe. ' + os.linesep +
-        'Please download and install from ' +
-        'https://github.com/maxscheurer/cppe ' + os.linesep +
-        'or install via ' +
-        '\'pip install git+https://github.com/maxscheurer/cppe.git\'')
+    raise ImportError('Unable to import cppe. Please install cppe via ' +
+                      '\'pip install cppe==0.2.1\'')
 
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricFieldIntegralsDriver
@@ -120,6 +116,16 @@ class PolEmbed:
                 cppe_version) + os.linesep
             err_str += 'cppe version {} was found.'.format(cppe.__version__)
             raise ModuleNotFoundError(err_str)
+
+    def get_cppe_version(self):
+        """
+        Gets the version of CPPE.
+
+        :return:
+            The version of CPPE.
+        """
+
+        return str(cppe.__version__)
 
     def update_options(self, pe_dict):
         """

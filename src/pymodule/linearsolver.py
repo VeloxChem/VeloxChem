@@ -359,6 +359,11 @@ class LinearSolver:
             pe_drv = PolEmbed(molecule, basis, self.pe_options, self.comm)
             V_es = pe_drv.compute_multipole_potential_integrals()
 
+            cppe_info = 'Using CPPE {} for polarizable embedding.'.format(
+                pe_drv.get_cppe_version())
+            self.ostream.print_info(cppe_info)
+            self.ostream.print_blank()
+
             pot_info = "Reading polarizable embedding potential: {}".format(
                 self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
