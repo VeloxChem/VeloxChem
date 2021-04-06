@@ -1,4 +1,3 @@
-//
 //                           VELOXCHEM 1.0-RC
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
@@ -94,8 +93,8 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&       molecule,
 CElectricFieldMatrix
 CElectricFieldIntegralsDriver::compute(const CMolecule&           molecule,
                                        const CMolecularBasis&     basis,
-                                       const CMemBlock2D<double>* dipoles,
-                                       const CMemBlock2D<double>* coordinates) const
+                                       const CMemBlock2D<double>& dipoles,
+                                       const CMemBlock2D<double>& coordinates) const
 {
     CElectricFieldMatrix efieldmat;
 
@@ -107,7 +106,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&           molecule,
 
         // compute electric field integrals
 
-        efieldmat = _compElectricFieldIntegrals(dipoles, coordinates, &bracontr, &bracontr);
+        efieldmat = _compElectricFieldIntegrals(&dipoles, &coordinates, &bracontr, &bracontr);
     }
 
     return efieldmat;
@@ -149,8 +148,8 @@ CElectricFieldMatrix
 CElectricFieldIntegralsDriver::compute(const CMolecule&           molecule,
                                        const CMolecularBasis&     braBasis,
                                        const CMolecularBasis&     ketBasis,
-                                       const CMemBlock2D<double>* dipoles,
-                                       const CMemBlock2D<double>* coordinates) const
+                                       const CMemBlock2D<double>& dipoles,
+                                       const CMemBlock2D<double>& coordinates) const
 {
     CElectricFieldMatrix efieldmat;
 
@@ -164,7 +163,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&           molecule,
 
         // compute electric field integrals
 
-        efieldmat = _compElectricFieldIntegrals(dipoles, coordinates, &bracontr, &ketcontr);
+        efieldmat = _compElectricFieldIntegrals(&dipoles, &coordinates, &bracontr, &ketcontr);
     }
 
     return efieldmat;
@@ -206,8 +205,8 @@ CElectricFieldMatrix
 CElectricFieldIntegralsDriver::compute(const CMolecule&           braMolecule,
                                        const CMolecule&           ketMolecule,
                                        const CMolecularBasis&     basis,
-                                       const CMemBlock2D<double>* dipoles,
-                                       const CMemBlock2D<double>* coordinates) const
+                                       const CMemBlock2D<double>& dipoles,
+                                       const CMemBlock2D<double>& coordinates) const
 {
     CElectricFieldMatrix efieldmat;
 
@@ -221,7 +220,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&           braMolecule,
 
         // compute electric field integrals
 
-        efieldmat = _compElectricFieldIntegrals(dipoles, coordinates, &bracontr, &ketcontr);
+        efieldmat = _compElectricFieldIntegrals(&dipoles, &coordinates, &bracontr, &ketcontr);
     }
 
     return efieldmat;
@@ -265,8 +264,8 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&           braMolecule,
                                        const CMolecule&           ketMolecule,
                                        const CMolecularBasis&     braBasis,
                                        const CMolecularBasis&     ketBasis,
-                                       const CMemBlock2D<double>* dipoles,
-                                       const CMemBlock2D<double>* coordinates) const
+                                       const CMemBlock2D<double>& dipoles,
+                                       const CMemBlock2D<double>& coordinates) const
 {
     CElectricFieldMatrix efieldmat;
 
@@ -280,7 +279,7 @@ CElectricFieldIntegralsDriver::compute(const CMolecule&           braMolecule,
 
         // compute electric field integrals
 
-        efieldmat = _compElectricFieldIntegrals(dipoles, coordinates, &bracontr, &ketcontr);
+        efieldmat = _compElectricFieldIntegrals(&dipoles, &coordinates, &bracontr, &ketcontr);
     }
 
     return efieldmat;

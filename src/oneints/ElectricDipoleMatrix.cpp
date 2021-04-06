@@ -178,6 +178,16 @@ CElectricDipoleMatrix::setOriginCoordinates(const double xOrigin, const double y
     _zOrigin = zOrigin;
 }
 
+void
+CElectricDipoleMatrix::setOriginCoordinates(const std::array<double, 3>& origin)
+{
+    _xOrigin = origin[0];
+
+    _yOrigin = origin[1];
+
+    _zOrigin = origin[2];
+}
+
 std::string
 CElectricDipoleMatrix::getString() const
 {

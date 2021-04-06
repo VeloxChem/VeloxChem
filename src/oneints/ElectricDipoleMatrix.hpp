@@ -175,6 +175,13 @@ class CElectricDipoleMatrix
     void setOriginCoordinates(const double xOrigin, const double yOrigin, const double zOrigin);
 
     /**
+     Sets coordinates of electric dipole origin.
+
+     @param origin an array holding the Cartesian coordinates for the electric dipole origin.
+     */
+    void setOriginCoordinates(const std::array<double, 3>& origin);
+
+    /**
      Gets string representation of electric dipole matrix.
 
      @return a string for printing the electric dipole matrix.

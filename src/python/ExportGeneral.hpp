@@ -26,15 +26,20 @@
 #ifndef ExportGeneral_hpp
 #define ExportGeneral_hpp
 
+#include <mpi.h>
+#include <mpi4py/mpi4py.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-#include <mpi.h>
+#include <memory>
 
 #include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
 
 namespace py = pybind11;
+
+template <typename T>
+using PyClass = py::class_<T, std::shared_ptr<T>>;
 
 namespace vlx_general {  // vlx_general namespace
 
@@ -110,7 +115,9 @@ py::array_t<int32_t> pointer_to_numpy(const int32_t* ptr, const int32_t nRows, c
  @return memory block object.
  */
 template <typename T>
-CMemBlock<T> numpy_to_memblock(const py::array_t<T>& arr) {
+CMemBlock<T>
+numpy_to_memblock(const py::array_t<T>& arr)
+{
     return CMemBlock<T>(arr.data(), arr.size());
 }
 
@@ -122,7 +129,9 @@ CMemBlock<T> numpy_to_memblock(const py::array_t<T>& arr) {
  @return memory block object.
  */
 template <typename T>
-CMemBlock2D<T> numpy_to_memblock2d(const py::array_t<T, py::array::f_style>& arr) {
+CMemBlock2D<T>
+numpy_to_memblock2d(const py::array_t<T, py::array::f_style>& arr)
+{
     return CMemBlock2D<T>(arr.data(), arr.shape(0), arr.shape(1));
 }
 
@@ -144,11 +153,11 @@ using overload_cast_ = py::detail::overload_cast_impl<Args...>;
  * @tparam T type of the object to wrap in a shared pointer.
  * @param py_comm Python object wrapping an MPI communicator.
  */
-template <typename T>
+template <typename T, typename... Args>
 inline std::shared_ptr<T>
-create(py::object py_comm)
+create(py::object py_comm, Args&&... args)
 {
-    return std::make_shared<T>(get_mpi_comm(py_comm));
+    return std::make_shared<T>(get_mpi_comm(py_comm), std::forward<Args>(args)...);
 }
 
 /**

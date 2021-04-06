@@ -26,9 +26,11 @@
 #ifndef AngularMomentumMatrix_hpp
 #define AngularMomentumMatrix_hpp
 
+#include <array>
 #include <cstdint>
 #include <string>
 
+#include "CartesianComponents.hpp"
 #include "DenseMatrix.hpp"
 
 /**
@@ -99,6 +101,14 @@ class CAngularMomentumMatrix
                            const double        zOrigin);
 
     /**
+     Creates a angular momentum matrix object.
+
+     @param matrices cartesian components of the angular momentum integrals.
+     @param origin the Cartesian coordinates of the angular momentum origin.
+     */
+    CAngularMomentumMatrix(const std::array<CDenseMatrix, 3>& matrices, const std::array<double, 3>& origin);
+
+    /**
      Creates a angular momentum matrix object by copying other angular momentum
      matrix object.
 
@@ -162,6 +172,20 @@ class CAngularMomentumMatrix
      @param zOrigin the Z coordinate of angular momentum origin.
      */
     void setOriginCoordinates(const double xOrigin, const double yOrigin, const double zOrigin);
+
+    /**
+     Sets coordinates of angular momentum origin.
+
+     @param origin an array holding the Cartesian coordinates for the angular momentum origin.
+     */
+    void setOriginCoordinates(const std::array<double, 3>& origin);
+
+    /**
+     Gets string representation of angular momentum matrix.
+
+     @return a string for printing the angular momentum matrix.
+     */
+    std::string getString() const;
 
     /**
      Gets string representation of X component of angular momentum matrix.
@@ -233,6 +257,28 @@ class CAngularMomentumMatrix
     const double* zvalues() const;
 
     /**
+     Gets constant pointer to first element of requested component of linear momentum
+     matrix.
+
+     @param cart requested Cartesian component of the linear momentum integrals matrix
+
+     @return the constant pointer to first element of requested component of linear momentum
+     matrix.
+     */
+    const double* values(cartesians cart) const noexcept;
+
+    /**
+     Gets constant pointer to first element of requested component of linear momentum
+     matrix.
+
+     @param cart requested Cartesian component of the linear momentum integrals matrix
+
+     @return the constant pointer to first element of requested component of linear momentum
+     matrix.
+     */
+    const double* values(int32_t cart) const noexcept;
+
+    /**
      Gets X coordinate of angular momentum origin.
 
      @return the X coordinate of angular momentum origin.
@@ -254,13 +300,25 @@ class CAngularMomentumMatrix
     double getOriginCoordinateZ() const;
 
     /**
-     Converts angular momentum matrix object to text output and insert it into
-     output text stream.
+     Gets coordinates of angular momentum origin.
 
-     @param output the output text stream.
-     @param source the angular momentum matrix object.
+     @return the coordinates of angular momentum origin.
      */
-    friend std::ostream& operator<<(std::ostream& output, const CAngularMomentumMatrix& source);
+    std::array<double, 3> getOriginCoordinates() const;
+
+    /**
+     Converts angular momentum matrix object to text output.
+     */
+    std::string repr() const noexcept;
 };
+
+/**
+ Converts angular momentum matrix object to text output and insert it into
+ output text stream.
+
+ @param output the output text stream.
+ @param source the angular momentum matrix object.
+ */
+std::ostream& operator<<(std::ostream& output, const CAngularMomentumMatrix& source);
 
 #endif /* AngularMomentumMatrix_hpp */

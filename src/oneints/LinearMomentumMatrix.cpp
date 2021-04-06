@@ -25,6 +25,7 @@
 
 #include "LinearMomentumMatrix.hpp"
 
+#include <array>
 #include <cmath>
 
 CLinearMomentumMatrix::CLinearMomentumMatrix()
@@ -38,6 +39,16 @@ CLinearMomentumMatrix::CLinearMomentumMatrix(const CDenseMatrix& xMatrix, const 
     , _yMatrix(yMatrix)
 
     , _zMatrix(zMatrix)
+{
+}
+
+CLinearMomentumMatrix::CLinearMomentumMatrix(const std::array<CDenseMatrix, 3>& matrices)
+
+    : _xMatrix(matrices[0])
+
+    , _yMatrix(matrices[1])
+
+    , _zMatrix(matrices[2])
 {
 }
 
@@ -129,6 +140,12 @@ CLinearMomentumMatrix::getStringForComponentZ() const
     return _zMatrix.getString();
 }
 
+std::string
+CLinearMomentumMatrix::getString() const
+{
+    return getStringForComponentX() + getStringForComponentY() + getStringForComponentZ();
+}
+
 int32_t
 CLinearMomentumMatrix::getNumberOfRows() const
 {
@@ -165,18 +182,52 @@ CLinearMomentumMatrix::zvalues() const
     return _zMatrix.values();
 }
 
+const double*
+CLinearMomentumMatrix::values(cartesians cart) const noexcept
+{
+    const double* retval = nullptr;
+    switch (cart)
+    {
+        case cartesians::X:
+            retval = _xMatrix.values();
+            break;
+        case cartesians::Y:
+            retval = _yMatrix.values();
+            break;
+        case cartesians::Z:
+            retval = _zMatrix.values();
+            break;
+    }
+    return retval;
+}
+
+const double*
+CLinearMomentumMatrix::values(int32_t cart) const noexcept
+{
+    auto d = static_cast<cartesians>(cart);
+    return this->values(d);
+}
+
+std::string
+CLinearMomentumMatrix::repr() const noexcept
+{
+    std::ostringstream os;
+
+    os << std::endl;
+
+    os << "[CLinearMomentumMatrix (Object):" << this << "]" << std::endl;
+
+    os << "_xMatrix: " << _xMatrix << std::endl;
+
+    os << "_yMatrix: " << _yMatrix << std::endl;
+
+    os << "_zMatrix: " << _zMatrix << std::endl;
+
+    return os.str();
+}
+
 std::ostream&
 operator<<(std::ostream& output, const CLinearMomentumMatrix& source)
 {
-    output << std::endl;
-
-    output << "[CLinearMomentumMatrix (Object):" << &source << "]" << std::endl;
-
-    output << "_xMatrix: " << source._xMatrix << std::endl;
-
-    output << "_yMatrix: " << source._yMatrix << std::endl;
-
-    output << "_zMatrix: " << source._zMatrix << std::endl;
-
-    return output;
+    return (output << source.repr());
 }
