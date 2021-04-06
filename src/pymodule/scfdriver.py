@@ -234,7 +234,7 @@ class ScfDriver:
             self.eri_thresh = float(scf_dict['eri_thresh'])
         if 'restart' in scf_dict:
             key = scf_dict['restart'].lower()
-            self.restart = True if key == 'yes' else False
+            self.restart = True if key in ['yes', 'y'] else False
         if 'checkpoint_file' in scf_dict:
             self.checkpoint_file = scf_dict['checkpoint_file']
 
@@ -245,11 +245,11 @@ class ScfDriver:
 
         if 'dispersion' in method_dict:
             key = method_dict['dispersion'].lower()
-            self.dispersion = True if key == 'yes' else False
+            self.dispersion = True if key in ['yes', 'y'] else False
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
-            self.dft = True if key == 'yes' else False
+            self.dft = True if key in ['yes', 'y'] else False
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
@@ -264,7 +264,7 @@ class ScfDriver:
 
         if 'pe' in method_dict:
             key = method_dict['pe'].lower()
-            self.pe = True if key == 'yes' else False
+            self.pe = True if key in ['yes', 'y'] else False
         else:
             if ('potfile' in method_dict) or method_dict['pe_options']:
                 self.pe = True
@@ -279,7 +279,7 @@ class ScfDriver:
 
         if 'use_split_comm' in method_dict:
             key = method_dict['use_split_comm'].lower()
-            self.use_split_comm = True if key == 'yes' else False
+            self.use_split_comm = True if key in ['yes', 'y'] else False
 
         if 'timing' in scf_dict:
             key = scf_dict['timing'].lower()

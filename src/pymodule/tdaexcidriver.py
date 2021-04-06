@@ -114,13 +114,13 @@ class TDAExciDriver(LinearSolver):
 
         if 'nto' in rsp_dict:
             key = rsp_dict['nto'].lower()
-            self.nto = True if key == 'yes' else False
+            self.nto = True if key in ['yes', 'y'] else False
         if 'nto_pairs' in rsp_dict:
             self.nto_pairs = int(rsp_dict['nto_pairs'])
 
         if 'detach_attach' in rsp_dict:
             key = rsp_dict['detach_attach'].lower()
-            self.detach_attach = True if key == 'yes' else False
+            self.detach_attach = True if key in ['yes', 'y'] else False
 
         if 'cube_points' in rsp_dict:
             self.cube_points = [

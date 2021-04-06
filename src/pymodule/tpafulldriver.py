@@ -72,7 +72,7 @@ class TpaFullDriver(TpaDriver):
         :param rsp_dict:
             The dictionary of response dict.
         :param method_dict:
-            The dictionary of method rsp_dict.
+            The dictionary of method settings.
         """
 
         if method_dict is None:

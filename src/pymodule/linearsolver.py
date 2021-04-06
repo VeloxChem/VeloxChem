@@ -178,7 +178,7 @@ class LinearSolver:
         :param rsp_dict:
             The dictionary of response dict.
         :param method_dict:
-            The dictionary of method rsp_dict.
+            The dictionary of method settings.
         """
 
         if method_dict is None:
@@ -193,7 +193,7 @@ class LinearSolver:
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
-            self.dft = True if key == 'yes' else False
+            self.dft = True if key in ['yes', 'y'] else False
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
@@ -208,7 +208,7 @@ class LinearSolver:
 
         if 'pe' in method_dict:
             key = method_dict['pe'].lower()
-            self.pe = True if key == 'yes' else False
+            self.pe = True if key in ['yes', 'y'] else False
         else:
             if ('potfile' in method_dict) or method_dict['pe_options']:
                 self.pe = True
@@ -223,7 +223,7 @@ class LinearSolver:
 
         if 'use_split_comm' in method_dict:
             key = method_dict['use_split_comm'].lower()
-            self.use_split_comm = True if key == 'yes' else False
+            self.use_split_comm = True if key in ['yes', 'y'] else False
 
         if 'conv_thresh' in rsp_dict:
             self.conv_thresh = float(rsp_dict['conv_thresh'])
@@ -234,7 +234,7 @@ class LinearSolver:
 
         if 'restart' in rsp_dict:
             key = rsp_dict['restart'].lower()
-            self.restart = True if key == 'yes' else False
+            self.restart = True if key in ['yes', 'y'] else False
         if 'checkpoint_file' in rsp_dict:
             self.checkpoint_file = rsp_dict['checkpoint_file']
 

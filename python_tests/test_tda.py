@@ -16,6 +16,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaexcidriver import TDAExciDriver
 
 
+@pytest.mark.solvers
 class TestTDA(unittest.TestCase):
 
     def run_tda(self, inpfile, potfile, xcfun_label, data_lines):

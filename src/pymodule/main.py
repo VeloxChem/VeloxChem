@@ -26,6 +26,8 @@
 from mpi4py import MPI
 import time as tm
 
+from .veloxchemlib import mpi_initialized
+from .veloxchemlib import mpi_master
 from .cli import cli
 from .cli import print_help
 from .errorhandler import assert_msg_critical
@@ -47,7 +49,6 @@ from .scfgradientdriver import ScfGradientDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .slurminfo import get_slurm_maximum_hours
-from .veloxchemlib import mpi_initialized, mpi_master
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
@@ -94,7 +95,7 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     :param rsp_dict:
         The dictionary of response dict.
     :param method_dict:
-        The dictionary of method rsp_dict.
+        The dictionary of method settings.
 
     :return:
         The response property object.
@@ -235,6 +236,11 @@ def main():
         scf_dict['maximum_hours'] = maximum_hours
 
         if use_xtb:
+            if 'potfile' in method_dict:
+                errmsg = 'XTBDriver: The \'potfile\' keyword is not supported '
+                errmsg += 'in XTB calculation.'
+                if task.mpi_rank == mpi_master():
+                    assert_msg_critical(False, errmsg)
             xtb_drv = XTBDriver(task.mpi_comm)
             xtb_drv.set_method(method_dict['xtb'].lower())
             xtb_drv.compute(task.molecule, task.ostream)
@@ -269,6 +275,12 @@ def main():
     # Geometry optimization
 
     if task_type == 'optimize':
+        if 'potfile' in method_dict:
+            errmsg = 'OptimizationDriver: The \'potfile\' keyword is not '
+            errmsg += 'supported in geometry optimization.'
+            if task.mpi_rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
         if 'optimize' in task.input_dict:
             opt_dict = task.input_dict['optimize']
         else:
@@ -350,7 +362,7 @@ def main():
             mp2_dict['qq_type'] = scf_drv.qq_type
 
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
-        mp2_drv.update_settings(mp2_dict)
+        mp2_drv.update_settings(mp2_dict, method_dict)
         mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
 
     # Cube file

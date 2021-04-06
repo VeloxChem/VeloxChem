@@ -1,5 +1,6 @@
 from pathlib import Path
 import unittest
+import pytest
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
@@ -7,6 +8,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.rsptpa import TPA
 
 
+@pytest.mark.solvers
 class TestTPA(unittest.TestCase):
     """
     Tests the TPA code for the full and reduced expressions. Note that if one

@@ -98,13 +98,18 @@ class Mp2Driver:
         # use conventional (in-memory) AO-to-MO integral transformation?
         self.conventional = False
 
-    def update_settings(self, mp2_dict):
+    def update_settings(self, mp2_dict, method_dict=None):
         """
         Updates settings in MP2 driver.
 
         :param mp2_dict:
             The dictionary of MP2 settings.
+        :param method_dict:
+            The dictionary of method.
         """
+
+        if method_dict is None:
+            method_dict = {}
 
         if 'qq_type' in mp2_dict:
             self.qq_type = mp2_dict['qq_type']
@@ -121,6 +126,18 @@ class Mp2Driver:
         if 'conventional' in mp2_dict:
             key = mp2_dict['conventional'].lower()
             self.conventional = True if key in ['yes', 'y'] else False
+
+        if 'xcfun' in method_dict:
+            errmsg = 'Mp2Driver: The \'xcfun\' keyword is not supported in MP2 '
+            errmsg += 'calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if 'potfile' in method_dict:
+            errmsg = 'Mp2Driver: The \'potfile\' keyword is not supported in '
+            errmsg += 'MP2 calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
 
     def compute(self, molecule, ao_basis, mol_orbs):
         """

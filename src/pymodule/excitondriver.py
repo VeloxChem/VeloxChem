@@ -138,9 +138,9 @@ class ExcitonModelDriver:
         self.scf_max_iter = 150
 
         # tda settings
-        self.nstates = 5
-        self.ct_nocc = 1
-        self.ct_nvir = 1
+        self.nstates = 3
+        self.ct_nocc = 0
+        self.ct_nvir = 0
         self.tda_conv_thresh = 1.0e-4
         self.tda_max_iter = 100
 
@@ -202,19 +202,25 @@ class ExcitonModelDriver:
 
         if 'restart' in exciton_dict:
             key = exciton_dict['restart'].lower()
-            self.restart = True if key == 'yes' else False
+            self.restart = True if key in ['yes', 'y'] else False
         if 'checkpoint_file' in exciton_dict:
             self.checkpoint_file = exciton_dict['checkpoint_file']
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
-            self.dft = True if key == 'yes' else False
+            self.dft = True if key in ['yes', 'y'] else False
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
                 self.dft = True
             self.xcfun_label = method_dict['xcfun']
+
+        if 'potfile' in method_dict:
+            errmsg = 'ExcitonModelDriver: The \'potfile\' keyword is not '
+            errmsg += 'supported in exciton model calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
 
     def compute(self, molecule, basis, min_basis):
         """
