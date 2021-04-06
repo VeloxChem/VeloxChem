@@ -25,7 +25,7 @@ Build prerequisites
 
   - `h5py <https://www.h5py.org/>`_
   - `psutil <https://psutil.readthedocs.io/en/latest/>`_
-  - `Mpi4Py <https://mpi4py.readthedocs.io/>`_
+  - `MPI4Py <https://mpi4py.readthedocs.io/>`_
   - `NumPy <https://numpy.org>`_
   - `LoProp <https://pypi.org/project/LoProp/>`_
   - `geomeTRIC <https://github.com/leeping/geomeTRIC>`_
@@ -33,7 +33,7 @@ Build prerequisites
 Optional, add-on dependencies:
 
   - `CPPE (v0.2.1) <https://github.com/maxscheurer/cppe/releases/tag/v0.2.1>`_
-  - `XTB Python <https://xtb-python.readthedocs.io/>`_
+  - `XTB <https://github.com/grimme-lab/xtb>`_
 
 See :ref:`external-dependencies` for instructions on how to get these add-ons.
 
@@ -246,7 +246,7 @@ Dependencies
 
 If you wish to use functionality offered through interfaces with other software
 packages, you will first need to install them.  Currently, interfaces to add-on
-dependencies `XTB <https://xtb-docs.readthedocs.io/>`_ and `CPPE (v0.2.1)
+dependencies `XTB <https://github.com/grimme-lab/xtb>`_ and `CPPE (v0.2.1)
 <https://github.com/maxscheurer/cppe/releases/tag/v0.2.1>`_  are available.
 
 
@@ -281,9 +281,6 @@ Alternatively, you can compile it without using ``pip``:
     # Set up python path
     $ export PYTHONPATH=/path/to/your/cppe/build/stage/lib:$PYTHONPATH
 
-    # Make sure that cppe can be imported
-    $ python3 -c 'import cppe'
-
 
 The XTB package for semiempirical methods
 +++++++++++++++++++++++++++++++++++++++++
@@ -293,3 +290,17 @@ It is recommended to install the XTB package in a conda environment:
 .. code-block:: bash
 
    $ conda install xtb -c conda-forge
+
+Alternatively, you can compile it using ``cmake``:
+
+.. code-block:: bash
+
+    # Build XTB
+    $ git clone -b v6.3.3 https://github.com/grimme-lab/xtb
+    $ cd xtb; mkdir build; cd build
+    $ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=/path/to/your/xtb ..
+    $ make
+    $ make install
+
+    # Set XTBHOME prior to installing VeloxChem
+    $ export XTBHOME=/path/to/your/xtb

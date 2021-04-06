@@ -1026,6 +1026,20 @@ class ExcitonModelDriver:
             self.ostream.print_header(valstr.ljust(80))
             self.ostream.print_blank()
 
+            if self.ct_nocc > 0 and self.ct_nvir > 0:
+                self.ostream.print_blank()
+                valstr = '*** Warning: In this implementation, the charge-'
+                valstr += 'transfer (CT) excitation'
+                self.ostream.print_header(valstr.ljust(80))
+                valstr = 'energies are calculated by TDDFT-TDA. The CT '
+                valstr += 'excitation energies will be'
+                self.ostream.print_header(valstr.ljust(80))
+                valstr = 'problematic if pure or global hybrid density '
+                valstr += 'functionals are employed.'
+                self.ostream.print_header(valstr.ljust(80))
+                self.ostream.print_blank()
+                self.ostream.print_blank()
+
             eigvals, eigvecs = np.linalg.eigh(self.H)
             adia_trans_dipoles = np.matmul(eigvecs.T, self.trans_dipoles)
             adia_velo_trans_dipoles = np.matmul(eigvecs.T,
