@@ -296,12 +296,12 @@ def _Molecule_write_xyz(self, xyz_filename):
 
     with open(str(xyz_filename), 'w') as fh:
 
-        fh.write(f"{self.number_of_atoms():d}\n")
+        fh.write(f"{self.number_of_atoms():d}\n\n")
 
         for elem_id, x, y, z in zip(elem_ids, xs, ys, zs):
             elem = ChemicalElement()
             elem.set_atom_type(elem_id)
-            fh.write(f'{elem.get_name():<6s} {x:22.12f} {y:22.12f} {z:22.12f}')
+            fh.write(f'{elem.get_name():<6s} {x:22.12f} {y:22.12f} {z:22.12f}\n')
 
 
 Molecule.read_str = _Molecule_read_str

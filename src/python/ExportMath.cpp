@@ -51,14 +51,6 @@ namespace py = pybind11;
 
 namespace vlx_math {  // vlx_math namespace
 
-// Helper function for printing CDenseMatrix
-
-static std::string
-CDenseMatrix_str(const CDenseMatrix& self)
-{
-    return self.getString();
-}
-
 // Helper function for converting CDenseMatrix to numpy array
 
 static py::array_t<double>
@@ -384,7 +376,7 @@ export_math(py::module& m)
         .def(py::init<const int32_t, const int32_t>())
         .def(py::init<const CDenseMatrix&>())
         .def(py::init(&CDenseMatrix_from_numpy))
-        .def("__str__", &CDenseMatrix_str)
+        .def("__str__", &CDenseMatrix::getString)
         .def("to_numpy", &CDenseMatrix_to_numpy)
         .def("number_of_rows", &CDenseMatrix::getNumberOfRows)
         .def("number_of_columns", &CDenseMatrix::getNumberOfColumns)
