@@ -462,8 +462,8 @@ export_oneints(py::module& m)
     py::class_<COverlapIntegralsDriver, std::shared_ptr<COverlapIntegralsDriver>>(m, "OverlapIntegralsDriver")
         .def(py::init(&COverlapIntegralsDriver_create), py::arg("py_comm") = py::none())
         .def("compute",
-             (COverlapMatrix(COverlapIntegralsDriver::*)(const CMolecule&, const CMolecularBasis&) const) &
-                 COverlapIntegralsDriver::compute)
+             vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&>()(&COverlapIntegralsDriver::compute, py::const_) 
+                 )
         .def("compute",
              (COverlapMatrix(COverlapIntegralsDriver::*)(
                  const CMolecule&, const CMolecularBasis&, const CMolecularBasis&) const) &

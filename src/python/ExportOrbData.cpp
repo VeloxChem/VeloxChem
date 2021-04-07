@@ -270,8 +270,7 @@ export_orbdata(py::module& m)
              "ang_mom"_a)
         .def(
             "__iter__",
-            [](const CMolecularBasis& obj) {
-        return py::make_iterator(obj.begin(), obj.end()); },
+            [](const CMolecularBasis& obj) { return py::make_iterator(obj.begin(), obj.end()); },
             py::keep_alive<0, 1>() /* Essential: keep object alive while iterator exists */);
 
     // denmat enum class
