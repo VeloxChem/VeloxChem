@@ -166,7 +166,7 @@ CXTBDriver::isAvailable() const
 }
 
 bool
-CXTBDriver::getState()
+CXTBDriver::getState() const
 {
 #ifdef ENABLE_XTB
     return xtb_checkEnvironment(_environment) > 0;
@@ -175,7 +175,7 @@ CXTBDriver::getState()
 }
 
 std::vector<std::string>
-CXTBDriver::getOutput()
+CXTBDriver::getOutput() const
 {
     std::vector<std::string> output_strings;
 
@@ -201,13 +201,13 @@ CXTBDriver::getOutput()
 }
 
 std::string
-CXTBDriver::getOutputFilename()
+CXTBDriver::getOutputFilename() const
 {
     return _outputFilename;
 }
 
 double 
-CXTBDriver::getEnergy() 
+CXTBDriver::getEnergy() const
 {
     double energy = 0.0; 
  
@@ -222,7 +222,7 @@ CXTBDriver::getEnergy()
 }
 
 std::vector<double> 
-CXTBDriver::getGradient()
+CXTBDriver::getGradient() const
 {
     std::vector<double> grad;
 

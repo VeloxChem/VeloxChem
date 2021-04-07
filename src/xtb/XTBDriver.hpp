@@ -177,35 +177,35 @@ class CXTBDriver
 
      @return the state of XTB environment.
     */
-    bool getState();
+    bool getState() const;
 
     /**
      Gets XTB output as a vector of strings.
 
      @return a vector of strings.
     */
-    std::vector<std::string> getOutput();
+    std::vector<std::string> getOutput() const;
 
     /**
      Gets XTB output filename.
 
      @return the output filename.
     */
-    std::string getOutputFilename();
+    std::string getOutputFilename() const;
 
     /**
      Gets energy of molecular system.
 
      @return the energy of molecular system.
     */
-    double getEnergy();
+    double getEnergy() const;
 
     /**
      Gets molecular gradient as vector (order: natoms x 3).
 
      @return the molecular gradient.
     */
-    std::vector<double> getGradient();
+    std::vector<double> getGradient() const;
 };
 
 #endif /* XTBDriver_hpp */
