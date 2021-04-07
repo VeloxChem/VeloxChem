@@ -24,8 +24,9 @@ class TestTPA(unittest.TestCase):
     def run_scf(self, task):
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
+        scf_drv.update_settings(
+            task.input_dict["scf"], task.input_dict["method_settings"]
+        )
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         return scf_drv.scf_tensors
@@ -50,53 +51,60 @@ class TestTPA(unittest.TestCase):
             tpa_result = tpa_prop.rsp_property
 
             for key in [
-                    't4_dict', 't3_dict', 'NaX3NyNz', 'NaA3NxNy', 'NaX2Nyz',
-                    'NxA2Nyz', 'gamma'
+                "t4_dict",
+                "t3_dict",
+                "NaX3NyNz",
+                "NaA3NxNy",
+                "NaX2Nyz",
+                "NxA2Nyz",
+                "gamma",
             ]:
                 if key in tpa_result and key in ref_result:
                     if tpa_result[key] is None:
                         continue
                     self.assertTrue(
-                        abs(tpa_result[key][(w, -w, w)].real -
-                            ref_result[key].real) < 1.0e-4)
+                        abs(tpa_result[key][(w, -w, w)].real - ref_result[key].real)
+                        < 1.0e-4
+                    )
                     self.assertTrue(
-                        abs(tpa_result[key][(w, -w, w)].imag -
-                            ref_result[key].imag) < 1.0e-4)
+                        abs(tpa_result[key][(w, -w, w)].imag - ref_result[key].imag)
+                        < 1.0e-4
+                    )
 
     def test_tpa_full(self):
 
         w = 0.05
 
         ref_result = {
-            't4_dict': 11.43071305 + 0.04957732j,
-            't3_dict': -42.19841751 - 0.28695214j,
-            'NaX3NyNz': -81.62345190 - 0.35812832j,
-            'NaA3NxNy': -27.21320341 - 0.03029788j,
-            'NaX2Nyz': 270.69041328 + 2.67837597j,
-            'NxA2Nyz': 270.83461366 + 0.52758094j,
-            'gamma': 401.92066716 + 2.58015589j,
+            "t4_dict": 11.43071305 + 0.04957732j,
+            "t3_dict": -42.19841751 - 0.28695214j,
+            "NaX3NyNz": -81.62345190 - 0.35812832j,
+            "NaA3NxNy": -27.21320341 - 0.03029788j,
+            "NaX2Nyz": 270.69041328 + 2.67837597j,
+            "NxA2Nyz": 270.83461366 + 0.52758094j,
+            "gamma": 401.92066716 + 2.58015589j,
         }
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water_tpa.inp')
+        inpfile = str(here / "inputs" / "water_tpa.inp")
 
-        self.run_tpa(inpfile, 'full', w, ref_result)
+        self.run_tpa(inpfile, "full", w, ref_result)
 
     def test_tpa_reduced(self):
 
         w = 0.05
 
         ref_result = {
-            't3_dict': -15.12982062 - 0.19793495j,
-            'NaX2Nyz': 96.30910639 + 1.72679037j,
-            'NxA2Nyz': 96.36431088 + 0.51886895j,
-            'gamma': 177.54359664 + 2.04772438j,
+            "t3_dict": -15.12982062 - 0.19793495j,
+            "NaX2Nyz": 96.30910639 + 1.72679037j,
+            "NxA2Nyz": 96.36431088 + 0.51886895j,
+            "gamma": 177.54359664 + 2.04772438j,
         }
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water_tpa.inp')
+        inpfile = str(here / "inputs" / "water_tpa.inp")
 
-        self.run_tpa(inpfile, 'reduced', w, ref_result)
+        self.run_tpa(inpfile, "reduced", w, ref_result)
 
 
 if __name__ == "__main__":

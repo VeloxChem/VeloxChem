@@ -1,19 +1,20 @@
+import sys
+import unittest
 from pathlib import Path
+
 import numpy as np
 import unittest
 import pytest
-import sys
-import os
+
 try:
     import cppe
 except ImportError:
     pass
 
-from veloxchem.veloxchemlib import is_mpi_master
-from veloxchem.veloxchemlib import hartree_in_ev
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaexcidriver import TDAExciDriver
+from veloxchem.veloxchemlib import hartree_in_ev, is_mpi_master
 
 
 @pytest.mark.solvers
@@ -22,17 +23,18 @@ class TestTDA(unittest.TestCase):
     def run_tda(self, inpfile, potfile, xcfun_label, data_lines):
 
         task = MpiTask([inpfile, None])
-        task.input_dict['scf']['checkpoint_file'] = None
+        task.input_dict["scf"]["checkpoint_file"] = None
 
         if potfile is not None:
-            task.input_dict['method_settings']['potfile'] = potfile
+            task.input_dict["method_settings"]["potfile"] = potfile
 
         if xcfun_label is not None:
-            task.input_dict['method_settings']['xcfun'] = xcfun_label
+            task.input_dict["method_settings"]["xcfun"] = xcfun_label
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
+        scf_drv.update_settings(
+            task.input_dict["scf"], task.input_dict["method_settings"]
+        )
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         ref_exc_ene = [float(line.split()[1]) for line in data_lines]
@@ -40,15 +42,17 @@ class TestTDA(unittest.TestCase):
         ref_rot_str = [float(line.split()[4]) for line in data_lines]
 
         tda_solver = TDAExciDriver(task.mpi_comm, task.ostream)
-        tda_solver.update_settings({'nstates': len(ref_exc_ene)},
-                                   task.input_dict['method_settings'])
-        tda_results = tda_solver.compute(task.molecule, task.ao_basis,
-                                         scf_drv.scf_tensors)
+        tda_solver.update_settings(
+            {"nstates": len(ref_exc_ene)}, task.input_dict["method_settings"]
+        )
+        tda_results = tda_solver.compute(
+            task.molecule, task.ao_basis, scf_drv.scf_tensors
+        )
 
         if is_mpi_master(task.mpi_comm):
-            exc_ene = tda_results['eigenvalues'] * hartree_in_ev()
-            osc_str = tda_results['oscillator_strengths']
-            rot_str = tda_results['rotatory_strengths']
+            exc_ene = tda_results["eigenvalues"] * hartree_in_ev()
+            osc_str = tda_results["oscillator_strengths"]
+            rot_str = tda_results["rotatory_strengths"]
 
             self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
             self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
@@ -57,7 +61,7 @@ class TestTDA(unittest.TestCase):
     def test_tda_hf(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water.inp')
+        inpfile = str(here / "inputs" / "water.inp")
 
         potfile = None
 
@@ -73,18 +77,18 @@ class TestTDA(unittest.TestCase):
             4    12.1889     0.0014     0.0045    -0.0000    -0.0000
             5    12.8274     0.0117     0.0250     0.0000     0.0000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
     def test_tda_dft(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water.inp')
+        inpfile = str(here / "inputs" / "water.inp")
 
         potfile = None
 
-        xcfun_label = 'b3lyp'
+        xcfun_label = "b3lyp"
 
         #  State Frequency   Oscillator Strength    Rotatory  Strength
         #          (eV)      Velocity     Length    Velocity    Length
@@ -96,18 +100,18 @@ class TestTDA(unittest.TestCase):
             4    10.3003     0.0005     0.0000    -0.0000    -0.0000
             5    10.6270     0.0044     0.0127    -0.0000    -0.0000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
     def test_tda_dft_slda(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water.inp')
+        inpfile = str(here / "inputs" / "water.inp")
 
         potfile = None
 
-        xcfun_label = 'slda'
+        xcfun_label = "slda"
 
         #  State Frequency   Oscillator Strength    Rotatory  Strength
         #          (eV)      Velocity     Length    Velocity    Length
@@ -119,16 +123,16 @@ class TestTDA(unittest.TestCase):
             4    10.1323     0.0014     0.0003     0.0000     0.0000
             5    10.3444     0.0036     0.0115    -0.0000    -0.0000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    @pytest.mark.skipif("cppe" not in sys.modules, reason="cppe not available")
     def test_tda_hf_pe(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'pe_water.inp')
-        potfile = str(here / 'inputs' / 'pe_water.pot')
+        inpfile = str(here / "inputs" / "pe_water.inp")
+        potfile = str(here / "inputs" / "pe_water.pot")
 
         xcfun_label = None
 
@@ -142,18 +146,18 @@ class TestTDA(unittest.TestCase):
             4    11.9792     0.0004     0.0013     0.0916     0.1963
             5    12.8941     0.0007     0.0006     0.0132    -0.4366
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    @pytest.mark.skipif("cppe" not in sys.modules, reason="cppe not available")
     def test_tda_dft_pe(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'pe_water.inp')
-        potfile = str(here / 'inputs' / 'pe_water.pot')
+        inpfile = str(here / "inputs" / "pe_water.inp")
+        potfile = str(here / "inputs" / "pe_water.pot")
 
-        xcfun_label = 'b3lyp'
+        xcfun_label = "b3lyp"
 
         #  State Frequency   Oscillator Strength    Rotatory  Strength
         #          (eV)      Velocity     Length    Velocity    Length
@@ -165,7 +169,7 @@ class TestTDA(unittest.TestCase):
             4    10.1845     0.0003     0.0003    -0.1075    -0.2451
             5    11.0440     0.0076     0.0029     0.1461    -0.5130
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 

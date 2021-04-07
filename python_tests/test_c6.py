@@ -1,16 +1,15 @@
-from pathlib import Path
-import numpy as np
-import unittest
-import tempfile
 import random
-import pytest
-import os
+import tempfile
+import unittest
+from pathlib import Path
 
-from veloxchem.veloxchemlib import is_mpi_master
+import numpy as np
+import pytest
 from veloxchem.mpitask import MpiTask
 from veloxchem.outputstream import OutputStream
-from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.rspc6 import C6
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.veloxchemlib import is_mpi_master
 
 
 @pytest.mark.solvers
@@ -19,8 +18,9 @@ class TestC6(unittest.TestCase):
     def run_scf(self, task):
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
+        scf_drv.update_settings(
+            task.input_dict["scf"], task.input_dict["method_settings"]
+        )
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         return scf_drv.scf_tensors
@@ -59,16 +59,20 @@ class TestC6(unittest.TestCase):
             diff_freq = np.max(np.abs(np.array(freqs) - np.array(ref_freqs)))
             self.assertTrue(diff_freq < 1.0e-6)
 
-            prop = np.array([
-                -c6_results['response_functions'][(a, b, iw)]
-                for iw in freqs
-                for (a, b) in ['xx', 'yy', 'zz', 'xy', 'xz', 'yz']
-            ])
-            ref_prop = np.array([
-                -ref_results['response_functions'][(a, b, iw)]
-                for iw in ref_freqs
-                for (a, b) in ['xx', 'yy', 'zz', 'xy', 'xz', 'yz']
-            ])
+            prop = np.array(
+                [
+                    -c6_results["response_functions"][(a, b, iw)]
+                    for iw in freqs
+                    for (a, b) in ["xx", "yy", "zz", "xy", "xz", "yz"]
+                ]
+            )
+            ref_prop = np.array(
+                [
+                    -ref_results["response_functions"][(a, b, iw)]
+                    for iw in ref_freqs
+                    for (a, b) in ["xx", "yy", "zz", "xy", "xz", "yz"]
+                ]
+            )
             diff_prop = np.max(np.abs(prop - ref_prop))
             self.assertTrue(diff_prop < 1.0e-4)
 
@@ -80,7 +84,7 @@ class TestC6(unittest.TestCase):
     def get_ref_data(data_lines):
 
         ref_freqs = set()
-        ref_results = {'response_functions': {}}
+        ref_results = {"response_functions": {}}
 
         for line in data_lines:
             content = line.split()
@@ -91,8 +95,7 @@ class TestC6(unittest.TestCase):
             prop_real = float(content[4])
 
             ref_freqs.add(freq)
-            ref_results['response_functions'][(a_op, b_op,
-                                               freq)] = -(prop_real + 0j)
+            ref_results["response_functions"][(a_op, b_op, freq)] = -(prop_real + 0j)
 
         ref_freqs = sorted(list(ref_freqs), reverse=True)[:-1]
 
@@ -129,7 +132,7 @@ class TestC6(unittest.TestCase):
     def test_c6_hf(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water.inp')
+        inpfile = str(here / "inputs" / "water.inp")
 
         xcfun_label = None
 
@@ -192,7 +195,7 @@ class TestC6(unittest.TestCase):
             53   XDIPLEN   ZDIPLEN   14.809490        0.000000
             54   YDIPLEN   ZDIPLEN   14.809490       -0.000000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         ref_c6_value = 36.230454
 
@@ -201,9 +204,9 @@ class TestC6(unittest.TestCase):
     def test_c6_dft(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water.inp')
+        inpfile = str(here / "inputs" / "water.inp")
 
-        xcfun_label = 'b3lyp'
+        xcfun_label = "b3lyp"
 
         #   --------------------------------------------------
         #   No    A-oper    B-oper   Frequency       Real part
@@ -264,7 +267,7 @@ class TestC6(unittest.TestCase):
             53   XDIPLEN   ZDIPLEN   14.809490        0.000000
             54   YDIPLEN   ZDIPLEN   14.809490        0.000000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         ref_c6_value = 42.315098
 
@@ -273,9 +276,9 @@ class TestC6(unittest.TestCase):
     def test_c6_dft_slda(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water.inp')
+        inpfile = str(here / "inputs" / "water.inp")
 
-        xcfun_label = 'slda'
+        xcfun_label = "slda"
 
         #   --------------------------------------------------
         #   No    A-oper    B-oper   Frequency       Real part
@@ -336,7 +339,7 @@ class TestC6(unittest.TestCase):
             53   XDIPLEN   ZDIPLEN   14.809490        0.000000
             54   YDIPLEN   ZDIPLEN   14.809490        0.000000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         ref_c6_value = 44.494604
 

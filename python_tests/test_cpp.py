@@ -1,31 +1,32 @@
-from pathlib import Path
-import numpy as np
-import unittest
-import tempfile
 import random
-import pytest
 import sys
-import os
+import tempfile
+import unittest
+from pathlib import Path
+
+import numpy as np
+import pytest
+
 try:
     import cppe
 except ImportError:
     pass
 
-from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.outputstream import OutputStream
-from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.rsplinabscross import LinearAbsorptionCrossSection
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.veloxchemlib import is_mpi_master
 
 
 @pytest.mark.solvers
 class TestCPP(unittest.TestCase):
-
     def run_scf(self, task):
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
+        scf_drv.update_settings(
+            task.input_dict["scf"], task.input_dict["method_settings"]
+        )
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         return scf_drv.scf_tensors
@@ -33,13 +34,13 @@ class TestCPP(unittest.TestCase):
     def run_cpp(self, inpfile, potfile, xcfun_label, data_lines):
 
         task = MpiTask([inpfile, None])
-        task.input_dict['scf']['checkpoint_file'] = None
+        task.input_dict["scf"]["checkpoint_file"] = None
 
         if potfile is not None:
-            task.input_dict['method_settings']['potfile'] = potfile
+            task.input_dict["method_settings"]["potfile"] = potfile
 
         if xcfun_label is not None:
-            task.input_dict['method_settings']['xcfun'] = xcfun_label
+            task.input_dict["method_settings"]["xcfun"] = xcfun_label
 
         scf_tensors = self.run_scf(task)
 
@@ -53,9 +54,11 @@ class TestCPP(unittest.TestCase):
 
         cpp_prop = LinearAbsorptionCrossSection(
             {
-                'frequencies': ','.join(ref_freqs_str),
-                'batch_size': random.choice([1, 10, 100])
-            }, task.input_dict['method_settings'])
+                "frequencies": ",".join(ref_freqs_str),
+                "batch_size": random.choice([1, 10, 100]),
+            },
+            task.input_dict["method_settings"],
+        )
         cpp_prop.init_driver(task.mpi_comm, task.ostream)
         cpp_prop.compute(task.molecule, task.ao_basis, scf_tensors)
 
@@ -65,38 +68,40 @@ class TestCPP(unittest.TestCase):
             self.check_printout(cpp_prop)
             cpp_results = cpp_prop.rsp_property
 
-            prop = np.array([
-                -cpp_results['response_functions'][(a, b, w)]
-                for w in ref_freqs
-                for (a, b) in ['xx', 'yy', 'zz', 'xy', 'xz', 'yz']
-            ])
+            prop = np.array(
+                [
+                    -cpp_results["response_functions"][(a, b, w)]
+                    for w in ref_freqs
+                    for (a, b) in ["xx", "yy", "zz", "xy", "xz", "yz"]
+                ]
+            )
             self.assertTrue(np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4)
             self.assertTrue(np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4)
 
     def check_printout(self, cpp_prop):
 
-        rsp_func = cpp_prop.rsp_property['response_functions']
+        rsp_func = cpp_prop.rsp_property["response_functions"]
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            fname = str(Path(temp_dir, 'cpp.out'))
+            fname = str(Path(temp_dir, "cpp.out"))
 
             ostream = OutputStream(fname)
             cpp_prop.print_property(ostream)
             ostream.close()
 
-            with open(fname, 'r') as f_out:
+            with open(fname, "r") as f_out:
                 lines = f_out.readlines()
 
             for key, val in rsp_func.items():
                 key_found = False
                 for line in lines:
-                    if f'{key[0]}  ;  {key[1]}' in line:
-                        content = line.split('>>')[1].split()
+                    if f"{key[0]}  ;  {key[1]}" in line:
+                        content = line.split(">>")[1].split()
                         print_freq = float(content[0])
                         if abs(key[2] - print_freq) < 1e-4:
                             key_found = True
                             print_real = float(content[1])
-                            print_imag = float(content[2].replace('j', ''))
+                            print_imag = float(content[2].replace("j", ""))
                             self.assertAlmostEqual(val.real, print_real, 6)
                             self.assertAlmostEqual(val.imag, print_imag, 6)
                 self.assertTrue(key_found)
@@ -104,7 +109,7 @@ class TestCPP(unittest.TestCase):
     def test_cpp_hf(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water.inp')
+        inpfile = str(here / "inputs" / "water.inp")
 
         potfile = None
 
@@ -133,18 +138,18 @@ class TestCPP(unittest.TestCase):
             17   XDIPLEN   ZDIPLEN    0.100000        0.000000        0.000000
             18   YDIPLEN   ZDIPLEN    0.100000       -0.000001       -0.000000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
     def test_cpp_dft(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water.inp')
+        inpfile = str(here / "inputs" / "water.inp")
 
         potfile = None
 
-        xcfun_label = 'b3lyp'
+        xcfun_label = "b3lyp"
 
         #   ------------------------------------------------------------------
         #   No    A-oper    B-oper   Frequency       Real part       Imag part
@@ -169,18 +174,18 @@ class TestCPP(unittest.TestCase):
             17   XDIPLEN   ZDIPLEN    0.100000        0.000000        0.000000
             18   YDIPLEN   ZDIPLEN    0.100000       -0.000000       -0.000000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
     def test_cpp_dft_slda(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water.inp')
+        inpfile = str(here / "inputs" / "water.inp")
 
         potfile = None
 
-        xcfun_label = 'slda'
+        xcfun_label = "slda"
 
         #   ------------------------------------------------------------------
         #   No    A-oper    B-oper   Frequency       Real part       Imag part
@@ -205,18 +210,17 @@ class TestCPP(unittest.TestCase):
             17   XDIPLEN   ZDIPLEN    0.100000        0.000000        0.000000
             18   YDIPLEN   ZDIPLEN    0.100000        0.000000        0.000000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    @pytest.mark.skipif("cppe" not in sys.modules, reason="cppe not available")
     def test_cpp_hf_pe(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'pe_water.inp')
+        inpfile = str(here / "inputs" / "pe_water.inp")
 
-        here = Path(__file__).parent
-        potfile = str(here / 'inputs' / 'pe_water.pot')
+        potfile = str(here / "inputs" / "pe_water.pot")
 
         xcfun_label = None
 
@@ -243,20 +247,19 @@ class TestCPP(unittest.TestCase):
             17   XDIPLEN   ZDIPLEN    0.100000        0.269121        0.001838
             18   YDIPLEN   ZDIPLEN    0.100000        0.284970        0.001107
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    @pytest.mark.skipif("cppe" not in sys.modules, reason="cppe not available")
     def test_cpp_dft_pe(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'pe_water.inp')
+        inpfile = str(here / "inputs" / "pe_water.inp")
 
-        here = Path(__file__).parent
-        potfile = str(here / 'inputs' / 'pe_water.pot')
+        potfile = str(here / "inputs" / "pe_water.pot")
 
-        xcfun_label = 'b3lyp'
+        xcfun_label = "b3lyp"
 
         #   ------------------------------------------------------------------
         #   No    A-oper    B-oper   Frequency       Real part       Imag part
@@ -281,7 +284,7 @@ class TestCPP(unittest.TestCase):
             17   XDIPLEN   ZDIPLEN    0.100000        0.361531        0.003442
             18   YDIPLEN   ZDIPLEN    0.100000        0.301579        0.000664
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
