@@ -69,7 +69,11 @@ export_oneints(py::module& m)
     // COverlapMatrix class
 
     auto py_overlap_matrix = bind_operator_matrix<COverlapMatrix>(m, "OverlapMatrix");
-    py_overlap_matrix.def("get_ortho_matrix", &COverlapMatrix::getOrthogonalizationMatrix);
+    py_overlap_matrix.def("get_ortho_matrix",
+                          &COverlapMatrix::getOrthogonalizationMatrix,
+                          "Get orthogonalization matrix. Use Lowdin symmetric orthogonalization with no linear dependencies. Use canonical "
+                          "orthogonalization otherwise.",
+                          "threshold"_a);
 
     // COverlapIntegralsDriver class
 
