@@ -42,19 +42,6 @@
 namespace py = pybind11;
 
 namespace vlx_oneints {  // vlx_oneints namespace
-/** Convert a VeloxChem matrix object, i.e. COverlapMatrix, to NumPy array.
- *
- * @tparam T type of the VeloxChem matrix object.
- * @param obj VeloxChem matrix object.
- * @return The NumPy array.
- */
-template <typename T>
-inline py::array_t<double>
-matrix_to_numpy(const T& obj)
-{
-    return vlx_general::pointer_to_numpy(obj.values(), obj.getNumberOfRows(), obj.getNumberOfColumns());
-}
-
 /** Convert a VeloxChem matrix object with Cartesian components, i.e. CElectricDipoleMomentMatrix, to NumPy array.
  *
  * @tparam T type of the VeloxChem matrix object.
@@ -83,20 +70,6 @@ matrix_to_numpy(const T& obj, cartesians cart)
     return vlx_general::pointer_to_numpy(obj.values(cart), obj.getNumberOfRows(), obj.getNumberOfColumns());
 }
 
-/** Convert a NumPy array to a VeloxChem matrix object, i.e. COverlapMatrix.
- *
- * @tparam T type of the VeloxChem matrix object.
- * @param np the NumPy array.
- * @return The VeloxChem matrix object.
- */
-template <typename T>
-inline std::shared_ptr<T>
-matrix_from_numpy(const py::array_t<double>& np)
-{
-    auto mp = vlx_math::CDenseMatrix_from_numpy(np);
-    return std::make_shared<T>(*mp);
-}
-
 /** Common binding code for matrix objects for the various one-electron operators
  *
  * @tparam T type of the VeloxChem matrix object.
@@ -114,9 +87,15 @@ bind_operator_matrix(py::module& m, const std::string& cls_name)
         .def(py::init<>())
         .def(py::init<const CDenseMatrix&>())
         .def(py::init<const T&>())
-        .def(py::init(&matrix_from_numpy<T>))
+        .def(py::init([](const py::array_t<double>& np) {
+            auto mp = vlx_math::CDenseMatrix_from_numpy(np);
+            return std::make_shared<T>(*mp);
+        }))
         .def("__str__", &T::getString)
-        .def("to_numpy", &matrix_to_numpy<T>)
+        .def(
+            "to_numpy",
+            [](const T& obj) { return vlx_general::pointer_to_numpy(obj.values(), obj.getNumberOfRows(), obj.getNumberOfColumns()); },
+            "Convert operator matrix object to NumPy array")
         .def(py::self == py::self);
 }
 
