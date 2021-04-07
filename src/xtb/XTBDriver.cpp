@@ -116,15 +116,15 @@ CXTBDriver::compute(const CMolecule& molecule)
     
         if (_xtbMethod == "gfn2")
         {
-            xtb_loadGFN2xTB(_environment, tmol, _calculator, NULL);
+            xtb_loadGFN2xTB(_environment, tmol, _calculator, nullptr);
         }
         else if (_xtbMethod == "gfn1")
         {
-            xtb_loadGFN1xTB(_environment, tmol, _calculator, NULL);
+            xtb_loadGFN1xTB(_environment, tmol, _calculator, nullptr);
         }
         else if (_xtbMethod == "gfn0")
         {
-            xtb_loadGFN0xTB(_environment, tmol, _calculator, NULL);
+            xtb_loadGFN0xTB(_environment, tmol, _calculator, nullptr);
         }
         else
         {
@@ -278,6 +278,6 @@ CXTBDriver::_set_molecule(const CMolecule& molecule)
     return xtb_newMolecule(_environment, &_natoms, atoms.data(),
                            coords.data(),
                            &charge, &uhf,
-                           NULL, NULL);
+                           nullptr, nullptr);
 }
 #endif

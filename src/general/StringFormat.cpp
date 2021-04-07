@@ -25,6 +25,7 @@
 
 #include "StringFormat.hpp"
 
+#include <cctype>
 #include <sstream>
 
 namespace fstr {  // fstr namespace

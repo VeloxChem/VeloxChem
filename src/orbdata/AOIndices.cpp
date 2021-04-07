@@ -25,6 +25,8 @@
 
 #include "AOIndices.hpp"
 
+#include <algorithm>
+
 namespace aoindices {  // aoindices namespace
 
 std::vector<std::vector<int32_t>>

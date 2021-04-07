@@ -586,7 +586,7 @@ CMemBlock<T>::shrink(const int32_t nElements)
 {
     if (nElements < _nElements)
     {
-        T* tvals = (T*)mem::malloc(nElements * sizeof(T));
+        auto tvals = static_cast<T*>(mem::malloc(nElements * sizeof(T)));
 
         auto pdata = _data;
 
@@ -683,7 +683,7 @@ CMemBlock<int32_t>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         int32_t* bsizes = nullptr;
 
-        if (rank == mpi::master()) bsizes = (int32_t*)mem::malloc(nsizes);
+        if (rank == mpi::master()) bsizes = static_cast<int32_t*>(mem::malloc(nsizes));
 
         mpi::gather(bsizes, _nElements, rank, comm);
 
@@ -693,7 +693,7 @@ CMemBlock<int32_t>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         if (rank == mpi::master())
         {
-            bindexes = (int32_t*)mem::malloc(nsizes);
+            bindexes = static_cast<int32_t*>(mem::malloc(nsizes));
 
             mathfunc::indexes(bindexes, bsizes, nodes);
 
@@ -734,7 +734,7 @@ CMemBlock<double>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         int32_t* bsizes = nullptr;
 
-        if (rank == mpi::master()) bsizes = (int32_t*)mem::malloc(nsizes);
+        if (rank == mpi::master()) bsizes = static_cast<int32_t*>(mem::malloc(nsizes));
 
         mpi::gather(bsizes, _nElements, rank, comm);
 
@@ -744,7 +744,7 @@ CMemBlock<double>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         if (rank == mpi::master())
         {
-            bindexes = (int32_t*)mem::malloc(nsizes);
+            bindexes = static_cast<int32_t*>(mem::malloc(nsizes));
 
             mathfunc::indexes(bindexes, bsizes, nodes);
 
@@ -791,7 +791,7 @@ CMemBlock<int32_t>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         auto nsizes = static_cast<size_t>(_nElements) * sizeof(int32_t);
 
-        int32_t* bdata = (int32_t*)mem::malloc(nsizes);
+        int32_t* bdata = static_cast<int32_t*>(mem::malloc(nsizes));
 
         // setup for scaterring pattern
 
@@ -803,11 +803,11 @@ CMemBlock<int32_t>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
         {
             nsizes = static_cast<size_t>(nodes) * sizeof(int32_t);
 
-            bsizes = (int32_t*)mem::malloc(nsizes);
+            bsizes = static_cast<int32_t*>(mem::malloc(nsizes));
 
             mpi::batches_pattern(bsizes, totelem, nodes);
 
-            bindexes = (int32_t*)mem::malloc(nsizes);
+            bindexes = static_cast<int32_t*>(mem::malloc(nsizes));
 
             mathfunc::indexes(bindexes, bsizes, nodes);
         }
@@ -854,7 +854,7 @@ CMemBlock<double>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         auto nsizes = static_cast<size_t>(_nElements) * sizeof(double);
 
-        double* bdata = (double*)mem::malloc(nsizes);
+        auto bdata = static_cast<double*>(mem::malloc(nsizes));
 
         // setup for scaterring pattern
 
@@ -866,11 +866,11 @@ CMemBlock<double>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
         {
             nsizes = static_cast<size_t>(nodes) * sizeof(int32_t);
 
-            bsizes = (int32_t*)mem::malloc(nsizes);
+            bsizes = static_cast<int32_t*>(mem::malloc(nsizes));
 
             mpi::batches_pattern(bsizes, totelem, nodes);
 
-            bindexes = (int32_t*)mem::malloc(nsizes);
+            bindexes = static_cast<int32_t*>(mem::malloc(nsizes));
 
             mathfunc::indexes(bindexes, bsizes, nodes);
         }
@@ -907,7 +907,7 @@ CMemBlock<double>::reduce_sum(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         auto nsize = static_cast<size_t>(_nElements) * sizeof(double);
 
-        if (rank == mpi::master()) bdata = (double*) mem::malloc(nsize);
+        if (rank == mpi::master()) bdata = static_cast<double*>(mem::malloc(nsize));
 
         mpi::reduce_sum(_data, bdata, _nElements, comm);
 
@@ -930,7 +930,7 @@ CMemBlock<T>::_allocate()
 
         auto numelem = static_cast<size_t>(_nElements);
 
-        _data = (T*)mem::malloc(numelem * sizeof(T));
+        _data = static_cast<T*>(mem::malloc(numelem * sizeof(T)));
     }
 }
 
