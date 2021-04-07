@@ -52,17 +52,17 @@ class CMemBlock
     /**
      The pointer to contiguous memory block.
      */
-    T* _data;
+    T* _data{nullptr};
 
     /**
      The number of elements in memory block.
      */
-    int32_t _nElements;
+    int32_t _nElements{0};
 
     /**
      The NUMA policy for memory block handling.
      */
-    numa _numaPolicy;
+    numa _numaPolicy{numa::serial};
 
     /**
      Allocates memory block.
@@ -87,7 +87,7 @@ class CMemBlock
 
      @param nElements - the number of elements.
      */
-    CMemBlock(const int32_t nElements);
+    explicit CMemBlock(const int32_t nElements);
 
     /**
      Creates a memory block object with specific NUMA policy.
@@ -109,8 +109,9 @@ class CMemBlock
 
      @param source - a raw pointer
      @param size - size of data
+     @param numaPolicy - the numa policy for data initialization.
      */
-    CMemBlock(const T* source, int32_t nElements);
+    CMemBlock(const T* source, int32_t size, numa numaPolicy);
 
     /**
      Creates a memory block object by copying other memory block object.
@@ -359,14 +360,14 @@ CMemBlock<T>::CMemBlock(const std::vector<T>& dataVector)
     std::memcpy(_data, dataVector.data(), _nElements * sizeof(T));
 }
 
-template <class T>
-CMemBlock<T>::CMemBlock(const T* source, int32_t nElements)
+template <typename T>
+CMemBlock<T>::CMemBlock(const T* source, int32_t nElements, numa numaPolicy)
 
     : _data(nullptr)
 
     , _nElements(nElements)
 
-    , _numaPolicy(numa::serial)
+    , _numaPolicy(numaPolicy)
 {
     _allocate();
 

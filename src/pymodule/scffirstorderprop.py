@@ -86,7 +86,7 @@ class ScfFirstOrderProperties:
 
         # dipole integrals
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-        dipole_drv.set_origin(*list(origin))
+        dipole_drv.origin = origin
         dipole_mats = dipole_drv.compute(molecule, basis)
 
         if self.rank == mpi_master():

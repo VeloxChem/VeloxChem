@@ -372,10 +372,8 @@ CMemBlock2D<T>::CMemBlock2D(const int32_t nElements, const int32_t nBlocks)
 }
 
 template <class T>
-CMemBlock2D<T>::CMemBlock2D(const std::vector<int32_t>& dimVector)
+CMemBlock2D<T>::CMemBlock2D(const std::vector<int32_t>& dimVector) : _originalSizes(dimVector)
 {
-    _originalSizes = CMemBlock<int32_t>(dimVector);
-
     _setDimensions();
 
     _data = CMemBlock<T>(_nElements);
@@ -384,10 +382,8 @@ CMemBlock2D<T>::CMemBlock2D(const std::vector<int32_t>& dimVector)
 }
 
 template <class T>
-CMemBlock2D<T>::CMemBlock2D(const CMemBlock<int32_t> originalSizes)
+CMemBlock2D<T>::CMemBlock2D(const CMemBlock<int32_t> originalSizes) : _originalSizes(originalSizes)
 {
-    _originalSizes = originalSizes;
-
     _setDimensions();
 
     _data = CMemBlock<T>(_nElements);
@@ -428,7 +424,7 @@ CMemBlock2D<T>::CMemBlock2D(const T* raw, const int32_t nElements, const int32_t
 template <class T>
 CMemBlock2D<T>::CMemBlock2D(const T* raw, const matorder dataOrder, const int32_t nElements, const int32_t nBlocks)
 
-    : _nElements(0)
+    : _nElements(nElements)
 {
     _setOriginalSizes(nElements, nBlocks);
 

@@ -94,6 +94,9 @@ from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .scffirstorderprop import ScfFirstOrderProperties
 
+# Deprecation warnings
+from . import deprecations
+
 # Python functions
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_type

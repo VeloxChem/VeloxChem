@@ -32,9 +32,11 @@
 #include <pybind11/pybind11.h>
 
 #include <memory>
+#include <utility>
 
 #include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
+#include "NumaPolicy.hpp"
 
 namespace py = pybind11;
 
@@ -118,7 +120,7 @@ template <typename T>
 CMemBlock<T>
 numpy_to_memblock(const py::array_t<T>& arr)
 {
-    return CMemBlock<T>(arr.data(), arr.size());
+    return CMemBlock<T>(arr.data(), arr.size(), numa::serial);
 }
 
 /**

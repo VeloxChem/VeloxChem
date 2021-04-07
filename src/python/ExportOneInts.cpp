@@ -29,6 +29,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include <array>
 #include <memory>
@@ -344,18 +345,19 @@ export_oneints(py::module& m)
 
                 return obj.compute(molecule, basis, ds, xyz);
             },
+            // the wonky format of the raw string literal is to get help(...) in Python to look nice
             R"pbdoc(
-        Compute electric field integrals for a collection of point dipoles.
+Compute electric field integrals for a collection of point dipoles.
 
-        :param molecule:
-            The molecule.
-        :param basis:
-            The basis set.
-        :param dipoles:
-            Values of the point dipoles. This is a NumpPy array of shape (N,3), i.e. [..., [dx_i, dy_i, dz_i], ...]
-        :param coordinates:
-            Coordinates of the point dipoles. This is a NumpPy array of shape (N,3), i.e. [..., [x_i, y_i, z_i], ...]
-        )pbdoc",
+:param molecule:
+    The molecule.
+:param basis:
+    The basis set.
+:param dipoles:
+    Values of the point dipoles. This is a NumpPy array of shape (N,3), i.e. [..., [dx_i, dy_i, dz_i], ...]
+:param coordinates:
+    Coordinates of the point dipoles. This is a NumpPy array of shape (N,3), i.e. [..., [x_i, y_i, z_i], ...]
+)pbdoc",
             "molecule"_a,
             "basis"_a,
             "dipoles"_a,
