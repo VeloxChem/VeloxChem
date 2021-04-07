@@ -58,7 +58,7 @@ class InputParser:
 
         self.input_dict = {}
 
-        self.inpname = inpname
+        self.inpname = inpname if isinstance(inpname, str) else str(inpname)
         self.outname = outname
 
         self.is_basis_set = False

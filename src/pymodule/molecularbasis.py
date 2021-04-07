@@ -24,21 +24,87 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from os import environ
-from os import walk
 from pathlib import Path
 
-from .veloxchemlib import MolecularBasis
-from .veloxchemlib import AtomBasis
-from .veloxchemlib import BasisFunction
-from .veloxchemlib import ChemicalElement
-from .veloxchemlib import to_angular_momentum
+from .errorhandler import assert_msg_critical
 from .inputparser import InputParser
 from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical
+from .veloxchemlib import (AtomBasis, BasisFunction, ChemicalElement,
+                           MolecularBasis, to_angular_momentum)
+
+
+def _known_aliases():
+    return {
+        "6-31+G_D,P_": [
+            "6-31+G**",
+            "6-31+G(D,P)",
+        ],
+        "6-311++G_2D,2P_": [
+            "6-311++G(2D,2P)",
+        ],
+        "6-311++G_D,P_": [
+            "6-311++G**",
+            "6-311++G(D,P)",
+        ],
+        "6-311+G_2D,P_": [
+            "6-311+G(2D,P)",
+        ],
+        "6-311G_2DF,2PD_": [
+            "6-311G(2DF,2PD)",
+        ],
+        "6-31G_2DF,P_": [
+            "6-31G(2DF,P)",
+        ],
+        "DEF2-SV_P_": [
+            "DEF2-SV(P)",
+        ],
+    }
+
+
+def _name_to_file(name):
+    """
+    Determine basis set file from conventional name.
+
+    :param name:
+        Name of the basis set.
+
+    :return:
+        The file containing the basis set.
+    """
+
+    basis_file = name
+    for k, v in _known_aliases().items():
+        if name in v:
+            basis_file = k
+
+    return basis_file
+
+
+def _file_to_name(fname):
+    """
+    Determine basis set conventional name from filename.
+
+    :param fname:
+        Name of the basis set file.
+
+    :return:
+        The conventional name of the basis set.
+    """
+
+    fname_ = fname if isinstance(fname, str) else fname.name
+    basis_name = fname_
+    for k, v in _known_aliases().items():
+        if fname_ == k:
+            basis_name = v[0]
+
+    return basis_name
 
 
 @staticmethod
-def _MolecularBasis_read(mol, basis_name, basis_path='.', ostream=None):
+def _MolecularBasis_read(mol,
+                         basis_name,
+                         basis_path='.',
+                         ostream=OutputStream()):
     """
     Reads AO basis set from file.
 
@@ -61,18 +127,21 @@ def _MolecularBasis_read(mol, basis_name, basis_path='.', ostream=None):
     err_gc = "MolcularBasis.read: "
     err_gc += "General contraction currently is not supported"
 
+    # de-alias basis set name to basis set file
+    fname = _name_to_file(basis_name.upper())
+
     # searching order:
     # 1. given basis_path
     # 2. current directory
     # 3. VLXBASISPATH
 
-    basis_file = Path(basis_path, basis_name.upper())
+    basis_file = Path(basis_path, fname)
 
-    if not basis_file.is_file() and basis_path != '.':
-        basis_file = Path('.', basis_name.upper())
+    if not basis_file.is_file() and basis_path != ".":
+        basis_file = Path(".", fname)
 
-    if not basis_file.is_file() and 'VLXBASISPATH' in environ:
-        basis_file = Path(environ['VLXBASISPATH'], basis_name.upper())
+    if not basis_file.is_file() and "VLXBASISPATH" in environ:
+        basis_file = Path(environ["VLXBASISPATH"], fname)
 
     basis_info = "Reading basis set: " + str(basis_file)
     ostream.print_info(basis_info)
@@ -81,8 +150,9 @@ def _MolecularBasis_read(mol, basis_name, basis_path='.', ostream=None):
     basis_dict = InputParser(str(basis_file)).input_dict
 
     assert_msg_critical(
-        basis_name.upper() == basis_dict['basis_set_name'].upper(),
-        "MolecularBasis.read: Inconsistent basis set name")
+        basis_name.upper() == basis_dict["basis_set_name"].upper(),
+        "MolecularBasis.read: Inconsistent basis set name",
+    )
 
     mol_basis = MolecularBasis()
 
@@ -94,7 +164,7 @@ def _MolecularBasis_read(mol, basis_name, basis_path='.', ostream=None):
         err = elem.set_atom_type(elem_id)
         assert_msg_critical(err, "ChemicalElement.set_atom_type")
 
-        basis_key = 'atombasis_{}'.format(elem.get_name().lower())
+        basis_key = "atombasis_{}".format(elem.get_name().lower())
         basis_list = [entry for entry in basis_dict[basis_key]]
 
         atom_basis = AtomBasis()
@@ -103,7 +173,8 @@ def _MolecularBasis_read(mol, basis_name, basis_path='.', ostream=None):
             shell_title = basis_list.pop(0).split()
             assert_msg_critical(
                 len(shell_title) == 3,
-                "Basis set parser (shell): {}".format(' '.join(shell_title)))
+                "Basis set parser (shell): {}".format(" ".join(shell_title)),
+            )
 
             angl = to_angular_momentum(shell_title[0])
             npgto = int(shell_title[1])
@@ -118,7 +189,8 @@ def _MolecularBasis_read(mol, basis_name, basis_path='.', ostream=None):
                 prims = basis_list.pop(0).split()
                 assert_msg_critical(
                     len(prims) == ncgto + 1,
-                    "Basis set parser (primitive): {}".format(' '.join(prims)))
+                    "Basis set parser (primitive): {}".format(" ".join(prims)),
+                )
 
                 expons[i] = float(prims[0])
                 for k in range(ncgto):
@@ -154,19 +226,18 @@ def _MolecularBasis_get_avail_basis(element_label):
 
     avail_basis = set()
 
-    basis_path = environ['VLXBASISPATH']
+    basis_path = Path(environ["VLXBASISPATH"])
+    basis_files = sorted((x for x in basis_path.iterdir() if x.is_file()))
 
-    for root, dirs, files in walk(basis_path, topdown=True):
-        for filename in files:
-            basis_file = Path(basis_path, filename)
-            basis_dict = InputParser(str(basis_file)).input_dict
-            for key in list(basis_dict.keys()):
-                if 'atombasis_' in key:
-                    elem = key.replace('atombasis_', '')
-                    if element_label.upper() == elem.upper():
-                        avail_basis.add(filename)
-        # skip subfolder
-        break
+    for x in basis_files:
+        name = _file_to_name(x)
+        basis = InputParser(str(x)).input_dict
+        # check that the given element appears as key
+        # and that its value is a non-empty list
+        elem = f"atombasis_{element_label.lower()}"
+        if elem in basis.keys():
+            if basis[elem]:
+                avail_basis.add(name)
 
     return sorted(list(avail_basis))
 

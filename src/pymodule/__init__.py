@@ -100,7 +100,7 @@ from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 
 # Environment variable: basis set path and number of OpenMP threads
-from .environ import set_vlxbasispath, set_omp_num_threads
+from .environ import set_vlxbasispath, set_omp_num_threads, VLX_BASIS_PATH
 
 set_vlxbasispath()
 set_omp_num_threads()

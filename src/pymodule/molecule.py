@@ -51,7 +51,7 @@ def _Molecule_read_str(xyzstr, units='angstrom'):
     labels = []
     coords = []
 
-    for line in xyzstr.strip().split(os.linesep):
+    for line in xyzstr.strip().splitlines():
         if line:
             content = line.split()
             labels.append(content[0])
