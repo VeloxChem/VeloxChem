@@ -42,6 +42,22 @@ if "" not in sys.path:
 from config.generate_setup import generate_setup
 
 
+def read(rel_path):
+    here = Path(__file__).parent
+    f = here / rel_path
+    with f.open("r") as fp:
+        return fp.read()
+
+
+def get_version(rel_path):
+    for line in read(rel_path).splitlines():
+        if line.startswith("__version__"):
+            delim = '"' if '"' in line else "'"
+            return line.split(delim)[1]
+    else:
+        raise RuntimeError("Unable to find version string.")
+
+
 class MakefileExtension(Extension):
     def __init__(self, name, sourcedir=""):
         Extension.__init__(self, name, sources=[])
@@ -85,7 +101,7 @@ class MakefileBuild(build_ext):
 
 
 setup(
-    version="1.0rc1.post1",
+    version=get_version("src/pymodule/__init__.py"),
     package_data={
         "veloxchem":
         # glob and sort
