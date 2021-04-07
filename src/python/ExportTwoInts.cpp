@@ -361,7 +361,7 @@ export_twoints(py::module& m)
 
     // CCauchySchwarzScreener class
 
-    py::class_<CCauchySchwarzScreener, std::shared_ptr<CCauchySchwarzScreener>>(m, "CauchySchwarzScreener")
+    PyClass<CCauchySchwarzScreener>(m, "CauchySchwarzScreener")
         .def(py::init<>())
         .def(py::init<const CCauchySchwarzScreener&>())
         .def("get_threshold", &CCauchySchwarzScreener::getThreshold)
@@ -370,7 +370,7 @@ export_twoints(py::module& m)
 
     // CScreeningContainer class
 
-    py::class_<CScreeningContainer, std::shared_ptr<CScreeningContainer>>(m, "ScreeningContainer")
+    PyClass<CScreeningContainer>(m, "ScreeningContainer")
         .def(py::init<>())
         .def(py::init<const CScreeningContainer&>())
         .def("is_empty", &CScreeningContainer::isEmpty)
@@ -435,7 +435,7 @@ molecule with specific AO basis set. Performs screening according to
 
     // CMOIntsBatch class
 
-    py::class_<CMOIntsBatch, std::shared_ptr<CMOIntsBatch>>(m, "MOIntsBatch")
+    PyClass<CMOIntsBatch>(m, "MOIntsBatch")
         .def(py::init<>())
         .def("to_numpy", &CMOIntsBatch_to_numpy)
         .def("to_numpy", &CMOIntsBatch_to_numpy_2)

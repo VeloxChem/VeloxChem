@@ -370,7 +370,7 @@ export_math(py::module& m)
 {
     // CDenseMatrix class
 
-    py::class_<CDenseMatrix, std::shared_ptr<CDenseMatrix>>(m, "DenseMatrix")
+    PyClass<CDenseMatrix>(m, "DenseMatrix")
         .def(py::init<>())
         .def(py::init<const int32_t>())
         .def(py::init<const int32_t, const int32_t>())
@@ -386,7 +386,7 @@ export_math(py::module& m)
 
     // CTwoIndexes class
 
-    py::class_<CTwoIndexes, std::shared_ptr<CTwoIndexes>>(m, "TwoIndexes")
+    PyClass<CTwoIndexes>(m, "TwoIndexes")
         .def(py::init<>())
         .def(py::init<const int32_t, const int32_t>())
         .def("first", &CTwoIndexes::first)

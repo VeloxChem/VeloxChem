@@ -39,30 +39,14 @@
 #include "XTBDriver.hpp"
 
 namespace py = pybind11;
+using namespace py::literals;
 
 namespace vlx_xtb {  // vlx_xtb namespace
 
 // Exports classes/functions in src/xtb to python
 
-// Helper function for CXTBDriver constructor
-
-static std::shared_ptr<CXTBDriver>
-CXTBDriver_create(py::object py_comm)
-{
-    if (py_comm.is_none())
-    {
-        return std::make_shared<CXTBDriver>(MPI_COMM_WORLD);
-    }
-    else
-    {
-        auto comm = vlx_general::get_mpi_comm(py_comm);
-
-        return std::make_shared<CXTBDriver>(comm);
-    }
-}
-
 static py::array_t<double>
-CXTBDriver_gradient_to_numpy(CXTBDriver& self)
+CXTBDriver_gradient_to_numpy(const CXTBDriver& self)
 {
     auto grad = self.getGradient(); 
 
@@ -74,8 +58,8 @@ export_xtb(py::module& m)
 {
     // CXTBDriver class
 
-    py::class_<CXTBDriver, std::shared_ptr<CXTBDriver>>(m, "XTBDriver")
-        .def(py::init(&CXTBDriver_create), py::arg("py_comm") = py::none())
+    PyClass<CXTBDriver>(m, "XTBDriver")
+        .def(py::init(&vlx_general::create<CXTBDriver>), "comm"_a = py::none())
         .def("is_available", &CXTBDriver::isAvailable)
         .def("is_master_node", &CXTBDriver::isMasterNode)
         .def("set_max_iter", &CXTBDriver::setMaxIterations)
@@ -86,6 +70,7 @@ export_xtb(py::module& m)
         .def("get_output_filename", &CXTBDriver::getOutputFilename)
         .def("get_energy", &CXTBDriver::getEnergy)
         .def("get_gradient", &CXTBDriver_gradient_to_numpy)
+        // prefixed by an underscore because it will be decorated in xtbdriver.py
         .def("_compute", &CXTBDriver::compute);
 }
 

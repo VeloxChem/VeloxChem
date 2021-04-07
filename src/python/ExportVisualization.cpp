@@ -23,37 +23,21 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#include "ExportVisualization.hpp"
+
+#include <mpi.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <mpi.h>
-
 #include "CubicGrid.hpp"
 #include "ExportGeneral.hpp"
-#include "ExportVisualization.hpp"
 #include "VisualizationDriver.hpp"
 
 namespace py = pybind11;
+using namespace py::literals;
 
 namespace vlx_visualization {  // vlx_visualization namespace
-
-// Helper function for CVisualizationDriver constructor
-
-static std::shared_ptr<CVisualizationDriver>
-CVisualizationDriver_create(py::object py_comm)
-{
-    if (py_comm.is_none())
-    {
-        return std::make_shared<CVisualizationDriver>(MPI_COMM_WORLD);
-    }
-    else
-    {
-        auto comm = vlx_general::get_mpi_comm(py_comm);
-
-        return std::make_shared<CVisualizationDriver>(comm);
-    }
-}
 
 // Helper function for converting cubic grid values to 3d numpy array
 
@@ -76,7 +60,7 @@ export_visualization(py::module& m)
 {
     // CCubicGrid class
 
-    py::class_<CCubicGrid, std::shared_ptr<CCubicGrid>>(m, "CubicGrid")
+    PyClass<CCubicGrid>(m, "CubicGrid")
         .def(py::init<>())
         .def(py::init<const std::vector<double>&, const std::vector<double>&, const std::vector<int32_t>>())
         .def("x_origin", &CCubicGrid::originX)
@@ -93,25 +77,32 @@ export_visualization(py::module& m)
 
     // CVisualizationDriver class
 
-    py::class_<CVisualizationDriver, std::shared_ptr<CVisualizationDriver>>(m, "VisualizationDriver")
-        .def(py::init(&CVisualizationDriver_create), py::arg("py_comm") = py::none())
+    PyClass<CVisualizationDriver>(m, "VisualizationDriver")
+        .def(py::init(&vlx_general::create<CVisualizationDriver>), "comm"_a = py::none())
         .def("get_rank", &CVisualizationDriver::getRank)
+        .def(
+            "compute",
+            vlx_general::
+                overload_cast_<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CMolecularOrbitals&, const int32_t, const std::string&>()(
+                    &CVisualizationDriver::compute, py::const_),
+            "Compute molecular orbital values on cubic grid",
+            "grid"_a,
+            "molecule"_a,
+            "basis"_a,
+            "mos"_a,
+            "mo_idx"_a,
+            "mo_spin"_a)
         .def("compute",
-             (void (CVisualizationDriver::*)(CCubicGrid&,
-                                             const CMolecule&,
-                                             const CMolecularBasis&,
-                                             const CMolecularOrbitals&,
-                                             const int32_t,
-                                             const std::string&) const) &
-                 CVisualizationDriver::compute)
-        .def("compute",
-             (void (CVisualizationDriver::*)(CCubicGrid&,
-                                             const CMolecule&,
-                                             const CMolecularBasis&,
-                                             const CAODensityMatrix&,
-                                             const int32_t,
-                                             const std::string&) const) &
-                 CVisualizationDriver::compute)
+             vlx_general::
+                 overload_cast_<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CAODensityMatrix&, const int32_t, const std::string&>()(
+                     &CVisualizationDriver::compute, py::const_),
+             "Compute density values on cubic grid",
+             "grid"_a,
+             "molecule"_a,
+             "basis"_a,
+             "ao_density"_a,
+             "idx"_a,
+             "spin"_a)
         .def("get_mo", &CVisualizationDriver::getMO)
         .def("get_density", &CVisualizationDriver::getDensity)
         .def("get_two_particle_density", &CVisualizationDriver::getTwoParticleDensity);

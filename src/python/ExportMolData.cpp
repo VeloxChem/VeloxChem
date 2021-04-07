@@ -324,7 +324,7 @@ export_moldata(py::module& m)
 {
     // CMolecule class
 
-    py::class_<CMolecule, std::shared_ptr<CMolecule>>(m, "Molecule")
+    PyClass<CMolecule>(m, "Molecule")
         .def(py::init<>())
         .def(py::init<const CMolecule&>())
         .def(py::init<const CMolecule&, const CMolecule&>())
@@ -363,7 +363,7 @@ export_moldata(py::module& m)
 
     // CChemicalElement class
 
-    py::class_<CChemicalElement, std::shared_ptr<CChemicalElement>>(m, "ChemicalElement")
+    PyClass<CChemicalElement>(m, "ChemicalElement")
         .def(py::init<>())
         .def("set_atom_type", vlx_general::overload_cast_<const std::string&>()(&CChemicalElement::setAtomType), "label"_a)
         .def("set_atom_type", vlx_general::overload_cast_<const int32_t>()(&CChemicalElement::setAtomType), "idElemental"_a)
@@ -372,7 +372,7 @@ export_moldata(py::module& m)
 
     // CDispersionModel class
 
-    py::class_<CDispersionModel, std::shared_ptr<CDispersionModel>>(m, "DispersionModel")
+    PyClass<CDispersionModel>(m, "DispersionModel")
         .def(py::init<>())
         .def("compute", &CDispersionModel::compute)
         .def("get_energy", &CDispersionModel::getEnergy)
