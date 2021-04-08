@@ -112,7 +112,6 @@ class MOIntegralsDriver:
         nocc = molecule.number_of_alpha_electrons()
         mo_occ = mo[:, :nocc]
         mo_vir = mo[:, nocc:]
-        nao = mo.shape[0]
 
         err_msg = 'MOIntegralsDriver.compute_in_mem: invalid mints_type'
         assert_msg_critical(len(mints_type) == 4, err_msg)
@@ -121,9 +120,8 @@ class MOIntegralsDriver:
 
         mo_coefs = [mo_occ if x.lower() == 'o' else mo_vir for x in mints_type]
 
-        pqrs = np.zeros((nao, nao, nao, nao))
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        eri_drv.compute_in_mem(molecule, basis, pqrs)
+        pqrs = eri_drv.compute_in_mem(molecule, basis)
 
         # Note that we calculate the integrals in physicists' notation
 
