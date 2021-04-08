@@ -42,6 +42,7 @@
 #include "MOIntsBatch.hpp"
 #include "MOIntsType.hpp"
 #include "ScreeningContainer.hpp"
+#include "ExportOrbData.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -99,24 +100,7 @@ CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegra
 
     errors::assertMsgCritical(eri.ndim() == 4, errshape);
 
-    auto natoms = molecule.getNumberOfAtoms();
-
-    auto max_angl = basis.getMolecularMaxAngularMomentum(molecule);
-
-    int32_t nao = 0;
-
-    for (int32_t angl = 0; angl <= max_angl; angl++)
-    {
-        for (int32_t s = -angl; s <= angl; s++)
-        {
-            for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
-            {
-                int32_t idelem = molecule.getIdsElemental()[atomidx];
-
-                nao += basis.getNumberOfBasisFunctions(idelem, angl);
-            }
-        }
-    }
+    auto nao = vlx_orbdata::get_number_of_atomic_orbitals(molecule, basis);
 
     std::string errsize("ElectronRepulsionIntegralsDriver.compute_in_mem: Inconsistent size");
 
@@ -128,7 +112,7 @@ CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegra
 
     errors::assertMsgCritical(eri.shape(3) == nao, errsize);
 
-    self.computeInMemory(molecule, basis, static_cast<double*>(eri.request().ptr));
+    self.computeInMemory(molecule, basis, eri.mutable_data());
 }
 
 // Helper function for reduce_sum CAOFockMatrix object
@@ -431,7 +415,25 @@ molecule with specific AO basis set. Performs screening according to
              "molecule"_a,
              "ao_basis"_a,
              "screening"_a)
-        .def("compute_in_mem", &CElectronRepulsionIntegralsDriver_compute_in_mem);
+        .def("compute_in_mem",
+             &CElectronRepulsionIntegralsDriver_compute_in_mem,
+             "Computes electron repulsion integrals as a full 4D array and stores them in memory.",
+             "molecule"_a,
+             "basis"_a,
+             "eri_tensor"_a)
+        .def(
+            "compute_in_mem",
+            [](const CElectronRepulsionIntegralsDriver& obj, const CMolecule& molecule, const CMolecularBasis& basis) {
+                auto nao = vlx_orbdata::get_number_of_atomic_orbitals(molecule, basis);
+                auto eri = py::array_t<double, py::array::c_style>({nao, nao, nao, nao});
+
+                obj.computeInMemory(molecule, basis, eri.mutable_data());
+
+                return eri;
+            },
+            "Computes electron repulsion integrals as a full 4D array and stores them in memory.",
+            "molecule"_a,
+            "basis"_a);
 
     // CMOIntsBatch class
 

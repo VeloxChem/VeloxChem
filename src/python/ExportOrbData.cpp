@@ -43,6 +43,7 @@
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "GtoTransform.hpp"
+#include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularOrbitals.hpp"
 #include "MolecularOrbitalsType.hpp"
@@ -53,6 +54,31 @@ namespace py = pybind11;
 using namespace py::literals;
 
 namespace vlx_orbdata {  // vlx_orbdata namespace
+
+int32_t
+get_number_of_atomic_orbitals(const CMolecule& molecule, const CMolecularBasis& basis) noexcept
+{
+    auto natoms = molecule.getNumberOfAtoms();
+
+    auto max_angl = basis.getMolecularMaxAngularMomentum(molecule);
+
+    int32_t nao = 0;
+
+    for (int32_t angl = 0; angl <= max_angl; angl++)
+    {
+        for (int32_t s = -angl; s <= angl; s++)
+        {
+            for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
+            {
+                int32_t idelem = molecule.getIdsElemental()[atomidx];
+
+                nao += basis.getNumberOfBasisFunctions(idelem, angl);
+            }
+        }
+    }
+
+    return nao;
+}
 
 // Helper function for broadcasting CMolecularBasis object
 

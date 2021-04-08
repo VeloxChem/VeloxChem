@@ -28,9 +28,15 @@
 
 #include <pybind11/pybind11.h>
 
+class CMolecule;
+class CMolecularBasis;
+
 namespace py = pybind11;
 
 namespace vlx_orbdata {  // vlx_orbdata namespace
+
+int32_t
+get_number_of_atomic_orbitals(const CMolecule& molecule, const CMolecularBasis& basis) noexcept;
 
 /**
  Exports classes/functions in src/orbdata to python.
