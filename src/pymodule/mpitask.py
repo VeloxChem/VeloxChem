@@ -80,9 +80,7 @@ class MpiTask:
             output_fname = sys.stdout
 
             if len(fname_list) > 1:
-                if fname_list[1] is None:
-                    output_fname = None
-                elif isinstance(fname_list[1], str):
+                if isinstance(fname_list[1], str):
                     if fname_list[1].strip().split():
                         output_fname = fname_list[1].strip()
                         if ('\0' in output_fname or output_fname == '-' or
@@ -91,7 +89,7 @@ class MpiTask:
 
             assert_msg_critical(
                 Path(input_fname).is_file(),
-                'MpiTask: input file {} does not exist'.format(input_fname))
+                f'MpiTask: input file {input_fname} does not exist')
 
             assert_msg_critical(
                 input_fname != output_fname,

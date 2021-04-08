@@ -29,7 +29,6 @@ import time as tm
 from .veloxchemlib import mpi_initialized
 from .veloxchemlib import mpi_master
 from .cli import cli
-from .cli import print_help
 from .errorhandler import assert_msg_critical
 from .excitondriver import ExcitonModelDriver
 from .loprop import LoPropDriver
@@ -166,14 +165,12 @@ def main():
 
     # Parse command line
 
-    args = cli()
-
-    if not args.input_output_files:
-        print_help()
+    parser = cli()
+    args = parser.parse_args()
 
     # MPI task
 
-    task = MpiTask(args.input_output_files, MPI.COMM_WORLD)
+    task = MpiTask([args.input_file, args.output_file], MPI.COMM_WORLD)
     task_type = task.input_dict['jobs']['task'].lower()
 
     # Timelimit in hours

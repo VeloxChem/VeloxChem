@@ -23,9 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from mpi4py import MPI
 import argparse
-import sys
 
 from . import __version__
 from .veloxchemlib import mpi_master
@@ -33,37 +31,34 @@ from .veloxchemlib import mpi_master
 
 def cli():
     """
-    Parses argument strings.
+    Generate command-line argument parser.
 
     :return:
-        The populated namespace.
+        The parser.
     """
 
-    cli = argparse.ArgumentParser(description='Front-end CLI for VeloxChem')
-    cli.add_argument('-v', '--version', action='version', version=__version__)
-    cli.add_argument(
-        'input_output_files',
+    usage = """
+=================   VeloxChem   =================
+
+%(prog)s input_file [output_file]
+
+or
+
+python -m veloxchem input_file [output_file]
+    """
+    parser = argparse.ArgumentParser(prog="vlx", usage=usage)
+    parser.add_argument('-v', '--version', action='version', version=__version__)
+    parser.add_argument(
+        'input_file',
         type=str,
-        nargs=argparse.REMAINDER,
-        help='Input/Output files',
+        help='Input file',
+    )
+    parser.add_argument(
+        'output_file',
+        type=str,
+        nargs="?",
+        default=None,
+        help='Output file (default: STDOUT)',
     )
 
-    return cli.parse_args()
-
-
-def print_help():
-    """
-    Prints help text.
-    """
-
-    info_txt = [
-        '',
-        '=================   VeloxChem   =================',
-        '',
-        'Usage:',
-        '    python3 -m veloxchem input_file [output_file]',
-        '',
-    ]
-    if MPI.COMM_WORLD.Get_rank() == mpi_master():
-        print('\n'.join(info_txt), file=sys.stdout)
-    sys.exit(0)
+    return parser
