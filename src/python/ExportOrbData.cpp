@@ -25,12 +25,11 @@
 
 #include "ExportOrbData.hpp"
 
+#include <mpi.h>
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-
-#include <mpi.h>
 
 #include <fstream>
 #include <string>
@@ -43,10 +42,10 @@
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "GtoTransform.hpp"
-#include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularOrbitals.hpp"
 #include "MolecularOrbitalsType.hpp"
+#include "Molecule.hpp"
 #include "SADGuessDriver.hpp"
 #include "StringFormat.hpp"
 
@@ -241,7 +240,10 @@ export_orbdata(py::module& m)
 
     PyClass<CMolecularBasis>(m, "MolecularBasis")
         .def(py::init<>())
-        .def("get_string", vlx_general::overload_cast_<const std::string&, const CMolecule&>()(&CMolecularBasis::printBasis, py::const_), "title"_a, "molecule"_a)
+        .def("get_string",
+             vlx_general::overload_cast_<const std::string&, const CMolecule&>()(&CMolecularBasis::printBasis, py::const_),
+             "title"_a,
+             "molecule"_a)
         .def("get_string", vlx_general::overload_cast_<const CMolecule&>()(&CMolecularBasis::printBasis, py::const_), "molecule"_a)
         .def("set_label", &CMolecularBasis::setLabel)
         .def("get_label", &CMolecularBasis::getLabel)
@@ -319,14 +321,13 @@ export_orbdata(py::module& m)
              "n_alpha_electrons"_a,
              "n_beta_electrons"_a)
         .def("get_pair_density",
-             vlx_general::overload_cast_<const std::vector<int32_t>&, const std::vector<int32_t>&>()(
-                 &CMolecularOrbitals::getRestrictedPairDensity, py::const_),
+             vlx_general::overload_cast_<const std::vector<int32_t>&, const std::vector<int32_t>&>()(&CMolecularOrbitals::getRestrictedPairDensity,
+                                                                                                     py::const_),
              "Computes set of restricted pair C_i C_j^T density matrices in AO basis",
              "i"_a,
              "j"_a)
         .def("get_pair_density",
-             vlx_general::overload_cast_<const int32_t, const int32_t>()(
-                 &CMolecularOrbitals::getRestrictedPairDensity, py::const_),
+             vlx_general::overload_cast_<const int32_t, const int32_t>()(&CMolecularOrbitals::getRestrictedPairDensity, py::const_),
              "Computes restricted pair C_i C_j^T density matrix in AO basis",
              "i"_a,
              "j"_a)
@@ -343,6 +344,11 @@ export_orbdata(py::module& m)
              "Get beta orbitals within specific range",
              "i"_a,
              "n_orbitals"_a)
+        .def("transform",
+             &CMolecularOrbitals::transform,
+             "Transform matrix in AO basis to matrix in MO basis using selected molecular orbitals.",
+             "ao_matrix"_a,
+             "spin_block"_a)
         .def("broadcast", &CMolecularOrbitals_broadcast)
         .def(py::self == py::self);
 
