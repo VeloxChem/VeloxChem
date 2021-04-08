@@ -25,6 +25,7 @@
 
 from pathlib import Path
 import numpy as np
+import os
 import geometric
 
 from .veloxchemlib import Molecule
@@ -62,22 +63,34 @@ def _Molecule_read_str(xyzstr, units='angstrom'):
 @staticmethod
 def _Molecule_read_xyz(xyzfile):
     """
-    Reads molecule from xyz file.
+    Reads molecule from file in XYZ format.
 
     :param xyzfile:
-        The name of the xyz file.
+        File with molecular structure in XYZ format.
 
     :return:
         The molecule.
     """
 
-    xyzstr = ''
+    with Path(xyzfile).open('r') as fh:
+        xyzstr = "\n".join(fh.readlines()[2:])
 
-    with open(str(xyzfile), 'r') as f_xyz:
-        natoms = int(f_xyz.readline().split()[0])
-        f_xyz.readline()
-        for a in range(natoms):
-            xyzstr += f_xyz.readline().strip() + '\n'
+    return xyzstr
+
+
+@staticmethod
+def _Molecule_from_xyz(xyz):
+    """
+    Generate molecule from string in XYZ format.
+
+    :param xyz:
+        String with XYZ structure.
+
+    :return:
+        The molecule.
+    """
+
+    xyzstr = "\n".join(xyz.strip().split(os.linesep)[2:])
 
     return Molecule.read_str(xyzstr, 'angstrom')
 
@@ -306,6 +319,7 @@ def _Molecule_write_xyz(self, xyz_filename):
 
 Molecule.read_str = _Molecule_read_str
 Molecule.read_xyz = _Molecule_read_xyz
+Molecule.from_xyz = _Molecule_from_xyz
 Molecule.from_dict = _Molecule_from_dict
 Molecule.center_of_mass = _Molecule_center_of_mass
 Molecule.more_info = _Molecule_more_info

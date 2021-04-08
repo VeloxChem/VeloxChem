@@ -1,14 +1,13 @@
 import warnings
 
-from .veloxchemlib import (AngularMomentumIntegralsDriver,
-                           ElectricDipoleIntegralsDriver)
+from .veloxchemlib import AngularMomentumIntegralsDriver, ElectricDipoleIntegralsDriver
 
 
 def _electric_dipole_integrals_driver_set_origin(
     self, x: float, y: float, z: float
 ) -> None:
     warnings.warn(
-        "Using the function `veloxchem.ElectricDipoleIntegralsDriver.set_origin` instead of the setter property`veloxchem.ElectricDipoleIntegralsDriver.origin` is deprecated and in future versions will stop working.\n",
+        "Using the function `veloxchem.ElectricDipoleIntegralsDriver.set_origin` instead of the setter property `veloxchem.ElectricDipoleIntegralsDriver.origin` is deprecated and in future versions will stop working.\n",
         category=FutureWarning,
         stacklevel=2,
     )
@@ -23,7 +22,7 @@ def _angular_momentum_integrals_driver_set_origin(
     self, x: float, y: float, z: float
 ) -> None:
     warnings.warn(
-        "Using the function `veloxchem.AngularMomentumIntegralsDriver.set_origin` instead of the setter property`veloxchem.AngularMomentumIntegralsDriver.origin` is deprecated and in future versions will stop working.\n",
+        "Using the function `veloxchem.AngularMomentumIntegralsDriver.set_origin` instead of the setter property `veloxchem.AngularMomentumIntegralsDriver.origin` is deprecated and in future versions will stop working.\n",
         category=FutureWarning,
         stacklevel=2,
     )
