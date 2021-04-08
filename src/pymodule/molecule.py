@@ -75,7 +75,7 @@ def _Molecule_read_xyz(xyzfile):
     with Path(xyzfile).open('r') as fh:
         xyzstr = "\n".join(fh.readlines()[2:])
 
-    return xyzstr
+    return Molecule.read_str(xyzstr, units="angstrom")
 
 
 @staticmethod
@@ -190,10 +190,10 @@ def _Molecule_get_labels(self):
 
 def _Molecule_get_coordinates(self):
     """
-    Returns atom coordinates.
+    Returns atom coordinates in atomic units.
 
     :return:
-        A numpy array of atom coordinates (nx3).
+        A numpy array of atom coordinates (nx3) in atomic units.
     """
 
     return np.array([
