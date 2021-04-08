@@ -296,6 +296,7 @@ export_orbdata(py::module& m)
         .def("number_of_density_matrices", &CAODensityMatrix::getNumberOfDensityMatrices)
         .def("get_density_type", &CAODensityMatrix::getDensityType)
         .def("sub", &CAODensityMatrix::sub)
+        .def("append", &CAODensityMatrix::append)
         .def("broadcast", &CAODensityMatrix_broadcast)
         .def(py::self == py::self);
 
