@@ -121,20 +121,20 @@ class PulsedResponse:
             'centers', 'CEP', 'field_max'
         ]
 
-    def update_settings(self, settings, cpp_settings):
+    def update_settings(self, settings, cpp_settings, method_settings=None):
         """
         Updates settings in PulsedRespnse
 
         :param settings:
             The settings dictionary for the driver.
-
         :param cpp_settings:
             The settings dictionary for complex response driver.
+        :param method_settings:
+            The dictionary of method settings.
         """
 
-        # Default CRSP settings (if nothing else given,
-        # it will use defaults in cpp.cpp)
-        # cpp_settings['rot_averaging'] = False
+        if method_settings is None:
+            method_settings = {}
 
         # Update the default args with the user provided inputs
         self.pulse_settings.update(settings)
@@ -234,7 +234,7 @@ class PulsedResponse:
             'b_components': self.pulse_settings['pol_dir']
         })
         self.rsp_driver = ComplexResponse(self.comm, self.ostream)
-        self.rsp_driver.update_settings(cpp_settings)
+        self.rsp_driver.update_settings(cpp_settings, method_settings)
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """

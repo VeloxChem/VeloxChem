@@ -345,7 +345,7 @@ def main():
             cpp_dict['restart'] = 'no'
 
         pulsed_response = PulsedResponse(task.mpi_comm, task.ostream)
-        pulsed_response.update_settings(prt_dict, cpp_dict)
+        pulsed_response.update_settings(prt_dict, cpp_dict, method_dict)
         pulsed_response.compute(task.molecule, task.ao_basis, scf_tensors)
 
     # MP2 perturbation theory
