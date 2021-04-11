@@ -362,6 +362,8 @@ def generate_setup(
         xtb_lib += f"XTB_LIB := -L{str(xtb_dir)} -Wl,-rpath,{str(xtb_dir)} -lxtb\n"
         xtb_lib += f"XTB_PATH := {str(xtb_path)}\n"
 
+        print(f"*** Checking XTB... {xtb_root}")
+
     # google test lib
 
     gtest_root = os.getenv("GTESTROOT", sys.prefix)

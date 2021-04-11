@@ -262,13 +262,17 @@ def main():
             if task.mpi_rank == mpi_master():
                 scf_prop.print_properties(task.molecule)
 
+            if scf_drv.electric_field is not None:
+                task.finish()
+                return
+
     # Gradient
 
     if task_type == 'gradient':
         if use_xtb:
             grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
             grad_drv.compute(task.molecule)
-        elif scf_drv.restricted:
+        elif scf_drv.closed_shell:
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
             grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
@@ -290,7 +294,7 @@ def main():
             grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
             opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
                                          'XTB')
-        elif scf_drv.restricted:
+        elif scf_drv.closed_shell:
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
             opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
                                          'SCF')
@@ -300,7 +304,7 @@ def main():
 
     # Response
 
-    if task_type == 'response' and scf_drv.restricted:
+    if task_type == 'response' and scf_drv.closed_shell:
         if 'response' in task.input_dict:
             rsp_dict = dict(task.input_dict['response'])
         else:
@@ -330,7 +334,7 @@ def main():
     # Pulsed Linear Response Theory
 
     if ((task_type == 'pulses' or 'pulses' in task.input_dict) and
-            scf_drv.restricted):
+            scf_drv.closed_shell):
         if 'pulses' in task.input_dict:
             prt_dict = task.input_dict['pulses']
         else:
@@ -350,7 +354,7 @@ def main():
 
     # MP2 perturbation theory
 
-    if task_type == 'mp2' and scf_drv.restricted:
+    if task_type == 'mp2' and scf_drv.closed_shell:
         if 'mp2' in task.input_dict:
             mp2_dict = task.input_dict['mp2']
         else:

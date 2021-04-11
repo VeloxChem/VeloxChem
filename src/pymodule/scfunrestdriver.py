@@ -62,7 +62,7 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         super().__init__(comm, ostream)
 
-        self.restricted = False
+        self.closed_shell = False
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """

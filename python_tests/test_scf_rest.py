@@ -22,13 +22,16 @@ from veloxchem.qqscheme import get_qq_scheme
 
 class TestScfRestricted(unittest.TestCase):
 
-    def run_scf(self, inpfile, potfile, xcfun_label, ref_e_scf, ref_dip):
+    def run_scf(self, inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
+                ref_dip):
 
         task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
 
         if potfile is not None:
             task.input_dict['method_settings']['potfile'] = potfile
+        elif electric_field is not None:
+            task.input_dict['scf']['electric_field'] = electric_field
 
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
@@ -53,49 +56,76 @@ class TestScfRestricted(unittest.TestCase):
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
-
         potfile = None
 
         xcfun_label = None
+        electric_field = None
 
-        #    Final HF energy:             -76.041697549811
         ref_e_scf = -76.041697549811
-
         ref_dip = np.array([0.000000, 0.000000, 0.786770])
 
-        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
+        self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
+                     ref_dip)
+
+    def test_scf_hf_efield(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water.inp')
+        potfile = None
+
+        xcfun_label = None
+        electric_field = '0, 0, -0.03'
+
+        ref_e_scf = -76.0688447658
+        ref_dip = np.array([0.000000, 0.000000, 1.023625])
+
+        self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
+                     ref_dip)
 
     def test_scf_dft(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
-
         potfile = None
 
         xcfun_label = 'b3lyp'
+        electric_field = None
 
-        #    Final DFT energy:            -76.443545741524
         ref_e_scf = -76.443545741524
-
         ref_dip = np.array([0.000000, 0.000000, 0.731257])
 
-        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
+        self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
+                     ref_dip)
 
     def test_scf_dft_slda(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
-
         potfile = None
 
         xcfun_label = 'slda'
+        electric_field = None
 
-        #    Final DFT energy:            -76.074208234637
         ref_e_scf = -76.074208234637
-
         ref_dip = np.array([0.000000, 0.000000, 0.731291])
 
-        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
+        self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
+                     ref_dip)
+
+    def test_scf_dft_slda_efield(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water.inp')
+        potfile = None
+
+        xcfun_label = 'slda'
+        electric_field = '-0.001, 0, 0'
+
+        ref_e_scf = -76.0742203744
+        ref_dip = np.array([0.009288, 0.000000, 0.731285])
+
+        self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
+                     ref_dip)
 
     @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_scf_hf_pe(self):
@@ -105,13 +135,13 @@ class TestScfRestricted(unittest.TestCase):
         potfile = str(here / 'inputs' / 'pe_water.pot')
 
         xcfun_label = None
+        electric_field = None
 
-        #    Final HF energy:             -76.067159426565
         ref_e_scf = -76.067159426565
-
         ref_dip = np.array([-0.039715, 0.098785, 0.945128])
 
-        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
+        self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
+                     ref_dip)
 
     @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_scf_dft_pe(self):
@@ -121,13 +151,13 @@ class TestScfRestricted(unittest.TestCase):
         potfile = str(here / 'inputs' / 'pe_water.pot')
 
         xcfun_label = 'b3lyp'
+        electric_field = None
 
-        #    Final DFT energy:            -76.468733754150
         ref_e_scf = -76.468733754150
-
         ref_dip = np.array([-0.048195, 0.098715, 0.902822])
 
-        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
+        self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
+                     ref_dip)
 
     def test_comp_fock_split_comm(self):
 
