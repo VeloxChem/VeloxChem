@@ -258,7 +258,7 @@ def generate_setup(
                 os.linesep + f"MATH_LIB += -lmkl_rt -Wl,--no-as-needed -lpthread -lm -ldl"
             )
 
-        if is_ubuntu and not use_intel:
+        if is_linux and not use_intel:
             conf = {
                 "@_mkl_interface_layer_@": "MKL_INTERFACE_LP64+MKL_INTERFACE_GNU",
                 "@_mkl_threading_layer_@": "MKL_THREADING_GNU",
