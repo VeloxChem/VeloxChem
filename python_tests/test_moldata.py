@@ -10,9 +10,10 @@ from veloxchem.veloxchemlib import ChemicalElement, DispersionModel, bohr_in_ang
 
 
 class TestMolData(unittest.TestCase):
+
     def nh3_labels(self):
 
-        return ["N", "H", "H", "H"]
+        return ['N', 'H', 'H', 'H']
 
     def nh3_coords(self):
 
@@ -35,7 +36,7 @@ class TestMolData(unittest.TestCase):
         labels = self.nh3_labels()
         coords = self.nh3_coords()
 
-        return Molecule(labels, coords, "au")
+        return Molecule(labels, coords, 'au')
 
     def test_constructors(self):
 
@@ -43,8 +44,8 @@ class TestMolData(unittest.TestCase):
         coords = self.nh3_coords()
         xyzstr = self.nh3_xyzstr()
 
-        mol_1 = Molecule(labels, coords, "au")
-        mol_2 = Molecule.read_str(xyzstr, "au")
+        mol_1 = Molecule(labels, coords, 'au')
+        mol_2 = Molecule.read_str(xyzstr, 'au')
 
         array = np.array(coords)
         arrayT = np.zeros((array.shape[1], array.shape[0]))
@@ -52,16 +53,16 @@ class TestMolData(unittest.TestCase):
             for j in range(array.shape[1]):
                 arrayT[j][i] = array[i][j]
 
-        mol_3 = Molecule(labels, array, "au")
-        mol_4 = Molecule(labels, arrayT.T, "au")
+        mol_3 = Molecule(labels, array, 'au')
+        mol_4 = Molecule(labels, arrayT.T, 'au')
 
         array_ang = array * bohr_in_angstroms()
 
         mol_5 = Molecule(labels, array_ang)
-        mol_6 = Molecule(labels, array_ang, "angstrom")
+        mol_6 = Molecule(labels, array_ang, 'angstrom')
 
-        mol_7 = Molecule([7, 1, 1, 1], array, "au")
-        mol_8 = Molecule([7, 1, 1, 1], array_ang, "angstrom")
+        mol_7 = Molecule([7, 1, 1, 1], array, 'au')
+        mol_8 = Molecule([7, 1, 1, 1], array_ang, 'angstrom')
         mol_9 = Molecule([7, 1, 1, 1], array_ang)
 
         self.assertEqual(mol_1, mol_2)
@@ -76,8 +77,8 @@ class TestMolData(unittest.TestCase):
     def test_get_sub_molecule(self):
 
         here = Path(__file__).parent
-        inpfile = here / "inputs" / "dimer.inp"
-        outfile = inpfile.with_suffix(".out")
+        inpfile = here / 'inputs' / 'dimer.inp'
+        outfile = inpfile.with_suffix('.out')
 
         task = MpiTask([str(inpfile), str(outfile)])
         molecule = task.molecule
@@ -145,8 +146,7 @@ class TestMolData(unittest.TestCase):
 
         # fake molecule made of H,Li,C,N,O,S,Cu,Zn,Br,Ag,Au,Hg
 
-        mol = Molecule.read_str(
-            """H    0.0   0.0   0.0
+        mol = Molecule.read_str("""H    0.0   0.0   0.0
                                    Li   0.0   0.0   1.0
                                    C    0.0   0.0   2.0
                                    N    0.0   0.0   3.0
@@ -157,14 +157,14 @@ class TestMolData(unittest.TestCase):
                                    Br   0.0   0.0   8.0
                                    Ag   0.0   0.0   9.0
                                    Au   0.0   0.0  10.0
-                                   Hg   0.0   0.0  11.0"""
-        )
+                                   Hg   0.0   0.0  11.0""")
 
         atom_radii = mol.vdw_radii_to_numpy()
 
-        ref_radii = np.array(
-            [1.09, 1.82, 1.70, 1.55, 1.52, 1.80, 1.40, 1.39, 1.85, 1.72, 1.66, 1.55]
-        )
+        ref_radii = np.array([
+            1.09, 1.82, 1.70, 1.55, 1.52, 1.80, 1.40, 1.39, 1.85, 1.72, 1.66,
+            1.55
+        ])
 
         ref_radii /= bohr_in_angstroms()
 
@@ -181,13 +181,13 @@ class TestMolData(unittest.TestCase):
     def test_chemical_element(self):
 
         elem = ChemicalElement()
-        self.assertEqual("", elem.get_name())
-        elem.set_atom_type("BR")
-        self.assertEqual("Br", elem.get_name())
+        self.assertEqual('', elem.get_name())
+        elem.set_atom_type('BR')
+        self.assertEqual('Br', elem.get_name())
 
         elem2 = ChemicalElement()
         elem2.set_atom_type(35)
-        self.assertEqual("Br", elem2.get_name())
+        self.assertEqual('Br', elem2.get_name())
 
         self.assertEqual(elem, elem2)
 
@@ -340,5 +340,5 @@ class TestMolData(unittest.TestCase):
                 self.assertTrue(np.max(np.abs(coords - ref_coords)) < 1.0e-10)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

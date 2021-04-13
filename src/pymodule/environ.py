@@ -29,12 +29,14 @@ from pathlib import Path
 from sys import stdout
 
 
-VLX_BASIS_PATH = Path(__file__).parent / "basis"
+def get_basis_path():
+    """Returns location of basis files within module."""
+    return Path(__file__).parent / "basis"
+
 
 def set_vlxbasispath():
     if 'VLXBASISPATH' not in environ:
-        module_path = Path(__file__).parent
-        environ['VLXBASISPATH'] = str(VLX_BASIS_PATH)
+        environ['VLXBASISPATH'] = str(get_basis_path())
 
 
 def set_omp_num_threads(ncores=None):

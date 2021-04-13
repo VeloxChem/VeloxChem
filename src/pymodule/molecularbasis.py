@@ -34,31 +34,19 @@ from .veloxchemlib import (AtomBasis, BasisFunction, ChemicalElement,
 
 
 def _known_aliases():
-    return {
-        "6-31+G_D,P_": [
-            "6-31+G**",
-            "6-31+G(D,P)",
-        ],
-        "6-311++G_2D,2P_": [
-            "6-311++G(2D,2P)",
-        ],
-        "6-311++G_D,P_": [
-            "6-311++G**",
-            "6-311++G(D,P)",
-        ],
-        "6-311+G_2D,P_": [
-            "6-311+G(2D,P)",
-        ],
-        "6-311G_2DF,2PD_": [
-            "6-311G(2DF,2PD)",
-        ],
-        "6-31G_2DF,P_": [
-            "6-31G(2DF,P)",
-        ],
-        "DEF2-SV_P_": [
-            "DEF2-SV(P)",
-        ],
+    """Mapping from common basis name to basis filename."""
+    aliases = {
+        '6-31+G**': '6-31+G_D,P_',
+        '6-31+G(D,P)': '6-31+G_D,P_',
+        '6-311++G(2D,2P)': '6-311++G_2D,2P_',
+        '6-311++G**': '6-311++G_D,P_',
+        '6-311++G(D,P)': '6-311++G_D,P_',
+        '6-311+G(2D,P)': '6-311+G_2D,P_',
+        '6-311G(2DF,2PD)': '6-311G_2DF,2PD_',
+        '6-31G(2DF,P)': '6-31G_2DF,P_',
+        'DEF2-SV(P)': 'DEF2-SV_P_',
     }
+    return aliases
 
 
 def _name_to_file(name):
@@ -72,12 +60,10 @@ def _name_to_file(name):
         The file containing the basis set.
     """
 
-    basis_file = name
-    for k, v in _known_aliases().items():
-        if name in v:
-            basis_file = k
-
-    return basis_file
+    if name in _known_aliases().keys():
+        return _known_aliases()[name]
+    else:
+        return name
 
 
 def _file_to_name(fname):
@@ -91,20 +77,27 @@ def _file_to_name(fname):
         The conventional name of the basis set.
     """
 
-    fname_ = fname if isinstance(fname, str) else fname.name
-    basis_name = fname_
+    # invert _known_aliases mapping
+    inv = {}
     for k, v in _known_aliases().items():
-        if fname_ == k:
-            basis_name = v[0]
+        if v in inv.keys():
+            inv[v].append(k)
+        else:
+            inv[v] = [k]
 
-    return basis_name
+    fname_ = fname if isinstance(fname, str) else fname.name
+    if fname_ in _known_aliases().values():
+        # use first common alias
+        return inv[fname_][0]
+    else:
+        return fname_
 
 
 @staticmethod
 def _MolecularBasis_read(mol,
                          basis_name,
                          basis_path='.',
-                         ostream=OutputStream()):
+                         ostream=None):
     """
     Reads AO basis set from file.
 
@@ -115,7 +108,7 @@ def _MolecularBasis_read(mol,
     :param basis_path:
         Path to the basis set.
     :param ostream:
-        The outputstream.
+        The output stream.
 
     :return:
         The AO basis set.
@@ -124,8 +117,8 @@ def _MolecularBasis_read(mol,
     if ostream is None:
         ostream = OutputStream(None)
 
-    err_gc = "MolcularBasis.read: "
-    err_gc += "General contraction currently is not supported"
+    err_gc = 'MolcularBasis.read: '
+    err_gc += 'General contraction currently is not supported'
 
     # de-alias basis set name to basis set file
     fname = _name_to_file(basis_name.upper())
@@ -137,21 +130,21 @@ def _MolecularBasis_read(mol,
 
     basis_file = Path(basis_path, fname)
 
-    if not basis_file.is_file() and basis_path != ".":
-        basis_file = Path(".", fname)
+    if not basis_file.is_file() and basis_path != '.':
+        basis_file = Path('.', fname)
 
-    if not basis_file.is_file() and "VLXBASISPATH" in environ:
-        basis_file = Path(environ["VLXBASISPATH"], fname)
+    if not basis_file.is_file() and 'VLXBASISPATH' in environ:
+        basis_file = Path(environ['VLXBASISPATH'], fname)
 
-    basis_info = "Reading basis set: " + str(basis_file)
+    basis_info = 'Reading basis set: ' + str(basis_file)
     ostream.print_info(basis_info)
     ostream.print_blank()
 
     basis_dict = InputParser(str(basis_file)).input_dict
 
     assert_msg_critical(
-        basis_name.upper() == basis_dict["basis_set_name"].upper(),
-        "MolecularBasis.read: Inconsistent basis set name",
+        basis_name.upper() == basis_dict['basis_set_name'].upper(),
+        'MolecularBasis.read: Inconsistent basis set name',
     )
 
     mol_basis = MolecularBasis()
@@ -162,9 +155,9 @@ def _MolecularBasis_read(mol,
 
         elem = ChemicalElement()
         err = elem.set_atom_type(elem_id)
-        assert_msg_critical(err, "ChemicalElement.set_atom_type")
+        assert_msg_critical(err, 'ChemicalElement.set_atom_type')
 
-        basis_key = "atombasis_{}".format(elem.get_name().lower())
+        basis_key = 'atombasis_{}'.format(elem.get_name().lower())
         basis_list = [entry for entry in basis_dict[basis_key]]
 
         atom_basis = AtomBasis()
@@ -173,7 +166,7 @@ def _MolecularBasis_read(mol,
             shell_title = basis_list.pop(0).split()
             assert_msg_critical(
                 len(shell_title) == 3,
-                "Basis set parser (shell): {}".format(" ".join(shell_title)),
+                'Basis set parser (shell): {}'.format(' '.join(shell_title)),
             )
 
             angl = to_angular_momentum(shell_title[0])
@@ -189,7 +182,7 @@ def _MolecularBasis_read(mol,
                 prims = basis_list.pop(0).split()
                 assert_msg_critical(
                     len(prims) == ncgto + 1,
-                    "Basis set parser (primitive): {}".format(" ".join(prims)),
+                    'Basis set parser (primitive): {}'.format(' '.join(prims)),
                 )
 
                 expons[i] = float(prims[0])
@@ -226,7 +219,7 @@ def _MolecularBasis_get_avail_basis(element_label):
 
     avail_basis = set()
 
-    basis_path = Path(environ["VLXBASISPATH"])
+    basis_path = Path(environ['VLXBASISPATH'])
     basis_files = sorted((x for x in basis_path.iterdir() if x.is_file()))
 
     for x in basis_files:
@@ -234,7 +227,7 @@ def _MolecularBasis_get_avail_basis(element_label):
         basis = InputParser(str(x)).input_dict
         # check that the given element appears as key
         # and that its value is a non-empty list
-        elem = f"atombasis_{element_label.lower()}"
+        elem = f'atombasis_{element_label.lower()}'
         if elem in basis.keys():
             if basis[elem]:
                 avail_basis.add(name)
