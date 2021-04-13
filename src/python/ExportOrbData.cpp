@@ -86,7 +86,7 @@ CMolecularBasis_broadcast(CMolecularBasis& self, int32_t rank, py::object py_com
 {
     auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.broadcast(rank, comm);
+    self.broadcast(rank, *comm);
 }
 
 // Helper function for converting CAODensityMatrix to numpy array
@@ -129,7 +129,7 @@ CAODensityMatrix_broadcast(CAODensityMatrix& self, int32_t rank, py::object py_c
 {
     auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.broadcast(rank, comm);
+    self.broadcast(rank, *comm);
 }
 
 // Helper function for converting CMolecularOrbitals to numpy array
@@ -204,7 +204,7 @@ CMolecularOrbitals_broadcast(CMolecularOrbitals& self, int32_t rank, py::object 
 {
     auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.broadcast(rank, comm);
+    self.broadcast(rank, *comm);
 }
 
 // Exports classes/functions in src/orbdata to python

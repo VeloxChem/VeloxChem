@@ -57,7 +57,7 @@ get_mpi_comm(py::object py_comm)
 {
     auto comm_ptr = PyMPIComm_Get(py_comm.ptr());
 
-    if (comm_ptr == nullptr) throw py::error_already_set();
+    if (!comm_ptr) throw py::error_already_set();
 
     return comm_ptr;
 }
@@ -73,9 +73,8 @@ is_mpi_master(py::object py_comm)
     }
     else
     {
-        auto comm_ptr = get_mpi_comm(py_comm);
-
-        return (mpi::rank(*comm_ptr) == mpi::master());
+        auto comm = get_mpi_comm(py_comm);
+        return (mpi::rank(*comm) == mpi::master());
     }
 }
 
@@ -90,9 +89,8 @@ is_single_node(py::object py_comm)
     }
     else
     {
-        auto comm_ptr = get_mpi_comm(py_comm);
-
-        return (mpi::nodes(*comm_ptr) == 1);
+        auto comm = get_mpi_comm(py_comm);
+        return (mpi::nodes(*comm) == 1);
     }
 }
 
@@ -230,12 +228,13 @@ export_general(py::module& m)
     }
 
     // szblock enum class
-
+    // clang-format off
     py::enum_<szblock>(m, "szblock")
         .value("aa", szblock::aa)
         .value("ab", szblock::ab)
         .value("ba", szblock::ba)
         .value("bb", szblock::bb);
+    // clang-format on
 
     // exposing functions
 

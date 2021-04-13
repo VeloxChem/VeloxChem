@@ -315,7 +315,7 @@ class CMolecularBasis
 
      @param molecule the molecule.
      */
-    std::string printBasis(const CMolecule& molecule) const { return printBasis(_label, molecule); }
+    std::string printBasis(const CMolecule& molecule) const { return printBasis("Atomic Basis", molecule); }
 
     /**
      Broadcasts molecular basis object within domain of MPI communicator.

@@ -204,7 +204,7 @@ const double*
 CElectricFieldMatrix::values(int32_t cart) const noexcept
 {
     auto d = static_cast<cartesians>(cart);
-    return this->values(d);
+    return values(d);
 }
 
 std::string

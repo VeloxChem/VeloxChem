@@ -357,7 +357,7 @@ CMemBlock<T>::CMemBlock(const std::vector<T>& dataVector)
 {
     _allocate();
 
-    std::memcpy(_data, dataVector.data(), _nElements * sizeof(T));
+    _copy(dataVector.data());
 }
 
 template <typename T>
@@ -371,7 +371,7 @@ CMemBlock<T>::CMemBlock(const T* source, int32_t nElements, numa numaPolicy)
 {
     _allocate();
 
-    std::memcpy(_data, source, _nElements * sizeof(T));
+    _copy(source);
 }
 
 template <class T>

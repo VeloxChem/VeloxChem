@@ -6,7 +6,8 @@
 //  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
 //  Contact: https://veloxchem.org/contact
 
-#pragma once
+#ifndef CartesianComponents_hpp
+#define CartesianComponents_hpp
 
 /**
  Enumerate class cartesians:
@@ -23,3 +24,5 @@ enum class cartesians : int32_t
     Y = 1,
     Z = 2
 };
+
+#endif /* CartesianComponents_hpp */

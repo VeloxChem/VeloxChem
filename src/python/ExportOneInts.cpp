@@ -96,7 +96,7 @@ export_oneints(py::module& m)
             "reduce_sum",
             [](CNuclearPotentialMatrix& obj, int32_t rank, int32_t nodes, py::object py_comm) -> void {
                 auto comm = vlx_general::get_mpi_comm(py_comm);
-                obj.reduce_sum(rank, nodes, comm);
+                obj.reduce_sum(rank, nodes, *comm);
             },
             "Sum-reduce nuclear potential matrix object from all MPI ranks within the communicator into nuclear potential matrix object on "
             "master node.",

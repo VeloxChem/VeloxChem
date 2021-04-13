@@ -51,7 +51,7 @@ namespace vlx_general {  // vlx_general namespace
  @param py_comm mpi4py communicator object.
  @return the MPI_Comm pointer.
  */
-MPI_Comm get_mpi_comm(py::object py_comm);
+MPI_Comm* get_mpi_comm(py::object py_comm);
 
 /**
  Gets numpy array from double pointer and int32_t dimension.
@@ -159,7 +159,14 @@ template <typename T, typename... Args>
 inline std::shared_ptr<T>
 create(py::object py_comm, Args&&... args)
 {
-    return std::make_shared<T>(get_mpi_comm(py_comm), std::forward<Args>(args)...);
+    if (py_comm.is_none())
+    {
+        return std::make_shared<T>(MPI_COMM_WORLD, std::forward<Args>(args)...);
+    }
+    else
+    {
+        return std::make_shared<T>(*get_mpi_comm(py_comm), std::forward<Args>(args)...);
+    }
 }
 
 /**

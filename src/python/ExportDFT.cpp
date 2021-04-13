@@ -63,7 +63,7 @@ CAOKohnShamMatrix_reduce_sum(CAOKohnShamMatrix& self, int32_t rank, int32_t node
 {
     auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.reduce_sum(rank, nodes, comm);
+    self.reduce_sum(rank, nodes, *comm);
 }
 
 // Helper function for collect CAOKohnShamMatrix object
@@ -73,7 +73,7 @@ CAOKohnShamMatrix_collect(CAOKohnShamMatrix& self, int32_t rank, int32_t nodes, 
 {
     auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.collect(rank, nodes, comm, source);
+    self.collect(rank, nodes, *comm, source);
 }
 
 // Helper function for getting grid coordinates and weigths as numpy array
@@ -109,7 +109,7 @@ CMolecularGrid_distribute(CMolecularGrid& self, int32_t rank, int32_t nodes, py:
 {
     auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.distribute(rank, nodes, comm);
+    self.distribute(rank, nodes, *comm);
 }
 
 // Helper function for broadcasting CMolecularGrid object
@@ -119,7 +119,7 @@ CMolecularGrid_broadcast(CMolecularGrid& self, int32_t rank, py::object py_comm)
 {
     auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.broadcast(rank, comm);
+    self.broadcast(rank, *comm);
 }
 
 void
