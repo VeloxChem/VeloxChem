@@ -143,7 +143,7 @@ def _MolecularBasis_read(mol,
     basis_dict = InputParser(str(basis_file)).input_dict
 
     assert_msg_critical(
-        basis_name.upper() == basis_dict['basis_set_name'].upper(),
+        fname.upper() == basis_dict['basis_set_name'].upper(),
         'MolecularBasis.read: Inconsistent basis set name',
     )
 
