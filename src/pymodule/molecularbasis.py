@@ -94,10 +94,7 @@ def _file_to_name(fname):
 
 
 @staticmethod
-def _MolecularBasis_read(mol,
-                         basis_name,
-                         basis_path='.',
-                         ostream=None):
+def _MolecularBasis_read(mol, basis_name, basis_path='.', ostream=None):
     """
     Reads AO basis set from file.
 
@@ -136,7 +133,7 @@ def _MolecularBasis_read(mol,
     if not basis_file.is_file() and 'VLXBASISPATH' in environ:
         basis_file = Path(environ['VLXBASISPATH'], fname)
 
-    basis_info = 'Reading basis set: ' + str(basis_file)
+    basis_info = 'Reading basis set from file: ' + str(basis_file)
     ostream.print_info(basis_info)
     ostream.print_blank()
 
@@ -198,9 +195,7 @@ def _MolecularBasis_read(mol,
 
         mol_basis.add_atom_basis(atom_basis)
 
-    basis_label = basis_dict['basis_set_name'].upper()
-
-    mol_basis.set_label(basis_label)
+    mol_basis.set_label(basis_name.upper())
 
     return mol_basis
 

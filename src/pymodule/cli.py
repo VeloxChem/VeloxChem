@@ -26,7 +26,6 @@
 from mpi4py import MPI
 import argparse
 import sys
-import os
 
 from . import __version__
 from .veloxchemlib import mpi_master
@@ -66,5 +65,5 @@ def print_help():
         '',
     ]
     if MPI.COMM_WORLD.Get_rank() == mpi_master():
-        print(os.linesep.join(info_txt), file=sys.stdout)
+        print('\n'.join(info_txt), file=sys.stdout)
     sys.exit(0)

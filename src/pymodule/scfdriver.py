@@ -28,7 +28,6 @@ import numpy as np
 import time as tm
 import math
 import sys
-import os
 
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import OverlapIntegralsDriver
@@ -1510,7 +1509,7 @@ class ScfDriver:
 
         if self.pe:
             self.ostream.print_blank()
-            for line in self.pe_summary.split(os.linesep):
+            for line in self.pe_summary.splitlines():
                 self.ostream.print_header(line.ljust(92))
             self.ostream.flush()
 

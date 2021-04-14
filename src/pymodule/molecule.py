@@ -25,7 +25,6 @@
 
 from pathlib import Path
 import numpy as np
-import os
 import geometric
 
 from .veloxchemlib import Molecule
@@ -78,7 +77,7 @@ def _Molecule_read_xyz(xyzfile):
         natoms = int(f_xyz.readline().split()[0])
         f_xyz.readline()
         for a in range(natoms):
-            xyzstr += f_xyz.readline().strip() + os.linesep
+            xyzstr += f_xyz.readline().strip() + '\n'
 
     return Molecule.read_str(xyzstr, 'angstrom')
 
@@ -95,7 +94,7 @@ def _Molecule_from_dict(mol_dict):
         The molecule.
     """
 
-    xyzstr = os.linesep.join(mol_dict['xyz'])
+    xyzstr = '\n'.join(mol_dict['xyz'])
 
     units = 'angstrom'
     if 'units' in mol_dict:
@@ -160,7 +159,7 @@ def _Molecule_more_info(self):
     mol_info.append('Number of beta  electrons   : {:d}'.format(
         self.number_of_beta_electrons()).ljust(width))
 
-    return os.linesep.join(mol_info)
+    return '\n'.join(mol_info)
 
 
 def _Molecule_get_labels(self):

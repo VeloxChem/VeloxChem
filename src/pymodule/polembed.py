@@ -25,7 +25,6 @@
 
 from mpi4py import MPI
 import numpy as np
-import os
 try:
     import cppe
 except ImportError:
@@ -112,8 +111,7 @@ class PolEmbed:
         cppe_version = '0.2.1'
 
         if parse_version(cppe.__version__) != parse_version(cppe_version):
-            err_str = 'cppe version {} is required.'.format(
-                cppe_version) + os.linesep
+            err_str = 'cppe version {} is required. '.format(cppe_version)
             err_str += 'cppe version {} was found.'.format(cppe.__version__)
             raise ModuleNotFoundError(err_str)
 

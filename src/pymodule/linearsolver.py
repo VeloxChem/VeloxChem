@@ -26,7 +26,6 @@
 import numpy as np
 import time as tm
 import sys
-import os
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
@@ -370,7 +369,7 @@ class LinearSolver:
             self.ostream.print_blank()
 
             with open(str(self.pe_options['potfile']), 'r') as f_pot:
-                potfile_text = os.linesep.join(f_pot.readlines())
+                potfile_text = '\n'.join(f_pot.readlines())
         else:
             pe_drv = None
             V_es = None

@@ -566,6 +566,8 @@ CMolecularBasis::printBasis(const char* title, const CMolecule& molecule) const
 
     ss << fstr::format(str, 54, fmt::left) << "\n";
 
+    ss << "\n";
+
     return ss.str();
 }
 
