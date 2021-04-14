@@ -226,7 +226,7 @@ class CElectricFieldMatrix
      @return the constant pointer to first element of requested component of electric field
      matrix.
      */
-    const double* values(cartesians cart) const noexcept;
+    const double* values(cartesians cart) const;
 
     /**
      Gets constant pointer to first element of requested component of electric field
@@ -237,12 +237,12 @@ class CElectricFieldMatrix
      @return the constant pointer to first element of requested component of electric field
      matrix.
      */
-    const double* values(int32_t cart) const noexcept;
+    const double* values(int32_t cart) const;
 
     /**
      Converts electric field matrix object to text output.
      */
-    std::string repr() const noexcept;
+    std::string repr() const;
 };
 
 /**

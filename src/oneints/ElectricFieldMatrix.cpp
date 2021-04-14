@@ -182,7 +182,7 @@ CElectricFieldMatrix::zvalues() const
 }
 
 const double*
-CElectricFieldMatrix::values(cartesians cart) const noexcept
+CElectricFieldMatrix::values(cartesians cart) const
 {
     const double* retval = nullptr;
     switch (cart)
@@ -201,14 +201,14 @@ CElectricFieldMatrix::values(cartesians cart) const noexcept
 }
 
 const double*
-CElectricFieldMatrix::values(int32_t cart) const noexcept
+CElectricFieldMatrix::values(int32_t cart) const
 {
     auto d = static_cast<cartesians>(cart);
     return values(d);
 }
 
 std::string
-CElectricFieldMatrix::repr() const noexcept
+CElectricFieldMatrix::repr() const
 {
     std::ostringstream os;
 

@@ -255,7 +255,7 @@ CAngularMomentumMatrix::zvalues() const
 }
 
 const double*
-CAngularMomentumMatrix::values(cartesians cart) const noexcept
+CAngularMomentumMatrix::values(cartesians cart) const
 {
     const double* retval = nullptr;
     switch (cart)
@@ -274,7 +274,7 @@ CAngularMomentumMatrix::values(cartesians cart) const noexcept
 }
 
 const double*
-CAngularMomentumMatrix::values(int32_t cart) const noexcept
+CAngularMomentumMatrix::values(int32_t cart) const
 {
     auto d = static_cast<cartesians>(cart);
     return values(d);
@@ -305,7 +305,7 @@ CAngularMomentumMatrix::getOriginCoordinates() const
 }
 
 std::string
-CAngularMomentumMatrix::repr() const noexcept
+CAngularMomentumMatrix::repr() const
 {
     std::ostringstream os;
 

@@ -55,7 +55,7 @@ using namespace py::literals;
 namespace vlx_orbdata {  // vlx_orbdata namespace
 
 int32_t
-get_number_of_atomic_orbitals(const CMolecule& molecule, const CMolecularBasis& basis) noexcept
+get_number_of_atomic_orbitals(const CMolecule& molecule, const CMolecularBasis& basis)
 {
     auto natoms = molecule.getNumberOfAtoms();
 

@@ -249,14 +249,14 @@ CElectricDipoleMatrix::zvalues() const
 }
 
 const double*
-CElectricDipoleMatrix::values(int32_t cart) const noexcept
+CElectricDipoleMatrix::values(int32_t cart) const
 {
     auto d = static_cast<cartesians>(cart);
     return values(d);
 }
 
 const double*
-CElectricDipoleMatrix::values(cartesians cart) const noexcept
+CElectricDipoleMatrix::values(cartesians cart) const
 {
     const double* retval = nullptr;
     switch (cart) {
@@ -298,7 +298,7 @@ CElectricDipoleMatrix::getOriginCoordinates() const
 }
 
 std::string
-CElectricDipoleMatrix::repr() const noexcept
+CElectricDipoleMatrix::repr() const
 {
     std::ostringstream os;
 

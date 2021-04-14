@@ -187,7 +187,7 @@ class CAngularMomentumIntegralsDriver
 
      @return origin the Cartesian coordinates of angular momentum origin.
      */
-    std::array<double, 3> getAngularMomentumOrigin() const noexcept;
+    std::array<double, 3> getAngularMomentumOrigin() const;
 
     /**
      Computes angular momentum integrals for molecule in specific basis set and

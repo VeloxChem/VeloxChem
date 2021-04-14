@@ -100,7 +100,7 @@ CAngularMomentumIntegralsDriver::setAngularMomentumOrigin(const std::array<doubl
 }
 
 std::array<double, 3>
-CAngularMomentumIntegralsDriver::getAngularMomentumOrigin() const noexcept
+CAngularMomentumIntegralsDriver::getAngularMomentumOrigin() const
 {
     return std::array<double, 3>{{_xOrigin, _yOrigin, _zOrigin}};
 }

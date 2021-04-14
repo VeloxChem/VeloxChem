@@ -265,7 +265,7 @@ class CAngularMomentumMatrix
      @return the constant pointer to first element of requested component of linear momentum
      matrix.
      */
-    const double* values(cartesians cart) const noexcept;
+    const double* values(cartesians cart) const;
 
     /**
      Gets constant pointer to first element of requested component of linear momentum
@@ -276,7 +276,7 @@ class CAngularMomentumMatrix
      @return the constant pointer to first element of requested component of linear momentum
      matrix.
      */
-    const double* values(int32_t cart) const noexcept;
+    const double* values(int32_t cart) const;
 
     /**
      Gets X coordinate of angular momentum origin.
@@ -309,7 +309,7 @@ class CAngularMomentumMatrix
     /**
      Converts angular momentum matrix object to text output.
      */
-    std::string repr() const noexcept;
+    std::string repr() const;
 };
 
 /**

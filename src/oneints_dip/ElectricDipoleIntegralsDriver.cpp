@@ -90,7 +90,7 @@ CElectricDipoleIntegralsDriver::setElectricDipoleOrigin(const std::array<double,
 }
 
 std::array<double, 3>
-CElectricDipoleIntegralsDriver::getElectricDipoleOrigin() const noexcept
+CElectricDipoleIntegralsDriver::getElectricDipoleOrigin() const
 {
     return std::array<double, 3>{{_xOrigin, _yOrigin, _zOrigin}};
 }

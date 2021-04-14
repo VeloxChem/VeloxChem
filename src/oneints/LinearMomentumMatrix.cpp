@@ -183,7 +183,7 @@ CLinearMomentumMatrix::zvalues() const
 }
 
 const double*
-CLinearMomentumMatrix::values(cartesians cart) const noexcept
+CLinearMomentumMatrix::values(cartesians cart) const
 {
     const double* retval = nullptr;
     switch (cart)
@@ -202,14 +202,14 @@ CLinearMomentumMatrix::values(cartesians cart) const noexcept
 }
 
 const double*
-CLinearMomentumMatrix::values(int32_t cart) const noexcept
+CLinearMomentumMatrix::values(int32_t cart) const
 {
     auto d = static_cast<cartesians>(cart);
     return values(d);
 }
 
 std::string
-CLinearMomentumMatrix::repr() const noexcept
+CLinearMomentumMatrix::repr() const
 {
     std::ostringstream os;
 

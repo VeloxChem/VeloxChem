@@ -222,7 +222,7 @@ class CLinearMomentumMatrix
      @return the constant pointer to first element of requested component of linear momentum
      matrix.
      */
-    const double* values(cartesians cart) const noexcept;
+    const double* values(cartesians cart) const;
 
     /**
      Gets constant pointer to first element of requested component of linear momentum
@@ -233,12 +233,12 @@ class CLinearMomentumMatrix
      @return the constant pointer to first element of requested component of linear momentum
      matrix.
      */
-    const double* values(int32_t cart) const noexcept;
+    const double* values(int32_t cart) const;
 
     /**
      Converts linear momentum matrix object to text output.
      */
-    std::string repr() const noexcept;
+    std::string repr() const;
 };
 
 /**

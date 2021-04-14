@@ -266,7 +266,7 @@ class CElectricDipoleMatrix
      @return the constant pointer to first element of requested component of electric
      dipole matrix.
      */
-    const double* values(cartesians cart) const noexcept;
+    const double* values(cartesians cart) const;
 
     /**
      Gets constant pointer to first element of requested component of electric dipole
@@ -277,7 +277,7 @@ class CElectricDipoleMatrix
      @return the constant pointer to first element of requested component of electric
      dipole matrix.
      */
-    const double* values(int32_t cart) const noexcept;
+    const double* values(int32_t cart) const;
 
     /**
      Gets coordinates of electric dipole origin.
@@ -310,7 +310,7 @@ class CElectricDipoleMatrix
     /**
      Converts electric dipole matrix object to text output.
      */
-    std::string repr() const noexcept;
+    std::string repr() const;
 };
 
 /**

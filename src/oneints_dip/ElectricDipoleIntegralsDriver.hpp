@@ -185,7 +185,7 @@ class CElectricDipoleIntegralsDriver
 
      @return Cartesian coordinates of electric dipole origin.
      */
-    std::array<double, 3> getElectricDipoleOrigin() const noexcept;
+    std::array<double, 3> getElectricDipoleOrigin() const;
 
     /**
      Computes electric dipole integrals for molecule in specific basis set and
