@@ -74,17 +74,6 @@ def get_command_output(command):
     return output.decode("utf-8")
 
 
-def check_ubuntu():
-    for name in ["lsb-release", "os-release"]:
-        fname = os.path.join(os.sep, "etc", name)
-        if os.path.isfile(fname):
-            with open(fname, "r") as fh:
-                for line in fh:
-                    if "ubuntu" in line.lower():
-                        return True
-    return False
-
-
 def check_cray():
     if "CRAYPE_VERSION" in os.environ and "CXX" in os.environ:
         return True
@@ -120,8 +109,6 @@ def generate_setup(
         print("*** Error: Unsupported OS!")
         print("***        Only Linux and MacOS are supported.")
         sys.exit(1)
-
-    is_ubuntu = is_linux and check_ubuntu()
 
     if is_linux:
         print("Linux")
@@ -248,14 +235,14 @@ def generate_setup(
         check_dir(mkl_dir, "mkl lib")
 
         math_lib = f"MATH_INC := -isystem {mkl_inc}"
-        math_lib += os.linesep + f"MATH_LIB := -L{mkl_dir}"
+        math_lib += "\n" + f"MATH_LIB := -L{mkl_dir}"
         if is_macos:
             math_lib += (
-                os.linesep + f"MATH_LIB += -Wl,-rpath,{mkl_dir} -lmkl_rt -lpthread -lm -ldl"
+                "\n" + f"MATH_LIB += -Wl,-rpath,{mkl_dir} -lmkl_rt -lpthread -lm -ldl"
             )
         else:
             math_lib += (
-                os.linesep + f"MATH_LIB += -lmkl_rt -Wl,--no-as-needed -lpthread -lm -ldl"
+                "\n" + f"MATH_LIB += -lmkl_rt -Wl,--no-as-needed -lpthread -lm -ldl"
             )
 
         if is_linux and not use_intel:
@@ -297,12 +284,12 @@ def generate_setup(
         check_dir(openblas_dir, "openblas lib")
 
         math_lib = "MATH_INC := -isystem {}".format(openblas_inc)
-        math_lib += os.linesep + "MATH_LIB := -L{}".format(openblas_dir)
-        math_lib += os.linesep + "MATH_LIB += -Wl,-rpath,{}".format(openblas_dir)
+        math_lib += "\n" + "MATH_LIB := -L{}".format(openblas_dir)
+        math_lib += "\n" + "MATH_LIB += -Wl,-rpath,{}".format(openblas_dir)
         openblas_flag = "-lopenblas"
         if use_intel:
             openblas_flag += " -lifcore"
-        math_lib += os.linesep + "MATH_LIB += {} {} {}".format(
+        math_lib += "\n" + "MATH_LIB += {} {} {}".format(
             openblas_flag, omp_flag, "-lpthread -lm -ldl"
         )
 
@@ -312,7 +299,7 @@ def generate_setup(
         print("Cray LibSci")
 
         math_lib = "MATH_INC := "
-        math_lib += os.linesep + "MATH_LIB := {} {}".format(
+        math_lib += "\n" + "MATH_LIB := {} {}".format(
             omp_flag, "-lpthread -lm -ldl"
         )
 

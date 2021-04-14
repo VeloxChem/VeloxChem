@@ -33,9 +33,15 @@ from .veloxchemlib import (AtomBasis, BasisFunction, ChemicalElement,
                            MolecularBasis, to_angular_momentum)
 
 
-def _known_aliases():
-    """Mapping from common basis name to basis filename."""
-    aliases = {
+def _known_aliases_for_basis_sets():
+    """
+    Maps from common basis name to basis filename.
+
+    :return:
+        A dictionary that maps from common basis name to basis filename.
+    """
+
+    return {
         '6-31+G**': '6-31+G_D,P_',
         '6-31+G(D,P)': '6-31+G_D,P_',
         '6-311++G(2D,2P)': '6-311++G_2D,2P_',
@@ -46,51 +52,48 @@ def _known_aliases():
         '6-31G(2DF,P)': '6-31G_2DF,P_',
         'DEF2-SV(P)': 'DEF2-SV_P_',
     }
-    return aliases
 
 
-def _name_to_file(name):
+def _basis_name_to_file(name):
     """
-    Determine basis set file from conventional name.
+    Determines basis set file name from common name.
 
     :param name:
-        Name of the basis set.
+        Common name of the basis set.
 
     :return:
-        The file containing the basis set.
+        The file name of the basis set.
     """
 
-    if name in _known_aliases().keys():
-        return _known_aliases()[name]
+    known_aliases = _known_aliases_for_basis_sets()
+
+    if name in known_aliases:
+        return known_aliases[name]
     else:
         return name
 
 
-def _file_to_name(fname):
+def _basis_file_to_name(fname):
     """
-    Determine basis set conventional name from filename.
+    Determines basis set common name from file name.
 
     :param fname:
         Name of the basis set file.
 
     :return:
-        The conventional name of the basis set.
+        The common name of the basis set.
     """
 
-    # invert _known_aliases mapping
-    inv = {}
-    for k, v in _known_aliases().items():
-        if v in inv.keys():
-            inv[v].append(k)
-        else:
-            inv[v] = [k]
+    common_names = []
 
-    fname_ = fname if isinstance(fname, str) else fname.name
-    if fname_ in _known_aliases().values():
-        # use first common alias
-        return inv[fname_][0]
+    for key, val in _known_aliases_for_basis_sets().items():
+        if str(fname) == val and key not in common_names:
+            common_names.append(key)
+
+    if common_names:
+        return sorted(common_names)[0]
     else:
-        return fname_
+        return str(fname)
 
 
 @staticmethod
@@ -118,7 +121,7 @@ def _MolecularBasis_read(mol, basis_name, basis_path='.', ostream=None):
     err_gc += 'General contraction currently is not supported'
 
     # de-alias basis set name to basis set file
-    fname = _name_to_file(basis_name.upper())
+    fname = _basis_name_to_file(basis_name.upper())
 
     # searching order:
     # 1. given basis_path
@@ -218,7 +221,7 @@ def _MolecularBasis_get_avail_basis(element_label):
     basis_files = sorted((x for x in basis_path.iterdir() if x.is_file()))
 
     for x in basis_files:
-        name = _file_to_name(x)
+        name = _basis_file_to_name(x.name)
         basis = InputParser(str(x)).input_dict
         # check that the given element appears as key
         # and that its value is a non-empty list
