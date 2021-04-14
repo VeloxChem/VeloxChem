@@ -26,7 +26,6 @@
 import argparse
 
 from . import __version__
-from .veloxchemlib import mpi_master
 
 
 def cli():

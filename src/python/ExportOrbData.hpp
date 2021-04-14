@@ -35,8 +35,14 @@ namespace py = pybind11;
 
 namespace vlx_orbdata {  // vlx_orbdata namespace
 
-int32_t
-get_number_of_atomic_orbitals(const CMolecule& molecule, const CMolecularBasis& basis);
+/**
+ Gets number of atomic orbitals.
+
+ @param molecule the molecule.
+ @param basis the AO basis set.
+ @return the number of atomic orbitals.
+ */
+int32_t get_number_of_atomic_orbitals(const CMolecule& molecule, const CMolecularBasis& basis);
 
 /**
  Exports classes/functions in src/orbdata to python.

@@ -1,3 +1,4 @@
+//
 //                           VELOXCHEM 1.0-RC
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
@@ -28,7 +29,7 @@
 #include <cmath>
 #include <sstream>
 
-#include "CartesianComponents.hpp"
+#include "ErrorHandler.hpp"
 
 CElectricDipoleMatrix::CElectricDipoleMatrix()
 
@@ -258,19 +259,20 @@ CElectricDipoleMatrix::values(int32_t cart) const
 const double*
 CElectricDipoleMatrix::values(cartesians cart) const
 {
-    const double* retval = nullptr;
     switch (cart) {
         case cartesians::X:
-            retval =  _xMatrix.values();
-            break;
+            return _xMatrix.values();
+
         case cartesians::Y:
-            retval = _yMatrix.values();
-            break;
+            return _yMatrix.values();
+
         case cartesians::Z:
-            retval = _zMatrix.values();
-            break;
+            return _zMatrix.values();
+
+        default:
+            errors::assertMsgCritical(false, "ElectricDipoleMatrix.values: invalid Cartesian component");
+            return nullptr;
     }
-    return retval;
 }
 
 double

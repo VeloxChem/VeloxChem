@@ -169,7 +169,7 @@ bool
 CXTBDriver::getState() const
 {
 #ifdef ENABLE_XTB
-    return xtb_checkEnvironment(_environment) > 0;
+    return xtb_checkEnvironment(_environment) == 0;
 #endif
     return false;
 }

@@ -567,6 +567,12 @@ CMolecularBasis::printBasis(const std::string& title, const CMolecule& molecule)
     return ss.str();
 }
 
+std::string
+CMolecularBasis::printBasis(const CMolecule& molecule) const
+{
+    return printBasis(std::string("Atomic Basis"), molecule);
+}
+
 void
 CMolecularBasis::broadcast(int32_t rank, MPI_Comm comm)
 {

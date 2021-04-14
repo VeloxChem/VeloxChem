@@ -257,23 +257,23 @@ class CAngularMomentumMatrix
     const double* zvalues() const;
 
     /**
-     Gets constant pointer to first element of requested component of linear momentum
+     Gets constant pointer to first element of requested component of angular momentum
      matrix.
 
-     @param cart requested Cartesian component of the linear momentum integrals matrix
+     @param cart requested Cartesian component of the angular momentum integrals matrix
 
-     @return the constant pointer to first element of requested component of linear momentum
+     @return the constant pointer to first element of requested component of angular momentum
      matrix.
      */
     const double* values(cartesians cart) const;
 
     /**
-     Gets constant pointer to first element of requested component of linear momentum
+     Gets constant pointer to first element of requested component of angular momentum
      matrix.
 
-     @param cart requested Cartesian component of the linear momentum integrals matrix
+     @param cart requested Cartesian component of the angular momentum integrals matrix
 
-     @return the constant pointer to first element of requested component of linear momentum
+     @return the constant pointer to first element of requested component of angular momentum
      matrix.
      */
     const double* values(int32_t cart) const;

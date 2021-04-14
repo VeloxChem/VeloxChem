@@ -28,6 +28,8 @@
 #include <array>
 #include <cmath>
 
+#include "ErrorHandler.hpp"
+
 CLinearMomentumMatrix::CLinearMomentumMatrix()
 {
 }
@@ -185,20 +187,21 @@ CLinearMomentumMatrix::zvalues() const
 const double*
 CLinearMomentumMatrix::values(cartesians cart) const
 {
-    const double* retval = nullptr;
     switch (cart)
     {
         case cartesians::X:
-            retval = _xMatrix.values();
-            break;
+            return _xMatrix.values();
+
         case cartesians::Y:
-            retval = _yMatrix.values();
-            break;
+            return _yMatrix.values();
+
         case cartesians::Z:
-            retval = _zMatrix.values();
-            break;
+            return _zMatrix.values();
+
+        default:
+            errors::assertMsgCritical(false, "LinearMomentumMatrix.values: invalid Cartesian component");
+            return nullptr;
     }
-    return retval;
 }
 
 const double*

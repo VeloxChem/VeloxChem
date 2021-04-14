@@ -73,13 +73,13 @@ def _Molecule_read_xyz(xyzfile):
     """
 
     with Path(xyzfile).open('r') as fh:
-        xyzstr = "\n".join(fh.readlines()[2:])
+        xyzstr = '\n'.join(fh.readlines()[2:])
 
-    return Molecule.read_str(xyzstr, units="angstrom")
+    return Molecule.read_str(xyzstr, units='angstrom')
 
 
 @staticmethod
-def _Molecule_from_xyz(xyz):
+def _Molecule_from_xyz_string(xyz):
     """
     Generate molecule from string in XYZ format.
 
@@ -90,7 +90,7 @@ def _Molecule_from_xyz(xyz):
         The molecule.
     """
 
-    xyzstr = "\n".join(xyz.strip().split(os.linesep)[2:])
+    xyzstr = '\n'.join(xyz.strip().split(os.linesep)[2:])
 
     return Molecule.read_str(xyzstr, 'angstrom')
 
@@ -319,7 +319,7 @@ def _Molecule_write_xyz(self, xyz_filename):
 
 Molecule.read_str = _Molecule_read_str
 Molecule.read_xyz = _Molecule_read_xyz
-Molecule.from_xyz = _Molecule_from_xyz
+Molecule.from_xyz_string = _Molecule_from_xyz_string
 Molecule.from_dict = _Molecule_from_dict
 Molecule.center_of_mass = _Molecule_center_of_mass
 Molecule.more_info = _Molecule_more_info

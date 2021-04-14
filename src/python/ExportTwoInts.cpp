@@ -423,11 +423,11 @@ molecule with specific AO basis set. Performs screening according to
              "eri_tensor"_a)
         .def(
             "compute_in_mem",
-            [](const CElectronRepulsionIntegralsDriver& obj, const CMolecule& molecule, const CMolecularBasis& basis) {
+            [](const CElectronRepulsionIntegralsDriver& eridrv, const CMolecule& molecule, const CMolecularBasis& basis) {
                 auto nao = vlx_orbdata::get_number_of_atomic_orbitals(molecule, basis);
                 auto eri = py::array_t<double, py::array::c_style>({nao, nao, nao, nao});
 
-                obj.computeInMemory(molecule, basis, eri.mutable_data());
+                eridrv.computeInMemory(molecule, basis, eri.mutable_data());
 
                 return eri;
             },

@@ -833,7 +833,7 @@ class ScfDriver:
             else:
                 self.dipole_origin = np.zeros(3)
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-            dipole_drv.set_origin(*self.dipole_origin)
+            dipole_drv.origin = tuple(self.dipole_origin)
             dipole_mats = dipole_drv.compute(molecule, basis)
         else:
             dipole_mats = None
