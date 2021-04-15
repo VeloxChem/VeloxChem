@@ -154,8 +154,7 @@ export_oneints(py::module& m)
                 const py::array_t<double>&                     charges,
                 const py::array_t<double, py::array::f_style>& coordinates) -> CNuclearPotentialMatrix {
                  auto chg = vlx_general::numpy_to_memblock(charges);
-                 auto xyz = vlx_general::numpy_to_memblock2d(coordinates);
-
+                 auto xyz = vlx_general::numpy_fstyle_to_memblock2d(coordinates);
                  return obj.compute(molecule, basis, chg, xyz);
              });
 
@@ -333,20 +332,13 @@ export_oneints(py::module& m)
                const py::array_t<double, py::array::f_style>& dipoles,
                const py::array_t<double, py::array::f_style>& coordinates) {
                 std::string errdims("ElectricFieldIntegralsDirver.compute: Inconsistent size of dipoles and/or their coordinates");
-
                 errors::assertMsgCritical(coordinates.shape(0) == dipoles.shape(0), errdims);
-
                 errors::assertMsgCritical(coordinates.shape(0) > 0, errdims);
-
                 errors::assertMsgCritical(coordinates.shape(1) == 3, errdims);
-
                 errors::assertMsgCritical(dipoles.shape(0) > 0, errdims);
-
                 errors::assertMsgCritical(dipoles.shape(1) == 3, errdims);
-
-                auto ds  = vlx_general::numpy_to_memblock2d(dipoles);
-                auto xyz = vlx_general::numpy_to_memblock2d(coordinates);
-
+                auto ds  = vlx_general::numpy_fstyle_to_memblock2d(dipoles);
+                auto xyz = vlx_general::numpy_fstyle_to_memblock2d(coordinates);
                 return obj.compute(molecule, basis, ds, xyz);
             },
             // the wonky format of the raw string literal is to get help(...) in Python to look nice

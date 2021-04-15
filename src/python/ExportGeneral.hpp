@@ -34,6 +34,7 @@
 #include <memory>
 #include <utility>
 
+#include "ErrorHandler.hpp"
 #include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
 #include "NumaPolicy.hpp"
@@ -120,11 +121,15 @@ template <typename T>
 CMemBlock<T>
 numpy_to_memblock(const py::array_t<T>& arr)
 {
+    std::string errmsg("numpy_to_memblock: Expecting a C-style contiguous numpy array");
+    auto c_style = py::detail::check_flags(arr.ptr(), py::array::c_style);
+    errors::assertMsgCritical(c_style, errmsg);
     return CMemBlock<T>(arr.data(), arr.size(), numa::serial);
 }
 
 /**
- Convert NumPy array to 2-dimensional memory block, i.e. contiguous storage for 2-index quantity.
+ Convert Fortran-style NumPy array to 2-dimensional memory block, i.e. contiguous storage
+ for 2-index quantity.
 
  @tparam T underlying scalar type.
  @param arr NumPy array.
@@ -132,7 +137,7 @@ numpy_to_memblock(const py::array_t<T>& arr)
  */
 template <typename T>
 CMemBlock2D<T>
-numpy_to_memblock2d(const py::array_t<T, py::array::f_style>& arr)
+numpy_fstyle_to_memblock2d(const py::array_t<T, py::array::f_style>& arr)
 {
     return CMemBlock2D<T>(arr.data(), arr.shape(0), arr.shape(1));
 }

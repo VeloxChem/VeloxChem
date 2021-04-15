@@ -94,8 +94,14 @@ static void
 CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegralsDriver& self,
                                                  const CMolecule&                         molecule,
                                                  const CMolecularBasis&                   basis,
-                                                 py::array_t<double, py::array::c_style>& eri)
+                                                 py::array_t<double>&                     eri)
 {
+    std::string errsrc("ElectronRepulsionIntegralsDriver.compute_in_mem: Expecting a C-style contiguous numpy array");
+
+    auto c_style = py::detail::check_flags(eri.ptr(), py::array::c_style);
+
+    errors::assertMsgCritical(c_style, errsrc);
+
     std::string errshape("ElectronRepulsionIntegralsDriver.compute_in_mem: Invalid shape");
 
     errors::assertMsgCritical(eri.ndim() == 4, errshape);
@@ -426,9 +432,7 @@ molecule with specific AO basis set. Performs screening according to
             [](const CElectronRepulsionIntegralsDriver& eridrv, const CMolecule& molecule, const CMolecularBasis& basis) {
                 auto nao = vlx_orbdata::get_number_of_atomic_orbitals(molecule, basis);
                 auto eri = py::array_t<double, py::array::c_style>({nao, nao, nao, nao});
-
                 eridrv.computeInMemory(molecule, basis, eri.mutable_data());
-
                 return eri;
             },
             "Computes electron repulsion integrals as a full 4D array and stores them in memory.",
