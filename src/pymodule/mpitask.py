@@ -80,7 +80,9 @@ class MpiTask:
             output_fname = sys.stdout
 
             if len(fname_list) > 1:
-                if isinstance(fname_list[1], str):
+                if fname_list[1] is None:
+                    output_fname = None
+                elif isinstance(fname_list[1], str):
                     if fname_list[1].strip().split():
                         output_fname = fname_list[1].strip()
                         if ('\0' in output_fname or output_fname == '-' or

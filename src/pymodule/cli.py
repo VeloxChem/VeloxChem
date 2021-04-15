@@ -56,7 +56,7 @@ python -m veloxchem input_file [output_file]
         'output_file',
         type=str,
         nargs="?",
-        default=None,
+        default=".",
         help='Output file (default: STDOUT)',
     )
 
