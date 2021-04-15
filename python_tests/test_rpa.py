@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from mpi4py import MPI
 
 try:
     import cppe

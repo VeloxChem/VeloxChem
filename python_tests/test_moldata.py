@@ -6,7 +6,8 @@ import numpy as np
 
 from veloxchem.molecule import Molecule
 from veloxchem.mpitask import MpiTask
-from veloxchem.veloxchemlib import ChemicalElement, DispersionModel, bohr_in_angstroms, is_mpi_master, bohr_in_angstroms
+from veloxchem.veloxchemlib import (ChemicalElement, DispersionModel,
+                                    bohr_in_angstroms, is_mpi_master)
 
 
 class TestMolData(unittest.TestCase):
@@ -325,19 +326,21 @@ class TestMolData(unittest.TestCase):
             mol = self.nh3_molecule()
             mol.write_xyz(fname)
 
+            ref_labels = mol.get_labels()
+            ref_coords = mol.get_coordinates()
+
+            mol_2 = Molecule.read_xyz(fname)
+            self.assertEqual(ref_labels, mol_2.get_labels())
+            self.assertTrue(
+                np.max(np.abs(ref_coords - mol_2.get_coordinates())) < 1.0e-10)
+
             with open(fname, 'r') as f_xyz:
                 lines = f_xyz.readlines()
-
-                labels = [line.split()[0] for line in lines[2:]]
-                coords = np.array([
-                    [float(x) for x in line.split()[1:]] for line in lines[2:]
-                ])
-
-                for a, b in zip(labels, mol.get_labels()):
-                    self.assertEqual(a.lower(), b.lower())
-
-                ref_coords = mol.get_coordinates() * bohr_in_angstroms()
-                self.assertTrue(np.max(np.abs(coords - ref_coords)) < 1.0e-10)
+                mol_3 = Molecule.from_xyz_string(''.join(lines))
+                self.assertEqual(ref_labels, mol_3.get_labels())
+                self.assertTrue(
+                    np.max(np.abs(ref_coords -
+                                  mol_3.get_coordinates())) < 1.0e-10)
 
 
 if __name__ == '__main__':
