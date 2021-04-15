@@ -1,6 +1,10 @@
 target_sources(vlxobjs
   PRIVATE
     ChemicalElement.cpp
+    CoordinationNumber.cpp
+    DispersionData.cpp
+    DispersionModel.cpp
+    DispersionParameters.cpp
     Molecule.cpp
     PartialCharges.cpp
     VdwRadii.cpp

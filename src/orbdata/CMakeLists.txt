@@ -1,8 +1,8 @@
 target_sources(vlxobjs
   PRIVATE
-    AngularMomentum.cpp
     AODensityMatrix.cpp
     AOIndices.cpp
+    AngularMomentum.cpp
     AtomBasis.cpp
     BasisFunction.cpp
     GenFunc.cpp
