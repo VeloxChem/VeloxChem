@@ -9,7 +9,7 @@ dependencies:
   - h5py
   - libblas=*=*mkl
   - loprop>=0.3.4
-  - mkl-devel
+  - mkl-devel=*2020.*
   - mpi4py
   - ninja
   - numpy

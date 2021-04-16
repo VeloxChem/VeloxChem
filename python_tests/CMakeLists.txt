@@ -21,7 +21,7 @@ foreach(_f IN LISTS _vlx_pytests)
   file(
     CREATE_LINK
       ${CMAKE_CURRENT_LIST_DIR}/${_f}
-      ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/../tests/${_f}
+      ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/tests/${_f}
     COPY_ON_ERROR
     SYMBOLIC
     )
@@ -37,7 +37,7 @@ foreach(_f IN LISTS _vlx_pytests)
     NAME
       ${_name}
     COMMAND
-      ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 1 ${Python_EXECUTABLE} -m pytest -v -s ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/../tests/${_f}
+      ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 1 ${Python_EXECUTABLE} -m pytest -v -s --pyargs veloxchem -k test_${_name}
     WORKING_DIRECTORY
       ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/..
     )
@@ -50,7 +50,7 @@ foreach(_f IN LISTS _vlx_pytests)
 endforeach()
 
 # handle folder with reference input files
-file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/../tests/inputs)
+file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/tests/inputs)
 # we glob the reference input files in inputs and let CMake add a rule such that
 # the glob is repeated every time we rebuild.
 # This is NOT RECOMMENDED by CMake
@@ -70,7 +70,7 @@ foreach(_input IN LISTS _ref_inputs)
  file(
    CREATE_LINK
      ${_input}
-     ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/../tests/inputs/${__input}
+     ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/tests/inputs/${__input}
    COPY_ON_ERROR
    SYMBOLIC
    )

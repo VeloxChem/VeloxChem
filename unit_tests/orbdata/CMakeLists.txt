@@ -1,7 +1,7 @@
 target_sources(utests
   PRIVATE
-    AngularMomentumTest.cpp
     AODensityMatrixTest.cpp
+    AngularMomentumTest.cpp
     AtomBasisSetter.cpp
     AtomBasisTest.cpp
     BasisFunctionTest.cpp

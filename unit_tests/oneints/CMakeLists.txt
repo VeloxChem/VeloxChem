@@ -9,12 +9,12 @@ target_sources(utests
     KineticEnergyMatrixTest.cpp
     LinearMomentumMatrixTest.cpp
     NuclearPotentialMatrixTest.cpp
-    OneIntsDistributionTest.cpp
     OneIntsDistTypeTest.cpp
+    OneIntsDistributionTest.cpp
     OneIntsFuncTest.cpp
     OverlapMatrixTest.cpp
-    RecursionFunctionsListTest.cpp
     RecursionFunctionTest.cpp
+    RecursionFunctionsListTest.cpp
     RecursionMapTest.cpp
     RecursionTermTest.cpp
     TwoCentersRecursionFunctionsTest.cpp

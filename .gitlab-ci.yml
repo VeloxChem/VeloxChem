@@ -96,7 +96,8 @@ monkey:deploy:
     - export PATH=/home/roberto/Software/cmake-3.19.6/bin:$PATH
     - cmake -S. -Bbuild -DPython_EXECUTABLE=$(type -P python3) &> /dev/null
     - cmake --build build --target package_source
-    - python .gitlab/trigger.py
+    - python3 -m pip install requests  # though it appears to be already installed
+    - python3 .gitlab/trigger.py
         --tarball "$TARBALL"
         --url "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/$TARBALL"
   artifacts:
@@ -106,8 +107,7 @@ monkey:deploy:
 
 .baboon:setup:
   tags:
-    - vlx-test
-    - windows
+    - vlx-test-win
   before_script:
     - cmd /c '"C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" amd64 > nul 2>&1 && set' | .{process{ if ($_ -match '^([^=]+)=(.*)') { [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2])}}}
     - $env:Path += ";C:\ProgramData\Miniconda3\Scripts;C:\ProgramData\Miniconda3;C:\ProgramData\Miniconda3\Library\bin"
@@ -122,12 +122,14 @@ baboon:build:
   extends: .baboon:setup
   stage: build
   script:
-    - cmake -S. -Bbuild -GNinja -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=Release
-    - cmake --build build --config Release -- -v -d stats
+    - cmake -S. -Bbuild -GNinja -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=Release -DENABLE_ARCH_FLAGS=OFF
+    - cmake --build build --parallel 6 --config Release -- -v -d stats
   artifacts:
     paths:
       - build
     expire_in: 2 hours
+  allow_failure: true
+  timeout: 30 minutes
 
 baboon:test:
   extends: .baboon:setup
@@ -137,4 +139,6 @@ baboon:test:
     KMP_DUPLICATE_LIB_OK: "TRUE"
   script:
     - cd build
-    - ctest --output-on-failure
+    - ctest -C Release --output-on-failure
+  allow_failure: true
+  timeout: 30 minutes

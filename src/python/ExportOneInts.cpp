@@ -31,7 +31,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <mpi.h>
+#include <array>
 #include <memory>
 #include <string>
 
