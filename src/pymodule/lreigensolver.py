@@ -1,3 +1,28 @@
+#
+#                           VELOXCHEM 1.0-RC
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from mpi4py import MPI
 import numpy as np
 import time as tm
@@ -64,7 +89,7 @@ class LinearResponseEigenSolver(LinearSolver):
         :param rsp_dict:
             The dictionary of response dict.
         :param method_dict:
-            The dictionary of method rsp_dict.
+            The dictionary of method settings.
         """
 
         if method_dict is None:
@@ -77,13 +102,13 @@ class LinearResponseEigenSolver(LinearSolver):
 
         if 'nto' in rsp_dict:
             key = rsp_dict['nto'].lower()
-            self.nto = True if key == 'yes' else False
+            self.nto = True if key in ['yes', 'y'] else False
         if 'nto_pairs' in rsp_dict:
             self.nto_pairs = int(rsp_dict['nto_pairs'])
 
         if 'detach_attach' in rsp_dict:
             key = rsp_dict['detach_attach'].lower()
-            self.detach_attach = True if key == 'yes' else False
+            self.detach_attach = True if key in ['yes', 'y'] else False
 
         if 'cube_points' in rsp_dict:
             self.cube_points = [
@@ -291,9 +316,9 @@ class LinearResponseEigenSolver(LinearSolver):
                 xn = np.sqrt(np.sum(x_norms_2))
 
                 if xn != 0:
-                    relative_residual_norm[k] = rn / xn
+                    relative_residual_norm[k] = 2.0 * rn / xn
                 else:
-                    relative_residual_norm[k] = rn
+                    relative_residual_norm[k] = 2.0 * rn
 
                 if relative_residual_norm[k] < self.conv_thresh:
                     excitations[k] = (w, x)

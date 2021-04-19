@@ -1,10 +1,27 @@
 //
 //                           VELOXCHEM 1.0-RC
-//      ---------------------------------------------------
+//         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
 //  Contact: https://veloxchem.org/contact
+//
+//  SPDX-License-Identifier: LGPL-3.0-or-later
+//
+//  This file is part of VeloxChem.
+//
+//  VeloxChem is free software: you can redistribute it and/or modify it under
+//  the terms of the GNU Lesser General Public License as published by the Free
+//  Software Foundation, either version 3 of the License, or (at your option)
+//  any later version.
+//
+//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+//  License for more details.
+//
+//  You should have received a copy of the GNU Lesser General Public License
+//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 #ifndef SADGuessDriver_hpp
 #define SADGuessDriver_hpp
@@ -45,66 +62,66 @@ class CSADGuessDriver
     /**
      Gets occupation numbers for 1s elements.
 
-     @param occ number of 1s orbital.
+     @param nocc number of 1s orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc1s(double occ) const;
+    std::vector<double> _getOcc1s(const double nocc) const;
 
     /**
      Gets occupation numbers for 2s elements.
 
-     @param occ number of 2s orbital.
+     @param nocc number of 2s orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc2s(double occ) const;
+    std::vector<double> _getOcc2s(const double nocc) const;
 
     /**
      Gets occupation numbers for 2p elements.
 
-     @param occ number of 2s2p orbitals.
+     @param nocc number of 2s2p orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc2s2p(double occ) const;
+    std::vector<double> _getOcc2s2p(const double nocc) const;
 
     /**
      Gets occupation numbers for 3s elements.
 
-     @param occ number of 3s orbital.
+     @param nocc number of 3s orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc3s(double occ) const;
+    std::vector<double> _getOcc3s(const double nocc) const;
 
     /**
      Gets occupation numbers for 3p elements.
 
-     @param occ number of 3s3p orbitals.
+     @param nocc number of 3s3p orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc3s3p(double occ) const;
+    std::vector<double> _getOcc3s3p(const double nocc) const;
 
     /**
      Gets occupation numbers for 4s elements.
 
-     @param occ number of 4s orbital.
+     @param nocc number of 4s orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc4s(double occ) const;
+    std::vector<double> _getOcc4s(const double nocc) const;
 
     /**
      Gets occupation numbers for 3d elements.
 
-     @param occ number of 3d orbitals.
+     @param nocc number of 3d orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc3d(double occ) const;
+    std::vector<double> _getOcc3d(const double nocc) const;
 
     /**
      Gets occupation numbers for 4p elements.
 
-     @param occ number of 4s4p orbitals.
+     @param nocc number of 4s4p orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc4s4p(double occ) const;
+    std::vector<double> _getOcc4s4p(const double nocc) const;
 
     /**
      Computes SAD initial guess.

@@ -1,10 +1,27 @@
 //
 //                           VELOXCHEM 1.0-RC
-//      ---------------------------------------------------
+//         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
 //  Contact: https://veloxchem.org/contact
+//
+//  SPDX-License-Identifier: LGPL-3.0-or-later
+//
+//  This file is part of VeloxChem.
+//
+//  VeloxChem is free software: you can redistribute it and/or modify it under
+//  the terms of the GNU Lesser General Public License as published by the Free
+//  Software Foundation, either version 3 of the License, or (at your option)
+//  any later version.
+//
+//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+//  License for more details.
+//
+//  You should have received a copy of the GNU Lesser General Public License
+//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 #include "SADGuessDriver.hpp"
 
@@ -33,66 +50,80 @@ CSADGuessDriver::~CSADGuessDriver()
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc1s(double occ) const
+CSADGuessDriver::_getOcc1s(const double nocc) const
 {
+    double occ = std::min(std::max(0.0, nocc), 1.0);
+
     //                           1s
     return std::vector<double>({occ});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc2s(double occ) const
+CSADGuessDriver::_getOcc2s(const double nocc) const
 {
+    double occ = std::min(std::max(0.0, nocc), 1.0);
+
     //                           1s   2s
     return std::vector<double>({1.0, occ});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc2s2p(double occ) const
+CSADGuessDriver::_getOcc2s2p(const double nocc) const
 {
+    double occ = std::min(std::max(0.0, nocc), 1.0);
+
     //                           1s   2s   2p-1 2p0  2p+1
     return std::vector<double>({1.0, occ, occ, occ, occ});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc3s(double occ) const
+CSADGuessDriver::_getOcc3s(const double nocc) const
 {
+    double occ = std::min(std::max(0.0, nocc), 1.0);
+
     //                           1s   2s   3s   2p-1 2p0  2p+1
     return std::vector<double>({1.0, 1.0, occ, 1.0, 1.0, 1.0});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc3s3p(double occ) const
+CSADGuessDriver::_getOcc3s3p(const double nocc) const
 {
+    double occ = std::min(std::max(0.0, nocc), 1.0);
+
     //                           1s   2s   3s   2p-1 3p-1 2p0  3p0  2p+1 3p+1
     return std::vector<double>({1.0, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc4s(double occ) const
+CSADGuessDriver::_getOcc4s(const double nocc) const
 {
+    double occ = std::min(std::max(0.0, nocc), 1.0);
+
     //                           1s   2s   3s   4s   2p-1 3p-1 2p0  3p0  2p+1 3p+1
     return std::vector<double>({1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc3d(double occ) const
+CSADGuessDriver::_getOcc3d(const double nocc) const
 {
+    double occ = std::min(std::max(0.0, nocc), 1.0);
+
     //                           1s   2s   3s   4s  2p-1 3p-1 2p0  3p0  2p+1 3p+1 3d-2 3d-1 3d0  3d+1 3d+2
     return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, occ, occ, occ, occ});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc4s4p(double occ) const
+CSADGuessDriver::_getOcc4s4p(const double nocc) const
 {
+    double occ = std::min(std::max(0.0, nocc), 1.0);
+
     //                           1s   2s   3s   4s  2p-1 3p-1 4p-1 2p0  3p0  4p0  2p+1 3p+1 4p+1 3d-2 3d-1 3d0  3d+1 3d+2
     return std::vector<double>({1.0, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0});
 }
 
 std::vector<double>
-CSADGuessDriver::getOccupationNumbersForElement(const int32_t elem_id, const double num_electrons) const
+CSADGuessDriver::getOccupationNumbersForElement(const int32_t elem_id, const double nelec) const
 {
-    double nelec = std::min(std::max(-0.5, num_electrons), 0.5);
-
     switch (elem_id)
     {
             // dummy atom

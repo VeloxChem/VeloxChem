@@ -1,3 +1,28 @@
+#
+#                           VELOXCHEM 1.0-RC
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from mpi4py import MPI
 import numpy as np
 import time as tm
@@ -60,7 +85,7 @@ class LinearResponseSolver(LinearSolver):
         :param rsp_dict:
             The dictionary of response dict.
         :param method_dict:
-            The dictionary of method rsp_dict.
+            The dictionary of method settings.
         """
 
         if method_dict is None:
@@ -287,7 +312,7 @@ class LinearResponseSolver(LinearSolver):
                 x_full = self.get_full_solution_vector(x)
 
                 if self.rank == mpi_master():
-                    xv = np.dot(x_full, v1[(op, freq)])
+                    xv = 2.0 * np.dot(x_full, v1[(op, freq)])
                     xvs.append((op, freq, xv))
 
                 r_norms_2 = 2.0 * r.squared_norm(axis=0)
@@ -297,9 +322,9 @@ class LinearResponseSolver(LinearSolver):
                 xn = np.sqrt(np.sum(x_norms_2))
 
                 if xn != 0:
-                    relative_residual_norm[(op, freq)] = rn / xn
+                    relative_residual_norm[(op, freq)] = 2.0 * rn / xn
                 else:
-                    relative_residual_norm[(op, freq)] = rn
+                    relative_residual_norm[(op, freq)] = 2.0 * rn
 
                 if relative_residual_norm[(op, freq)] < self.conv_thresh:
                     solutions[(op, freq)] = x

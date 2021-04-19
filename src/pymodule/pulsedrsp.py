@@ -1,3 +1,28 @@
+#
+#                           VELOXCHEM 1.0-RC
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from mpi4py import MPI
 import numpy as np
 import h5py
@@ -96,20 +121,20 @@ class PulsedResponse:
             'centers', 'CEP', 'field_max'
         ]
 
-    def update_settings(self, settings, cpp_settings):
+    def update_settings(self, settings, cpp_settings, method_settings=None):
         """
         Updates settings in PulsedRespnse
 
         :param settings:
             The settings dictionary for the driver.
-
         :param cpp_settings:
             The settings dictionary for complex response driver.
+        :param method_settings:
+            The dictionary of method settings.
         """
 
-        # Default CRSP settings (if nothing else given,
-        # it will use defaults in cpp.cpp)
-        # cpp_settings['rot_averaging'] = False
+        if method_settings is None:
+            method_settings = {}
 
         # Update the default args with the user provided inputs
         self.pulse_settings.update(settings)
@@ -209,7 +234,7 @@ class PulsedResponse:
             'b_components': self.pulse_settings['pol_dir']
         })
         self.rsp_driver = ComplexResponse(self.comm, self.ostream)
-        self.rsp_driver.update_settings(cpp_settings)
+        self.rsp_driver.update_settings(cpp_settings, method_settings)
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """

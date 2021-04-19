@@ -1,5 +1,4 @@
 from unittest.mock import patch
-from unittest.mock import MagicMock
 import numpy.testing as npt
 import textwrap
 import pytest
@@ -41,105 +40,6 @@ def sample():
         @end
         """)
     return inp
-
-
-@patch('veloxchem.main.ScfUnrestrictedDriver')
-@patch('veloxchem.main.ScfRestrictedDriver')
-@patch('veloxchem.main.ScfFirstOrderProperties')
-@patch('veloxchem.main.MpiTask')
-def test_loprop_called_from_main(mock_mpi, mock_scf_prop, mock_scf, mock_uscf,
-                                 sample, tmpdir):
-    """
-    Verify that LoPropDriver is called from main, loprop task in input
-    """
-
-    # given
-    task = mock_mpi()
-    task.input_dict = {
-        'jobs': {
-            'task': 'loprop',
-            'maximum_hours': 1
-        },
-        'loprop': {}
-    }
-    input_file = f'{tmpdir}/water.inp'
-    with open(input_file, 'w') as f:
-        f.write(sample)
-    sys.argv[1:] = [input_file]
-
-    # when
-    with patch('veloxchem.main.LoPropDriver', autospec=True) as mock_prop:
-        main()
-
-    # then
-    mock_prop.assert_called_with(task)
-    mock_prop(task).compute.assert_called()
-
-
-@patch('veloxchem.main.ScfUnrestrictedDriver')
-@patch('veloxchem.main.ScfRestrictedDriver')
-@patch('veloxchem.main.ScfFirstOrderProperties')
-@patch('veloxchem.main.MpiTask')
-def test_scf_called_from_main(mock_mpi, mock_scf_prop, mock_scf, mock_uscf,
-                              sample, tmpdir):
-    """
-    Verify that SCF is called from main, loprop task in input
-    """
-
-    # given
-    task = mock_mpi()
-    task.input_dict = {
-        'jobs': {
-            'task': 'loprop',
-            'maximum_hours': 1
-        },
-        'loprop': {}
-    }
-    input_file = f'{tmpdir}/water.inp'
-    with open(input_file, 'w') as f:
-        f.write(sample)
-    sys.argv[1:] = [input_file]
-
-    # when
-    with patch('veloxchem.main.LoPropDriver', autospec=True):
-        with patch('veloxchem.main.ScfRestrictedDriver',
-                   autospec=True) as mock_scf:
-            main()
-
-    # then
-    mock_scf.assert_called_with(task.mpi_comm, task.ostream)
-    mock_scf().compute.assert_called
-
-
-@patch('veloxchem.loprop.h5py')
-@patch('veloxchem.loprop.OverlapIntegralsDriver')
-@patch('veloxchem.loprop.ao_matrix_to_dalton')
-def test_overlap_called(mock_to_dalton, mock_ovldrv, mock_h5py):
-    """
-    Verify that veloxchem overlap driver from loprop module
-    """
-
-    # given
-    mock_mpi = MagicMock()
-    task = mock_mpi()
-    task.input_dict = {
-        'loprop': {
-            'checkpoint_file': 'water.loprop.h5'
-        },
-        'scf': {
-            'checkpoint_file': 'water.scf.h5'
-        },
-    }
-
-    # when
-    lpd = LoPropDriver(task)
-    lpd.save_overlap()
-
-    # then
-    mock_ovldrv.assert_called_with(task.mpi_comm)
-    mock_ovldrv().compute.assert_called_with(task.molecule, task.ao_basis)
-    mock_h5py.File.assert_called_with('water.loprop.h5', 'w')
-    mock_to_dalton.assert_called
 
 
 @patch('veloxchem.main.MpiTask')
@@ -265,7 +165,7 @@ def test_opa(sample, tmpdir):
     assert loprop_driver.get_opa() == [[0, 1, 3, 4, 5], [0], [0]]
 
 
-@pytest.mark.parametrize('input, expected', [
+@pytest.mark.parametrize('input_lines, expected', [
     (textwrap.dedent("""
                 @ATOMBASIS H
                 S 3  1
@@ -309,8 +209,8 @@ def test_opa(sample, tmpdir):
     }),
 ],
                          ids=['H:2S1P', 'O:3S2P1D'])
-def test_count_contracted(input, expected):
-    assert count_contracted(input.split('\n')) == expected
+def test_count_contracted(input_lines, expected):
+    assert count_contracted(input_lines.splitlines()) == expected
 
 
 @pytest.mark.parametrize('input, expected', [

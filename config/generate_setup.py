@@ -1,6 +1,29 @@
-# -*- coding: utf-8 -*-
+#
+#                           VELOXCHEM 1.0-RC
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import os
 import platform
@@ -51,47 +74,6 @@ def get_command_output(command):
     return output.decode("utf-8")
 
 
-def find_avx_linux():
-    cpuinfo = os.path.join(os.sep, "proc", "cpuinfo")
-    if os.path.isfile(cpuinfo):
-        for avx in ["avx512", "avx2", "avx"]:
-            with open(cpuinfo, "r") as fh:
-                for line in fh:
-                    if line[:5] == "flags" and avx in line:
-                        return avx
-    return None
-
-
-def find_avx_macos():
-    output = get_command_output(["sysctl", "-a"])
-    lines = output.split(os.linesep)
-    for line in lines:
-        if "machdep.cpu.leaf7_features" in line and "AVX2" in line:
-            return "avx2"
-    for line in lines:
-        if "machdep.cpu.features" in line and "AVX1" in line:
-            return "avx"
-    return None
-
-
-def find_mkl_avx(is_linux, is_macos):
-
-    print("*** Checking avx... ", end="")
-    if is_linux:
-        avx = find_avx_linux()
-        if check_pdc_beskow():
-            avx = "avx2"
-    elif is_macos:
-        avx = find_avx_macos()
-    print(avx)
-
-    if avx is not None:
-        mkl_avx = "-lmkl_{}".format(avx)
-    else:
-        mkl_avx = "-lmkl_def"
-    return mkl_avx
-
-
 def check_ubuntu():
     for name in ["lsb-release", "os-release"]:
         fname = os.path.join(os.sep, "etc", name)
@@ -103,23 +85,15 @@ def check_ubuntu():
     return False
 
 
-def check_pdc_beskow():
-    is_pdc = "SNIC_SITE" in os.environ and os.environ["SNIC_SITE"] == "pdc"
-    is_beskow = (
-        "SNIC_RESOURCE" in os.environ and os.environ["SNIC_RESOURCE"] == "beskow"
-    )
-    return is_pdc and is_beskow
+def check_cray():
+    if "CRAYPE_VERSION" in os.environ and "CXX" in os.environ:
+        return True
+    return False
 
 
 def check_dir(dirname, label):
     if not os.path.isdir(dirname):
         print("*** Error: {} dir {} does not exist!".format(label, dirname))
-        sys.exit(1)
-
-
-def check_file(filename, label):
-    if not os.path.isfile(filename):
-        print("*** Error: {} file {} does not exist!".format(label, filename))
         sys.exit(1)
 
 
@@ -158,7 +132,7 @@ def generate_setup(
 
     print("*** Checking c++ compiler... ", end="")
 
-    if "CRAYPE_VERSION" in os.environ and "CXX" in os.environ:
+    if check_cray():
         cxx, cxx_path = find_exe([os.environ["CXX"]])
     else:
         if isinstance(user_flag, str) and user_flag.lower() == "gnu":
@@ -170,7 +144,7 @@ def generate_setup(
 
     if cxx is None:
         print("*** Error: Unable to find c++ compiler!")
-        if "CRAYPE_VERSION" in os.environ and "CXX" in os.environ:
+        if check_cray():
             print("***        Please make sure that CXX is correctly set.")
         else:
             print("***        Please make sure that mpiicpc, mpicxx, or")
@@ -208,7 +182,7 @@ def generate_setup(
 
     if use_intel:
         cxx_flags = "-xHost -qopenmp"
-        if check_pdc_beskow():
+        if check_cray():
             cxx_flags = "-qopenmp"
         omp_flag = "-liomp5"
     elif use_gnu:
@@ -359,7 +333,9 @@ def generate_setup(
     use_xtb = False
     xtb_root = os.getenv("XTBHOME", sys.prefix)
     # include
-    xtb_inc = Path(xtb_root, "include/xtb")
+    xtb_inc = Path(xtb_root, "include")
+    if not xtb_inc.is_dir():
+        xtb_inc = Path(xtb_root, "include", "xtb")
     has_xtb_header = xtb_inc.is_dir() and (xtb_inc / "xtb.h").is_file()
     # library
     has_xtb_lib = False
@@ -374,9 +350,9 @@ def generate_setup(
         ).is_file()
     # support files
     xtb_path = Path(xtb_root, "share/xtb")
-    xtb_params = ["param_gfn0-xtb.txt", "param_gfn1-xtb", "param_gfn2-xtb.txt"]
+    xtb_params = ["param_gfn0-xtb.txt", "param_gfn1-xtb.txt", "param_gfn2-xtb.txt"]
     has_xtb_share = xtb_path.is_dir() and all(
-        [(xtb_path / f"param_gfn{x}-xtb.txt").is_file() for x in range(3)]
+        [(xtb_path / x).is_file() for x in xtb_params]
     )
 
     if has_xtb_header and has_xtb_lib and has_xtb_share:
@@ -385,6 +361,8 @@ def generate_setup(
         xtb_lib = f"XTB_INC := -I{str(xtb_inc)}\n"
         xtb_lib += f"XTB_LIB := -L{str(xtb_dir)} -Wl,-rpath,{str(xtb_dir)} -lxtb\n"
         xtb_lib += f"XTB_PATH := {str(xtb_path)}\n"
+
+        print(f"*** Checking XTB... {xtb_root}")
 
     # google test lib
 

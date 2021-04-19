@@ -1,15 +1,36 @@
+#
+#                           VELOXCHEM 1.0-RC
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from mpi4py import MPI
 import numpy as np
 import os
 try:
     import cppe
 except ImportError:
-    raise ImportError(
-        'Unable to import cppe. ' + os.linesep +
-        'Please download and install from ' +
-        'https://github.com/maxscheurer/cppe ' + os.linesep +
-        'or install via ' +
-        '\'pip install git+https://github.com/maxscheurer/cppe.git\'')
+    raise ImportError('Unable to import cppe. Please install cppe via ' +
+                      '\'pip install cppe==0.2.1\'')
 
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricFieldIntegralsDriver
@@ -88,13 +109,23 @@ class PolEmbed:
         """
 
         from pkg_resources import parse_version
-        min_cppe_version = '0.3.1'
+        cppe_version = '0.2.1'
 
-        if parse_version(cppe.__version__) < parse_version(min_cppe_version):
-            err_str = 'cppe version {} or higher is required.'.format(
-                min_cppe_version) + os.linesep
+        if parse_version(cppe.__version__) != parse_version(cppe_version):
+            err_str = 'cppe version {} is required.'.format(
+                cppe_version) + os.linesep
             err_str += 'cppe version {} was found.'.format(cppe.__version__)
             raise ModuleNotFoundError(err_str)
+
+    def get_cppe_version(self):
+        """
+        Gets the version of CPPE.
+
+        :return:
+            The version of CPPE.
+        """
+
+        return str(cppe.__version__)
 
     def update_options(self, pe_dict):
         """
@@ -119,10 +150,6 @@ class PolEmbed:
             'border_nredist': 'int',
             'border_redist_order': 'int',
             'border_redist_pol': 'bool',
-            'summation_induced_fields': 'string',
-            'tree_ncrit': 'int',
-            'tree_expansion_order': 'int',
-            'theta': 'float',
         }
 
         self.options = {}

@@ -147,15 +147,18 @@ class TestExciton(unittest.TestCase):
         if is_mpi_master(task.mpi_comm):
             self.assertTrue(np.max(np.abs(backup_H - exciton_drv.H)) < 1.0e-10)
 
+            exciton_h5 = Path(exciton_drv.checkpoint_file)
+
             for ind in range(len(exciton_drv.monomers)):
-                scf_h5 = Path('monomer_{:d}.scf.h5'.format(ind + 1))
-                rsp_h5 = Path('monomer_{:d}.rsp.h5'.format(ind + 1))
+                scf_h5 = f'monomer_{ind + 1}.scf.h5'
+                scf_h5 = exciton_h5.with_suffix(f'.{scf_h5}')
+                rsp_h5 = f'monomer_{ind + 1}.rsp.h5'
+                rsp_h5 = exciton_h5.with_suffix(f'.{rsp_h5}')
                 if scf_h5.is_file():
                     scf_h5.unlink()
                 if rsp_h5.is_file():
                     rsp_h5.unlink()
 
-            exciton_h5 = Path(exciton_dict['checkpoint_file'])
             if exciton_h5.is_file():
                 exciton_h5.unlink()
 

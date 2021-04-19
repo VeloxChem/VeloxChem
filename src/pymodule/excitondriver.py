@@ -1,4 +1,30 @@
+#
+#                           VELOXCHEM 1.0-RC
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import time as tm
 import math
@@ -112,9 +138,9 @@ class ExcitonModelDriver:
         self.scf_max_iter = 150
 
         # tda settings
-        self.nstates = 5
-        self.ct_nocc = 1
-        self.ct_nvir = 1
+        self.nstates = 3
+        self.ct_nocc = 0
+        self.ct_nvir = 0
         self.tda_conv_thresh = 1.0e-4
         self.tda_max_iter = 100
 
@@ -176,19 +202,25 @@ class ExcitonModelDriver:
 
         if 'restart' in exciton_dict:
             key = exciton_dict['restart'].lower()
-            self.restart = True if key == 'yes' else False
+            self.restart = True if key in ['yes', 'y'] else False
         if 'checkpoint_file' in exciton_dict:
             self.checkpoint_file = exciton_dict['checkpoint_file']
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
-            self.dft = True if key == 'yes' else False
+            self.dft = True if key in ['yes', 'y'] else False
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
                 self.dft = True
             self.xcfun_label = method_dict['xcfun']
+
+        if 'potfile' in method_dict:
+            errmsg = 'ExcitonModelDriver: The \'potfile\' keyword is not '
+            errmsg += 'supported in exciton model calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
 
     def compute(self, molecule, basis, min_basis):
         """
@@ -350,6 +382,12 @@ class ExcitonModelDriver:
             else:
                 method_dict = {'dft': 'no'}
 
+            # SCF checkpoint file
+            monomer_scf_h5 = f'monomer_{ind + 1}.scf.h5'
+            if self.checkpoint_file is not None:
+                monomer_scf_h5 = Path(
+                    self.checkpoint_file).with_suffix(f'.{monomer_scf_h5}')
+
             # SCF calculation
             scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
             scf_drv.update_settings(
@@ -359,7 +397,7 @@ class ExcitonModelDriver:
                     'conv_thresh': self.scf_conv_thresh,
                     'max_iter': self.scf_max_iter,
                     'restart': 'yes' if self.restart else 'no',
-                    'checkpoint_file': 'monomer_{:d}.scf.h5'.format(ind + 1),
+                    'checkpoint_file': str(monomer_scf_h5),
                 }, method_dict)
             scf_drv.compute(monomer, basis, min_basis)
 
@@ -369,6 +407,12 @@ class ExcitonModelDriver:
             # update ERI screening threshold
             if self.eri_thresh > scf_drv.eri_thresh and scf_drv.eri_thresh > 0:
                 self.eri_thresh = scf_drv.eri_thresh
+
+            # TDA checkpoint file
+            monomer_rsp_h5 = f'monomer_{ind + 1}.rsp.h5'
+            if self.checkpoint_file is not None:
+                monomer_rsp_h5 = Path(
+                    self.checkpoint_file).with_suffix(f'.{monomer_rsp_h5}')
 
             # TDA calculation
             abs_spec = Absorption(
@@ -380,7 +424,7 @@ class ExcitonModelDriver:
                     'conv_thresh': self.tda_conv_thresh,
                     'max_iter': self.tda_max_iter,
                     'restart': 'yes' if self.restart else 'no',
-                    'checkpoint_file': 'monomer_{:d}.rsp.h5'.format(ind + 1),
+                    'checkpoint_file': str(monomer_rsp_h5),
                 }, method_dict)
             abs_spec.init_driver(self.comm, self.ostream)
             abs_spec.compute(monomer, basis, scf_drv.scf_tensors)
@@ -409,11 +453,11 @@ class ExcitonModelDriver:
                     tdens = math.sqrt(2.0) * np.matmul(
                         mo_occ, np.matmul(vec.reshape(nocc, nvir), mo_vir.T))
                     self.trans_dipoles[h, :] = np.array(
-                        [np.sum(tdens * dipole_ints[d]) for d in range(3)])
+                        [np.sum(tdens * dipole_ints[d].T) for d in range(3)])
                     self.velo_trans_dipoles[h, :] = np.array(
-                        [np.sum(tdens * linmom_ints[d]) for d in range(3)])
+                        [np.sum(tdens * linmom_ints[d].T) for d in range(3)])
                     self.magn_trans_dipoles[h, :] = np.array(
-                        [np.sum(tdens * angmom_ints[d]) for d in range(3)])
+                        [np.sum(tdens * angmom_ints[d].T) for d in range(3)])
 
             valstr = '*** Time used in monomer calculation:'
             valstr += ' {:.2f} sec'.format(tm.time() - monomer_start_time)
@@ -881,12 +925,15 @@ class ExcitonModelDriver:
                         # CT transition dipole
                         tdens = math.sqrt(2.0) * np.matmul(
                             mo_occ, np.matmul(cvec['vec'], mo_vir.T))
-                        self.trans_dipoles[svec['index'], :] = np.array(
-                            [np.sum(tdens * dipole_ints[d]) for d in range(3)])
-                        self.velo_trans_dipoles[svec['index'], :] = np.array(
-                            [np.sum(tdens * linmom_ints[d]) for d in range(3)])
-                        self.magn_trans_dipoles[svec['index'], :] = np.array(
-                            [np.sum(tdens * angmom_ints[d]) for d in range(3)])
+                        self.trans_dipoles[svec['index'], :] = np.array([
+                            np.sum(tdens * dipole_ints[d].T) for d in range(3)
+                        ])
+                        self.velo_trans_dipoles[svec['index'], :] = np.array([
+                            np.sum(tdens * linmom_ints[d].T) for d in range(3)
+                        ])
+                        self.magn_trans_dipoles[svec['index'], :] = np.array([
+                            np.sum(tdens * angmom_ints[d].T) for d in range(3)
+                        ])
 
                     self.ostream.print_blank()
 
@@ -976,6 +1023,29 @@ class ExcitonModelDriver:
         if self.rank == mpi_master():
             self.print_banner('Summary')
 
+            valstr = '*** Reference for ab initio exciton model:'
+            self.ostream.print_header(valstr.ljust(80))
+            valstr = 'X. Li, R.M. Parrish, F. Liu, S.I.L. Kokkila '
+            valstr += 'Schumacher and T.J. Martinez,'
+            self.ostream.print_header(valstr.ljust(80))
+            valstr = 'J. Chem. Theory Comput. 2017, 13, 8, 3493-3504.'
+            self.ostream.print_header(valstr.ljust(80))
+            self.ostream.print_blank()
+
+            if self.ct_nocc > 0 and self.ct_nvir > 0:
+                self.ostream.print_blank()
+                valstr = '*** Warning: In this implementation, the charge-'
+                valstr += 'transfer (CT) excitation'
+                self.ostream.print_header(valstr.ljust(80))
+                valstr = 'energies are calculated by TDDFT-TDA. The CT '
+                valstr += 'excitation energies will be'
+                self.ostream.print_header(valstr.ljust(80))
+                valstr = 'problematic if pure or global hybrid density '
+                valstr += 'functionals are employed.'
+                self.ostream.print_header(valstr.ljust(80))
+                self.ostream.print_blank()
+                self.ostream.print_blank()
+
             eigvals, eigvecs = np.linalg.eigh(self.H)
             adia_trans_dipoles = np.matmul(eigvecs.T, self.trans_dipoles)
             adia_velo_trans_dipoles = np.matmul(eigvecs.T,
@@ -985,7 +1055,7 @@ class ExcitonModelDriver:
 
             for s in range(adia_velo_trans_dipoles.shape[0]):
                 adia_velo_trans_dipoles[s, :] /= -eigvals[s]
-                adia_magn_trans_dipoles[s, :] *= 0.5
+                adia_magn_trans_dipoles[s, :] *= -0.5
 
             valstr = 'Adiabatic excited states:'
             self.ostream.print_header(valstr.ljust(80))
@@ -996,11 +1066,11 @@ class ExcitonModelDriver:
 
             for i, e in enumerate(eigvals):
                 dip_strength = np.sum(adia_trans_dipoles[i, :]**2)
-                f = 2.0 / 3.0 * dip_strength * e
+                f = (2.0 / 3.0) * dip_strength * e
                 osc_str.append(f)
 
-                R = np.vdot(adia_velo_trans_dipoles[i, :],
-                            adia_magn_trans_dipoles[i, :])
+                R = (-1.0) * np.vdot(adia_velo_trans_dipoles[i, :],
+                                     adia_magn_trans_dipoles[i, :])
                 R *= rotatory_strength_in_cgs()
                 rot_str.append(R)
 

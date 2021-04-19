@@ -10,7 +10,7 @@ from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.optimizationdriver import OptimizationDriver
 
 
-class TestOptimization:
+class TestOptimizeSCF:
 
     def run_opt(self, inpfile, basis_label, ref_coords):
 
@@ -42,8 +42,11 @@ class TestOptimization:
 
             inpfile = Path(inpfile)
             optfile = Path(str(inpfile.with_name(inpfile.stem)) + '_optim.xyz')
+            logfile = inpfile.with_suffix('.log')
             if optfile.is_file():
                 optfile.unlink()
+            if logfile.is_file():
+                logfile.unlink()
 
     def test_nh3(self):
 

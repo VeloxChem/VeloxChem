@@ -1,10 +1,27 @@
 //
 //                           VELOXCHEM 1.0-RC
-//      ---------------------------------------------------
+//         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2020 by VeloxChem developers. All rights reserved.
+//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
 //  Contact: https://veloxchem.org/contact
+//
+//  SPDX-License-Identifier: LGPL-3.0-or-later
+//
+//  This file is part of VeloxChem.
+//
+//  VeloxChem is free software: you can redistribute it and/or modify it under
+//  the terms of the GNU Lesser General Public License as published by the Free
+//  Software Foundation, either version 3 of the License, or (at your option)
+//  any later version.
+//
+//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+//  License for more details.
+//
+//  You should have received a copy of the GNU Lesser General Public License
+//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
@@ -15,12 +32,15 @@
 #include <string>
 #include <vector>
 
+#include "CoordinationNumber.hpp"
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
+#include "DispersionModel.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMolData.hpp"
 #include "Molecule.hpp"
+#include "PartialCharges.hpp"
 #include "StringFormat.hpp"
 #include "VdwRadii.hpp"
 
@@ -194,6 +214,26 @@ CMolecule_z_to_numpy(const CMolecule& self)
     return vlx_general::pointer_to_numpy(self.getCoordinatesZ(), self.getNumberOfAtoms());
 }
 
+// Helper function for getting coodination number for molecule
+
+static py::array_t<double>
+CMolecule_coordination_numbers(const CMolecule& self)
+{
+    auto cn = coordnum::getCoordinationNumber(self);
+
+    return vlx_general::pointer_to_numpy(cn.data(), static_cast<int32_t>(cn.size()));
+}
+
+// Helper function for getting partial charges for molecule
+
+static py::array_t<double>
+CMolecule_partial_charges(const CMolecule& self)
+{
+    auto chg = parchg::getPartialCharges(self, self.getCharge());
+
+    return vlx_general::pointer_to_numpy(chg.data(), static_cast<int32_t>(chg.size()));
+}
+
 // Helper function for getting VDW radii for molecule
 
 static py::array_t<double>
@@ -311,6 +351,8 @@ export_moldata(py::module& m)
         .def("x_to_numpy", &CMolecule_x_to_numpy)
         .def("y_to_numpy", &CMolecule_y_to_numpy)
         .def("z_to_numpy", &CMolecule_z_to_numpy)
+        .def("coordination_numbers", &CMolecule_coordination_numbers)
+        .def("partial_charges", &CMolecule_partial_charges)
         .def("vdw_radii_to_numpy", &CMolecule_vdw_radii_to_numpy)
         .def("elem_ids_to_numpy", &CMolecule_elem_ids_to_numpy)
         .def("masses_to_numpy", &CMolecule_masses_to_numpy)
@@ -326,6 +368,14 @@ export_moldata(py::module& m)
         .def("set_atom_type", (bool (CChemicalElement::*)(const int32_t)) & CChemicalElement::setAtomType)
         .def("get_name", &CChemicalElement::getName)
         .def(py::self == py::self);
+
+    // CDispersionModel class
+
+    py::class_<CDispersionModel, std::shared_ptr<CDispersionModel>>(m, "DispersionModel")
+        .def(py::init<>())
+        .def("compute", &CDispersionModel::compute)
+        .def("get_energy", &CDispersionModel::getEnergy)
+        .def("get_gradient", &CDispersionModel::getGradient);
 }
 
 }  // namespace vlx_moldata

@@ -1,6 +1,33 @@
+#
+#                           VELOXCHEM 1.0-RC
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from mpi4py import MPI
 import time as tm
 
+from .veloxchemlib import mpi_initialized
+from .veloxchemlib import mpi_master
 from .cli import cli
 from .cli import print_help
 from .errorhandler import assert_msg_critical
@@ -22,7 +49,6 @@ from .scfgradientdriver import ScfGradientDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .slurminfo import get_slurm_maximum_hours
-from .veloxchemlib import mpi_initialized, mpi_master
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
@@ -70,7 +96,7 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     :param rsp_dict:
         The dictionary of response dict.
     :param method_dict:
-        The dictionary of method rsp_dict.
+        The dictionary of method settings.
 
     :return:
         The response property object.
@@ -211,10 +237,13 @@ def main():
         scf_dict['maximum_hours'] = maximum_hours
 
         if use_xtb:
+            if 'potfile' in method_dict:
+                errmsg = 'XTBDriver: The \'potfile\' keyword is not supported '
+                errmsg += 'in XTB calculation.'
+                if task.mpi_rank == mpi_master():
+                    assert_msg_critical(False, errmsg)
             xtb_drv = XTBDriver(task.mpi_comm)
             xtb_drv.set_method(method_dict['xtb'].lower())
-            xtb_drv.set_output_filename(task.input_dict['filename'] +
-                                        '_xtb.out')
             xtb_drv.compute(task.molecule, task.ostream)
         else:
             scf_drv = select_scf_driver(task, scf_type)
@@ -234,19 +263,29 @@ def main():
             if task.mpi_rank == mpi_master():
                 scf_prop.print_properties(task.molecule)
 
+            if scf_drv.electric_field is not None:
+                task.finish()
+                return
+
     # Gradient
 
     if task_type == 'gradient':
         if use_xtb:
             grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
             grad_drv.compute(task.molecule)
-        elif scf_drv.restricted:
+        elif scf_drv.closed_shell:
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
             grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Geometry optimization
 
     if task_type == 'optimize':
+        if 'potfile' in method_dict:
+            errmsg = 'OptimizationDriver: The \'potfile\' keyword is not '
+            errmsg += 'supported in geometry optimization.'
+            if task.mpi_rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
         if 'optimize' in task.input_dict:
             opt_dict = task.input_dict['optimize']
         else:
@@ -256,7 +295,7 @@ def main():
             grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
             opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
                                          'XTB')
-        elif scf_drv.restricted:
+        elif scf_drv.closed_shell:
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
             opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
                                          'SCF')
@@ -266,7 +305,7 @@ def main():
 
     # Response
 
-    if task_type == 'response' and scf_drv.restricted:
+    if task_type == 'response' and scf_drv.closed_shell:
         if 'response' in task.input_dict:
             rsp_dict = dict(task.input_dict['response'])
         else:
@@ -304,7 +343,7 @@ def main():
     # Pulsed Linear Response Theory
 
     if ((task_type == 'pulses' or 'pulses' in task.input_dict) and
-            scf_drv.restricted):
+            scf_drv.closed_shell):
         if 'pulses' in task.input_dict:
             prt_dict = task.input_dict['pulses']
         else:
@@ -319,12 +358,12 @@ def main():
             cpp_dict['restart'] = 'no'
 
         pulsed_response = PulsedResponse(task.mpi_comm, task.ostream)
-        pulsed_response.update_settings(prt_dict, cpp_dict)
+        pulsed_response.update_settings(prt_dict, cpp_dict, method_dict)
         pulsed_response.compute(task.molecule, task.ao_basis, scf_tensors)
 
     # MP2 perturbation theory
 
-    if task_type == 'mp2' and scf_drv.restricted:
+    if task_type == 'mp2' and scf_drv.closed_shell:
         if 'mp2' in task.input_dict:
             mp2_dict = task.input_dict['mp2']
         else:
@@ -336,7 +375,7 @@ def main():
             mp2_dict['qq_type'] = scf_drv.qq_type
 
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
-        mp2_drv.update_settings(mp2_dict)
+        mp2_drv.update_settings(mp2_dict, method_dict)
         mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
 
     # Cube file

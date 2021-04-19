@@ -1,3 +1,28 @@
+#
+#                           VELOXCHEM 1.0-RC
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 import numpy as np
 import time as tm
 import sys
@@ -153,7 +178,7 @@ class LinearSolver:
         :param rsp_dict:
             The dictionary of response dict.
         :param method_dict:
-            The dictionary of method rsp_dict.
+            The dictionary of method settings.
         """
 
         if method_dict is None:
@@ -168,7 +193,7 @@ class LinearSolver:
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
-            self.dft = True if key == 'yes' else False
+            self.dft = True if key in ['yes', 'y'] else False
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
@@ -183,7 +208,7 @@ class LinearSolver:
 
         if 'pe' in method_dict:
             key = method_dict['pe'].lower()
-            self.pe = True if key == 'yes' else False
+            self.pe = True if key in ['yes', 'y'] else False
         else:
             if ('potfile' in method_dict) or method_dict['pe_options']:
                 self.pe = True
@@ -198,7 +223,7 @@ class LinearSolver:
 
         if 'use_split_comm' in method_dict:
             key = method_dict['use_split_comm'].lower()
-            self.use_split_comm = True if key == 'yes' else False
+            self.use_split_comm = True if key in ['yes', 'y'] else False
 
         if 'conv_thresh' in rsp_dict:
             self.conv_thresh = float(rsp_dict['conv_thresh'])
@@ -209,7 +234,7 @@ class LinearSolver:
 
         if 'restart' in rsp_dict:
             key = rsp_dict['restart'].lower()
-            self.restart = True if key == 'yes' else False
+            self.restart = True if key in ['yes', 'y'] else False
         if 'checkpoint_file' in rsp_dict:
             self.checkpoint_file = rsp_dict['checkpoint_file']
 
@@ -333,6 +358,11 @@ class LinearSolver:
             from .polembed import PolEmbed
             pe_drv = PolEmbed(molecule, basis, self.pe_options, self.comm)
             V_es = pe_drv.compute_multipole_potential_integrals()
+
+            cppe_info = 'Using CPPE {} for polarizable embedding.'.format(
+                pe_drv.get_cppe_version())
+            self.ostream.print_info(cppe_info)
+            self.ostream.print_blank()
 
             pot_info = "Reading polarizable embedding potential: {}".format(
                 self.pe_options['potfile'])

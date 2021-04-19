@@ -1,3 +1,28 @@
+#
+#                           VELOXCHEM 1.0-RC
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 import time as tm
 import sys
 import os
@@ -261,7 +286,7 @@ class OutputStream:
         self.print_title('VELOXCHEM 1.0-RC')
         self.print_title('AN ELECTRONIC STRUCTURE CODE')
         self.print_title('')
-        self.print_title('Copyright (C) 2018-2020 VeloxChem developers.')
+        self.print_title('Copyright (C) 2018-2021 VeloxChem developers.')
         self.print_title('All rights reserved.')
         self.print_separator()
         exec_str = 'VeloxChem execution started'
@@ -301,4 +326,19 @@ class OutputStream:
         exec_str += '{:.2f}'.format(end_time - start_time) + ' sec.'
         self.print_title(exec_str)
         self.print_separator()
+
+        ref_str = 'Rinkevicius, Z.; Li, X.; Vahtras, O.; Ahmadzadeh, K.; '
+        ref_str += 'Brand, M.; Ringholm, M.;'
+        self.print_title(ref_str)
+        ref_str = 'List, N. H.; Scheurer, M.; Scott, M.; Dreuw, A.; Norman, P.'
+        self.print_title(ref_str)
+        ref_str = 'VeloxChem: A Python-driven Density-functional Theory '
+        ref_str += 'Program for Spectroscopy'
+        self.print_title(ref_str)
+        ref_str = 'Simulations in High-performance Computing Environments.'
+        self.print_title(ref_str)
+        ref_str = 'WIREs Comput Mol Sci 2020, 10 (5), e1457.'
+        self.print_title(ref_str)
+        self.print_separator()
+
         self.flush()

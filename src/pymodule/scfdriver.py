@@ -1,3 +1,28 @@
+#
+#                           VELOXCHEM 1.0-RC
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from collections import deque
 import numpy as np
 import time as tm
@@ -5,10 +30,12 @@ import math
 import sys
 import os
 
+from .veloxchemlib import DispersionModel
 from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
+from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import GridDriver
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCIntegrator
@@ -73,6 +100,7 @@ class ScfDriver:
         - ref_mol_orbs: The reference molecular orbitals read from checkpoint
           file.
         - restricted: The flag for restricted SCF.
+        - dispersion: The flag for calculating D4 dispersion correction.
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.
@@ -83,6 +111,12 @@ class ScfDriver:
         - pe_summary: The summary string for polarizable embedding.
         - use_split_comm: The flag for using split communicators.
         - split_comm_ratio: The list of ratios for split communicators.
+        - dispersion: The flag for calculating D4 dispersion correction.
+        - d4_energy: The D4 dispersion correction to energy.
+        - electric_field: The static electric field.
+        - ef_nuc_energy: The electric potential energy of the nuclei in the
+          static electric field.
+        - dipole_origin: The origin of the dipole operator.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
@@ -151,8 +185,12 @@ class ScfDriver:
         self.program_start_time = None
         self.maximum_hours = None
 
-        # restricted?
-        self.restricted = True
+        # closed shell?
+        self.closed_shell = True
+
+        # D4 dispersion correction
+        self.dispersion = False
+        self.d4_energy = 0.0
 
         # dft
         self.dft = False
@@ -169,6 +207,11 @@ class ScfDriver:
         # split communicators
         self.use_split_comm = False
         self.split_comm_ratio = None
+
+        # static electric field
+        self.electric_field = None
+        self.ef_nuc_energy = 0.0
+        self.dipole_origin = None
 
         # timing and profiling
         self.timing = False
@@ -203,7 +246,7 @@ class ScfDriver:
             self.eri_thresh = float(scf_dict['eri_thresh'])
         if 'restart' in scf_dict:
             key = scf_dict['restart'].lower()
-            self.restart = True if key == 'yes' else False
+            self.restart = True if key in ['yes', 'y'] else False
         if 'checkpoint_file' in scf_dict:
             self.checkpoint_file = scf_dict['checkpoint_file']
 
@@ -212,9 +255,13 @@ class ScfDriver:
         if 'maximum_hours' in scf_dict:
             self.maximum_hours = scf_dict['maximum_hours']
 
+        if 'dispersion' in method_dict:
+            key = method_dict['dispersion'].lower()
+            self.dispersion = True if key in ['yes', 'y'] else False
+
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
-            self.dft = True if key == 'yes' else False
+            self.dft = True if key in ['yes', 'y'] else False
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
@@ -229,7 +276,7 @@ class ScfDriver:
 
         if 'pe' in method_dict:
             key = method_dict['pe'].lower()
-            self.pe = True if key == 'yes' else False
+            self.pe = True if key in ['yes', 'y'] else False
         else:
             if ('potfile' in method_dict) or method_dict['pe_options']:
                 self.pe = True
@@ -244,7 +291,20 @@ class ScfDriver:
 
         if 'use_split_comm' in method_dict:
             key = method_dict['use_split_comm'].lower()
-            self.use_split_comm = True if key == 'yes' else False
+            self.use_split_comm = True if key in ['yes', 'y'] else False
+
+        if 'electric_field' in scf_dict:
+            self.electric_field = [
+                float(x)
+                for x in scf_dict['electric_field'].replace(',', ' ').split()
+            ]
+            assert_msg_critical(
+                len(self.electric_field) == 3,
+                'SCF driver: Expecting 3 values in \'electric field\' input')
+            assert_msg_critical(
+                not self.pe,
+                'SCF driver: \'electric field\' input is incompatible with ' +
+                'polarizable embedding')
 
         if 'timing' in scf_dict:
             key = scf_dict['timing'].lower()
@@ -293,7 +353,7 @@ class ScfDriver:
             self.den_guess = DensityGuess("RESTART", self.checkpoint_file)
             self.restart = self.den_guess.validate_checkpoint(
                 self.rank, self.comm, molecule.elem_ids_to_numpy(),
-                ao_basis.get_label(), self.restricted)
+                ao_basis.get_label(), self.closed_shell)
 
         if self.restart:
             self.acc_type = "DIIS"
@@ -313,6 +373,19 @@ class ScfDriver:
                 self.nuc_energy)
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
+
+        # D4 dispersion correction
+        if self.dispersion:
+            if self.rank == mpi_master():
+                disp = DispersionModel()
+                xc_label = self.xcfun.get_func_label() if self.dft else 'HF'
+                disp.compute(molecule, xc_label)
+                self.d4_energy = disp.get_energy()
+            else:
+                self.d4_energy = 0.0
+            self.d4_energy = self.comm.bcast(self.d4_energy, root=mpi_master())
+        else:
+            self.d4_energy = 0.0
 
         # generate integration grid
         if self.dft:
@@ -334,6 +407,11 @@ class ScfDriver:
             self.pe_drv = PolEmbed(molecule, ao_basis, self.pe_options,
                                    self.comm)
             self.V_es = self.pe_drv.compute_multipole_potential_integrals()
+
+            cppe_info = 'Using CPPE {} for polarizable embedding.'.format(
+                self.pe_drv.get_cppe_version())
+            self.ostream.print_info(cppe_info)
+            self.ostream.print_blank()
 
             pot_info = 'Reading polarizable embedding potential: {}'.format(
                 self.pe_options['potfile'])
@@ -386,7 +464,7 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self.print_scf_energy()
-            if self.restricted:
+            if self.closed_shell:
                 s2 = 0.0
             else:
                 s2 = self.compute_s2(molecule, self.scf_tensors['S'],
@@ -445,7 +523,12 @@ class ScfDriver:
         self.fock_matrices_beta.clear()
         self.den_matrices_beta.clear()
 
-        ovl_mat, kin_mat, npot_mat = self.comp_one_ints(molecule, ao_basis)
+        ovl_mat, kin_mat, npot_mat, dipole_mats = self.comp_one_ints(
+            molecule, ao_basis)
+
+        if self.rank == mpi_master() and self.electric_field is not None:
+            dipole_ints = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
+                           dipole_mats.z_to_numpy())
 
         linear_dependency = False
 
@@ -547,10 +630,35 @@ class ScfDriver:
             profiler.stop_timer(self.num_iter, 'FockBuild')
             profiler.start_timer(self.num_iter, 'CompEnergy')
 
-            e_ee, e_kin, e_en = self.comp_energy(fock_mat, vxc_mat, e_pe,
-                                                 kin_mat, npot_mat, den_mat)
+            e_el = self.comp_energy(fock_mat, vxc_mat, e_pe, kin_mat, npot_mat,
+                                    den_mat)
 
             self.comp_full_fock(fock_mat, vxc_mat, V_pe, kin_mat, npot_mat)
+
+            if self.rank == mpi_master() and self.electric_field is not None:
+                efpot = sum([
+                    ef * mat
+                    for ef, mat in zip(self.electric_field, dipole_ints)
+                ])
+
+                if self.closed_shell:
+                    e_el -= 2.0 * np.trace(
+                        np.matmul(efpot, den_mat.alpha_to_numpy(0)))
+                    fock_mat.add_matrix(DenseMatrix(-efpot), 0)
+                else:
+                    e_el -= np.trace(
+                        np.matmul(efpot, (den_mat.alpha_to_numpy(0) +
+                                          den_mat.beta_to_numpy(0))))
+                    fock_mat.add_matrix(DenseMatrix(-efpot), 0, 'alpha')
+                    fock_mat.add_matrix(DenseMatrix(-efpot), 0, 'beta')
+
+                self.ef_nuc_energy = 0.0
+                coords = molecule.get_coordinates()
+                elem_ids = molecule.elem_ids_to_numpy()
+                for i in range(molecule.number_of_atoms()):
+                    self.ef_nuc_energy += np.dot(
+                        elem_ids[i] * (coords[i] - self.dipole_origin),
+                        self.electric_field)
 
             e_grad, max_grad = self.comp_gradient(fock_mat, ovl_mat, den_mat,
                                                   oao_mat)
@@ -562,7 +670,8 @@ class ScfDriver:
             self.density = AODensityMatrix(den_mat)
 
             self.add_iter_data({
-                'energy': e_ee + e_kin + e_en + self.nuc_energy,
+                'energy': (e_el + self.nuc_energy + self.d4_energy +
+                           self.ef_nuc_energy),
                 'gradient_norm': e_grad,
                 'max_gradient': max_grad,
                 'diff_density': diff_den,
@@ -716,6 +825,22 @@ class ScfDriver:
 
         t3 = tm.time()
 
+        if self.electric_field is not None:
+            if molecule.get_charge() != 0:
+                coords = molecule.get_coordinates()
+                nuclear_charges = molecule.elem_ids_to_numpy()
+                self.dipole_origin = np.sum(coords.T * nuclear_charges,
+                                            axis=1) / np.sum(nuclear_charges)
+            else:
+                self.dipole_origin = np.zeros(3)
+            dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+            dipole_drv.set_origin(*self.dipole_origin)
+            dipole_mats = dipole_drv.compute(molecule, basis)
+        else:
+            dipole_mats = None
+
+        t4 = tm.time()
+
         if self.rank == mpi_master():
 
             self.ostream.print_info("Overlap matrix computed in" +
@@ -730,9 +855,14 @@ class ScfDriver:
                                     " {:.2f} sec.".format(t3 - t2))
             self.ostream.print_blank()
 
+            if self.electric_field is not None:
+                self.ostream.print_info("Electric dipole matrices computed in" +
+                                        " {:.2f} sec.".format(t4 - t3))
+                self.ostream.print_blank()
+
             self.ostream.flush()
 
-        return ovl_mat, kin_mat, npot_mat
+        return ovl_mat, kin_mat, npot_mat, dipole_mats
 
     def comp_npot_mat_split_comm(self, molecule, basis):
         """
@@ -801,7 +931,7 @@ class ScfDriver:
         if self.den_guess.guess_type == "SAD":
 
             return self.den_guess.sad_density(molecule, ao_basis, min_basis,
-                                              ovl_mat, self.restricted,
+                                              ovl_mat, self.closed_shell,
                                               self.comm, self.ostream)
 
         # guess: projection of molecular orbitals from reduced basis
@@ -910,7 +1040,7 @@ class ScfDriver:
 
         if self.dft and not self.first_step:
             if not self.xcfun.is_hybrid():
-                if self.restricted is True:
+                if self.closed_shell:
                     fock_mat.scale(2.0, 0)
 
             self.molgrid.distribute(self.rank, self.nodes, self.comm)
@@ -1030,7 +1160,7 @@ class ScfDriver:
             fock_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
                                 local_comm)
             if self.dft and (not self.xcfun.is_hybrid()):
-                if self.restricted is True:
+                if self.closed_shell:
                     fock_mat.scale(2.0, 0)
 
         # calculate Vxc on DFT nodes
@@ -1099,8 +1229,8 @@ class ScfDriver:
 
     def comp_energy(self, fock_mat, vxc_mat, e_pe, kin_mat, npot_mat, den_mat):
         """
-        Computes SCF energy components: electronic energy, kinetic energy, and
-        nuclear potential energy.
+        Computes the sum of SCF energy components: electronic energy, kinetic
+        energy, and nuclear potential energy.
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix (only 2e-part).
@@ -1116,13 +1246,9 @@ class ScfDriver:
             The density matrix.
 
         :return:
-            The tuple (electronic energy, kinetic energy, nuclear potential
-            energy).
+            The sum of electronic energy, kinetic energy and nuclear potential
+            energy.
         """
-
-        e_ee = 0.0
-        e_kin = 0.0
-        e_en = 0.0
 
         if self.rank == mpi_master():
             # electronic, kinetic, nuclear energy
@@ -1133,12 +1259,12 @@ class ScfDriver:
                 e_ee += vxc_mat.get_energy()
             if self.pe and not self.first_step:
                 e_ee += e_pe
+            e_sum = e_ee + e_kin + e_en
+        else:
+            e_sum = 0.0
+        e_sum = self.comm.bcast(e_sum, root=mpi_master())
 
-        e_ee = self.comm.bcast(e_ee, root=mpi_master())
-        e_kin = self.comm.bcast(e_kin, root=mpi_master())
-        e_en = self.comm.bcast(e_en, root=mpi_master())
-
-        return (e_ee, e_kin, e_en)
+        return e_sum
 
     def comp_full_fock(self, fock_mat, vxc_mat, pe_mat, kin_mat, npot_mat):
         """
@@ -1163,7 +1289,7 @@ class ScfDriver:
 
             if self.dft and not self.first_step:
                 fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
-                if not self.restricted:
+                if not self.closed_shell:
                     fock_mat.add_matrix(vxc_mat.get_matrix(True), 0, 'beta')
 
             if self.pe and not self.first_step:
@@ -1434,6 +1560,11 @@ class ScfDriver:
                 self.grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
+        if self.electric_field is not None:
+            cur_str = 'Static Electric Field           : '
+            cur_str += str(self.electric_field)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         self.ostream.print_blank()
 
     def print_scf_title(self):
@@ -1666,7 +1797,7 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         mult = molecule.get_multiplicity()
-        if self.restricted:
+        if self.closed_shell:
             valstr = "Multiplicity (2S+1)           :{:5.1f}".format(mult)
             self.ostream.print_header(valstr.ljust(92))
 
@@ -1674,7 +1805,7 @@ class ScfDriver:
         valstr = "Magnetic Quantum Number (M_S) :{:5.1f}".format(sz)
         self.ostream.print_header(valstr.ljust(92))
 
-        if not self.restricted:
+        if not self.closed_shell:
             valstr = "Expectation value of S**2     :{:8.4f}".format(s2)
             self.ostream.print_header(valstr.ljust(92))
 
@@ -1687,22 +1818,45 @@ class ScfDriver:
 
         enuc = self.nuc_energy
 
+        e_d4 = self.d4_energy
+
+        e_ef_nuc = self.ef_nuc_energy
+
         etot = self.iter_data[-1]['energy']
 
-        e_el = etot - enuc
+        e_el = etot - enuc - e_d4 - e_ef_nuc
 
-        valstr = "Total Energy                       :{:20.10f} au".format(etot)
+        valstr = f'Total Energy                       :{etot:20.10f} au'
         self.ostream.print_header(valstr.ljust(92))
 
-        valstr = "Electronic Energy                  :{:20.10f} au".format(e_el)
+        valstr = f'Electronic Energy                  :{e_el:20.10f} au'
         self.ostream.print_header(valstr.ljust(92))
 
-        valstr = "Nuclear Repulsion Energy           :{:20.10f} au".format(enuc)
+        valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} au'
         self.ostream.print_header(valstr.ljust(92))
+
+        if self.dispersion:
+            valstr = f'D4 Dispersion Correction           :{e_d4:20.10f} au'
+            self.ostream.print_header(valstr.ljust(92))
+
+        if self.electric_field is not None:
+            valstr = f'Nuclei in Static Electric Field    :{e_ef_nuc:20.10f} au'
+            self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_header(
-            "------------------------------------".ljust(92))
+            '------------------------------------'.ljust(92))
 
         grad = self.iter_data[-1]['gradient_norm']
-        valstr = "Gradient Norm                      :{:20.10f} au".format(grad)
+        valstr = 'Gradient Norm                      :{:20.10f} au'.format(grad)
         self.ostream.print_header(valstr.ljust(92))
+
+        self.ostream.print_blank()
+
+        if self.dispersion:
+            valstr = '*** Reference for D4 dispersion correction: '
+            self.ostream.print_header(valstr.ljust(92))
+            valstr = 'E. Caldeweyher, S. Ehlert, A. Hansen, H. Neugebauer, '
+            valstr += 'S. Spicher, C. Bannwarth'
+            self.ostream.print_header(valstr.ljust(92))
+            valstr = 'and S. Grimme, J. Chem Phys, 2019, 150, 154122.'
+            self.ostream.print_header(valstr.ljust(92))

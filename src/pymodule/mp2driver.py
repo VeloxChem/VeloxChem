@@ -1,3 +1,28 @@
+#
+#                           VELOXCHEM 1.0-RC
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from mpi4py import MPI
 import numpy as np
 import time as tm
@@ -73,13 +98,18 @@ class Mp2Driver:
         # use conventional (in-memory) AO-to-MO integral transformation?
         self.conventional = False
 
-    def update_settings(self, mp2_dict):
+    def update_settings(self, mp2_dict, method_dict=None):
         """
         Updates settings in MP2 driver.
 
         :param mp2_dict:
             The dictionary of MP2 settings.
+        :param method_dict:
+            The dictionary of method.
         """
+
+        if method_dict is None:
+            method_dict = {}
 
         if 'qq_type' in mp2_dict:
             self.qq_type = mp2_dict['qq_type']
@@ -96,6 +126,18 @@ class Mp2Driver:
         if 'conventional' in mp2_dict:
             key = mp2_dict['conventional'].lower()
             self.conventional = True if key in ['yes', 'y'] else False
+
+        if 'xcfun' in method_dict:
+            errmsg = 'Mp2Driver: The \'xcfun\' keyword is not supported in MP2 '
+            errmsg += 'calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if 'potfile' in method_dict:
+            errmsg = 'Mp2Driver: The \'potfile\' keyword is not supported in '
+            errmsg += 'MP2 calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
 
     def compute(self, molecule, ao_basis, mol_orbs):
         """
