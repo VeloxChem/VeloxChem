@@ -119,6 +119,7 @@ class RpaOrbitalResponse(OrbitalResponse):
 
         # Fock matrices with corresponding type
         fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
+		# TODO: these types probably need to be changed for DFT
         fock_ao_rhs.set_fock_type(fockmat.rgenjk, 1)
         fock_ao_rhs.set_fock_type(fockmat.rgenjk, 2)
 

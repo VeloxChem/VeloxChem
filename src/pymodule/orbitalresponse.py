@@ -49,8 +49,6 @@ class OrbitalResponse:
         Initializes orbital response computation driver to default setup.
         """
 
-        #super().__init__(comm, ostream)
-
         # ERI settings
         self.eri_thresh = 1.0e-15
         self.qq_type = 'QQ_DEN'
@@ -241,6 +239,7 @@ class OrbitalResponse:
                                     self.eri_thresh, molecule, basis)
         eri_drv.compute(fock_lambda, ao_density_lambda, molecule, basis,
                         screening)
+		# TODO: DFT E[3] contribution probably needs to be added here
         fock_lambda.reduce_sum(self.rank, self.nodes, self.comm)
 
         # Compute the omega multipliers
@@ -265,15 +264,13 @@ class OrbitalResponse:
             if not self.is_converged:
                 warn_msg = '*** Warning: Orbital response did not converge.'
                 self.ostream.print_header(warn_msg.ljust(56))
-                #warn_msg = '    implemented. Relaxed dipole moment will be wrong.'
-                #self.ostream.print_header(warn_msg.ljust(56))
             else:
                 orbrsp_time = tm.time() - self.start_time
                 self.ostream.print_info(
                     'Orbital response converged after {:d} iterations.'.format(
                         self.iter_count))
                 self.ostream.print_info(
-                    'Total time needed for orbital response: {:5.2f} s.'.format(
+                    'Total time needed for orbital response: {:.2f} s.'.format(
                         orbrsp_time))
 
             self.ostream.flush()
@@ -319,13 +316,6 @@ class OrbitalResponse:
         # count variable for conjugate gradient iterations
         self.iter_count = 0
 
-        # Workflow:
-        # 1) Construct the necessary density matrices => in child classes
-        # 2) Construct the RHS => in child classes
-        # 3) Construct the initial guess
-        # 4) Write the linear operator for matrix-vector product
-        # 5) Run the conjugate gradient
-
         nocc = molecule.number_of_alpha_electrons()
 
         if self.rank == mpi_master():
@@ -368,11 +358,11 @@ class OrbitalResponse:
         fock_lambda = AOFockMatrix(ao_density_lambda)
         fock_lambda.set_fock_type(fockmat.rgenjk, 0)
 
-        # matrix-vector product
+        # Matrix-vector product of orbital Hessian with trial vector
         def orb_rsp_matvec(v):
             """
             Function to carry out matrix multiplication of Lagrange multiplier
-            vector with orbital Hessian matrix
+            vector with orbital Hessian matrix.
             """
 
             profiler.start_timer(self.iter_count, 'CG')
@@ -388,6 +378,7 @@ class OrbitalResponse:
 
             eri_drv.compute(fock_lambda, ao_density_lambda, molecule, basis,
                             screening)
+			# TODO: DFT E[3] contributions probably need to be added here
             fock_lambda.reduce_sum(self.rank, self.nodes, self.comm)
 
             # Transform to MO basis (symmetrized w.r.t. occ. and virt.)
@@ -415,13 +406,13 @@ class OrbitalResponse:
 
             return lambda_mo.reshape(nocc * nvir)
 
-        # matrix-vector product for preconditioner using the
+        # Matrix-vector product for preconditioner using the
         # inverse of the diagonal (i.e. eocc - evir)
         def precond_matvec(v):
             """
             Function that defines the matrix-vector product
-            required by the pre-conditioner for the conjugate gradient;
-            it's an approximation for the inverse of matrix A in Ax=b.
+            required by the pre-conditioner for the conjugate gradient.
+            It is an approximation for the inverse of matrix A in Ax = b.
             """
             current_v = v.reshape(nocc, nvir)
             M_dot_v = current_v / eov
