@@ -67,7 +67,7 @@ class TestScfUnrestricted(unittest.TestCase):
         potfile = None
 
         xcfun_label = 'blyp'
-        electric_field = '0, 0.002, 0'
+        electric_field = '0, -0.002, 0'
 
         ref_e_scf = -76.119843
         ref_dip = np.array([0.000000, -0.106245, -0.238934])

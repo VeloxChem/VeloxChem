@@ -74,7 +74,7 @@ class TestScfRestricted(unittest.TestCase):
         potfile = None
 
         xcfun_label = None
-        electric_field = '0, 0, -0.03'
+        electric_field = '0, 0, 0.03'
 
         ref_e_scf = -76.0688447658
         ref_dip = np.array([0.000000, 0.000000, 1.023625])
@@ -119,7 +119,7 @@ class TestScfRestricted(unittest.TestCase):
         potfile = None
 
         xcfun_label = 'slda'
-        electric_field = '-0.001, 0, 0'
+        electric_field = '0.001, 0, 0'
 
         ref_e_scf = -76.0742203744
         ref_dip = np.array([0.009288, 0.000000, 0.731285])

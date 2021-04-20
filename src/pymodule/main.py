@@ -259,7 +259,8 @@ def main():
             if task.mpi_rank == mpi_master():
                 scf_prop.print_properties(task.molecule)
 
-            if scf_drv.electric_field is not None:
+            if (scf_drv.electric_field is not None and
+                    task.molecule.get_charge() != 0):
                 task.finish()
                 return
 
