@@ -176,6 +176,20 @@ class CAngularMomentumIntegralsDriver
     void setAngularMomentumOrigin(const double xOrigin, const double yOrigin, const double zOrigin);
 
     /**
+     Sets origin of angular momentum.
+
+     @param origin the Cartesian coordinates of angular momentum origin.
+     */
+    void setAngularMomentumOrigin(const std::array<double, 3>& origin);
+
+    /**
+     Gets origin of angular momentum.
+
+     @return origin the Cartesian coordinates of angular momentum origin.
+     */
+    std::array<double, 3> getAngularMomentumOrigin() const;
+
+    /**
      Computes angular momentum integrals for molecule in specific basis set and
      stores results in angular momentum matrix object.
 

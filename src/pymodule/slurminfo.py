@@ -96,7 +96,7 @@ def get_slurm_maximum_hours():
             ['scontrol', 'show', 'job', job_id])
 
         if scontrol_output is not None:
-            for line in scontrol_output.split(os.linesep):
+            for line in scontrol_output.splitlines():
                 if 'TimeLimit=' in line:
                     match = re.search(
                         r'TimeLimit=(\d+-)?(\d{2}):(\d{2}):(\d{2})', line)

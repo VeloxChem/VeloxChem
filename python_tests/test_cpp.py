@@ -1,21 +1,22 @@
-from pathlib import Path
-import numpy as np
-import unittest
-import tempfile
 import random
-import pytest
 import sys
-import os
+import tempfile
+import unittest
+from pathlib import Path
+
+import numpy as np
+import pytest
+
 try:
     import cppe
 except ImportError:
     pass
 
-from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.outputstream import OutputStream
-from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.rsplinabscross import LinearAbsorptionCrossSection
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.veloxchemlib import is_mpi_master
 
 
 @pytest.mark.solvers
@@ -54,8 +55,10 @@ class TestCPP(unittest.TestCase):
         cpp_prop = LinearAbsorptionCrossSection(
             {
                 'frequencies': ','.join(ref_freqs_str),
-                'batch_size': random.choice([1, 10, 100])
-            }, task.input_dict['method_settings'])
+                'batch_size': random.choice([1, 10, 100]),
+            },
+            task.input_dict['method_settings'],
+        )
         cpp_prop.init_driver(task.mpi_comm, task.ostream)
         cpp_prop.compute(task.molecule, task.ao_basis, scf_tensors)
 
@@ -133,7 +136,7 @@ class TestCPP(unittest.TestCase):
             17   XDIPLEN   ZDIPLEN    0.100000        0.000000        0.000000
             18   YDIPLEN   ZDIPLEN    0.100000       -0.000001       -0.000000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
@@ -169,7 +172,7 @@ class TestCPP(unittest.TestCase):
             17   XDIPLEN   ZDIPLEN    0.100000        0.000000        0.000000
             18   YDIPLEN   ZDIPLEN    0.100000       -0.000000       -0.000000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
@@ -205,7 +208,7 @@ class TestCPP(unittest.TestCase):
             17   XDIPLEN   ZDIPLEN    0.100000        0.000000        0.000000
             18   YDIPLEN   ZDIPLEN    0.100000        0.000000        0.000000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
@@ -215,7 +218,6 @@ class TestCPP(unittest.TestCase):
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'pe_water.inp')
 
-        here = Path(__file__).parent
         potfile = str(here / 'inputs' / 'pe_water.pot')
 
         xcfun_label = None
@@ -243,7 +245,7 @@ class TestCPP(unittest.TestCase):
             17   XDIPLEN   ZDIPLEN    0.100000        0.269121        0.001838
             18   YDIPLEN   ZDIPLEN    0.100000        0.284970        0.001107
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
@@ -253,7 +255,6 @@ class TestCPP(unittest.TestCase):
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'pe_water.inp')
 
-        here = Path(__file__).parent
         potfile = str(here / 'inputs' / 'pe_water.pot')
 
         xcfun_label = 'b3lyp'
@@ -281,10 +282,10 @@ class TestCPP(unittest.TestCase):
             17   XDIPLEN   ZDIPLEN    0.100000        0.361531        0.003442
             18   YDIPLEN   ZDIPLEN    0.100000        0.301579        0.000664
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

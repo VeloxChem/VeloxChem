@@ -23,16 +23,21 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#include "ExportGeneral.hpp"
+
+#include <mpi.h>
+// see here: https://github.com/mpi4py/mpi4py/issues/19#issuecomment-768143143
+#ifdef MSMPI_VER
+#define PyMPI_HAVE_MPI_Message 1
+#endif
+#include <mpi4py/mpi4py.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-#include <mpi.h>
-#include <mpi4py/mpi4py.h>
 #include <string>
 
 #include "Codata.hpp"
 #include "ErrorHandler.hpp"
-#include "ExportGeneral.hpp"
 #include "MpiFunc.hpp"
 #include "SpinBlock.hpp"
 #include "StringFormat.hpp"
@@ -50,11 +55,9 @@ namespace vlx_general {  // vlx_general namespace
 MPI_Comm*
 get_mpi_comm(py::object py_comm)
 {
-    PyObject* py_obj = py_comm.ptr();
+    auto comm_ptr = PyMPIComm_Get(py_comm.ptr());
 
-    MPI_Comm* comm_ptr = PyMPIComm_Get(py_obj);
-
-    if (comm_ptr == NULL) throw py::error_already_set();
+    if (!comm_ptr) throw py::error_already_set();
 
     return comm_ptr;
 }
@@ -70,9 +73,8 @@ is_mpi_master(py::object py_comm)
     }
     else
     {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-        return (mpi::rank(*comm_ptr) == mpi::master());
+        auto comm = get_mpi_comm(py_comm);
+        return (mpi::rank(*comm) == mpi::master());
     }
 }
 
@@ -87,9 +89,8 @@ is_single_node(py::object py_comm)
     }
     else
     {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-        return (mpi::nodes(*comm_ptr) == 1);
+        auto comm = get_mpi_comm(py_comm);
+        return (mpi::nodes(*comm) == 1);
     }
 }
 
@@ -100,7 +101,7 @@ is_single_node(py::object py_comm)
 static int32_t
 mpi_size_limit()
 {
-    return static_cast<int32_t>(1<<30) / 5 * 9;
+    return static_cast<int32_t>(1 << 30) / 5 * 9;
 }
 
 // Helper functions for getting shape and strides from int32_t dimension
@@ -129,7 +130,7 @@ dimension_to_strides(const std::vector<int32_t>& dimension, size_t sizeoftype)
 
         for (size_t j = i + 1; j < dimension.size(); j++)
         {
-            strd *= dimension[j];
+            strd *= static_cast<size_t>(dimension[j]);
         }
 
         strides.push_back(static_cast<ssize_t>(strd * sizeoftype));
@@ -178,8 +179,7 @@ pointer_to_numpy(const int32_t* ptr, const std::vector<int32_t>& dimension)
     }
     else
     {
-        return py::array_t<int32_t>(
-            dimension_to_shape(dimension), dimension_to_strides(dimension, sizeof(int32_t)), ptr);
+        return py::array_t<int32_t>(dimension_to_shape(dimension), dimension_to_strides(dimension, sizeof(int32_t)), ptr);
     }
 }
 
@@ -220,20 +220,21 @@ export_general(py::module& m)
 #endif
 
     // initialize mpi4py's C-API
-
-    auto err = import_mpi4py();
-
-    std::string errmpi4py("Failed to import mpi4py");
-
-    errors::assertMsgCritical(err == 0, errmpi4py);
+    if (import_mpi4py() < 0)
+    {
+        // mpi4py calls the Python C API
+        // we let pybind11 give us the detailed traceback
+        throw py::error_already_set();
+    }
 
     // szblock enum class
-
+    // clang-format off
     py::enum_<szblock>(m, "szblock")
         .value("aa", szblock::aa)
         .value("ab", szblock::ab)
         .value("ba", szblock::ba)
         .value("bb", szblock::bb);
+    // clang-format on
 
     // exposing functions
 

@@ -91,7 +91,7 @@ class MpiTask:
 
             assert_msg_critical(
                 Path(input_fname).is_file(),
-                'MpiTask: input file {} does not exist'.format(input_fname))
+                f'MpiTask: input file {input_fname} does not exist')
 
             assert_msg_critical(
                 input_fname != output_fname,

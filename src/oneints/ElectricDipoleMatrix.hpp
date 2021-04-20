@@ -26,9 +26,11 @@
 #ifndef ElectricDipoleMatrix_hpp
 #define ElectricDipoleMatrix_hpp
 
+#include <array>
 #include <cstdint>
 #include <string>
 
+#include "CartesianComponents.hpp"
 #include "DenseMatrix.hpp"
 
 /**
@@ -99,6 +101,15 @@ class CElectricDipoleMatrix
                           const double        zOrigin);
 
     /**
+     Creates a electric dipole matrix object.
+
+     @param matrices cartesian componentes of the electric dipole integrals.
+     @param origin the Cartesian coordinates of the electric dipole origin.
+     */
+    CElectricDipoleMatrix(const std::array<CDenseMatrix, 3>& matrices,
+                          const std::array<double, 3>& origin);
+
+    /**
      Creates a electric dipole matrix object by copying other electric dipole
      matrix object.
 
@@ -162,6 +173,20 @@ class CElectricDipoleMatrix
      @param zOrigin the Z coordinate of electric dipole origin.
      */
     void setOriginCoordinates(const double xOrigin, const double yOrigin, const double zOrigin);
+
+    /**
+     Sets coordinates of electric dipole origin.
+
+     @param origin an array holding the Cartesian coordinates for the electric dipole origin.
+     */
+    void setOriginCoordinates(const std::array<double, 3>& origin);
+
+    /**
+     Gets string representation of electric dipole matrix.
+
+     @return a string for printing the electric dipole matrix.
+     */
+    std::string getString() const;
 
     /**
      Gets string representation of X component of electric dipole matrix.
@@ -233,6 +258,35 @@ class CElectricDipoleMatrix
     const double* zvalues() const;
 
     /**
+     Gets constant pointer to first element of requested component of electric dipole
+     matrix.
+
+     @param cart requested Cartesian component of the electric dipole integrals matrix
+
+     @return the constant pointer to first element of requested component of electric
+     dipole matrix.
+     */
+    const double* values(cartesians cart) const;
+
+    /**
+     Gets constant pointer to first element of requested component of electric dipole
+     matrix.
+
+     @param cart requested Cartesian component of the electric dipole integrals matrix
+
+     @return the constant pointer to first element of requested component of electric
+     dipole matrix.
+     */
+    const double* values(int32_t cart) const;
+
+    /**
+     Gets coordinates of electric dipole origin.
+
+     @return the coordinates of electric dipole origin.
+     */
+    std::array<double, 3> getOriginCoordinates() const;
+
+    /**
      Gets X coordinate of electric dipole origin.
 
      @return the X coordinate of electric dipole origin.
@@ -254,13 +308,18 @@ class CElectricDipoleMatrix
     double getOriginCoordinateZ() const;
 
     /**
-     Converts electric dipole  matrix object to text output and insert it into
-     output text stream.
-
-     @param output the output text stream.
-     @param source the electric dipole matrix object.
+     Converts electric dipole matrix object to text output.
      */
-    friend std::ostream& operator<<(std::ostream& output, const CElectricDipoleMatrix& source);
+    std::string repr() const;
 };
+
+/**
+ Converts electric dipole matrix object to text output and insert it into
+ output text stream.
+
+ @param output the output text stream.
+ @param source the electric dipole matrix object.
+ */
+std::ostream& operator<<(std::ostream& output, const CElectricDipoleMatrix& source);
 
 #endif /* ElectricDipoleMatrix_hpp */

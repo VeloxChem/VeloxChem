@@ -26,12 +26,14 @@
 #ifndef MemBlock_hpp
 #define MemBlock_hpp
 
+#include <mpi.h>
+
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
-#include <iostream>
-
-#include <mpi.h>
+#include <cstring>
+#include <sstream>
+#include <string>
 
 #include "MathFunc.hpp"
 #include "MemAlloc.hpp"
@@ -50,17 +52,17 @@ class CMemBlock
     /**
      The pointer to contiguous memory block.
      */
-    T* _data;
+    T* _data{nullptr};
 
     /**
      The number of elements in memory block.
      */
-    int32_t _nElements;
-    
+    int32_t _nElements{0};
+
     /**
      The NUMA policy for memory block handling.
      */
-    numa _numaPolicy;
+    numa _numaPolicy{numa::serial};
 
     /**
      Allocates memory block.
@@ -85,16 +87,15 @@ class CMemBlock
 
      @param nElements - the number of elements.
      */
-    CMemBlock(const int32_t nElements);
-    
+    explicit CMemBlock(const int32_t nElements);
+
     /**
      Creates a memory block object with specific NUMA policy.
-     
+
      @param nElements - the number of elements.
      @param numaPolicy - the numa policy for data initialization.
      */
-    CMemBlock(const int32_t nElements,
-              const numa    numaPolicy);
+    CMemBlock(const int32_t nElements, const numa numaPolicy);
 
     /**
      Creates a memory block object.
@@ -102,6 +103,15 @@ class CMemBlock
      @param dataVector - the vector with data elements.
      */
     CMemBlock(const std::vector<T>& dataVector);
+
+    /**
+     Create a memory block object.
+
+     @param source - a raw pointer
+     @param size - size of data
+     @param numaPolicy - the numa policy for data initialization.
+     */
+    CMemBlock(const T* source, int32_t size, numa numaPolicy);
 
     /**
      Creates a memory block object by copying other memory block object.
@@ -218,8 +228,7 @@ class CMemBlock
      @param nBlocks the number of subblocks.
      @return the memory block object.
      */
-    CMemBlock<T> pack(const int32_t nElements,
-                      const int32_t nBlocks) const;
+    CMemBlock<T> pack(const int32_t nElements, const int32_t nBlocks) const;
 
     /**
      Creates a memory block object by subdividing data in memory block object
@@ -231,9 +240,7 @@ class CMemBlock
      @param iPosition the position of picked element in subblock.
      @return the memory block object.
      */
-    CMemBlock<T> pick(const int32_t nElements,
-                      const int32_t nBlocks,
-                      const int32_t iPosition) const;
+    CMemBlock<T> pick(const int32_t nElements, const int32_t nBlocks, const int32_t iPosition) const;
 
     /**
      Shrinks memory block object by discarding all elements beyond given elements
@@ -252,8 +259,7 @@ class CMemBlock
      @param nElements the number of sliced elements.
      @return the memory block object with sliced elements.
      */
-    CMemBlock<T> slice(const int32_t iPosition,
-                       const int32_t nElements) const;
+    CMemBlock<T> slice(const int32_t iPosition, const int32_t nElements) const;
 
     /**
      Broadcasts memory block object within domain of MPI communicator.
@@ -261,8 +267,7 @@ class CMemBlock
      @param rank the rank of MPI process.
      @param comm the MPI communicator.
      */
-    void broadcast(int32_t  rank,
-                   MPI_Comm comm);
+    void broadcast(int32_t rank, MPI_Comm comm);
 
     /**
      Creates memory block object on master MPI process by gathering memory
@@ -274,9 +279,7 @@ class CMemBlock
      @return the memory block object: (a) on master node with gathered data;
              (b) on worker nodes empty.
      */
-    CMemBlock<T> gather(int32_t  rank,
-                        int32_t  nodes,
-                        MPI_Comm comm);
+    CMemBlock<T> gather(int32_t rank, int32_t nodes, MPI_Comm comm);
 
     /**
      Reasigns memory block object on all MPI process within domain of MPI
@@ -286,9 +289,7 @@ class CMemBlock
      @param nodes the number of MPI processes in MPI communicator.
      @param comm the MPI communicator.
      */
-    void scatter(int32_t  rank,
-                 int32_t  nodes,
-                 MPI_Comm comm);
+    void scatter(int32_t rank, int32_t nodes, MPI_Comm comm);
 
     /**
      Reduces memory block objects from all MPI process within domain of MPI
@@ -298,20 +299,12 @@ class CMemBlock
      @param nodes the number of MPI processes in MPI communicator.
      @param comm the MPI communicator.
      */
-    void reduce_sum(int32_t  rank,
-                    int32_t  nodes,
-                    MPI_Comm comm);
+    void reduce_sum(int32_t rank, int32_t nodes, MPI_Comm comm);
 
     /**
-     Converts memory block object to text output and insert it into output text
-     stream.
-
-     @param output the output text stream.
-     @param source the memory block object.
+     Converts memory block object to text output.
      */
-    template <class U>
-    friend std::ostream& operator<<(      std::ostream& output,
-                                    const CMemBlock<U>& source);
+    std::string repr() const;
 };
 
 template <class T>
@@ -340,8 +333,7 @@ CMemBlock<T>::CMemBlock(const int32_t nElements)
 }
 
 template <class T>
-CMemBlock<T>::CMemBlock(const int32_t nElements,
-                        const numa    numaPolicy)
+CMemBlock<T>::CMemBlock(const int32_t nElements, const numa numaPolicy)
 
     : _data(nullptr)
 
@@ -365,8 +357,21 @@ CMemBlock<T>::CMemBlock(const std::vector<T>& dataVector)
 {
     _allocate();
 
-    for (int32_t i = 0; i < _nElements; i++)
-        _data[i] = dataVector[i];
+    _copy(dataVector.data());
+}
+
+template <typename T>
+CMemBlock<T>::CMemBlock(const T* source, int32_t nElements, numa numaPolicy)
+
+    : _data(nullptr)
+
+    , _nElements(nElements)
+
+    , _numaPolicy(numaPolicy)
+{
+    _allocate();
+
+    _copy(source);
 }
 
 template <class T>
@@ -410,7 +415,7 @@ CMemBlock<T>::operator=(const CMemBlock<T>& source)
     if (this == &source) return *this;
 
     _nElements = source._nElements;
-    
+
     _numaPolicy = source._numaPolicy;
 
     _allocate();
@@ -427,7 +432,7 @@ CMemBlock<T>::operator=(CMemBlock<T>&& source) noexcept
     if (this == &source) return *this;
 
     _nElements = std::move(source._nElements);
-    
+
     _numaPolicy = std::move(source._numaPolicy);
 
     mem::free(_data);
@@ -444,7 +449,7 @@ bool
 CMemBlock<T>::operator==(const CMemBlock<T>& other) const
 {
     if (_nElements != other._nElements) return false;
-    
+
     if (_numaPolicy != other._numaPolicy) return false;
 
     for (int32_t i = 0; i < _nElements; i++)
@@ -504,16 +509,16 @@ CMemBlock<T>::zero()
     auto t0value = static_cast<T>(0);
 
     auto pdata = _data;
-    
+
     if (_numaPolicy == numa::parallel)
     {
-        #pragma omp parallel for schedule(static)
+#pragma omp      parallel for schedule(static)
         for (int32_t i = 0; i < _nElements; i++)
             pdata[i] = t0value;
     }
     else
     {
-        #pragma omp simd aligned(pdata:VLX_ALIGN)
+#pragma omp simd aligned(pdata : VLX_ALIGN)
         for (int32_t i = 0; i < _nElements; i++)
             pdata[i] = t0value;
     }
@@ -586,11 +591,11 @@ CMemBlock<T>::shrink(const int32_t nElements)
 {
     if (nElements < _nElements)
     {
-        T* tvals = (T*)mem::malloc(nElements * sizeof(T));
+        auto tvals = static_cast<T*>(mem::malloc(nElements * sizeof(T)));
 
         auto pdata = _data;
 
-        #pragma omp simd aligned(pdata, tvals:VLX_ALIGN)
+#pragma omp simd aligned(pdata, tvals : VLX_ALIGN)
         for (int32_t i = 0; i < nElements; i++)
             tvals[i] = pdata[i];
 
@@ -646,17 +651,17 @@ CMemBlock<double>::broadcast(int32_t rank, MPI_Comm comm)
     if (ENABLE_MPI)
     {
         // broadcast numa policy
-        
+
         int32_t nmpol = 0;
-        
+
         if (rank == mpi::master()) nmpol = to_int(_numaPolicy);
-        
+
         mpi::bcast(nmpol, comm);
-        
+
         if (rank != mpi::master()) _numaPolicy = to_numa(nmpol);
-        
+
         // broadcast memory block data
-        
+
         mpi::bcast(_nElements, comm);
 
         if (rank != mpi::master()) _allocate();
@@ -683,7 +688,7 @@ CMemBlock<int32_t>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         int32_t* bsizes = nullptr;
 
-        if (rank == mpi::master()) bsizes = (int32_t*)mem::malloc(nsizes);
+        if (rank == mpi::master()) bsizes = static_cast<int32_t*>(mem::malloc(nsizes));
 
         mpi::gather(bsizes, _nElements, rank, comm);
 
@@ -693,7 +698,7 @@ CMemBlock<int32_t>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         if (rank == mpi::master())
         {
-            bindexes = (int32_t*)mem::malloc(nsizes);
+            bindexes = static_cast<int32_t*>(mem::malloc(nsizes));
 
             mathfunc::indexes(bindexes, bsizes, nodes);
 
@@ -734,7 +739,7 @@ CMemBlock<double>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         int32_t* bsizes = nullptr;
 
-        if (rank == mpi::master()) bsizes = (int32_t*)mem::malloc(nsizes);
+        if (rank == mpi::master()) bsizes = static_cast<int32_t*>(mem::malloc(nsizes));
 
         mpi::gather(bsizes, _nElements, rank, comm);
 
@@ -744,7 +749,7 @@ CMemBlock<double>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         if (rank == mpi::master())
         {
-            bindexes = (int32_t*)mem::malloc(nsizes);
+            bindexes = static_cast<int32_t*>(mem::malloc(nsizes));
 
             mathfunc::indexes(bindexes, bsizes, nodes);
 
@@ -791,7 +796,7 @@ CMemBlock<int32_t>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         auto nsizes = static_cast<size_t>(_nElements) * sizeof(int32_t);
 
-        int32_t* bdata = (int32_t*)mem::malloc(nsizes);
+        int32_t* bdata = static_cast<int32_t*>(mem::malloc(nsizes));
 
         // setup for scaterring pattern
 
@@ -803,11 +808,11 @@ CMemBlock<int32_t>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
         {
             nsizes = static_cast<size_t>(nodes) * sizeof(int32_t);
 
-            bsizes = (int32_t*)mem::malloc(nsizes);
+            bsizes = static_cast<int32_t*>(mem::malloc(nsizes));
 
             mpi::batches_pattern(bsizes, totelem, nodes);
 
-            bindexes = (int32_t*)mem::malloc(nsizes);
+            bindexes = static_cast<int32_t*>(mem::malloc(nsizes));
 
             mathfunc::indexes(bindexes, bsizes, nodes);
         }
@@ -854,7 +859,7 @@ CMemBlock<double>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         auto nsizes = static_cast<size_t>(_nElements) * sizeof(double);
 
-        double* bdata = (double*)mem::malloc(nsizes);
+        auto bdata = static_cast<double*>(mem::malloc(nsizes));
 
         // setup for scaterring pattern
 
@@ -866,11 +871,11 @@ CMemBlock<double>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
         {
             nsizes = static_cast<size_t>(nodes) * sizeof(int32_t);
 
-            bsizes = (int32_t*)mem::malloc(nsizes);
+            bsizes = static_cast<int32_t*>(mem::malloc(nsizes));
 
             mpi::batches_pattern(bsizes, totelem, nodes);
 
-            bindexes = (int32_t*)mem::malloc(nsizes);
+            bindexes = static_cast<int32_t*>(mem::malloc(nsizes));
 
             mathfunc::indexes(bindexes, bsizes, nodes);
         }
@@ -907,7 +912,7 @@ CMemBlock<double>::reduce_sum(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         auto nsize = static_cast<size_t>(_nElements) * sizeof(double);
 
-        if (rank == mpi::master()) bdata = (double*) mem::malloc(nsize);
+        if (rank == mpi::master()) bdata = static_cast<double*>(mem::malloc(nsize));
 
         mpi::reduce_sum(_data, bdata, _nElements, comm);
 
@@ -930,7 +935,7 @@ CMemBlock<T>::_allocate()
 
         auto numelem = static_cast<size_t>(_nElements);
 
-        _data = (T*)mem::malloc(numelem * sizeof(T));
+        _data = static_cast<T*>(mem::malloc(numelem * sizeof(T)));
     }
 }
 
@@ -942,40 +947,49 @@ CMemBlock<T>::_copy(const T* source)
 
     if (_numaPolicy == numa::parallel)
     {
-        #pragma omp parallel for schedule(static)
+#pragma omp      parallel for schedule(static)
         for (int32_t i = 0; i < _nElements; i++)
             pdata[i] = source[i];
     }
     else
     {
-        #pragma omp simd aligned(pdata, source:VLX_ALIGN)
+#pragma omp simd aligned(pdata, source : VLX_ALIGN)
         for (int32_t i = 0; i < _nElements; i++)
             pdata[i] = source[i];
     }
 }
 
-template <class U>
-std::ostream&
-operator<<(std::ostream& output, const CMemBlock<U>& source)
+template <typename T>
+std::string
+CMemBlock<T>::repr() const
 {
-    output << std::endl;
+    std::ostringstream os;
 
-    output << "[CMemBlock (Object):" << &source << "]" << std::endl;
-    
-    output << "_numaPolicy: " << to_string(source._numaPolicy);
+    os << std::endl;
 
-    output << "_nElements: " << source._nElements << std::endl;
+    os << "[CMemBlock (Object):" << this << "]" << std::endl;
 
-    output << "_data (" << &(source._data) << "):" << std::endl;
+    os << "_numaPolicy: " << to_string(_numaPolicy);
 
-    for (int32_t i = 0; i < source._nElements; i++)
+    os << "_nElements: " << _nElements << std::endl;
+
+    os << "_data (" << &(_data) << "):" << std::endl;
+
+    for (auto i = 0; i < _nElements; ++i)
     {
-        output << " " << source._data[i];
+        os << " " << _data[i];
     }
 
-    output << std::endl;
+    os << std::endl;
 
-    return output;
+    return os.str();
+}
+
+template <typename T>
+std::ostream&
+operator<<(std::ostream& output, const CMemBlock<T>& source)
+{
+    return (output << source.repr());
 }
 
 #endif /* MemBlock_hpp */

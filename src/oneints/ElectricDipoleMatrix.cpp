@@ -25,7 +25,11 @@
 
 #include "ElectricDipoleMatrix.hpp"
 
+#include <array>
 #include <cmath>
+#include <sstream>
+
+#include "ErrorHandler.hpp"
 
 CElectricDipoleMatrix::CElectricDipoleMatrix()
 
@@ -55,6 +59,13 @@ CElectricDipoleMatrix::CElectricDipoleMatrix(const CDenseMatrix& xMatrix,
     , _yMatrix(yMatrix)
 
     , _zMatrix(zMatrix)
+{
+}
+
+CElectricDipoleMatrix::CElectricDipoleMatrix(const std::array<CDenseMatrix, 3>& matrices,
+                                             const std::array<double, 3>& origin)
+
+    : CElectricDipoleMatrix(matrices[0], matrices[1], matrices[2], origin[0], origin[1], origin[2])
 {
 }
 
@@ -168,6 +179,22 @@ CElectricDipoleMatrix::setOriginCoordinates(const double xOrigin, const double y
     _zOrigin = zOrigin;
 }
 
+void
+CElectricDipoleMatrix::setOriginCoordinates(const std::array<double, 3>& origin)
+{
+    _xOrigin = origin[0];
+
+    _yOrigin = origin[1];
+
+    _zOrigin = origin[2];
+}
+
+std::string
+CElectricDipoleMatrix::getString() const
+{
+    return getStringForComponentX() + getStringForComponentY() + getStringForComponentZ();
+}
+
 std::string
 CElectricDipoleMatrix::getStringForComponentX() const
 {
@@ -222,6 +249,32 @@ CElectricDipoleMatrix::zvalues() const
     return _zMatrix.values();
 }
 
+const double*
+CElectricDipoleMatrix::values(int32_t cart) const
+{
+    auto d = static_cast<cartesians>(cart);
+    return values(d);
+}
+
+const double*
+CElectricDipoleMatrix::values(cartesians cart) const
+{
+    switch (cart) {
+        case cartesians::X:
+            return _xMatrix.values();
+
+        case cartesians::Y:
+            return _yMatrix.values();
+
+        case cartesians::Z:
+            return _zMatrix.values();
+
+        default:
+            errors::assertMsgCritical(false, "ElectricDipoleMatrix.values: invalid Cartesian component");
+            return nullptr;
+    }
+}
+
 double
 CElectricDipoleMatrix::getOriginCoordinateX() const
 {
@@ -240,24 +293,38 @@ CElectricDipoleMatrix::getOriginCoordinateZ() const
     return _zOrigin;
 }
 
+std::array<double, 3>
+CElectricDipoleMatrix::getOriginCoordinates() const
+{
+    return std::array<double, 3>{{_xOrigin, _yOrigin, _zOrigin}};
+}
+
+std::string
+CElectricDipoleMatrix::repr() const
+{
+    std::ostringstream os;
+
+    os << std::endl;
+
+    os << "[CElectricDipoleMatrix (Object):" << this << "]" << std::endl;
+
+    os << "_xMatrix: " << _xMatrix << std::endl;
+
+    os << "_yMatrix: " << _yMatrix << std::endl;
+
+    os << "_zMatrix: " << _zMatrix << std::endl;
+
+    os << "_xOrigin: " << _xOrigin << std::endl;
+
+    os << "_yOrigin: " << _yOrigin << std::endl;
+
+    os << "_zOrigin: " << _zOrigin << std::endl;
+
+    return os.str();
+}
+
 std::ostream&
 operator<<(std::ostream& output, const CElectricDipoleMatrix& source)
 {
-    output << std::endl;
-
-    output << "[CElectricDipoleMatrix (Object):" << &source << "]" << std::endl;
-
-    output << "_xMatrix: " << source._xMatrix << std::endl;
-
-    output << "_yMatrix: " << source._yMatrix << std::endl;
-
-    output << "_zMatrix: " << source._zMatrix << std::endl;
-
-    output << "_xOrigin: " << source._xOrigin << std::endl;
-
-    output << "_yOrigin: " << source._yOrigin << std::endl;
-
-    output << "_zOrigin: " << source._zOrigin << std::endl;
-
-    return output;
+    return (output << source.repr());
 }

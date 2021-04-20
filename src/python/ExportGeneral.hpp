@@ -27,11 +27,22 @@
 #define ExportGeneral_hpp
 
 #include <mpi.h>
-
+#include <mpi4py/mpi4py.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
+#include <memory>
+#include <utility>
+
+#include "ErrorHandler.hpp"
+#include "MemBlock.hpp"
+#include "MemBlock2D.hpp"
+#include "NumaPolicy.hpp"
+
 namespace py = pybind11;
+
+template <typename T>
+using PyClass = py::class_<T, std::shared_ptr<T>>;
 
 namespace vlx_general {  // vlx_general namespace
 
@@ -100,6 +111,38 @@ py::array_t<int32_t> pointer_to_numpy(const int32_t* ptr, const int32_t nElement
 py::array_t<int32_t> pointer_to_numpy(const int32_t* ptr, const int32_t nRows, const int32_t nColumns);
 
 /**
+ Convert NumPy array to 1-dimensional memory block, i.e. contiguous array.
+
+ @tparam T underlying scalar type.
+ @param arr NumPy array.
+ @return memory block object.
+ */
+template <typename T>
+CMemBlock<T>
+numpy_to_memblock(const py::array_t<T>& arr)
+{
+    std::string errmsg("numpy_to_memblock: Expecting a C-style contiguous numpy array");
+    auto c_style = py::detail::check_flags(arr.ptr(), py::array::c_style);
+    errors::assertMsgCritical(c_style, errmsg);
+    return CMemBlock<T>(arr.data(), arr.size(), numa::serial);
+}
+
+/**
+ Convert Fortran-style NumPy array to 2-dimensional memory block, i.e. contiguous storage
+ for 2-index quantity.
+
+ @tparam T underlying scalar type.
+ @param arr NumPy array.
+ @return memory block object.
+ */
+template <typename T>
+CMemBlock2D<T>
+numpy_fstyle_to_memblock2d(const py::array_t<T, py::array::f_style>& arr)
+{
+    return CMemBlock2D<T>(arr.data(), arr.shape(0), arr.shape(1));
+}
+
+/**
  Bind overloaded functions in a less verbose fashion
 
  Use as:
@@ -111,6 +154,25 @@ py::array_t<int32_t> pointer_to_numpy(const int32_t* ptr, const int32_t nRows, c
  */
 template <typename... Args>
 using overload_cast_ = py::detail::overload_cast_impl<Args...>;
+
+/** Wrapper for object constructors accepting an MPI communicator.
+ *
+ * @tparam T type of the object to wrap in a shared pointer.
+ * @param py_comm Python object wrapping an MPI communicator.
+ */
+template <typename T, typename... Args>
+inline std::shared_ptr<T>
+create(py::object py_comm, Args&&... args)
+{
+    if (py_comm.is_none())
+    {
+        return std::make_shared<T>(MPI_COMM_WORLD, std::forward<Args>(args)...);
+    }
+    else
+    {
+        return std::make_shared<T>(*get_mpi_comm(py_comm), std::forward<Args>(args)...);
+    }
+}
 
 /**
  Exports classes/functions in src/general to python.

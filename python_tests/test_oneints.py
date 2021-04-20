@@ -3,12 +3,17 @@ import numpy as np
 import unittest
 import h5py
 
+from veloxchem.veloxchemlib import DenseMatrix
 from veloxchem.veloxchemlib import OverlapMatrix
 from veloxchem.veloxchemlib import KineticEnergyMatrix
 from veloxchem.veloxchemlib import NuclearPotentialMatrix
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
 from veloxchem.veloxchemlib import KineticEnergyIntegralsDriver
 from veloxchem.veloxchemlib import NuclearPotentialIntegralsDriver
+from veloxchem.veloxchemlib import ElectricDipoleMatrix
+from veloxchem.veloxchemlib import LinearMomentumMatrix
+from veloxchem.veloxchemlib import AngularMomentumMatrix
+from veloxchem.veloxchemlib import ElectricFieldMatrix
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
@@ -46,6 +51,66 @@ class TestOneInts(unittest.TestCase):
 
         self.assertTrue((array == array2).all())
         self.assertEqual(matrix, matrix2)
+
+    def test_electric_dipole_matrix(self):
+
+        x_array = DenseMatrix(np.random.rand(2, 2))
+        y_array = DenseMatrix(np.random.rand(2, 2))
+        z_array = DenseMatrix(np.random.rand(2, 2))
+        origin = list(np.random.rand(3))
+
+        matrix = ElectricDipoleMatrix(x_array, y_array, z_array, *origin)
+        matrix2 = ElectricDipoleMatrix([x_array, y_array, z_array], origin)
+
+        self.assertEqual(matrix, matrix2)
+        self.assertEqual(matrix.origin, origin)
+        self.assertTrue((matrix.x_to_numpy() == x_array.to_numpy()).all())
+        self.assertTrue((matrix.y_to_numpy() == y_array.to_numpy()).all())
+        self.assertTrue((matrix.z_to_numpy() == z_array.to_numpy()).all())
+
+    def test_linear_momentum_matrix(self):
+
+        x_array = DenseMatrix(np.random.rand(2, 2))
+        y_array = DenseMatrix(np.random.rand(2, 2))
+        z_array = DenseMatrix(np.random.rand(2, 2))
+
+        matrix = LinearMomentumMatrix(x_array, y_array, z_array)
+        matrix2 = LinearMomentumMatrix([x_array, y_array, z_array])
+
+        self.assertEqual(matrix, matrix2)
+        self.assertTrue((matrix.x_to_numpy() == x_array.to_numpy()).all())
+        self.assertTrue((matrix.y_to_numpy() == y_array.to_numpy()).all())
+        self.assertTrue((matrix.z_to_numpy() == z_array.to_numpy()).all())
+
+    def test_angular_momentum_matrix(self):
+
+        x_array = DenseMatrix(np.random.rand(2, 2))
+        y_array = DenseMatrix(np.random.rand(2, 2))
+        z_array = DenseMatrix(np.random.rand(2, 2))
+        origin = list(np.random.rand(3))
+
+        matrix = AngularMomentumMatrix(x_array, y_array, z_array, *origin)
+        matrix2 = AngularMomentumMatrix([x_array, y_array, z_array], origin)
+
+        self.assertEqual(matrix, matrix2)
+        self.assertEqual(matrix.origin, origin)
+        self.assertTrue((matrix.x_to_numpy() == x_array.to_numpy()).all())
+        self.assertTrue((matrix.y_to_numpy() == y_array.to_numpy()).all())
+        self.assertTrue((matrix.z_to_numpy() == z_array.to_numpy()).all())
+
+    def test_electric_field_matrix(self):
+
+        x_array = DenseMatrix(np.random.rand(2, 2))
+        y_array = DenseMatrix(np.random.rand(2, 2))
+        z_array = DenseMatrix(np.random.rand(2, 2))
+
+        matrix = ElectricFieldMatrix(x_array, y_array, z_array)
+        matrix2 = ElectricFieldMatrix([x_array, y_array, z_array])
+
+        self.assertEqual(matrix, matrix2)
+        self.assertTrue((matrix.x_to_numpy() == x_array.to_numpy()).all())
+        self.assertTrue((matrix.y_to_numpy() == y_array.to_numpy()).all())
+        self.assertTrue((matrix.z_to_numpy() == z_array.to_numpy()).all())
 
     def test_1e_integrals(self):
 

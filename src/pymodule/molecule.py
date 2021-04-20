@@ -51,7 +51,7 @@ def _Molecule_read_str(xyzstr, units='angstrom'):
     labels = []
     coords = []
 
-    for line in xyzstr.strip().split(os.linesep):
+    for line in xyzstr.strip().splitlines():
         if line:
             content = line.split()
             labels.append(content[0])
@@ -63,22 +63,34 @@ def _Molecule_read_str(xyzstr, units='angstrom'):
 @staticmethod
 def _Molecule_read_xyz(xyzfile):
     """
-    Reads molecule from xyz file.
+    Reads molecule from file in XYZ format.
 
     :param xyzfile:
-        The name of the xyz file.
+        File with molecular structure in XYZ format.
 
     :return:
         The molecule.
     """
 
-    xyzstr = ''
+    with Path(xyzfile).open('r') as fh:
+        xyzstr = '\n'.join(fh.readlines()[2:])
 
-    with open(str(xyzfile), 'r') as f_xyz:
-        natoms = int(f_xyz.readline().split()[0])
-        f_xyz.readline()
-        for a in range(natoms):
-            xyzstr += f_xyz.readline().strip() + os.linesep
+    return Molecule.read_str(xyzstr, units='angstrom')
+
+
+@staticmethod
+def _Molecule_from_xyz_string(xyz):
+    """
+    Generate molecule from string in XYZ format.
+
+    :param xyz:
+        String with XYZ structure.
+
+    :return:
+        The molecule.
+    """
+
+    xyzstr = '\n'.join(xyz.strip().split(os.linesep)[2:])
 
     return Molecule.read_str(xyzstr, 'angstrom')
 
@@ -95,7 +107,7 @@ def _Molecule_from_dict(mol_dict):
         The molecule.
     """
 
-    xyzstr = os.linesep.join(mol_dict['xyz'])
+    xyzstr = '\n'.join(mol_dict['xyz'])
 
     units = 'angstrom'
     if 'units' in mol_dict:
@@ -149,18 +161,13 @@ def _Molecule_more_info(self):
     width = 70
     mol_info = []
 
-    mol_info.append('Molecular charge            : {:.0f}'.format(
-        self.get_charge()).ljust(width))
-    mol_info.append('Spin multiplicity           : {:d}'.format(
-        self.get_multiplicity()).ljust(width))
-    mol_info.append('Number of atoms             : {:d}'.format(
-        self.number_of_atoms()).ljust(width))
-    mol_info.append('Number of alpha electrons   : {:d}'.format(
-        self.number_of_alpha_electrons()).ljust(width))
-    mol_info.append('Number of beta  electrons   : {:d}'.format(
-        self.number_of_beta_electrons()).ljust(width))
+    mol_info.append(f'Molecular charge            : {self.get_charge():.0f}'.ljust(width))
+    mol_info.append(f'Spin multiplicity           : {self.get_multiplicity():d}'.ljust(width))
+    mol_info.append(f'Number of atoms             : {self.number_of_atoms():d}'.ljust(width))
+    mol_info.append(f'Number of alpha electrons   : {self.number_of_alpha_electrons():d}'.ljust(width))
+    mol_info.append(f'Number of beta  electrons   : {self.number_of_beta_electrons():d}'.ljust(width))
 
-    return os.linesep.join(mol_info)
+    return '\n'.join(mol_info)
 
 
 def _Molecule_get_labels(self):
@@ -183,10 +190,10 @@ def _Molecule_get_labels(self):
 
 def _Molecule_get_coordinates(self):
     """
-    Returns atom coordinates.
+    Returns atom coordinates in atomic units.
 
     :return:
-        A numpy array of atom coordinates (nx3).
+        A numpy array of atom coordinates (nx3) in atomic units.
     """
 
     return np.array([
@@ -302,19 +309,17 @@ def _Molecule_write_xyz(self, xyz_filename):
 
     with open(str(xyz_filename), 'w') as fh:
 
-        print('{:d}'.format(self.number_of_atoms()), file=fh)
-        print('', file=fh)
+        fh.write(f"{self.number_of_atoms():d}\n\n")
 
         for elem_id, x, y, z in zip(elem_ids, xs, ys, zs):
             elem = ChemicalElement()
             elem.set_atom_type(elem_id)
-            line = '{:<6s} {:22.12f} {:22.12f} {:22.12f}'.format(
-                elem.get_name(), x, y, z)
-            print(line, file=fh)
+            fh.write(f'{elem.get_name():<6s} {x:22.12f} {y:22.12f} {z:22.12f}\n')
 
 
 Molecule.read_str = _Molecule_read_str
 Molecule.read_xyz = _Molecule_read_xyz
+Molecule.from_xyz_string = _Molecule_from_xyz_string
 Molecule.from_dict = _Molecule_from_dict
 Molecule.center_of_mass = _Molecule_center_of_mass
 Molecule.more_info = _Molecule_more_info

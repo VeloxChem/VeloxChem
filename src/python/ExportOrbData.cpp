@@ -25,12 +25,11 @@
 
 #include "ExportOrbData.hpp"
 
+#include <mpi.h>
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-
-#include <mpi.h>
 
 #include <fstream>
 #include <string>
@@ -46,29 +45,48 @@
 #include "MolecularBasis.hpp"
 #include "MolecularOrbitals.hpp"
 #include "MolecularOrbitalsType.hpp"
+#include "Molecule.hpp"
 #include "SADGuessDriver.hpp"
 #include "StringFormat.hpp"
 
 namespace py = pybind11;
+using namespace py::literals;
 
 namespace vlx_orbdata {  // vlx_orbdata namespace
+
+int32_t
+get_number_of_atomic_orbitals(const CMolecule& molecule, const CMolecularBasis& basis)
+{
+    auto natoms = molecule.getNumberOfAtoms();
+
+    auto max_angl = basis.getMolecularMaxAngularMomentum(molecule);
+
+    int32_t nao = 0;
+
+    for (int32_t angl = 0; angl <= max_angl; angl++)
+    {
+        for (int32_t s = -angl; s <= angl; s++)
+        {
+            for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
+            {
+                int32_t idelem = molecule.getIdsElemental()[atomidx];
+
+                nao += basis.getNumberOfBasisFunctions(idelem, angl);
+            }
+        }
+    }
+
+    return nao;
+}
 
 // Helper function for broadcasting CMolecularBasis object
 
 static void
 CMolecularBasis_broadcast(CMolecularBasis& self, int32_t rank, py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.broadcast(rank, *comm_ptr);
-}
-
-// Helper function for printing CAODensityMatrix
-
-static std::string
-CAODensityMatrix_str(const CAODensityMatrix& self)
-{
-    return self.getString();
+    self.broadcast(rank, *comm);
 }
 
 // Helper function for converting CAODensityMatrix to numpy array
@@ -109,17 +127,9 @@ CAODensityMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
 static void
 CAODensityMatrix_broadcast(CAODensityMatrix& self, int32_t rank, py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.broadcast(rank, *comm_ptr);
-}
-
-// Helper function for printing CMolecularOrbitals
-
-static std::string
-CMolecularOrbitals_str(const CMolecularOrbitals& self)
-{
-    return self.getString();
+    self.broadcast(rank, *comm);
 }
 
 // Helper function for converting CMolecularOrbitals to numpy array
@@ -192,26 +202,9 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
 static void
 CMolecularOrbitals_broadcast(CMolecularOrbitals& self, int32_t rank, py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.broadcast(rank, *comm_ptr);
-}
-
-// Helper function for CSADGuessDriver constructor
-
-static std::shared_ptr<CSADGuessDriver>
-CSADGuessDriver_create(py::object py_comm)
-{
-    if (py_comm.is_none())
-    {
-        return std::make_shared<CSADGuessDriver>(MPI_COMM_WORLD);
-    }
-    else
-    {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-        return std::make_shared<CSADGuessDriver>(*comm_ptr);
-    }
+    self.broadcast(rank, *comm);
 }
 
 // Exports classes/functions in src/orbdata to python
@@ -219,11 +212,9 @@ CSADGuessDriver_create(py::object py_comm)
 void
 export_orbdata(py::module& m)
 {
-    using namespace py::literals;
-
     // CBasisFunction class
 
-    py::class_<CBasisFunction, std::shared_ptr<CBasisFunction>>(m, "BasisFunction")
+    PyClass<CBasisFunction>(m, "BasisFunction")
         .def(py::init<>())
         .def(py::init<const std::vector<double>&, const std::vector<double>&, const int32_t>())
         .def("normalize", &CBasisFunction::normalize)
@@ -235,7 +226,7 @@ export_orbdata(py::module& m)
 
     // CAtomBasis class
 
-    py::class_<CAtomBasis, std::shared_ptr<CAtomBasis>>(m, "AtomBasis")
+    PyClass<CAtomBasis>(m, "AtomBasis")
         .def(py::init<>())
         .def("add_basis_function", &CAtomBasis::addBasisFunction)
         .def("set_elemental_id", &CAtomBasis::setIdElemental)
@@ -247,9 +238,13 @@ export_orbdata(py::module& m)
 
     // CMolecularBasis class
 
-    py::class_<CMolecularBasis, std::shared_ptr<CMolecularBasis>>(m, "MolecularBasis")
+    PyClass<CMolecularBasis>(m, "MolecularBasis")
         .def(py::init<>())
-        .def("get_string", &CMolecularBasis::printBasis)
+        .def("get_string",
+             vlx_general::overload_cast_<const std::string&, const CMolecule&>()(&CMolecularBasis::printBasis, py::const_),
+             "title"_a,
+             "molecule"_a)
+        .def("get_string", vlx_general::overload_cast_<const CMolecule&>()(&CMolecularBasis::printBasis, py::const_), "molecule"_a)
         .def("set_label", &CMolecularBasis::setLabel)
         .def("get_label", &CMolecularBasis::getLabel)
         .def("get_ao_basis_map", &CMolecularBasis::getAOBasisMap)
@@ -270,12 +265,11 @@ export_orbdata(py::module& m)
              "ang_mom"_a)
         .def(
             "__iter__",
-            [](const CMolecularBasis& obj) {
-        return py::make_iterator(obj.begin(), obj.end()); },
+            [](const CMolecularBasis& obj) { return py::make_iterator(obj.begin(), obj.end()); },
             py::keep_alive<0, 1>() /* Essential: keep object alive while iterator exists */);
 
     // denmat enum class
-
+    // clang-format off
     py::enum_<denmat>(m, "denmat")
         .value("rest", denmat::rest)
         .value("unrest", denmat::unrest)
@@ -283,14 +277,15 @@ export_orbdata(py::module& m)
         .value("rmoij", denmat::rmoij)
         .value("umoij", denmat::umoij)
         .value("rgen", denmat::rgen);
+    // clang-format on
 
     // CAODensityMatrix class
 
-    py::class_<CAODensityMatrix, std::shared_ptr<CAODensityMatrix>>(m, "AODensityMatrix")
+    PyClass<CAODensityMatrix>(m, "AODensityMatrix")
         .def(py::init<>())
         .def(py::init<const CAODensityMatrix&>())
         .def(py::init(&CAODensityMatrix_from_numpy_list))
-        .def("__str__", &CAODensityMatrix_str)
+        .def("__str__", &CAODensityMatrix::getString)
         .def("alpha_to_numpy", &CAODensityMatrix_alpha_density_to_numpy)
         .def("beta_to_numpy", &CAODensityMatrix_beta_density_to_numpy)
         .def("number_of_density_matrices", &CAODensityMatrix::getNumberOfDensityMatrices)
@@ -306,35 +301,61 @@ export_orbdata(py::module& m)
 
     // CMolecularOrbitals class
 
-    py::class_<CMolecularOrbitals, std::shared_ptr<CMolecularOrbitals>>(m, "MolecularOrbitals")
+    PyClass<CMolecularOrbitals>(m, "MolecularOrbitals")
         .def(py::init<>())
         .def(py::init<const CMolecularOrbitals&>())
         .def(py::init(&CMolecularOrbitals_from_numpy_list))
-        .def("__str__", &CMolecularOrbitals_str)
+        .def("__str__", &CMolecularOrbitals::getString)
         .def("alpha_to_numpy", &CMolecularOrbitals_alpha_orbitals_to_numpy)
         .def("beta_to_numpy", &CMolecularOrbitals_beta_orbitals_to_numpy)
         .def("ea_to_numpy", &CMolecularOrbitals_alpha_energies_to_numpy)
         .def("eb_to_numpy", &CMolecularOrbitals_beta_energies_to_numpy)
         .def("get_orbitals_type", &CMolecularOrbitals::getOrbitalsType)
-        .def("get_ao_density", (CAODensityMatrix(CMolecularOrbitals::*)(const int32_t) const) & CMolecularOrbitals::getAODensity)
-        .def("get_ao_density", (CAODensityMatrix(CMolecularOrbitals::*)(const int32_t, const int32_t) const) & CMolecularOrbitals::getAODensity)
+        .def("get_ao_density",
+             vlx_general::overload_cast_<const int32_t>()(&CMolecularOrbitals::getAODensity, py::const_),
+             "Compute spin-restricted AO density matrix for given number of electrons",
+             "n_electrons"_a)
+        .def("get_ao_density",
+             vlx_general::overload_cast_<const int32_t, const int32_t>()(&CMolecularOrbitals::getAODensity, py::const_),
+             "Compute spin-restricted AO density matrix for given number of alpha and beta electrons",
+             "n_alpha_electrons"_a,
+             "n_beta_electrons"_a)
         .def("get_pair_density",
-             (CAODensityMatrix(CMolecularOrbitals::*)(const std::vector<int32_t>&, const std::vector<int32_t>&) const) &
-                 CMolecularOrbitals::getRestrictedPairDensity)
+             vlx_general::overload_cast_<const std::vector<int32_t>&, const std::vector<int32_t>&>()(&CMolecularOrbitals::getRestrictedPairDensity,
+                                                                                                     py::const_),
+             "Computes set of restricted pair C_i C_j^T density matrices in AO basis",
+             "i"_a,
+             "j"_a)
         .def("get_pair_density",
-             (CAODensityMatrix(CMolecularOrbitals::*)(const int32_t, const int32_t) const) & CMolecularOrbitals::getRestrictedPairDensity)
+             vlx_general::overload_cast_<const int32_t, const int32_t>()(&CMolecularOrbitals::getRestrictedPairDensity, py::const_),
+             "Computes restricted pair C_i C_j^T density matrix in AO basis",
+             "i"_a,
+             "j"_a)
         .def("insert", &CMolecularOrbitals::insert)
         .def("number_mos", &CMolecularOrbitals::getNumberOfColumns)
         .def("number_aos", &CMolecularOrbitals::getNumberOfRows)
-        .def("alpha_orbitals", (CDenseMatrix(CMolecularOrbitals::*)(const int32_t, const int32_t) const) & CMolecularOrbitals::alphaOrbitals)
-        .def("beta_orbitals", (CDenseMatrix(CMolecularOrbitals::*)(const int32_t, const int32_t) const) & CMolecularOrbitals::betaOrbitals)
+        .def("alpha_orbitals",
+             vlx_general::overload_cast_<const int32_t, const int32_t>()(&CMolecularOrbitals::alphaOrbitals, py::const_),
+             "Get alpha orbitals within specific range",
+             "i"_a,
+             "n_orbitals"_a)
+        .def("beta_orbitals",
+             vlx_general::overload_cast_<const int32_t, const int32_t>()(&CMolecularOrbitals::betaOrbitals, py::const_),
+             "Get beta orbitals within specific range",
+             "i"_a,
+             "n_orbitals"_a)
+        .def("transform",
+             &CMolecularOrbitals::transform,
+             "Transform matrix in AO basis to matrix in MO basis using selected molecular orbitals.",
+             "ao_matrix"_a,
+             "spin_block"_a)
         .def("broadcast", &CMolecularOrbitals_broadcast)
         .def(py::self == py::self);
 
     // CSADGuessDriver class
 
-    py::class_<CSADGuessDriver, std::shared_ptr<CSADGuessDriver>>(m, "SADGuessDriver")
-        .def(py::init(&CSADGuessDriver_create), py::arg("py_comm") = py::none())
+    PyClass<CSADGuessDriver>(m, "SADGuessDriver")
+        .def(py::init(&vlx_general::create<CSADGuessDriver>), "comm"_a = py::none())
         .def("compute", &CSADGuessDriver::compute);
 
     // exposing functions

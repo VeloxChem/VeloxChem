@@ -23,59 +23,50 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#include "ExportTwoInts.hpp"
+
+#include <mpi.h>
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <mpi.h>
-
 #include "AOFockMatrix.hpp"
 #include "DenseMatrix.hpp"
 #include "ElectronRepulsionIntegralsDriver.hpp"
 #include "EriScreenerType.hpp"
+#include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
-#include "ExportTwoInts.hpp"
 #include "FockMatrixType.hpp"
 #include "MOIntsBatch.hpp"
 #include "MOIntsType.hpp"
 #include "ScreeningContainer.hpp"
-#include "ErrorHandler.hpp"
+#include "ExportOrbData.hpp"
 
 namespace py = pybind11;
+using namespace py::literals;
 
 namespace vlx_twoints {  // vlx_twoints namespace
-
-// Helper function for printing CAOFockMatrix
-
-static std::string
-CAOFockMatrix_str(const CAOFockMatrix& self)
-{
-    return self.getString();
-}
 
 // Helper function for converting CAOFockMatrix to numpy array
 
 static py::array_t<double>
 CAOFockMatrix_to_numpy(const CAOFockMatrix& self, const int32_t iFockMatrix)
 {
-    return vlx_general::pointer_to_numpy(
-        self.getFock(iFockMatrix), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
+    return vlx_general::pointer_to_numpy(self.getFock(iFockMatrix), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
 }
 
 static py::array_t<double>
 CAOFockMatrix_alpha_to_numpy(const CAOFockMatrix& self, const int32_t iFockMatrix)
 {
-    return vlx_general::pointer_to_numpy(
-        self.getFock(iFockMatrix, "alpha"), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
+    return vlx_general::pointer_to_numpy(self.getFock(iFockMatrix, "alpha"), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
 }
 
 static py::array_t<double>
 CAOFockMatrix_beta_to_numpy(const CAOFockMatrix& self, const int32_t iFockMatrix)
 {
-    return vlx_general::pointer_to_numpy(
-        self.getFock(iFockMatrix, "beta"), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
+    return vlx_general::pointer_to_numpy(self.getFock(iFockMatrix, "beta"), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
 }
 
 // Helper function for CAOFockMatrix constructor
@@ -88,44 +79,13 @@ CAOFockMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
 {
     std::vector<CDenseMatrix> fmat;
 
-    for (size_t i = 0; i < arrays.size(); i++)
+    for (const auto& x : arrays)
     {
-        auto mp = vlx_math::CDenseMatrix_from_numpy(arrays[i]);
-
+        auto mp = vlx_math::CDenseMatrix_from_numpy(x);
         fmat.push_back(*mp);
     }
 
     return std::make_shared<CAOFockMatrix>(fmat, types, factors, ids);
-}
-
-// Helper function for CElectronRepulsionIntegralsDriver constructor
-
-static std::shared_ptr<CElectronRepulsionIntegralsDriver>
-CElectronRepulsionIntegralsDriver_create(py::object py_comm)
-{
-    if (py_comm.is_none())
-    {
-        return std::make_shared<CElectronRepulsionIntegralsDriver>(MPI_COMM_WORLD);
-    }
-    else
-    {
-        MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
-
-        return std::make_shared<CElectronRepulsionIntegralsDriver>(*comm_ptr);
-    }
-}
-
-// Helper function for exporting CElectronRepulsionIntegralsDriver.compute
-
-static void
-CElectronRepulsionIntegralsDriver_compute(const CElectronRepulsionIntegralsDriver& self,
-                                                CAOFockMatrix&       aoFockMatrix,
-                                          const CAODensityMatrix&    aoDensityMatrix,
-                                          const CMolecule&           molecule,
-                                          const CMolecularBasis&     aoBasis,
-                                          const CScreeningContainer& screeningContainer)
-{
-    self.compute(aoFockMatrix, aoDensityMatrix, molecule, aoBasis, screeningContainer);
 }
 
 // Helper function for exporting CElectronRepulsionIntegralsDriver.computeInMemory
@@ -134,9 +94,9 @@ static void
 CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegralsDriver& self,
                                                  const CMolecule&                         molecule,
                                                  const CMolecularBasis&                   basis,
-                                                       py::array_t<double>&               eri)
+                                                 py::array_t<double>&                     eri)
 {
-    std::string errsrc("ElectronRepulsionIntegralsDriver.compute_in_mem: Expecting a c_style contiguous numpy array");
+    std::string errsrc("ElectronRepulsionIntegralsDriver.compute_in_mem: Expecting a C-style contiguous numpy array");
 
     auto c_style = py::detail::check_flags(eri.ptr(), py::array::c_style);
 
@@ -146,24 +106,7 @@ CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegra
 
     errors::assertMsgCritical(eri.ndim() == 4, errshape);
 
-    auto natoms = molecule.getNumberOfAtoms();
-
-    auto max_angl = basis.getMolecularMaxAngularMomentum(molecule);
-
-    int32_t nao = 0;
-
-    for (int32_t angl = 0; angl <= max_angl; angl++)
-    {
-        for (int32_t s = -angl; s <= angl; s++)
-        {
-            for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
-            {
-                int32_t idelem = molecule.getIdsElemental()[atomidx];
-
-                nao += basis.getNumberOfBasisFunctions(idelem, angl);
-            }
-        }
-    }
+    auto nao = vlx_orbdata::get_number_of_atomic_orbitals(molecule, basis);
 
     std::string errsize("ElectronRepulsionIntegralsDriver.compute_in_mem: Inconsistent size");
 
@@ -175,7 +118,7 @@ CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegra
 
     errors::assertMsgCritical(eri.shape(3) == nao, errsize);
 
-    self.computeInMemory(molecule, basis, static_cast<double*>(eri.request().ptr));
+    self.computeInMemory(molecule, basis, eri.mutable_data());
 }
 
 // Helper function for reduce_sum CAOFockMatrix object
@@ -183,9 +126,9 @@ CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegra
 static void
 CAOFockMatrix_reduce_sum(CAOFockMatrix& self, int32_t rank, int32_t nodes, py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.reduce_sum(rank, nodes, *comm_ptr);
+    self.reduce_sum(rank, nodes, *comm);
 }
 
 // Helper function for converting CMOIntsBatch to numpy array
@@ -199,8 +142,7 @@ CMOIntsBatch_to_numpy(const CMOIntsBatch& self, const int32_t iBatch)
 static py::array_t<double>
 CMOIntsBatch_to_numpy_2(const CMOIntsBatch& self, const CTwoIndexes& iGeneratorPair)
 {
-    return vlx_general::pointer_to_numpy(
-        self.getBatch(iGeneratorPair), self.getNumberOfRows(), self.getNumberOfColumns());
+    return vlx_general::pointer_to_numpy(self.getBatch(iGeneratorPair), self.getNumberOfRows(), self.getNumberOfColumns());
 }
 
 static py::array_t<double>
@@ -220,7 +162,7 @@ CMOIntsBatchYX_to_numpy(const CMOIntsBatch& self, const int32_t iBatch)
 static void
 CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cross_nodes, py::object py_cross_comm)
 {
-    MPI_Comm* cross_comm_ptr = vlx_general::get_mpi_comm(py_cross_comm);
+    auto cross_comm = vlx_general::get_mpi_comm(py_cross_comm);
 
     int32_t nrows = self.getNumberOfRows();
 
@@ -238,7 +180,7 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
 
             int32_t numbatches = 0;
 
-            auto merror = MPI_Recv(&numbatches, 1, MPI_INT, cross_id, tag_id++, *cross_comm_ptr, &mstat);
+            auto merror = MPI_Recv(&numbatches, 1, MPI_INT, cross_id, tag_id++, *cross_comm, &mstat);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -248,15 +190,15 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
             {
                 int32_t first = -1, second = -1;
 
-                merror = MPI_Recv(&first, 1, MPI_INT, cross_id, tag_id++, *cross_comm_ptr, &mstat);
+                merror = MPI_Recv(&first, 1, MPI_INT, cross_id, tag_id++, *cross_comm, &mstat);
 
                 if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
-                merror = MPI_Recv(&second, 1, MPI_INT, cross_id, tag_id++, *cross_comm_ptr, &mstat);
+                merror = MPI_Recv(&second, 1, MPI_INT, cross_id, tag_id++, *cross_comm, &mstat);
 
                 if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
-                merror = MPI_Recv(data.data(), nrows * ncols, MPI_DOUBLE, cross_id, tag_id++, *cross_comm_ptr, &mstat);
+                merror = MPI_Recv(data.data(), nrows * ncols, MPI_DOUBLE, cross_id, tag_id++, *cross_comm, &mstat);
 
                 if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -273,7 +215,7 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
 
         auto numbatches = self.getNumberOfBatches();
 
-        auto merror = MPI_Send(&numbatches, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm_ptr);
+        auto merror = MPI_Send(&numbatches, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm);
 
         if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -287,15 +229,15 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
 
             auto second = genpairs[ibatch].second();
 
-            merror = MPI_Send(&first, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm_ptr);
+            merror = MPI_Send(&first, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
-            merror = MPI_Send(&second, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm_ptr);
+            merror = MPI_Send(&second, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
-            merror = MPI_Send(data, nrows * ncols, MPI_DOUBLE, mpi::master(), tag_id++, *cross_comm_ptr);
+            merror = MPI_Send(data, nrows * ncols, MPI_DOUBLE, mpi::master(), tag_id++, *cross_comm);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
         }
@@ -325,12 +267,13 @@ export_twoints(py::module& m)
         .value("unrestjkx", fockmat::unrestjkx);
 
     // ericut enum class
-
+    // clang-format off
     py::enum_<ericut>(m, "ericut")
         .value("qq", ericut::qq)
         .value("qqr", ericut::qqr)
         .value("qqden", ericut::qqden)
         .value("qqrden", ericut::qqrden);
+    // clang-format on
 
     // moints enum class
 
@@ -350,33 +293,65 @@ export_twoints(py::module& m)
 
     // CAOFockMatrix class
 
-    py::class_<CAOFockMatrix, std::shared_ptr<CAOFockMatrix>>(m, "AOFockMatrix")
+    PyClass<CAOFockMatrix>(m, "AOFockMatrix")
         .def(py::init<>())
         .def(py::init<const CAODensityMatrix&>())
         .def(py::init<const CAOFockMatrix&>())
         .def(py::init(&CAOFockMatrix_from_numpy_list))
-        .def("__str__", &CAOFockMatrix_str)
+        .def("__str__", &CAOFockMatrix::getString)
         .def("to_numpy", &CAOFockMatrix_to_numpy)
         .def("alpha_to_numpy", &CAOFockMatrix_alpha_to_numpy)
         .def("beta_to_numpy", &CAOFockMatrix_beta_to_numpy)
         .def("is_closed_shell", &CAOFockMatrix::isClosedShell)
         .def("number_of_fock_matrices", &CAOFockMatrix::getNumberOfFockMatrices)
-        .def("set_fock_type", &CAOFockMatrix::setFockType, py::arg(), py::arg(), py::arg("spin") = std::string("alpha"))
-        .def("set_scale_factor", &CAOFockMatrix::setFockScaleFactor, py::arg(), py::arg(), py::arg("spin") = std::string("alpha"))
-        .def("get_fock_type", &CAOFockMatrix::getFockType, py::arg(), py::arg("spin") = std::string("alpha"))
-        .def("get_scale_factor", &CAOFockMatrix::getScaleFactor, py::arg(), py::arg("spin") = std::string("alpha"))
-        .def("get_density_identifier", &CAOFockMatrix::getDensityIdentifier, py::arg(), py::arg("spin") = std::string("alpha"))
+        .def("set_fock_type",
+             &CAOFockMatrix::setFockType,
+             "Set type of Fock matrix at fock_idx with given spin",
+             "fock_type"_a,
+             "fock_idx"_a,
+             "spin"_a = std::string("ALPHA"))
+        .def("set_scale_factor",
+             &CAOFockMatrix::setFockScaleFactor,
+             "Set scaling factor of exact exchange for Fock matrix at fock_idx with given spin",
+             "factor"_a,
+             "fock_idx"_a,
+             "spin"_a = std::string("ALPHA"))
+        .def("get_fock_type",
+             &CAOFockMatrix::getFockType,
+             "Get type of Fock matrix at fock_idx with given spin",
+             "fock_idx"_a,
+             "spin"_a = std::string("ALPHA"))
+        .def("get_scale_factor",
+             &CAOFockMatrix::getScaleFactor,
+             "Get scaling factor of exchange contribution for Fock matrix at fock_idx with given spin",
+             "fock_idx"_a,
+             "spin"_a = std::string("ALPHA"))
+        .def("get_density_identifier",
+             &CAOFockMatrix::getDensityIdentifier,
+             "Get identifier of AO density matrix used to construct Fock matrix at fock_idx with given spin",
+             "fock_idx"_a,
+             "spin"_a = std::string("ALPHA"))
         .def("add_hcore", &CAOFockMatrix::addCoreHamiltonian)
         .def("add", &CAOFockMatrix::add)
-        .def("add_matrix", &CAOFockMatrix::addOneElectronMatrix, py::arg(), py::arg(), py::arg("spin") = std::string("alpha"))
-        .def("scale", &CAOFockMatrix::scale, py::arg(), py::arg(), py::arg("spin") = std::string("alpha"))
+        .def("add_matrix",
+             &CAOFockMatrix::addOneElectronMatrix,
+             "Add one-electron operator matrix to Fock matrix at fock_idx with given spin",
+             "one_el"_a,
+             "fock_idx"_a,
+             "spin"_a = std::string("ALPHA"))
+        .def("scale",
+             &CAOFockMatrix::scale,
+             "Scale Fock matrix at fock_idx with given spin by a factor",
+             "factor"_a,
+             "fock_idx"_a,
+             "spin"_a = std::string("ALPHA"))
         .def("reduce_sum", &CAOFockMatrix_reduce_sum)
         .def("get_energy", &CAOFockMatrix::getElectronicEnergy)
         .def(py::self == py::self);
 
     // CCauchySchwarzScreener class
 
-    py::class_<CCauchySchwarzScreener, std::shared_ptr<CCauchySchwarzScreener>>(m, "CauchySchwarzScreener")
+    PyClass<CCauchySchwarzScreener>(m, "CauchySchwarzScreener")
         .def(py::init<>())
         .def(py::init<const CCauchySchwarzScreener&>())
         .def("get_threshold", &CCauchySchwarzScreener::getThreshold)
@@ -385,7 +360,7 @@ export_twoints(py::module& m)
 
     // CScreeningContainer class
 
-    py::class_<CScreeningContainer, std::shared_ptr<CScreeningContainer>>(m, "ScreeningContainer")
+    PyClass<CScreeningContainer>(m, "ScreeningContainer")
         .def(py::init<>())
         .def(py::init<const CScreeningContainer&>())
         .def("is_empty", &CScreeningContainer::isEmpty)
@@ -396,19 +371,77 @@ export_twoints(py::module& m)
 
     // CElectronRepulsionIntegralsDriver class
 
-    py::class_<CElectronRepulsionIntegralsDriver, std::shared_ptr<CElectronRepulsionIntegralsDriver>>(
-        m, "ElectronRepulsionIntegralsDriver")
-        .def(py::init(&CElectronRepulsionIntegralsDriver_create), py::arg("py_comm") = py::none())
+    PyClass<CElectronRepulsionIntegralsDriver>(m, "ElectronRepulsionIntegralsDriver")
+        .def(py::init(&vlx_general::create<CElectronRepulsionIntegralsDriver>), "comm"_a = py::none())
         .def("compute",
-             (CScreeningContainer(CElectronRepulsionIntegralsDriver::*)(
-                 const ericut, const double, const CMolecule&, const CMolecularBasis&) const) &
-                 CElectronRepulsionIntegralsDriver::compute)
-        .def("compute", &CElectronRepulsionIntegralsDriver_compute)
-        .def("compute_in_mem", &CElectronRepulsionIntegralsDriver_compute_in_mem);
+             vlx_general::overload_cast_<const ericut, const double, const CMolecule&, const CMolecularBasis&>()(
+                 &CElectronRepulsionIntegralsDriver::compute, py::const_),
+             // the wonky format of the raw string literal is to get help(...) in Python to look nice
+             R"pbdoc(
+Computes Q values for electron repulsion integrals for molecule with specific AO
+basis set and stores results in screening container object.
+
+:param screening:
+    The screening scheme for screening container object.
+:param threshold:
+    The screening threshold for screening container object.
+:param molecule:
+    The molecule.
+:param ao_basis:
+    The molecular AO basis.
+:return: the screening container with Q values.
+)pbdoc",
+             "screening"_a,
+             "threshold"_a,
+             "molecule"_a,
+             "ao_basis"_a)
+        .def("compute",
+             vlx_general::
+                 overload_cast_<CAOFockMatrix&, const CAODensityMatrix&, const CMolecule&, const CMolecularBasis&, const CScreeningContainer&>()(
+                     &CElectronRepulsionIntegralsDriver::compute, py::const_),
+             // the wonky format of the raw string literal is to get help(...) in Python to look nice
+             R"pbdoc(
+Computes electron repulsion integrals and stores them in AO Fock matrix for
+molecule with specific AO basis set. Performs screening according to
+``screening`` parameters.
+
+:param ao_fock:
+    The AO Fock matrix.
+:param ao_density:
+    The AO density matrix.
+:param molecule:
+    The molecule.
+:param ao_basis:
+    The molecular AO basis.
+:param screening:
+    The screening container object.
+)pbdoc",
+             "ao_fock"_a,
+             "ao_density"_a,
+             "molecule"_a,
+             "ao_basis"_a,
+             "screening"_a)
+        .def("compute_in_mem",
+             &CElectronRepulsionIntegralsDriver_compute_in_mem,
+             "Computes electron repulsion integrals as a full 4D array and stores them in memory.",
+             "molecule"_a,
+             "basis"_a,
+             "eri_tensor"_a)
+        .def(
+            "compute_in_mem",
+            [](const CElectronRepulsionIntegralsDriver& eridrv, const CMolecule& molecule, const CMolecularBasis& basis) {
+                auto nao = vlx_orbdata::get_number_of_atomic_orbitals(molecule, basis);
+                auto eri = py::array_t<double, py::array::c_style>({nao, nao, nao, nao});
+                eridrv.computeInMemory(molecule, basis, eri.mutable_data());
+                return eri;
+            },
+            "Computes electron repulsion integrals as a full 4D array and stores them in memory.",
+            "molecule"_a,
+            "basis"_a);
 
     // CMOIntsBatch class
 
-    py::class_<CMOIntsBatch, std::shared_ptr<CMOIntsBatch>>(m, "MOIntsBatch")
+    PyClass<CMOIntsBatch>(m, "MOIntsBatch")
         .def(py::init<>())
         .def("to_numpy", &CMOIntsBatch_to_numpy)
         .def("to_numpy", &CMOIntsBatch_to_numpy_2)

@@ -129,7 +129,7 @@ class CVisualizationDriver
                  const std::string&        mospin) const;
 
     /**
-     Computes molecular orbital values at cubic grid points (MPI).
+     Computes density values at cubic grid points (MPI).
 
      @param grid the cubic grid.
      @param molecule the molecule.

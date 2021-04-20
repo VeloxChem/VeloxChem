@@ -1,14 +1,13 @@
-from pathlib import Path
-import numpy as np
 import unittest
+from pathlib import Path
 import tempfile
 
-from veloxchem.veloxchemlib import DispersionModel
-from veloxchem.veloxchemlib import is_mpi_master
-from veloxchem.veloxchemlib import bohr_in_angstroms
-from veloxchem.veloxchemlib import ChemicalElement
-from veloxchem.mpitask import MpiTask
+import numpy as np
+
 from veloxchem.molecule import Molecule
+from veloxchem.mpitask import MpiTask
+from veloxchem.veloxchemlib import (ChemicalElement, DispersionModel,
+                                    bohr_in_angstroms, is_mpi_master)
 
 
 class TestMolData(unittest.TestCase):
@@ -19,8 +18,12 @@ class TestMolData(unittest.TestCase):
 
     def nh3_coords(self):
 
-        return [[-3.710, 3.019, -0.037], [-3.702, 4.942, 0.059],
-                [-4.704, 2.415, 1.497], [-4.780, 2.569, -1.573]]
+        return [
+            [-3.710, 3.019, -0.037],
+            [-3.702, 4.942, 0.059],
+            [-4.704, 2.415, 1.497],
+            [-4.780, 2.569, -1.573],
+        ]
 
     def nh3_xyzstr(self):
 
@@ -323,20 +326,22 @@ class TestMolData(unittest.TestCase):
             mol = self.nh3_molecule()
             mol.write_xyz(fname)
 
+            ref_labels = mol.get_labels()
+            ref_coords = mol.get_coordinates()
+
+            mol_2 = Molecule.read_xyz(fname)
+            self.assertEqual(ref_labels, mol_2.get_labels())
+            self.assertTrue(
+                np.max(np.abs(ref_coords - mol_2.get_coordinates())) < 1.0e-10)
+
             with open(fname, 'r') as f_xyz:
                 lines = f_xyz.readlines()
-
-                labels = [line.split()[0] for line in lines[2:]]
-                coords = np.array([
-                    [float(x) for x in line.split()[1:]] for line in lines[2:]
-                ])
-
-                for a, b in zip(labels, mol.get_labels()):
-                    self.assertEqual(a.lower(), b.lower())
-
-                ref_coords = mol.get_coordinates() * bohr_in_angstroms()
-                self.assertTrue(np.max(np.abs(coords - ref_coords)) < 1.0e-10)
+                mol_3 = Molecule.from_xyz_string(''.join(lines))
+                self.assertEqual(ref_labels, mol_3.get_labels())
+                self.assertTrue(
+                    np.max(np.abs(ref_coords -
+                                  mol_3.get_coordinates())) < 1.0e-10)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

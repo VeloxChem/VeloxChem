@@ -25,6 +25,10 @@
 
 #include "ElectricFieldMatrix.hpp"
 
+#include <array>
+
+#include "ErrorHandler.hpp"
+
 CElectricFieldMatrix::CElectricFieldMatrix()
 {
 }
@@ -36,6 +40,16 @@ CElectricFieldMatrix::CElectricFieldMatrix(const CDenseMatrix& xMatrix, const CD
     , _yMatrix(yMatrix)
 
     , _zMatrix(zMatrix)
+{
+}
+
+CElectricFieldMatrix::CElectricFieldMatrix(const std::array<CDenseMatrix, 3>& matrices)
+
+    : _xMatrix(matrices[0])
+
+    , _yMatrix(matrices[1])
+
+    , _zMatrix(matrices[2])
 {
 }
 
@@ -127,6 +141,12 @@ CElectricFieldMatrix::getStringForComponentZ() const
     return _zMatrix.getString();
 }
 
+std::string
+CElectricFieldMatrix::getString() const
+{
+    return getStringForComponentX() + getStringForComponentY() + getStringForComponentZ();
+}
+
 int32_t
 CElectricFieldMatrix::getNumberOfRows() const
 {
@@ -163,18 +183,53 @@ CElectricFieldMatrix::zvalues() const
     return _zMatrix.values();
 }
 
+const double*
+CElectricFieldMatrix::values(cartesians cart) const
+{
+    switch (cart)
+    {
+        case cartesians::X:
+            return _xMatrix.values();
+
+        case cartesians::Y:
+            return _yMatrix.values();
+
+        case cartesians::Z:
+            return _zMatrix.values();
+
+        default:
+            errors::assertMsgCritical(false, "ElectricFieldMatrix.values: invalid Cartesian component");
+            return nullptr;
+    }
+}
+
+const double*
+CElectricFieldMatrix::values(int32_t cart) const
+{
+    auto d = static_cast<cartesians>(cart);
+    return values(d);
+}
+
+std::string
+CElectricFieldMatrix::repr() const
+{
+    std::ostringstream os;
+
+    os << std::endl;
+
+    os << "[CElectricFieldMatrix (Object):" << this << "]" << std::endl;
+
+    os << "_xMatrix: " << _xMatrix << std::endl;
+
+    os << "_yMatrix: " << _yMatrix << std::endl;
+
+    os << "_zMatrix: " << _zMatrix << std::endl;
+
+    return os.str();
+}
+
 std::ostream&
 operator<<(std::ostream& output, const CElectricFieldMatrix& source)
 {
-    output << std::endl;
-
-    output << "[CElectricFieldMatrix (Object):" << &source << "]" << std::endl;
-
-    output << "_xMatrix: " << source._xMatrix << std::endl;
-
-    output << "_yMatrix: " << source._yMatrix << std::endl;
-
-    output << "_zMatrix: " << source._zMatrix << std::endl;
-
-    return output;
+    return (output << source.repr());
 }

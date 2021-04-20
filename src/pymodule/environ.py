@@ -29,13 +29,34 @@ from pathlib import Path
 from sys import stdout
 
 
+def get_basis_path():
+    """
+    Returns location of basis files within module.
+
+    :return:
+        The location of basis files within module.
+    """
+
+    return Path(__file__).parent / "basis"
+
+
 def set_vlxbasispath():
+    """
+    Sets location of basis files.
+    """
+
     if 'VLXBASISPATH' not in environ:
-        module_path = Path(__file__).parent
-        environ['VLXBASISPATH'] = str(module_path / 'basis')
+        environ['VLXBASISPATH'] = str(get_basis_path())
 
 
 def set_omp_num_threads(ncores=None):
+    """
+    Sets number of OpenMP threads.
+
+    :param ncores:
+        The number of cores available for OpenMP threads.
+    """
+
     if ncores is not None:
         environ['OMP_NUM_THREADS'] = ncores
     else:

@@ -141,7 +141,7 @@ class Profiler:
             ostream.print_info('   ' + '-' * len(valstr))
             ostream.print_info('')
 
-            for line in s.getvalue().split(os.linesep):
+            for line in s.getvalue().splitlines():
                 if os.sep in line[20:]:
                     text = line.split(os.sep, 1)[0]
                     fname, lineno = line.split(os.sep, 1)[1].split(':')

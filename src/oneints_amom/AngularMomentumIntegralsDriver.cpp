@@ -89,6 +89,22 @@ CAngularMomentumIntegralsDriver::setAngularMomentumOrigin(const double xOrigin, 
     _zOrigin = zOrigin;
 }
 
+void
+CAngularMomentumIntegralsDriver::setAngularMomentumOrigin(const std::array<double, 3>& origin)
+{
+    _xOrigin = origin[0];
+
+    _yOrigin = origin[1];
+
+    _zOrigin = origin[2];
+}
+
+std::array<double, 3>
+CAngularMomentumIntegralsDriver::getAngularMomentumOrigin() const
+{
+    return std::array<double, 3>{{_xOrigin, _yOrigin, _zOrigin}};
+}
+
 CAngularMomentumMatrix
 CAngularMomentumIntegralsDriver::compute(const CMolecule& molecule, const CMolecularBasis& basis) const
 {

@@ -1,19 +1,19 @@
-from pathlib import Path
-import numpy as np
-import unittest
-import pytest
 import sys
-import os
+import unittest
+from pathlib import Path
+
+import numpy as np
+import pytest
+
 try:
     import cppe
 except ImportError:
     pass
 
-from veloxchem.veloxchemlib import is_mpi_master
-from veloxchem.veloxchemlib import hartree_in_ev
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaexcidriver import TDAExciDriver
+from veloxchem.veloxchemlib import hartree_in_ev, is_mpi_master
 
 
 @pytest.mark.solvers
@@ -73,7 +73,7 @@ class TestTDA(unittest.TestCase):
             4    12.1889     0.0014     0.0045    -0.0000    -0.0000
             5    12.8274     0.0117     0.0250     0.0000     0.0000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
@@ -96,7 +96,7 @@ class TestTDA(unittest.TestCase):
             4    10.3003     0.0005     0.0000    -0.0000    -0.0000
             5    10.6270     0.0044     0.0127    -0.0000    -0.0000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
@@ -119,7 +119,7 @@ class TestTDA(unittest.TestCase):
             4    10.1323     0.0014     0.0003     0.0000     0.0000
             5    10.3444     0.0036     0.0115    -0.0000    -0.0000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
@@ -142,7 +142,7 @@ class TestTDA(unittest.TestCase):
             4    11.9792     0.0004     0.0013     0.0916     0.1963
             5    12.8941     0.0007     0.0006     0.0132    -0.4366
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
@@ -165,10 +165,10 @@ class TestTDA(unittest.TestCase):
             4    10.1845     0.0003     0.0003    -0.1075    -0.2451
             5    11.0440     0.0076     0.0029     0.1461    -0.5130
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

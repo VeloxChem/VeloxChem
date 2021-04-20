@@ -25,7 +25,10 @@
 
 #include "AngularMomentumMatrix.hpp"
 
+#include <array>
 #include <cmath>
+
+#include "ErrorHandler.hpp"
 
 CAngularMomentumMatrix::CAngularMomentumMatrix()
 
@@ -55,6 +58,21 @@ CAngularMomentumMatrix::CAngularMomentumMatrix(const CDenseMatrix& xMatrix,
     , _yMatrix(yMatrix)
 
     , _zMatrix(zMatrix)
+{
+}
+
+CAngularMomentumMatrix::CAngularMomentumMatrix(const std::array<CDenseMatrix, 3>& matrices, const std::array<double, 3>& origin)
+    : _xOrigin(origin[0])
+
+    , _yOrigin(origin[1])
+
+    , _zOrigin(origin[2])
+
+    , _xMatrix(matrices[0])
+
+    , _yMatrix(matrices[1])
+
+    , _zMatrix(matrices[2])
 {
 }
 
@@ -168,6 +186,16 @@ CAngularMomentumMatrix::setOriginCoordinates(const double xOrigin, const double 
     _zOrigin = zOrigin;
 }
 
+void
+CAngularMomentumMatrix::setOriginCoordinates(const std::array<double, 3>& origin)
+{
+    _xOrigin = origin[0];
+
+    _yOrigin = origin[1];
+
+    _zOrigin = origin[2];
+}
+
 std::string
 CAngularMomentumMatrix::getStringForComponentX() const
 {
@@ -184,6 +212,12 @@ std::string
 CAngularMomentumMatrix::getStringForComponentZ() const
 {
     return _zMatrix.getString();
+}
+
+std::string
+CAngularMomentumMatrix::getString() const
+{
+    return getStringForComponentX() + getStringForComponentY() + getStringForComponentZ();
 }
 
 int32_t
@@ -222,6 +256,33 @@ CAngularMomentumMatrix::zvalues() const
     return _zMatrix.values();
 }
 
+const double*
+CAngularMomentumMatrix::values(cartesians cart) const
+{
+    switch (cart)
+    {
+        case cartesians::X:
+            return _xMatrix.values();
+
+        case cartesians::Y:
+            return _yMatrix.values();
+
+        case cartesians::Z:
+            return _zMatrix.values();
+
+        default:
+            errors::assertMsgCritical(false, "AngularMomentumMatrix.values: invalid Cartesian component");
+            return nullptr;
+    }
+}
+
+const double*
+CAngularMomentumMatrix::values(int32_t cart) const
+{
+    auto d = static_cast<cartesians>(cart);
+    return values(d);
+}
+
 double
 CAngularMomentumMatrix::getOriginCoordinateX() const
 {
@@ -240,24 +301,36 @@ CAngularMomentumMatrix::getOriginCoordinateZ() const
     return _zOrigin;
 }
 
+std::array<double, 3>
+CAngularMomentumMatrix::getOriginCoordinates() const
+{
+    return std::array<double, 3>{{_xOrigin, _yOrigin, _zOrigin}};
+}
+
+std::string
+CAngularMomentumMatrix::repr() const
+{
+    std::ostringstream os;
+
+    os << "[CAngularMomentumMatrix (Object):" << this << "]" << std::endl;
+
+    os << "_xMatrix: " << _xMatrix << std::endl;
+
+    os << "_yMatrix: " << _yMatrix << std::endl;
+
+    os << "_zMatrix: " << _zMatrix << std::endl;
+
+    os << "_xOrigin: " << _xOrigin << std::endl;
+
+    os << "_yOrigin: " << _yOrigin << std::endl;
+
+    os << "_zOrigin: " << _zOrigin << std::endl;
+
+    return os.str();
+}
+
 std::ostream&
 operator<<(std::ostream& output, const CAngularMomentumMatrix& source)
 {
-    output << std::endl;
-
-    output << "[CAngularMomentumMatrix (Object):" << &source << "]" << std::endl;
-
-    output << "_xMatrix: " << source._xMatrix << std::endl;
-
-    output << "_yMatrix: " << source._yMatrix << std::endl;
-
-    output << "_zMatrix: " << source._zMatrix << std::endl;
-
-    output << "_xOrigin: " << source._xOrigin << std::endl;
-
-    output << "_yOrigin: " << source._yOrigin << std::endl;
-
-    output << "_zOrigin: " << source._zOrigin << std::endl;
-
-    return output;
+    return (output << source.repr());
 }

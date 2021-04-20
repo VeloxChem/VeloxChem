@@ -41,14 +41,6 @@ namespace vlx_response {  // vlx_response namespace
 
 // Exports classes/functions in src/response to python
 
-// Helper function for printing CExcitationVector
-
-static std::string
-CExcitationVector_str(const CExcitationVector& self)
-{
-    return self.getString();
-}
-
 // Helper function for converting Z vector to numpy array
 
 static py::array_t<double>
@@ -108,7 +100,7 @@ export_response(py::module& m)
 {
     // CExcitationVector class
 
-    py::class_<CExcitationVector, std::shared_ptr<CExcitationVector>>(m, "ExcitationVector")
+    PyClass<CExcitationVector>(m, "ExcitationVector")
         .def(py::init<>())
         .def(py::init<const szblock,
                       const std::vector<int32_t>&,
@@ -119,7 +111,7 @@ export_response(py::module& m)
         .def(py::init<const szblock, const int32_t, const int32_t, const int32_t, const int32_t>())
         .def(py::init<const std::vector<double>&, const std::vector<CExcitationVector>&>())
         .def(py::init<const CExcitationVector&>())
-        .def("__str__", &CExcitationVector_str)
+        .def("__str__", &CExcitationVector::getString)
         .def("set_zcoefficient", &CExcitationVector::setCoefficientZ)
         .def("set_ycoefficient", &CExcitationVector::setCoefficientY)
         .def("set_yzcoefficients", &CExcitationVector_set_yzcoefficients)

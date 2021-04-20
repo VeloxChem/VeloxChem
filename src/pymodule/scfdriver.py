@@ -28,7 +28,6 @@ import numpy as np
 import time as tm
 import math
 import sys
-import os
 
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import OverlapIntegralsDriver
@@ -642,21 +641,21 @@ class ScfDriver:
                 ])
 
                 if self.closed_shell:
-                    e_el -= 2.0 * np.trace(
+                    e_el += 2.0 * np.trace(
                         np.matmul(efpot, den_mat.alpha_to_numpy(0)))
-                    fock_mat.add_matrix(DenseMatrix(-efpot), 0)
+                    fock_mat.add_matrix(DenseMatrix(efpot), 0)
                 else:
-                    e_el -= np.trace(
+                    e_el += np.trace(
                         np.matmul(efpot, (den_mat.alpha_to_numpy(0) +
                                           den_mat.beta_to_numpy(0))))
-                    fock_mat.add_matrix(DenseMatrix(-efpot), 0, 'alpha')
-                    fock_mat.add_matrix(DenseMatrix(-efpot), 0, 'beta')
+                    fock_mat.add_matrix(DenseMatrix(efpot), 0, 'alpha')
+                    fock_mat.add_matrix(DenseMatrix(efpot), 0, 'beta')
 
                 self.ef_nuc_energy = 0.0
                 coords = molecule.get_coordinates()
                 elem_ids = molecule.elem_ids_to_numpy()
                 for i in range(molecule.number_of_atoms()):
-                    self.ef_nuc_energy += np.dot(
+                    self.ef_nuc_energy -= np.dot(
                         elem_ids[i] * (coords[i] - self.dipole_origin),
                         self.electric_field)
 
@@ -834,7 +833,7 @@ class ScfDriver:
             else:
                 self.dipole_origin = np.zeros(3)
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-            dipole_drv.set_origin(*self.dipole_origin)
+            dipole_drv.origin = tuple(self.dipole_origin)
             dipole_mats = dipole_drv.compute(molecule, basis)
         else:
             dipole_mats = None
@@ -1510,7 +1509,7 @@ class ScfDriver:
 
         if self.pe:
             self.ostream.print_blank()
-            for line in self.pe_summary.split(os.linesep):
+            for line in self.pe_summary.splitlines():
                 self.ostream.print_header(line.ljust(92))
             self.ostream.flush()
 

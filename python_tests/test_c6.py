@@ -1,16 +1,15 @@
-from pathlib import Path
-import numpy as np
-import unittest
-import tempfile
 import random
-import pytest
-import os
+import tempfile
+import unittest
+from pathlib import Path
 
-from veloxchem.veloxchemlib import is_mpi_master
+import numpy as np
+import pytest
 from veloxchem.mpitask import MpiTask
 from veloxchem.outputstream import OutputStream
-from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.rspc6 import C6
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.veloxchemlib import is_mpi_master
 
 
 @pytest.mark.solvers
@@ -192,7 +191,7 @@ class TestC6(unittest.TestCase):
             53   XDIPLEN   ZDIPLEN   14.809490        0.000000
             54   YDIPLEN   ZDIPLEN   14.809490       -0.000000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         ref_c6_value = 36.230454
 
@@ -264,7 +263,7 @@ class TestC6(unittest.TestCase):
             53   XDIPLEN   ZDIPLEN   14.809490        0.000000
             54   YDIPLEN   ZDIPLEN   14.809490        0.000000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         ref_c6_value = 42.315098
 
@@ -336,12 +335,12 @@ class TestC6(unittest.TestCase):
             53   XDIPLEN   ZDIPLEN   14.809490        0.000000
             54   YDIPLEN   ZDIPLEN   14.809490        0.000000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         ref_c6_value = 44.494604
 
         self.run_c6(inpfile, xcfun_label, data_lines, ref_c6_value)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

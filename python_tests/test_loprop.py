@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import patch
 import numpy.testing as npt
 import textwrap
@@ -165,7 +166,7 @@ def test_opa(sample, tmpdir):
     assert loprop_driver.get_opa() == [[0, 1, 3, 4, 5], [0], [0]]
 
 
-@pytest.mark.parametrize('input_lines, expected', [
+@pytest.mark.parametrize('input_, expected', [
     (textwrap.dedent("""
                 @ATOMBASIS H
                 S 3  1
@@ -209,18 +210,18 @@ def test_opa(sample, tmpdir):
     }),
 ],
                          ids=['H:2S1P', 'O:3S2P1D'])
-def test_count_contracted(input_lines, expected):
-    assert count_contracted(input_lines.splitlines()) == expected
+def test_count_contracted(input_, expected):
+    assert count_contracted(input_.splitlines()) == expected
 
 
-@pytest.mark.parametrize('input, expected', [
+@pytest.mark.parametrize('input_, expected', [
     ({
         'S': 2,
         'P': 1
     }, 5),
 ])
-def test_count_contracted_on_atom(input, expected):
-    assert count_contracted_on_atom(input) == expected
+def test_count_contracted_on_atom(input_, expected):
+    assert count_contracted_on_atom(input_) == expected
 
 
 def test_get_local_basis_file():
@@ -241,7 +242,7 @@ def test_get_lib_basis_file():
             mock_exists.side_effect = [False, True]
             full_path = get_basis_file('STO-3G')
 
-    assert full_path == '/vlxlib/STO-3G'
+    assert Path(full_path) == Path('/vlxlib/STO-3G')
 
 
 class TestIntegrations:

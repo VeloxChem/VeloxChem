@@ -50,8 +50,13 @@ class TestTPA(unittest.TestCase):
             tpa_result = tpa_prop.rsp_property
 
             for key in [
-                    't4_dict', 't3_dict', 'NaX3NyNz', 'NaA3NxNy', 'NaX2Nyz',
-                    'NxA2Nyz', 'gamma'
+                    't4_dict',
+                    't3_dict',
+                    'NaX3NyNz',
+                    'NaA3NxNy',
+                    'NaX2Nyz',
+                    'NxA2Nyz',
+                    'gamma',
             ]:
                 if key in tpa_result and key in ref_result:
                     if tpa_result[key] is None:
@@ -99,5 +104,5 @@ class TestTPA(unittest.TestCase):
         self.run_tpa(inpfile, 'reduced', w, ref_result)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

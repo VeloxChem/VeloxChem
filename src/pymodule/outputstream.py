@@ -112,7 +112,7 @@ class OutputStream:
 
         if self.state:
             for line in self.buffer_lines:
-                self.stream.write(line)
+                self.stream.write(line + '\n')
             self.stream.flush()
             del self.buffer_lines[:]
 
@@ -197,7 +197,7 @@ class OutputStream:
 
         if not self.state:
             return
-        self.buffer_lines.append(line + os.linesep)
+        self.buffer_lines.append(line)
 
     def print_blank(self):
         """
@@ -206,7 +206,7 @@ class OutputStream:
 
         if not self.state:
             return
-        self.buffer_lines.append(' ' * self.width + os.linesep)
+        self.buffer_lines.append(' ' * self.width)
 
     def print_header(self, line):
         """
@@ -218,7 +218,7 @@ class OutputStream:
 
         if not self.state:
             return
-        self.buffer_lines.append(self.header(line, self.width) + os.linesep)
+        self.buffer_lines.append(self.header(line, self.width))
 
     def print_title(self, line):
         """
@@ -230,7 +230,7 @@ class OutputStream:
 
         if not self.state:
             return
-        self.buffer_lines.append(self.title(line, self.width) + os.linesep)
+        self.buffer_lines.append(self.title(line, self.width))
 
     def print_info(self, line):
         """
@@ -242,7 +242,7 @@ class OutputStream:
 
         if not self.state:
             return
-        self.buffer_lines.append(self.info(line, self.width) + os.linesep)
+        self.buffer_lines.append(self.info(line, self.width))
 
     def print_separator(self):
         """
@@ -251,7 +251,7 @@ class OutputStream:
 
         if not self.state:
             return
-        self.buffer_lines.append(self.tsep(self.width) + os.linesep)
+        self.buffer_lines.append(self.tsep(self.width))
 
     def print_block(self, block_lines):
         """
@@ -264,7 +264,7 @@ class OutputStream:
         if not self.state:
             return
 
-        lines = block_lines.split(os.linesep)
+        lines = block_lines.splitlines()
         for line in lines:
             self.print_header(line)
 

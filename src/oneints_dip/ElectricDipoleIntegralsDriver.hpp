@@ -26,6 +26,7 @@
 #ifndef ElectricDipoleIntegralsDriver_hpp
 #define ElectricDipoleIntegralsDriver_hpp
 
+#include <array>
 #include <cstdint>
 
 #include <mpi.h>
@@ -171,6 +172,20 @@ class CElectricDipoleIntegralsDriver
      @param zOrigin the Cartesian Z coordinate of electric dipole origin.
      */
     void setElectricDipoleOrigin(const double xOrigin, const double yOrigin, const double zOrigin);
+
+    /**
+     Sets origin of electric dipole.
+
+     @param origin an array holding the Cartesian coordinates for the electric dipole origin.
+     */
+    void setElectricDipoleOrigin(const std::array<double, 3>& origin);
+
+    /**
+     Gets origin of electric dipole.
+
+     @return Cartesian coordinates of electric dipole origin.
+     */
+    std::array<double, 3> getElectricDipoleOrigin() const;
 
     /**
      Computes electric dipole integrals for molecule in specific basis set and

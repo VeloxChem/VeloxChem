@@ -1,20 +1,20 @@
-from pathlib import Path
-import numpy as np
-import unittest
 import random
-import pytest
 import sys
-import os
+import unittest
+from pathlib import Path
+
+import numpy as np
+import pytest
+
 try:
     import cppe
 except ImportError:
     pass
 
-from veloxchem.veloxchemlib import is_mpi_master
-from veloxchem.veloxchemlib import hartree_in_ev
+from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.lreigensolver import LinearResponseEigenSolver
+from veloxchem.veloxchemlib import hartree_in_ev, is_mpi_master
 
 
 @pytest.mark.solvers
@@ -45,7 +45,9 @@ class TestRPA(unittest.TestCase):
             {
                 'nstates': len(ref_exc_ene),
                 'batch_size': random.choice([1, 10, 100])
-            }, task.input_dict['method_settings'])
+            },
+            task.input_dict['method_settings'],
+        )
         rpa_results = rpa_solver.compute(task.molecule, task.ao_basis,
                                          scf_drv.scf_tensors)
 
@@ -77,7 +79,7 @@ class TestRPA(unittest.TestCase):
             4    12.1540     0.0025     0.0048    -0.0000     0.0000
             5    12.7907     0.0235     0.0237    -0.0000    -0.0000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_rpa(inpfile, potfile, xcfun_label, data_lines)
 
@@ -100,7 +102,7 @@ class TestRPA(unittest.TestCase):
             4    10.2976     0.0004     0.0000    -0.0000    -0.0000
             5    10.6191     0.0111     0.0116    -0.0000    -0.0000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_rpa(inpfile, potfile, xcfun_label, data_lines)
 
@@ -123,7 +125,7 @@ class TestRPA(unittest.TestCase):
             4    10.1292     0.0014     0.0002     0.0000     0.0000
             5    10.3354     0.0099     0.0106     0.0000     0.0000
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_rpa(inpfile, potfile, xcfun_label, data_lines)
 
@@ -146,7 +148,7 @@ class TestRPA(unittest.TestCase):
             4    11.9383     0.0007     0.0014     0.1049     0.1939
             5    12.8292     0.0004     0.0004    -0.0033    -0.2579
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_rpa(inpfile, potfile, xcfun_label, data_lines)
 
@@ -169,10 +171,10 @@ class TestRPA(unittest.TestCase):
             4    10.1815     0.0005     0.0003    -0.1341    -0.3188
             5    11.0079     0.0046     0.0025     0.2632    -0.1881
         """
-        data_lines = raw_data.split(os.linesep)[1:-1]
+        data_lines = raw_data.splitlines()[1:-1]
 
         self.run_rpa(inpfile, potfile, xcfun_label, data_lines)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

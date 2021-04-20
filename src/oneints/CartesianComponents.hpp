@@ -23,32 +23,22 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef ExportOrbData_hpp
-#define ExportOrbData_hpp
-
-#include <pybind11/pybind11.h>
-
-class CMolecule;
-class CMolecularBasis;
-
-namespace py = pybind11;
-
-namespace vlx_orbdata {  // vlx_orbdata namespace
+#ifndef CartesianComponents_hpp
+#define CartesianComponents_hpp
 
 /**
- Gets number of atomic orbitals.
+ Enumerate class cartesians:
 
- @param molecule the molecule.
- @param basis the AO basis set.
- @return the number of atomic orbitals.
+ Defines all allowed key values for Cartesian directions:
+ cartesians::X - x direction
+ cartesians::Y - Y direction
+ cartesians::Z - Z direction
  */
-int32_t get_number_of_atomic_orbitals(const CMolecule& molecule, const CMolecularBasis& basis);
+enum class cartesians : int32_t
+{
+    X = 0,
+    Y = 1,
+    Z = 2
+};
 
-/**
- Exports classes/functions in src/orbdata to python.
- */
-void export_orbdata(py::module& m);
-
-}  // namespace vlx_orbdata
-
-#endif /* ExportOrbData_hpp */
+#endif /* CartesianComponents_hpp */

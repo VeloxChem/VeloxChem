@@ -96,13 +96,16 @@ from .scffirstorderprop import ScfFirstOrderProperties
 from .orbitalresponse import OrbitalResponse
 from .tdhfgradientdriver import TdhfGradientDriver
 
+# Deprecation warnings
+from . import deprecations
+
 # Python functions
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 
 # Environment variable: basis set path and number of OpenMP threads
-from .environ import set_vlxbasispath, set_omp_num_threads
+from .environ import set_vlxbasispath, set_omp_num_threads, get_basis_path
 
 set_vlxbasispath()
 set_omp_num_threads()

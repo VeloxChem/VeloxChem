@@ -26,9 +26,11 @@
 #ifndef LinearMomentumMatrix_hpp
 #define LinearMomentumMatrix_hpp
 
+#include <array>
 #include <cstdint>
 #include <string>
 
+#include "CartesianComponents.hpp"
 #include "DenseMatrix.hpp"
 
 /**
@@ -71,6 +73,13 @@ class CLinearMomentumMatrix
      @param zMatrix the dense matrix with Z component of linear momentum integrals.
      */
     CLinearMomentumMatrix(const CDenseMatrix& xMatrix, const CDenseMatrix& yMatrix, const CDenseMatrix& zMatrix);
+
+    /**
+     Creates a linear momentum matrix object.
+
+     @param matrices cartesian components of linear momentum integrals.
+     */
+    CLinearMomentumMatrix(const std::array<CDenseMatrix, 3>& matrices);
 
     /**
      Creates a linear momentum matrix object by copying other linear momentum
@@ -127,6 +136,13 @@ class CLinearMomentumMatrix
      otherwise.
      */
     bool operator!=(const CLinearMomentumMatrix& other) const;
+
+    /**
+     Gets string representation of linear momentum matrix.
+
+     @return a string for printing the linear momentum matrix.
+     */
+    std::string getString() const;
 
     /**
      Gets string representation of X component of linear momentum matrix.
@@ -198,13 +214,40 @@ class CLinearMomentumMatrix
     const double* zvalues() const;
 
     /**
-     Converts linear momentum matrix object to text output and insert it into
-     output text stream.
+     Gets constant pointer to first element of requested component of linear momentum
+     matrix.
 
-     @param output the output text stream.
-     @param source the linear momentum matrix object.
+     @param cart requested Cartesian component of the linear momentum integrals matrix
+
+     @return the constant pointer to first element of requested component of linear momentum
+     matrix.
      */
-    friend std::ostream& operator<<(std::ostream& output, const CLinearMomentumMatrix& source);
+    const double* values(cartesians cart) const;
+
+    /**
+     Gets constant pointer to first element of requested component of linear momentum
+     matrix.
+
+     @param cart requested Cartesian component of the linear momentum integrals matrix
+
+     @return the constant pointer to first element of requested component of linear momentum
+     matrix.
+     */
+    const double* values(int32_t cart) const;
+
+    /**
+     Converts linear momentum matrix object to text output.
+     */
+    std::string repr() const;
 };
+
+/**
+ Converts linear momentum matrix object to text output and insert it into
+ output text stream.
+
+ @param output the output text stream.
+ @param source the linear momentum matrix object.
+ */
+std::ostream& operator<<(std::ostream& output, const CLinearMomentumMatrix& source);
 
 #endif /* LinearMomentumMatrix_hpp */

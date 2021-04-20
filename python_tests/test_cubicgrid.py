@@ -1,7 +1,6 @@
 from pathlib import Path
 import unittest
 import tempfile
-import os
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.cubicgrid import CubicGrid
@@ -32,9 +31,9 @@ class TestCheckpoint(unittest.TestCase):
         """
 
         with open(fname, 'w') as f_cube:
-            for line in text.split(os.linesep):
+            for line in text.splitlines():
                 if line.strip():
-                    f_cube.write(line.lstrip() + os.linesep)
+                    print(line.lstrip(), file=f_cube)
 
     def test_cube(self):
 

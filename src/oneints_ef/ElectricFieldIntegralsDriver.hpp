@@ -26,9 +26,9 @@
 #ifndef ElectricFieldIntegralsDriver_hpp
 #define ElectricFieldIntegralsDriver_hpp
 
-#include <cstdint>
-
 #include <mpi.h>
+
+#include <cstdint>
 
 #include "BoysFunction.hpp"
 #include "ElectricFieldMatrix.hpp"
@@ -211,8 +211,8 @@ class CElectricFieldIntegralsDriver
      */
     CElectricFieldMatrix compute(const CMolecule&           molecule,
                                  const CMolecularBasis&     basis,
-                                 const CMemBlock2D<double>* dipoles,
-                                 const CMemBlock2D<double>* coordinates) const;
+                                 const CMemBlock2D<double>& dipoles,
+                                 const CMemBlock2D<double>& coordinates) const;
 
     /**
      Computes electric field integrals for molecule in two basis sets at
@@ -247,8 +247,8 @@ class CElectricFieldIntegralsDriver
     CElectricFieldMatrix compute(const CMolecule&           molecule,
                                  const CMolecularBasis&     braBasis,
                                  const CMolecularBasis&     ketBasis,
-                                 const CMemBlock2D<double>* dipoles,
-                                 const CMemBlock2D<double>* coordinates) const;
+                                 const CMemBlock2D<double>& dipoles,
+                                 const CMemBlock2D<double>& coordinates) const;
 
     /**
      Computes electric field integrals for two molecules in specific basis
@@ -285,8 +285,8 @@ class CElectricFieldIntegralsDriver
     CElectricFieldMatrix compute(const CMolecule&           braMolecule,
                                  const CMolecule&           ketMolecule,
                                  const CMolecularBasis&     basis,
-                                 const CMemBlock2D<double>* dipoles,
-                                 const CMemBlock2D<double>* coordinates) const;
+                                 const CMemBlock2D<double>& dipoles,
+                                 const CMemBlock2D<double>& coordinates) const;
 
     /**
      Computes electric field integrals for two molecules in two basis sets
@@ -326,8 +326,8 @@ class CElectricFieldIntegralsDriver
                                  const CMolecule&           ketMolecule,
                                  const CMolecularBasis&     braBasis,
                                  const CMolecularBasis&     ketBasis,
-                                 const CMemBlock2D<double>* dipoles,
-                                 const CMemBlock2D<double>* coordinates) const;
+                                 const CMemBlock2D<double>& dipoles,
+                                 const CMemBlock2D<double>& coordinates) const;
 
     /**
      Computes electric field integrals blocks for pair of GTOs blocks and

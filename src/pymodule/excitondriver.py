@@ -350,14 +350,14 @@ class ExcitonModelDriver:
 
             # 1e integral
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-            dipole_drv.set_origin(*self.center_of_mass)
+            dipole_drv.origin = self.center_of_mass
             dipole_mats = dipole_drv.compute(monomer, basis)
 
             linmom_drv = LinearMomentumIntegralsDriver(self.comm)
             linmom_mats = linmom_drv.compute(monomer, basis)
 
             angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-            angmom_drv.set_origin(*self.center_of_mass)
+            angmom_drv.origin = self.center_of_mass
             angmom_mats = angmom_drv.compute(monomer, basis)
 
             if self.rank == mpi_master():
@@ -572,14 +572,14 @@ class ExcitonModelDriver:
                 npot_mat = npot_drv.compute(dimer, basis)
 
                 dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-                dipole_drv.set_origin(*self.center_of_mass)
+                dipole_drv.origin = self.center_of_mass
                 dipole_mats = dipole_drv.compute(dimer, basis)
 
                 linmom_drv = LinearMomentumIntegralsDriver(self.comm)
                 linmom_mats = linmom_drv.compute(dimer, basis)
 
                 angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-                angmom_drv.set_origin(*self.center_of_mass)
+                angmom_drv.origin = self.center_of_mass
                 angmom_mats = angmom_drv.compute(dimer, basis)
 
                 # dft grid

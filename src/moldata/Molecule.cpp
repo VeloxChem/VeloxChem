@@ -610,6 +610,8 @@ CMolecule::printGeometry() const
         ss << "\n";
     }
 
+    ss << "\n";
+
     return ss.str();
 }
 

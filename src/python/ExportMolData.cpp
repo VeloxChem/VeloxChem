@@ -23,11 +23,13 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#include "ExportMolData.hpp"
+
+#include <mpi.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <mpi.h>
 #include <memory>
 #include <string>
 #include <vector>
@@ -38,22 +40,20 @@
 #include "DispersionModel.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
-#include "ExportMolData.hpp"
 #include "Molecule.hpp"
 #include "PartialCharges.hpp"
 #include "StringFormat.hpp"
 #include "VdwRadii.hpp"
 
 namespace py = pybind11;
+using namespace py::literals;
 
 namespace vlx_moldata {  // vlx_moldata namespace
 
 // Helper function for CMolecule constructor
 
 static std::shared_ptr<CMolecule>
-CMolecule_from_coords(const std::vector<std::string>& labels,
-                      const std::vector<double>&      coords_raw,
-                      const std::string&              units)
+CMolecule_from_coords(const std::vector<std::string>& labels, const std::vector<double>& coords_raw, const std::string& units)
 {
     // NOTE:
     // The C++ Molecule constructor expects the coordinates to be arranged as 3 x natoms,
@@ -150,9 +150,7 @@ CMolecule_from_array(const std::vector<std::string>&                labels,
 }
 
 static std::shared_ptr<CMolecule>
-CMolecule_from_array_2(const std::vector<int32_t>& idselem,
-                       const py::array_t<double>&  py_coords,
-                       const std::string&          units = std::string("angstrom"))
+CMolecule_from_array_2(const std::vector<int32_t>& idselem, const py::array_t<double>& py_coords, const std::string& units = std::string("angstrom"))
 {
     std::vector<std::string> labels;
 
@@ -314,9 +312,9 @@ CMolecule_check_proximity(const CMolecule& self, const double minDistance)
 static void
 CMolecule_broadcast(CMolecule& self, int32_t rank, py::object py_comm)
 {
-    MPI_Comm* comm_ptr = vlx_general::get_mpi_comm(py_comm);
+    auto comm = vlx_general::get_mpi_comm(py_comm);
 
-    self.broadcast(rank, *comm_ptr);
+    self.broadcast(rank, *comm);
 }
 
 // Exports classes/functions in src/moldata to python
@@ -326,12 +324,12 @@ export_moldata(py::module& m)
 {
     // CMolecule class
 
-    py::class_<CMolecule, std::shared_ptr<CMolecule>>(m, "Molecule")
+    PyClass<CMolecule>(m, "Molecule")
         .def(py::init<>())
         .def(py::init<const CMolecule&>())
         .def(py::init<const CMolecule&, const CMolecule&>())
-        .def(py::init(&CMolecule_from_array), py::arg(), py::arg(), py::arg("units") = std::string("angstrom"))
-        .def(py::init(&CMolecule_from_array_2), py::arg(), py::arg(), py::arg("units") = std::string("angstrom"))
+        .def(py::init(&CMolecule_from_array), "symbols"_a, "coordinates"_a, "units"_a = std::string("angstrom"))
+        .def(py::init(&CMolecule_from_array_2), "Zs"_a, "coordinates"_a, "units"_a = std::string("angstrom"))
         .def("set_charge", &CMolecule::setCharge)
         .def("get_charge", &CMolecule::getCharge)
         .def("set_multiplicity", &CMolecule::setMultiplicity)
@@ -340,10 +338,13 @@ export_moldata(py::module& m)
         .def("get_string", &CMolecule::printGeometry)
         .def("check_proximity", &CMolecule_check_proximity)
         .def("get_sub_molecule", &CMolecule::getSubMolecule)
-        .def("number_of_atoms", (int32_t(CMolecule::*)() const) & CMolecule::getNumberOfAtoms)
-        .def("number_of_atoms", (int32_t(CMolecule::*)(const int32_t) const) & CMolecule::getNumberOfAtoms)
+        .def("number_of_atoms", vlx_general::overload_cast_<>()(&CMolecule::getNumberOfAtoms, py::const_))
+        .def("number_of_atoms", vlx_general::overload_cast_<const int32_t>()(&CMolecule::getNumberOfAtoms, py::const_), "idElemental"_a)
         .def("number_of_atoms",
-             (int32_t(CMolecule::*)(const int32_t, const int32_t, const int32_t) const) & CMolecule::getNumberOfAtoms)
+             vlx_general::overload_cast_<const int32_t, const int32_t, const int32_t>()(&CMolecule::getNumberOfAtoms, py::const_),
+             "iatom"_a,
+             "natoms"_a,
+             "idElemental"_a)
         .def("number_of_electrons", &CMolecule::getNumberOfElectrons)
         .def("number_of_alpha_electrons", &CMolecule_alpha_elec)
         .def("number_of_beta_electrons", &CMolecule_beta_elec)
@@ -362,16 +363,16 @@ export_moldata(py::module& m)
 
     // CChemicalElement class
 
-    py::class_<CChemicalElement, std::shared_ptr<CChemicalElement>>(m, "ChemicalElement")
+    PyClass<CChemicalElement>(m, "ChemicalElement")
         .def(py::init<>())
-        .def("set_atom_type", (bool (CChemicalElement::*)(const std::string&)) & CChemicalElement::setAtomType)
-        .def("set_atom_type", (bool (CChemicalElement::*)(const int32_t)) & CChemicalElement::setAtomType)
+        .def("set_atom_type", vlx_general::overload_cast_<const std::string&>()(&CChemicalElement::setAtomType), "label"_a)
+        .def("set_atom_type", vlx_general::overload_cast_<const int32_t>()(&CChemicalElement::setAtomType), "idElemental"_a)
         .def("get_name", &CChemicalElement::getName)
         .def(py::self == py::self);
 
     // CDispersionModel class
 
-    py::class_<CDispersionModel, std::shared_ptr<CDispersionModel>>(m, "DispersionModel")
+    PyClass<CDispersionModel>(m, "DispersionModel")
         .def(py::init<>())
         .def("compute", &CDispersionModel::compute)
         .def("get_energy", &CDispersionModel::getEnergy)

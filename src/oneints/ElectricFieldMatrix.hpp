@@ -26,9 +26,11 @@
 #ifndef ElectricFieldMatrix_hpp
 #define ElectricFieldMatrix_hpp
 
+#include <array>
 #include <cstdint>
 #include <string>
 
+#include "CartesianComponents.hpp"
 #include "DenseMatrix.hpp"
 
 /**
@@ -74,6 +76,14 @@ class CElectricFieldMatrix
      integrals.
      */
     CElectricFieldMatrix(const CDenseMatrix& xMatrix, const CDenseMatrix& yMatrix, const CDenseMatrix& zMatrix);
+
+    /**
+     Creates a electric field matrix object.
+
+     @param matrices array of dense matrices with components of electric field
+     integrals.
+     */
+    CElectricFieldMatrix(const std::array<CDenseMatrix, 3>& matrix);
 
     /**
      Creates a electric field matrix object by copying other electric field
@@ -153,6 +163,13 @@ class CElectricFieldMatrix
     std::string getStringForComponentZ() const;
 
     /**
+     Gets string representation of electric field matrix.
+
+     @return a string for printing the components of electric field matrix.
+     */
+    std::string getString() const;
+
+    /**
      Gets number of rows in electric field matrix.
 
      @return the number of rows.
@@ -201,13 +218,40 @@ class CElectricFieldMatrix
     const double* zvalues() const;
 
     /**
-     Converts electric field matrix object to text output and insert it into
-     output text stream.
+     Gets constant pointer to first element of requested component of electric field
+     matrix.
 
-     @param output the output text stream.
-     @param source the electric field matrix object.
+     @param cart requested Cartesian component of the electric field integrals matrix
+
+     @return the constant pointer to first element of requested component of electric field
+     matrix.
      */
-    friend std::ostream& operator<<(std::ostream& output, const CElectricFieldMatrix& source);
+    const double* values(cartesians cart) const;
+
+    /**
+     Gets constant pointer to first element of requested component of electric field
+     matrix.
+
+     @param cart requested Cartesian component of the electric field integrals matrix
+
+     @return the constant pointer to first element of requested component of electric field
+     matrix.
+     */
+    const double* values(int32_t cart) const;
+
+    /**
+     Converts electric field matrix object to text output.
+     */
+    std::string repr() const;
 };
+
+/**
+ Converts electric field matrix object to text output and insert it into
+ output text stream.
+
+ @param output the output text stream.
+ @param source the electric field matrix object.
+ */
+std::ostream& operator<<(std::ostream& output, const CElectricFieldMatrix& source);
 
 #endif /* ElectricFieldMatrix_hpp */

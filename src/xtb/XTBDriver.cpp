@@ -116,15 +116,15 @@ CXTBDriver::compute(const CMolecule& molecule)
     
         if (_xtbMethod == "gfn2")
         {
-            xtb_loadGFN2xTB(_environment, tmol, _calculator, NULL);
+            xtb_loadGFN2xTB(_environment, tmol, _calculator, nullptr);
         }
         else if (_xtbMethod == "gfn1")
         {
-            xtb_loadGFN1xTB(_environment, tmol, _calculator, NULL);
+            xtb_loadGFN1xTB(_environment, tmol, _calculator, nullptr);
         }
         else if (_xtbMethod == "gfn0")
         {
-            xtb_loadGFN0xTB(_environment, tmol, _calculator, NULL);
+            xtb_loadGFN0xTB(_environment, tmol, _calculator, nullptr);
         }
         else
         {
@@ -166,16 +166,16 @@ CXTBDriver::isAvailable() const
 }
 
 bool
-CXTBDriver::getState()
+CXTBDriver::getState() const
 {
 #ifdef ENABLE_XTB
-    return xtb_checkEnvironment(_environment) > 0;
+    return xtb_checkEnvironment(_environment) == 0;
 #endif
     return false;
 }
 
 std::vector<std::string>
-CXTBDriver::getOutput()
+CXTBDriver::getOutput() const
 {
     std::vector<std::string> output_strings;
 
@@ -201,13 +201,13 @@ CXTBDriver::getOutput()
 }
 
 std::string
-CXTBDriver::getOutputFilename()
+CXTBDriver::getOutputFilename() const
 {
     return _outputFilename;
 }
 
 double 
-CXTBDriver::getEnergy() 
+CXTBDriver::getEnergy() const
 {
     double energy = 0.0; 
  
@@ -222,7 +222,7 @@ CXTBDriver::getEnergy()
 }
 
 std::vector<double> 
-CXTBDriver::getGradient()
+CXTBDriver::getGradient() const
 {
     std::vector<double> grad;
 
@@ -278,6 +278,6 @@ CXTBDriver::_set_molecule(const CMolecule& molecule)
     return xtb_newMolecule(_environment, &_natoms, atoms.data(),
                            coords.data(),
                            &charge, &uhf,
-                           NULL, NULL);
+                           nullptr, nullptr);
 }
 #endif

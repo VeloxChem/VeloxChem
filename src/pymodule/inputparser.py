@@ -27,7 +27,6 @@ from pathlib import PurePath
 import numpy as np
 import sys
 import re
-import os
 
 from .errorhandler import assert_msg_critical
 
@@ -58,7 +57,7 @@ class InputParser:
 
         self.input_dict = {}
 
-        self.inpname = inpname
+        self.inpname = inpname if isinstance(inpname, str) else str(inpname)
         self.outname = outname
 
         self.is_basis_set = False
@@ -73,8 +72,8 @@ class InputParser:
 
         self.input_dict = {}
 
-        errmsg = f'InputParser: bad syntax in file {self.inpname}' + os.linesep
-        errmsg += '    You may check for incorrect, incomplete or empty groups.'
+        errmsg = f'InputParser: bad syntax in file {self.inpname}. '
+        errmsg += 'You may check for incorrect, incomplete or empty groups.'
 
         group = None
 
