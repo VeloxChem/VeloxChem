@@ -28,6 +28,7 @@
 
 #include "DispersionModel.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 #include "CoordinationNumber.hpp"

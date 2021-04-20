@@ -25,6 +25,8 @@
 
 #include "SADGuessDriver.hpp"
 
+#include <algorithm>
+
 #include <mpi.h>
 
 #include "AODensityMatrix.hpp"

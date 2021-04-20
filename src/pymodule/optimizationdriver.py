@@ -149,7 +149,7 @@ class OptimizationDriver:
             else:
                 constr_filename = None
 
-            log_ini = str(PurePath(temp_dir, f'log.ini_{self.rank}'))
+            log_ini = Path(temp_dir, f'log.ini_{self.rank}')
             self.write_log_ini(log_ini)
 
             # geomeTRIC prints information to stdout and stderr. On master node
@@ -172,7 +172,7 @@ class OptimizationDriver:
                             maxiter=self.max_iter,
                             constraints=constr_filename,
                             input=filename,
-                            logIni=log_ini)
+                            logIni=str(log_ini))
 
         coords = m.xyzs[-1] / geometric.nifty.bohr2ang
         labels = molecule.get_labels()
@@ -240,12 +240,12 @@ class OptimizationDriver:
             'class=geometric.nifty.RawFileHandler',
             'level=INFO',
             'formatter=formatter',
-            'args=(\'%(logfilename)s\',)',
+            'args=(r\'%(logfilename)s\',)',
             '[formatter_formatter]',
             'format=%(message)s',
         ]
 
-        with open(fname, 'w') as f_ini:
+        with fname.open('w') as f_ini:
             for line in lines:
                 print(line, file=f_ini)
 
