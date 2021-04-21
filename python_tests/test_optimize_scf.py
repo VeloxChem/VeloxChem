@@ -42,11 +42,8 @@ class TestOptimizeSCF:
 
             inpfile = Path(inpfile)
             optfile = Path(str(inpfile.with_name(inpfile.stem)) + '_optim.xyz')
-            logfile = inpfile.with_suffix('.log')
             if optfile.is_file():
                 optfile.unlink()
-            #if logfile.is_file():
-            #    logfile.unlink()
 
     def test_nh3(self):
 
