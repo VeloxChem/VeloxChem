@@ -1,5 +1,5 @@
 #
-#                           VELOXCHEM 1.0-RC
+#                           VELOXCHEM 1.0-RC2
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
@@ -108,4 +108,4 @@ from .environ import set_vlxbasispath, set_omp_num_threads, get_basis_path
 set_vlxbasispath()
 set_omp_num_threads()
 
-__version__ = "1.0rc1.post1"
+__version__ = "1.0rc2"
