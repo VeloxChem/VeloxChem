@@ -44,6 +44,7 @@ from .profiler import Profiler
 from .linearsolver import LinearSolver
 from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
+from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
 from .checkpoint import read_rsp_hdf5
 from .checkpoint import write_rsp_hdf5
@@ -329,6 +330,10 @@ class TDAExciDriver(LinearSolver):
             if self.rank == mpi_master():
                 t_mat = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
 
+            if self.nto or self.detach_attach:
+                vis_drv = VisualizationDriver(self.comm)
+                cubic_grid = vis_drv.gen_cubic_grid(molecule, self.cube_points)
+
             if self.nto and self.is_converged:
                 self.ostream.print_info(
                     'Running NTO analysis for S{:d}...'.format(s + 1))
@@ -342,8 +347,8 @@ class TDAExciDriver(LinearSolver):
                 lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
                 nto_mo.broadcast(self.rank, self.comm)
 
-                self.write_nto_cubes(self.cube_points, molecule, basis, s,
-                                     lam_diag, nto_mo, self.nto_pairs)
+                self.write_nto_cubes(cubic_grid, molecule, basis, s, lam_diag,
+                                     nto_mo, self.nto_pairs)
 
             if self.detach_attach and self.is_converged:
                 self.ostream.print_info(
@@ -359,8 +364,8 @@ class TDAExciDriver(LinearSolver):
                     dens_DA = AODensityMatrix()
                 dens_DA.broadcast(self.rank, self.comm)
 
-                self.write_detach_attach_cubes(self.cube_points, molecule,
-                                               basis, s, dens_DA)
+                self.write_detach_attach_cubes(cubic_grid, molecule, basis, s,
+                                               dens_DA)
 
         if (self.nto or self.detach_attach) and self.is_converged:
             self.ostream.print_blank()

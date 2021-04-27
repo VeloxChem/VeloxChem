@@ -457,7 +457,7 @@ class LinearResponseEigenSolver(LinearSolver):
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
                     cubic_grid = vis_drv.gen_cubic_grid(molecule,
-                                                        *self.cube_points)
+                                                        self.cube_points)
 
                 if self.nto:
                     self.ostream.print_info(
