@@ -40,6 +40,7 @@ from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
+from .cubicgrid import CubicGrid
 from .errorhandler import assert_msg_critical
 from .checkpoint import check_rsp_hdf5
 from .checkpoint import append_rsp_solution_hdf5
@@ -59,6 +60,9 @@ class LinearResponseEigenSolver(LinearSolver):
         - nto: The flag for natural transition orbital analysis.
         - nto_pairs: The number of NTO pairs in NTO analysis.
         - detach_attach: The flag for detachment/attachment density analysis.
+        - cube_origin: The origin of cubic grid points.
+        - cube_stepsize: The step size of cubic grid points in X, Y and Z
+          directions.
         - cube_points: The number of cubic grid points in X, Y and Z directions.
     """
 
@@ -80,6 +84,8 @@ class LinearResponseEigenSolver(LinearSolver):
         self.nto = False
         self.nto_pairs = None
         self.detach_attach = False
+        self.cube_origin = None
+        self.cube_stepsize = None
         self.cube_points = [80, 80, 80]
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -109,6 +115,22 @@ class LinearResponseEigenSolver(LinearSolver):
         if 'detach_attach' in rsp_dict:
             key = rsp_dict['detach_attach'].lower()
             self.detach_attach = True if key in ['yes', 'y'] else False
+
+        if 'cube_origin' in rsp_dict:
+            self.cube_origin = [
+                float(x)
+                for x in rsp_dict['cube_origin'].replace(',', ' ').split()
+            ]
+            assert_msg_critical(
+                len(self.cube_origin) == 3, 'cube origin: Need 3 numbers')
+
+        if 'cube_stepsize' in rsp_dict:
+            self.cube_stepsize = [
+                float(x)
+                for x in rsp_dict['cube_stepsize'].replace(',', ' ').split()
+            ]
+            assert_msg_critical(
+                len(self.cube_stepsize) == 3, 'cube stepsize: Need 3 numbers')
 
         if 'cube_points' in rsp_dict:
             self.cube_points = [
@@ -445,6 +467,10 @@ class LinearResponseEigenSolver(LinearSolver):
 
             sqrt_2 = np.sqrt(2.0)
 
+            nto_lambdas = []
+            nto_cube_files = []
+            dens_cube_files = []
+
             for s in range(self.nstates):
                 eigvec = self.get_full_solution_vector(excitations[s][1])
 
@@ -456,8 +482,13 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
-                    cubic_grid = vis_drv.gen_cubic_grid(molecule,
-                                                        self.cube_points)
+                    if self.cube_origin is None or self.cube_stepsize is None:
+                        cubic_grid = vis_drv.gen_cubic_grid(
+                            molecule, self.cube_points)
+                    else:
+                        cubic_grid = CubicGrid(self.cube_origin,
+                                               self.cube_stepsize,
+                                               self.cube_points)
 
                 if self.nto:
                     self.ostream.print_info(
@@ -472,8 +503,13 @@ class LinearResponseEigenSolver(LinearSolver):
                     lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
                     nto_mo.broadcast(self.rank, self.comm)
 
-                    self.write_nto_cubes(cubic_grid, molecule, basis, s,
-                                         lam_diag, nto_mo, self.nto_pairs)
+                    nto_cube_fnames = self.write_nto_cubes(
+                        cubic_grid, molecule, basis, s, lam_diag, nto_mo,
+                        self.nto_pairs)
+
+                    if self.rank == mpi_master():
+                        nto_lambdas.append(lam_diag)
+                        nto_cube_files.append(nto_cube_fnames)
 
                 if self.detach_attach:
                     self.ostream.print_info(
@@ -489,8 +525,11 @@ class LinearResponseEigenSolver(LinearSolver):
                         dens_DA = AODensityMatrix()
                     dens_DA.broadcast(self.rank, self.comm)
 
-                    self.write_detach_attach_cubes(cubic_grid, molecule, basis,
-                                                   s, dens_DA)
+                    dens_cube_fnames = self.write_detach_attach_cubes(
+                        cubic_grid, molecule, basis, s, dens_DA)
+
+                    if self.rank == mpi_master():
+                        dens_cube_files.append(dens_cube_fnames)
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
@@ -529,6 +568,13 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 if not write_solution_to_file:
                     ret_dict['eigenvectors'] = eigvecs
+
+                if self.nto:
+                    ret_dict['nto_lambdas'] = nto_lambdas
+                    ret_dict['nto_cubes'] = nto_cube_files
+
+                if self.detach_attach:
+                    ret_dict['density_cubes'] = dens_cube_files
 
                 return ret_dict
 
