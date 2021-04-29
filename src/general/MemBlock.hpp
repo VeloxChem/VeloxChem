@@ -953,7 +953,7 @@ CMemBlock<T>::_copy(const T* source)
     }
     else
     {
-#pragma omp simd aligned(pdata, source : VLX_ALIGN)
+#pragma omp simd aligned(pdata : VLX_ALIGN)
         for (int32_t i = 0; i < _nElements; i++)
             pdata[i] = source[i];
     }
