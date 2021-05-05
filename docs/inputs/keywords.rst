@@ -17,6 +17,8 @@ The jobs group
     "``mp2``", "Run second-order Møller–Plesset perturbation theory."
     "``visualization``", "Generate cube files for visualization."
     "``loprop``", "Run LoProp calculation."
+    "``exciton``", "Run ab initio exciton model calculation."
+    "``optimize``", "Run geometry optimization."
 
 The method settings group
 -------------------------
@@ -35,6 +37,18 @@ The method settings group
     "``def2-SVPD``", "Karlsruhe basis set, split valence polarization with
     diffuse functions"
     "``...``", ""
+
+- **xtb**
+
+  - the xTB method, if xTB calculation is to be carried out. The ``basis``
+    keyword will be ignored if ``xtb`` is specified.
+
+  .. csv-table::
+    :widths: 1, 3
+
+    "``gfn0``", "The GFN0-xTB method"
+    "``gfn1``", "The GFN1-xTB method"
+    "``gfn2``", "The GFN2-xTB method"
 
 - **xcfun**
 
@@ -217,3 +231,55 @@ The visualization group
   - example::
 
       files: density.cube, homo.cube
+
+The exciton group
+-----------------------
+
+- **fragments**
+
+  - number of fragments with the same number of atoms
+  - example (2 fragments with *m* atoms and 3 fragments with *n* atoms, where
+    *m* and *n* are specified by the ``atoms_per_fragment`` keyword)::
+
+      fragments: 2, 3
+
+- **atoms_per_fragment**
+
+  - number of atoms in each fragment
+  - example (18 atoms per fragment in the first group of fragments, 26 atoms
+    per fragment in the second group of fragments)::
+
+      atoms_per_fragment: 18, 26
+
+- **nstates**
+
+  - number of locally excited (LE) states in each fragment
+  - default: 3
+
+- **ct_nocc**
+
+  - number of occupied oribtals to be involved in charge-transfer (CT) excited
+    states
+  - default: 0
+
+- **ct_nvir**
+
+  - number of virtual oribtals to be involved in charge-transfer (CT) excited
+    states
+  - default: 0
+
+The optimize group
+-----------------------
+
+- **coordsys**
+
+  - the coordinate system
+
+  .. csv-table::
+    :widths: 1, 3
+
+    "``tric``", "Translation-rotation internal coordinates (default)"
+    "``cart``", "Cartesian coordinates"
+    "``prim``", "Primitive (a.k.a redundant) coordinates"
+    "``dlc``", "Delocalized internal coordinates"
+    "``hdlc``", "Hybrid delocalized internal coordinates"
