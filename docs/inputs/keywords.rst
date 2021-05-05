@@ -238,8 +238,9 @@ The exciton group
 - **fragments**
 
   - number of fragments with the same number of atoms
-  - example (2 fragments with *m* atoms and 3 fragments with *n* atoms, where
-    *m* and *n* are specified by the ``atoms_per_fragment`` keyword)::
+  - example (2 fragments with *m* atoms per fragment and 3 fragments with *n*
+    atoms per fragment, where *m* and *n* are specified by the
+    ``atoms_per_fragment`` keyword)::
 
       fragments: 2, 3
 
