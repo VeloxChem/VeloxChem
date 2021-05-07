@@ -322,7 +322,8 @@ class LinearSolver:
             self.ostream.print_blank()
 
             if self.rank == mpi_master():
-                gs_density = AODensityMatrix([scf_tensors['D'][0]], denmat.rest)
+                gs_density = AODensityMatrix([scf_tensors['D_alpha']],
+                                             denmat.rest)
             else:
                 gs_density = AODensityMatrix()
             gs_density.broadcast(self.rank, self.comm)
@@ -544,10 +545,12 @@ class LinearSolver:
                 'LinearResponse.e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
-            mo = scf_tensors['C']
+            mo = scf_tensors['C_alpha']
             S = scf_tensors['S']
-            da, db = scf_tensors['D']
-            fa, fb = scf_tensors['F']
+            da = scf_tensors['D_alpha']
+            db = scf_tensors['D_beta']
+            fa = scf_tensors['F_alpha']
+            # fb = scf_tensors['F_beta']
 
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
@@ -1302,9 +1305,9 @@ class LinearSolver:
             indices = {'x': 0, 'y': 1, 'z': 2}
             integral_comps = [integrals[indices[p]] for p in components]
 
-            mo = scf_tensors['C']
+            mo = scf_tensors['C_alpha']
             S = scf_tensors['S']
-            D = scf_tensors['D'][0] + scf_tensors['D'][1]
+            D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
 
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
@@ -1390,9 +1393,9 @@ class LinearSolver:
             indices = {'x': 0, 'y': 1, 'z': 2}
             integral_comps = [integrals[indices[p]] for p in components]
 
-            mo = scf_tensors['C']
+            mo = scf_tensors['C_alpha']
             S = scf_tensors['S']
-            D = scf_tensors['D'][0] + scf_tensors['D'][1]
+            D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
 
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]

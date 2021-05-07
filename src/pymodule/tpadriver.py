@@ -232,8 +232,8 @@ class TpaDriver:
 
         if self.rank == mpi_master():
             S = scf_tensors['S']
-            da = scf_tensors['D'][0]
-            mo = scf_tensors['C']
+            da = scf_tensors['D_alpha']
+            mo = scf_tensors['C_alpha']
             d_a_mo = np.linalg.multi_dot([mo.T, S, da, S, mo])
             norb = mo.shape[1]
         else:
@@ -384,9 +384,9 @@ class TpaDriver:
 
         if self.rank == mpi_master():
             S = scf_tensors['S']
-            D0 = scf_tensors['D'][0]
-            mo = scf_tensors['C']
-            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F'][0], mo])
+            D0 = scf_tensors['D_alpha']
+            mo = scf_tensors['C_alpha']
+            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F_alpha'], mo])
             norb = mo.shape[1]
         else:
             S = None

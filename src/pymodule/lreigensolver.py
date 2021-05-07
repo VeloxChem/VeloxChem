@@ -182,7 +182,7 @@ class LinearResponseEigenSolver(LinearSolver):
             'LinearResponseEigenSolver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            orb_ene = scf_tensors['E']
+            orb_ene = scf_tensors['E_alpha']
         else:
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
@@ -475,8 +475,8 @@ class LinearResponseEigenSolver(LinearSolver):
                 eigvec = self.get_full_solution_vector(excitations[s][1])
 
                 if self.rank == mpi_master():
-                    mo_occ = scf_tensors['C'][:, :nocc]
-                    mo_vir = scf_tensors['C'][:, nocc:]
+                    mo_occ = scf_tensors['C_alpha'][:, :nocc]
+                    mo_vir = scf_tensors['C_alpha'][:, nocc:]
                     z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
                     y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
 
@@ -815,7 +815,7 @@ class LinearResponseEigenSolver(LinearSolver):
             'LinearResponseEigenSolver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            orb_ene = scf_tensors['E']
+            orb_ene = scf_tensors['E_alpha']
         else:
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())

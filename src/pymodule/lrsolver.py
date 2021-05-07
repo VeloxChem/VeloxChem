@@ -148,7 +148,7 @@ class LinearResponseSolver(LinearSolver):
             'LinearResponseSolver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            orb_ene = scf_tensors['E']
+            orb_ene = scf_tensors['E_alpha']
         else:
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())

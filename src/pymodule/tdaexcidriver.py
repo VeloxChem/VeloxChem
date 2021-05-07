@@ -194,8 +194,8 @@ class TDAExciDriver(LinearSolver):
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
-            mol_orbs = MolecularOrbitals([scf_tensors['C']], [scf_tensors['E']],
-                                         molorb.rest)
+            mol_orbs = MolecularOrbitals([scf_tensors['C_alpha']],
+                                         [scf_tensors['E_alpha']], molorb.rest)
         else:
             mol_orbs = MolecularOrbitals()
 
@@ -330,8 +330,8 @@ class TDAExciDriver(LinearSolver):
 
         if self.rank == mpi_master() and self.is_converged:
             nocc = molecule.number_of_alpha_electrons()
-            mo_occ = scf_tensors['C'][:, :nocc].copy()
-            mo_vir = scf_tensors['C'][:, nocc:].copy()
+            mo_occ = scf_tensors['C_alpha'][:, :nocc].copy()
+            mo_vir = scf_tensors['C_alpha'][:, nocc:].copy()
 
             eigvals, rnorms = self.solver.get_eigenvalues()
             eigvecs = self.solver.ritz_vectors
@@ -515,10 +515,10 @@ class TDAExciDriver(LinearSolver):
 
         if self.rank == mpi_master():
             nocc = molecule.number_of_alpha_electrons()
-            norb = tensors['C'].shape[1]
+            norb = tensors['C_alpha'].shape[1]
             nvir = norb - nocc
-            mo_occ = tensors['C'][:, :nocc].copy()
-            mo_vir = tensors['C'][:, nocc:].copy()
+            mo_occ = tensors['C_alpha'][:, :nocc].copy()
+            mo_vir = tensors['C_alpha'][:, nocc:].copy()
             ao_mats = []
             for k in range(trial_mat.shape[1]):
                 mat = trial_mat[:, k].reshape(nocc, nvir)
@@ -551,7 +551,7 @@ class TDAExciDriver(LinearSolver):
 
         if self.dft:
             if self.rank == mpi_master():
-                gsdens = AODensityMatrix([tensors['D'][0]], denmat.rest)
+                gsdens = AODensityMatrix([tensors['D_alpha']], denmat.rest)
             else:
                 gsdens = AODensityMatrix()
             gsdens.broadcast(self.rank, self.comm)
@@ -578,11 +578,11 @@ class TDAExciDriver(LinearSolver):
         """
 
         nocc = molecule.number_of_alpha_electrons()
-        norb = tensors['C'].shape[1]
+        norb = tensors['C_alpha'].shape[1]
         nvir = norb - nocc
-        mo_occ = tensors['C'][:, :nocc].copy()
-        mo_vir = tensors['C'][:, nocc:].copy()
-        orb_ene = tensors['E']
+        mo_occ = tensors['C_alpha'][:, :nocc].copy()
+        mo_vir = tensors['C_alpha'][:, nocc:].copy()
+        orb_ene = tensors['E_alpha']
 
         sigma_vecs = []
         for fockind in range(fock.number_of_fock_matrices()):
