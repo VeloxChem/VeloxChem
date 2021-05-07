@@ -70,11 +70,18 @@ class CMemBlock
     void _allocate();
 
     /**
-     Copies data to memory block from data source.
+     Copies aligned data to memory block from data source.
 
      @param source the pointer to data source.
      */
-    void _copy(const T* source);
+    void _copy_aligned(const T* source);
+
+    /**
+     Copies unaligned data to memory block from data source.
+
+     @param source the pointer to data source.
+     */
+    void _copy_unaligned(const T* source);
 
    public:
     /**
@@ -357,7 +364,7 @@ CMemBlock<T>::CMemBlock(const std::vector<T>& dataVector)
 {
     _allocate();
 
-    _copy(dataVector.data());
+    _copy_unaligned(dataVector.data());
 }
 
 template <typename T>
@@ -371,7 +378,7 @@ CMemBlock<T>::CMemBlock(const T* source, int32_t nElements, numa numaPolicy)
 {
     _allocate();
 
-    _copy(source);
+    _copy_unaligned(source);
 }
 
 template <class T>
@@ -385,7 +392,7 @@ CMemBlock<T>::CMemBlock(const CMemBlock<T>& source)
 {
     _allocate();
 
-    _copy(source.data());
+    _copy_aligned(source.data());
 }
 
 template <class T>
@@ -420,7 +427,7 @@ CMemBlock<T>::operator=(const CMemBlock<T>& source)
 
     _allocate();
 
-    _copy(source.data());
+    _copy_aligned(source.data());
 
     return *this;
 }
@@ -941,7 +948,7 @@ CMemBlock<T>::_allocate()
 
 template <class T>
 void
-CMemBlock<T>::_copy(const T* source)
+CMemBlock<T>::_copy_unaligned(const T* source)
 {
     auto pdata = _data;
 
@@ -954,6 +961,26 @@ CMemBlock<T>::_copy(const T* source)
     else
     {
 #pragma omp simd aligned(pdata : VLX_ALIGN)
+        for (int32_t i = 0; i < _nElements; i++)
+            pdata[i] = source[i];
+    }
+}
+
+template <class T>
+void
+CMemBlock<T>::_copy_aligned(const T* source)
+{
+    auto pdata = _data;
+
+    if (_numaPolicy == numa::parallel)
+    {
+#pragma omp      parallel for schedule(static)
+        for (int32_t i = 0; i < _nElements; i++)
+            pdata[i] = source[i];
+    }
+    else
+    {
+#pragma omp simd aligned(pdata, source : VLX_ALIGN)
         for (int32_t i = 0; i < _nElements; i++)
             pdata[i] = source[i];
     }
