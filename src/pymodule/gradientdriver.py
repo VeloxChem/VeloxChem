@@ -86,7 +86,7 @@ class GradientDriver:
 
     def print_geometry(self, molecule):
         """
-        Prints the gradient.
+        Prints the geometry.
 
         :param molecule:
             The molecule.

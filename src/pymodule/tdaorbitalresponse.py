@@ -6,6 +6,7 @@ from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
+from .veloxchemlib import XCIntegrator
 from .orbitalresponse import OrbitalResponse
 from .qqscheme import get_qq_scheme
 
@@ -42,7 +43,7 @@ class TdaOrbitalResponse(OrbitalResponse):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def compute_rhs(self, molecule, basis, scf_tensors, tda_results, profiler):
+    def compute_rhs(self, molecule, basis, scf_tensors, tda_results, dft_dict, profiler):
         """
         Computes the right-hand side (RHS) of the TDA orbital response equation
         including the necessary density matrices using molecular data.
@@ -55,6 +56,10 @@ class TdaOrbitalResponse(OrbitalResponse):
             The dictionary of tensors from the converged SCF calculation.
         :param tda_results:
             The results from the converged TDA calculation.
+        :param dft_dict:
+            The dictionary containing DFT information.
+        :param profiler:
+            The profiler.
 
         :return:
             A dictionary containing the orbital-response RHS and
@@ -103,17 +108,43 @@ class TdaOrbitalResponse(OrbitalResponse):
 
         dm_ao_rhs.broadcast(self.rank, self.comm)
 
+        molgrid = dft_dict['molgrid']
+        gs_density = dft_dict['gs_density']
+
         # Fock matrices with corresponding type
         fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
         fock_ao_rhs.set_fock_type(fockmat.rgenjk, 1)
+        if self.dft:
+            if self.xcfun.is_hybrid():
+                fact_xc = self.xcfun.get_frac_exact_exchange()
+                for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
+                    fock_ao_rhs.set_scale_factor(fact_xc, ifock)
+                fock_ao_rhs.set_fock_type(fockmat.restjkx, 0)
+                fock_ao_rhs.set_fock_type(fockmat.rgenjkx, 1)
+            else:
+                fock_ao_rhs.set_fock_type(fockmat.restj, 0)
+                fock_ao_rhs.set_fock_type(fockmat.rgenj, 1)
+
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                     self.eri_thresh, molecule, basis)
 
         eri_drv.compute(fock_ao_rhs, dm_ao_rhs, molecule, basis, screening)
-		# TODO: probably at this point we will have to do another calculation
-		# for the additional contributions from the xc kernel derivative in DFT
+        if self.dft:
+            #t0 = tm.time()
+            if not self.xcfun.is_hybrid():
+                fock_ao_rhs.scale(2.0, 0)
+                fock_ao_rhs.scale(2.0, 1)
+            xc_drv = XCIntegrator(self.comm)
+            molgrid.distribute(self.rank, self.nodes, self.comm)
+            xc_drv.integrate(fock_ao_rhs, dm_ao_rhs, gs_density,
+                             molecule, basis, molgrid, self.xcfun.get_func_label())
+            #if timing_dict is not None:
+            #    timing_dict['DFT'] = tm.time() - t0
+
+		    # TODO: The DFT E[3] term is missing here!!
+
         fock_ao_rhs.reduce_sum(self.rank, self.nodes, self.comm)
 
         # Calculate the RHS and transform it to the MO basis

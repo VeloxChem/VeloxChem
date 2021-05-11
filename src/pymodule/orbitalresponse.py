@@ -7,6 +7,11 @@ from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
+from .veloxchemlib import GridDriver
+from .veloxchemlib import XCFunctional
+from .veloxchemlib import XCIntegrator
+from .veloxchemlib import MolecularGrid
+from .veloxchemlib import parse_xc_func
 from .profiler import Profiler
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
@@ -30,6 +35,9 @@ class OrbitalResponse:
         - is_converged: The flag for convergence.
         - comm: The MPI communicator.
         - rank: The MPI rank.
+        - dft: The flag for running DFT.
+        - grid_level: The accuracy level of DFT grid.
+        - xcfun: The XC functional.
         - eri_thresh: The electron repulsion integrals screening threshold.
         - qq_type: The electron repulsion integrals screening scheme.
         - nodes: Number of MPI processes.
@@ -63,6 +71,11 @@ class OrbitalResponse:
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
+
+        # DFT information
+        self.dft = False
+        self.grid_level = 4
+        self.xcfun = XCFunctional()
 
         # Output stream
         self.ostream = ostream
@@ -116,6 +129,19 @@ class OrbitalResponse:
             # user gives '1' for first excited state, but internal index is 0
             self.n_state_deriv = int(rsp_dict['n_state_deriv']) - 1
 
+        # DFT
+        if 'dft' in method_dict:
+            key = method_dict['dft'].lower()
+            self.dft = True if key in ['yes', 'y'] else False
+        if 'grid_level' in method_dict:
+            self.grid_level = int(method_dict['grid_level'])
+        if 'xcfun' in method_dict:
+            if 'dft' not in method_dict:
+                self.dft = True
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'Response solver: Undefined XC functional')
+
         # Timing and profiling
         if 'timing' in rsp_dict:
             key = rsp_dict['timing'].lower()
@@ -129,6 +155,52 @@ class OrbitalResponse:
         if 'memory_tracing' in rsp_dict:
             key = rsp_dict['memory_tracing'].lower()
             self.memory_tracing = True if key in ['yes', 'y'] else False
+
+    def init_dft(self, molecule, scf_tensors):
+        """
+        Initializes DFT.
+
+        :param molecule:
+            The molecule.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+
+        :return:
+            The dictionary of DFT information.
+        """
+
+        # generate integration grid
+        if self.dft:
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(self.grid_level)
+
+            grid_t0 = tm.time()
+            molgrid = grid_drv.generate(molecule)
+            n_grid_points = molgrid.number_of_points()
+            self.ostream.print_info(
+                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
+                format(n_grid_points,
+                       tm.time() - grid_t0))
+            self.ostream.print_blank()
+
+            if self.rank == mpi_master():
+                gs_density = AODensityMatrix([scf_tensors['D_alpha']],
+                                             denmat.rest)
+            else:
+                gs_density = AODensityMatrix()
+            gs_density.broadcast(self.rank, self.comm)
+
+            dft_func_label = self.xcfun.get_func_label().upper()
+        else:
+            molgrid = MolecularGrid()
+            gs_density = AODensityMatrix()
+            dft_func_label = 'HF'
+
+        return {
+            'molgrid': molgrid,
+            'gs_density': gs_density,
+            'dft_func_label': dft_func_label,
+        }
 
     def compute(self, molecule, basis, scf_tensors, rsp_results):
         """
@@ -158,6 +230,10 @@ class OrbitalResponse:
             self.print_orbrsp_header('Orbital Response Driver',
                                      self.n_state_deriv)
 
+        # DFT information
+
+        dft_dict = self.init_dft(molecule, scf_tensors)
+
         # set start time
 
         self.start_time = tm.time()
@@ -178,7 +254,7 @@ class OrbitalResponse:
         # 5) Run the conjugate gradient
 
         rhs_results = self.compute_rhs(molecule, basis, scf_tensors,
-                                       rsp_results, profiler)
+                                       rsp_results, dft_dict, profiler)
 
         if self.rank == mpi_master():
             rhs_mo = rhs_results['rhs_mo']
@@ -193,7 +269,7 @@ class OrbitalResponse:
 
         # Calculate the lambda multipliers in the parent class
         lambda_multipliers = self.compute_lambda(molecule, basis, scf_tensors,
-                                                 rhs_mo, profiler)
+                                                 rhs_mo, dft_dict, profiler)
 
         profiler.start_timer(0, 'omega')
 
@@ -231,15 +307,34 @@ class OrbitalResponse:
             ao_density_lambda = AODensityMatrix()
         ao_density_lambda.broadcast(self.rank, self.comm)
 
+        molgrid = dft_dict['molgrid']
+        gs_density = dft_dict['gs_density']
+
         fock_lambda = AOFockMatrix(ao_density_lambda)
-        fock_lambda.set_fock_type(fockmat.rgenjk, 0)
+        fock_flag = fockmat.rgenjk
+        if self.dft:
+            if self.xcfun.is_hybrid():
+                fock_flag = fockmat.rgenjkx
+                fact_xc = self.xcfun.get_frac_exact_exchange()
+                fock_lambda.set_scale_factor(fact_xc, 0)
+            else:
+                fock_flag = fockmat.rgenj
+
+        fock_lambda.set_fock_type(fock_flag, 0)
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                     self.eri_thresh, molecule, basis)
         eri_drv.compute(fock_lambda, ao_density_lambda, molecule, basis,
                         screening)
-		# TODO: DFT E[3] contribution probably needs to be added here
+        if self.dft:
+            if not self.xcfun.is_hybrid():
+                fock_lambda.scale(2.0, 0)
+            xc_drv = XCIntegrator(self.comm)
+            molgrid.distribute(self.rank, self.nodes, self.comm)
+            xc_drv.integrate(fock_lambda, ao_density_lambda, gs_density,
+                             molecule, basis, molgrid, self.xcfun.get_func_label())
+
         fock_lambda.reduce_sum(self.rank, self.nodes, self.comm)
 
         # Compute the omega multipliers
@@ -292,7 +387,7 @@ class OrbitalResponse:
         else:
             return {}
 
-    def compute_lambda(self, molecule, basis, scf_tensors, rhs_mo, profiler):
+    def compute_lambda(self, molecule, basis, scf_tensors, rhs_mo, dft_dict, profiler):
         """
         Performs orbital response Lagrange multipliers calculation for the
         occupied-virtual alpha block using molecular data.
@@ -305,6 +400,8 @@ class OrbitalResponse:
             The dictionary of tensors from converged SCF wavefunction.
         :param rhs_mo:
             The right-hand side of orbital response equation in MO basis.
+        :param dft_dict:
+            The dictionary containing DFT information.
         :param profiler:
             The profiler.
 
@@ -354,9 +451,21 @@ class OrbitalResponse:
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                     self.eri_thresh, molecule, basis)
 
+        molgrid = dft_dict['molgrid']
+        gs_density = dft_dict['gs_density']
+
         # Create a Fock Matrix Object (initialized with zeros)
         fock_lambda = AOFockMatrix(ao_density_lambda)
-        fock_lambda.set_fock_type(fockmat.rgenjk, 0)
+        fock_flag = fockmat.rgenjk
+        if self.dft:
+            if self.xcfun.is_hybrid():
+                fock_flag = fockmat.rgenjkx
+                fact_xc = self.xcfun.get_frac_exact_exchange()
+                fock_lambda.set_scale_factor(fact_xc, 0)
+            else:
+                fock_flag = fockmat.rgenj
+
+        fock_lambda.set_fock_type(fock_flag, 0)
 
         # Matrix-vector product of orbital Hessian with trial vector
         def orb_rsp_matvec(v):
@@ -378,7 +487,17 @@ class OrbitalResponse:
 
             eri_drv.compute(fock_lambda, ao_density_lambda, molecule, basis,
                             screening)
-			# TODO: DFT E[3] contributions probably need to be added here
+            if self.dft:
+                #t0 = tm.time()
+                if not self.xcfun.is_hybrid():
+                    fock_lambda.scale(2.0, 0)
+                xc_drv = XCIntegrator(self.comm)
+                molgrid.distribute(self.rank, self.nodes, self.comm)
+                xc_drv.integrate(fock_lambda, ao_density_lambda, gs_density,
+                                 molecule, basis, molgrid, self.xcfun.get_func_label())
+                #if timing_dict is not None:
+                #    timing_dict['DFT'] = tm.time() - t0
+
             fock_lambda.reduce_sum(self.rank, self.nodes, self.comm)
 
             # Transform to MO basis (symmetrized w.r.t. occ. and virt.)

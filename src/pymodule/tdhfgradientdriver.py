@@ -152,7 +152,7 @@ class TdhfGradientDriver(GradientDriver):
 
         # dipole integrals
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-        dipole_drv.set_origin(*list(origin))
+        dipole_drv.origin = origin
         dipole_mats = dipole_drv.compute(molecule, basis)
 
         if self.rank == mpi_master():
@@ -411,9 +411,69 @@ class TdhfGradientDriver(GradientDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
+    def compute_numerical_dipole(self, molecule, ao_basis, scf_drv,
+                                 rsp_drv, field_strength=1e-5, min_basis=None):
+        """
+        Performs calculation of numerical dipole moment at RPA or TDA level.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param scf_drv:
+            The SCF driver.
+        :param rsp_drv:
+            The response (RPA or TDA) driver.
+        :param field_strength:
+            The strength of the external electric field.
+        :param min_basis:
+            The minimal AO basis set.
+        """
+
+        # self.print_header()
+        start_time = tm.time()
+
+        self.scf_drv = scf_drv
+        scf_ostream_state = self.scf_drv.ostream.state
+        self.scf_drv.ostream.state = False
+
+        # This does not have any influence, but depends
+        # on the ostream state of the scf driver
+        self.rsp_drv = rsp_drv
+        # rsp_ostream_state = self.rsp_drv.ostream.state
+        # self.rsp_drv.ostream.state = False
+
+        # numerical gradient
+        dipole_moment = np.zeros((3))
+        field = [0.0, 0.0, 0.0]
+
+        for i in range(3):
+            field[i] = field_strength
+            self.scf_drv.electric_field = field
+            self.scf_drv.compute(molecule, ao_basis, min_basis)
+            scf_tensors = self.scf_drv.scf_tensors
+            self.rsp_drv.is_converged = False  # only needed for RPA
+            rsp_results = self.rsp_drv.compute(molecule, ao_basis,
+                                               scf_tensors)
+            exc_en_plus = rsp_results['eigenvalues'][self.n_state_deriv]
+            e_plus = self.scf_drv.get_scf_energy() + exc_en_plus
+
+            field[i] = -field_strength
+            self.scf_drv.compute(molecule, ao_basis, min_basis)
+            self.rsp_drv.is_converged = False
+            rsp_results = self.rsp_drv.compute(molecule, ao_basis,
+                                               self.scf_drv.scf_tensors)
+            exc_en_minus = rsp_results['eigenvalues'][self.n_state_deriv]
+            e_minus = self.scf_drv.get_scf_energy() + exc_en_minus
+
+            field[i] = 0.0
+            dipole_moment[i] = - (e_plus - e_minus) / (2.0 * field_strength)
+
+        return dipole_moment
+
     def print_geometry(self, molecule):
         """
-        Prints the gradient.
+        Prints the geometry.
 
         :param molecule:
             The molecule.
