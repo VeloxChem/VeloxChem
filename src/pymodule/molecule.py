@@ -1,5 +1,5 @@
 #
-#                           VELOXCHEM 1.0-RC
+#                           VELOXCHEM 1.0-RC2
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
@@ -25,7 +25,6 @@
 
 from pathlib import Path
 import numpy as np
-import os
 import geometric
 
 from .veloxchemlib import Molecule
@@ -90,7 +89,7 @@ def _Molecule_from_xyz_string(xyz):
         The molecule.
     """
 
-    xyzstr = '\n'.join(xyz.strip().split(os.linesep)[2:])
+    xyzstr = '\n'.join(xyz.strip().splitlines()[2:])
 
     return Molecule.read_str(xyzstr, 'angstrom')
 

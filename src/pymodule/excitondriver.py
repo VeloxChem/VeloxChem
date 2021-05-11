@@ -1,5 +1,5 @@
 #
-#                           VELOXCHEM 1.0-RC
+#                           VELOXCHEM 1.0-RC2
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
@@ -402,7 +402,7 @@ class ExcitonModelDriver:
             scf_drv.compute(monomer, basis, min_basis)
 
             if self.rank == mpi_master():
-                self.monomers[ind]['C'] = scf_drv.scf_tensors['C'].copy()
+                self.monomers[ind]['mo'] = scf_drv.scf_tensors['C_alpha'].copy()
 
             # update ERI screening threshold
             if self.eri_thresh > scf_drv.eri_thresh and scf_drv.eri_thresh > 0:
@@ -439,9 +439,9 @@ class ExcitonModelDriver:
                     'eigenvectors').copy()
 
                 nocc = monomer.number_of_alpha_electrons()
-                nvir = self.monomers[ind]['C'].shape[1] - nocc
-                mo_occ = self.monomers[ind]['C'][:, :nocc].copy()
-                mo_vir = self.monomers[ind]['C'][:, nocc:].copy()
+                nvir = self.monomers[ind]['mo'].shape[1] - nocc
+                mo_occ = self.monomers[ind]['mo'][:, :nocc].copy()
+                mo_vir = self.monomers[ind]['mo'][:, nocc:].copy()
 
                 for s in range(self.nstates):
                     # LE excitation energy
@@ -627,8 +627,8 @@ class ExcitonModelDriver:
                     #      |         |         |         |         |
                     #      +---------+---------+---------+---------+
 
-                    CA = self.monomers[ind_A]['C']
-                    CB = self.monomers[ind_B]['C']
+                    CA = self.monomers[ind_A]['mo']
+                    CB = self.monomers[ind_B]['mo']
 
                     nao_A = CA.shape[0]
                     nao_B = CB.shape[0]

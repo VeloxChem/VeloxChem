@@ -1,5 +1,5 @@
 #
-#                           VELOXCHEM 1.0-RC
+#                           VELOXCHEM 1.0-RC2
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
@@ -94,7 +94,7 @@ class ScfFirstOrderProperties:
                            dipole_mats.z_to_numpy())
 
             # electronic contribution
-            total_density = scf_tensors['D'][0] + scf_tensors['D'][1]
+            total_density = scf_tensors['D_alpha'] + scf_tensors['D_beta']
             electronic_dipole = -1.0 * np.array(
                 [np.sum(dipole_ints[d] * total_density) for d in range(3)])
 

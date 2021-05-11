@@ -1,5 +1,5 @@
 //
-//                           VELOXCHEM 1.0-RC
+//                           VELOXCHEM 1.0-RC2
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
@@ -27,6 +27,10 @@
 #define ExportGeneral_hpp
 
 #include <mpi.h>
+// see here: https://github.com/mpi4py/mpi4py/issues/19#issuecomment-768143143
+#ifdef MSMPI_VER
+#define PyMPI_HAVE_MPI_Message 1
+#endif
 #include <mpi4py/mpi4py.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>

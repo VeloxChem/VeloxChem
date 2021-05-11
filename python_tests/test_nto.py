@@ -3,13 +3,9 @@ import numpy as np
 import unittest
 import tempfile
 
-from veloxchem.veloxchemlib import mpi_master
 from veloxchem.veloxchemlib import is_mpi_master
-from veloxchem.veloxchemlib import denmat
 from veloxchem.mpitask import MpiTask
 from veloxchem.cubicgrid import CubicGrid
-from veloxchem.aodensitymatrix import AODensityMatrix
-from veloxchem.molecularorbitals import MolecularOrbitals
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaexcidriver import TDAExciDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
@@ -35,105 +31,53 @@ class TestNTO(unittest.TestCase):
 
         # run TDA/RPA
 
-        if flag == 'tda':
-            rsp_drv = TDAExciDriver(task.mpi_comm, task.ostream)
-        elif flag == 'rpa':
-            rsp_drv = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
-        rsp_drv.update_settings({'nstates': ref_eig_vals.shape[0]},
-                                task.input_dict['method_settings'])
-        rsp_results = rsp_drv.compute(task.molecule, task.ao_basis,
-                                      scf_drv.scf_tensors)
+        with tempfile.TemporaryDirectory() as temp_dir:
 
-        # get eigenvalues and eigenvectors
+            filename = str(Path(temp_dir, Path(inpfile).stem))
 
-        nocc = task.molecule.number_of_alpha_electrons()
+            rsp_dict = {
+                'filename': filename,
+                'nstates': ref_eig_vals.shape[0],
+                'nto': 'yes',
+                'detach_attach': 'yes',
+                'cube_origin': '-0.1, -0.1, -0.1',
+                'cube_stepsize': '0.3, 0.3, 0.2',
+                'cube_points': '2, 2, 3',
+            }
 
-        if is_mpi_master(task.mpi_comm):
-            mo = scf_drv.scf_tensors['C']
-            mo_occ = mo[:, :nocc]
-            mo_vir = mo[:, nocc:]
-
-            nocc = mo_occ.shape[1]
-            nvir = mo_vir.shape[1]
-
-            eig_vals = rsp_results['eigenvalues']
-            eig_vecs = rsp_results['eigenvectors']
-
-            nto_lambdas = []
-            nto_cube_vals = []
-            dens_cube_vals = []
-
-        for s in range(ref_eig_vals.shape[0]):
-
-            # calculate NTOs and densities
+            if flag == 'tda':
+                rsp_drv = TDAExciDriver(task.mpi_comm, task.ostream)
+            elif flag == 'rpa':
+                rsp_drv = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
+            rsp_drv.update_settings(rsp_dict,
+                                    task.input_dict['method_settings'])
+            rsp_results = rsp_drv.compute(task.molecule, task.ao_basis,
+                                          scf_drv.scf_tensors)
 
             if is_mpi_master(task.mpi_comm):
-                eig_vec = eig_vecs[:, s].copy()
+                eig_vals = rsp_results['eigenvalues']
 
-                if flag == 'tda':
-                    z_mat = eig_vec.reshape(nocc, nvir)
-                    dens_D, dens_A = rsp_drv.get_detach_attach_densities(
-                        z_mat, None, mo_occ, mo_vir)
+                nto_lambdas = []
+                nto_cube_vals = []
+                dens_cube_vals = []
 
-                elif flag == 'rpa':
-                    z_mat = eig_vec[:eig_vec.size // 2].reshape(nocc, nvir)
-                    y_mat = eig_vec[eig_vec.size // 2:].reshape(nocc, nvir)
-                    dens_D, dens_A = rsp_drv.get_detach_attach_densities(
-                        z_mat, y_mat, mo_occ, mo_vir)
+                for s in range(ref_eig_vals.shape[0]):
+                    lam_diag = rsp_results['nto_lambdas'][s]
+                    nto_lambdas.append(lam_diag[0])
 
-                lam_diag, nto_mo = rsp_drv.get_nto(z_mat, mo_occ, mo_vir)
-                dens_DA = AODensityMatrix([dens_D, dens_A], denmat.rest)
-
-            else:
-                lam_diag = None
-                nto_mo = MolecularOrbitals()
-                dens_DA = AODensityMatrix()
-
-            lam_diag = task.mpi_comm.bcast(lam_diag, root=mpi_master())
-            nto_mo.broadcast(task.mpi_rank, task.mpi_comm)
-            dens_DA.broadcast(task.mpi_rank, task.mpi_comm)
-
-            # check sum of lambdas and number of electrons
-
-            if is_mpi_master(task.mpi_comm):
-                nto_lambdas.append(lam_diag[0])
-
-                if flag == 'tda':
-                    self.assertAlmostEqual(np.sum(lam_diag), 1.0, 8)
-
-                self.assertAlmostEqual(
-                    np.sum(dens_D * scf_drv.scf_tensors['S']), -1.0, 8)
-                self.assertAlmostEqual(
-                    np.sum(dens_A * scf_drv.scf_tensors['S']), 1.0, 8)
-
-            # set up grid points
-
-            grid = CubicGrid([-0.1, -0.1, -0.1], [0.3, 0.3, 0.2], [2, 2, 3])
-
-            # compute NTOs on grid points
-
-            with tempfile.TemporaryDirectory() as temp_dir:
-                rsp_drv.filename = str(Path(temp_dir, 'test'))
-
-                nto_cube_fnames = rsp_drv.write_nto_cubes(
-                    grid, task.molecule, task.ao_basis, s, lam_diag, nto_mo, 1)
-
-                dens_cube_fnames = rsp_drv.write_detach_attach_cubes(
-                    grid, task.molecule, task.ao_basis, s, dens_DA)
-
-                if is_mpi_master(task.mpi_comm):
-
-                    for fname in nto_cube_fnames:
+                    nto_cube_fnames = rsp_results['nto_cubes'][s]
+                    for fname in nto_cube_fnames[:2]:
                         read_grid = CubicGrid.read_cube(fname)
                         nto_cube_vals.append(
                             read_grid.values_to_numpy().flatten())
 
+                    dens_cube_fnames = rsp_results['density_cubes'][s]
                     for fname in dens_cube_fnames:
                         read_grid = CubicGrid.read_cube(fname)
                         dens_cube_vals.append(
                             read_grid.values_to_numpy().flatten())
 
-        # compare NTO and densities on grid points with reference
+        # compare with reference
 
         if is_mpi_master(task.mpi_comm):
             nto_lambdas = np.array(nto_lambdas)

@@ -12,5 +12,10 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 
 First release candidate
 
-.. _Unreleased: https://gitlab.com/veloxchem/veloxchem/-/compare/v1.0-rc...master
+1.0-rc2_ (2021-04-23)
+--------------------
+
+Second release candidate
+
 .. _1.0-rc: https://gitlab.com/veloxchem/veloxchem/-/tree/v1.0-rc
+.. _1.0-rc2: https://gitlab.com/veloxchem/veloxchem/-/tree/v1.0-rc2

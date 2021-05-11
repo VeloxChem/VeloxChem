@@ -1,5 +1,5 @@
 #
-#                           VELOXCHEM 1.0-RC
+#                           VELOXCHEM 1.0-RC2
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
@@ -720,22 +720,37 @@ class ScfDriver:
                               ao_basis.get_label())
 
         if self.rank == mpi_master():
+            S = ovl_mat.to_numpy()
+
+            C_alpha = self.mol_orbs.alpha_to_numpy()
+            C_beta = self.mol_orbs.beta_to_numpy()
+
+            E_alpha = self.mol_orbs.ea_to_numpy()
+            E_beta = self.mol_orbs.eb_to_numpy()
+
+            D_alpha = self.density.alpha_to_numpy(0)
+            D_beta = self.density.beta_to_numpy(0)
+
+            F_alpha = fock_mat.alpha_to_numpy(0)
+            F_beta = fock_mat.beta_to_numpy(0)
+
             self.scf_tensors = {
-                'C': self.mol_orbs.alpha_to_numpy(),
-                'E': self.mol_orbs.ea_to_numpy(),
-                'S': ovl_mat.to_numpy(),
-                'D': (self.density.alpha_to_numpy(0),
-                      self.density.beta_to_numpy(0)),
-                'F': (fock_mat.alpha_to_numpy(0), fock_mat.beta_to_numpy(0)),
+                'C': C_alpha,
+                'E': E_alpha,
+                'D': (D_alpha, D_beta),
+                'F': (F_alpha, F_beta),
+                'S': S,
+                'C_alpha': C_alpha,
+                'C_beta': C_beta,
+                'E_alpha': E_alpha,
+                'E_beta': E_beta,
+                'D_alpha': D_alpha,
+                'D_beta': D_beta,
+                'F_alpha': F_alpha,
+                'F_beta': F_beta,
             }
         else:
-            self.scf_tensors = {
-                'C': None,
-                'E': None,
-                'S': None,
-                'D': None,
-                'F': None,
-            }
+            self.scf_tensors = None
 
         if self.rank == mpi_master():
             self.print_scf_finish(diis_start_time)

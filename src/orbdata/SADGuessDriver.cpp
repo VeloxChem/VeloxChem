@@ -1,5 +1,5 @@
 //
-//                           VELOXCHEM 1.0-RC
+//                           VELOXCHEM 1.0-RC2
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
@@ -24,6 +24,8 @@
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 #include "SADGuessDriver.hpp"
+
+#include <algorithm>
 
 #include <mpi.h>
 
