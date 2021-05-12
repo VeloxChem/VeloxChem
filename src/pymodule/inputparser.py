@@ -204,13 +204,15 @@ class InputError(Exception):
     pass
 
 
-def parse_seq_fixed(input_seq):
+def parse_seq_fixed(input_seq, flag='float'):
     """
     Parses input sequence that has fixed number of elements, using comma and/or
     white space as delimiter.
 
     :param input_seq:
         The input sequence.
+    :param flag:
+        The flag for int/float.
 
     :return:
         A tuple.
@@ -221,7 +223,12 @@ def parse_seq_fixed(input_seq):
 
     elif isinstance(input_seq, str):
         seq_str = input_seq.replace(',', ' ')
-        return tuple([float(x) for x in seq_str.split()])
+        if flag == 'float':
+            return tuple([float(x) for x in seq_str.split()])
+        elif flag == 'int':
+            return tuple([int(x) for x in seq_str.split()])
+        else:
+            assert_msg_critical(False, f'parse_seq_fixed: invalid flag {flag}')
 
     else:
         errmsg = 'parse_seq_fixed: invalid type for input_seq'
@@ -303,6 +310,8 @@ def parse_str(input_str, flag=None):
 
     :param input_str:
         The input.
+    :param flag:
+        The flag for upper/lower case.
 
     :return:
         A string.
@@ -358,6 +367,9 @@ def parse_input(obj, keyword_types, input_dictionary):
 
         elif keyword_types[key] == 'bool':
             setattr(obj, key, parse_bool(val))
+
+        elif keyword_types[key] == 'seq_fixed_int':
+            setattr(obj, key, parse_seq_fixed(val, 'int'))
 
         elif keyword_types[key] == 'seq_fixed':
             setattr(obj, key, parse_seq_fixed(val))

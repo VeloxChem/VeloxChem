@@ -294,6 +294,10 @@ class ScfDriver:
                 not self.pe,
                 'SCF driver: \'electric field\' input is incompatible with ' +
                 'polarizable embedding')
+            # disable restart of calculation with static electric field since
+            # checkpoint file does not contain information about the electric
+            # field
+            self.restart = False
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """

@@ -47,6 +47,7 @@ from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
 from .checkpoint import read_rsp_hdf5
 from .checkpoint import write_rsp_hdf5
 
@@ -116,40 +117,27 @@ class TDAExciDriver(LinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-        if 'nstates' in rsp_dict:
-            self.nstates = int(rsp_dict['nstates'])
+        rsp_keywords = {
+            'nstates': 'int',
+            'nto': 'bool',
+            'nto_pairs': 'int',
+            'detach_attach': 'bool',
+            'cube_origin': 'seq_fixed',
+            'cube_stepsize': 'seq_fixed',
+            'cube_points': 'seq_fixed_int',
+        }
 
-        if 'nto' in rsp_dict:
-            key = rsp_dict['nto'].lower()
-            self.nto = True if key in ['yes', 'y'] else False
-        if 'nto_pairs' in rsp_dict:
-            self.nto_pairs = int(rsp_dict['nto_pairs'])
+        parse_input(self, rsp_keywords, rsp_dict)
 
-        if 'detach_attach' in rsp_dict:
-            key = rsp_dict['detach_attach'].lower()
-            self.detach_attach = True if key in ['yes', 'y'] else False
-
-        if 'cube_origin' in rsp_dict:
-            self.cube_origin = [
-                float(x)
-                for x in rsp_dict['cube_origin'].replace(',', ' ').split()
-            ]
+        if self.cube_origin is not None:
             assert_msg_critical(
                 len(self.cube_origin) == 3, 'cube origin: Need 3 numbers')
 
-        if 'cube_stepsize' in rsp_dict:
-            self.cube_stepsize = [
-                float(x)
-                for x in rsp_dict['cube_stepsize'].replace(',', ' ').split()
-            ]
+        if self.cube_stepsize is not None:
             assert_msg_critical(
                 len(self.cube_stepsize) == 3, 'cube stepsize: Need 3 numbers')
 
-        if 'cube_points' in rsp_dict:
-            self.cube_points = [
-                int(x)
-                for x in rsp_dict['cube_points'].replace(',', ' ').split()
-            ]
+        if self.cube_points is not None:
             assert_msg_critical(
                 len(self.cube_points) == 3, 'cube points: Need 3 integers')
 

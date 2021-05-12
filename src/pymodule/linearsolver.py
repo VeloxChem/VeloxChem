@@ -48,6 +48,7 @@ from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .checkpoint import write_rsp_hdf5
@@ -75,6 +76,7 @@ class LinearSolver:
         - pe_options: The dictionary with options for polarizable embedding.
         - use_split_comm: The flag for using split communicators.
         - split_comm_ratio: The list of ratios for split communicators.
+        - electric_field: The static electric field.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
         - cur_iter: Index of the current iteration.
@@ -127,6 +129,9 @@ class LinearSolver:
         # split communicators
         self.use_split_comm = False
         self.split_comm_ratio = None
+
+        # static electric field
+        self.electric_field = None
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -183,33 +188,52 @@ class LinearSolver:
         if method_dict is None:
             method_dict = {}
 
-        if 'eri_thresh' in rsp_dict:
-            self.eri_thresh = float(rsp_dict['eri_thresh'])
-        if 'qq_type' in rsp_dict:
-            self.qq_type = rsp_dict['qq_type']
-        if 'batch_size' in rsp_dict:
-            self.batch_size = int(rsp_dict['batch_size'])
+        rsp_keywords = {
+            'eri_thresh': 'float',
+            'qq_type': 'str_upper',
+            'batch_size': 'int',
+            'conv_thresh': 'float',
+            'max_iter': 'int',
+            'lindep_thresh': 'float',
+            'restart': 'bool',
+            'checkpoint_file': 'str',
+            'timing': 'bool',
+            'profiling': 'bool',
+            'memory_profiling': 'bool',
+            'memory_tracing': 'bool',
+        }
 
-        if 'dft' in method_dict:
-            key = method_dict['dft'].lower()
-            self.dft = True if key in ['yes', 'y'] else False
-        if 'grid_level' in method_dict:
-            self.grid_level = int(method_dict['grid_level'])
+        parse_input(self, rsp_keywords, rsp_dict)
+
+        if 'program_start_time' in rsp_dict:
+            self.program_start_time = rsp_dict['program_start_time']
+        if 'maximum_hours' in rsp_dict:
+            self.maximum_hours = rsp_dict['maximum_hours']
+        if 'filename' in rsp_dict:
+            self.filename = rsp_dict['filename']
+
+        method_keywords = {
+            'dft': 'bool',
+            'grid_level': 'int',
+            'pe': 'bool',
+            'electric_field': 'seq_fixed',
+            'use_split_comm': 'bool',
+        }
+
+        parse_input(self, method_keywords, method_dict)
+
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
                 self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Response solver: Undefined XC functional')
+                                'Linear solver: Undefined XC functional')
 
         if 'pe_options' not in method_dict:
             method_dict['pe_options'] = {}
 
-        if 'pe' in method_dict:
-            key = method_dict['pe'].lower()
-            self.pe = True if key in ['yes', 'y'] else False
-        else:
-            if ('potfile' in method_dict) or method_dict['pe_options']:
+        if ('potfile' in method_dict) or method_dict['pe_options']:
+            if 'pe' not in method_dict:
                 self.pe = True
 
         if self.pe:
@@ -220,44 +244,18 @@ class LinearSolver:
                                 'SCF driver: No potential file defined')
             self.pe_options = dict(method_dict['pe_options'])
 
-        if 'use_split_comm' in method_dict:
-            key = method_dict['use_split_comm'].lower()
-            self.use_split_comm = True if key in ['yes', 'y'] else False
-
-        if 'conv_thresh' in rsp_dict:
-            self.conv_thresh = float(rsp_dict['conv_thresh'])
-        if 'max_iter' in rsp_dict:
-            self.max_iter = int(rsp_dict['max_iter'])
-        if 'lindep_thresh' in rsp_dict:
-            self.lindep_thresh = float(rsp_dict['lindep_thresh'])
-
-        if 'restart' in rsp_dict:
-            key = rsp_dict['restart'].lower()
-            self.restart = True if key in ['yes', 'y'] else False
-        if 'checkpoint_file' in rsp_dict:
-            self.checkpoint_file = rsp_dict['checkpoint_file']
-
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
-
-        if 'timing' in rsp_dict:
-            key = rsp_dict['timing'].lower()
-            self.timing = True if key in ['yes', 'y'] else False
-        if 'profiling' in rsp_dict:
-            key = rsp_dict['profiling'].lower()
-            self.profiling = True if key in ['yes', 'y'] else False
-
-        if 'memory_profiling' in rsp_dict:
-            key = rsp_dict['memory_profiling'].lower()
-            self.memory_profiling = True if key in ['yes', 'y'] else False
-        if 'memory_tracing' in rsp_dict:
-            key = rsp_dict['memory_tracing'].lower()
-            self.memory_tracing = True if key in ['yes', 'y'] else False
-
-        if 'filename' in rsp_dict:
-            self.filename = rsp_dict['filename']
+        if self.electric_field is not None:
+            assert_msg_critical(
+                len(self.electric_field) == 3,
+                'Linear solver: Expecting 3 values in \'electric field\' input')
+            assert_msg_critical(
+                not self.pe,
+                'Linear solver: \'electric field\' input is incompatible ' +
+                'with polarizable embedding')
+            # disable restart of calculation with static electric field since
+            # checkpoint file does not contain information about the electric
+            # field
+            self.restart = False
 
     def init_eri(self, molecule, basis):
         """

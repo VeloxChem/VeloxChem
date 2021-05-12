@@ -40,8 +40,8 @@ from .linearsolver import LinearSolver
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .distributedarray import DistributedArray
-from .inputparser import parse_seq_range
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 
@@ -138,48 +138,29 @@ class TpaDriver:
         if method_dict is None:
             method_dict = {}
 
-        if 'frequencies' in rsp_dict:
-            self.frequencies = parse_seq_range(rsp_dict['frequencies'])
-        if 'damping' in rsp_dict:
-            self.damping = float(rsp_dict['damping'])
+        rsp_keywords = {
+            'frequencies': 'seq_range',
+            'damping': 'float',
+            'eri_thresh': 'float',
+            'qq_type': 'str_upper',
+            'batch_size': 'int',
+            'max_iter': 'int',
+            'conv_thresh': 'float',
+            'lindep_thresh': 'float',
+            'restart': 'bool',
+            'checkpoint_file': 'str',
+            'timing': 'bool',
+            'profiling': 'bool',
+            'memory_profiling': 'bool',
+            'memory_tracing': 'bool',
+        }
 
-        if 'eri_thresh' in rsp_dict:
-            self.eri_thresh = float(rsp_dict['eri_thresh'])
-        if 'qq_type' in rsp_dict:
-            self.qq_type = rsp_dict['qq_type']
-        if 'batch_size' in rsp_dict:
-            self.batch_size = int(rsp_dict['batch_size'])
-
-        if 'max_iter' in rsp_dict:
-            self.max_iter = int(rsp_dict['max_iter'])
-        if 'conv_thresh' in rsp_dict:
-            self.conv_thresh = float(rsp_dict['conv_thresh'])
-        if 'lindep_thresh' in rsp_dict:
-            self.lindep_thresh = float(rsp_dict['lindep_thresh'])
-
-        if 'restart' in rsp_dict:
-            key = rsp_dict['restart'].lower()
-            self.restart = True if key in ['yes', 'y'] else False
-        if 'checkpoint_file' in rsp_dict:
-            self.checkpoint_file = rsp_dict['checkpoint_file']
+        parse_input(self, rsp_keywords, rsp_dict)
 
         if 'program_start_time' in rsp_dict:
             self.program_start_time = rsp_dict['program_start_time']
         if 'maximum_hours' in rsp_dict:
             self.maximum_hours = rsp_dict['maximum_hours']
-
-        if 'timing' in rsp_dict:
-            key = rsp_dict['timing'].lower()
-            self.timing = True if key in ['yes', 'y'] else False
-        if 'profiling' in rsp_dict:
-            key = rsp_dict['profiling'].lower()
-            self.profiling = True if key in ['yes', 'y'] else False
-        if 'memory_profiling' in rsp_dict:
-            key = rsp_dict['memory_profiling'].lower()
-            self.memory_profiling = True if key in ['yes', 'y'] else False
-        if 'memory_tracing' in rsp_dict:
-            key = rsp_dict['memory_tracing'].lower()
-            self.memory_tracing = True if key in ['yes', 'y'] else False
 
         if 'xcfun' in method_dict:
             errmsg = 'TpaDriver: The \'xcfun\' keyword is not supported in TPA '
@@ -190,6 +171,12 @@ class TpaDriver:
         if 'potfile' in method_dict:
             errmsg = 'TpaDriver: The \'potfile\' keyword is not supported in '
             errmsg += 'TPA calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if 'electric_field' in method_dict:
+            errmsg = 'TpaDriver: The \'electric field\' keyword is not '
+            errmsg += 'supported in TPA calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
