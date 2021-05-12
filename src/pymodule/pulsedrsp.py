@@ -31,7 +31,7 @@ import sys
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
-from .inputparser import InputParser
+from .inputparser import parse_seq_range
 
 
 class PulsedResponse:
@@ -142,8 +142,7 @@ class PulsedResponse:
         # Construct frequency array based on input
         self.pulse_settings['given_frequencies'] = self.pulse_settings[
             'frequency_range']
-        freq_range = InputParser.parse_frequencies(
-            self.pulse_settings['frequency_range'])
+        freq_range = parse_seq_range(self.pulse_settings['frequency_range'])
 
         # Convert frequency range to a zero padded and a truncated list
         # of frequncies

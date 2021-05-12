@@ -27,7 +27,7 @@ import math
 
 from .veloxchemlib import hartree_in_ev
 from .rspproperty import ResponseProperty
-from .inputparser import InputParser
+from .inputparser import parse_seq_range
 
 
 class LinearAbsorptionCrossSection(ResponseProperty):
@@ -102,7 +102,7 @@ class LinearAbsorptionCrossSection(ResponseProperty):
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
-        freqs = InputParser.parse_frequencies(self.rsp_dict['frequencies'])
+        freqs = parse_seq_range(self.rsp_dict['frequencies'])
 
         for w in freqs:
             title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(

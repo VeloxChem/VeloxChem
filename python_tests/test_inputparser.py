@@ -5,6 +5,7 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 from veloxchem.inputparser import InputParser
+from veloxchem.inputparser import parse_seq_range
 from veloxchem.veloxchemlib import is_mpi_master, is_single_node
 
 
@@ -130,5 +131,4 @@ def test_error_in_input(tmpdir):
 def test_parse_frequencies(input_frequencies, expected):
 
     if is_mpi_master():
-        npt.assert_allclose(InputParser.parse_frequencies(input_frequencies),
-                            expected)
+        npt.assert_allclose(parse_seq_range(input_frequencies), expected)

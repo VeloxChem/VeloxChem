@@ -40,7 +40,7 @@ from .linearsolver import LinearSolver
 from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .distributedarray import DistributedArray
-from .inputparser import InputParser
+from .inputparser import parse_seq_range
 from .errorhandler import assert_msg_critical
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
@@ -139,8 +139,7 @@ class TpaDriver:
             method_dict = {}
 
         if 'frequencies' in rsp_dict:
-            self.frequencies = InputParser.parse_frequencies(
-                rsp_dict['frequencies'])
+            self.frequencies = parse_seq_range(rsp_dict['frequencies'])
         if 'damping' in rsp_dict:
             self.damping = float(rsp_dict['damping'])
 

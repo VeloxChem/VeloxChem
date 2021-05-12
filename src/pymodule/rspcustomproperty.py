@@ -24,7 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from .rspproperty import ResponseProperty
-from .inputparser import InputParser
+from .inputparser import parse_seq_range
 
 
 class CustomProperty(ResponseProperty):
@@ -100,7 +100,7 @@ class CustomProperty(ResponseProperty):
 
         width = 92
 
-        freqs = InputParser.parse_frequencies(self.rsp_dict['frequencies'])
+        freqs = parse_seq_range(self.rsp_dict['frequencies'])
 
         for w in freqs:
             w_str = 'Response Function (w={:.4f})'.format(w)
