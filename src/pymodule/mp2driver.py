@@ -40,6 +40,7 @@ from .subcommunicators import SubCommunicators
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
 
 
 class Mp2Driver:
@@ -111,21 +112,19 @@ class Mp2Driver:
         if method_dict is None:
             method_dict = {}
 
-        if 'qq_type' in mp2_dict:
-            self.qq_type = mp2_dict['qq_type']
-        if 'eri_thresh' in mp2_dict:
-            self.eri_thresh = float(mp2_dict['eri_thresh'])
+        mp2_keywords = {
+            'qq_type': 'str_upper',
+            'eri_thresh': 'float',
+            'batch_size': 'int',
+            'comm_size': 'int',
+            'conventional': 'bool',
+        }
 
-        if 'batch_size' in mp2_dict:
-            self.batch_size = int(mp2_dict['batch_size'])
-        if 'comm_size' in mp2_dict:
-            self.comm_size = int(mp2_dict['comm_size'])
+        parse_input(self, mp2_keywords, mp2_dict)
+
+        if self.comm_size != 1:
             if self.nodes % self.comm_size != 0:
                 self.comm_size = 1
-
-        if 'conventional' in mp2_dict:
-            key = mp2_dict['conventional'].lower()
-            self.conventional = True if key in ['yes', 'y'] else False
 
         if 'xcfun' in method_dict:
             errmsg = 'Mp2Driver: The \'xcfun\' keyword is not supported in MP2 '
@@ -136,6 +135,12 @@ class Mp2Driver:
         if 'potfile' in method_dict:
             errmsg = 'Mp2Driver: The \'potfile\' keyword is not supported in '
             errmsg += 'MP2 calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if 'electric_field' in method_dict:
+            errmsg = 'Mp2Driver: The \'electric field\' keyword is not '
+            errmsg += 'supported in MP2 calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 

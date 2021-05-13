@@ -37,6 +37,7 @@ from .veloxchemlib import hartree_in_kcalpermol
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
 
 
 class OptimizationDriver:
@@ -88,23 +89,15 @@ class OptimizationDriver:
             The input dictionary of optimize group.
         """
 
-        if 'coordsys' in opt_dict:
-            self.coordsys = opt_dict['coordsys'].lower()
-        if 'constraints' in opt_dict:
-            self.constraints = list(opt_dict['constraints'])
+        opt_keywords = {
+            'coordsys': 'str_lower',
+            'constraints': 'list',
+            'check_interval': 'int',
+            'max_iter': 'int',
+            'ref_xyz': 'str',
+        }
 
-        if 'check_interval' in opt_dict:
-            self.check_interval = int(opt_dict['check_interval'])
-        elif 'check' in opt_dict:
-            self.check_interval = int(opt_dict['check'])
-
-        if 'max_iter' in opt_dict:
-            self.max_iter = int(opt_dict['max_iter'])
-        elif 'maxiter' in opt_dict:
-            self.max_iter = int(opt_dict['maxiter'])
-
-        if 'ref_xyz' in opt_dict:
-            self.ref_xyz = opt_dict['ref_xyz']
+        parse_input(self, opt_keywords, opt_dict)
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """

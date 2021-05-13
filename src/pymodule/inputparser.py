@@ -330,9 +330,36 @@ def parse_str(input_str, flag=None):
         assert_msg_critical(False, f'parse_str: invalid flag {flag}')
 
 
+def parse_list(input_list):
+    """
+    Parses input list.
+
+    :param input_list:
+        The input.
+
+    :return:
+        A list.
+    """
+
+    err_list = f'parse_list: Expecting a list but got {input_list}'
+    assert_msg_critical(isinstance(input_list, list), err_list)
+
+    return list(input_list)
+
+
 def parse_input(obj, keyword_types, input_dictionary):
     """
     Parses input keywords for object.
+    - 'str' for string input, such as 'checkpoint_file: mycheckpoint.h5'
+    - 'str_upper' for uppercase string input, such as 'qq_type: QQ_DEN'
+    - 'str_lower' for lowercase string input, such as 'coordsys: tric'
+    - 'int' for integer input, such as 'max_iter: 300'
+    - 'float' for floating-point input, such as 'eri_thresh: 1.0e-12'
+    - 'bool' for floating-point input, such as 'restart: no'
+    - 'list' for multi-line input, such as 'constraints'
+    - 'seq_fixed_int' for fixed-length integer sequence, such as 'cube_points: 80,80,80'
+    - 'seq_fixed' for fixed-length sequence, such as 'cube_origin: 0.0,0.0,0.0'
+    - 'seq_range' for sequence with range, such as 'frequencies: 0.0-0.1(0.02)'
 
     :param obj:
         The object.
@@ -367,6 +394,9 @@ def parse_input(obj, keyword_types, input_dictionary):
 
         elif keyword_types[key] == 'bool':
             setattr(obj, key, parse_bool(val))
+
+        elif keyword_types[key] == 'list':
+            setattr(obj, key, parse_list(val))
 
         elif keyword_types[key] == 'seq_fixed_int':
             setattr(obj, key, parse_seq_fixed(val, 'int'))

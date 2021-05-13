@@ -23,6 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+
 class GradientDriver:
     """
     Implements gradient driver.
@@ -47,18 +48,6 @@ class GradientDriver:
 
         self.gradient = None
         self.flag = None
-
-    def update_settings(self, scf_dict, method_dict=None):
-        """
-        Updates settings in gradient driver.
-
-        :param scf_dict:
-            The input dictionary of scf group.
-        :param method_dict:
-            The input dicitonary of method settings group.
-        """
-
-        return
 
     def compute(self, molecule, ao_basis=None, min_basis=None):
         """
