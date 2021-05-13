@@ -24,10 +24,10 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import time
 import sys
-import re
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
@@ -260,8 +260,8 @@ class TpaFullDriver(TpaDriver):
         ]
 
         if self.checkpoint_file is not None:
-            fock_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
-            fock_file += '_tpa_fock_1_full.h5'
+            fock_file = str(
+                Path(self.checkpoint_file).with_suffix('.tpa_fock_1_full.h5'))
         else:
             fock_file = None
 
@@ -512,44 +512,31 @@ class TpaFullDriver(TpaDriver):
             response vectors and second-order response matrices
         """
 
-        xy_dict = {}
-        freq = None
-
         # Get second-order gradients
         xy_dict = self.get_xy(d_a_mo, X, w, fock_dict, kX, nocc, norb)
 
+        # Frequencies to compute
         if self.rank == mpi_master():
-
-            # Frequencies to compute
-            wbd = [sum(x) for x in zip(w, w)]
-
-            freq = '0.0,'
-            for i in range(len(wbd)):
-                freq += str(wbd[i]) + ','
-
+            freq = tuple([0.0] + [sum(x) for x in zip(w, w)])
+        else:
+            freq = None
         freq = self.comm.bcast(freq, root=mpi_master())
 
         N_total_drv = ComplexResponse(self.comm, self.ostream)
+        N_total_drv.frequencies = freq
 
-        N_total_drv.update_settings({
-            'frequencies': freq,
-            'damping': self.damping,
-            'conv_thresh': self.conv_thresh,
-            'lindep_thresh': self.lindep_thresh,
-            'max_iter': self.max_iter,
-            'eri_thresh': self.eri_thresh,
-            'qq_type': self.qq_type,
-        })
-        N_total_drv.timing = self.timing
-        N_total_drv.memory_profiling = self.memory_profiling
-        N_total_drv.batch_size = self.batch_size
-        N_total_drv.restart = self.restart
-        N_total_drv.program_start_time = self.program_start_time
-        N_total_drv.maximum_hours = self.maximum_hours
+        cpp_keywords = {
+            'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
+            'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
+            'program_start_time', 'maximum_hours'
+        }
+
+        for key in cpp_keywords:
+            setattr(N_total_drv, key, getattr(self, key))
+
         if self.checkpoint_file is not None:
-            N_total_drv.checkpoint_file = re.sub(r'\.h5$', r'',
-                                                 self.checkpoint_file)
-            N_total_drv.checkpoint_file += '_tpa_2_full.h5'
+            N_total_drv.checkpoint_file = str(
+                Path(self.checkpoint_file).with_suffix('.tpa_2_full.h5'))
 
         # commutpute second-order response vectors
         N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
@@ -914,8 +901,8 @@ class TpaFullDriver(TpaDriver):
         keys = ['F123_x', 'F123_y', 'F123_z']
 
         if self.checkpoint_file is not None:
-            fock_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
-            fock_file += '_tpa_fock_2_full.h5'
+            fock_file = str(
+                Path(self.checkpoint_file).with_suffix('.tpa_fock_2_full.h5'))
         else:
             fock_file = None
 

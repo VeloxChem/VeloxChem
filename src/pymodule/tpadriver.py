@@ -24,9 +24,9 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import time
-import re
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
@@ -261,24 +261,18 @@ class TpaDriver:
         # Computing the first-order response vectors (3 per frequency)
         Nb_drv = ComplexResponse(self.comm, self.ostream)
 
-        Nb_drv.update_settings({
-            'frequencies': self.frequencies,
-            'damping': self.damping,
-            'lindep_thresh': self.lindep_thresh,
-            'conv_thresh': self.conv_thresh,
-            'max_iter': self.max_iter,
-            'eri_thresh': self.eri_thresh,
-            'qq_type': self.qq_type,
-        })
-        Nb_drv.timing = self.timing
-        Nb_drv.memory_profiling = self.memory_profiling
-        Nb_drv.batch_size = self.batch_size
-        Nb_drv.restart = self.restart
-        Nb_drv.program_start_time = self.program_start_time
-        Nb_drv.maximum_hours = self.maximum_hours
+        cpp_keywords = {
+            'frequencies', 'damping', 'lindep_thresh', 'conv_thresh',
+            'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
+            'batch_size', 'restart', 'program_start_time', 'maximum_hours'
+        }
+
+        for key in cpp_keywords:
+            setattr(Nb_drv, key, getattr(self, key))
+
         if self.checkpoint_file is not None:
-            Nb_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
-            Nb_drv.checkpoint_file += '_tpa_1.h5'
+            Nb_drv.checkpoint_file = str(
+                Path(self.checkpoint_file).with_suffix('.tpa_1.h5'))
 
         Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v1)
 
