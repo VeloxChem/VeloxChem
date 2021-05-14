@@ -91,6 +91,25 @@ class TestMOIntegralsDriver(unittest.TestCase):
 
         task.finish()
 
+    def test_mp2_update_settings(self):
+
+        mp2_dict = {
+            'qq_type': 'QQ',
+            'eri_thresh': 1e-13,
+            'batch_size': 99,
+            'conventional': True,
+        }
+
+        mp2_drv = Mp2Driver()
+
+        for key, val in mp2_dict.items():
+            self.assertTrue(getattr(mp2_drv, key) != val)
+
+        mp2_drv.update_settings(mp2_dict)
+
+        for key, val in mp2_dict.items():
+            self.assertTrue(getattr(mp2_drv, key) == val)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -14,6 +14,44 @@ from veloxchem.linearsolver import LinearSolver
 
 class TestLinearSolver(unittest.TestCase):
 
+    def test_update_settings(self):
+
+        rsp_dict = {
+            'eri_thresh': 1e-13,
+            'qq_type': 'QQ',
+            'batch_size': 99,
+            'conv_thresh': 1e-7,
+            'max_iter': 199,
+            'lindep_thresh': 1e-10,
+            'restart': False,
+            'checkpoint_file': 'mycheckpoint.h5',
+            'timing': True,
+            'profiling': True,
+            'memory_profiling': True,
+            'memory_tracing': True,
+        }
+
+        method_dict = {
+            'dft': True,
+            'grid_level': 5,
+            'electric_field': (0, -0.002, 0.001),
+            'use_split_comm': True,
+        }
+
+        lin_solver = LinearSolver(MPI.COMM_WORLD, OutputStream(None))
+
+        for key, val in rsp_dict.items():
+            self.assertTrue(getattr(lin_solver, key) != val)
+        for key, val in method_dict.items():
+            self.assertTrue(getattr(lin_solver, key) != val)
+
+        lin_solver.update_settings(rsp_dict, method_dict)
+
+        for key, val in rsp_dict.items():
+            self.assertTrue(getattr(lin_solver, key) == val)
+        for key, val in method_dict.items():
+            self.assertTrue(getattr(lin_solver, key) == val)
+
     def get_molecule_and_basis(self):
 
         mol_str = """

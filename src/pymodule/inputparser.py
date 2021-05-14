@@ -296,8 +296,13 @@ def parse_bool(input_bool):
         return input_bool
 
     elif isinstance(input_bool, str):
-        bool_val = True if input_bool.lower() in ['yes', 'y'] else False
-        return bool_val
+        if input_bool.lower() in ['yes', 'y']:
+            return True
+        elif input_bool.lower() in ['no', 'n']:
+            return False
+        else:
+            assert_msg_critical(False,
+                                f'parse_bool: invalid input {input_bool}')
 
     else:
         errmsg = 'parse_bool: invalid type for input_bool'

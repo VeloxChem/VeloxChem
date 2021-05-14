@@ -1,8 +1,11 @@
+from mpi4py import MPI
 from pathlib import Path
 import unittest
 import pytest
 
 from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.outputstream import OutputStream
+from veloxchem.tpadriver import TpaDriver
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.rsptpa import TPA
@@ -102,6 +105,35 @@ class TestTPA(unittest.TestCase):
         inpfile = str(here / 'inputs' / 'water_tpa.inp')
 
         self.run_tpa(inpfile, 'reduced', w, ref_result)
+
+    def test_update_settings(self):
+
+        tpa_dict = {
+            'frequencies': (0.1, 0.12, 0.16, 0.20),
+            'damping': 0.01,
+            'eri_thresh': 1e-13,
+            'qq_type': 'QQ',
+            'batch_size': 99,
+            'max_iter': 199,
+            'conv_thresh': 1e-5,
+            'lindep_thresh': 1e-11,
+            'restart': False,
+            'checkpoint_file': 'mycheckpoint.h5',
+            'timing': True,
+            'profiling': True,
+            'memory_profiling': True,
+            'memory_tracing': True,
+        }
+
+        tpa_drv = TpaDriver(MPI.COMM_WORLD, OutputStream(None))
+
+        for key, val in tpa_dict.items():
+            self.assertTrue(getattr(tpa_drv, key) != val)
+
+        tpa_drv.update_settings(tpa_dict)
+
+        for key, val in tpa_dict.items():
+            self.assertTrue(getattr(tpa_drv, key) == val)
 
 
 if __name__ == '__main__':

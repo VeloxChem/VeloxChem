@@ -199,11 +199,16 @@ class ExcitonModelDriver:
             'ct_nvir': 'int',
             'restart': 'bool',
             'checkpoint_file': 'str',
+        }
+
+        parse_input(self, exciton_keywords, exciton_dict)
+
+        method_keywords = {
             'dft': 'bool',
             'grid_level': 'int',
         }
 
-        parse_input(self, exciton_keywords, exciton_dict)
+        parse_input(self, method_keywords, method_dict)
 
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
