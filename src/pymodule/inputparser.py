@@ -228,7 +228,8 @@ def parse_seq_fixed(input_seq, flag='float'):
         elif flag == 'int':
             return tuple([int(x) for x in seq_str.split()])
         else:
-            assert_msg_critical(False, f'parse_seq_fixed: invalid flag {flag}')
+            assert_msg_critical(False,
+                                f'parse_seq_fixed: invalid flag \'{flag}\'')
 
     else:
         errmsg = 'parse_seq_fixed: invalid type for input_seq'
@@ -262,8 +263,9 @@ def parse_seq_range(input_seq):
                 m = re.search(r'^(.*)-(.*)-(.*)$', w)
 
             if m is not None:
-                assert_msg_critical(m is not None,
-                                    'parse_seq_range: failed to read seqence')
+                assert_msg_critical(
+                    m is not None,
+                    f'parse_seq_range: failed to read seqence \'{w}\'')
 
                 start, stop, step = (float(m.group(1)), float(m.group(2)),
                                      float(m.group(3)))
@@ -301,8 +303,8 @@ def parse_bool(input_bool):
         elif input_bool.lower() in ['no', 'n']:
             return False
         else:
-            assert_msg_critical(False,
-                                f'parse_bool: invalid input {input_bool}')
+            assert_msg_critical(
+                False, f'parse_bool: invalid boolean input \'{input_bool}\'')
 
     else:
         errmsg = 'parse_bool: invalid type for input_bool'
@@ -322,7 +324,7 @@ def parse_str(input_str, flag=None):
         A string.
     """
 
-    err_str = f'parse_str: Expecting a string but got {input_str}'
+    err_str = f'parse_str: invalid string input \'{input_str}\''
     assert_msg_critical(isinstance(input_str, str), err_str)
 
     if flag is None:
@@ -332,7 +334,7 @@ def parse_str(input_str, flag=None):
     elif flag == 'lower':
         return input_str.lower()
     else:
-        assert_msg_critical(False, f'parse_str: invalid flag {flag}')
+        assert_msg_critical(False, f'parse_str: invalid flag \'{flag}\'')
 
 
 def parse_list(input_list):
@@ -346,7 +348,7 @@ def parse_list(input_list):
         A list.
     """
 
-    err_list = f'parse_list: Expecting a list but got {input_list}'
+    err_list = f'parse_list: invalid list input \'{input_list}\''
     assert_msg_critical(isinstance(input_list, list), err_list)
 
     return list(input_list)
@@ -413,5 +415,5 @@ def parse_input(obj, keyword_types, input_dictionary):
             setattr(obj, key, parse_seq_range(val))
 
         else:
-            err_type = f'parse_input: invalid keyword type for {key}'
+            err_type = f'parse_input: invalid keyword type for \'{key}\''
             assert_msg_critical(False, err_type)
