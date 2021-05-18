@@ -79,6 +79,8 @@ export_visualization(py::module& m)
 
     PyClass<CVisualizationDriver>(m, "VisualizationDriver")
         .def(py::init(&vlx_general::create<CVisualizationDriver>), "comm"_a = py::none())
+        .def("get_atomic_orbital_info", &CVisualizationDriver::getAtomicOrbitalInformation)
+        .def("compute_atomic_orbital_for_grid", &CVisualizationDriver::computeAtomicOrbitalForGrid)
         .def("get_rank", &CVisualizationDriver::getRank)
         .def(
             "compute",

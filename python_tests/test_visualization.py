@@ -71,6 +71,22 @@ class TestVisualization(unittest.TestCase):
             self.assertTrue(
                 np.max(np.abs(np.abs(homo_values) - np.abs(mo_val))) < 1.0e-8)
 
+            # test compute_atomic_orbitals_for_grid
+
+            ao_info = vis_drv.get_atomic_orbital_info(task.molecule,
+                                                      task.ao_basis)
+
+            mo_val.fill(0.0)
+            mo_coefs = mol_orbs.alpha_to_numpy()[:, homo]
+
+            for ao_index, ao in enumerate(ao_info):
+                vis_drv.compute_atomic_orbital_for_grid(grid, task.molecule,
+                                                        task.ao_basis, ao)
+                mo_val += mo_coefs[ao_index] * grid.values_to_numpy()
+
+            self.assertTrue(
+                np.max(np.abs(np.abs(homo_values) - np.abs(mo_val))) < 1.0e-8)
+
         vis_drv.compute(grid, task.molecule, task.ao_basis, density, 0, 'alpha')
 
         den_val = vis_drv.get_density(points, task.molecule, task.ao_basis,
