@@ -220,7 +220,7 @@ CVisualizationDriver::getAtomicOrbitalInformation(const CMolecule& molecule, con
 
                 for (int32_t iao = 0; iao < nao; iao++)
                 {
-                    aoinfo.push_back(std::vector<int32_t>({atomidx, angl, isph, iao}));
+                    aoinfo.push_back(std::vector<int32_t>({idelem, angl, isph, iao}));
                 }
             }
         }
@@ -229,31 +229,62 @@ CVisualizationDriver::getAtomicOrbitalInformation(const CMolecule& molecule, con
     return aoinfo;
 }
 
+std::vector<std::vector<int32_t>>
+CVisualizationDriver::mapAtomToAtomicOrbitals(const CMolecule& molecule, const CMolecularBasis& basis) const
+{
+    auto natoms = molecule.getNumberOfAtoms();
+
+    std::vector<std::vector<int32_t>> atomToAO(natoms, std::vector<int32_t>());
+
+    auto max_angl = basis.getMolecularMaxAngularMomentum(molecule);
+
+    // azimuthal quantum number: s,p,d,f,...
+
+    for (int32_t aoidx = 0, angl = 0; angl <= max_angl; angl++)
+    {
+        CSphericalMomentum sphmom(angl);
+
+        auto nsph = sphmom.getNumberOfComponents();
+
+        // magnetic quantum number: s,p-1,p0,p+1,d-2,d-1,d0,d+1,d+2,...
+
+        for (int32_t isph = 0; isph < nsph; isph++)
+        {
+            // atoms
+
+            for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
+            {
+                auto idelem = molecule.getIdsElemental()[atomidx];
+
+                auto nao = basis.getNumberOfBasisFunctions(idelem, angl);
+
+                // atomic orbitals
+
+                for (int32_t iao = 0; iao < nao; iao++, aoidx++)
+                {
+                    atomToAO[atomidx].push_back(aoidx);
+                }
+            }
+        }
+    }
+
+    return atomToAO;
+}
+
 void
 CVisualizationDriver::computeAtomicOrbitalForGrid(CCubicGrid&                 grid,
-                                                  const CMolecule&            molecule,
                                                   const CMolecularBasis&      basis,
                                                   const std::vector<int32_t>& aoinfo) const
 {
     // atomic orbital information
 
-    auto atomidx = aoinfo[0];
+    auto idelem = aoinfo[0];
 
     auto angl = aoinfo[1];
 
     auto isph = aoinfo[2];
 
     auto iao = aoinfo[3];
-
-    // atom information
-
-    auto idelem = molecule.getIdsElemental()[atomidx];
-
-    double xa = molecule.getCoordinatesX()[atomidx];
-
-    double ya = molecule.getCoordinatesY()[atomidx];
-
-    double za = molecule.getCoordinatesZ()[atomidx];
 
     // prepare Cartesian components
 
@@ -289,29 +320,23 @@ CVisualizationDriver::computeAtomicOrbitalForGrid(CCubicGrid&                 gr
 #pragma omp parallel for schedule(dynamic)
     for (int32_t ix = 0; ix < nx; ix++)
     {
-        double xp = x0 + dx * ix;
+        double rx = x0 + dx * ix;
 
         int32_t xstride = ix * ny * nz;
 
         for (int32_t iy = 0; iy < ny; iy++)
         {
-            double yp = y0 + dy * iy;
+            double ry = y0 + dy * iy;
 
             int32_t ystride = iy * nz;
 
             for (int32_t iz = 0; iz < nz; iz++)
             {
-                double zp = z0 + dz * iz;
+                double rz = z0 + dz * iz;
 
                 int32_t zstride = iz;
 
-                // process coordinates
-
-                double rx = xp - xa;
-
-                double ry = yp - ya;
-
-                double rz = zp - za;
+                // note that the AO is centered at origin
 
                 double r2 = rx * rx + ry * ry + rz * rz;
 
