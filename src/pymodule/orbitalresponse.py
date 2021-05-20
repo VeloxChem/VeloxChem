@@ -92,7 +92,7 @@ class OrbitalResponse:
         self.memory_profiling = False
         self.memory_tracing = False
 
-    def update_settings(self, rsp_dict, method_dict=None):
+    def update_settings(self, rsp_dict=None, method_dict=None, mp2_dict=None):
         """
         Updates response and method settings in orbital response computation
         driver.
@@ -105,6 +105,10 @@ class OrbitalResponse:
 
         if method_dict is None:
             method_dict = {}
+        if mp2_dict is None:
+            mp2_dict = {}
+        if rsp_dict is None:
+            rsp_dict = {}
 
         # ERI settings
         if 'eri_thresh' in rsp_dict:
@@ -202,7 +206,7 @@ class OrbitalResponse:
             'dft_func_label': dft_func_label,
         }
 
-    def compute(self, molecule, basis, scf_tensors, rsp_results):
+    def compute(self, molecule, basis, scf_tensors, rsp_results=None, mol_orbs=None):
         """
         Computes orbital response Lagrange multipliers and relaxed density
         for the calculation of energy gradients.
@@ -215,8 +219,10 @@ class OrbitalResponse:
             The dictionary of tensors from the converged SCF wavefunction.
         :param rsp_results:
             The results from the RPA or TDA excited states calculation.
-        :param profiler:
-            The profiler.
+            use None for MP2 
+        :param mol_orbs:
+            Molecular orbitals object from scfdriver;
+            needed for MP2; use None for RPA and TDA.
         """
 
         profiler = Profiler({
@@ -253,8 +259,12 @@ class OrbitalResponse:
         # 4) Write the linear operator for matrix-vector product
         # 5) Run the conjugate gradient
 
-        rhs_results = self.compute_rhs(molecule, basis, scf_tensors,
-                                       rsp_results, dft_dict, profiler)
+        if rsp_results is None:
+            rhs_results = self.compute_rhs(molecule, basis, mol_orbs,
+                                           dft_dict, profiler)
+        else:
+            rhs_results = self.compute_rhs(molecule, basis, scf_tensors,
+                                           rsp_results, dft_dict, profiler)
 
         if self.rank == mpi_master():
             rhs_mo = rhs_results['rhs_mo']
@@ -340,8 +350,13 @@ class OrbitalResponse:
         # Compute the omega multipliers
         if self.rank == mpi_master():
             ovlp = scf_tensors['S']
-            omega_ao = self.compute_omega(ovlp, mo_occ, mo_vir, epsilon_dm_ao,
-                                          rsp_results, fock_ao_rhs, fock_lambda)
+
+            if rsp_results is None:
+                omega_ao = self.compute_omega(ovlp, mo_occ, mo_vir, epsilon_dm_ao,
+                                              mol_orbs, fock_ao_rhs, fock_lambda)
+            else:
+                omega_ao = self.compute_omega(ovlp, mo_occ, mo_vir, epsilon_dm_ao,
+                                              rsp_results, fock_ao_rhs, fock_lambda)
 
         self.ostream.print_blank()
         self.ostream.flush()

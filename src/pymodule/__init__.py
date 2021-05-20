@@ -95,6 +95,7 @@ from .loprop import LoPropDriver
 from .scffirstorderprop import ScfFirstOrderProperties
 from .orbitalresponse import OrbitalResponse
 from .tdhfgradientdriver import TdhfGradientDriver
+from .mp2orbitalresponse import Mp2OrbitalResponse
 
 # Deprecation warnings
 from . import deprecations
