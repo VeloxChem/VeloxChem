@@ -114,7 +114,7 @@ class Mp2OrbitalResponse(OrbitalResponse):
             # the way it is implemented now, or using transpose directly inside
             # the np.einsum
 
-            dm_oo = - 0.5 * ( np.einsum('ikab,jkab->ij',
+            dm_oo = - ( np.einsum('ikab,jkab->ij',
                                          oovv / eoovv,
                                         (oovv + oovv_antisym) / eoovv,
                                          optimize=True)
@@ -123,7 +123,7 @@ class Mp2OrbitalResponse(OrbitalResponse):
                                          oovv / eoovv, optimize=True)
                              )
 
-            dm_vv =  0.5 * ( np.einsum('ijac,ijbc->ab',
+            dm_vv =  ( np.einsum('ijac,ijbc->ab',
                                         oovv / eoovv,
                                        (oovv + oovv_antisym) / eoovv,
                                         optimize=True)
@@ -136,9 +136,8 @@ class Mp2OrbitalResponse(OrbitalResponse):
             # print(dm_oo) 
 
             # Transform unrelaxed one-particle density matrix to the AO basis
-            # the factor 2 accounts for both spins in restricted calculations
-            unrel_dm_ao = (2*np.linalg.multi_dot([mo_occ, dm_oo, mo_occ.T]) +
-                           2*np.linalg.multi_dot([mo_vir, dm_vv, mo_vir.T]))
+            unrel_dm_ao = (np.linalg.multi_dot([mo_occ, dm_oo, mo_occ.T]) +
+                           np.linalg.multi_dot([mo_vir, dm_vv, mo_vir.T]))
 
             # 2) Construct the right-hand side
             dm_ao_rhs = AODensityMatrix([unrel_dm_ao], denmat.rest)
@@ -176,7 +175,8 @@ class Mp2OrbitalResponse(OrbitalResponse):
             ooov_antisym = ooov - ooov.transpose(1,0,2,3)
             ovvv_antisym = ovvv - ovvv.transpose(0,1,3,2)
 
-            rhs_2pdm_mo = 0.5*( np.einsum('jkab,jkib->ia',
+            # Not sure about the "-" sign..
+            rhs_2pdm_mo = -0.5*( np.einsum('jkab,jkib->ia',
                                            oovv / eoovv,
                                            ooov + ooov_antisym,
                                            optimize=True)
@@ -202,7 +202,7 @@ class Mp2OrbitalResponse(OrbitalResponse):
         # print("1PDM contribution to RHS:\n")
         # print(fmo_rhs_0)
         # print()
-        # print("2PDM cotrnibution to RHS:\n")
+        # print("2PDM contribution to RHS:\n")
         # print(rhs_2pdm_mo)
         # print("Right Hand SIDE:\n")
         # print(rhs_mo)
@@ -218,7 +218,7 @@ class Mp2OrbitalResponse(OrbitalResponse):
         else:
             return {}
 
-    # TODO: fix omega; now is for TDA;
+    # TODO: fix omega; now it is from TDA;
     def compute_omega(self, ovlp, mo_occ, mo_vir, epsilon_dm_ao, mol_orbs,
                       fock_ao_rhs, fock_lambda):
         """

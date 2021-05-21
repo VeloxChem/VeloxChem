@@ -281,6 +281,9 @@ class OrbitalResponse:
         lambda_multipliers = self.compute_lambda(molecule, basis, scf_tensors,
                                                  rhs_mo, dft_dict, profiler)
 
+        # TODO: delete print statement
+        # print("Lambda:\n", lambda_multipliers)
+
         profiler.start_timer(0, 'omega')
 
         # Prerequesites for the overlap matrix multipliers
@@ -310,8 +313,14 @@ class OrbitalResponse:
                  np.matmul(eo_diag, lambda_multipliers), mo_vir.T]).T
 
             # 2) Transform the lambda multipliers to AO basis:
-            lambda_ao = np.linalg.multi_dot(
+            # TODO: add VO block here; mo_vir lambda.T mo_occ.T;
+            # without it the MP2 lambdas in AO are not correct..
+            lambda_ao = ( np.linalg.multi_dot(
                 [mo_occ, lambda_multipliers, mo_vir.T])
+                #+  np.linalg.multi_dot(
+                #[mo_vir, lambda_multipliers.T, mo_occ.T])
+                )
+                
             ao_density_lambda = AODensityMatrix([lambda_ao], denmat.rest)
         else:
             ao_density_lambda = AODensityMatrix()
@@ -389,6 +398,7 @@ class OrbitalResponse:
             if self.is_converged:
                 # Calculate the relaxed one-particle density matrix
                 # Factor 4: (ov + vo)*(alpha + beta)
+                # TODO: for mp2 ov+vo doesn't seem to reduce to just a factor 2...
                 rel_dm_ao = unrel_dm_ao + 4 * lambda_ao
                 return {
                     'lambda_ao': lambda_ao,
@@ -509,7 +519,8 @@ class OrbitalResponse:
                 xc_drv = XCIntegrator(self.comm)
                 molgrid.distribute(self.rank, self.nodes, self.comm)
                 xc_drv.integrate(fock_lambda, ao_density_lambda, gs_density,
-                                 molecule, basis, molgrid, self.xcfun.get_func_label())
+                                 molecule, basis, molgrid,
+                                 self.xcfun.get_func_label())
                 #if timing_dict is not None:
                 #    timing_dict['DFT'] = tm.time() - t0
 
