@@ -16,16 +16,16 @@ class TdaOrbitalResponse(OrbitalResponse):
     Implements orbital response Lagrange multipliers computation using a
     conjugate gradient scheme for the Tamm-Dancoff Approximation (TDA)
     level of theory.
-
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
     """
 
     def __init__(self, comm, ostream):
         """
         Initializes orbital response computation driver to default setup.
+
+        :param comm:
+            The MPI communicator.
+        :param ostream:
+            The output stream.
         """
 
         super().__init__(comm, ostream)

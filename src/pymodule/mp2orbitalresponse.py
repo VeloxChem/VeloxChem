@@ -55,7 +55,7 @@ class Mp2OrbitalResponse(OrbitalResponse):
         :param basis:
             The AO basis set.
         :param mol_orbs:
-            Molecular orbitals object from scfdriver;
+            Molecular orbitals object from scfdriver.
         :param dft_dict:
             The dictionary containing DFT information.
             Kept for consistency with the parent class Orbital Response;
@@ -83,7 +83,7 @@ class Mp2OrbitalResponse(OrbitalResponse):
 
         if self.rank == mpi_master():
 
-            # 1) Calculate unrelaxed one-particle density matrix
+            # 0) Preparing necessary quantities (MO coefficients, orbital energies)
             ### ovlp = scf_tensors['S'] #TODO
             mo = mol_orbs.alpha_to_numpy()
 
@@ -96,24 +96,25 @@ class Mp2OrbitalResponse(OrbitalResponse):
             eocc = orb_ene[:nocc]
             evv = evir.reshape(-1,1) + evir
             eoo = eocc.reshape(-1,1) + eocc
-            
-            # Creating the 4D tensor of orbital energy differences
-            eoovv = -evv.reshape((1,1,nvir,nvir)) + eoo.reshape((nocc,nocc,1,1))
-            
 
-            moints_drv = MOIntegralsDriver(self.comm, self.ostream)
+            # Creating the 4D tensor of orbital energy differences
+            eoovv = eoo.reshape((nocc,nocc,1,1)) - evv.reshape((1,1,nvir,nvir))
+
 
             # TODO: consider transforming the t-amplitudes to AO basis
             # t2_ao = np.linalg.multi_dot([mo_occ, t2_mo, mo_vir.T])
+            # t2_ao = np.einsum('mi,nj,ijab,ta,pb->mntp', mo_occ, mo_occ, t2_mo, mo_vir, mo_vir)
 
-            # Calcuate the unrelaxed one-particle density matrix in MO basis
+            # Calculate the oovv integrals and anti-symmetrize them
+            moints_drv = MOIntegralsDriver(self.comm, self.ostream)
             oovv = moints_drv.compute_in_mem(molecule, basis, mol_orbs, "OOVV")
             oovv_antisym = oovv - oovv.transpose(0,1,3,2)
-            
+
             # TODO: check what is more efficient (memory and time)
             # the way it is implemented now, or using transpose directly inside
             # the np.einsum
 
+            # 1) Calculate unrelaxed one-particle density matrix in MO basis
             dm_oo = - ( np.einsum('ikab,jkab->ij',
                                          oovv / eoovv,
                                         (oovv + oovv_antisym) / eoovv,
@@ -133,7 +134,7 @@ class Mp2OrbitalResponse(OrbitalResponse):
                             )
 
             # print("DM_OO")
-            # print(dm_oo) 
+            # print(dm_oo)
 
             # Transform unrelaxed one-particle density matrix to the AO basis
             unrel_dm_ao = (np.linalg.multi_dot([mo_occ, dm_oo, mo_occ.T]) +
@@ -175,7 +176,7 @@ class Mp2OrbitalResponse(OrbitalResponse):
             ooov_antisym = ooov - ooov.transpose(1,0,2,3)
             ovvv_antisym = ovvv - ovvv.transpose(0,1,3,2)
 
-            # Not sure about the "-" sign..
+            # Not sure about the "-" sign...
             rhs_2pdm_mo = -0.5*( np.einsum('jkab,jkib->ia',
                                            oovv / eoovv,
                                            ooov + ooov_antisym,
@@ -191,10 +192,10 @@ class Mp2OrbitalResponse(OrbitalResponse):
                                - np.einsum('ijcb,jabc->ia',
                                             oovv / eoovv,
                                             ovvv + ovvv_antisym,
-                                            optimize=True) 
+                                            optimize=True)
                                )
 
-            rhs_mo = fmo_rhs_0 + rhs_2pdm_mo 
+            rhs_mo = fmo_rhs_0 + rhs_2pdm_mo
 
         profiler.stop_timer(0, 'RHS')
 

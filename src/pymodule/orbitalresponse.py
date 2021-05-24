@@ -24,11 +24,6 @@ class OrbitalResponse:
     conjugate gradient scheme for the time-dependent Hartree-Fock or DFT
     level of theory.
 
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
-
     Instance variables
         - is_tda: Flag if Tamm-Dancoff approximation is employed.
         - n_state_deriv: The number of the excited state of interest.
@@ -55,6 +50,12 @@ class OrbitalResponse:
     def __init__(self, comm, ostream):
         """
         Initializes orbital response computation driver to default setup.
+
+        :param comm:
+            The MPI communicator.
+        :param ostream:
+            The output stream.
+
         """
 
         # ERI settings

@@ -214,7 +214,7 @@ class TdhfGradientDriver(GradientDriver):
             warn_msg = '    Center of nuclear charge is chosen as the origin.'
             self.ostream.print_header(warn_msg.ljust(56))
 
-        # Remove warning once DFT orbital response is implemented
+        # Remove warning once DFT orbital response is fully implemented
         if 'xcfun' in self.method_dict:
             if self.method_dict['xcfun'] is not None:
                 warn_msg = '*** Warning: Orbital response for TDDFT is not yet fully'
