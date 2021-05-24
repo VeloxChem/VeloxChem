@@ -199,15 +199,6 @@ class Mp2OrbitalResponse(OrbitalResponse):
 
         profiler.stop_timer(0, 'RHS')
 
-        # TODO: delete print statements
-        # print("1PDM contribution to RHS:\n")
-        # print(fmo_rhs_0)
-        # print()
-        # print("2PDM contribution to RHS:\n")
-        # print(rhs_2pdm_mo)
-        # print("Right Hand SIDE:\n")
-        # print(rhs_mo)
-
         if self.rank == mpi_master():
             return {
                 'rhs_mo': rhs_mo,

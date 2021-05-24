@@ -234,8 +234,11 @@ class OrbitalResponse:
         })
 
         if self.rank == mpi_master():
-            self.print_orbrsp_header('Orbital Response Driver',
+            if rsp_results is not None:
+                self.print_orbrsp_header('Orbital Response Driver',
                                      self.n_state_deriv)
+            else:
+                self.print_orbrsp_header('Orbital Response Driver', None)
 
         # DFT information
 
@@ -314,12 +317,10 @@ class OrbitalResponse:
                  np.matmul(eo_diag, lambda_multipliers), mo_vir.T]).T
 
             # 2) Transform the lambda multipliers to AO basis:
-            # TODO: add VO block here; mo_vir lambda.T mo_occ.T;
-            # without it the MP2 lambdas in AO are not correct..
+            # (this is only the OV alpha block;
+            # lambda_ao will not be symmetric at this point)
             lambda_ao = ( np.linalg.multi_dot(
                 [mo_occ, lambda_multipliers, mo_vir.T])
-                #+  np.linalg.multi_dot(
-                #[mo_vir, lambda_multipliers.T, mo_occ.T])
                 )
                 
             ao_density_lambda = AODensityMatrix([lambda_ao], denmat.rest)
@@ -382,7 +383,7 @@ class OrbitalResponse:
         if self.rank == mpi_master():
             # print warning if Lambda did not converge
             if not self.is_converged:
-                warn_msg = '*** Warning: Orbital response did not converge.'
+                warn_msg = '*** Warning: Orbital response CG did not converge.'
                 self.ostream.print_header(warn_msg.ljust(56))
             else:
                 orbrsp_time = tm.time() - self.start_time
@@ -398,9 +399,9 @@ class OrbitalResponse:
         if self.rank == mpi_master():
             if self.is_converged:
                 # Calculate the relaxed one-particle density matrix
-                # Factor 4: (ov + vo)*(alpha + beta)
-                # TODO: for mp2 ov+vo doesn't seem to reduce to just a factor 2...
-                rel_dm_ao = unrel_dm_ao + 4 * lambda_ao
+                # Factor 2: (alpha + beta)
+                # lambda_ao + lambda_ao.T: OV + VO
+                rel_dm_ao = unrel_dm_ao + 2 * lambda_ao + 2 * lambda_ao.T
                 return {
                     'lambda_ao': lambda_ao,
                     'omega_ao': omega_ao,
