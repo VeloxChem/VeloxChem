@@ -30,6 +30,9 @@ class Mp2OrbitalResponse(OrbitalResponse):
 
         super().__init__(comm, ostream)
 
+        # Whether to calculate MP2 orbital response RHS in AO or MO basis
+        self.in_mo = False
+
     def update_settings(self, mp2_dict, method_dict=None):
         """
         Updates response and method settings in orbital response computation
@@ -45,10 +48,20 @@ class Mp2OrbitalResponse(OrbitalResponse):
 
         super().update_settings(method_dict=method_dict, mp2_dict=mp2_dict)
 
+        if 'in_mo' in mp2_dict:
+            key = mp2_dict['in_mo'].lower()
+            self.in_mo = True if key in ['yes', 'y'] else False
+
+    #def compute_rhs(self, molecule, basis, mol_orbs, dft_dict, profiler):
+    #    if self.in_mo:
+    #        self.compute_rhs_mo(molecule, basis, mol_orbs, dft_dict, profiler)
+    #    else:
+    #        self.compute_rhs_ao(molecule, basis, mol_orbs, dft_dict, profiler)
+
     def compute_rhs(self, molecule, basis, mol_orbs, dft_dict, profiler):
         """
         Computes the right-hand side (RHS) of the MP2 orbital response equation
-        including the necessary density matrices using molecular data.
+        in MO basis including the necessary density matrices using molecular data.
 
         :param molecule:
             The molecule.
@@ -100,10 +113,6 @@ class Mp2OrbitalResponse(OrbitalResponse):
             # Creating the 4D tensor of orbital energy differences
             eoovv = eoo.reshape((nocc,nocc,1,1)) - evv.reshape((1,1,nvir,nvir))
 
-
-            # TODO: consider transforming the t-amplitudes to AO basis
-            # t2_ao = np.linalg.multi_dot([mo_occ, t2_mo, mo_vir.T])
-            # t2_ao = np.einsum('mi,nj,ijab,ta,pb->mntp', mo_occ, mo_occ, t2_mo, mo_vir, mo_vir)
 
             # Calculate the oovv integrals and anti-symmetrize them
             moints_drv = MOIntegralsDriver(self.comm, self.ostream)
@@ -161,7 +170,18 @@ class Mp2OrbitalResponse(OrbitalResponse):
 
         fock_ao_rhs.reduce_sum(self.rank, self.nodes, self.comm)
 
-        # Calculate the RHS and transform it to the MO basis
+        # Calculate the 2PDM contribution to the  RHS in AO or MO basis
+        if not self.in_mo:
+            # Transforming the "T2-amplitudes" to AO basis
+			# (Caution: only the oovv integrals are used, not the anti-symmetrized ones)
+            # t2_ao = np.linalg.multi_dot([mo_occ, t2_mo, mo_vir.T])
+            t2_ao = np.einsum('mi,nj,ijab,ta,pb->mntp', mo_occ, mo_occ, oovv / eoovv, mo_vir, mo_vir)
+            n_ao = nocc + nvir
+            # this object will hold the final Fock-like matrix
+            fock_np_2pdm = np.zeros((n_ao, n_ao))
+            
+
+
         if self.rank == mpi_master():
             fock_ao_rhs_0 = fock_ao_rhs.alpha_to_numpy(0)
             ### fock_ao_rhs_1 = fock_ao_rhs.alpha_to_numpy(1)
