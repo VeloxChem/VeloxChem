@@ -58,7 +58,7 @@ class Mp2OrbitalResponse(OrbitalResponse):
     #    else:
     #        self.compute_rhs_ao(molecule, basis, mol_orbs, dft_dict, profiler)
 
-    def compute_rhs(self, molecule, basis, mol_orbs, dft_dict, profiler):
+    def compute_rhs(self, molecule, basis, scf_tensors, mol_orbs, dft_dict, profiler):
         """
         Computes the right-hand side (RHS) of the MP2 orbital response equation
         in MO basis including the necessary density matrices using molecular data.
@@ -67,6 +67,8 @@ class Mp2OrbitalResponse(OrbitalResponse):
             The molecule.
         :param basis:
             The AO basis set.
+        :param scf_tensors:
+            Tensors from the converged SCF calculation
         :param mol_orbs:
             Molecular orbitals object from scfdriver.
         :param dft_dict:
@@ -83,8 +85,6 @@ class Mp2OrbitalResponse(OrbitalResponse):
 
         profiler.start_timer(0, 'RHS')
 
-        #TODO: consider removing scf_tensors; if everything we need is
-        # contained in mol_orbs
 
         # Workflow:
         # 1) Construct the necessary density matrices
@@ -97,7 +97,7 @@ class Mp2OrbitalResponse(OrbitalResponse):
         if self.rank == mpi_master():
 
             # 0) Preparing necessary quantities (MO coefficients, orbital energies)
-            ### ovlp = scf_tensors['S'] #TODO
+            ovlp = scf_tensors['S'] 
             mo = mol_orbs.alpha_to_numpy()
 
             nocc = molecule.number_of_alpha_electrons()
@@ -173,47 +173,80 @@ class Mp2OrbitalResponse(OrbitalResponse):
         # Calculate the 2PDM contribution to the  RHS in AO or MO basis
         if not self.in_mo:
             # Transforming the "T2-amplitudes" to AO basis
-			# (Caution: only the oovv integrals are used, not the anti-symmetrized ones)
+            # (Caution: only the oovv integrals are used,
+            # not the anti-symmetrized ones)
             # t2_ao = np.linalg.multi_dot([mo_occ, t2_mo, mo_vir.T])
-            t2_ao = np.einsum('mi,nj,ijab,ta,pb->mntp', mo_occ, mo_occ, oovv / eoovv, mo_vir, mo_vir)
-            n_ao = nocc + nvir
-            # this object will hold the final Fock-like matrix
-            fock_np_2pdm = np.zeros((n_ao, n_ao))
-            
+            if self.rank == mpi_master():
+                t2_ao = np.einsum('mi,nj,ijab,ta,pb->mntp', 
+                               mo_occ, mo_occ, oovv / eoovv, mo_vir, mo_vir)
+                n_ao = nocc + nvir
+                # this object will hold the final Fock-like matrix
+                fock_np_2pdm_1 = np.zeros((n_ao, n_ao))
+                fock_np_2pdm_2 = np.zeros((n_ao, n_ao))
+
+
+                for r in range(n_ao):
+                    fock_np_1d_slice1 = np.zeros((n_ao))
+                    fock_np_1d_slice2 = np.zeros((n_ao))
+
+
+                    for z in range(n_ao):
+                        # If we don't use copy here, there is a 
+                        # segmentation fault; is there a way to avoid copy?
+                        t2_dm_1 = t2_ao[z, :, r, :].copy() 
+                        t2_dm_2 = t2_ao[r, :, z, :].copy()
+                        t2_dm_ao = AODensityMatrix(
+                                     [t2_dm_1, t2_dm_2], denmat.rest
+                                                    )
+                        t2_fock = AOFockMatrix(t2_dm_ao)
+                        t2_fock.set_fock_type(fockmat.rgenjk, 0)
+                        t2_fock.set_fock_type(fockmat.rgenjk, 1)
+
+                        eri_drv.compute(t2_fock, t2_dm_ao, molecule, 
+                                        basis, screening)
+                        t2_fock.reduce_sum(self.rank, self.nodes, self.comm)
+
+                        fock_np_1d_slice1 += t2_fock.alpha_to_numpy(0).T[z,:]
+                        fock_np_1d_slice2 += t2_fock.alpha_to_numpy(1)[z,:]
+                   
+                    fock_np_2pdm_1[r,:] = fock_np_1d_slice1
+                    fock_np_2pdm_2[r,:] = fock_np_1d_slice2
+
+                # Transform the result to MO basis (OV)
+                rhs_2pdm_mo = (
+                            np.linalg.multi_dot(
+                                [mo_occ.T, ovlp, fock_np_2pdm_2, mo_vir]
+                                                )
+                         - np.linalg.multi_dot(
+                                [mo_vir.T, ovlp, fock_np_2pdm_1, mo_occ]
+                                                ).T   
+                          )
+        else:
+            # Compute the 2PDM contribution directly in MO basis
+            if self.rank == mpi_master(): 
+                # Compute the 2PDM contributions to the RHS:
+                ooov = moints_drv.compute_in_mem(molecule, basis, mol_orbs, "OOOV")
+                ovvv = moints_drv.compute_in_mem(molecule, basis, mol_orbs, "OVVV")
+                ooov_antisym = ooov - ooov.transpose(1,0,2,3)
+                ovvv_antisym = ovvv - ovvv.transpose(0,1,3,2)
+
+                # Not sure about the "-" sign...
+                rhs_2pdm_mo =  ( -np.einsum('jkab,jkib->ia',
+                                               oovv / eoovv,
+                                               ooov + ooov_antisym,
+                                               optimize=True)
+                                   + np.einsum('ijbc,jacb->ia',
+                                                oovv / eoovv,
+                                                ovvv + ovvv_antisym,
+                                                optimize=True)
+                                   )
 
 
         if self.rank == mpi_master():
             fock_ao_rhs_0 = fock_ao_rhs.alpha_to_numpy(0)
-            ### fock_ao_rhs_1 = fock_ao_rhs.alpha_to_numpy(1)
 
             fmo_rhs_0 = np.linalg.multi_dot(
                 [mo_occ.T, 0.5 * fock_ao_rhs_0, mo_vir])
-
-            # Compute the 2PDM contributions to the RHS:
-            # TODO: is it worth doing this in AO basis, rather than MO?
-            ooov = moints_drv.compute_in_mem(molecule, basis, mol_orbs, "OOOV")
-            ovvv = moints_drv.compute_in_mem(molecule, basis, mol_orbs, "OVVV")
-            ooov_antisym = ooov - ooov.transpose(1,0,2,3)
-            ovvv_antisym = ovvv - ovvv.transpose(0,1,3,2)
-
-            # Not sure about the "-" sign...
-            rhs_2pdm_mo = -0.5*( np.einsum('jkab,jkib->ia',
-                                           oovv / eoovv,
-                                           ooov + ooov_antisym,
-                                           optimize=True)
-                               + np.einsum('jkba,kjib->ia',
-                                           oovv / eoovv,
-                                           ooov + ooov_antisym,
-                                           optimize=True)
-                               - np.einsum('ijbc,jacb->ia',
-                                            oovv / eoovv,
-                                            ovvv + ovvv_antisym,
-                                            optimize=True)
-                               - np.einsum('ijcb,jabc->ia',
-                                            oovv / eoovv,
-                                            ovvv + ovvv_antisym,
-                                            optimize=True)
-                               )
 
             rhs_mo = fmo_rhs_0 + rhs_2pdm_mo
 

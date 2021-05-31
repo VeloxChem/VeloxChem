@@ -264,8 +264,8 @@ class OrbitalResponse:
         # 5) Run the conjugate gradient
 
         if rsp_results is None:
-            rhs_results = self.compute_rhs(molecule, basis, mol_orbs,
-                                           dft_dict, profiler)
+            rhs_results = self.compute_rhs(molecule, basis, scf_tensors,
+                                           mol_orbs, dft_dict, profiler)
         else:
             rhs_results = self.compute_rhs(molecule, basis, scf_tensors,
                                            rsp_results, dft_dict, profiler)
