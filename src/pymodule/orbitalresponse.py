@@ -364,7 +364,8 @@ class OrbitalResponse:
 
             if rsp_results is None:
                 omega_ao = self.compute_omega(ovlp, mo_occ, mo_vir, epsilon_dm_ao,
-                                              mol_orbs, fock_ao_rhs, fock_lambda)
+                                              mol_orbs, fock_ao_rhs, fock_lambda,
+                                              molecule, basis)
             else:
                 omega_ao = self.compute_omega(ovlp, mo_occ, mo_vir, epsilon_dm_ao,
                                               rsp_results, fock_ao_rhs, fock_lambda)

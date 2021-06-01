@@ -255,6 +255,7 @@ export_orbdata(py::module& m)
         .def("get_dimensions_of_primitive_basis", &CMolecularBasis::getDimensionsOfPrimitiveBasis)
         .def(py::self == py::self)
         .def("__repr__", &CMolecularBasis::repr)
+        .def("get_index_map", &CMolecularBasis::getIndexMapForDalton)
         .def("n_basis_functions",
              vlx_general::overload_cast_<const CMolecule&, int32_t>()(&CMolecularBasis::getNumberOfBasisFunctions, py::const_),
              "molecule"_a,

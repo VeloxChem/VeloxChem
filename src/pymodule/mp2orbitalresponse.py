@@ -230,7 +230,7 @@ class Mp2OrbitalResponse(OrbitalResponse):
                 ooov_antisym = ooov - ooov.transpose(1,0,2,3)
                 ovvv_antisym = ovvv - ovvv.transpose(0,1,3,2)
 
-                # Not sure about the "-" sign...
+             
                 rhs_2pdm_mo =  ( -np.einsum('jkab,jkib->ia',
                                                oovv / eoovv,
                                                ooov + ooov_antisym,
@@ -265,7 +265,7 @@ class Mp2OrbitalResponse(OrbitalResponse):
 
     # TODO: fix omega; now it is from TDA;
     def compute_omega(self, ovlp, mo_occ, mo_vir, epsilon_dm_ao, mol_orbs,
-                      fock_ao_rhs, fock_lambda):
+                      fock_ao_rhs, fock_lambda, molecule, basis):
         """
         Calculates the TDA Lagrange multipliers for the overlap matrix.
 
@@ -291,23 +291,43 @@ class Mp2OrbitalResponse(OrbitalResponse):
         # Get the excitation vector of interest and transform it to AO
         nocc = mo_occ.shape[1]
         nvir = mo_vir.shape[1]
-        ###exc_vec = tda_results['eigenvectors'][:, self.n_state_deriv]
-        ###exc_vec = exc_vec.reshape(nocc, nvir).copy()
-        ###exc_vec_ao = np.linalg.multi_dot([mo_occ, exc_vec, mo_vir.T])
+
+        # Get the pre-requisites to compute the 2PDM contributions:
+        orb_ene = mol_orbs.ea_to_numpy()
+        evir = orb_ene[nocc:]
+        eocc = orb_ene[:nocc]
+        evv = evir.reshape(-1,1) + evir
+        eoo = eocc.reshape(-1,1) + eocc
+
+        # Creating the 4D tensor of orbital energy differences
+        eoovv = eoo.reshape((nocc,nocc,1,1)) - evv.reshape((1,1,nvir,nvir))
+
+        # Calculate the oovv integrals and anti-symmetrize them
+        moints_drv = MOIntegralsDriver(self.comm, self.ostream)
+        oovv = moints_drv.compute_in_mem(molecule, basis, mol_orbs, "OOVV")
+        oovv_antisym = oovv - oovv.transpose(0,1,3,2)
+        ooov = moints_drv.compute_in_mem(molecule, basis, mol_orbs, "OOOV")
+        ooov_antisym = ooov - ooov.transpose(1,0,2,3)
+
+        two_pdm_for_oo = np.einsum('jkab,ikab->ij',
+                                               oovv / eoovv,
+                                               oovv + oovv_antisym,
+                                               optimize=True)
+
+        two_pdm_for_ov = np.einsum('jkab,jkib->ia',
+                                    oovv / eoovv,
+                                    ooov + ooov_antisym,
+                                    optimize=True)
+
+        two_pdm_for_vv = np.einsum('ijbc,ijac->ab',
+                                    oovv / eoovv,
+                                    oovv + oovv_antisym,
+                                    optimize=True) 
 
         # The density matrix; only alpha block;
         # Only works for the restricted case
         D_occ = np.matmul(mo_occ, mo_occ.T)
         D_vir = np.matmul(mo_vir, mo_vir.T)
-
-        # Because the excitation vector is not symmetric,
-        # we need both the matrix (OO block in omega, and probably VO)
-        # and its transpose (VV, OV blocks)
-        # this comes from the transformation of the 2PDM contribution
-        # from MO to AO basis
-        ### fock_ao_rhs_1 = fock_ao_rhs.alpha_to_numpy(1)
-        ### Ft = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, exc_vec_ao, ovlp])
-        ### F = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, exc_vec_ao.T, ovlp.T])
 
         # Compute the contributions from the 2PDM and the relaxed 1PDM
         # to the omega Lagrange multipliers:
@@ -315,11 +335,13 @@ class Mp2OrbitalResponse(OrbitalResponse):
                 fock_lambda.alpha_to_numpy(0).T +
                 0.5 * fock_ao_rhs.alpha_to_numpy(0))
 
-        omega_1pdm_2pdm_contribs = ( #np.linalg.multi_dot([D_occ, F, D_occ]) +
-        #                            np.linalg.multi_dot([D_occ, Ft, D_vir]) +
-        #                            np.linalg.multi_dot([D_occ, Ft, D_vir]).T +
-        #                            np.linalg.multi_dot([D_vir, Ft, D_vir]) +
-                                    np.linalg.multi_dot([D_occ, fmat, D_occ]))
+        # Because the 2PDM OV contribution is not symmetric,
+        # we need both the matrix (OV) and its transpose (VO block)
+        omega_1pdm_2pdm_contribs = ( np.linalg.multi_dot([mo_occ, two_pdm_for_oo, mo_occ.T]) +
+                                     np.linalg.multi_dot([mo_occ, two_pdm_for_ov, mo_vir.T]) +
+                                     np.linalg.multi_dot([mo_occ, two_pdm_for_ov, mo_vir.T]).T +
+                                     np.linalg.multi_dot([mo_vir, two_pdm_for_vv, mo_vir.T]) +
+                                     np.linalg.multi_dot([D_occ, fmat, D_occ]))
 
         omega = -epsilon_dm_ao - omega_1pdm_2pdm_contribs
 
