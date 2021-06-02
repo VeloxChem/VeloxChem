@@ -228,7 +228,7 @@ CBoysFunction::compute(CMemBlock2D<double>& values, const CMemBlock<double>& arg
 
     if (iOrder == 24)
     {
-        _computeBF23(values, arguments, nArguments);
+        _computeBF24(values, arguments, nArguments);
 
         return;
     }

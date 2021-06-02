@@ -15,6 +15,7 @@ build
 *~
 dummy.*
 .vscode
+*.DS_Store
 Makefile.setup
 /.ccls-cache/
 
