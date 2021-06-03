@@ -43,7 +43,7 @@ from .rspcustomproperty import CustomProperty
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rsppolarizability import Polarizability
 from .rsptpa import TPA
-from .scffirstorderprop import ScfFirstOrderProperties
+from .firstorderprop import FirstOrderProperties
 from .scfgradientdriver import ScfGradientDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -255,8 +255,9 @@ def main():
                 return
 
             # SCF first-order properties
-            scf_prop = ScfFirstOrderProperties(task.mpi_comm, task.ostream)
-            scf_prop.compute(task.molecule, task.ao_basis, scf_tensors)
+            scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
+            total_density = scf_tensors['D_alpha'] + scf_tensors['D_beta']
+            scf_prop.compute(task.molecule, task.ao_basis, total_density)
             if task.mpi_rank == mpi_master():
                 scf_prop.print_properties(task.molecule)
 

@@ -33,9 +33,9 @@ from .veloxchemlib import dipole_in_debye
 from .outputstream import OutputStream
 
 
-class ScfFirstOrderProperties:
+class FirstOrderProperties:
     """
-    Implements SCF first-order properties.
+    Implements first-order properties.
 
     :param comm:
         The MPI communicator.
@@ -64,7 +64,7 @@ class ScfFirstOrderProperties:
 
         self.properties = {}
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, total_density):
         """
         Computes SCF first-order properties.
 
@@ -72,8 +72,8 @@ class ScfFirstOrderProperties:
             The molecule
         :param basis:
             The AO basis set.
-        :param scf_tensors:
-            The tensors from the converged SCF calculation.
+        :param total_density:
+            The total electron density.
         """
 
         if molecule.get_charge() != 0:
@@ -94,7 +94,6 @@ class ScfFirstOrderProperties:
                            dipole_mats.z_to_numpy())
 
             # electronic contribution
-            total_density = scf_tensors['D_alpha'] + scf_tensors['D_beta']
             electronic_dipole = -1.0 * np.array(
                 [np.sum(dipole_ints[d] * total_density) for d in range(3)])
 
@@ -109,7 +108,7 @@ class ScfFirstOrderProperties:
 
     def get_property(self, key):
         """
-        Gets SCF first-order property.
+        Gets first-order property.
 
         :param key:
             The name of the property.
@@ -120,17 +119,21 @@ class ScfFirstOrderProperties:
 
         return self.properties[key]
 
-    def print_properties(self, molecule):
+    def print_properties(self, molecule, title=None):
         """
-        Prints SCF first-order properties.
+        Prints first-order properties.
 
         :param molecule:
             The molecule.
+        :param title:
+            The title of the printout, giving information about the method,
+            relaxed/unrelaxed density, which excited state.
         """
 
         self.ostream.print_blank()
 
-        title = 'SCF Ground-State Dipole Moment'
+        if title is None:
+            title = 'SCF Ground-State Dipole Moment'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * (len(title) + 2))
 

@@ -9,6 +9,7 @@ from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import dipole_in_debye
 from .errorhandler import assert_msg_critical
+from .firstorderprop import FirstOrderProperties
 
 
 class TdhfGradientDriver(GradientDriver):
@@ -28,8 +29,9 @@ class TdhfGradientDriver(GradientDriver):
         - scf_tensors: The results from the converged SCF calculation.
         - is_tda: Flag if Tamm-Dancoff approximation is employed.
         - n_state_deriv: The excited state of interest.
+        - do_first_order_prop: Controls the calculation of first-order properties.
         - delta_h: The displacement for finite difference.
-		- do_four_point: Flag for four-point finite difference.
+        - do_four_point: Flag for four-point finite difference.
     """
 
     def __init__(self, comm, ostream):
@@ -48,7 +50,10 @@ class TdhfGradientDriver(GradientDriver):
         # excited state information, default to first excited state
         self.n_state_deriv = 0
 
-		# for numerical gradient
+        # flag on whether to calculate excited-state properties
+        self.do_first_order_prop = False
+
+        # for numerical gradient
         self.gradient = None
         self.delta_h = 0.001
         #self.scf_drv = None #scf_drv
@@ -71,9 +76,15 @@ class TdhfGradientDriver(GradientDriver):
             method_dict = {}
 
         if 'tamm_dancoff' in rsp_dict:
-            if rsp_dict['tamm_dancoff'] == 'yes':
-                self.is_tda = True
-                self.flag = 'TDA Gradient Driver'
+            key = rsp_dict['tamm_dancoff'].lower()
+            self.is_tda = True if key in ['yes', 'y'] else False
+
+        if self.is_tda:
+            self.flag = 'TDA Gradient Driver'
+
+        if 'do_first_order_prop' in rsp_dict:
+            key = rsp_dict['do_first_order_prop'].lower()
+            self.do_first_order_prop = True if key in ['yes', 'y'] else False
 
         # TODO: 'n_state_deriv' can be interpreted as the number of states, not
         # the index of the state. Perhaps 'state_deriv' is a better keyword.
@@ -109,178 +120,42 @@ class TdhfGradientDriver(GradientDriver):
 
         # orbital response driver
         if self.is_tda:
+            method = 'TDA'
             orbrsp_drv = TdaOrbitalResponse(self.comm, self.ostream)
         else:
             orbrsp_drv = RpaOrbitalResponse(self.comm, self.ostream)
+            method = 'RPA'
 
         orbrsp_drv.update_settings(self.rsp_dict, self.method_dict)
         orbrsp_results = orbrsp_drv.compute(molecule, basis, scf_tensors,
                                             rsp_results)
 
-        # calculate the relaxed and unrelaxed excited-state dipole moment
-        dipole_moments = self.compute_properties(molecule, basis, scf_tensors,
-                                                 orbrsp_results)
+        # If desired, calculate the relaxed and unrelaxed excited-state dipole moment
+        if self.do_first_order_prop:
+            firstorderprop = FirstOrderProperties(self.comm, self.ostream)
 
-        if self.rank == mpi_master():
-            self.print_properties(molecule, dipole_moments)
-
-    def compute_properties(self, molecule, basis, scf_tensors, orbrsp_results):
-        """
-        Calculates first-order properties of RPA or TDA excited states
-        using the results of the orbital response calculation.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param scf_tensors:
-            The tensors from the converged SCF calculation.
-        :param orbrsp_results:
-            The orbital response results.
-
-        :return:
-            A dictionary containing the properties.
-        """
-
-        if molecule.get_charge() != 0:
-            coords = molecule.get_coordinates()
-            nuclear_charges = molecule.elem_ids_to_numpy()
-            origin = np.sum(coords.T * nuclear_charges,
-                            axis=1) / np.sum(nuclear_charges)
-        else:
-            origin = np.zeros(3)
-
-        # dipole integrals
-        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-        dipole_drv.origin = origin
-        dipole_mats = dipole_drv.compute(molecule, basis)
-
-        if self.rank == mpi_master():
-            dipole_ints = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
-                           dipole_mats.z_to_numpy())
-
-            # electronic contribution
             unrel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
                              orbrsp_results['unrel_dm_ao'])
-            unrel_electronic_dipole = -1.0 * np.array(
-                [np.sum(dipole_ints[d] * unrel_density) for d in range(3)])
+            firstorderprop.compute(molecule, basis, unrel_density)
+            if self.rank == mpi_master():
+                title = method + ' Unrelaxed Dipole Moment for Excited State ' + str(self.n_state_deriv + 1)
+                firstorderprop.print_properties(molecule, title)
 
-            # relaxed density only available if orbital response converged
             if 'rel_dm_ao' in orbrsp_results:
                 rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
                                orbrsp_results['rel_dm_ao'])
-                rel_electronic_dipole = -1.0 * np.array(
-                    [np.sum(dipole_ints[d] * rel_density) for d in range(3)])
+                firstorderprop.compute(molecule, basis, rel_density)
+                if self.rank == mpi_master():
+                    # TODO: Remove warning once TDDFT orbital response is fully implemented
+                    if 'xcfun' in self.method_dict and self.method_dict['xcfun'] is not None:
+                        warn_msg = '*** Warning: Orbital response for TDDFT is not yet fully'
+                        self.ostream.print_header(warn_msg.ljust(56))
+                        warn_msg = '    implemented. Relaxed dipole moment will be wrong.'
+                        self.ostream.print_header(warn_msg.ljust(56))
 
-            # nuclear contribution
-            coords = molecule.get_coordinates()
-            nuclear_charges = molecule.elem_ids_to_numpy()
-            nuclear_dipole = np.sum((coords - origin).T * nuclear_charges,
-                                    axis=1)
+                    title = method + ' Relaxed Dipole Moment for Excited State ' + str(self.n_state_deriv + 1)
+                    firstorderprop.print_properties(molecule, title)
 
-            if 'rel_dm_ao' in orbrsp_results:
-                return {
-                    'unrelaxed_dipole_moment':
-                        (nuclear_dipole + unrel_electronic_dipole),
-                    'relaxed_dipole_moment':
-                        (nuclear_dipole + rel_electronic_dipole),
-                }
-            else:
-                return {
-                    'unrelaxed_dipole_moment':
-                        (nuclear_dipole + unrel_electronic_dipole),
-                }
-        else:
-            return {}
-
-    def print_properties(self, molecule, properties):
-        """
-        Prints RPA/TDA excited-state properties.
-
-        :param molecule:
-            The molecule.
-        :param properties:
-            The dictionary of properties.
-        """
-
-        self.ostream.print_blank()
-
-        # prints warning if the molecule is charged
-        if molecule.get_charge() != 0:
-            warn_msg = '*** Warning: Molecule has non-zero charge. Dipole'
-            self.ostream.print_header(warn_msg.ljust(56))
-            warn_msg = '    moment will be dependent on the choice of origin.'
-            self.ostream.print_header(warn_msg.ljust(56))
-            warn_msg = '    Center of nuclear charge is chosen as the origin.'
-            self.ostream.print_header(warn_msg.ljust(56))
-
-        # Remove warning once DFT orbital response is fully implemented
-        if 'xcfun' in self.method_dict:
-            if self.method_dict['xcfun'] is not None:
-                warn_msg = '*** Warning: Orbital response for TDDFT is not yet fully'
-                self.ostream.print_header(warn_msg.ljust(56))
-                warn_msg = '    implemented. Relaxed dipole moment will be wrong.'
-                self.ostream.print_header(warn_msg.ljust(56))
-
-        self.ostream.print_blank()
-
-        prop_header = 'First-Order Properties for Excited State S'
-        prop_header += str(self.n_state_deriv + 1)
-        self.ostream.print_header(prop_header)
-        self.ostream.print_header('-' * (len(prop_header) + 2))
-
-        self.ostream.print_blank()
-
-        if self.is_tda:
-            title = 'TDA '
-        else:
-            title = 'RPA '
-
-        title += 'Unrelaxed Dipole Moment'
-        self.ostream.print_header(title)
-        self.ostream.print_header('-' * (len(title) + 2))
-
-        unrel_dip = properties['unrelaxed_dipole_moment']
-        unrel_dip_au = list(unrel_dip) + [np.linalg.norm(unrel_dip)]
-        unrel_dip_debye = [m * dipole_in_debye() for m in unrel_dip_au]
-
-        for i, a in enumerate(['  X', '  Y', '  Z', 'Total']):
-            valstr = '{:<5s} :'.format(a)
-            valstr += '{:17.6f} a.u.'.format(unrel_dip_au[i])
-            valstr += '{:17.6f} Debye   '.format(unrel_dip_debye[i])
-            self.ostream.print_header(valstr)
-
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-        if 'relaxed_dipole_moment' in properties:
-            if self.is_tda:
-                title = 'TDA '
-            else:
-                title = 'RPA '
-
-            title += 'Relaxed Dipole Moment'
-            self.ostream.print_header(title)
-            self.ostream.print_header('-' * (len(title) + 2))
-
-            rel_dip = properties['relaxed_dipole_moment']
-            rel_dip_au = list(rel_dip) + [np.linalg.norm(rel_dip)]
-            rel_dip_debye = [m * dipole_in_debye() for m in rel_dip_au]
-
-            for i, a in enumerate(['  X', '  Y', '  Z', 'Total']):
-                valstr = '{:<5s} :'.format(a)
-                valstr += '{:17.6f} a.u.'.format(rel_dip_au[i])
-                valstr += '{:17.6f} Debye   '.format(rel_dip_debye[i])
-                self.ostream.print_header(valstr)
-
-            self.ostream.print_blank()
-            self.ostream.flush()
-        else:
-            warn_msg = '*** Warning: Orbital response did not converge.'
-            self.ostream.print_header(warn_msg.ljust(56))
-            warn_msg = '    Relaxed dipole moment could not be calculated.'
-            self.ostream.print_header(warn_msg.ljust(56))
-            self.ostream.print_blank()
 
     def compute_numerical_gradient(self, molecule, ao_basis, scf_drv,
                                    rsp_drv, min_basis=None):
@@ -347,9 +222,9 @@ class TdhfGradientDriver(GradientDriver):
                     self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
 
         else:
-		    # Four-point numerical derivative approximation
-		    # for debugging of analytical gradient:
-		    # [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
+            # Four-point numerical derivative approximation
+            # for debugging of analytical gradient:
+            # [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
             for i in range(molecule.number_of_atoms()):
                 for d in range(3):
                     coords[i, d] += self.delta_h
@@ -391,7 +266,7 @@ class TdhfGradientDriver(GradientDriver):
                     e_minus2 = self.scf_drv.get_scf_energy() + exc_en
 
                     coords[i, d] += 2.0 * self.delta_h
-		            # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
+                    # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
                     self.gradient[i, d] = (e_minus2 - 8.0 * e_minus1
                                            + 8.0 * e_plus1 - e_plus2) / (12.0 * self.delta_h)
 

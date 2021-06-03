@@ -92,7 +92,7 @@ from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
-from .scffirstorderprop import ScfFirstOrderProperties
+from .firstorderprop import FirstOrderProperties
 from .orbitalresponse import OrbitalResponse
 from .tdhfgradientdriver import TdhfGradientDriver
 from .mp2orbitalresponse import Mp2OrbitalResponse
