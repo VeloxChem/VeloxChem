@@ -28,11 +28,12 @@
 
 #include <cstdint>
 #include <vector>
+#include <set>
 
 #include "MemBlock.hpp"
 #include "DenseMatrix.hpp"
 #include "TwoIndexes.hpp"
-#include "ThreeIndexes.hpp"
+#include "FourIndexes.hpp"
 #include "Molecule.hpp"
 
 /**
@@ -60,12 +61,22 @@ class CCommonNeighbors
     /**
      The vector of unique  CNA signatures.
     */
-    std::vector<CThreeIndexes> _signatures;
+    std::vector<CFourIndexes> _signatures;
     
     /**
      The vector of repetitions of CNA unique signatures.
     */
     std::vector<int32_t> _repetitions;
+    
+    /**
+      The atomic identifiers of atoms.
+     */
+    std::vector<int32_t> _idAtomic;
+    
+    /**
+      The elemental composition.
+     */
+    std::set<int32_t> _composition;
     
     /**
      Computes the bonding matrix for the given molecule.
@@ -87,7 +98,54 @@ class CCommonNeighbors
      @return the vector of common atoms.
     */
     std::vector<int32_t> _getCommonAtoms(const CTwoIndexes& atomsPair,
-                                         const double       radius); 
+                                         const double       radius);
+    
+    /**
+     Determines number of bonds between common atoms.
+        
+     @param atoms the vector of common atoms.
+     @return the number of bonds between common atoms.
+    */
+    int32_t _getNumberOfCommonBonds(const std::vector<int32_t>& atoms);
+    
+    /**
+     Determines longest consecutive bond between common atoms.
+        
+     @param atoms the vector of common atoms.
+     @return the longest concecutive bond between common atoms.
+    */
+    int32_t _getLongestCommonBond(const std::vector<int32_t>& atoms);
+    
+    /**
+     Determines longest consecutive bond for given path.
+        
+     @param path the atoms connection path.
+     @return the longest concecutive bond for the given path.
+    */
+    int32_t _getLongestBondForPath(const std::vector<int32_t>& path);
+    
+    /**
+     Determines bond identifier for the given pair of atoms.
+        
+     @param atomsPair the atoms pair.
+     @return the unique identifier of bond.
+    */
+    int32_t _getBondIdentifier(const CTwoIndexes& atomsPair);
+    
+    /**
+     Adds signature to vector of unique signatures.
+        
+     @param signature the signature to be added.
+    */
+    void _add(const CFourIndexes& signature);
+    
+    /**
+     Finds requested signature to vector of unique signatures.
+        
+     @param signature the signature to be find.
+     @return the index of requested signature in vector of unique signatures.
+    */
+    int32_t _find(const CFourIndexes& signature);
 
    public:
     /**
@@ -104,11 +162,13 @@ class CCommonNeighbors
      @param signatures The vector of unique CNA signatures.
      @param repetitions The vector of repetitions of unique CNA signatures.
     */
-    CCommonNeighbors(const double                      cutRadius,
-                     const CMemBlock<int32_t>&         adjacencies,
-                     const CDenseMatrix&               bonds,
-                     const std::vector<CThreeIndexes>& signatures,
-                     const std::vector<int32_t>&       repetitions);
+    CCommonNeighbors(const double                     cutRadius,
+                     const CMemBlock<int32_t>&        adjacencies,
+                     const CDenseMatrix&              bonds,
+                     const std::vector<CFourIndexes>& signatures,
+                     const std::vector<int32_t>&      repetitions,
+                     const std::vector<int32_t>&      idAtomic,
+                     const std::set<int32_t>&         composition);
     
     /**
      Creates a common neighbors object using molecule data.
@@ -193,7 +253,28 @@ class CCommonNeighbors
      @return the vector of bond pairs.
     */
     std::vector<CTwoIndexes> getBondPairs() const;
+    
+    /**
+     Gets unique signatures vector.
 
+     @return the vector of signatures.
+    */
+    std::vector<CFourIndexes> getSignatures() const;
+
+    /**
+     Gets unique repetitions vector.
+
+     @return the vector of repetitions.
+    */
+    std::vector<int32_t> getRepetitions() const;
+    
+    /**
+     Computes Jaccard similarity index between this  object and other common neighbors object.
+
+     @return the vector of repetitions.
+    */
+    double compJaccardIndex(const CCommonNeighbors& other);
+    
     /**
      Converts common neighbors object to text output and insert it into output text
      stream.

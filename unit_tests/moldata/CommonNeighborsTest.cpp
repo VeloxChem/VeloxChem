@@ -32,9 +32,13 @@ TEST_F(CCommonNeighborsTest, DefaultConstructor)
 {
     CCommonNeighbors cna;
     
-    CCommonNeighbors cnb(0.0, CMemBlock<int32_t>(), CDenseMatrix(),
-                         std::vector<CThreeIndexes>(),
-                         std::vector<int32_t>());
+    CCommonNeighbors cnb(0.0,
+                         CMemBlock<int32_t>(),
+                         CDenseMatrix(),
+                         std::vector<CFourIndexes>(),
+                         std::vector<int32_t>(),
+                         std::vector<int32_t>(),
+                         std::set<int32_t>());
 
     ASSERT_EQ(cna, cnb);
 }
@@ -109,11 +113,24 @@ TEST_F(CCommonNeighborsTest, Generate)
 {
     CCommonNeighbors cna(vlxmol::getMoleculeNH3CH4(), 3.0);
     
-    cna.generate(5.0); 
-    
-    const std::vector<CTwoIndexes> refpairs({{0, 1}, {0, 2}});
+    cna.generate(15.0);
 
-    //ASSERT_EQ(refpairs, cna.getBondPairs());
+    ASSERT_EQ(cna.getRepetitions(), std::vector<int32_t>({3, 4}));
+    
+    ASSERT_EQ(cna.getSignatures(), std::vector<CFourIndexes>({CFourIndexes(2, 7, 4, 2),
+                                                              CFourIndexes(1, 7, 3, 2)}));
 }
 
+TEST_F(CCommonNeighborsTest, CompJaccardIndex)
+{
+    CCommonNeighbors cna(vlxmol::getMoleculeNH3CH4(), 3.0);
+    
+    CCommonNeighbors cnb(vlxmol::getMoleculeNH3CH4(), 3.0);
+    
+    cna.generate(15.0);
+    
+    cnb.generate(3.0);
+
+    ASSERT_NEAR(cna.compJaccardIndex(cna), 1.0, 1.0e-13);
+}
 

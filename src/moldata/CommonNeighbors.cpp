@@ -28,6 +28,7 @@
 #include <cmath>
 #include <set>
 #include <algorithm>
+#include <iterator>
 
 #include <iostream>
 
@@ -39,18 +40,24 @@ CCommonNeighbors::CCommonNeighbors()
 
     , _bonds(CDenseMatrix())
 
-    , _signatures(std::vector<CThreeIndexes>())
+    , _signatures(std::vector<CFourIndexes>())
 
     , _repetitions(std::vector<int32_t>())
+
+    , _idAtomic(std::vector<int32_t>())
+
+    , _composition(std::set<int32_t>())
 {
     
 }
 
-CCommonNeighbors::CCommonNeighbors(const double                      cutRadius,
-                                   const CMemBlock<int32_t>&         adjacencies,
-                                   const CDenseMatrix&               bonds,
-                                   const std::vector<CThreeIndexes>& signatures,
-                                   const std::vector<int32_t>&       repetitions)
+CCommonNeighbors::CCommonNeighbors(const double                     cutRadius,
+                                   const CMemBlock<int32_t>&        adjacencies,
+                                   const CDenseMatrix&              bonds,
+                                   const std::vector<CFourIndexes>& signatures,
+                                   const std::vector<int32_t>&      repetitions,
+                                   const std::vector<int32_t>&      idAtomic,
+                                   const std::set<int32_t>&         composition)
     :  _cutRadius(cutRadius)
 
     , _adjacencies(adjacencies)
@@ -60,6 +67,10 @@ CCommonNeighbors::CCommonNeighbors(const double                      cutRadius,
     , _signatures(signatures)
 
     , _repetitions(repetitions)
+
+    , _idAtomic(idAtomic)
+
+    , _composition(composition)
 {
     
 }
@@ -85,6 +96,10 @@ CCommonNeighbors::CCommonNeighbors(const CCommonNeighbors& source)
     , _signatures(source._signatures)
 
     , _repetitions(source._repetitions)
+
+    , _idAtomic(source._idAtomic)
+
+    , _composition(source._composition)
 {
     
 }
@@ -100,6 +115,10 @@ CCommonNeighbors::CCommonNeighbors(CCommonNeighbors&& source) noexcept
     , _signatures(std::move(source._signatures))
 
     , _repetitions(std::move(source._repetitions))
+
+    , _idAtomic(std::move(source._idAtomic))
+
+    , _composition(std::move(source._composition))
 {
     
 }
@@ -123,6 +142,10 @@ CCommonNeighbors::operator=(const CCommonNeighbors& source)
     _signatures = source._signatures;
 
     _repetitions = source._repetitions;
+    
+    _idAtomic = source._idAtomic;
+    
+    _composition = source._composition;
 
     return *this;
 }
@@ -141,6 +164,10 @@ CCommonNeighbors::operator=(CCommonNeighbors&& source) noexcept
     _signatures = std::move(source._signatures);
 
     _repetitions = std::move(source._repetitions);
+    
+    _idAtomic = std::move(source._idAtomic);
+    
+    _composition = std::move(source._composition);
 
     return *this;
 }
@@ -158,6 +185,10 @@ CCommonNeighbors::operator==(const CCommonNeighbors& other) const
    
     if (_repetitions != other._repetitions) return false;
     
+    if (_idAtomic != other._idAtomic) return false;
+    
+    if (_composition != other._composition) return false;
+    
     return true;
 }
 
@@ -172,16 +203,15 @@ CCommonNeighbors::generate(const double radius)
 {
     for (const auto& tidx : getBondPairs())
     {
-        const auto atoms = _getCommonAtoms(tidx, radius);
+        const auto idbond = _getBondIdentifier(tidx);
         
-        std::cout << "index: " << tidx.first() << ":"  << tidx.second() << ": " << std::endl;
+        const auto catoms = _getCommonAtoms(tidx, radius);
         
-        for (size_t i = 0; i < atoms.size(); i++)
-        {
-            std::cout << atoms[i] << " ";
-        }
+        const auto cbonds = _getNumberOfCommonBonds(catoms);
         
-        std::cout << std::endl;
+        const auto mcbond = _getLongestCommonBond(catoms);
+        
+        _add(CFourIndexes(idbond, static_cast<int32_t>(catoms.size()), cbonds, mcbond));
     }
 }
 
@@ -239,8 +269,18 @@ CCommonNeighbors::_computeBonds(const CMolecule& molecule)
     
     auto rab = _bonds.values();
     
+    // set up pointer to atomic identifiers
+    
+    auto eleids = molecule.getIdsElemental();
+    
     for (int32_t i = 0; i < natoms; i++)
     {
+        // atomic identifiers
+        
+        _idAtomic.push_back(eleids[i]);
+        
+        // compute bond distances
+        
         const auto ax = rx[i];
         
         const auto ay = ry[i];
@@ -262,6 +302,10 @@ CCommonNeighbors::_computeBonds(const CMolecule& molecule)
             rab[j * natoms + i] = frad;
         }
     }
+    
+    // set up elemental composition
+    
+    _composition.insert(_idAtomic.begin(), _idAtomic.end());
 }
 
 void
@@ -339,6 +383,230 @@ CCommonNeighbors::_getCommonAtoms(const CTwoIndexes& atomsPair,
     return atoms;
 }
 
+int32_t
+CCommonNeighbors::_getNumberOfCommonBonds(const std::vector<int32_t>& atoms)
+{
+    const auto natoms = _bonds.getNumberOfRows();
+    
+    auto edges = _adjacencies.data();
+    
+    const auto ndim = atoms.size();
+    
+    int32_t nbonds = 0;
+    
+    for (size_t i = 0; i < ndim; i++)
+    {
+        for (size_t j = i + 1; j < ndim; j++)
+        {
+            if (edges[atoms[i] * natoms + atoms[j]] == 1) nbonds++;
+        }
+    }
+    
+    return nbonds; 
+}
+
+int32_t
+CCommonNeighbors::_getLongestCommonBond(const std::vector<int32_t>& atoms)
+{
+    const auto natoms = _bonds.getNumberOfRows();
+    
+    auto edges = _adjacencies.data();
+    
+    const auto ndim = atoms.size();
+    
+    // select all bonded atoms
+    
+    std::set<int32_t> bpairs;
+    
+    for (size_t i = 0; i < ndim; i++)
+    {
+        for (size_t j = i + 1; j < ndim; j++)
+        {
+            if (edges[atoms[i] * natoms + atoms[j]] == 1)
+            {
+                bpairs.insert(atoms[i]);
+                
+                bpairs.insert(atoms[j]);
+            }
+        }
+    }
+    
+    // compute longest bond
+    
+    int32_t nbonds = 0;
+    
+    if (bpairs.size() > 1)
+    {
+        std::vector<int32_t> bvec(bpairs.begin(), bpairs.end());
+        
+        int32_t mbonds = static_cast<int32_t>(bpairs.size() - 1);
+        
+        do {
+            auto cbonds = _getLongestBondForPath(bvec);
+            
+            if (cbonds > nbonds)  nbonds = cbonds;
+            
+            if (nbonds == mbonds) break;
+            
+        } while (std::next_permutation(bvec.begin(), bvec.end()));
+    }
+    
+    return nbonds;
+}
+
+int32_t
+CCommonNeighbors::_getLongestBondForPath(const std::vector<int32_t>& path)
+{
+    const auto natoms = _bonds.getNumberOfRows();
+    
+    auto edges = _adjacencies.data();
+    
+    const auto ndim = path.size() - 1;
+    
+    int32_t mbonds = 0;
+    
+    int32_t cbonds = 0;
+    
+    for (size_t i = 0; i < ndim; i++)
+    {
+        if (edges[path[i] * natoms + path[i + 1]] == 1)
+        {
+            cbonds++;
+        }
+        else
+        {
+            if (cbonds > mbonds) mbonds = cbonds;
+            
+            cbonds = 0;
+        }
+    }
+    
+    return mbonds;
+}
+
+int32_t
+CCommonNeighbors::_getBondIdentifier(const CTwoIndexes& atomsPair)
+{
+    const auto ndim = _composition.size();
+        
+    auto it = _composition.find(_idAtomic[atomsPair.first()]);
+    
+    const auto idxa = std::distance(_composition.begin(), it);
+    
+    it = _composition.find(_idAtomic[atomsPair.second()]);
+    
+    const auto idxb = std::distance(_composition.begin(), it);
+    
+    if (idxa > idxb)
+    {
+        return static_cast<int32_t>(idxb * ndim + idxa);
+    }
+    else
+    {
+        return static_cast<int32_t>(idxa * ndim + idxb);
+    }
+}
+
+void
+CCommonNeighbors::_add(const CFourIndexes& signature)
+{
+    const auto idx = _find(signature);
+    
+    if (idx == -1)
+    {
+        _signatures.push_back(signature);
+        
+        _repetitions.push_back(1);
+    }
+    else
+    {
+        _repetitions[idx] = _repetitions[idx] + 1;
+    }
+}
+
+int32_t
+CCommonNeighbors::_find(const CFourIndexes& signature)
+{
+    for (size_t i = 0; i < _signatures.size(); i++)
+    {
+        if (_signatures[i] == signature)
+        {
+            return static_cast<int32_t>(i);
+        }
+    }
+    
+    return -1;
+}
+
+std::vector<CFourIndexes>
+CCommonNeighbors::getSignatures() const
+{
+    return _signatures;
+}
+
+std::vector<int32_t>
+CCommonNeighbors::getRepetitions() const
+{
+    return _repetitions;
+}
+
+double
+CCommonNeighbors::compJaccardIndex(const CCommonNeighbors& other) 
+{
+    // compute intersection
+    
+    int32_t ifact = 0;
+    
+    for (int32_t i = 0; i < other._signatures.size(); i++)
+    {
+        const auto j = _find(_signatures[i]);
+        
+        if (j != -1)
+        {
+            const auto irep = _repetitions[i];
+            
+            const auto jrep = other._repetitions[j];
+            
+            if (irep > jrep)
+            {
+                ifact += jrep;
+            }
+            else
+            {
+                ifact += irep;
+            }
+        }
+    }
+    
+    // compute union
+    
+    int32_t ufact = 1;
+    
+    for (int32_t i = 0; i < other._signatures.size(); i++)
+    {
+        const auto j = _find(_signatures[i]);
+        
+        if (j != -1)
+        {
+            const auto irep = _repetitions[i];
+            
+            const auto jrep = other._repetitions[j];
+            
+            if (irep > jrep)
+            {
+                ufact += irep;
+            }
+            else
+            {
+                ufact += jrep;
+            }
+        }
+    }
+    
+    
+    return  static_cast<double>(ifact) / static_cast<double>(ufact);
+}
+
 std::ostream&
 operator<<(      std::ostream&     output,
            const CCommonNeighbors& source)
@@ -367,6 +635,20 @@ operator<<(      std::ostream&     output,
         output << source._repetitions[i] << std::endl;
     }
 
+    output << "_idAtomic: " << source._idAtomic.size() << std::endl;
+    
+    for (size_t i = 0; i < source._idAtomic.size(); i++)
+    {
+        output << source._idAtomic[i] << std::endl;
+    }
+    
+    output << "_composition: " << source._composition.size() << std::endl;
+       
+    for (const auto& tval : source._composition)
+    {
+           output << tval << std::endl;
+    }
+    
     return output;
 }
 
