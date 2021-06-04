@@ -31,6 +31,9 @@
 #include <iterator>
 #include <sstream>
 
+#include "ChemicalElement.hpp"
+#include "StringFormat.hpp"
+
 CCommonNeighbors::CCommonNeighbors()
     
     :  _cutRadius(0.0)
@@ -46,6 +49,8 @@ CCommonNeighbors::CCommonNeighbors()
     , _idAtomic(std::vector<int32_t>())
 
     , _composition(std::set<int32_t>())
+
+    , _bondLabels(std::vector<std::string>())
 {
     
 }
@@ -56,7 +61,8 @@ CCommonNeighbors::CCommonNeighbors(const double                     cutRadius,
                                    const std::vector<CFourIndexes>& signatures,
                                    const std::vector<int32_t>&      repetitions,
                                    const std::vector<int32_t>&      idAtomic,
-                                   const std::set<int32_t>&         composition)
+                                   const std::set<int32_t>&         composition,
+                                   const std::vector<std::string>&  bondLabels)
     :  _cutRadius(cutRadius)
 
     , _adjacencies(adjacencies)
@@ -70,6 +76,8 @@ CCommonNeighbors::CCommonNeighbors(const double                     cutRadius,
     , _idAtomic(idAtomic)
 
     , _composition(composition)
+
+    , _bondLabels(bondLabels)
 {
     
 }
@@ -82,6 +90,8 @@ CCommonNeighbors::CCommonNeighbors(const CMolecule& molecule,
     _computeBonds(molecule);
     
     _computeAdjacencies();
+    
+    _setBondLabels();
 }
 
 CCommonNeighbors::CCommonNeighbors(const CCommonNeighbors& source)
@@ -99,6 +109,8 @@ CCommonNeighbors::CCommonNeighbors(const CCommonNeighbors& source)
     , _idAtomic(source._idAtomic)
 
     , _composition(source._composition)
+
+    , _bondLabels(source._bondLabels)
 {
     
 }
@@ -118,6 +130,8 @@ CCommonNeighbors::CCommonNeighbors(CCommonNeighbors&& source) noexcept
     , _idAtomic(std::move(source._idAtomic))
 
     , _composition(std::move(source._composition))
+
+    , _bondLabels(std::move(source._bondLabels))
 {
     
 }
@@ -145,6 +159,8 @@ CCommonNeighbors::operator=(const CCommonNeighbors& source)
     _idAtomic = source._idAtomic;
     
     _composition = source._composition;
+    
+    _bondLabels = source._bondLabels;
 
     return *this;
 }
@@ -167,6 +183,8 @@ CCommonNeighbors::operator=(CCommonNeighbors&& source) noexcept
     _idAtomic = std::move(source._idAtomic);
     
     _composition = std::move(source._composition);
+    
+    _bondLabels = std::move(source._bondLabels);
 
     return *this;
 }
@@ -187,6 +205,8 @@ CCommonNeighbors::operator==(const CCommonNeighbors& other) const
     if (_idAtomic != other._idAtomic) return false;
     
     if (_composition != other._composition) return false;
+    
+    if (_bondLabels != other._bondLabels) return false;
     
     return true;
 }
@@ -347,15 +367,21 @@ CCommonNeighbors::getSignaturesRepr() const
     
     for (size_t i = 0; i < _signatures.size(); i++)
     {
-        ss << _signatures[i].first()  << " : " ;
+        const auto tsig = _signatures[i];
         
-        ss << "(" << _signatures[i].second();
+        ss << fstr::format(_bondLabels[tsig.first()], 16, fmt::left);
         
-        ss << "," << _signatures[i].third();
+        auto str = "(" + std::to_string(tsig.second())
+                 
+                 + "," + std::to_string(tsig.third())
+                
+                 + "," + std::to_string(tsig.fourth()) + ")";
         
-        ss << "," << _signatures[i].fourth();
+        ss << fstr::format(str, 18, fmt::left);
+        
+        ss << fstr::format(std::to_string(_repetitions[i]), 8, fmt::left);
     
-        ss << ") : " << _repetitions[i] << "\n";
+        ss << "\n";
     }
     
     return ss.str();
@@ -635,6 +661,29 @@ CCommonNeighbors::_add(const CFourIndexes& signature)
     }
 }
 
+void
+CCommonNeighbors::_setBondLabels()
+{
+    auto bele = CChemicalElement();
+    
+    auto kele = CChemicalElement();
+    
+    for (const auto& bval : _composition)
+    {
+        bele.setAtomType(bval);
+        
+        for (const auto& kval : _composition)
+        {
+            kele.setAtomType(kval);
+            
+            const auto str = bele.getName() + "-"
+                            
+                           + kele.getName();
+            
+            _bondLabels.push_back(str);
+        }
+    }
+}
 
 std::ostream&
 operator<<(      std::ostream&     output,
@@ -678,6 +727,12 @@ operator<<(      std::ostream&     output,
            output << tval << std::endl;
     }
     
+    output << "_bondLabels: " << source._bondLabels.size() << std::endl;
+       
+    for (const auto& tval : source._bondLabels)
+    {
+           output << tval << std::endl;
+    }
+    
     return output;
 }
-

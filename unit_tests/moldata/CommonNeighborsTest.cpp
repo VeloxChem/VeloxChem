@@ -38,7 +38,8 @@ TEST_F(CCommonNeighborsTest, DefaultConstructor)
                          std::vector<CFourIndexes>(),
                          std::vector<int32_t>(),
                          std::vector<int32_t>(),
-                         std::set<int32_t>());
+                         std::set<int32_t>(),
+                         std::vector<std::string>());
 
     ASSERT_EQ(cna, cnb);
 }
@@ -180,7 +181,9 @@ TEST_F(CCommonNeighborsTest, GetSignaturesRepr)
     
     const auto str = cna.getSignaturesRepr();
     
-    const std::string refstr("2 : (7,4,2) : 3\n1 : (7,3,2) : 4\n");
+    std::string refstr("H-N             (7,4,2)           3       \n"); 
+                       
+    refstr += "H-C             (7,3,2)           4       \n";
     
     ASSERT_EQ(str, refstr);
 }

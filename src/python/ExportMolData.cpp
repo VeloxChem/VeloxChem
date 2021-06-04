@@ -44,6 +44,7 @@
 #include "PartialCharges.hpp"
 #include "StringFormat.hpp"
 #include "VdwRadii.hpp"
+#include "CommonNeighbors.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -377,6 +378,15 @@ export_moldata(py::module& m)
         .def("compute", &CDispersionModel::compute)
         .def("get_energy", &CDispersionModel::getEnergy)
         .def("get_gradient", &CDispersionModel::getGradient);
+    
+    // CCommonNeighbors class
+
+    PyClass<CCommonNeighbors>(m, "CommonNeighbors")
+        .def(py::init<>())
+        .def(py::init<const CMolecule&, const double>())
+        .def("generate", &CCommonNeighbors::generate)
+        .def("comp_cna", &CCommonNeighbors::compJaccardIndex)
+        .def("__repr__", &CCommonNeighbors::getSignaturesRepr);
 }
 
 }  // namespace vlx_moldata

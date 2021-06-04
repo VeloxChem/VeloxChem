@@ -27,6 +27,7 @@
 #define CommonNeighbors_hpp
 
 #include <cstdint>
+#include <string>
 #include <vector>
 #include <set>
 
@@ -77,6 +78,11 @@ class CCommonNeighbors
       The elemental composition.
      */
     std::set<int32_t> _composition;
+    
+    /**
+      The bond labels.
+     */
+    std::vector<std::string> _bondLabels;
     
     /**
      Computes the bonding matrix for the given molecule.
@@ -138,6 +144,11 @@ class CCommonNeighbors
      @param signature the signature to be added.
     */
     void _add(const CFourIndexes& signature);
+    
+    /**
+     Sets bond labels.
+    */
+    void _setBondLabels();
 
    public:
     /**
@@ -153,6 +164,9 @@ class CCommonNeighbors
      @param bonds The bonds matrix.
      @param signatures The vector of unique CNA signatures.
      @param repetitions The vector of repetitions of unique CNA signatures.
+     @param idAtomic The vector of elemental identifiers.
+     @param composition The elemental composition of molecular system.
+     @param bondLabels The vector of bond labels.
     */
     CCommonNeighbors(const double                     cutRadius,
                      const CMemBlock<int32_t>&        adjacencies,
@@ -160,7 +174,8 @@ class CCommonNeighbors
                      const std::vector<CFourIndexes>& signatures,
                      const std::vector<int32_t>&      repetitions,
                      const std::vector<int32_t>&      idAtomic,
-                     const std::set<int32_t>&         composition);
+                     const std::set<int32_t>&         composition,
+                     const std::vector<std::string>&  bondLabels);
     
     /**
      Creates a common neighbors object using molecule data.

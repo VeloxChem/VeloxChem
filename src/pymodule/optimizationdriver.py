@@ -38,6 +38,7 @@ from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
+from .veloxchemlib import CommonNeighbors
 
 
 class OptimizationDriver:
@@ -80,6 +81,11 @@ class OptimizationDriver:
         self.filename = filename
         self.grad_drv = grad_drv
         self.flag = flag
+        
+        self.cna = False
+        self.cna_bond = 3.7
+        self.cna_rcut = 4.5
+        
 
     def update_settings(self, opt_dict):
         """
@@ -95,6 +101,9 @@ class OptimizationDriver:
             'check_interval': 'int',
             'max_iter': 'int',
             'ref_xyz': 'str',
+            'cna': 'bool',
+            'cna_bond': 'float',
+            'cna_rcut': 'float',
         }
 
         parse_input(self, opt_keywords, opt_dict)
@@ -190,7 +199,10 @@ class OptimizationDriver:
                     self.print_ic_rmsd(final_mol, self.ref_xyz)
                 else:
                     self.print_ic_rmsd(final_mol, molecule)
-
+                    
+            if self.cna:
+                self.cna_analysis(final_mol, molecule, self.ref_xyz)
+    
             valstr = '*** Time spent in Optimization Driver: '
             valstr += '{:.2f} sec'.format(tm.time() - start_time)
             self.ostream.print_header(valstr)
@@ -453,3 +465,87 @@ class OptimizationDriver:
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def cna_analysis(self, last_mol, start_mol, ref_mol):
+        """
+        Performs common neighbor analysis between the initial, optimized,
+        and reference geometries.
+
+        :param last_mol:
+            The last i.e. optimized molecule.
+        :param start_mol:
+            The first i.e. initial molecule.
+        :param ref_mol:
+            The reference molecule (or xyz filename).
+        """
+
+        self.ostream.print_blank()
+
+        xyz_filename = ref_mol if isinstance(ref_mol, str) else None
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Summary of Common Neighbor Analysis')
+        self.ostream.print_header('=' * 37)
+        self.ostream.print_blank()
+        
+        # compute CNA signatures for first/last molecules
+        
+        cna_first = CommonNeighbors(start_mol, self.cna_bond)
+        cna_first.generate(self.cna_rcut)
+        
+        cna_last = CommonNeighbors(last_mol, self.cna_bond)
+        cna_last.generate(self.cna_rcut)
+        
+        # compute CNA signatures for reference molecule
+        
+        cna_ref = None
+        if xyz_filename is not None:
+            if Path(xyz_filename).is_file():
+                ref_mol = Molecule.read_xyz(xyz_filename)
+            else:
+                return '*** Note: invalid reference xyz file!'
+            cna_ref = CommonNeighbors(ref_mol, self.cna_bond)
+            cna_ref.generate(self.cna_rcut)
+        
+        # print signatures
+        
+        self.print_bonding_pattern(cna_first, 'Initial')
+        self.print_bonding_pattern(cna_last, 'Optimized')
+        if cna_ref is not None:
+                self.print_bonding_pattern(cna_ref, 'Reference')
+        
+        # print Jaccard similarity indexes
+        
+        self.ostream.print_header('Jaccard Similarity Indexes')
+        self.ostream.print_header('-' * 28)
+        fact = cna_last.comp_cna(cna_first) * 100.0
+        valstr = 'Initial/Optimized   {:3.2f}'.format(fact)
+        self.ostream.print_header(valstr)
+        if cna_ref is not None:
+            fact = cna_ref.comp_cna(cna_first) * 100.0
+            valstr = 'Reference/Initial   {:3.2f}'.format(fact)
+            self.ostream.print_header(valstr)
+            fact = cna_ref.comp_cna(cna_last) * 100.0
+            valstr = 'Reference/Optimized {:3.2f}'.format(fact)
+            self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        
+    def print_bonding_pattern(self, cna_data, label):
+        """
+        Prints bonding pattern for the given CNA data.
+
+        :param cna_data:
+            The CNA data with bonding pattern information.
+        :param label:
+            The label of bonding patterm header.
+        """
+        valstr = 'Bonding Pattern of ' + label + ' Geometry'
+        self.ostream.print_header(valstr)
+        self.ostream.print_header('-' * 41)
+        valstr = '{:>9s} {:>15s} {:>15s}'.format('Bond Type',
+                                                 'Signature',
+                                                 'Repetitions')
+        self.ostream.print_header(valstr)
+        self.ostream.print_header(len(valstr) * '-')
+        self.ostream.print_block(str(cna_data))
+        self.ostream.print_blank()
