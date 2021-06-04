@@ -29,8 +29,7 @@
 #include <set>
 #include <algorithm>
 #include <iterator>
-
-#include <iostream>
+#include <sstream>
 
 CCommonNeighbors::CCommonNeighbors()
     
@@ -201,6 +200,10 @@ CCommonNeighbors::operator!=(const CCommonNeighbors& other) const
 void
 CCommonNeighbors::generate(const double radius)
 {
+    _signatures.clear();
+    
+    _repetitions.clear();
+    
     for (const auto& tidx : getBondPairs())
     {
         const auto idbond = _getBondIdentifier(tidx);
@@ -248,6 +251,114 @@ CCommonNeighbors::getBondPairs() const
     }
     
     return bpairs;
+}
+
+std::vector<CFourIndexes>
+CCommonNeighbors::getSignatures() const
+{
+    return _signatures;
+}
+
+std::vector<int32_t>
+CCommonNeighbors::getRepetitions() const
+{
+    return _repetitions;
+}
+
+double
+CCommonNeighbors::compJaccardIndex(const CCommonNeighbors& other)
+{
+    // compute intersection
+    
+    std::vector<CFourIndexes> ivecab;
+    
+    for (const auto& tval : _signatures)
+    {
+        if (other.find(tval) != -1)
+        {
+            ivecab.push_back(tval);
+        }
+    }
+    
+    int32_t ifact = 0;
+    
+    for (const auto& tval : ivecab)
+    {
+        const auto repa = _repetitions[find(tval)];
+        
+        const auto repb = other._repetitions[other.find(tval)];
+        
+        ifact += (repa > repb) ? repb : repa;
+    }
+    
+    // compute union
+    
+    int32_t ufact = 0;
+    
+    for (size_t i = 0; i < _signatures.size(); i++)
+    {
+        const auto idx = other.find(_signatures[i]);
+        
+        const auto repa = _repetitions[i];
+        
+        if (idx == -1)
+        {
+            ufact += repa;
+        }
+        else
+        {
+            const auto repb = other._repetitions[idx];
+            
+            ufact += (repa > repb) ? repa : repb;
+        }
+    }
+    
+    for (int32_t i = 0; i < other._signatures.size(); i++)
+    {
+        const auto idx = find(other._signatures[i]);
+        
+        if (idx == - 1)
+        {
+            ufact += other._repetitions[i];
+        }
+    }
+    
+    return  static_cast<double>(ifact) / static_cast<double>(ufact);
+}
+
+int32_t
+CCommonNeighbors::find(const CFourIndexes& signature) const
+{
+    for (size_t i = 0; i < _signatures.size(); i++)
+    {
+        if (_signatures[i] == signature)
+        {
+            return static_cast<int32_t>(i);
+        }
+    }
+    
+    return -1;
+}
+
+std::string
+CCommonNeighbors::getSignaturesRepr() const
+{
+    std::stringstream ss;
+    
+    for (size_t i = 0; i < _signatures.size(); i++)
+    {
+        ss << _signatures[i].first()  << " : " ;
+        
+        ss << "(" << _signatures[i].second();
+        
+        ss << "," << _signatures[i].third();
+        
+        ss << "," << _signatures[i].fourth();
+    
+        ss << ") : " << _repetitions[i] << "\n";
+    }
+    
+    return ss.str();
 }
 
 void
@@ -510,7 +621,7 @@ CCommonNeighbors::_getBondIdentifier(const CTwoIndexes& atomsPair)
 void
 CCommonNeighbors::_add(const CFourIndexes& signature)
 {
-    const auto idx = _find(signature);
+    const auto idx = find(signature);
     
     if (idx == -1)
     {
@@ -524,88 +635,6 @@ CCommonNeighbors::_add(const CFourIndexes& signature)
     }
 }
 
-int32_t
-CCommonNeighbors::_find(const CFourIndexes& signature)
-{
-    for (size_t i = 0; i < _signatures.size(); i++)
-    {
-        if (_signatures[i] == signature)
-        {
-            return static_cast<int32_t>(i);
-        }
-    }
-    
-    return -1;
-}
-
-std::vector<CFourIndexes>
-CCommonNeighbors::getSignatures() const
-{
-    return _signatures;
-}
-
-std::vector<int32_t>
-CCommonNeighbors::getRepetitions() const
-{
-    return _repetitions;
-}
-
-double
-CCommonNeighbors::compJaccardIndex(const CCommonNeighbors& other) 
-{
-    // compute intersection
-    
-    int32_t ifact = 0;
-    
-    for (int32_t i = 0; i < other._signatures.size(); i++)
-    {
-        const auto j = _find(_signatures[i]);
-        
-        if (j != -1)
-        {
-            const auto irep = _repetitions[i];
-            
-            const auto jrep = other._repetitions[j];
-            
-            if (irep > jrep)
-            {
-                ifact += jrep;
-            }
-            else
-            {
-                ifact += irep;
-            }
-        }
-    }
-    
-    // compute union
-    
-    int32_t ufact = 1;
-    
-    for (int32_t i = 0; i < other._signatures.size(); i++)
-    {
-        const auto j = _find(_signatures[i]);
-        
-        if (j != -1)
-        {
-            const auto irep = _repetitions[i];
-            
-            const auto jrep = other._repetitions[j];
-            
-            if (irep > jrep)
-            {
-                ufact += irep;
-            }
-            else
-            {
-                ufact += jrep;
-            }
-        }
-    }
-    
-    
-    return  static_cast<double>(ifact) / static_cast<double>(ufact);
-}
 
 std::ostream&
 operator<<(      std::ostream&     output,

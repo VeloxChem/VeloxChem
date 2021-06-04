@@ -138,14 +138,6 @@ class CCommonNeighbors
      @param signature the signature to be added.
     */
     void _add(const CFourIndexes& signature);
-    
-    /**
-     Finds requested signature to vector of unique signatures.
-        
-     @param signature the signature to be find.
-     @return the index of requested signature in vector of unique signatures.
-    */
-    int32_t _find(const CFourIndexes& signature);
 
    public:
     /**
@@ -274,6 +266,21 @@ class CCommonNeighbors
      @return the vector of repetitions.
     */
     double compJaccardIndex(const CCommonNeighbors& other);
+    
+    /**
+     Finds requested signature in vector of unique signatures.
+        
+     @param signature the signature to be find.
+     @return the index of requested signature in vector of unique signatures.
+    */
+    int32_t find(const CFourIndexes& signature) const;
+    
+    /**
+     Gets signatures string representation.
+        
+     @return the string representation of signatures.
+    */
+    std::string getSignaturesRepr() const;
     
     /**
      Converts common neighbors object to text output and insert it into output text

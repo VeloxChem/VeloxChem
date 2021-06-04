@@ -121,6 +121,25 @@ TEST_F(CCommonNeighborsTest, Generate)
                                                               CFourIndexes(1, 7, 3, 2)}));
 }
 
+TEST_F(CCommonNeighborsTest, GetRepetitions)
+{
+    CCommonNeighbors cna(vlxmol::getMoleculeNH3CH4(), 3.0);
+    
+    cna.generate(15.0);
+
+    ASSERT_EQ(cna.getRepetitions(), std::vector<int32_t>({3, 4}));
+}
+
+TEST_F(CCommonNeighborsTest, GetSignatures)
+{
+    CCommonNeighbors cna(vlxmol::getMoleculeNH3CH4(), 3.0);
+    
+    cna.generate(15.0);
+    
+    ASSERT_EQ(cna.getSignatures(), std::vector<CFourIndexes>({CFourIndexes(2, 7, 4, 2),
+                                                              CFourIndexes(1, 7, 3, 2)}));
+}
+
 TEST_F(CCommonNeighborsTest, CompJaccardIndex)
 {
     CCommonNeighbors cna(vlxmol::getMoleculeNH3CH4(), 3.0);
@@ -132,5 +151,36 @@ TEST_F(CCommonNeighborsTest, CompJaccardIndex)
     cnb.generate(3.0);
 
     ASSERT_NEAR(cna.compJaccardIndex(cna), 1.0, 1.0e-13);
+    
+    ASSERT_NEAR(cnb.compJaccardIndex(cnb), 1.0, 1.0e-13);
+    
+    ASSERT_NEAR(cna.compJaccardIndex(cnb), 0.0, 1.0e-13);
+    
+    ASSERT_NEAR(cnb.compJaccardIndex(cna), 0.0, 1.0e-13);
 }
 
+TEST_F(CCommonNeighborsTest, Find)
+{
+    CCommonNeighbors cna(vlxmol::getMoleculeNH3CH4(), 3.0);
+    
+    cna.generate(15.0);
+    
+    ASSERT_EQ(cna.find(CFourIndexes(2, 7, 4, 2)), 0);
+    
+    ASSERT_EQ(cna.find(CFourIndexes(1, 7, 3, 2)), 1);
+    
+    ASSERT_EQ(cna.find(CFourIndexes(1, 7, 3, 1)), -1);
+}
+
+TEST_F(CCommonNeighborsTest, GetSignaturesRepr)
+{
+    CCommonNeighbors cna(vlxmol::getMoleculeNH3CH4(), 3.0);
+    
+    cna.generate(15.0);
+    
+    const auto str = cna.getSignaturesRepr();
+    
+    const std::string refstr("2 : (7,4,2) : 3\n1 : (7,3,2) : 4\n");
+    
+    ASSERT_EQ(str, refstr);
+}
