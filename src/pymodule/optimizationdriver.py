@@ -34,6 +34,7 @@ import geometric
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import hartree_in_kcalpermol
+from .veloxchemlib import bohr_in_angstroms
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 from .errorhandler import assert_msg_critical
@@ -83,8 +84,8 @@ class OptimizationDriver:
         self.flag = flag
         
         self.cna = False
-        self.cna_bond = 3.7
-        self.cna_rcut = 4.5
+        self.cna_bond = None
+        self.cna_rcut = None
         
 
     def update_settings(self, opt_dict):
@@ -107,6 +108,18 @@ class OptimizationDriver:
         }
 
         parse_input(self, opt_keywords, opt_dict)
+        
+        # update CNA bond cut-off radius
+        if self.cna_bond is None:
+            self.cna_bond = 3.0
+        else:
+            self.cna_bond /= bohr_in_angstroms()
+            
+        # update CNA bond environment cut-off radius
+        if self.cna_rcut is None:
+            self.cna_rcut = 4.5
+        else:
+            self.cna_rcut /= bohr_in_angstroms()
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
