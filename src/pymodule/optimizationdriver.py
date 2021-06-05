@@ -119,7 +119,7 @@ class OptimizationDriver:
         if self.cna_rcut is None:
             self.cna_rcut = 4.5
         else:
-            self.cna_rcut /= bohr_in_angstroms()
+            self.cna_rcut /= bohr_in_angstroms() 
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
@@ -541,6 +541,13 @@ class OptimizationDriver:
             fact = cna_ref.comp_cna(cna_last) * 100.0
             valstr = 'Reference/Optimized {:3.2f}'.format(fact)
             self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        
+        # print radius
+        valstr = 'Bond cut-off radius: {:3.1f}'.format(self.cna_bond)
+        self.ostream.print_header(valstr)
+        valstr = 'Environment cut-off radius: {:3.1f}'.format(self.cna_rcut)
+        self.ostream.print_header(valstr)
         self.ostream.print_blank()
         
     def print_bonding_pattern(self, cna_data, label):
