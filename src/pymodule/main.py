@@ -392,6 +392,16 @@ def main():
         task.input_dict['loprop']['density'] = density
         loprop_driver = LoPropDriver(task)
         loprop_driver.compute()
+        
+    # CNA correlation analysis
+
+    if task_type == 'cna':
+        if 'cna' in task.input_dict:
+            cna_dict = task.input_dict['cna']
+        else:
+            cna_dict = {}
+            
+        print("Doing CNA analysis")
 
     # All done
 
