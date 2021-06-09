@@ -36,7 +36,7 @@
 
 #include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
-#include "VdwRadii.hpp"
+#include "AtomicRadii.hpp"
 
 /**
  Class CMolecule stores data about single molecule and provides set of methods
@@ -317,6 +317,20 @@ class CMolecule
      @return the vector of VDW radii.
      */
     std::vector<double> getVdwRadii() const;
+
+    /**
+     Gets MK radii of the atoms.
+
+     @return the vector of MK radii.
+     */
+    std::vector<double> getMkRadii() const;
+
+    /**
+     Gets covalent radii of the atoms.
+
+     @return the vector of covalent radii.
+     */
+    std::vector<double> getCovalentRadii() const;
 
     /**
      Gets labele of specific atom.

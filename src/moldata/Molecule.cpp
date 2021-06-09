@@ -541,7 +541,46 @@ CMolecule::getVdwRadii() const
 {
     std::vector<double> atomradii;
 
-    auto radii = vdwradii::buildVdwRadii();
+    auto radii = atomicradii::buildVdwRadii();
+
+    for (int32_t i = 0; i < getNumberOfAtoms(); i++)
+    {
+        atomradii.push_back(radii[_idsElemental.data()[i]]);
+    }
+
+    return atomradii;
+}
+
+std::vector<double>
+CMolecule::getMkRadii() const
+{
+    std::vector<double> atomradii;
+
+    auto mk_radii = atomicradii::buildMkRadii();
+
+    auto vdw_radii = atomicradii::buildVdwRadii();
+
+    for (int32_t i = 0; i < getNumberOfAtoms(); i++)
+    {
+        if (_idsElemental.data()[i] < mk_radii.size())
+        {
+            atomradii.push_back(mk_radii[_idsElemental.data()[i]]);
+        }
+        else
+        {
+            atomradii.push_back(vdw_radii[_idsElemental.data()[i]]);
+        }
+    }
+
+    return atomradii;
+}
+
+std::vector<double>
+CMolecule::getCovalentRadii() const
+{
+    std::vector<double> atomradii;
+
+    auto radii = atomicradii::buildCovalentRadii();
 
     for (int32_t i = 0; i < getNumberOfAtoms(); i++)
     {

@@ -43,7 +43,7 @@
 #include "Molecule.hpp"
 #include "PartialCharges.hpp"
 #include "StringFormat.hpp"
-#include "VdwRadii.hpp"
+#include "AtomicRadii.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -242,6 +242,26 @@ CMolecule_vdw_radii_to_numpy(const CMolecule& self)
     return vlx_general::pointer_to_numpy(atomradii.data(), static_cast<int32_t>(atomradii.size()));
 }
 
+// Helper function for getting MK radii for molecule
+
+static py::array_t<double>
+CMolecule_mk_radii_to_numpy(const CMolecule& self)
+{
+    auto atomradii = self.getMkRadii();
+
+    return vlx_general::pointer_to_numpy(atomradii.data(), static_cast<int32_t>(atomradii.size()));
+}
+
+// Helper function for getting covalent radii for molecule
+
+static py::array_t<double>
+CMolecule_covalent_radii_to_numpy(const CMolecule& self)
+{
+    auto atomradii = self.getCovalentRadii();
+
+    return vlx_general::pointer_to_numpy(atomradii.data(), static_cast<int32_t>(atomradii.size()));
+}
+
 // Helper function for getting nuclear charges for molecule
 
 static py::array_t<int32_t>
@@ -355,6 +375,8 @@ export_moldata(py::module& m)
         .def("coordination_numbers", &CMolecule_coordination_numbers)
         .def("partial_charges", &CMolecule_partial_charges)
         .def("vdw_radii_to_numpy", &CMolecule_vdw_radii_to_numpy)
+        .def("mk_radii_to_numpy", &CMolecule_mk_radii_to_numpy)
+        .def("covalent_radii_to_numpy", &CMolecule_covalent_radii_to_numpy)
         .def("elem_ids_to_numpy", &CMolecule_elem_ids_to_numpy)
         .def("masses_to_numpy", &CMolecule_masses_to_numpy)
         .def("get_elemental_composition", &CMolecule_get_elem_comp)
