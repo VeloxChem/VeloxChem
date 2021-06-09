@@ -36,6 +36,7 @@ from .mp2driver import Mp2Driver
 from .mpitask import MpiTask
 from .optimizationdriver import OptimizationDriver
 from .pulsedrsp import PulsedResponse
+from .respchargesdriver import RespChargesDriver
 from .rspabsorption import Absorption
 from .rspc6 import C6
 from .rspcdspec import CircularDichroismSpectrum
@@ -215,7 +216,7 @@ def main():
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'scf', 'uscf', 'wavefunction', 'wave function',
         'mp2', 'gradient', 'optimize', 'response', 'pulses', 'visualization',
-        'loprop'
+        'loprop', 'resp charges', 'esp charges'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -392,6 +393,30 @@ def main():
         task.input_dict['loprop']['density'] = density
         loprop_driver = LoPropDriver(task)
         loprop_driver.compute()
+
+    # RESP charges
+
+    if task_type == 'resp charges':
+        if 'resp_charges' in task.input_dict:
+            resp_charges_dict = task.input_dict['resp_charges']
+        else:
+            resp_charges_dict = {}
+
+        resp_drv = RespChargesDriver(task.mpi_comm, task.ostream)
+        resp_drv.update_settings(resp_charges_dict)
+        resp_drv.compute(task.molecule, task.ao_basis, scf_tensors)
+
+    # ESP charges
+
+    if task_type == 'esp charges':
+        if 'esp_charges' in task.input_dict:
+            esp_charges_dict = task.input_dict['esp_charges']
+        else:
+            esp_charges_dict = {}
+
+        esp_drv = RespChargesDriver(task.mpi_comm, task.ostream)
+        esp_drv.update_settings(esp_charges_dict)
+        esp_drv.compute_esp_charges(task.molecule, task.ao_basis, scf_tensors)
 
     # All done
 
