@@ -420,8 +420,17 @@ TEST_F(CMolecularBasisTest, GetIndexMapForDalton)
     vlxtest::compare({0, 1, 2, 11, 5, 8, 12, 6, 9, 3, 4, 13, 7, 10}, idsmap.data(0));
     
     vlxtest::compare({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}, idsmap.data(1));
+}
+
+TEST_F(CMolecularBasisTest, GetIndexMap)
+{
+    CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();
     
-    std::cout << idsmap << std::endl; 
+    auto lih = vlxmol::getMoleculeLiH();
+    
+    auto idsmap = ambas.getIndexMap(lih);
+    
+    vlxtest::compare({0, 1, 2, 11, 5, 8, 12, 6, 9, 3, 4, 13, 7, 10}, idsmap);
 }
 
 TEST_F(CMolecularBasisTest, GetPositionInAngularBlock)

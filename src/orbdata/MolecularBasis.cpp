@@ -482,6 +482,22 @@ CMolecularBasis::getIndexMapForDalton(const CMolecule &molecule) const
     return idsmap;
 }
 
+std::vector<int32_t>
+CMolecularBasis::getIndexMap(const CMolecule& molecule) const
+{
+    const auto idsmap = getIndexMapForDalton(molecule);
+    
+    const auto ndim = idsmap.size(0);
+    
+    auto vlxidx = idsmap.data(0);
+    
+    std::vector<int32_t> indexes(ndim);
+    
+    for (int32_t i = 0; i < ndim; i++) indexes[i] = vlxidx[i];
+    
+    return indexes;
+}
+
 int32_t
 CMolecularBasis::getPositionInAngularBlock(const CMolecule& molecule,
                                            const int32_t    iAtom,

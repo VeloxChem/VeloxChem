@@ -253,6 +253,7 @@ export_orbdata(py::module& m)
         .def("add_atom_basis", &CMolecularBasis::addAtomBasis)
         .def("get_dimensions_of_basis", &CMolecularBasis::getDimensionsOfBasis)
         .def("get_dimensions_of_primitive_basis", &CMolecularBasis::getDimensionsOfPrimitiveBasis)
+        .def("get_index_map", &CMolecularBasis::getIndexMap)
         .def(py::self == py::self)
         .def("__repr__", &CMolecularBasis::repr)
         .def("n_basis_functions",

@@ -290,6 +290,14 @@ class CMolecularBasis
      */
     CMemBlock2D<int32_t> getIndexMapForDalton(const CMolecule& molecule) const;
     
+    /**
+     Creates indexes to map standard atom/basis indexing scheme to VeloxChem angular momentum based indexing scheme.
+     NOTE: basis set definitions in both programs "MUST" follow angular order.
+     
+     @param molecule the molecule.
+     @return the vector of indexes.
+     */
+    std::vector<int32_t> getIndexMap(const CMolecule& molecule) const;
     
     /**
      Gets position of atomic basis 
