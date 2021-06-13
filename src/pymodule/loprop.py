@@ -68,7 +68,6 @@ class LoPropDriver:
         self.ostream = ostream
 
     def compute(self, molecule, basis):
-        np.set_printoptions(precision=4, suppress=True, linewidth=112)
         """
          calculate the loprop transformation matrix T         
          patial charge (Qab) and localised polarisabilities
