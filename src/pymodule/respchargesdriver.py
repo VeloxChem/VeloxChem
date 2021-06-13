@@ -29,6 +29,8 @@ import sys
 
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import mpi_master
+from .subcommunicators import SubCommunicators
 from .outputstream import OutputStream
 from .inputparser import parse_input
 
@@ -45,6 +47,7 @@ class RespChargesDriver:
     Instance variables:
         - comm: The MPI communicator.
         - rank: The MPI rank.
+        - nodes: The number of MPI processes.
         - ostream: The output stream.
         - n_layers: The number of layers of scaled van der Waals surfaces.
         - density: The density of grid points in points per square Angstrom.
@@ -70,6 +73,7 @@ class RespChargesDriver:
         # mpi information
         self.comm = comm
         self.rank = comm.Get_rank()
+        self.nodes = comm.Get_size()
 
         # outputstream
         self.ostream = ostream
@@ -135,41 +139,44 @@ class RespChargesDriver:
         esp = self.get_electrostatic_potential(grid, molecule, basis,
                                                scf_tensors)
 
-        self.print_header(esp.size)
-        self.print_resp_header()
+        if self.rank == mpi_master():
+            self.print_header(esp.size)
+            self.print_resp_header()
 
-        constr_1, constr_2 = self.generate_constraints(molecule)
+            constr_1, constr_2 = self.generate_constraints(molecule)
 
-        # first stage of resp fit
-        self.print_resp_stage_header('first')
-        q0 = np.zeros(molecule.number_of_atoms())
-        q = self.optimize_charges(grid, esp, q0, constr_1, self.weak_restraint,
-                                  molecule)
-
-        # quality of fit
-        cur_str = 'RRMS          :   {:9.6f}  '.format(
-            self.get_rrms(grid, esp, q, molecule))
-        self.ostream.print_header(cur_str)
-        self.ostream.print_blank()
-
-        # second stage of RESP fit
-        if constr_2 == [-1] * molecule.number_of_atoms():
-            cur_str = '*** No refitting in second stage needed.'
-            self.ostream.print_header(cur_str.ljust(40))
-        else:
-            self.print_resp_stage_header('second')
-            q = self.optimize_charges(grid, esp, q, constr_2,
-                                      self.strong_restraint, molecule)
+            # first stage of resp fit
+            self.print_resp_stage_header('first')
+            q0 = np.zeros(molecule.number_of_atoms())
+            q = self.optimize_charges(grid, esp, q0, constr_1,
+                                      self.weak_restraint, molecule)
 
             # quality of fit
             cur_str = 'RRMS          :   {:9.6f}  '.format(
                 self.get_rrms(grid, esp, q, molecule))
             self.ostream.print_header(cur_str)
+            self.ostream.print_blank()
 
-        self.ostream.print_blank()
-        self.ostream.flush()
+            # second stage of RESP fit
+            if constr_2 == [-1] * molecule.number_of_atoms():
+                cur_str = '*** No refitting in second stage needed.'
+                self.ostream.print_header(cur_str.ljust(40))
+            else:
+                self.print_resp_stage_header('second')
+                q = self.optimize_charges(grid, esp, q, constr_2,
+                                          self.strong_restraint, molecule)
 
-        return q
+                # quality of fit
+                cur_str = 'RRMS          :   {:9.6f}  '.format(
+                    self.get_rrms(grid, esp, q, molecule))
+                self.ostream.print_header(cur_str)
+
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            return q
+        else:
+            return None
 
     def compute_esp_charges(self, molecule, basis, scf_tensors):
         """
@@ -191,32 +198,35 @@ class RespChargesDriver:
         esp = self.get_electrostatic_potential(grid, molecule, basis,
                                                scf_tensors)
 
-        self.print_header(esp.size)
-        self.print_esp_header()
+        if self.rank == mpi_master():
+            self.print_header(esp.size)
+            self.print_esp_header()
 
-        # generate and solve equation system (ESP fit)
-        a, b = self.generate_equation_system(grid, esp, molecule)
-        q = np.linalg.solve(a, b)
+            # generate and solve equation system (ESP fit)
+            a, b = self.generate_equation_system(grid, esp, molecule)
+            q = np.linalg.solve(a, b)
 
-        n_atoms = molecule.number_of_atoms()
+            n_atoms = molecule.number_of_atoms()
 
-        for i in range(n_atoms):
-            cur_str = '{:3d}     {:2s}     {:11.6f}    '.format(
-                i + 1,
-                molecule.get_labels()[i], q[i])
+            for i in range(n_atoms):
+                cur_str = '{:3d}     {:2s}     {:11.6f}    '.format(
+                    i + 1,
+                    molecule.get_labels()[i], q[i])
+                self.ostream.print_header(cur_str)
+
+            self.ostream.print_header(31 * '-')
+            cur_str = 'Total Charge  : {:9.6f}   '.format(np.sum(q[:n_atoms]))
+            self.ostream.print_header(cur_str)
+            cur_str = 'RRMS          : {:9.6f}   '.format(
+                self.get_rrms(grid, esp, q, molecule))
             self.ostream.print_header(cur_str)
 
-        self.ostream.print_header(31 * '-')
-        cur_str = 'Total Charge  : {:9.6f}   '.format(np.sum(q[:n_atoms]))
-        self.ostream.print_header(cur_str)
-        cur_str = 'RRMS          : {:9.6f}   '.format(
-            self.get_rrms(grid, esp, q, molecule))
-        self.ostream.print_header(cur_str)
+            self.ostream.print_blank()
+            self.ostream.flush()
 
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-        return q[:n_atoms]
+            return q[:n_atoms]
+        else:
+            return None
 
     def optimize_charges(self, grid, esp, q0, constr, restraint_strength,
                          molecule):
@@ -258,8 +268,8 @@ class RespChargesDriver:
             # add restraint to matrix a
             rstr = np.zeros(b.size)
             for i in range(n_atoms):
-                if (not self.restrained_hydrogens) and (molecule.get_labels()[i]
-                                                        == 'H'):
+                if (not self.restrained_hydrogens and
+                        molecule.get_labels()[i] == 'H'):
                     continue
                 elif constr[i] == -1:
                     continue
@@ -524,26 +534,51 @@ class RespChargesDriver:
             The ESP at each grid point listed in an array.
         """
 
-        D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
+        if self.rank == mpi_master():
+            D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
+        else:
+            D = None
+        D = self.comm.bcast(D, root=mpi_master())
 
         coords = molecule.get_coordinates()
         elem_ids = molecule.elem_ids_to_numpy()
 
         esp = np.zeros(grid.shape[0])
-        for i in range(esp.size):
 
-            # classical electrostatic potential
-            for j in range(molecule.number_of_atoms()):
-                esp[i] += elem_ids[j] / np.linalg.norm(coords[j] - grid[i])
+        # classical electrostatic potential
+        if self.rank == mpi_master():
+            for i in range(esp.size):
+                for j in range(molecule.number_of_atoms()):
+                    esp[i] += elem_ids[j] / np.linalg.norm(coords[j] - grid[i])
 
-            # electrostatic potential integrals
-            epi_drv = NuclearPotentialIntegralsDriver()
-            epi_matrix = epi_drv.compute(molecule, basis, np.array([[1.0]]),
+        # electrostatic potential integrals
+
+        node_grps = [p for p in range(self.nodes)]
+        subcomm = SubCommunicators(self.comm, node_grps)
+        local_comm = subcomm.local_comm
+        cross_comm = subcomm.cross_comm
+
+        ave, res = divmod(esp.size, self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
+
+        epi_drv = NuclearPotentialIntegralsDriver(local_comm)
+
+        for i in range(start, end):
+            epi_matrix = epi_drv.compute(molecule, basis, np.array([1.0]),
                                          np.array([grid[i]]))
+            if local_comm.Get_rank() == mpi_master():
+                esp[i] -= np.sum(epi_matrix.to_numpy() * D)
 
-            esp[i] -= np.sum(epi_matrix.to_numpy() * D)
+        if local_comm.Get_rank() == mpi_master():
+            esp = cross_comm.reduce(esp, op=MPI.SUM, root=mpi_master())
 
-        return esp
+        if self.rank == mpi_master():
+            return esp
+        else:
+            return None
 
     def get_rrms(self, grid, esp, q, molecule):
         """
