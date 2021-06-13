@@ -26,13 +26,18 @@
 from mpi4py import MPI
 import numpy as np
 import sys
+import MDAnalysis as mda
 
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import mpi_master
 from .subcommunicators import SubCommunicators
 from .outputstream import OutputStream
+from .molecule import Molecule
+from .molecularbasis import MolecularBasis
+from .scfrestdriver import ScfRestrictedDriver
 from .inputparser import parse_input
+from .errorhandler import assert_msg_critical
 
 
 class RespChargesDriver:
@@ -78,6 +83,11 @@ class RespChargesDriver:
         # outputstream
         self.ostream = ostream
 
+        # conformers
+        self.xyz_filename = None
+        self.net_charge = 0.0
+        self.method_dict = None
+
         # grid information
         self.n_layers = 4
         self.density = 1.0
@@ -90,15 +100,13 @@ class RespChargesDriver:
         self.max_iter = 50
         self.threshold = 1.0e-6
 
-    def update_settings(self, resp_dict):
+    def update_settings(self, resp_dict, method_dict=None):
         """
         Updates settings in RESP charges driver.
 
         :param resp_dict:
             The input dictionary of RESP charges group.
         """
-
-        # TODO: add method_dict
 
         resp_keywords = {
             'n_layers': 'int',
@@ -108,6 +116,8 @@ class RespChargesDriver:
             'strong_restraint': 'float',
             'max_iter': 'int',
             'threshold': 'float',
+            'xyz_filename': 'str',
+            'net_charge': 'float',
         }
 
         parse_input(self, resp_keywords, resp_dict)
@@ -119,7 +129,68 @@ class RespChargesDriver:
             for i in list(resp_dict['constraints'].split(', ')):
                 self.constraints.append(list(map(int, list(i.split(' ')))))
 
-    def compute(self, molecule, basis, scf_tensors):
+        if method_dict is not None:
+            self.method_dict = dict(method_dict)
+
+    def compute(self, flag):
+        """
+        Computes RESP or ESP charges.
+
+        :param flag:
+            The flag for the task ("resp" or "esp").
+
+        :return:
+            The charges.
+        """
+
+        errmsg = 'RespChargesDriver: The \'xyz_filename\' keyword is not '
+        errmsg += 'specified.'
+        assert_msg_critical(self.xyz_filename is not None, errmsg)
+
+        u = mda.Universe(str(self.xyz_filename))
+        qs = []
+
+        for ts in u.trajectory:
+            info_text = f'Processing conformer {ts.frame}...'
+            self.ostream.print_info(info_text)
+            self.ostream.flush()
+
+            if self.rank == mpi_master():
+                # create molecule
+                mol = Molecule(u.atoms.names, u.atoms.positions, 'angstrom')
+                mol.set_charge(self.net_charge)
+                # create basis set
+                basis_path = '.'
+                if 'basis_path' in self.method_dict:
+                    basis_path = self.method_dict['basis_path']
+                basis_name = self.method_dict['basis'].upper()
+                basis = MolecularBasis.read(mol, basis_name, basis_path)
+            else:
+                mol = Molecule()
+                basis = MolecularBasis()
+
+            # broadcast molecule and basis set
+            mol.broadcast(self.rank, self.comm)
+            basis.broadcast(self.rank, self.comm)
+
+            # run SCF
+            # TODO: add unrestricted SCF
+            scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
+            scf_drv.update_settings({}, self.method_dict)
+            scf_drv.compute(mol, basis)
+
+            if flag.lower() == 'resp':
+                q = self.compute_resp_charges(mol, basis, scf_drv.scf_tensors)
+                qs.append(q)
+            elif flag.lower() == 'esp':
+                q = self.compute_esp_charges(mol, basis, scf_drv.scf_tensors)
+                qs.append(q)
+            else:
+                qs.append(None)
+
+        return qs
+
+    def compute_resp_charges(self, molecule, basis, scf_tensors):
         """
         Computes RESP charges.
 
