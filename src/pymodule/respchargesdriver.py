@@ -540,12 +540,13 @@ class RespChargesDriver:
             D = None
         D = self.comm.bcast(D, root=mpi_master())
 
-        coords = molecule.get_coordinates()
-        elem_ids = molecule.elem_ids_to_numpy()
-
         esp = np.zeros(grid.shape[0])
 
         # classical electrostatic potential
+
+        coords = molecule.get_coordinates()
+        elem_ids = molecule.elem_ids_to_numpy()
+
         if self.rank == mpi_master():
             for i in range(esp.size):
                 for j in range(molecule.number_of_atoms()):
@@ -558,24 +559,29 @@ class RespChargesDriver:
         local_comm = subcomm.local_comm
         cross_comm = subcomm.cross_comm
 
-        ave, res = divmod(esp.size, self.nodes)
+        ave, res = divmod(grid.shape[0], self.nodes)
         counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
 
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
         epi_drv = NuclearPotentialIntegralsDriver(local_comm)
+        local_esp = np.zeros(end - start)
 
         for i in range(start, end):
             epi_matrix = epi_drv.compute(molecule, basis, np.array([1.0]),
                                          np.array([grid[i]]))
             if local_comm.Get_rank() == mpi_master():
-                esp[i] -= np.sum(epi_matrix.to_numpy() * D)
+                local_esp[i - start] -= np.sum(epi_matrix.to_numpy() * D)
 
         if local_comm.Get_rank() == mpi_master():
-            esp = cross_comm.reduce(esp, op=MPI.SUM, root=mpi_master())
+            local_esp = cross_comm.gather(local_esp, root=mpi_master())
 
         if self.rank == mpi_master():
+            for i in range(self.nodes):
+                start = sum(counts[:i])
+                end = sum(counts[:i + 1])
+                esp[start:end] += local_esp[i]
             return esp
         else:
             return None
