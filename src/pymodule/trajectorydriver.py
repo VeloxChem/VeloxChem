@@ -17,10 +17,10 @@ from .veloxchemlib import hartree_in_inverse_nm
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
-from .inputparser import InputParser
 from .outputstream import OutputStream
 from .rspabsorption import Absorption
 from .subcommunicators import SubCommunicators
+from .inputparser import parse_seq_range
 
 
 class TrajectoryDriver:
@@ -138,7 +138,7 @@ class TrajectoryDriver:
 
         if 'sampling_time' in traj_dict:
             self.sampling_time = np.array(
-                InputParser.parse_frequencies(traj_dict['sampling_time']))
+                parse_seq_range(traj_dict['sampling_time']))
             self.sampling_time *= time_factor
 
         if 'quantum_region' in traj_dict:
@@ -282,9 +282,9 @@ class TrajectoryDriver:
             if local_rank == mpi_master():
 
                 with open(str(potfile), 'w') as f_pot:
-                    f_pot.write('@environment' + os.linesep)
-                    f_pot.write('units: angstrom' + os.linesep)
-                    f_pot.write('xyz:' + os.linesep)
+                    f_pot.write('@environment\n')
+                    f_pot.write('units: angstrom\n')
+                    f_pot.write('xyz:\n')
 
                     res_count = 0
 
@@ -299,7 +299,7 @@ class TrajectoryDriver:
                                         f'{atom.position[1]:15.8f}' +
                                         f'{atom.position[2]:15.8f}' +
                                         f'{res_name:>10s}' + f'{res_count:8d}' +
-                                        os.linesep)
+                                        '\n')
 
                     # write coordinate for the non-polarizable region
                     res_name = 'water-n'
@@ -312,23 +312,23 @@ class TrajectoryDriver:
                                         f'{atom.position[1]:15.8f}' +
                                         f'{atom.position[2]:15.8f}' +
                                         f'{res_name:>10s}' + f'{res_count:8d}' +
-                                        os.linesep)
+                                        '\n')
 
-                    f_pot.write('@end' + os.linesep + os.linesep)
+                    f_pot.write('@end\n\n')
 
                     # charges
                     if self.charges:
-                        f_pot.write('@charges' + os.linesep)
+                        f_pot.write('@charges\n')
                         for line in self.charges:
-                            f_pot.write(line + os.linesep)
-                        f_pot.write('@end' + os.linesep + os.linesep)
+                            f_pot.write(line + '\n')
+                        f_pot.write('@end\n\n')
 
                     # polarizabilities
                     if self.polarizabilities:
-                        f_pot.write('@polarizabilities' + os.linesep)
+                        f_pot.write('@polarizabilities\n')
                         for line in self.polarizabilities:
-                            f_pot.write(line + os.linesep)
-                        f_pot.write('@end' + os.linesep + os.linesep)
+                            f_pot.write(line + '\n')
+                        f_pot.write('@end\n\n')
 
             # update method_dict with potential file
             if 'pe_options' in self.method_dict:
