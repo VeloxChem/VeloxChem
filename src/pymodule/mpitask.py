@@ -129,6 +129,8 @@ class MpiTask:
                     continue
                 self.ostream.print_info('@{:s}'.format(key))
                 for key_2 in self.input_dict[key]:
+                    if key_2 == 'checkpoint_file':
+                        continue
                     if isinstance(self.input_dict[key][key_2], str):
                         self.ostream.print_info('{:s}: {:s}'.format(
                             key_2, self.input_dict[key][key_2]))
@@ -145,11 +147,12 @@ class MpiTask:
             self.ostream.print_info('...done.')
             self.ostream.print_blank()
 
-            self.molecule = Molecule.from_dict(self.input_dict['molecule'])
+            if 'xyz' in self.input_dict['molecule']:
+                self.molecule = Molecule.from_dict(self.input_dict['molecule'])
 
-            self.ostream.print_block(self.molecule.get_string())
-            self.ostream.print_block(self.molecule.more_info())
-            self.ostream.print_blank()
+                self.ostream.print_block(self.molecule.get_string())
+                self.ostream.print_block(self.molecule.more_info())
+                self.ostream.print_blank()
 
             # create basis set
 
@@ -165,16 +168,16 @@ class MpiTask:
 
                 basis_name = self.input_dict['method_settings']['basis'].upper()
 
-                self.ao_basis = MolecularBasis.read(self.molecule, basis_name,
-                                                    basis_path, self.ostream)
+                if 'xyz' in self.input_dict['molecule']:
+                    self.ao_basis = MolecularBasis.read(self.molecule,
+                                                        basis_name, basis_path,
+                                                        self.ostream)
+                    self.min_basis = MolecularBasis.read(
+                        self.molecule, 'MIN-CC-PVDZ', basis_path)
 
-                self.min_basis = MolecularBasis.read(self.molecule,
-                                                     'MIN-CC-PVDZ', basis_path)
-
-                self.ostream.print_block(
-                    self.ao_basis.get_string('Atomic Basis', self.molecule))
-
-                self.ostream.flush()
+                    self.ostream.print_block(
+                        self.ao_basis.get_string('Atomic Basis', self.molecule))
+                    self.ostream.flush()
 
         # broadcast input dictionary
 
@@ -183,9 +186,10 @@ class MpiTask:
 
         # broadcast molecule and basis set
 
-        self.molecule.broadcast(self.mpi_rank, self.mpi_comm)
-        self.ao_basis.broadcast(self.mpi_rank, self.mpi_comm)
-        self.min_basis.broadcast(self.mpi_rank, self.mpi_comm)
+        if 'xyz' in self.input_dict['molecule']:
+            self.molecule.broadcast(self.mpi_rank, self.mpi_comm)
+            self.ao_basis.broadcast(self.mpi_rank, self.mpi_comm)
+            self.min_basis.broadcast(self.mpi_rank, self.mpi_comm)
 
     def finish(self):
         """

@@ -365,6 +365,8 @@ export_orbdata(py::module& m)
     m.def("ao_matrix_to_veloxchem", &gtotra::to_veloxchem);
 
     m.def("ao_matrix_to_dalton", &gtotra::to_dalton);
+
+    m.def("get_basis_function_indices_for_atom", &gtotra::getBasisFunctionIndicesForAtom);
 }
 
 }  // namespace vlx_orbdata

@@ -48,6 +48,7 @@ to_angular_momentum = Mock()
 parse_xc_func = Mock()
 ao_matrix_to_veloxchem = Mock()
 ao_matrix_to_dalton = Mock()
+get_basis_function_indices_for_atom = Mock()
 
 Molecule = Mock()
 MolecularBasis = Mock()
