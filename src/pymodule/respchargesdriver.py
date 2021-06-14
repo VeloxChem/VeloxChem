@@ -132,58 +132,76 @@ class RespChargesDriver:
         if method_dict is not None:
             self.method_dict = dict(method_dict)
 
-    def compute(self, flag):
+    def compute(self, molecule, basis, flag):
         """
         Computes RESP or ESP charges.
 
         :param flag:
             The flag for the task ("resp" or "esp").
+        :param molecule:
+            The molecule.
+        :param basis:
+            The molecular basis set.
 
         :return:
             The charges.
         """
 
-        errmsg = 'RespChargesDriver: The \'xyz_file\' keyword is not '
-        errmsg += 'specified.'
-        assert_msg_critical(self.xyz_file is not None, errmsg)
+        molecules = []
+        basis_sets = []
 
-        u = mda.Universe(str(self.xyz_file))
-        qs = []
+        if molecule.number_of_atoms() > 0:
+            molecules.append(molecule)
+            basis_sets.append(basis)
+        else:
+            errmsg = 'RespChargesDriver: The \'xyz_file\' keyword is not '
+            errmsg += 'specified.'
+            assert_msg_critical(self.xyz_file is not None, errmsg)
 
-        for ts in u.trajectory:
-            info_text = f'Processing conformer {ts.frame}...'
+            info_text = 'Processing conformers...'
+            self.ostream.print_info(info_text)
+
+            u = mda.Universe(str(self.xyz_file))
+            for ts in u.trajectory:
+                if self.rank == mpi_master():
+                    # create molecule
+                    mol = Molecule(u.atoms.names, u.atoms.positions, 'angstrom')
+                    mol.set_charge(self.net_charge)
+                    # create basis set
+                    basis_path = '.'
+                    if 'basis_path' in self.method_dict:
+                        basis_path = self.method_dict['basis_path']
+                    basis_name = self.method_dict['basis'].upper()
+                    bas = MolecularBasis.read(mol, basis_name, basis_path)
+                else:
+                    mol = Molecule()
+                    bas = MolecularBasis()
+
+                # broadcast molecule and basis set
+                mol.broadcast(self.rank, self.comm)
+                bas.broadcast(self.rank, self.comm)
+
+                molecules.append(mol)
+                basis_sets.append(bas)
+
+            info_text = f'Found {len(molecules):d} conformers.'
             self.ostream.print_info(info_text)
             self.ostream.flush()
 
-            if self.rank == mpi_master():
-                # create molecule
-                mol = Molecule(u.atoms.names, u.atoms.positions, 'angstrom')
-                mol.set_charge(self.net_charge)
-                # create basis set
-                basis_path = '.'
-                if 'basis_path' in self.method_dict:
-                    basis_path = self.method_dict['basis_path']
-                basis_name = self.method_dict['basis'].upper()
-                basis = MolecularBasis.read(mol, basis_name, basis_path)
-            else:
-                mol = Molecule()
-                basis = MolecularBasis()
+        qs = []
 
-            # broadcast molecule and basis set
-            mol.broadcast(self.rank, self.comm)
-            basis.broadcast(self.rank, self.comm)
-
+        for mol, bas in zip(molecules, basis_sets):
             # run SCF
             # TODO: add unrestricted SCF
             scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
             scf_drv.update_settings({}, self.method_dict)
-            scf_drv.compute(mol, basis)
+            scf_drv.compute(mol, bas)
 
             if flag.lower() == 'resp':
-                q = self.compute_resp_charges(mol, basis, scf_drv.scf_tensors)
+                q = self.compute_resp_charges(mol, bas, scf_drv.scf_tensors)
                 qs.append(q)
             elif flag.lower() == 'esp':
-                q = self.compute_esp_charges(mol, basis, scf_drv.scf_tensors)
+                q = self.compute_esp_charges(mol, bas, scf_drv.scf_tensors)
                 qs.append(q)
             else:
                 qs.append(None)
@@ -212,7 +230,6 @@ class RespChargesDriver:
 
         if self.rank == mpi_master():
             self.print_header(esp.size)
-            self.print_resp_header()
 
             constr_1, constr_2 = self.generate_constraints(molecule)
 
@@ -287,8 +304,9 @@ class RespChargesDriver:
             self.ostream.print_header(31 * '-')
             cur_str = 'Total Charge  : {:9.6f}   '.format(q_tot)
             self.ostream.print_header(cur_str)
-            self.print_fit_quality(self.get_rrms(grid, esp, q, molecule))
+            self.ostream.print_blank()
 
+            self.print_fit_quality(self.get_rrms(grid, esp, q, molecule))
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -529,7 +547,7 @@ class RespChargesDriver:
         for layer in range(self.number_layers):
 
             # MK radii with layer-dependent scaling factor
-            scaling_factor = 1.4 + layer * 0.4 / np.sqrt(self.n_layers)
+            scaling_factor = 1.4 + layer * 0.4 / np.sqrt(self.number_layers)
             r = scaling_factor * molecule.mk_radii_to_numpy()
 
             for atom in range(molecule.number_of_atoms()):
@@ -692,29 +710,10 @@ class RespChargesDriver:
         str_width = 40
         cur_str = 'Number of Layers             :  ' + str(self.number_layers)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Points per square Angstrom   :  ' + str(self.density)
+        cur_str = 'Points per Square Angstrom   :  ' + str(self.density)
         self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = 'Total Number of Grid Points  :  ' + str(n_points)
         self.ostream.print_header(cur_str.ljust(str_width))
-
-    def print_resp_header(self):
-        """
-        Prints header for RESP charges calculation.
-
-        """
-
-        self.ostream.print_blank()
-        self.ostream.print_header('Restrained ESP Charges')
-        self.ostream.print_header(24 * '-')
-        self.ostream.print_blank()
-
-        if (self.n_layers != 4 or self.density != 1.0 or
-                self.weak_restraint != 0.0005 or
-                self.strong_restraint != 0.001):
-            cur_str = '*** Warning: Parameters for RESP fitting differ from '
-            cur_str += 'optimal choice!'
-            self.ostream.print_header(cur_str.ljust(40))
-            self.ostream.print_blank()
 
     def print_resp_stage_header(self, stage):
         """
@@ -725,31 +724,29 @@ class RespChargesDriver:
         """
 
         str_width = 40
+        self.ostream.print_blank()
 
         if stage.lower() == 'first':
-            if (self.number_layers != 4 or self.density != 1.0 or
-                    self.weak_restraint != 0.0005 or
-                    self.strong_restraint != 0.001):
+            if not self.check_resp_parameters():
                 cur_str = '*** Warning: Parameters for RESP fitting differ '
                 cur_str += 'from recommended choice!'
                 self.ostream.print_header(cur_str.ljust(str_width))
-                self.ostream.print_blank()
             self.ostream.print_blank()
             self.ostream.print_header('First Stage Fit')
             self.ostream.print_header(17 * '-')
             self.ostream.print_blank()
-            cur_str = 'Restraint Strength         :  ' + str(
+            cur_str = 'Restraint Strength           :  ' + str(
                 self.weak_restraint)
         elif stage.lower() == 'second':
             self.ostream.print_header('Second Stage Fit')
             self.ostream.print_header(18 * '-')
             self.ostream.print_blank()
-            cur_str = 'Restraint Strength         :  ' + str(
+            cur_str = 'Restraint Strength           :  ' + str(
                 self.strong_restraint)
 
         self.ostream.print_header(cur_str.ljust(str_width))
-        str_restrained_hydrogens = 'yes' if self.restrained_hydrogens else 'no'
-        cur_str = 'Restrained Hydrogens       :  ' + str_restrained_hydrogens
+        str_restrained_hydrogens = 'Yes' if self.restrained_hydrogens else 'No'
+        cur_str = 'Restrained Hydrogens         :  ' + str_restrained_hydrogens
         self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = 'Max. Number of Iterations    :  ' + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
@@ -767,7 +764,7 @@ class RespChargesDriver:
         self.ostream.print_header('Merz-Kollman ESP Charges')
         self.ostream.print_header(26 * '-')
         self.ostream.print_blank()
-        cur_str = '{}   {}         {}'.format('No.', 'Atom', 'Charge (a.u.)')
+        cur_str = '{}   {}      {}'.format('No.', 'Atom', 'Charge (a.u.)')
         self.ostream.print_header(cur_str)
         self.ostream.print_header(31 * '-')
 
@@ -790,7 +787,6 @@ class RespChargesDriver:
             str_variation = 'Frozen |'
             width = 52
 
-        self.ostream.print_blank()
         cur_str = '{} | {} | {} {} | {}'.format('No.', 'Atom', str_variation,
                                                 'Constraints', 'Charges (a.u.)')
         self.ostream.print_header(cur_str)
@@ -821,6 +817,8 @@ class RespChargesDriver:
         q_tot = round(q_tot * 1e+6) / 1e+6
         cur_str = 'Total Charge  : {:9.6f}   '.format(q_tot)
         self.ostream.print_header(cur_str)
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def print_fit_quality(self, rrms):
         """
@@ -830,8 +828,26 @@ class RespChargesDriver:
             The relative root-mean-square error.
         """
 
-        self.ostream.print_blank()
         self.ostream.print_header('Fit Quality')
         self.ostream.print_header('-' * 13)
         cur_str = 'Relative Root-Mean-Square Error  : {:9.6f}'.format(rrms)
         self.ostream.print_header(cur_str)
+        self.ostream.flush()
+
+    def check_resp_parameters(self):
+        """
+        Checks if the RESP parameters are recommended.
+
+        :return:
+            True if the RESP parameters are recommended, False otherwise.
+        """
+
+        if self.number_layers != 4:
+            return False
+        if abs(self.density - 1.0) > 1e-6:
+            return False
+        if abs(self.weak_restraint - 0.0005) > 1e-6:
+            return False
+        if abs(self.strong_restraint - 0.001) > 1e-6:
+            return False
+        return True

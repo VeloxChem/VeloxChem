@@ -436,9 +436,9 @@ def main():
         chg_drv.update_settings(charges_dict, method_dict)
 
         if 'resp_charges' in task.input_dict:
-            chg_drv.compute('resp')
+            chg_drv.compute(task.molecule, task.ao_basis, 'resp')
         elif 'esp_charges' in task.input_dict:
-            chg_drv.compute('esp')
+            chg_drv.compute(task.molecule, task.ao_basis, 'esp')
 
     # All done
 
