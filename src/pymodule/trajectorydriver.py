@@ -79,7 +79,7 @@ class TrajectoryDriver:
         self.mm_pol_region = None
         self.mm_nonpol_region = None
 
-        self.filename = None
+        self.filename = 'veloxchem_trajectory_input'
         self.method_dict = None
         self.description = 'N/A'
 
@@ -236,8 +236,8 @@ class TrajectoryDriver:
                 # crate pdb files
                 with open(os.devnull, 'w') as f_devnull:
                     with contextlib.redirect_stderr(f_devnull):
-                        qm.write(output_dir /
-                                 f'{self.filename}_frame_{ts.frame}.pdb')
+                        qm.write(output_dir / '{}_frame_{}.pdb'.format(
+                            Path(self.filename).name, ts.frame))
 
                 # make QM molecule whole
                 qm.unwrap()
@@ -274,7 +274,8 @@ class TrajectoryDriver:
                 qm_basis = MolecularBasis()
 
             # create potential file
-            potfile = output_dir / f'{self.filename}_frame_{ts.frame}.pot'
+            potfile = output_dir / '{}_frame_{}.pot'.format(
+                Path(self.filename).name, ts.frame)
 
             if local_rank == mpi_master():
 
@@ -339,7 +340,7 @@ class TrajectoryDriver:
 
             # setup output stream
             output = output_dir / '{}_frame_{}.out'.format(
-                self.filename, ts.frame)
+                Path(self.filename).name, ts.frame)
             ostream = OutputStream(str(output))
             self.print_molecule_and_basis(qm_mol, qm_basis, ostream)
 
@@ -372,6 +373,8 @@ class TrajectoryDriver:
                         'oscillator_strengths': oscillator_strengths,
                     },
                 ))
+
+            ostream.close()
 
         self.ostream.print_blank()
         self.ostream.flush()

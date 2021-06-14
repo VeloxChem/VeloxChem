@@ -258,6 +258,8 @@ def main():
         else:
             scf_dict = {}
 
+        scf_dict['filename'] = task.input_dict['filename']
+
         scf_dict['program_start_time'] = program_start_time
         scf_dict['maximum_hours'] = maximum_hours
 
@@ -431,6 +433,8 @@ def main():
             charges_dict = task.input_dict['esp_charges']
         else:
             charges_dict = {}
+
+        charges_dict['filename'] = task.input_dict['filename']
 
         chg_drv = RespChargesDriver(task.mpi_comm, task.ostream)
         chg_drv.update_settings(charges_dict, method_dict)

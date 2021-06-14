@@ -24,6 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import sys
 import MDAnalysis as mda
@@ -62,6 +63,7 @@ class RespChargesDriver:
         - strong_restraint: The strength of the restraint in second stage of RESP fit.
         - max_iter: The maximum number of iterations of the RESP fit.
         - threshold: The convergence threshold of the RESP fit.
+        - filename: The filename for the calculation.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -87,6 +89,7 @@ class RespChargesDriver:
         self.xyz_file = None
         self.net_charge = 0.0
         self.method_dict = None
+        self.filename = 'veloxchem_electrostatic_potential_input'
 
         # grid information
         self.number_layers = 4
@@ -122,6 +125,9 @@ class RespChargesDriver:
 
         parse_input(self, resp_keywords, resp_dict)
 
+        if 'filename' in resp_dict:
+            self.filename = resp_dict['filename']
+
         # TODO: improve the format of constraints
 
         if 'constraints' in resp_dict:
@@ -150,16 +156,17 @@ class RespChargesDriver:
         molecules = []
         basis_sets = []
 
-        if molecule.number_of_atoms() > 0:
+        use_xyz_file = (molecule.number_of_atoms() == 0)
+
+        if not use_xyz_file:
             molecules.append(molecule)
             basis_sets.append(basis)
+            output_dir = Path(self.filename).parent
+
         else:
             errmsg = 'RespChargesDriver: The \'xyz_file\' keyword is not '
             errmsg += 'specified.'
             assert_msg_critical(self.xyz_file is not None, errmsg)
-
-            info_text = 'Processing conformers...'
-            self.ostream.print_info(info_text)
 
             u = mda.Universe(str(self.xyz_file))
             for ts in u.trajectory:
@@ -186,16 +193,40 @@ class RespChargesDriver:
 
             info_text = f'Found {len(molecules):d} conformers.'
             self.ostream.print_info(info_text)
+            self.ostream.print_blank()
             self.ostream.flush()
+
+            output_dir = Path(self.filename + '_files')
+            if self.rank == mpi_master():
+                output_dir.mkdir(parents=True, exist_ok=True)
+            self.comm.barrier()
 
         qs = []
 
-        for mol, bas in zip(molecules, basis_sets):
+        for ind, (mol, bas) in enumerate(zip(molecules, basis_sets)):
+            if use_xyz_file:
+                info_text = f'Processing conformer {ind+1}...'
+                self.ostream.print_info(info_text)
+                self.ostream.print_blank()
+                self.ostream.flush()
+
             # run SCF
             # TODO: add unrestricted SCF
-            scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
-            scf_drv.update_settings({}, self.method_dict)
-            scf_drv.compute(mol, bas)
+            if not use_xyz_file:
+                scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
+                scf_drv.update_settings({'filename': self.filename},
+                                        self.method_dict)
+                scf_drv.compute(mol, bas)
+
+            else:
+                filename = Path(self.filename).name + f'_conformer_{ind+1}'
+                filename = str(output_dir / filename)
+                ostream = OutputStream(filename + '.out')
+                scf_drv = ScfRestrictedDriver(self.comm, ostream)
+                scf_drv.update_settings({'filename': filename},
+                                        self.method_dict)
+                scf_drv.compute(mol, bas)
+                ostream.close()
 
             if flag.lower() == 'resp':
                 q = self.compute_resp_charges(mol, bas, scf_drv.scf_tensors)
@@ -727,7 +758,7 @@ class RespChargesDriver:
         self.ostream.print_blank()
 
         if stage.lower() == 'first':
-            if not self.check_resp_parameters():
+            if not self.recommended_resp_parameters():
                 cur_str = '*** Warning: Parameters for RESP fitting differ '
                 cur_str += 'from recommended choice!'
                 self.ostream.print_header(cur_str.ljust(str_width))
@@ -834,7 +865,7 @@ class RespChargesDriver:
         self.ostream.print_header(cur_str)
         self.ostream.flush()
 
-    def check_resp_parameters(self):
+    def recommended_resp_parameters(self):
         """
         Checks if the RESP parameters are recommended.
 
@@ -844,10 +875,10 @@ class RespChargesDriver:
 
         if self.number_layers != 4:
             return False
-        if abs(self.density - 1.0) > 1e-6:
+        if self.density != 1.0:
             return False
-        if abs(self.weak_restraint - 0.0005) > 1e-6:
+        if self.weak_restraint != 0.0005:
             return False
-        if abs(self.strong_restraint - 0.001) > 1e-6:
+        if self.strong_restraint != 0.001:
             return False
         return True

@@ -121,6 +121,7 @@ class ScfDriver:
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation using
+        - filename: The filename.
     """
 
     def __init__(self, comm, ostream):
@@ -219,6 +220,9 @@ class ScfDriver:
         self.memory_profiling = False
         self.memory_tracing = False
 
+        # filename
+        self.filename = None
+
     def update_settings(self, scf_dict, method_dict=None):
         """
         Updates settings in SCF driver.
@@ -252,6 +256,8 @@ class ScfDriver:
             self.program_start_time = scf_dict['program_start_time']
         if 'maximum_hours' in scf_dict:
             self.maximum_hours = scf_dict['maximum_hours']
+        if 'filename' in scf_dict:
+            self.filename = scf_dict['filename']
 
         method_keywords = {
             'dispersion': 'bool',
