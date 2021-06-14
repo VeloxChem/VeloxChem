@@ -104,6 +104,9 @@ from . import deprecations
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
+from .import_from_pyscf import overlap_deriv
+from .import_from_pyscf import fock_deriv
+from .import_from_pyscf import eri_deriv
 
 # Environment variable: basis set path and number of OpenMP threads
 from .environ import set_vlxbasispath, set_omp_num_threads, get_basis_path
