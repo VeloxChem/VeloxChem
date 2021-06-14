@@ -7,7 +7,7 @@ basis: 6-31g
 @end
 
 @esp charges
-n_layers: 5
+number layers: 5
 density: 10.0
 @end
 

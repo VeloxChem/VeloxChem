@@ -43,7 +43,7 @@ class RespChargesDriver:
         - comm: The MPI communicator.
         - rank: The MPI rank.
         - ostream: The output stream.
-        - n_layers: The number of layers of scaled van der Waals surfaces.
+        - number_layers: The number of layers of scaled van der Waals surfaces.
         - density: The density of grid points in points per Å².
         - constraints: The constraints for charges to be equal.
         - restrained_hydrogens: If hydrogens should be restrained or not.
@@ -72,7 +72,7 @@ class RespChargesDriver:
         self.ostream = ostream
 
         # grid information
-        self.n_layers = 4
+        self.number_layers = 4
         self.density = 1.0
 
         # resp fitting
@@ -91,8 +91,8 @@ class RespChargesDriver:
             The input dictionary of RESP charges group.
         """
 
-        if 'n_layers' in resp_charges_dict:
-            self.n_layers = int(resp_charges_dict['n_layers'])
+        if 'number_layers' in resp_charges_dict:
+            self.number_layers = int(resp_charges_dict['number_layers'])
         if 'density' in resp_charges_dict:
             self.density = float(resp_charges_dict['density'])
 
@@ -143,7 +143,6 @@ class RespChargesDriver:
             n_points += esp[i].size
 
         self.print_header(len(molecule), n_points)
-        self.print_resp_header()
 
         vary1, vary2 = self.generate_constraints(molecule[0])
 
@@ -151,11 +150,9 @@ class RespChargesDriver:
         self.print_resp_stage_header(True) 
         q0 = np.zeros(molecule[0].number_of_atoms())
         q = self.optimize_charges(grid, esp, q0, vary1, self.weak_restraint, molecule, weights)
+        self.print_resp_stage_results(True, molecule[0], q, vary1)
+        self.print_fit_quality(self.get_rrms(grid, esp, q, molecule, weights))
 
-        # quality-of-fit
-        cur_str = 'RRMS          :   {:9.6f}  '.format(
-            self.get_rrms(grid, esp, q, molecule, weights))
-        self.ostream.print_header(cur_str)
         self.ostream.print_blank()
 
         if vary2 == [-1] * molecule[0].number_of_atoms():
@@ -165,11 +162,8 @@ class RespChargesDriver:
             # second stage of RESP fit
             self.print_resp_stage_header(False)
             q = self.optimize_charges(grid, esp, q, vary2, self.strong_restraint, molecule, weights)
-
-            # quality-of-fit
-            cur_str = 'RRMS          :   {:9.6f}  '.format(
-                self.get_rrms(grid, esp, q, molecule, weights))
-            self.ostream.print_header(cur_str)
+            self.print_resp_stage_results(False, molecule[0], q, vary2)
+            self.print_fit_quality(self.get_rrms(grid, esp, q, molecule, weights))
 
         self.ostream.print_blank()
         self.ostream.flush()
@@ -219,19 +213,19 @@ class RespChargesDriver:
 
         n_atoms = molecule[0].number_of_atoms()
 
+        # print results
         for i in range(n_atoms):
             cur_str = '{:3d}     {:2s}     {:11.6f}    '.format(
                 i + 1, molecule[0].get_labels()[i], q[i])
             self.ostream.print_header(cur_str)
 
         self.ostream.print_header(31 * '-')
-        cur_str = 'Total Charge  : {:9.6f}   '.format(
-            np.sum(q[:n_atoms]))
-        self.ostream.print_header(cur_str)
-        cur_str = 'RRMS          : {:9.6f}   '.format(
-            self.get_rrms(grid, esp, q, molecule, weights))
-        self.ostream.print_header(cur_str)
 
+        q_tot = np.sum(q[:n_atoms])        
+        cur_str = 'Total Charge  : {:9.6f}   '.format(
+             abs(q_tot) if q_tot >= -5e-7 else q_tot)   # no -0.000000
+        self.ostream.print_header(cur_str)
+        self.print_fit_quality(self.get_rrms(grid, esp, q, molecule, weights))
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -296,22 +290,6 @@ class RespChargesDriver:
         else:
             cur_str = '*** Charge fitting converged in {} iterations.'.format(it)
             self.ostream.print_header(cur_str.ljust(40))
-
-        self.ostream.print_blank()
-        cur_str = '{} | {} | {} | {} | {}'.format(
-            'No.', 'Atom', 'Variation', 'Initial Charge', 'Final Charge')
-        self.ostream.print_header(cur_str)
-        self.ostream.print_header(56 * '-')
-
-        for i in range(n_atoms):
-            cur_str = '{:3d}     {:2s}     {:3d}      {:15.6f}   {:12.6f}'.format(
-                i + 1, molecule[0].get_labels()[i], vary[i], q0[i], q_new[i])
-            self.ostream.print_header(cur_str)
-
-        self.ostream.print_header(56 * '-')
-        cur_str = 'Total Charge  :   {:9.6f}   '.format(
-            np.sum(q_new[:n_atoms]))
-        self.ostream.print_header(cur_str)
 
         return q_new[:n_atoms]
 
@@ -475,10 +453,10 @@ class RespChargesDriver:
         grid = []
         coords = molecule.get_coordinates()
 
-        for layer in range(self.n_layers):
+        for layer in range(self.number_layers):
 
             # MK radii with layer-dependent scaling factor
-            r = (1.4 + layer * 0.4 / np.sqrt(self.n_layers)) * molecule.mk_radii_to_numpy()
+            r = (1.4 + layer * 0.4 / np.sqrt(self.number_layers)) * molecule.mk_radii_to_numpy()
 
             for atom in range(molecule.number_of_atoms()):
                 # number of points fitting on the equator
@@ -609,29 +587,12 @@ class RespChargesDriver:
         str_width = 40
         cur_str = 'Number of Conformers         :  ' + str(n_conf)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Number of Layers             :  ' + str(self.n_layers)
+        cur_str = 'Number of Layers             :  ' + str(self.number_layers)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Points per Å²                :  ' + str(self.density)
+        cur_str = 'Points per Square Angstrom   :  ' + str(self.density)
         self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = 'Total Number of Grid Points  :  ' + str(n_points)
         self.ostream.print_header(cur_str.ljust(str_width))
-
-    def print_resp_header(self):
-        """
-        Prints header for RESP charges calculation.
-
-        """
-
-        self.ostream.print_blank()
-        self.ostream.print_header('Restrained ESP Charges')
-        self.ostream.print_header(24 * '-')
-        self.ostream.print_blank()
-
-        if (self.n_layers != 4 or self.density != 1.0 or
-                self.weak_restraint != 0.0005 or self.strong_restraint != 0.001):
-            cur_str = '*** Warning: Parameters for RESP fitting differ from optimal choice!'
-            self.ostream.print_header(cur_str.ljust(40))
-            self.ostream.print_blank()
 
     def print_resp_stage_header(self, stage):
         """
@@ -645,22 +606,28 @@ class RespChargesDriver:
         self.ostream.print_blank()
 
         if stage:
+            if (self.number_layers != 4 or self.density != 1.0 or
+                    self.weak_restraint != 0.0005 or self.strong_restraint != 0.001):
+                cur_str = '*** Warning: Parameters for RESP fitting differ from recommended choice!'
+                self.ostream.print_header(cur_str.ljust(str_width))
+                self.ostream.print_blank()
+            self.ostream.print_blank()
             self.ostream.print_header('First Stage Fit')
             self.ostream.print_header(17 * '-')
             self.ostream.print_blank()
-            cur_str = 'Restraint Strength         :  ' + str(self.weak_restraint)
+            cur_str = 'Restraint Strength           :  ' + str(self.weak_restraint)
         else:
             self.ostream.print_header('Second Stage Fit')
             self.ostream.print_header(18 * '-')
             self.ostream.print_blank()
-            cur_str = 'Restraint Strength         :  ' + str(self.strong_restraint)
+            cur_str = 'Restraint Strength           :  ' + str(self.strong_restraint)
 
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Restrained Hydrogens       :  ' + str(self.restrained_hydrogens)
+        cur_str = 'Restrained Hydrogens         :  ' + str(self.restrained_hydrogens)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Max. Number of Iterations  :  ' + str(self.max_iter)
+        cur_str = 'Max. Number of Iterations    :  ' + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Convergence Threshold      :  ' + str(self.threshold)
+        cur_str = 'Convergence Threshold (a.u.) :  ' + str(self.threshold)
         self.ostream.print_header(cur_str.ljust(str_width))
         self.ostream.print_blank()
 
@@ -674,7 +641,70 @@ class RespChargesDriver:
         self.ostream.print_header('Merz-Kollman ESP Charges')
         self.ostream.print_header(26 * '-')
         self.ostream.print_blank()
-        cur_str = '{}   {}         {}'.format(
-            'No.', 'Atom', 'Charge    ')
+        cur_str = '{}   {}      {}'.format(
+            'No.', 'Atom', 'Charge (a.u.)')
         self.ostream.print_header(cur_str)
         self.ostream.print_header(31 * '-')
+
+    def print_resp_stage_results(self, stage, molecule, q, vary):
+        """
+        Prints results for a stage of the RESP fit.
+
+        :param stage:
+            The stage of the RESP fit.
+        :param q:
+            The final charges of the stage.
+        :param vary:
+            The variations and constraints for the stage.
+        """
+
+        if stage:
+            str_variation = ''
+            width = 44
+        else:
+            str_variation = 'Frozen |'
+            width = 52
+
+        self.ostream.print_blank()
+        cur_str = '{} | {} | {} {} | {}'.format(
+            'No.', 'Atom', str_variation, 'Constraints', 'Charges (a.u.)')
+        self.ostream.print_header(cur_str)
+        self.ostream.print_header(width * '-')
+
+        for i in range(q.size):
+            constraint = ''
+            if vary[i] < 0:
+                str_variation = 'Yes     '
+            elif vary[i] == 0:
+                str_variation = ' No     '
+            else:
+                str_variation = ' No     '
+                constraint = str(vary[i])
+
+            if stage:
+                str_variation = ''
+
+            cur_str = '{:3d}     {:2s}     {}    {:3.6s}     {:12.6f}   '.format(
+                i + 1, molecule.get_labels()[i], str_variation, constraint, q[i])
+            self.ostream.print_header(cur_str)
+
+        self.ostream.print_header(width * '-')
+
+        q_tot = np.sum(q)
+        cur_str = 'Total Charge  : {:9.6f}   '.format(
+             abs(q_tot) if q_tot >= -5e-7 else q_tot)   # no -0.000000
+        self.ostream.print_header(cur_str)
+
+    def print_fit_quality(self, rrms):
+        """
+        Prints fit quality.
+
+        :param rrms:
+            The relative root-mean-square error.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Fit Quality')
+        self.ostream.print_header('-' * 13)
+        cur_str = 'Relative Root-Mean-Square Error  : {:9.6f}'.format(rrms)
+        self.ostream.print_header(cur_str)
