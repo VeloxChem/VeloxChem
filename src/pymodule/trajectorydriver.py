@@ -191,9 +191,6 @@ class TrajectoryDriver:
 
         start_time = tm.time()
 
-        qm_charge = molecule.get_charge()
-        qm_multiplicity = molecule.get_multiplicity()
-
         output_dir = Path(self.filename + '_files')
         if self.rank == mpi_master():
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -261,8 +258,8 @@ class TrajectoryDriver:
                 # create molecule
                 qm_elems = [guess_atom_element(name) for name in qm.names]
                 qm_mol = Molecule(qm_elems, qm.positions, 'angstrom')
+                qm_charge = int(round(qm.total_charge()))
                 qm_mol.set_charge(qm_charge)
-                qm_mol.set_multiplicity(qm_multiplicity)
 
                 # create basis set
                 basis_path = '.'
