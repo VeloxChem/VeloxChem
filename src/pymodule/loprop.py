@@ -30,7 +30,6 @@ import sys
 import os
 from collections import Counter
 
-from .scfrestdriver import ScfRestrictedDriver
 from .lrsolver import LinearResponseSolver
 from .inputparser import InputParser
 from .outputstream import OutputStream
@@ -67,7 +66,7 @@ class LoPropDriver:
         self.nodes = self.comm.Get_size()
         self.ostream = ostream
 
-    def compute(self, molecule, basis):
+    def compute(self, molecule, basis, scf_tensors):
         """
          calculate the loprop transformation matrix T         
          patial charge (Qab) and localised polarisabilities
@@ -83,11 +82,9 @@ class LoPropDriver:
          """
         natoms = molecule.number_of_atoms()
 
-        scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
-        scf_drv.compute(molecule, basis)
-        S = scf_drv.scf_tensors['S']
-        C = scf_drv.scf_tensors['C']
-        D = scf_drv.scf_tensors['D'][0] + scf_drv.scf_tensors['D'][1]
+        S = scf_tensors['S']
+        C = scf_tensors['C_alpha']
+        D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
 
         #number of orbitals
         norb = np.shape(S)[0]
@@ -187,7 +184,7 @@ class LoPropDriver:
 
         #solve linear response
         lrs_drv = LinearResponseSolver(self.comm, self.ostream)
-        lrs_out = lrs_drv.compute(molecule, basis, scf_drv.scf_tensors)
+        lrs_out = lrs_drv.compute(molecule, basis, scf_tensors)
 
         #obtain response vectors
         Nx = lrs_out['solutions'][('x', 0)]
@@ -551,7 +548,7 @@ class LoPropDriver:
         width = 92
 
         self.ostream.print_blank()
-        self.ostream.print_header('Local Properties(loprop) Calculations')
+        self.ostream.print_header('Local Properties (LoProp) Calculations')
         self.ostream.print_header(19 * '=')
         self.ostream.print_blank()
 

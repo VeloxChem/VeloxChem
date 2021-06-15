@@ -420,9 +420,8 @@ def main():
     # LoProp
 
     if task_type == 'loprop':
-        task.input_dict['loprop']['density'] = density
-        loprop_driver = LoPropDriver()
-        loprop_driver.compute(task.molecule, task.ao_basis)
+        loprop_driver = LoPropDriver(task.mpi_comm, task.ostream)
+        loprop_driver.compute(task.molecule, task.ao_basis, scf_tensors)
 
     # RESP and ESP charges
 
