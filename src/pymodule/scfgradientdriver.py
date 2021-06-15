@@ -32,6 +32,11 @@ from .molecule import Molecule
 from .gradientdriver import GradientDriver
 from .outputstream import OutputStream
 
+# For PySCF integral derivatives
+from .import_from_pyscf import overlap_deriv
+from .import_from_pyscf import fock_deriv
+from .import_from_pyscf import eri_deriv
+
 
 class ScfGradientDriver(GradientDriver):
     """
@@ -66,7 +71,81 @@ class ScfGradientDriver(GradientDriver):
         self.scf_drv = scf_drv
         self.delta_h = 0.001
 
+    def update_settings(self, method_dict):
+        """
+        Updates settings in ScfGradientDriver.
+
+        TODO: Add new gradient settings group?
+
+        :param method_dict:
+            The input dicitonary of method settings group.
+        """
+        # Analytical DFT gradient is not implemented yet
+        if 'xcfun' in method_dict:
+            if method_dict['xcfun'] is not None:
+                self.numerical = True
+        if 'dft' in method_dict:
+            key = method_dict['dft'].lower()
+            self.numerical = True if key in ['yes', 'y'] else False
+
+        # TODO: possibly put settings in new input group
+        if 'numerical_grad' in method_dict:
+            key = method_dict['numerical_grad'].lower()
+            self.numerical = True if key in ['yes', 'y'] else False
+
     def compute(self, molecule, ao_basis, min_basis=None):
+        """
+        Computes the analytical or numerical nuclear gradient.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param min_basis:
+            The minimal AO basis set.
+        """
+        if self.numerical:
+            self.compute_numerical(molecule, ao_basis, min_basis)
+        else:
+            self.compute_analytical(molecule, ao_basis)
+
+    def compute_analytical(self, molecule, ao_basis):
+        """
+        Computes the analytical nuclear gradient.
+        So far only for restricted Hartree-Fock with PySCF integral derivatives...
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        """
+        natm = molecule.number_of_atoms()
+        nocc = molecule.number_of_alpha_electrons()
+        mo = self.scf_drv.scf_tensors['C']
+        mo_occ = mo[:, :nocc].copy()
+        one_pdm_ao = self.scf_drv.scf_tensors['D_alpha']
+        mo_energies = self.scf_drv.scf_tensors['E']
+        eocc = mo_energies[:nocc]
+        eo_diag = np.diag(eocc)
+        epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
+
+        # analytical gradient
+        self.gradient = np.zeros((natm, 3))
+
+        for i in range(natm):
+            d_ovlp = overlap_deriv(molecule, ao_basis, i)
+            d_fock = fock_deriv(molecule, ao_basis, one_pdm_ao, i)
+            d_eri = eri_deriv(molecule, ao_basis, i)
+
+            self.gradient[i] += ( 2.0*np.einsum('mn,xmn->x', one_pdm_ao, d_fock)
+                            +2.0*np.einsum('mn,xmn->x', epsilon_dm_ao, d_ovlp)
+                            -2.0*np.einsum('mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
+                            +1.0*np.einsum('mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
+                            )
+
+        self.gradient += self.grad_nuc_contrib(molecule)
+
+    def compute_numerical(self, molecule, ao_basis, min_basis=None):
         """
         Performs calculation of numerical gradient.
 
@@ -93,20 +172,52 @@ class ScfGradientDriver(GradientDriver):
         # numerical gradient
         self.gradient = np.zeros((molecule.number_of_atoms(), 3))
 
-        for i in range(molecule.number_of_atoms()):
-            for d in range(3):
-                coords[i, d] += self.delta_h
-                new_mol = Molecule(labels, coords, units='au')
-                self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                e_plus = self.scf_drv.get_scf_energy()
+        if not self.do_four_point:
+            for i in range(molecule.number_of_atoms()):
+                for d in range(3):
+                    coords[i, d] += self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                    e_plus = self.scf_drv.get_scf_energy()
 
-                coords[i, d] -= 2.0 * self.delta_h
-                new_mol = Molecule(labels, coords, units='au')
-                self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                e_minus = self.scf_drv.get_scf_energy()
+                    coords[i, d] -= 2.0 * self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                    e_minus = self.scf_drv.get_scf_energy()
 
-                coords[i, d] += self.delta_h
-                self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
+                    coords[i, d] += self.delta_h
+                    self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
+
+        else:
+            # Four-point numerical derivative approximation
+            # for debugging of analytical gradient:
+            # [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
+            for i in range(molecule.number_of_atoms()):
+                for d in range(3):
+                    coords[i, d] += self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                    e_plus1 = self.scf_drv.get_scf_energy()
+
+                    coords[i, d] += self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                    e_plus2 = self.scf_drv.get_scf_energy()
+
+                    coords[i, d] -= 3.0 * self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                    e_minus1 = self.scf_drv.get_scf_energy()
+
+                    coords[i, d] -= self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                    e_minus2 = self.scf_drv.get_scf_energy()
+
+                    coords[i, d] += 2.0 * self.delta_h
+                    # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
+                    self.gradient[i, d] = (e_minus2 - 8.0 * e_minus1
+                                           + 8.0 * e_plus1 - e_plus2) / (12.0 * self.delta_h)
 
         self.ostream.print_blank()
 

@@ -58,8 +58,6 @@ class TdhfGradientDriver(GradientDriver):
         self.delta_h = 0.001
         #self.scf_drv = None #scf_drv
         #self.rsp_drv = None
-        # flag for two-point or four-point approximation
-        self.do_four_point = False
 
 
     def update_settings(self, rsp_dict, method_dict=None):

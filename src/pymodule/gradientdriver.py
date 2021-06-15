@@ -23,6 +23,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+import numpy as np
+
 class GradientDriver:
     """
     Implements gradient driver.
@@ -35,6 +37,7 @@ class GradientDriver:
     Instance variables
         - gradient: The gradient.
         - flag: The type of gradient driver.
+        - numerical: Perform numerical gradient calculation.
     """
 
     def __init__(self, comm, ostream):
@@ -47,6 +50,9 @@ class GradientDriver:
 
         self.gradient = None
         self.flag = None
+        self.numerical = False
+        # flag for two-point or four-point approximation
+        self.do_four_point = False
 
     def update_settings(self, scf_dict, method_dict=None):
         """
@@ -73,6 +79,43 @@ class GradientDriver:
         """
 
         return
+
+    def grad_nuc_contrib(self, molecule):
+        """
+        Calculates the contribution of the nuclear-nuclear repulsion
+        to the analytical nuclear gradient.
+
+        :param molecule:
+            The molecule.
+
+        :return:
+            The nuclear contribution to the gradient.
+        """
+        # number of atoms
+        natm = molecule.number_of_atoms()
+
+        # nuclear repulsion energy contribution to nuclear gradient
+        nuc_contrib = np.zeros((natm, 3))
+
+        # atom coordinates (nx3)
+        coords = molecule.get_coordinates()
+
+        # atomic charges
+        nuclear_charges = molecule.elem_ids_to_numpy()
+
+        # loop over all distinct atom pairs and add energy contribution
+        for i in range(natm):
+            z_a = nuclear_charges[i]
+            r_a = coords[i]
+            for j in range(natm):
+                if i != j:
+                    z_b = nuclear_charges[j]
+                    r_b = coords[j]
+                    r = np.sqrt(np.dot(r_a - r_b, r_a - r_b))
+                    nuc_contrib[i] += z_a * z_b * (r_b - r_a) / r**3
+
+        return nuc_contrib
+
 
     def get_gradient(self):
         """

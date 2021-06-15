@@ -3,6 +3,7 @@ from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import ao_matrix_to_veloxchem 
+from .veloxchemlib import ao_matrix_to_dalton
 import numpy as np
 import sys
 
@@ -25,8 +26,18 @@ def translate_to_pyscf(label):
     else:
         return label
 
-def overlap_deriv(molecule, basis, molecule_string, basis_set_label,
-                  i=0, unit="au"):
+def get_molecule_string(molecule):
+    mol_string = ""
+    for i in range(molecule.number_of_atoms()):
+        mol_string += molecule.get_labels()[i] + " "
+        for j in range(3):
+            mol_string += str(molecule.get_coordinates()[i][j]) + " "
+
+        mol_string += "\n"
+
+    return mol_string
+
+def overlap_deriv(molecule, basis, i=0, unit="au"):
     """
     Imports the derivatives of the overlap matrix
     from pyscf and converts it to veloxchem format
@@ -35,11 +46,6 @@ def overlap_deriv(molecule, basis, molecule_string, basis_set_label,
         the vlx molecule object
     :param basis:
         the vlx basis object 
-    :param molecule_string:
-        the string which defines the molecular structure
-        in xyz format
-    :param basis_set_label:
-        the label describing the basis set;
     :param i:
         the index of the atom for which the derivatives
         are computed.
@@ -54,6 +60,8 @@ def overlap_deriv(molecule, basis, molecule_string, basis_set_label,
         with repsect to the x, y and z coords. of atom i.
     """
 
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
                                  basis=pyscf_basis, unit=unit)
@@ -95,8 +103,7 @@ def overlap_deriv(molecule, basis, molecule_string, basis_set_label,
 
     
 
-def fock_deriv(molecule, basis, molecule_string, basis_set_label,
-               i=0, unit="au"):
+def fock_deriv(molecule, basis, density, i=0, unit="au"):
     """
     Imports the derivatives of the Fock matrix
     from pyscf and converts it to veloxchem format
@@ -104,12 +111,9 @@ def fock_deriv(molecule, basis, molecule_string, basis_set_label,
     :param molecule:
         the vlx molecule object
     :param basis:
-        the vlx basis object 
-    :param molecule_string:
-        the string which defines the molecular structure
-        in xyz format
-    :param basis_set_label:
-        the label describing the basis set;
+        the vlx basis object
+    :param density:
+        The SCF density matrix in AO basis
     :param i:
         the index of the atom for which the derivatives
         are computed.
@@ -121,17 +125,20 @@ def fock_deriv(molecule, basis, molecule_string, basis_set_label,
         a numpy array of shape 3 x nao x nao
         (nao = number of atomic orbitals)
         corresponding to the derivative of the Fock matrix
-        with repsect to the x, y and z coords. of atom i.
+        with respect to the x, y and z coords. of atom i.
     """
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
                                  basis=pyscf_basis, unit=unit)
     pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
-    pyscf_scf.kernel()
-    nocc = pyscf_molecule.nelec[0]
-    gs_dm = np.einsum('mi,ni->mn', pyscf_scf.mo_coeff[:,:nocc],
-                       pyscf_scf.mo_coeff[:,:nocc])
-    nao = pyscf_scf.mo_coeff.shape[0]
+    #pyscf_scf.kernel()
+    #nocc = pyscf_molecule.nelec[0]
+    gs_dm = ao_matrix_to_dalton(DenseMatrix(density), basis, molecule).to_numpy()
+    #gs_dm = np.einsum('mi,ni->mn', pyscf_scf.mo_coeff[:,:nocc],
+    #                   pyscf_scf.mo_coeff[:,:nocc])
+    nao = density.shape[0]
     pyscf_grad = grad.RHF(pyscf_scf)
     
     # The "-" sign is due to the fact that pyscf computes -(nabla m n | t p)
@@ -139,7 +146,7 @@ def fock_deriv(molecule, basis, molecule_string, basis_set_label,
     ao_slices = pyscf_molecule.aoslice_by_atom()
     hcore_generator = pyscf_grad.hcore_generator(pyscf_molecule)
     
-    # Get the AO indeces corresponding to atom i 
+    # Get the AO indices corresponding to atom i 
     ki, kf = ao_slices[i, 2:]
 
     eri_deriv_atom_i = np.zeros(pyscf_eri_deriv.shape)
@@ -181,8 +188,7 @@ def fock_deriv(molecule, basis, molecule_string, basis_set_label,
     return vlx_fock_deriv_atom_i
 
 
-def eri_deriv(molecule, basis, molecule_string, basis_set_label,
-               i=0, unit="au"):
+def eri_deriv(molecule, basis, i=0, unit="au"):
     """
     Imports the derivatives of the electron repulsion integrals
     from pyscf and converts them to veloxchem format
@@ -191,11 +197,6 @@ def eri_deriv(molecule, basis, molecule_string, basis_set_label,
         the vlx molecule object
     :param basis:
         the vlx basis object 
-    :param molecule_string:
-        the string which defines the molecular structure
-        in xyz format
-    :param basis_set_label:
-        the label describing the basis set;
     :param i:
         the index of the atom for which the derivatives
         are computed.
@@ -206,6 +207,8 @@ def eri_deriv(molecule, basis, molecule_string, basis_set_label,
     :return:
         a numpy array with the derivatives for atom i
     """
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
 
     basis_set_map = basis.get_index_map(molecule)
 
