@@ -161,7 +161,9 @@ class RespChargesDriver:
         molecules = []
         basis_sets = []
 
-        if molecule.number_of_atoms() > 0:
+        use_xyz_file = (molecule.number_of_atoms() == 0)
+
+        if not use_xyz_file:
             molecules.append(molecule)
             basis_sets.append(basis)
             output_dir = Path(self.filename).parent
@@ -216,12 +218,13 @@ class RespChargesDriver:
         esp = []
 
         for ind, (mol, bas) in enumerate(zip(molecules, basis_sets)):
-            info_text = f'Processing conformer {ind+1}...'
-            self.ostream.print_info(info_text)
-            self.ostream.flush()
+            if use_xyz_file:
+                info_text = f'Processing conformer {ind+1}...'
+                self.ostream.print_info(info_text)
+                self.ostream.flush()
 
             # run SCF
-            if len(molecules) == 1:
+            if not use_xyz_file:
                 scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
                 scf_drv.update_settings({'filename': self.filename},
                                         self.method_dict)
@@ -306,7 +309,7 @@ class RespChargesDriver:
                 self.get_rrms(molecules, grids, esp, weights, q))
 
         self.ostream.print_blank()
-        self.print_references()
+        self.print_references('resp', len(molecules))
         self.ostream.flush()
 
         return q
@@ -357,7 +360,7 @@ class RespChargesDriver:
 
         self.print_fit_quality(self.get_rrms(molecules, grids, esp, weights, q))
         self.ostream.print_blank()
-        self.print_references()
+        self.print_references('esp', len(molecules))
         self.ostream.flush()
 
         return q[:n_atoms]
@@ -906,16 +909,29 @@ class RespChargesDriver:
         self.ostream.print_header(cur_str)
         self.ostream.flush()
 
-    def print_references(self):
+    def print_references(self, flag, n_conf):
         """
         Prints references.
+
+        :param flag:
+            The flag for the task ("resp" or "esp").
+        :param n_conf:
+            The number of conformers.
         """
 
+        str_width = 44
+
+        if flag.lower() == 'esp' and n_conf == 1:
+            return
+
         title = 'Reference: '
-        title += '(1) J. Phys. Chem. 1993, 97, 10269-10280.'
-        self.ostream.print_header(title.ljust(54))
-        title = '(2) J. Am. Chem. Soc. 1992, 114, 9075-9079.'
-        self.ostream.print_header(title.ljust(54))
+        self.ostream.print_header(title.ljust(str_width))
+        if flag.lower() == 'resp':
+            title = 'J. Phys. Chem. 1993, 97, 10269-10280.'
+            self.ostream.print_header(title.ljust(str_width))
+        if n_conf > 1:
+            title = 'J. Am. Chem. Soc. 1992, 114, 9075-9079.'
+            self.ostream.print_header(title.ljust(str_width))
         self.ostream.print_blank()
 
     def recommended_resp_parameters(self):
