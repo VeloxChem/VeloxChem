@@ -31,6 +31,7 @@ import sys
 from .molecule import Molecule
 from .gradientdriver import GradientDriver
 from .outputstream import OutputStream
+from .firstorderprop import FirstOrderProperties
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -71,6 +72,10 @@ class ScfGradientDriver(GradientDriver):
         self.scf_drv = scf_drv
         self.delta_h = 0.001
 
+        # Flag for numerical derivative of dipole moment
+        self.dipole_deriv = False
+        self.dipole_gradient = None
+
     def update_settings(self, method_dict):
         """
         Updates settings in ScfGradientDriver.
@@ -92,6 +97,11 @@ class ScfGradientDriver(GradientDriver):
         if 'numerical_grad' in method_dict:
             key = method_dict['numerical_grad'].lower()
             self.numerical = True if key in ['yes', 'y'] else False
+
+        # Numerical derivative of dipole moment
+        if 'dipole_deriv' in method_dict:
+            key = method_dict['dipole_deriv'].lower()
+            self.dipole_deriv = True if key in ['yes', 'y'] else False
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
@@ -169,8 +179,13 @@ class ScfGradientDriver(GradientDriver):
         # atom coordinates (nx3)
         coords = molecule.get_coordinates()
 
-        # numerical gradient
         self.gradient = np.zeros((molecule.number_of_atoms(), 3))
+
+        # First-order properties for gradient of dipole moment
+        if self.dipole_deriv:
+            prop = FirstOrderProperties(self.comm, self.ostream)
+            # numerical gradient (3 dipole components x no. atoms x 3 atom coords)
+            self.dipole_gradient = np.zeros((3, molecule.number_of_atoms(), 3))
 
         if not self.do_four_point:
             for i in range(molecule.number_of_atoms()):
@@ -180,13 +195,29 @@ class ScfGradientDriver(GradientDriver):
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     e_plus = self.scf_drv.get_scf_energy()
 
+                    if self.dipole_deriv:
+                        density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
+                        prop.compute(new_mol, ao_basis, density)
+                        mu_plus = prop.get_property('dipole moment')
+
                     coords[i, d] -= 2.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     e_minus = self.scf_drv.get_scf_energy()
 
+                    if self.dipole_deriv:
+                        density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
+                        prop.compute(new_mol, ao_basis, density)
+                        mu_minus = prop.get_property('dipole moment')
+
                     coords[i, d] += self.delta_h
                     self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
+
+                    if self.dipole_deriv:
+                        for c in range(3):
+                            self.dipole_gradient[c, i, d] = (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
+
+            ##print("\ndipole_gradient =\n", self.dipole_gradient)
 
         else:
             # Four-point numerical derivative approximation
