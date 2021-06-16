@@ -27,8 +27,8 @@ class TestRespCharges:
         q_esp = chg_drv.compute(task.molecule, task.ao_basis, 'esp')
 
         if is_mpi_master(task.mpi_comm):
-            resp_charges = q_resp[0]
-            esp_charges = q_esp[0]
+            resp_charges = q_resp
+            esp_charges = q_esp
             assert np.max(np.abs(resp_charges - ref_resp_charges)) < 1.0e-6
             assert np.max(np.abs(esp_charges - ref_esp_charges)) < 1.0e-6
 

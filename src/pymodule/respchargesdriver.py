@@ -61,6 +61,7 @@ class RespChargesDriver:
         - restrained_hydrogens: If hydrogens should be restrained or not.
         - weak_restraint: The strength of the restraint in first stage of RESP fit.
         - strong_restraint: The strength of the restraint in second stage of RESP fit.
+        - weights: The weight factors of different conformers.
         - max_iter: The maximum number of iterations of the RESP fit.
         - threshold: The convergence threshold of the RESP fit.
         - filename: The filename for the calculation.
@@ -89,6 +90,7 @@ class RespChargesDriver:
         self.xyz_file = None
         self.net_charge = 0.0
         self.method_dict = None
+        self.weights = None
         self.filename = 'veloxchem_electrostatic_potential_input'
 
         # grid information
@@ -109,6 +111,8 @@ class RespChargesDriver:
 
         :param resp_dict:
             The input dictionary of RESP charges group.
+        :param method_dict:
+            The input dicitonary of method settings group.
         """
 
         resp_keywords = {
@@ -121,6 +125,7 @@ class RespChargesDriver:
             'threshold': 'float',
             'xyz_file': 'str',
             'net_charge': 'float',
+            'weights': 'seq_fixed',
         }
 
         parse_input(self, resp_keywords, resp_dict)
@@ -142,12 +147,12 @@ class RespChargesDriver:
         """
         Computes RESP or ESP charges.
 
-        :param flag:
-            The flag for the task ("resp" or "esp").
         :param molecule:
             The molecule.
         :param basis:
             The molecular basis set.
+        :param flag:
+            The flag for the task ("resp" or "esp").
 
         :return:
             The charges.
@@ -156,9 +161,7 @@ class RespChargesDriver:
         molecules = []
         basis_sets = []
 
-        use_xyz_file = (molecule.number_of_atoms() == 0)
-
-        if not use_xyz_file:
+        if molecule.number_of_atoms() > 0:
             molecules.append(molecule)
             basis_sets.append(basis)
             output_dir = Path(self.filename).parent
@@ -201,18 +204,24 @@ class RespChargesDriver:
                 output_dir.mkdir(parents=True, exist_ok=True)
             self.comm.barrier()
 
-        qs = []
+        if self.weights is not None:
+            errmsg = 'RespChargesDriver: Number of weights does not match '
+            errmsg += 'number of conformers.'
+            assert_msg_critical(len(self.weights) == len(molecules), errmsg)
+            # normalize weights
+            sum_of_weights = sum(self.weights)
+            self.weights = [w / sum_of_weights for w in self.weights]
+
+        grids = []
+        esp = []
 
         for ind, (mol, bas) in enumerate(zip(molecules, basis_sets)):
-            if use_xyz_file:
-                info_text = f'Processing conformer {ind+1}...'
-                self.ostream.print_info(info_text)
-                self.ostream.print_blank()
-                self.ostream.flush()
+            info_text = f'Processing conformer {ind+1}...'
+            self.ostream.print_info(info_text)
+            self.ostream.flush()
 
             # run SCF
-            # TODO: add unrestricted SCF
-            if not use_xyz_file:
+            if len(molecules) == 1:
                 scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
                 scf_drv.update_settings({'filename': self.filename},
                                         self.method_dict)
@@ -228,149 +237,160 @@ class RespChargesDriver:
                 scf_drv.compute(mol, bas)
                 ostream.close()
 
+            grid_m = self.get_grid_points(mol)
+            esp_m = self.get_electrostatic_potential(grid_m, mol, bas,
+                                                     scf_drv.scf_tensors)
+            if self.rank == mpi_master():
+                grids.append(grid_m)
+                esp.append(esp_m)
+
+        q = None
+
+        if self.rank == mpi_master():
             if flag.lower() == 'resp':
-                q = self.compute_resp_charges(mol, bas, scf_drv.scf_tensors)
-                qs.append(q)
+                q = self.compute_resp_charges(molecules, grids, esp,
+                                              self.weights)
             elif flag.lower() == 'esp':
-                q = self.compute_esp_charges(mol, bas, scf_drv.scf_tensors)
-                qs.append(q)
-            else:
-                qs.append(None)
+                q = self.compute_esp_charges(molecules, grids, esp,
+                                             self.weights)
 
-        return qs
+        return q
 
-    def compute_resp_charges(self, molecule, basis, scf_tensors):
+    def compute_resp_charges(self, molecules, grids, esp, weights=None):
         """
         Computes RESP charges.
 
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param scf_tensors:
-            The tensors from the converged SCF calculation.
+        :param molecules:
+            The list of molecules.
+        :param grids:
+            The list of grid points.
+        :param esp:
+            The QM ESP on grid points.
+        :param weights:
+            The weight factors of different conformers.
 
         :return:
             The RESP charges.
         """
 
-        # generate grid points and calculate QM ESP for all conformers
-        grid = self.get_grid_points(molecule)
-        esp = self.get_electrostatic_potential(grid, molecule, basis,
-                                               scf_tensors)
+        n_conf = len(molecules)
+        if weights is None:
+            weights = np.ones(n_conf)
 
-        if self.rank == mpi_master():
-            self.print_header(esp.size)
+        n_points = sum([esp[m].size for m in range(n_conf)])
+        self.print_header(n_conf, n_points)
 
-            constr_1, constr_2 = self.generate_constraints(molecule)
+        constr_1, constr_2 = self.generate_constraints(molecules[0])
 
-            # first stage of resp fit
-            self.print_resp_stage_header('first')
-            q0 = np.zeros(molecule.number_of_atoms())
-            q = self.optimize_charges(grid, esp, q0, constr_1,
-                                      self.weak_restraint, molecule)
+        # first stage of resp fit
+        self.print_resp_stage_header('first')
+        q0 = np.zeros(molecules[0].number_of_atoms())
+        q = self.optimize_charges(molecules, grids, esp, weights, q0, constr_1,
+                                  self.weak_restraint)
 
-            self.print_resp_stage_results('first', molecule, q, constr_1)
-            self.print_fit_quality(self.get_rrms(grid, esp, q, molecule))
-            self.ostream.print_blank()
+        self.print_resp_stage_results('first', molecules[0], q, constr_1)
+        self.print_fit_quality(self.get_rrms(molecules, grids, esp, weights, q))
+        self.ostream.print_blank()
 
-            # second stage of RESP fit
-            if constr_2 == [-1] * molecule.number_of_atoms():
-                cur_str = '*** No refitting in second stage needed.'
-                self.ostream.print_header(cur_str.ljust(40))
-            else:
-                self.print_resp_stage_header('second')
-                q = self.optimize_charges(grid, esp, q, constr_2,
-                                          self.strong_restraint, molecule)
-
-                self.print_resp_stage_results('second', molecule, q, constr_2)
-                self.print_fit_quality(self.get_rrms(grid, esp, q, molecule))
-
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-            return q
+        # second stage of RESP fit
+        if constr_2 == [-1] * molecules[0].number_of_atoms():
+            cur_str = '*** No refitting in second stage needed.'
+            self.ostream.print_header(cur_str.ljust(40))
         else:
-            return None
+            self.print_resp_stage_header('second')
+            q = self.optimize_charges(molecules, grids, esp, weights, q,
+                                      constr_2, self.strong_restraint)
 
-    def compute_esp_charges(self, molecule, basis, scf_tensors):
+            self.print_resp_stage_results('second', molecules[0], q, constr_2)
+            self.print_fit_quality(
+                self.get_rrms(molecules, grids, esp, weights, q))
+
+        self.ostream.print_blank()
+        self.print_references()
+        self.ostream.flush()
+
+        return q
+
+    def compute_esp_charges(self, molecules, grids, esp, weights=None):
         """
         Computes Merz-Kollman ESP charges.
 
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param scf_tensors:
-            The tensors from the converged SCF calculation.
+        :param molecules:
+            The list of molecules.
+        :param grids:
+            The list of grid points.
+        :param esp:
+            The QM ESP on grid points.
+        :param weights:
+            The weight factors of different conformers.
 
         :return:
             The ESP charges.
         """
 
-        # generate grid points and calculate QM ESP for all conformers
-        grid = self.get_grid_points(molecule)
-        esp = self.get_electrostatic_potential(grid, molecule, basis,
-                                               scf_tensors)
+        n_conf = len(molecules)
+        if weights is None:
+            weights = np.ones(n_conf)
 
-        if self.rank == mpi_master():
-            self.print_header(esp.size)
-            self.print_esp_header()
+        n_points = sum([esp[m].size for m in range(n_conf)])
+        self.print_header(n_conf, n_points)
+        self.print_esp_header()
 
-            # generate and solve equation system (ESP fit)
-            a, b = self.generate_equation_system(grid, esp, molecule)
-            q = np.linalg.solve(a, b)
+        # generate and solve equation system (ESP fit)
+        a, b = self.generate_equation_system(molecules, grids, esp, weights)
+        q = np.linalg.solve(a, b)
 
-            n_atoms = molecule.number_of_atoms()
+        n_atoms = molecules[0].number_of_atoms()
 
-            # print results
-            for i in range(n_atoms):
-                cur_str = '{:3d}     {:2s}     {:11.6f}    '.format(
-                    i + 1,
-                    molecule.get_labels()[i], q[i])
-                self.ostream.print_header(cur_str)
-
-            q_tot = np.sum(q[:n_atoms])
-            q_tot = round(q_tot * 1e+6) / 1e+6
-            self.ostream.print_header(31 * '-')
-            cur_str = 'Total Charge  : {:9.6f}   '.format(q_tot)
+        # print results
+        for i in range(n_atoms):
+            cur_str = '{:3d}     {:2s}     {:11.6f}    '.format(
+                i + 1, molecules[0].get_labels()[i], q[i])
             self.ostream.print_header(cur_str)
-            self.ostream.print_blank()
 
-            self.print_fit_quality(self.get_rrms(grid, esp, q, molecule))
-            self.ostream.print_blank()
-            self.ostream.flush()
+        q_tot = np.sum(q[:n_atoms])
+        q_tot = round(q_tot * 1e+6) / 1e+6
+        self.ostream.print_header(31 * '-')
+        cur_str = 'Total Charge  : {:9.6f}   '.format(q_tot)
+        self.ostream.print_header(cur_str)
+        self.ostream.print_blank()
 
-            return q[:n_atoms]
-        else:
-            return None
+        self.print_fit_quality(self.get_rrms(molecules, grids, esp, weights, q))
+        self.ostream.print_blank()
+        self.print_references()
+        self.ostream.flush()
 
-    def optimize_charges(self, grid, esp, q0, constr, restraint_strength,
-                         molecule):
+        return q[:n_atoms]
+
+    def optimize_charges(self, molecules, grids, esp, weights, q0, constr,
+                         restraint_strength):
         """
         Iterative procedure to optimize charges for a single stage of the RESP fit.
 
-        :param grid:
-            The grid points.
+        :param molecules:
+            The list of molecules.
+        :param grids:
+            The list of grid points.
         :param esp:
             The QM ESP on grid points.
+        :param weights:
+            The weight factors of different conformers.
         :param q0:
             The intial charges.
         :param constr:
             The constraints of the charges.
         :param restraint_strength:
             The strength of the hyperbolic penalty function.
-        :param molecule:
-            The molecule.
 
         :return:
             The optimized charges.
         """
 
-        n_atoms = molecule.number_of_atoms()
+        n_atoms = molecules[0].number_of_atoms()
 
         # initializes equation system
-        a, b = self.generate_equation_system(grid, esp, molecule, q0, constr)
+        a, b = self.generate_equation_system(molecules, grids, esp, weights, q0,
+                                             constr)
         q_new = np.concatenate((q0, np.zeros(b.size - n_atoms)), axis=None)
 
         dq_norm = 1.0
@@ -386,12 +406,12 @@ class RespChargesDriver:
             rstr = np.zeros(b.size)
             for i in range(n_atoms):
                 if (not self.restrained_hydrogens and
-                        molecule.get_labels()[i] == 'H'):
+                        molecules[0].get_labels()[i] == 'H'):
                     continue
                 elif constr[i] == -1:
                     continue
                 else:
-                    # TODO: add documentation for 0.1
+                    # eq.10, J. Phys. Chem. 1993, 97, 10269-10280
                     rstr[i] += restraint_strength / np.sqrt(q_old[i]**2 +
                                                             0.1**2)
             a_tot = a + np.diag(rstr)
@@ -411,20 +431,25 @@ class RespChargesDriver:
         return q_new[:n_atoms]
 
     def generate_equation_system(self,
-                                 grid,
+                                 molecules,
+                                 grids,
                                  esp,
-                                 molecule,
+                                 weights,
                                  q0=None,
                                  constr=None):
         """
         Generates the equation system for charge fitting to QM ESP.
 
-        :param grid:
-            The grid points.
+        :param molecules:
+            The list of molecules.
+        :param grids:
+            The list of grid points.
         :param esp:
             The QM ESP on grid points.
-        :param molecule:
-            The molecule.
+        :param weights:
+            The weight factors of different conformers.
+        :param q0:
+            The initial charges.
         :param constr:
             The constraints of the charges.
 
@@ -432,7 +457,7 @@ class RespChargesDriver:
             The matrix a and vector b.
         """
 
-        n_atoms = molecule.number_of_atoms()
+        n_atoms = molecules[0].number_of_atoms()
 
         if q0 is None:
             q0 = np.zeros(n_atoms)
@@ -452,18 +477,26 @@ class RespChargesDriver:
         # total charge constraint
         a[:n_atoms, n_atoms] = 1
         a[n_atoms, :n_atoms] = 1
-        b[n_atoms] = molecule.get_charge()
+        b[n_atoms] = molecules[0].get_charge()
 
-        coords = molecule.get_coordinates()
+        # eq.10 & 11,  J. Am. Chem. Soc. 1992, 114, 9075-9079
+        for m in range(len(molecules)):
+            a_m = np.zeros(a.shape)
+            b_m = np.zeros(b.shape)
 
-        for i in range(n_atoms):
-            if constr[i] != -1:
-                for p in range(esp.size):
-                    r_pi = np.linalg.norm(grid[p] - coords[i])
-                    b[i] += esp[p] / r_pi
-                    for j in range(n_atoms):
-                        a[i, j] += 1.0 / (r_pi *
-                                          np.linalg.norm(grid[p] - coords[j]))
+            coords = molecules[m].get_coordinates()
+
+            for i in range(n_atoms):
+                if constr[i] != -1:
+                    for p in range(esp[m].size):
+                        r_pi = np.linalg.norm(grids[m][p] - coords[i])
+                        b_m[i] += esp[m][p] / r_pi
+                        for j in range(n_atoms):
+                            a_m[i, j] += 1.0 / (
+                                r_pi * np.linalg.norm(grids[m][p] - coords[j]))
+
+            a += weights[m] * a_m
+            b += weights[m] * b_m
 
         # equivalent charge constraints and frozen/constant charges
         j = 0
@@ -687,18 +720,20 @@ class RespChargesDriver:
         else:
             return None
 
-    def get_rrms(self, grid, esp, q, molecule):
+    def get_rrms(self, molecules, grids, esp, weights, q):
         """
         Gets the relative root-mean-square (RRMS) error.
 
-        :param grid:
-            The grid points.
+        :param molecules:
+            The list of molecules.
+        :param grids:
+            The list of grid points.
         :param esp:
             The QM ESP on grid points.
+        :param weights:
+            The weight factors of different conformers.
         :param q:
             The atom-centered charges.
-        :param molecule:
-            The molecule.
 
         :return:
             The RRMS.
@@ -710,25 +745,27 @@ class RespChargesDriver:
         # sum of the QM ESP
         norm = 0.0
 
-        coords = molecule.get_coordinates()
+        for m in range(len(molecules)):
+            coords = molecules[m].get_coordinates()
 
-        for i in range(esp.size):
+            for i in range(esp[m].size):
+                # partial charge ESP
+                pot = 0.0
 
-            # partial charge ESP
-            pot = 0.0
+                for j in range(molecules[m].number_of_atoms()):
+                    pot += q[j] / np.linalg.norm(grids[m][i] - coords[j])
 
-            for j in range(molecule.number_of_atoms()):
-                pot += q[j] / np.linalg.norm(grid[i] - coords[j])
-
-            chi_square += (esp[i] - pot)**2
-            norm += esp[i]**2
+                chi_square += weights[m] * (esp[m][i] - pot)**2
+                norm += weights[m] * esp[m][i]**2
 
         return np.sqrt(chi_square / norm)
 
-    def print_header(self, n_points):
+    def print_header(self, n_conf, n_points):
         """
         Prints header for the RESP charges driver.
 
+        :param n_conf:
+            The number of conformers.
         :param n_points:
             The number of grid points.
         """
@@ -739,6 +776,8 @@ class RespChargesDriver:
         self.ostream.print_blank()
 
         str_width = 40
+        cur_str = 'Number of Conformers         :  ' + str(n_conf)
+        self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = 'Number of Layers             :  ' + str(self.number_layers)
         self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = 'Points per Square Angstrom   :  ' + str(self.density)
@@ -805,6 +844,8 @@ class RespChargesDriver:
 
         :param stage:
             The stage of the RESP fit.
+        :param molecule:
+            The molecule.
         :param q:
             The final charges of the stage.
         :param constr:
@@ -864,6 +905,18 @@ class RespChargesDriver:
         cur_str = 'Relative Root-Mean-Square Error  : {:9.6f}'.format(rrms)
         self.ostream.print_header(cur_str)
         self.ostream.flush()
+
+    def print_references(self):
+        """
+        Prints references.
+        """
+
+        title = 'Reference: '
+        title += '(1) J. Phys. Chem. 1993, 97, 10269-10280.'
+        self.ostream.print_header(title.ljust(54))
+        title = '(2) J. Am. Chem. Soc. 1992, 114, 9075-9079.'
+        self.ostream.print_header(title.ljust(54))
+        self.ostream.print_blank()
 
     def recommended_resp_parameters(self):
         """
