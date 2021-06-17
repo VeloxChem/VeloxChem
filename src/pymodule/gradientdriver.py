@@ -137,17 +137,23 @@ class GradientDriver:
 
         self.ostream.print_block(molecule.get_string())
 
-    def print_gradient(self, molecule, labels):
+    def print_gradient(self, molecule):
         """
         Prints the gradient.
 
         :param molecule:
             The molecule.
-        :param labels:
-            The atom labels.
         """
 
-        title = 'Gradient (Hartree/Bohr)'
+        # atom labels
+        labels = molecule.get_labels()
+
+        if self.numerical:
+            title = 'Numerical '
+        else:
+            title = 'Analytical '
+
+        title += 'Gradient (Hartree/Bohr)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * (len(title) + 2))
         self.ostream.print_blank()

@@ -276,6 +276,8 @@ class OrbitalResponse:
             dm_vv = rhs_results['dm_vv']
             unrel_dm_ao = rhs_results['unrel_dm_ao']
             fock_ao_rhs = rhs_results['fock_ao_rhs']
+            xpy_ao = rhs_results['xpy_ao']
+            xmy_ao = rhs_results['xmy_ao']
         else:
             rhs_mo = None
 
@@ -395,6 +397,7 @@ class OrbitalResponse:
                     'Total time needed for orbital response: {:.2f} s.'.format(
                         orbrsp_time))
 
+            self.ostream.print_blank()
             self.ostream.flush()
 
         if self.rank == mpi_master():
@@ -404,6 +407,8 @@ class OrbitalResponse:
                 # lambda_ao + lambda_ao.T: OV + VO
                 rel_dm_ao = unrel_dm_ao + 2 * lambda_ao + 2 * lambda_ao.T
                 return {
+                    'xpy_ao': xpy_ao,
+                    'xmy_ao': xmy_ao,
                     'lambda_ao': lambda_ao,
                     'omega_ao': omega_ao,
                     'unrel_dm_ao': unrel_dm_ao,

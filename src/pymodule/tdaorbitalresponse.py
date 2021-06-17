@@ -169,6 +169,8 @@ class TdaOrbitalResponse(OrbitalResponse):
                 'rhs_mo': rhs_mo,
                 'dm_oo': dm_oo,
                 'dm_vv': dm_vv,
+                'xpy_ao': exc_vec_ao,
+                'xmy_ao': exc_vec_ao,
                 'unrel_dm_ao': unrel_dm_ao,
                 'fock_ao_rhs': fock_ao_rhs,
             }

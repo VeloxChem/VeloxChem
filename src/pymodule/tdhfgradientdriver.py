@@ -1,8 +1,11 @@
+from mpi4py import MPI
 import numpy as np
 import time as tm
+import sys
 
 from .molecule import Molecule
 from .gradientdriver import GradientDriver
+from .outputstream import OutputStream
 from .tdaorbitalresponse import TdaOrbitalResponse
 from .rpaorbitalresponse import RpaOrbitalResponse
 from .veloxchemlib import ElectricDipoleIntegralsDriver
@@ -10,6 +13,11 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import dipole_in_debye
 from .errorhandler import assert_msg_critical
 from .firstorderprop import FirstOrderProperties
+
+# For PySCF integral derivatives
+from .import_from_pyscf import overlap_deriv
+from .import_from_pyscf import fock_deriv
+from .import_from_pyscf import eri_deriv
 
 
 class TdhfGradientDriver(GradientDriver):
@@ -25,8 +33,9 @@ class TdhfGradientDriver(GradientDriver):
         The output stream.
 
     Instance variables
+        - scf_drv: The SCF driver.
+        - rsp_drv: Wrapper object for RPA/TDA calculations and results (?)
         - gradient: The gradient.
-        - scf_tensors: The results from the converged SCF calculation.
         - is_tda: Flag if Tamm-Dancoff approximation is employed.
         - n_state_deriv: The excited state of interest.
         - do_first_order_prop: Controls the calculation of first-order properties.
@@ -34,15 +43,26 @@ class TdhfGradientDriver(GradientDriver):
         - do_four_point: Flag for four-point finite difference.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, scf_drv, comm=None, ostream=None):
         """
         Initializes gradient driver.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
         self.rank = self.comm.Get_rank()
 
         self.flag = 'RPA Gradient Driver'
+        self.gradient = None
+
+        # SCF and response drivers
+        self.scf_drv = scf_drv
+        # self.rsp_drv = rsp_drv # rsp_prop object from main.py
 
         # flag on whether RPA or TDA is calculated
         self.is_tda = False
@@ -54,10 +74,7 @@ class TdhfGradientDriver(GradientDriver):
         self.do_first_order_prop = False
 
         # for numerical gradient
-        self.gradient = None
         self.delta_h = 0.001
-        #self.scf_drv = None #scf_drv
-        #self.rsp_drv = None
 
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -94,18 +111,18 @@ class TdhfGradientDriver(GradientDriver):
         self.rsp_dict = rsp_dict
         self.method_dict = method_dict
 
-    def compute(self, molecule, basis, scf_tensors, rsp_results):
+    def compute(self, molecule, basis, rsp_drv, rsp_results):
         """
-        Performs calculation of analytical gradient.
+        Performs calculation of analytical or numerical gradient.
 
         :param molecule:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
-            The tensors from the converged SCF calculation.
+        :param rsp_drv:
+            The RPA or TDA driver.
         :param rsp_results:
-            The results of the RPA or TDA calculation.
+            The results from the RPA or TDA calculation.
         """
 
         # sanity check for number of state
@@ -116,6 +133,45 @@ class TdhfGradientDriver(GradientDriver):
 
         self.print_header()
 
+        # self.print_header()
+        start_time = tm.time()
+
+        if self.numerical:
+            self.compute_numerical(molecule, basis, rsp_drv)
+        else:
+            self.compute_analytical(molecule, basis, rsp_results)
+
+        # print gradient
+        self.print_geometry(molecule)
+        self.print_gradient(molecule)
+
+        valstr = '*** Time spent in gradient calculation: '
+        valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+
+    def compute_analytical(self, molecule, basis, rsp_results):
+        """
+        Performs calculation of analytical gradient.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param rsp_results:
+            The results of the RPA or TDA calculation.
+        """
+
+        # sanity check for number of state
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                self.n_state_deriv < rsp_results['eigenvalues'].size,
+                'TdhfGradientDriver: not enough states calculated')
+
+        # self.print_header()
+
         # orbital response driver
         if self.is_tda:
             method = 'TDA'
@@ -124,9 +180,45 @@ class TdhfGradientDriver(GradientDriver):
             orbrsp_drv = RpaOrbitalResponse(self.comm, self.ostream)
             method = 'RPA'
 
+        # SCF results
+        scf_tensors = self.scf_drv.scf_tensors
+
         orbrsp_drv.update_settings(self.rsp_dict, self.method_dict)
         orbrsp_results = orbrsp_drv.compute(molecule, basis, scf_tensors,
                                             rsp_results)
+
+
+        natm = molecule.number_of_atoms()
+        nocc = molecule.number_of_alpha_electrons()
+        mo = self.scf_drv.scf_tensors['C']
+        mo_occ = mo[:, :nocc].copy()
+        gs_dm = self.scf_drv.scf_tensors['D_alpha']
+        xpy = orbrsp_results['xpy_ao']
+        xmy = orbrsp_results['xmy_ao']
+        rel_dm_ao = orbrsp_results['rel_dm_ao']
+        omega_ao = orbrsp_results['omega_ao']
+
+        # analytical gradient
+        self.gradient = np.zeros((natm, 3))
+        #self.gradient = self.grad_nuc_contrib(molecule)
+
+        for i in range(natm):
+            d_ovlp = overlap_deriv(molecule, basis, i)
+            d_fock = fock_deriv(molecule, basis, gs_dm, i)
+            d_eri = eri_deriv(molecule, basis, i)
+
+            self.gradient[i] += ( np.einsum('mn,xmn->x', 2.0*gs_dm + rel_dm_ao, d_fock)
+                             +2.0*np.einsum('mn,xmn->x', omega_ao, d_ovlp)
+                             -2.0*np.einsum('mt,np,xmtnp->x', gs_dm, gs_dm, d_eri)
+                             +1.0*np.einsum('mt,np,xmnpt->x', gs_dm, gs_dm, d_eri)
+                             #+2.0*np.einsum('mn,pt,xtpmn->x', xpy, xpy - xpy.T, d_eri)
+                             #-1.0*np.einsum('mn,pt,xtnmp->x', xpy, xpy - xpy.T, d_eri)
+                             #+2.0*np.einsum('mn,pt,xtpmn->x', xmy, xmy + xmy.T, d_eri)
+                             #-1.0*np.einsum('mn,pt,xtnmp->x', xmy, xmy + xmy.T, d_eri)
+                            )
+
+        #self.gradient += self.grad_nuc_contrib(molecule)
+
 
         # If desired, calculate the relaxed and unrelaxed excited-state dipole moment
         if self.do_first_order_prop:
@@ -155,8 +247,7 @@ class TdhfGradientDriver(GradientDriver):
                     firstorderprop.print_properties(molecule, title)
 
 
-    def compute_numerical_gradient(self, molecule, ao_basis, scf_drv,
-                                   rsp_drv, min_basis=None):
+    def compute_numerical(self, molecule, ao_basis, rsp_drv, min_basis=None):
         """
         Performs calculation of numerical gradient at RPA or TDA level.
 
@@ -164,26 +255,15 @@ class TdhfGradientDriver(GradientDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param scf_drv:
-            The SCF driver.
         :param rsp_drv:
-            The response (RPA or TDA) driver.
+            The RPA or TDA driver.
         :param min_basis:
             The minimal AO basis set.
         """
 
-        # self.print_header()
-        start_time = tm.time()
-
-        self.scf_drv = scf_drv
+        # self.scf_drv = scf_drv
         scf_ostream_state = self.scf_drv.ostream.state
         self.scf_drv.ostream.state = False
-
-        # This does not have any influence, but depends
-        # on the ostream state of the scf driver
-        self.rsp_drv = rsp_drv
-        # rsp_ostream_state = self.rsp_drv.ostream.state
-        # self.rsp_drv.ostream.state = False
 
         # atom labels
         labels = molecule.get_labels()
@@ -201,8 +281,8 @@ class TdhfGradientDriver(GradientDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     scf_tensors = self.scf_drv.scf_tensors
-                    self.rsp_drv.is_converged = False  # only needed for RPA
-                    rsp_results = self.rsp_drv.compute(new_mol, ao_basis,
+                    rsp_drv.is_converged = False  # only needed for RPA
+                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
                     exc_en_plus = rsp_results['eigenvalues'][self.n_state_deriv]
                     e_plus = self.scf_drv.get_scf_energy() + exc_en_plus
@@ -210,8 +290,8 @@ class TdhfGradientDriver(GradientDriver):
                     coords[i, d] -= 2.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    self.rsp_drv.is_converged = False
-                    rsp_results = self.rsp_drv.compute(new_mol, ao_basis,
+                    rsp_drv.is_converged = False
+                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        self.scf_drv.scf_tensors)
                     exc_en_minus = rsp_results['eigenvalues'][self.n_state_deriv]
                     e_minus = self.scf_drv.get_scf_energy() + exc_en_minus
@@ -229,8 +309,8 @@ class TdhfGradientDriver(GradientDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     scf_tensors = self.scf_drv.scf_tensors
-                    self.rsp_drv.is_converged = False  # only needed for RPA
-                    rsp_results = self.rsp_drv.compute(new_mol, ao_basis,
+                    rsp_drv.is_converged = False  # only needed for RPA
+                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
                     exc_en = rsp_results['eigenvalues'][self.n_state_deriv]
                     e_plus1 = self.scf_drv.get_scf_energy() + exc_en
@@ -239,8 +319,8 @@ class TdhfGradientDriver(GradientDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     scf_tensors = self.scf_drv.scf_tensors
-                    self.rsp_drv.is_converged = False  # only needed for RPA
-                    rsp_results = self.rsp_drv.compute(new_mol, ao_basis,
+                    rsp_drv.is_converged = False  # only needed for RPA
+                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
                     exc_en = rsp_results['eigenvalues'][self.n_state_deriv]
                     e_plus2 = self.scf_drv.get_scf_energy() + exc_en
@@ -248,8 +328,8 @@ class TdhfGradientDriver(GradientDriver):
                     coords[i, d] -= 3.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    self.rsp_drv.is_converged = False
-                    rsp_results = self.rsp_drv.compute(new_mol, ao_basis,
+                    rsp_drv.is_converged = False
+                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        self.scf_drv.scf_tensors)
                     exc_en = rsp_results['eigenvalues'][self.n_state_deriv]
                     e_minus1 = self.scf_drv.get_scf_energy() + exc_en
@@ -257,8 +337,8 @@ class TdhfGradientDriver(GradientDriver):
                     coords[i, d] -= self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    self.rsp_drv.is_converged = False
-                    rsp_results = self.rsp_drv.compute(new_mol, ao_basis,
+                    rsp_drv.is_converged = False
+                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        self.scf_drv.scf_tensors)
                     exc_en = rsp_results['eigenvalues'][self.n_state_deriv]
                     e_minus2 = self.scf_drv.get_scf_energy() + exc_en
@@ -274,18 +354,8 @@ class TdhfGradientDriver(GradientDriver):
         self.scf_drv.compute(molecule, ao_basis, min_basis)
         self.scf_drv.ostream.state = scf_ostream_state
 
-        # print gradient
-        self.print_geometry(molecule)
-        self.print_gradient(molecule, labels)
-
-        valstr = '*** Time spent in gradient calculation: '
-        valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-    def compute_numerical_dipole(self, molecule, ao_basis, scf_drv,
-                                 rsp_drv, field_strength=1e-5, min_basis=None):
+    def compute_numerical_dipole(self, molecule, ao_basis, rsp_drv,
+                                 field_strength=1e-5, min_basis=None):
         """
         Performs calculation of numerical dipole moment at RPA or TDA level.
 
@@ -293,10 +363,8 @@ class TdhfGradientDriver(GradientDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param scf_drv:
-            The SCF driver.
         :param rsp_drv:
-            The response (RPA or TDA) driver.
+            The RPA or TDA driver.
         :param field_strength:
             The strength of the external electric field.
         :param min_basis:
@@ -306,15 +374,8 @@ class TdhfGradientDriver(GradientDriver):
         # self.print_header()
         start_time = tm.time()
 
-        self.scf_drv = scf_drv
         scf_ostream_state = self.scf_drv.ostream.state
         self.scf_drv.ostream.state = False
-
-        # This does not have any influence, but depends
-        # on the ostream state of the scf driver
-        self.rsp_drv = rsp_drv
-        # rsp_ostream_state = self.rsp_drv.ostream.state
-        # self.rsp_drv.ostream.state = False
 
         # numerical gradient
         dipole_moment = np.zeros((3))
@@ -325,16 +386,16 @@ class TdhfGradientDriver(GradientDriver):
             self.scf_drv.electric_field = field
             self.scf_drv.compute(molecule, ao_basis, min_basis)
             scf_tensors = self.scf_drv.scf_tensors
-            self.rsp_drv.is_converged = False  # only needed for RPA
-            rsp_results = self.rsp_drv.compute(molecule, ao_basis,
+            rsp_drv.is_converged = False  # only needed for RPA
+            rsp_results = rsp_drv.compute(molecule, ao_basis,
                                                scf_tensors)
             exc_en_plus = rsp_results['eigenvalues'][self.n_state_deriv]
             e_plus = self.scf_drv.get_scf_energy() + exc_en_plus
 
             field[i] = -field_strength
             self.scf_drv.compute(molecule, ao_basis, min_basis)
-            self.rsp_drv.is_converged = False
-            rsp_results = self.rsp_drv.compute(molecule, ao_basis,
+            rsp_drv.is_converged = False
+            rsp_results = rsp_drv.compute(molecule, ao_basis,
                                                self.scf_drv.scf_tensors)
             exc_en_minus = rsp_results['eigenvalues'][self.n_state_deriv]
             e_minus = self.scf_drv.get_scf_energy() + exc_en_minus
@@ -344,43 +405,43 @@ class TdhfGradientDriver(GradientDriver):
 
         return dipole_moment
 
-    def print_geometry(self, molecule):
-        """
-        Prints the geometry.
-
-        :param molecule:
-            The molecule.
-        """
-
-        self.ostream.print_block(molecule.get_string())
-
-    def print_gradient(self, molecule, labels):
-        """
-        Prints the gradient.
-
-        :param molecule:
-            The molecule.
-        :param labels:
-            The atom labels.
-        """
-
-        title = 'Gradient (Hartree/Bohr)'
-        self.ostream.print_header(title)
-        self.ostream.print_header('-' * (len(title) + 2))
-        self.ostream.print_blank()
-
-        valstr = '  Atom '
-        valstr += '{:>20s}  '.format('Gradient X')
-        valstr += '{:>20s}  '.format('Gradient Y')
-        valstr += '{:>20s}  '.format('Gradient Z')
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-
-        for i in range(molecule.number_of_atoms()):
-            valstr = '  {:<4s}'.format(labels[i])
-            for d in range(3):
-                valstr += '{:22.12f}'.format(self.gradient[i, d])
-            self.ostream.print_header(valstr)
-
-        self.ostream.print_blank()
-        self.ostream.flush()
+#    def print_geometry(self, molecule):
+#        """
+#        Prints the geometry.
+#
+#        :param molecule:
+#            The molecule.
+#        """
+#
+#        self.ostream.print_block(molecule.get_string())
+#
+#    def print_gradient(self, molecule, labels):
+#        """
+#        Prints the gradient.
+#
+#        :param molecule:
+#            The molecule.
+#        :param labels:
+#            The atom labels.
+#        """
+#
+#        title = 'Gradient (Hartree/Bohr)'
+#        self.ostream.print_header(title)
+#        self.ostream.print_header('-' * (len(title) + 2))
+#        self.ostream.print_blank()
+#
+#        valstr = '  Atom '
+#        valstr += '{:>20s}  '.format('Gradient X')
+#        valstr += '{:>20s}  '.format('Gradient Y')
+#        valstr += '{:>20s}  '.format('Gradient Z')
+#        self.ostream.print_header(valstr)
+#        self.ostream.print_blank()
+#
+#        for i in range(molecule.number_of_atoms()):
+#            valstr = '  {:<4s}'.format(labels[i])
+#            for d in range(3):
+#                valstr += '{:22.12f}'.format(self.gradient[i, d])
+#            self.ostream.print_header(valstr)
+#
+#        self.ostream.print_blank()
+#        self.ostream.flush()

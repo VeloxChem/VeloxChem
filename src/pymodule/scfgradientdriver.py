@@ -114,10 +114,24 @@ class ScfGradientDriver(GradientDriver):
         :param min_basis:
             The minimal AO basis set.
         """
+        self.print_header()
+
+        start_time = tm.time()
+
         if self.numerical:
             self.compute_numerical(molecule, ao_basis, min_basis)
         else:
             self.compute_analytical(molecule, ao_basis)
+
+        # print gradient
+        self.print_geometry(molecule)
+        self.print_gradient(molecule)
+
+        valstr = '*** Time spent in gradient calculation: '
+        valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def compute_analytical(self, molecule, ao_basis):
         """
@@ -166,9 +180,6 @@ class ScfGradientDriver(GradientDriver):
         :param min_basis:
             The minimal AO basis set.
         """
-
-        self.print_header()
-        start_time = tm.time()
 
         scf_ostream_state = self.scf_drv.ostream.state
         self.scf_drv.ostream.state = False
@@ -255,12 +266,3 @@ class ScfGradientDriver(GradientDriver):
         self.scf_drv.compute(molecule, ao_basis, min_basis)
         self.scf_drv.ostream.state = scf_ostream_state
 
-        # print gradient
-        self.print_geometry(molecule)
-        self.print_gradient(molecule, labels)
-
-        valstr = '*** Time spent in gradient calculation: '
-        valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.flush()
