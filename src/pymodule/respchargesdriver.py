@@ -31,12 +31,15 @@ import MDAnalysis as mda
 
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import boltzmann_in_evperkelvin
+from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import mpi_master
 from .subcommunicators import SubCommunicators
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
 from .inputparser import parse_input
 from .errorhandler import assert_msg_critical
 
@@ -57,14 +60,19 @@ class RespChargesDriver:
         - ostream: The output stream.
         - number_layers: The number of layers of scaled van der Waals surfaces.
         - density: The density of grid points in points per square Angstrom.
-        - constraints: The constraints for charges to be equal.
+        - equal_charges: The charges that are constrained to be equal.
         - restrained_hydrogens: If hydrogens should be restrained or not.
         - weak_restraint: The strength of the restraint in first stage of RESP fit.
         - strong_restraint: The strength of the restraint in second stage of RESP fit.
         - weights: The weight factors of different conformers.
+        - temperature: The temperature for Boltzmann weight factors.
+        - net_charge: The charge of the molecule.
+        - multiplicity: The multiplicity of the molecule.
+        - method_dict: The input dictionary of the method settings group.
         - max_iter: The maximum number of iterations of the RESP fit.
         - threshold: The convergence threshold of the RESP fit.
         - filename: The filename for the calculation.
+        - xyz_file: The xyz file containing the conformers.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -89,8 +97,10 @@ class RespChargesDriver:
         # conformers
         self.xyz_file = None
         self.net_charge = 0.0
+        self.multiplicity = 1
         self.method_dict = None
         self.weights = None
+        self.temperature = 293.15
         self.filename = 'veloxchem_electrostatic_potential_input'
 
         # grid information
@@ -98,7 +108,7 @@ class RespChargesDriver:
         self.density = 1.0
 
         # resp fitting
-        self.constraints = None
+        self.equal_charges = None
         self.restrained_hydrogens = False
         self.weak_restraint = 0.0005
         self.strong_restraint = 0.001
@@ -125,7 +135,9 @@ class RespChargesDriver:
             'threshold': 'float',
             'xyz_file': 'str',
             'net_charge': 'float',
+            'multiplicity': 'int',
             'weights': 'seq_fixed',
+            'temperature': 'float',
         }
 
         parse_input(self, resp_keywords, resp_dict)
@@ -133,12 +145,10 @@ class RespChargesDriver:
         if 'filename' in resp_dict:
             self.filename = resp_dict['filename']
 
-        # TODO: improve the format of constraints
-
-        if 'constraints' in resp_dict:
-            self.constraints = []
-            for i in list(resp_dict['constraints'].split(', ')):
-                self.constraints.append(list(map(int, list(i.split(' ')))))
+        if 'equal_charges' in resp_dict:
+            self.equal_charges = []
+            for i in list(resp_dict['equal_charges'].split(', ')):
+                self.equal_charges.append(list(map(int, list(i.split(' = ')))))
 
         if method_dict is not None:
             self.method_dict = dict(method_dict)
@@ -179,6 +189,7 @@ class RespChargesDriver:
                     # create molecule
                     mol = Molecule(u.atoms.names, u.atoms.positions, 'angstrom')
                     mol.set_charge(self.net_charge)
+                    mol.set_multiplicity(self.multiplicity)
                     # create basis set
                     basis_path = '.'
                     if 'basis_path' in self.method_dict:
@@ -216,6 +227,7 @@ class RespChargesDriver:
 
         grids = []
         esp = []
+        scf_energies = []
 
         for ind, (mol, bas) in enumerate(zip(molecules, basis_sets)):
             if use_xyz_file:
@@ -223,9 +235,16 @@ class RespChargesDriver:
                 self.ostream.print_info(info_text)
                 self.ostream.flush()
 
+            nalpha = mol.number_of_alpha_electrons()
+            nbeta = mol.number_of_beta_electrons()
+
             # run SCF
             if not use_xyz_file:
-                scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
+                # select SCF driver
+                if nalpha == nbeta:
+                    scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
+                else:
+                    scf_drv = ScfUnrestrictedDriver(self.comm, self.ostream)
                 scf_drv.update_settings({'filename': self.filename},
                                         self.method_dict)
                 scf_drv.compute(mol, bas)
@@ -234,7 +253,11 @@ class RespChargesDriver:
                 filename = Path(self.filename).name + f'_conformer_{ind+1}'
                 filename = str(output_dir / filename)
                 ostream = OutputStream(filename + '.out')
-                scf_drv = ScfRestrictedDriver(self.comm, ostream)
+                # select SCF driver
+                if nalpha == nbeta:
+                    scf_drv = ScfRestrictedDriver(self.comm, ostream)
+                else:
+                    scf_drv = ScfUnrestrictedDriver(self.comm, ostream)
                 scf_drv.update_settings({'filename': filename},
                                         self.method_dict)
                 scf_drv.compute(mol, bas)
@@ -243,9 +266,15 @@ class RespChargesDriver:
             grid_m = self.get_grid_points(mol)
             esp_m = self.get_electrostatic_potential(grid_m, mol, bas,
                                                      scf_drv.scf_tensors)
+            scf_energy_m = scf_drv.get_scf_energy()
+
             if self.rank == mpi_master():
                 grids.append(grid_m)
                 esp.append(esp_m)
+                scf_energies.append(scf_energy_m)
+
+        if self.weights is None:
+            self.weights = self.get_boltzmann_weights(scf_energies, self.temperature)
 
         q = None
 
@@ -565,7 +594,7 @@ class RespChargesDriver:
         constr_2 = [-1] * n_atoms
 
         # automatic constraints (refitting methyl and methylene in the 2nd stage)
-        if self.constraints is None:
+        if self.equal_charges is None:
             for i in range(n_atoms):
                 if c_nh[i] > 1:
                     constr_2[i] = 0
@@ -581,9 +610,9 @@ class RespChargesDriver:
         # use constraints from input
         else:
             # put all constraints to constr_1
-            for equal_atoms in self.constraints:
-                for i in range(len(equal_atoms) - 1):
-                    constr_1[equal_atoms[i + 1] - 1] = equal_atoms[i]
+            for atoms in self.equal_charges:
+                for i in range(len(atoms) - 1):
+                    constr_1[atoms[i + 1] - 1] = atoms[i]
 
             # move methyl and methylene constraints to constr_2
             for i in range(n_atoms):
@@ -762,6 +791,29 @@ class RespChargesDriver:
                 norm += weights[m] * esp[m][i]**2
 
         return np.sqrt(chi_square / norm)
+
+    def get_boltzmann_weights(self, energies, temperature):
+        """
+        Gets Boltzmann weight factors for conformers.
+
+        :param energies:
+            The energies.
+        :param temperature:
+            The temperature.
+        """
+
+        k_b = boltzmann_in_evperkelvin() / hartree_in_ev()
+
+        weights = []
+        for i in range(len(energies)):
+            weights.append(np.exp((-1) * (energies[i] - 
+                min(energies)) / (k_b * temperature)))
+
+        # normalize weights
+        sum_of_weights = sum(weights)
+        weights = [w / sum_of_weights for w in weights]
+
+        return weights
 
     def print_header(self, n_conf, n_points):
         """

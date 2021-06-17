@@ -70,6 +70,13 @@ double getDipoleInDebye();
  */
 double getRotatoryStrengthInCGS();
 
+/**
+ *  Gets Boltzmann constant in eV/K.
+ *
+ *   @return the conversion factor.
+ *    */
+double getBoltzmannConstantInElectronVoltsPerKelvin();
+
 }  // namespace units
 
 #endif /* Codata_hpp */

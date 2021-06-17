@@ -262,6 +262,8 @@ export_general(py::module& m)
 
     m.def("rotatory_strength_in_cgs", &units::getRotatoryStrengthInCGS);
 
+    m.def("boltzmann_in_evperkelvin", &units::getBoltzmannConstantInElectronVoltsPerKelvin);
+
     m.def("to_angular_momentum", &string_to_angular_momentum);
 
     m.def("to_angular_momentum", &integer_to_angular_momentum);

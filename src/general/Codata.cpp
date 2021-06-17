@@ -94,4 +94,12 @@ getRotatoryStrengthInCGS()
     return 471.44360760;
 }
 
+double
+getBoltzmannConstantInElectronVoltsPerKelvin()
+{
+    // Boltzmann constant: 8.617 3324 e-5 eV K^-1
+
+    return 8.6173324e-5;
+}
+
 }  // namespace units
