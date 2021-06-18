@@ -164,15 +164,7 @@ class TdhfGradientDriver(GradientDriver):
             The results of the RPA or TDA calculation.
         """
 
-        # sanity check for number of state
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                self.n_state_deriv < rsp_results['eigenvalues'].size,
-                'TdhfGradientDriver: not enough states calculated')
-
-        # self.print_header()
-
-        # orbital response driver
+        # select orbital response driver
         if self.is_tda:
             method = 'TDA'
             orbrsp_drv = TdaOrbitalResponse(self.comm, self.ostream)
@@ -183,47 +175,48 @@ class TdhfGradientDriver(GradientDriver):
         # SCF results
         scf_tensors = self.scf_drv.scf_tensors
 
+        # compute orbital response
         orbrsp_drv.update_settings(self.rsp_dict, self.method_dict)
         orbrsp_results = orbrsp_drv.compute(molecule, basis, scf_tensors,
                                             rsp_results)
 
-
         natm = molecule.number_of_atoms()
-        nocc = molecule.number_of_alpha_electrons()
-        mo = self.scf_drv.scf_tensors['C']
-        mo_occ = mo[:, :nocc].copy()
+        # only alpha part:
         gs_dm = self.scf_drv.scf_tensors['D_alpha']
+        omega_ao = orbrsp_results['omega_ao']
+        # spin summation already included:
         xpy = orbrsp_results['xpy_ao']
         xmy = orbrsp_results['xmy_ao']
         rel_dm_ao = orbrsp_results['rel_dm_ao']
-        omega_ao = orbrsp_results['omega_ao']
 
         # analytical gradient
-        self.gradient = np.zeros((natm, 3))
-        #self.gradient = self.grad_nuc_contrib(molecule)
+        # self.gradient = np.zeros((natm, 3))
+        self.gradient = self.grad_nuc_contrib(molecule)
 
+        # loop over atoms and contract integral derivatives with density matrices
+        # add the corresponding contribution to the gradient
         for i in range(natm):
+            # taking integral derivatives from pyscf
             d_ovlp = overlap_deriv(molecule, basis, i)
             d_fock = fock_deriv(molecule, basis, gs_dm, i)
             d_eri = eri_deriv(molecule, basis, i)
 
-            self.gradient[i] += ( np.einsum('mn,xmn->x', 2.0*gs_dm + rel_dm_ao, d_fock)
-                             +2.0*np.einsum('mn,xmn->x', omega_ao, d_ovlp)
-                             -2.0*np.einsum('mt,np,xmtnp->x', gs_dm, gs_dm, d_eri)
-                             +1.0*np.einsum('mt,np,xmnpt->x', gs_dm, gs_dm, d_eri)
-                             #+2.0*np.einsum('mn,pt,xtpmn->x', xpy, xpy - xpy.T, d_eri)
-                             #-1.0*np.einsum('mn,pt,xtnmp->x', xpy, xpy - xpy.T, d_eri)
-                             #+2.0*np.einsum('mn,pt,xtpmn->x', xmy, xmy + xmy.T, d_eri)
-                             #-1.0*np.einsum('mn,pt,xtnmp->x', xmy, xmy + xmy.T, d_eri)
+            self.gradient[i] += ( np.einsum('mn,xmn->x', 2.0 * gs_dm + rel_dm_ao, d_fock)
+                             +1.0 * np.einsum('mn,xmn->x', 2.0 * omega_ao, d_ovlp)
+                             -2.0 * np.einsum('mt,np,xmtnp->x', gs_dm, gs_dm, d_eri)
+                             +1.0 * np.einsum('mt,np,xmnpt->x', gs_dm, gs_dm, d_eri)
+                             +1.0 * np.einsum('mn,pt,xtpmn->x', xpy, xpy - xpy.T, d_eri)
+                             -0.5 * np.einsum('mn,pt,xtnmp->x', xpy, xpy - xpy.T, d_eri)
+                             +1.0 * np.einsum('mn,pt,xtpmn->x', xmy, xmy + xmy.T, d_eri)
+                             -0.5 * np.einsum('mn,pt,xtnmp->x', xmy, xmy + xmy.T, d_eri)
                             )
-
-        #self.gradient += self.grad_nuc_contrib(molecule)
 
 
         # If desired, calculate the relaxed and unrelaxed excited-state dipole moment
         if self.do_first_order_prop:
             firstorderprop = FirstOrderProperties(self.comm, self.ostream)
 
+            # unrelaxed density and dipole moment
             unrel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
                              orbrsp_results['unrel_dm_ao'])
             firstorderprop.compute(molecule, basis, unrel_density)
@@ -231,6 +224,7 @@ class TdhfGradientDriver(GradientDriver):
                 title = method + ' Unrelaxed Dipole Moment for Excited State ' + str(self.n_state_deriv + 1)
                 firstorderprop.print_properties(molecule, title)
 
+            # relaxed density and dipole moment
             if 'rel_dm_ao' in orbrsp_results:
                 rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
                                orbrsp_results['rel_dm_ao'])
@@ -405,43 +399,3 @@ class TdhfGradientDriver(GradientDriver):
 
         return dipole_moment
 
-#    def print_geometry(self, molecule):
-#        """
-#        Prints the geometry.
-#
-#        :param molecule:
-#            The molecule.
-#        """
-#
-#        self.ostream.print_block(molecule.get_string())
-#
-#    def print_gradient(self, molecule, labels):
-#        """
-#        Prints the gradient.
-#
-#        :param molecule:
-#            The molecule.
-#        :param labels:
-#            The atom labels.
-#        """
-#
-#        title = 'Gradient (Hartree/Bohr)'
-#        self.ostream.print_header(title)
-#        self.ostream.print_header('-' * (len(title) + 2))
-#        self.ostream.print_blank()
-#
-#        valstr = '  Atom '
-#        valstr += '{:>20s}  '.format('Gradient X')
-#        valstr += '{:>20s}  '.format('Gradient Y')
-#        valstr += '{:>20s}  '.format('Gradient Z')
-#        self.ostream.print_header(valstr)
-#        self.ostream.print_blank()
-#
-#        for i in range(molecule.number_of_atoms()):
-#            valstr = '  {:<4s}'.format(labels[i])
-#            for d in range(3):
-#                valstr += '{:22.12f}'.format(self.gradient[i, d])
-#            self.ostream.print_header(valstr)
-#
-#        self.ostream.print_blank()
-#        self.ostream.flush()
