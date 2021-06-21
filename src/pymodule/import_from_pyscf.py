@@ -2,7 +2,7 @@
 from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import DenseMatrix
-from .veloxchemlib import ao_matrix_to_veloxchem 
+from .veloxchemlib import ao_matrix_to_veloxchem
 from .veloxchemlib import ao_matrix_to_dalton
 import numpy as np
 import sys
@@ -23,6 +23,8 @@ def translate_to_pyscf(label):
     """
     if label == "6-31+G_D,P_":
         return "6-31+G(d,p)"
+    elif label == "6-311++G_D,P_":
+        return "6-311++G(d,p)"
     else:
         return label
 
@@ -41,11 +43,11 @@ def overlap_deriv(molecule, basis, i=0, unit="au"):
     """
     Imports the derivatives of the overlap matrix
     from pyscf and converts it to veloxchem format
-   
+
     :param molecule:
         the vlx molecule object
     :param basis:
-        the vlx basis object 
+        the vlx basis object
     :param i:
         the index of the atom for which the derivatives
         are computed.

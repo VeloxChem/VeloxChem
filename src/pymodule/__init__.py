@@ -96,6 +96,7 @@ from .firstorderprop import FirstOrderProperties
 from .orbitalresponse import OrbitalResponse
 from .tdhfgradientdriver import TdhfGradientDriver
 from .mp2orbitalresponse import Mp2OrbitalResponse
+from .scfhessiandriver import ScfHessianDriver
 
 # Deprecation warnings
 from . import deprecations
