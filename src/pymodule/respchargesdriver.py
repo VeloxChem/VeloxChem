@@ -217,14 +217,6 @@ class RespChargesDriver:
                 output_dir.mkdir(parents=True, exist_ok=True)
             self.comm.barrier()
 
-        if self.weights is not None:
-            errmsg = 'RespChargesDriver: Number of weights does not match '
-            errmsg += 'number of conformers.'
-            assert_msg_critical(len(self.weights) == len(molecules), errmsg)
-            # normalize weights
-            sum_of_weights = sum(self.weights)
-            self.weights = [w / sum_of_weights for w in self.weights]
-
         grids = []
         esp = []
         scf_energies = []
@@ -245,8 +237,8 @@ class RespChargesDriver:
                     scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
                 else:
                     scf_drv = ScfUnrestrictedDriver(self.comm, self.ostream)
-                scf_drv.update_settings({'filename': self.filename},
-                                        self.method_dict)
+                scf_dict = {'filename': self.filename, 'checkpoint_file': self.filename + '.scf.h5'}
+                scf_drv.update_settings(scf_dict, self.method_dict)
                 scf_drv.compute(mol, bas)
 
             else:
@@ -258,8 +250,8 @@ class RespChargesDriver:
                     scf_drv = ScfRestrictedDriver(self.comm, ostream)
                 else:
                     scf_drv = ScfUnrestrictedDriver(self.comm, ostream)
-                scf_drv.update_settings({'filename': filename},
-                                        self.method_dict)
+                scf_dict = {'filename': filename, 'checkpoint_file': filename + '.scf.h5'}
+                scf_drv.update_settings(scf_dict, self.method_dict)
                 scf_drv.compute(mol, bas)
                 ostream.close()
 
@@ -273,7 +265,13 @@ class RespChargesDriver:
                 esp.append(esp_m)
                 scf_energies.append(scf_energy_m)
 
-        if self.weights is None:
+        if self.weights is not None and len(self.weights) == len(molecules):
+            # normalize weights
+            sum_of_weights = sum(self.weights)
+            self.weights = [w / sum_of_weights for w in self.weights]
+        elif self.weights is not None and len(self.weights) != len(molecules):
+            self.weights = self.get_boltzmann_weights(scf_energies, self.temperature)
+        elif self.weights is None and len(molecules) > 1:
             self.weights = self.get_boltzmann_weights(scf_energies, self.temperature)
 
         q = None
@@ -285,6 +283,13 @@ class RespChargesDriver:
             elif flag.lower() == 'esp':
                 q = self.compute_esp_charges(molecules, grids, esp,
                                              self.weights)
+        if not use_xyz_file:
+            filename = str(output_dir / self.filename)
+        else:
+            filename = Path(self.filename).name + '_conformer'
+            filename = str(output_dir / filename)
+
+        self.write_pdb_file(filename, molecules, q)
 
         return q
 
@@ -771,26 +776,21 @@ class RespChargesDriver:
             The RRMS.
         """
 
-        # sum of the squared error between QM ESP and partial charge ESP
-        chi_square = 0.0
-
-        # sum of the QM ESP
-        norm = 0.0
+        rrms = 0.0
 
         for m in range(len(molecules)):
             coords = molecules[m].get_coordinates()
-
+            chi_square = 0.0
+            norm = 0.0
             for i in range(esp[m].size):
                 # partial charge ESP
                 pot = 0.0
-
                 for j in range(molecules[m].number_of_atoms()):
                     pot += q[j] / np.linalg.norm(grids[m][i] - coords[j])
-
-                chi_square += weights[m] * (esp[m][i] - pot)**2
-                norm += weights[m] * esp[m][i]**2
-
-        return np.sqrt(chi_square / norm)
+                chi_square += (esp[m][i] - pot)**2
+                norm += esp[m][i]**2
+            rrms += weights[m] * np.sqrt(chi_square / norm)
+        return rrms
 
     def get_boltzmann_weights(self, energies, temperature):
         """
@@ -815,6 +815,35 @@ class RespChargesDriver:
 
         return weights
 
+    def write_pdb_file(self, filename, molecules, q):
+        """
+        Writes data in PDB file.
+
+        :param filename:
+            The name of the file.
+        :param molecules:
+            The list of molecules.
+        :param q:
+            The charges.
+        """
+
+        i = 0
+        for mol in molecules:
+            newfile = filename
+            if len(molecules) > 1:
+                i += 1
+                newfile += '_' + str(i)
+            file = open(newfile + '.pdb', 'w')
+            coords = mol.get_coordinates() * bohr_in_angstroms()
+            for j in range(mol.number_of_atoms()):
+                cur_str = '{:6s}{:5d} {:^4s} {:3s}  {:4d}    '.format(
+                    'ATOM', j + 1, mol.get_labels()[j], 'RES', 1) 
+                cur_str += '{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:10.6f}'.format(
+                    coords[j][0], coords[j][1], coords[j][2], 1.0, q[j])
+                file.write(cur_str)
+                file.write('\n')
+            file.close()
+
     def print_header(self, n_conf, n_points):
         """
         Prints header for the RESP charges driver.
@@ -833,6 +862,14 @@ class RespChargesDriver:
         str_width = 40
         cur_str = 'Number of Conformers         :  ' + str(n_conf)
         self.ostream.print_header(cur_str.ljust(str_width))
+        if n_conf > 1:
+            cur_str = 'Weights of Conformers        :  {:4f}'.format(
+                self.weights[0])
+            self.ostream.print_header(cur_str.ljust(str_width))
+            for i in range(1, n_conf):
+                cur_str = '                                {:4f}'.format(
+                    self.weights[i])
+                self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = 'Number of Layers             :  ' + str(self.number_layers)
         self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = 'Points per Square Angstrom   :  ' + str(self.density)
