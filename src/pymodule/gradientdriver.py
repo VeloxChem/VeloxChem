@@ -107,12 +107,13 @@ class GradientDriver:
         for i in range(natm):
             z_a = nuclear_charges[i]
             r_a = coords[i]
-            for j in range(natm):
-                if i != j:
-                    z_b = nuclear_charges[j]
-                    r_b = coords[j]
-                    r = np.sqrt(np.dot(r_a - r_b, r_a - r_b))
-                    nuc_contrib[i] += z_a * z_b * (r_b - r_a) / r**3
+            for j in range(i+1, natm):
+                z_b = nuclear_charges[j]
+                r_b = coords[j]
+                r = np.sqrt(np.dot(r_a - r_b, r_a - r_b))
+                f_ij = z_a * z_b * (r_b - r_a) / r**3
+                nuc_contrib[i] += f_ij
+                nuc_contrib[j] -= f_ij #z_a * z_b * (r_a - r_b) / r**3
 
         return nuc_contrib
 

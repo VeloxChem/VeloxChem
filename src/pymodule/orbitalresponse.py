@@ -407,16 +407,16 @@ class OrbitalResponse:
                 # lambda_ao + lambda_ao.T: OV + VO
                 rel_dm_ao = unrel_dm_ao + 2 * lambda_ao + 2 * lambda_ao.T
                 return {
-                    'xpy_ao': xpy_ao,
-                    'xmy_ao': xmy_ao,
+                    'x_plus_y_ao': xpy_ao,
+                    'x_minus_y_ao': xmy_ao,
                     'lambda_ao': lambda_ao,
                     'omega_ao': omega_ao,
-                    'unrel_dm_ao': unrel_dm_ao,
-                    'rel_dm_ao': rel_dm_ao,
+                    'unrelaxed_density_ao': unrel_dm_ao,
+                    'relaxed_density_ao': rel_dm_ao,
                 }
             else:
                 # return only unrelaxed density matrix if not converged
-                return {'unrel_dm_ao': unrel_dm_ao}
+                return {'unrelaxed_density_ao': unrel_dm_ao}
         else:
             return {}
 

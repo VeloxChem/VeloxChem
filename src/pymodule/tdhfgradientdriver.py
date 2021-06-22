@@ -92,6 +92,7 @@ class TdhfGradientDriver(GradientDriver):
 
         if 'tamm_dancoff' in rsp_dict:
             key = rsp_dict['tamm_dancoff'].lower()
+			# TODO: change to "self.tamm_dancoff"
             self.is_tda = True if key in ['yes', 'y'] else False
 
         if self.is_tda:
@@ -108,8 +109,8 @@ class TdhfGradientDriver(GradientDriver):
             # user gives '1' for first excited state, but internal index is 0
             self.n_state_deriv = int(rsp_dict['n_state_deriv']) - 1
 
-        self.rsp_dict = rsp_dict
-        self.method_dict = method_dict
+        self.rsp_dict = dict(rsp_dict)
+        self.method_dict = dict(method_dict)
 
     def compute(self, molecule, basis, rsp_drv, rsp_results):
         """
@@ -181,13 +182,14 @@ class TdhfGradientDriver(GradientDriver):
                                             rsp_results)
 
         natm = molecule.number_of_atoms()
+        # TODO: the following is available on the master node only
         # only alpha part:
         gs_dm = self.scf_drv.scf_tensors['D_alpha']
         omega_ao = orbrsp_results['omega_ao']
         # spin summation already included:
-        xpy = orbrsp_results['xpy_ao']
-        xmy = orbrsp_results['xmy_ao']
-        rel_dm_ao = orbrsp_results['rel_dm_ao']
+        xpy = orbrsp_results['x_plus_y_ao']
+        xmy = orbrsp_results['x_minus_y_ao']
+        rel_dm_ao = orbrsp_results['relaxed_density_ao']
 
         # analytical gradient
         # self.gradient = np.zeros((natm, 3))

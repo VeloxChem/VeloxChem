@@ -145,10 +145,10 @@ class ScfGradientDriver(GradientDriver):
         """
         natm = molecule.number_of_atoms()
         nocc = molecule.number_of_alpha_electrons()
-        mo = self.scf_drv.scf_tensors['C']
+        mo = self.scf_drv.scf_tensors['C_alpha']
         mo_occ = mo[:, :nocc].copy()
         one_pdm_ao = self.scf_drv.scf_tensors['D_alpha']
-        mo_energies = self.scf_drv.scf_tensors['E']
+        mo_energies = self.scf_drv.scf_tensors['E_alpha']
         eocc = mo_energies[:nocc]
         eo_diag = np.diag(eocc)
         epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])

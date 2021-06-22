@@ -294,20 +294,18 @@ class ScfHessianDriver:
                     z_b = nuclear_charges[j]
                     r_b = coords[j]
                     r = np.sqrt(np.dot(r_a - r_b, r_a - r_b))
-                    # nondiagonal parts
-                    nuc_contrib[i, 0, j, 0] = ( z_a * z_b * ( 1 / r**3 )
-                                              - 3*(r_b[0] - r_a[0])**2 / r**5 )
-                    nuc_contrib[i, 1, j, 1] = ( z_a * z_b * ( 1 / r**3 )
-                                              - 3*(r_b[1] - r_a[1])**2 / r**5 )
-                    nuc_contrib[i, 2, j, 2] = ( z_a * z_b * ( 1 / r**3 )
-                                              - 3*(r_b[2] - r_a[2])**2 / r**5 )
+                    for k in range(3):
+                        for l in range(3):
+                    # off-diagonal parts
+                            nuc_contrib[i, k, j, l] = - 3*z_a*z_b*(r_b[k] - r_a[k])*(r_b[l] - r_a[l]) / r**5
+                            if k == l:
+                                nuc_contrib[i, k, j, l] += z_a * z_b / r**3
+
                     # add the diagonal contribution
-                    nuc_contrib[i, 0, i, 0] += ( -z_a * z_b * ( 1 / r**3 )
-                                              + 3*(r_b[0] - r_a[0])**2 / r**5 )
-                    nuc_contrib[i, 1, i, 1] += ( -z_a * z_b * ( 1 / r**3 )
-                                              + 3*(r_b[1] - r_a[1])**2 / r**5 )
-                    nuc_contrib[i, 2, i, 2] += ( z_a * z_b * ( 1 / r**3 )
-                                              + 3*(r_b[2] - r_a[2])**2 / r**5 )
+                            nuc_contrib[i, k, i, l] += 3*z_a*z_b*(r_b[k] - r_a[k])*(r_b[l] - r_a[l]) / r**5
+                            if k == l:
+                                nuc_contrib[i, k, i, l] -= z_a * z_b / r**3
+
 
         return nuc_contrib
 
