@@ -207,7 +207,7 @@ class OrbitalResponse:
             'dft_func_label': dft_func_label,
         }
 
-    def compute(self, molecule, basis, scf_tensors, rsp_results=None, mol_orbs=None):
+    def compute(self, molecule, basis, scf_tensors, rsp_results=None):
         """
         Computes orbital response Lagrange multipliers and relaxed density
         for the calculation of energy gradients.
@@ -221,9 +221,6 @@ class OrbitalResponse:
         :param rsp_results:
             The results from the RPA or TDA excited states calculation.
             use None for MP2 
-        :param mol_orbs:
-            Molecular orbitals object from scfdriver;
-            needed for MP2; use None for RPA and TDA.
         """
 
         profiler = Profiler({
@@ -264,9 +261,11 @@ class OrbitalResponse:
         # 5) Run the conjugate gradient
 
         if rsp_results is None:
+            # This is the MP2 routine
             rhs_results = self.compute_rhs(molecule, basis, scf_tensors,
-                                           mol_orbs, dft_dict, profiler)
+                                           profiler)
         else:
+            # This is the excited state routine
             rhs_results = self.compute_rhs(molecule, basis, scf_tensors,
                                            rsp_results, dft_dict, profiler)
 
@@ -276,8 +275,6 @@ class OrbitalResponse:
             dm_vv = rhs_results['dm_vv']
             unrel_dm_ao = rhs_results['unrel_dm_ao']
             fock_ao_rhs = rhs_results['fock_ao_rhs']
-            xpy_ao = rhs_results['xpy_ao']
-            xmy_ao = rhs_results['xmy_ao']
         else:
             rhs_mo = None
 
@@ -365,10 +362,12 @@ class OrbitalResponse:
             ovlp = scf_tensors['S']
 
             if rsp_results is None:
+                # This is the routine for MP2
                 omega_ao = self.compute_omega(ovlp, mo_occ, mo_vir, epsilon_dm_ao,
-                                              mol_orbs, fock_ao_rhs, fock_lambda,
+                                              scf_tensors, fock_ao_rhs, fock_lambda,
                                               molecule, basis)
             else:
+                # This is the routine for excited states
                 omega_ao = self.compute_omega(ovlp, mo_occ, mo_vir, epsilon_dm_ao,
                                               rsp_results, fock_ao_rhs, fock_lambda)
 
@@ -406,14 +405,27 @@ class OrbitalResponse:
                 # Factor 2: (alpha + beta)
                 # lambda_ao + lambda_ao.T: OV + VO
                 rel_dm_ao = unrel_dm_ao + 2 * lambda_ao + 2 * lambda_ao.T
-                return {
-                    'x_plus_y_ao': xpy_ao,
-                    'x_minus_y_ao': xmy_ao,
-                    'lambda_ao': lambda_ao,
-                    'omega_ao': omega_ao,
-                    'unrelaxed_density_ao': unrel_dm_ao,
-                    'relaxed_density_ao': rel_dm_ao,
-                }
+
+                if rsp_results is None:
+                    # This is the dictionary for MP2
+                    return {
+                        'lambda_ao': lambda_ao,
+                        'omega_ao': omega_ao,
+                        'unrelaxed_density_ao': unrel_dm_ao,
+                        'relaxed_density_ao': rel_dm_ao,
+                    }
+                else:
+                    # This is the dictionary for the excited states
+                    xpy_ao = rhs_results['xpy_ao']
+                    xmy_ao = rhs_results['xmy_ao']
+                    return {
+                        'x_plus_y_ao': xpy_ao,
+                        'x_minus_y_ao': xmy_ao,
+                        'lambda_ao': lambda_ao,
+                        'omega_ao': omega_ao,
+                        'unrelaxed_density_ao': unrel_dm_ao,
+                        'relaxed_density_ao': rel_dm_ao,
+                    }
             else:
                 # return only unrelaxed density matrix if not converged
                 return {'unrelaxed_density_ao': unrel_dm_ao}
