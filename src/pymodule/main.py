@@ -438,9 +438,9 @@ def main():
         chg_drv = RespChargesDriver(task.mpi_comm, task.ostream)
         chg_drv.update_settings(charges_dict, method_dict)
 
-        if 'resp_charges' in task.input_dict:
+        if task_type == 'resp charges':
             chg_drv.compute(task.molecule, task.ao_basis, 'resp')
-        elif 'esp_charges' in task.input_dict:
+        elif task_type == 'esp_charges':
             chg_drv.compute(task.molecule, task.ao_basis, 'esp')
 
     # All done
