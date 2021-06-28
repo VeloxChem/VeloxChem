@@ -440,7 +440,7 @@ def main():
 
         if task_type == 'resp charges':
             chg_drv.compute(task.molecule, task.ao_basis, 'resp')
-        elif task_type == 'esp_charges':
+        elif task_type == 'esp charges':
             chg_drv.compute(task.molecule, task.ao_basis, 'esp')
 
     # All done
