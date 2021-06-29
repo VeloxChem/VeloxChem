@@ -232,62 +232,61 @@ class LoPropDriver:
         #    contribution from localised dipoles: rAB*delta DAB = Aab
         #    bond contribution:  dQab (Ra-Rb)
 
-        #dQa:charge shift per atom
+        # dQa:charge shift per atom
         dQa = np.zeros((natoms, 3))
-        #dQa array as [[Ax,Ay,Az],[Bx,By,Bz]]
+        # dQa array as [[Ax,Ay,Az],[Bx,By,Bz]]
         it = 0
         for a in range(natoms):
-            select = np.arange(0 + it, ao_per_atom[a] + it)
+            select = np.arange(it, it + ao_per_atom[a])
             dQa[a][0] = np.trace(Dx_loprop[select, :][:, select])
             dQa[a][1] = np.trace(Dy_loprop[select, :][:, select])
             dQa[a][2] = np.trace(Dz_loprop[select, :][:, select])
-            it = it + ao_per_atom[a]
+            it += ao_per_atom[a]
 
-        #coord_matrix, the rab matrix in equation above
+        # coord_matrix, the rab matrix in equation above
         molecule_coord = molecule.get_coordinates()
         coord_matrix = np.zeros((natoms, natoms, 3))
         for i in range(natoms):
             for j in range(natoms):
                 if i == j:
-                    #if a=b rab=ra
+                    # a==b: rab=ra
                     coord_matrix[i][j] = molecule_coord[i]
                 else:
-                    #if a =!b, rab = (ra-rb)/2
-                    a = np.absolute(molecule_coord[i] - molecule_coord[j])
+                    # a!=b: rab = (ra-rb)/2
+                    a = np.abs(molecule_coord[i] - molecule_coord[j])
                     coord_matrix[i][j] = a / 2
 
-        #contribution from localised dipole
+        # contribution from localised dipole
         loc_dipole = np.zeros((3, 3, natoms, natoms))
-        # 3 stands for x y z directions
         for i in range(3):
             for j in range(3):
                 it_a = 0
                 for a in range(natoms):
-                    select_a = np.arange(0 + it_a, ao_per_atom[a] + it_a)
+                    select_a = np.arange(it_a, it_a + ao_per_atom[a])
                     it_b = 0
                     for b in range(natoms):
-                        #select the subblock[a][b] region in dks_lp
-                        select_b = np.arange(0 + it_b, ao_per_atom[b] + it_b)
-                        #selected the lp basis for subblock[A][B] in purterbed density matrix
+                        # select the subblock[a][b] region in dks_lp
+                        select_b = np.arange(it_b, it_b + ao_per_atom[b])
+                        # selected the lp basis for subblock[A][B] in purterbed density matrix
                         D_AB = Dk_loprop[i][select_a, :][:, select_b]
-                        #selected the dipole matrice for subblock[A][B] in purterbed density matrix
+                        # selected the dipole matrice for subblock[A][B] in purterbed density matrix
                         dipole_select = dipole[j][select_a, :][:, select_b]
                         dipole_select = dipole_select.transpose()
 
-                        loc_dipole[i, j, a, b] = np.trace(dipole_select @ D_AB)
-                        it_b = it_b + ao_per_atom[b]
+                        loc_dipole[i, j, a, b] += np.trace(
+                            np.matmul(dipole_select, D_AB))
+                        it_b += ao_per_atom[b]
 
                     loc_dipole[i, j, a, a] -= dQa[a, j] * coord_matrix[a, a, i]
-                    it_a = it_a + ao_per_atom[a]
+                    it_a += ao_per_atom[a]
 
-        #Lagragian
+        # Lagragian
         Fab = np.zeros((natoms, natoms))
         for a in range(natoms):
             za = nuclear_charge[a]
             Ra = molecule_coord[a]
             for b in range(a):
                 zb = nuclear_charge[b]
-                ##read the coordinate
                 Rb = molecule_coord[b]
                 Fab[a, b] = self.penalty_fc(za, Ra, zb, Rb)
                 Fab[b, a] = Fab[a][b]
@@ -296,8 +295,8 @@ class LoPropDriver:
 
         Lab = Fab + 2 * np.max(np.abs(Fab))
 
-        dQa = np.swapaxes(dQa, 0, 1)
-        lagragian = [np.linalg.solve(Lab, rhs) for rhs in dQa]
+        #dQa = np.swapaxes(dQa, 0, 1)
+        lagragian = [np.linalg.solve(Lab, rhs) for rhs in dQa.T]
 
         #dQab
         dQab = np.zeros((natoms, natoms, 3))
@@ -385,20 +384,22 @@ class LoPropDriver:
             return ret_dict
 
     def penalty_fc(self, za, Ra, zb, Rb):
-        '''
-         penalty function        
-         param: za
-             atomic number for atom a
-         param: Ra
-             position vector for atom a
-         param: zb
-             atomic number for atom b
-         param: Rb
-             position vector for atom b
+        """
+        penalty function        
+
+        :param za:
+            atomic number for atom a
+        :param Ra:
+            position vector for atom a
+        :param zb:
+            atomic number for atom b
+        :param Rb:
+            position vector for atom b
              
-        return:f
-            the penalty function
-         '''
+        :return:
+            The penalty function
+        """
+
         #Ra/Rb are the position vectors
         AUG2AU_factor = bohr_in_angstroms()
         AUG2AU = 1.0 / AUG2AU_factor
