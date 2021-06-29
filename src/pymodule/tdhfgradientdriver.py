@@ -13,6 +13,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import dipole_in_debye
 from .errorhandler import assert_msg_critical
 from .firstorderprop import FirstOrderProperties
+from .lrsolver import LinearResponseSolver
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -60,7 +61,7 @@ class TdhfGradientDriver(GradientDriver):
         self.flag = 'RPA Gradient Driver'
         self.gradient = None
 
-        # SCF and response drivers
+        # SCF (and response) drivers
         self.scf_drv = scf_drv
         # self.rsp_drv = rsp_drv # rsp_prop object from main.py
 
@@ -365,6 +366,8 @@ class TdhfGradientDriver(GradientDriver):
             The strength of the external electric field.
         :param min_basis:
             The minimal AO basis set.
+        :return:
+            The electric dipole moment vector.
         """
 
         # self.print_header()
@@ -400,4 +403,108 @@ class TdhfGradientDriver(GradientDriver):
             dipole_moment[i] = - (e_plus - e_minus) / (2.0 * field_strength)
 
         return dipole_moment
+
+    def compute_polarizability_grad(self, molecule, ao_basis, min_basis=None):
+        """
+        Performs calculation of numerical nuclear gradient
+        of the electric dipole polarizability.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        """
+        scf_ostream_state = self.scf_drv.ostream.state
+        self.scf_drv.ostream.state = False
+
+        # number of atoms
+        natm = molecule.number_of_atoms()
+
+        # atom labels
+        labels = molecule.get_labels()
+
+        # atom coordinates (nx3)
+        coords = molecule.get_coordinates()
+
+        # linear response driver for polarizability calculation
+        lr_drv = LinearResponseSolver(self.comm, self.ostream)
+        #lr_ostream_state = lr_drv.ostream.state
+        lr_drv.ostream.state = False
+        # lr_drv has self.a_components and self.b_components = 'xyz'
+        # as well as self.frequencies = (0,)
+        #lr_drv.update_settings(rsp_settings, method_settings)
+
+        # polarizability: 3 coordinates x 3 coordinates (ignoring frequencies)
+        # polarizability gradient: dictionary goes through 3 coordinates x 3 coordinates
+        # each entry having values for n atoms x 3 coordinates
+        self.pol_grad = {}
+
+        if not self.do_four_point:
+            for i in range(natm):
+                for d in range(3):
+                    coords[i, d] += self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                    lr_drv.is_converged = False
+                    lr_results_p = lr_drv.compute(new_mol, ao_basis,
+                                                       self.scf_drv.scf_tensors)
+
+                    coords[i, d] -= 2.0 * self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                    lr_drv.is_converged = False
+                    lr_results_m = lr_drv.compute(new_mol, ao_basis,
+                                                       self.scf_drv.scf_tensors)
+
+                    coords[i, d] += self.delta_h
+                    for aop in lr_drv.a_components:
+                        for bop in lr_drv.b_components:
+                            self.pol_grad[aop, bop, i, d] = (
+                                ( lr_results_p['response_functions'][aop, bop, 0.0]
+                                - lr_results_m['response_functions'][aop, bop, 0.0] ) /
+                                (2.0 * self.delta_h) )
+
+        # four-point approximation for debugging of analytical gradient
+        else:
+            for i in range(natm):
+                for d in range(3):
+                    coords[i, d] += self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                    lr_drv.is_converged = False
+                    lr_results_p1 = lr_drv.compute(new_mol, ao_basis,
+                                                       self.scf_drv.scf_tensors)
+
+                    coords[i, d] += self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                    lr_drv.is_converged = False
+                    lr_results_p2 = lr_drv.compute(new_mol, ao_basis,
+                                                       self.scf_drv.scf_tensors)
+
+                    coords[i, d] -= 3.0 * self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                    lr_drv.is_converged = False
+                    lr_results_m1 = lr_drv.compute(new_mol, ao_basis,
+                                                       self.scf_drv.scf_tensors)
+
+                    coords[i, d] -= 1.0 * self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                    lr_drv.is_converged = False
+                    lr_results_m2 = lr_drv.compute(new_mol, ao_basis,
+                                                       self.scf_drv.scf_tensors)
+
+                    coords[i, d] += 2.0 * self.delta_h
+                    for aop in lr_drv.a_components:
+                        for bop in lr_drv.b_components:
+                    # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
+                            self.pol_grad[aop, bop, i, d] = (
+                                ( lr_results_m2['response_functions'][aop, bop, 0.0]
+                                - 8 * lr_results_m1['response_functions'][aop, bop, 0.0]
+                                + 8 * lr_results_p1['response_functions'][aop, bop, 0.0]
+                                - lr_results_p2['response_functions'][aop, bop, 0.0] ) /
+                                (12.0 * self.delta_h) )
+
 
