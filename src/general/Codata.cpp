@@ -59,6 +59,16 @@ getHartreeValueInKiloCaloriePerMole()
 }
 
 double
+getHartreeValueInWavenumbers()
+{
+    // Bohr radius: a0 = 0.529 177 210 92 e-8 [cm]
+    // inverse fine-structure constant: a = 137.035 999 074
+    // 1 [h] = 1 / (a * a0 * 2*pi) [cm^-1]
+
+    return 219474.6313718698;
+}
+
+double
 getDipoleInDebye()
 {
     // atomic unit of electric dipole mom.: 8.478 353 26 e-30 [C m]
@@ -83,6 +93,17 @@ getRotatoryStrengthInCGS()
     // 1 [a.u.] = 2 ea0 mu_B = 471.44360760 [10**(-40) cgs unit]
 
     return 471.44360760;
+}
+
+double
+getMolarEllipticityFromBeta()
+{
+    // Avogadro constant: N_A = 6.022 141 29 e23 [mol^-1]
+    // Bohr radius: a0 = 0.529 177 210 92 [angs]
+
+    // factor = 288e-30 * pi^2 * N_A * a0^4
+
+    return 0.000134229;
 }
 
 }  // namespace units

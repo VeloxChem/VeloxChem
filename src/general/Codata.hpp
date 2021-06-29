@@ -50,6 +50,13 @@ double getHartreeValueInElectronVolts();
 double getHartreeValueInKiloCaloriePerMole();
 
 /**
+ Gets a Hartree value in reciprocal cm.
+
+ @return the conversion factor.
+ */
+double getHartreeValueInWavenumbers();
+
+/**
  Gets convertion factor for dipole moment (a.u.->Debye)
 
  @return the conversion factor.
@@ -62,6 +69,14 @@ double getDipoleInDebye();
  @return the conversion factor.
  */
 double getRotatoryStrengthInCGS();
+
+/**
+ Gets factor needed for the calculation of the molar ellipticity from the
+ electric-dipole magnetic-dipole polarizability beta
+
+ @return the factor.
+ */
+double getMolarEllipticityFromBeta();
 
 }  // namespace units
 

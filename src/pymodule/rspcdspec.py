@@ -24,6 +24,8 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from .veloxchemlib import hartree_in_ev
+from .veloxchemlib import hartree_in_wavenumbers
+from .veloxchemlib import molar_ellipticity_from_beta
 from .rspproperty import ResponseProperty
 from .inputparser import parse_seq_range
 
@@ -61,7 +63,7 @@ class CircularDichroismSpectrum(ResponseProperty):
         rsp_dict['onlystatic'] = 'no'
         rsp_dict['complex'] = 'yes'
 
-        rsp_dict['a_operator'] = 'angular momentum'
+        rsp_dict['a_operator'] = 'magnetic dipole'
         rsp_dict['a_components'] = 'xyz'
 
         rsp_dict['b_operator'] = 'linear momentum'
@@ -104,7 +106,7 @@ class CircularDichroismSpectrum(ResponseProperty):
 
         for w in freqs:
             title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
-                'AngMom', 'LinMom', 'Frequency', 'Real', 'Imaginary')
+                'MagDip', 'LinMom', 'Frequency', 'Real', 'Imaginary')
             ostream.print_header(title.ljust(width))
             ostream.print_header(('-' * len(title)).ljust(width))
 
@@ -149,9 +151,10 @@ class CircularDichroismSpectrum(ResponseProperty):
             Gyy = self.rsp_property['response_functions'][('y', 'y', w)].imag
             Gzz = self.rsp_property['response_functions'][('z', 'z', w)].imag
 
-            beta = -(Gxx + Gyy + Gzz) / (3.0 * w)
-            wavenumber = 2.1947463e+5 * w
-            Delta_epsilon = beta * wavenumber**2 * 0.0001343 / (100.0 * 3298.8)
+            beta = -(Gxx + Gyy + Gzz) / (3.0 * w**2)
+            wavenumber = w * hartree_in_wavenumbers()
+            Delta_epsilon = (beta * wavenumber**2
+                             * molar_ellipticity_from_beta() / (100.0 * 3298.8))
 
             output = '{:<20.4f}{:<20.5f}{:>18.8f}'.format(
                 w, w * hartree_in_ev(), Delta_epsilon)
