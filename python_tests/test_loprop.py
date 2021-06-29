@@ -24,8 +24,8 @@ class TestLoProp:
                                            scf_drv.scf_tensors)
 
         if is_mpi_master(task.mpi_comm):
-            charges = loprop_result['localised_charges']
-            polarizabilities = loprop_result['localised_polarisabilities']
+            charges = loprop_result['localized_charges']
+            polarizabilities = loprop_result['localized_polarizabilities']
             assert np.max(np.abs(charges - ref_charges)) < 1.0e-4
             assert np.max(
                 np.abs(polarizabilities - ref_polarizabilities)) < 1.0e-4

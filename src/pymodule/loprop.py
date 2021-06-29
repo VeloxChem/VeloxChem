@@ -42,7 +42,7 @@ from .errorhandler import assert_msg_critical
 class LoPropDriver:
     """
     Implements the LoProp driver.
-    
+
     :param comm:
         The MPI communicator.
     :param ostream:
@@ -67,15 +67,15 @@ class LoPropDriver:
     def compute(self, molecule, basis, scf_tensors):
         """
         calculate the loprop transformation matrix T
-        patial charge (Qab) and localised polarisabilities
-                
+        patial charge (Qab) and localized polarizabilities
+
         :param molecule:
             the molecule
         :param basis:
             the bais functions
         :param scf_tensors:
             The tensors from the converged SCF calculation.
-            
+
         :return:
             A dictionary containing localized charges and localized
             polarizabilities.
@@ -161,7 +161,7 @@ class LoPropDriver:
         D = D[re_arranged_indices, :][:, re_arranged_indices]
         D_loprop = np.linalg.multi_dot([T_inv, D, T_inv.T])
 
-        # calculated localised charges
+        # calculated localized charges
         Qab = np.zeros((natoms, natoms))
         start_point = 0
         for atom in range(natoms):
@@ -221,14 +221,14 @@ class LoPropDriver:
         z_ao_loprop = np.linalg.multi_dot([T.T, z_ao, T])
         dipole = np.concatenate(([x_ao_loprop], [y_ao_loprop], [z_ao_loprop]))
 
-        # localised polarisabilities:
+        # localized polarizabilities:
         #
         #    aAB = -rAB delta DAB + dQab (Ra-Rb)
         #
         #    where dQab is obtained by solving the following Lagragian with
         #    minimal charge transfer, here a penaty function is also introduced
         #
-        #    contribution from localised dipoles: rAB*delta DAB = Aab
+        #    contribution from localized dipoles: rAB*delta DAB = Aab
         #    bond contribution:  dQab (Ra-Rb)
 
         # dQa:charge shift per atom
@@ -255,7 +255,7 @@ class LoPropDriver:
                     a = np.abs(molecule_coord[i] - molecule_coord[j])
                     coord_matrix[i][j] = a / 2
 
-        # contribution from localised dipole
+        # contribution from localized dipole
         loc_dipole = np.zeros((3, 3, natoms, natoms))
         for i in range(3):
             for j in range(3):
@@ -266,9 +266,11 @@ class LoPropDriver:
                     for b in range(natoms):
                         # select the subblock[a][b] region in dks_lp
                         select_b = np.arange(it_b, it_b + ao_per_atom[b])
-                        # selected the lp basis for subblock[A][B] in purterbed density matrix
+                        # selected the lp basis for subblock[A][B] in purterbed
+                        # density matrix
                         D_AB = Dk_loprop[i][select_a, :][:, select_b]
-                        # selected the dipole matrice for subblock[A][B] in purterbed density matrix
+                        # selected the dipole matrice for subblock[A][B] in
+                        # purterbed density matrix
                         dipole_select = dipole[j][select_a, :][:, select_b]
                         dipole_select = dipole_select.transpose()
 
@@ -294,10 +296,10 @@ class LoPropDriver:
 
         Lab = Fab + 2 * np.max(np.abs(Fab))
 
-        #dQa = np.swapaxes(dQa, 0, 1)
-        lagragian = [np.linalg.solve(Lab, rhs) for rhs in dQa.T]
+        dQa = dQa.swapaxes(0, 1)
+        lagragian = [np.linalg.solve(Lab, rhs) for rhs in dQa]
 
-        #dQab
+        # dQab
         dQab = np.zeros((natoms, natoms, 3))
         for i in range(3):
             for a in range(natoms):
@@ -322,49 +324,49 @@ class LoPropDriver:
                     dRab[b][a][i] = -dRab[a][b][i]
 
         # charge transfer from bond polarisability
-        bond_polarisabilities = np.zeros((3, 3, natoms, natoms))
+        bond_polarizabilities = np.zeros((3, 3, natoms, natoms))
         for a in range(natoms):
             for b in range(natoms):
                 for i in range(3):
                     for j in range(3):
-                        bond_polarisabilities[
+                        bond_polarizabilities[
                             i, j, a, b] = dRab[a, b, i] * dQab[a, b, j] + dRab[
                                 a, b, j] * dQab[a, b, i]
 
-        local_polarisabilities = loc_dipole + 0.5 * bond_polarisabilities
+        local_polarizabilities = loc_dipole + 0.5 * bond_polarizabilities
 
-        # molecular polarisabilities
-        molecule_polarisabilities = (loc_dipole +
-                                     0.5 * bond_polarisabilities).sum(
+        # molecular polarizabilities
+        molecule_polarizabilities = (loc_dipole +
+                                     0.5 * bond_polarizabilities).sum(
                                          axis=3).sum(axis=2)
 
-        # obtain atom polarisabilities & re-arrange Qab in 1D array
-        atom_polarisabilities = np.zeros((natoms, 6))
+        # obtain atom polarizabilities & re-arrange Qab in 1D array
+        atom_polarizabilities = np.zeros((natoms, 6))
         Qab_array = np.zeros((natoms))
         for i in range(natoms):
             Qab_array[i] = Qab[i, i]
 
-            atom_pol_matrix = local_polarisabilities.sum(axis=3)[:, :, i]
-            #in the order xx,xy,xz, yy, yz zz
-            atom_polarisabilities[i, 0] = atom_pol_matrix[0, 0]
-            atom_polarisabilities[i, 1] = (atom_pol_matrix[0, 1] +
-                                           atom_pol_matrix[1, 0]) * 0.5
-            atom_polarisabilities[i, 2] = (atom_pol_matrix[0, 2] +
-                                           atom_pol_matrix[2, 0]) * 0.5
-            atom_polarisabilities[i, 3] = atom_pol_matrix[1, 1]
-            atom_polarisabilities[i, 4] = (atom_pol_matrix[1, 2] +
-                                           atom_pol_matrix[2, 1]) * 0.5
-            atom_polarisabilities[i, 5] = atom_pol_matrix[2, 2]
+            atom_pol_matrix = local_polarizabilities.sum(axis=3)[:, :, i]
+            # in the order xx, xy, xz, yy, yz, zz
+            atom_polarizabilities[i, 0] = atom_pol_matrix[0, 0]
+            atom_polarizabilities[i, 1] = 0.5 * (atom_pol_matrix[0, 1] +
+                                                 atom_pol_matrix[1, 0])
+            atom_polarizabilities[i, 2] = 0.5 * (atom_pol_matrix[0, 2] +
+                                                 atom_pol_matrix[2, 0])
+            atom_polarizabilities[i, 3] = atom_pol_matrix[1, 1]
+            atom_polarizabilities[i, 4] = 0.5 * (atom_pol_matrix[1, 2] +
+                                                 atom_pol_matrix[2, 1])
+            atom_polarizabilities[i, 5] = atom_pol_matrix[2, 2]
 
         AUG2AU_factor = bohr_in_angstroms()
-        atom_polarisabilities = atom_polarisabilities * (AUG2AU_factor**3)
-        self.print_results(molecule, natoms, Qab, local_polarisabilities,
-                           molecule_polarisabilities, atom_polarisabilities)
+        atom_polarizabilities = atom_polarizabilities * (AUG2AU_factor**3)
+        self.print_results(molecule, natoms, Qab, local_polarizabilities,
+                           molecule_polarizabilities, atom_polarizabilities)
 
         if self.rank == mpi_master():
             ret_dict = {
-                'localised_charges': Qab_array,
-                'localised_polarisabilities': atom_polarisabilities,
+                'localized_charges': Qab_array,
+                'localized_polarizabilities': atom_polarizabilities,
             }
             return ret_dict
 
@@ -380,12 +382,12 @@ class LoPropDriver:
             atomic number for atom b
         :param Rb:
             position vector for atom b
-             
+
         :return:
             The penalty function
         """
 
-        #Ra/Rb are the position vectors
+        # Ra/Rb are the position vectors
         AUG2AU_factor = bohr_in_angstroms()
         AUG2AU = 1.0 / AUG2AU_factor
         RBS = np.array([
@@ -396,9 +398,9 @@ class LoPropDriver:
                             'Response: we currently support up to Cl')
         ra = RBS[za]
         rb = RBS[zb]
-        #Ra and Rb taking from r_mat: 0,1,2 represents x y z directions
+        # Ra and Rb taking from r_mat: 0,1,2 represents x y z directions
         rab2 = (Ra[0] - Rb[0])**2 + (Ra[1] - Rb[1])**2 + (Ra[2] - Rb[2])**2
-        #alpha set to 2
+        # alpha set to 2
         f = 0.5 * np.exp(-2 * (rab2 / (ra + rb)**2))
         return f
 
@@ -412,7 +414,7 @@ class LoPropDriver:
             number of contracted orbitals (alpha electrons)
         :param norb:
             number of orbitals
-            
+
         :return:
             unpacked response vector
         """
@@ -445,20 +447,20 @@ class LoPropDriver:
         """
         Gets information about occupied/virtual orbitals by counting the basis
         set functions.
-        
+
         :param molecule:
             The molecule.
         :param basis:
             The molecular basis set.
-        
+
         :return:
-            
+            ao_per_atom, ao_occ, and ao_vir
         """
 
         elements = molecule.elem_ids_to_numpy()
         basis = basis.get_label()
 
-        #get basis file
+        # get basis file
         local_name = basis
         basis_file = []
         lib_member = os.path.join(os.environ['VLXBASISPATH'], basis)
@@ -508,21 +510,21 @@ class LoPropDriver:
 
         return ao_per_atom, ao_occ, ao_vir
 
-    def print_results(self, molecule, natoms, Qab, local_polarisabilities, Am,
-                      atom_polarisabilities):
+    def print_results(self, molecule, natoms, Qab, local_polarizabilities, Am,
+                      atom_polarizabilities):
         """
         Prints results for loprop calculation.
-        
+
         param: molecule
             the molecule
         param: natoms
             number of atoms
         param: Qab
-            localised charges
-        param: local_polarisabilities
-            localised polarisabilities
+            localized charges
+        param: local_polarizabilities
+            localized polarizabilities
         param: Am
-            molecular polarisabilities
+            molecular polarizabilities
         """
         element_names = molecule.get_labels()
 
@@ -536,13 +538,13 @@ class LoPropDriver:
 
         direction = ["x", "y", "z"]
         for a in range(3):
-            output_iter = '\u03B1 {}{}: {:15.4f} '.format(
+            output_iter = 'alpha_{}{}: {:12.4f} '.format(
                 direction[a], direction[a], Am[a, a])
             self.ostream.print_header(output_iter)
         self.ostream.print_blank()
 
-        #print localised chagres
-        output_header = '*** LoProp localised charges *** '
+        # print localized chagres
+        output_header = '*** LoProp localized charges *** '
         self.ostream.print_header(output_header)
         for a in range(natoms):
             output_iter = '{:<5s}: {:15.4f} '.format(element_names[a], Qab[a,
@@ -550,17 +552,20 @@ class LoPropDriver:
             self.ostream.print_header(output_iter)
         self.ostream.print_blank()
 
-        output_header = '*** LoProp Localised polarisabilities *** '
+        output_header = '*** LoProp Localised polarizabilities *** '
         self.ostream.print_header(output_header)
-        output_order = '              {:10}  {:10}  {:10}  {:10} {:10} {:10}'.format(
-            'xx', 'xy', 'xz', 'yy', 'yz', 'zz')
+        output_order = '               '
+        output_order += '{:10s} {:10s} {:10s} '.format('xx', 'xy', 'xz')
+        output_order += '{:10s} {:10s} {:10s}'.format('yy', 'yz', 'zz')
         self.ostream.print_header(output_order)
         for a in range(natoms):
-            output_iter = '{:<5s}: {:10.4f}  {:10.4f}  {:10.4f}  {:10.4f} {:10.4f} {:10.4f}'.format(
-                element_names[a], atom_polarisabilities[a][0],
-                atom_polarisabilities[a][1], atom_polarisabilities[a][2],
-                atom_polarisabilities[a][3], atom_polarisabilities[a][4],
-                atom_polarisabilities[a][5])
+            output_iter = '{:<5s}: '.format(element_names[a])
+            output_iter += '{:10.4f} {:10.4f} {:10.4f} '.format(
+                atom_polarizabilities[a][0], atom_polarizabilities[a][1],
+                atom_polarizabilities[a][2])
+            output_iter += '{:10.4f} {:10.4f} {:10.4f}'.format(
+                atom_polarizabilities[a][3], atom_polarizabilities[a][4],
+                atom_polarizabilities[a][5])
             self.ostream.print_header(output_iter)
         self.ostream.print_blank()
 
