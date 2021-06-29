@@ -42,20 +42,19 @@ from .errorhandler import assert_msg_critical
 
 class LoPropDriver:
     """
-    Set up for Loprop Driver
+    Implements the LoProp driver.
     
     :param comm:
         The MPI communicator.
     :param ostream:
         The output stream.
-                
     """
 
     def __init__(self, comm=None, ostream=None):
         """
-        Initializes trajectory driver.
-            
+        Initializes the LoProp driver.
         """
+
         if comm is None:
             comm = MPI.COMM_WORLD
         if ostream is None:
@@ -68,186 +67,181 @@ class LoPropDriver:
 
     def compute(self, molecule, basis, scf_tensors):
         """
-         calculate the loprop transformation matrix T         
-         patial charge (Qab) and localised polarisabilities
-                 
-         param: molecule
-             the molecule
-         param: basis
-             the bais functions 
-             
-         return:
-             ret_direct{Qab, localised_polarisabilities}
-        
-         """
+        calculate the loprop transformation matrix T         
+        patial charge (Qab) and localised polarisabilities
+                
+        :param molecule:
+            the molecule
+        :param basis:
+            the bais functions 
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+            
+        :return:
+            A dictionary containing localized charges and localized
+            polarizabilities.
+        """
+
         natoms = molecule.number_of_atoms()
 
         S = scf_tensors['S']
         C = scf_tensors['C_alpha']
         D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
 
-        #number of orbitals
-        norb = np.shape(S)[0]
+        # number of orbitals
+        n_ao = C.shape[0]
+        n_mo = C.shape[1]
 
-        #re-arrange AOs according to principal quantum number
+        # re-arrange AOs according to principal quantum number
         re_arranged_indices = []
         for i in range(molecule.number_of_atoms()):
             indices, angmoms = get_basis_function_indices_for_atom(
                 molecule, basis, i)
             re_arranged_indices.append(indices)
-        re_arranged_indices = np.concatenate((re_arranged_indices))
+        re_arranged_indices = np.concatenate(re_arranged_indices)
 
-        #obtain occupied&virtual orbital lists
-        orb_per_atom, ao_occ, ao_vir = self.get_ao_indices(molecule, basis)
+        # obtain occupied & virtual orbital lists
+        ao_per_atom, ao_occ, ao_vir = self.get_ao_indices(molecule, basis)
 
-        #TO transforation:re-arrange S
+        # TO transforation: re-arrange S
         S0 = S[re_arranged_indices, :][:, re_arranged_indices]
 
-        #T1 transformation:Gram-Schmidt
-        T1 = np.zeros((norb, norb))
+        # T1 transformation: Gram-Schmidt
+        T1 = np.zeros((n_ao, n_ao))
         ri = 0
         for a in range(natoms):
-            rf = ri + orb_per_atom[a]
+            rf = ri + ao_per_atom[a]
             s = S0[ri:rf, ri:rf]
             L = np.linalg.cholesky(s)
             t = np.linalg.inv(L.T)
             T1[ri:rf, ri:rf] = t
-            ri += orb_per_atom[a]
-        S1 = np.matmul(T1.T, np.matmul(S0, T1))
+            ri += ao_per_atom[a]
+        S1 = np.linalg.multi_dot([T1.T, S0, T1])
 
-        #T2 transformation:Lodwin occupied and virtual
-        T2 = np.zeros((norb, norb))
-        n_occ = len(ao_occ)
-        n_vir = len(ao_vir)
-        #occupied
+        # T2 transformation: Lodwin occupied and virtual
+        T2 = np.zeros((n_ao, n_ao))
+        n_occ_ao = len(ao_occ)
+        n_vir_ao = len(ao_vir)
+        # occupied
         s = S1[ao_occ, :][:, ao_occ]
-        t = self.lowdin_ortho(s)
-        for r in range(n_occ):
-            for c in range(n_occ):
+        t = self.lowdin_orthonormalize(s)
+        for r in range(n_occ_ao):
+            for c in range(n_occ_ao):
                 T2[ao_occ[r], ao_occ[c]] = t[r, c]
-        #virtural
+        # virtural
         s = S1[ao_vir, :][:, ao_vir]
-        t = self.lowdin_ortho(s)
-        for r in range(n_vir):
-            for c in range(n_vir):
+        t = self.lowdin_orthonormalize(s)
+        for r in range(n_vir_ao):
+            for c in range(n_vir_ao):
                 T2[ao_vir[r], ao_vir[c]] = t[r, c]
-        S2 = np.matmul(T2.T, np.matmul(S1, T2))
+        S2 = np.linalg.multi_dot([T2.T, S1, T2])
 
-        #T3: projection to virtual
-        T3 = np.identity((norb))
-        #selected the overlap between occupied and virtual
+        # T3: projection to virtual
+        T3 = np.identity(n_ao)
+        # selected the overlap between occupied and virtual
         T3_ov = S2[ao_occ, :][:, ao_vir]
-        #projection
-        ao_occupied = 0
-        for ao_o in ao_occ:
-            ao_virtual = 0
-            for ao_v in ao_vir:
-                T3[ao_o, ao_v] = -T3_ov[ao_occupied, ao_virtual]
-                ao_virtual += 1
-            ao_occupied += 1
-        S3 = np.matmul(T3.T, np.matmul(S2, T3))
+        # projection
+        for ao_o_ind, ao_o in enumerate(ao_occ):
+            for ao_v_ind, ao_v in enumerate(ao_vir):
+                T3[ao_o, ao_v] = -T3_ov[ao_o_ind, ao_v_ind]
+        S3 = np.linalg.multi_dot([T3.T, S2, T3])
 
-        #T4: lodwin virtural
+        # T4: lodwin virtural
         T4_virtual = S3[ao_vir, :][:, ao_vir]
-        T4_virtual = self.lowdin_ortho(T4_virtual)
-        T4 = np.identity((norb))
+        T4_virtual = self.lowdin_orthonormalize(T4_virtual)
+        T4 = np.identity(n_ao)
+        for ao_v_ind, ao_v in enumerate(ao_vir):
+            for ao_v_1_ind, ao_v_1 in enumerate(ao_vir):
+                T4[ao_v, ao_v_1] = T4_virtual[ao_v_ind, ao_v_1_ind]
 
-        ao_virtual = 0
-        for ao_v in ao_vir:
-            ao_virtual_1 = 0
-            for ao_v_1 in ao_vir:
-                T4[ao_v, ao_v_1] = T4_virtual[ao_virtual, ao_virtual_1]
-                ao_virtual_1 += 1
-            ao_virtual += 1
+        # total transformation T becomes:
+        T = np.linalg.multi_dot([T1, T2, T3, T4])
 
-        #total transformation T becomes:
-        T = np.matmul(T1, np.matmul(T2, np.matmul(T3, T4)))
-
-        #obtain density matrix D in loprop basis set
+        # obtain density matrix D in loprop basis set
         T_inv = np.linalg.pinv(T)
         D = D[re_arranged_indices, :][:, re_arranged_indices]
-        D_loprop = np.matmul(T_inv, np.matmul(D, T_inv.T))
+        D_loprop = np.linalg.multi_dot([T_inv, D, T_inv.T])
 
-        #calculated localised charges
+        # calculated localised charges
         Qab = np.zeros((natoms, natoms))
         start_point = 0
         for atom in range(natoms):
-            select = np.arange(0 + start_point,
-                               orb_per_atom[atom] + start_point)
+            select = np.arange(start_point, start_point + ao_per_atom[atom])
             Qab[atom, atom] = -np.trace(D_loprop[select, :][:, select])
-            start_point += orb_per_atom[atom]
+            start_point += ao_per_atom[atom]
 
-        #nuclear charge
+        # nuclear charge
         nuclear_charge = molecule.elem_ids_to_numpy()
         for a in range(natoms):
             Qab[a, a] = Qab[a, a] + nuclear_charge[a]
 
-        #solve linear response
+        # solve linear response
         lrs_drv = LinearResponseSolver(self.comm, self.ostream)
         lrs_out = lrs_drv.compute(molecule, basis, scf_tensors)
 
-        #obtain response vectors
+        # obtain response vectors
         Nx = lrs_out['solutions'][('x', 0)]
         Ny = lrs_out['solutions'][('y', 0)]
         Nz = lrs_out['solutions'][('z', 0)]
 
+        # unpact response vectors to matrix form
         nocc = molecule.number_of_alpha_electrons()
-        #unpact response vectors to matrix form
+        norb = n_mo
         kappa_x = self.lrvec2mat(Nx, nocc, norb)
         kappa_y = self.lrvec2mat(Ny, nocc, norb)
         kappa_z = self.lrvec2mat(Nz, nocc, norb)
 
-        #perturbed densities
+        # perturbed densities
         # factor of 2 from spin-adapted excitation vectors
-        Dx = 2 * np.matmul(C, np.matmul(kappa_x, C.T))
-        Dy = 2 * np.matmul(C, np.matmul(kappa_y, C.T))
-        Dz = 2 * np.matmul(C, np.matmul(kappa_z, C.T))
+        Dx = 2 * np.linalg.multi_dot([C, kappa_x, C.T])
+        Dy = 2 * np.linalg.multi_dot([C, kappa_y, C.T])
+        Dz = 2 * np.linalg.multi_dot([C, kappa_z, C.T])
 
-        #convert purterbed density to loprop basis
+        # convert purterbed density to loprop basis
         Dx = Dx[re_arranged_indices, :][:, re_arranged_indices]
         Dy = Dy[re_arranged_indices, :][:, re_arranged_indices]
         Dz = Dz[re_arranged_indices, :][:, re_arranged_indices]
-        Dx_loprop = np.matmul(T_inv, np.matmul(Dx, T_inv.T))
-        Dy_loprop = np.matmul(T_inv, np.matmul(Dy, T_inv.T))
-        Dz_loprop = np.matmul(T_inv, np.matmul(Dz, T_inv.T))
+        Dx_loprop = np.linalg.multi_dot([T_inv, Dx, T_inv.T])
+        Dy_loprop = np.linalg.multi_dot([T_inv, Dy, T_inv.T])
+        Dz_loprop = np.linalg.multi_dot([T_inv, Dz, T_inv.T])
         Dk_loprop = np.concatenate(([Dx_loprop], [Dy_loprop], [Dz_loprop]))
 
-        #dipole
-        dipole_drv = ElectricDipoleIntegralsDriver()
+        # dipole
+        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
         dipole_mats = dipole_drv.compute(molecule, basis)
         x_ao = dipole_mats.x_to_numpy()
         y_ao = dipole_mats.y_to_numpy()
         z_ao = dipole_mats.z_to_numpy()
 
-        #convert to loprop basis
+        # convert to loprop basis
         x_ao = x_ao[re_arranged_indices, :][:, re_arranged_indices]
         y_ao = y_ao[re_arranged_indices, :][:, re_arranged_indices]
         z_ao = z_ao[re_arranged_indices, :][:, re_arranged_indices]
-        x_ao_loprop = np.matmul(T.T, np.matmul(x_ao, T))
-        y_ao_loprop = np.matmul(T.T, np.matmul(y_ao, T))
-        z_ao_loprop = np.matmul(T.T, np.matmul(z_ao, T))
+        x_ao_loprop = np.linalg.multi_dot([T.T, x_ao, T])
+        y_ao_loprop = np.linalg.multi_dot([T.T, y_ao, T])
+        z_ao_loprop = np.linalg.multi_dot([T.T, z_ao, T])
         dipole = np.concatenate(([x_ao_loprop], [y_ao_loprop], [z_ao_loprop]))
-        '''
-         localised polarisabilities:
-             aAB = -rAB delta DAB + dQab (Ra-Rb)
-             
-             where dQab is obtained by solving the following Lagragian with 
-             minimal charge transfer, here a penaty function is also introduced
-             
-             contribution from localised dipoles: rAB*delta DAB = Aab   
-             bond contribution:  dQab (Ra-Rb)        
-         '''
+
+        # localised polarisabilities:
+        #
+        #    aAB = -rAB delta DAB + dQab (Ra-Rb)
+        #
+        #    where dQab is obtained by solving the following Lagragian with
+        #    minimal charge transfer, here a penaty function is also introduced
+        #
+        #    contribution from localised dipoles: rAB*delta DAB = Aab
+        #    bond contribution:  dQab (Ra-Rb)
 
         #dQa:charge shift per atom
         dQa = np.zeros((natoms, 3))
         #dQa array as [[Ax,Ay,Az],[Bx,By,Bz]]
         it = 0
         for a in range(natoms):
-            select = np.arange(0 + it, orb_per_atom[a] + it)
+            select = np.arange(0 + it, ao_per_atom[a] + it)
             dQa[a][0] = np.trace(Dx_loprop[select, :][:, select])
             dQa[a][1] = np.trace(Dy_loprop[select, :][:, select])
             dQa[a][2] = np.trace(Dz_loprop[select, :][:, select])
-            it = it + orb_per_atom[a]
+            it = it + ao_per_atom[a]
 
         #coord_matrix, the rab matrix in equation above
         molecule_coord = molecule.get_coordinates()
@@ -269,11 +263,11 @@ class LoPropDriver:
             for j in range(3):
                 it_a = 0
                 for a in range(natoms):
-                    select_a = np.arange(0 + it_a, orb_per_atom[a] + it_a)
+                    select_a = np.arange(0 + it_a, ao_per_atom[a] + it_a)
                     it_b = 0
                     for b in range(natoms):
                         #select the subblock[a][b] region in dks_lp
-                        select_b = np.arange(0 + it_b, orb_per_atom[b] + it_b)
+                        select_b = np.arange(0 + it_b, ao_per_atom[b] + it_b)
                         #selected the lp basis for subblock[A][B] in purterbed density matrix
                         D_AB = Dk_loprop[i][select_a, :][:, select_b]
                         #selected the dipole matrice for subblock[A][B] in purterbed density matrix
@@ -281,10 +275,10 @@ class LoPropDriver:
                         dipole_select = dipole_select.transpose()
 
                         loc_dipole[i, j, a, b] = np.trace(dipole_select @ D_AB)
-                        it_b = it_b + orb_per_atom[b]
+                        it_b = it_b + ao_per_atom[b]
 
                     loc_dipole[i, j, a, a] -= dQa[a, j] * coord_matrix[a, a, i]
-                    it_a = it_a + orb_per_atom[a]
+                    it_a = it_a + ao_per_atom[a]
 
         #Lagragian
         Fab = np.zeros((natoms, natoms))
@@ -445,36 +439,35 @@ class LoPropDriver:
         kappa = kappa + kappa.T
         return kappa
 
-    #lowddin orthonomalisation
-    def lowdin_ortho(self, A):
+    def lowdin_orthonormalize(self, A):
         """
-         Lodwin orthonormaliztaion
-         param: A 
-             input matrix
-         return: X
-             orthonormalised vector
-         """
+        Lodwin orthonormaliztaion.
+
+        :param A:
+            The input matrix.
+
+        :return:
+            The orthonormalised vector.
+        """
+
         eigs, U = np.linalg.eigh(A)
-        X = np.matmul(np.multiply(U, 1.0 / np.sqrt(eigs)), U.T)
+        X = np.linalg.multi_dot([U, np.diag(1.0 / np.sqrt(eigs)), U.T])
         return X
 
     def get_ao_indices(self, molecule, basis):
-        '''
-         Obtain information about occupied/virtual orbitals by counting the basis set functions
-         
-         param: molecule:
-             the molecule
-         param: basis:
-             the basis functions 
+        """
+        Gets information about occupied/virtual orbitals by counting the basis
+        set functions.
         
-         return:
-         param: orb_per_atom:
-             orbitals per atom
-         param: ao_occ
-             list of occupied orbitals
-         param: ao_vir
-             list of virtual orbitals                        
-         '''
+        :param molecule:
+            The molecule.
+        :param basis:
+            The molecular basis set.
+        
+        :return:
+            
+        """
+
         elements = molecule.elem_ids_to_numpy()
         basis = basis.get_label()
 
@@ -495,7 +488,7 @@ class LoPropDriver:
         ao_vir = []
         iterr = 0
         multiplicity = dict(S=1, P=3, D=5, F=7, G=9, H=11, I=13)
-        orb_per_atom = []
+        ao_per_atom = []
         for e in elements:
             k = keys[e - 1]
             atoms_data = basis[k]
@@ -518,7 +511,7 @@ class LoPropDriver:
             #sum no. orbitals. used to calculate virtual orbitals later
             orb = sum(multiplicity[k] * v for k, v in c.items())
             iterr = iterr + orb
-            orb_per_atom.append(orb)
+            ao_per_atom.append(orb)
 
         total_orb_array = np.arange(iterr)
 
@@ -526,7 +519,7 @@ class LoPropDriver:
             if i not in ao_occ:
                 ao_vir.append(i)
 
-        return orb_per_atom, ao_occ, ao_vir
+        return ao_per_atom, ao_occ, ao_vir
 
     def print_results(self, molecule, natoms, Qab, local_polarisabilities, Am,
                       atom_polarisabilities):
