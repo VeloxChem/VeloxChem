@@ -25,7 +25,6 @@
 
 from mpi4py import MPI
 import numpy as np
-import h5py
 import sys
 import os
 from collections import Counter
@@ -67,13 +66,13 @@ class LoPropDriver:
 
     def compute(self, molecule, basis, scf_tensors):
         """
-        calculate the loprop transformation matrix T         
+        calculate the loprop transformation matrix T
         patial charge (Qab) and localised polarisabilities
                 
         :param molecule:
             the molecule
         :param basis:
-            the bais functions 
+            the bais functions
         :param scf_tensors:
             The tensors from the converged SCF calculation.
             
@@ -85,8 +84,8 @@ class LoPropDriver:
         natoms = molecule.number_of_atoms()
 
         S = scf_tensors['S']
-        C = scf_tensors['C']
-        D = scf_tensors['D'][0] + scf_tensors['D'][1]
+        C = scf_tensors['C_alpha']
+        D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
 
         # number of orbitals
         n_ao = C.shape[0]
@@ -337,41 +336,41 @@ class LoPropDriver:
         # molecular polarisabilities
         molecule_polarisabilities = (loc_dipole +
                                      0.5 * bond_polarisabilities).sum(
-                                         axis=3).sum(axis=2)    
+                                         axis=3).sum(axis=2)
 
         # obtain atom polarisabilities & re-arrange Qab in 1D array
         atom_polarisabilities = np.zeros((natoms, 6))
         Qab_array = np.zeros((natoms))
         for i in range(natoms):
-            Qab_array[i] = Qab[i,i]
-            
-            atom_pol_matrix = local_polarisabilities.sum(axis=3)[:,:,i]        
-            #in the order xx,xy,xz, yy, yz zz   
-            atom_polarisabilities[i,0] = atom_pol_matrix[0,0]
-            atom_polarisabilities[i,1] = (atom_pol_matrix[0,1]+atom_pol_matrix[1,0])*0.5
-            atom_polarisabilities[i,2] =  (atom_pol_matrix[0,2]+ atom_pol_matrix[2,0])*0.5
-            atom_polarisabilities[i,3] = atom_pol_matrix[1,1]
-            atom_polarisabilities[i,4] = (atom_pol_matrix[1,2]+ atom_pol_matrix[2,1])*0.5
-            atom_polarisabilities[i,5] = atom_pol_matrix[2,2]
-        
+            Qab_array[i] = Qab[i, i]
+
+            atom_pol_matrix = local_polarisabilities.sum(axis=3)[:, :, i]
+            #in the order xx,xy,xz, yy, yz zz
+            atom_polarisabilities[i, 0] = atom_pol_matrix[0, 0]
+            atom_polarisabilities[i, 1] = (atom_pol_matrix[0, 1] +
+                                           atom_pol_matrix[1, 0]) * 0.5
+            atom_polarisabilities[i, 2] = (atom_pol_matrix[0, 2] +
+                                           atom_pol_matrix[2, 0]) * 0.5
+            atom_polarisabilities[i, 3] = atom_pol_matrix[1, 1]
+            atom_polarisabilities[i, 4] = (atom_pol_matrix[1, 2] +
+                                           atom_pol_matrix[2, 1]) * 0.5
+            atom_polarisabilities[i, 5] = atom_pol_matrix[2, 2]
+
         AUG2AU_factor = bohr_in_angstroms()
         atom_polarisabilities = atom_polarisabilities * (AUG2AU_factor**3)
         self.print_results(molecule, natoms, Qab, local_polarisabilities,
                            molecule_polarisabilities, atom_polarisabilities)
-       
 
-        
         if self.rank == mpi_master():
             ret_dict = {
                 'localised_charges': Qab_array,
                 'localised_polarisabilities': atom_polarisabilities,
-
             }
             return ret_dict
 
     def penalty_fc(self, za, Ra, zb, Rb):
         """
-        penalty function        
+        penalty function
 
         :param za:
             atomic number for atom a
@@ -403,20 +402,21 @@ class LoPropDriver:
         f = 0.5 * np.exp(-2 * (rab2 / (ra + rb)**2))
         return f
 
-    #unpact response vector to matrix form
     def lrvec2mat(self, vec, nocc, norb):
         """
-         unpact response vector to matrix form
-         param: vec
-             the response vector
-         param: nocc
-             number of contracted orbitals (alpha electrons)
-         param: norb
-             number of orbitals 
-             
-         return: kappa
-              unpacked response vector
-         """
+        unpact response vector to matrix form
+
+        :param vec:
+            the response vector
+        :param nocc:
+            number of contracted orbitals (alpha electrons)
+        :param norb:
+            number of orbitals
+            
+        :return:
+            unpacked response vector
+        """
+
         kappa = np.zeros((norb, norb))
         i = 0
         for r in range(nocc):
@@ -494,12 +494,8 @@ class LoPropDriver:
                 ao_occ.append(offset_p + 0)
                 ao_occ.append(offset_p + 1)
                 ao_occ.append(offset_p + 2)
-           #     if c['P']>1:
-            #        ao_occ.append(offset_p + 3)
-             #       ao_occ.append(offset_p + 4)
-              #      ao_occ.append(offset_p + 5)
 
-            #sum no. orbitals. used to calculate virtual orbitals later
+            # sum no. orbitals. used to calculate virtual orbitals later
             orb = sum(multiplicity[k] * v for k, v in c.items())
             iterr = iterr + orb
             ao_per_atom.append(orb)
@@ -540,8 +536,8 @@ class LoPropDriver:
 
         direction = ["x", "y", "z"]
         for a in range(3):
-            output_iter = '\u03B1 {}{}: {:15.4f} '.format(direction[a],
-                                                        direction[a], Am[a, a])
+            output_iter = '\u03B1 {}{}: {:15.4f} '.format(
+                direction[a], direction[a], Am[a, a])
             self.ostream.print_header(output_iter)
         self.ostream.print_blank()
 
@@ -557,7 +553,7 @@ class LoPropDriver:
         output_header = '*** LoProp Localised polarisabilities *** '
         self.ostream.print_header(output_header)
         output_order = '              {:10}  {:10}  {:10}  {:10} {:10} {:10}'.format(
-                 'xx','xy','xz','yy','yz','zz')
+            'xx', 'xy', 'xz', 'yy', 'yz', 'zz')
         self.ostream.print_header(output_order)
         for a in range(natoms):
             output_iter = '{:<5s}: {:10.4f}  {:10.4f}  {:10.4f}  {:10.4f} {:10.4f} {:10.4f}'.format(
