@@ -166,7 +166,7 @@ def _MolecularOrbitals_print_coefficients(eigval, focc, iorb, coeffs, ao_map,
     valstr = 26 * "-"
     ostream.print_header(valstr.ljust(92))
 
-    valstr = "Occupation: {:.1f} Energy: {:10.5f} au".format(focc, eigval)
+    valstr = "Occupation: {:.1f} Energy: {:10.5f} a.u.".format(focc, eigval)
     ostream.print_header(valstr.ljust(92))
 
     tuplist = []

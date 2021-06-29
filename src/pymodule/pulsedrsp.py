@@ -57,17 +57,17 @@ class PulsedResponse:
           ['gaussian', ]
         - number_pulses: Integer - The number of different pulse settings to
           expect 'N'.  Currently limited to one.
-        - pulse_widths: List of floats (len(N)) - pulse widths in [au].
+        - pulse_widths: List of floats (len(N)) - pulse widths in [a.u.].
         - carrier_frequencies: List of floats (len(N)) - carrier frequencies in
-          [au].
-        - field_max: List of floats (len(N)) - pulse amplitudes in [au].
+          [a.u.].
+        - field_max: List of floats (len(N)) - pulse amplitudes in [a.u.].
         - centers: List of floats (len(N)) - time centers for the pulses in
-          [au].
+          [a.u.].
         - pol_dir: string - polarization directions, arguments given in
           combinations of x, y and z - e.g.: 'x' for [1 0 0], yz for [0 1 1].
         - frequency_range: List of frequencies to map solution to.  Given as
-          range: 'start-end(df)' in [au], e.g. 0.2-0.4(0.007) for 0.2 -> 0.4 au
-          in steps of 0.007 au.  Zero-padding will be applied if range does not
+          range: 'start-end(df)' in [a.u.], e.g. 0.2-0.4(0.007) for 0.2 -> 0.4 a.u.
+          in steps of 0.007 a.u.  Zero-padding will be applied if range does not
           start at 0.
         - CEP: List of floats (len(N)) - carrier envelope phases in [radians].
         - h5file: String - optional - name of requested h5 formatted result

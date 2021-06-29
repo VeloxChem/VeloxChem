@@ -348,7 +348,7 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self.print_header()
-            valstr = "Nuclear repulsion energy: {:.10f} au".format(
+            valstr = "Nuclear repulsion energy: {:.10f} a.u.".format(
                 self.nuc_energy)
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
@@ -1594,7 +1594,7 @@ class ScfDriver:
         if self.first_step:
             valstr = "...done. SCF energy in reduced basis set: "
             valstr += "{:.12f}".format(self.old_energy)
-            valstr += " au. Time: "
+            valstr += " a.u. Time: "
             valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
@@ -1820,28 +1820,29 @@ class ScfDriver:
 
         e_el = etot - enuc - e_d4 - e_ef_nuc
 
-        valstr = f'Total Energy                       :{etot:20.10f} au'
+        valstr = f'Total Energy                       :{etot:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
-        valstr = f'Electronic Energy                  :{e_el:20.10f} au'
+        valstr = f'Electronic Energy                  :{e_el:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
-        valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} au'
+        valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
         if self.dispersion:
-            valstr = f'D4 Dispersion Correction           :{e_d4:20.10f} au'
+            valstr = f'D4 Dispersion Correction           :{e_d4:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
         if self.electric_field is not None:
-            valstr = f'Nuclei in Static Electric Field    :{e_ef_nuc:20.10f} au'
+            valstr = f'Nuclei in Static Electric Field    :{e_ef_nuc:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_header(
             '------------------------------------'.ljust(92))
 
         grad = self.iter_data[-1]['gradient_norm']
-        valstr = 'Gradient Norm                      :{:20.10f} au'.format(grad)
+        valstr = 'Gradient Norm                      :{:20.10f} a.u.'.format(
+            grad)
         self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_blank()

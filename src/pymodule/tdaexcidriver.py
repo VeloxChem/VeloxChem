@@ -699,7 +699,7 @@ class TDAExciDriver(LinearSolver):
         reigs, rnorms = self.solver.get_eigenvalues()
         for i in range(reigs.shape[0]):
             exec_str = 'State {:2d}: {:5.8f} '.format(i + 1, reigs[i])
-            exec_str += 'au Residual Norm: {:3.8f}'.format(rnorms[i])
+            exec_str += 'a.u. Residual Norm: {:3.8f}'.format(rnorms[i])
             self.ostream.print_header(exec_str.ljust(84))
 
         # flush output stream
