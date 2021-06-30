@@ -408,11 +408,14 @@ class OrbitalResponse:
 
                 if rsp_results is None:
                     # This is the dictionary for MP2
+                    t2_ao = rhs_results['t2_ao']
+                    # TODO: delete t2_ao once integral derivatives become available
                     return {
                         'lambda_ao': lambda_ao,
                         'omega_ao': omega_ao,
                         'unrelaxed_density_ao': unrel_dm_ao,
                         'relaxed_density_ao': rel_dm_ao,
+                        't2_amplitudes_ao': t2_ao, 
                     }
                 else:
                     # This is the dictionary for the excited states
