@@ -25,7 +25,7 @@
 
 import math
 
-from .veloxchemlib import hartree_in_ev
+from .veloxchemlib import hartree_in_ev, fine_structure_constant
 from .rspproperty import ResponseProperty
 from .inputparser import parse_seq_range
 
@@ -152,7 +152,7 @@ class LinearAbsorptionCrossSection(ResponseProperty):
             azz = -self.rsp_property['response_functions'][('z', 'z', w)].imag
 
             alpha_bar = (axx + ayy + azz) / 3.0
-            sigma = 4.0 * math.pi * w * alpha_bar / 137.035999
+            sigma = 4.0 * math.pi * w * alpha_bar * fine_structure_constant()
 
             output = '{:<20.4f}{:<20.5f}{:>13.8f}'.format(
                 w, w * hartree_in_ev(), sigma)

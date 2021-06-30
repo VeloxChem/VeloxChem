@@ -256,9 +256,17 @@ export_general(py::module& m)
 
     m.def("hartree_in_kcalpermol", &units::getHartreeValueInKiloCaloriePerMole);
 
+    m.def("hartree_in_wavenumbers", &units::getHartreeValueInWavenumbers);
+
     m.def("dipole_in_debye", &units::getDipoleInDebye);
 
     m.def("rotatory_strength_in_cgs", &units::getRotatoryStrengthInCGS);
+
+    m.def("molar_ellipticity_from_beta", &units::getMolarEllipticityFromBeta);
+
+    m.def("extinction_coefficient_from_molar_ellipticity", &units::getExtinctionCoefficientFromMolarEllipticity);
+
+    m.def("fine_structure_constant", &units::getFineStructureConstant);
 
     m.def("to_angular_momentum", &string_to_angular_momentum);
 
