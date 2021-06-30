@@ -72,11 +72,26 @@ double getRotatoryStrengthInCGS();
 
 /**
  Gets factor needed for the calculation of the molar ellipticity from the
- electric-dipole magnetic-dipole polarizability beta
+ electric-dipole magnetic-dipole polarizability beta.
 
  @return the factor.
  */
 double getMolarEllipticityFromBeta();
+
+/**
+ Gets factor needed for the calculation of extinction coefficient from molar
+ ellipticity.
+
+ @return the factor.
+ */
+double getExtinctionCoefficientFromMolarEllipticity();
+
+/**
+ Gets fine-structure constant.
+
+ @return the fine-structure constant.
+ */
+double getFineStructureConstant();
 
 }  // namespace units
 

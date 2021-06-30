@@ -23,9 +23,12 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from .veloxchemlib import hartree_in_ev
-from .veloxchemlib import hartree_in_wavenumbers
-from .veloxchemlib import molar_ellipticity_from_beta
+from .veloxchemlib import (
+    hartree_in_ev,
+    hartree_in_wavenumbers,
+    molar_ellipticity_from_beta,
+    extinction_coefficient_from_molar_ellipticity,
+)
 from .rspproperty import ResponseProperty
 from .inputparser import parse_seq_range
 
@@ -151,10 +154,17 @@ class CircularDichroismSpectrum(ResponseProperty):
             Gyy = self.rsp_property['response_functions'][('y', 'y', w)].imag
             Gzz = self.rsp_property['response_functions'][('z', 'z', w)].imag
 
-            beta = -(Gxx + Gyy + Gzz) / (3.0 * w**2)
-            wavenumber = w * hartree_in_wavenumbers()
-            Delta_epsilon = (beta * wavenumber**2
-                             * molar_ellipticity_from_beta() / (100.0 * 3298.8))
+            Gxx /= w
+            Gyy /= w
+            Gzz /= w
+
+            Delta_epsilon_factor = (
+                extinction_coefficient_from_molar_ellipticity() *
+                molar_ellipticity_from_beta())
+
+            beta = -(Gxx + Gyy + Gzz) / (3.0 * w)
+            w_wavenumber = w * hartree_in_wavenumbers()
+            Delta_epsilon = beta * w_wavenumber**2 * Delta_epsilon_factor
 
             output = '{:<20.4f}{:<20.5f}{:>18.8f}'.format(
                 w, w * hartree_in_ev(), Delta_epsilon)

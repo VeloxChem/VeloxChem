@@ -264,6 +264,10 @@ export_general(py::module& m)
 
     m.def("molar_ellipticity_from_beta", &units::getMolarEllipticityFromBeta);
 
+    m.def("extinction_coefficient_from_molar_ellipticity", &units::getExtinctionCoefficientFromMolarEllipticity);
+
+    m.def("fine_structure_constant", &units::getFineStructureConstant);
+
     m.def("to_angular_momentum", &string_to_angular_momentum);
 
     m.def("to_angular_momentum", &integer_to_angular_momentum);
