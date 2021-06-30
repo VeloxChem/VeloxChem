@@ -221,16 +221,16 @@ class TdhfGradientDriver(GradientDriver):
 
             # unrelaxed density and dipole moment
             unrel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
-                             orbrsp_results['unrel_dm_ao'])
+                             orbrsp_results['unrelaxed_density_ao'])
             firstorderprop.compute(molecule, basis, unrel_density)
             if self.rank == mpi_master():
                 title = method + ' Unrelaxed Dipole Moment for Excited State ' + str(self.n_state_deriv + 1)
                 firstorderprop.print_properties(molecule, title)
 
             # relaxed density and dipole moment
-            if 'rel_dm_ao' in orbrsp_results:
+            if 'relaxed_density_ao' in orbrsp_results:
                 rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
-                               orbrsp_results['rel_dm_ao'])
+                               orbrsp_results['relaxed_density_ao'])
                 firstorderprop.compute(molecule, basis, rel_density)
                 if self.rank == mpi_master():
                     # TODO: Remove warning once TDDFT orbital response is fully implemented
@@ -243,6 +243,7 @@ class TdhfGradientDriver(GradientDriver):
                     title = method + ' Relaxed Dipole Moment for Excited State ' + str(self.n_state_deriv + 1)
                     firstorderprop.print_properties(molecule, title)
 
+            self.ostream.print_blank()
 
     def compute_numerical(self, molecule, ao_basis, rsp_drv, min_basis=None):
         """
