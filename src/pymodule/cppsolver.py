@@ -29,7 +29,7 @@ import time as tm
 import psutil
 import sys
 
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, hartree_in_wavenumbers
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
@@ -78,7 +78,7 @@ class ComplexResponse(LinearSolver):
         self.b_components = 'xyz'
 
         self.frequencies = (0,)
-        self.damping = 0.004556335294880438
+        self.damping = 1000.0 / hartree_in_wavenumbers()
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
