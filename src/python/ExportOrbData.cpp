@@ -230,6 +230,7 @@ export_orbdata(py::module& m)
         .def(py::init<>())
         .def("add_basis_function", &CAtomBasis::addBasisFunction)
         .def("set_elemental_id", &CAtomBasis::setIdElemental)
+        .def("get_elemental_id", &CAtomBasis::getIdElemental)
         .def("__repr__", &CAtomBasis::repr)
         .def(
             "__iter__",
