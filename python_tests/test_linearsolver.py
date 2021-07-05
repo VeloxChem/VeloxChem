@@ -23,7 +23,7 @@ class TestLinearSolver(unittest.TestCase):
             'conv_thresh': 1e-7,
             'max_iter': 199,
             'lindep_thresh': 1e-10,
-            'restart': False,
+            #'restart': False,
             'checkpoint_file': 'mycheckpoint.h5',
             'timing': True,
             'profiling': True,
