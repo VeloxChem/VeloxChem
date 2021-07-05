@@ -75,6 +75,9 @@ class TdhfHessianDriver(ScfHessianDriver):
         # flag for two-point or four-point approximation
         self.do_four_point = False
 
+        # flag for printing the Hessian 
+        self.do_print = False
+
 
         # Flag for numerical derivative of dipole moment
         self.dipole_deriv = False
@@ -133,9 +136,12 @@ class TdhfHessianDriver(ScfHessianDriver):
         #else:
         #    self.compute_analytical(molecule, ao_basis)
 
+
         # print Hessian
-        #self.print_geometry(molecule)
-        #self.print_gradient(molecule)
+        if self.do_print is True:
+            self.print_geometry(molecule)
+            self.ostream.print_blank()
+            self.print_hessian(molecule)
 
         valstr = '*** Time spent in Hessian calculation: '
         valstr += '{:.2f} sec ***'.format(tm.time() - start_time)

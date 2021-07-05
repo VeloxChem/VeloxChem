@@ -30,6 +30,7 @@ import sys
 
 from .molecule import Molecule
 from .gradientdriver import GradientDriver
+from .hessiandriver import HessianDriver
 from .scfgradientdriver import ScfGradientDriver
 from .outputstream import OutputStream
 #from .firstorderprop import FirstOrderProperties
@@ -40,7 +41,7 @@ from .import_from_pyscf import fock_deriv
 from .import_from_pyscf import eri_deriv
 
 
-class ScfHessianDriver:
+class ScfHessianDriver(HessianDriver):
     """
     Implements SCF Hessian driver.
 
@@ -58,7 +59,7 @@ class ScfHessianDriver:
 
     def __init__(self, scf_drv, comm=None, ostream=None):
         """
-        Initializes gradient driver.
+        Initializes SCF Hessian driver.
         """
 
         if comm is None:
@@ -75,10 +76,12 @@ class ScfHessianDriver:
         # flag for two-point or four-point approximation
         self.do_four_point = False
 
+        # flag for printing the Hessian
+        self.do_print = False
 
         # Flag for numerical derivative of dipole moment
-        self.dipole_deriv = False
-        self.dipole_gradient = None
+        # self.dipole_deriv = False
+        # self.dipole_gradient = None
 
     def update_settings(self, method_dict):
         """
@@ -124,8 +127,10 @@ class ScfHessianDriver:
         #    self.compute_analytical(molecule, ao_basis)
 
         # print Hessian
-        #self.print_geometry(molecule)
-        #self.print_gradient(molecule)
+        if self.do_print is True:
+            self.print_geometry(molecule)
+            self.ostream.print_blank()
+            self.print_hessian(molecule)
 
         valstr = '*** Time spent in Hessian calculation: '
         valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
@@ -263,141 +268,141 @@ class ScfHessianDriver:
         self.scf_drv.compute(molecule, ao_basis, min_basis)
         self.scf_drv.ostream.state = scf_ostream_state
 
-    def hess_nuc_contrib(self, molecule):
-        """
-        Calculates the contribution of the nuclear-nuclear repulsion
-        to the analytical nuclear Hessian.
+###    def hess_nuc_contrib(self, molecule):
+###        """
+###        Calculates the contribution of the nuclear-nuclear repulsion
+###        to the analytical nuclear Hessian.
+###
+###        :param molecule:
+###            The molecule.
+###
+###        :return:
+###            The nuclear contribution to the Hessian.
+###        """
+###        # number of atoms
+###        natm = molecule.number_of_atoms()
+###
+###        # nuclear repulsion energy contribution to Hessian
+###        nuc_contrib = np.zeros((natm, 3, natm, 3))
+###
+###        # atom coordinates (nx3)
+###        coords = molecule.get_coordinates()
+###
+###        # atomic charges
+###        nuclear_charges = molecule.elem_ids_to_numpy()
+###
+###        # loop over all distinct atom pairs and add energy contribution
+###        for i in range(natm):
+###            z_a = nuclear_charges[i]
+###            r_a = coords[i]
+###            for j in range(natm):
+###                if i != j:
+###                    z_b = nuclear_charges[j]
+###                    r_b = coords[j]
+###                    r = np.sqrt(np.dot(r_a - r_b, r_a - r_b))
+###                    for k in range(3):
+###                        for l in range(3):
+###                    # off-diagonal parts
+###                            nuc_contrib[i, k, j, l] = - 3*z_a*z_b*(r_b[k] - r_a[k])*(r_b[l] - r_a[l]) / r**5
+###                            if k == l:
+###                                nuc_contrib[i, k, j, l] += z_a * z_b / r**3
+###
+###                    # add the diagonal contribution
+###                            nuc_contrib[i, k, i, l] += 3*z_a*z_b*(r_b[k] - r_a[k])*(r_b[l] - r_a[l]) / r**5
+###                            if k == l:
+###                                nuc_contrib[i, k, i, l] -= z_a * z_b / r**3
+###
+###
+###        return nuc_contrib.reshape(3*natm, 3*natm)
 
-        :param molecule:
-            The molecule.
-
-        :return:
-            The nuclear contribution to the Hessian.
-        """
-        # number of atoms
-        natm = molecule.number_of_atoms()
-
-        # nuclear repulsion energy contribution to Hessian
-        nuc_contrib = np.zeros((natm, 3, natm, 3))
-
-        # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
-
-        # atomic charges
-        nuclear_charges = molecule.elem_ids_to_numpy()
-
-        # loop over all distinct atom pairs and add energy contribution
-        for i in range(natm):
-            z_a = nuclear_charges[i]
-            r_a = coords[i]
-            for j in range(natm):
-                if i != j:
-                    z_b = nuclear_charges[j]
-                    r_b = coords[j]
-                    r = np.sqrt(np.dot(r_a - r_b, r_a - r_b))
-                    for k in range(3):
-                        for l in range(3):
-                    # off-diagonal parts
-                            nuc_contrib[i, k, j, l] = - 3*z_a*z_b*(r_b[k] - r_a[k])*(r_b[l] - r_a[l]) / r**5
-                            if k == l:
-                                nuc_contrib[i, k, j, l] += z_a * z_b / r**3
-
-                    # add the diagonal contribution
-                            nuc_contrib[i, k, i, l] += 3*z_a*z_b*(r_b[k] - r_a[k])*(r_b[l] - r_a[l]) / r**5
-                            if k == l:
-                                nuc_contrib[i, k, i, l] -= z_a * z_b / r**3
-
-
-        return nuc_contrib.reshape(3*natm, 3*natm)
-
-    def diagonalize_hessian(self, molecule, basis, rsp_drv=None):
-        """
-        Diagonalizes the Hessian matrix to obtain force constants as eigenvalues
-        (and hence vibrational frequencies) and normal modes as eigenvectors.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param rsp_drv:
-            The RPA or TDA driver (for TdhfHessianDriver).
-
-        :return:
-            The vibrational frequencies in atomic units.
-        """
-        # compute the Hessian if not done already
-        if self.hessian is None:
-            if rsp_drv is None:
-                self.compute(molecule, basis)
-            else:
-                # TdhfHessianDriver inherits this function
-                self.compute(molecule, basis, rsp_drv)
-
-        natm = molecule.number_of_atoms()
-
-        # take the square root of the atomic masses, repeat each three times (xyz components)
-        # then form the direct product matrix
-        masses_sqrt = np.sqrt(molecule.masses_to_numpy())
-        masses_repeat = np.repeat(masses_sqrt, 3)
-        masses_matrix = masses_repeat.reshape(-1, 1) * masses_repeat
-
-        # reshape the Hessian as 3Nx3N and mass-weight it
-        reshaped_hessian = self.hessian.reshape(3*natm, 3*natm)
-        self.mass_weighted_hessian = reshaped_hessian / masses_matrix
-
-        # diagonalize the mass-weighted Hessian
-        hessian_eigvals, hessian_eigvecs = np.linalg.eigh(self.mass_weighted_hessian)
-
-        # the first 6 elements should be close to zero (translation & rotation)
-        return hessian_eigvals[6:]
-
-
-    def get_hessian(self):
-        """
-        Gets the Hessian.
-
-        :return:
-            The Hessian.
-        """
-
-        return self.hessian
-
-    def print_geometry(self, molecule):
-        """
-        Prints the geometry.
-
-        :param molecule:
-            The molecule.
-        """
-
-        self.ostream.print_block(molecule.get_string())
-
-    def print_hessian(self, molecule):
-        """
-        Prints the Hessian.
-
-        :param molecule:
-            The molecule.
-        """
-
-        # atom labels
-        labels = molecule.get_labels()
-
-        if self.numerical:
-            title = 'Numerical '
-        else:
-            title = 'Analytical '
-
-        # TODO: write the actual print function
-        return
-
-    def print_header(self):
-        """
-        Prints Hessian calculation setup details to output stream.
-        """
-
-        self.ostream.print_blank()
-        self.ostream.print_header(self.flag)
-        self.ostream.print_header((len(self.flag) + 2) * '=')
-        self.ostream.print_blank()
-        self.ostream.flush()
+###    def diagonalize_hessian(self, molecule, basis, rsp_drv=None):
+###        """
+###        Diagonalizes the Hessian matrix to obtain force constants as eigenvalues
+###        (and hence vibrational frequencies) and normal modes as eigenvectors.
+###
+###        :param molecule:
+###            The molecule.
+###        :param basis:
+###            The AO basis set.
+###        :param rsp_drv:
+###            The RPA or TDA driver (for TdhfHessianDriver).
+###
+###        :return:
+###            The vibrational frequencies in atomic units.
+###        """
+###        # compute the Hessian if not done already
+###        if self.hessian is None:
+###            if rsp_drv is None:
+###                self.compute(molecule, basis)
+###            else:
+###                # TdhfHessianDriver inherits this function
+###                self.compute(molecule, basis, rsp_drv)
+###
+###        natm = molecule.number_of_atoms()
+###
+###        # take the square root of the atomic masses, repeat each three times (xyz components)
+###        # then form the direct product matrix
+###        masses_sqrt = np.sqrt(molecule.masses_to_numpy())
+###        masses_repeat = np.repeat(masses_sqrt, 3)
+###        masses_matrix = masses_repeat.reshape(-1, 1) * masses_repeat
+###
+###        # reshape the Hessian as 3Nx3N and mass-weight it
+###        reshaped_hessian = self.hessian.reshape(3*natm, 3*natm)
+###        self.mass_weighted_hessian = reshaped_hessian / masses_matrix
+###
+###        # diagonalize the mass-weighted Hessian
+###        hessian_eigvals, hessian_eigvecs = np.linalg.eigh(self.mass_weighted_hessian)
+###
+###        # the first 6 elements should be close to zero (translation & rotation)
+###        return hessian_eigvals[6:]
+###
+###
+###    def get_hessian(self):
+###        """
+###        Gets the Hessian.
+###
+###        :return:
+###            The Hessian.
+###        """
+###
+###        return self.hessian
+###
+###    def print_geometry(self, molecule):
+###        """
+###        Prints the geometry.
+###
+###        :param molecule:
+###            The molecule.
+###        """
+###
+###        self.ostream.print_block(molecule.get_string())
+###
+###    def print_hessian(self, molecule):
+###        """
+###        Prints the Hessian.
+###
+###        :param molecule:
+###            The molecule.
+###        """
+###
+###        # atom labels
+###        labels = molecule.get_labels()
+###
+###        if self.numerical:
+###            title = 'Numerical '
+###        else:
+###            title = 'Analytical '
+###
+###        # TODO: write the actual print function
+###        return
+###
+###    def print_header(self):
+###        """
+###        Prints Hessian calculation setup details to output stream.
+###        """
+###
+###        self.ostream.print_blank()
+###        self.ostream.print_header(self.flag)
+###        self.ostream.print_header((len(self.flag) + 2) * '=')
+###        self.ostream.print_blank()
+###        self.ostream.flush()

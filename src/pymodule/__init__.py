@@ -95,6 +95,7 @@ from .loprop import LoPropDriver
 from .firstorderprop import FirstOrderProperties
 from .orbitalresponse import OrbitalResponse
 from .tdhfgradientdriver import TdhfGradientDriver
+from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
 from .tdhfhessiandriver import TdhfHessianDriver
 
