@@ -51,6 +51,7 @@ from .molecularorbitals import MolecularOrbitals
 from .subcommunicators import SubCommunicators
 from .signalhandler import SignalHandler
 from .denguess import DensityGuess
+from .inputparser import parse_input
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
@@ -231,38 +232,38 @@ class ScfDriver:
         if method_dict is None:
             method_dict = {}
 
-        if 'acc_type' in scf_dict:
-            self.acc_type = scf_dict['acc_type'].upper()
-        if 'max_iter' in scf_dict:
-            self.max_iter = int(scf_dict['max_iter'])
-        if 'conv_thresh' in scf_dict:
-            self.conv_thresh = float(scf_dict['conv_thresh'])
-        if 'diis_thresh' in scf_dict:
-            self.diis_thresh = float(scf_dict['diis_thresh'])
-        if 'qq_type' in scf_dict:
-            self.qq_type = scf_dict['qq_type'].upper()
-        if 'eri_thresh' in scf_dict:
-            self.eri_thresh = float(scf_dict['eri_thresh'])
-        if 'restart' in scf_dict:
-            key = scf_dict['restart'].lower()
-            self.restart = True if key in ['yes', 'y'] else False
-        if 'checkpoint_file' in scf_dict:
-            self.checkpoint_file = scf_dict['checkpoint_file']
+        scf_keywords = {
+            'acc_type': 'str_upper',
+            'max_iter': 'int',
+            'conv_thresh': 'float',
+            'qq_type': 'str_upper',
+            'eri_thresh': 'float',
+            'restart': 'bool',
+            'checkpoint_file': 'str',
+            'timing': 'bool',
+            'profiling': 'bool',
+            'memory_profiling': 'bool',
+            'memory_tracing': 'bool',
+        }
+
+        parse_input(self, scf_keywords, scf_dict)
 
         if 'program_start_time' in scf_dict:
             self.program_start_time = scf_dict['program_start_time']
         if 'maximum_hours' in scf_dict:
             self.maximum_hours = scf_dict['maximum_hours']
 
-        if 'dispersion' in method_dict:
-            key = method_dict['dispersion'].lower()
-            self.dispersion = True if key in ['yes', 'y'] else False
+        method_keywords = {
+            'dispersion': 'bool',
+            'dft': 'bool',
+            'grid_level': 'int',
+            'pe': 'bool',
+            'electric_field': 'seq_fixed',
+            'use_split_comm': 'bool',
+        }
 
-        if 'dft' in method_dict:
-            key = method_dict['dft'].lower()
-            self.dft = True if key in ['yes', 'y'] else False
-        if 'grid_level' in method_dict:
-            self.grid_level = int(method_dict['grid_level'])
+        parse_input(self, method_keywords, method_dict)
+
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
                 self.dft = True
@@ -273,11 +274,8 @@ class ScfDriver:
         if 'pe_options' not in method_dict:
             method_dict['pe_options'] = {}
 
-        if 'pe' in method_dict:
-            key = method_dict['pe'].lower()
-            self.pe = True if key in ['yes', 'y'] else False
-        else:
-            if ('potfile' in method_dict) or method_dict['pe_options']:
+        if ('potfile' in method_dict) or method_dict['pe_options']:
+            if 'pe' not in method_dict:
                 self.pe = True
 
         if self.pe:
@@ -288,15 +286,7 @@ class ScfDriver:
                                 'SCF driver: No potential file defined')
             self.pe_options = dict(method_dict['pe_options'])
 
-        if 'use_split_comm' in method_dict:
-            key = method_dict['use_split_comm'].lower()
-            self.use_split_comm = True if key in ['yes', 'y'] else False
-
-        if 'electric_field' in scf_dict:
-            self.electric_field = [
-                float(x)
-                for x in scf_dict['electric_field'].replace(',', ' ').split()
-            ]
+        if self.electric_field is not None:
             assert_msg_critical(
                 len(self.electric_field) == 3,
                 'SCF driver: Expecting 3 values in \'electric field\' input')
@@ -304,20 +294,10 @@ class ScfDriver:
                 not self.pe,
                 'SCF driver: \'electric field\' input is incompatible with ' +
                 'polarizable embedding')
-
-        if 'timing' in scf_dict:
-            key = scf_dict['timing'].lower()
-            self.timing = True if key in ['yes', 'y'] else False
-        if 'profiling' in scf_dict:
-            key = scf_dict['profiling'].lower()
-            self.profiling = True if key in ['yes', 'y'] else False
-
-        if 'memory_profiling' in scf_dict:
-            key = scf_dict['memory_profiling'].lower()
-            self.memory_profiling = True if key in ['yes', 'y'] else False
-        if 'memory_tracing' in scf_dict:
-            key = scf_dict['memory_tracing'].lower()
-            self.memory_tracing = True if key in ['yes', 'y'] else False
+            # disable restart of calculation with static electric field since
+            # checkpoint file does not contain information about the electric
+            # field
+            self.restart = False
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
@@ -368,7 +348,7 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self.print_header()
-            valstr = "Nuclear repulsion energy: {:.10f} au".format(
+            valstr = "Nuclear repulsion energy: {:.10f} a.u.".format(
                 self.nuc_energy)
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
@@ -1614,7 +1594,7 @@ class ScfDriver:
         if self.first_step:
             valstr = "...done. SCF energy in reduced basis set: "
             valstr += "{:.12f}".format(self.old_energy)
-            valstr += " au. Time: "
+            valstr += " a.u. Time: "
             valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
@@ -1840,28 +1820,29 @@ class ScfDriver:
 
         e_el = etot - enuc - e_d4 - e_ef_nuc
 
-        valstr = f'Total Energy                       :{etot:20.10f} au'
+        valstr = f'Total Energy                       :{etot:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
-        valstr = f'Electronic Energy                  :{e_el:20.10f} au'
+        valstr = f'Electronic Energy                  :{e_el:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
-        valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} au'
+        valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
         if self.dispersion:
-            valstr = f'D4 Dispersion Correction           :{e_d4:20.10f} au'
+            valstr = f'D4 Dispersion Correction           :{e_d4:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
         if self.electric_field is not None:
-            valstr = f'Nuclei in Static Electric Field    :{e_ef_nuc:20.10f} au'
+            valstr = f'Nuclei in Static Electric Field    :{e_ef_nuc:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_header(
             '------------------------------------'.ljust(92))
 
         grad = self.iter_data[-1]['gradient_norm']
-        valstr = 'Gradient Norm                      :{:20.10f} au'.format(grad)
+        valstr = 'Gradient Norm                      :{:20.10f} a.u.'.format(
+            grad)
         self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_blank()

@@ -1,3 +1,4 @@
+from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import unittest
@@ -11,6 +12,7 @@ except ImportError:
 from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.veloxchemlib import denmat
+from veloxchem.outputstream import OutputStream
 from veloxchem.mpitask import MpiTask
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.aofockmatrix import AOFockMatrix
@@ -22,7 +24,7 @@ from veloxchem.qqscheme import get_qq_scheme
 
 class TestScfRestricted(unittest.TestCase):
 
-    def run_scf(self, inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
+    def run_scf(self, inpfile, potfile, xcfun_label, efield, ref_e_scf,
                 ref_dip):
 
         task = MpiTask([inpfile, None])
@@ -30,8 +32,8 @@ class TestScfRestricted(unittest.TestCase):
 
         if potfile is not None:
             task.input_dict['method_settings']['potfile'] = potfile
-        elif electric_field is not None:
-            task.input_dict['scf']['electric_field'] = electric_field
+        elif efield is not None:
+            task.input_dict['method_settings']['electric_field'] = efield
 
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
@@ -181,6 +183,44 @@ class TestScfRestricted(unittest.TestCase):
         solver.comp_2e_fock_split_comm(fock, dens, mol, bas, screening)
 
         self.assertEqual(fock.alpha_to_numpy(0).shape, dmat.shape)
+
+    def test_update_settings(self):
+
+        scf_dict = {
+            'acc_type': 'DIIS',
+            'max_iter': 199,
+            'conv_thresh': 1e-7,
+            'qq_type': 'QQ',
+            'eri_thresh': 1e-13,
+            'restart': False,
+            'checkpoint_file': 'mycheckpoint.h5',
+            'timing': True,
+            'profiling': True,
+            'memory_profiling': True,
+            'memory_tracing': True,
+        }
+
+        method_dict = {
+            'dispersion': True,
+            'dft': True,
+            'grid_level': 5,
+            'electric_field': (0, -0.002, 0.001),
+            'use_split_comm': True,
+        }
+
+        scf_drv = ScfDriver(MPI.COMM_WORLD, OutputStream(None))
+
+        for key, val in scf_dict.items():
+            self.assertTrue(getattr(scf_drv, key) != val)
+        for key, val in method_dict.items():
+            self.assertTrue(getattr(scf_drv, key) != val)
+
+        scf_drv.update_settings(scf_dict, method_dict)
+
+        for key, val in scf_dict.items():
+            self.assertTrue(getattr(scf_drv, key) == val)
+        for key, val in method_dict.items():
+            self.assertTrue(getattr(scf_drv, key) == val)
 
 
 if __name__ == "__main__":

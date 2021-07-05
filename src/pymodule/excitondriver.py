@@ -52,6 +52,7 @@ from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .rspabsorption import Absorption
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
 from .qqscheme import get_qq_scheme
 from .checkpoint import read_rsp_hdf5
 from .checkpoint import write_rsp_hdf5
@@ -192,25 +193,23 @@ class ExcitonModelDriver:
             self.natoms += [int(x)] * int(n)
             self.charges += [float(q)] * int(n)
 
-        if 'nstates' in exciton_dict:
-            self.nstates = int(exciton_dict['nstates'])
+        exciton_keywords = {
+            'nstates': 'int',
+            'ct_nocc': 'int',
+            'ct_nvir': 'int',
+            'restart': 'bool',
+            'checkpoint_file': 'str',
+        }
 
-        if 'ct_nocc' in exciton_dict:
-            self.ct_nocc = int(exciton_dict['ct_nocc'])
-        if 'ct_nvir' in exciton_dict:
-            self.ct_nvir = int(exciton_dict['ct_nvir'])
+        parse_input(self, exciton_keywords, exciton_dict)
 
-        if 'restart' in exciton_dict:
-            key = exciton_dict['restart'].lower()
-            self.restart = True if key in ['yes', 'y'] else False
-        if 'checkpoint_file' in exciton_dict:
-            self.checkpoint_file = exciton_dict['checkpoint_file']
+        method_keywords = {
+            'dft': 'bool',
+            'grid_level': 'int',
+        }
 
-        if 'dft' in method_dict:
-            key = method_dict['dft'].lower()
-            self.dft = True if key in ['yes', 'y'] else False
-        if 'grid_level' in method_dict:
-            self.grid_level = int(method_dict['grid_level'])
+        parse_input(self, method_keywords, method_dict)
+
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
                 self.dft = True
@@ -219,6 +218,12 @@ class ExcitonModelDriver:
         if 'potfile' in method_dict:
             errmsg = 'ExcitonModelDriver: The \'potfile\' keyword is not '
             errmsg += 'supported in exciton model calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if 'electric_field' in method_dict:
+            errmsg = 'ExcitonModelDriver: The \'electric field\' keyword '
+            errmsg += 'is not supported in exciton model calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
@@ -713,7 +718,7 @@ class ExcitonModelDriver:
                     self.ostream.print_header('=' * (len(valstr) + 2))
                     self.ostream.print_blank()
 
-                    valstr = 'Dimer Energy:{:20.10f} au'.format(dimer_energy)
+                    valstr = 'Dimer Energy:{:20.10f} a.u.'.format(dimer_energy)
                     self.ostream.print_header(valstr.ljust(72))
                     self.ostream.print_blank()
                     self.ostream.flush()

@@ -29,14 +29,14 @@ import time as tm
 import psutil
 import sys
 
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, hartree_in_wavenumbers
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
-from .inputparser import InputParser
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
 from .checkpoint import check_rsp_hdf5
 from .checkpoint import append_rsp_solution_hdf5
 
@@ -78,7 +78,7 @@ class ComplexResponse(LinearSolver):
         self.b_components = 'xyz'
 
         self.frequencies = (0,)
-        self.damping = 0.004556335294880438
+        self.damping = 1000.0 / hartree_in_wavenumbers()
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -95,20 +95,16 @@ class ComplexResponse(LinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-        if 'a_operator' in rsp_dict:
-            self.a_operator = rsp_dict['a_operator'].lower()
-        if 'a_components' in rsp_dict:
-            self.a_components = rsp_dict['a_components'].lower()
-        if 'b_operator' in rsp_dict:
-            self.b_operator = rsp_dict['b_operator'].lower()
-        if 'b_components' in rsp_dict:
-            self.b_components = rsp_dict['b_components'].lower()
+        rsp_keywords = {
+            'a_operator': 'str_lower',
+            'a_components': 'str_lower',
+            'b_operator': 'str_lower',
+            'b_components': 'str_lower',
+            'frequencies': 'seq_range',
+            'damping': 'float',
+        }
 
-        if 'frequencies' in rsp_dict:
-            self.frequencies = InputParser.parse_frequencies(
-                rsp_dict['frequencies'])
-        if 'damping' in rsp_dict:
-            self.damping = float(rsp_dict['damping'])
+        parse_input(self, rsp_keywords, rsp_dict)
 
     def get_precond(self, orb_ene, nocc, norb, w, d):
         """

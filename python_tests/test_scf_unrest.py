@@ -14,7 +14,7 @@ from veloxchem.firstorderprop import FirstOrderProperties
 
 class TestScfUnrestricted(unittest.TestCase):
 
-    def run_scf(self, inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
+    def run_scf(self, inpfile, potfile, xcfun_label, efield, ref_e_scf,
                 ref_dip):
 
         task = MpiTask([inpfile, None])
@@ -22,8 +22,8 @@ class TestScfUnrestricted(unittest.TestCase):
 
         if potfile is not None:
             task.input_dict['method_settings']['potfile'] = potfile
-        elif electric_field is not None:
-            task.input_dict['scf']['electric_field'] = electric_field
+        elif efield is not None:
+            task.input_dict['method_settings']['electric_field'] = efield
 
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label

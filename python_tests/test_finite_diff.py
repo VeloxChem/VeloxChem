@@ -31,26 +31,25 @@ class TestFiniteDifference:
         efield_plus = [0.0, 0.0, delta_ef]
         efield_minus = [0.0, 0.0, -delta_ef]
 
+        method_dict_plus = dict(task.input_dict['method_settings'])
+        method_dict_minus = dict(task.input_dict['method_settings'])
+        method_dict_plus['electric_field'] = efield_plus
+        method_dict_minus['electric_field'] = efield_minus
+
         scf_drv_plus = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv_plus.update_settings(task.input_dict['scf'],
-                                     task.input_dict['method_settings'])
-        scf_drv_plus.electric_field = efield_plus
+        scf_drv_plus.update_settings(task.input_dict['scf'], method_dict_plus)
         scf_drv_plus.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        lr_prop_plus = Polarizability({'frequencies': '0'},
-                                      task.input_dict['method_settings'])
+        lr_prop_plus = Polarizability({'frequencies': '0'}, method_dict_plus)
         lr_prop_plus.init_driver(task.mpi_comm, task.ostream)
         lr_prop_plus.compute(task.molecule, task.ao_basis,
                              scf_drv_plus.scf_tensors)
 
         scf_drv_minus = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv_minus.update_settings(task.input_dict['scf'],
-                                      task.input_dict['method_settings'])
-        scf_drv_minus.electric_field = efield_minus
+        scf_drv_minus.update_settings(task.input_dict['scf'], method_dict_minus)
         scf_drv_minus.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        lr_prop_minus = Polarizability({'frequencies': '0'},
-                                       task.input_dict['method_settings'])
+        lr_prop_minus = Polarizability({'frequencies': '0'}, method_dict_minus)
         lr_prop_minus.init_driver(task.mpi_comm, task.ostream)
         lr_prop_minus.compute(task.molecule, task.ao_basis,
                               scf_drv_minus.scf_tensors)

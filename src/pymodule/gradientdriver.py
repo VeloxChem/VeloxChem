@@ -54,18 +54,6 @@ class GradientDriver:
         # flag for two-point or four-point approximation
         self.do_four_point = False
 
-    def update_settings(self, scf_dict, method_dict=None):
-        """
-        Updates settings in gradient driver.
-
-        :param scf_dict:
-            The input dictionary of scf group.
-        :param method_dict:
-            The input dicitonary of method settings group.
-        """
-
-        return
-
     def compute(self, molecule, ao_basis=None, min_basis=None):
         """
         Performs calculation of numerical gradient.

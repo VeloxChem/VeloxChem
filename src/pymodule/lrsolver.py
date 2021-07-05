@@ -35,8 +35,8 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
-from .inputparser import InputParser
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
 from .checkpoint import check_rsp_hdf5
 from .checkpoint import append_rsp_solution_hdf5
 
@@ -93,17 +93,15 @@ class LinearResponseSolver(LinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-        if 'a_operator' in rsp_dict:
-            self.a_operator = rsp_dict['a_operator'].lower()
-        if 'a_components' in rsp_dict:
-            self.a_components = rsp_dict['a_components'].lower()
-        if 'b_operator' in rsp_dict:
-            self.b_operator = rsp_dict['b_operator'].lower()
-        if 'b_components' in rsp_dict:
-            self.b_components = rsp_dict['b_components'].lower()
-        if 'frequencies' in rsp_dict:
-            self.frequencies = InputParser.parse_frequencies(
-                rsp_dict['frequencies'])
+        rsp_keywords = {
+            'a_operator': 'str_lower',
+            'a_components': 'str_lower',
+            'b_operator': 'str_lower',
+            'b_components': 'str_lower',
+            'frequencies': 'seq_range',
+        }
+
+        parse_input(self, rsp_keywords, rsp_dict)
 
     def compute(self, molecule, basis, scf_tensors):
         """

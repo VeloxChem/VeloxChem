@@ -5,6 +5,12 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 from veloxchem.inputparser import InputParser
+from veloxchem.inputparser import (
+    parse_seq_range,
+    parse_seq_fixed,
+    parse_bool,
+    parse_str,
+)
 from veloxchem.veloxchemlib import is_mpi_master, is_single_node
 
 
@@ -112,7 +118,7 @@ def test_error_in_input(tmpdir):
 
 
 @pytest.mark.parametrize(
-    'input_frequencies, expected',
+    'input_seq, expected',
     [
         ([], []),
         ([1.0, 2.0], [1.0, 2.0]),
@@ -127,8 +133,53 @@ def test_error_in_input(tmpdir):
         ),
     ],
 )
-def test_parse_frequencies(input_frequencies, expected):
+def test_parse_seq_range(input_seq, expected):
 
     if is_mpi_master():
-        npt.assert_allclose(InputParser.parse_frequencies(input_frequencies),
-                            expected)
+        npt.assert_allclose(parse_seq_range(input_seq), expected)
+
+
+@pytest.mark.parametrize(
+    'input_seq, flag, expected',
+    [
+        ([], 'float', []),
+        ([1.0, 2.0], 'float', [1.0, 2.0]),
+        (np.array([1.0, 2.0, 3.0]), 'float', [1.0, 2.0, 3.0]),
+        ([], 'int', []),
+        ([1, 2], 'int', [1, 2]),
+        (np.array([1, 2, 3]), 'int', [1, 2, 3]),
+    ],
+)
+def test_parse_seq_fixed(input_seq, flag, expected):
+
+    if is_mpi_master():
+        npt.assert_allclose(parse_seq_fixed(input_seq, flag), expected)
+
+
+@pytest.mark.parametrize(
+    'input_bool, expected',
+    [
+        ('yes', True),
+        ('Y', True),
+        ('no', False),
+        ('N', False),
+    ],
+)
+def test_parse_bool(input_bool, expected):
+
+    if is_mpi_master():
+        assert parse_bool(input_bool) == expected
+
+
+@pytest.mark.parametrize(
+    'input_str, flag, expected',
+    [
+        ('Qq', 'upper', 'QQ'),
+        ('Qq', 'lower', 'qq'),
+        ('Qq', None, 'Qq'),
+    ],
+)
+def test_parse_str(input_str, flag, expected):
+
+    if is_mpi_master():
+        assert parse_str(input_str, flag) == expected

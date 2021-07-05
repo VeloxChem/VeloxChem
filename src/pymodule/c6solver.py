@@ -36,6 +36,7 @@ from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
 from .checkpoint import check_rsp_hdf5
 from .checkpoint import append_rsp_solution_hdf5
 
@@ -97,19 +98,16 @@ class C6Solver(LinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-        if 'a_operator' in rsp_dict:
-            self.a_operator = rsp_dict['a_operator'].lower()
-        if 'a_components' in rsp_dict:
-            self.a_components = rsp_dict['a_components'].lower()
-        if 'b_operator' in rsp_dict:
-            self.b_operator = rsp_dict['b_operator'].lower()
-        if 'b_components' in rsp_dict:
-            self.b_components = rsp_dict['b_components'].lower()
+        rsp_keywords = {
+            'a_operator': 'str_lower',
+            'a_components': 'str_lower',
+            'b_operator': 'str_lower',
+            'b_components': 'str_lower',
+            'n_points': 'int',
+            'w0': 'float',
+        }
 
-        if 'n_points' in rsp_dict:
-            self.n_points = int(rsp_dict['n_points'])
-        if 'w0' in rsp_dict:
-            self.w0 = float(rsp_dict['w0'])
+        parse_input(self, rsp_keywords, rsp_dict)
 
     def get_precond(self, orb_ene, nocc, norb, iw):
         """

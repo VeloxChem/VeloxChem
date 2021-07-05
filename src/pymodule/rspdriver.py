@@ -30,6 +30,7 @@ from .c6solver import C6Solver
 from .tdaexcidriver import TDAExciDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
+from .inputparser import parse_input
 
 
 class ResponseDriver:
@@ -86,18 +87,20 @@ class ResponseDriver:
             The dictionary of method settings.
         """
 
-        self.rsp_dict = dict(rsp_dict)
         if method_dict is None:
             self.method_dict = None
         else:
             self.method_dict = dict(method_dict)
 
-        if 'property' in rsp_dict:
-            self.prop_type = rsp_dict['property'].lower()
+        self.rsp_dict = dict(rsp_dict)
+        self.rsp_dict['prop_type'] = self.rsp_dict['property']
 
-        if 'tamm_dancoff' in rsp_dict:
-            key = rsp_dict['tamm_dancoff'].lower()
-            self.tamm_dancoff = True if key in ['yes', 'y'] else False
+        rsp_keywords = {
+            'prop_type': 'str_lower',
+            'tamm_dancoff': 'bool',
+        }
+
+        parse_input(self, rsp_keywords, self.rsp_dict)
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """

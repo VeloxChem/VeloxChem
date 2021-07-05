@@ -199,40 +199,221 @@ class InputParser:
 
         return self.input_dict
 
-    @staticmethod
-    def parse_frequencies(input_frequencies):
-        """
-        Parses frequencies input for response solver.
-        Input example: '0.0 - 0.2525 (0.0025), 0.5 - 1.0 (0.02), 2.0'
 
-        :param input_frequencies:
-            The string of input frequencies.
-        """
-        if isinstance(input_frequencies, list):
-            return input_frequencies
+class InputError(Exception):
+    pass
 
-        if isinstance(input_frequencies, np.ndarray):
-            return input_frequencies.tolist()
 
-        frequencies = []
-        for w in input_frequencies.split(','):
-            if '-' in w:
-                m = re.search(r'^(.*)-(.*)\((.*)\)$', w)
-                if m is None:
-                    m = re.search(r'^(.*)-(.*)-(.*)$', w)
+def parse_seq_fixed(input_seq, flag='float'):
+    """
+    Parses input sequence that has fixed number of elements, using comma and/or
+    white space as delimiter.
 
-                assert_msg_critical(m is not None,
-                                    'InputParser: failed to read frequencies')
+    :param input_seq:
+        The input sequence.
+    :param flag:
+        The flag for int/float.
+
+    :return:
+        A tuple.
+    """
+
+    if isinstance(input_seq, (tuple, list, np.ndarray)):
+        return tuple(input_seq)
+
+    elif isinstance(input_seq, str):
+        seq_str = input_seq.replace(',', ' ')
+        if flag == 'float':
+            return tuple([float(x) for x in seq_str.split()])
+        elif flag == 'int':
+            return tuple([int(x) for x in seq_str.split()])
+        else:
+            assert_msg_critical(False,
+                                f'parse_seq_fixed: invalid flag \'{flag}\'')
+
+    else:
+        errmsg = 'parse_seq_fixed: invalid type for input_seq'
+        assert_msg_critical(False, errmsg)
+
+
+def parse_seq_range(input_seq):
+    """
+    Parses input sequence that is specified by range.
+    Input example: '0.0 - 0.2525 (0.0025), 0.5 - 1.0 (0.02), 2.0'
+
+    :param input_seq:
+        The input sequence.
+
+    :return:
+        A tuple.
+    """
+
+    if isinstance(input_seq, (tuple, list, np.ndarray)):
+        return tuple(input_seq)
+
+    elif isinstance(input_seq, str):
+        seq = []
+
+        for w in input_seq.split(','):
+            if not w:
+                continue
+
+            m = re.search(r'^(.*)-(.*)\((.*)\)$', w)
+            if m is None:
+                m = re.search(r'^(.*)-(.*)-(.*)$', w)
+
+            if m is not None:
+                assert_msg_critical(
+                    m is not None,
+                    f'parse_seq_range: failed to read seqence \'{w}\'')
 
                 start, stop, step = (float(m.group(1)), float(m.group(2)),
                                      float(m.group(3)))
                 stop += 0.01 * step
 
-                frequencies += list(np.arange(start, stop, step))
-            elif w:
-                frequencies.append(float(w))
-        return frequencies
+                seq += list(np.arange(start, stop, step))
+
+            else:
+                seq.append(float(w))
+
+        return tuple(seq)
+
+    else:
+        errmsg = 'parse_seq_range: invalid type for input_seq'
+        assert_msg_critical(False, errmsg)
 
 
-class InputError(Exception):
-    pass
+def parse_bool(input_bool):
+    """
+    Parses input boolean.
+
+    :param input_bool:
+        The input.
+
+    :return:
+        A boolean.
+    """
+
+    if isinstance(input_bool, bool):
+        return input_bool
+
+    elif isinstance(input_bool, str):
+        if input_bool.lower() in ['yes', 'y']:
+            return True
+        elif input_bool.lower() in ['no', 'n']:
+            return False
+        else:
+            assert_msg_critical(
+                False, f'parse_bool: invalid boolean input \'{input_bool}\'')
+
+    else:
+        errmsg = 'parse_bool: invalid type for input_bool'
+        assert_msg_critical(False, errmsg)
+
+
+def parse_str(input_str, flag=None):
+    """
+    Parses input string.
+
+    :param input_str:
+        The input.
+    :param flag:
+        The flag for upper/lower case.
+
+    :return:
+        A string.
+    """
+
+    err_str = f'parse_str: invalid string input \'{input_str}\''
+    assert_msg_critical(isinstance(input_str, str), err_str)
+
+    if flag is None:
+        return input_str
+    elif flag == 'upper':
+        return input_str.upper()
+    elif flag == 'lower':
+        return input_str.lower()
+    else:
+        assert_msg_critical(False, f'parse_str: invalid flag \'{flag}\'')
+
+
+def parse_list(input_list):
+    """
+    Parses input list.
+
+    :param input_list:
+        The input.
+
+    :return:
+        A list.
+    """
+
+    err_list = f'parse_list: invalid list input \'{input_list}\''
+    assert_msg_critical(isinstance(input_list, list), err_list)
+
+    return list(input_list)
+
+
+def parse_input(obj, keyword_types, input_dictionary):
+    """
+    Parses input keywords for object.
+    - 'str' for string input, such as 'checkpoint_file: mycheckpoint.h5'
+    - 'str_upper' for uppercase string input, such as 'qq_type: QQ_DEN'
+    - 'str_lower' for lowercase string input, such as 'coordsys: tric'
+    - 'int' for integer input, such as 'max_iter: 300'
+    - 'float' for floating-point input, such as 'eri_thresh: 1.0e-12'
+    - 'bool' for floating-point input, such as 'restart: no'
+    - 'list' for multi-line input, such as 'constraints'
+    - 'seq_fixed_int' for fixed-length integer sequence, such as 'cube_points: 80,80,80'
+    - 'seq_fixed' for fixed-length sequence, such as 'cube_origin: 0.0,0.0,0.0'
+    - 'seq_range' for sequence with range, such as 'frequencies: 0.0-0.1(0.02)'
+
+    :param obj:
+        The object.
+    :param keyword_types:
+        The data type associated with keyword.
+    :param input_dictionary:
+        The input dictionary.
+    """
+
+    for key, val in input_dictionary.items():
+        if key not in keyword_types:
+            continue
+
+        # the value of certain keyword can be set to None
+        if val is None:
+            setattr(obj, key, val)
+
+        elif keyword_types[key] == 'str':
+            setattr(obj, key, parse_str(val))
+
+        elif keyword_types[key] == 'str_upper':
+            setattr(obj, key, parse_str(val, 'upper'))
+
+        elif keyword_types[key] == 'str_lower':
+            setattr(obj, key, parse_str(val, 'lower'))
+
+        elif keyword_types[key] == 'int':
+            setattr(obj, key, int(val))
+
+        elif keyword_types[key] == 'float':
+            setattr(obj, key, float(val))
+
+        elif keyword_types[key] == 'bool':
+            setattr(obj, key, parse_bool(val))
+
+        elif keyword_types[key] == 'list':
+            setattr(obj, key, parse_list(val))
+
+        elif keyword_types[key] == 'seq_fixed_int':
+            setattr(obj, key, parse_seq_fixed(val, 'int'))
+
+        elif keyword_types[key] == 'seq_fixed':
+            setattr(obj, key, parse_seq_fixed(val))
+
+        elif keyword_types[key] == 'seq_range':
+            setattr(obj, key, parse_seq_range(val))
+
+        else:
+            err_type = f'parse_input: invalid keyword type for \'{key}\''
+            assert_msg_critical(False, err_type)
