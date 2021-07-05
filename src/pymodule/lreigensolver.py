@@ -453,8 +453,6 @@ class LinearResponseEigenSolver(LinearSolver):
                 if not write_solution_to_file:
                     eigvecs = np.zeros((x_0.size, self.nstates))
 
-            sqrt_2 = np.sqrt(2.0)
-
             nto_lambdas = []
             nto_cube_files = []
             dens_cube_files = []
@@ -521,11 +519,11 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
-                        elec_trans_dipoles[s, ind] = sqrt_2 * np.vdot(
+                        elec_trans_dipoles[s, ind] = np.vdot(
                             edip_rhs[ind], eigvec)
-                        velo_trans_dipoles[s, ind] = sqrt_2 * np.vdot(
+                        velo_trans_dipoles[s, ind] = np.vdot(
                             lmom_rhs[ind], eigvec) / (-eigvals[s])
-                        magn_trans_dipoles[s, ind] = sqrt_2 * np.vdot(
+                        magn_trans_dipoles[s, ind] = np.vdot(
                             mdip_rhs[ind], eigvec)
 
                     if write_solution_to_file:

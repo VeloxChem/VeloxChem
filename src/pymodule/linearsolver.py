@@ -1310,7 +1310,8 @@ class LinearSolver:
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            matrices = tuple(0.5 * np.linalg.multi_dot([
+            factor = 0.5 * np.sqrt(2.0)
+            matrices = tuple(factor * np.linalg.multi_dot([
                 mo.T,
                 (np.linalg.multi_dot([S, D, P.T]) -
                  np.linalg.multi_dot([P.T, D, S])), mo
@@ -1409,7 +1410,8 @@ class LinearSolver:
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            matrices = tuple(0.5 * np.linalg.multi_dot([
+            factor = 0.5 * np.sqrt(2.0)
+            matrices = tuple(factor * np.linalg.multi_dot([
                 mo.T,
                 (np.linalg.multi_dot([S, D, P.conj().T]) -
                  np.linalg.multi_dot([P.conj().T, D, S])), mo
