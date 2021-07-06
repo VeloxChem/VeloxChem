@@ -194,7 +194,7 @@ class InputParser:
         Gets the input dictonary.
 
         :return:
-            A dictionary containing all information form the input file.
+            A dictionary containing all information from the input file.
         """
 
         return self.input_dict

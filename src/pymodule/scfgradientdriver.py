@@ -76,32 +76,19 @@ class ScfGradientDriver(GradientDriver):
         self.dipole_deriv = False
         self.dipole_gradient = None
 
-    def update_settings(self, method_dict):
+    def update_settings(self, grad_dict, method_dict):
         """
         Updates settings in ScfGradientDriver.
 
-        TODO: Add new gradient settings group?
-
+        :param grad_dict:
+            The input dictionary of gradient settings group.
         :param method_dict:
             The input dicitonary of method settings group.
         """
-        # Analytical DFT gradient is not implemented yet
-        if 'xcfun' in method_dict:
-            if method_dict['xcfun'] is not None:
-                self.numerical = True
-        if 'dft' in method_dict:
-            key = method_dict['dft'].lower()
-            self.numerical = True if key in ['yes', 'y'] else False
 
-        # TODO: possibly put settings in new input group
-        if 'numerical_grad' in method_dict:
-            key = method_dict['numerical_grad'].lower()
-            self.numerical = True if key in ['yes', 'y'] else False
+        # update settings in parent class
+        super().update_settings(grad_dict, method_dict)
 
-        # Numerical derivative of dipole moment
-        if 'dipole_deriv' in method_dict:
-            key = method_dict['dipole_deriv'].lower()
-            self.dipole_deriv = True if key in ['yes', 'y'] else False
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
@@ -221,14 +208,12 @@ class ScfGradientDriver(GradientDriver):
                         prop.compute(new_mol, ao_basis, density)
                         mu_minus = prop.get_property('dipole moment')
 
-                    coords[i, d] += self.delta_h
-                    self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
-
-                    if self.dipole_deriv:
                         for c in range(3):
                             self.dipole_gradient[c, i, d] = (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
 
-            ##print("\ndipole_gradient =\n", self.dipole_gradient)
+                    coords[i, d] += self.delta_h
+                    self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
+
 
         else:
             # Four-point numerical derivative approximation
@@ -241,20 +226,45 @@ class ScfGradientDriver(GradientDriver):
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     e_plus1 = self.scf_drv.get_scf_energy()
 
+                    if self.dipole_deriv:
+                        density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
+                        prop.compute(new_mol, ao_basis, density)
+                        mu_plus1 = prop.get_property('dipole moment')
+
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     e_plus2 = self.scf_drv.get_scf_energy()
+
+                    if self.dipole_deriv:
+                        density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
+                        prop.compute(new_mol, ao_basis, density)
+                        mu_plus2 = prop.get_property('dipole moment')
 
                     coords[i, d] -= 3.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     e_minus1 = self.scf_drv.get_scf_energy()
 
+                    if self.dipole_deriv:
+                        density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
+                        prop.compute(new_mol, ao_basis, density)
+                        mu_minus1 = prop.get_property('dipole moment')
+
                     coords[i, d] -= self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     e_minus2 = self.scf_drv.get_scf_energy()
+
+                    if self.dipole_deriv:
+                        density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
+                        prop.compute(new_mol, ao_basis, density)
+                        mu_minus2 = prop.get_property('dipole moment')
+
+                        for c in range(3):
+                            self.dipole_gradient[c, i, d] = (mu_minus2[c] - 8.0 * mu_minus1[c]
+                                                             + 8.0 * mu_plus1[c] - mu_plus2[c]) / (12.0 * self.delta_h)
+
 
                     coords[i, d] += 2.0 * self.delta_h
                     # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )

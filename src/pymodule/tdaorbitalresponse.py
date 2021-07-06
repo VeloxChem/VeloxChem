@@ -18,7 +18,7 @@ class TdaOrbitalResponse(OrbitalResponse):
     level of theory.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes orbital response computation driver to default setup.
 
@@ -30,18 +30,20 @@ class TdaOrbitalResponse(OrbitalResponse):
 
         super().__init__(comm, ostream)
 
-    def update_settings(self, rsp_dict, method_dict=None):
+    def update_settings(self, orbrsp_dict, rsp_dict, method_dict=None):
         """
         Updates response and method settings in orbital response computation
         driver.
 
+        :param orbrsp_dict:
+            The dictionary of orbital response settings.
         :param rsp_dict:
             The dictionary of response settings.
         :param method_dict:
             The dictionary of method settings.
         """
 
-        super().update_settings(rsp_dict, method_dict)
+        super().update_settings(orbrsp_dict, rsp_dict, method_dict)
 
     def compute_rhs(self, molecule, basis, scf_tensors, tda_results, dft_dict, profiler):
         """
@@ -87,7 +89,7 @@ class TdaOrbitalResponse(OrbitalResponse):
             nvir = mo_vir.shape[1]
 
             # Take vector of interest and convert to matrix form
-            exc_vec = tda_results['eigenvectors'][:, self.n_state_deriv]
+            exc_vec = tda_results['eigenvectors'][:, self.state_deriv_index]
             exc_vec = exc_vec.reshape(nocc, nvir).copy()
 
             # Transform the excitation vectors to the AO basis
@@ -204,7 +206,7 @@ class TdaOrbitalResponse(OrbitalResponse):
         # Get the excitation vector of interest and transform it to AO
         nocc = mo_occ.shape[1]
         nvir = mo_vir.shape[1]
-        exc_vec = tda_results['eigenvectors'][:, self.n_state_deriv]
+        exc_vec = tda_results['eigenvectors'][:, self.state_deriv_index]
         exc_vec = exc_vec.reshape(nocc, nvir).copy()
         exc_vec_ao = np.linalg.multi_dot([mo_occ, exc_vec, mo_vir.T])
 

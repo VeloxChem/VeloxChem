@@ -24,6 +24,10 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import sys
+from mpi4py import MPI
+
+from .outputstream import OutputStream
 
 class GradientDriver:
     """
@@ -40,10 +44,16 @@ class GradientDriver:
         - numerical: Perform numerical gradient calculation.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes gradient driver.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         self.comm = comm
         self.ostream = ostream
@@ -53,6 +63,50 @@ class GradientDriver:
         self.numerical = False
         # flag for two-point or four-point approximation
         self.do_four_point = False
+
+    def update_settings(self, grad_dict, method_dict):
+        """
+        Updates settings in GradientDriver.
+
+        :param grad_dict:
+            The input dictionary of gradient settings group.
+        :param method_dict:
+            The input dicitonary of method settings group.
+        """
+        # Analytical DFT gradient is not implemented yet
+        if 'xcfun' in method_dict:
+            if method_dict['xcfun'] is not None:
+                self.numerical = True
+        if 'dft' in method_dict:
+            key = method_dict['dft'].lower()
+            self.numerical = True if key in ['yes', 'y'] else False
+
+        # Numerical gradient?
+        if 'numerical' in grad_dict:
+            key = grad_dict['numerical'].lower()
+            self.numerical = True if key in ['yes', 'y'] else False
+
+        if 'delta_h' in grad_dict:
+            self.delta_h = float(grad_dict['delta_h'])
+
+		# TODO: if this is True, numerical must also be True
+        if 'do_four_point' in grad_dict:
+            key = grad_dict['do_four_point'].lower()
+            self.do_four_point = True if key in ['yes', 'y'] else False
+            # if four-point is desired, numerical is also set to True
+            if self.do_four_point:
+                self.numerical = True
+
+        # Numerical derivative of dipole moment
+        if 'dipole_deriv' in grad_dict:
+            key = grad_dict['dipole_deriv'].lower()
+            self.dipole_deriv = True if key in ['yes', 'y'] else False
+            if self.dipole_deriv and not self.numerical:
+                warn_msg = '*** Warning: Dipole moment derivatives requested.\n'
+                warn_msg += '           Gradient will be calculated numerically.'
+                self.ostream.print_header(warn_msg.ljust(56))
+                self.numerical = True
+
 
     def compute(self, molecule, ao_basis=None, min_basis=None):
         """
@@ -79,6 +133,7 @@ class GradientDriver:
         :return:
             The nuclear contribution to the gradient.
         """
+
         # number of atoms
         natm = molecule.number_of_atoms()
 
@@ -126,6 +181,7 @@ class GradientDriver:
 
         self.ostream.print_block(molecule.get_string())
 
+
     def print_gradient(self, molecule):
         """
         Prints the gradient.
@@ -162,6 +218,7 @@ class GradientDriver:
 
         self.ostream.print_blank()
         self.ostream.flush()
+
 
     def print_header(self):
         """

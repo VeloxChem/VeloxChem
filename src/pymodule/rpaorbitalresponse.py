@@ -18,7 +18,7 @@ class RpaOrbitalResponse(OrbitalResponse):
     level of theory.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes orbital response computation driver to default setup.
 
@@ -30,18 +30,20 @@ class RpaOrbitalResponse(OrbitalResponse):
 
         super().__init__(comm, ostream)
 
-    def update_settings(self, rsp_dict, method_dict=None):
+    def update_settings(self, orbrsp_dict, rsp_dict, method_dict=None):
         """
         Updates response and method settings in orbital response computation
         driver.
 
+        :param orbrsp_dict:
+            The dictionary of orbital response settings.
         :param rsp_dict:
             The dictionary of response settings.
         :param method_dict:
             The dictionary of method settings.
         """
 
-        super().update_settings(rsp_dict, method_dict)
+        super().update_settings(orbrsp_dict, rsp_dict, method_dict)
 
     def compute_rhs(self, molecule, basis, scf_tensors, rpa_results, dft_dict, profiler):
         """
@@ -88,9 +90,9 @@ class RpaOrbitalResponse(OrbitalResponse):
 
             # Take vector of interest and convert to matrix form
             exc_vec = rpa_results['eigenvectors'][:nocc * nvir,
-                                                  self.n_state_deriv]
+                                                  self.state_deriv_index]
             deexc_vec = rpa_results['eigenvectors'][nocc * nvir:,
-                                                    self.n_state_deriv]
+                                                    self.state_deriv_index]
             exc_vec = exc_vec.reshape(nocc, nvir).copy()
             deexc_vec = deexc_vec.reshape(nocc, nvir).copy()
 
@@ -230,9 +232,9 @@ class RpaOrbitalResponse(OrbitalResponse):
         # construct plus/minus combinations and transform them to AO
         nocc = mo_occ.shape[1]
         nvir = mo_vir.shape[1]
-        exc_vec = rpa_results['eigenvectors'][:nocc * nvir, self.n_state_deriv]
+        exc_vec = rpa_results['eigenvectors'][:nocc * nvir, self.state_deriv_index]
         deexc_vec = rpa_results['eigenvectors'][nocc * nvir:,
-                                                self.n_state_deriv]
+                                                self.state_deriv_index]
         exc_vec = exc_vec.reshape(nocc, nvir).copy()
         deexc_vec = deexc_vec.reshape(nocc, nvir).copy()
         xpy = exc_vec + deexc_vec

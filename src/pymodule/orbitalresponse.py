@@ -1,5 +1,7 @@
 import numpy as np
 import time as tm
+import sys
+from mpi4py import MPI
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import AODensityMatrix
@@ -15,6 +17,7 @@ from .veloxchemlib import parse_xc_func
 from .profiler import Profiler
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_scheme
+from .outputstream import OutputStream
 from scipy.sparse import linalg
 
 
@@ -25,8 +28,8 @@ class OrbitalResponse:
     level of theory.
 
     Instance variables
-        - is_tda: Flag if Tamm-Dancoff approximation is employed.
-        - n_state_deriv: The number of the excited state of interest.
+        - tamm_dancoff: Flag if Tamm-Dancoff approximation is employed.
+        - state_deriv_index: The number of the excited state of interest.
         - is_converged: The flag for convergence.
         - comm: The MPI communicator.
         - rank: The MPI rank.
@@ -47,7 +50,7 @@ class OrbitalResponse:
         - memory_tracing: The flag for tracing memory allocation.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes orbital response computation driver to default setup.
 
@@ -57,6 +60,12 @@ class OrbitalResponse:
             The output stream.
 
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         # ERI settings
         self.eri_thresh = 1.0e-15
@@ -82,10 +91,10 @@ class OrbitalResponse:
         self.ostream = ostream
 
         # Flag on whether RPA or TDA is calculated
-        self.is_tda = False
+        self.tamm_dancoff = False
 
         # Excited state information, default to first excited state
-        self.n_state_deriv = 0
+        self.state_deriv_index = 0
 
         # Timing and profiling
         self.timing = False
@@ -93,17 +102,24 @@ class OrbitalResponse:
         self.memory_profiling = False
         self.memory_tracing = False
 
-    def update_settings(self, rsp_dict=None, method_dict=None, mp2_dict=None):
+    def update_settings(self, orbrsp_dict=None, rsp_dict=None,
+                        method_dict=None, mp2_dict=None):
         """
         Updates response and method settings in orbital response computation
         driver.
 
+        :param orbrsp_dict:
+            The dictionary of orbital response settings.
         :param rsp_dict:
             The dictionary of response settings.
         :param method_dict:
             The dictionary of method settings.
+        :param mp2_dict:
+            The dictionary of MP2 settings.
         """
 
+        if orbrsp_dict is None:
+            orbrsp_dict = {}
         if method_dict is None:
             method_dict = {}
         if mp2_dict is None:
@@ -117,22 +133,21 @@ class OrbitalResponse:
         if 'qq_type' in rsp_dict:
             self.qq_type = rsp_dict['qq_type']
 
-        # Solver setup
-        # TODO: use specific orbital response keywords here?
-        if 'conv_thresh' in rsp_dict:
-            self.conv_thresh = float(rsp_dict['conv_thresh'])
-        if 'max_iter' in rsp_dict:
-            self.max_iter = int(rsp_dict['max_iter'])
+        # Orbital response solver setup
+        if 'conv_thresh' in orbrsp_dict:
+            self.conv_thresh = float(orbrsp_dict['conv_thresh'])
+        if 'max_iter' in orbrsp_dict:
+            self.max_iter = int(orbrsp_dict['max_iter'])
 
         # Use TDA or not
         if 'tamm_dancoff' in rsp_dict:
             key = rsp_dict['tamm_dancoff'].lower()
-            self.is_tda = True if key in ['yes', 'y'] else False
+            self.tamm_dancoff = True if key in ['yes', 'y'] else False
 
         # Excited state of interest
-        if 'n_state_deriv' in rsp_dict:
+        if 'state_deriv_index' in orbrsp_dict:
             # user gives '1' for first excited state, but internal index is 0
-            self.n_state_deriv = int(rsp_dict['n_state_deriv']) - 1
+            self.state_deriv_index = int(orbrsp_dict['state_deriv_index']) - 1
 
         # DFT
         if 'dft' in method_dict:
@@ -220,7 +235,7 @@ class OrbitalResponse:
             The dictionary of tensors from the converged SCF wavefunction.
         :param rsp_results:
             The results from the RPA or TDA excited states calculation.
-            use None for MP2 
+            Use 'None' for MP2.
         """
 
         profiler = Profiler({
@@ -233,7 +248,7 @@ class OrbitalResponse:
         if self.rank == mpi_master():
             if rsp_results is not None:
                 self.print_orbrsp_header('Orbital Response Driver',
-                                     self.n_state_deriv)
+                                     self.state_deriv_index)
             else:
                 self.print_orbrsp_header('Orbital Response Driver', None)
 
@@ -284,9 +299,6 @@ class OrbitalResponse:
         lambda_multipliers = self.compute_lambda(molecule, basis, scf_tensors,
                                                  rhs_mo, dft_dict, profiler)
 
-        # TODO: delete print statement
-        # print("Lambda:\n", lambda_multipliers)
-
         profiler.start_timer(0, 'omega')
 
         # Prerequesites for the overlap matrix multipliers
@@ -321,7 +333,7 @@ class OrbitalResponse:
             lambda_ao = ( np.linalg.multi_dot(
                 [mo_occ, lambda_multipliers, mo_vir.T])
                 )
-                
+
             ao_density_lambda = AODensityMatrix([lambda_ao], denmat.rest)
         else:
             ao_density_lambda = AODensityMatrix()
@@ -610,7 +622,7 @@ class OrbitalResponse:
 
         return lambda_multipliers.reshape(nocc, nvir)
 
-    def print_orbrsp_header(self, title, n_state_deriv):
+    def print_orbrsp_header(self, title, state_deriv_index):
         self.ostream.print_blank()
         self.ostream.print_header('{:s} Setup'.format(title))
         self.ostream.print_header('=' * (len(title) + 8))
@@ -620,8 +632,8 @@ class OrbitalResponse:
 
         # print solver-specific info
 
-        if n_state_deriv is not None:
-            cur_str = 'Excited State of Interest       : ' + str(n_state_deriv +
+        if state_deriv_index is not None:
+            cur_str = 'Excited State of Interest       : ' + str(state_deriv_index +
                                                                  1)
             self.ostream.print_header(cur_str.ljust(str_width))
 

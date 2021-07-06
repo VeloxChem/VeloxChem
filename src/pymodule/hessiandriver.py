@@ -220,7 +220,7 @@ class HessianDriver:
         self.ostream.print_blank()
 
         natm = molecule.number_of_atoms()
-        
+
         for k in range(0, natm, 2):
 
             valstr = 'Coord. '
@@ -235,8 +235,8 @@ class HessianDriver:
 
             self.ostream.print_line(valstr)
             self.ostream.print_blank()
-    
-            
+
+
             for i in range(natm):
                 for di in range(3):
                     valstr = '  {:<4s}'.format(str(i+1)+' '+labels[i]+coord_dict[di])
@@ -250,8 +250,6 @@ class HessianDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        # TODO: write the actual print function
-        return
 
     def print_header(self):
         """

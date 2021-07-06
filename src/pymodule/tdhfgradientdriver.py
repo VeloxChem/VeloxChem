@@ -37,8 +37,8 @@ class TdhfGradientDriver(GradientDriver):
         - scf_drv: The SCF driver.
         - rsp_drv: Wrapper object for RPA/TDA calculations and results (?)
         - gradient: The gradient.
-        - is_tda: Flag if Tamm-Dancoff approximation is employed.
-        - n_state_deriv: The excited state of interest.
+        - tamm_dancoff: Flag if Tamm-Dancoff approximation is employed.
+        - state_deriv_index: The excited state of interest.
         - do_first_order_prop: Controls the calculation of first-order properties.
         - delta_h: The displacement for finite difference.
         - do_four_point: Flag for four-point finite difference.
@@ -66,10 +66,10 @@ class TdhfGradientDriver(GradientDriver):
         # self.rsp_drv = rsp_drv # rsp_prop object from main.py
 
         # flag on whether RPA or TDA is calculated
-        self.is_tda = False
+        self.tamm_dancoff = False
 
         # excited state information, default to first excited state
-        self.n_state_deriv = 0
+        self.state_deriv_index = 0
 
         # flag on whether to calculate excited-state properties
         self.do_first_order_prop = False
@@ -78,7 +78,7 @@ class TdhfGradientDriver(GradientDriver):
         self.delta_h = 0.001
 
 
-    def update_settings(self, rsp_dict, method_dict=None):
+    def update_settings(self, grad_dict, rsp_dict, orbrsp_dict=None, method_dict=None):
         """
         Updates settings in gradient driver.
 
@@ -90,28 +90,31 @@ class TdhfGradientDriver(GradientDriver):
 
         if method_dict is None:
             method_dict = {}
+        if orbrsp_dict is None:
+            orbrsp_dict = {}
+
+        # basic settings from parent class
+        super().update_settings(grad_dict, method_dict)
 
         if 'tamm_dancoff' in rsp_dict:
             key = rsp_dict['tamm_dancoff'].lower()
-			# TODO: change to "self.tamm_dancoff"
-            self.is_tda = True if key in ['yes', 'y'] else False
+            self.tamm_dancoff = True if key in ['yes', 'y'] else False
 
-        if self.is_tda:
+        if self.tamm_dancoff:
             self.flag = 'TDA Gradient Driver'
 
-        if 'do_first_order_prop' in rsp_dict:
-            key = rsp_dict['do_first_order_prop'].lower()
+        if 'do_first_order_prop' in grad_dict:
+            key = grad_dict['do_first_order_prop'].lower()
             self.do_first_order_prop = True if key in ['yes', 'y'] else False
 
-        # TODO: 'n_state_deriv' can be interpreted as the number of states, not
-        # the index of the state. Perhaps 'state_deriv' is a better keyword.
-
-        if 'n_state_deriv' in rsp_dict:
+        if 'state_deriv_index' in grad_dict:
             # user gives '1' for first excited state, but internal index is 0
-            self.n_state_deriv = int(rsp_dict['n_state_deriv']) - 1
+            self.state_deriv_index = int(grad_dict['state_deriv_index']) - 1
+            orbrsp_dict['state_deriv_index'] = grad_dict['state_deriv_index']
 
         self.rsp_dict = dict(rsp_dict)
         self.method_dict = dict(method_dict)
+        self.orbrsp_dict = dict(orbrsp_dict)
 
     def compute(self, molecule, basis, rsp_drv, rsp_results):
         """
@@ -130,7 +133,7 @@ class TdhfGradientDriver(GradientDriver):
         # sanity check for number of state
         if self.rank == mpi_master():
             assert_msg_critical(
-                self.n_state_deriv < rsp_results['eigenvalues'].size,
+                self.state_deriv_index < rsp_results['eigenvalues'].size,
                 'TdhfGradientDriver: not enough states calculated')
 
         self.print_header()
@@ -167,7 +170,7 @@ class TdhfGradientDriver(GradientDriver):
         """
 
         # select orbital response driver
-        if self.is_tda:
+        if self.tamm_dancoff:
             method = 'TDA'
             orbrsp_drv = TdaOrbitalResponse(self.comm, self.ostream)
         else:
@@ -178,7 +181,7 @@ class TdhfGradientDriver(GradientDriver):
         scf_tensors = self.scf_drv.scf_tensors
 
         # compute orbital response
-        orbrsp_drv.update_settings(self.rsp_dict, self.method_dict)
+        orbrsp_drv.update_settings(self.orbrsp_dict, self.rsp_dict, self.method_dict)
         orbrsp_results = orbrsp_drv.compute(molecule, basis, scf_tensors,
                                             rsp_results)
 
@@ -224,7 +227,7 @@ class TdhfGradientDriver(GradientDriver):
                              orbrsp_results['unrelaxed_density_ao'])
             firstorderprop.compute(molecule, basis, unrel_density)
             if self.rank == mpi_master():
-                title = method + ' Unrelaxed Dipole Moment for Excited State ' + str(self.n_state_deriv + 1)
+                title = method + ' Unrelaxed Dipole Moment for Excited State ' + str(self.state_deriv_index + 1)
                 firstorderprop.print_properties(molecule, title)
 
             # relaxed density and dipole moment
@@ -240,7 +243,7 @@ class TdhfGradientDriver(GradientDriver):
                         warn_msg = '    implemented. Relaxed dipole moment will be wrong.'
                         self.ostream.print_header(warn_msg.ljust(56))
 
-                    title = method + ' Relaxed Dipole Moment for Excited State ' + str(self.n_state_deriv + 1)
+                    title = method + ' Relaxed Dipole Moment for Excited State ' + str(self.state_deriv_index + 1)
                     firstorderprop.print_properties(molecule, title)
 
             self.ostream.print_blank()
@@ -282,7 +285,7 @@ class TdhfGradientDriver(GradientDriver):
                     rsp_drv.is_converged = False  # only needed for RPA
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
-                    exc_en_plus = rsp_results['eigenvalues'][self.n_state_deriv]
+                    exc_en_plus = rsp_results['eigenvalues'][self.state_deriv_index]
                     e_plus = self.scf_drv.get_scf_energy() + exc_en_plus
 
                     coords[i, d] -= 2.0 * self.delta_h
@@ -291,7 +294,7 @@ class TdhfGradientDriver(GradientDriver):
                     rsp_drv.is_converged = False
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        self.scf_drv.scf_tensors)
-                    exc_en_minus = rsp_results['eigenvalues'][self.n_state_deriv]
+                    exc_en_minus = rsp_results['eigenvalues'][self.state_deriv_index]
                     e_minus = self.scf_drv.get_scf_energy() + exc_en_minus
 
                     coords[i, d] += self.delta_h
@@ -310,7 +313,7 @@ class TdhfGradientDriver(GradientDriver):
                     rsp_drv.is_converged = False  # only needed for RPA
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
-                    exc_en = rsp_results['eigenvalues'][self.n_state_deriv]
+                    exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
                     e_plus1 = self.scf_drv.get_scf_energy() + exc_en
 
                     coords[i, d] += self.delta_h
@@ -320,7 +323,7 @@ class TdhfGradientDriver(GradientDriver):
                     rsp_drv.is_converged = False  # only needed for RPA
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
-                    exc_en = rsp_results['eigenvalues'][self.n_state_deriv]
+                    exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
                     e_plus2 = self.scf_drv.get_scf_energy() + exc_en
 
                     coords[i, d] -= 3.0 * self.delta_h
@@ -329,7 +332,7 @@ class TdhfGradientDriver(GradientDriver):
                     rsp_drv.is_converged = False
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        self.scf_drv.scf_tensors)
-                    exc_en = rsp_results['eigenvalues'][self.n_state_deriv]
+                    exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
                     e_minus1 = self.scf_drv.get_scf_energy() + exc_en
 
                     coords[i, d] -= self.delta_h
@@ -338,7 +341,7 @@ class TdhfGradientDriver(GradientDriver):
                     rsp_drv.is_converged = False
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        self.scf_drv.scf_tensors)
-                    exc_en = rsp_results['eigenvalues'][self.n_state_deriv]
+                    exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
                     e_minus2 = self.scf_drv.get_scf_energy() + exc_en
 
                     coords[i, d] += 2.0 * self.delta_h
@@ -371,7 +374,6 @@ class TdhfGradientDriver(GradientDriver):
             The electric dipole moment vector.
         """
 
-        # self.print_header()
         start_time = tm.time()
 
         scf_ostream_state = self.scf_drv.ostream.state
@@ -389,7 +391,7 @@ class TdhfGradientDriver(GradientDriver):
             rsp_drv.is_converged = False  # only needed for RPA
             rsp_results = rsp_drv.compute(molecule, ao_basis,
                                                scf_tensors)
-            exc_en_plus = rsp_results['eigenvalues'][self.n_state_deriv]
+            exc_en_plus = rsp_results['eigenvalues'][self.state_deriv_index]
             e_plus = self.scf_drv.get_scf_energy() + exc_en_plus
 
             field[i] = -field_strength
@@ -397,7 +399,7 @@ class TdhfGradientDriver(GradientDriver):
             rsp_drv.is_converged = False
             rsp_results = rsp_drv.compute(molecule, ao_basis,
                                                self.scf_drv.scf_tensors)
-            exc_en_minus = rsp_results['eigenvalues'][self.n_state_deriv]
+            exc_en_minus = rsp_results['eigenvalues'][self.state_deriv_index]
             e_minus = self.scf_drv.get_scf_energy() + exc_en_minus
 
             field[i] = 0.0
@@ -415,6 +417,7 @@ class TdhfGradientDriver(GradientDriver):
         :param ao_basis:
             The AO basis set.
         """
+
         scf_ostream_state = self.scf_drv.ostream.state
         self.scf_drv.ostream.state = False
 
