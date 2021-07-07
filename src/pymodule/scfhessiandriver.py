@@ -54,7 +54,6 @@ class ScfHessianDriver(HessianDriver):
 
     Instance variables
         - scf_drv: The SCF driver.
-        - delta_h: The displacement for finite difference.
     """
 
     def __init__(self, scf_drv, comm=None, ostream=None):
@@ -62,48 +61,26 @@ class ScfHessianDriver(HessianDriver):
         Initializes SCF Hessian driver.
         """
 
-        if comm is None:
-            self.comm = MPI.COMM_WORLD
-
-        if ostream is None:
-            self.ostream = OutputStream(sys.stdout)
+        super().__init__(comm, ostream)
 
         self.flag = 'SCF Hessian Driver'
-        self.hessian = None
         self.scf_drv = scf_drv
-        self.delta_h = 0.001
-        self.numerical = True #False
-        # flag for two-point or four-point approximation
-        self.do_four_point = False
 
-        # flag for printing the Hessian
-        self.do_print = False
 
-        # Flag for numerical derivative of dipole moment
-        # self.dipole_deriv = False
-        # self.dipole_gradient = None
-
-    def update_settings(self, method_dict):
+    def update_settings(self, method_dict, freq_dict=None):
         """
         Updates settings in ScfHessianDriver.
 
-        TODO: Add new settings group?
-
         :param method_dict:
-            The input dicitonary of method settings group.
+            The input dictionary of method settings group.
+        :param freq_dict:
+            The input dictionary of Hessian/frequency settings group.
         """
-        # Analytical DFT gradient is not implemented yet
-        if 'xcfun' in method_dict:
-            if method_dict['xcfun'] is not None:
-                self.numerical = True
-        if 'dft' in method_dict:
-            key = method_dict['dft'].lower()
-            self.numerical = True if key in ['yes', 'y'] else False
 
-        # TODO: possibly put settings in new input group
-        if 'numerical_grad' in method_dict:
-            key = method_dict['numerical_grad'].lower()
-            self.numerical = True if key in ['yes', 'y'] else False
+        super().update_settings(method_dict, freq_dict)
+
+        # The electronic energy
+        self.elec_energy = self.scf_drv.get_scf_energy()
 
 
     def compute(self, molecule, ao_basis, min_basis=None):
@@ -127,7 +104,7 @@ class ScfHessianDriver(HessianDriver):
         #    self.compute_analytical(molecule, ao_basis)
 
         # print Hessian
-        if self.do_print is True:
+        if self.do_print_hessian is True:
             self.print_geometry(molecule)
             self.ostream.print_blank()
             self.print_hessian(molecule)
@@ -186,6 +163,19 @@ class ScfHessianDriver(HessianDriver):
             The minimal AO basis set.
         """
 
+        # settings dictionary for gradient driver
+        grad_dict = dict(self.freq_dict)
+        if self.numerical_grad:
+            grad_dict['numerical'] = 'yes'
+            warn_msg = '*** Warning: Numerical Hessian will be calculated based on numerical gradient.'
+            self.ostream.print_header(warn_msg.ljust(56))
+            warn_msg = '  This takes a long time and has limited accuracy.'
+            self.ostream.print_header(warn_msg.ljust(56))
+            self.ostream.print_blank()
+            self.ostream.flush()
+        else:
+            grad_dict['numerical'] = 'no'
+
         scf_ostream_state = self.scf_drv.ostream.state
         self.scf_drv.ostream.state = False
 
@@ -200,10 +190,10 @@ class ScfHessianDriver(HessianDriver):
 
         # gradient driver
         grad_drv = ScfGradientDriver(self.scf_drv, self.scf_drv.comm, self.scf_drv.ostream)
+        grad_drv.update_settings(grad_dict, self.method_dict)
 
         # Hessian
         hessian = np.zeros((natm, 3, natm, 3))
-
 
         if not self.do_four_point:
             for i in range(molecule.number_of_atoms()):
@@ -263,146 +253,8 @@ class ScfHessianDriver(HessianDriver):
         # reshaped Hessian as member variable
         self.hessian = hessian.reshape(3*natm, 3*natm)
 
-        self.ostream.print_blank()
+        #self.ostream.print_blank()
 
         self.scf_drv.compute(molecule, ao_basis, min_basis)
         self.scf_drv.ostream.state = scf_ostream_state
 
-###    def hess_nuc_contrib(self, molecule):
-###        """
-###        Calculates the contribution of the nuclear-nuclear repulsion
-###        to the analytical nuclear Hessian.
-###
-###        :param molecule:
-###            The molecule.
-###
-###        :return:
-###            The nuclear contribution to the Hessian.
-###        """
-###        # number of atoms
-###        natm = molecule.number_of_atoms()
-###
-###        # nuclear repulsion energy contribution to Hessian
-###        nuc_contrib = np.zeros((natm, 3, natm, 3))
-###
-###        # atom coordinates (nx3)
-###        coords = molecule.get_coordinates()
-###
-###        # atomic charges
-###        nuclear_charges = molecule.elem_ids_to_numpy()
-###
-###        # loop over all distinct atom pairs and add energy contribution
-###        for i in range(natm):
-###            z_a = nuclear_charges[i]
-###            r_a = coords[i]
-###            for j in range(natm):
-###                if i != j:
-###                    z_b = nuclear_charges[j]
-###                    r_b = coords[j]
-###                    r = np.sqrt(np.dot(r_a - r_b, r_a - r_b))
-###                    for k in range(3):
-###                        for l in range(3):
-###                    # off-diagonal parts
-###                            nuc_contrib[i, k, j, l] = - 3*z_a*z_b*(r_b[k] - r_a[k])*(r_b[l] - r_a[l]) / r**5
-###                            if k == l:
-###                                nuc_contrib[i, k, j, l] += z_a * z_b / r**3
-###
-###                    # add the diagonal contribution
-###                            nuc_contrib[i, k, i, l] += 3*z_a*z_b*(r_b[k] - r_a[k])*(r_b[l] - r_a[l]) / r**5
-###                            if k == l:
-###                                nuc_contrib[i, k, i, l] -= z_a * z_b / r**3
-###
-###
-###        return nuc_contrib.reshape(3*natm, 3*natm)
-
-###    def diagonalize_hessian(self, molecule, basis, rsp_drv=None):
-###        """
-###        Diagonalizes the Hessian matrix to obtain force constants as eigenvalues
-###        (and hence vibrational frequencies) and normal modes as eigenvectors.
-###
-###        :param molecule:
-###            The molecule.
-###        :param basis:
-###            The AO basis set.
-###        :param rsp_drv:
-###            The RPA or TDA driver (for TdhfHessianDriver).
-###
-###        :return:
-###            The vibrational frequencies in atomic units.
-###        """
-###        # compute the Hessian if not done already
-###        if self.hessian is None:
-###            if rsp_drv is None:
-###                self.compute(molecule, basis)
-###            else:
-###                # TdhfHessianDriver inherits this function
-###                self.compute(molecule, basis, rsp_drv)
-###
-###        natm = molecule.number_of_atoms()
-###
-###        # take the square root of the atomic masses, repeat each three times (xyz components)
-###        # then form the direct product matrix
-###        masses_sqrt = np.sqrt(molecule.masses_to_numpy())
-###        masses_repeat = np.repeat(masses_sqrt, 3)
-###        masses_matrix = masses_repeat.reshape(-1, 1) * masses_repeat
-###
-###        # reshape the Hessian as 3Nx3N and mass-weight it
-###        reshaped_hessian = self.hessian.reshape(3*natm, 3*natm)
-###        self.mass_weighted_hessian = reshaped_hessian / masses_matrix
-###
-###        # diagonalize the mass-weighted Hessian
-###        hessian_eigvals, hessian_eigvecs = np.linalg.eigh(self.mass_weighted_hessian)
-###
-###        # the first 6 elements should be close to zero (translation & rotation)
-###        return hessian_eigvals[6:]
-###
-###
-###    def get_hessian(self):
-###        """
-###        Gets the Hessian.
-###
-###        :return:
-###            The Hessian.
-###        """
-###
-###        return self.hessian
-###
-###    def print_geometry(self, molecule):
-###        """
-###        Prints the geometry.
-###
-###        :param molecule:
-###            The molecule.
-###        """
-###
-###        self.ostream.print_block(molecule.get_string())
-###
-###    def print_hessian(self, molecule):
-###        """
-###        Prints the Hessian.
-###
-###        :param molecule:
-###            The molecule.
-###        """
-###
-###        # atom labels
-###        labels = molecule.get_labels()
-###
-###        if self.numerical:
-###            title = 'Numerical '
-###        else:
-###            title = 'Analytical '
-###
-###        # TODO: write the actual print function
-###        return
-###
-###    def print_header(self):
-###        """
-###        Prints Hessian calculation setup details to output stream.
-###        """
-###
-###        self.ostream.print_blank()
-###        self.ostream.print_header(self.flag)
-###        self.ostream.print_header((len(self.flag) + 2) * '=')
-###        self.ostream.print_blank()
-###        self.ostream.flush()

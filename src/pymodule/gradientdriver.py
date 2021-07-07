@@ -73,19 +73,33 @@ class GradientDriver:
         :param method_dict:
             The input dicitonary of method settings group.
         """
-        # Analytical DFT gradient is not implemented yet
-        if 'xcfun' in method_dict:
-            if method_dict['xcfun'] is not None:
-                self.numerical = True
-        if 'dft' in method_dict:
-            key = method_dict['dft'].lower()
-            self.numerical = True if key in ['yes', 'y'] else False
 
         # Numerical gradient?
         if 'numerical' in grad_dict:
             key = grad_dict['numerical'].lower()
             self.numerical = True if key in ['yes', 'y'] else False
 
+        # TODO: Analytical DFT gradient is not implemented yet
+        is_dft = False
+        if 'xcfun' in method_dict:
+            if method_dict['xcfun'] is not None:
+                is_dft = True
+                #self.numerical = True
+        if 'dft' in method_dict:
+            key = method_dict['dft'].lower()
+            #self.numerical = True if key in ['yes', 'y'] else False
+            is_dft = True if key in ['yes', 'y'] else False
+
+        if is_dft and not self.numerical:
+            self.numerical = True
+            warn_msg = '*** Warning: Analytical DFT gradient is not yet implemented.'
+            self.ostream.print_header(warn_msg.ljust(56))
+            warn_msg = '    Gradient will be calculated numerically instead.'
+            self.ostream.print_header(warn_msg.ljust(56))
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        # step size for finite differences
         if 'delta_h' in grad_dict:
             self.delta_h = float(grad_dict['delta_h'])
 

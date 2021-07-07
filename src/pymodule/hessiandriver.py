@@ -24,6 +24,11 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import sys
+from mpi4py import MPI
+
+from .outputstream import OutputStream
+from geometric import normal_modes
 
 class HessianDriver:
     """
@@ -38,12 +43,26 @@ class HessianDriver:
         - hessian: The Hessian.
         - flag: The type of Hessian driver.
         - numerical: Perform numerical Hessian calculation.
+        - numerical_grad: Perform numerical gradient calculation.
+        - delta_h: Nuclear displacement for finite differences.
+        - do_four_point: Perform four-point numerical approximation.
+        - print_vib_analysis: Print vibrational analysis (frequencies and normal modes)
+        - do_print_hessian: Flag for printing the Hessian.
+        - elec_energy: The (total) electronic energy.
+        - temperature: The temperature (in K) used for thermodynamic analysis.
+        - pressure: The pressure (in bar) used for thermodynamic analysis.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes Hessian driver.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
         self.comm = comm
         self.ostream = ostream
@@ -51,12 +70,89 @@ class HessianDriver:
         self.hessian = None
         self.flag = None
         self.numerical = True
+        self.numerical_grad = False
+        self.delta_h = 0.001
         # flag for two-point or four-point approximation
         self.do_four_point = False
+        self.print_vib_analysis = True
+        # flag for printing the Hessian
+        self.do_print_hessian = False
+
+        # Thermodynamics
+        self.elec_energy = 0.0
+        self.temperature = 300
+        self.pressure = 1.0
+
+
+    def update_settings(self, method_dict, freq_dict=None):
+        """
+        Updates settings in HessianDriver.
+
+        :param method_dict:
+            The input dictionary of method settings group.
+        :param freq_dict:
+            The input dictionary of Hessian/frequency settings group.
+        """
+
+        if freq_dict is None:
+            freq_dict = {}
+
+        # check if Hessianis to be calculated numerically
+        if 'numerical' in freq_dict:
+            key = freq_dict['numerical'].lower()
+            self.numerical = True if key in ['yes', 'y'] else False
+            # TODO: analytical Hessian not yet implemented
+            if not self.numerical:
+                self.numerical = True
+                warn_msg = '*** Warning: Analytical Hessian is not yet implemented.'
+                self.ostream.print_header(warn_msg.ljust(56))
+                warn_msg = '    Hessian will be calculated numerically instead.'
+                self.ostream.print_header(warn_msg.ljust(56))
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+        # check if gradient is to be calculated numerically
+        if 'numerical_grad' in freq_dict:
+            key = freq_dict['numerical_grad'].lower()
+            self.numerical_grad = True if key in ['yes', 'y'] else False
+
+        # if gradient is calculated numerically, so is the Hessian
+        if self.numerical_grad:
+            self.numerical = True
+
+        # Analytical DFT gradient/Hessian is not implemented yet
+        if 'xcfun' in method_dict:
+            if method_dict['xcfun'] is not None:
+                self.numerical = True
+                self.numerical_grad = True
+        if 'dft' in method_dict:
+            key = method_dict['dft'].lower()
+            if key in ['yes', 'y']:
+                self.numerical = True
+                self.numerical_grad = True
+
+        # print vibrational analysis (frequencies and normal modes)
+        if 'print_vib_analysis' in freq_dict:
+            key = freq_dict['print_vib_analysis'].lower()
+            self.print_vib_analysis = True if key in ['yes', 'y'] else False
+
+        # print the Hessian (not mass-weighted)
+        if 'do_print_hessian' in freq_dict:
+            key = freq_dict['do_print_hessian'].lower()
+            self.do_print_hessian = True if key in ['yes', 'y'] else False
+
+        if 'temperature' in freq_dict:
+            self.temperature = float(freq_dict['temperature'])
+        if 'pressure' in freq_dict:
+            self.pressure = float(freq_dict['pressure'])
+
+        self.method_dict = dict(method_dict)
+        self.freq_dict = dict(freq_dict)
+
 
     def compute(self, molecule, ao_basis=None, min_basis=None):
         """
-        Performs calculation of numerical gradient.
+        Performs calculation of molecular Hessian.
 
         :param molecule:
             The molecule.
@@ -67,6 +163,29 @@ class HessianDriver:
         """
 
         return
+
+    def vibrational_analysis(self, molecule, ao_basis, filename=None):
+        """
+        Performs vibrational analysis (frequencies and normal modes)
+        based on the molecular Hessian employing the geomeTRIC module.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param filename:
+            Filename where thermodynamic properties are saved by geomeTRIC.
+        """
+
+        # number of atoms, elements, and coordinates
+        natm = molecule.number_of_atoms()
+        elem = molecule.get_labels()
+        coords = molecule.get_coordinates().reshape(natm*3)
+
+        normal_modes.frequency_analysis(coords, hessian_drv.hessian, elem,
+                        energy=self.elec_energy, temperatur=self.temperature,
+                        pressure=self.pressure, outfnm=filename)
+
 
     def hess_nuc_contrib(self, molecule):
         """
@@ -115,26 +234,6 @@ class HessianDriver:
 
         return nuc_contrib.reshape(3*natm, 3*natm)
 
-
-    def get_gradient(self):
-        """
-        Gets the gradient.
-
-        :return:
-            The gradient.
-        """
-
-        return self.gradient
-
-    def print_geometry(self, molecule):
-        """
-        Prints the geometry.
-
-        :param molecule:
-            The molecule.
-        """
-
-        self.ostream.print_block(molecule.get_string())
 
     def diagonalize_hessian(self, molecule, basis, rsp_drv=None):
         """
@@ -223,7 +322,7 @@ class HessianDriver:
 
         for k in range(0, natm, 2):
 
-            valstr = 'Coord. '
+            valstr = '{:15s}'.format('Coord. ')
 
             coord_dict = {0:'(x)', 1:'(y)', 2:'(z)'}
             end = k + 2
@@ -231,7 +330,7 @@ class HessianDriver:
                  end = natm
             for i in range(k,end):
                 for di in range(3):
-                    valstr += '{:>20s}  '.format('     '+str(i+1)+' '+labels[i]+coord_dict[di]+'     ')
+                    valstr += '{:16s}'.format(''+str(i+1)+' '+labels[i]+coord_dict[di]+'')
 
             self.ostream.print_line(valstr)
             self.ostream.print_blank()
@@ -239,15 +338,15 @@ class HessianDriver:
 
             for i in range(natm):
                 for di in range(3):
-                    valstr = '  {:<4s}'.format(str(i+1)+' '+labels[i]+coord_dict[di])
+                    valstr = '  {:7s}'.format(str(i+1)+' '+labels[i]+coord_dict[di])
                     for j in range(k,end):
                         #print("j = %d" % j)
                         for dj in range(3):
-                            valstr += '{:22.12f}'.format(self.hessian[i*3+di,j*3+dj])
+                            valstr += '{:16.8f}'.format(self.hessian[i*3+di,j*3+dj])
                     self.ostream.print_line(valstr)
             self.ostream.print_blank()
             self.ostream.print_blank()
-        self.ostream.print_blank()
+        # self.ostream.print_blank()
         self.ostream.flush()
 
 

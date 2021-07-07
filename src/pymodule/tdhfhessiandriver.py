@@ -30,7 +30,7 @@ import sys
 
 from .molecule import Molecule
 from .tdhfgradientdriver import TdhfGradientDriver
-from .scfhessiandriver import ScfHessianDriver
+from .hessiandriver import HessianDriver
 from .outputstream import OutputStream
 #from .firstorderprop import FirstOrderProperties
 
@@ -40,7 +40,7 @@ from .import_from_pyscf import fock_deriv
 from .import_from_pyscf import eri_deriv
 
 
-class TdhfHessianDriver(ScfHessianDriver):
+class TdhfHessianDriver(HessianDriver):
     """
     Implements the Hessian at the TDHF and CIS levels of theory.
 
@@ -53,7 +53,6 @@ class TdhfHessianDriver(ScfHessianDriver):
 
     Instance variables
         - scf_drv: The SCF driver.
-        - delta_h: The displacement for finite difference.
     """
 
     def __init__(self, scf_drv, comm=None, ostream=None):
@@ -61,58 +60,48 @@ class TdhfHessianDriver(ScfHessianDriver):
         Initializes gradient driver.
         """
 
-        if comm is None:
-            self.comm = MPI.COMM_WORLD
+        super().__init__(comm, ostream)
 
-        if ostream is None:
-            self.ostream = OutputStream(sys.stdout)
-
-        self.flag = 'TDHF Hessian Driver'
-        self.hessian = None
+        self.flag = 'RPA Hessian Driver'
         self.scf_drv = scf_drv
-        self.delta_h = 0.001
-        self.numerical = True #False
-        # flag for two-point or four-point approximation
-        self.do_four_point = False
 
-        # flag for printing the Hessian 
-        self.do_print = False
-
-
-        # Flag for numerical derivative of dipole moment
-        self.dipole_deriv = False
-        self.dipole_gradient = None
-
-    def update_settings(self, method_dict, rsp_dict):
+    def update_settings(self, method_dict, rsp_dict, freq_dict=None, orbrsp_dict=None):
         """
         Updates settings in ScfHessianDriver.
 
-        TODO: Add new gradient settings group?
-
         :param method_dict:
-            The input dicitonary of method settings group.
-        :param response_dict:
-            The input dicitonary of response settings group.
+            The input dictionary of method settings group.
+        :param rsp_dict:
+            The input dictionary of response settings group.
+        :param freq_dict:
+            The input dictionary of Hessian/frequency settings group.
+        :param orbrsp_dict:
+            The input dictionary of orbital response settings group.
         """
-        # Analytical DFT gradient is not implemented yet
-        if 'xcfun' in method_dict:
-            if method_dict['xcfun'] is not None:
-                self.numerical = True
-        if 'dft' in method_dict:
-            key = method_dict['dft'].lower()
-            self.numerical = True if key in ['yes', 'y'] else False
 
-        # TODO: possibly put settings in new input group
-        if 'numerical_grad' in method_dict:
-            key = method_dict['numerical_grad'].lower()
-            self.numerical = True if key in ['yes', 'y'] else False
+        if freq_dict is None:
+            freq_dict = {}
+        if orbrsp_dict is None:
+            orbrsp_dict = {}
 
-        if 'n_state_deriv' in rsp_dict:
+        super().update_settings(method_dict, freq_dict)
+
+        if 'state_deriv_index' in freq_dict:
             # user gives '1' for first excited state, but internal index is 0
-            self.n_state_deriv = int(rsp_dict['n_state_deriv']) - 1
+            self.state_deriv_index = int(freq_dict['state_deriv_index']) - 1
+
+        if 'tamm_dancoff' in rsp_dict:
+            key = rsp_dict['tamm_dancoff'].lower()
+            tamm_dancoff = True if key in ['yes', 'y'] else False
+
+        if tamm_dancoff:
+            self.flag = 'TDA Hessian Driver'
+
+            
 
         self.rsp_dict = dict(rsp_dict)
-        self.method_dict = dict(method_dict)
+        self.orbrsp_dict = dict(orbrsp_dict)
+
 
     def compute(self, molecule, ao_basis, rsp_drv, min_basis=None):
         """
@@ -138,7 +127,7 @@ class TdhfHessianDriver(ScfHessianDriver):
 
 
         # print Hessian
-        if self.do_print is True:
+        if self.do_print_hessian is True:
             self.print_geometry(molecule)
             self.ostream.print_blank()
             self.print_hessian(molecule)
@@ -152,38 +141,13 @@ class TdhfHessianDriver(ScfHessianDriver):
 ###    def compute_analytical(self, molecule, ao_basis):
 ###        """
 ###        Computes the analytical nuclear Hessian.
-###        So far only for restricted Hartree-Fock with PySCF integral derivatives...
 ###
 ###        :param molecule:
 ###            The molecule.
 ###        :param ao_basis:
 ###            The AO basis set.
 ###        """
-###        natm = molecule.number_of_atoms()
-###        nocc = molecule.number_of_alpha_electrons()
-###        mo = self.scf_drv.scf_tensors['C']
-###        mo_occ = mo[:, :nocc].copy()
-###        one_pdm_ao = self.scf_drv.scf_tensors['D_alpha']
-###        mo_energies = self.scf_drv.scf_tensors['E']
-###        eocc = mo_energies[:nocc]
-###        eo_diag = np.diag(eocc)
-###        epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
-###
-###        # analytical gradient
-###        self.gradient = np.zeros((natm, 3))
-###
-###        for i in range(natm):
-###            d_ovlp = overlap_deriv(molecule, ao_basis, i)
-###            d_fock = fock_deriv(molecule, ao_basis, one_pdm_ao, i)
-###            d_eri = eri_deriv(molecule, ao_basis, i)
-###
-###            self.gradient[i] += ( 2.0*np.einsum('mn,xmn->x', one_pdm_ao, d_fock)
-###                            +2.0*np.einsum('mn,xmn->x', epsilon_dm_ao, d_ovlp)
-###                            -2.0*np.einsum('mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
-###                            +1.0*np.einsum('mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
-###                            )
-###
-###        self.gradient += self.grad_nuc_contrib(molecule)
+###        return
 
     def compute_numerical(self, molecule, ao_basis, rsp_drv, min_basis=None):
         """
@@ -199,6 +163,19 @@ class TdhfHessianDriver(ScfHessianDriver):
             The minimal AO basis set.
         """
 
+        # settings dictionary for gradient driver
+        grad_dict = dict(self.freq_dict)
+        if self.numerical_grad:
+            grad_dict['numerical'] = 'yes'
+            warn_msg = '*** Warning: Numerical Hessian will be calculated based on numerical gradient.'
+            self.ostream.print_header(warn_msg.ljust(56))
+            warn_msg = '  This takes a long time and has limited accuracy.'
+            self.ostream.print_header(warn_msg.ljust(56))
+            self.ostream.print_blank()
+            self.ostream.flush()
+        else:
+            grad_dict['numerical'] = 'no'
+
         scf_ostream_state = self.scf_drv.ostream.state
         self.scf_drv.ostream.state = False
 
@@ -213,11 +190,10 @@ class TdhfHessianDriver(ScfHessianDriver):
 
         # gradient driver
         grad_drv = TdhfGradientDriver(self.scf_drv, self.scf_drv.comm, self.scf_drv.ostream)
-        grad_drv.update_settings(self.rsp_dict, self.method_dict)
+        grad_drv.update_settings(grad_dict, self.rsp_dict, self.orbrsp_dict, self.method_dict)
 
-        # Hessian
+        # Hessian in temporary variable
         hessian = np.zeros((natm, 3, natm, 3))
-
 
         if not self.do_four_point:
             for i in range(molecule.number_of_atoms()):
@@ -230,7 +206,6 @@ class TdhfHessianDriver(ScfHessianDriver):
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
                     grad_drv.compute(new_mol, ao_basis, rsp_drv, rsp_results)
-                    #print("Gradient[%d, %d] =" % (i, d), self.grad_drv.print_gradient(molecule))
                     grad_plus = grad_drv.get_gradient()
 
 
@@ -242,7 +217,6 @@ class TdhfHessianDriver(ScfHessianDriver):
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
                     grad_drv.compute(new_mol, ao_basis, rsp_drv, rsp_results)
-                    #print("Gradient[%d, %d] =" % (i, d), self.grad_drv.print_gradient(molecule))
                     grad_minus = grad_drv.get_gradient()
 
                     coords[i, d] += self.delta_h
@@ -303,8 +277,12 @@ class TdhfHessianDriver(ScfHessianDriver):
         # reshaped Hessian as member variable
         self.hessian = hessian.reshape(3*natm, 3*natm)
 
-        self.ostream.print_blank()
+        #self.ostream.print_blank()
 
         self.scf_drv.compute(molecule, ao_basis, min_basis)
+        rsp_drv.is_converged = False
+        rsp_results = rsp_drv.compute(molecule, ao_basis, self.scf_drv.scf_tensors)
+        self.elec_energy = (self.scf_drv.get_scf_energy()
+                           + rsp_results['eigenvalues'][self.state_deriv_index])
         self.scf_drv.ostream.state = scf_ostream_state
 
