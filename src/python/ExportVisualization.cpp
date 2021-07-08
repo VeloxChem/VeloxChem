@@ -63,49 +63,75 @@ export_visualization(py::module& m)
     PyClass<CCubicGrid>(m, "CubicGrid")
         .def(py::init<>())
         .def(py::init<const std::vector<double>&, const std::vector<double>&, const std::vector<int32_t>>())
-        .def("x_origin", &CCubicGrid::originX)
-        .def("y_origin", &CCubicGrid::originY)
-        .def("z_origin", &CCubicGrid::originZ)
-        .def("x_step_size", &CCubicGrid::stepSizeX)
-        .def("y_step_size", &CCubicGrid::stepSizeY)
-        .def("z_step_size", &CCubicGrid::stepSizeZ)
-        .def("x_num_points", &CCubicGrid::numPointsX)
-        .def("y_num_points", &CCubicGrid::numPointsY)
-        .def("z_num_points", &CCubicGrid::numPointsZ)
-        .def("set_values", &CCubicGrid::setValues)
-        .def("values_to_numpy", &CCubicGrid_values_to_numpy);
+        .def("x_origin", &CCubicGrid::originX, "Gets X coordinate of the origin.")
+        .def("y_origin", &CCubicGrid::originY, "Gets Y coordinate of the origin.")
+        .def("z_origin", &CCubicGrid::originZ, "Gets Z coordinate of the origin.")
+        .def("x_step_size", &CCubicGrid::stepSizeX, "Gets step size in X direction.")
+        .def("y_step_size", &CCubicGrid::stepSizeY, "Gets step size in Y direction.")
+        .def("z_step_size", &CCubicGrid::stepSizeZ, "Gets step size in Z direction.")
+        .def("x_num_points", &CCubicGrid::numPointsX, "Gets number of points in X direction.")
+        .def("y_num_points", &CCubicGrid::numPointsY, "Gets number of points in Y direction.")
+        .def("z_num_points", &CCubicGrid::numPointsZ, "Gets number of points in Z direction.")
+        .def("set_values", &CCubicGrid::setValues, "Sets the cubic grid values.", "vals"_a)
+        .def("values_to_numpy", &CCubicGrid_values_to_numpy, "Convertis cubic grid values to 3D numpy array.");
 
     // CVisualizationDriver class
 
     PyClass<CVisualizationDriver>(m, "VisualizationDriver")
         .def(py::init(&vlx_general::create<CVisualizationDriver>), "comm"_a = py::none())
-        .def("get_rank", &CVisualizationDriver::getRank)
+        .def("get_rank", &CVisualizationDriver::getRank, "Gets rank of the MPI process.")
         .def(
             "compute",
             vlx_general::
                 overload_cast_<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CMolecularOrbitals&, const int32_t, const std::string&>()(
                     &CVisualizationDriver::compute, py::const_),
-            "Compute molecular orbital values on cubic grid",
+            "Computes molecular orbital values at cubic grid points.",
             "grid"_a,
             "molecule"_a,
             "basis"_a,
-            "mos"_a,
-            "mo_idx"_a,
-            "mo_spin"_a)
+            "molorb"_a,
+            "moidx"_a,
+            "mospin"_a)
         .def("compute",
              vlx_general::
                  overload_cast_<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CAODensityMatrix&, const int32_t, const std::string&>()(
                      &CVisualizationDriver::compute, py::const_),
-             "Compute density values on cubic grid",
+             "Computes density values at cubic grid points.",
              "grid"_a,
              "molecule"_a,
              "basis"_a,
-             "ao_density"_a,
-             "idx"_a,
-             "spin"_a)
-        .def("get_mo", &CVisualizationDriver::getMO)
-        .def("get_density", &CVisualizationDriver::getDensity)
-        .def("get_two_particle_density", &CVisualizationDriver::getTwoParticleDensity);
+             "density"_a,
+             "denidx"_a,
+             "denspin"_a)
+        .def("get_mo",
+             &CVisualizationDriver::getMO,
+             "Computes molecular orbital at given coordinates.",
+             "coords"_a,
+             "molecule"_a,
+             "basis"_a,
+             "mo"_a,
+             "moidx"_a,
+             "mospin"_a)
+        .def("get_density",
+             &CVisualizationDriver::getDensity,
+             "Computes densities at given coordinates.",
+             "coords"_a,
+             "molecule"_a,
+             "basis"_a,
+             "density"_a,
+             "denidx"_a,
+             "denspin"_a)
+        .def("get_two_particle_density",
+             &CVisualizationDriver::getTwoParticleDensity,
+             "Computes two-particle density Gamma(x1,x2;x1,x2) at given coordinates.",
+             "coords_1"_a,
+             "coords_2"_a,
+             "molecule"_a,
+             "basis"_a,
+             "density"_a,
+             "denidx"_a,
+             "spin_1"_a,
+             "spin_2"_a);
 }
 
 }  // namespace vlx_visualization
