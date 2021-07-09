@@ -61,6 +61,7 @@ namespace py = pybind11;
 using namespace py::literals;
 
 namespace vlx_oneints {  // vlx_oneints namespace
+
 // Exports classes/functions in src/oneints to python
 
 void
@@ -68,42 +69,48 @@ export_oneints(py::module& m)
 {
     // COverlapMatrix class
 
-    auto py_overlap_matrix = bind_operator_matrix<COverlapMatrix>(m, "OverlapMatrix");
-    py_overlap_matrix.def("get_ortho_matrix",
-                          &COverlapMatrix::getOrthogonalizationMatrix,
-                          "Get orthogonalization matrix. Use Lowdin symmetric orthogonalization with no linear dependencies. Use canonical "
-                          "orthogonalization otherwise.",
-                          "threshold"_a);
+    bind_operator_matrix<COverlapMatrix>(m, "OverlapMatrix")
+        .def("get_ortho_matrix",
+             &COverlapMatrix::getOrthogonalizationMatrix,
+             "Gets Löwdin symmetric orthogonalization matrix if overalp matrix eigenvalues is linearly independent, or canonical orthogonalization "
+             "matrix if overlap matrix eigenvalues is linearly dependent.",
+             "threshold"_a);
 
     // COverlapIntegralsDriver class
 
-    auto py_ovl_driver = bind_integrals_driver<COverlapIntegralsDriver>(m, "OverlapIntegralsDriver", "overlap");
+    bind_integrals_driver<COverlapIntegralsDriver>(m, "OverlapIntegralsDriver", "overlap");
 
     // CKineticEnergyMatrix class
 
-    auto py_kinetic_matrix = bind_operator_matrix<CKineticEnergyMatrix>(m, "KineticEnergyMatrix");
-    py_kinetic_matrix.def("get_energy", &CKineticEnergyMatrix::getKineticEnergy);
+    bind_operator_matrix<CKineticEnergyMatrix>(m, "KineticEnergyMatrix")
+        .def("get_energy",
+             &CKineticEnergyMatrix::getKineticEnergy,
+             "Computes kinetic energy for specific AO density matrix.",
+             "aoDensityMatrix"_a,
+             "iDensityMatrix"_a);
 
     // CKineticEnergyIntegralsDriver class
 
-    auto py_kin_driver = bind_integrals_driver<CKineticEnergyIntegralsDriver>(m, "KineticEnergyIntegralsDriver", "kinetic energy");
+    bind_integrals_driver<CKineticEnergyIntegralsDriver>(m, "KineticEnergyIntegralsDriver", "kinetic energy");
 
     // CNuclearPotentialMatrix class
 
-    auto py_npot_matrix = bind_operator_matrix<CNuclearPotentialMatrix>(m, "NuclearPotentialMatrix");
-    py_npot_matrix
+    bind_operator_matrix<CNuclearPotentialMatrix>(m, "NuclearPotentialMatrix")
         .def(
             "reduce_sum",
             [](CNuclearPotentialMatrix& obj, int32_t rank, int32_t nodes, py::object py_comm) -> void {
                 auto comm = vlx_general::get_mpi_comm(py_comm);
                 obj.reduce_sum(rank, nodes, *comm);
             },
-            "Sum-reduce nuclear potential matrix object from all MPI ranks within the communicator into nuclear potential matrix object on "
-            "master node.",
+            "Performs reduce_sum for NuclearPotentialMatrix object.",
             "rank"_a,
             "nodes"_a,
-            "comm"_a)
-        .def("get_energy", &CNuclearPotentialMatrix::getNuclearPotentialEnergy);
+            "py_comm"_a)
+        .def("get_energy",
+             &CNuclearPotentialMatrix::getNuclearPotentialEnergy,
+             "Computes nuclear potential energy for specific AO density matrix.",
+             "aoDensityMatrix"_a,
+             "iDensityMatrix"_a);
 
     // CNuclearPotentialIntegralsDriver class
 
@@ -111,20 +118,20 @@ export_oneints(py::module& m)
         .def(py::init(&vlx_general::create<CNuclearPotentialIntegralsDriver>), "comm"_a = py::none())
         .def("compute",
              vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&>()(&CNuclearPotentialIntegralsDriver::compute, py::const_),
-             "Compute AO-basis nuclear potential integrals for given molecule and basis",
+             "Computes AO-basis nuclear potential integrals for given molecule and basis",
              "molecule"_a,
              "basis"_a)
         .def("compute",
              vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&, const CMolecule&>()(&CNuclearPotentialIntegralsDriver::compute,
                                                                                                        py::const_),
-             "Compute AO-basis nuclear potential integrals for given molecule and basis, using charges from the second molecule object as sources",
+             "Computes AO-basis nuclear potential integrals for given molecule and basis set, using charges from the second molecule.",
              "molecule"_a,
              "basis"_a,
              "charges"_a)
         .def("compute",
              vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const CMolecule&>()(
                  &CNuclearPotentialIntegralsDriver::compute, py::const_),
-             "Compute AO-basis nuclear potential integrals for given molecule and bases, using charges from the second molecule object as sources",
+             "Computes AO-basis nuclear potential integrals for given molecule and two basis sets, using charges from the second molecule.",
              "molecule"_a,
              "bra_basis"_a,
              "ket_basis"_a,
@@ -132,7 +139,7 @@ export_oneints(py::module& m)
         .def("compute",
              vlx_general::overload_cast_<const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecule&>()(
                  &CNuclearPotentialIntegralsDriver::compute, py::const_),
-             "Compute AO-basis nuclear potential integrals for two molecules in given basis, using charges from the third molecule object as sources",
+             "Computes AO-basis nuclear potential integrals for two molecules in given basis set, using charges from the third molecule.",
              "bra_molecule"_a,
              "ket_molecule"_a,
              "basis"_a,
@@ -140,23 +147,24 @@ export_oneints(py::module& m)
         .def("compute",
              vlx_general::overload_cast_<const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const CMolecule&>()(
                  &CNuclearPotentialIntegralsDriver::compute, py::const_),
-             "Compute AO-basis nuclear potential integrals for two molecules, each with its own basis. Use the charges from the third molecule "
-             "object as sources",
+             "Computes AO-basis nuclear potential integrals for two molecules, each with its own basis set. Use the charges from the third molecule.",
              "bra_molecule"_a,
              "ket_molecule"_a,
              "bra_basis"_a,
              "ket_basis"_a,
              "charges"_a)
-        .def("compute",
-             [](const CNuclearPotentialIntegralsDriver&        obj,
-                const CMolecule&                               molecule,
-                const CMolecularBasis&                         basis,
-                const py::array_t<double>&                     charges,
-                const py::array_t<double, py::array::f_style>& coordinates) -> CNuclearPotentialMatrix {
-                 auto chg = vlx_general::numpy_to_memblock(charges);
-                 auto xyz = vlx_general::numpy_fstyle_to_memblock2d(coordinates);
-                 return obj.compute(molecule, basis, chg, xyz);
-             });
+        .def(
+            "compute",
+            [](const CNuclearPotentialIntegralsDriver&        obj,
+               const CMolecule&                               molecule,
+               const CMolecularBasis&                         basis,
+               const py::array_t<double>&                     charges,
+               const py::array_t<double, py::array::f_style>& coordinates) -> CNuclearPotentialMatrix {
+                auto chg = vlx_general::numpy_to_memblock(charges);
+                auto xyz = vlx_general::numpy_fstyle_to_memblock2d(coordinates);
+                return obj.compute(molecule, basis, chg, xyz);
+            },
+            "Computes AO-basis nuclear potential integrals for given molecule and basis set, using external charges and coordinates.");
 
     // CElectricDipoleMatrix class
 
@@ -171,28 +179,30 @@ export_oneints(py::module& m)
              "y_0"_a,
              "z_0"_a)
         .def(py::init<const CElectricDipoleMatrix&>())
-        .def_property("origin",
-                      &CElectricDipoleMatrix::getOriginCoordinates,
-                      vlx_general::overload_cast_<const std::array<double, 3>&>()(&CElectricDipoleMatrix::setOriginCoordinates))
         .def("__str__", &CElectricDipoleMatrix::getString)
+        .def_property("origin", &CElectricDipoleMatrix::getOriginCoordinates, &CElectricDipoleMatrix::setOriginCoordinates)
         .def(
             "to_numpy",
             [](const CElectricDipoleMatrix& obj) {
                 return std::array<py::array_t<double>, 3>{
                     {matrix_to_numpy(obj, cartesians::X), matrix_to_numpy(obj, cartesians::Y), matrix_to_numpy(obj, cartesians::Z)}};
             },
-            "Return a list of NumPy arrays holding the components of the electric dipole moment integrals")
-        .def("x_to_numpy", &matrix_to_numpy<CElectricDipoleMatrix, cartesians::X>)
-        .def("y_to_numpy", &matrix_to_numpy<CElectricDipoleMatrix, cartesians::Y>)
-        .def("z_to_numpy", &matrix_to_numpy<CElectricDipoleMatrix, cartesians::Z>)
+            "Converts the Cartesian components of ElectricDipoleMatrix object to a list of numpy arrays.")
+        .def("x_to_numpy",
+             &matrix_to_numpy<CElectricDipoleMatrix, cartesians::X>,
+             "Converts the X component of ElectricDipoleMatrix object to numpy array.")
+        .def("y_to_numpy",
+             &matrix_to_numpy<CElectricDipoleMatrix, cartesians::Y>,
+             "Converts the Y component of ElectricDipoleMatrix object to numpy array.")
+        .def("z_to_numpy",
+             &matrix_to_numpy<CElectricDipoleMatrix, cartesians::Z>,
+             "Converts the Z component of ElectricDipoleMatrix object to numpy array.")
         .def(py::self == py::self);
 
     // CElectricDipoleIntegralsDriver class
 
-    auto py_dip_driver = bind_integrals_driver<CElectricDipoleIntegralsDriver>(m, "ElectricDipoleIntegralsDriver", "electric dipole");
-    py_dip_driver.def_property("origin",
-                               &CElectricDipoleIntegralsDriver::getElectricDipoleOrigin,
-                               vlx_general::overload_cast_<const std::array<double, 3>&>()(&CElectricDipoleIntegralsDriver::setElectricDipoleOrigin));
+    bind_integrals_driver<CElectricDipoleIntegralsDriver>(m, "ElectricDipoleIntegralsDriver", "electric dipole")
+        .def_property("origin", &CElectricDipoleIntegralsDriver::getElectricDipoleOrigin, &CElectricDipoleIntegralsDriver::setElectricDipoleOrigin);
 
     // CLinearMomentumMatrix class
 
@@ -208,15 +218,21 @@ export_oneints(py::module& m)
                 return std::array<py::array_t<double>, 3>{
                     {matrix_to_numpy(obj, cartesians::X), matrix_to_numpy(obj, cartesians::Y), matrix_to_numpy(obj, cartesians::Z)}};
             },
-            "Return a list of NumPy arrays holding the components of the electric dipole moment integrals")
-        .def("x_to_numpy", &matrix_to_numpy<CLinearMomentumMatrix, cartesians::X>)
-        .def("y_to_numpy", &matrix_to_numpy<CLinearMomentumMatrix, cartesians::Y>)
-        .def("z_to_numpy", &matrix_to_numpy<CLinearMomentumMatrix, cartesians::Z>)
+            "Converts the Cartesian components of LinearMomentumMatrix object to a list of numpy arrays.")
+        .def("x_to_numpy",
+             &matrix_to_numpy<CLinearMomentumMatrix, cartesians::X>,
+             "Converts the X component of LinearMomentumMatrix object to numpy array.")
+        .def("y_to_numpy",
+             &matrix_to_numpy<CLinearMomentumMatrix, cartesians::Y>,
+             "Converts the Y component of LinearMomentumMatrix object to numpy array.")
+        .def("z_to_numpy",
+             &matrix_to_numpy<CLinearMomentumMatrix, cartesians::Z>,
+             "Converts the Z component of LinearMomentumMatrix object to numpy array.")
         .def(py::self == py::self);
 
     // CLinearMomentumIntegralsDriver class
 
-    auto py_lmom_driver = bind_integrals_driver<CLinearMomentumIntegralsDriver>(m, "LinearMomentumIntegralsDriver", "linear momentum");
+    bind_integrals_driver<CLinearMomentumIntegralsDriver>(m, "LinearMomentumIntegralsDriver", "linear momentum");
 
     // CAngularMomentumMatrix class
 
@@ -231,28 +247,31 @@ export_oneints(py::module& m)
              "z_0"_a)
         .def(py::init<const std::array<CDenseMatrix, 3>&, const std::array<double, 3>&>(), "matrices"_a, "origin"_a)
         .def(py::init<const CAngularMomentumMatrix&>())
-        .def_property("origin",
-                      &CAngularMomentumMatrix::getOriginCoordinates,
-                      vlx_general::overload_cast_<const std::array<double, 3>&>()(&CAngularMomentumMatrix::setOriginCoordinates))
         .def("__str__", &CAngularMomentumMatrix::getString)
+        .def_property("origin", &CAngularMomentumMatrix::getOriginCoordinates, &CAngularMomentumMatrix::setOriginCoordinates)
         .def(
             "to_numpy",
             [](const CAngularMomentumMatrix& obj) {
                 return std::array<py::array_t<double>, 3>{
                     {matrix_to_numpy(obj, cartesians::X), matrix_to_numpy(obj, cartesians::Y), matrix_to_numpy(obj, cartesians::Z)}};
             },
-            "Return a list of NumPy arrays holding the components of the electric dipole moment integrals")
-        .def("x_to_numpy", &matrix_to_numpy<CAngularMomentumMatrix, cartesians::X>)
-        .def("y_to_numpy", &matrix_to_numpy<CAngularMomentumMatrix, cartesians::Y>)
-        .def("z_to_numpy", &matrix_to_numpy<CAngularMomentumMatrix, cartesians::Z>)
+            "Converts the Cartesian components of AngularMomentumMatrix object to a list of numpy arrays.")
+        .def("x_to_numpy",
+             &matrix_to_numpy<CAngularMomentumMatrix, cartesians::X>,
+             "Converts the X component of AngularMomentumMatrix object to numpy array.")
+        .def("y_to_numpy",
+             &matrix_to_numpy<CAngularMomentumMatrix, cartesians::Y>,
+             "Converts the Y component of AngularMomentumMatrix object to numpy array.")
+        .def("z_to_numpy",
+             &matrix_to_numpy<CAngularMomentumMatrix, cartesians::Z>,
+             "Converts the Z component of AngularMomentumMatrix object to numpy array.")
         .def(py::self == py::self);
 
     // CAngularMomentumIntegralsDriver class
-    auto py_amom_driver = bind_integrals_driver<CAngularMomentumIntegralsDriver>(m, "AngularMomentumIntegralsDriver", "angular momentum");
-    py_amom_driver.def_property(
-        "origin",
-        &CAngularMomentumIntegralsDriver::getAngularMomentumOrigin,
-        vlx_general::overload_cast_<const std::array<double, 3>&>()(&CAngularMomentumIntegralsDriver::setAngularMomentumOrigin));
+
+    bind_integrals_driver<CAngularMomentumIntegralsDriver>(m, "AngularMomentumIntegralsDriver", "angular momentum")
+        .def_property(
+            "origin", &CAngularMomentumIntegralsDriver::getAngularMomentumOrigin, &CAngularMomentumIntegralsDriver::setAngularMomentumOrigin);
 
     // CElectricFieldMatrix class
 
@@ -268,10 +287,16 @@ export_oneints(py::module& m)
                 return std::array<py::array_t<double>, 3>{
                     {matrix_to_numpy(obj, cartesians::X), matrix_to_numpy(obj, cartesians::Y), matrix_to_numpy(obj, cartesians::Z)}};
             },
-            "Return a list of NumPy arrays holding the components of the electric dipole moment integrals")
-        .def("x_to_numpy", &matrix_to_numpy<CElectricFieldMatrix, cartesians::X>)
-        .def("y_to_numpy", &matrix_to_numpy<CElectricFieldMatrix, cartesians::Y>)
-        .def("z_to_numpy", &matrix_to_numpy<CElectricFieldMatrix, cartesians::Z>)
+            "Converts the Cartesian components of ElectricFieldMatrix object to a list of numpy arrays.")
+        .def("x_to_numpy",
+             &matrix_to_numpy<CElectricFieldMatrix, cartesians::X>,
+             "Converts the X component of ElectricFieldMatrix object to numpy array.")
+        .def("y_to_numpy",
+             &matrix_to_numpy<CElectricFieldMatrix, cartesians::Y>,
+             "Converts the Y component of ElectricFieldMatrix object to numpy array.")
+        .def("z_to_numpy",
+             &matrix_to_numpy<CElectricFieldMatrix, cartesians::Z>,
+             "Converts the Z component of ElectricFieldMatrix object to numpy array.")
         .def(py::self == py::self);
 
     // CElectricFieldIntegralsDriver class
@@ -281,7 +306,7 @@ export_oneints(py::module& m)
         .def("compute",
              vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&, const double, const double, const double>()(
                  &CElectricFieldIntegralsDriver::compute, py::const_),
-             "Compute AO-basis electric field integrals for given molecule and basis, at given point",
+             "Compute AO-basis electric field integrals for given molecule and basis set, at given point.",
              "molecule"_a,
              "basis"_a,
              "X"_a,
@@ -291,7 +316,7 @@ export_oneints(py::module& m)
             "compute",
             vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const double, const double, const double>()(
                 &CElectricFieldIntegralsDriver::compute, py::const_),
-            "Compute AO-basis electric field integrals for given molecule and bases, at given point",
+            "Compute AO-basis electric field integrals for given molecule and two basis sets, at given point.",
             "molecule"_a,
             "bra_basis"_a,
             "ket_basis"_a,
@@ -301,7 +326,7 @@ export_oneints(py::module& m)
         .def("compute",
              vlx_general::overload_cast_<const CMolecule&, const CMolecule&, const CMolecularBasis&, const double, const double, const double>()(
                  &CElectricFieldIntegralsDriver::compute, py::const_),
-             "Compute AO-basis electric field integrals for two molecules in given basis, at given point",
+             "Compute AO-basis electric field integrals for two molecules in given basis set, at given point.",
              "bra_molecule"_a,
              "ket_molecule"_a,
              "basis"_a,
@@ -316,7 +341,7 @@ export_oneints(py::module& m)
                                          const double,
                                          const double,
                                          const double>()(&CElectricFieldIntegralsDriver::compute, py::const_),
-             "Compute AO-basis electric field integrals for two molecules, each with its own basis, at given point",
+             "Compute AO-basis electric field integrals for two molecules, each with its own basis set, at given point.",
              "bra_molecule"_a,
              "ket_molecule"_a,
              "bra_basis"_a,
@@ -350,10 +375,13 @@ Compute electric field integrals for a collection of point dipoles.
 :param basis:
     The basis set.
 :param dipoles:
-    Values of the point dipoles. This is a NumpPy array of shape (N,3), i.e. [..., [dx_i, dy_i, dz_i], ...]
+    Values of the point dipoles. This is a numpy array of shape (N,3), i.e. [..., [dx_i, dy_i, dz_i], ...]
 :param coordinates:
-    Coordinates of the point dipoles. This is a NumpPy array of shape (N,3), i.e. [..., [x_i, y_i, z_i], ...]
-)pbdoc",
+    Coordinates of the point dipoles. This is a numpy array of shape (N,3), i.e. [..., [x_i, y_i, z_i], ...]
+
+:return:
+    The electric field matrix.
+            )pbdoc",
             "molecule"_a,
             "basis"_a,
             "dipoles"_a,
@@ -364,7 +392,7 @@ Compute electric field integrals for a collection of point dipoles.
             [](const CElectricFieldIntegralsDriver& obj, const CMolecule& mol, const CMolecularBasis& bas, const std::array<double, 3>& point) {
                 return obj.compute(mol, bas, point[0], point[1], point[2]);
             },
-            "Compute AO-basis electric field integrals for given molecule and basis, at given point",
+            "Compute AO-basis electric field integrals for given molecule and basis set, at given point.",
             "molecule"_a,
             "basis"_a,
             "point"_a)
@@ -375,7 +403,7 @@ Compute electric field integrals for a collection of point dipoles.
                const CMolecularBasis&               bra,
                const CMolecularBasis&               ket,
                const std::array<double, 3>&         point) { return obj.compute(mol, bra, ket, point[0], point[1], point[2]); },
-            "Compute AO-basis electric field integrals for given molecule and bases, at given point",
+            "Compute AO-basis electric field integrals for given molecule and two basis sets, at given point.",
             "molecule"_a,
             "bra_basis"_a,
             "ket_basis"_a,
@@ -387,7 +415,7 @@ Compute electric field integrals for a collection of point dipoles.
                const CMolecule&                     ket_mol,
                const CMolecularBasis&               bas,
                const std::array<double, 3>&         point) { return obj.compute(bra_mol, ket_mol, bas, point[0], point[1], point[2]); },
-            "Compute AO-basis electric field integrals for two molecules in given basis, at given point",
+            "Compute AO-basis electric field integrals for two molecules in given basis set, at given point.",
             "bra_molecule"_a,
             "ket_molecule"_a,
             "basis"_a,
@@ -400,11 +428,12 @@ Compute electric field integrals for a collection of point dipoles.
                const CMolecularBasis&               bra,
                const CMolecularBasis&               ket,
                const std::array<double, 3>&         point) { return obj.compute(bra_mol, ket_mol, bra, ket, point[0], point[1], point[2]); },
-            "Compute AO-basis electric field integrals for two molecules, each with its own basis, at given point",
+            "Compute AO-basis electric field integrals for two molecules, each with its own basis set, at given point.",
             "bra_molecule"_a,
             "ket_molecule"_a,
             "bra_basis"_a,
             "ket_basis"_a,
             "point"_a);
 }
+
 }  // namespace vlx_oneints

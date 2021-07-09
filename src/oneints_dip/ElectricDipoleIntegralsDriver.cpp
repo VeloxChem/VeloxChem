@@ -70,16 +70,6 @@ CElectricDipoleIntegralsDriver::~CElectricDipoleIntegralsDriver()
 }
 
 void
-CElectricDipoleIntegralsDriver::setElectricDipoleOrigin(const double xOrigin, const double yOrigin, const double zOrigin)
-{
-    _xOrigin = xOrigin;
-
-    _yOrigin = yOrigin;
-
-    _zOrigin = zOrigin;
-}
-
-void
 CElectricDipoleIntegralsDriver::setElectricDipoleOrigin(const std::array<double, 3>& origin)
 {
     _xOrigin = origin[0];
