@@ -38,11 +38,11 @@
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
+#include "ExportOrbData.hpp"
 #include "FockMatrixType.hpp"
 #include "MOIntsBatch.hpp"
 #include "MOIntsType.hpp"
 #include "ScreeningContainer.hpp"
-#include "ExportOrbData.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -88,6 +88,16 @@ CAOFockMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
     return std::make_shared<CAOFockMatrix>(fmat, types, factors, ids);
 }
 
+// Helper function for reduce_sum CAOFockMatrix object
+
+static void
+CAOFockMatrix_reduce_sum(CAOFockMatrix& self, int32_t rank, int32_t nodes, py::object py_comm)
+{
+    auto comm = vlx_general::get_mpi_comm(py_comm);
+
+    self.reduce_sum(rank, nodes, *comm);
+}
+
 // Helper function for exporting CElectronRepulsionIntegralsDriver.computeInMemory
 
 static void
@@ -121,16 +131,6 @@ CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegra
     self.computeInMemory(molecule, basis, eri.mutable_data());
 }
 
-// Helper function for reduce_sum CAOFockMatrix object
-
-static void
-CAOFockMatrix_reduce_sum(CAOFockMatrix& self, int32_t rank, int32_t nodes, py::object py_comm)
-{
-    auto comm = vlx_general::get_mpi_comm(py_comm);
-
-    self.reduce_sum(rank, nodes, *comm);
-}
-
 // Helper function for converting CMOIntsBatch to numpy array
 
 static py::array_t<double>
@@ -143,18 +143,6 @@ static py::array_t<double>
 CMOIntsBatch_to_numpy_2(const CMOIntsBatch& self, const CTwoIndexes& iGeneratorPair)
 {
     return vlx_general::pointer_to_numpy(self.getBatch(iGeneratorPair), self.getNumberOfRows(), self.getNumberOfColumns());
-}
-
-static py::array_t<double>
-CMOIntsBatchXY_to_numpy(const CMOIntsBatch& self, const int32_t iBatch)
-{
-    return vlx_general::pointer_to_numpy(self.getBatchXY(iBatch), self.getNumberOfRows(), self.getNumberOfColumns());
-}
-
-static py::array_t<double>
-CMOIntsBatchYX_to_numpy(const CMOIntsBatch& self, const int32_t iBatch)
-{
-    return vlx_general::pointer_to_numpy(self.getBatchYX(iBatch), self.getNumberOfColumns(), self.getNumberOfRows());
 }
 
 // Helper function for collecting CMOIntsBatch on global master node
@@ -267,6 +255,7 @@ export_twoints(py::module& m)
         .value("unrestjkx", fockmat::unrestjkx);
 
     // ericut enum class
+
     // clang-format off
     py::enum_<ericut>(m, "ericut")
         .value("qq", ericut::qq)
@@ -299,63 +288,64 @@ export_twoints(py::module& m)
         .def(py::init<const CAOFockMatrix&>())
         .def(py::init(&CAOFockMatrix_from_numpy_list))
         .def("__str__", &CAOFockMatrix::getString)
-        .def("to_numpy", &CAOFockMatrix_to_numpy)
-        .def("alpha_to_numpy", &CAOFockMatrix_alpha_to_numpy)
-        .def("beta_to_numpy", &CAOFockMatrix_beta_to_numpy)
-        .def("is_closed_shell", &CAOFockMatrix::isClosedShell)
-        .def("number_of_fock_matrices", &CAOFockMatrix::getNumberOfFockMatrices)
+        .def("to_numpy", &CAOFockMatrix_to_numpy, "Converts alpha AOFockMatrix to numpy array.", "iFockMatrix"_a)
+        .def("alpha_to_numpy", &CAOFockMatrix_alpha_to_numpy, "Converts alpha AOFockMatrix to numpy array.", "iFockMatrix"_a)
+        .def("beta_to_numpy", &CAOFockMatrix_beta_to_numpy, "Converts beta AOFockMatrix to numpy array.", "iFockMatrix"_a)
+        .def("is_closed_shell", &CAOFockMatrix::isClosedShell, "Checks if AO Fock matrix is of closed-shell type.")
+        .def("number_of_fock_matrices", &CAOFockMatrix::getNumberOfFockMatrices, "Gets number of Fock matrices.")
         .def("set_fock_type",
              &CAOFockMatrix::setFockType,
-             "Set type of Fock matrix at fock_idx with given spin",
-             "fock_type"_a,
-             "fock_idx"_a,
+             "Sets type of specific Fock matrix.",
+             "fockType"_a,
+             "iFockMatrix"_a,
              "spin"_a = std::string("ALPHA"))
         .def("set_scale_factor",
              &CAOFockMatrix::setFockScaleFactor,
-             "Set scaling factor of exact exchange for Fock matrix at fock_idx with given spin",
+             "Sets scaling factor of exact exchange of specific Fock matrix.",
              "factor"_a,
-             "fock_idx"_a,
+             "iFockMatrix"_a,
              "spin"_a = std::string("ALPHA"))
         .def("get_fock_type",
              &CAOFockMatrix::getFockType,
-             "Get type of Fock matrix at fock_idx with given spin",
-             "fock_idx"_a,
+             "Gets type of specific Fock matrix."
+             "iFockMatrix"_a,
              "spin"_a = std::string("ALPHA"))
         .def("get_scale_factor",
              &CAOFockMatrix::getScaleFactor,
-             "Get scaling factor of exchange contribution for Fock matrix at fock_idx with given spin",
-             "fock_idx"_a,
+             "Gets scaling factor of exchange contribution for specific Fock matrix.",
+             "iFockMatrix"_a,
              "spin"_a = std::string("ALPHA"))
         .def("get_density_identifier",
              &CAOFockMatrix::getDensityIdentifier,
-             "Get identifier of AO density matrix used to construct Fock matrix at fock_idx with given spin",
-             "fock_idx"_a,
+             "Gets identifier of AO density matrix used to construct specific Fock matrix.",
+             "iFockMatrix"_a,
              "spin"_a = std::string("ALPHA"))
-        .def("add_hcore", &CAOFockMatrix::addCoreHamiltonian)
-        .def("add", &CAOFockMatrix::add)
+        .def("add_hcore",
+             &CAOFockMatrix::addCoreHamiltonian,
+             "Adds core Hamiltonian, kinetic energy and nuclear potential matrices, to specific Fock matrix.",
+             "kineticEnergyMatrix"_a,
+             "nuclearPotentialMatrix"_a,
+             "iFockMatrix"_a)
+        .def("add", &CAOFockMatrix::add, "Add AO Fock matrix to AO Fock matrix.", "source"_a)
         .def("add_matrix",
              &CAOFockMatrix::addOneElectronMatrix,
-             "Add one-electron operator matrix to Fock matrix at fock_idx with given spin",
-             "one_el"_a,
-             "fock_idx"_a,
+             "Adds one electron operator matrix to specific Fock matrix.",
+             "oneElectronMatrix"_a,
+             "iFockMatrix"_a,
              "spin"_a = std::string("ALPHA"))
         .def("scale",
              &CAOFockMatrix::scale,
-             "Scale Fock matrix at fock_idx with given spin by a factor",
+             "Scales specific Fock matrix by factor."
              "factor"_a,
-             "fock_idx"_a,
+             "iFockMatrix"_a,
              "spin"_a = std::string("ALPHA"))
-        .def("reduce_sum", &CAOFockMatrix_reduce_sum)
-        .def("get_energy", &CAOFockMatrix::getElectronicEnergy)
-        .def(py::self == py::self);
-
-    // CCauchySchwarzScreener class
-
-    PyClass<CCauchySchwarzScreener>(m, "CauchySchwarzScreener")
-        .def(py::init<>())
-        .def(py::init<const CCauchySchwarzScreener&>())
-        .def("get_threshold", &CCauchySchwarzScreener::getThreshold)
-        .def("get_screening_scheme", &CCauchySchwarzScreener::getScreeningScheme)
+        .def("reduce_sum", &CAOFockMatrix_reduce_sum, "Performs reduce_sum for a CAOFockMatrix object.", "rank"_a, "nodes"_a, "py_comm"_a)
+        .def("get_energy",
+             &CAOFockMatrix::getElectronicEnergy,
+             "Computes electronic energy for specific AO density matrix.",
+             "iFockMatrix"_a,
+             "aoDensityMatrix"_a,
+             "iDensityMatrix"_a)
         .def(py::self == py::self);
 
     // CScreeningContainer class
@@ -363,10 +353,7 @@ export_twoints(py::module& m)
     PyClass<CScreeningContainer>(m, "ScreeningContainer")
         .def(py::init<>())
         .def(py::init<const CScreeningContainer&>())
-        .def("is_empty", &CScreeningContainer::isEmpty)
-        .def("number_of_screeners", &CScreeningContainer::getNumberOfScreeners)
-        .def("get_screener", &CScreeningContainer::getScreener)
-        .def("set_threshold", &CScreeningContainer::setThreshold)
+        .def("set_threshold", &CScreeningContainer::setThreshold, "Sets threshold for screening of electron repulsion integrals.", "threshold"_a)
         .def(py::self == py::self);
 
     // CElectronRepulsionIntegralsDriver class
@@ -389,8 +376,10 @@ basis set and stores results in screening container object.
     The molecule.
 :param ao_basis:
     The molecular AO basis.
-:return: the screening container with Q values.
-)pbdoc",
+
+:return:
+    The screening container with Q values.
+             )pbdoc",
              "screening"_a,
              "threshold"_a,
              "molecule"_a,
@@ -415,7 +404,7 @@ molecule with specific AO basis set. Performs screening according to
     The molecular AO basis.
 :param screening:
     The screening container object.
-)pbdoc",
+             )pbdoc",
              "ao_fock"_a,
              "ao_density"_a,
              "molecule"_a,
@@ -443,20 +432,30 @@ molecule with specific AO basis set. Performs screening according to
 
     PyClass<CMOIntsBatch>(m, "MOIntsBatch")
         .def(py::init<>())
-        .def("to_numpy", &CMOIntsBatch_to_numpy)
-        .def("to_numpy", &CMOIntsBatch_to_numpy_2)
-        .def("xy_to_numpy", &CMOIntsBatchXY_to_numpy)
-        .def("yx_to_numpy", &CMOIntsBatchYX_to_numpy)
-        .def("number_of_batches", &CMOIntsBatch::getNumberOfBatches)
-        .def("number_of_rows", &CMOIntsBatch::getNumberOfRows)
-        .def("number_of_columns", &CMOIntsBatch::getNumberOfColumns)
-        .def("append", &CMOIntsBatch::append)
-        .def("set_batch_type", &CMOIntsBatch::setBatchType)
-        .def("set_ext_indexes", &CMOIntsBatch::setExternalIndexes)
-        .def("get_batch_type", &CMOIntsBatch::getBatchType)
-        .def("get_ext_indexes", &CMOIntsBatch::getExternalIndexes)
-        .def("get_gen_pairs", &CMOIntsBatch::getGeneratorPairs)
-        .def("collect_batches", &CMOIntsBatch_collectBatches);
+        .def("to_numpy", &CMOIntsBatch_to_numpy, "Converts CMOIntsBatch to numpy array.", "iBatch"_a)
+        .def("to_numpy", &CMOIntsBatch_to_numpy_2, "Converts CMOIntsBatch to numpy array.", "iGeneratorPair"_a)
+        .def("number_of_batches", &CMOIntsBatch::getNumberOfBatches, "Gets number of MO integrals batches.")
+        .def("number_of_rows", &CMOIntsBatch::getNumberOfRows, "Gets number of rows in MO integrals batch.")
+        .def("number_of_columns", &CMOIntsBatch::getNumberOfColumns, "Gets number of columns in MO integrals batch.")
+        .def("append",
+             &CMOIntsBatch::append,
+             "Adds set of mo integrals to batch by transforming AO Fock matrix.",
+             "aoFockMatrix"_a,
+             "braVector"_a,
+             "ketVector"_a,
+             "braIndexes"_a,
+             "ketIndexes"_a)
+        .def("set_batch_type", &CMOIntsBatch::setBatchType, "Sets type of MO integrals batch.", "batchType"_a)
+        .def("set_ext_indexes", &CMOIntsBatch::setExternalIndexes, "Sets positions of external indexes in in <ij|xy> integrals.", "externalIndexes"_a)
+        .def("get_batch_type", &CMOIntsBatch::getBatchType, "Gets MO integrals batch type.")
+        .def("get_ext_indexes", &CMOIntsBatch::getExternalIndexes, "Gets pair of external indexes in MO integrals contraction.")
+        .def("get_gen_pairs", &CMOIntsBatch::getGeneratorPairs, "Gets vector with generator pairs.")
+        .def("collect_batches",
+             &CMOIntsBatch_collectBatches,
+             "Collects MOIntsBatch on master node.",
+             "cross_rank"_a,
+             "cross_nodes"_a,
+             "py_cross_comm"_a);
 }
 
 }  // namespace vlx_twoints
