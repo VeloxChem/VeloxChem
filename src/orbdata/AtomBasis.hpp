@@ -114,7 +114,7 @@ class CAtomBasis
     bool operator!=(const CAtomBasis& other) const;
 
     /**
-     Set identifier of chemical element in atom basis.
+     Sets identifier of chemical element in atom basis.
 
      @param idElemental the identifier of chemical element.
      */

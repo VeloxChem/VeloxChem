@@ -99,7 +99,7 @@ class ScfDriver:
         - checkpoint_file: The name of checkpoint file.
         - ref_mol_orbs: The reference molecular orbitals read from checkpoint
           file.
-        - restricted: The flag for restricted SCF.
+        - closed_shell: The flag for restricted SCF.
         - dispersion: The flag for calculating D4 dispersion correction.
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
