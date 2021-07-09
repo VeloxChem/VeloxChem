@@ -46,6 +46,7 @@
 #endif
 
 namespace py = pybind11;
+using namespace py::literals;
 
 namespace vlx_general {  // vlx_general namespace
 
@@ -239,37 +240,25 @@ export_general(py::module& m)
     // exposing functions
 
     m.def("mpi_master", &mpi::master);
-
-    m.def("is_mpi_master", &is_mpi_master, py::arg("py_comm") = py::none());
-
-    m.def("is_single_node", &is_single_node, py::arg("py_comm") = py::none());
-
+    m.def("is_mpi_master", &is_mpi_master, "py_comm"_a = py::none());
+    m.def("is_single_node", &is_single_node, "py_comm"_a = py::none());
     m.def("mpi_size_limit", &mpi_size_limit);
-
     m.def("mpi_initialized", &mpi::initialized);
 
     m.def("assert_msg_critical", &errors::assertMsgCritical);
 
     m.def("bohr_in_angstroms", &units::getBohrValueInAngstroms);
-
     m.def("hartree_in_ev", &units::getHartreeValueInElectronVolts);
-
     m.def("hartree_in_kcalpermol", &units::getHartreeValueInKiloCaloriePerMole);
-
     m.def("hartree_in_wavenumbers", &units::getHartreeValueInWavenumbers);
 
     m.def("dipole_in_debye", &units::getDipoleInDebye);
-
     m.def("rotatory_strength_in_cgs", &units::getRotatoryStrengthInCGS);
-
     m.def("molar_ellipticity_from_beta", &units::getMolarEllipticityFromBeta);
-
     m.def("extinction_coefficient_from_molar_ellipticity", &units::getExtinctionCoefficientFromMolarEllipticity);
-
     m.def("fine_structure_constant", &units::getFineStructureConstant);
 
     m.def("to_angular_momentum", &string_to_angular_momentum);
-
     m.def("to_angular_momentum", &integer_to_angular_momentum);
 }
 

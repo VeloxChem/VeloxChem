@@ -339,7 +339,7 @@ export_twoints(py::module& m)
              "factor"_a,
              "iFockMatrix"_a,
              "spin"_a = std::string("ALPHA"))
-        .def("reduce_sum", &CAOFockMatrix_reduce_sum, "Performs reduce_sum for a CAOFockMatrix object.", "rank"_a, "nodes"_a, "py_comm"_a)
+        .def("reduce_sum", &CAOFockMatrix_reduce_sum, "Performs reduce_sum for AOFockMatrix object.", "rank"_a, "nodes"_a, "py_comm"_a)
         .def("get_energy",
              &CAOFockMatrix::getElectronicEnergy,
              "Computes electronic energy for specific AO density matrix.",

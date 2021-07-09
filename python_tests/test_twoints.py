@@ -172,15 +172,6 @@ class TestTwoInts(unittest.TestCase):
         self.assertEqual(get_qq_scheme("QQ_DEN"), ericut.qqden)
         self.assertEqual(get_qq_scheme("QQR_DEN"), ericut.qqrden)
 
-        num_screeners = qqdata.number_of_screeners()
-        self.assertTrue(num_screeners > 0)
-        self.assertFalse(qqdata.is_empty())
-
-        for screener_index in range(num_screeners):
-            screener = qqdata.get_screener(screener_index)
-            self.assertEqual(1.0e-12, screener.get_threshold())
-            self.assertEqual(ericut.qqden, screener.get_screening_scheme())
-
         fock = AOFockMatrix(dmat)
 
         eridrv.compute(fock, dmat, molecule, ao_basis, qqdata)
