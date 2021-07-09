@@ -28,7 +28,7 @@ import sys
 from mpi4py import MPI
 
 from .outputstream import OutputStream
-from geometric import normal_modes
+import geometric
 
 class HessianDriver:
     """
@@ -182,9 +182,57 @@ class HessianDriver:
         elem = molecule.get_labels()
         coords = molecule.get_coordinates().reshape(natm*3)
 
-        normal_modes.frequency_analysis(coords, hessian_drv.hessian, elem,
-                        energy=self.elec_energy, temperatur=self.temperature,
-                        pressure=self.pressure, outfnm=filename)
+        frequencies, normal_modes, gibbs_energy = ( 
+                        geometric.normal_modes.frequency_analysis(coords, 
+                                self.hessian, elem,
+                                energy=self.elec_energy,
+                                temperature=self.temperature,
+                                pressure=self.pressure, outfnm=filename)
+                                                    )
+        number_of_modes = len(frequencies)
+
+        natoms = molecule.number_of_atoms()
+        atom_symbol = molecule.get_labels()
+
+        title = 'Vibrational Analysis'
+        self.ostream.print_header(title)
+        self.ostream.print_header('-' * (len(title) + 2))
+        self.ostream.print_blank()
+
+        valstr = 'Frequencies (in cm**-1) and normal modes.'
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+
+        for k in range(0, number_of_modes, 3):
+
+            end = k + 3
+            if k + 3 > number_of_modes:
+                 end = number_of_modes
+
+            # Print indices and frequencies:
+            index_string = '{:17s}'.format('Index: ')
+            freq_string =  '{:17s}'.format('Frequency: ')
+            normal_mode_string = '{:17s}'.format('Normal mode: ')
+            for i in range(k, end):
+                index_string += '{:^31d}'.format(i+1)
+                freq_string +=  '{:^31.2f}'.format(frequencies[i])
+                normal_mode_string += '{:^30s}{:>1s}'.format('X         Y         Z','|') 
+            self.ostream.print_line(index_string)
+            self.ostream.print_line(freq_string)
+            self.ostream.print_line(normal_mode_string)
+
+            # Print normal modes:
+            for atom_index in range(natoms):
+                valstr =  '{:17s}'.format(str(atom_index+1)+' '+atom_symbol[atom_index])
+               
+                for j in range(k, end):
+                    valstr += '{:^10.4f}'.format(normal_modes[j][3*atom_index]) # X
+                    valstr += '{:^10.4f}'.format(normal_modes[j][3*atom_index+1]) # Y
+                    valstr += '{:^10.4f}{:>1s}'.format(normal_modes[j][3*atom_index+2],'|') # Z
+                self.ostream.print_line(valstr)
+            
+            self.ostream.print_blank()
+        self.ostream.flush()
 
 
     def hess_nuc_contrib(self, molecule):
