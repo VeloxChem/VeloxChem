@@ -131,7 +131,7 @@ class TestMolData(unittest.TestCase):
         mol.check_proximity(0.1)
 
         elem_comp = mol.get_elemental_composition()
-        self.assertTrue(elem_comp == [1, 7])
+        self.assertTrue(elem_comp == set((7, 1)))
 
     def test_number_of_atoms(self):
 

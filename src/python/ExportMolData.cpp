@@ -34,9 +34,9 @@
 #include <string>
 #include <vector>
 
-#include "CoordinationNumber.hpp"
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
+#include "CoordinationNumber.hpp"
 #include "DispersionModel.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
@@ -170,113 +170,6 @@ CMolecule_from_array_2(const std::vector<int32_t>& idselem, const py::array_t<do
     return CMolecule_from_array(labels, py_coords, units);
 }
 
-// Helper function for getting number of alpha/beta electrons
-
-static int32_t
-CMolecule_alpha_elec(const CMolecule& self)
-{
-    int32_t nelec = self.getNumberOfElectrons();
-
-    int32_t mult_1 = self.getMultiplicity() - 1;
-
-    return (nelec + mult_1) / 2;
-}
-
-static int32_t
-CMolecule_beta_elec(const CMolecule& self)
-{
-    int32_t nelec = self.getNumberOfElectrons();
-
-    int32_t mult_1 = self.getMultiplicity() - 1;
-
-    return (nelec - mult_1) / 2;
-}
-
-// Helper function for getting coordinates as numpy array
-
-static py::array_t<double>
-CMolecule_x_to_numpy(const CMolecule& self)
-{
-    return vlx_general::pointer_to_numpy(self.getCoordinatesX(), self.getNumberOfAtoms());
-}
-
-static py::array_t<double>
-CMolecule_y_to_numpy(const CMolecule& self)
-{
-    return vlx_general::pointer_to_numpy(self.getCoordinatesY(), self.getNumberOfAtoms());
-}
-
-static py::array_t<double>
-CMolecule_z_to_numpy(const CMolecule& self)
-{
-    return vlx_general::pointer_to_numpy(self.getCoordinatesZ(), self.getNumberOfAtoms());
-}
-
-// Helper function for getting coodination number for molecule
-
-static py::array_t<double>
-CMolecule_coordination_numbers(const CMolecule& self)
-{
-    auto cn = coordnum::getCoordinationNumber(self);
-
-    return vlx_general::pointer_to_numpy(cn.data(), static_cast<int32_t>(cn.size()));
-}
-
-// Helper function for getting partial charges for molecule
-
-static py::array_t<double>
-CMolecule_partial_charges(const CMolecule& self)
-{
-    auto chg = parchg::getPartialCharges(self, self.getCharge());
-
-    return vlx_general::pointer_to_numpy(chg.data(), static_cast<int32_t>(chg.size()));
-}
-
-// Helper function for getting VDW radii for molecule
-
-static py::array_t<double>
-CMolecule_vdw_radii_to_numpy(const CMolecule& self)
-{
-    auto atomradii = self.getVdwRadii();
-
-    return vlx_general::pointer_to_numpy(atomradii.data(), static_cast<int32_t>(atomradii.size()));
-}
-
-// Helper function for getting nuclear charges for molecule
-
-static py::array_t<int32_t>
-CMolecule_elem_ids_to_numpy(const CMolecule& self)
-{
-    return vlx_general::pointer_to_numpy(self.getIdsElemental(), self.getNumberOfAtoms());
-}
-
-// Helper function for getting masses for molecule
-
-static py::array_t<double>
-CMolecule_masses_to_numpy(const CMolecule& self)
-{
-    auto masses = self.getMasses();
-
-    return vlx_general::pointer_to_numpy(masses.data(), masses.size());
-}
-
-// Helper function for getting elemental composition
-
-static py::list
-CMolecule_get_elem_comp(const CMolecule& self)
-{
-    py::list elemcomp;
-
-    auto elmlist = self.getElementalComposition();
-
-    for (auto p = elmlist.cbegin(); p != elmlist.cend(); ++p)
-    {
-        elemcomp.append(*p);
-    }
-
-    return elemcomp;
-}
-
 // Helper function for checking multiplicity of molecule
 
 static void
@@ -307,16 +200,6 @@ CMolecule_check_proximity(const CMolecule& self, const double minDistance)
     errors::assertMsgCritical(self.checkProximity(minDistance), errproxi);
 }
 
-// Helper function for broadcasting CMolecule object
-
-static void
-CMolecule_broadcast(CMolecule& self, int32_t rank, py::object py_comm)
-{
-    auto comm = vlx_general::get_mpi_comm(py_comm);
-
-    self.broadcast(rank, *comm);
-}
-
 // Exports classes/functions in src/moldata to python
 
 void
@@ -330,53 +213,132 @@ export_moldata(py::module& m)
         .def(py::init<const CMolecule&, const CMolecule&>())
         .def(py::init(&CMolecule_from_array), "symbols"_a, "coordinates"_a, "units"_a = std::string("angstrom"))
         .def(py::init(&CMolecule_from_array_2), "Zs"_a, "coordinates"_a, "units"_a = std::string("angstrom"))
-        .def("set_charge", &CMolecule::setCharge)
-        .def("get_charge", &CMolecule::getCharge)
-        .def("set_multiplicity", &CMolecule::setMultiplicity)
-        .def("get_multiplicity", &CMolecule::getMultiplicity)
-        .def("check_multiplicity", &CMolecule_check_multiplicity)
-        .def("get_string", &CMolecule::printGeometry)
-        .def("check_proximity", &CMolecule_check_proximity)
-        .def("get_sub_molecule", &CMolecule::getSubMolecule)
-        .def("number_of_atoms", vlx_general::overload_cast_<>()(&CMolecule::getNumberOfAtoms, py::const_))
-        .def("number_of_atoms", vlx_general::overload_cast_<const int32_t>()(&CMolecule::getNumberOfAtoms, py::const_), "idElemental"_a)
+        .def("get_string", &CMolecule::printGeometry, "Prints geometry of molecule as table to output stream.")
+        .def("set_charge", &CMolecule::setCharge, "Sets charge of molecule object.", "charge"_a)
+        .def("get_charge", &CMolecule::getCharge, "Gets charge of molecule.")
+        .def("set_multiplicity", &CMolecule::setMultiplicity, "Sets spin multiplicity of molecule object.", "multiplicity"_a)
+        .def("get_multiplicity", &CMolecule::getMultiplicity, "Gets spin multiplicity of molecule.")
+        .def("check_multiplicity", &CMolecule_check_multiplicity, "Checks multiplicity of molecule.")
+        .def("check_proximity", &CMolecule_check_proximity, "Checks proximity of atoms.", "minDistance"_a)
+        .def("get_elemental_composition", &CMolecule::getElementalComposition, "Gets set of unique chemical elements in molecule.")
+        .def("nuclear_repulsion_energy",
+             &CMolecule::getNuclearRepulsionEnergy,
+             "Gets nuclear repulsion energy for molecule assuming point charge model for nucleus.")
+        .def("get_sub_molecule",
+             &CMolecule::getSubMolecule,
+             "Creates a sub-molecule object by slicing the molecule object.",
+             "startIndex"_a,
+             "numAtoms"_a)
+        .def("number_of_atoms", vlx_general::overload_cast_<>()(&CMolecule::getNumberOfAtoms, py::const_), "Gets total number of atoms in molecule.")
+        .def("number_of_atoms",
+             vlx_general::overload_cast_<const int32_t>()(&CMolecule::getNumberOfAtoms, py::const_),
+             "Gets number of atoms belonging to specific chemical element in molecule.",
+             "idElemental"_a)
         .def("number_of_atoms",
              vlx_general::overload_cast_<const int32_t, const int32_t, const int32_t>()(&CMolecule::getNumberOfAtoms, py::const_),
-             "iatom"_a,
-             "natoms"_a,
+             "Gets number of atoms belonging to specific chemical element in list of atoms in molecule.",
+             "iAtom"_a,
+             "nAtoms"_a,
              "idElemental"_a)
-        .def("number_of_electrons", &CMolecule::getNumberOfElectrons)
-        .def("number_of_alpha_electrons", &CMolecule_alpha_elec)
-        .def("number_of_beta_electrons", &CMolecule_beta_elec)
-        .def("nuclear_repulsion_energy", &CMolecule::getNuclearRepulsionEnergy)
-        .def("x_to_numpy", &CMolecule_x_to_numpy)
-        .def("y_to_numpy", &CMolecule_y_to_numpy)
-        .def("z_to_numpy", &CMolecule_z_to_numpy)
-        .def("coordination_numbers", &CMolecule_coordination_numbers)
-        .def("partial_charges", &CMolecule_partial_charges)
-        .def("vdw_radii_to_numpy", &CMolecule_vdw_radii_to_numpy)
-        .def("elem_ids_to_numpy", &CMolecule_elem_ids_to_numpy)
-        .def("masses_to_numpy", &CMolecule_masses_to_numpy)
-        .def("get_elemental_composition", &CMolecule_get_elem_comp)
-        .def("broadcast", &CMolecule_broadcast)
+        .def("number_of_electrons", &CMolecule::getNumberOfElectrons, "Gets a number of electrons in molecule.")
+        .def(
+            "number_of_alpha_electrons",
+            [](const CMolecule& self) -> int32_t {
+                int32_t nelec  = self.getNumberOfElectrons();
+                int32_t mult_1 = self.getMultiplicity() - 1;
+                return (nelec + mult_1) / 2;
+            },
+            "Gets number of alpha electrons.")
+        .def(
+            "number_of_beta_electrons",
+            [](const CMolecule& self) -> int32_t {
+                int32_t nelec  = self.getNumberOfElectrons();
+                int32_t mult_1 = self.getMultiplicity() - 1;
+                return (nelec - mult_1) / 2;
+            },
+            "Gets number of beta electrons.")
+        .def(
+            "x_to_numpy",
+            [](const CMolecule& self) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.getCoordinatesX(), self.getNumberOfAtoms());
+            },
+            "Gets X coordinates as numpy array.")
+        .def(
+            "y_to_numpy",
+            [](const CMolecule& self) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.getCoordinatesY(), self.getNumberOfAtoms());
+            },
+            "Gets Y coordinates as numpy array.")
+        .def(
+            "z_to_numpy",
+            [](const CMolecule& self) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.getCoordinatesZ(), self.getNumberOfAtoms());
+            },
+            "Gets Z coordinates as numpy array.")
+        .def(
+            "partial_charges",
+            [](const CMolecule& self) -> py::array_t<double> {
+                auto chg = parchg::getPartialCharges(self, self.getCharge());
+                return vlx_general::pointer_to_numpy(chg.data(), static_cast<int32_t>(chg.size()));
+            },
+            "Gets partial charges for molecule.")
+        .def(
+            "vdw_radii_to_numpy",
+            [](const CMolecule& self) -> py::array_t<double> {
+                auto atomradii = self.getVdwRadii();
+                return vlx_general::pointer_to_numpy(atomradii.data(), static_cast<int32_t>(atomradii.size()));
+            },
+            "Gets VDW radii for molecule.")
+        .def(
+            "elem_ids_to_numpy",
+            [](const CMolecule& self) -> py::array_t<int32_t> {
+                return vlx_general::pointer_to_numpy(self.getIdsElemental(), self.getNumberOfAtoms());
+            },
+            "Gets nuclear charges for molecule.")
+        .def(
+            "masses_to_numpy",
+            [](const CMolecule& self) -> py::array_t<double> {
+                auto masses = self.getMasses();
+                return vlx_general::pointer_to_numpy(masses.data(), masses.size());
+            },
+            "Gets masses for molecule.")
+        .def(
+            "broadcast",
+            [](CMolecule& self, int32_t rank, py::object py_comm) -> void {
+                auto comm = vlx_general::get_mpi_comm(py_comm);
+                self.broadcast(rank, *comm);
+            },
+            "Broadcasts Molecule object.",
+            "rank"_a,
+            "py_comm"_a)
         .def(py::self == py::self);
 
     // CChemicalElement class
 
     PyClass<CChemicalElement>(m, "ChemicalElement")
         .def(py::init<>())
-        .def("set_atom_type", vlx_general::overload_cast_<const std::string&>()(&CChemicalElement::setAtomType), "label"_a)
-        .def("set_atom_type", vlx_general::overload_cast_<const int32_t>()(&CChemicalElement::setAtomType), "idElemental"_a)
-        .def("get_name", &CChemicalElement::getName)
+        .def("set_atom_type",
+             vlx_general::overload_cast_<const std::string&>()(&CChemicalElement::setAtomType),
+             "Sets chemical element properties using name of chemical element.",
+             "atomLabel"_a)
+        .def("set_atom_type",
+             vlx_general::overload_cast_<const int32_t>()(&CChemicalElement::setAtomType),
+             "Sets chemical element object properties using chemical element number.",
+             "idElemental"_a)
+        .def("get_name", &CChemicalElement::getName, "Gets name of chemical element.")
         .def(py::self == py::self);
 
     // CDispersionModel class
 
     PyClass<CDispersionModel>(m, "DispersionModel")
         .def(py::init<>())
-        .def("compute", &CDispersionModel::compute)
-        .def("get_energy", &CDispersionModel::getEnergy)
-        .def("get_gradient", &CDispersionModel::getGradient);
+        .def("compute",
+             &CDispersionModel::compute,
+             "Computes dispersion energy and gradient for a given molecule and a given density functional.",
+             "molecule"_a,
+             "xcLabel"_a)
+        .def("get_energy", &CDispersionModel::getEnergy, "Gets dispersion energy.")
+        .def("get_gradient", &CDispersionModel::getGradient, "Gets dispersion gradient.");
 }
 
 }  // namespace vlx_moldata
