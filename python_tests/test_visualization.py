@@ -121,22 +121,9 @@ class TestVisualization(unittest.TestCase):
 
         grid = CubicGrid(origin, step_size, num_points)
 
-        self.assertEqual(
-            origin,
-            [grid.x_origin(), grid.y_origin(),
-             grid.z_origin()])
-
-        self.assertEqual(
-            step_size,
-            [grid.x_step_size(),
-             grid.y_step_size(),
-             grid.z_step_size()])
-
-        self.assertEqual(
-            num_points,
-            [grid.x_num_points(),
-             grid.y_num_points(),
-             grid.z_num_points()])
+        self.assertEqual(origin, grid.get_origin())
+        self.assertEqual(step_size, grid.get_step_size())
+        self.assertEqual(num_points, grid.get_num_points())
 
         self.assertEqual(grid.values_to_numpy().shape, tuple(num_points))
 
@@ -149,11 +136,7 @@ class TestVisualization(unittest.TestCase):
         vis_drv = VisualizationDriver()
         grid = vis_drv.gen_cubic_grid(mol, num_points)
 
-        self.assertEqual(
-            num_points,
-            [grid.x_num_points(),
-             grid.y_num_points(),
-             grid.z_num_points()])
+        self.assertEqual(num_points, grid.get_num_points())
 
     def test_gen_cubes(self):
 

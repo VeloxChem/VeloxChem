@@ -39,20 +39,6 @@ using namespace py::literals;
 
 namespace vlx_visualization {  // vlx_visualization namespace
 
-// Helper function for converting cubic grid values to 3d numpy array
-
-static py::array_t<double>
-CCubicGrid_values_to_numpy(const CCubicGrid& self)
-{
-    auto nx = self.numPointsX();
-
-    auto ny = self.numPointsY();
-
-    auto nz = self.numPointsZ();
-
-    return vlx_general::pointer_to_numpy(self.values(), {nx, ny, nz});
-}
-
 // Exports classes/functions in src/visualization to python
 
 void
@@ -63,17 +49,14 @@ export_visualization(py::module& m)
     PyClass<CCubicGrid>(m, "CubicGrid")
         .def(py::init<>())
         .def(py::init<const std::vector<double>&, const std::vector<double>&, const std::vector<int32_t>>())
-        .def("x_origin", &CCubicGrid::originX, "Gets X coordinate of the origin.")
-        .def("y_origin", &CCubicGrid::originY, "Gets Y coordinate of the origin.")
-        .def("z_origin", &CCubicGrid::originZ, "Gets Z coordinate of the origin.")
-        .def("x_step_size", &CCubicGrid::stepSizeX, "Gets step size in X direction.")
-        .def("y_step_size", &CCubicGrid::stepSizeY, "Gets step size in Y direction.")
-        .def("z_step_size", &CCubicGrid::stepSizeZ, "Gets step size in Z direction.")
-        .def("x_num_points", &CCubicGrid::numPointsX, "Gets number of points in X direction.")
-        .def("y_num_points", &CCubicGrid::numPointsY, "Gets number of points in Y direction.")
-        .def("z_num_points", &CCubicGrid::numPointsZ, "Gets number of points in Z direction.")
+        .def("get_origin", &CCubicGrid::getOrigin, "Gets coordinate of the origin.")
+        .def("get_step_size", &CCubicGrid::getStepSize, "Gets step size in X, Y and Z direction.")
+        .def("get_num_points", &CCubicGrid::getNumPoints, "Gets number of points in X, Y and Z direction.")
         .def("set_values", &CCubicGrid::setValues, "Sets the cubic grid values.", "vals"_a)
-        .def("values_to_numpy", &CCubicGrid_values_to_numpy, "Convertis cubic grid values to 3D numpy array.");
+        .def(
+            "values_to_numpy",
+            [](const CCubicGrid& self) -> py::array_t<double> { return vlx_general::pointer_to_numpy(self.values(), self.getNumPoints()); },
+            "Convertis cubic grid values to 3D numpy array.");
 
     // CVisualizationDriver class
 

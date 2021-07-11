@@ -49,26 +49,6 @@ using namespace py::literals;
 
 namespace vlx_twoints {  // vlx_twoints namespace
 
-// Helper function for converting CAOFockMatrix to numpy array
-
-static py::array_t<double>
-CAOFockMatrix_to_numpy(const CAOFockMatrix& self, const int32_t iFockMatrix)
-{
-    return vlx_general::pointer_to_numpy(self.getFock(iFockMatrix), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
-}
-
-static py::array_t<double>
-CAOFockMatrix_alpha_to_numpy(const CAOFockMatrix& self, const int32_t iFockMatrix)
-{
-    return vlx_general::pointer_to_numpy(self.getFock(iFockMatrix, "alpha"), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
-}
-
-static py::array_t<double>
-CAOFockMatrix_beta_to_numpy(const CAOFockMatrix& self, const int32_t iFockMatrix)
-{
-    return vlx_general::pointer_to_numpy(self.getFock(iFockMatrix, "beta"), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
-}
-
 // Helper function for CAOFockMatrix constructor
 
 static std::shared_ptr<CAOFockMatrix>
@@ -86,16 +66,6 @@ CAOFockMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
     }
 
     return std::make_shared<CAOFockMatrix>(fmat, types, factors, ids);
-}
-
-// Helper function for reduce_sum CAOFockMatrix object
-
-static void
-CAOFockMatrix_reduce_sum(CAOFockMatrix& self, int32_t rank, int32_t nodes, py::object py_comm)
-{
-    auto comm = vlx_general::get_mpi_comm(py_comm);
-
-    self.reduce_sum(rank, nodes, *comm);
 }
 
 // Helper function for exporting CElectronRepulsionIntegralsDriver.computeInMemory
@@ -129,20 +99,6 @@ CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegra
     errors::assertMsgCritical(eri.shape(3) == nao, errsize);
 
     self.computeInMemory(molecule, basis, eri.mutable_data());
-}
-
-// Helper function for converting CMOIntsBatch to numpy array
-
-static py::array_t<double>
-CMOIntsBatch_to_numpy(const CMOIntsBatch& self, const int32_t iBatch)
-{
-    return vlx_general::pointer_to_numpy(self.getBatch(iBatch), self.getNumberOfRows(), self.getNumberOfColumns());
-}
-
-static py::array_t<double>
-CMOIntsBatch_to_numpy_2(const CMOIntsBatch& self, const CTwoIndexes& iGeneratorPair)
-{
-    return vlx_general::pointer_to_numpy(self.getBatch(iGeneratorPair), self.getNumberOfRows(), self.getNumberOfColumns());
 }
 
 // Helper function for collecting CMOIntsBatch on global master node
@@ -288,9 +244,30 @@ export_twoints(py::module& m)
         .def(py::init<const CAOFockMatrix&>())
         .def(py::init(&CAOFockMatrix_from_numpy_list))
         .def("__str__", &CAOFockMatrix::getString)
-        .def("to_numpy", &CAOFockMatrix_to_numpy, "Converts alpha AOFockMatrix to numpy array.", "iFockMatrix"_a)
-        .def("alpha_to_numpy", &CAOFockMatrix_alpha_to_numpy, "Converts alpha AOFockMatrix to numpy array.", "iFockMatrix"_a)
-        .def("beta_to_numpy", &CAOFockMatrix_beta_to_numpy, "Converts beta AOFockMatrix to numpy array.", "iFockMatrix"_a)
+        .def(
+            "to_numpy",
+            [](const CAOFockMatrix& self, const int32_t iFockMatrix) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(
+                    self.getFock(iFockMatrix), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
+            },
+            "Converts alpha AOFockMatrix to numpy array.",
+            "iFockMatrix"_a)
+        .def(
+            "alpha_to_numpy",
+            [](const CAOFockMatrix& self, const int32_t iFockMatrix) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(
+                    self.getFock(iFockMatrix, "alpha"), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
+            },
+            "Converts alpha AOFockMatrix to numpy array.",
+            "iFockMatrix"_a)
+        .def(
+            "beta_to_numpy",
+            [](const CAOFockMatrix& self, const int32_t iFockMatrix) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(
+                    self.getFock(iFockMatrix, "beta"), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
+            },
+            "Converts beta AOFockMatrix to numpy array.",
+            "iFockMatrix"_a)
         .def("is_closed_shell", &CAOFockMatrix::isClosedShell, "Checks if AO Fock matrix is of closed-shell type.")
         .def("number_of_fock_matrices", &CAOFockMatrix::getNumberOfFockMatrices, "Gets number of Fock matrices.")
         .def("set_fock_type",
@@ -339,13 +316,22 @@ export_twoints(py::module& m)
              "factor"_a,
              "iFockMatrix"_a,
              "spin"_a = std::string("ALPHA"))
-        .def("reduce_sum", &CAOFockMatrix_reduce_sum, "Performs reduce_sum for AOFockMatrix object.", "rank"_a, "nodes"_a, "py_comm"_a)
         .def("get_energy",
              &CAOFockMatrix::getElectronicEnergy,
              "Computes electronic energy for specific AO density matrix.",
              "iFockMatrix"_a,
              "aoDensityMatrix"_a,
              "iDensityMatrix"_a)
+        .def(
+            "reduce_sum",
+            [](CAOFockMatrix& self, int32_t rank, int32_t nodes, py::object py_comm) -> void {
+                auto comm = vlx_general::get_mpi_comm(py_comm);
+                self.reduce_sum(rank, nodes, *comm);
+            },
+            "Performs reduce_sum for AOFockMatrix object.",
+            "rank"_a,
+            "nodes"_a,
+            "py_comm"_a)
         .def(py::self == py::self);
 
     // CScreeningContainer class
@@ -432,8 +418,24 @@ molecule with specific AO basis set. Performs screening according to
 
     PyClass<CMOIntsBatch>(m, "MOIntsBatch")
         .def(py::init<>())
-        .def("to_numpy", &CMOIntsBatch_to_numpy, "Converts CMOIntsBatch to numpy array.", "iBatch"_a)
-        .def("to_numpy", &CMOIntsBatch_to_numpy_2, "Converts CMOIntsBatch to numpy array.", "iGeneratorPair"_a)
+        .def(
+            "to_numpy",
+            [](const CMOIntsBatch& self, const int32_t iBatch) -> py::array_t<double> {
+                auto numRows = self.getNumberOfRows();
+                auto numCols = self.getNumberOfColumns();
+                return vlx_general::pointer_to_numpy(self.getBatch(iBatch), numRows, numCols);
+            },
+            "Converts CMOIntsBatch to numpy array.",
+            "iBatch"_a)
+        .def(
+            "to_numpy",
+            [](const CMOIntsBatch& self, const CTwoIndexes& iGeneratorPair) -> py::array_t<double> {
+                auto numRows = self.getNumberOfRows();
+                auto numCols = self.getNumberOfColumns();
+                return vlx_general::pointer_to_numpy(self.getBatch(iGeneratorPair), numRows, numCols);
+            },
+            "Converts CMOIntsBatch to numpy array.",
+            "iGeneratorPair"_a)
         .def("number_of_batches", &CMOIntsBatch::getNumberOfBatches, "Gets number of MO integrals batches.")
         .def("number_of_rows", &CMOIntsBatch::getNumberOfRows, "Gets number of rows in MO integrals batch.")
         .def("number_of_columns", &CMOIntsBatch::getNumberOfColumns, "Gets number of columns in MO integrals batch.")

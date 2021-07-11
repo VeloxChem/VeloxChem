@@ -120,67 +120,25 @@ class CCubicGrid
     bool operator!=(const CCubicGrid& other) const;
 
     /**
-     Gets X coordinate of the origin.
+     Gets coordinate of the origin.
 
-     @return X coordinate of the origin.
+     @return coordinate of the origin.
      */
-    double originX() const;
+    std::vector<double> getOrigin() const;
 
     /**
-     Gets Y coordinate of the origin.
+     Gets step size in X, Y and Z direction.
 
-     @return Y coordinate of the origin.
+     @return step size in X, Y and Z direction.
      */
-    double originY() const;
+    std::vector<double> getStepSize() const;
 
     /**
-     Gets Z coordinate of the origin.
+     Gets number of points in X, Y and Z direction.
 
-     @return Z coordinate of the origin.
+     @return number of points in X, Y and Z direction.
      */
-    double originZ() const;
-
-    /**
-     Gets step size in X direction.
-
-     @return step size in X direction.
-     */
-    double stepSizeX() const;
-
-    /**
-     Gets step size in Y direction.
-
-     @return step size in Y direction.
-     */
-    double stepSizeY() const;
-
-    /**
-     Gets step size in Z direction.
-
-     @return step size in Z direction.
-     */
-    double stepSizeZ() const;
-
-    /**
-     Gets number of points in X direction.
-
-     @return number of points in X direction.
-     */
-    int32_t numPointsX() const;
-
-    /**
-     Gets number of points in Y direction.
-
-     @return number of points in Y direction.
-     */
-    int32_t numPointsY() const;
-
-    /**
-     Gets number of points in Z direction.
-
-     @return number of points in Z direction.
-     */
-    int32_t numPointsZ() const;
+    std::vector<int32_t> getNumPoints() const;
 
     /**
      Gets constant pointer to first element of cubic grid values.

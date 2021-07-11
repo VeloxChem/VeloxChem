@@ -79,32 +79,6 @@ get_number_of_atomic_orbitals(const CMolecule& molecule, const CMolecularBasis& 
     return nao;
 }
 
-// Helper function for broadcasting CMolecularBasis object
-
-static void
-CMolecularBasis_broadcast(CMolecularBasis& self, int32_t rank, py::object py_comm)
-{
-    auto comm = vlx_general::get_mpi_comm(py_comm);
-
-    self.broadcast(rank, *comm);
-}
-
-// Helper function for converting CAODensityMatrix to numpy array
-
-static py::array_t<double>
-CAODensityMatrix_alpha_density_to_numpy(const CAODensityMatrix& self, const int32_t iDensityMatrix)
-{
-    return vlx_general::pointer_to_numpy(
-        self.alphaDensity(iDensityMatrix), self.getNumberOfRows(iDensityMatrix), self.getNumberOfColumns(iDensityMatrix));
-}
-
-static py::array_t<double>
-CAODensityMatrix_beta_density_to_numpy(const CAODensityMatrix& self, const int32_t iDensityMatrix)
-{
-    return vlx_general::pointer_to_numpy(
-        self.betaDensity(iDensityMatrix), self.getNumberOfRows(iDensityMatrix), self.getNumberOfColumns(iDensityMatrix));
-}
-
 // Helper function for CAODensityMatrix constructor
 
 static std::shared_ptr<CAODensityMatrix>
@@ -120,42 +94,6 @@ CAODensityMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
     }
 
     return std::make_shared<CAODensityMatrix>(dmat, den_type);
-}
-
-// Helper function for broadcasting CAODensityMatrix object
-
-static void
-CAODensityMatrix_broadcast(CAODensityMatrix& self, int32_t rank, py::object py_comm)
-{
-    auto comm = vlx_general::get_mpi_comm(py_comm);
-
-    self.broadcast(rank, *comm);
-}
-
-// Helper function for converting CMolecularOrbitals to numpy array
-
-static py::array_t<double>
-CMolecularOrbitals_alpha_orbitals_to_numpy(const CMolecularOrbitals& self)
-{
-    return vlx_general::pointer_to_numpy(self.alphaOrbitals(), self.getNumberOfRows(), self.getNumberOfColumns());
-}
-
-static py::array_t<double>
-CMolecularOrbitals_beta_orbitals_to_numpy(const CMolecularOrbitals& self)
-{
-    return vlx_general::pointer_to_numpy(self.betaOrbitals(), self.getNumberOfRows(), self.getNumberOfColumns());
-}
-
-static py::array_t<double>
-CMolecularOrbitals_alpha_energies_to_numpy(const CMolecularOrbitals& self)
-{
-    return vlx_general::pointer_to_numpy(self.alphaEnergies(), self.getNumberOfColumns());
-}
-
-static py::array_t<double>
-CMolecularOrbitals_beta_energies_to_numpy(const CMolecularOrbitals& self)
-{
-    return vlx_general::pointer_to_numpy(self.betaEnergies(), self.getNumberOfColumns());
 }
 
 // Helper function for CMolecularOrbitals constructor
@@ -195,16 +133,6 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
     }
 
     return std::make_shared<CMolecularOrbitals>(cmos, ceigs, orbs_type);
-}
-
-// Helper function for broadcasting CMolecularOrbitals object
-
-static void
-CMolecularOrbitals_broadcast(CMolecularOrbitals& self, int32_t rank, py::object py_comm)
-{
-    auto comm = vlx_general::get_mpi_comm(py_comm);
-
-    self.broadcast(rank, *comm);
 }
 
 // Exports classes/functions in src/orbdata to python
@@ -274,7 +202,15 @@ export_orbdata(py::module& m)
         .def("set_label", &CMolecularBasis::setLabel, "Sets name of molecular basis.", "label"_a)
         .def("get_label", &CMolecularBasis::getLabel, "Gets name of molecular basis.")
         .def("get_ao_basis_map", &CMolecularBasis::getAOBasisMap, "Creates string representation map of basis functions.", "molecule"_a)
-        .def("broadcast", &CMolecularBasis_broadcast, "Broadcasts MolecularBasis object.", "rank"_a, "py_comm"_a)
+        .def(
+            "broadcast",
+            [](CMolecularBasis& self, int32_t rank, py::object py_comm) -> void {
+                auto comm = vlx_general::get_mpi_comm(py_comm);
+                self.broadcast(rank, *comm);
+            },
+            "Broadcasts MolecularBasis object.",
+            "rank"_a,
+            "py_comm"_a)
         .def("get_valence_basis", &CMolecularBasis::reduceToValenceBasis, "Reduces molecular basis to valence molecular basis.")
         .def("add_atom_basis", &CMolecularBasis::addAtomBasis, "Adds atom basis object to molecular basis.", "atomBasis"_a)
         .def("get_dimensions_of_basis",
@@ -308,8 +244,24 @@ export_orbdata(py::module& m)
         .def(py::init<const CAODensityMatrix&>())
         .def(py::init(&CAODensityMatrix_from_numpy_list))
         .def("__str__", &CAODensityMatrix::getString)
-        .def("alpha_to_numpy", &CAODensityMatrix_alpha_density_to_numpy, "Converts alpha density matrix to numpy array.", "iDensityMatrix"_a)
-        .def("beta_to_numpy", &CAODensityMatrix_beta_density_to_numpy, "Converts beta density matrix to numpy array.", "iDensityMatrix"_a)
+        .def(
+            "alpha_to_numpy",
+            [](const CAODensityMatrix& self, const int32_t iDensityMatrix) -> py::array_t<double> {
+                auto numRows = self.getNumberOfRows(iDensityMatrix);
+                auto numCols = self.getNumberOfColumns(iDensityMatrix);
+                return vlx_general::pointer_to_numpy(self.alphaDensity(iDensityMatrix), numRows, numCols);
+            },
+            "Converts alpha density matrix to numpy array.",
+            "iDensityMatrix"_a)
+        .def(
+            "beta_to_numpy",
+            [](const CAODensityMatrix& self, const int32_t iDensityMatrix) -> py::array_t<double> {
+                auto numRows = self.getNumberOfRows(iDensityMatrix);
+                auto numCols = self.getNumberOfColumns(iDensityMatrix);
+                return vlx_general::pointer_to_numpy(self.betaDensity(iDensityMatrix), numRows, numCols);
+            },
+            "Converts beta density matrix to numpy array.",
+            "iDensityMatrix"_a)
         .def("number_of_density_matrices", &CAODensityMatrix::getNumberOfDensityMatrices, "Gets number of density matrices.")
         .def("get_density_type", &CAODensityMatrix::getDensityType, "Gets type of density matrix.")
         .def("sub",
@@ -317,7 +269,15 @@ export_orbdata(py::module& m)
              "Creates difference AO density matrix between this AO density matrix and given AO density matrix.",
              "other"_a)
         .def("append", &CAODensityMatrix::append, "Appends AO density matrix object to current AO density matrix object.", "other"_a)
-        .def("broadcast", &CAODensityMatrix_broadcast, "Broadcasts AODensityMatrix object.", "rank"_a, "py_comm"_a)
+        .def(
+            "broadcast",
+            [](CAODensityMatrix& self, int32_t rank, py::object py_comm) -> void {
+                auto comm = vlx_general::get_mpi_comm(py_comm);
+                self.broadcast(rank, *comm);
+            },
+            "Broadcasts AODensityMatrix object.",
+            "rank"_a,
+            "py_comm"_a)
         .def(py::self == py::self);
 
     // CMolecularOrbitals class
@@ -327,10 +287,30 @@ export_orbdata(py::module& m)
         .def(py::init<const CMolecularOrbitals&>())
         .def(py::init(&CMolecularOrbitals_from_numpy_list))
         .def("__str__", &CMolecularOrbitals::getString)
-        .def("alpha_to_numpy", &CMolecularOrbitals_alpha_orbitals_to_numpy, "Converts alpha MO coefficients in MolecularOrbitals to numpy array.")
-        .def("beta_to_numpy", &CMolecularOrbitals_beta_orbitals_to_numpy, "Converts beta MO coefficients in MolecularOrbitals to numpy array.")
-        .def("ea_to_numpy", &CMolecularOrbitals_alpha_energies_to_numpy, "Converts alpha orbital energies in MolecularOrbitals to numpy array.")
-        .def("eb_to_numpy", &CMolecularOrbitals_beta_energies_to_numpy, "Converts beta orbital energies in MolecularOrbitals to numpy array.")
+        .def(
+            "alpha_to_numpy",
+            [](const CMolecularOrbitals& self) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.alphaOrbitals(), self.getNumberOfRows(), self.getNumberOfColumns());
+            },
+            "Converts alpha MO coefficients in MolecularOrbitals to numpy array.")
+        .def(
+            "beta_to_numpy",
+            [](const CMolecularOrbitals& self) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.betaOrbitals(), self.getNumberOfRows(), self.getNumberOfColumns());
+            },
+            "Converts beta MO coefficients in MolecularOrbitals to numpy array.")
+        .def(
+            "ea_to_numpy",
+            [](const CMolecularOrbitals& self) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.alphaEnergies(), self.getNumberOfColumns());
+            },
+            "Converts alpha orbital energies in MolecularOrbitals to numpy array.")
+        .def(
+            "eb_to_numpy",
+            [](const CMolecularOrbitals& self) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.betaEnergies(), self.getNumberOfColumns());
+            },
+            "Converts beta orbital energies in MolecularOrbitals to numpy array.")
         .def("get_orbitals_type", &CMolecularOrbitals::getOrbitalsType, "Gets type of molecular orbital matrix.")
         .def("get_ao_density",
              vlx_general::overload_cast_<const int32_t>()(&CMolecularOrbitals::getAODensity, py::const_),
@@ -375,7 +355,15 @@ export_orbdata(py::module& m)
              "Transforms matrix in AO basis to matrix in MO basis using selected molecular orbitals.",
              "aoMatrix"_a,
              "spinPair"_a)
-        .def("broadcast", &CMolecularOrbitals_broadcast, "Broadcasts MolecularOrbitals object.", "rank"_a, "py_comm"_a)
+        .def(
+            "broadcast",
+            [](CMolecularOrbitals& self, int32_t rank, py::object py_comm) -> void {
+                auto comm = vlx_general::get_mpi_comm(py_comm);
+                self.broadcast(rank, *comm);
+            },
+            "Broadcasts MolecularOrbitals object.",
+            "rank"_a,
+            "py_comm"_a)
         .def(py::self == py::self);
 
     // CSADGuessDriver class
