@@ -41,6 +41,10 @@ class HessianDriver:
 
     Instance variables
         - hessian: The Hessian.
+        - mass_weighted_hessian: The mass-weighted Hessian.
+        - reduced_masses: The reduced masses of the normal modes.
+        - force_constants: The force constants.
+        - frequencies: The vibrational frequencies. 
         - flag: The type of Hessian driver.
         - numerical: Perform numerical Hessian calculation.
         - numerical_grad: Perform numerical gradient calculation.
@@ -68,6 +72,10 @@ class HessianDriver:
         self.ostream = ostream
 
         self.hessian = None
+        self.mass_weighted_hessian = None
+        self.reduced_masses = None
+        self.force_constants = None
+        self.frequencies = None
         self.flag = None
         self.numerical = True
         self.numerical_grad = False
@@ -104,11 +112,11 @@ class HessianDriver:
             # TODO: analytical Hessian not yet implemented
             if not self.numerical:
                 self.numerical = True
+                self.ostream.print_blank()
                 warn_msg = '*** Warning: Analytical Hessian is not yet implemented.'
                 self.ostream.print_header(warn_msg.ljust(56))
                 warn_msg = '    Hessian will be calculated numerically instead.'
                 self.ostream.print_header(warn_msg.ljust(56))
-                self.ostream.print_blank()
                 self.ostream.flush()
 
         # check if gradient is to be calculated numerically
@@ -164,7 +172,7 @@ class HessianDriver:
 
         return
 
-    def vibrational_analysis(self, molecule, ao_basis, filename=None):
+    def vibrational_analysis(self, molecule, ao_basis, filename=None, rsp_drv=None):
         """
         Performs vibrational analysis (frequencies and normal modes)
         based on the molecular Hessian employing the geomeTRIC module.
@@ -175,12 +183,18 @@ class HessianDriver:
             The AO basis set.
         :param filename:
             Filename where thermodynamic properties are saved by geomeTRIC.
+        :param rsp_drv:
+            The response driver (for excited state vibrational analysis).
         """
 
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
         coords = molecule.get_coordinates().reshape(natm*3)
+
+        # square root of atomic masses needed for computing the reduced mass
+        masses_sqrt = np.sqrt(molecule.masses_to_numpy())
+        masses_sqrt_repeat = np.repeat(masses_sqrt, 3)
 
         frequencies, normal_modes, gibbs_energy = ( 
                         geometric.normal_modes.frequency_analysis(coords, 
@@ -189,6 +203,24 @@ class HessianDriver:
                                 temperature=self.temperature,
                                 pressure=self.pressure, outfnm=filename)
                                                     )
+
+
+        # Diagonalizes Hessian and calculates the reduced masses
+        self.diagonalize_hessian(molecule, ao_basis, rsp_drv)
+
+        # Constants and conversion factors
+        # TODO: get these from the proper place.
+        c = 2.99792458e8
+        cm_to_m = 1e-2
+        amu_to_kg = 1.6605390666e-27
+        N_to_mdyne = 1e8
+        m_to_A = 1e10 
+
+        self.force_constants = ( 4.0 * np.pi**2
+                            * (c * (frequencies / cm_to_m) )**2
+                            * self.reduced_masses * amu_to_kg 
+                            )  * ( N_to_mdyne / m_to_A )  
+
         number_of_modes = len(frequencies)
 
         natoms = molecule.number_of_atoms()
@@ -196,10 +228,11 @@ class HessianDriver:
 
         title = 'Vibrational Analysis'
         self.ostream.print_header(title)
-        self.ostream.print_header('-' * (len(title) + 2))
+        self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
-        valstr = 'Frequencies (in cm**-1) and normal modes.'
+        valstr = 'Frequencies (in cm**-1), reduced masses (in amu),'
+        valstr += ' force constants (in mdyne/A), and normal modes.'
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
 
@@ -210,20 +243,26 @@ class HessianDriver:
                  end = number_of_modes
 
             # Print indices and frequencies:
-            index_string = '{:17s}'.format('Index: ')
-            freq_string =  '{:17s}'.format('Frequency: ')
-            normal_mode_string = '{:17s}'.format('Normal mode: ')
+            index_string = '{:17s}'.format('  Index: ')
+            freq_string =  '{:17s}'.format('  Frequency: ')
+            mass_string =  '{:17s}'.format('  Reduced mass: ')
+            force_cnst_string =  '{:17s}'.format('  Force constant:')
+            normal_mode_string = '{:17s}'.format('  Normal mode: ')
             for i in range(k, end):
                 index_string += '{:^31d}'.format(i+1)
                 freq_string +=  '{:^31.2f}'.format(frequencies[i])
+                mass_string += '{:^31.4f}'.format(self.reduced_masses[i])
+                force_cnst_string += '{:^31.4f}'.format(self.force_constants[i])
                 normal_mode_string += '{:^30s}{:>1s}'.format('X         Y         Z','|') 
             self.ostream.print_line(index_string)
             self.ostream.print_line(freq_string)
+            self.ostream.print_line(mass_string)
+            self.ostream.print_line(force_cnst_string)
             self.ostream.print_line(normal_mode_string)
 
             # Print normal modes:
             for atom_index in range(natoms):
-                valstr =  '{:17s}'.format(str(atom_index+1)+' '+atom_symbol[atom_index])
+                valstr =  '{:17s}'.format('  '+str(atom_index+1)+' '+atom_symbol[atom_index])
                
                 for j in range(k, end):
                     valstr += '{:^10.4f}'.format(normal_modes[j][3*atom_index]) # X
@@ -232,6 +271,9 @@ class HessianDriver:
                 self.ostream.print_line(valstr)
             
             self.ostream.print_blank()
+
+        self.ostream.print_blank()
+ 
         self.ostream.flush()
 
 
@@ -311,15 +353,24 @@ class HessianDriver:
         # take the square root of the atomic masses, repeat each three times (xyz components)
         # then form the direct product matrix
         masses_sqrt = np.sqrt(molecule.masses_to_numpy())
-        masses_repeat = np.repeat(masses_sqrt, 3)
-        masses_matrix = masses_repeat.reshape(-1, 1) * masses_repeat
+        masses_sqrt_repeat = np.repeat(masses_sqrt, 3)
+        masses_matrix = masses_sqrt_repeat.reshape(-1, 1) * masses_sqrt_repeat
 
-        # reshape the Hessian as 3Nx3N and mass-weight it
+        # reshape the Hessian as 3Nx3N and mass-weigh it
         reshaped_hessian = self.hessian.reshape(3*natm, 3*natm)
         self.mass_weighted_hessian = reshaped_hessian / masses_matrix
 
         # diagonalize the mass-weighted Hessian
         hessian_eigvals, hessian_eigvecs = np.linalg.eigh(self.mass_weighted_hessian)
+
+        cart_normal_modes = np.einsum('k,ki->ki',
+                                      1/masses_sqrt_repeat,
+                                      hessian_eigvecs)
+
+        reduced_masses = 1.0/(np.einsum('ki->i',cart_normal_modes**2))
+
+        self.reduced_masses = reduced_masses[6:]
+
 
         # the first 6 elements should be close to zero (translation & rotation)
         return hessian_eigvals[6:]
@@ -370,7 +421,7 @@ class HessianDriver:
 
         for k in range(0, natm, 2):
 
-            valstr = '{:15s}'.format('Coord. ')
+            valstr = '{:15s}'.format('  Coord. ')
 
             coord_dict = {0:'(x)', 1:'(y)', 2:'(z)'}
             end = k + 2

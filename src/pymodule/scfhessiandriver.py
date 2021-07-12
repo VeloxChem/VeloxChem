@@ -113,6 +113,7 @@ class ScfHessianDriver(HessianDriver):
         valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
+        self.ostream.print_blank()
         self.ostream.flush()
 
 ###    def compute_analytical(self, molecule, ao_basis):

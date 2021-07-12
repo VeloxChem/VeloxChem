@@ -52,6 +52,7 @@ from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
 from .tdhfgradientdriver import TdhfGradientDriver
+from .scfhessiandriver import ScfHessianDriver
 
 
 def select_scf_driver(task, scf_type):
@@ -216,7 +217,7 @@ def main():
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'scf', 'uscf', 'wavefunction', 'wave function',
         'mp2', 'gradient', 'optimize', 'response', 'pulses', 'visualization',
-        'loprop'
+        'loprop', 'frequencies', 'freq'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -302,6 +303,21 @@ def main():
         opt_drv.update_settings(opt_dict)
         opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+    # Hessian / Vibrational analysis
+
+    if task_type in ['freq', 'frequencies']:
+
+        if 'frequencies' in task.input_dict:
+            freq_dict = task.input_dict['frequencies']
+        else:
+            freq_dict = {}
+
+        hessian_drv = ScfHessianDriver(scf_drv, task.mpi_comm, task.ostream)
+        hessian_drv.update_settings(method_dict, freq_dict)
+        hessian_drv.compute(task.molecule, task.ao_basis)
+        # TODO: add output file name for geomeTRIC vibrational analysis
+        hessian_drv.vibrational_analysis(task.molecule, task.ao_basis)
+
     # Response
 
     if task_type == 'response' and scf_drv.closed_shell:
@@ -333,11 +349,12 @@ def main():
 
         # Calculate the excited-state gradient (for now only
         # CIS relaxed dipole moments)
-        if 'n_state_deriv' in rsp_dict:
+        if 'state_deriv_index' in rsp_dict:
             tdhfgrad_drv = TdhfGradientDriver(task.mpi_comm, task.ostream)
             tdhfgrad_drv.update_settings(rsp_dict, method_dict)
             tdhfgrad_drv.compute(task.molecule, task.ao_basis, scf_tensors,
                                 rsp_prop.rsp_property)
+
 
     # Pulsed Linear Response Theory
 
