@@ -93,17 +93,17 @@ class GradientDriver:
         if is_dft and not self.numerical:
             self.numerical = True
             warn_msg = '*** Warning: Analytical DFT gradient is not yet implemented.'
-            self.ostream.print_header(warn_msg.ljust(56))
-            warn_msg = '    Gradient will be calculated numerically instead.'
-            self.ostream.print_header(warn_msg.ljust(56))
             self.ostream.print_blank()
+            self.ostream.print_header(warn_msg.ljust(56))
+            warn_msg = '              Gradient will be calculated numerically instead.'
+            self.ostream.print_header(warn_msg.ljust(56))
             self.ostream.flush()
 
         # step size for finite differences
         if 'delta_h' in grad_dict:
             self.delta_h = float(grad_dict['delta_h'])
 
-		# TODO: if this is True, numerical must also be True
+        # TODO: if this is True, numerical must also be True
         if 'do_four_point' in grad_dict:
             key = grad_dict['do_four_point'].lower()
             self.do_four_point = True if key in ['yes', 'y'] else False
@@ -116,8 +116,10 @@ class GradientDriver:
             key = grad_dict['dipole_deriv'].lower()
             self.dipole_deriv = True if key in ['yes', 'y'] else False
             if self.dipole_deriv and not self.numerical:
-                warn_msg = '*** Warning: Dipole moment derivatives requested.\n'
-                warn_msg += '           Gradient will be calculated numerically.'
+                self.ostream.print_blank()
+                warn_msg = '*** Warning: Dipole moment derivatives requested.'
+                self.ostream.print_header(warn_msg.ljust(56))
+                warn_msg = '             Gradient will be calculated numerically.'
                 self.ostream.print_header(warn_msg.ljust(56))
                 self.numerical = True
 

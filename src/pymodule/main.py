@@ -53,7 +53,7 @@ from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
 from .tdhfgradientdriver import TdhfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
-
+from .tdhfhessiandriver import TdhfHessianDriver
 
 def select_scf_driver(task, scf_type):
     """
@@ -274,7 +274,12 @@ def main():
             grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
             grad_drv.compute(task.molecule)
         elif scf_drv.closed_shell:
+            if 'gradient' in task.input_dict:
+                grad_dict = task.input_dict['gradient']
+            else:
+                grad_dict = {}
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
+            grad_drv.update_settings(grad_dict, method_dict)
             grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Geometry optimization
@@ -303,7 +308,7 @@ def main():
         opt_drv.update_settings(opt_dict)
         opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-    # Hessian / Vibrational analysis
+    # Ground state Hessian / Vibrational analysis
 
     if task_type in ['freq', 'frequencies']:
 
@@ -347,14 +352,52 @@ def main():
         if task.mpi_rank == mpi_master():
             rsp_prop.print_property(task.ostream)
 
-        # Calculate the excited-state gradient (for now only
-        # CIS relaxed dipole moments)
-        if 'state_deriv_index' in rsp_dict:
-            tdhfgrad_drv = TdhfGradientDriver(task.mpi_comm, task.ostream)
-            tdhfgrad_drv.update_settings(rsp_dict, method_dict)
-            tdhfgrad_drv.compute(task.molecule, task.ao_basis, scf_tensors,
-                                rsp_prop.rsp_property)
+        # Calculate the excited-state gradient
 
+        if 'property' in rsp_dict:
+            prop_type = rsp_dict['property'].lower()
+        else:
+            prop_type = None
+
+        if prop_type in ['absorption', 'uv-vis', 'ecd']: 
+
+            if 'orbital_response' in task.input_dict:
+                orbrsp_dict = task.input_dict['orbital_response']
+            else:
+                orbrsp_dict = {}
+
+            # Excited state gradient
+            if 'gradient' in task.input_dict:
+                grad_dict = task.input_dict['gradient']
+                tdhfgrad_drv = TdhfGradientDriver(scf_drv, 
+                                                  task.mpi_comm, task.ostream)
+                tdhfgrad_drv.update_settings(grad_dict, rsp_dict,
+                                             orbrsp_dict, method_dict)
+                tdhfgrad_drv.compute(task.molecule, task.ao_basis,
+                                     rsp_prop.rsp_driver, rsp_prop.rsp_property)
+
+            # Excited state Hessian and vibrational analysis
+            if 'frequencies' in task.input_dict:
+                freq_dict = task.input_dict['frequencies']
+                tdhfhessian_drv = TdhfHessianDriver(scf_drv, 
+                                                    task.mpi_comm,
+                                                    task.ostream)
+                tdhfhessian_drv.update_settings(method_dict, rsp_dict,
+                                                freq_dict, orbrsp_dict)
+                tdhfhessian_drv.compute(task.molecule, task.ao_basis,
+                                        rsp_prop.rsp_driver)
+                tdhfhessian_drv.vibrational_analysis(task.molecule,
+                                                     task.ao_basis)
+        else:
+            task.ostream.print_blank()
+            info_msg = 'The excited state derivatives '
+            info_msg += 'can only be computed if the response '
+            info_msg += 'property is "absorption", "uv-vis", or "ecd".'
+            task.ostream.print_info(info_msg)
+            info_msg = 'Computation of gradient/Hessian will be skipped.'
+            task.ostream.print_info(info_msg)
+            task.ostream.print_blank()
+            task.ostream.flush()
 
     # Pulsed Linear Response Theory
 
