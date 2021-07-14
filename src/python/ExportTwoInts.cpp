@@ -425,7 +425,7 @@ molecule with specific AO basis set. Performs screening according to
                 auto numCols = self.getNumberOfColumns();
                 return vlx_general::pointer_to_numpy(self.getBatch(iBatch), numRows, numCols);
             },
-            "Converts CMOIntsBatch to numpy array.",
+            "Converts MOIntsBatch to numpy array.",
             "iBatch"_a)
         .def(
             "to_numpy",
@@ -434,7 +434,7 @@ molecule with specific AO basis set. Performs screening according to
                 auto numCols = self.getNumberOfColumns();
                 return vlx_general::pointer_to_numpy(self.getBatch(iGeneratorPair), numRows, numCols);
             },
-            "Converts CMOIntsBatch to numpy array.",
+            "Converts MOIntsBatch to numpy array.",
             "iGeneratorPair"_a)
         .def("number_of_batches", &CMOIntsBatch::getNumberOfBatches, "Gets number of MO integrals batches.")
         .def("number_of_rows", &CMOIntsBatch::getNumberOfRows, "Gets number of rows in MO integrals batch.")

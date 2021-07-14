@@ -1,8 +1,8 @@
 from pathlib import Path
 import numpy as np
-import unittest
 import math
 
+from veloxchem.veloxchemlib import DenseMatrix
 from veloxchem.veloxchemlib import KineticEnergyMatrix
 from veloxchem.veloxchemlib import NuclearPotentialMatrix
 from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver
@@ -16,20 +16,20 @@ from veloxchem.aofockmatrix import AOFockMatrix
 from veloxchem.qqscheme import get_qq_scheme
 
 
-class TestTwoInts(unittest.TestCase):
+class TestTwoInts:
 
-    def test_fock_matrix(self):
+    def test_restricted_fock_matrix(self):
 
         data_j = [[1., .2], [.2, 1.]]
         data_k = [[.9, .5], [.5, .9]]
 
         arr_j = np.array(data_j)
         arr_k = np.array(data_k)
-        arr_jk = arr_j + arr_k
+        arr_jk = 2.0 * arr_j - arr_k
 
-        x = -0.5
+        x = 0.5
         arr_kx = x * arr_k
-        arr_jkx = arr_j + arr_kx
+        arr_jkx = 2.0 * arr_j - arr_kx
 
         fock = AOFockMatrix(
             [arr_jk, arr_jkx, arr_j, arr_k, arr_kx],
@@ -45,17 +45,20 @@ class TestTwoInts(unittest.TestCase):
         np_j = fock.to_numpy(2)
         np_k = fock.to_numpy(3)
 
-        self.assertTrue((arr_j == np_j).all())
-        self.assertTrue((arr_k == np_k).all())
-        self.assertTrue((arr_jkx == np_jkx).all())
+        assert (arr_j == np_j).all()
+        assert (arr_k == np_k).all()
+        assert (arr_jkx == np_jkx).all()
 
-        self.assertEqual(fockmat.restjk, fock.get_fock_type(0))
-        self.assertEqual(x, fock.get_scale_factor(1))
-        self.assertEqual(0, fock.get_density_identifier(2))
+        assert fock.get_fock_type(0) == fockmat.restjk
+        assert fock.get_scale_factor(1) == x
+        assert fock.get_density_identifier(2) == 0
+        assert fock.number_of_fock_matrices() == 5
+        assert fock.is_closed_shell()
 
-        self.assertEqual(5, fock.number_of_fock_matrices())
+        fock.set_scale_factor(2.0 * x, 1)
+        assert fock.get_scale_factor(1) == 2.0 * x
 
-    def test_unrestricted(self):
+    def test_unrestricted_fock_matrix(self):
 
         data_a = [[1., .2], [.2, 1.]]
         data_b = [[.9, .5], [.5, .9]]
@@ -70,19 +73,22 @@ class TestTwoInts(unittest.TestCase):
             [1, 2],
         )
 
-        self.assertEqual(1, fock.number_of_fock_matrices())
+        assert fock.number_of_fock_matrices() == 1
 
-        self.assertTrue((fock.alpha_to_numpy(0) == arr_a).all())
-        self.assertTrue((fock.beta_to_numpy(0) == arr_b).all())
+        assert (fock.alpha_to_numpy(0) == arr_a).all()
+        assert (fock.beta_to_numpy(0) == arr_b).all()
 
-        self.assertEqual(fockmat.unrestjk, fock.get_fock_type(0, 'alpha'))
-        self.assertEqual(fockmat.unrestjk, fock.get_fock_type(0, 'beta'))
+        assert fock.get_fock_type(0, 'alpha') == fockmat.unrestjk
+        assert fock.get_fock_type(0, 'beta') == fockmat.unrestjk
 
-        self.assertEqual(0.7, fock.get_scale_factor(0, 'alpha'))
-        self.assertEqual(0.6, fock.get_scale_factor(0, 'beta'))
+        assert fock.get_scale_factor(0, 'alpha') == 0.7
+        assert fock.get_scale_factor(0, 'beta') == 0.6
 
-        self.assertEqual(1, fock.get_density_identifier(0, 'alpha'))
-        self.assertEqual(2, fock.get_density_identifier(0, 'beta'))
+        assert fock.get_density_identifier(0, 'alpha') == 1
+        assert fock.get_density_identifier(0, 'beta') == 2
+
+        assert fock.number_of_fock_matrices() == 1
+        assert not fock.is_closed_shell()
 
     def test_add_hcore(self):
 
@@ -97,7 +103,15 @@ class TestTwoInts(unittest.TestCase):
         fock.add_hcore(kin, npot, 0)
 
         diff = np.max(np.abs(fock.to_numpy(0) - arr_fock))
-        self.assertAlmostEqual(0., diff, 13)
+        assert abs(diff) < 1.0e-13
+
+        fock.add_matrix(DenseMatrix(arr_t), 0)
+        diff = np.max(np.abs(fock.to_numpy(0) - (arr_fock + arr_t)))
+        assert abs(diff) < 1.0e-13
+
+        fock.scale(0.5, 0)
+        diff = np.max(np.abs(fock.to_numpy(0) - 0.5 * (arr_fock + arr_t)))
+        assert abs(diff) < 1.0e-13
 
     def test_add_fock(self):
 
@@ -111,7 +125,29 @@ class TestTwoInts(unittest.TestCase):
         fock_sum.add(fock_2)
 
         diff = np.max(np.abs(fock_sum.to_numpy(0) - (arr_1 + arr_2)))
-        self.assertAlmostEqual(0., diff, 13)
+        assert abs(diff) < 1.0e-13
+
+    def test_get_energy(self):
+
+        arr_a = np.array([[1., .2], [.2, 1.]])
+        arr_b = np.array([[.9, .5], [.5, .9]])
+
+        fock_rest = AOFockMatrix([arr_a], [fockmat.restjk], [1.0], [0])
+        fock_unrest = AOFockMatrix([arr_a, arr_b],
+                                   [fockmat.unrestjk, fockmat.unrestjk],
+                                   [1.0, 1.0], [0, 0])
+
+        dens_rest = AODensityMatrix([arr_a], denmat.rest)
+        dens_unrest = AODensityMatrix([arr_a, arr_b], denmat.unrest)
+
+        energy_rest = fock_rest.get_energy(0, dens_rest, 0)
+        energy_unrest = fock_unrest.get_energy(0, dens_unrest, 0)
+
+        energy_a = np.trace(np.matmul(arr_a, arr_a))
+        energy_b = np.trace(np.matmul(arr_b, arr_b))
+
+        assert abs(energy_rest - energy_a) < 1.0e-12
+        assert abs(energy_unrest - 0.5 * (energy_a + energy_b)) < 1.0e-12
 
     def test_fock_density(self):
 
@@ -121,9 +157,9 @@ class TestTwoInts(unittest.TestCase):
 
         f_rest = AOFockMatrix(d_rest)
 
-        self.assertEqual(fockmat.restjk, f_rest.get_fock_type(0))
-        self.assertEqual(1.0, f_rest.get_scale_factor(0))
-        self.assertEqual(0, f_rest.get_density_identifier(0))
+        assert f_rest.get_fock_type(0) == fockmat.restjk
+        assert f_rest.get_scale_factor(0) == 1.0
+        assert f_rest.get_density_identifier(0) == 0
 
     def test_fock_build(self):
 
@@ -144,7 +180,7 @@ class TestTwoInts(unittest.TestCase):
 
         ref_enuc = 34.0 / 2.8 + 34.0 / 2.8 + 1.0 / (2.8 * math.sqrt(2.0))
 
-        self.assertAlmostEqual(enuc, ref_enuc, 13)
+        assert abs(enuc - ref_enuc) < 1.0e-13
 
         comm = task.mpi_comm
         rank = task.mpi_rank
@@ -167,10 +203,10 @@ class TestTwoInts(unittest.TestCase):
 
         qqdata = eridrv.compute(ericut.qqden, 1.0e-12, molecule, ao_basis)
 
-        self.assertEqual(get_qq_scheme("QQ"), ericut.qq)
-        self.assertEqual(get_qq_scheme("QQR"), ericut.qqr)
-        self.assertEqual(get_qq_scheme("QQ_DEN"), ericut.qqden)
-        self.assertEqual(get_qq_scheme("QQR_DEN"), ericut.qqrden)
+        assert get_qq_scheme('QQ') == ericut.qq
+        assert get_qq_scheme('QQR') == ericut.qqr
+        assert get_qq_scheme('QQ_DEN') == ericut.qqden
+        assert get_qq_scheme('QQR_DEN') == ericut.qqrden
 
         fock = AOFockMatrix(dmat)
 
@@ -192,16 +228,14 @@ class TestTwoInts(unittest.TestCase):
         eridrv.compute(f2, d2, molecule, ao_basis, qqdata)
         f2.reduce_sum(rank, size, comm)
 
-        self.assertEqual(1, f2.number_of_fock_matrices())
-        self.assertEqual(fockmat.unrestjk, f2.get_fock_type(0, 'alpha'))
-        self.assertEqual(fockmat.unrestjk, f2.get_fock_type(0, 'beta'))
+        assert f2.number_of_fock_matrices() == 1
+        assert f2.get_fock_type(0, 'alpha') == fockmat.unrestjk
+        assert f2.get_fock_type(0, 'beta') == fockmat.unrestjk
 
-        self.assertTrue(
-            np.max(np.abs(fock.alpha_to_numpy(0) -
-                          f2.alpha_to_numpy(0))) < 1.0e-13)
-        self.assertTrue(
-            np.max(np.abs(fock.beta_to_numpy(0) -
-                          f2.beta_to_numpy(0))) < 1.0e-13)
+        assert np.max(
+            np.abs(fock.alpha_to_numpy(0) - f2.alpha_to_numpy(0))) < 1.0e-13
+        assert np.max(
+            np.abs(fock.beta_to_numpy(0) - f2.beta_to_numpy(0))) < 1.0e-13
 
         # compare with reference
 
@@ -215,8 +249,4 @@ class TestTwoInts(unittest.TestCase):
             F2 = fock_ref.to_numpy(0)
             dF = np.max(np.abs(F1 - F2))
 
-            self.assertTrue(dF < 1.0e-11)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert dF < 1.0e-11
