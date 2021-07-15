@@ -33,7 +33,7 @@ from .gradientdriver import GradientDriver
 from .hessiandriver import HessianDriver
 from .scfgradientdriver import ScfGradientDriver
 from .outputstream import OutputStream
-#from .firstorderprop import FirstOrderProperties
+from .firstorderprop import FirstOrderProperties
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -196,6 +196,11 @@ class ScfHessianDriver(HessianDriver):
         # Hessian
         hessian = np.zeros((natm, 3, natm, 3))
 
+        # First-order properties for gradient of dipole moment
+        prop = FirstOrderProperties(self.comm, self.ostream)
+        # numerical gradient (3 dipole components x no. atoms x 3 atom coords)
+        self.dipole_gradient = np.zeros((3, molecule.number_of_atoms(), 3))
+
         if not self.do_four_point:
             for i in range(molecule.number_of_atoms()):
                 for d in range(3):
@@ -205,6 +210,10 @@ class ScfHessianDriver(HessianDriver):
                     grad_drv.compute(new_mol, ao_basis)
                     grad_plus = grad_drv.get_gradient()
 
+                    density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
+                    prop.compute(new_mol, ao_basis, density)
+                    mu_plus = prop.get_property('dipole moment')
+
 
                     coords[i, d] -= 2.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
@@ -212,6 +221,12 @@ class ScfHessianDriver(HessianDriver):
                     grad_drv.compute(new_mol, ao_basis)
                     grad_minus = grad_drv.get_gradient()
 
+                    density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
+                    prop.compute(new_mol, ao_basis, density)
+                    mu_minus = prop.get_property('dipole moment')
+
+                    for c in range(3):
+                        self.dipole_gradient[c, i, d] = (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
                     coords[i, d] += self.delta_h
                     hessian[i, d, :, :] = (grad_plus - grad_minus) / (2.0 * self.delta_h)
 
@@ -228,11 +243,19 @@ class ScfHessianDriver(HessianDriver):
                     grad_drv.compute(new_mol, ao_basis)
                     grad_plus1 = grad_drv.get_gradient()
 
+                    density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
+                    prop.compute(new_mol, ao_basis, density)
+                    mu_plus1 = prop.get_property('dipole moment')
+
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     grad_drv.compute(new_mol, ao_basis)
                     grad_plus2 = grad_drv.get_gradient()
+
+                    density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
+                    prop.compute(new_mol, ao_basis, density)
+                    mu_plus2 = prop.get_property('dipole moment')
 
                     coords[i, d] -= 3.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
@@ -240,12 +263,23 @@ class ScfHessianDriver(HessianDriver):
                     grad_drv.compute(new_mol, ao_basis)
                     grad_minus1 = grad_drv.get_gradient()
 
+                    density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
+                    prop.compute(new_mol, ao_basis, density)
+                    mu_minus1 = prop.get_property('dipole moment')
+
                     coords[i, d] -= self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     grad_drv.compute(new_mol, ao_basis)
                     grad_minus2 = grad_drv.get_gradient()
 
+                    density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
+                    prop.compute(new_mol, ao_basis, density)
+                    mu_minus2 = prop.get_property('dipole moment')
+
+                    for c in range(3):
+                        self.dipole_gradient[c, i, d] = (mu_minus2[c] - 8.0 * mu_minus1[c]
+                                                         + 8.0 * mu_plus1[c] - mu_plus2[c]) / (12.0 * self.delta_h)
                     coords[i, d] += 2.0 * self.delta_h
                     # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
                     hessian[i, d] = (grad_minus2 - 8.0 * grad_minus1

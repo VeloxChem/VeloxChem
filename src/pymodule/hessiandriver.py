@@ -44,7 +44,9 @@ class HessianDriver:
         - mass_weighted_hessian: The mass-weighted Hessian.
         - reduced_masses: The reduced masses of the normal modes.
         - force_constants: The force constants.
-        - frequencies: The vibrational frequencies. 
+        - frequencies: The vibrational frequencies.
+        - normal_modes: The vibrational normal modes in
+                        (non-mass-weighted) Cartesian coordinates.
         - flag: The type of Hessian driver.
         - numerical: Perform numerical Hessian calculation.
         - numerical_grad: Perform numerical gradient calculation.
@@ -76,6 +78,7 @@ class HessianDriver:
         self.reduced_masses = None
         self.force_constants = None
         self.frequencies = None
+        self.normal_modes = None
         self.flag = None
         self.numerical = True
         self.numerical_grad = False
@@ -196,8 +199,8 @@ class HessianDriver:
         masses_sqrt = np.sqrt(molecule.masses_to_numpy())
         masses_sqrt_repeat = np.repeat(masses_sqrt, 3)
 
-        frequencies, normal_modes, gibbs_energy = ( 
-                        geometric.normal_modes.frequency_analysis(coords, 
+        self.frequencies, self.normal_modes, gibbs_energy = (
+                        geometric.normal_modes.frequency_analysis(coords,
                                 self.hessian, elem,
                                 energy=self.elec_energy,
                                 temperature=self.temperature,
@@ -214,14 +217,14 @@ class HessianDriver:
         cm_to_m = 1e-2
         amu_to_kg = 1.6605390666e-27
         N_to_mdyne = 1e8
-        m_to_A = 1e10 
+        m_to_A = 1e10
 
         self.force_constants = ( 4.0 * np.pi**2
-                            * (c * (frequencies / cm_to_m) )**2
-                            * self.reduced_masses * amu_to_kg 
-                            )  * ( N_to_mdyne / m_to_A )  
+                            * (c * (self.frequencies / cm_to_m) )**2
+                            * self.reduced_masses * amu_to_kg
+                            )  * ( N_to_mdyne / m_to_A )
 
-        number_of_modes = len(frequencies)
+        number_of_modes = len(self.frequencies)
 
         natoms = molecule.number_of_atoms()
         atom_symbol = molecule.get_labels()
@@ -250,10 +253,10 @@ class HessianDriver:
             normal_mode_string = '{:17s}'.format('  Normal mode: ')
             for i in range(k, end):
                 index_string += '{:^31d}'.format(i+1)
-                freq_string +=  '{:^31.2f}'.format(frequencies[i])
+                freq_string +=  '{:^31.2f}'.format(self.frequencies[i])
                 mass_string += '{:^31.4f}'.format(self.reduced_masses[i])
                 force_cnst_string += '{:^31.4f}'.format(self.force_constants[i])
-                normal_mode_string += '{:^30s}{:>1s}'.format('X         Y         Z','|') 
+                normal_mode_string += '{:^30s}{:>1s}'.format('X         Y         Z','|')
             self.ostream.print_line(index_string)
             self.ostream.print_line(freq_string)
             self.ostream.print_line(mass_string)
@@ -263,17 +266,17 @@ class HessianDriver:
             # Print normal modes:
             for atom_index in range(natoms):
                 valstr =  '{:17s}'.format('  '+str(atom_index+1)+' '+atom_symbol[atom_index])
-               
+
                 for j in range(k, end):
-                    valstr += '{:^10.4f}'.format(normal_modes[j][3*atom_index]) # X
-                    valstr += '{:^10.4f}'.format(normal_modes[j][3*atom_index+1]) # Y
-                    valstr += '{:^10.4f}{:>1s}'.format(normal_modes[j][3*atom_index+2],'|') # Z
+                    valstr += '{:^10.4f}'.format(self.normal_modes[j][3*atom_index]) # X
+                    valstr += '{:^10.4f}'.format(self.normal_modes[j][3*atom_index+1]) # Y
+                    valstr += '{:^10.4f}{:>1s}'.format(self.normal_modes[j][3*atom_index+2],'|') # Z
                 self.ostream.print_line(valstr)
-            
+
             self.ostream.print_blank()
 
         self.ostream.print_blank()
- 
+
         self.ostream.flush()
 
 
@@ -369,11 +372,15 @@ class HessianDriver:
 
         reduced_masses = 1.0/(np.einsum('ki->i',cart_normal_modes**2))
 
-        self.reduced_masses = reduced_masses[6:]
+        # TODO: linear molecules only for diatomics, needs to be generalized
+        if natm == 2:
+            self.reduced_masses = reduced_masses[5:]
+            return hessian_eigvals[5:]
+        else:
+            self.reduced_masses = reduced_masses[6:]
+            # the first 6 elements should be close to zero (translation & rotation)
+            return hessian_eigvals[6:]
 
-
-        # the first 6 elements should be close to zero (translation & rotation)
-        return hessian_eigvals[6:]
 
 
     def get_hessian(self):
