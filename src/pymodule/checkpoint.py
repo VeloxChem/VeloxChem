@@ -31,6 +31,64 @@ from .veloxchemlib import mpi_master
 from .distributedarray import DistributedArray
 
 
+def write_final_scf_results(fname, molecule, basis, dft_func_label, scf_tensors,
+                            ostream):
+    """
+    Writes final SCF results in a HDF5 file.
+
+    :param fname:
+        Name of the checkpoint file.
+    :param molecule:
+        The molecule.
+    :param basis:
+        The AO basis set.
+    :param dft_func_label:
+        The name of DFT functional.
+    :param scf_tensors:
+        The dictionary of tensors from converged SCF wavefunction.
+    :param ostream:
+        The output stream.
+
+    :return:
+        True if checkpoint file is written. False if checkpoint file is not
+        valid.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str))
+
+    if not valid_checkpoint:
+        return False
+
+    hf = h5py.File(fname, 'w')
+
+    keys = [f'{x}_{y}' for x in 'CEDF' for y in ['alpha', 'beta']]
+    keys.append('S')
+    for key in keys:
+        hf.create_dataset(key, data=scf_tensors[key], compression='gzip')
+
+    hf.create_dataset('nuclear_charges',
+                      data=molecule.elem_ids_to_numpy(),
+                      compression='gzip')
+    hf.create_dataset('atom_coordinates',
+                      data=molecule.get_coordinates(),
+                      compression='gzip')
+    hf.create_dataset('basis_set',
+                      data=np.string_([basis.get_label()]),
+                      compression='gzip')
+    hf.create_dataset('dft_func_label',
+                      data=np.string_([dft_func_label]),
+                      compression='gzip')
+
+    hf.close()
+
+    ostream.print_blank()
+    checkpoint_text = 'Final results written to file: '
+    checkpoint_text += fname
+    ostream.print_info(checkpoint_text)
+
+    return True
+
+
 def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
                    ostream):
     """

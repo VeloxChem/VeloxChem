@@ -37,6 +37,9 @@ class TestH2Se:
             scf_h5 = Path(task.input_dict['scf']['checkpoint_file'])
             if scf_h5.is_file():
                 scf_h5.unlink()
+            scf_final_h5 = scf_h5.with_suffix('.results.h5')
+            if scf_final_h5.is_file():
+                scf_final_h5.unlink()
 
         assert abs(-2400.70461320 - e_scf) < 1.0e-8
         assert abs(-2400.70461320 - e_scf_restart) < 1.0e-8

@@ -24,6 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from collections import deque
+from pathlib import Path
 import numpy as np
 import time as tm
 import math
@@ -55,6 +56,7 @@ from .inputparser import parse_input
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
+from .checkpoint import write_final_scf_results
 
 
 class ScfDriver:
@@ -463,7 +465,7 @@ class ScfDriver:
             Name of the basis set.
         """
 
-        if self.rank == mpi_master() and not self.first_step:
+        if self.rank == mpi_master():
             if self.checkpoint_file and isinstance(self.checkpoint_file, str):
                 self.mol_orbs.write_hdf5(self.checkpoint_file, nuclear_charges,
                                          basis_set)
@@ -688,18 +690,18 @@ class ScfDriver:
             profiler.check_memory_usage('Iteration {:d} Fock diag.'.format(
                 self.num_iter))
 
-            iter_in_hours = (tm.time() - iter_start_time) / 3600
-
-            if self.need_graceful_exit(iter_in_hours):
-                self.graceful_exit(molecule, ao_basis)
+            if not self.first_step:
+                iter_in_hours = (tm.time() - iter_start_time) / 3600
+                if self.need_graceful_exit(iter_in_hours):
+                    self.graceful_exit(molecule, ao_basis)
 
         if not self.first_step:
             signal_handler.remove_sigterm_function()
 
-        self.write_checkpoint(molecule.elem_ids_to_numpy(),
-                              ao_basis.get_label())
+            self.write_checkpoint(molecule.elem_ids_to_numpy(),
+                                  ao_basis.get_label())
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and not self.first_step:
             S = ovl_mat.to_numpy()
 
             C_alpha = self.mol_orbs.alpha_to_numpy()
@@ -729,6 +731,17 @@ class ScfDriver:
                 'F_alpha': F_alpha,
                 'F_beta': F_beta,
             }
+
+            if self.is_converged:
+                if self.checkpoint_file is not None:
+                    final_h5_fname = str(
+                        Path(self.checkpoint_file).with_suffix('.results.h5'))
+                else:
+                    final_h5_fname = 'scf.results.h5'
+                xc_label = self.xcfun.get_func_label() if self.dft else 'HF'
+                write_final_scf_results(final_h5_fname, molecule, ao_basis,
+                                        xc_label, self.scf_tensors,
+                                        self.ostream)
         else:
             self.scf_tensors = None
 
