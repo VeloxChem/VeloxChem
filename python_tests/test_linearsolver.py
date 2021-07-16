@@ -1,7 +1,6 @@
 from mpi4py import MPI
 import numpy as np
 import time as tm
-import unittest
 
 from veloxchem.veloxchemlib import denmat
 from veloxchem.molecule import Molecule
@@ -12,7 +11,7 @@ from veloxchem.aofockmatrix import AOFockMatrix
 from veloxchem.linearsolver import LinearSolver
 
 
-class TestLinearSolver(unittest.TestCase):
+class TestLinearSolver:
 
     def test_update_settings(self):
 
@@ -41,16 +40,16 @@ class TestLinearSolver(unittest.TestCase):
         lin_solver = LinearSolver(MPI.COMM_WORLD, OutputStream(None))
 
         for key, val in rsp_dict.items():
-            self.assertTrue(getattr(lin_solver, key) != val)
+            assert getattr(lin_solver, key) != val
         for key, val in method_dict.items():
-            self.assertTrue(getattr(lin_solver, key) != val)
+            assert getattr(lin_solver, key) != val
 
         lin_solver.update_settings(rsp_dict, method_dict)
 
         for key, val in rsp_dict.items():
-            self.assertTrue(getattr(lin_solver, key) == val)
+            assert getattr(lin_solver, key) == val
         for key, val in method_dict.items():
-            self.assertTrue(getattr(lin_solver, key) == val)
+            assert getattr(lin_solver, key) == val
 
     def get_molecule_and_basis(self):
 
@@ -84,7 +83,7 @@ class TestLinearSolver(unittest.TestCase):
         solver.comp_lr_fock_split_comm(fock, dens, mol, bas, eri_dict, dft_dict,
                                        pe_dict)
 
-        self.assertEqual(fock.alpha_to_numpy(0).shape, dmat.shape)
+        assert fock.alpha_to_numpy(0).shape == dmat.shape
 
     def test_need_graceful_exit(self):
 
@@ -95,9 +94,5 @@ class TestLinearSolver(unittest.TestCase):
         solver.maximum_hours = 1.0
         solver.program_start_time = tm.time()
 
-        self.assertTrue(solver.need_graceful_exit(1.5))
-        self.assertFalse(solver.need_graceful_exit(0.5))
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert solver.need_graceful_exit(1.5)
+        assert not solver.need_graceful_exit(0.5)

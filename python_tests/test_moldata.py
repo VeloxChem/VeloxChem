@@ -1,4 +1,3 @@
-import unittest
 from pathlib import Path
 import tempfile
 
@@ -6,11 +5,11 @@ import numpy as np
 
 from veloxchem.molecule import Molecule
 from veloxchem.mpitask import MpiTask
-from veloxchem.veloxchemlib import (ChemicalElement, DispersionModel,
-                                    bohr_in_angstroms, is_mpi_master)
+from veloxchem.veloxchemlib import ChemicalElement, DispersionModel
+from veloxchem.veloxchemlib import bohr_in_angstroms, is_mpi_master
 
 
-class TestMolData(unittest.TestCase):
+class TestMolData:
 
     def nh3_labels(self):
 
@@ -66,14 +65,14 @@ class TestMolData(unittest.TestCase):
         mol_8 = Molecule([7, 1, 1, 1], array_ang, 'angstrom')
         mol_9 = Molecule([7, 1, 1, 1], array_ang)
 
-        self.assertEqual(mol_1, mol_2)
-        self.assertEqual(mol_1, mol_3)
-        self.assertEqual(mol_1, mol_4)
-        self.assertEqual(mol_1, mol_5)
-        self.assertEqual(mol_1, mol_6)
-        self.assertEqual(mol_1, mol_7)
-        self.assertEqual(mol_1, mol_8)
-        self.assertEqual(mol_1, mol_9)
+        assert mol_1 == mol_2
+        assert mol_1 == mol_3
+        assert mol_1 == mol_4
+        assert mol_1 == mol_5
+        assert mol_1 == mol_6
+        assert mol_1 == mol_7
+        assert mol_1 == mol_8
+        assert mol_1 == mol_9
 
     def test_get_sub_molecule(self):
 
@@ -90,9 +89,9 @@ class TestMolData(unittest.TestCase):
 
         mol_4 = self.nh3_molecule()
 
-        self.assertEqual(mol_1, mol_3)
-        self.assertEqual(mol_1, mol_4)
-        self.assertEqual(mol_2, molecule)
+        assert mol_1 == mol_3
+        assert mol_1 == mol_4
+        assert mol_2 == molecule
 
     def test_coordinates_to_numpy(self):
 
@@ -106,42 +105,42 @@ class TestMolData(unittest.TestCase):
         y_arr = np.array([3.019, 4.942, 2.415, 2.569])
         z_arr = np.array([-0.037, 0.059, 1.497, -1.573])
 
-        self.assertTrue((x == x_arr).all())
-        self.assertTrue((y == y_arr).all())
-        self.assertTrue((z == z_arr).all())
+        assert (x == x_arr).all()
+        assert (y == y_arr).all()
+        assert (z == z_arr).all()
 
     def test_center_of_mass(self):
 
         mol = self.nh3_molecule()
         mol_com = mol.center_of_mass()
         ref_com = np.array([-3.831697, 3.070437, -0.031436])
-        self.assertTrue(np.max(np.abs(ref_com - mol_com)) < 1.0e-6)
+        assert np.max(np.abs(ref_com - mol_com)) < 1.0e-6
 
     def test_setters_and_getters(self):
 
         mol = self.nh3_molecule()
 
         mol.set_charge(-1)
-        self.assertEqual(-1.0, mol.get_charge())
+        assert mol.get_charge() == -1.0
 
         mol.set_multiplicity(2)
-        self.assertEqual(2.0, mol.get_multiplicity())
+        assert mol.get_multiplicity() == 2.0
 
         mol.check_multiplicity()
         mol.check_proximity(0.1)
 
         elem_comp = mol.get_elemental_composition()
-        self.assertTrue(elem_comp == set((7, 1)))
+        assert elem_comp == set((7, 1))
 
     def test_number_of_atoms(self):
 
         mol = self.nh3_molecule()
 
-        self.assertEqual(mol.number_of_atoms(1), 3)
-        self.assertEqual(mol.number_of_atoms(7), 1)
+        assert mol.number_of_atoms(1) == 3
+        assert mol.number_of_atoms(7) == 1
 
-        self.assertEqual(mol.number_of_atoms(0, 1, 1), 0)
-        self.assertEqual(mol.number_of_atoms(0, 2, 1), 1)
+        assert mol.number_of_atoms(0, 1, 1) == 0
+        assert mol.number_of_atoms(0, 2, 1) == 1
 
     def test_vdw_radii_and_elem_ids(self):
 
@@ -169,28 +168,28 @@ class TestMolData(unittest.TestCase):
 
         ref_radii /= bohr_in_angstroms()
 
-        self.assertTrue((atom_radii == ref_radii).all())
+        assert (atom_radii == ref_radii).all()
 
         elem_ids = mol.elem_ids_to_numpy()
 
-        self.assertTrue(elem_ids.dtype.type is np.int32)
+        assert elem_ids.dtype.type is np.int32
 
         ref_ids = np.array([1, 3, 6, 7, 8, 16, 29, 30, 35, 47, 79, 80])
 
-        self.assertTrue((elem_ids == ref_ids).all())
+        assert (elem_ids == ref_ids).all()
 
     def test_chemical_element(self):
 
         elem = ChemicalElement()
-        self.assertEqual('', elem.get_name())
+        assert elem.get_name() == ''
         elem.set_atom_type('BR')
-        self.assertEqual('Br', elem.get_name())
+        assert elem.get_name() == 'Br'
 
         elem2 = ChemicalElement()
         elem2.set_atom_type(35)
-        self.assertEqual('Br', elem2.get_name())
+        assert elem2.get_name() == 'Br'
 
-        self.assertEqual(elem, elem2)
+        assert elem == elem2
 
     def test_dispersion_model(self):
 
@@ -250,15 +249,15 @@ class TestMolData(unittest.TestCase):
 
             e_disp = disp.get_energy()
             e_ref = sum(ref_energies[xc_label])
-            self.assertTrue(abs(e_disp - e_ref) < 1.0e-13)
-            self.assertTrue(abs(e_disp - e_ref) / abs(e_ref) < 1.0e-10)
+            assert abs(e_disp - e_ref) < 1.0e-13
+            assert abs(e_disp - e_ref) / abs(e_ref) < 1.0e-10
 
             g_disp = disp.get_gradient().to_numpy()
             g_ref = ref_gradient[xc_label]
             max_diff = np.max(np.abs(g_disp - g_ref))
             max_rel_diff = np.max(np.abs(g_disp - g_ref) / np.abs(g_ref))
-            self.assertTrue(max_diff < 1.0e-13)
-            self.assertTrue(max_rel_diff < 1.0e-10)
+            assert max_diff < 1.0e-13
+            assert max_rel_diff < 1.0e-10
 
     def test_get_ic_rmsd(self):
 
@@ -312,8 +311,7 @@ class TestMolData(unittest.TestCase):
 
         for ic in ['bonds', 'angles', 'dihedrals']:
             for val in ['rms', 'max']:
-                self.assertTrue(
-                    abs(ic_rmsd[ic][val] - ref_ic_rmsd[ic][val]) < 1.0e-3)
+                assert abs(ic_rmsd[ic][val] - ref_ic_rmsd[ic][val]) < 1.0e-3
 
     def test_write_xyz(self):
 
@@ -330,18 +328,13 @@ class TestMolData(unittest.TestCase):
             ref_coords = mol.get_coordinates()
 
             mol_2 = Molecule.read_xyz(fname)
-            self.assertEqual(ref_labels, mol_2.get_labels())
-            self.assertTrue(
-                np.max(np.abs(ref_coords - mol_2.get_coordinates())) < 1.0e-10)
+            assert ref_labels == mol_2.get_labels()
+            assert np.max(
+                np.abs(ref_coords - mol_2.get_coordinates())) < 1.0e-10
 
             with open(fname, 'r') as f_xyz:
                 lines = f_xyz.readlines()
                 mol_3 = Molecule.from_xyz_string(''.join(lines))
-                self.assertEqual(ref_labels, mol_3.get_labels())
-                self.assertTrue(
-                    np.max(np.abs(ref_coords -
-                                  mol_3.get_coordinates())) < 1.0e-10)
-
-
-if __name__ == '__main__':
-    unittest.main()
+                assert ref_labels == mol_3.get_labels()
+                assert np.max(
+                    np.abs(ref_coords - mol_3.get_coordinates())) < 1.0e-10
