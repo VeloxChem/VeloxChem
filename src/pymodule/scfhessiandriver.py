@@ -198,8 +198,9 @@ class ScfHessianDriver(HessianDriver):
 
         # First-order properties for gradient of dipole moment
         prop = FirstOrderProperties(self.comm, self.ostream)
-        # numerical gradient (3 dipole components x no. atoms x 3 atom coords)
-        self.dipole_gradient = np.zeros((3, molecule.number_of_atoms(), 3))
+        # numerical gradient (3 dipole components, no. atoms x 3 atom coords)
+        #self.dipole_gradient = np.zeros((3, molecule.number_of_atoms(), 3))
+        self.dipole_gradient = np.zeros((3, 3 * molecule.number_of_atoms()))
 
         if not self.do_four_point:
             for i in range(molecule.number_of_atoms()):
@@ -226,7 +227,7 @@ class ScfHessianDriver(HessianDriver):
                     mu_minus = prop.get_property('dipole moment')
 
                     for c in range(3):
-                        self.dipole_gradient[c, i, d] = (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
+                        self.dipole_gradient[c, 3*i + d] = (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
                     coords[i, d] += self.delta_h
                     hessian[i, d, :, :] = (grad_plus - grad_minus) / (2.0 * self.delta_h)
 

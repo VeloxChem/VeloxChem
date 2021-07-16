@@ -28,7 +28,11 @@ import sys
 from mpi4py import MPI
 
 from .outputstream import OutputStream
+from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import dipole_in_debye
+
 import geometric
+
 
 class HessianDriver:
     """
