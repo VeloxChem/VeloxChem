@@ -12,7 +12,7 @@ from veloxchem.linearsolver import LinearSolver
 from veloxchem.checkpoint import write_rsp_hdf5
 from veloxchem.checkpoint import read_rsp_hdf5
 from veloxchem.checkpoint import check_rsp_hdf5
-from veloxchem.checkpoint import append_rsp_solution_hdf5
+from veloxchem.checkpoint import append_final_rsp_solution
 from veloxchem.checkpoint import write_distributed_focks
 from veloxchem.checkpoint import read_distributed_focks
 from veloxchem.checkpoint import check_distributed_focks
@@ -63,7 +63,7 @@ class TestCheckpoint:
             # test appending
             new_array = np.random.rand(10, 20)
             new_label = 'c'
-            append_rsp_solution_hdf5(fname, new_label, new_array)
+            append_final_rsp_solution(fname, new_label, new_array)
 
             # test hdf5
             arrays.append(new_array)

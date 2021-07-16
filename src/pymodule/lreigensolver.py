@@ -24,9 +24,9 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import time as tm
-import psutil
 import sys
 
 from .veloxchemlib import AODensityMatrix
@@ -44,7 +44,7 @@ from .cubicgrid import CubicGrid
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .checkpoint import check_rsp_hdf5
-from .checkpoint import append_rsp_solution_hdf5
+from .checkpoint import create_final_rsp_hdf5, append_final_rsp_solution
 
 
 class LinearResponseEigenSolver(LinearSolver):
@@ -447,11 +447,15 @@ class LinearResponseEigenSolver(LinearSolver):
             x_0 = self.get_full_solution_vector(excitations[key_0][1])
 
             if self.rank == mpi_master():
-                avail_mem = psutil.virtual_memory().available
-                write_solution_to_file = (avail_mem <
-                                          sys.getsizeof(x_0) * self.nstates * 2)
-                if not write_solution_to_file:
-                    eigvecs = np.zeros((x_0.size, self.nstates))
+                eigvecs = np.zeros((x_0.size, self.nstates))
+
+                if self.checkpoint_file is not None:
+                    final_h5_fname = str(
+                        Path(self.checkpoint_file).with_suffix('.solutions.h5'))
+                else:
+                    final_h5_fname = 'rsp.solutions.h5'
+                if self.rank == mpi_master():
+                    create_final_rsp_hdf5(final_h5_fname)
 
             nto_lambdas = []
             nto_cube_files = []
@@ -526,11 +530,10 @@ class LinearResponseEigenSolver(LinearSolver):
                         magn_trans_dipoles[s, ind] = np.vdot(
                             mdip_rhs[ind], eigvec)
 
-                    if write_solution_to_file:
-                        append_rsp_solution_hdf5(self.checkpoint_file,
-                                                 'S{:d}'.format(s + 1), eigvec)
-                    else:
-                        eigvecs[:, s] = eigvec[:]
+                    eigvecs[:, s] = eigvec[:]
+
+                    append_final_rsp_solution(final_h5_fname,
+                                              'S{:d}'.format(s + 1), eigvec)
 
             if self.nto or self.detach_attach:
                 self.ostream.print_blank()
@@ -545,15 +548,13 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 ret_dict = {
                     'eigenvalues': eigvals,
+                    'eigenvectors': eigvecs,
                     'electric_transition_dipoles': elec_trans_dipoles,
                     'velocity_transition_dipoles': velo_trans_dipoles,
                     'magnetic_transition_dipoles': magn_trans_dipoles,
                     'oscillator_strengths': osc,
                     'rotatory_strengths': rot_vel,
                 }
-
-                if not write_solution_to_file:
-                    ret_dict['eigenvectors'] = eigvecs
 
                 if self.nto:
                     ret_dict['nto_lambdas'] = nto_lambdas
@@ -562,9 +563,14 @@ class LinearResponseEigenSolver(LinearSolver):
                 if self.detach_attach:
                     ret_dict['density_cubes'] = dens_cube_files
 
+                checkpoint_text = 'Final solutions written to file: '
+                checkpoint_text += final_h5_fname
+                self.ostream.print_info(checkpoint_text)
+                self.ostream.print_blank()
+
                 return ret_dict
 
-        return {}
+        return None
 
     def get_full_solution_vector(self, solution):
         """

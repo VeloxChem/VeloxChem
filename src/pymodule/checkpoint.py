@@ -23,7 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from os.path import isfile
+from pathlib import Path
 import numpy as np
 import h5py
 
@@ -87,6 +87,42 @@ def write_final_scf_results(fname, molecule, basis, dft_func_label, scf_tensors,
     ostream.print_info(checkpoint_text)
 
     return True
+
+
+def create_final_rsp_hdf5(fname):
+    """
+    Creates an empty HDF5 file for storing response solution vectors.
+
+    :param fname:
+        The name of the checkpoint file.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str))
+
+    if valid_checkpoint:
+        hf = h5py.File(fname, 'w')
+        hf.close()
+
+
+def append_final_rsp_solution(fname, key, vec):
+    """
+    Appends a solution vector to checkpoint file.
+
+    :param fname:
+        The name of the checkpoint file.
+    :param key:
+        The key for the solution vector.
+    :param vec:
+        The solution vector.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
+
+    if valid_checkpoint:
+        hf = h5py.File(fname, 'a')
+        hf.create_dataset(key, data=vec, compression='gzip')
+        hf.close()
 
 
 def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
@@ -236,7 +272,8 @@ def check_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict):
         True if the checkpoint file is valid, False otherwise.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and isfile(fname))
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
 
     if not valid_checkpoint:
         return False
@@ -291,26 +328,6 @@ def check_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict):
     return (match_labels and match_nuclear_repulsion and
             match_nuclear_charges and match_basis_set and match_dft_func and
             match_potfile)
-
-
-def append_rsp_solution_hdf5(fname, key, vec):
-    """
-    Appends a solution vector to checkpoint file.
-
-    :param fname:
-        The name of the checkpoint file.
-    :param key:
-        The key for the solution vector.
-    :param vec:
-        The solution vector.
-    """
-
-    valid_checkpoint = (fname and isinstance(fname, str))
-
-    if valid_checkpoint:
-        hf = h5py.File(fname, 'a')
-        hf.create_dataset(key, data=vec, compression='gzip')
-        hf.close()
 
 
 def write_distributed_focks(fname, focks, keys, freqs, comm, ostream):
@@ -426,7 +443,8 @@ def check_distributed_focks(fname, keys, freqs):
         True if the checkpoint file is valid, False otherwise.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and isfile(fname))
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
 
     if not valid_checkpoint:
         return False
