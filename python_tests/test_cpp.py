@@ -1,7 +1,6 @@
 import random
 import sys
 import tempfile
-import unittest
 from pathlib import Path
 
 import numpy as np
@@ -20,7 +19,7 @@ from veloxchem.veloxchemlib import is_mpi_master
 
 
 @pytest.mark.solvers
-class TestCPP(unittest.TestCase):
+class TestCPP:
 
     def run_scf(self, task):
 
@@ -62,7 +61,7 @@ class TestCPP(unittest.TestCase):
         cpp_prop.init_driver(task.mpi_comm, task.ostream)
         cpp_prop.compute(task.molecule, task.ao_basis, scf_tensors)
 
-        self.assertTrue(cpp_prop.rsp_driver.is_converged)
+        assert cpp_prop.rsp_driver.is_converged
 
         if is_mpi_master(task.mpi_comm):
             self.check_printout(cpp_prop)
@@ -73,8 +72,8 @@ class TestCPP(unittest.TestCase):
                 for w in ref_freqs
                 for (a, b) in ['xx', 'yy', 'zz', 'xy', 'xz', 'yz']
             ])
-            self.assertTrue(np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4)
-            self.assertTrue(np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4)
+            assert np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4
+            assert np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4
 
     def check_printout(self, cpp_prop):
 
@@ -100,9 +99,9 @@ class TestCPP(unittest.TestCase):
                             key_found = True
                             print_real = float(content[1])
                             print_imag = float(content[2].replace('j', ''))
-                            self.assertAlmostEqual(val.real, print_real, 6)
-                            self.assertAlmostEqual(val.imag, print_imag, 6)
-                self.assertTrue(key_found)
+                            assert abs(val.real - print_real) < 1.0e-6
+                            assert abs(val.imag - print_imag) < 1.0e-6
+                assert key_found
 
     def test_cpp_hf(self):
 
@@ -285,7 +284,3 @@ class TestCPP(unittest.TestCase):
         data_lines = raw_data.splitlines()[1:-1]
 
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
-
-
-if __name__ == '__main__':
-    unittest.main()
