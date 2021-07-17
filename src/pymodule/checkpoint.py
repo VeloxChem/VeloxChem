@@ -31,82 +31,78 @@ from .veloxchemlib import mpi_master
 from .distributedarray import DistributedArray
 
 
-def write_final_scf_results(fname, molecule, basis, dft_func_label, scf_tensors,
-                            ostream):
+def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
     """
-    Writes final SCF results in a HDF5 file.
+    Creates HDF5 file for a calculation.
 
     :param fname:
-        Name of the checkpoint file.
+        Name of the HDF5 file.
     :param molecule:
         The molecule.
     :param basis:
         The AO basis set.
     :param dft_func_label:
         The name of DFT functional.
-    :param scf_tensors:
-        The dictionary of tensors from converged SCF wavefunction.
-    :param ostream:
-        The output stream.
-
-    :return:
-        True if checkpoint file is written. False if checkpoint file is not
-        valid.
-    """
-
-    valid_checkpoint = (fname and isinstance(fname, str))
-
-    if not valid_checkpoint:
-        return False
-
-    hf = h5py.File(fname, 'w')
-
-    keys = [f'{x}_{y}' for x in 'CEDF' for y in ['alpha', 'beta']]
-    keys.append('S')
-    for key in keys:
-        hf.create_dataset(key, data=scf_tensors[key], compression='gzip')
-
-    hf.create_dataset('nuclear_charges',
-                      data=molecule.elem_ids_to_numpy(),
-                      compression='gzip')
-    hf.create_dataset('atom_coordinates',
-                      data=molecule.get_coordinates(),
-                      compression='gzip')
-    hf.create_dataset('basis_set',
-                      data=np.string_([basis.get_label()]),
-                      compression='gzip')
-    hf.create_dataset('dft_func_label',
-                      data=np.string_([dft_func_label]),
-                      compression='gzip')
-
-    hf.close()
-
-    ostream.print_blank()
-    checkpoint_text = 'Final results written to file: '
-    checkpoint_text += fname
-    ostream.print_info(checkpoint_text)
-
-    return True
-
-
-def create_final_rsp_hdf5(fname):
-    """
-    Creates an empty HDF5 file for storing response solution vectors.
-
-    :param fname:
-        The name of the checkpoint file.
+    :param potfile_text:
+        The content of potential file for polarizable embedding.
     """
 
     valid_checkpoint = (fname and isinstance(fname, str))
 
     if valid_checkpoint:
         hf = h5py.File(fname, 'w')
+
+        hf.create_dataset('nuclear_repulsion',
+                          data=np.array([molecule.nuclear_repulsion_energy()]),
+                          compression='gzip')
+
+        hf.create_dataset('nuclear_charges',
+                          data=molecule.elem_ids_to_numpy(),
+                          compression='gzip')
+
+        hf.create_dataset('atom_coordinates',
+                          data=molecule.get_coordinates(),
+                          compression='gzip')
+
+        hf.create_dataset('basis_set',
+                          data=np.string_([basis.get_label()]),
+                          compression='gzip')
+
+        hf.create_dataset('dft_func_label',
+                          data=np.string_([dft_func_label]),
+                          compression='gzip')
+
+        hf.create_dataset('potfile_text',
+                          data=np.string_([potfile_text]),
+                          compression='gzip')
+
         hf.close()
 
 
-def append_final_rsp_solution(fname, key, vec):
+def write_scf_tensors(fname, scf_tensors):
     """
-    Appends a solution vector to checkpoint file.
+    Writes SCF tensors to HDF5 file.
+
+    :param fname:
+        Name of the HDF5 file.
+    :param scf_tensors:
+        The dictionary of tensors from converged SCF wavefunction.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
+
+    if valid_checkpoint:
+        hf = h5py.File(fname, 'a')
+        keys = ['S'] + [f'{x}_{y}' for x in 'CEDF' for y in ['alpha', 'beta']]
+        for key in keys:
+            hf.create_dataset(key, data=scf_tensors[key], compression='gzip')
+        hf.close()
+
+
+def write_rsp_solution(fname, key, vec):
+    """
+    Writes a response solution vector to HDF5 file.
 
     :param fname:
         The name of the checkpoint file.
@@ -158,38 +154,12 @@ def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
     if not valid_checkpoint:
         return False
 
-    e_nuc = molecule.nuclear_repulsion_energy()
-    nuclear_charges = molecule.elem_ids_to_numpy()
-    basis_set = basis.get_label()
+    create_hdf5(fname, molecule, basis, dft_dict['dft_func_label'],
+                pe_dict['potfile_text'])
 
-    dft_func_label = dft_dict['dft_func_label']
-    potfile_text = pe_dict['potfile_text']
-
-    hf = h5py.File(fname, 'w')
-
+    hf = h5py.File(fname, 'a')
     for label, array in zip(labels, arrays):
         hf.create_dataset(label, data=array, compression='gzip')
-
-    hf.create_dataset('nuclear_repulsion',
-                      data=np.array([e_nuc]),
-                      compression='gzip')
-
-    hf.create_dataset('nuclear_charges',
-                      data=nuclear_charges,
-                      compression='gzip')
-
-    hf.create_dataset('basis_set',
-                      data=np.string_([basis_set]),
-                      compression='gzip')
-
-    hf.create_dataset('dft_func_label',
-                      data=np.string_([dft_func_label]),
-                      compression='gzip')
-
-    hf.create_dataset('potfile_text',
-                      data=np.string_([potfile_text]),
-                      compression='gzip')
-
     hf.close()
 
     checkpoint_text = 'Checkpoint written to file: '

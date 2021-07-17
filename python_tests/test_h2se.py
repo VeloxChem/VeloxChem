@@ -37,7 +37,7 @@ class TestH2Se:
             scf_h5 = Path(task.input_dict['scf']['checkpoint_file'])
             if scf_h5.is_file():
                 scf_h5.unlink()
-            scf_final_h5 = scf_h5.with_suffix('.results.h5')
+            scf_final_h5 = scf_h5.with_suffix('.tensors.h5')
             if scf_final_h5.is_file():
                 scf_final_h5.unlink()
 

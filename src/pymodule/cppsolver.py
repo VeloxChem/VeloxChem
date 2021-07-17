@@ -38,7 +38,7 @@ from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .checkpoint import check_rsp_hdf5
-from .checkpoint import create_final_rsp_hdf5, append_final_rsp_solution
+from .checkpoint import create_hdf5, write_rsp_solution
 
 
 class ComplexResponse(LinearSolver):
@@ -699,7 +699,9 @@ class ComplexResponse(LinearSolver):
                     else:
                         final_h5_fname = 'rsp.solutions.h5'
                     if self.rank == mpi_master():
-                        create_final_rsp_hdf5(final_h5_fname)
+                        create_hdf5(final_h5_fname, molecule, basis,
+                                    dft_dict['dft_func_label'],
+                                    pe_dict['potfile_text'])
 
                 for bop, w in solutions:
                     x = self.get_full_solution_vector(solutions[(bop, w)])
@@ -709,12 +711,12 @@ class ComplexResponse(LinearSolver):
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
                             full_solutions[(bop, w)] = x
 
-                            append_final_rsp_solution(
+                            write_rsp_solution(
                                 final_h5_fname,
                                 '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
 
                 if self.rank == mpi_master():
-                    checkpoint_text = 'Final solutions written to file: '
+                    checkpoint_text = 'Response solution vectors written to file: '
                     checkpoint_text += final_h5_fname
                     self.ostream.print_info(checkpoint_text)
                     self.ostream.print_blank()

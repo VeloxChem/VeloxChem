@@ -56,7 +56,7 @@ from .inputparser import parse_input
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
-from .checkpoint import write_final_scf_results
+from .checkpoint import create_hdf5, write_scf_tensors
 
 
 class ScfDriver:
@@ -733,15 +733,8 @@ class ScfDriver:
             }
 
             if self.is_converged:
-                if self.checkpoint_file is not None:
-                    final_h5_fname = str(
-                        Path(self.checkpoint_file).with_suffix('.results.h5'))
-                else:
-                    final_h5_fname = 'scf.results.h5'
-                xc_label = self.xcfun.get_func_label() if self.dft else 'HF'
-                write_final_scf_results(final_h5_fname, molecule, ao_basis,
-                                        xc_label, self.scf_tensors,
-                                        self.ostream)
+                self.write_final_hdf5(molecule, ao_basis)
+
         else:
             self.scf_tensors = None
 
@@ -1868,3 +1861,38 @@ class ScfDriver:
             self.ostream.print_header(valstr.ljust(92))
             valstr = 'and S. Grimme, J. Chem Phys, 2019, 150, 154122.'
             self.ostream.print_header(valstr.ljust(92))
+
+    def write_final_hdf5(self, molecule, ao_basis):
+        """
+        Writes final HDF5 that contains SCF tensors.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        """
+
+        if self.checkpoint_file is not None:
+            final_h5_fname = str(
+                Path(self.checkpoint_file).with_suffix('.tensors.h5'))
+        else:
+            final_h5_fname = 'scf.tensors.h5'
+
+        if self.dft:
+            xc_label = self.xcfun.get_func_label()
+        else:
+            xc_label = 'HF'
+
+        if self.pe:
+            with open(str(self.pe_options['potfile']), 'r') as f_pot:
+                potfile_text = '\n'.join(f_pot.readlines())
+        else:
+            potfile_text = ''
+
+        create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
+        write_scf_tensors(final_h5_fname, self.scf_tensors)
+
+        self.ostream.print_blank()
+        checkpoint_text = 'SCF tensors written to file: '
+        checkpoint_text += final_h5_fname
+        self.ostream.print_info(checkpoint_text)

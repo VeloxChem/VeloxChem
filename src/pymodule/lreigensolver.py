@@ -44,7 +44,7 @@ from .cubicgrid import CubicGrid
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .checkpoint import check_rsp_hdf5
-from .checkpoint import create_final_rsp_hdf5, append_final_rsp_solution
+from .checkpoint import create_hdf5, write_rsp_solution
 
 
 class LinearResponseEigenSolver(LinearSolver):
@@ -455,7 +455,9 @@ class LinearResponseEigenSolver(LinearSolver):
                 else:
                     final_h5_fname = 'rsp.solutions.h5'
                 if self.rank == mpi_master():
-                    create_final_rsp_hdf5(final_h5_fname)
+                    create_hdf5(final_h5_fname, molecule, basis,
+                                dft_dict['dft_func_label'],
+                                pe_dict['potfile_text'])
 
             nto_lambdas = []
             nto_cube_files = []
@@ -532,8 +534,8 @@ class LinearResponseEigenSolver(LinearSolver):
 
                     eigvecs[:, s] = eigvec[:]
 
-                    append_final_rsp_solution(final_h5_fname,
-                                              'S{:d}'.format(s + 1), eigvec)
+                    write_rsp_solution(final_h5_fname, 'S{:d}'.format(s + 1),
+                                       eigvec)
 
             if self.nto or self.detach_attach:
                 self.ostream.print_blank()
@@ -563,7 +565,7 @@ class LinearResponseEigenSolver(LinearSolver):
                 if self.detach_attach:
                     ret_dict['density_cubes'] = dens_cube_files
 
-                checkpoint_text = 'Final solutions written to file: '
+                checkpoint_text = 'Response solution vectors written to file: '
                 checkpoint_text += final_h5_fname
                 self.ostream.print_info(checkpoint_text)
                 self.ostream.print_blank()

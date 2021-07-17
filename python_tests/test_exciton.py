@@ -152,7 +152,7 @@ class TestExciton:
                 scf_h5 = exciton_h5.with_suffix(f'.monomer_{ind + 1}.scf.h5')
                 if scf_h5.is_file():
                     scf_h5.unlink()
-                scf_final_h5 = scf_h5.with_suffix('.results.h5')
+                scf_final_h5 = scf_h5.with_suffix('.tensors.h5')
                 if scf_final_h5.is_file():
                     scf_final_h5.unlink()
                 rsp_h5 = exciton_h5.with_suffix(f'.monomer_{ind + 1}.rsp.h5')

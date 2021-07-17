@@ -9,13 +9,10 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.outputstream import OutputStream
 from veloxchem.distributedarray import DistributedArray
 from veloxchem.linearsolver import LinearSolver
-from veloxchem.checkpoint import write_rsp_hdf5
-from veloxchem.checkpoint import read_rsp_hdf5
-from veloxchem.checkpoint import check_rsp_hdf5
-from veloxchem.checkpoint import append_final_rsp_solution
-from veloxchem.checkpoint import write_distributed_focks
-from veloxchem.checkpoint import read_distributed_focks
-from veloxchem.checkpoint import check_distributed_focks
+from veloxchem.checkpoint import (write_rsp_hdf5, read_rsp_hdf5, check_rsp_hdf5,
+                                  write_rsp_solution, write_distributed_focks,
+                                  read_distributed_focks,
+                                  check_distributed_focks)
 
 
 class TestCheckpoint:
@@ -63,7 +60,7 @@ class TestCheckpoint:
             # test appending
             new_array = np.random.rand(10, 20)
             new_label = 'c'
-            append_final_rsp_solution(fname, new_label, new_array)
+            write_rsp_solution(fname, new_label, new_array)
 
             # test hdf5
             arrays.append(new_array)
