@@ -37,8 +37,7 @@ from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
-from .checkpoint import check_rsp_hdf5
-from .checkpoint import create_hdf5, write_rsp_solution
+from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
 
 
 class C6Solver(LinearSolver):

@@ -158,6 +158,9 @@ class TestExciton:
                 rsp_h5 = exciton_h5.with_suffix(f'.monomer_{ind + 1}.rsp.h5')
                 if rsp_h5.is_file():
                     rsp_h5.unlink()
+                rsp_final_h5 = rsp_h5.with_suffix('.solutions.h5')
+                if rsp_final_h5.is_file():
+                    rsp_final_h5.unlink()
 
             if exciton_h5.is_file():
                 exciton_h5.unlink()
