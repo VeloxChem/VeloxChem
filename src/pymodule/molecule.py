@@ -315,6 +315,59 @@ def _Molecule_write_xyz(self, xyz_filename):
             elem.set_atom_type(elem_id)
             fh.write(f'{elem.get_name():<6s} {x:22.12f} {y:22.12f} {z:22.12f}\n')
 
+def _Molecule_moments_of_inertia(self):
+    """
+    Calculates the moment of inertia tensor and principle axes
+
+    :return:
+        The principle moments of inertia.
+    """
+
+    masses = self.masses_to_numpy()
+    coordinates = self.get_coordinates()
+    center_of_mass = np.array(self.center_of_mass())
+    natm = self.number_of_atoms()
+
+    # Coordinates in the center-of-mass frame
+    coords_com = coordinates - center_of_mass[np.newaxis, :]
+
+    # Moment of inertia tensor
+    I = np.sum([masses[i] * (np.eye(3)*(np.dot(coords_com[i], coords_com[i]))
+                - np.outer(coords_com[i], coords_com[i])) for i in range(natm)], axis=0)
+
+    # Principal moments
+    Ivals, Ivecs = np.linalg.eigh(I)
+    # Eigenvectors are in the rows after transpose
+    #Ivecs = Ivecs.T
+
+    return Ivals
+
+def _Molecule_is_linear(self):
+    """
+    Checks if a molecule is linear or not.
+
+    :return:
+        True if linear, False otherwise.
+    """
+
+    # Get principle moments of inertia
+    Ivals = self.moments_of_inertia()
+
+    # Obtain the number of rotational degrees of freedom (DoF)
+    Rotational_DoF = 0
+    for i in range(3):
+        if abs(Ivals[i]) > 1.0e-10:
+            Rotational_DoF += 1
+
+    if Rotational_DoF == 2:
+        return True
+    elif Rotational_DoF == 3:
+        return False
+    # TODO: Raise an error if rotational DoFs are not 2 or 3
+    else:
+        pass
+
+
 
 Molecule.read_str = _Molecule_read_str
 Molecule.read_xyz = _Molecule_read_xyz
@@ -326,3 +379,5 @@ Molecule.get_labels = _Molecule_get_labels
 Molecule.get_coordinates = _Molecule_get_coordinates
 Molecule.get_ic_rmsd = _Molecule_get_ic_rmsd
 Molecule.write_xyz = _Molecule_write_xyz
+Molecule.moments_of_inertia = _Molecule_moments_of_inertia
+Molecule.is_linear = _Molecule_is_linear
