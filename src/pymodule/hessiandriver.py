@@ -374,7 +374,9 @@ class HessianDriver:
                                       1/masses_sqrt_repeat,
                                       hessian_eigvecs)
 
+
         reduced_masses = 1.0/(np.einsum('ki->i',cart_normal_modes**2))
+        self.cart_normal_modes = cart_normal_modes
 
         # TODO: linear molecules only for diatomics, needs to be generalized
         if natm == 2:
