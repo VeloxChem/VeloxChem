@@ -279,7 +279,7 @@ class ScfHessianDriver(HessianDriver):
                     mu_minus2 = prop.get_property('dipole moment')
 
                     for c in range(3):
-                        self.dipole_gradient[c, i, d] = (mu_minus2[c] - 8.0 * mu_minus1[c]
+                        self.dipole_gradient[c, 3*i + d] = (mu_minus2[c] - 8.0 * mu_minus1[c]
                                                          + 8.0 * mu_plus1[c] - mu_plus2[c]) / (12.0 * self.delta_h)
                     coords[i, d] += 2.0 * self.delta_h
                     # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )

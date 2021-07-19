@@ -192,6 +192,9 @@ class TdhfHessianDriver(HessianDriver):
         grad_drv = TdhfGradientDriver(self.scf_drv, self.scf_drv.comm, self.scf_drv.ostream)
         grad_drv.update_settings(grad_dict, self.rsp_dict, self.orbrsp_dict, self.method_dict)
 
+        # numerical dipole moment gradient (3 dipole components, no. atoms x 3 atom coords)
+        self.dipole_gradient = np.zeros((3, 3 * molecule.number_of_atoms()))
+
         # Hessian in temporary variable
         hessian = np.zeros((natm, 3, natm, 3))
 
@@ -207,6 +210,7 @@ class TdhfHessianDriver(HessianDriver):
                                                        scf_tensors)
                     grad_drv.compute(new_mol, ao_basis, rsp_drv, rsp_results)
                     grad_plus = grad_drv.get_gradient()
+                    mu_plus = grad_drv.relaxed_dipole_moment
 
 
                     coords[i, d] -= 2.0 * self.delta_h
@@ -218,6 +222,10 @@ class TdhfHessianDriver(HessianDriver):
                                                        scf_tensors)
                     grad_drv.compute(new_mol, ao_basis, rsp_drv, rsp_results)
                     grad_minus = grad_drv.get_gradient()
+                    mu_minus = grad_drv.relaxed_dipole_moment
+
+                    for c in range(3):
+                        self.dipole_gradient[c, 3*i + d] = (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
 
                     coords[i, d] += self.delta_h
                     hessian[i, d, :, :] = (grad_plus - grad_minus) / (2.0 * self.delta_h)
@@ -238,6 +246,7 @@ class TdhfHessianDriver(HessianDriver):
                                                        scf_tensors)
                     grad_drv.compute(new_mol, ao_basis, rsp_drv, rsp_results)
                     grad_plus1 = grad_drv.get_gradient()
+                    mu_plus1 = grad_drv.relaxed_dipole_moment
 
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
@@ -248,6 +257,7 @@ class TdhfHessianDriver(HessianDriver):
                                                        scf_tensors)
                     grad_drv.compute(new_mol, ao_basis, rsp_drv, rsp_results)
                     grad_plus2 = grad_drv.get_gradient()
+                    mu_plus2 = grad_drv.relaxed_dipole_moment
 
                     coords[i, d] -= 3.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
@@ -258,6 +268,7 @@ class TdhfHessianDriver(HessianDriver):
                                                        scf_tensors)
                     grad_drv.compute(new_mol, ao_basis, rsp_drv, rsp_results)
                     grad_minus1 = grad_drv.get_gradient()
+                    mu_minus1 = grad_drv.relaxed_dipole_moment
 
                     coords[i, d] -= self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
@@ -268,7 +279,11 @@ class TdhfHessianDriver(HessianDriver):
                                                        scf_tensors)
                     grad_drv.compute(new_mol, ao_basis, rsp_drv, rsp_results)
                     grad_minus2 = grad_drv.get_gradient()
+                    mu_minus2 = grad_drv.relaxed_dipole_moment
 
+                    for c in range(3):
+                        self.dipole_gradient[c, 3*i + d] = (mu_minus2[c] - 8.0 * mu_minus1[c]
+                                                         + 8.0 * mu_plus1[c] - mu_plus2[c]) / (12.0 * self.delta_h)
                     coords[i, d] += 2.0 * self.delta_h
                     # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
                     hessian[i, d] = (grad_minus2 - 8.0 * grad_minus1

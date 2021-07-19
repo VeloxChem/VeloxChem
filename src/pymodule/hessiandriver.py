@@ -44,13 +44,17 @@ class HessianDriver:
         The output stream.
 
     Instance variables
-        - hessian: The Hessian.
-        - mass_weighted_hessian: The mass-weighted Hessian.
-        - reduced_masses: The reduced masses of the normal modes.
-        - force_constants: The force constants.
-        - frequencies: The vibrational frequencies.
-        - normal_modes: The vibrational normal modes in
+        - hessian: The Hessian in Hartree per Bohr**2.
+        - mass_weighted_hessian: The mass-weighted Hessian in Hartree / (amu * Bohr**2).
+        - reduced_masses: The reduced masses of the normal modes in amu.
+        - force_constants: The force constants in mdyn/Angstrom.
+        - frequencies: The vibrational frequencies in cm**-1.
+        - normal_modes: The normalized vibrational normal modes in
                         (non-mass-weighted) Cartesian coordinates.
+        - cart_normal_modes: The non-normalized vibrational modes in
+                        (non-mass-weighted) Cartesian coordinates in 1/sqrt(amu).
+        - dipole_gradient: The gradient of the dipole moment.
+        - ir_intensities: The IR intensities in km/mol.
         - flag: The type of Hessian driver.
         - numerical: Perform numerical Hessian calculation.
         - numerical_grad: Perform numerical gradient calculation.
@@ -82,7 +86,10 @@ class HessianDriver:
         self.reduced_masses = None
         self.force_constants = None
         self.frequencies = None
-        self.normal_modes = None
+        self.normal_modes = None # normalized, not mass-weighted
+        self.cart_normal_modes = None # neither normalized nor mass-weighted
+        self.dipole_gradient = None
+        self.ir_intensities = None
         self.flag = None
         self.numerical = True
         self.numerical_grad = False
@@ -217,16 +224,34 @@ class HessianDriver:
 
         # Constants and conversion factors
         # TODO: get these from the proper place.
-        c = 2.99792458e8
-        cm_to_m = 1e-2
-        amu_to_kg = 1.6605390666e-27
-        N_to_mdyne = 1e8
-        m_to_A = 1e10
+        c = 2.99792458e8 # speed of light in m/s
+        cm_to_m = 1e-2 # centimeters in meters
+        amu_to_kg = 1.6605390666e-27 # atomic mass unit in kg
+        N_to_mdyne = 1e8 # Newton in milli dyne
+        m_to_A = 1e10 # meters in Angstroms
+        me_in_amu = 5.4857990907e-4 # electron mass in u
+        n_avogadro = 6.02214076e23 # Avogadro's number
+        alpha = 0.00729735257 # fine structure constant
+        bohr_in_km = 5.291772109e-14 # bohr radius in kilometers
 
+        # Conversion factor of IR intensity to km/mol
+        conv_ir_ea0amu2kmmol = me_in_amu * n_avogadro * alpha**2 * bohr_in_km * np.pi / 3.0
+
+        # Calculate force constants
         self.force_constants = ( 4.0 * np.pi**2
                             * (c * (self.frequencies / cm_to_m) )**2
                             * self.reduced_masses * amu_to_kg
                             )  * ( N_to_mdyne / m_to_A )
+
+        # Calculate IR intensities (for ground state only)
+        if self.dipole_gradient is not None:
+            ir_trans_dipole = self.dipole_gradient.dot(self.cart_normal_modes)
+            ir_intensity_au_amu = np.array([np.linalg.norm(ir_trans_dipole[:,x])**2 for x in range(ir_trans_dipole.shape[1])])
+
+            if molecule.is_linear():
+                self.ir_intensities = ir_intensity_au_amu[5:] * conv_ir_ea0amu2kmmol
+            else:
+                self.ir_intensities = ir_intensity_au_amu[6:] * conv_ir_ea0amu2kmmol
 
         number_of_modes = len(self.frequencies)
 
@@ -238,9 +263,15 @@ class HessianDriver:
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
-        valstr = 'Frequencies (in cm**-1), reduced masses (in amu),'
-        valstr += ' force constants (in mdyne/A), and normal modes.'
+        valstr = 'Harmonic frequencies (in cm**-1), reduced masses (in amu), force constants (in mdyne/A),'
         self.ostream.print_header(valstr)
+        if self.ir_intensities is not None:
+            valstr = ' IR intensities (in km/mol), and Cartesian normal mode displacements.'
+        else:
+            valstr = ' and normal mode displacements.'
+        self.ostream.print_header(valstr)
+        #self.ostream.print_header('-' * (len(valstr) + 2))
+        self.ostream.print_blank()
         self.ostream.print_blank()
 
         for k in range(0, number_of_modes, 3):
@@ -254,17 +285,23 @@ class HessianDriver:
             freq_string =  '{:17s}'.format('  Frequency: ')
             mass_string =  '{:17s}'.format('  Reduced mass: ')
             force_cnst_string =  '{:17s}'.format('  Force constant:')
+            if self.ir_intensities is not None:
+                ir_intens_string =  '{:17s}'.format('  IR intensity:')
             normal_mode_string = '{:17s}'.format('  Normal mode: ')
             for i in range(k, end):
                 index_string += '{:^31d}'.format(i+1)
                 freq_string +=  '{:^31.2f}'.format(self.frequencies[i])
                 mass_string += '{:^31.4f}'.format(self.reduced_masses[i])
                 force_cnst_string += '{:^31.4f}'.format(self.force_constants[i])
+                if self.ir_intensities is not None:
+                    ir_intens_string += '{:^31.4f}'.format(self.ir_intensities[i])
                 normal_mode_string += '{:^30s}{:>1s}'.format('X         Y         Z','|')
             self.ostream.print_line(index_string)
             self.ostream.print_line(freq_string)
             self.ostream.print_line(mass_string)
             self.ostream.print_line(force_cnst_string)
+            if self.ir_intensities is not None:
+                self.ostream.print_line(ir_intens_string)
             self.ostream.print_line(normal_mode_string)
 
             # Print normal modes:
@@ -378,8 +415,7 @@ class HessianDriver:
         reduced_masses = 1.0/(np.einsum('ki->i',cart_normal_modes**2))
         self.cart_normal_modes = cart_normal_modes
 
-        # TODO: linear molecules only for diatomics, needs to be generalized
-        if natm == 2:
+        if molecule.is_linear():
             self.reduced_masses = reduced_masses[5:]
             return hessian_eigvals[5:]
         else:

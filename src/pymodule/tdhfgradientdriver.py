@@ -39,7 +39,8 @@ class TdhfGradientDriver(GradientDriver):
         - gradient: The gradient.
         - tamm_dancoff: Flag if Tamm-Dancoff approximation is employed.
         - state_deriv_index: The excited state of interest.
-        - do_first_order_prop: Controls the calculation of first-order properties.
+        - do_first_order_prop: Controls the printout of first-order properties.
+        - relaxed_dipole_moment: The relaxed excited-state dipole moment.
         - delta_h: The displacement for finite difference.
         - do_four_point: Flag for four-point finite difference.
     """
@@ -71,8 +72,9 @@ class TdhfGradientDriver(GradientDriver):
         # excited state information, default to first excited state
         self.state_deriv_index = 0
 
-        # flag on whether to calculate excited-state properties
+        # flag on whether to print excited-state properties
         self.do_first_order_prop = False
+        self.relaxed_dipole_moment = None
 
         # for numerical gradient
         self.delta_h = 0.001
@@ -218,31 +220,34 @@ class TdhfGradientDriver(GradientDriver):
                             )
 
 
-        # If desired, calculate the relaxed and unrelaxed excited-state dipole moment
-        if self.do_first_order_prop:
-            firstorderprop = FirstOrderProperties(self.comm, self.ostream)
+        # Calculate the relaxed and unrelaxed excited-state dipole moment
+        firstorderprop = FirstOrderProperties(self.comm, self.ostream)
 
-            # unrelaxed density and dipole moment
-            unrel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
-                             orbrsp_results['unrelaxed_density_ao'])
-            firstorderprop.compute(molecule, basis, unrel_density)
-            if self.rank == mpi_master():
+        # unrelaxed density and dipole moment
+        unrel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
+                         orbrsp_results['unrelaxed_density_ao'])
+        firstorderprop.compute(molecule, basis, unrel_density)
+        if self.rank == mpi_master():
+            if self.do_first_order_prop:
                 title = method + ' Unrelaxed Dipole Moment for Excited State ' + str(self.state_deriv_index + 1)
                 firstorderprop.print_properties(molecule, title)
 
-            # relaxed density and dipole moment
-            if 'relaxed_density_ao' in orbrsp_results:
-                rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
-                               orbrsp_results['relaxed_density_ao'])
-                firstorderprop.compute(molecule, basis, rel_density)
-                if self.rank == mpi_master():
-                    # TODO: Remove warning once TDDFT orbital response is fully implemented
-                    if 'xcfun' in self.method_dict and self.method_dict['xcfun'] is not None:
-                        warn_msg = '*** Warning: Orbital response for TDDFT is not yet fully'
-                        self.ostream.print_header(warn_msg.ljust(56))
-                        warn_msg = '    implemented. Relaxed dipole moment will be wrong.'
-                        self.ostream.print_header(warn_msg.ljust(56))
+        # relaxed density and dipole moment
+        if 'relaxed_density_ao' in orbrsp_results:
+            rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
+                           orbrsp_results['relaxed_density_ao'])
+            firstorderprop.compute(molecule, basis, rel_density)
+            self.relaxed_dipole_moment = firstorderprop.get_property('dipole moment')
 
+            if self.rank == mpi_master():
+                # TODO: Remove warning once TDDFT orbital response is fully implemented
+                if 'xcfun' in self.method_dict and self.method_dict['xcfun'] is not None:
+                    warn_msg = '*** Warning: Orbital response for TDDFT is not yet fully'
+                    self.ostream.print_header(warn_msg.ljust(56))
+                    warn_msg = '    implemented. Relaxed dipole moment will be wrong.'
+                    self.ostream.print_header(warn_msg.ljust(56))
+
+                if self.do_first_order_prop:
                     title = method + ' Relaxed Dipole Moment for Excited State ' + str(self.state_deriv_index + 1)
                     firstorderprop.print_properties(molecule, title)
 
