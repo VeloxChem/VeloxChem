@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-import unittest
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
@@ -8,7 +7,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfgradientdriver import ScfGradientDriver
 
 
-class TestGrad(unittest.TestCase):
+class TestGrad:
 
     def run_grad(self, inpfile, ref_grad):
 
@@ -25,7 +24,7 @@ class TestGrad(unittest.TestCase):
 
         if is_mpi_master(task.mpi_comm):
             grad = grad_drv.get_gradient()
-            self.assertTrue(np.max(np.abs(grad - ref_grad)) < 1.0e-6)
+            assert np.max(np.abs(grad - ref_grad)) < 1.0e-6
 
     def test_nh3(self):
 
@@ -39,7 +38,3 @@ class TestGrad(unittest.TestCase):
         ]).T
 
         self.run_grad(inpfile, ref_grad)
-
-
-if __name__ == "__main__":
-    unittest.main()

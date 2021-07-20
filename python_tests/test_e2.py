@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-import unittest
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
@@ -8,7 +7,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 
 
-class TestE2(unittest.TestCase):
+class TestE2:
 
     def test_E2_Be(self):
 
@@ -40,8 +39,4 @@ class TestE2(unittest.TestCase):
 
             evals, evecs = np.linalg.eig(np.matmul(S2, E2))
             evals = np.sort(evals.real)[half_size:]
-            self.assertTrue(np.max(np.abs(evals - ref_evals)) < 1.0e-6)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert np.max(np.abs(evals - ref_evals)) < 1.0e-6

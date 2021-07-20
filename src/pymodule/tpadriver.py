@@ -239,6 +239,13 @@ class TpaDriver:
                                                     molecule, ao_basis,
                                                     scf_tensors)
 
+        # This is a workaround for the sqrt(2) factor in the property gradient
+        if self.rank == mpi_master():
+            inv_sqrt_2 = 1.0 / np.sqrt(2.0)
+            b_rhs = list(b_rhs)
+            for ind in range(len(b_rhs)):
+                b_rhs[ind] *= inv_sqrt_2
+
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
         if self.rank == mpi_master():

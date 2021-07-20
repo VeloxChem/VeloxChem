@@ -42,12 +42,14 @@
 namespace py = pybind11;
 
 namespace vlx_oneints {  // vlx_oneints namespace
-/** Convert a VeloxChem matrix object with Cartesian components, i.e. CElectricDipoleMomentMatrix, to NumPy array.
- *
- * @tparam T type of the VeloxChem matrix object.
- * @tparam cart requested Cartesian component.
- * @param obj VeloxChem matrix object.
- * @return The NumPy array.
+
+/**
+ Converts a VeloxChem matrix object with Cartesian components, i.e. CElectricDipoleMomentMatrix, to numpy array.
+
+ @tparam T type of the VeloxChem matrix object.
+ @tparam cart requested Cartesian component.
+ @param obj VeloxChem matrix object.
+ @return The numpy array.
  */
 template <typename T, cartesians cart>
 inline py::array_t<double>
@@ -56,12 +58,13 @@ matrix_to_numpy(const T& obj)
     return vlx_general::pointer_to_numpy(obj.values(cart), obj.getNumberOfRows(), obj.getNumberOfColumns());
 }
 
-/** Convert a VeloxChem matrix object with Cartesian components, i.e. CElectricDipoleMomentMatrix, to NumPy array.
- *
- * @tparam T type of the VeloxChem matrix object.
- * @param obj VeloxChem matrix object.
- * @param cart requested Cartesian component.
- * @return The NumPy array.
+/**
+ Converts a VeloxChem matrix object with Cartesian components, i.e. CElectricDipoleMomentMatrix, to numpy array.
+
+ @tparam T type of the VeloxChem matrix object.
+ @param obj VeloxChem matrix object.
+ @param cart requested Cartesian component.
+ @return The numpy array.
  */
 template <typename T>
 inline py::array_t<double>
@@ -70,14 +73,14 @@ matrix_to_numpy(const T& obj, cartesians cart)
     return vlx_general::pointer_to_numpy(obj.values(cart), obj.getNumberOfRows(), obj.getNumberOfColumns());
 }
 
-/** Common binding code for matrix objects for the various one-electron operators
- *
- * @tparam T type of the VeloxChem matrix object.
- * @param m the pybind11 module object.
- * @param cls_name the name of the class to bind.
- * @return the bound class.
- * @note we return the `py::class_` object to allow for binding of additional
- * methods specific to the class.
+/**
+ Common binding code for matrix objects for the various one-electron operators
+
+ @tparam T type of the VeloxChem matrix object.
+ @param m the pybind11 module object.
+ @param cls_name the name of the class to bind.
+ @return the bound class.
+ @note we return the `py::class_` object to allow for binding of additional methods specific to the class.
  */
 template <typename T>
 PyClass<T>
@@ -95,19 +98,19 @@ bind_operator_matrix(py::module& m, const std::string& cls_name)
         .def(
             "to_numpy",
             [](const T& obj) { return vlx_general::pointer_to_numpy(obj.values(), obj.getNumberOfRows(), obj.getNumberOfColumns()); },
-            "Convert operator matrix object to NumPy array")
+            "Converts operator matrix object to numpy array.")
         .def(py::self == py::self);
 }
 
-/** Common binding code for integral driver objects for the various one-electron operators
- *
- * @tparam T type of the VeloxChem integral driver object.
- * @param m the pybind11 module object.
- * @param cls_name the name of the class to bind, e.g. "COverlapIntegralsDriver".
- * @param docstring the name of the class for documentation, e.g. "overlap integrals".
- * @return the bound class.
- * @note we return the `py::class_` object to allow for binding of additional
- * methods specific to the class.
+/**
+ Common binding code for integral driver objects for the various one-electron operators
+
+ @tparam T type of the VeloxChem integral driver object.
+ @param m the pybind11 module object.
+ @param cls_name the name of the class to bind, e.g. "COverlapIntegralsDriver".
+ @param docstring the name of the class for documentation, e.g. "overlap integrals".
+ @return the bound class.
+ @note we return the `py::class_` object to allow for binding of additional methods specific to the class.
  */
 template <typename T>
 PyClass<T>
@@ -119,25 +122,25 @@ bind_integrals_driver(py::module& m, const char* cls_name, const std::string& do
         .def(py::init(&vlx_general::create<T>), "comm"_a = py::none())
         .def("compute",
              vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&>()(&T::compute, py::const_),
-             (docpreamble + " integrals for given molecule and basis").c_str(),
+             (docpreamble + " integrals for given molecule and basis set.").c_str(),
              "molecule"_a,
              "basis"_a)
         .def("compute",
              vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&, const CMolecularBasis&>()(&T::compute, py::const_),
-             (docpreamble + " integrals for given molecule in mixed basis").c_str(),
+             (docpreamble + " integrals for given molecule in two basis sets.").c_str(),
              "molecule"_a,
              "bra_basis"_a,
              "ket_basis"_a)
         .def("compute",
              vlx_general::overload_cast_<const CMolecule&, const CMolecule&, const CMolecularBasis&>()(&T::compute, py::const_),
-             (docpreamble + " integrals for two molecules in given basis").c_str(),
+             (docpreamble + " integrals for two molecules in given basis set.").c_str(),
              "bra_molecule"_a,
              "ket_molecule"_a,
              "basis"_a)
         .def("compute",
              vlx_general::overload_cast_<const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&>()(&T::compute,
                                                                                                                                py::const_),
-             (docpreamble + " integrals for two molecules, each in its own basis").c_str(),
+             (docpreamble + " integrals for two molecules, each in its own basis set.").c_str(),
              "bra_molecule"_a,
              "ket_molecule"_a,
              "bra_basis"_a,
@@ -148,6 +151,7 @@ bind_integrals_driver(py::module& m, const char* cls_name, const std::string& do
  Exports classes/functions in src/oneints to python.
  */
 void export_oneints(py::module& m);
+
 }  // namespace vlx_oneints
 
 #endif /* ExportOneInts_hpp */

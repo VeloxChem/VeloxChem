@@ -24,6 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from collections import deque
+from pathlib import Path
 import numpy as np
 import time as tm
 import math
@@ -55,6 +56,7 @@ from .inputparser import parse_input
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
+from .checkpoint import create_hdf5, write_scf_tensors
 
 
 class ScfDriver:
@@ -99,7 +101,7 @@ class ScfDriver:
         - checkpoint_file: The name of checkpoint file.
         - ref_mol_orbs: The reference molecular orbitals read from checkpoint
           file.
-        - restricted: The flag for restricted SCF.
+        - closed_shell: The flag for restricted SCF.
         - dispersion: The flag for calculating D4 dispersion correction.
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
@@ -463,7 +465,7 @@ class ScfDriver:
             Name of the basis set.
         """
 
-        if self.rank == mpi_master() and not self.first_step:
+        if self.rank == mpi_master():
             if self.checkpoint_file and isinstance(self.checkpoint_file, str):
                 self.mol_orbs.write_hdf5(self.checkpoint_file, nuclear_charges,
                                          basis_set)
@@ -688,18 +690,18 @@ class ScfDriver:
             profiler.check_memory_usage('Iteration {:d} Fock diag.'.format(
                 self.num_iter))
 
-            iter_in_hours = (tm.time() - iter_start_time) / 3600
-
-            if self.need_graceful_exit(iter_in_hours):
-                self.graceful_exit(molecule, ao_basis)
+            if not self.first_step:
+                iter_in_hours = (tm.time() - iter_start_time) / 3600
+                if self.need_graceful_exit(iter_in_hours):
+                    self.graceful_exit(molecule, ao_basis)
 
         if not self.first_step:
             signal_handler.remove_sigterm_function()
 
-        self.write_checkpoint(molecule.elem_ids_to_numpy(),
-                              ao_basis.get_label())
+            self.write_checkpoint(molecule.elem_ids_to_numpy(),
+                                  ao_basis.get_label())
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and not self.first_step:
             S = ovl_mat.to_numpy()
 
             C_alpha = self.mol_orbs.alpha_to_numpy()
@@ -729,6 +731,10 @@ class ScfDriver:
                 'F_alpha': F_alpha,
                 'F_beta': F_beta,
             }
+
+            if self.is_converged:
+                self.write_final_hdf5(molecule, ao_basis)
+
         else:
             self.scf_tensors = None
 
@@ -1855,3 +1861,38 @@ class ScfDriver:
             self.ostream.print_header(valstr.ljust(92))
             valstr = 'and S. Grimme, J. Chem Phys, 2019, 150, 154122.'
             self.ostream.print_header(valstr.ljust(92))
+
+    def write_final_hdf5(self, molecule, ao_basis):
+        """
+        Writes final HDF5 that contains SCF tensors.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        """
+
+        if self.checkpoint_file is not None:
+            final_h5_fname = str(
+                Path(self.checkpoint_file).with_suffix('.tensors.h5'))
+        else:
+            final_h5_fname = 'scf.tensors.h5'
+
+        if self.dft:
+            xc_label = self.xcfun.get_func_label()
+        else:
+            xc_label = 'HF'
+
+        if self.pe:
+            with open(str(self.pe_options['potfile']), 'r') as f_pot:
+                potfile_text = '\n'.join(f_pot.readlines())
+        else:
+            potfile_text = ''
+
+        create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
+        write_scf_tensors(final_h5_fname, self.scf_tensors)
+
+        self.ostream.print_blank()
+        checkpoint_text = 'SCF tensors written to file: '
+        checkpoint_text += final_h5_fname
+        self.ostream.print_info(checkpoint_text)

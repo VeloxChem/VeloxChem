@@ -169,7 +169,7 @@ public:
     void setBatchType(const moints batchType);
     
     /**
-     Sets posiitons of external indexes in in <ij|xy> integrals.
+     Sets positions of external indexes in in <ij|xy> integrals.
      
      @param externalIndexes the positions of external indexes.
      */

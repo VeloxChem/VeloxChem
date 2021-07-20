@@ -326,7 +326,7 @@ CSADGuessDriver::compute(const CMolecule&       molecule,
                          const CMolecularBasis& basis_2,
                          const COverlapMatrix&  S12,
                          const COverlapMatrix&  S22,
-                         const bool             restricted) const
+                         const bool             closedShell) const
 {
     CAODensityMatrix dsad;
 
@@ -334,7 +334,7 @@ CSADGuessDriver::compute(const CMolecule&       molecule,
     {
         // generate SAD guess
 
-        dsad = _compSADGuess(molecule, basis_1, basis_2, S12, S22, restricted);
+        dsad = _compSADGuess(molecule, basis_1, basis_2, S12, S22, closedShell);
     }
 
     return dsad;
@@ -346,7 +346,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
                                const CMolecularBasis& basis_2,
                                const COverlapMatrix&  S12,
                                const COverlapMatrix&  S22,
-                               const bool             restricted) const
+                               const bool             closedShell) const
 {
     auto natoms = molecule.getNumberOfAtoms();
 
@@ -525,7 +525,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
         // update csad_beta
 
-        if (!restricted)
+        if (!closedShell)
         {
             for (int32_t j = 0; j < naodim_2; j++)
             {
@@ -543,7 +543,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     std::vector<CDenseMatrix> dsad;
 
-    if (restricted)
+    if (closedShell)
     {
         dsad.push_back(denblas::multABt(csad_alpha, csad_alpha));
 

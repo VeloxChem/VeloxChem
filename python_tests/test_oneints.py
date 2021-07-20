@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-import unittest
 import h5py
 
 from veloxchem.veloxchemlib import DenseMatrix
@@ -20,7 +19,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 
 
-class TestOneInts(unittest.TestCase):
+class TestOneInts:
 
     def test_overlap_matrix(self):
 
@@ -29,8 +28,8 @@ class TestOneInts(unittest.TestCase):
         array2 = matrix.to_numpy()
         matrix2 = OverlapMatrix(array2)
 
-        self.assertTrue((array == array2).all())
-        self.assertEqual(matrix, matrix2)
+        assert (array == array2).all()
+        assert matrix == matrix2
 
     def test_kinetic_energy_matrix(self):
 
@@ -39,8 +38,8 @@ class TestOneInts(unittest.TestCase):
         array2 = matrix.to_numpy()
         matrix2 = KineticEnergyMatrix(array2)
 
-        self.assertTrue((array == array2).all())
-        self.assertEqual(matrix, matrix2)
+        assert (array == array2).all()
+        assert matrix == matrix2
 
     def test_nuclear_potential_matrix(self):
 
@@ -49,8 +48,8 @@ class TestOneInts(unittest.TestCase):
         array2 = matrix.to_numpy()
         matrix2 = NuclearPotentialMatrix(array2)
 
-        self.assertTrue((array == array2).all())
-        self.assertEqual(matrix, matrix2)
+        assert (array == array2).all()
+        assert matrix == matrix2
 
     def test_electric_dipole_matrix(self):
 
@@ -62,11 +61,11 @@ class TestOneInts(unittest.TestCase):
         matrix = ElectricDipoleMatrix(x_array, y_array, z_array, *origin)
         matrix2 = ElectricDipoleMatrix([x_array, y_array, z_array], origin)
 
-        self.assertEqual(matrix, matrix2)
-        self.assertEqual(matrix.origin, origin)
-        self.assertTrue((matrix.x_to_numpy() == x_array.to_numpy()).all())
-        self.assertTrue((matrix.y_to_numpy() == y_array.to_numpy()).all())
-        self.assertTrue((matrix.z_to_numpy() == z_array.to_numpy()).all())
+        assert matrix == matrix2
+        assert matrix.origin == origin
+        assert (matrix.x_to_numpy() == x_array.to_numpy()).all()
+        assert (matrix.y_to_numpy() == y_array.to_numpy()).all()
+        assert (matrix.z_to_numpy() == z_array.to_numpy()).all()
 
     def test_linear_momentum_matrix(self):
 
@@ -77,10 +76,10 @@ class TestOneInts(unittest.TestCase):
         matrix = LinearMomentumMatrix(x_array, y_array, z_array)
         matrix2 = LinearMomentumMatrix([x_array, y_array, z_array])
 
-        self.assertEqual(matrix, matrix2)
-        self.assertTrue((matrix.x_to_numpy() == x_array.to_numpy()).all())
-        self.assertTrue((matrix.y_to_numpy() == y_array.to_numpy()).all())
-        self.assertTrue((matrix.z_to_numpy() == z_array.to_numpy()).all())
+        assert matrix == matrix2
+        assert (matrix.x_to_numpy() == x_array.to_numpy()).all()
+        assert (matrix.y_to_numpy() == y_array.to_numpy()).all()
+        assert (matrix.z_to_numpy() == z_array.to_numpy()).all()
 
     def test_angular_momentum_matrix(self):
 
@@ -92,11 +91,11 @@ class TestOneInts(unittest.TestCase):
         matrix = AngularMomentumMatrix(x_array, y_array, z_array, *origin)
         matrix2 = AngularMomentumMatrix([x_array, y_array, z_array], origin)
 
-        self.assertEqual(matrix, matrix2)
-        self.assertEqual(matrix.origin, origin)
-        self.assertTrue((matrix.x_to_numpy() == x_array.to_numpy()).all())
-        self.assertTrue((matrix.y_to_numpy() == y_array.to_numpy()).all())
-        self.assertTrue((matrix.z_to_numpy() == z_array.to_numpy()).all())
+        assert matrix == matrix2
+        assert matrix.origin == origin
+        assert (matrix.x_to_numpy() == x_array.to_numpy()).all()
+        assert (matrix.y_to_numpy() == y_array.to_numpy()).all()
+        assert (matrix.z_to_numpy() == z_array.to_numpy()).all()
 
     def test_electric_field_matrix(self):
 
@@ -107,10 +106,10 @@ class TestOneInts(unittest.TestCase):
         matrix = ElectricFieldMatrix(x_array, y_array, z_array)
         matrix2 = ElectricFieldMatrix([x_array, y_array, z_array])
 
-        self.assertEqual(matrix, matrix2)
-        self.assertTrue((matrix.x_to_numpy() == x_array.to_numpy()).all())
-        self.assertTrue((matrix.y_to_numpy() == y_array.to_numpy()).all())
-        self.assertTrue((matrix.z_to_numpy() == z_array.to_numpy()).all())
+        assert matrix == matrix2
+        assert (matrix.x_to_numpy() == x_array.to_numpy()).all()
+        assert (matrix.y_to_numpy() == y_array.to_numpy()).all()
+        assert (matrix.z_to_numpy() == z_array.to_numpy()).all()
 
     def test_1e_integrals(self):
 
@@ -153,9 +152,9 @@ class TestOneInts(unittest.TestCase):
             dT = np.max(np.abs(T1 - T2))
             dV = np.max(np.abs(V1 - V2))
 
-            self.assertTrue(dS < 1.0e-13)
-            self.assertTrue(dT < 1.0e-11)
-            self.assertTrue(dV < 1.0e-11)
+            assert dS < 1.0e-13
+            assert dT < 1.0e-11
+            assert dV < 1.0e-11
 
     def test_mixed_basis_1e(self):
 
@@ -180,7 +179,7 @@ class TestOneInts(unittest.TestCase):
         V11 = npotdrv.compute(mol_1, bas_1)
 
         V11p = npotdrv.compute(mol_1, bas_1, mol_1)
-        self.assertTrue((V11.to_numpy() == V11p.to_numpy()).all())
+        assert (V11.to_numpy() == V11p.to_numpy()).all()
 
         if is_mpi_master():
 
@@ -194,9 +193,9 @@ class TestOneInts(unittest.TestCase):
             dT = np.max(np.abs(T11.to_numpy() - ref_T11))
             dV = np.max(np.abs(V11.to_numpy() - ref_V11))
 
-            self.assertTrue(dS < 1.0e-13)
-            self.assertTrue(dT < 1.0e-13)
-            self.assertTrue(dV < 1.0e-12)
+            assert dS < 1.0e-13
+            assert dT < 1.0e-13
+            assert dV < 1.0e-12
 
         # one molecule, two basis sets
 
@@ -220,9 +219,9 @@ class TestOneInts(unittest.TestCase):
             dT = np.max(np.abs(T12.to_numpy() - ref_T12))
             dV = np.max(np.abs(V12.to_numpy() - ref_V12))
 
-            self.assertTrue(dS < 1.0e-13)
-            self.assertTrue(dT < 1.0e-13)
-            self.assertTrue(dV < 1.0e-12)
+            assert dS < 1.0e-13
+            assert dT < 1.0e-13
+            assert dV < 1.0e-12
 
         # two molecules, one basis set
 
@@ -247,9 +246,9 @@ class TestOneInts(unittest.TestCase):
             dT = np.max(np.abs(T12.to_numpy() - ref_T12))
             dV = np.max(np.abs(V12.to_numpy() - ref_V12))
 
-            self.assertTrue(dS < 1.0e-13)
-            self.assertTrue(dT < 1.0e-11)
-            self.assertTrue(dV < 1.0e-11)
+            assert dS < 1.0e-13
+            assert dT < 1.0e-11
+            assert dV < 1.0e-11
 
         # two molecules, two basis sets
 
@@ -275,10 +274,6 @@ class TestOneInts(unittest.TestCase):
             dT = np.max(np.abs(T12.to_numpy() - ref_T12))
             dV = np.max(np.abs(V12.to_numpy() - ref_V12))
 
-            self.assertTrue(dS < 1.0e-13)
-            self.assertTrue(dT < 1.0e-11)
-            self.assertTrue(dV < 1.0e-11)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert dS < 1.0e-13
+            assert dT < 1.0e-11
+            assert dV < 1.0e-11
