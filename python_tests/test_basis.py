@@ -112,11 +112,11 @@ class TestBasis(unittest.TestCase):
 
         h_basis = [
             '6-311++G(2D,2P)', 'AUG-CC-PVTZ', 'DEF2-SVPD', 'MIN-CC-PVDZ',
-            'STO-6G'
+            'STO-6G', 'DEF2-SV(P)', 'PCSEG-0'
         ]
         c_basis = [
-            '6-31G', '6-31G(2DF,P)', 'AUG-CC-PVDZ', 'D-AUG-CC-PVQZ',
-            'SADLEJ-PVTZ'
+            '6-31G', '6-31G(2DF,P)', 'AUG-CC-PVDZ', 'AUG-CC-PVQZ',
+            'SADLEJ-PVTZ', 'AUG-CC-PCVTZ', 'PCX-2'
         ]
         zn_basis = ['CC-PVTZ', 'MIN-CC-PVDZ', 'STO-3G']
 
