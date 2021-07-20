@@ -468,8 +468,7 @@ class OrbitalResponse:
             The profiler.
 
         :return:
-            A dictionary containing the Lagrange multipliers and relaxed
-            one-particle density.
+            The Lagrange multipliers lambda in MO basis.
         """
 
         # count variable for conjugate gradient iterations

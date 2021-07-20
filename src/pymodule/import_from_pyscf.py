@@ -115,7 +115,7 @@ def fock_deriv(molecule, basis, density, i=0, unit="au"):
     :param basis:
         the vlx basis object
     :param density:
-        The SCF density matrix in AO basis
+        The SCF density matrix (alpha part) in AO basis
     :param i:
         the index of the atom for which the derivatives
         are computed.
