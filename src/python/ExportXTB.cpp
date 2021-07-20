@@ -25,14 +25,13 @@
 
 #include "ExportXTB.hpp"
 
-#include <memory>
-
+#include <mpi.h>
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <mpi.h>
+#include <memory>
 
 #include "ExportGeneral.hpp"
 #include "Molecule.hpp"
@@ -45,14 +44,6 @@ namespace vlx_xtb {  // vlx_xtb namespace
 
 // Exports classes/functions in src/xtb to python
 
-static py::array_t<double>
-CXTBDriver_gradient_to_numpy(const CXTBDriver& self)
-{
-    auto grad = self.getGradient(); 
-
-    return vlx_general::pointer_to_numpy(grad.data(), grad.size() / 3, 3);
-}
-
 void
 export_xtb(py::module& m)
 {
@@ -60,16 +51,22 @@ export_xtb(py::module& m)
 
     PyClass<CXTBDriver>(m, "XTBDriver")
         .def(py::init(&vlx_general::create<CXTBDriver>), "comm"_a = py::none())
-        .def("is_available", &CXTBDriver::isAvailable)
-        .def("is_master_node", &CXTBDriver::isMasterNode)
-        .def("set_max_iter", &CXTBDriver::setMaxIterations)
-        .def("set_elec_temp", &CXTBDriver::setElectronicTemp)
-        .def("set_method", &CXTBDriver::setMethod)
-        .def("set_output_filename", &CXTBDriver::setOutputFilename)
-        .def("get_output", &CXTBDriver::getOutput)
-        .def("get_output_filename", &CXTBDriver::getOutputFilename)
-        .def("get_energy", &CXTBDriver::getEnergy)
-        .def("get_gradient", &CXTBDriver_gradient_to_numpy)
+        .def("is_available", &CXTBDriver::isAvailable, "Checks if XTB package is available.")
+        .def("is_master_node", &CXTBDriver::isMasterNode, "Checks if XTB driver is running on master node.")
+        .def("set_max_iter", &CXTBDriver::setMaxIterations, "Sets maximum number of SCF iterations.", "maxIterations"_a)
+        .def("set_elec_temp", &CXTBDriver::setElectronicTemp, "Sets electronic temperature for electron smearing.", "electronicTemp"_a)
+        .def("set_method", &CXTBDriver::setMethod, "Sets XTB method.", "method"_a)
+        .def("set_output_filename", &CXTBDriver::setOutputFilename, "Sets output filename.", "filename"_a)
+        .def("get_output", &CXTBDriver::getOutput, "Gets XTB output as a vector of strings.")
+        .def("get_output_filename", &CXTBDriver::getOutputFilename, "Gets XTB output filename.")
+        .def("get_energy", &CXTBDriver::getEnergy, "Gets energy of molecular system.")
+        .def(
+            "get_gradient",
+            [](const CXTBDriver& self) -> py::array_t<double> {
+                auto grad = self.getGradient();
+                return vlx_general::pointer_to_numpy(grad.data(), grad.size() / 3, 3);
+            },
+            "Gets molecular gradient as numpy array of shape (natoms, 3).")
         // prefixed by an underscore because it will be decorated in xtbdriver.py
         .def("_compute", &CXTBDriver::compute);
 }

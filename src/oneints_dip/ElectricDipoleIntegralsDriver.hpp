@@ -167,15 +167,6 @@ class CElectricDipoleIntegralsDriver
     /**
      Sets origin of electric dipole.
 
-     @param xOrigin the Cartesian X coordinate of electric dipole origin.
-     @param yOrigin the Cartesian Y coordinate of electric dipole origin.
-     @param zOrigin the Cartesian Z coordinate of electric dipole origin.
-     */
-    void setElectricDipoleOrigin(const double xOrigin, const double yOrigin, const double zOrigin);
-
-    /**
-     Sets origin of electric dipole.
-
      @param origin an array holding the Cartesian coordinates for the electric dipole origin.
      */
     void setElectricDipoleOrigin(const std::array<double, 3>& origin);

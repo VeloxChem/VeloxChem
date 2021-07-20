@@ -167,18 +167,16 @@ class CAngularMomentumMatrix
     /**
      Sets coordinates of angular momentum origin.
 
-     @param xOrigin the X coordinate of angular momentum origin.
-     @param yOrigin the Y coordinate of angular momentum origin.
-     @param zOrigin the Z coordinate of angular momentum origin.
-     */
-    void setOriginCoordinates(const double xOrigin, const double yOrigin, const double zOrigin);
-
-    /**
-     Sets coordinates of angular momentum origin.
-
      @param origin an array holding the Cartesian coordinates for the angular momentum origin.
      */
     void setOriginCoordinates(const std::array<double, 3>& origin);
+
+    /**
+     Gets coordinates of angular momentum origin.
+
+     @return the coordinates of angular momentum origin.
+     */
+    std::array<double, 3> getOriginCoordinates() const;
 
     /**
      Gets string representation of angular momentum matrix.
@@ -277,34 +275,6 @@ class CAngularMomentumMatrix
      matrix.
      */
     const double* values(int32_t cart) const;
-
-    /**
-     Gets X coordinate of angular momentum origin.
-
-     @return the X coordinate of angular momentum origin.
-     */
-    double getOriginCoordinateX() const;
-
-    /**
-     Gets Y coordinate of angular momentum origin.
-
-     @return the Y coordinate of angular momentum origin.
-     */
-    double getOriginCoordinateY() const;
-
-    /**
-     Gets Z coordinate of angular momentum origin.
-
-     @return the Z coordinate of angular momentum origin.
-     */
-    double getOriginCoordinateZ() const;
-
-    /**
-     Gets coordinates of angular momentum origin.
-
-     @return the coordinates of angular momentum origin.
-     */
-    std::array<double, 3> getOriginCoordinates() const;
 
     /**
      Converts angular momentum matrix object to text output.

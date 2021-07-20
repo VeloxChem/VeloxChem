@@ -1,5 +1,4 @@
 import sys
-import unittest
 from pathlib import Path
 
 import numpy as np
@@ -17,7 +16,7 @@ from veloxchem.veloxchemlib import hartree_in_ev, is_mpi_master
 
 
 @pytest.mark.solvers
-class TestTDA(unittest.TestCase):
+class TestTDA:
 
     def run_tda(self, inpfile, potfile, xcfun_label, data_lines):
 
@@ -50,9 +49,9 @@ class TestTDA(unittest.TestCase):
             osc_str = tda_results['oscillator_strengths']
             rot_str = tda_results['rotatory_strengths']
 
-            self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
-            self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
-            self.assertTrue(np.max(np.abs(rot_str - ref_rot_str)) < 1.0e-2)
+            assert np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4
+            assert np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4
+            assert np.max(np.abs(rot_str - ref_rot_str)) < 1.0e-2
 
     def test_tda_hf(self):
 
@@ -168,7 +167,3 @@ class TestTDA(unittest.TestCase):
         data_lines = raw_data.splitlines()[1:-1]
 
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
-
-
-if __name__ == '__main__':
-    unittest.main()

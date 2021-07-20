@@ -1,12 +1,11 @@
 from pathlib import Path
-import unittest
 import tempfile
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.cubicgrid import CubicGrid
 
 
-class TestCheckpoint(unittest.TestCase):
+class TestCheckpoint:
 
     def write_cube(self, fname):
 
@@ -47,8 +46,4 @@ class TestCheckpoint(unittest.TestCase):
             grid_1 = CubicGrid.read_cube(fname)
             grid_2 = CubicGrid.read_cube(fname)
             diff = grid_1.compare(grid_2)
-            self.assertTrue(diff < 1.0e-12)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert diff < 1.0e-12

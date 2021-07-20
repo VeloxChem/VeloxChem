@@ -1,6 +1,5 @@
 import random
 import tempfile
-import unittest
 from pathlib import Path
 
 import numpy as np
@@ -13,7 +12,7 @@ from veloxchem.veloxchemlib import is_mpi_master
 
 
 @pytest.mark.solvers
-class TestC6(unittest.TestCase):
+class TestC6:
 
     def run_scf(self, task):
 
@@ -45,7 +44,7 @@ class TestC6(unittest.TestCase):
         c6_prop.init_driver(task.mpi_comm, task.ostream)
         c6_prop.compute(task.molecule, task.ao_basis, scf_tensors)
 
-        self.assertTrue(c6_prop.rsp_driver.is_converged)
+        assert c6_prop.rsp_driver.is_converged
 
         if is_mpi_master(task.mpi_comm):
             self.check_printout(c6_prop)
@@ -56,7 +55,7 @@ class TestC6(unittest.TestCase):
                 freqs.add(iw)
             freqs = sorted(list(freqs), reverse=True)[:-1]
             diff_freq = np.max(np.abs(np.array(freqs) - np.array(ref_freqs)))
-            self.assertTrue(diff_freq < 1.0e-6)
+            assert diff_freq < 1.0e-6
 
             prop = np.array([
                 -c6_results['response_functions'][(a, b, iw)]
@@ -69,11 +68,11 @@ class TestC6(unittest.TestCase):
                 for (a, b) in ['xx', 'yy', 'zz', 'xy', 'xz', 'yz']
             ])
             diff_prop = np.max(np.abs(prop - ref_prop))
-            self.assertTrue(diff_prop < 1.0e-4)
+            assert diff_prop < 1.0e-4
 
             points, weights = np.polynomial.legendre.leggauss(ref_n_points)
             c6_value = C6.integrate(c6_results, freqs, points, weights, 0.3)
-            self.assertTrue(abs(c6_value - ref_c6_value) < 1.0e-4)
+            assert abs(c6_value - ref_c6_value) < 1.0e-4
 
     @staticmethod
     def get_ref_data(data_lines):
@@ -121,9 +120,9 @@ class TestC6(unittest.TestCase):
                             key_found = True
                             print_real = float(content[1])
                             print_imag = float(content[2].replace('j', ''))
-                            self.assertAlmostEqual(val.real, print_real, 6)
-                            self.assertAlmostEqual(val.imag, print_imag, 6)
-                self.assertTrue(key_found)
+                            assert abs(val.real - print_real) < 1.0e-6
+                            assert abs(val.imag - print_imag) < 1.0e-6
+                assert key_found
 
     def test_c6_hf(self):
 
@@ -340,7 +339,3 @@ class TestC6(unittest.TestCase):
         ref_c6_value = 44.494604
 
         self.run_c6(inpfile, xcfun_label, data_lines, ref_c6_value)
-
-
-if __name__ == '__main__':
-    unittest.main()

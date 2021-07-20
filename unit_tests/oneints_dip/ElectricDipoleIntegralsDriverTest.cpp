@@ -26,6 +26,7 @@
 #include "ElectricDipoleIntegralsDriverTest.hpp"
 
 #include <mpi.h>
+#include <array>
 
 #include "ElectricDipoleIntegralsDriver.hpp"
 #include "MolecularBasisSetter.hpp"
@@ -5527,7 +5528,7 @@ TEST_F(CElectricDipoleIntegralsDriverTest, ComputeElectricDipoleForH2OWithOrigin
 
     CElectricDipoleIntegralsDriver dipdrv(MPI_COMM_WORLD);
 
-    dipdrv.setElectricDipoleOrigin(1.0, 1.0, 1.0);
+    dipdrv.setElectricDipoleOrigin(std::array<double, 3>({1.0, 1.0, 1.0}));
 
     auto dipmat = dipdrv.compute(mh2o, mbas);
 

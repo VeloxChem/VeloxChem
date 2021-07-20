@@ -30,9 +30,8 @@ import time
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import denmat
-from .veloxchemlib import fockmat
-from .veloxchemlib import mpi_master
+from .veloxchemlib import denmat, fockmat
+from .veloxchemlib import mpi_master, hartree_in_wavenumbers
 from .qqscheme import get_qq_scheme
 from .profiler import Profiler
 from .cppsolver import ComplexResponse
@@ -98,7 +97,7 @@ class TpaDriver:
         # cpp settings
         self.frequencies = (0,)
         self.comp = None
-        self.damping = 0.004556335294880438
+        self.damping = 1000.0 / hartree_in_wavenumbers()
         self.lindep_thresh = 1.0e-10
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
@@ -239,6 +238,13 @@ class TpaDriver:
         b_rhs = linear_solver.get_complex_prop_grad(operator, component,
                                                     molecule, ao_basis,
                                                     scf_tensors)
+
+        # This is a workaround for the sqrt(2) factor in the property gradient
+        if self.rank == mpi_master():
+            inv_sqrt_2 = 1.0 / np.sqrt(2.0)
+            b_rhs = list(b_rhs)
+            for ind in range(len(b_rhs)):
+                b_rhs[ind] *= inv_sqrt_2
 
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis

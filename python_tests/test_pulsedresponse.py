@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-import unittest
 import h5py
 
 from veloxchem.veloxchemlib import is_mpi_master
@@ -61,10 +60,10 @@ xx = np.array([
 # ---------------------------------------------------------------------------
 
 
-class TestComplexResponse(unittest.TestCase):
+class TestComplexResponse:
 
     @classmethod
-    def setUpClass(cls):
+    def setup_class(cls):
         """ setUpClass - initiates the Test object making a single calculcation for all
             subsequent tests
         """
@@ -107,7 +106,7 @@ class TestComplexResponse(unittest.TestCase):
         task.finish()
 
     @classmethod
-    def tearDownClass(cls):
+    def teardown_class(cls):
 
         h5_file = Path('{}.h5'.format(cls.h5fname))
         txt_file = Path('{}.txt'.format(cls.h5fname))
@@ -164,8 +163,8 @@ class TestComplexResponse(unittest.TestCase):
 
             # Verify that the non-zero padded list of amplitudes and
             # frequencies match
-            self.assertTrue(
-                len(hf.get('amplitudes')[()]) == len(hf.get('frequencies')[()]))
+            assert len(hf.get('amplitudes')[()]) == len(
+                hf.get('frequencies')[()])
 
             primary_key = 'frequencies'
 
@@ -174,8 +173,7 @@ class TestComplexResponse(unittest.TestCase):
                     # Match the length of the frequency list
                     # (zero padded or non zero padded)
                     # and the polarization direction lists of amplitudes
-                    self.assertTrue(
-                        len(hf.get(primary_key)[()]) == len(hf.get(key)[()]))
+                    assert len(hf.get(primary_key)[()]) == len(hf.get(key)[()])
                 except ValueError:
                     self.fail('Len of {}[{}] did not match data length {}!= {}'.
                               format(primary_key, key,
@@ -183,9 +181,9 @@ class TestComplexResponse(unittest.TestCase):
                                      len(hf.get(key)[()])))
 
             # Verify that the results stored are the same as expected
-            self.assertTrue(np.allclose(hf.get('amplitudes')[()], amplitudes))
-            self.assertTrue(np.allclose(hf.get('frequencies')[()], frequencies))
-            self.assertTrue(np.allclose(hf.get('xx')[()], xx))
+            assert np.allclose(hf.get('amplitudes')[()], amplitudes)
+            assert np.allclose(hf.get('frequencies')[()], frequencies)
+            assert np.allclose(hf.get('xx')[()], xx)
 
             hf.close()
 
@@ -205,13 +203,7 @@ class TestComplexResponse(unittest.TestCase):
             trunc_amplitudes = amplitudes[33:]
             trunc_frequencies = frequencies[33:]
             # Verify that the results stored are the same as expected
-            self.assertTrue(
-                np.allclose(self.results['pulse_settings']['freq_amplitude'],
-                            trunc_amplitudes))
-            self.assertTrue(
-                np.allclose(self.results['pulse_settings']['frequencies'],
-                            trunc_frequencies))
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert np.allclose(self.results['pulse_settings']['freq_amplitude'],
+                               trunc_amplitudes)
+            assert np.allclose(self.results['pulse_settings']['frequencies'],
+                               trunc_frequencies)

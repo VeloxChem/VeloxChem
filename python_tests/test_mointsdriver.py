@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-import unittest
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.veloxchemlib import moints
@@ -10,18 +9,18 @@ from veloxchem.mp2driver import Mp2Driver
 from veloxchem.mpitask import MpiTask
 
 
-class TestMOIntegralsDriver(unittest.TestCase):
+class TestMOIntegralsDriver:
 
     def test_moints_type(self):
 
         moints_drv = MOIntegralsDriver()
 
-        self.assertEqual(moints_drv.get_moints_type("OOOO"), moints.oooo)
-        self.assertEqual(moints_drv.get_moints_type("OOOV"), moints.ooov)
-        self.assertEqual(moints_drv.get_moints_type("OVOV"), moints.ovov)
-        self.assertEqual(moints_drv.get_moints_type("OOVV"), moints.oovv)
-        self.assertEqual(moints_drv.get_moints_type("OVVV"), moints.ovvv)
-        self.assertEqual(moints_drv.get_moints_type("VVVV"), moints.vvvv)
+        assert moints_drv.get_moints_type("OOOO") == moints.oooo
+        assert moints_drv.get_moints_type("OOOV") == moints.ooov
+        assert moints_drv.get_moints_type("OVOV") == moints.ovov
+        assert moints_drv.get_moints_type("OOVV") == moints.oovv
+        assert moints_drv.get_moints_type("OVVV") == moints.ovvv
+        assert moints_drv.get_moints_type("VVVV") == moints.vvvv
 
     def test_h2se_mp2(self):
 
@@ -42,13 +41,13 @@ class TestMOIntegralsDriver(unittest.TestCase):
         if is_mpi_master(task.mpi_comm):
             e_ref = -0.28529088
             e_mp2 = mp2_drv.e_mp2
-            self.assertAlmostEqual(e_ref, e_mp2, 8)
+            assert abs(e_ref - e_mp2) < 1.0e-8
 
         mp2_drv.update_settings({'conventional': 'yes'})
         mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
 
         if is_mpi_master(task.mpi_comm):
-            self.assertAlmostEqual(e_mp2, mp2_drv.e_mp2, 12)
+            assert abs(e_mp2 - mp2_drv.e_mp2) < 1.0e-12
 
         # extra test: collect moints batches to master node
         moints_drv = MOIntegralsDriver(task.mpi_comm, task.ostream)
@@ -72,7 +71,7 @@ class TestMOIntegralsDriver(unittest.TestCase):
                 denom = eocc[pair.first()] + eocc[pair.second()] - eab
                 master_e_mp2 += np.sum(ij * (ij + ij_antisym) / denom)
 
-            self.assertAlmostEqual(e_mp2, master_e_mp2, 12)
+            assert abs(e_mp2 - master_e_mp2) < 1.0e-12
 
         # in-memory test
         in_mem_oovv = moints_drv.compute_in_mem(task.molecule, task.ao_basis,
@@ -87,7 +86,7 @@ class TestMOIntegralsDriver(unittest.TestCase):
                     denom = eocc[i] + eocc[j] - eab
                     in_mem_e_mp2 += np.sum(ij * (ij + ij_antisym) / denom)
 
-            self.assertAlmostEqual(e_mp2, in_mem_e_mp2, 12)
+            assert abs(e_mp2 - in_mem_e_mp2) < 1.0e-12
 
         task.finish()
 
@@ -103,13 +102,9 @@ class TestMOIntegralsDriver(unittest.TestCase):
         mp2_drv = Mp2Driver()
 
         for key, val in mp2_dict.items():
-            self.assertTrue(getattr(mp2_drv, key) != val)
+            assert getattr(mp2_drv, key) != val
 
         mp2_drv.update_settings(mp2_dict)
 
         for key, val in mp2_dict.items():
-            self.assertTrue(getattr(mp2_drv, key) == val)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert getattr(mp2_drv, key) == val

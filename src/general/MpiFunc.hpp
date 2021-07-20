@@ -35,7 +35,7 @@
 namespace mpi {  // mpi namespace
 
 /**
- Defines a default rank of master MPI process.
+ Gets default rank of master MPI process.
 
  @return the rank of master MPI process.
 */

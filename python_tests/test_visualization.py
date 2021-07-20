@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-import unittest
 import tempfile
 
 from veloxchem.veloxchemlib import is_mpi_master
@@ -9,22 +8,9 @@ from veloxchem.visualizationdriver import VisualizationDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
-from veloxchem.molecularbasis import MolecularBasis
 
 
-class TestVisualization(unittest.TestCase):
-
-    def get_molecule_and_basis(self):
-
-        mol_str = """
-            O   0.0   0.0   0.0
-            H   0.0   1.4   1.1
-            H   0.0  -1.4   1.1
-        """
-        mol = Molecule.read_str(mol_str, units='bohr')
-        bas = MolecularBasis.read(mol, 'aug-cc-pvdz')
-
-        return mol, bas
+class TestVisualization:
 
     def test_visualization_driver(self):
 
@@ -65,11 +51,10 @@ class TestVisualization(unittest.TestCase):
 
             homo_diff = np.abs(homo_values) - np.abs(homo_ref)
             homo_diff_rel = homo_diff / np.abs(homo_ref)
-            self.assertTrue(np.max(homo_diff_rel) < 1.0e-5)
+            assert np.max(homo_diff_rel) < 1.0e-5
 
             mo_val = np.array(mo_val).reshape(2, 3, 3)
-            self.assertTrue(
-                np.max(np.abs(np.abs(homo_values) - np.abs(mo_val))) < 1.0e-8)
+            assert np.max(np.abs(np.abs(homo_values) - np.abs(mo_val))) < 1.0e-8
 
         vis_drv.compute(grid, task.molecule, task.ao_basis, density, 0, 'alpha')
 
@@ -89,10 +74,10 @@ class TestVisualization(unittest.TestCase):
 
             dens_diff = dens_total - dens_ref
             dens_diff_rel = dens_diff / np.abs(dens_ref)
-            self.assertTrue(np.max(dens_diff_rel) < 1.0e-5)
+            assert np.max(dens_diff_rel) < 1.0e-5
 
             den_val = np.array(den_val).reshape(2, 3, 3)
-            self.assertTrue(np.max(np.abs(dens_alpha - den_val)) < 1.0e-8)
+            assert np.max(np.abs(dens_alpha - den_val)) < 1.0e-8
 
         twoe_val_aa = vis_drv.get_two_particle_density(points, points,
                                                        task.molecule,
@@ -108,8 +93,8 @@ class TestVisualization(unittest.TestCase):
             twoe_val_aa = np.array(twoe_val_aa).reshape(2, 3, 3)
             twoe_val_ab = np.array(twoe_val_ab).reshape(2, 3, 3)
 
-            self.assertTrue(np.max(np.abs(twoe_val_aa) < 1.0e-8))
-            self.assertTrue(np.max(np.abs(twoe_val_ab - den_val**2) < 1.0e-8))
+            assert np.max(np.abs(twoe_val_aa) < 1.0e-8)
+            assert np.max(np.abs(twoe_val_ab - den_val**2) < 1.0e-8)
 
         task.finish()
 
@@ -120,40 +105,27 @@ class TestVisualization(unittest.TestCase):
         num_points = [2, 3, 5]
 
         grid = CubicGrid(origin, step_size, num_points)
+        data = list(np.random.rand(2 * 3 * 5))
+        grid.set_values(data)
 
-        self.assertEqual(
-            origin,
-            [grid.x_origin(), grid.y_origin(),
-             grid.z_origin()])
-
-        self.assertEqual(
-            step_size,
-            [grid.x_step_size(),
-             grid.y_step_size(),
-             grid.z_step_size()])
-
-        self.assertEqual(
-            num_points,
-            [grid.x_num_points(),
-             grid.y_num_points(),
-             grid.z_num_points()])
-
-        self.assertEqual(grid.values_to_numpy().shape, tuple(num_points))
+        assert origin == grid.get_origin()
+        assert step_size == grid.get_step_size()
+        assert num_points == grid.get_num_points()
+        assert data == list(grid.values_to_numpy().flatten())
 
     def test_gen_cubic_grid(self):
 
-        mol, bas = self.get_molecule_and_basis()
-
+        mol_str = """
+            O   0.0   0.0   0.0
+            H   0.0   1.4   1.1
+            H   0.0  -1.4   1.1
+        """
+        mol = Molecule.read_str(mol_str, units='bohr')
         num_points = [2, 3, 5]
 
         vis_drv = VisualizationDriver()
         grid = vis_drv.gen_cubic_grid(mol, num_points)
-
-        self.assertEqual(
-            num_points,
-            [grid.x_num_points(),
-             grid.y_num_points(),
-             grid.z_num_points()])
+        assert num_points == grid.get_num_points()
 
     def test_gen_cubes(self):
 
@@ -190,15 +162,11 @@ class TestVisualization(unittest.TestCase):
                             0, 'alpha')
             if is_mpi_master(task.mpi_comm):
                 read_grid = CubicGrid.read_cube(dens_cube_fname)
-                self.assertTrue(read_grid.compare(cubic_grid) < 1e-6)
+                assert read_grid.compare(cubic_grid) < 1e-6
 
             vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, mol_orbs,
                             task.molecule.number_of_alpha_electrons() - 1,
                             'alpha')
             if is_mpi_master(task.mpi_comm):
                 read_grid = CubicGrid.read_cube(homo_cube_fname)
-                self.assertTrue(read_grid.compare(cubic_grid) < 1e-6)
-
-
-if __name__ == "__main__":
-    unittest.main()
+                assert read_grid.compare(cubic_grid) < 1e-6
