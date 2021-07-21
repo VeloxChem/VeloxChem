@@ -117,17 +117,13 @@ class TestBasis:
             '6-31G', '6-31G(2DF,P)', 'AUG-CC-PVDZ', 'AUG-CC-PVQZ',
             'SADLEJ-PVTZ', 'AUG-CC-PCVTZ', 'PCX-2'
         ]
-        zn_basis = ['CC-PVTZ', 'MIN-CC-PVDZ', 'STO-3G']
 
         if is_mpi_master():
 
             h_avail_basis = MolecularBasis.get_avail_basis('H')
             c_avail_basis = MolecularBasis.get_avail_basis('C')
-            zn_avail_basis = MolecularBasis.get_avail_basis('Zn')
 
             for bas in h_basis:
                 assert bas in h_avail_basis
             for bas in c_basis:
                 assert bas in c_avail_basis
-            for bas in zn_basis:
-                assert bas in zn_avail_basis
