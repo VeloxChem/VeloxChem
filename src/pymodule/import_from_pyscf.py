@@ -67,25 +67,25 @@ def overlap_deriv(molecule, basis, i=0, unit="au"):
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
                                  basis=pyscf_basis, unit=unit)
-    
+
     # The "-" sign is due to the fact that pyscf computes -(nabla m | n)
     pyscf_ovlp_deriv = - pyscf_molecule.intor('int1e_ipovlp', aosym='s1')
     ao_slices = pyscf_molecule.aoslice_by_atom()
-    
-    # Get the AO indeces corresponding to atom i 
+
+    # Get the AO indeces corresponding to atom i
     ki, kf = ao_slices[i, 2:]
 
     overlap_deriv_atom_i = np.zeros(pyscf_ovlp_deriv.shape)
 
     overlap_deriv_atom_i[:,ki:kf] = pyscf_ovlp_deriv[:,ki:kf]
-    
-    # (nabla m | n) + (m | nabla m)
+
+    # (nabla m | n) + (m | nabla n)
     overlap_deriv_atom_i += overlap_deriv_atom_i.transpose(0,2,1)
 
     vlx_ovlp_deriv_atom_i = np.zeros(overlap_deriv_atom_i.shape)
 
 
-    # Transform each compnent (x,y,z) to veloxchem format    
+    # Transform each component (x,y,z) to veloxchem format
     vlx_ovlp_deriv_atom_i[0] = ( ao_matrix_to_veloxchem(
                                  DenseMatrix(overlap_deriv_atom_i[0]),
                                  basis, molecule).to_numpy()
@@ -103,13 +103,13 @@ def overlap_deriv(molecule, basis, i=0, unit="au"):
 
     return vlx_ovlp_deriv_atom_i
 
-    
+
 
 def fock_deriv(molecule, basis, density, i=0, unit="au"):
     """
     Imports the derivatives of the Fock matrix
     from pyscf and converts it to veloxchem format
-   
+
     :param molecule:
         the vlx molecule object
     :param basis:
@@ -142,28 +142,28 @@ def fock_deriv(molecule, basis, density, i=0, unit="au"):
     #                   pyscf_scf.mo_coeff[:,:nocc])
     nao = density.shape[0]
     pyscf_grad = grad.RHF(pyscf_scf)
-    
+
     # The "-" sign is due to the fact that pyscf computes -(nabla m n | t p)
     pyscf_eri_deriv = - pyscf_molecule.intor('int2e_ip1', aosym='s1')
     ao_slices = pyscf_molecule.aoslice_by_atom()
     hcore_generator = pyscf_grad.hcore_generator(pyscf_molecule)
-    
-    # Get the AO indices corresponding to atom i 
+
+    # Get the AO indices corresponding to atom i
     ki, kf = ao_slices[i, 2:]
 
     eri_deriv_atom_i = np.zeros(pyscf_eri_deriv.shape)
     fock_deriv_atom_i = np.zeros((3,nao,nao))
 
-    #   (nabla m n | t p) + ( m nabla n | t p) 
+    #   (nabla m n | t p) + ( m nabla n | t p)
     # + (m n | nabla t p) + (m n | t nabla p)
     eri_deriv_atom_i[:, ki:kf] = pyscf_eri_deriv[:, ki:kf]
-    eri_deriv_atom_i += ( eri_deriv_atom_i.transpose(0,2,1,4,3) 
+    eri_deriv_atom_i += ( eri_deriv_atom_i.transpose(0,2,1,4,3)
                          + eri_deriv_atom_i.transpose(0,3,4,1,2)
                          + eri_deriv_atom_i.transpose(0,4,3,2,1) )
-    
-    fock_deriv_atom_i = (  hcore_generator(i) 
+
+    fock_deriv_atom_i = (  hcore_generator(i)
                          + 2 * np.einsum('xmntf,tf->xmn',
-                                          eri_deriv_atom_i, gs_dm) 
+                                          eri_deriv_atom_i, gs_dm)
                          - np.einsum('xmtnf,tf->xmn',
                                       eri_deriv_atom_i, gs_dm)
                         )
@@ -171,7 +171,7 @@ def fock_deriv(molecule, basis, density, i=0, unit="au"):
     vlx_fock_deriv_atom_i = np.zeros(fock_deriv_atom_i.shape)
 
 
-    # Transform each compnent (x,y,z) to veloxchem format    
+    # Transform each compnent (x,y,z) to veloxchem format
     vlx_fock_deriv_atom_i[0] = ( ao_matrix_to_veloxchem(
                                  DenseMatrix(fock_deriv_atom_i[0]),
                                  basis, molecule).to_numpy()
@@ -194,11 +194,11 @@ def eri_deriv(molecule, basis, i=0, unit="au"):
     """
     Imports the derivatives of the electron repulsion integrals
     from pyscf and converts them to veloxchem format
-   
+
     :param molecule:
         the vlx molecule object
     :param basis:
-        the vlx basis object 
+        the vlx basis object
     :param i:
         the index of the atom for which the derivatives
         are computed.
@@ -222,16 +222,16 @@ def eri_deriv(molecule, basis, i=0, unit="au"):
 
     pyscf_eri_deriv = - pyscf_molecule.intor('int2e_ip1', aosym='s1')
     ao_slices = pyscf_molecule.aoslice_by_atom()
-    
-    # Get the AO indeces corresponding to atom i 
+
+    # Get the AO indeces corresponding to atom i
     ki, kf = ao_slices[i, 2:]
 
     eri_deriv_atom_i = np.zeros(pyscf_eri_deriv.shape)
 
-    #   (nabla m n | t p) + ( m nabla n | t p) 
+    #   (nabla m n | t p) + ( m nabla n | t p)
     # + (m n | nabla t p) + (m n | t nabla p)
     eri_deriv_atom_i[:, ki:kf] = pyscf_eri_deriv[:, ki:kf]
-    eri_deriv_atom_i += ( eri_deriv_atom_i.transpose(0,2,1,4,3) 
+    eri_deriv_atom_i += ( eri_deriv_atom_i.transpose(0,2,1,4,3)
                          + eri_deriv_atom_i.transpose(0,3,4,1,2)
                          + eri_deriv_atom_i.transpose(0,4,3,2,1) )
 
@@ -246,8 +246,81 @@ def eri_deriv(molecule, basis, i=0, unit="au"):
                     vt = basis_set_map[t]
                     vp = basis_set_map[p]
                     vlx_eri_deriv_atom_i[:,vm,vn,vt,vp] = eri_deriv_atom_i[:,m,n,t,p]
-    
+
     return vlx_eri_deriv_atom_i
 
+
+### Second derivatives
+
+def overlap_second_deriv(molecule, basis, i=0, j=0, unit="au"):
+    """
+    Imports the derivatives of the overlap matrix
+    from pyscf and converts it to veloxchem format
+
+    :param molecule:
+        the vlx molecule object
+    :param basis:
+        the vlx basis object
+    :param i, j:
+        the indices of the atoms for which the derivatives
+        are computed.
+    :param unit:
+        the units to be used for the molecular geometry;
+        possible values: "au" (default), "Angstrom"
+
+    :return:
+        two numpy arrays corresponding to (nabla**2 m | n) and
+        (nabla m | nabla n) of shape 3 x 3 x nao x nao
+        (nao = number of atomic orbitals)
+        corresponding to the derivative of the overlap matrix
+        with respect to the x, y and z coords. of atoms i and j.
+    """
+
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+    # number of atomic orbitals
+    nao = pyscf_molecule.nao
+
+    # (nabla**2 m | n)
+    pyscf_ovlp_deriv_aa = pyscf_molecule.intor('int1e_ipipovlp', aosym='s1').reshape(3, 3, nao, nao)
+    # (nabla m | nabla n)
+    pyscf_ovlp_deriv_ab = pyscf_molecule.intor('int1e_ipovlpip', aosym='s1').reshape(3, 3, nao, nao)
+
+    ao_slices = pyscf_molecule.aoslice_by_atom()
+
+    # Get the AO indeces corresponding to atoms i and j
+    ki, kf = ao_slices[i, 2:]
+    kj, kg = ao_slices[j, 2:]
+
+    overlap_deriv_atoms_ii = np.zeros(pyscf_ovlp_deriv_aa.shape)
+    overlap_deriv_atoms_ij = np.zeros(pyscf_ovlp_deriv_ab.shape)
+
+    overlap_deriv_atoms_ii[:,:,ki:kf] = pyscf_ovlp_deriv_aa[:,:,ki:kf]
+    overlap_deriv_atoms_ij[:,:,ki:kf,kj:kg] = pyscf_ovlp_deriv_ab[:,:,ki:kf,kj:kg]
+
+    # add the transpose
+    overlap_deriv_atoms_ii += overlap_deriv_atoms_ii.transpose(0,1,3,2)
+    overlap_deriv_atoms_ij += overlap_deriv_atoms_ij.transpose(0,1,3,2)
+
+    vlx_ovlp_deriv_atoms_ii = np.zeros(overlap_deriv_atoms_ii.shape)
+    vlx_ovlp_deriv_atoms_ij = np.zeros(overlap_deriv_atoms_ij.shape)
+
+
+    # Transform each component (x,y,z),(x,y,z) to veloxchem format
+    for x in range(3):
+        for y in range(3):
+            vlx_ovlp_deriv_atoms_ii[x,y] = ( ao_matrix_to_veloxchem(
+                                         DenseMatrix(overlap_deriv_atoms_ii[x,y]),
+                                         basis, molecule).to_numpy()
+                                        )
+            vlx_ovlp_deriv_atoms_ij[x,y] = ( ao_matrix_to_veloxchem(
+                                         DenseMatrix(overlap_deriv_atoms_ij[x,y]),
+                                         basis, molecule).to_numpy()
+                                        )
+
+    return vlx_ovlp_deriv_atoms_ii, vlx_ovlp_deriv_atoms_ij
 
 
