@@ -26,6 +26,7 @@
 #include "AngularMomentumIntegralsDriverTest.hpp"
 
 #include <mpi.h>
+#include <array>
 
 #include "AngularMomentumIntegralsDriver.hpp"
 #include "MolecularBasisSetter.hpp"
@@ -35,7 +36,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeSSForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -115,7 +116,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeSPForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -171,7 +172,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeSDForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -242,7 +243,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeSFForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -325,7 +326,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeSGForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -423,7 +424,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputePSForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -479,7 +480,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputePPForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -577,7 +578,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputePDForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -717,7 +718,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputePFForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -896,7 +897,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputePGForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -1117,7 +1118,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeDSForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -1188,7 +1189,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeDPForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -1328,7 +1329,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeDDForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -1537,7 +1538,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeDFForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -1812,7 +1813,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeDGForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -2156,7 +2157,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeFSForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -2239,7 +2240,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeFPForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -2418,7 +2419,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeFDForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -2693,7 +2694,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeFFForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -3064,7 +3065,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeFGForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -3531,7 +3532,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeGSForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -3629,7 +3630,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeGPForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -3850,7 +3851,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeGDForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -4194,7 +4195,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeGFForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -4661,7 +4662,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeGGForLiH)
 {
     CAngularMomentumIntegralsDriver amomdrv(MPI_COMM_WORLD);
 
-    amomdrv.setAngularMomentumOrigin(1.0, 2.0, 3.0);
+    amomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 2.0, 3.0}));
 
     auto mlih = vlxmol::getTestLiH();
 
@@ -5577,7 +5578,7 @@ TEST_F(CAngularMomentumIntegralsDriverTest, ComputeAngularMomentumForH2OWithOrig
 
     CAngularMomentumIntegralsDriver angmomdrv(MPI_COMM_WORLD);
 
-    angmomdrv.setAngularMomentumOrigin(1.0, 1.0, 1.0);
+    angmomdrv.setAngularMomentumOrigin(std::array<double, 3>({1.0, 1.0, 1.0}));
 
     auto angmommat = angmomdrv.compute(mh2o, mbas);
 

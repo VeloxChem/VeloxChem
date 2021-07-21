@@ -718,7 +718,7 @@ class ExcitonModelDriver:
                     self.ostream.print_header('=' * (len(valstr) + 2))
                     self.ostream.print_blank()
 
-                    valstr = 'Dimer Energy:{:20.10f} au'.format(dimer_energy)
+                    valstr = 'Dimer Energy:{:20.10f} a.u.'.format(dimer_energy)
                     self.ostream.print_header(valstr.ljust(72))
                     self.ostream.print_blank()
                     self.ostream.flush()

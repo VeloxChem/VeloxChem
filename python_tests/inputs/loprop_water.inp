@@ -1,0 +1,16 @@
+@jobs
+task: loprop
+@end
+
+@method settings
+basis: 6-31g
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyz:  
+O  0.0  0.0  0.0
+H  1.0  0.0  0.0
+H  0.0  0.0  1.0
+@end

@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-import unittest
 import tempfile
 
 from veloxchem.veloxchemlib import is_mpi_master
@@ -11,7 +10,7 @@ from veloxchem.tdaexcidriver import TDAExciDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 
 
-class TestNTO(unittest.TestCase):
+class TestNTO:
 
     def run_nto(self, inpfile, xcfun_label, ref_eig_vals, ref_nto_lambdas,
                 ref_nto_cube_vals, ref_dens_cube_vals, flag):
@@ -85,11 +84,10 @@ class TestNTO(unittest.TestCase):
             dens_cube_vals = np.array(dens_cube_vals)
 
             thresh = 1.0e-6 if xcfun_label is None else 1.0e-5
-            self.assertTrue(np.max(np.abs(eig_vals - ref_eig_vals)) < thresh)
+            assert np.max(np.abs(eig_vals - ref_eig_vals)) < thresh
 
             thresh = 1.0e-4 if xcfun_label is None else 1.0e-3
-            self.assertTrue(
-                np.max(np.abs(nto_lambdas - ref_nto_lambdas)) < thresh)
+            assert np.max(np.abs(nto_lambdas - ref_nto_lambdas)) < thresh
 
             for s in range(nto_cube_vals.shape[0]):
                 if np.vdot(nto_cube_vals[s, :], ref_nto_cube_vals[s, :]) < 0.0:
@@ -97,10 +95,8 @@ class TestNTO(unittest.TestCase):
                 if np.vdot(dens_cube_vals[s, :],
                            ref_dens_cube_vals[s, :]) < 0.0:
                     dens_cube_vals[s, :] *= -1.0
-            self.assertTrue(
-                np.max(np.abs(nto_cube_vals - ref_nto_cube_vals)) < 1.0e-4)
-            self.assertTrue(
-                np.max(np.abs(dens_cube_vals - ref_dens_cube_vals)) < 1.0e-4)
+            assert np.max(np.abs(nto_cube_vals - ref_nto_cube_vals)) < 1.0e-4
+            assert np.max(np.abs(dens_cube_vals - ref_dens_cube_vals)) < 1.0e-4
 
     def test_nto_tda(self):
 
@@ -329,7 +325,3 @@ class TestNTO(unittest.TestCase):
 
         self.run_nto(inpfile, xcfun_label, eig_vals, nto_lambdas, nto_cube_vals,
                      dens_cube_vals, 'rpa')
-
-
-if __name__ == "__main__":
-    unittest.main()

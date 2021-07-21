@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-import unittest
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.veloxchemlib import rotatory_strength_in_cgs
@@ -10,7 +9,7 @@ from veloxchem.tdaexcidriver import TDAExciDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 
 
-class TestECD(unittest.TestCase):
+class TestECD:
 
     def run_ecd(self, inpfile, ref, flag):
 
@@ -46,13 +45,13 @@ class TestECD(unittest.TestCase):
                     vdip[i, :] *= -1.0
                     mdip[i, :] *= -1.0
 
-            self.assertTrue(np.max(np.abs(eigvals - ref['eig'])) < 1.0e-6)
-            self.assertTrue(np.max(np.abs(edip - ref['edip'])) < 5.0e-4)
-            self.assertTrue(np.max(np.abs(vdip - ref['vdip'])) < 5.0e-4)
-            self.assertTrue(np.max(np.abs(mdip - ref['mdip'])) < 5.0e-4)
-            self.assertTrue(np.max(np.abs(osc - ref['osc'])) < 1.0e-4)
-            self.assertTrue(np.max(np.abs(rot - ref['rot'])) < 2.0e-4)
-            self.assertTrue(np.max(np.abs(rot_len - ref['rot_len'])) < 2.0e-4)
+            assert np.max(np.abs(eigvals - ref['eig'])) < 1.0e-6
+            assert np.max(np.abs(edip - ref['edip'])) < 5.0e-4
+            assert np.max(np.abs(vdip - ref['vdip'])) < 5.0e-4
+            assert np.max(np.abs(mdip - ref['mdip'])) < 5.0e-4
+            assert np.max(np.abs(osc - ref['osc'])) < 1.0e-4
+            assert np.max(np.abs(rot - ref['rot'])) < 2.0e-4
+            assert np.max(np.abs(rot_len - ref['rot_len'])) < 2.0e-4
 
     def gen_ref(self, eigvals, edip, vdip, mdip):
 
@@ -169,7 +168,3 @@ class TestECD(unittest.TestCase):
         mdip = [float(x) for x in raw_vals.split()]
 
         self.run_ecd(inpfile, self.gen_ref(eigvals, edip, vdip, mdip), 'rpa')
-
-
-if __name__ == "__main__":
-    unittest.main()

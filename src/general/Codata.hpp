@@ -29,21 +29,21 @@
 namespace units {  // units namespace
 
 /**
- Gets a Bohr value in Angstroms.
+ Gets Bohr value in Angstroms.
 
  @return the conversion factor.
  */
 double getBohrValueInAngstroms();
 
 /**
- Gets a Hartree value in electronvolts.
+ Gets Hartree value in electronvolts.
 
  @return the conversion factor.
  */
 double getHartreeValueInElectronVolts();
 
 /**
- Gets a Hartree value in kcal/mol.
+ Gets Hartree value in kcal/mol.
 
  @return the conversion factor.
  */
@@ -57,25 +57,55 @@ double getHartreeValueInKiloCaloriePerMole();
 double getHartreeValueInInverseNanometer();
 
 /**
- Gets convertion factor for dipole moment (a.u.->Debye)
+ Gets Hartree value in reciprocal cm.
+
+ @return the conversion factor.
+ */
+double getHartreeValueInWavenumbers();
+
+/**
+ Gets convertion factor for dipole moment (a.u. -> Debye).
 
  @return the conversion factor.
  */
 double getDipoleInDebye();
 
 /**
- Gets convertion factor for rotatory strength (a.u.->cgs)
+ Gets convertion factor for rotatory strength (a.u. -> 10^-40 cgs).
 
  @return the conversion factor.
  */
 double getRotatoryStrengthInCGS();
 
 /**
- *  Gets Boltzmann constant in eV/K.
- *
- *   @return the conversion factor.
- *    */
+ Gets Boltzmann constant in eV/K.
+
+ @return the conversion factor.
+ */
 double getBoltzmannConstantInElectronVoltsPerKelvin();
+
+/**
+ Gets factor needed for the calculation of the molar ellipticity from the
+ electric-dipole magnetic-dipole polarizability beta.
+
+ @return the factor.
+ */
+double getMolarEllipticityFromBeta();
+
+/**
+ Gets factor needed for the calculation of extinction coefficient from molar
+ ellipticity.
+
+ @return the factor.
+ */
+double getExtinctionCoefficientFromMolarEllipticity();
+
+/**
+ Gets fine-structure constant.
+
+ @return the fine-structure constant.
+ */
+double getFineStructureConstant();
 
 }  // namespace units
 

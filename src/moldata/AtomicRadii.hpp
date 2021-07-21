@@ -38,17 +38,17 @@ namespace atomicradii {  // atomicradii namespace
 std::vector<double> buildVdwRadii();
 
 /**
- *  Creates MK radii.
- *
- *   @return a vector of MK radii with nuclear charge as index.
- *    */
+ Creates MK radii.
+
+ @return a vector of MK radii with nuclear charge as index.
+ */
 std::vector<double> buildMkRadii();
 
 /**
- *  Creates covalent radii.
- *
- *   @return a vector of covalent radii with nuclear charge as index.
- *    */
+ Creates covalent radii.
+
+ @return a vector of covalent radii with nuclear charge as index.
+ */
 std::vector<double> buildCovalentRadii();
 
 }  // namespace atomicradii

@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-import unittest
 try:
     import cppe
 except ImportError:
@@ -12,7 +11,7 @@ from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.scffirstorderprop import ScfFirstOrderProperties
 
 
-class TestTripletH2(unittest.TestCase):
+class TestTripletH2:
 
     def run_scf(self, inpfile, potfile, xcfun_label, ref_e_scf, ref_dip):
 
@@ -36,10 +35,10 @@ class TestTripletH2(unittest.TestCase):
         if is_mpi_master(task.mpi_comm):
             e_scf = scf_drv.get_scf_energy()
             tol = 1.0e-5 if xcfun_label is not None else 1.0e-6
-            self.assertTrue(np.max(np.abs(e_scf - ref_e_scf)) < tol)
+            assert np.max(np.abs(e_scf - ref_e_scf)) < tol
 
             dip = scf_prop.get_property('dipole moment')
-            self.assertTrue(np.max(np.abs(dip - ref_dip)) < 1.0e-5)
+            assert np.max(np.abs(dip - ref_dip)) < 1.0e-5
 
     def test_uscf_hf(self):
 
@@ -55,7 +54,3 @@ class TestTripletH2(unittest.TestCase):
         ref_dip = np.array([0.000000, 0.000000, 0.000000])
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
-
-
-if __name__ == "__main__":
-    unittest.main()

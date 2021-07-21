@@ -25,6 +25,8 @@
 
 #include "AngularMomentumMatrixTest.hpp"
 
+#include <array>
+
 #include "AngularMomentumMatrix.hpp"
 #include "CheckFunctions.hpp"
 
@@ -107,7 +109,7 @@ TEST_F(CAngularMomentumMatrixTest, SetOriginCoordinates)
 
     CAngularMomentumMatrix smata(mx, my, mz, 1.2, 3.4, 6.1);
 
-    smata.setOriginCoordinates(2.3, 1.6, 8.1);
+    smata.setOriginCoordinates(std::array<double, 3>({2.3, 1.6, 8.1}));
 
     CAngularMomentumMatrix smatb(mx, my, mz, 2.3, 1.6, 8.1);
 
@@ -219,7 +221,7 @@ TEST_F(CAngularMomentumMatrixTest, ZValues)
     vlxtest::compare({7.0, -1.0, -2.0, -9.0, 5.0, 8.0, 1.0, 3.0, -2.0}, smata.zvalues());
 }
 
-TEST_F(CAngularMomentumMatrixTest, GetOriginCoordinateX)
+TEST_F(CAngularMomentumMatrixTest, GetOriginCoordinates)
 {
     CDenseMatrix mx({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
 
@@ -229,31 +231,9 @@ TEST_F(CAngularMomentumMatrixTest, GetOriginCoordinateX)
 
     const CAngularMomentumMatrix smata(mx, my, mz, 1.2, 3.4, 6.1);
 
-    ASSERT_NEAR(1.2, smata.getOriginCoordinateX(), 1.0e-13);
-}
+    ASSERT_NEAR(1.2, smata.getOriginCoordinates()[0], 1.0e-13);
 
-TEST_F(CAngularMomentumMatrixTest, GetOriginCoordinateY)
-{
-    CDenseMatrix mx({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
+    ASSERT_NEAR(3.4, smata.getOriginCoordinates()[1], 1.0e-13);
 
-    CDenseMatrix my({1.0, -2.0, -1.0, -6.0, 6.0, 1.0, 3.0, 4.0, -8.0}, 3, 3);
-
-    CDenseMatrix mz({7.0, -1.0, -2.0, -9.0, 5.0, 8.0, 1.0, 3.0, -2.0}, 3, 3);
-
-    const CAngularMomentumMatrix smata(mx, my, mz, 1.2, 3.4, 6.1);
-
-    ASSERT_NEAR(3.4, smata.getOriginCoordinateY(), 1.0e-13);
-}
-
-TEST_F(CAngularMomentumMatrixTest, GetOriginCoordinateZ)
-{
-    CDenseMatrix mx({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, 3, 3);
-
-    CDenseMatrix my({1.0, -2.0, -1.0, -6.0, 6.0, 1.0, 3.0, 4.0, -8.0}, 3, 3);
-
-    CDenseMatrix mz({7.0, -1.0, -2.0, -9.0, 5.0, 8.0, 1.0, 3.0, -2.0}, 3, 3);
-
-    const CAngularMomentumMatrix smata(mx, my, mz, 1.2, 3.4, 6.1);
-
-    ASSERT_NEAR(6.1, smata.getOriginCoordinateZ(), 1.0e-13);
+    ASSERT_NEAR(6.1, smata.getOriginCoordinates()[2], 1.0e-13);
 }

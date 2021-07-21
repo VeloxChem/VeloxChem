@@ -45,19 +45,11 @@
 #include "ExportMath.hpp"
 #include "MathConst.hpp"
 #include "StringFormat.hpp"
-#include "TwoIndexes.hpp"
 
 namespace py = pybind11;
+using namespace py::literals;
 
 namespace vlx_math {  // vlx_math namespace
-
-// Helper function for converting CDenseMatrix to numpy array
-
-static py::array_t<double>
-CDenseMatrix_to_numpy(const CDenseMatrix& self)
-{
-    return vlx_general::pointer_to_numpy(self.values(), self.getNumberOfRows(), self.getNumberOfColumns());
-}
 
 // Helper function for CDenseMatrix constructor
 // Not a static function; used in other files
@@ -175,39 +167,26 @@ c_matmul(const py::array_t<double>& A, const py::array_t<double>& B)
 
     auto lda_C = ncol_B;
 
-    cblas_dgemm(CblasRowMajor,
-                trans_A,
-                trans_B,
-                nrow_A,
-                ncol_B,
-                ncol_A,
-                1.0,
-                A.data(),
-                lda_A,
-                B.data(),
-                lda_B,
-                0.0,
-                C.mutable_data(),
-                lda_C);
+    cblas_dgemm(CblasRowMajor, trans_A, trans_B, nrow_A, ncol_B, ncol_A, 1.0, A.data(), lda_A, B.data(), lda_B, 0.0, C.mutable_data(), lda_C);
 
     return C;
 }
 
 static void
-c_dgemm(const std::string layout_str,
-        const std::string trans_A_str,
-        const std::string trans_B_str,
-        const int32_t m,
-        const int32_t n,
-        const int32_t k,
-        const double alpha,
+c_dgemm(const std::string          layout_str,
+        const std::string          trans_A_str,
+        const std::string          trans_B_str,
+        const int32_t              m,
+        const int32_t              n,
+        const int32_t              k,
+        const double               alpha,
         const py::array_t<double>& A,
-        const int32_t lda_A,
+        const int32_t              lda_A,
         const py::array_t<double>& B,
-        const int32_t lda_B,
-        const double beta,
-        py::array_t<double>& C,
-        const int32_t lda_C)
+        const int32_t              lda_B,
+        const double               beta,
+        py::array_t<double>&       C,
+        const int32_t              lda_C)
 {
     auto layout = CblasRowMajor;
 
@@ -221,20 +200,7 @@ c_dgemm(const std::string layout_str,
 
     if (fstr::upcase(trans_B_str) == std::string("T")) trans_B = CblasTrans;
 
-    cblas_dgemm(layout,
-                trans_A,
-                trans_B,
-                m,
-                n,
-                k,
-                alpha,
-                A.data(),
-                lda_A,
-                B.data(),
-                lda_B,
-                beta,
-                C.mutable_data(),
-                lda_C);
+    cblas_dgemm(layout, trans_A, trans_B, m, n, k, alpha, A.data(), lda_A, B.data(), lda_B, beta, C.mutable_data(), lda_C);
 }
 
 static py::array_t<double>
@@ -349,8 +315,7 @@ c_eigh(const py::array_t<double>& A)
 
     // diagonalize matrix
 
-    auto st = LAPACKE_dsyevr(
-        layout_A, 'V', 'A', 'U', dim, mat, dim, 0.0, 0.0, 0, 0, 1.0e-13, &nval, evals, evecs, dim, idx.data());
+    auto st = LAPACKE_dsyevr(layout_A, 'V', 'A', 'U', dim, mat, dim, 0.0, 0.0, 0, 0, 1.0e-13, &nval, evals, evecs, dim, idx.data());
 
     errors::assertMsgCritical(st == 0, "c_eigh: Diagonalization failed");
 
@@ -377,34 +342,33 @@ export_math(py::module& m)
         .def(py::init<const CDenseMatrix&>())
         .def(py::init(&CDenseMatrix_from_numpy))
         .def("__str__", &CDenseMatrix::getString)
-        .def("to_numpy", &CDenseMatrix_to_numpy)
-        .def("number_of_rows", &CDenseMatrix::getNumberOfRows)
-        .def("number_of_columns", &CDenseMatrix::getNumberOfColumns)
-        .def("symmetrize", &CDenseMatrix::symmetrize)
-        .def("slice", &CDenseMatrix::slice)
+        .def("number_of_rows", &CDenseMatrix::getNumberOfRows, "Gets number of rows in dense matrix.")
+        .def("number_of_columns", &CDenseMatrix::getNumberOfColumns, "Gets number of columns in dense matrix.")
+        .def("symmetrize", &CDenseMatrix::symmetrize, "Symmetrizes elements of square matrix: a_ij = a_ji = (a_ij + a_ji).")
+        .def("slice",
+             &CDenseMatrix::slice,
+             "Creates dense matrix object by slicing specified size submatrix at selected position from this dense matrix object.",
+             "iRow"_a,
+             "iColumn"_a,
+             "nRows"_a,
+             "nColumns"_a)
+        .def(
+            "to_numpy",
+            [](const CDenseMatrix& self) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.values(), self.getNumberOfRows(), self.getNumberOfColumns());
+            },
+            "Converts DenseMatrix to numpy array.")
         .def(py::self == py::self);
-
-    // CTwoIndexes class
-
-    PyClass<CTwoIndexes>(m, "TwoIndexes")
-        .def(py::init<>())
-        .def(py::init<const int32_t, const int32_t>())
-        .def("first", &CTwoIndexes::first)
-        .def("second", &CTwoIndexes::second);
 
     // exposing functions
 
-    m.def("mathconst_pi", &mathconst::getPiValue);
+    m.def("mathconst_pi", &mathconst::getPiValue, "Gets value of PI constant.");
 
-    m.def("c_matmul", &c_matmul);
-
-    m.def("c_dgemm", &c_dgemm);
-
-    m.def("c_multi_dot", &c_multi_dot);
-
-    m.def("c_outer", &c_outer);
-
-    m.def("c_eigh", &c_eigh);
+    m.def("c_matmul", &c_matmul, "matmul for testing purposes.");
+    m.def("c_dgemm", &c_dgemm, "dgemm for testing purposes.");
+    m.def("c_multi_dot", &c_multi_dot, "multi_dot for testing purposes");
+    m.def("c_outer", &c_outer, "outer for testing purposes");
+    m.def("c_eigh", &c_eigh, "eigh for testing purposes");
 }
 
 }  // namespace vlx_math

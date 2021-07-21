@@ -33,29 +33,23 @@
 
 TEST_F(CCubicGridTest, Getters)
 {
-    CCubicGrid grid({0.1, 0.2, 0.3}, {1.0, 2.0, 3.0}, {1, 2, 3});
+    std::vector<double> origin({0.1, 0.2, 0.3});
+
+    std::vector<double> stepSize({1.0, 2.0, 3.0});
+
+    std::vector<int32_t> numPoints({1, 2, 3});
+
+    CCubicGrid grid(origin, stepSize, numPoints);
 
     std::vector<double> data({0.55, 0.32, 0.97, 0.18, 0.33, 0.26});
 
-    std::memcpy(grid.values(), data.data(), data.size() * sizeof(double));
+    grid.setValues(data);
 
-    ASSERT_EQ(0.1, grid.originX());
+    ASSERT_EQ(origin, grid.getOrigin());
 
-    ASSERT_EQ(0.2, grid.originY());
+    ASSERT_EQ(stepSize, grid.getStepSize());
 
-    ASSERT_EQ(0.3, grid.originZ());
-
-    ASSERT_EQ(1.0, grid.stepSizeX());
-
-    ASSERT_EQ(2.0, grid.stepSizeY());
-
-    ASSERT_EQ(3.0, grid.stepSizeZ());
-
-    ASSERT_EQ(1, grid.numPointsX());
-
-    ASSERT_EQ(2, grid.numPointsY());
-
-    ASSERT_EQ(3, grid.numPointsZ());
+    ASSERT_EQ(numPoints, grid.getNumPoints());
 
     vlxtest::compare(data, grid.values());
 }
@@ -66,7 +60,7 @@ TEST_F(CCubicGridTest, CopyMoveConstructor)
 
     std::vector<double> data({0.55, 0.32, 0.97, 0.18, 0.33, 0.26});
 
-    std::memcpy(grid.values(), data.data(), data.size() * sizeof(double));
+    grid.setValues(data);
 
     CCubicGrid grid2(grid);
 
@@ -83,7 +77,7 @@ TEST_F(CCubicGridTest, CopyMoveAssignment)
 
     std::vector<double> data({0.55, 0.32, 0.97, 0.18, 0.33, 0.26});
 
-    std::memcpy(grid.values(), data.data(), data.size() * sizeof(double));
+    grid.setValues(data);
 
     CCubicGrid grid2;
 

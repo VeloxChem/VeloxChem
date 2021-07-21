@@ -669,26 +669,23 @@ class LinearSolver:
                                     np.matmul(da, fat.T) + np.matmul(db, fbt.T))
                     gao -= np.matmul(
                         np.matmul(fat.T, da) + np.matmul(fbt.T, db), S)
+                    gao *= 0.5
 
                     gmo = np.linalg.multi_dot([mo.T, gao, mo])
 
-                    if ifock < batch_ger:
-                        e2_ger[:, ifock] = -self.lrmat2vec(gmo, nocc,
-                                                           norb)[:half_size]
-                        if self.nonlinear:
-                            fock_ger[:, ifock] = np.linalg.multi_dot(
-                                [mo.T, fak.T, mo]).reshape(norb**2)
-                    else:
-                        e2_ung[:, ifock - batch_ger] = -self.lrmat2vec(
-                            gmo, nocc, norb)[:half_size]
-                        if self.nonlinear:
-                            fock_ung[:,
-                                     ifock - batch_ger] = np.linalg.multi_dot(
-                                         [mo.T, fak.T, mo]).reshape(norb**2)
+                    gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
+                                                      norb)[:half_size]
+                    fak_T_mo_vec = np.linalg.multi_dot([mo.T, fak.T,
+                                                        mo]).reshape(norb**2)
 
-            if self.rank == mpi_master():
-                e2_ger *= 0.5
-                e2_ung *= 0.5
+                    if ifock < batch_ger:
+                        e2_ger[:, ifock] = -gmo_vec_halfsize
+                        if self.nonlinear:
+                            fock_ger[:, ifock] = fak_T_mo_vec
+                    else:
+                        e2_ung[:, ifock - batch_ger] = -gmo_vec_halfsize
+                        if self.nonlinear:
+                            fock_ung[:, ifock - batch_ger] = fak_T_mo_vec
 
             vecs_e2_ger = DistributedArray(e2_ger, self.comm)
             vecs_e2_ung = DistributedArray(e2_ung, self.comm)
@@ -1319,7 +1316,8 @@ class LinearSolver:
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            matrices = tuple(0.5 * np.linalg.multi_dot([
+            factor = 0.5 * np.sqrt(2.0)
+            matrices = tuple(factor * np.linalg.multi_dot([
                 mo.T,
                 (np.linalg.multi_dot([S, D, P.T]) -
                  np.linalg.multi_dot([P.T, D, S])), mo
@@ -1357,7 +1355,7 @@ class LinearSolver:
             operator in [
                 'dipole', 'electric dipole', 'electric_dipole',
                 'linear_momentum', 'linear momentum', 'angular_momentum',
-                'angular momentum'
+                'angular momentum', 'magnetic dipole', 'magnetic_dipole'
             ],
             'get_complex_prop_grad: unsupported operator {}'.format(operator))
 
@@ -1394,6 +1392,17 @@ class LinearSolver:
             else:
                 integrals = tuple()
 
+        elif operator in ['magnetic_dipole', 'magnetic dipole']:
+            angmom_drv = AngularMomentumIntegralsDriver(self.comm)
+            angmom_mats = angmom_drv.compute(molecule, basis)
+
+            if self.rank == mpi_master():
+                integrals = (-0.5j * angmom_mats.x_to_numpy(),
+                             -0.5j * angmom_mats.y_to_numpy(),
+                             -0.5j * angmom_mats.z_to_numpy())
+            else:
+                integrals = tuple()
+
         # compute right-hand side
 
         if self.rank == mpi_master():
@@ -1407,7 +1416,8 @@ class LinearSolver:
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            matrices = tuple(0.5 * np.linalg.multi_dot([
+            factor = 0.5 * np.sqrt(2.0)
+            matrices = tuple(factor * np.linalg.multi_dot([
                 mo.T,
                 (np.linalg.multi_dot([S, D, P.conj().T]) -
                  np.linalg.multi_dot([P.conj().T, D, S])), mo

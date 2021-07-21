@@ -1,7 +1,6 @@
 from mpi4py import MPI
 from pathlib import Path
 import numpy as np
-import unittest
 import tempfile
 
 from veloxchem.veloxchemlib import is_mpi_master
@@ -10,16 +9,13 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.outputstream import OutputStream
 from veloxchem.distributedarray import DistributedArray
 from veloxchem.linearsolver import LinearSolver
-from veloxchem.checkpoint import write_rsp_hdf5
-from veloxchem.checkpoint import read_rsp_hdf5
-from veloxchem.checkpoint import check_rsp_hdf5
-from veloxchem.checkpoint import append_rsp_solution_hdf5
-from veloxchem.checkpoint import write_distributed_focks
-from veloxchem.checkpoint import read_distributed_focks
-from veloxchem.checkpoint import check_distributed_focks
+from veloxchem.checkpoint import (write_rsp_hdf5, read_rsp_hdf5, check_rsp_hdf5,
+                                  write_rsp_solution, write_distributed_focks,
+                                  read_distributed_focks,
+                                  check_distributed_focks)
 
 
-class TestCheckpoint(unittest.TestCase):
+class TestCheckpoint:
 
     def get_molecule_and_basis(self):
 
@@ -53,28 +49,28 @@ class TestCheckpoint(unittest.TestCase):
             # test writing
             success = write_rsp_hdf5(fname, arrays, labels, mol, bas, dft_dict,
                                      pe_dict, ostream)
-            self.assertTrue(success)
+            assert success
 
             # test reading
             read_arrays = read_rsp_hdf5(fname, labels, mol, bas, dft_dict,
                                         pe_dict, ostream)
             for a, b in zip(read_arrays, arrays):
-                self.assertTrue(np.max(np.abs(a - b)) < 1.0e-12)
+                assert np.max(np.abs(a - b)) < 1.0e-12
 
             # test appending
             new_array = np.random.rand(10, 20)
             new_label = 'c'
-            append_rsp_solution_hdf5(fname, new_label, new_array)
+            write_rsp_solution(fname, new_label, new_array)
 
             # test hdf5
             arrays.append(new_array)
             labels.append(new_label)
             match = check_rsp_hdf5(fname, labels, mol, bas, dft_dict, pe_dict)
-            self.assertTrue(match)
+            assert match
 
             match = check_rsp_hdf5(fname, ['bger', 'e2bger', 'c'], mol, bas,
                                    dft_dict, pe_dict)
-            self.assertFalse(match)
+            assert not match
 
     def test_rsp_checkpoint_distributed(self):
 
@@ -108,18 +104,16 @@ class TestCheckpoint(unittest.TestCase):
             solver.write_checkpoint(mol, bas, dft_dict, pe_dict, labels)
 
             solver.read_vectors(labels)
-            self.assertTrue(
-                np.max(np.abs(backup_data['bger'] -
-                              solver.dist_bger.data)) < 1.0e-12)
-            self.assertTrue(
-                np.max(np.abs(backup_data['bung'] -
-                              solver.dist_bung.data)) < 1.0e-12)
-            self.assertTrue(
-                np.max(np.abs(backup_data['e2bger'] -
-                              solver.dist_e2bger.data)) < 1.0e-12)
-            self.assertTrue(
-                np.max(np.abs(backup_data['e2bung'] -
-                              solver.dist_e2bung.data)) < 1.0e-12)
+            assert np.max(
+                np.abs(backup_data['bger'] - solver.dist_bger.data)) < 1.0e-12
+            assert np.max(
+                np.abs(backup_data['bung'] - solver.dist_bung.data)) < 1.0e-12
+            assert np.max(
+                np.abs(backup_data['e2bger'] -
+                       solver.dist_e2bger.data)) < 1.0e-12
+            assert np.max(
+                np.abs(backup_data['e2bung'] -
+                       solver.dist_e2bung.data)) < 1.0e-12
 
     def test_fock_checkpoint(self):
 
@@ -143,7 +137,7 @@ class TestCheckpoint(unittest.TestCase):
             # test writing
             success = write_distributed_focks(fname, focks, keys, freqs, comm,
                                               ostream)
-            self.assertTrue(success)
+            assert success
 
             # test reading
             read_focks = read_distributed_focks(fname, keys, freqs, comm,
@@ -153,21 +147,21 @@ class TestCheckpoint(unittest.TestCase):
                     a = read_focks[key][w].get_full_vector()
                     b = focks[key][w].get_full_vector()
                     if is_mpi_master(comm):
-                        self.assertTrue(np.max(np.abs(a - b)) < 1.0e-12)
+                        assert np.max(np.abs(a - b)) < 1.0e-12
 
             # test hdf5
             if is_mpi_master(comm):
 
                 valid_checkpoint = check_distributed_focks(fname, keys, freqs)
-                self.assertTrue(valid_checkpoint)
+                assert valid_checkpoint
 
                 valid_checkpoint = check_distributed_focks(
                     fname, ['x', 'y'], freqs)
-                self.assertFalse(valid_checkpoint)
+                assert not valid_checkpoint
 
                 valid_checkpoint = check_distributed_focks(
                     fname, keys, [0.1, 0.2])
-                self.assertFalse(valid_checkpoint)
+                assert not valid_checkpoint
 
     def test_distributed_array(self):
 
@@ -188,8 +182,4 @@ class TestCheckpoint(unittest.TestCase):
                 a = dist_array.get_full_vector(col)
                 b = read_array.get_full_vector(col)
                 if is_mpi_master(comm):
-                    self.assertTrue(np.max(np.abs(a - b)) < 1.0e-12)
-
-
-if __name__ == "__main__":
-    unittest.main()
+                    assert np.max(np.abs(a - b)) < 1.0e-12
