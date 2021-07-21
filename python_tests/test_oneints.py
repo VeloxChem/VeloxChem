@@ -143,9 +143,9 @@ class TestOneInts:
             h5file = here / 'inputs' / 'h2se.onee.h5'
 
             hf = h5py.File(h5file, 'r')
-            S2 = np.array(hf.get("overlap"))
-            T2 = np.array(hf.get("kinetic_energy"))
-            V2 = np.array(hf.get("nuclear_potential"))
+            S2 = np.array(hf.get('overlap'))
+            T2 = np.array(hf.get('kinetic_energy'))
+            V2 = np.array(hf.get('nuclear_potential'))
             hf.close()
 
             dS = np.max(np.abs(S1 - S2))
@@ -184,9 +184,9 @@ class TestOneInts:
         if is_mpi_master():
 
             hf = h5py.File(h5file, 'r')
-            ref_S11 = np.array(hf.get("S_h2o_def2-svp"))
-            ref_T11 = np.array(hf.get("T_h2o_def2-svp"))
-            ref_V11 = np.array(hf.get("V_h2o_def2-svp"))
+            ref_S11 = np.array(hf.get('S_h2o_def2-svp'))
+            ref_T11 = np.array(hf.get('T_h2o_def2-svp'))
+            ref_V11 = np.array(hf.get('V_h2o_def2-svp'))
             hf.close()
 
             dS = np.max(np.abs(S11.to_numpy() - ref_S11))
@@ -201,7 +201,7 @@ class TestOneInts:
 
         mol_1 = Molecule.read_xyz(h2ofile)
         bas_1 = MolecularBasis.read(mol_1, 'def2-svp')
-        bas_2 = MolecularBasis.read(mol_1, 'cc-pvdz')
+        bas_2 = MolecularBasis.read(mol_1, 'cc-pvdz-optgc')
 
         S12 = ovldrv.compute(mol_1, bas_1, bas_2)
         T12 = kindrv.compute(mol_1, bas_1, bas_2)
@@ -210,9 +210,9 @@ class TestOneInts:
         if is_mpi_master():
 
             hf = h5py.File(h5file, 'r')
-            ref_S12 = np.array(hf.get("S_h2o_def2-svp_cc-pvdz"))
-            ref_T12 = np.array(hf.get("T_h2o_def2-svp_cc-pvdz"))
-            ref_V12 = np.array(hf.get("V_h2o_def2-svp_cc-pvdz"))
+            ref_S12 = np.array(hf.get('S_h2o_def2-svp_cc-pvdz'))
+            ref_T12 = np.array(hf.get('T_h2o_def2-svp_cc-pvdz'))
+            ref_V12 = np.array(hf.get('V_h2o_def2-svp_cc-pvdz'))
             hf.close()
 
             dS = np.max(np.abs(S12.to_numpy() - ref_S12))
@@ -237,9 +237,9 @@ class TestOneInts:
         if is_mpi_master():
 
             hf = h5py.File(h5file, 'r')
-            ref_S12 = np.array(hf.get("S_h2o_nh3_def2-svp"))
-            ref_T12 = np.array(hf.get("T_h2o_nh3_def2-svp"))
-            ref_V12 = np.array(hf.get("V_h2o_nh3_def2-svp"))
+            ref_S12 = np.array(hf.get('S_h2o_nh3_def2-svp'))
+            ref_T12 = np.array(hf.get('T_h2o_nh3_def2-svp'))
+            ref_V12 = np.array(hf.get('V_h2o_nh3_def2-svp'))
             hf.close()
 
             dS = np.max(np.abs(S12.to_numpy() - ref_S12))
@@ -256,7 +256,7 @@ class TestOneInts:
         mol_2 = Molecule.read_xyz(nh3file)
         mol = Molecule(mol_1, mol_2)
         bas_1 = MolecularBasis.read(mol_1, 'def2-svp')
-        bas_2 = MolecularBasis.read(mol_2, 'cc-pvdz')
+        bas_2 = MolecularBasis.read(mol_2, 'cc-pvdz-optgc')
 
         S12 = ovldrv.compute(mol_1, mol_2, bas_1, bas_2)
         T12 = kindrv.compute(mol_1, mol_2, bas_1, bas_2)
@@ -265,9 +265,9 @@ class TestOneInts:
         if is_mpi_master():
 
             hf = h5py.File(h5file, 'r')
-            ref_S12 = np.array(hf.get("S_h2o_def2-svp_nh3_cc-pvdz"))
-            ref_T12 = np.array(hf.get("T_h2o_def2-svp_nh3_cc-pvdz"))
-            ref_V12 = np.array(hf.get("V_h2o_def2-svp_nh3_cc-pvdz"))
+            ref_S12 = np.array(hf.get('S_h2o_def2-svp_nh3_cc-pvdz'))
+            ref_T12 = np.array(hf.get('T_h2o_def2-svp_nh3_cc-pvdz'))
+            ref_V12 = np.array(hf.get('V_h2o_def2-svp_nh3_cc-pvdz'))
             hf.close()
 
             dS = np.max(np.abs(S12.to_numpy() - ref_S12))
