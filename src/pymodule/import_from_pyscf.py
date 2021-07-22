@@ -10,6 +10,7 @@ import sys
 try:
     import pyscf
     from pyscf import grad
+    from pyscf import hessian
 except ImportError:
     errtxt = "Please install pyscf.\n"
     errtxt += "$pip3 install pyscf"
@@ -254,7 +255,7 @@ def eri_deriv(molecule, basis, i=0, unit="au"):
 
 def overlap_second_deriv(molecule, basis, i=0, j=0, unit="au"):
     """
-    Imports the derivatives of the overlap matrix
+    Imports the second derivatives of the overlap matrix
     from pyscf and converts it to veloxchem format
 
     :param molecule:
@@ -323,4 +324,162 @@ def overlap_second_deriv(molecule, basis, i=0, j=0, unit="au"):
 
     return vlx_ovlp_deriv_atoms_ii, vlx_ovlp_deriv_atoms_ij
 
+
+def hcore_second_deriv(molecule, basis, i=0, j=0, unit="au"):
+    """
+    Imports the second derivatives of the core Hamiltonian
+    from pyscf and converts it to veloxchem format
+
+    :param molecule:
+        the vlx molecule object
+    :param basis:
+        the vlx basis object
+    :param i, j:
+        the indices of the atoms for which the derivatives
+        are computed.
+    :param unit:
+        the units to be used for the molecular geometry;
+        possible values: "au" (default), "Angstrom"
+
+    :return:
+        two numpy arrays corresponding to (nabla**2 m | n) and
+        (nabla m | nabla n) of shape 3 x 3 x nao x nao
+        (nao = number of atomic orbitals)
+        corresponding to the derivative of the overlap matrix
+        with respect to the x, y and z coords. of atoms i and j.
+    """
+
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+    # number of atomic orbitals
+    nao = pyscf_molecule.nao
+
+    # PYSCF SCF and Hessian drivers
+    pyscf_scf_drv = pyscf.scf.RHF(pyscf_molecule)
+    pyscf_hessian_drv = hessian.rhf.Hessian(pyscf_scf_drv)
+    pyscf_hcore_generator = pyscf_hessian_drv.hcore_generator(pyscf_molecule)
+
+    # Call hcore_generator for atoms i and j
+    pyscf_hcore_2nd_deriv = pyscf_hcore_generator(i, j)
+
+
+    vlx_hcore_deriv_atoms_ij = np.zeros(pyscf_hcore_2nd_deriv.shape)
+
+
+    # Transform each component (x,y,z),(x,y,z) to veloxchem format
+    for x in range(3):
+        for y in range(3):
+            vlx_hcore_deriv_atoms_ij[x,y] = ( ao_matrix_to_veloxchem(
+                                         DenseMatrix(pyscf_hcore_2nd_deriv[x,y]),
+                                         basis, molecule).to_numpy()
+                                        )
+
+    return vlx_hcore_deriv_atoms_ij
+
+
+def eri_second_deriv(molecule, basis, i=0, j=0, unit="au"):
+    """
+    Imports the second derivatives of the ERI tensor
+    from pyscf and converts it to veloxchem format
+
+    :param molecule:
+        the vlx molecule object
+    :param basis:
+        the vlx basis object
+    :param i, j:
+        the indices of the atoms for which the derivatives
+        are computed.
+    :param unit:
+        the units to be used for the molecular geometry;
+        possible values: "au" (default), "Angstrom"
+
+    :return:
+        two numpy arrays corresponding to (nabla**2 m | n) and
+        (nabla m | nabla n) of shape 3 x 3 x nao x nao
+        (nao = number of atomic orbitals)
+        corresponding to the derivative of the overlap matrix
+        with respect to the x, y and z coords. of atoms i and j.
+    """
+
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+    # number of atomic orbitals
+    nao = pyscf_molecule.nao
+
+    basis_set_map = basis.get_index_map(molecule)
+
+    # terms with nabla squared
+    pyscf_eri_deriv_ii = pyscf_molecule.intor('int2e_ipip1', aosym='s1').reshape(
+                                3, 3, nao, nao, nao, nao)
+
+    # terms with two nablas on same side
+    pyscf_eri_deriv_ij = pyscf_molecule.intor('int2e_ipvip1', aosym='s1').reshape(
+                                3, 3, nao, nao, nao, nao)
+
+    # terms with two nablas on different sides
+    pyscf_eri_deriv_12 = pyscf_molecule.intor('int2e_ip1ip2', aosym='s1').reshape(
+                                3, 3, nao, nao, nao, nao)
+
+    ao_slices = pyscf_molecule.aoslice_by_atom()
+
+    # Get the AO indeces corresponding to atoms i and j
+    ki, kf = ao_slices[i, 2:]
+    kj, kg = ao_slices[j, 2:]
+
+    eri_deriv_atom_ii = np.zeros(pyscf_eri_deriv_ii.shape)
+    eri_deriv_atom_ij = np.zeros(pyscf_eri_deriv_ij.shape)
+    eri_deriv_atom_12 = np.zeros(pyscf_eri_deriv_12.shape)
+
+    #   (nabla**2 m n | t p) + ( m nabla**2 n | t p)
+    # + (m n | nabla**2 t p) + (m n | t nabla**2 p)
+    eri_deriv_atom_ii[:, :, ki:kf] = pyscf_eri_deriv_ii[:, :, ki:kf]
+    eri_deriv_atom_ii += ( eri_deriv_atom_ii.transpose(0,1,3,2,5,4)
+                         + eri_deriv_atom_ii.transpose(0,1,4,5,2,3)
+                         + eri_deriv_atom_ii.transpose(0,1,5,4,3,2) )
+
+    #   (nabla_i m nabla_j n | t p) + (nabla_j m nabla_i n | t p)
+    # + (m n | nabla_i t nabla_j p) + (m n | nabla_j t nabla_i p)
+    eri_deriv_atom_ij[:, :, ki:kf, kj:kg] = pyscf_eri_deriv_ij[:, :, ki:kf, kj:kg]
+    eri_deriv_atom_ij += ( eri_deriv_atom_ij.transpose(0,1,3,2,5,4)
+                         + eri_deriv_atom_ij.transpose(0,1,4,5,2,3)
+                         + eri_deriv_atom_ij.transpose(0,1,5,4,3,2) )
+
+    #   (nabla_i m n | nabla_j t p) + (m nabla_i n | nabla_j t p)
+    # + (nabla_i m n | t nabla_j p) + (m nabla_i n | t nabla_j p)
+    # + (nabla_j m n | nabla_i t p) + (m nabla_j n | nabla_i t p)
+    # + (nabla_j m n | t nabla_i p) + (m nabla_j n | t nabla_i p)
+    eri_deriv_atom_12[:, :, ki:kf, :, kj:kg] = pyscf_eri_deriv_12[:, :, ki:kf, :, kj:kg]
+    eri_deriv_atom_12 += ( eri_deriv_atom_12.transpose(0,1,3,2,4,5)
+                         + eri_deriv_atom_12.transpose(0,1,2,3,5,4)
+                         + eri_deriv_atom_12.transpose(0,1,3,2,5,4)
+                         + eri_deriv_atom_12.transpose(0,1,4,5,2,3)
+                         + eri_deriv_atom_12.transpose(0,1,5,4,2,3)
+                         + eri_deriv_atom_12.transpose(0,1,4,5,3,2)
+                         + eri_deriv_atom_12.transpose(0,1,5,4,3,2) )
+
+    vlx_eri_deriv_atom_ii = np.zeros(eri_deriv_atom_ii.shape)
+    vlx_eri_deriv_atom_ij = np.zeros(eri_deriv_atom_ij.shape)
+    vlx_eri_deriv_atom_12 = np.zeros(eri_deriv_atom_12.shape)
+
+
+    # Transform each component (x,y,z),(x,y,z) to veloxchem format
+    for m in range(nao):
+        for n in range(nao):
+            for t in range(nao):
+                for p in range(nao):
+                    vm = basis_set_map[m]
+                    vn = basis_set_map[n]
+                    vt = basis_set_map[t]
+                    vp = basis_set_map[p]
+                    vlx_eri_deriv_atom_ii[:,:,vm,vn,vt,vp] = eri_deriv_atom_ii[:,:,m,n,t,p]
+                    vlx_eri_deriv_atom_ij[:,:,vm,vn,vt,vp] = eri_deriv_atom_ij[:,:,m,n,t,p]
+                    vlx_eri_deriv_atom_12[:,:,vm,vn,vt,vp] = eri_deriv_atom_12[:,:,m,n,t,p]
+
+    return vlx_eri_deriv_atom_ii, vlx_eri_deriv_atom_ij + vlx_eri_deriv_atom_12
 
