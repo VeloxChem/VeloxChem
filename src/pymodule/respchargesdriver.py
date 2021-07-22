@@ -217,6 +217,14 @@ class RespChargesDriver:
                 output_dir.mkdir(parents=True, exist_ok=True)
             self.comm.barrier()
 
+        if self.rank == mpi_master() and self.weights is not None:
+            errmsg = 'RespChargesDriver: Number of weights does not match '
+            errmsg += 'number of conformers.'
+            assert_msg_critical(len(self.weights) == len(molecules), errmsg)
+            # normalize weights
+            sum_of_weights = sum(self.weights)
+            self.weights = [w / sum_of_weights for w in self.weights]
+
         grids = []
         esp = []
         scf_energies = []
@@ -237,7 +245,10 @@ class RespChargesDriver:
                     scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
                 else:
                     scf_drv = ScfUnrestrictedDriver(self.comm, self.ostream)
-                scf_dict = {'filename': self.filename, 'checkpoint_file': self.filename + '.scf.h5'}
+                scf_dict = {
+                    'filename': self.filename,
+                    'checkpoint_file': self.filename + '.scf.h5'
+                }
                 scf_drv.update_settings(scf_dict, self.method_dict)
                 scf_drv.compute(mol, bas)
 
@@ -250,7 +261,10 @@ class RespChargesDriver:
                     scf_drv = ScfRestrictedDriver(self.comm, ostream)
                 else:
                     scf_drv = ScfUnrestrictedDriver(self.comm, ostream)
-                scf_dict = {'filename': filename, 'checkpoint_file': filename + '.scf.h5'}
+                scf_dict = {
+                    'filename': filename,
+                    'checkpoint_file': filename + '.scf.h5'
+                }
                 scf_drv.update_settings(scf_dict, self.method_dict)
                 scf_drv.compute(mol, bas)
                 ostream.close()
@@ -265,14 +279,9 @@ class RespChargesDriver:
                 esp.append(esp_m)
                 scf_energies.append(scf_energy_m)
 
-        if self.weights is not None and len(self.weights) == len(molecules):
-            # normalize weights
-            sum_of_weights = sum(self.weights)
-            self.weights = [w / sum_of_weights for w in self.weights]
-        elif self.weights is not None and len(self.weights) != len(molecules):
-            self.weights = self.get_boltzmann_weights(scf_energies, self.temperature)
-        elif self.weights is None and len(molecules) > 1:
-            self.weights = self.get_boltzmann_weights(scf_energies, self.temperature)
+        if self.rank == mpi_master() and self.weights is None:
+            self.weights = self.get_boltzmann_weights(scf_energies,
+                                                      self.temperature)
 
         q = None
 
@@ -283,17 +292,17 @@ class RespChargesDriver:
             elif flag.lower() == 'esp':
                 q = self.compute_esp_charges(molecules, grids, esp,
                                              self.weights)
-        if not use_xyz_file:
-            filename = str(output_dir / self.filename)
-        else:
-            filename = Path(self.filename).name + '_conformer'
-            filename = str(output_dir / filename)
+            if not use_xyz_file:
+                filename = str(output_dir / self.filename)
+            else:
+                filename = Path(self.filename).name + '_conformer'
+                filename = str(output_dir / filename)
 
-        self.write_pdb_file(filename, molecules, q)
+            self.write_pdb_file(filename, molecules, q)
 
         return q
 
-    def compute_resp_charges(self, molecules, grids, esp, weights=None):
+    def compute_resp_charges(self, molecules, grids, esp, weights):
         """
         Computes RESP charges.
 
@@ -311,9 +320,6 @@ class RespChargesDriver:
         """
 
         n_conf = len(molecules)
-        if weights is None:
-            weights = np.ones(n_conf)
-
         n_points = sum([esp[m].size for m in range(n_conf)])
         self.print_header(n_conf, n_points)
 
@@ -348,7 +354,7 @@ class RespChargesDriver:
 
         return q
 
-    def compute_esp_charges(self, molecules, grids, esp, weights=None):
+    def compute_esp_charges(self, molecules, grids, esp, weights):
         """
         Computes Merz-Kollman ESP charges.
 
@@ -366,9 +372,6 @@ class RespChargesDriver:
         """
 
         n_conf = len(molecules)
-        if weights is None:
-            weights = np.ones(n_conf)
-
         n_points = sum([esp[m].size for m in range(n_conf)])
         self.print_header(n_conf, n_points)
         self.print_esp_header()
@@ -806,8 +809,9 @@ class RespChargesDriver:
 
         weights = []
         for i in range(len(energies)):
-            weights.append(np.exp((-1) * (energies[i] - 
-                min(energies)) / (k_b * temperature)))
+            weights.append(
+                np.exp(
+                    (-1) * (energies[i] - min(energies)) / (k_b * temperature)))
 
         # normalize weights
         sum_of_weights = sum(weights)
@@ -827,22 +831,21 @@ class RespChargesDriver:
             The charges.
         """
 
-        i = 0
-        for mol in molecules:
-            newfile = filename
+        for i, mol in enumerate(molecules):
             if len(molecules) > 1:
-                i += 1
-                newfile += '_' + str(i)
-            file = open(newfile + '.pdb', 'w')
-            coords = mol.get_coordinates() * bohr_in_angstroms()
-            for j in range(mol.number_of_atoms()):
-                cur_str = '{:6s}{:5d} {:^4s} {:3s}  {:4d}    '.format(
-                    'ATOM', j + 1, mol.get_labels()[j], 'RES', 1) 
-                cur_str += '{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:10.6f}'.format(
-                    coords[j][0], coords[j][1], coords[j][2], 1.0, q[j])
-                file.write(cur_str)
-                file.write('\n')
-            file.close()
+                pdb_fname = f'{filename}_{i+1}.pdb'
+            else:
+                pdb_fname = f'{filename}.pdb'
+            with open(pdb_fname, 'w') as f_pdb:
+                coords = mol.get_coordinates() * bohr_in_angstroms()
+                for j in range(mol.number_of_atoms()):
+                    cur_str = '{:6s}{:5d} {:^4s} {:3s}  {:4d}    '.format(
+                        'ATOM', j + 1,
+                        mol.get_labels()[j], 'RES', 1)
+                    cur_str += '{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:10.6f}'.format(
+                        coords[j][0], coords[j][1], coords[j][2], 1.0, q[j])
+                    f_pdb.write(cur_str)
+                    f_pdb.write('\n')
 
     def print_header(self, n_conf, n_points):
         """
