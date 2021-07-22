@@ -157,15 +157,14 @@ class OptimizationDriver:
                     f_out = f_devnull
 
                 with contextlib.redirect_stdout(f_out):
-                    with contextlib.redirect_stderr(f_out):
-                        m = geometric.optimize.run_optimizer(
-                            customengine=opt_engine,
-                            coordsys=self.coordsys,
-                            check=self.check_interval,
-                            maxiter=self.max_iter,
-                            constraints=constr_filename,
-                            input=filename,
-                            logIni=str(log_ini))
+                    m = geometric.optimize.run_optimizer(
+                        customengine=opt_engine,
+                        coordsys=self.coordsys,
+                        check=self.check_interval,
+                        maxiter=self.max_iter,
+                        constraints=constr_filename,
+                        input=filename,
+                        logIni=str(log_ini))
 
         coords = m.xyzs[-1] / geometric.nifty.bohr2ang
         labels = molecule.get_labels()

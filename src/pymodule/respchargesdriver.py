@@ -858,8 +858,9 @@ class RespChargesDriver:
         """
 
         self.ostream.print_blank()
-        self.ostream.print_header('RESP Charges Driver Setup')
-        self.ostream.print_header(29 * '=')
+        title = 'RESP Charges Driver Setup'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
         str_width = 40

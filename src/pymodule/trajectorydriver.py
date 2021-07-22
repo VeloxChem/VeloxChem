@@ -26,10 +26,8 @@
 from mpi4py import MPI
 import numpy as np
 import time as tm
-import contextlib
 import json
 import sys
-import os
 from pathlib import Path
 import matplotlib.pyplot as plt
 import MDAnalysis as mda
@@ -225,6 +223,12 @@ class TrajectoryDriver:
                          self.trajectory_file,
                          refresh_offsets=True)
 
+        # add topology attributes to suppress warnings from writing PDB files
+        u.add_TopologyAttr('altLocs')
+        u.add_TopologyAttr('icodes')
+        u.add_TopologyAttr('occupancies')
+        u.add_TopologyAttr('tempfactors')
+
         grps = [p for p in range(self.nodes)]
         subcomm = SubCommunicators(self.comm, grps)
         local_comm = subcomm.local_comm
@@ -238,6 +242,8 @@ class TrajectoryDriver:
         # go through frames in trajectory
         for ts in u.trajectory:
             # skip frames that are not in sampling_time
+            if local_sampling_time.size == 0:
+                continue
             if np.min(np.abs(local_sampling_time - u.trajectory.time)) > 1e-6:
                 continue
 
@@ -259,10 +265,8 @@ class TrajectoryDriver:
                 mm_nonpol = mm_nonpol - mm_pol
 
                 # crate pdb files
-                with open(os.devnull, 'w') as f_devnull:
-                    with contextlib.redirect_stderr(f_devnull):
-                        qm.write(output_dir / '{}_frame_{}.pdb'.format(
-                            Path(self.filename).name, ts.frame))
+                qm.write(output_dir / '{}_frame_{}.pdb'.format(
+                    Path(self.filename).name, ts.frame))
 
                 # make QM molecule whole
                 qm.unwrap()
@@ -464,8 +468,9 @@ class TrajectoryDriver:
         """
 
         self.ostream.print_blank()
-        self.ostream.print_header('Trajectory Driver Setup')
-        self.ostream.print_header(19 * '=')
+        title = 'Trajectory Driver Setup'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
         lines = []
