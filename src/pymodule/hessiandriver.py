@@ -336,7 +336,7 @@ class HessianDriver:
         natm = molecule.number_of_atoms()
 
         # nuclear repulsion energy contribution to Hessian
-        nuc_contrib = np.zeros((natm, 3, natm, 3))
+        nuc_contrib = np.zeros((natm, natm, 3, 3))
 
         # atom coordinates (nx3)
         coords = molecule.get_coordinates()
@@ -356,17 +356,17 @@ class HessianDriver:
                     for k in range(3):
                         for l in range(3):
                     # off-diagonal parts
-                            nuc_contrib[i, k, j, l] = - 3*z_a*z_b*(r_b[k] - r_a[k])*(r_b[l] - r_a[l]) / r**5
+                            nuc_contrib[i, j, k, l] = - 3*z_a*z_b*(r_b[k] - r_a[k])*(r_b[l] - r_a[l]) / r**5
                             if k == l:
-                                nuc_contrib[i, k, j, l] += z_a * z_b / r**3
+                                nuc_contrib[i, j, k, l] += z_a * z_b / r**3
 
                     # add the diagonal contribution
-                            nuc_contrib[i, k, i, l] += 3*z_a*z_b*(r_b[k] - r_a[k])*(r_b[l] - r_a[l]) / r**5
+                            nuc_contrib[i, i, k, l] += 3*z_a*z_b*(r_b[k] - r_a[k])*(r_b[l] - r_a[l]) / r**5
                             if k == l:
-                                nuc_contrib[i, k, i, l] -= z_a * z_b / r**3
+                                nuc_contrib[i, i, k, l] -= z_a * z_b / r**3
 
 
-        return nuc_contrib.reshape(3*natm, 3*natm)
+        return nuc_contrib #.reshape(3*natm, 3*natm)
 
 
     def diagonalize_hessian(self, molecule, basis, rsp_drv=None):
