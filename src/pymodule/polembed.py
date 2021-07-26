@@ -375,7 +375,9 @@ class PolEmbed:
         """
 
         with open(potfile) as f_pot:
-            first_line = f_pot.readline()
+            first_line = f_pot.readline().strip()
+            while (not first_line) or first_line.startswith('!'):
+                first_line = f_pot.readline().strip()
 
         if first_line.split()[0] == '@COORDINATES':
             return potfile
