@@ -83,6 +83,15 @@ def overlap_deriv(molecule, basis, i=0, unit="au"):
     # (nabla m | n) + (m | nabla n)
     overlap_deriv_atom_i += overlap_deriv_atom_i.transpose(0,2,1)
 
+    # Transform the oo block to MO basis
+    pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
+    pyscf_scf.conv_tol = 1e-10
+    pyscf_scf.kernel()
+    mo_occ = pyscf_scf.mo_coeff[:,pyscf_scf.mo_occ>0]
+    print("mo_occ obtained from pyscf:\n", mo_occ)
+    s1oo = np.einsum('mi,xmn,nj->xij', mo_occ, overlap_deriv_atom_i, mo_occ)
+    print("\n\ns1oo transformed with pyscf data:\n", s1oo)
+
     vlx_ovlp_deriv_atom_i = np.zeros(overlap_deriv_atom_i.shape)
 
 
@@ -104,6 +113,68 @@ def overlap_deriv(molecule, basis, i=0, unit="au"):
 
     return vlx_ovlp_deriv_atom_i
 
+
+def hcore_deriv(molecule, basis, i=0, unit="au"):
+    """
+    Imports the derivatives of the Fock matrix
+    from pyscf and converts it to veloxchem format
+
+    :param molecule:
+        the vlx molecule object
+    :param basis:
+        the vlx basis object
+    :param i:
+        the index of the atom for which the derivatives
+        are computed.
+    :param unit:
+        the units to be used for the molecular geometry;
+        possible values: "au" (default), "Angstrom"
+
+    :return:
+        a numpy array of shape 3 x nao x nao
+        (nao = number of atomic orbitals)
+        corresponding to the derivative of the core Hamiltonian matrix
+        with respect to the x, y and z coords. of atom i.
+    """
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+    pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
+    nao = pyscf_molecule.nao
+    pyscf_grad = grad.RHF(pyscf_scf)
+
+    ao_slices = pyscf_molecule.aoslice_by_atom()
+    hcore_generator = pyscf_grad.hcore_generator(pyscf_molecule)
+
+    # Get the AO indices corresponding to atom i
+    ki, kf = ao_slices[i, 2:]
+
+    hcore_deriv_atom_i = np.zeros((3,nao,nao))
+
+    hcore_deriv_atom_i = hcore_generator(i)
+
+    vlx_hcore_deriv_atom_i = np.zeros(hcore_deriv_atom_i.shape)
+
+
+    # Transform each compnent (x,y,z) to veloxchem format
+    vlx_hcore_deriv_atom_i[0] = ( ao_matrix_to_veloxchem(
+                                 DenseMatrix(hcore_deriv_atom_i[0]),
+                                 basis, molecule).to_numpy()
+                                )
+
+    vlx_hcore_deriv_atom_i[1] = ( ao_matrix_to_veloxchem(
+                                 DenseMatrix(hcore_deriv_atom_i[1]),
+                                 basis, molecule).to_numpy()
+                                )
+
+    vlx_hcore_deriv_atom_i[2] = ( ao_matrix_to_veloxchem(
+                                 DenseMatrix(hcore_deriv_atom_i[2]),
+                                 basis, molecule).to_numpy()
+                                )
+
+    return vlx_hcore_deriv_atom_i
 
 
 def fock_deriv(molecule, basis, density, i=0, unit="au"):
