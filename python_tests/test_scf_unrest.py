@@ -1,9 +1,5 @@
 from pathlib import Path
 import numpy as np
-try:
-    import cppe
-except ImportError:
-    pass
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
