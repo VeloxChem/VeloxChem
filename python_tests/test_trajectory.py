@@ -1,4 +1,10 @@
 from pathlib import Path
+import pytest
+import sys
+try:
+    import MDAnalysis
+except ImportError:
+    pass
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
@@ -55,6 +61,8 @@ class TestTrajectoryDriver:
                 assert abs(e - ref_e) < 1.0e-6
                 assert abs(f - ref_f) < 1.0e-4
 
+    @pytest.mark.skipif('MDAnalysis' not in sys.modules,
+                        reason='MDAnalysis not available')
     def test_trajectory_bithio(self):
 
         here = Path(__file__).parent

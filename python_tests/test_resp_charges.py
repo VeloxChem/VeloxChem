@@ -1,5 +1,11 @@
 from pathlib import Path
 import numpy as np
+import pytest
+import sys
+try:
+    import MDAnalysis
+except ImportError:
+    pass
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
@@ -47,6 +53,8 @@ class TestRespCharges:
             if scf_final_h5_file.is_file():
                 scf_final_h5_file.unlink()
 
+    @pytest.mark.skipif('MDAnalysis' not in sys.modules,
+                        reason='MDAnalysis not available')
     def test_resp_methanol(self):
 
         here = Path(__file__).parent

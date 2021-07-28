@@ -30,8 +30,6 @@ import json
 import sys
 from pathlib import Path
 import matplotlib.pyplot as plt
-import MDAnalysis as mda
-from MDAnalysis.topology.guessers import guess_atom_element
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstroms
@@ -209,6 +207,13 @@ class TrajectoryDriver:
         :param min_basis:
             The minimal AO basis set.
         """
+
+        try:
+            import MDAnalysis as mda
+            from MDAnalysis.topology.guessers import guess_atom_element
+        except ImportError:
+            raise ImportError('Unable to import MDAnalysis. Please install ' +
+                              'MDAnalysis via \'pip install MDAnalysis\'')
 
         self.print_header()
 

@@ -27,7 +27,6 @@ from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import sys
-import MDAnalysis as mda
 
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import bohr_in_angstroms
@@ -167,6 +166,12 @@ class RespChargesDriver:
         :return:
             The charges.
         """
+
+        try:
+            import MDAnalysis as mda
+        except ImportError:
+            raise ImportError('Unable to import MDAnalysis. Please install ' +
+                              'MDAnalysis via \'pip install MDAnalysis\'')
 
         molecules = []
         basis_sets = []
