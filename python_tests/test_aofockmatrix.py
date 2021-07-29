@@ -1,9 +1,6 @@
 from pathlib import Path
 
-from veloxchem.veloxchemlib import (
-    fockmat,
-    is_mpi_master,
-)
+from veloxchem.veloxchemlib import fockmat, is_mpi_master
 from veloxchem.aofockmatrix import AOFockMatrix
 
 

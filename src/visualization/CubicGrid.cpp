@@ -143,58 +143,22 @@ CCubicGrid::operator!=(const CCubicGrid& other) const
     return !(*this == other);
 }
 
-double
-CCubicGrid::originX() const
+std::vector<double>
+CCubicGrid::getOrigin() const
 {
-    return _origin[0];
+    return _origin;
 }
 
-double
-CCubicGrid::originY() const
+std::vector<double>
+CCubicGrid::getStepSize() const
 {
-    return _origin[1];
+    return _stepSize;
 }
 
-double
-CCubicGrid::originZ() const
+std::vector<int32_t>
+CCubicGrid::getNumPoints() const
 {
-    return _origin[2];
-}
-
-double
-CCubicGrid::stepSizeX() const
-{
-    return _stepSize[0];
-}
-
-double
-CCubicGrid::stepSizeY() const
-{
-    return _stepSize[1];
-}
-
-double
-CCubicGrid::stepSizeZ() const
-{
-    return _stepSize[2];
-}
-
-int32_t
-CCubicGrid::numPointsX() const
-{
-    return _numPoints[0];
-}
-
-int32_t
-CCubicGrid::numPointsY() const
-{
-    return _numPoints[1];
-}
-
-int32_t
-CCubicGrid::numPointsZ() const
-{
-    return _numPoints[2];
+    return _numPoints;
 }
 
 const double*

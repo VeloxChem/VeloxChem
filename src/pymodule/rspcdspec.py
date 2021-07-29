@@ -23,7 +23,12 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from .veloxchemlib import hartree_in_ev
+from .veloxchemlib import (
+    hartree_in_ev,
+    hartree_in_wavenumbers,
+    molar_ellipticity_from_beta,
+    extinction_coefficient_from_molar_ellipticity,
+)
 from .rspproperty import ResponseProperty
 from .inputparser import parse_seq_range
 
@@ -61,7 +66,7 @@ class CircularDichroismSpectrum(ResponseProperty):
         rsp_dict['onlystatic'] = 'no'
         rsp_dict['complex'] = 'yes'
 
-        rsp_dict['a_operator'] = 'angular momentum'
+        rsp_dict['a_operator'] = 'magnetic dipole'
         rsp_dict['a_components'] = 'xyz'
 
         rsp_dict['b_operator'] = 'linear momentum'
@@ -85,6 +90,43 @@ class CircularDichroismSpectrum(ResponseProperty):
 
         return self.rsp_property[key]
 
+    def get_spectrum(self):
+        """
+        Gets circular dichroism spectrum.
+
+        :return:
+            A list containing the energies and extinction coefficient (Delta
+            epsilon).
+        """
+
+        spectrum = []
+
+        freqs = parse_seq_range(self.rsp_dict['frequencies'])
+
+        for w in freqs:
+            if w == 0.0:
+                continue
+
+            Gxx = self.rsp_property['response_functions'][('x', 'x', w)].imag
+            Gyy = self.rsp_property['response_functions'][('y', 'y', w)].imag
+            Gzz = self.rsp_property['response_functions'][('z', 'z', w)].imag
+
+            Gxx /= w
+            Gyy /= w
+            Gzz /= w
+
+            Delta_epsilon_factor = (
+                extinction_coefficient_from_molar_ellipticity() *
+                molar_ellipticity_from_beta())
+
+            beta = -(Gxx + Gyy + Gzz) / (3.0 * w)
+            w_wavenumber = w * hartree_in_wavenumbers()
+            Delta_epsilon = beta * w_wavenumber**2 * Delta_epsilon_factor
+
+            spectrum.append((w, Delta_epsilon))
+
+        return spectrum
+
     def print_property(self, ostream):
         """
         Prints response property to output stream.
@@ -104,7 +146,7 @@ class CircularDichroismSpectrum(ResponseProperty):
 
         for w in freqs:
             title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
-                'AngMom', 'LinMom', 'Frequency', 'Real', 'Imaginary')
+                'MagDip', 'LinMom', 'Frequency', 'Real', 'Imaginary')
             ostream.print_header(title.ljust(width))
             ostream.print_header(('-' * len(title)).ljust(width))
 
@@ -141,18 +183,9 @@ class CircularDichroismSpectrum(ResponseProperty):
         ostream.print_header(title.ljust(width))
         ostream.print_header(('-' * len(title)).ljust(width))
 
-        for w in freqs:
-            if w == 0.0:
-                continue
+        spectrum = self.get_spectrum()
 
-            Gxx = self.rsp_property['response_functions'][('x', 'x', w)].imag
-            Gyy = self.rsp_property['response_functions'][('y', 'y', w)].imag
-            Gzz = self.rsp_property['response_functions'][('z', 'z', w)].imag
-
-            beta = -(Gxx + Gyy + Gzz) / (3.0 * w)
-            wavenumber = 2.1947463e+5 * w
-            Delta_epsilon = beta * wavenumber**2 * 0.0001343 / (100.0 * 3298.8)
-
+        for w, Delta_epsilon in spectrum:
             output = '{:<20.4f}{:<20.5f}{:>18.8f}'.format(
                 w, w * hartree_in_ev(), Delta_epsilon)
             ostream.print_header(output.ljust(width))

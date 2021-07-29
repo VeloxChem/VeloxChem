@@ -24,6 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import time as tm
 import math
@@ -48,8 +49,8 @@ from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
-from .checkpoint import read_rsp_hdf5
-from .checkpoint import write_rsp_hdf5
+from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, create_hdf5,
+                         write_rsp_solution)
 
 
 class TDAExciDriver(LinearSolver):
@@ -418,9 +419,12 @@ class TDAExciDriver(LinearSolver):
             if self.detach_attach:
                 ret_dict['density_cubes'] = dens_cube_files
 
+            self.write_final_hdf5(molecule, basis, dft_dict['dft_func_label'],
+                                  pe_dict['potfile_text'], eigvecs)
+
             return ret_dict
         else:
-            return {}
+            return None
 
     def gen_trial_vectors(self, mol_orbs, molecule):
         """
@@ -699,9 +703,44 @@ class TDAExciDriver(LinearSolver):
         reigs, rnorms = self.solver.get_eigenvalues()
         for i in range(reigs.shape[0]):
             exec_str = 'State {:2d}: {:5.8f} '.format(i + 1, reigs[i])
-            exec_str += 'au Residual Norm: {:3.8f}'.format(rnorms[i])
+            exec_str += 'a.u. Residual Norm: {:3.8f}'.format(rnorms[i])
             self.ostream.print_header(exec_str.ljust(84))
 
         # flush output stream
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def write_final_hdf5(self, molecule, basis, dft_func_label, potfile_text,
+                         eigvecs):
+        """
+        Writes final HDF5 that contains TDA solution vectors.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param dft_func_label:
+            The name of DFT functional.
+        :param potfile_text:
+            The content of potential file for polarizable embedding.
+        :param eigvecs:
+            The TDA eigenvectors (in columns).
+        """
+
+        if self.checkpoint_file is not None:
+            final_h5_fname = str(
+                Path(self.checkpoint_file).with_suffix('.solutions.h5'))
+        else:
+            final_h5_fname = 'rsp.solutions.h5'
+
+        create_hdf5(final_h5_fname, molecule, basis, dft_func_label,
+                    potfile_text)
+
+        for s in range(eigvecs.shape[1]):
+            write_rsp_solution(final_h5_fname, 'S{:d}'.format(s + 1),
+                               eigvecs[:, s])
+
+        checkpoint_text = 'Response solution vectors written to file: '
+        checkpoint_text += final_h5_fname
+        self.ostream.print_info(checkpoint_text)
+        self.ostream.print_blank()

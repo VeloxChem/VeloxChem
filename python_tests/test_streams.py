@@ -1,11 +1,10 @@
 from pathlib import Path
-import unittest
 import sys
 
 from veloxchem.outputstream import OutputStream
 
 
-class TestStreams(unittest.TestCase):
+class TestStreams:
 
     def run_ostream_test(self, ostream, state):
 
@@ -13,7 +12,7 @@ class TestStreams(unittest.TestCase):
         ostream.print_title('')
         ostream.print_separator()
         ostream.print_blank()
-        self.assertTrue(ostream.get_state() is state)
+        assert ostream.get_state() is state
 
     def test_file(self):
 
@@ -24,7 +23,7 @@ class TestStreams(unittest.TestCase):
         self.run_ostream_test(ostream, True)
 
         ostream.close()
-        self.assertFalse(ostream.get_state())
+        assert not ostream.get_state()
 
     def test_path(self):
 
@@ -35,7 +34,7 @@ class TestStreams(unittest.TestCase):
         self.run_ostream_test(ostream, True)
 
         ostream.close()
-        self.assertFalse(ostream.get_state())
+        assert not ostream.get_state()
 
     def test_stdout(self):
 
@@ -51,7 +50,3 @@ class TestStreams(unittest.TestCase):
 
         ostream = OutputStream(None)
         self.run_ostream_test(ostream, False)
-
-
-if __name__ == "__main__":
-    unittest.main()

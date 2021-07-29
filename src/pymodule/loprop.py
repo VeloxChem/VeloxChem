@@ -187,6 +187,12 @@ class LoPropDriver:
             Ny = lrs_out['solutions'][('y', 0)]
             Nz = lrs_out['solutions'][('z', 0)]
 
+            # This is a workaround for the sqrt(2) factor in the solution vectors
+            inv_sqrt_2 = 1.0 / np.sqrt(2.0)
+            Nx *= inv_sqrt_2
+            Ny *= inv_sqrt_2
+            Nz *= inv_sqrt_2
+
             # unpact response vectors to matrix form
             nocc = molecule.number_of_alpha_electrons()
             norb = n_mo

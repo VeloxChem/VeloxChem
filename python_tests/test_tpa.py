@@ -1,6 +1,5 @@
 from mpi4py import MPI
 from pathlib import Path
-import unittest
 import pytest
 
 from veloxchem.veloxchemlib import is_mpi_master
@@ -12,7 +11,7 @@ from veloxchem.rsptpa import TPA
 
 
 @pytest.mark.solvers
-class TestTPA(unittest.TestCase):
+class TestTPA:
     """
     Tests the TPA code for the full and reduced expressions. Note that if one
     wants to compare with DALTON, one needs to only pass in the real part of
@@ -64,12 +63,10 @@ class TestTPA(unittest.TestCase):
                 if key in tpa_result and key in ref_result:
                     if tpa_result[key] is None:
                         continue
-                    self.assertTrue(
-                        abs(tpa_result[key][(w, -w, w)].real -
-                            ref_result[key].real) < 1.0e-4)
-                    self.assertTrue(
-                        abs(tpa_result[key][(w, -w, w)].imag -
-                            ref_result[key].imag) < 1.0e-4)
+                    assert abs(tpa_result[key][(w, -w, w)].real -
+                               ref_result[key].real) < 1.0e-4
+                    assert abs(tpa_result[key][(w, -w, w)].imag -
+                               ref_result[key].imag) < 1.0e-4
 
     def test_tpa_full(self):
 
@@ -128,13 +125,9 @@ class TestTPA(unittest.TestCase):
         tpa_drv = TpaDriver(MPI.COMM_WORLD, OutputStream(None))
 
         for key, val in tpa_dict.items():
-            self.assertTrue(getattr(tpa_drv, key) != val)
+            assert getattr(tpa_drv, key) != val
 
         tpa_drv.update_settings(tpa_dict)
 
         for key, val in tpa_dict.items():
-            self.assertTrue(getattr(tpa_drv, key) == val)
-
-
-if __name__ == '__main__':
-    unittest.main()
+            assert getattr(tpa_drv, key) == val

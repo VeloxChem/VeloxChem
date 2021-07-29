@@ -7,7 +7,7 @@ basis: 6-31g
 @end
 
 @resp charges
-constraints: 2 3
+equal charges: 2 = 3
 @end
 
 @molecule

@@ -170,16 +170,6 @@ CElectricDipoleMatrix::operator!=(const CElectricDipoleMatrix& other) const
 }
 
 void
-CElectricDipoleMatrix::setOriginCoordinates(const double xOrigin, const double yOrigin, const double zOrigin)
-{
-    _xOrigin = xOrigin;
-
-    _yOrigin = yOrigin;
-
-    _zOrigin = zOrigin;
-}
-
-void
 CElectricDipoleMatrix::setOriginCoordinates(const std::array<double, 3>& origin)
 {
     _xOrigin = origin[0];
@@ -187,6 +177,12 @@ CElectricDipoleMatrix::setOriginCoordinates(const std::array<double, 3>& origin)
     _yOrigin = origin[1];
 
     _zOrigin = origin[2];
+}
+
+std::array<double, 3>
+CElectricDipoleMatrix::getOriginCoordinates() const
+{
+    return std::array<double, 3>{{_xOrigin, _yOrigin, _zOrigin}};
 }
 
 std::string
@@ -273,30 +269,6 @@ CElectricDipoleMatrix::values(cartesians cart) const
             errors::assertMsgCritical(false, "ElectricDipoleMatrix.values: invalid Cartesian component");
             return nullptr;
     }
-}
-
-double
-CElectricDipoleMatrix::getOriginCoordinateX() const
-{
-    return _xOrigin;
-}
-
-double
-CElectricDipoleMatrix::getOriginCoordinateY() const
-{
-    return _yOrigin;
-}
-
-double
-CElectricDipoleMatrix::getOriginCoordinateZ() const
-{
-    return _zOrigin;
-}
-
-std::array<double, 3>
-CElectricDipoleMatrix::getOriginCoordinates() const
-{
-    return std::array<double, 3>{{_xOrigin, _yOrigin, _zOrigin}};
 }
 
 std::string

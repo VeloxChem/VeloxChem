@@ -169,15 +169,6 @@ class CAngularMomentumIntegralsDriver
     /**
      Sets origin of angular momentum.
 
-     @param xOrigin the Cartesian X coordinate of angular momentum origin.
-     @param yOrigin the Cartesian Y coordinate of angular momentum origin.
-     @param zOrigin the Cartesian Z coordinate of angular momentum origin.
-     */
-    void setAngularMomentumOrigin(const double xOrigin, const double yOrigin, const double zOrigin);
-
-    /**
-     Sets origin of angular momentum.
-
      @param origin the Cartesian coordinates of angular momentum origin.
      */
     void setAngularMomentumOrigin(const std::array<double, 3>& origin);
