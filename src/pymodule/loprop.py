@@ -190,9 +190,9 @@ class LoPropDriver:
             # unpact response vectors to matrix form
             nocc = molecule.number_of_alpha_electrons()
             norb = n_mo
-            kappa_x = self.lrvec2mat(Nx, nocc, norb)
-            kappa_y = self.lrvec2mat(Ny, nocc, norb)
-            kappa_z = self.lrvec2mat(Nz, nocc, norb)
+            kappa_x = self.lrmat(Nx, nocc, norb)
+            kappa_y = self.lrmat(Ny, nocc, norb)
+            kappa_z = self.lrmat(Nz, nocc, norb)
 
             # perturbed densities
             # factor of 2 from spin-adapted excitation vectors
@@ -259,6 +259,7 @@ class LoPropDriver:
                 for j in range(i + 1, natoms):
                     # a!=b: rab = (ra-rb)/2
                     # TODO: double check absolute value
+                    #checked
                     rij = 0.5 * np.abs(molecule_coord[i] - molecule_coord[j])
                     coord_matrix[i][j] = rij
                     coord_matrix[j][i] = rij
@@ -402,6 +403,8 @@ class LoPropDriver:
             1.25, 1.1, 1.0, 1.0, 1.0, 1.0
         ]) / bohr_in_angstroms()
         # TODO: check if it is possible to go beyond Cl
+        # we just have to update RBS array and get_ao_indices function
+        # have to decide how far we want to go
         assert_msg_critical(za <= 17 or zb <= 17,
                             'LoPropDriver: we currently support up to Cl')
         ra = RBS[za]
@@ -412,7 +415,7 @@ class LoPropDriver:
         f = 0.5 * np.exp(-2 * (rab2 / (ra + rb)**2))
         return f
 
-    def lrvec2mat(self, vec, nocc, norb):
+    def lrmat(self, vec, nocc, norb):
         """
         unpact response vector to matrix form
 
@@ -464,55 +467,68 @@ class LoPropDriver:
         """
 
         elements = molecule.elem_ids_to_numpy()
-        basis = basis.get_label()
-
-        # get basis file
-        local_name = basis
-        basis_file = []
 
         # TODO: check if it is possible to extract the information from the
         #       basis set object
+        #       yes
         # potential problems with reading the basis set file:j
         # 1) the basis set may be in the current folder and not the basis folder
         # 2) there will be Pople type basis set with 'SP' functions
-
-        lib_member = os.path.join(os.environ['VLXBASISPATH'], basis)
-        if os.path.exists(local_name):
-            basis_file = os.path.abspath(local_name)
-        elif os.path.exists(lib_member):
-            basis_file = lib_member
-
-        bp = InputParser(basis_file)
-        basis = bp.get_dict()
-        keys = list(basis.keys())
-
+        angular_momentum_string = 'SPDFGHI'
+        ao_count = dict(S = 1, P = 3, D = 5, F = 7, G = 9, H = 11, I = 13 )
+        
+        basis_info = {}
+        for atombasis in basis:            
+             angular_momenta = [
+                 angular_momentum_string[basisfunc.angular_momentum]
+                 for basisfunc in atombasis
+            ]
+             
+             element_id = atombasis.get_elemental_id()
+             basis_info[element_id] = angular_momenta        
+             
+        ao_per_atom = []
         ao_occ = []
         ao_vir = []
         iterr = 0
-        multiplicity = dict(S=1, P=3, D=5, F=7, G=9, H=11, I=13)
-        ao_per_atom = []
-        for e in elements:
-            k = keys[e - 1]
-            atoms_data = basis[k]
-            c = Counter(
-                line[0] for line in atoms_data if line and line[0] in 'SPDFGHI')
+        for element_id in elements:
+            angular_momenta = basis_info[element_id]
+            angular_momentum_counter = Counter(angular_momenta)
 
-            # TODO: check if it is possible to go beyond Ne
-            assert_msg_critical(e <= 10,
-                                'LoProp: we currently support up to Ne')
+            """TODO: check if it is possible to go beyond Ne
+            now it's support up to Ar 
+            if we want to support more element then we have to 
+            update RBS radius list           
+            """
+            assert_msg_critical(element_id <= 18,
+                                'LoProp: we currently support up to Ar')
             # For H and He: 1s
             ao_occ.append(iterr)
 
+            offset_2p = angular_momentum_counter['S'] + iterr
             # For Li-Ne: + 2s 2p
-            if e >= 3:
-                ao_occ.append(iterr + 1)
-                offset_p = c['S'] + iterr
-                ao_occ.append(offset_p + 0)
-                ao_occ.append(offset_p + 1)
-                ao_occ.append(offset_p + 2)
+            if (element_id >= 3 and element_id >11):
+                ao_occ.append(iterr + 1)                
+                ao_occ.append(offset_2p + 0)
+                ao_occ.append(offset_2p + 1)
+                ao_occ.append(offset_2p + 2)
+             #for Na-Ar atoms: + 2s 3s 2p 3p
+            elif element_id >= 11 :              
+                #2s,3s
+                 ao_occ.append(iterr + 1)
+                 ao_occ.append(iterr + 2)
+                #2p
+                 ao_occ.append(offset_2p + 0)
+                 ao_occ.append(offset_2p + 1)
+                 ao_occ.append(offset_2p + 2)
+                #3p
+                 offset_3p = offset_2p + angular_momentum_counter['P'] 
+                 ao_occ.append(offset_3p + 0)
+                 ao_occ.append(offset_3p + 1)
+                 ao_occ.append(offset_3p + 2)
 
             # sum number of orbitals. used to calculate virtual orbitals later
-            orb = sum(multiplicity[k] * v for k, v in c.items())
+            orb = sum(ao_count[k] * v for k, v in angular_momentum_counter.items())
             iterr += orb
             ao_per_atom.append(orb)
 
