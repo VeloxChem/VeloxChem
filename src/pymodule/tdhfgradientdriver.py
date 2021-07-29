@@ -445,8 +445,11 @@ class TdhfGradientDriver(GradientDriver):
 
         # polarizability: 3 coordinates x 3 coordinates (ignoring frequencies)
         # polarizability gradient: dictionary goes through 3 coordinates x 3 coordinates
-        # each entry having values for n atoms x 3 coordinates
-        self.pol_grad = {}
+        # each entry having values for no. atoms x 3 coordinates
+        #self.pol_grad = {}
+        self.pol_grad = np.zeros((3, 3, natm, 3))
+        # dictionary to translate from numbers to operator components 'xyz'
+        component_dict = {0: 'x', 1: 'y', 2: 'z'}
 
         if not self.do_four_point:
             for i in range(natm):
@@ -466,11 +469,13 @@ class TdhfGradientDriver(GradientDriver):
                                                        self.scf_drv.scf_tensors)
 
                     coords[i, d] += self.delta_h
-                    for aop in lr_drv.a_components:
-                        for bop in lr_drv.b_components:
+                    #for aop in lr_drv.a_components:
+                    for aop in range(3):
+                        #for bop in lr_drv.b_components:
+                        for bop in range(3):
                             self.pol_grad[aop, bop, i, d] = (
-                                ( lr_results_p['response_functions'][aop, bop, 0.0]
-                                - lr_results_m['response_functions'][aop, bop, 0.0] ) /
+                                ( lr_results_p['response_functions'][component_dict[aop], component_dict[bop], 0.0]
+                                - lr_results_m['response_functions'][component_dict[aop], component_dict[bop], 0.0] ) /
                                 (2.0 * self.delta_h) )
 
         # four-point approximation for debugging of analytical gradient
@@ -506,14 +511,16 @@ class TdhfGradientDriver(GradientDriver):
                                                        self.scf_drv.scf_tensors)
 
                     coords[i, d] += 2.0 * self.delta_h
-                    for aop in lr_drv.a_components:
-                        for bop in lr_drv.b_components:
+                    #for aop in lr_drv.a_components:
+                    for aop in range(3):
+                        #for bop in lr_drv.b_components:
+                        for bop in range(3):
                     # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
                             self.pol_grad[aop, bop, i, d] = (
-                                ( lr_results_m2['response_functions'][aop, bop, 0.0]
-                                - 8 * lr_results_m1['response_functions'][aop, bop, 0.0]
-                                + 8 * lr_results_p1['response_functions'][aop, bop, 0.0]
-                                - lr_results_p2['response_functions'][aop, bop, 0.0] ) /
+                                ( lr_results_m2['response_functions'][component_dict[aop], component_dict[bop], 0.0]
+                                - 8 * lr_results_m1['response_functions'][component_dict[aop], component_dict[bop], 0.0]
+                                + 8 * lr_results_p1['response_functions'][component_dict[aop], component_dict[bop], 0.0]
+                                - lr_results_p2['response_functions'][component_dict[aop], component_dict[bop], 0.0] ) /
                                 (12.0 * self.delta_h) )
 
 

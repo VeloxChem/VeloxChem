@@ -84,12 +84,12 @@ def overlap_deriv(molecule, basis, i=0, unit="au"):
     overlap_deriv_atom_i += overlap_deriv_atom_i.transpose(0,2,1)
 
     # Transform the oo block to MO basis
-    pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
-    pyscf_scf.conv_tol = 1e-10
-    pyscf_scf.kernel()
-    mo_occ = pyscf_scf.mo_coeff[:,pyscf_scf.mo_occ>0]
+    #pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
+    #pyscf_scf.conv_tol = 1e-10
+    #pyscf_scf.kernel()
+    #mo_occ = pyscf_scf.mo_coeff[:,pyscf_scf.mo_occ>0]
     #print("mo_occ obtained from pyscf:\n", mo_occ)
-    s1oo = np.einsum('mi,xmn,nj->xij', mo_occ, overlap_deriv_atom_i, mo_occ)
+    #s1oo = np.einsum('mi,xmn,nj->xij', mo_occ, overlap_deriv_atom_i, mo_occ)
     #print("\n\ns1oo transformed with pyscf data:\n", s1oo)
 
     vlx_ovlp_deriv_atom_i = np.zeros(overlap_deriv_atom_i.shape)
