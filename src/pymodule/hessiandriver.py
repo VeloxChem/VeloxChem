@@ -55,6 +55,8 @@ class HessianDriver:
                         (non-mass-weighted) Cartesian coordinates in 1/sqrt(amu).
         - dipole_gradient: The gradient of the dipole moment.
         - ir_intensities: The IR intensities in km/mol.
+        - pol_gradient: The gradient of the polarizability.
+        - raman_intensities: The Raman intensities (in ??).
         - flag: The type of Hessian driver.
         - numerical: Perform numerical Hessian calculation.
         - numerical_grad: Perform numerical gradient calculation.
@@ -90,6 +92,8 @@ class HessianDriver:
         self.cart_normal_modes = None # neither normalized nor mass-weighted
         self.dipole_gradient = None
         self.ir_intensities = None
+        self.pol_gradient = None
+        self.raman_intensities = None
         self.flag = None
         self.numerical = True
         self.numerical_grad = False
@@ -233,6 +237,7 @@ class HessianDriver:
         n_avogadro = 6.02214076e23 # Avogadro's number
         alpha = 0.00729735257 # fine structure constant
         bohr_in_km = 5.291772109e-14 # bohr radius in kilometers
+        raman_conversion_factor = 0.078424 # taken from Q-Chem (units??)
 
         # Conversion factor of IR intensity to km/mol
         conv_ir_ea0amu2kmmol = me_in_amu * n_avogadro * alpha**2 * bohr_in_km * np.pi / 3.0
@@ -243,20 +248,43 @@ class HessianDriver:
                             * self.reduced_masses * amu_to_kg
                             )  * ( N_to_mdyne / m_to_A )
 
+        # Number of translational and rotational degrees of freedom
+        if molecule.is_linear():
+            transrot = 5
+        else:
+            transrot = 6
+
+        natoms = molecule.number_of_atoms()
+        atom_symbol = molecule.get_labels()
+        number_of_modes = len(self.frequencies)
+
         # Calculate IR intensities (for ground state only)
         if self.dipole_gradient is not None:
             ir_trans_dipole = self.dipole_gradient.dot(self.cart_normal_modes)
             ir_intensity_au_amu = np.array([np.linalg.norm(ir_trans_dipole[:,x])**2 for x in range(ir_trans_dipole.shape[1])])
 
-            if molecule.is_linear():
-                self.ir_intensities = ir_intensity_au_amu[5:] * conv_ir_ea0amu2kmmol
-            else:
-                self.ir_intensities = ir_intensity_au_amu[6:] * conv_ir_ea0amu2kmmol
+            self.ir_intensities = ir_intensity_au_amu[transrot:] * conv_ir_ea0amu2kmmol
 
-        number_of_modes = len(self.frequencies)
+        # Calculate Raman intensities, if applicable
+        if self.pol_gradient is not None:
+            raman_transmom = np.einsum('xyi,ik->xyk', self.pol_gradient, self.cart_normal_modes[:, transrot:])
 
-        natoms = molecule.number_of_atoms()
-        atom_symbol = molecule.get_labels()
+            # Calculate rotational invariants
+            alpha_bar = np.zeros((number_of_modes))
+            gamma_bar_sq = np.zeros((number_of_modes))
+            for i in range(3):
+                alpha_bar += raman_transmom[i,i] / 3
+                for j in range(i+1, 3):
+                    gamma_bar_sq += 0.5 * (raman_transmom[i,i] - raman_transmom[j,j])**2 + 3 * raman_transmom[i,j]**2
+
+            alpha_bar_sq = alpha_bar**2
+            ### Uncomment if parallel/perpendicular polarized Raman intensity is needed
+            ## int_pol = 45 * alpha_bar_sq +  4 * gamma_bar_sq
+            ## int_depol = 3 * gamma_bar_sq
+            ## depol_ratio = int_depol / int_pol
+
+            self.raman_intensities = (45 * alpha_bar_sq + 7 * gamma_bar_sq) * raman_conversion_factor
+
 
         title = 'Vibrational Analysis'
         self.ostream.print_header(title)
@@ -266,9 +294,11 @@ class HessianDriver:
         valstr = 'Harmonic frequencies (in cm**-1), reduced masses (in amu), force constants (in mdyne/A),'
         self.ostream.print_header(valstr)
         if self.ir_intensities is not None:
-            valstr = ' IR intensities (in km/mol), and Cartesian normal mode displacements.'
-        else:
-            valstr = ' and normal mode displacements.'
+            valstr = ' IR intensities (in km/mol),'
+            if self.raman_intensities is not None:
+                valstr += ' Raman scattering activities (in A**4/amu),'
+            self.ostream.print_header(valstr)
+        valstr = 'and Cartesian normal mode displacements.'
         self.ostream.print_header(valstr)
         #self.ostream.print_header('-' * (len(valstr) + 2))
         self.ostream.print_blank()
@@ -287,6 +317,8 @@ class HessianDriver:
             force_cnst_string =  '{:17s}'.format('  Force constant:')
             if self.ir_intensities is not None:
                 ir_intens_string =  '{:17s}'.format('  IR intensity:')
+                if self.raman_intensities is not None:
+                    raman_intens_string =  '{:17s}'.format('  Raman intens.:')
             normal_mode_string = '{:17s}'.format('  Normal mode: ')
             for i in range(k, end):
                 index_string += '{:^31d}'.format(i+1)
@@ -295,6 +327,8 @@ class HessianDriver:
                 force_cnst_string += '{:^31.4f}'.format(self.force_constants[i])
                 if self.ir_intensities is not None:
                     ir_intens_string += '{:^31.4f}'.format(self.ir_intensities[i])
+                    if self.raman_intensities is not None:
+                        raman_intens_string += '{:^31.4f}'.format(self.raman_intensities[i])
                 normal_mode_string += '{:^30s}{:>1s}'.format('X         Y         Z','|')
             self.ostream.print_line(index_string)
             self.ostream.print_line(freq_string)
@@ -302,6 +336,8 @@ class HessianDriver:
             self.ostream.print_line(force_cnst_string)
             if self.ir_intensities is not None:
                 self.ostream.print_line(ir_intens_string)
+                if self.raman_intensities is not None:
+                    self.ostream.print_line(raman_intens_string)
             self.ostream.print_line(normal_mode_string)
 
             # Print normal modes:

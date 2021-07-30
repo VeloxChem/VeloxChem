@@ -446,8 +446,7 @@ class TdhfGradientDriver(GradientDriver):
         # polarizability: 3 coordinates x 3 coordinates (ignoring frequencies)
         # polarizability gradient: dictionary goes through 3 coordinates x 3 coordinates
         # each entry having values for no. atoms x 3 coordinates
-        #self.pol_grad = {}
-        self.pol_grad = np.zeros((3, 3, natm, 3))
+        self.pol_grad = np.zeros((3, 3, 3 * natm))
         # dictionary to translate from numbers to operator components 'xyz'
         component_dict = {0: 'x', 1: 'y', 2: 'z'}
 
@@ -473,7 +472,7 @@ class TdhfGradientDriver(GradientDriver):
                     for aop in range(3):
                         #for bop in lr_drv.b_components:
                         for bop in range(3):
-                            self.pol_grad[aop, bop, i, d] = (
+                            self.pol_grad[aop, bop, 3*i + d] = (
                                 ( lr_results_p['response_functions'][component_dict[aop], component_dict[bop], 0.0]
                                 - lr_results_m['response_functions'][component_dict[aop], component_dict[bop], 0.0] ) /
                                 (2.0 * self.delta_h) )
@@ -516,7 +515,7 @@ class TdhfGradientDriver(GradientDriver):
                         #for bop in lr_drv.b_components:
                         for bop in range(3):
                     # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
-                            self.pol_grad[aop, bop, i, d] = (
+                            self.pol_grad[aop, bop, 3*i + d] = (
                                 ( lr_results_m2['response_functions'][component_dict[aop], component_dict[bop], 0.0]
                                 - 8 * lr_results_m1['response_functions'][component_dict[aop], component_dict[bop], 0.0]
                                 + 8 * lr_results_p1['response_functions'][component_dict[aop], component_dict[bop], 0.0]

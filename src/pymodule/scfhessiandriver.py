@@ -34,6 +34,7 @@ from .hessiandriver import HessianDriver
 from .scfgradientdriver import ScfGradientDriver
 from .outputstream import OutputStream
 from .firstorderprop import FirstOrderProperties
+from .lrsolver import LinearResponseSolver
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -54,6 +55,8 @@ class ScfHessianDriver(HessianDriver):
 
     Instance variables
         - scf_drv: The SCF driver.
+        - do_raman: Additionally calculate Raman intensities
+                (at significantly higher computational cost).
     """
 
     def __init__(self, scf_drv, comm=None, ostream=None):
@@ -65,6 +68,7 @@ class ScfHessianDriver(HessianDriver):
 
         self.flag = 'SCF Hessian Driver'
         self.scf_drv = scf_drv
+        self.do_raman = False
 
 
     def update_settings(self, method_dict, freq_dict=None):
@@ -78,6 +82,14 @@ class ScfHessianDriver(HessianDriver):
         """
 
         super().update_settings(method_dict, freq_dict)
+
+        if freq_dict is None:
+            freq_dict = {}
+
+        # check if Raman intensities are to be calculated (numerically)
+        if 'do_raman' in freq_dict:
+            key = freq_dict['do_raman'].lower()
+            self.do_raman = True if key in ['yes', 'y'] else False
 
         # The electronic energy
         self.elec_energy = self.scf_drv.get_scf_energy()
@@ -202,6 +214,20 @@ class ScfHessianDriver(HessianDriver):
         #self.dipole_gradient = np.zeros((3, molecule.number_of_atoms(), 3))
         self.dipole_gradient = np.zeros((3, 3 * molecule.number_of_atoms()))
 
+        # If Raman intensities are calculated, set up LR solver and member variable
+        if self.do_raman:
+            # linear response driver for polarizability calculation
+            lr_drv = LinearResponseSolver(self.comm, self.scf_drv.ostream)
+            #lr_ostream_state = lr_drv.ostream.state
+            #lr_drv.ostream.state = False
+            # polarizability: 3 coordinates x 3 coordinates (ignoring frequencies)
+            # polarizability gradient: dictionary goes through 3 coordinates x 3 coordinates
+            # each entry having values for no. atoms x 3 coordinates
+            self.pol_gradient = np.zeros((3, 3, 3 * natm))
+            # dictionary to translate from numbers to operator components 'xyz'
+            component_dict = {0: 'x', 1: 'y', 2: 'z'}
+
+
         if not self.do_four_point:
             for i in range(molecule.number_of_atoms()):
                 for d in range(3):
@@ -215,6 +241,11 @@ class ScfHessianDriver(HessianDriver):
                     prop.compute(new_mol, ao_basis, density)
                     mu_plus = prop.get_property('dipole moment')
 
+                    if self.do_raman:
+                        lr_drv.is_converged = False
+                        lr_results_p = lr_drv.compute(new_mol, ao_basis,
+                                                           self.scf_drv.scf_tensors)
+
 
                     coords[i, d] -= 2.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
@@ -225,6 +256,19 @@ class ScfHessianDriver(HessianDriver):
                     density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
                     prop.compute(new_mol, ao_basis, density)
                     mu_minus = prop.get_property('dipole moment')
+
+                    if self.do_raman:
+                        lr_drv.is_converged = False
+                        lr_results_m = lr_drv.compute(new_mol, ao_basis,
+                                                           self.scf_drv.scf_tensors)
+                        for aop in range(3):
+                            #for bop in lr_drv.b_components:
+                            for bop in range(3):
+                                self.pol_gradient[aop, bop, 3*i + d] = (
+                                    ( lr_results_p['response_functions'][component_dict[aop], component_dict[bop], 0.0]
+                                    - lr_results_m['response_functions'][component_dict[aop], component_dict[bop], 0.0] ) /
+                                    (2.0 * self.delta_h) )
+
 
                     for c in range(3):
                         self.dipole_gradient[c, 3*i + d] = (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
@@ -248,6 +292,11 @@ class ScfHessianDriver(HessianDriver):
                     prop.compute(new_mol, ao_basis, density)
                     mu_plus1 = prop.get_property('dipole moment')
 
+                    if self.do_raman:
+                        lr_drv.is_converged = False
+                        lr_results_p1 = lr_drv.compute(new_mol, ao_basis,
+                                                           self.scf_drv.scf_tensors)
+
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
@@ -257,6 +306,11 @@ class ScfHessianDriver(HessianDriver):
                     density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
                     prop.compute(new_mol, ao_basis, density)
                     mu_plus2 = prop.get_property('dipole moment')
+
+                    if self.do_raman:
+                        lr_drv.is_converged = False
+                        lr_results_p2 = lr_drv.compute(new_mol, ao_basis,
+                                                           self.scf_drv.scf_tensors)
 
                     coords[i, d] -= 3.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
@@ -268,6 +322,11 @@ class ScfHessianDriver(HessianDriver):
                     prop.compute(new_mol, ao_basis, density)
                     mu_minus1 = prop.get_property('dipole moment')
 
+                    if self.do_raman:
+                        lr_drv.is_converged = False
+                        lr_results_m1 = lr_drv.compute(new_mol, ao_basis,
+                                                           self.scf_drv.scf_tensors)
+
                     coords[i, d] -= self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
@@ -277,6 +336,20 @@ class ScfHessianDriver(HessianDriver):
                     density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
                     prop.compute(new_mol, ao_basis, density)
                     mu_minus2 = prop.get_property('dipole moment')
+
+                    if self.do_raman:
+                        lr_drv.is_converged = False
+                        lr_results_m2 = lr_drv.compute(new_mol, ao_basis,
+                                                           self.scf_drv.scf_tensors)
+
+                        for aop in range(3):
+                            for bop in range(3):
+                                self.pol_gradient[aop, bop, 3*i + d] = (
+                                    ( lr_results_m2['response_functions'][component_dict[aop], component_dict[bop], 0.0]
+                                    - 8 * lr_results_m1['response_functions'][component_dict[aop], component_dict[bop], 0.0]
+                                    + 8 * lr_results_p1['response_functions'][component_dict[aop], component_dict[bop], 0.0]
+                                    - lr_results_p2['response_functions'][component_dict[aop], component_dict[bop], 0.0] ) /
+                                    (12.0 * self.delta_h) )
 
                     for c in range(3):
                         self.dipole_gradient[c, 3*i + d] = (mu_minus2[c] - 8.0 * mu_minus1[c]
