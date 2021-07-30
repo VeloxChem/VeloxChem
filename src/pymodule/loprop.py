@@ -513,7 +513,7 @@ class LoPropDriver:
 
             offset_2p = angular_momentum_counter['S'] + iterr
             # For Li-Ne: + 2s 2p
-            if (element_id >= 3 and element_id >11):
+            if (element_id >= 3 and element_id <11):
                 ao_occ.append(iterr + 1)                
                 ao_occ.append(offset_2p + 0)
                 ao_occ.append(offset_2p + 1)
