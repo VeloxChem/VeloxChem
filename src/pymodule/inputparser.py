@@ -169,7 +169,6 @@ class InputParser:
             'scf': 'scf',
             'response': 'rsp',
             'exciton': 'exciton',
-            'loprop': 'loprop',
         }
 
         for job_type in abbrev:
@@ -180,21 +179,6 @@ class InputParser:
                     f_path.with_suffix(f'.{abbrev[job_type]}.h5'))
                 self.input_dict[job_type]['checkpoint_file'] = checkpoint_file
 
-        # verify options for loprop
-        verifyers = {
-            'loprop': {
-                'checkpoint_file': (lambda v: True, 'Always OK'),
-                'localize':
-                    (lambda v: v in ['charges'], 'localize: {} illegal value')
-            }
-        }
-
-        if 'loprop' in self.input_dict:
-            for option, value in self.input_dict['loprop'].items():
-                verify, msg = verifyers['loprop'][option]
-                if not verify(value):
-                    raise InputError(msg.format(value))
-
     def get_dict(self):
         """
         Gets the input dictonary.
@@ -204,10 +188,6 @@ class InputParser:
         """
 
         return self.input_dict
-
-
-class InputError(Exception):
-    pass
 
 
 def parse_seq_fixed(input_seq, flag='float'):
