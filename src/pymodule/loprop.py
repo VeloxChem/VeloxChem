@@ -26,16 +26,13 @@
 from mpi4py import MPI
 import numpy as np
 import sys
-import os
 from collections import Counter
 
 from .lrsolver import LinearResponseSolver
-from .inputparser import InputParser
 from .outputstream import OutputStream
-from .veloxchemlib import get_basis_function_indices_for_atom
-from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import mpi_master
-from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import (ElectricDipoleIntegralsDriver, mpi_master,
+                           bohr_in_angstroms, to_angular_momentum,
+                           get_basis_function_indices_for_atom)
 from .errorhandler import assert_msg_critical
 
 
@@ -66,8 +63,8 @@ class LoPropDriver:
 
     def compute(self, molecule, basis, scf_tensors):
         """
-        calculate the loprop transformation matrix T
-        patial charge (Qab) and localized polarizabilities
+        Calculates the loprop transformation matrix T, patial charge (Qab) and
+        localized polarizabilities.
 
         :param molecule:
             the molecule
@@ -196,9 +193,9 @@ class LoPropDriver:
             # unpact response vectors to matrix form
             nocc = molecule.number_of_alpha_electrons()
             norb = n_mo
-            kappa_x = self.lrvec2mat(Nx, nocc, norb)
-            kappa_y = self.lrvec2mat(Ny, nocc, norb)
-            kappa_z = self.lrvec2mat(Nz, nocc, norb)
+            kappa_x = self.vec2mat(Nx, nocc, norb)
+            kappa_y = self.vec2mat(Ny, nocc, norb)
+            kappa_z = self.vec2mat(Nz, nocc, norb)
 
             # perturbed densities
             # factor of 2 from spin-adapted excitation vectors
@@ -264,7 +261,6 @@ class LoPropDriver:
                 coord_matrix[i][i] = molecule_coord[i]
                 for j in range(i + 1, natoms):
                     # a!=b: rab = (ra-rb)/2
-                    # TODO: double check absolute value
                     rij = 0.5 * np.abs(molecule_coord[i] - molecule_coord[j])
                     coord_matrix[i][j] = rij
                     coord_matrix[j][i] = rij
@@ -387,7 +383,7 @@ class LoPropDriver:
 
     def penalty_fc(self, za, Ra, zb, Rb):
         """
-        penalty function
+        Penalty function.
 
         :param za:
             atomic number for atom a
@@ -402,14 +398,14 @@ class LoPropDriver:
             The penalty function
         """
 
-        # Ra/Rb are the position vectors
         RBS = np.array([
             0, 0.25, 0.25, 1.45, 1.05, 0.85, 0.7, 0.65, 0.5, 0.43, 1.8, 1.5,
             1.25, 1.1, 1.0, 1.0, 1.0, 1.0
         ]) / bohr_in_angstroms()
-        # TODO: check if it is possible to go beyond Cl
+
         assert_msg_critical(za <= 17 or zb <= 17,
                             'LoPropDriver: we currently support up to Cl')
+
         ra = RBS[za]
         rb = RBS[zb]
         # Ra and Rb taking from r_mat: 0,1,2 represents x y z directions
@@ -418,9 +414,9 @@ class LoPropDriver:
         f = 0.5 * np.exp(-2 * (rab2 / (ra + rb)**2))
         return f
 
-    def lrvec2mat(self, vec, nocc, norb):
+    def vec2mat(self, vec, nocc, norb):
         """
-        unpact response vector to matrix form
+        Unpack response vector to matrix form.
 
         :param vec:
             the response vector
@@ -433,7 +429,6 @@ class LoPropDriver:
             unpacked response vector
         """
 
-        # TODO: use a different name from lrvec2mat
         kappa = np.zeros((norb, norb))
         nvir = norb - nocc
         n_ov = nocc * nvir
@@ -469,56 +464,57 @@ class LoPropDriver:
             ao_per_atom, ao_occ, and ao_vir
         """
 
-        elements = molecule.elem_ids_to_numpy()
-        basis = basis.get_label()
+        ao_count = dict(S=1, P=3, D=5, F=7, G=9, H=11, I=13)
 
-        # get basis file
-        local_name = basis
-        basis_file = []
+        basis_info = {}
+        for atombasis in basis:
+            element_id = atombasis.get_elemental_id()
+            basis_info[element_id] = [
+                to_angular_momentum(basisfunc.angular_momentum)
+                for basisfunc in atombasis
+            ]
 
-        # TODO: check if it is possible to extract the information from the
-        #       basis set object
-        # potential problems with reading the basis set file:j
-        # 1) the basis set may be in the current folder and not the basis folder
-        # 2) there will be Pople type basis set with 'SP' functions
-
-        lib_member = os.path.join(os.environ['VLXBASISPATH'], basis)
-        if os.path.exists(local_name):
-            basis_file = os.path.abspath(local_name)
-        elif os.path.exists(lib_member):
-            basis_file = lib_member
-
-        bp = InputParser(basis_file)
-        basis = bp.get_dict()
-        keys = list(basis.keys())
-
+        ao_per_atom = []
         ao_occ = []
         ao_vir = []
         iterr = 0
-        multiplicity = dict(S=1, P=3, D=5, F=7, G=9, H=11, I=13)
-        ao_per_atom = []
-        for e in elements:
-            k = keys[e - 1]
-            atoms_data = basis[k]
-            c = Counter(
-                line[0] for line in atoms_data if line and line[0] in 'SPDFGHI')
+        for element_id in molecule.elem_ids_to_numpy():
+            angular_momentum_counter = Counter(basis_info[element_id])
 
-            # TODO: check if it is possible to go beyond Ne
-            assert_msg_critical(e <= 10,
-                                'LoProp: we currently support up to Ne')
-            # For H and He: 1s
+            # Note: This function supports up to Ar but is limited by the RBS
+            # radius list in penalty_fc
+            assert_msg_critical(element_id <= 17,
+                                'LoPropDriver: we currently support up to Cl')
+
+            # H and He: 1s
             ao_occ.append(iterr)
 
-            # For Li-Ne: + 2s 2p
-            if e >= 3:
+            # Li-Ne: + 2s 2p
+            offset_2p = angular_momentum_counter['S'] + iterr
+            if (element_id >= 3) and (element_id < 11):
                 ao_occ.append(iterr + 1)
-                offset_p = c['S'] + iterr
-                ao_occ.append(offset_p + 0)
-                ao_occ.append(offset_p + 1)
-                ao_occ.append(offset_p + 2)
+                ao_occ.append(offset_2p + 0)
+                ao_occ.append(offset_2p + 1)
+                ao_occ.append(offset_2p + 2)
+
+            # Na-Ar atoms: + 2s 3s 2p 3p
+            elif element_id >= 11:
+                # 2s,3s
+                ao_occ.append(iterr + 1)
+                ao_occ.append(iterr + 2)
+                # 2p
+                ao_occ.append(offset_2p + 0)
+                ao_occ.append(offset_2p + 1)
+                ao_occ.append(offset_2p + 2)
+                # 3p
+                offset_3p = offset_2p + angular_momentum_counter['P']
+                ao_occ.append(offset_3p + 0)
+                ao_occ.append(offset_3p + 1)
+                ao_occ.append(offset_3p + 2)
 
             # sum number of orbitals. used to calculate virtual orbitals later
-            orb = sum(multiplicity[k] * v for k, v in c.items())
+            orb = sum(
+                ao_count[k] * v for k, v in angular_momentum_counter.items())
             iterr += orb
             ao_per_atom.append(orb)
 
