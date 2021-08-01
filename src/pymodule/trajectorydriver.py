@@ -29,7 +29,6 @@ import time as tm
 import json
 import sys
 from pathlib import Path
-import matplotlib.pyplot as plt
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstroms
@@ -212,8 +211,9 @@ class TrajectoryDriver:
             import MDAnalysis as mda
             from MDAnalysis.topology.guessers import guess_atom_element
         except ImportError:
-            raise ImportError('Unable to import MDAnalysis. Please install ' +
-                              'MDAnalysis via \'pip install MDAnalysis\'')
+            raise ImportError(
+                'Unable to import MDAnalysis. Please install ' +
+                'MDAnalysis via \'python3 -m pip install MDAnalysis\'')
 
         self.print_header()
 
@@ -627,6 +627,13 @@ class TrajectoryDriver:
         :return:
             The excitation energy and absorption at the peak.
         """
+
+        try:
+            from matplotlib import pyplot as plt
+        except ImportError:
+            raise ImportError(
+                'Unable to import matplotlib. Please install ' +
+                'matplotlib via \'python3 -m pip install matplotlib\'')
 
         # calculate the average spectrum
         y_averaged = np.sum(y, axis=0) / y.shape[0]
