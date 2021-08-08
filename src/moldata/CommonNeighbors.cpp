@@ -217,6 +217,8 @@ CCommonNeighbors::operator!=(const CCommonNeighbors& other) const
     return !(*this == other);
 }
 
+#include <iostream>
+
 void
 CCommonNeighbors::generate(const double radius)
 {

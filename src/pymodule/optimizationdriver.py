@@ -57,10 +57,14 @@ class OptimizationDriver:
         - constraints: The constraints.
         - check_interval: The interval (number of steps) for checking
           coordinate system.
-        - max_iter: The maximum number of optimization steps
+        - max_iter: The maximum number of optimization steps.
         - filename: The filename that will be used by geomeTRIC.
         - grad_drv: The gradient driver.
         - flag: The type of the optimization driver.
+        - cna: The flag for computation of Jaccard similarity index.
+        - cna_bond: The cut-off radius for chemical bond in CNA analysis.
+        - cna_rcut: The cut-off radius for chemical bonds environment in
+          CNA analysis.
     """
 
     def __init__(self, filename, grad_drv, flag):
@@ -525,7 +529,7 @@ class OptimizationDriver:
         self.print_bonding_pattern(cna_first, 'Initial')
         self.print_bonding_pattern(cna_last, 'Optimized')
         if cna_ref is not None:
-                self.print_bonding_pattern(cna_ref, 'Reference')
+            self.print_bonding_pattern(cna_ref, 'Reference')
         
         # print Jaccard similarity indexes
         

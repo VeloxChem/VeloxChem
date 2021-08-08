@@ -33,6 +33,7 @@ from .errorhandler import assert_msg_critical
 from .excitondriver import ExcitonModelDriver
 from .loprop import LoPropDriver
 from .mp2driver import Mp2Driver
+from .cnadriver import CnaAnalysisDriver
 from .mpitask import MpiTask
 from .optimizationdriver import OptimizationDriver
 from .pulsedrsp import PulsedResponse
@@ -401,7 +402,9 @@ def main():
         else:
             cna_dict = {}
             
-        print("Doing CNA analysis")
+        cna_drv = CnaAnalysisDriver(task.mpi_comm, task.ostream)
+        cna_drv.update_settings(cna_dict)
+        cna_drv.compute()
 
     # All done
 
