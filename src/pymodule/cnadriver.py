@@ -143,17 +143,17 @@ class CnaAnalysisDriver:
             cnas.append(mcna)
         
         self.ostream.print_blank()
-        self.ostream.print_line('--------------------------')
-        self.ostream.print_line('Self Correlation Function:')
-        self.ostream.print_line('--------------------------')
-        self.ostream.print_line('! (i) ! (j) !     J_ij   !')
-        self.ostream.print_line('--------------------------')
+        self.ostream.print_header(29 * '-')
+        self.ostream.print_header('! Self Correlation Function !')
+        self.ostream.print_header(29 * '-')
+        self.ostream.print_header('! (i) ! (j) !      J_ij     !')
+        self.ostream.print_header(29 * '-')
         matidx = np.tril_indices(len(cnas))
         for i,j in zip(matidx[0],matidx[1]):
             jval = cnas[i].comp_cna(cnas[j])
-            self.ostream.print_line('! {:^3d} ! {:^3d} !     {:^.2f}   !'.format(
+            self.ostream.print_header('! {:^3d} ! {:^3d} !      {:^.2f}     !'.format(
                 i, j, jval))
-        self.ostream.print_line('--------------------------')
+        self.ostream.print_header(29 * '-')
         
     def compute_cna_cross(self):
         """
@@ -176,17 +176,17 @@ class CnaAnalysisDriver:
             rhs_cnas.append(mcna)
     
         self.ostream.print_blank()
-        self.ostream.print_line('---------------------------')
-        self.ostream.print_line('Cross Correlation Function:')
-        self.ostream.print_line('---------------------------')
-        self.ostream.print_line('! (i) ! (j) !     J_ij    !')
-        self.ostream.print_line('---------------------------')
+        self.ostream.print_header(30 * '-')
+        self.ostream.print_header('! Cross Correlation Function !')
+        self.ostream.print_header(30 * '-')
+        self.ostream.print_header('! (i) ! (j) !      J_ij      !')
+        self.ostream.print_header(30 * '-')
         for i in range(len(lhs_cnas)):
             for j in range(len(rhs_cnas)):
                 jval = lhs_cnas[i].comp_cna(rhs_cnas[j])
-                self.ostream.print_line('! {:^3d} ! {:^3d} !     {:^.2f}    !'.format(
+                self.ostream.print_header('! {:^3d} ! {:^3d} !      {:^.2f}      !'.format(
                     i, j, jval))
-                self.ostream.print_line('---------------------------')
+        self.ostream.print_header(30 * '-')
         
     def print_header(self):
         """
