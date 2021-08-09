@@ -133,21 +133,15 @@ class CnaAnalysisDriver:
         """
         Computes CNA self correlation analysis.
         """
-        
-        molecules = [Molecule.read_xyz(finp) for finp in self.xyz_files]
-        
-        cnas = []
-        for mol in molecules:
-            mcna = CommonNeighbors(mol, self.cna_bond)
-            mcna.generate(self.cna_rcut)
-            cnas.append(mcna)
-        
+    
         self.ostream.print_blank()
         self.ostream.print_header(29 * '-')
         self.ostream.print_header('! Self Correlation Function !')
         self.ostream.print_header(29 * '-')
         self.ostream.print_header('! (i) ! (j) !      J_ij     !')
         self.ostream.print_header(29 * '-')
+        
+        cnas = self.get_cna_list(self.xyz_files)
         matidx = np.tril_indices(len(cnas))
         for i,j in zip(matidx[0],matidx[1]):
             jval = cnas[i].comp_cna(cnas[j])
@@ -159,34 +153,39 @@ class CnaAnalysisDriver:
         """
         Computes CNA cross correlation analysis.
         """
-    
-        lhs_molecules = [Molecule.read_xyz(finp) for finp in self.lhs_files]
-        rhs_molecules = [Molecule.read_xyz(finp) for finp in self.rhs_files]
-    
-        lhs_cnas = []
-        for mol in lhs_molecules:
-            mcna = CommonNeighbors(mol, self.cna_bond)
-            mcna.generate(self.cna_rcut)
-            lhs_cnas.append(mcna)
-            
-        rhs_cnas = []
-        for mol in rhs_molecules:
-            mcna = CommonNeighbors(mol, self.cna_bond)
-            mcna.generate(self.cna_rcut)
-            rhs_cnas.append(mcna)
-    
+
         self.ostream.print_blank()
         self.ostream.print_header(30 * '-')
         self.ostream.print_header('! Cross Correlation Function !')
         self.ostream.print_header(30 * '-')
         self.ostream.print_header('! (i) ! (j) !      J_ij      !')
         self.ostream.print_header(30 * '-')
+        
+        lhs_cnas = self.get_cna_list(self.lhs_files)
+        rhs_cnas = self.get_cna_list(self.rhs_files)
         for i in range(len(lhs_cnas)):
             for j in range(len(rhs_cnas)):
                 jval = lhs_cnas[i].comp_cna(rhs_cnas[j])
                 self.ostream.print_header('! {:^3d} ! {:^3d} !      {:^.2f}      !'.format(
                     i, j, jval))
         self.ostream.print_header(30 * '-')
+        
+    def get_cna_list(self, mol_files):
+        """
+        Gets Common Neighbors objects list for given list of files.
+
+        :param mol_files:
+            The list of molecule files.
+        """
+        
+        molecules = [Molecule.read_xyz(finp) for finp in mol_files]
+        cnas = []
+        for mol in molecules:
+            mcna = CommonNeighbors(mol, self.cna_bond)
+            mcna.generate(self.cna_rcut)
+            cnas.append(mcna)
+            
+        return cnas
         
     def print_header(self):
         """
