@@ -64,6 +64,7 @@ class RespChargesDriver:
         - weak_restraint: The strength of the restraint in first stage of RESP fit.
         - strong_restraint: The strength of the restraint in second stage of RESP fit.
         - weights: The weight factors of different conformers.
+        - energies: The energies of different conformers for Boltzmann weight factors.
         - temperature: The temperature for Boltzmann weight factors.
         - net_charge: The charge of the molecule.
         - multiplicity: The multiplicity of the molecule.
@@ -99,6 +100,7 @@ class RespChargesDriver:
         self.multiplicity = 1
         self.method_dict = None
         self.weights = None
+        self.energies = None
         self.temperature = 293.15
         self.filename = 'veloxchem_electrostatic_potential_input'
 
@@ -136,6 +138,7 @@ class RespChargesDriver:
             'net_charge': 'float',
             'multiplicity': 'int',
             'weights': 'seq_fixed',
+            'energies': 'seq_fixed',
             'temperature': 'float',
         }
 
@@ -238,6 +241,11 @@ class RespChargesDriver:
             if use_xyz_file:
                 info_text = f'Processing conformer {ind+1}...'
                 self.ostream.print_info(info_text)
+                self.ostream.print_blank()
+                self.ostream.print_block(mol.get_string())
+                self.ostream.print_block(mol.more_info())
+                self.ostream.print_blank()
+                self.ostream.print_block(bas.get_string('Atomic Basis', mol))
                 self.ostream.flush()
 
             nalpha = mol.number_of_alpha_electrons()
@@ -284,8 +292,15 @@ class RespChargesDriver:
                 esp.append(esp_m)
                 scf_energies.append(scf_energy_m)
 
+        if self.rank == mpi_master() and self.energies is not None:
+            errmsg = 'RespChargesDriver: Number of energies does not match '
+            errmsg += 'number of conformers.'
+            assert_msg_critical(len(self.energies) == len(molecules), errmsg)
+        else:
+            self.energies = scf_energies
+
         if self.rank == mpi_master() and self.weights is None:
-            self.weights = self.get_boltzmann_weights(scf_energies,
+            self.weights = self.get_boltzmann_weights(self.energies,
                                                       self.temperature)
 
         q = None
@@ -898,6 +913,10 @@ class RespChargesDriver:
         self.ostream.print_blank()
 
         if stage.lower() == 'first':
+            if self.method_dict['basis'].upper() != '6-31G*':
+                cur_str = '*** Warning: Recommended basis set 6-31G* '
+                cur_str += 'is not used!'
+                self.ostream.print_header(cur_str.ljust(str_width))
             if not self.recommended_resp_parameters():
                 cur_str = '*** Warning: Parameters for RESP fitting differ '
                 cur_str += 'from recommended choice!'
