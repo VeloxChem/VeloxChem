@@ -211,8 +211,8 @@ class ScfHessianDriver(HessianDriver):
         # First-order properties for gradient of dipole moment
         prop = FirstOrderProperties(self.comm, self.ostream)
         # numerical gradient (3 dipole components, no. atoms x 3 atom coords)
-        #self.dipole_gradient = np.zeros((3, molecule.number_of_atoms(), 3))
-        self.dipole_gradient = np.zeros((3, 3 * molecule.number_of_atoms()))
+        #self.dipole_gradient = np.zeros((3, natm, 3))
+        self.dipole_gradient = np.zeros((3, 3 * natm))
 
         # If Raman intensities are calculated, set up LR solver and member variable
         if self.do_raman:
@@ -229,7 +229,7 @@ class ScfHessianDriver(HessianDriver):
 
 
         if not self.do_four_point:
-            for i in range(molecule.number_of_atoms()):
+            for i in range(natm):
                 for d in range(3):
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
@@ -280,7 +280,7 @@ class ScfHessianDriver(HessianDriver):
             # Four-point numerical derivative approximation
             # for debugging of analytical Hessian:
             # [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
-            for i in range(molecule.number_of_atoms()):
+            for i in range(natm):
                 for d in range(3):
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')

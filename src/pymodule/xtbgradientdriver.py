@@ -76,7 +76,7 @@ class XTBGradientDriver(GradientDriver):
         self.gradient = self.comm.bcast(self.gradient, root=mpi_master())
 
         self.print_geometry(molecule)
-        self.print_gradient(molecule, molecule.get_labels())
+        self.print_gradient(molecule) 
 
         self.ostream.print_blank()
         self.ostream.flush()

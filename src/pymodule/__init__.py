@@ -98,6 +98,7 @@ from .tdhfgradientdriver import TdhfGradientDriver
 from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
 from .tdhfhessiandriver import TdhfHessianDriver
+from .xtbhessiandriver import XTBHessianDriver
 
 # Deprecation warnings
 from . import deprecations

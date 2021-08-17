@@ -53,6 +53,14 @@ CXTBDriver_gradient_to_numpy(const CXTBDriver& self)
     return vlx_general::pointer_to_numpy(grad.data(), grad.size() / 3, 3);
 }
 
+static py::array_t<double>
+CXTBDriver_dipole_to_numpy(const CXTBDriver& self)
+{
+    auto dipole = self.getDipole(); 
+
+    return vlx_general::pointer_to_numpy(dipole.data(), dipole.size());
+}
+
 void
 export_xtb(py::module& m)
 {
@@ -70,6 +78,7 @@ export_xtb(py::module& m)
         .def("get_output_filename", &CXTBDriver::getOutputFilename)
         .def("get_energy", &CXTBDriver::getEnergy)
         .def("get_gradient", &CXTBDriver_gradient_to_numpy)
+        .def("get_dipole", &CXTBDriver_dipole_to_numpy)
         // prefixed by an underscore because it will be decorated in xtbdriver.py
         .def("_compute", &CXTBDriver::compute);
 }
