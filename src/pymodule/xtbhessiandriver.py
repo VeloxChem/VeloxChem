@@ -32,6 +32,7 @@ from .molecule import Molecule
 from .gradientdriver import GradientDriver
 from .hessiandriver import HessianDriver
 from .xtbgradientdriver import XTBGradientDriver
+from .xtbdriver import XTBDriver
 from .outputstream import OutputStream
 from .firstorderprop import FirstOrderProperties #TODO: remove?
 from .lrsolver import LinearResponseSolver #TODO: remove?
@@ -140,16 +141,6 @@ class XTBHessianDriver(HessianDriver):
 
         # settings dictionary for gradient driver
         grad_dict = dict(self.freq_dict)
-#        if self.numerical_grad:
-#            grad_dict['numerical'] = 'yes'
-#            warn_msg = '*** Warning: Numerical Hessian will be calculated based on numerical gradient.'
-#            self.ostream.print_header(warn_msg.ljust(56))
-#            warn_msg = '  This takes a long time and has limited accuracy.'
-#            self.ostream.print_header(warn_msg.ljust(56))
-#            self.ostream.print_blank()
-#            self.ostream.flush()
-#        else:
-#            grad_dict['numerical'] = 'no'
 
         #TODO -- check if working
         xtb_ostream_state = self.ostream.state
@@ -164,17 +155,11 @@ class XTBHessianDriver(HessianDriver):
         # atom coordinates (nx3)
         coords = molecule.get_coordinates()
 
-        # gradient driver
-        grad_drv = XTBGradientDriver(self.xtb_drv, self.comm,
-                                     self.ostream)
         # Hessian
         hessian = np.zeros((natm, 3, natm, 3))
 
-       # # First-order properties for gradient of dipole moment
-       # prop = FirstOrderProperties(self.comm, self.ostream)
-       # # numerical gradient (3 dipole components, no. atoms x 3 atom coords)
-       # #self.dipole_gradient = np.zeros((3, molecule.number_of_atoms(), 3))
-       # self.dipole_gradient = np.zeros((3, 3 * molecule.number_of_atoms()))
+        # numerical dipole gradient (3 dipole components, no. atoms x 3 atom coords)
+        self.dipole_gradient = np.zeros((3, 3 * molecule.number_of_atoms()))
 
        # # If Raman intensities are calculated, set up LR solver and member variable
        # if self.do_raman:
@@ -195,44 +180,39 @@ class XTBHessianDriver(HessianDriver):
                 for d in range(3):
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    self.xtb_drv.compute(new_mol, self.ostream)
+                    # create a new XTB driver object;
+                    # without this the energy is always zero...;
+                    xtb_drv = XTBDriver(self.comm)
+                    xtb_drv.compute(new_mol, self.ostream)
+                    # create a new gradient driver
+                    grad_drv = XTBGradientDriver(xtb_drv, self.comm,
+                                                 self.ostream)
                     grad_drv.compute(new_mol)
                     grad_plus = grad_drv.get_gradient()
 
-                    #density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                    #prop.compute(new_mol, ao_basis, density)
-                    #mu_plus = prop.get_property('dipole moment')
+                    mu_plus = xtb_drv.get_dipole()
 
                     #if self.do_raman:
-                    #    lr_drv.is_converged = False
-                    #    lr_results_p = lr_drv.compute(new_mol, ao_basis,
-                    #                                       self.scf_drv.scf_tensors)
+                    # TODO: add get_polarizability in the C layer
+                    # if this is possible to get from XTB
 
                     coords[i, d] -= 2.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    self.xtb_drv.compute(new_mol, self.ostream)
+                    xtb_drv = XTBDriver(self.comm)
+                    xtb_drv.compute(new_mol, self.ostream)
+                    # create a new gradient driver
+                    grad_drv = XTBGradientDriver(xtb_drv, self.comm,
+                                                 self.ostream)
                     grad_drv.compute(new_mol)
                     grad_minus = grad_drv.get_gradient()
 
-                    #density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                    #prop.compute(new_mol, ao_basis, density)
-                    #mu_minus = prop.get_property('dipole moment')
+                    mu_minus = xtb_drv.get_dipole()
 
                     #if self.do_raman:
-                    #    lr_drv.is_converged = False
-                    #    lr_results_m = lr_drv.compute(new_mol, ao_basis,
-                    #                                       self.scf_drv.scf_tensors)
-                    #    for aop in range(3):
-                    #        #for bop in lr_drv.b_components:
-                    #        for bop in range(3):
-                    #            self.pol_gradient[aop, bop, 3*i + d] = (
-                    #                ( lr_results_p['response_functions'][component_dict[aop], component_dict[bop], 0.0]
-                    #                - lr_results_m['response_functions'][component_dict[aop], component_dict[bop], 0.0] ) /
-                    #                (2.0 * self.delta_h) )
-
-
-                    #for c in range(3):
-                    #    self.dipole_gradient[c, 3*i + d] = (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
+                    # TODO: add get_polarizability in the C layer
+                    # if this is possible to get from XTB
+                    for c in range(3):
+                        self.dipole_gradient[c, 3*i + d] = (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
                     coords[i, d] += self.delta_h
                     hessian[i, d, :, :] = (grad_plus - grad_minus) / (2.0 * self.delta_h)
 
@@ -245,76 +225,71 @@ class XTBHessianDriver(HessianDriver):
                 for d in range(3):
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    self.xtb_drv.compute(new_mol, self.ostream)
+                    xtb_drv = XTBDriver(self.comm)
+                    xtb_drv.compute(new_mol, self.ostream)
+                    # create a new gradient driver
+                    grad_drv = XTBGradientDriver(xtb_drv, self.comm,
+                                                 self.ostream)
                     grad_drv.compute(new_mol)
                     grad_plus1 = grad_drv.get_gradient()
 
-                   # density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                   # prop.compute(new_mol, ao_basis, density)
-                   # mu_plus1 = prop.get_property('dipole moment')
+                    mu_plus1 = xtb_drv.get_dipole()
 
-                   # if self.do_raman:
-                   #     lr_drv.is_converged = False
-                   #     lr_results_p1 = lr_drv.compute(new_mol, ao_basis,
-                   #                                        self.scf_drv.scf_tensors)
+                    #if self.do_raman:
+                    # TODO: add get_polarizability in the C layer
+                    # if this is possible to get from XTB
 
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    self.xtb_drv.compute(new_mol, self.ostream)
+                    xtb_drv = XTBDriver(self.comm)
+                    xtb_drv.compute(new_mol, self.ostream)
+                    # create a new gradient driver
+                    grad_drv = XTBGradientDriver(xtb_drv, self.comm,
+                                                 self.ostream)
                     grad_drv.compute(new_mol)
                     grad_plus2 = grad_drv.get_gradient()
 
-                    #density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                    #prop.compute(new_mol, ao_basis, density)
-                    #mu_plus2 = prop.get_property('dipole moment')
+                    mu_plus2 = xtb_drv.get_dipole()
 
                     #if self.do_raman:
-                    #    lr_drv.is_converged = False
-                    #    lr_results_p2 = lr_drv.compute(new_mol, ao_basis,
-                    #                                       self.scf_drv.scf_tensors)
+                    # TODO: add get_polarizability in the C layer
+                    # if this is possible to get from XTB
 
                     coords[i, d] -= 3.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    self.xtb_drv.compute(new_mol, self.ostream)
+                    xtb_drv = XTBDriver(self.comm)
+                    xtb_drv.compute(new_mol, self.ostream)
+                    # create a new gradient driver
+                    grad_drv = XTBGradientDriver(xtb_drv, self.comm,
+                                                 self.ostream)
                     grad_drv.compute(new_mol)
                     grad_minus1 = grad_drv.get_gradient()
 
-                    #density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                    #prop.compute(new_mol, ao_basis, density)
-                    #mu_minus1 = prop.get_property('dipole moment')
+                    mu_minus1 = xtb_drv.get_dipole()
 
                     #if self.do_raman:
-                    #    lr_drv.is_converged = False
-                    #    lr_results_m1 = lr_drv.compute(new_mol, ao_basis,
-                    #                                       self.scf_drv.scf_tensors)
+                    # TODO: add get_polarizability in the C layer
+                    # if this is possible to get from XTB
 
                     coords[i, d] -= self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    self.xtb_drv.compute(new_mol, self.ostream)
+                    xtb_drv = XTBDriver(self.comm)
+                    xtb_drv.compute(new_mol, self.ostream)
+                    # create a new gradient driver
+                    grad_drv = XTBGradientDriver(xtb_drv, self.comm,
+                                                 self.ostream)
                     grad_drv.compute(new_mol)
                     grad_minus2 = grad_drv.get_gradient()
 
-                   # density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                   # prop.compute(new_mol, ao_basis, density)
-                   # mu_minus2 = prop.get_property('dipole moment')
+                    mu_minus2 = xtb_drv.get_dipole()
 
-                   # if self.do_raman:
-                   #     lr_drv.is_converged = False
-                   #     lr_results_m2 = lr_drv.compute(new_mol, ao_basis,
-                   #                                        self.scf_drv.scf_tensors)
+                    #if self.do_raman:
+                    # TODO: add get_polarizability in the C layer
+                    # if this is possible to get from XTB
+                    for c in range(3):
+                        self.dipole_gradient[c, 3*i + d] = (mu_minus2[c] - 8.0 * mu_minus1[c]
+                                                         + 8.0 * mu_plus1[c] - mu_plus2[c]) / (12.0 * self.delta_h)
 
-                   #     for aop in range(3):
-                   #         for bop in range(3):
-                   #             self.pol_gradient[aop, bop, 3*i + d] = (
-                   #                 ( lr_results_m2['response_functions'][component_dict[aop], component_dict[bop], 0.0]
-                   #                 - 8 * lr_results_m1['response_functions'][component_dict[aop], component_dict[bop], 0.0]
-                   #                 + 8 * lr_results_p1['response_functions'][component_dict[aop], component_dict[bop], 0.0]
-                   #                 - lr_results_p2['response_functions'][component_dict[aop], component_dict[bop], 0.0] ) /
-                   #                 (12.0 * self.delta_h) )
-
-                   # for c in range(3):
-                   #     self.dipole_gradient[c, 3*i + d] = (mu_minus2[c] - 8.0 * mu_minus1[c]
-                   #                                      + 8.0 * mu_plus1[c] - mu_plus2[c]) / (12.0 * self.delta_h)
                     coords[i, d] += 2.0 * self.delta_h
                     # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
                     hessian[i, d] = (grad_minus2 - 8.0 * grad_minus1
@@ -325,6 +300,6 @@ class XTBHessianDriver(HessianDriver):
 
         #self.ostream.print_blank()
 
-        self.xtb_drv.compute(molecule, self.ostream)
+        #self.xtb_drv.compute(molecule, self.ostream)
         self.ostream.state = xtb_ostream_state
 
