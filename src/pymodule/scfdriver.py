@@ -163,6 +163,8 @@ class ScfDriver:
         self.fock_matrices_beta = deque()
         self.den_matrices_beta = deque()
 
+        self.fock_matrices_proj = deque()
+
         # density matrix
         self.density = AODensityMatrix()
 
@@ -190,6 +192,7 @@ class ScfDriver:
 
         # closed shell?
         self.closed_shell = True
+        self.restricted_open = False
 
         # D4 dispersion correction
         self.dispersion = False
@@ -449,6 +452,8 @@ class ScfDriver:
         self.fock_matrices_beta.clear()
         self.den_matrices_beta.clear()
 
+        self.fock_matrices_proj.clear()
+
         profiler.end(self.ostream, scf_flag=True)
 
         if not self.is_converged:
@@ -519,6 +524,8 @@ class ScfDriver:
         self.fock_matrices_beta.clear()
         self.den_matrices_beta.clear()
 
+        self.fock_matrices_proj.clear()
+
         ovl_mat, kin_mat, npot_mat, dipole_mats = self.comp_one_ints(
             molecule, ao_basis)
 
@@ -532,6 +539,7 @@ class ScfDriver:
             t0 = tm.time()
 
             oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh)
+            self.scf_tensors = {'S': ovl_mat.to_numpy()}
 
             self.ostream.print_info("Orthogonalization matrix computed in" +
                                     " {:.2f} sec.".format(tm.time() - t0))
@@ -946,7 +954,8 @@ class ScfDriver:
         if self.den_guess.guess_type == "SAD":
 
             return self.den_guess.sad_density(molecule, ao_basis, min_basis,
-                                              ovl_mat, self.closed_shell,
+                                              ovl_mat, self.closed_shell and not
+                                              self.restricted_open,
                                               self.comm, self.ostream)
 
         # guess: projection of molecular orbitals from reduced basis

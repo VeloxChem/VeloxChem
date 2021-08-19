@@ -1,0 +1,15 @@
+        @jobs
+        task: rohf
+        @end
+
+        @method settings
+        basis: MIN-CC-PVDZ
+        @end
+
+        @molecule
+        charge: 0
+        multiplicity: 2
+        xyz:
+        He          -.620668   -1.294822      .054251
+        H           -2.508043   -1.382001     .040282
+        @end

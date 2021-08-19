@@ -48,6 +48,7 @@ from .rsptpa import TPA
 from .scffirstorderprop import ScfFirstOrderProperties
 from .scfgradientdriver import ScfGradientDriver
 from .scfrestdriver import ScfRestrictedDriver
+from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .slurminfo import get_slurm_maximum_hours
 from .visualizationdriver import VisualizationDriver
@@ -80,7 +81,10 @@ def select_scf_driver(task, scf_type):
     if nalpha == nbeta and scf_type == 'restricted':
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
     else:
-        scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
+        if scf_type == 'restricted_open':
+            scf_drv = ScfRestrictedOpenDriver(task.mpi_comm, task.ostream)
+        else:
+            scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
 
     return scf_drv
 
@@ -239,7 +243,7 @@ def main():
     # Self-consistent field
 
     run_scf = task_type in [
-        'hf', 'rhf', 'uhf', 'scf', 'uscf', 'wavefunction', 'wave function',
+        'hf', 'rhf', 'rohf', 'uhf', 'scf', 'roscf', 'uscf', 'wavefunction', 'wave function',
         'mp2', 'gradient', 'optimize', 'response', 'pulses', 'visualization',
         'loprop'
     ]
@@ -247,7 +251,12 @@ def main():
     if task_type == 'visualization' and 'visualization' in task.input_dict:
         run_scf = 'read_dalton' not in task.input_dict['visualization']['cubes']
 
-    scf_type = 'unrestricted' if task_type in ['uhf', 'uscf'] else 'restricted'
+    if task_type in ['uhf', 'uscf']:
+        scf_type = 'unrestricted'
+    elif task_type in ['rohf', 'roscf']:
+        scf_type = 'restricted_open'
+    else:
+        scf_type = 'restricted'
 
     if run_scf:
         assert_msg_critical(task.molecule.number_of_atoms(),

@@ -1,0 +1,15 @@
+@jobs
+task: rohf
+@end
+
+@method settings
+basis: 6-311++G(2D,2P)
+@end
+
+@molecule
+charge: 0
+multiplicity: 2
+units: angstrom
+xyz:  
+Li   0 0 0
+@end 
