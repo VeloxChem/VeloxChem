@@ -103,6 +103,7 @@ class HessianDriver:
         self.print_vib_analysis = True
         # flag for printing the Hessian
         self.do_print_hessian = False
+        self.print_depolarization_ratio = False
 
         # Thermodynamics
         self.elec_energy = 0.0
@@ -167,6 +168,12 @@ class HessianDriver:
             key = freq_dict['do_print_hessian'].lower()
             self.do_print_hessian = True if key in ['yes', 'y'] else False
 
+        # print the depolarization ratio, parallel, and perpendicular
+        # Raman activities
+        if 'print_depolarization_ratio' in freq_dict:
+            key = freq_dict['print_depolarization_ratio'].lower()
+            self.print_depolarization_ratio = True if key in ['yes', 'y'] else False
+
         if 'temperature' in freq_dict:
             self.temperature = float(freq_dict['temperature'])
         if 'pressure' in freq_dict:
@@ -219,12 +226,14 @@ class HessianDriver:
                                 self.hessian, elem,
                                 energy=self.elec_energy,
                                 temperature=self.temperature,
-                                pressure=self.pressure, outfnm=filename)
+                                pressure=self.pressure, outfnm=filename,
+                                normalized=False)
                                                     )
 
 
         # Diagonalizes Hessian and calculates the reduced masses
-        self.diagonalize_hessian(molecule, ao_basis, rsp_drv)
+        #self.diagonalize_hessian(molecule, ao_basis, rsp_drv)
+        self.reduced_masses = 1.0/(np.einsum('ki->i',self.normal_modes.T**2))
 
         # Constants and conversion factors
         # TODO: get these from the proper place.
@@ -260,15 +269,16 @@ class HessianDriver:
 
         # Calculate IR intensities (for ground state only)
         if self.dipole_gradient is not None:
-            ir_trans_dipole = self.dipole_gradient.dot(self.cart_normal_modes)
+            #ir_trans_dipole = self.dipole_gradient.dot(self.cart_normal_modes)
+            ir_trans_dipole = self.dipole_gradient.dot(self.normal_modes.T)
             ir_intensity_au_amu = np.array([np.linalg.norm(ir_trans_dipole[:,x])**2 for x in range(ir_trans_dipole.shape[1])])
 
-            self.ir_intensities = ir_intensity_au_amu[transrot:] * conv_ir_ea0amu2kmmol
+            self.ir_intensities = ir_intensity_au_amu * conv_ir_ea0amu2kmmol
 
         # Calculate Raman intensities, if applicable
         if self.pol_gradient is not None:
-            raman_transmom = np.einsum('xyi,ik->xyk', self.pol_gradient, self.cart_normal_modes[:, transrot:])
-
+            #raman_transmom = np.einsum('xyi,ik->xyk', self.pol_gradient, self.cart_normal_modes[:, transrot:])
+            raman_transmom = np.einsum('xyi,ik->xyk', self.pol_gradient, self.normal_modes.T) #TODO: check if transpose is needed
             # Calculate rotational invariants
             alpha_bar = np.zeros((number_of_modes))
             gamma_bar_sq = np.zeros((number_of_modes))
@@ -278,13 +288,16 @@ class HessianDriver:
                     gamma_bar_sq += 0.5 * (raman_transmom[i,i] - raman_transmom[j,j])**2 + 3 * raman_transmom[i,j]**2
 
             alpha_bar_sq = alpha_bar**2
-            ### Uncomment if parallel/perpendicular polarized Raman intensity is needed
-            ## int_pol = 45 * alpha_bar_sq +  4 * gamma_bar_sq
-            ## int_depol = 3 * gamma_bar_sq
-            ## depol_ratio = int_depol / int_pol
+
+            if self.print_depolarization_ratio:
+                int_pol = 45 * alpha_bar_sq +  4 * gamma_bar_sq
+                int_depol = 3 * gamma_bar_sq
+                depol_ratio = int_depol / int_pol
 
             self.raman_intensities = (45 * alpha_bar_sq + 7 * gamma_bar_sq) * raman_conversion_factor
 
+        # Now we can normalize the normal modes -- as done in geomeTRIC
+        self.normal_modes /= np.linalg.norm(self.normal_modes, axis=1)[:, np.newaxis] 
 
         title = 'Vibrational Analysis'
         self.ostream.print_header(title)
@@ -298,6 +311,10 @@ class HessianDriver:
             if self.raman_intensities is not None:
                 valstr += ' Raman scattering activities (in A**4/amu),'
             self.ostream.print_header(valstr)
+            if self.print_depolarization_ratio:
+                valstr = ' parallel and perpendicular Raman scattering activities,'
+                valstr += ' depolarization ratios,'
+                self.ostream.print_header(valstr)
         valstr = 'and Cartesian normal mode displacements.'
         self.ostream.print_header(valstr)
         #self.ostream.print_header('-' * (len(valstr) + 2))
@@ -318,7 +335,12 @@ class HessianDriver:
             if self.ir_intensities is not None:
                 ir_intens_string =  '{:17s}'.format('  IR intensity:')
                 if self.raman_intensities is not None:
-                    raman_intens_string =  '{:17s}'.format('  Raman intens.:')
+                    raman_intens_string =  '{:17s}'.format('  Raman activ.:')
+                    if self.print_depolarization_ratio:
+                        raman_parallel_str = '{:17s}'.format('  Parallel Raman:')
+                        raman_perpendicular_str = '{:17s}'.format('  Perp. Raman:')
+                        depolarization_str = '{:17s}'.format('  Depol. ratio:')
+
             normal_mode_string = '{:17s}'.format('  Normal mode: ')
             for i in range(k, end):
                 index_string += '{:^31d}'.format(i+1)
@@ -329,6 +351,11 @@ class HessianDriver:
                     ir_intens_string += '{:^31.4f}'.format(self.ir_intensities[i])
                     if self.raman_intensities is not None:
                         raman_intens_string += '{:^31.4f}'.format(self.raman_intensities[i])
+                        if self.print_depolarization_ratio:
+                            raman_parallel_str += '{:^31.4f}'.format(int_pol[i])
+                            raman_perpendicular_str += '{:^31.4f}'.format(int_depol[i])
+                            depolarization_str += '{:^31.4f}'.format(depol_ratio[i])
+  
                 normal_mode_string += '{:^30s}{:>1s}'.format('X         Y         Z','|')
             self.ostream.print_line(index_string)
             self.ostream.print_line(freq_string)
@@ -338,6 +365,10 @@ class HessianDriver:
                 self.ostream.print_line(ir_intens_string)
                 if self.raman_intensities is not None:
                     self.ostream.print_line(raman_intens_string)
+                    if self.print_depolarization_ratio:
+                        self.ostream.print_line(raman_parallel_str)
+                        self.ostream.print_line(raman_perpendicular_str)
+                        self.ostream.print_line(depolarization_str)
             self.ostream.print_line(normal_mode_string)
 
             # Print normal modes:
