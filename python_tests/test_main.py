@@ -89,7 +89,7 @@ class TestMain:
     def test_main(self, capsys):
 
         here = Path(__file__).parent
-        inpfile = here / 'inputs' / 'water.inp'
+        inpfile = here / 'inputs' / 'water_maxh.inp'
 
         with patch.object(sys, 'argv', ['vlx', str(inpfile)]):
             main()
