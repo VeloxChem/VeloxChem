@@ -467,6 +467,8 @@ class ScfDriver:
             self.print_scf_energy()
             if self.closed_shell:
                 s2 = 0.0
+            elif self.restricted_open:
+                s2 = molecule.get_multiplicity()
             else:
                 s2 = self.compute_s2(molecule, self.scf_tensors['S'],
                                      self.mol_orbs)

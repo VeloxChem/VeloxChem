@@ -1,29 +1,70 @@
+#
+#                           VELOXCHEM 1.0-RC2
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
+from mpi4py import MPI
 import numpy as np
+import sys
 
 from .aodensitymatrix import AODensityMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import molorb
 from .veloxchemlib import denmat
+from .veloxchemlib import fockmat
+from .outputstream import OutputStream
 from .scfdriver import ScfDriver
 from .c2diis import CTwoDiis
 
 
 class ScfRestrictedOpenDriver(ScfDriver):
     """
-    Implements spin restricted open shell SCF
+    Implements spin restricted open shell SCF method with C2-DIIS and
+    two-level C2-DIIS convergence accelerators.
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes spin restricted closed shell SCF driver to default setup
         (convergence threshold, initial guess, etc) by calling base class
         constructor.
         """
 
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
+
         super().__init__(comm, ostream)
 
-        self.restricted = True
+        self.closed_shell = False
         self.restricted_open = True
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
@@ -76,7 +117,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
     def comp_density_change(self, den_mat, old_den_mat):
         """
-        Computes norm of spin unrestricted open shell density change between
+        Computes norm of spin restricted open shell density change between
         two density matrices. Overloaded base class method.
 
         :param den_mat:
@@ -106,7 +147,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
     def store_diis_data(self, i, fock_mat, den_mat):
         """
-        Stores spin unrestricted open shell Fock/Kohn-Sham and density matrices
+        Stores spin restricted open shell Fock/Kohn-Sham and density matrices
         for current iteration. Overloaded base class method.
 
         :param i:
@@ -149,7 +190,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
     def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
-        Computes effective spin unrestricted open shell Fock/Kohn-Sham matrix
+        Computes effective spin restricted open shell Fock/Kohn-Sham matrix
         in OAO basis by applying Lowdin or canonical orthogonalization to AO
         Fock/Kohn-Sham matrix. Overloaded base class method.
 
@@ -267,6 +308,28 @@ class ScfRestrictedOpenDriver(ScfDriver):
             return "Spin-Restricted Open-Shell Kohn-Sham" + pe_type
 
         return "Spin-Restricted Open-Shell Hartree-Fock" + pe_type
+
+    def update_fock_type(self, fock_mat):
+        """
+        Updates Fock matrix to fit selected functional in Kohn-Sham
+        calculations.
+
+        :param fock_mat:
+            The Fock/Kohn-Sham matrix.
+        """
+
+        if self.xcfun.is_hybrid():
+            fock_mat.set_fock_type(fockmat.unrestjkx, 0, 'alpha')
+            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0,
+                                      'alpha')
+            fock_mat.set_fock_type(fockmat.unrestjkx, 0, 'beta')
+            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0,
+                                      'beta')
+        else:
+            fock_mat.set_fock_type(fockmat.unrestj, 0, 'alpha')
+            fock_mat.set_fock_type(fockmat.unrestj, 0, 'beta')
+
+        return
 
     def gen_new_density(self, molecule):
         c = self.mol_orbs.alpha_to_numpy()

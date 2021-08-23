@@ -29,7 +29,7 @@ from veloxchem.molecule import Molecule
 def sample():
     inp = textwrap.dedent("""
         @jobs
-        task: rohf
+        task: roscf
         @end
 
         @method settings
@@ -51,7 +51,7 @@ def sample():
 def input_dict():
     return {
         'jobs': {
-            'task': 'rohf',
+            'task': 'roscf',
         },
         'method_settings': {
             'basis': 'DEF2-SVP',
@@ -461,18 +461,22 @@ class TestFinalEnergies:
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, diis=None)
 
-    @pytest.mark.skip()
-    def test_scf_dft(self):
+    @pytest.mark.skip('WIP')
+    @pytest.mark.parametrize(
+        'inpfile, xcfun_label, ref_e_scf',
+        [
+            ('heh.inp', None, -3.347480513475661),
+            ('heh.inp', 'slater', -3.166481549679),
+            ('heh.inp', 'b3lyp', -3.404225946804),
+        ],
+        ids=['HeH-ROHF', 'HeH-Slater', 'HeH-B3LYP'],
+    )
+    def test_scf_dft(self, xcfun_label, inpfile, ref_e_scf):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water.inp')
+        inpfile = str(here / 'inputs' / inpfile)
 
         potfile = None
-
-        xcfun_label = 'b3lyp'
-
-        #    Final DFT energy:            -76.443545741524
-        ref_e_scf = -76.443545741524
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
 
