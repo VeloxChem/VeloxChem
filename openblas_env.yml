@@ -4,6 +4,7 @@ channels:
 dependencies:
   - cxx-compiler
   - geometric
+  - MDAnalysis
   - h5py
   - numpy
   - openblas=*=*openmp*

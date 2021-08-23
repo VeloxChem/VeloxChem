@@ -24,4 +24,5 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from .main import main
+
 main()

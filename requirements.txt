@@ -1,6 +1,5 @@
 geometric>=0.9.7
 h5py>=2.8
-loprop>=0.3.4
 mpi4py>=3.0
 numpy>=1.13
 psutil>=5.6

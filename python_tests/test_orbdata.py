@@ -1,17 +1,20 @@
 from pathlib import Path
 import numpy as np
-import unittest
 
+from veloxchem.veloxchemlib import OverlapIntegralsDriver
+from veloxchem.veloxchemlib import DenseMatrix
 from veloxchem.veloxchemlib import denmat
 from veloxchem.veloxchemlib import molorb
 from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.veloxchemlib import ao_matrix_to_dalton
+from veloxchem.veloxchemlib import get_basis_function_indices_for_atom
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.molecularorbitals import MolecularOrbitals
 
 
-class TestOrbData(unittest.TestCase):
+class TestOrbData:
 
     def test_get_label(self):
 
@@ -20,7 +23,7 @@ class TestOrbData(unittest.TestCase):
         outfile = inpfile.with_suffix('.out')
 
         task = MpiTask([str(inpfile), str(outfile)])
-        self.assertEqual(task.ao_basis.get_label(), "DEF2-SVP")
+        assert task.ao_basis.get_label() == "DEF2-SVP"
 
     def test_density_matrix(self):
 
@@ -35,26 +38,26 @@ class TestOrbData(unittest.TestCase):
         den_a2 = d_unrest.alpha_to_numpy(0)
         den_b2 = d_unrest.beta_to_numpy(0)
 
-        self.assertTrue((data_a == den_a1).all())
-        self.assertTrue((data_a == den_b1).all())
-        self.assertTrue((data_a == den_a2).all())
-        self.assertTrue((data_b == den_b2).all())
+        assert (data_a == den_a1).all()
+        assert (data_a == den_b1).all()
+        assert (data_a == den_a2).all()
+        assert (data_b == den_b2).all()
 
-        self.assertEqual(denmat.rest, d_rest.get_density_type())
-        self.assertEqual(denmat.unrest, d_unrest.get_density_type())
+        assert d_rest.get_density_type() == denmat.rest
+        assert d_unrest.get_density_type() == denmat.unrest
 
-        self.assertEqual(1, d_rest.number_of_density_matrices())
-        self.assertEqual(1, d_unrest.number_of_density_matrices())
+        assert d_rest.number_of_density_matrices() == 1
+        assert d_unrest.number_of_density_matrices() == 1
 
         den_empty_1 = d_rest.alpha_to_numpy(1)
         den_empty_2 = d_rest.beta_to_numpy(3)
         den_empty_3 = d_unrest.alpha_to_numpy(2)
         den_empty_4 = d_unrest.beta_to_numpy(4)
 
-        self.assertTrue(den_empty_1.size == 0)
-        self.assertTrue(den_empty_2.size == 0)
-        self.assertTrue(den_empty_3.size == 0)
-        self.assertTrue(den_empty_4.size == 0)
+        assert den_empty_1.size == 0
+        assert den_empty_2.size == 0
+        assert den_empty_3.size == 0
+        assert den_empty_4.size == 0
 
     def test_density_sub(self):
 
@@ -66,7 +69,7 @@ class TestOrbData(unittest.TestCase):
         den_diff = den_1.sub(den_2)
 
         diff = np.max(np.abs(den_diff.alpha_to_numpy(0) - (arr_1 - arr_2)))
-        self.assertAlmostEqual(0., diff, 13)
+        assert abs(diff) < 1.0e-13
 
     def test_orbitals_matrix(self):
 
@@ -85,26 +88,26 @@ class TestOrbData(unittest.TestCase):
         orb_a2 = orb_unrest.alpha_to_numpy()
         orb_b2 = orb_unrest.beta_to_numpy()
 
-        self.assertTrue((data_a == orb_a1).all())
-        self.assertTrue((data_a == orb_a2).all())
-        self.assertTrue((data_b == orb_b2).all())
+        assert (data_a == orb_a1).all()
+        assert (data_a == orb_a2).all()
+        assert (data_b == orb_b2).all()
 
         ene_a1 = orb_rest.ea_to_numpy()
         ene_a2 = orb_unrest.ea_to_numpy()
         ene_b2 = orb_unrest.eb_to_numpy()
 
-        self.assertTrue((ener_a == ene_a1).all())
-        self.assertTrue((ener_a == ene_a2).all())
-        self.assertTrue((ener_b == ene_b2).all())
+        assert (ener_a == ene_a1).all()
+        assert (ener_a == ene_a2).all()
+        assert (ener_b == ene_b2).all()
 
-        self.assertEqual(molorb.rest, orb_rest.get_orbitals_type())
-        self.assertEqual(molorb.unrest, orb_unrest.get_orbitals_type())
+        assert orb_rest.get_orbitals_type() == molorb.rest
+        assert orb_unrest.get_orbitals_type() == molorb.unrest
 
-        self.assertEqual(2, orb_rest.number_mos())
-        self.assertEqual(2, orb_unrest.number_mos())
+        assert orb_rest.number_mos() == 2
+        assert orb_unrest.number_mos() == 2
 
-        self.assertEqual(3, orb_rest.number_aos())
-        self.assertEqual(3, orb_unrest.number_aos())
+        assert orb_rest.number_aos() == 3
+        assert orb_unrest.number_aos() == 3
 
         # hdf5 read/write tests
 
@@ -116,16 +119,15 @@ class TestOrbData(unittest.TestCase):
             nuc_chg = np.array([1, 8, 1], dtype=np.int32)
             orb_rest.write_hdf5(h5file, nuc_chg, 'sto-3g')
             dummy = MolecularOrbitals.read_hdf5(h5file)
-            self.assertEqual(orb_rest, dummy)
-            self.assertTrue(
-                MolecularOrbitals.match_hdf5(h5file, nuc_chg, 'sto-3g', True))
+            assert orb_rest == dummy
+            assert MolecularOrbitals.match_hdf5(h5file, nuc_chg, 'sto-3g', True)
 
             nuc_chg = np.array([1, 1, 8], dtype=np.int32)
             orb_unrest.write_hdf5(h5file, nuc_chg, 'cc-pvdz')
             dummy = MolecularOrbitals.read_hdf5(h5file)
-            self.assertEqual(orb_unrest, dummy)
-            self.assertTrue(
-                MolecularOrbitals.match_hdf5(h5file, nuc_chg, 'cc-pvdz', False))
+            assert orb_unrest == dummy
+            assert MolecularOrbitals.match_hdf5(h5file, nuc_chg, 'cc-pvdz',
+                                                False)
 
     def test_rest_density(self):
 
@@ -142,8 +144,8 @@ class TestOrbData(unittest.TestCase):
         arr_occ = arr[:, :1]
         den_ref = np.dot(arr_occ, arr_occ.T)
 
-        self.assertTrue((den_ref == den_a).all())
-        self.assertTrue((den_ref == den_b).all())
+        assert (den_ref == den_a).all()
+        assert (den_ref == den_b).all()
 
     def test_unrest_density(self):
 
@@ -167,9 +169,37 @@ class TestOrbData(unittest.TestCase):
         arr_occ_b = arr_b[:, :1]
         den_ref_b = np.dot(arr_occ_b, arr_occ_b.T)
 
-        self.assertTrue((den_ref_a == den_a).all())
-        self.assertTrue((den_ref_b == den_b).all())
+        assert (den_ref_a == den_a).all()
+        assert (den_ref_b == den_b).all()
 
+    def test_basis_function_indices(self):
 
-if __name__ == "__main__":
-    unittest.main()
+        here = Path(__file__).parent
+        inpfile = here / 'inputs' / 'h2se.inp'
+
+        task = MpiTask([str(inpfile), None])
+
+        bf_indices = []
+        bf_angmoms = []
+
+        for i in range(task.molecule.number_of_atoms()):
+            indices, angmoms = get_basis_function_indices_for_atom(
+                task.molecule, task.ao_basis, i)
+            bf_indices += indices
+            bf_angmoms += angmoms
+
+        ref_angmoms = [
+            0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2,
+            2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1
+        ]
+        assert bf_angmoms == ref_angmoms
+
+        ovldrv = OverlapIntegralsDriver()
+        S = ovldrv.compute(task.molecule, task.ao_basis)
+        smat = S.to_numpy()
+
+        if is_mpi_master():
+            sdal = ao_matrix_to_dalton(DenseMatrix(smat), task.ao_basis,
+                                       task.molecule).to_numpy()
+            assert np.max(
+                np.abs(sdal - smat[bf_indices, :][:, bf_indices])) < 1.0e-12

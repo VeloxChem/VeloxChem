@@ -36,7 +36,7 @@
 
 #include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
-#include "VdwRadii.hpp"
+#include "AtomicRadii.hpp"
 
 /**
  Class CMolecule stores data about single molecule and provides set of methods
@@ -140,7 +140,7 @@ class CMolecule
      @param start_index the starting index of the sub-molecule (0-based).
      @param num_atoms the number of atoms in the sub-molecule.
      */
-    CMolecule getSubMolecule(int32_t start_index, int32_t num_atoms);
+    CMolecule getSubMolecule(int32_t startIndex, int32_t numAtoms);
 
     /**
      Assigns a molecule object by copying other molecule object.
@@ -187,28 +187,28 @@ class CMolecule
     void setCharge(const double charge);
 
     /**
-     Sets multiplicity of molecule object.
+     Sets spin multiplicity of molecule object.
 
      @param multiplicity the multiplicity (2S+1) of molecule.
      */
     void setMultiplicity(const int32_t multiplicity);
 
     /**
-     Gets a charge of molecule.
+     Gets charge of molecule.
 
      @return the charge of molecule.
      */
     double getCharge() const;
 
     /**
-     Gets a multiplicity of molecule.
+     Gets spin multiplicity of molecule.
 
      @return the multiplicity of molecules.
      */
     int32_t getMultiplicity() const;
 
     /**
-     Gets a total number of atoms in molecule.
+     Gets total number of atoms in molecule.
 
      @return the total number of atoms.
      */
@@ -317,6 +317,20 @@ class CMolecule
      @return the vector of VDW radii.
      */
     std::vector<double> getVdwRadii() const;
+
+    /**
+     Gets MK radii of the atoms.
+
+     @return the vector of MK radii.
+     */
+    std::vector<double> getMkRadii() const;
+
+    /**
+     Gets covalent radii of the atoms.
+
+     @return the vector of covalent radii.
+     */
+    std::vector<double> getCovalentRadii() const;
 
     /**
      Gets labele of specific atom.

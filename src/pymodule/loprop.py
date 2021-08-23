@@ -23,190 +23,570 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from collections import Counter
-import os
-
-import h5py
+from mpi4py import MPI
 import numpy as np
+import sys
+from collections import Counter
 
-from loprop.veloxchem import MolFragVeloxChem as MolFrag
-
-from .veloxchemlib import (
-    OverlapIntegralsDriver,
-    ao_matrix_to_dalton,
-    DenseMatrix,
-)
-
-from .inputparser import InputParser
+from .lrsolver import LinearResponseSolver
+from .outputstream import OutputStream
+from .veloxchemlib import (ElectricDipoleIntegralsDriver, mpi_master,
+                           bohr_in_angstroms, to_angular_momentum,
+                           get_basis_function_indices_for_atom)
+from .errorhandler import assert_msg_critical
 
 
 class LoPropDriver:
+    """
+    Implements the LoProp driver.
 
-    def __init__(self, task):
-        self.task = task
-        self.settings = task.input_dict.get('loprop', {})
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
+    """
 
-        scf_checkpoint_file = task.input_dict['scf']['checkpoint_file']
-        self.settings['scf_checkpoint_file'] = scf_checkpoint_file
-
-        self.checkpoint = self.settings['checkpoint_file']
-        self.tmpdir = os.path.dirname(self.checkpoint)
-
-    def compute(self):
-        self.save_overlap()
-        self.save_orbital_info()
-        self.save_density()
-        self.save_coordinates()
-        self.update_settings()
-
-        molfrag = MolFrag(self.tmpdir, **self.settings)
-
-        pot_output = molfrag.output_potential_file(self.settings['max_l'], 0, 0)
-        self.task.ostream.print_line(pot_output)
-
-    def save_overlap(self):
-
-        task = self.task
-        molecule = task.molecule
-        basis = task.ao_basis
-
-        ovldrv = OverlapIntegralsDriver(task.mpi_comm)
-        S = ovldrv.compute(molecule, basis).to_numpy()
-
-        S = ao_matrix_to_dalton(DenseMatrix(S), task.ao_basis, task.molecule)
-
-        with h5py.File(self.checkpoint, 'w') as f:
-            f['ao_overlap_matrix'] = S.to_numpy()
-
-    def save_density(self):
-
-        task = self.task
-
-        da = self.settings['density'].alpha_to_numpy(0)
-        db = self.settings['density'].beta_to_numpy(0)
-
-        D = ao_matrix_to_dalton(
-            DenseMatrix(da + db),
-            task.ao_basis,
-            task.molecule,
-        )
-
-        with h5py.File(self.checkpoint, 'a') as f:
-            f['ao_density_matrix'] = D.to_numpy()
-
-    def save_coordinates(self):
-        x = self.task.molecule.x_to_numpy()
-        y = self.task.molecule.y_to_numpy()
-        z = self.task.molecule.z_to_numpy()
-        r = np.array([x, y, z]).T
-        with h5py.File(self.checkpoint, 'a') as f:
-            f['nuclear_coordinates'] = r
-
-    def save_orbital_info(self):
-        with h5py.File(self.checkpoint, 'a') as f:
-            f['contracted_per_atom'] = self.get_cpa()
-            for i, occ in enumerate(self.get_opa()):
-                f[f'occupied_per_atom/{i}'] = occ
-
-    def get_cpa(self):
-        elements = self.task.molecule.elem_ids_to_numpy()
+    def __init__(self, comm=None, ostream=None):
         """
-        bp = InputParser(current basis)
-        for e in elements
-            get e:th entry in bp.input_dict as e
-                 given 3s 2p 1d dict sum up 3 + 2*3 + 1 * 5
+        Initializes the LoProp driver.
         """
 
-        basis = self.task.ao_basis.get_label()
-        basis_file = get_basis_file(basis)
-        bp = InputParser(basis_file)
-        basis = bp.get_dict()
-        keys = list(basis.keys())
+        if comm is None:
+            comm = MPI.COMM_WORLD
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
 
-        cpa = []
-        for e in elements:
-            k = keys[e - 1]
-            atoms_data = basis[k]
-            count_per_angmom = count_contracted(atoms_data)
-            cpa.append(count_contracted_on_atom(count_per_angmom))
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+        self.ostream = ostream
 
-        return cpa
-
-    def count_contracted(self):
-        return 1
-
-    def get_opa(self):
+    def compute(self, molecule, basis, scf_tensors):
         """
-        Returns list of occupied for case of single atom
-        i.e. first row 1s, second row 1s, 2s, 2p, whole shell
+        Calculates the loprop transformation matrix T, patial charge (Qab) and
+        localized polarizabilities.
+
+        :param molecule:
+            the molecule
+        :param basis:
+            the bais functions
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+
+        :return:
+            A dictionary containing localized charges and localized
+            polarizabilities.
         """
-        elements = self.task.molecule.elem_ids_to_numpy()
 
-        basis = self.task.ao_basis.get_label()
-        basis_file = get_basis_file(basis)
-        bp = InputParser(basis_file)
-        basis = bp.get_dict()
-        keys = list(basis.keys())
+        natoms = molecule.number_of_atoms()
 
-        opa = []
-        for e in elements:
-            opa.append([])
-            k = keys[e - 1]
-            atoms_data = basis[k]
-            count_per_angmom = count_contracted(atoms_data)
+        if self.rank == mpi_master():
 
-            # For H and He: 1s
-            opa[-1].append(0)
+            S = scf_tensors['S']
+            C = scf_tensors['C_alpha']
+            D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
 
-            # For Li-Ne: + 2s 2p
-            if e >= 3:
-                opa[-1].append(1)
-                offset_p = count_per_angmom['S']
-                opa[-1].append(offset_p + 0)
-                opa[-1].append(offset_p + 1)
-                opa[-1].append(offset_p + 2)
+            # number of orbitals
+            n_ao = C.shape[0]
+            n_mo = C.shape[1]
 
-        return opa
+            # re-arrange AOs according to principal quantum number
+            re_arranged_indices = []
+            for i in range(molecule.number_of_atoms()):
+                indices, angmoms = get_basis_function_indices_for_atom(
+                    molecule, basis, i)
+                re_arranged_indices.append(indices)
+            re_arranged_indices = np.concatenate(re_arranged_indices)
 
-    def get_coordinates(self):
-        with h5py.File(self.checkpoint, 'r') as f:
-            r = f['nuclear_coordinates'][...]
-        return r
+            # obtain occupied & virtual orbital lists
+            ao_per_atom, ao_occ, ao_vir = self.get_ao_indices(molecule, basis)
 
-    def update_settings(self):
-        #
-        # Default: always charges
-        #
-        self.settings['max_l'] = 0
+            # TO transforation: re-arrange S
+            S0 = S[re_arranged_indices, :][:, re_arranged_indices]
 
+            # T1 transformation: Gram-Schmidt
+            T1 = np.zeros((n_ao, n_ao))
+            ri = 0
+            for a in range(natoms):
+                rf = ri + ao_per_atom[a]
+                smat = S0[ri:rf, ri:rf]
+                L = np.linalg.cholesky(smat)
+                tmat = np.linalg.inv(L.T)
+                T1[ri:rf, ri:rf] = tmat
+                ri += ao_per_atom[a]
+            S1 = np.linalg.multi_dot([T1.T, S0, T1])
 
-def count_contracted(atombasis: list) -> dict:
-    """
-    Given atomic block in basis filei format return dict
-    which maps angular momentum to number of contracted
-    >>> count_contracted('S: 1 1\n1.0 1.9\n')
-    {'S': 1}
-    """
-    c = Counter(line[0] for line in atombasis if line and line[0] in "SPDFGHI")
-    return dict(c)
+            # T2 transformation: Lodwin occupied and virtual
+            T2 = np.zeros((n_ao, n_ao))
+            n_occ_ao = len(ao_occ)
+            n_vir_ao = len(ao_vir)
+            # occupied
+            smat = S1[ao_occ, :][:, ao_occ]
+            tmat = self.lowdin_orthonormalize(smat)
+            for r in range(n_occ_ao):
+                for c in range(n_occ_ao):
+                    T2[ao_occ[r], ao_occ[c]] = tmat[r, c]
+            # virtural
+            smat = S1[ao_vir, :][:, ao_vir]
+            tmat = self.lowdin_orthonormalize(smat)
+            for r in range(n_vir_ao):
+                for c in range(n_vir_ao):
+                    T2[ao_vir[r], ao_vir[c]] = tmat[r, c]
+            S2 = np.linalg.multi_dot([T2.T, S1, T2])
 
+            # T3: projection to virtual
+            T3 = np.identity(n_ao)
+            # selected the overlap between occupied and virtual
+            T3_ov = S2[ao_occ, :][:, ao_vir]
+            # projection
+            for ao_o_ind, ao_o in enumerate(ao_occ):
+                for ao_v_ind, ao_v in enumerate(ao_vir):
+                    T3[ao_o, ao_v] = -T3_ov[ao_o_ind, ao_v_ind]
+            S3 = np.linalg.multi_dot([T3.T, S2, T3])
 
-def count_contracted_on_atom(atombasis: dict) -> int:
-    """
-    Returns total contracted given angular momentum count
-    >>> count_contracted_on_atom({'S': 1})
-    1
-    >>> count_contracted_no_atom({'S': 2, 'P': 1})
-    5
-    """
-    multiplicity = dict(S=1, P=3, D=5, F=7, G=9, H=11, I=13)
-    return sum(multiplicity[k] * v for k, v in atombasis.items())
+            # T4: lodwin virtural
+            T4_virtual = S3[ao_vir, :][:, ao_vir]
+            T4_virtual = self.lowdin_orthonormalize(T4_virtual)
+            T4 = np.identity(n_ao)
+            for ao_v_ind, ao_v in enumerate(ao_vir):
+                for ao_v_1_ind, ao_v_1 in enumerate(ao_vir):
+                    T4[ao_v, ao_v_1] = T4_virtual[ao_v_ind, ao_v_1_ind]
 
+            # total transformation T becomes:
+            T = np.linalg.multi_dot([T1, T2, T3, T4])
 
-def get_basis_file(basis):
-    local_name = basis
-    lib_member = os.path.join(os.environ['VLXBASISPATH'], basis)
-    if os.path.exists(local_name):
-        return os.path.abspath(local_name)
-    elif os.path.exists(lib_member):
-        return lib_member
+            # obtain density matrix D in loprop basis set
+            T_inv = np.linalg.pinv(T)
+            D = D[re_arranged_indices, :][:, re_arranged_indices]
+            D_loprop = np.linalg.multi_dot([T_inv, D, T_inv.T])
+
+            # calculated localized charges
+            Qab = np.zeros((natoms, natoms))
+            start_point = 0
+            for atom in range(natoms):
+                select = np.arange(start_point, start_point + ao_per_atom[atom])
+                Qab[atom, atom] = -np.trace(D_loprop[select, :][:, select])
+                start_point += ao_per_atom[atom]
+
+            # nuclear charge
+            nuclear_charge = molecule.elem_ids_to_numpy()
+            for a in range(natoms):
+                Qab[a, a] += nuclear_charge[a]
+
+        # solve linear response
+        lrs_drv = LinearResponseSolver(self.comm, self.ostream)
+        lrs_out = lrs_drv.compute(molecule, basis, scf_tensors)
+
+        if self.rank == mpi_master():
+
+            # obtain response vectors
+            Nx = lrs_out['solutions'][('x', 0)]
+            Ny = lrs_out['solutions'][('y', 0)]
+            Nz = lrs_out['solutions'][('z', 0)]
+
+            # This is a workaround for the sqrt(2) factor in the solution vectors
+            inv_sqrt_2 = 1.0 / np.sqrt(2.0)
+            Nx *= inv_sqrt_2
+            Ny *= inv_sqrt_2
+            Nz *= inv_sqrt_2
+
+            # unpact response vectors to matrix form
+            nocc = molecule.number_of_alpha_electrons()
+            norb = n_mo
+            kappa_x = self.vec2mat(Nx, nocc, norb)
+            kappa_y = self.vec2mat(Ny, nocc, norb)
+            kappa_z = self.vec2mat(Nz, nocc, norb)
+
+            # perturbed densities
+            # factor of 2 from spin-adapted excitation vectors
+            Dx = 2.0 * np.linalg.multi_dot([C, kappa_x, C.T])
+            Dy = 2.0 * np.linalg.multi_dot([C, kappa_y, C.T])
+            Dz = 2.0 * np.linalg.multi_dot([C, kappa_z, C.T])
+
+            # convert purterbed density to loprop basis
+            Dx = Dx[re_arranged_indices, :][:, re_arranged_indices]
+            Dy = Dy[re_arranged_indices, :][:, re_arranged_indices]
+            Dz = Dz[re_arranged_indices, :][:, re_arranged_indices]
+            Dx_loprop = np.linalg.multi_dot([T_inv, Dx, T_inv.T])
+            Dy_loprop = np.linalg.multi_dot([T_inv, Dy, T_inv.T])
+            Dz_loprop = np.linalg.multi_dot([T_inv, Dz, T_inv.T])
+            Dk_loprop = np.concatenate(([Dx_loprop], [Dy_loprop], [Dz_loprop]))
+
+        # dipole
+        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+        dipole_mats = dipole_drv.compute(molecule, basis)
+
+        if self.rank == mpi_master():
+
+            x_ao = dipole_mats.x_to_numpy()
+            y_ao = dipole_mats.y_to_numpy()
+            z_ao = dipole_mats.z_to_numpy()
+
+            # convert to loprop basis
+            x_ao = x_ao[re_arranged_indices, :][:, re_arranged_indices]
+            y_ao = y_ao[re_arranged_indices, :][:, re_arranged_indices]
+            z_ao = z_ao[re_arranged_indices, :][:, re_arranged_indices]
+            x_ao_loprop = np.linalg.multi_dot([T.T, x_ao, T])
+            y_ao_loprop = np.linalg.multi_dot([T.T, y_ao, T])
+            z_ao_loprop = np.linalg.multi_dot([T.T, z_ao, T])
+            dipole = np.concatenate(
+                ([x_ao_loprop], [y_ao_loprop], [z_ao_loprop]))
+
+            # localized polarizabilities:
+            #
+            #    aAB = -rAB delta DAB + dQab (Ra-Rb)
+            #
+            #    where dQab is obtained by solving the following Lagragian with
+            #    minimal charge transfer, here a penaty function is also introduced
+            #
+            #    contribution from localized dipoles: rAB*delta DAB = Aab
+            #    bond contribution:  dQab (Ra-Rb)
+
+            # dQa:charge shift per atom
+            dQa = np.zeros((natoms, 3))
+            # dQa array as [[Ax,Ay,Az],[Bx,By,Bz]]
+            it = 0
+            for a in range(natoms):
+                select = np.arange(it, it + ao_per_atom[a])
+                dQa[a][0] = np.trace(Dx_loprop[select, :][:, select])
+                dQa[a][1] = np.trace(Dy_loprop[select, :][:, select])
+                dQa[a][2] = np.trace(Dz_loprop[select, :][:, select])
+                it += ao_per_atom[a]
+
+            # coord_matrix, the rab matrix in equation above
+            molecule_coord = molecule.get_coordinates()
+            coord_matrix = np.zeros((natoms, natoms, 3))
+            for i in range(natoms):
+                # a==b: rab=ra
+                coord_matrix[i][i] = molecule_coord[i]
+                for j in range(i + 1, natoms):
+                    # a!=b: rab = (ra-rb)/2
+                    rij = 0.5 * np.abs(molecule_coord[i] - molecule_coord[j])
+                    coord_matrix[i][j] = rij
+                    coord_matrix[j][i] = rij
+
+            # contribution from localized dipole
+            loc_dipole = np.zeros((3, 3, natoms, natoms))
+            for i in range(3):
+                for j in range(3):
+                    it_a = 0
+                    for a in range(natoms):
+                        select_a = np.arange(it_a, it_a + ao_per_atom[a])
+                        it_b = 0
+                        for b in range(natoms):
+                            # select the subblock[a][b] region in dks_lp
+                            select_b = np.arange(it_b, it_b + ao_per_atom[b])
+                            # selected the lp basis for subblock[A][B] in purterbed
+                            # density matrix
+                            D_AB = Dk_loprop[i][select_a, :][:, select_b]
+                            # selected the dipole matrice for subblock[A][B] in
+                            # purterbed density matrix
+                            dipole_select = dipole[j][select_a, :][:, select_b]
+                            dipole_select = dipole_select.transpose()
+
+                            loc_dipole[i, j, a, b] += np.trace(
+                                np.matmul(dipole_select, D_AB))
+                            it_b += ao_per_atom[b]
+
+                        loc_dipole[i, j, a,
+                                   a] -= dQa[a, j] * coord_matrix[a, a, i]
+                        it_a += ao_per_atom[a]
+
+            # Lagragian
+            Fab = np.zeros((natoms, natoms))
+            for a in range(natoms):
+                za = nuclear_charge[a]
+                Ra = molecule_coord[a]
+                for b in range(a):
+                    zb = nuclear_charge[b]
+                    Rb = molecule_coord[b]
+                    Fab[a, b] = self.penalty_fc(za, Ra, zb, Rb)
+                    Fab[b, a] = Fab[a][b]
+                for a in range(natoms):
+                    Fab[a, a] += -sum(Fab[a, :])
+
+            Lab = Fab + 2.0 * np.max(np.abs(Fab))
+
+            dQa = dQa.swapaxes(0, 1)
+            lagragian = [np.linalg.solve(Lab, rhs) for rhs in dQa]
+
+            # dQab
+            dQab = np.zeros((natoms, natoms, 3))
+            for i in range(3):
+                for a in range(natoms):
+                    za = nuclear_charge[a]
+                    Ra = molecule_coord[a]
+                    for b in range(a):
+                        zb = nuclear_charge[b]
+                        Rb = molecule_coord[b]
+                        dQab[a, b, i] = -(lagragian[i][a] -
+                                          lagragian[i][b]) * self.penalty_fc(
+                                              za, Ra, zb, Rb)
+                        dQab[b, a, i] -= dQab[a, b, i]
+
+            # dRab matrix: mid point of Ra-Rb
+            dRab = np.zeros((natoms, natoms, 3))
+
+            for a in range(natoms):
+                for b in range(natoms):
+                    for i in range(3):
+                        dRab[a][b][i] = 0.5 * (molecule_coord[a][i] -
+                                               molecule_coord[b][i])
+                        dRab[b][a][i] = -dRab[a][b][i]
+
+            # charge transfer from bond polarisability
+            bond_polarizabilities = np.zeros((3, 3, natoms, natoms))
+            for i in range(3):
+                for j in range(3):
+                    for a in range(natoms):
+                        for b in range(natoms):
+                            bond_polarizabilities[
+                                i, j, a, b] = dRab[a, b, i] * dQab[
+                                    a, b, j] + dRab[a, b, j] * dQab[a, b, i]
+
+            local_polarizabilities = loc_dipole + 0.5 * bond_polarizabilities
+
+            # molecular polarizabilities
+            molecule_polarizabilities = (loc_dipole +
+                                         0.5 * bond_polarizabilities).sum(
+                                             axis=3).sum(axis=2)
+
+            # obtain atom polarizabilities & re-arrange Qab in 1D array
+            atom_polarizabilities = np.zeros((natoms, 6))
+            Qab_array = np.zeros(natoms)
+            for i in range(natoms):
+                Qab_array[i] = Qab[i, i]
+
+                atom_pol_matrix = local_polarizabilities.sum(axis=3)[:, :, i]
+                # in the order xx, xy, xz, yy, yz, zz
+                atom_polarizabilities[i, 0] = atom_pol_matrix[0, 0]
+                atom_polarizabilities[i, 1] = 0.5 * (atom_pol_matrix[0, 1] +
+                                                     atom_pol_matrix[1, 0])
+                atom_polarizabilities[i, 2] = 0.5 * (atom_pol_matrix[0, 2] +
+                                                     atom_pol_matrix[2, 0])
+                atom_polarizabilities[i, 3] = atom_pol_matrix[1, 1]
+                atom_polarizabilities[i, 4] = 0.5 * (atom_pol_matrix[1, 2] +
+                                                     atom_pol_matrix[2, 1])
+                atom_polarizabilities[i, 5] = atom_pol_matrix[2, 2]
+
+            atom_polarizabilities = atom_polarizabilities * (
+                bohr_in_angstroms()**3)
+            self.print_results(molecule, natoms, Qab, local_polarizabilities,
+                               molecule_polarizabilities, atom_polarizabilities)
+
+            return {
+                'localized_charges': Qab_array,
+                'localized_polarizabilities': atom_polarizabilities,
+            }
+        else:
+            return None
+
+    def penalty_fc(self, za, Ra, zb, Rb):
+        """
+        Penalty function.
+
+        :param za:
+            atomic number for atom a
+        :param Ra:
+            position vector for atom a
+        :param zb:
+            atomic number for atom b
+        :param Rb:
+            position vector for atom b
+
+        :return:
+            The penalty function
+        """
+
+        RBS = np.array([
+            0, 0.25, 0.25, 1.45, 1.05, 0.85, 0.7, 0.65, 0.5, 0.43, 1.8, 1.5,
+            1.25, 1.1, 1.0, 1.0, 1.0, 1.0
+        ]) / bohr_in_angstroms()
+
+        assert_msg_critical(za <= 17 or zb <= 17,
+                            'LoPropDriver: we currently support up to Cl')
+
+        ra = RBS[za]
+        rb = RBS[zb]
+        # Ra and Rb taking from r_mat: 0,1,2 represents x y z directions
+        rab2 = (Ra[0] - Rb[0])**2 + (Ra[1] - Rb[1])**2 + (Ra[2] - Rb[2])**2
+        # alpha set to 2
+        f = 0.5 * np.exp(-2 * (rab2 / (ra + rb)**2))
+        return f
+
+    def vec2mat(self, vec, nocc, norb):
+        """
+        Unpack response vector to matrix form.
+
+        :param vec:
+            the response vector
+        :param nocc:
+            number of contracted orbitals (alpha electrons)
+        :param norb:
+            number of orbitals
+
+        :return:
+            unpacked response vector
+        """
+
+        kappa = np.zeros((norb, norb))
+        nvir = norb - nocc
+        n_ov = nocc * nvir
+        kappa[:nocc, nocc:] = vec[:n_ov].reshape(nocc, nvir)
+        kappa = kappa + kappa.T
+        return kappa
+
+    def lowdin_orthonormalize(self, A):
+        """
+        Lodwin orthonormaliztaion.
+
+        :param A:
+            The input matrix.
+
+        :return:
+            The orthonormalised vector.
+        """
+
+        eigs, U = np.linalg.eigh(A)
+        return np.linalg.multi_dot([U, np.diag(1.0 / np.sqrt(eigs)), U.T])
+
+    def get_ao_indices(self, molecule, basis):
+        """
+        Gets information about occupied/virtual orbitals by counting the basis
+        set functions.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The molecular basis set.
+
+        :return:
+            ao_per_atom, ao_occ, and ao_vir
+        """
+
+        ao_count = dict(S=1, P=3, D=5, F=7, G=9, H=11, I=13)
+
+        basis_info = {}
+        for atombasis in basis:
+            element_id = atombasis.get_elemental_id()
+            basis_info[element_id] = [
+                to_angular_momentum(basisfunc.angular_momentum)
+                for basisfunc in atombasis
+            ]
+
+        ao_per_atom = []
+        ao_occ = []
+        ao_vir = []
+        iterr = 0
+        for element_id in molecule.elem_ids_to_numpy():
+            angular_momentum_counter = Counter(basis_info[element_id])
+
+            # Note: This function supports up to Ar but is limited by the RBS
+            # radius list in penalty_fc
+            assert_msg_critical(element_id <= 17,
+                                'LoPropDriver: we currently support up to Cl')
+
+            # H and He: 1s
+            ao_occ.append(iterr)
+
+            # Li-Ne: + 2s 2p
+            offset_2p = angular_momentum_counter['S'] + iterr
+            if (element_id >= 3) and (element_id < 11):
+                ao_occ.append(iterr + 1)
+                ao_occ.append(offset_2p + 0)
+                ao_occ.append(offset_2p + 1)
+                ao_occ.append(offset_2p + 2)
+
+            # Na-Ar atoms: + 2s 3s 2p 3p
+            elif element_id >= 11:
+                # 2s,3s
+                ao_occ.append(iterr + 1)
+                ao_occ.append(iterr + 2)
+                # 2p
+                ao_occ.append(offset_2p + 0)
+                ao_occ.append(offset_2p + 1)
+                ao_occ.append(offset_2p + 2)
+                # 3p
+                offset_3p = offset_2p + angular_momentum_counter['P']
+                ao_occ.append(offset_3p + 0)
+                ao_occ.append(offset_3p + 1)
+                ao_occ.append(offset_3p + 2)
+
+            # sum number of orbitals. used to calculate virtual orbitals later
+            orb = sum(
+                ao_count[k] * v for k, v in angular_momentum_counter.items())
+            iterr += orb
+            ao_per_atom.append(orb)
+
+        total_orb_array = np.arange(iterr)
+
+        for i in total_orb_array:
+            if i not in ao_occ:
+                ao_vir.append(i)
+
+        return ao_per_atom, ao_occ, ao_vir
+
+    def print_results(self, molecule, natoms, Qab, local_polarizabilities, Am,
+                      atom_polarizabilities):
+        """
+        Prints results for loprop calculation.
+
+        param: molecule
+            the molecule
+        param: natoms
+            number of atoms
+        param: Qab
+            localized charges
+        param: local_polarizabilities
+            localized polarizabilities
+        param: Am
+            molecular polarizabilities
+        """
+
+        element_names = molecule.get_labels()
+
+        title = 'Local Properties (LoProp) Calculations'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
+        title = 'Molecular Polarisabilities'
+        self.ostream.print_header(title)
+        self.ostream.print_header('-' * len(title))
+
+        for a, comp in enumerate('xyz'):
+            output_iter = 'alpha_{}{} : {:12.4f}'.format(comp, comp, Am[a, a])
+            self.ostream.print_header(output_iter)
+        self.ostream.print_blank()
+
+        # print localized chagres
+        title = 'LoProp localized charges'
+        self.ostream.print_header(title)
+        self.ostream.print_header('-' * len(title))
+
+        for a in range(natoms):
+            output_iter = ' {:<4s} : '.format(element_names[a])
+            output_iter += '{:15.4f} '.format(Qab[a, a])
+            self.ostream.print_header(output_iter)
+        self.ostream.print_blank()
+
+        title = 'LoProp Localised polarizabilities'
+        self.ostream.print_header(title)
+        self.ostream.print_header('-' * len(title))
+
+        output_order = ' ' * 20
+        output_order += '{:10s} {:10s} {:10s} '.format('xx', 'xy', 'xz')
+        output_order += '{:10s} {:10s} {:10s}'.format('yy', 'yz', 'zz')
+        self.ostream.print_header(output_order)
+        for a in range(natoms):
+            output_iter = ' {:<4s} : '.format(element_names[a])
+            output_iter += '{:10.4f} {:10.4f} {:10.4f} '.format(
+                atom_polarizabilities[a][0], atom_polarizabilities[a][1],
+                atom_polarizabilities[a][2])
+            output_iter += '{:10.4f} {:10.4f} {:10.4f}'.format(
+                atom_polarizabilities[a][3], atom_polarizabilities[a][4],
+                atom_polarizabilities[a][5])
+            self.ostream.print_header(output_iter)
+        self.ostream.print_blank()
+
+        self.ostream.flush()

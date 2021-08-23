@@ -80,16 +80,6 @@ CAngularMomentumIntegralsDriver::~CAngularMomentumIntegralsDriver()
 }
 
 void
-CAngularMomentumIntegralsDriver::setAngularMomentumOrigin(const double xOrigin, const double yOrigin, const double zOrigin)
-{
-    _xOrigin = xOrigin;
-
-    _yOrigin = yOrigin;
-
-    _zOrigin = zOrigin;
-}
-
-void
 CAngularMomentumIntegralsDriver::setAngularMomentumOrigin(const std::array<double, 3>& origin)
 {
     _xOrigin = origin[0];

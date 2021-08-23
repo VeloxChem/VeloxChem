@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-import unittest
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
@@ -11,7 +10,7 @@ from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.lrsolver import LinearResponseSolver
 
 
-class TestH2Se(unittest.TestCase):
+class TestH2Se:
 
     def test_h2se_scf(self):
 
@@ -38,9 +37,12 @@ class TestH2Se(unittest.TestCase):
             scf_h5 = Path(task.input_dict['scf']['checkpoint_file'])
             if scf_h5.is_file():
                 scf_h5.unlink()
+            scf_final_h5 = scf_h5.with_suffix('.tensors.h5')
+            if scf_final_h5.is_file():
+                scf_final_h5.unlink()
 
-        self.assertAlmostEqual(-2400.70461320, e_scf, 8)
-        self.assertAlmostEqual(-2400.70461320, e_scf_restart, 8)
+        assert abs(-2400.70461320 - e_scf) < 1.0e-8
+        assert abs(-2400.70461320 - e_scf_restart) < 1.0e-8
 
         # unrestricted scf
 
@@ -52,13 +54,13 @@ class TestH2Se(unittest.TestCase):
         scf_unrest_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         e_uhf = scf_unrest_drv.get_scf_energy()
-        self.assertAlmostEqual(-2400.38319890, e_uhf, 8)
+        assert abs(-2400.38319890 - e_uhf) < 1.0e-8
 
         if is_mpi_master(task.mpi_comm):
             s2 = scf_unrest_drv.compute_s2(task.molecule,
                                            scf_unrest_drv.scf_tensors['S'],
                                            scf_unrest_drv.mol_orbs)
-            self.assertAlmostEqual(0.7619, s2, 4)
+            assert abs(0.7619 - s2) < 1.0e-4
 
         task.finish()
 
@@ -100,12 +102,12 @@ class TestH2Se(unittest.TestCase):
                 np.array([0.0, -0.754589, 0.754589]),
             ]
 
-            self.assertTrue(np.max(np.abs(reigs - ref_eigs)) < 1.0e-6)
-            self.assertTrue(np.max(np.abs(osc_strs - ref_osc_strs)) < 1.0e-4)
+            assert np.max(np.abs(reigs - ref_eigs)) < 1.0e-6
+            assert np.max(np.abs(osc_strs - ref_osc_strs)) < 1.0e-4
 
             for td, ref_td in zip(trans_dipoles, ref_trans_dipoles):
                 prefac = 1.0 if np.dot(td, ref_td) >= 0.0 else -1.0
-                self.assertTrue(np.max(np.abs(td - ref_td * prefac)) < 2.0e-4)
+                assert np.max(np.abs(td - ref_td * prefac)) < 2.0e-4
 
         # RPA
         lreig = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
@@ -132,12 +134,12 @@ class TestH2Se(unittest.TestCase):
                 np.array([0.0, -0.715935, 0.715935])
             ]
 
-            self.assertTrue(np.max(np.abs(reigs - ref_eigs)) < 1.0e-6)
-            self.assertTrue(np.max(np.abs(osc_strs - ref_osc_strs)) < 1.0e-4)
+            assert np.max(np.abs(reigs - ref_eigs)) < 1.0e-6
+            assert np.max(np.abs(osc_strs - ref_osc_strs)) < 1.0e-4
 
             for td, ref_td in zip(trans_dipoles, ref_trans_dipoles):
                 prefac = 1.0 if np.dot(td, ref_td) >= 0.0 else -1.0
-                self.assertTrue(np.max(np.abs(td - ref_td * prefac)) < 2.0e-4)
+                assert np.max(np.abs(td - ref_td * prefac)) < 2.0e-4
 
         # polarizability
         lr_solver = LinearResponseSolver(task.mpi_comm, task.ostream)
@@ -177,10 +179,6 @@ class TestH2Se(unittest.TestCase):
             for key, val in lr_results['response_functions'].items():
                 ref = -ref_polar[key]
                 diff = abs(val - ref)
-                self.assertTrue(diff < 1.0e-5)
+                assert diff < 1.0e-5
 
         task.finish()
-
-
-if __name__ == "__main__":
-    unittest.main()

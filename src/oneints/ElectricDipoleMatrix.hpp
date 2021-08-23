@@ -168,18 +168,16 @@ class CElectricDipoleMatrix
     /**
      Sets coordinates of electric dipole origin.
 
-     @param xOrigin the X coordinate of electric dipole origin.
-     @param yOrigin the Y coordinate of electric dipole origin.
-     @param zOrigin the Z coordinate of electric dipole origin.
-     */
-    void setOriginCoordinates(const double xOrigin, const double yOrigin, const double zOrigin);
-
-    /**
-     Sets coordinates of electric dipole origin.
-
      @param origin an array holding the Cartesian coordinates for the electric dipole origin.
      */
     void setOriginCoordinates(const std::array<double, 3>& origin);
+
+    /**
+     Gets coordinates of electric dipole origin.
+
+     @return the coordinates of electric dipole origin.
+     */
+    std::array<double, 3> getOriginCoordinates() const;
 
     /**
      Gets string representation of electric dipole matrix.
@@ -278,34 +276,6 @@ class CElectricDipoleMatrix
      dipole matrix.
      */
     const double* values(int32_t cart) const;
-
-    /**
-     Gets coordinates of electric dipole origin.
-
-     @return the coordinates of electric dipole origin.
-     */
-    std::array<double, 3> getOriginCoordinates() const;
-
-    /**
-     Gets X coordinate of electric dipole origin.
-
-     @return the X coordinate of electric dipole origin.
-     */
-    double getOriginCoordinateX() const;
-
-    /**
-     Gets Y coordinate of electric dipole origin.
-
-     @return the Y coordinate of electric dipole origin.
-     */
-    double getOriginCoordinateY() const;
-
-    /**
-     Gets Z coordinate of electric dipole origin.
-
-     @return the Z coordinate of electric dipole origin.
-     */
-    double getOriginCoordinateZ() const;
 
     /**
      Converts electric dipole matrix object to text output.

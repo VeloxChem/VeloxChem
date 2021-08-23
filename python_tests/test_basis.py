@@ -1,6 +1,5 @@
 from pathlib import Path
 import tempfile
-import unittest
 import hashlib
 
 from veloxchem.veloxchemlib import is_mpi_master
@@ -10,7 +9,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 
 
-class TestBasis(unittest.TestCase):
+class TestBasis:
 
     def build_basis_function(self, expons, coeffs, angl):
 
@@ -78,7 +77,7 @@ class TestBasis(unittest.TestCase):
 
             ref_basis.set_label(basis_name)
 
-            self.assertEqual(basis, ref_basis)
+            assert basis == ref_basis
 
     def test_basis_md5(self):
 
@@ -106,27 +105,25 @@ class TestBasis(unittest.TestCase):
             calculated_md5 = hashlib.md5(''.join(
                 basis_lines[:-1]).encode('utf-8')).hexdigest()
 
-            self.assertEqual(expected_md5, calculated_md5)
+            assert expected_md5 == calculated_md5
 
     def test_avail_basis(self):
 
         h_basis = [
             '6-311++G(2D,2P)', 'AUG-CC-PVTZ', 'DEF2-SVPD', 'MIN-CC-PVDZ',
-            'STO-6G'
+            'STO-6G', 'DEF2-SV(P)', 'PCSEG-0'
         ]
         c_basis = [
-            '6-31G', '6-31G(2DF,P)', 'AUG-CC-PVDZ', 'D-AUG-CC-PVQZ',
-            'SADLEJ-PVTZ'
+            '6-31G', '6-31G(2DF,P)', 'AUG-CC-PVDZ', 'AUG-CC-PVQZ',
+            'SADLEJ-PVTZ', 'AUG-CC-PCVTZ', 'PCX-2'
         ]
-        zn_basis = ['CC-PVTZ', 'MIN-CC-PVDZ', 'STO-3G']
 
-        for bas in h_basis:
-            self.assertTrue(bas in MolecularBasis.get_avail_basis('H'))
-        for bas in c_basis:
-            self.assertTrue(bas in MolecularBasis.get_avail_basis('c'))
-        for bas in zn_basis:
-            self.assertTrue(bas in MolecularBasis.get_avail_basis('Zn'))
+        if is_mpi_master():
 
+            h_avail_basis = MolecularBasis.get_avail_basis('H')
+            c_avail_basis = MolecularBasis.get_avail_basis('C')
 
-if __name__ == "__main__":
-    unittest.main()
+            for bas in h_basis:
+                assert bas in h_avail_basis
+            for bas in c_basis:
+                assert bas in c_avail_basis

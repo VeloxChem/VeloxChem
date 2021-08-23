@@ -216,7 +216,7 @@ public:
     
     
     /**
-     Gets number of electrons obtaines by integrating Kohn-Sham matrix.
+     Gets number of electrons obtained by integrating Kohn-Sham matrix.
 
      @return the number of electrons.
      */

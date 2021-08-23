@@ -177,16 +177,6 @@ CAngularMomentumMatrix::operator!=(const CAngularMomentumMatrix& other) const
 }
 
 void
-CAngularMomentumMatrix::setOriginCoordinates(const double xOrigin, const double yOrigin, const double zOrigin)
-{
-    _xOrigin = xOrigin;
-
-    _yOrigin = yOrigin;
-
-    _zOrigin = zOrigin;
-}
-
-void
 CAngularMomentumMatrix::setOriginCoordinates(const std::array<double, 3>& origin)
 {
     _xOrigin = origin[0];
@@ -194,6 +184,12 @@ CAngularMomentumMatrix::setOriginCoordinates(const std::array<double, 3>& origin
     _yOrigin = origin[1];
 
     _zOrigin = origin[2];
+}
+
+std::array<double, 3>
+CAngularMomentumMatrix::getOriginCoordinates() const
+{
+    return std::array<double, 3>{{_xOrigin, _yOrigin, _zOrigin}};
 }
 
 std::string
@@ -281,30 +277,6 @@ CAngularMomentumMatrix::values(int32_t cart) const
 {
     auto d = static_cast<cartesians>(cart);
     return values(d);
-}
-
-double
-CAngularMomentumMatrix::getOriginCoordinateX() const
-{
-    return _xOrigin;
-}
-
-double
-CAngularMomentumMatrix::getOriginCoordinateY() const
-{
-    return _yOrigin;
-}
-
-double
-CAngularMomentumMatrix::getOriginCoordinateZ() const
-{
-    return _zOrigin;
-}
-
-std::array<double, 3>
-CAngularMomentumMatrix::getOriginCoordinates() const
-{
-    return std::array<double, 3>{{_xOrigin, _yOrigin, _zOrigin}};
 }
 
 std::string

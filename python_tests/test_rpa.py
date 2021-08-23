@@ -1,6 +1,5 @@
 import random
 import sys
-import unittest
 from pathlib import Path
 
 import numpy as np
@@ -18,7 +17,7 @@ from veloxchem.veloxchemlib import hartree_in_ev, is_mpi_master
 
 
 @pytest.mark.solvers
-class TestRPA(unittest.TestCase):
+class TestRPA:
 
     def run_rpa(self, inpfile, potfile, xcfun_label, data_lines):
 
@@ -56,9 +55,9 @@ class TestRPA(unittest.TestCase):
             osc_str = rpa_results['oscillator_strengths']
             rot_str = rpa_results['rotatory_strengths']
 
-            self.assertTrue(np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4)
-            self.assertTrue(np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4)
-            self.assertTrue(np.max(np.abs(rot_str - ref_rot_str)) < 1.0e-2)
+            assert np.max(np.abs(exc_ene - ref_exc_ene)) < 5.0e-4
+            assert np.max(np.abs(osc_str - ref_osc_str)) < 5.0e-4
+            assert np.max(np.abs(rot_str - ref_rot_str)) < 1.0e-2
 
     def test_rpa_hf(self):
 
@@ -174,7 +173,3 @@ class TestRPA(unittest.TestCase):
         data_lines = raw_data.splitlines()[1:-1]
 
         self.run_rpa(inpfile, potfile, xcfun_label, data_lines)
-
-
-if __name__ == '__main__':
-    unittest.main()

@@ -43,6 +43,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import mpi_initialized
 from .veloxchemlib import ao_matrix_to_veloxchem
 from .veloxchemlib import ao_matrix_to_dalton
+from .veloxchemlib import get_basis_function_indices_for_atom
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import hartree_in_kcalpermol
@@ -93,9 +94,6 @@ from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .scffirstorderprop import ScfFirstOrderProperties
-
-# Deprecation warnings
-from . import deprecations
 
 # Python functions
 from .errorhandler import assert_msg_critical

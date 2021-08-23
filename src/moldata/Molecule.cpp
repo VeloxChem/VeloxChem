@@ -201,7 +201,7 @@ CMolecule::~CMolecule()
 }
 
 CMolecule
-CMolecule::getSubMolecule(int32_t start_index, int32_t num_atoms)
+CMolecule::getSubMolecule(int32_t startIndex, int32_t numAtoms)
 {
     std::vector<double>      atomCoordinates;
     std::vector<double>      atomCharges;
@@ -213,31 +213,31 @@ CMolecule::getSubMolecule(int32_t start_index, int32_t num_atoms)
 
     auto total_natoms = getNumberOfAtoms();
 
-    if (start_index < 0 || num_atoms <= 0 || start_index + num_atoms > total_natoms)
+    if ((startIndex < 0) || (numAtoms <= 0) || (startIndex + numAtoms > total_natoms))
     {
         return CMolecule();
     }
 
     // x, y, and z coordinates
 
-    for (int32_t i = start_index; i < start_index + num_atoms; i++)
+    for (int32_t i = startIndex; i < startIndex + numAtoms; i++)
     {
         atomCoordinates.push_back(_atomCoordinates.data(0)[i]);
     }
 
-    for (int32_t i = start_index; i < start_index + num_atoms; i++)
+    for (int32_t i = startIndex; i < startIndex + numAtoms; i++)
     {
         atomCoordinates.push_back(_atomCoordinates.data(1)[i]);
     }
 
-    for (int32_t i = start_index; i < start_index + num_atoms; i++)
+    for (int32_t i = startIndex; i < startIndex + numAtoms; i++)
     {
         atomCoordinates.push_back(_atomCoordinates.data(2)[i]);
     }
 
     // charges, masses, labels, ids
 
-    for (int32_t i = start_index; i < start_index + num_atoms; i++)
+    for (int32_t i = startIndex; i < startIndex + numAtoms; i++)
     {
         atomCharges.push_back(_atomCharges.data()[i]);
 
@@ -541,7 +541,46 @@ CMolecule::getVdwRadii() const
 {
     std::vector<double> atomradii;
 
-    auto radii = vdwradii::buildVdwRadii();
+    auto radii = atomicradii::buildVdwRadii();
+
+    for (int32_t i = 0; i < getNumberOfAtoms(); i++)
+    {
+        atomradii.push_back(radii[_idsElemental.data()[i]]);
+    }
+
+    return atomradii;
+}
+
+std::vector<double>
+CMolecule::getMkRadii() const
+{
+    std::vector<double> atomradii;
+
+    auto mk_radii = atomicradii::buildMkRadii();
+
+    auto vdw_radii = atomicradii::buildVdwRadii();
+
+    for (int32_t i = 0; i < getNumberOfAtoms(); i++)
+    {
+        if (_idsElemental.data()[i] < mk_radii.size())
+        {
+            atomradii.push_back(mk_radii[_idsElemental.data()[i]]);
+        }
+        else
+        {
+            atomradii.push_back(vdw_radii[_idsElemental.data()[i]]);
+        }
+    }
+
+    return atomradii;
+}
+
+std::vector<double>
+CMolecule::getCovalentRadii() const
+{
+    std::vector<double> atomradii;
+
+    auto radii = atomicradii::buildCovalentRadii();
 
     for (int32_t i = 0; i < getNumberOfAtoms(); i++)
     {

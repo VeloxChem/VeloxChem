@@ -37,7 +37,9 @@ from .cnadriver import CnaAnalysisDriver
 from .gopdriver import GlobalOptimizationDriver
 from .mpitask import MpiTask
 from .optimizationdriver import OptimizationDriver
+from .trajectorydriver import TrajectoryDriver
 from .pulsedrsp import PulsedResponse
+from .respchargesdriver import RespChargesDriver
 from .rspabsorption import Absorption
 from .rspc6 import C6
 from .rspcdspec import CircularDichroismSpectrum
@@ -212,6 +214,30 @@ def main():
         exciton_drv.update_settings(exciton_dict, method_dict)
         exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+    # Spectrum from trajectory
+
+    if task_type == 'trajectory':
+        if 'trajectory' in task.input_dict:
+            traj_dict = dict(task.input_dict['trajectory'])
+        else:
+            traj_dict = {}
+        if 'spectrum_settings' in task.input_dict:
+            spect_dict = dict(task.input_dict['spectrum_settings'])
+        else:
+            spect_dict = {}
+        if 'response' in task.input_dict:
+            rsp_dict = dict(task.input_dict['response'])
+        else:
+            rsp_dict = {}
+
+        traj_dict['filename'] = task.input_dict['filename']
+        traj_dict['charges'] = task.input_dict['charges']
+        traj_dict['polarizabilities'] = task.input_dict['polarizabilities']
+
+        traj_drv = TrajectoryDriver(task.mpi_comm, task.ostream)
+        traj_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
+        traj_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
     # Self-consistent field
 
     run_scf = task_type in [
@@ -226,10 +252,15 @@ def main():
     scf_type = 'unrestricted' if task_type in ['uhf', 'uscf'] else 'restricted'
 
     if run_scf:
+        assert_msg_critical(task.molecule.number_of_atoms(),
+                            'Molecule: no atoms found in molecule')
+
         if 'scf' in task.input_dict:
             scf_dict = task.input_dict['scf']
         else:
             scf_dict = {}
+
+        scf_dict['filename'] = task.input_dict['filename']
 
         scf_dict['program_start_time'] = program_start_time
         scf_dict['maximum_hours'] = maximum_hours
@@ -391,10 +422,29 @@ def main():
     # LoProp
 
     if task_type == 'loprop':
-        task.input_dict['loprop']['density'] = density
-        loprop_driver = LoPropDriver(task)
-        loprop_driver.compute()
-        
+        loprop_driver = LoPropDriver(task.mpi_comm, task.ostream)
+        loprop_driver.compute(task.molecule, task.ao_basis, scf_tensors)
+
+    # RESP and ESP charges
+
+    if task_type in ['resp charges', 'esp charges']:
+        if (task_type == 'resp charges' and 'resp_charges' in task.input_dict):
+            charges_dict = task.input_dict['resp_charges']
+        elif (task_type == 'esp charges' and 'esp_charges' in task.input_dict):
+            charges_dict = task.input_dict['esp_charges']
+        else:
+            charges_dict = {}
+
+        charges_dict['filename'] = task.input_dict['filename']
+
+        chg_drv = RespChargesDriver(task.mpi_comm, task.ostream)
+        chg_drv.update_settings(charges_dict, method_dict)
+
+        if task_type == 'resp charges':
+            chg_drv.compute(task.molecule, task.ao_basis, 'resp')
+        elif task_type == 'esp charges':
+            chg_drv.compute(task.molecule, task.ao_basis, 'esp')
+
     # CNA correlation analysis
 
     if task_type == 'cna':
