@@ -34,6 +34,7 @@ from .excitondriver import ExcitonModelDriver
 from .loprop import LoPropDriver
 from .mp2driver import Mp2Driver
 from .cnadriver import CnaAnalysisDriver
+from .gopdriver import GlobalOptimizationDriver
 from .mpitask import MpiTask
 from .optimizationdriver import OptimizationDriver
 from .pulsedrsp import PulsedResponse
@@ -405,6 +406,18 @@ def main():
         cna_drv = CnaAnalysisDriver(task.mpi_comm, task.ostream)
         cna_drv.update_settings(cna_dict)
         cna_drv.compute()
+        
+    # Global optimization with tree-growth scheme
+    
+    if task_type == 'gop':
+        if 'gop' in task.input_dict:
+            gop_dict = task.input_dict['gop']
+        else:
+            gop_dict = {}
+            
+        gop_drv = GlobalOptimizationDriver(task.mpi_comm, task.ostream)
+        gop_drv.update_settings(gop_dict)
+        gop_drv.compute(task.molecule)
 
     # All done
 

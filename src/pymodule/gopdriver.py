@@ -36,9 +36,9 @@ from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .molecule import Molecule
 
-class CnaAnalysisDriver:
+class GlobalOptimizationDriver:
     """
-    Implements CNA analysis driver.
+    Implements global optimization driver.
 
     :param comm:
         The MPI communicator.
@@ -53,14 +53,11 @@ class CnaAnalysisDriver:
         - cna_bond: The cut-off radius for chemical bond in CNA analysis.
         - cna_rcut: The cut-off radius for chemical bonds environment in
           CNA analysis.
-        - xyz_files: The list of xyz files for correlation analysis.
-        - lhs_files: The lhs list of xyz files for correlation analysis.
-        - rhs_files: The rhs list of xyz files for correlation analysis.
     """
 
     def __init__(self, comm=None, ostream=None):
         """
-        Initializes CNA analysis driver.
+        Initializes global optimization driver.
         """
 
         if comm is None:
@@ -80,24 +77,24 @@ class CnaAnalysisDriver:
         # CNA parameters
         self.cna_bond = None
         self.cna_rcut = None
-
-        # list of xyz files
-        self.xyz_files = None
-        self.lhs_files = None
-        self.rhs_files = None
+        
+        # tree growth parameters
+        self.max_confs = 500
+        self.conf_thresh = 1.0e-5
+        self.tree_energies = []
+        self.tree_geometries = []
 
     def update_settings(self, cna_dict):
         """
-        Updates settings in CNA analysis driver.
+        Updates settings in global optimization driver.
 
         :param cna_dict:
-            The dictionary of CNA analysis settings.
+            The dictionary of global optimization settings.
         """
 
         cna_keywords = {
-            'xyz_files': 'list',
-            'lhs_files': 'list',
-            'rhs_files': 'list',
+            'max_confs' : 'int',
+            'conf_thresh' : 'float',
             'cna_bond': 'float',
             'cna_rcut': 'float',
         }
@@ -116,85 +113,24 @@ class CnaAnalysisDriver:
         else:
             self.cna_rcut /= bohr_in_angstroms()
             
-    def compute(self):
+    def compute(self, seed):
         """
-        Performs CNA correlation analysis.
+        Performs global optimization with given molecular seed.
+        
+        :param seed:
+            The molecular seed.
         """
         
         self.print_header()
-        
-        if self.xyz_files is not None:
-            self.compute_cna_self()
-            
-        if self.lhs_files is not None and self.rhs_files is not None:
-            self.compute_cna_cross()
-            
-    def compute_cna_self(self):
-        """
-        Performs CNA self correlation analysis.
-        """
-    
-        self.ostream.print_blank()
-        self.ostream.print_header(29 * '-')
-        self.ostream.print_header('! Self Correlation Function !')
-        self.ostream.print_header(29 * '-')
-        self.ostream.print_header('! (i) ! (j) !      J_ij     !')
-        self.ostream.print_header(29 * '-')
-        
-        cnas = self.get_cna_list(self.xyz_files)
-        matidx = np.tril_indices(len(cnas))
-        for i,j in zip(matidx[0],matidx[1]):
-            jval = cnas[i].comp_cna(cnas[j])
-            self.ostream.print_header('! {:^3d} ! {:^3d} !      {:^.2f}     !'.format(
-                i, j, jval))
-        self.ostream.print_header(29 * '-')
-        
-    def compute_cna_cross(self):
-        """
-        Performs CNA cross correlation analysis.
-        """
-
-        self.ostream.print_blank()
-        self.ostream.print_header(30 * '-')
-        self.ostream.print_header('! Cross Correlation Function !')
-        self.ostream.print_header(30 * '-')
-        self.ostream.print_header('! (i) ! (j) !      J_ij      !')
-        self.ostream.print_header(30 * '-')
-        
-        lhs_cnas = self.get_cna_list(self.lhs_files)
-        rhs_cnas = self.get_cna_list(self.rhs_files)
-        for i in range(len(lhs_cnas)):
-            for j in range(len(rhs_cnas)):
-                jval = lhs_cnas[i].comp_cna(rhs_cnas[j])
-                self.ostream.print_header('! {:^3d} ! {:^3d} !      {:^.2f}      !'.format(
-                    i, j, jval))
-        self.ostream.print_header(30 * '-')
-        
-    def get_cna_list(self, mol_files):
-        """
-        Gets Common Neighbors objects list for given list of files.
-
-        :param mol_files:
-            The list of molecule files.
-        """
-        
-        molecules = [Molecule.read_xyz(finp) for finp in mol_files]
-        cnas = []
-        for mol in molecules:
-            mcna = CommonNeighbors(mol, self.cna_bond)
-            mcna.generate(self.cna_rcut)
-            cnas.append(mcna)
-            
-        return cnas
-        
+   
     def print_header(self):
         """
-        Prints header for the CNA driver.
+        Prints header for the global optimization driver.
         """
         
         self.ostream.print_blank()
-        self.ostream.print_header('CNA Driver Setup')
-        self.ostream.print_header(18 * '=')
+        self.ostream.print_header('Global Optimization Driver Setup')
+        self.ostream.print_header(34 * '=')
         self.ostream.print_blank()
         
         str_width = 40
@@ -203,14 +139,6 @@ class CnaAnalysisDriver:
         self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = 'Bonds Environment Cut-Off Radius : {:.2f}'.format(
             self.cna_rcut)
-        self.ostream.print_header(cur_str.ljust(str_width))
-       
-        task_str = 'None'
-        if self.xyz_files is not None:
-            task_str = 'Self'
-        if self.lhs_files is not None and self.rhs_files is not None:
-            task_str = 'Cross'
-        cur_str = 'Correlation type                 : ' + task_str
         self.ostream.print_header(cur_str.ljust(str_width))
        
         self.ostream.print_blank()
