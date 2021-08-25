@@ -180,6 +180,9 @@ class GlobalOptimizationDriver:
         cur_str = 'Bonds Environment Cut-Off Radius : {:.2f}'.format(
             self.cna_rcut)
         self.ostream.print_header(cur_str.ljust(str_width))
-       
         self.ostream.print_blank()
+        
+        self.ostream.print_block(self.tree_growth_unit.geom_string())
+        self.ostream.print_blank()
+        
         self.ostream.flush()
