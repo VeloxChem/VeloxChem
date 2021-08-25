@@ -1,6 +1,4 @@
 from pathlib import Path
-import sys
-import textwrap
 from unittest.mock import patch
 from dataclasses import dataclass
 
@@ -14,7 +12,7 @@ import numpy as np
 from veloxchem.veloxchemlib import mpi_master, denmat
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.aofockmatrix import AOFockMatrix
-from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver
+from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver, GridDriver
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
 from veloxchem.main import main, select_scf_driver
@@ -22,48 +20,23 @@ from veloxchem.qqscheme import get_qq_scheme
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.molecule import Molecule
 
-# pytestmark = pytest.mark.skip
-
-
-@pytest.fixture
-def sample():
-    inp = textwrap.dedent("""
-        @jobs
-        task: roscf
-        @end
-
-        @method settings
-        basis: DEF2-SVP
-        @end
-
-        @molecule
-        charge: 0
-        multiplicity: 2
-        xyz:
-        He          -.620668   -1.294822      .054251
-        H           -2.508043   -1.382001     .040282
-        @end
-        """)
-    return inp
-
-
-@pytest.fixture
-def input_dict():
-    return {
-        'jobs': {
-            'task': 'roscf',
-        },
-        'method_settings': {
-            'basis': 'DEF2-SVP',
-        },
-        'filename': None,
-    }
-
 
 @patch('veloxchem.main.ScfRestrictedOpenDriver')
 @patch('veloxchem.main.MpiTask')
 @patch('veloxchem.cli.argparse')
 class TestROSetup:
+
+    @pytest.fixture
+    def input_dict(self):
+        return {
+            'jobs': {
+                'task': 'roscf',
+            },
+            'method_settings': {
+                'basis': 'DEF2-SVP',
+            },
+            'filename': None,
+        }
 
     def test_scftype(self, mock_argparse, mock_mpi, mock_roscf, input_dict, tmpdir):
         """
@@ -78,7 +51,9 @@ class TestROSetup:
             main()
         mock_select.assert_called_with(task, 'restricted_open')
 
-    def test_roscfdriverreturned(self, mock_argparse, mock_mpi, mock_roscf, input_dict, tmpdir):
+    def test_roscfdriverreturned(
+        self, mock_argparse, mock_mpi, mock_roscf, input_dict, tmpdir
+    ):
         """
         Verify that RODriverCalled
         """
@@ -126,6 +101,11 @@ class ROSCF_Helper:
         return da, db
 
     def e2(self):
+        self.comp_2e_fock()
+        return self.comp_2e_energy()
+
+    def comp_2e_fock(self):
+
         eri_drv = ElectronRepulsionIntegralsDriver(self.scf_drv.comm)
         qq_data = eri_drv.compute(
             get_qq_scheme(self.scf_drv.qq_type),
@@ -146,26 +126,35 @@ class ROSCF_Helper:
             e_grad
         )
 
-        e_el = self.scf_drv.comp_energy(
-            fock_mat,
-            vxc_mat,
-            e_pe,
-            self.mats['kinetic'],
-            self.mats['potential'],
-            self.mats['ao_density']
-        )
-
         self.mats['fock_mat'] = fock_mat
         self.mats['vxc_mat'] = vxc_mat
         self.mats['e_pe'] = e_pe
         self.mats['V_pe'] = V_pe
 
-        return e_el - self.e1()
+    def comp_2e_energy(self):
+        e_ee = self.comp_ee_energy()
+        e_xc = self.comp_xc_energy()
+        return e_ee + e_xc
+
+    def comp_ee_energy(self):
+        e_ee = self.mats['fock_mat'].get_energy(
+            0, self.mats['ao_density'], 0
+        )
+        return e_ee
+
+    def comp_xc_energy(self):
+        try:
+            e_xc = self.mats['vxc_mat'].get_energy()
+        except AttributeError:
+            e_xc = 0.0
+
+        return e_xc
 
     def gradient(self):
         self.e2()
         mats = (
-            self.mats[k] for k in ['fock_mat', 'vxc_mat', 'V_pe', 'kinetic', 'potential']
+            self.mats[k]
+            for k in ['fock_mat', 'vxc_mat', 'V_pe', 'kinetic', 'potential']
         )
         self.scf_drv.comp_full_fock(*mats)
 
@@ -224,67 +213,63 @@ class ROSCF_Helper:
         self.mats['ao_density'] = ao_density
 
 
-@pytest.fixture
-def initial_density():
-    Da, Db = (
-        np.array(
-            [[1.017257008959035147e+00, -1.324945784447343899e-01],
-             [-1.324945784447343899e-01, 1.017257008959035369e+00]]
-
-        ),
-        np.array(
-            [[1.004974038596785801e+00, -2.073733392173061560e-02],
-             [-2.073733392173061560e-02, 4.279085843668227365e-04]]
-        )
-    )
-    ao_density = AODensityMatrix([Da, Db], denmat.unrest)
-    return ao_density
-
-
-@pytest.fixture
-def scf_setup(initial_density):
-    here = Path(__file__).parent
-    inpfile = str(here / 'inputs' / 'heh.inp')
-    task = MpiTask([inpfile, None], MPI.COMM_WORLD)
-    task.input_dict['scf']['checkpoint_file'] = None
-
-    scf_drv = ScfRestrictedOpenDriver(task.mpi_comm, task.ostream)
-
-    scf_drv.update_settings(
-        task.input_dict['scf'],
-        task.input_dict['method_settings']
-    )
-
-    mol = task.molecule
-    bas = task.ao_basis
-
-    S, T, V, _ = scf_drv.comp_one_ints(mol, bas)
-
-    scf_drv.comp_guess_density = lambda *args: initial_density
-    ao_density = scf_drv.comp_guess_density()
-    mats = {
-        'ao_density': ao_density,
-        'overlap': S,
-        'kinetic': T,
-        'potential': V,
-    }
-
-    return ROSCF_Helper(scf_drv, mol, bas, mats)
-
-
-@pytest.fixture
-def roothan_setup(scf_setup):
-    scf_setup.scf_drv.max_err_vecs = 1
-    return scf_setup
-
-
-@pytest.fixture
-def diis_setup(scf_setup):
-    scf_setup.scf_drv.max_err_vecs = 2
-    return scf_setup
-
-
 class TestROSCF:
+
+    @pytest.fixture
+    def initial_density(self):
+        Da, Db = (
+            np.array(
+                [[1.017257008959035147e+00, -1.324945784447343899e-01],
+                 [-1.324945784447343899e-01, 1.017257008959035369e+00]]
+
+            ),
+            np.array(
+                [[1.004974038596785801e+00, -2.073733392173061560e-02],
+                 [-2.073733392173061560e-02, 4.279085843668227365e-04]]
+            )
+        )
+        ao_density = AODensityMatrix([Da, Db], denmat.unrest)
+        return ao_density
+
+    @pytest.fixture
+    def scf_setup(self, initial_density):
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'heh.inp')
+        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task.input_dict['scf']['checkpoint_file'] = None
+
+        scf_drv = ScfRestrictedOpenDriver(task.mpi_comm, task.ostream)
+
+        scf_drv.update_settings(
+            task.input_dict['scf'],
+            task.input_dict['method_settings']
+        )
+
+        mol = task.molecule
+        bas = task.ao_basis
+
+        S, T, V, _ = scf_drv.comp_one_ints(mol, bas)
+
+        scf_drv.comp_guess_density = lambda *args: initial_density
+        ao_density = scf_drv.comp_guess_density()
+        mats = {
+            'ao_density': ao_density,
+            'overlap': S,
+            'kinetic': T,
+            'potential': V,
+        }
+
+        return ROSCF_Helper(scf_drv, mol, bas, mats)
+
+    @pytest.fixture
+    def roothan_setup(self, scf_setup):
+        scf_setup.scf_drv.max_err_vecs = 1
+        return scf_setup
+
+    @pytest.fixture
+    def diis_setup(self, scf_setup):
+        scf_setup.scf_drv.max_err_vecs = 2
+        return scf_setup
 
     def test_initial_density(self, scf_setup):
 
@@ -340,11 +325,6 @@ class TestROSCF:
 
         assert scf_drv.is_converged
         assert scf_drv.iter_data[-1]['energy'] == approx(-3.347480513475661)
-
-# (-3.3463749244141647, 0.05872228054511208),
-# (-3.347477184661499, 0.0032244743264249445),
-# (-3.347480505231504, 0.00016067000893129152),
-# (-3.347480513475661, 8.066484831554014e-06)]
 
     def test_step_1(self, roothan_setup):
         iscf = iter(roothan_setup)
@@ -480,47 +460,89 @@ class TestFinalEnergies:
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
 
-    @pytest.mark.skip()
-    def test_scf_dft_slda(self):
+
+class TestRODFT:
+
+    @pytest.fixture
+    def initial_density(self):
+
+        Da, Db = (
+            np.array(
+                [[1.007149386323507922e+00, -8.485576025415243751e-02],
+                 [-8.485576025415243751e-02, 1.007149386323507478e+00]]
+
+            ),
+            np.array(
+                [[1.000587154488399744e+00, -3.559606189326910367e-03],
+                 [-3.559606189326910367e-03, 1.266336087391910148e-05]]
+            )
+        )
+        ao_density = AODensityMatrix([Da, Db], denmat.unrest)
+        return ao_density
+
+    @pytest.fixture
+    def scf_setup(self, request, initial_density):
+
+        try:
+            xcfun_label, ref_energy = request.param
+        except AttributeError:
+            xcfun_label, ref_energy = None, 0.
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water.inp')
+        inpfile = str(here / 'inputs' / 'heh-sto3g.inp')
+        task = MpiTask([inpfile, None], MPI.COMM_WORLD)
+        task.input_dict['scf']['checkpoint_file'] = None
 
-        potfile = None
+        scf_drv = ScfRestrictedOpenDriver(task.mpi_comm, task.ostream)
 
-        xcfun_label = 'slda'
+        if xcfun_label:
+            grid_drv = GridDriver(scf_drv.comm)
+            grid_drv.set_level(scf_drv.grid_level)
+            task.input_dict['method_settings']['xcfun'] = xcfun_label
 
-        #    Final DFT energy:            -76.074208234637
-        ref_e_scf = -76.074208234637
+        scf_drv.update_settings(
+            task.input_dict['scf'],
+            task.input_dict['method_settings']
+        )
 
-        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
+        mol = task.molecule
+        bas = task.ao_basis
 
-    @pytest.mark.skip
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
-    def test_scf_hf_pe(self):
+        S, T, V, _ = scf_drv.comp_one_ints(mol, bas)
 
-        here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'pe_water.inp')
-        potfile = str(here / 'inputs' / 'pe_water.pot')
+        if xcfun_label:
+            scf_drv.molgrid = grid_drv.generate(mol)
 
-        xcfun_label = None
+        scf_drv.comp_guess_density = lambda *args: initial_density
+        ao_density = scf_drv.comp_guess_density()
+        mats = {
+            'ao_density': ao_density,
+            'overlap': S,
+            'kinetic': T,
+            'potential': V,
+        }
 
-        #    Final HF energy:             -76.067159426565
-        ref_e_scf = -76.067159426565
+        return ROSCF_Helper(scf_drv, mol, bas, mats), ref_energy
 
-        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
+    def test_initial_density(self, scf_setup):
 
-    @pytest.mark.skip
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
-    def test_scf_dft_pe(self):
+        scf, _ = scf_setup
 
-        here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'pe_water.inp')
-        potfile = str(here / 'inputs' / 'pe_water.pot')
+        alpha_density, beta_density = scf.ao_density()
+        overlap = scf.overlap()
 
-        xcfun_label = 'b3lyp'
+        assert np.trace(overlap @ alpha_density) == approx(2.0)
+        assert np.trace(overlap @ beta_density) == approx(1.0)
 
-        #    Final DFT energy:            -76.468733754150
-        ref_e_scf = -76.468733754150
-
-        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf)
+    @pytest.mark.parametrize(
+        'scf_setup',
+        [
+            (None, -3.269190923863),
+            # ('slater', -3.06446066717),
+        ],
+        indirect=True
+    )
+    def test_initial_total_energy(self, scf_setup):
+        scf, ref_energy = scf_setup
+        total_energy = scf.energy()
+        assert total_energy == approx(ref_energy)
