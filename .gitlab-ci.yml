@@ -129,7 +129,7 @@ baboon:build:
       - build
     expire_in: 2 hours
   allow_failure: true
-  timeout: 30 minutes
+  timeout: 20 minutes
 
 baboon:test:
   extends: .baboon:setup
@@ -141,4 +141,4 @@ baboon:test:
     - cd build
     - ctest -C Release --output-on-failure
   allow_failure: true
-  timeout: 30 minutes
+  timeout: 20 minutes
