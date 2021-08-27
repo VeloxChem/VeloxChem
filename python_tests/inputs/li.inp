@@ -3,7 +3,7 @@ task: rohf
 @end
 
 @method settings
-basis: 6-311++G(2D,2P)
+basis: def2-svp
 @end
 
 @molecule

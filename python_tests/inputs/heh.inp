@@ -1,9 +1,10 @@
 @jobs
-task: rohf
+task: roscf
 @end
 
 @method settings
 basis: MIN-CC-PVDZ
+grid: 6
 @end
 
 @molecule

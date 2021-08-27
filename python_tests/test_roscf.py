@@ -401,6 +401,9 @@ class TestFinalEnergies:
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
+        task.ao_basis = MolecularBasis.read(
+            task.molecule, 'def2-svp', './basis', task.ostream
+        )
 
         if potfile is not None:
             task.input_dict['method_settings']['potfile'] = potfile
@@ -425,8 +428,8 @@ class TestFinalEnergies:
     @pytest.mark.parametrize(
         'inpfile, ref_e_scf',
         [
-            ('heh.inp', -3.347480513475661),
-            ('li.inp', -7.4320054780567775),
+            ('heh.inp', -3.348471908695),
+            ('li.inp', -7.425064044619),
             ('ts01.inp', -460.413199994),
             ('ts02.inp', -76.406503929),
             ('ts03.inp', -40.618499031),
@@ -444,13 +447,12 @@ class TestFinalEnergies:
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, diis=None)
 
-    @pytest.mark.skip('WIP')
     @pytest.mark.parametrize(
         'inpfile, xcfun_label, ref_e_scf',
         [
-            ('heh.inp', None, -3.347480513475661),
-            ('heh.inp', 'slater', -3.166481549679),
-            ('heh.inp', 'b3lyp', -3.404225946804),
+            ('heh.inp', None, -3.34847190869),
+            ('heh.inp', 'slater', -3.166481549682),
+            ('heh.inp', 'b3lyp', -3.404225946805)
         ],
         ids=['HeH-ROHF', 'HeH-Slater', 'HeH-B3LYP'],
     )
@@ -492,16 +494,21 @@ class TestRODFT:
             xcfun_label, ref_energy = None, 0.
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'heh-sto3g.inp')
+        inpfile = str(here / 'inputs' / 'heh.inp')
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
+        task.ao_basis = MolecularBasis.read(
+            task.molecule, 'STO-3G', './basis', task.ostream
+        )
 
         scf_drv = ScfRestrictedOpenDriver(task.mpi_comm, task.ostream)
+        scf_drv.grid_level = 6
 
         if xcfun_label:
             grid_drv = GridDriver(scf_drv.comm)
             grid_drv.set_level(scf_drv.grid_level)
             task.input_dict['method_settings']['xcfun'] = xcfun_label
+            task.input_dict['method_settings']['grid'] = 6
 
         scf_drv.update_settings(
             task.input_dict['scf'],
@@ -541,11 +548,15 @@ class TestRODFT:
         'scf_setup',
         [
             (None, -3.269190923863),
-            # ('slater', -3.06446066717),
+            ('slater', -3.064460757711),
+            ('b3lyp', -3.315910830402),
         ],
         indirect=True
     )
     def test_initial_total_energy(self, scf_setup):
+        xcfun = scf_setup[0].scf_drv.xcfun
+        if xcfun and xcfun.get_func_label() == "B3LYP":
+            pytest.skip('missing accuracy')
         scf, ref_energy = scf_setup
         total_energy = scf.energy()
         assert total_energy == approx(ref_energy)
@@ -581,13 +592,17 @@ class TestRODFT:
     @pytest.mark.parametrize(
         'scf_setup',
         [
-            ('slater', -1.2427519358970003),
-            ('slda', -1.43873035593)
+            ('slater', -1.242752026437),
+            ('slda', -1.43873045822),
+            ('b3lyp', -1.20470566061)
         ],
         indirect=True
     )
     def test_initial_xc_energy(self, scf_setup):
+        xcfun = scf_setup[0].scf_drv.xcfun
+        if xcfun and xcfun.get_func_label() == "B3LYP":
+            pytest.skip('missing accuracy')
         scf, ref_energy = scf_setup
         scf.e2()
         e_xc = scf.comp_xc_energy()
-        assert e_xc == approx(ref_energy, abs=1e-5)
+        assert e_xc == approx(ref_energy)
