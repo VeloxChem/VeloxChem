@@ -117,6 +117,9 @@ class ROSCF_Helper:
         e_grad = None
 
         fock_mat = AOFockMatrix(self.mats['ao_density'])
+        if self.scf_drv.dft:
+            self.scf_drv.update_fock_type(fock_mat)
+
         vxc_mat, e_pe, V_pe = self.scf_drv.comp_2e_fock(
             fock_mat,
             self.mats['ao_density'],
@@ -546,3 +549,45 @@ class TestRODFT:
         scf, ref_energy = scf_setup
         total_energy = scf.energy()
         assert total_energy == approx(ref_energy)
+
+    @pytest.mark.parametrize(
+        'scf_setup',
+        [
+            (None, -5.442239744622594),
+            ('slater', -5.442239744622594),
+        ],
+        indirect=True
+    )
+    def test_initial_oneel_energy(self, scf_setup):
+        scf, ref_energy = scf_setup
+        total_energy = scf.e1()
+        assert total_energy == approx(ref_energy)
+
+    @pytest.mark.parametrize(
+        'scf_setup',
+        [
+            (None, 1.612906672206136),      # 1.0*K
+            ('slater', 3.060388872497171),  # 0.0*K
+            ('b3lyp', 2.7708924339156367),  # 0.2*K
+        ],
+        indirect=True
+    )
+    def test_initial_ee_energy(self, scf_setup):
+        scf, ref_energy = scf_setup
+        scf.e2()
+        e_ee = scf.comp_ee_energy()
+        assert e_ee == approx(ref_energy)
+
+    @pytest.mark.parametrize(
+        'scf_setup',
+        [
+            ('slater', -1.2427519358970003),
+            ('slda', -1.43873035593)
+        ],
+        indirect=True
+    )
+    def test_initial_xc_energy(self, scf_setup):
+        scf, ref_energy = scf_setup
+        scf.e2()
+        e_xc = scf.comp_xc_energy()
+        assert e_xc == approx(ref_energy, abs=1e-5)
