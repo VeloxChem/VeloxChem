@@ -551,7 +551,8 @@ class TestRODFT:
             ('slater', -3.064460757711),
             ('b3lyp', -3.315910830402),
         ],
-        indirect=True
+        indirect=True,
+        ids=['rohf', 'slater', 'b3lyp'],
     )
     def test_initial_total_energy(self, scf_setup):
         xcfun = scf_setup[0].scf_drv.xcfun
@@ -567,7 +568,8 @@ class TestRODFT:
             (None, -5.442239744622594),
             ('slater', -5.442239744622594),
         ],
-        indirect=True
+        indirect=True,
+        ids=['rohf', 'slater'],
     )
     def test_initial_oneel_energy(self, scf_setup):
         scf, ref_energy = scf_setup
@@ -581,7 +583,8 @@ class TestRODFT:
             ('slater', 3.060388872497171),  # 0.0*K
             ('b3lyp', 2.7708924339156367),  # 0.2*K
         ],
-        indirect=True
+        indirect=True,
+        ids=['rohf', 'slater', 'b3lyp'],
     )
     def test_initial_ee_energy(self, scf_setup):
         scf, ref_energy = scf_setup
@@ -596,7 +599,8 @@ class TestRODFT:
             ('slda', -1.43873045822),
             ('b3lyp', -1.20470566061)
         ],
-        indirect=True
+        indirect=True,
+        ids=['slater', 'slda', 'b3lyp'],
     )
     def test_initial_xc_energy(self, scf_setup):
         xcfun = scf_setup[0].scf_drv.xcfun
