@@ -1,0 +1,21 @@
+@jobs
+task: hf
+@end
+
+@method settings
+basis: def2-svp
+basis path: ../bases
+@end
+
+@molecule
+charge: 0
+multiplicity: 2
+units: angstrom
+xyz:  
+C   0.000000   0.000000   0.000000
+H   1.080000   0.000000   0.000000
+H  -0.450903   0.981370   0.000000
+H  -0.450903  -0.703555  -0.684177
+H  -0.323911  -0.505072   1.243843
+H  -0.535112  -0.833655   2.053045
+@end 

@@ -31,6 +31,8 @@ import sys
 from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import molorb
 from .veloxchemlib import to_angular_momentum
+from .veloxchemlib import denmat
+from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
@@ -206,15 +208,20 @@ def _MolecularOrbitals_get_density(self, molecule):
         The AO density matrix.
     """
 
-    if self.get_orbitals_type() == molorb.rest:
+    nalpha = molecule.number_of_alpha_electrons()
+    nbeta = molecule.number_of_beta_electrons()
 
-        nelec = molecule.number_of_electrons()
-        return self.get_ao_density(nelec)
+    if self.get_orbitals_type() == molorb.rest:
+        if nalpha == nbeta:
+            return self.get_ao_density(nalpha + nbeta)
+        else:
+            # Here call twice with 2*na, 2*nb respectively and then average
+            alpha_density = self.get_ao_density(2 * nalpha).alpha_to_numpy(0)
+            beta_density = self.get_ao_density(2 * nbeta).beta_to_numpy(0)
+            return AODensityMatrix([alpha_density, beta_density], denmat.unrest)
 
     elif self.get_orbitals_type() == molorb.unrest:
 
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
         return self.get_ao_density(nalpha, nbeta)
 
     else:
