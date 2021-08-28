@@ -424,6 +424,20 @@ CMolecule::setAtomicIndexes(const int32_t startIndex)
     }
 }
 
+std::vector<double>
+CMolecule::getAtomCoordinates(const int32_t iAtom) const
+{
+    std::vector<double> coords;
+    
+    coords.push_back(getCoordinatesX()[iAtom]);
+    
+    coords.push_back(getCoordinatesY()[iAtom]);
+    
+    coords.push_back(getCoordinatesZ()[iAtom]);
+    
+    return coords;
+}
+
 void
 CMolecule::setCharge(const double charge)
 {

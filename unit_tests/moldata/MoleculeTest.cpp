@@ -372,3 +372,20 @@ TEST_F(CMoleculeTest, GetMinDistance)
     ASSERT_NEAR(h2o.getMinDistance(0.0, 2.0, 1.0),
                 0.60827625302982196889, 1.0e-15);
 }
+
+TEST_F(CMoleculeTest, GetAtomCoordinates)
+{
+    CMolecule h2o = vlxmol::getMoleculeH2O();
+
+    const std::vector<double> coordsO({0.0, 0.0, 0.0});
+    
+    const std::vector<double> coordsH1({0.0, 1.4, 1.1});
+    
+    const std::vector<double> coordsH2({0.0, -1.4, 1.1});
+    
+    vlxtest::compare(h2o.getAtomCoordinates(0), coordsO.data());
+    
+    vlxtest::compare(h2o.getAtomCoordinates(1), coordsH1.data());
+    
+    vlxtest::compare(h2o.getAtomCoordinates(2), coordsH2.data());
+}

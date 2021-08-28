@@ -380,6 +380,14 @@ class CMolecule
     std::vector<int32_t> getAtomIndexes(const std::string& atomLabel) const;
     
     /**
+     Gets vector of atom coordinates of specific atom.
+
+     @param iAtom the index of atom.
+     @return the vector of atom indexes.
+    */
+    std::vector<double> getAtomCoordinates(const int32_t iAtom) const;
+    
+    /**
      Gets index of nearest atom with given atom label to specific atom.
 
      @param iAtom the index of requested atom.
