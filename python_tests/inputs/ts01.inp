@@ -1,0 +1,16 @@
+@jobs
+task: rohf
+@end
+
+@method settings
+basis: def2-svp
+@end
+
+@molecule
+multiplicity: 2
+units: angstrom
+xyz:  
+Cl   0.000000   0.000000   0.000000
+H   1.371000   0.000000   0.000000
+H   2.485000   0.000000   0.000000
+@end 
