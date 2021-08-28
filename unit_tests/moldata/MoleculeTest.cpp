@@ -319,3 +319,56 @@ TEST_F(CMoleculeTest, DispersionModel)
 
     vlxtest::compare(refGradient, g.values());
 }
+
+TEST_F(CMoleculeTest, GetAtomIndexes)
+{
+    CMolecule mol = vlxmol::getMoleculeNH3CH4();
+    
+    std::vector<int32_t> refNidx({0});
+    
+    std::vector<int32_t> refCidx({4});
+    
+    std::vector<int32_t> refHidx({1, 2, 3, 5, 6, 7, 8});
+   
+    ASSERT_EQ(mol.getAtomIndexes({"N"}), refNidx);
+    
+    ASSERT_EQ(mol.getAtomIndexes({"C"}), refCidx);
+    
+    ASSERT_EQ(mol.getAtomIndexes({"H"}), refHidx);
+    
+    ASSERT_EQ(mol.getAtomIndexes({"O"}), std::vector<int32_t>());
+}
+
+TEST_F(CMoleculeTest, GetIndexOfNearestAtom)
+{
+    CMolecule mol = vlxmol::getMoleculeNH3CH4();
+   
+    ASSERT_EQ(mol.getIndexOfNearestAtom(0, {"H"}), 3);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(4, {"H"}), 8);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(0, {"O"}), -1);
+}
+
+TEST_F(CMoleculeTest, AddAtom)
+{
+    CMolecule dimer = vlxmol::getMoleculeH2ODimer();
+
+    CMolecule h2o = dimer.getSubMolecule(0, 3);
+    
+    h2o.addAtom({"O"}, 3.0, 0.0, 0.0);
+    
+    h2o.addAtom({"H"}, 3.0, 1.4, 1.1);
+    
+    h2o.addAtom({"H"}, 3.0, -1.4, 1.1);
+    
+    ASSERT_EQ(h2o, dimer);
+}
+
+TEST_F(CMoleculeTest, GetMinDistance)
+{
+    CMolecule h2o = vlxmol::getMoleculeH2O();
+
+    ASSERT_NEAR(h2o.getMinDistance(0.0, 2.0, 1.0),
+                0.60827625302982196889, 1.0e-15);
+}

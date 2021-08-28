@@ -242,6 +242,14 @@ export_moldata(py::module& m)
              "nAtoms"_a,
              "idElemental"_a)
         .def("number_of_electrons", &CMolecule::getNumberOfElectrons, "Gets a number of electrons in molecule.")
+        .def("check_proximity", &CMolecule_check_proximity, "Checks proximity of atoms.", "minDistance"_a)
+        .def("atom_indexes", &CMolecule::getAtomIndexes, "Gets indexes of atoms with requested atomic label", "atomLabel"_a)
+        .def("add_atom", &CMolecule::addAtom, "Adds atom to molecule", "atomLabel"_a, "atomCoordinateX"_a, "atomCoordinateY"_a,
+             "atomCoordinateZ"_a)
+        .def("min_distance", &CMolecule::getMinDistance, "Get minimal distance from external point to closest atom in molecule.",
+             "coordinateX"_a, "coordinateY"_a, "coordinateZ"_a)
+        .def("index_of_nearest_atom", &CMolecule::getIndexOfNearestAtom, "Gets index of nearest atom with specific label to given atom.",
+             "iAtom"_a, "atomLabel"_a)
         .def(
             "number_of_alpha_electrons",
             [](const CMolecule& self) -> int32_t {

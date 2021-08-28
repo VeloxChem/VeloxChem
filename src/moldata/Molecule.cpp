@@ -33,6 +33,7 @@
 #include "Codata.hpp"
 #include "MathFunc.hpp"
 #include "StringFormat.hpp"
+#include "ChemicalElement.hpp"
 
 CMolecule::CMolecule()
 
@@ -201,12 +202,17 @@ CMolecule::~CMolecule()
 }
 
 CMolecule
-CMolecule::getSubMolecule(int32_t startIndex, int32_t numAtoms)
+CMolecule::getSubMolecule(int32_t startIndex,
+                          int32_t numAtoms)
 {
     std::vector<double>      atomCoordinates;
+    
     std::vector<double>      atomCharges;
+    
     std::vector<double>      atomMasses;
+    
     std::vector<std::string> atomLabels;
+    
     std::vector<int32_t>     idsElemental;
 
     // boundary check
@@ -332,6 +338,81 @@ bool
 CMolecule::operator!=(const CMolecule& other) const
 {
     return !(*this == other);
+}
+
+void
+CMolecule::addAtom(const std::string& atomLabel,
+                   const double       atomCoordinateX,
+                   const double       atomCoordinateY,
+                   const double       atomCoordinateZ)
+{
+    CChemicalElement elem;
+    
+    if (elem.setAtomType(atomLabel))
+    {
+        std::vector<double> atomCoordinates;
+        
+        std::vector<double> atomCharges;
+        
+        std::vector<double> atomMasses;
+        
+        std::vector<std::string> atomLabels;
+        
+        std::vector<int32_t> idsElemental;
+        
+        // set up pointers to atomic coordinates anf charges
+        
+        const auto natoms = getNumberOfAtoms();
+
+        auto coordx = getCoordinatesX();
+        
+        for (int32_t i = 0; i < natoms; i++)
+        {
+            atomCoordinates.push_back(coordx[i]);
+        }
+        
+        atomCoordinates.push_back(atomCoordinateX);
+        
+        auto coordy = getCoordinatesY();
+        
+        for (int32_t i = 0; i < natoms; i++)
+        {
+            atomCoordinates.push_back(coordy[i]);
+        }
+        
+        atomCoordinates.push_back(atomCoordinateY);
+        
+        auto coordz = getCoordinatesZ();
+        
+        for (int32_t i = 0; i < natoms; i++)
+        {
+            atomCoordinates.push_back(coordz[i]);
+        }
+        
+        atomCoordinates.push_back(atomCoordinateZ);
+        
+        for (int32_t i = 0; i < natoms; i++)
+        {
+            atomCharges.push_back(_atomCharges.at(i));
+
+            atomMasses.push_back(_atomMasses.at(i));
+
+            atomLabels.push_back(_atomLabels[i]);
+
+            idsElemental.push_back(_idsElemental.at(i));
+        }
+        
+        atomCharges.push_back(elem.getAtomicCharge());
+        
+        atomMasses.push_back(elem.getAtomicMass());
+        
+        atomLabels.push_back(atomLabel);
+        
+        idsElemental.push_back(elem.getIdentifier());
+        
+        *this = CMolecule(atomCoordinates, atomCharges, atomMasses,
+                          atomLabels, idsElemental);
+    }
 }
 
 void
@@ -599,6 +680,134 @@ CMolecule::getLabel(const int32_t iAtom) const
     }
 
     return std::string();
+}
+
+std::vector<int32_t>
+CMolecule::getAtomIndexes(const std::string& atomLabel) const
+{
+    CChemicalElement elem;
+    
+    if (elem.setAtomType(atomLabel))
+    {
+        std::vector<int32_t> indexes;
+        
+        const auto idatm = elem.getIdentifier();
+        
+        for (int32_t i = 0; i < getNumberOfAtoms(); i++)
+        {
+            if (_idsElemental.at(i) == idatm)
+            {
+                indexes.push_back(i);
+            }
+        }
+        
+        return indexes;
+    }
+    
+    return std::vector<int32_t>();
+}
+
+int32_t
+CMolecule::getIndexOfNearestAtom(const int32_t      iAtom,
+                                 const std::string& atomLabel) const
+{
+    // set up pointers to coordinates
+    
+    auto coordx = getCoordinatesX();
+    
+    auto coordy = getCoordinatesY();
+    
+    auto coordz = getCoordinatesZ();
+    
+    // set up coordinates of reference atom
+    
+    const auto rax = coordx[iAtom];
+    
+    const auto ray = coordy[iAtom];
+    
+    const auto raz = coordz[iAtom];
+    
+    // find nearest atom
+    
+    int32_t idx = -1;
+    
+    const auto indexes = getAtomIndexes(atomLabel);
+   
+    const auto nindexes = static_cast<int32_t>(indexes.size());
+    
+    if (nindexes > 0)
+    {
+        idx = indexes[0];
+        
+        double rmin = mathfunc::distance(rax, ray, raz,
+                                         coordx[idx],
+                                         coordy[idx],
+                                         coordz[idx]);
+        
+        for (int32_t i = 1; i < nindexes; i++)
+        {
+            const auto cidx = indexes[i];
+            
+            const auto rab = mathfunc::distance(rax, ray, raz,
+                                                coordx[cidx],
+                                                coordy[cidx],
+                                                coordz[cidx]);
+            
+            if (rmin > rab)
+            {
+                rmin = rmin;
+                
+                idx = cidx;
+            }
+        }
+    }
+    
+    return idx;
+}
+
+double
+CMolecule::getMinDistance(const double coordinateX,
+                          const double coordinateY,
+                          const double coordinateZ) const
+{
+    const auto natoms = getNumberOfAtoms();
+    
+    if (natoms > 0)
+    {
+        // set up pointers to coordinates
+           
+        auto coordx = getCoordinatesX();
+           
+        auto coordy = getCoordinatesY();
+           
+        auto coordz = getCoordinatesZ();
+        
+        double rmin = mathfunc::distance(coordinateX,
+                                         coordinateY,
+                                         coordinateZ,
+                                         coordx[0],
+                                         coordy[0],
+                                         coordz[0]);
+        
+        for (int32_t i = 1; i < natoms; i++)
+        {
+            const auto rab = mathfunc::distance(coordinateX,
+                                                coordinateY,
+                                                coordinateZ,
+                                                coordx[i],
+                                                coordy[i],
+                                                coordz[i]);
+            
+            if (rmin > rab)
+            {
+                rmin = rab;
+            }
+        }
+        
+        return rmin;
+    }
+    
+    return -1.0;
 }
 
 std::string
