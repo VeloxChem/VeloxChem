@@ -396,6 +396,17 @@ class CMolecule
     */
     int32_t getIndexOfNearestAtom(const int32_t      iAtom,
                                   const std::string& atomLabel) const;
+    
+    
+    /**
+     Gets coordination number of specific atom in molecule.
+
+     @param iAtom the index of requested atom.
+     @param raddius the effective coordination radius.
+     @return the coordination number of atom.
+    */
+    int32_t getCoordinationNummber(const int32_t iAtom,
+                                   const double  radius) const;
 
     /**
      Prints geometry of molecule as table to output stream.

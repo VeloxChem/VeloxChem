@@ -779,6 +779,54 @@ CMolecule::getIndexOfNearestAtom(const int32_t      iAtom,
     return idx;
 }
 
+int32_t
+CMolecule::getCoordinationNummber(const int32_t iAtom,
+                                  const double  radius) const
+{
+    const auto natoms = getNumberOfAtoms();
+    
+    if (natoms > 0)
+    {
+        // set up pointers to coordinates
+           
+        auto coordx = getCoordinatesX();
+           
+        auto coordy = getCoordinatesY();
+           
+        auto coordz = getCoordinatesZ();
+        
+        // set up atom coordinates
+        
+        const auto rax = coordx[iAtom];
+        
+        const auto ray = coordy[iAtom];
+        
+        const auto raz = coordz[iAtom];
+        
+        int32_t cnum = 0;
+        
+        for (int32_t i = 0; i < natoms; i++)
+        {
+            if (i != iAtom)
+            {
+                const auto rab = mathfunc::distance(rax, ray, raz,
+                                                    coordx[i],
+                                                    coordy[i],
+                                                    coordz[i]);
+                
+                if (rab < radius)
+                {
+                    cnum++;
+                }
+            }
+        }
+        
+        return cnum;
+    }
+    
+    return 0;
+}
+
 double
 CMolecule::getMinDistance(const double coordinateX,
                           const double coordinateY,

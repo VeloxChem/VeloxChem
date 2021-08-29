@@ -389,3 +389,24 @@ TEST_F(CMoleculeTest, GetAtomCoordinates)
     
     vlxtest::compare(h2o.getAtomCoordinates(2), coordsH2.data());
 }
+
+TEST_F(CMoleculeTest, GetCoordinationNummber)
+{
+    CMolecule h2o = vlxmol::getMoleculeH2O();
+
+    ASSERT_EQ(2, h2o.getCoordinationNummber(0, 3.0));
+    
+    ASSERT_EQ(0, h2o.getCoordinationNummber(0, 1.0));
+    
+    ASSERT_EQ(2, h2o.getCoordinationNummber(1, 6.0));
+    
+    ASSERT_EQ(1, h2o.getCoordinationNummber(1, 2.0));
+    
+    ASSERT_EQ(0, h2o.getCoordinationNummber(1, 1.0));
+    
+    ASSERT_EQ(2, h2o.getCoordinationNummber(2, 6.0));
+    
+    ASSERT_EQ(1, h2o.getCoordinationNummber(2, 2.0));
+    
+    ASSERT_EQ(0, h2o.getCoordinationNummber(2, 1.0));
+}
