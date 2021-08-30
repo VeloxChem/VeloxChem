@@ -64,6 +64,8 @@ class TdhfHessianDriver(HessianDriver):
 
         self.flag = 'RPA Hessian Driver'
         self.scf_drv = scf_drv
+        self.state_deriv_index = 0 # calculate 1st excited state by default
+        self.tamm_dancoff = False
 
     def update_settings(self, method_dict, rsp_dict, freq_dict=None, orbrsp_dict=None):
         """
@@ -86,18 +88,20 @@ class TdhfHessianDriver(HessianDriver):
 
         super().update_settings(method_dict, freq_dict)
 
+        # TODO: set default values in __init__ instead
         if 'state_deriv_index' in freq_dict:
             # user gives '1' for first excited state, but internal index is 0
             self.state_deriv_index = int(freq_dict['state_deriv_index']) - 1
 
         if 'tamm_dancoff' in rsp_dict:
             key = rsp_dict['tamm_dancoff'].lower()
-            tamm_dancoff = True if key in ['yes', 'y'] else False
+            if key in ['yes', 'y']:
+                self.tamm_dancoff = True
+            else:
+                self.tamm_dancoff = False
 
-        if tamm_dancoff:
-            self.flag = 'TDA Hessian Driver'
-
-            
+        if self.tamm_dancoff:
+            self.flag = 'TDA Hessian Driver'    
 
         self.rsp_dict = dict(rsp_dict)
         self.orbrsp_dict = dict(orbrsp_dict)

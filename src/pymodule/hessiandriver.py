@@ -304,7 +304,7 @@ class HessianDriver:
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
-        valstr = 'Harmonic frequencies (in cm**-1), reduced masses (in amu), force constants (in mdyne/A),'
+        valstr = 'Harmonic frequencies (in cm**-1), force constants (in mdyne/A), reduced masses (in amu),'
         self.ostream.print_header(valstr)
         if self.ir_intensities is not None:
             valstr = ' IR intensities (in km/mol),'
@@ -359,8 +359,8 @@ class HessianDriver:
                 normal_mode_string += '{:^30s}{:>1s}'.format('X         Y         Z','|')
             self.ostream.print_line(index_string)
             self.ostream.print_line(freq_string)
-            self.ostream.print_line(mass_string)
             self.ostream.print_line(force_cnst_string)
+            self.ostream.print_line(mass_string)
             if self.ir_intensities is not None:
                 self.ostream.print_line(ir_intens_string)
                 if self.raman_intensities is not None:
