@@ -1,11 +1,9 @@
-import random
-import sys
-import tempfile
-import unittest
 from pathlib import Path
-
 import numpy as np
+import tempfile
+import random
 import pytest
+import sys
 
 try:
     import cppe
@@ -20,7 +18,7 @@ from veloxchem.veloxchemlib import is_mpi_master
 
 
 @pytest.mark.solvers
-class TestCPP(unittest.TestCase):
+class TestCppAbs:
 
     def run_scf(self, task):
 
@@ -31,7 +29,7 @@ class TestCPP(unittest.TestCase):
 
         return scf_drv.scf_tensors
 
-    def run_cpp(self, inpfile, potfile, xcfun_label, data_lines):
+    def run_cpp(self, inpfile, potfile, xcfun_label, data_lines, ref_spectrum):
 
         task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
@@ -62,7 +60,7 @@ class TestCPP(unittest.TestCase):
         cpp_prop.init_driver(task.mpi_comm, task.ostream)
         cpp_prop.compute(task.molecule, task.ao_basis, scf_tensors)
 
-        self.assertTrue(cpp_prop.rsp_driver.is_converged)
+        assert cpp_prop.rsp_driver.is_converged
 
         if is_mpi_master(task.mpi_comm):
             self.check_printout(cpp_prop)
@@ -73,8 +71,14 @@ class TestCPP(unittest.TestCase):
                 for w in ref_freqs
                 for (a, b) in ['xx', 'yy', 'zz', 'xy', 'xz', 'yz']
             ])
-            self.assertTrue(np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4)
-            self.assertTrue(np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4)
+            assert np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4
+            assert np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4
+
+            spectrum = cpp_prop.get_spectrum()
+            for i, (w, sigma) in enumerate(spectrum):
+                ref_w, ref_sigma = ref_spectrum[i]
+                assert abs(w - ref_w) < 1.0e-6
+                assert abs((sigma - ref_sigma) / ref_sigma) < 1.0e-6
 
     def check_printout(self, cpp_prop):
 
@@ -100,9 +104,9 @@ class TestCPP(unittest.TestCase):
                             key_found = True
                             print_real = float(content[1])
                             print_imag = float(content[2].replace('j', ''))
-                            self.assertAlmostEqual(val.real, print_real, 6)
-                            self.assertAlmostEqual(val.imag, print_imag, 6)
-                self.assertTrue(key_found)
+                            assert abs(val.real - print_real) < 1.0e-6
+                            assert abs(val.imag - print_imag) < 1.0e-6
+                assert key_found
 
     def test_cpp_hf(self):
 
@@ -138,7 +142,12 @@ class TestCPP(unittest.TestCase):
         """
         data_lines = raw_data.splitlines()[1:-1]
 
-        self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
+        ref_spectrum = [
+            (0.05, 4.363694e-05),
+            (0.1, 0.0001884550),
+        ]
+
+        self.run_cpp(inpfile, potfile, xcfun_label, data_lines, ref_spectrum)
 
     def test_cpp_dft(self):
 
@@ -174,7 +183,12 @@ class TestCPP(unittest.TestCase):
         """
         data_lines = raw_data.splitlines()[1:-1]
 
-        self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
+        ref_spectrum = [
+            (0.05, 7.583334e-05),
+            (0.1, 0.0003491288),
+        ]
+
+        self.run_cpp(inpfile, potfile, xcfun_label, data_lines, ref_spectrum)
 
     def test_cpp_dft_slda(self):
 
@@ -210,7 +224,12 @@ class TestCPP(unittest.TestCase):
         """
         data_lines = raw_data.splitlines()[1:-1]
 
-        self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
+        ref_spectrum = [
+            (0.05, 8.661987e-05),
+            (0.1, 0.0004048237),
+        ]
+
+        self.run_cpp(inpfile, potfile, xcfun_label, data_lines, ref_spectrum)
 
     @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_cpp_hf_pe(self):
@@ -247,7 +266,12 @@ class TestCPP(unittest.TestCase):
         """
         data_lines = raw_data.splitlines()[1:-1]
 
-        self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
+        ref_spectrum = [
+            (0.05, 4.422682e-05),
+            (0.1, 0.000190097394),
+        ]
+
+        self.run_cpp(inpfile, potfile, xcfun_label, data_lines, ref_spectrum)
 
     @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
     def test_cpp_dft_pe(self):
@@ -284,8 +308,9 @@ class TestCPP(unittest.TestCase):
         """
         data_lines = raw_data.splitlines()[1:-1]
 
-        self.run_cpp(inpfile, potfile, xcfun_label, data_lines)
+        ref_spectrum = [
+            (0.05, 7.451565e-05),
+            (0.1, 0.0003379678),
+        ]
 
-
-if __name__ == '__main__':
-    unittest.main()
+        self.run_cpp(inpfile, potfile, xcfun_label, data_lines, ref_spectrum)

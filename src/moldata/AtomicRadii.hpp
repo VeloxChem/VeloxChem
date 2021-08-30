@@ -23,12 +23,12 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef VdwRadii_hpp
-#define VdwRadii_hpp
+#ifndef AtomicRadii_hpp
+#define AtomicRadii_hpp
 
 #include <vector>
 
-namespace vdwradii {  // vdwradii namespace
+namespace atomicradii {  // atomicradii namespace
 
 /**
  Creates VDW radii.
@@ -37,6 +37,20 @@ namespace vdwradii {  // vdwradii namespace
  */
 std::vector<double> buildVdwRadii();
 
-}  // namespace vdwradii
+/**
+ Creates MK radii.
 
-#endif /* VdwRadii_hpp */
+ @return a vector of MK radii with nuclear charge as index.
+ */
+std::vector<double> buildMkRadii();
+
+/**
+ Creates covalent radii.
+
+ @return a vector of covalent radii with nuclear charge as index.
+ */
+std::vector<double> buildCovalentRadii();
+
+}  // namespace atomicradii
+
+#endif /* AtomicRadii_hpp */

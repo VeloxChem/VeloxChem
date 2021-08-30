@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-import unittest
 
 from veloxchem.veloxchemlib import DenseMatrix
 from veloxchem.veloxchemlib import OverlapMatrix
@@ -15,7 +14,7 @@ from veloxchem.mpitask import MpiTask
 from veloxchem.excitondriver import ExcitonModelDriver
 
 
-class TestExciton(unittest.TestCase):
+class TestExciton:
 
     @staticmethod
     def assemble_matrices(ao_inds_1, ao_inds_2, s11, s12, s21, s22):
@@ -77,7 +76,7 @@ class TestExciton(unittest.TestCase):
                                           S12.to_numpy(), S21.to_numpy(),
                                           S22.to_numpy())
             S_exmod = OverlapMatrix(DenseMatrix(smat))
-            self.assertEqual(S, S_exmod)
+            assert S == S_exmod
 
         # compute kinetic energy
 
@@ -94,7 +93,7 @@ class TestExciton(unittest.TestCase):
                                           T12.to_numpy(), T21.to_numpy(),
                                           T22.to_numpy())
             T_exmod = KineticEnergyMatrix(DenseMatrix(tmat))
-            self.assertEqual(T, T_exmod)
+            assert T == T_exmod
 
         # compute nuclear potential
 
@@ -111,7 +110,7 @@ class TestExciton(unittest.TestCase):
                                           V12.to_numpy(), V21.to_numpy(),
                                           V22.to_numpy())
             V_exmod = NuclearPotentialMatrix(DenseMatrix(vmat))
-            self.assertEqual(V, V_exmod)
+            assert V == V_exmod
 
     def run_exciton_model(self, method_dict, ref_H, threshold):
 
@@ -130,14 +129,14 @@ class TestExciton(unittest.TestCase):
             diag_diff = np.max(np.abs(np.diag(exciton_drv.H) - np.diag(ref_H)))
             abs_diff = np.max(np.abs(np.abs(exciton_drv.H) - np.abs(ref_H)))
 
-            self.assertTrue(diag_diff < threshold)
-            self.assertTrue(abs_diff < threshold)
+            assert diag_diff < threshold
+            assert abs_diff < threshold
 
             ref_eigvals, ref_eigvecs = np.linalg.eigh(ref_H)
             eigvals, eigvecs = np.linalg.eigh(exciton_drv.H)
 
             eigval_diff = np.max(np.abs(eigvals - ref_eigvals))
-            self.assertTrue(eigval_diff < threshold)
+            assert eigval_diff < threshold
 
             backup_H = np.array(exciton_drv.H)
 
@@ -145,19 +144,23 @@ class TestExciton(unittest.TestCase):
         exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         if is_mpi_master(task.mpi_comm):
-            self.assertTrue(np.max(np.abs(backup_H - exciton_drv.H)) < 1.0e-10)
+            assert np.max(np.abs(backup_H - exciton_drv.H)) < 1.0e-10
 
             exciton_h5 = Path(exciton_drv.checkpoint_file)
 
             for ind in range(len(exciton_drv.monomers)):
-                scf_h5 = f'monomer_{ind + 1}.scf.h5'
-                scf_h5 = exciton_h5.with_suffix(f'.{scf_h5}')
-                rsp_h5 = f'monomer_{ind + 1}.rsp.h5'
-                rsp_h5 = exciton_h5.with_suffix(f'.{rsp_h5}')
+                scf_h5 = exciton_h5.with_suffix(f'.monomer_{ind + 1}.scf.h5')
                 if scf_h5.is_file():
                     scf_h5.unlink()
+                scf_final_h5 = scf_h5.with_suffix('.tensors.h5')
+                if scf_final_h5.is_file():
+                    scf_final_h5.unlink()
+                rsp_h5 = exciton_h5.with_suffix(f'.monomer_{ind + 1}.rsp.h5')
                 if rsp_h5.is_file():
                     rsp_h5.unlink()
+                rsp_final_h5 = rsp_h5.with_suffix('.solutions.h5')
+                if rsp_final_h5.is_file():
+                    rsp_final_h5.unlink()
 
             if exciton_h5.is_file():
                 exciton_h5.unlink()
@@ -295,7 +298,3 @@ class TestExciton(unittest.TestCase):
         ])
 
         self.run_exciton_model({'xcfun': 'blyp'}, ref_H, 1.0e-5)
-
-
-if __name__ == "__main__":
-    unittest.main()

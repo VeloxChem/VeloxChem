@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-import unittest
 
 from veloxchem.veloxchemlib import OverlapIntegralsDriver
 from veloxchem.veloxchemlib import SADGuessDriver
@@ -8,7 +7,7 @@ from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 
 
-class TestInitialGuess(unittest.TestCase):
+class TestInitialGuess:
 
     def test_sad_guess(self):
 
@@ -40,17 +39,17 @@ class TestInitialGuess(unittest.TestCase):
 
         if is_mpi_master(task.mpi_comm):
 
-            self.assertEqual(density.ndim, 2)
-            self.assertEqual(density.shape[0], 41)
-            self.assertEqual(density.shape[1], 41)
+            assert density.ndim == 2
+            assert density.shape[0] == 41
+            assert density.shape[1] == 41
 
             # number of electrons
 
-            self.assertEqual(molecule.number_of_electrons(), 10)
-            self.assertEqual(molecule.number_of_alpha_electrons(), 5)
-            self.assertEqual(molecule.number_of_beta_electrons(), 5)
+            assert molecule.number_of_electrons() == 10
+            assert molecule.number_of_alpha_electrons() == 5
+            assert molecule.number_of_beta_electrons() == 5
 
-            self.assertAlmostEqual(2.0 * np.sum(density * overlap), 10., 13)
+            assert abs(2.0 * np.sum(density * overlap) - 10.) < 1.0e-13
 
         # compute other initial guess
 
@@ -68,11 +67,11 @@ class TestInitialGuess(unittest.TestCase):
 
         if is_mpi_master(task.mpi_comm):
 
-            self.assertEqual(molecule.number_of_electrons(), 8)
-            self.assertEqual(molecule.number_of_alpha_electrons(), 4)
-            self.assertEqual(molecule.number_of_beta_electrons(), 4)
+            assert molecule.number_of_electrons() == 8
+            assert molecule.number_of_alpha_electrons() == 4
+            assert molecule.number_of_beta_electrons() == 4
 
-            self.assertAlmostEqual(np.sum(density_a * overlap), 4., 13)
+            assert abs(np.sum(density_a * overlap) - 4.) < 1.0e-13
 
         # closed-shell anion initial guess
 
@@ -85,11 +84,11 @@ class TestInitialGuess(unittest.TestCase):
 
         if is_mpi_master(task.mpi_comm):
 
-            self.assertEqual(molecule.number_of_electrons(), 12)
-            self.assertEqual(molecule.number_of_alpha_electrons(), 6)
-            self.assertEqual(molecule.number_of_beta_electrons(), 6)
+            assert molecule.number_of_electrons() == 12
+            assert molecule.number_of_alpha_electrons() == 6
+            assert molecule.number_of_beta_electrons() == 6
 
-            self.assertAlmostEqual(np.sum(density_a * overlap), 6., 13)
+            assert abs(np.sum(density_a * overlap) - 6.) < 1.0e-13
 
         # open-shell cation initial guess
 
@@ -103,12 +102,12 @@ class TestInitialGuess(unittest.TestCase):
 
         if is_mpi_master(task.mpi_comm):
 
-            self.assertEqual(molecule.number_of_electrons(), 9)
-            self.assertEqual(molecule.number_of_alpha_electrons(), 5)
-            self.assertEqual(molecule.number_of_beta_electrons(), 4)
+            assert molecule.number_of_electrons() == 9
+            assert molecule.number_of_alpha_electrons() == 5
+            assert molecule.number_of_beta_electrons() == 4
 
-            self.assertAlmostEqual(np.sum(density_a * overlap), 5., 13)
-            self.assertAlmostEqual(np.sum(density_b * overlap), 4., 13)
+            assert abs(np.sum(density_a * overlap) - 5.) < 1.0e-13
+            assert abs(np.sum(density_b * overlap) - 4.) < 1.0e-13
 
         # open-shell anion initial guess
 
@@ -122,12 +121,12 @@ class TestInitialGuess(unittest.TestCase):
 
         if is_mpi_master(task.mpi_comm):
 
-            self.assertEqual(molecule.number_of_electrons(), 11)
-            self.assertEqual(molecule.number_of_alpha_electrons(), 6)
-            self.assertEqual(molecule.number_of_beta_electrons(), 5)
+            assert molecule.number_of_electrons() == 11
+            assert molecule.number_of_alpha_electrons() == 6
+            assert molecule.number_of_beta_electrons() == 5
 
-            self.assertAlmostEqual(np.sum(density_a * overlap), 6., 13)
-            self.assertAlmostEqual(np.sum(density_b * overlap), 5., 13)
+            assert abs(np.sum(density_a * overlap) - 6.) < 1.0e-13
+            assert abs(np.sum(density_b * overlap) - 5.) < 1.0e-13
 
         # open-shell triplet initial guess
 
@@ -141,13 +140,9 @@ class TestInitialGuess(unittest.TestCase):
 
         if is_mpi_master(task.mpi_comm):
 
-            self.assertEqual(molecule.number_of_electrons(), 10)
-            self.assertEqual(molecule.number_of_alpha_electrons(), 6)
-            self.assertEqual(molecule.number_of_beta_electrons(), 4)
+            assert molecule.number_of_electrons() == 10
+            assert molecule.number_of_alpha_electrons() == 6
+            assert molecule.number_of_beta_electrons() == 4
 
-            self.assertAlmostEqual(np.sum(density_a * overlap), 6., 13)
-            self.assertAlmostEqual(np.sum(density_b * overlap), 4., 13)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert abs(np.sum(density_a * overlap) - 6.) < 1.0e-13
+            assert abs(np.sum(density_b * overlap) - 4.) < 1.0e-13

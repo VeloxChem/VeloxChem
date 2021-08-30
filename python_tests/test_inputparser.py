@@ -1,16 +1,11 @@
-import textwrap
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
 import numpy.testing as npt
 import pytest
-from veloxchem.inputparser import InputParser
-from veloxchem.inputparser import (
-    parse_seq_range,
-    parse_seq_fixed,
-    parse_bool,
-    parse_str,
-)
+from veloxchem.inputparser import (InputParser, parse_seq_range,
+                                   parse_seq_fixed, parse_bool, parse_str)
 from veloxchem.veloxchemlib import is_mpi_master, is_single_node
 
 
@@ -28,39 +23,17 @@ def test_input_dict(mock_parse):
 
 def test_full_input(tmpdir):
 
-    if not is_mpi_master():
-        return
+    here = Path(__file__).parent
+    inpfile = here / 'inputs' / 'water.inp'
 
-    with open(tmpdir / 'h2o.inp', 'w') as f:
-        f.write(
-            textwrap.dedent("""
-                @jobs
-                task: hf
-                @end
-
-                @method settings
-                basis: cc-pvdz
-                @end
-
-                @molecule
-                charge: 0
-                multiplicity: 1
-                units: au
-                xyz:
-                O   0.0   0.0   0.0
-                H   0.0   1.4   1.1
-                H   0.0  -1.4   1.1
-                @end
-                """))
-
-    ip = InputParser(str(tmpdir / 'h2o.inp'))
+    ip = InputParser(str(inpfile))
 
     expected = {
         'jobs': {
-            'task': 'hf',
+            'task': 'scf',
         },
         'method_settings': {
-            'basis': 'cc-pvdz',
+            'basis': 'aug-cc-pvdz',
         },
         'molecule': {
             'charge': '0',
@@ -68,18 +41,15 @@ def test_full_input(tmpdir):
             'units': 'au',
             'xyz': ['O 0.0 0.0 0.0', 'H 0.0 1.4 1.1', 'H 0.0 -1.4 1.1'],
         },
-        'filename': str(tmpdir / 'h2o'),
+        'filename': str(inpfile.with_name(inpfile.stem)),
         'scf': {
-            'checkpoint_file': str(tmpdir / 'h2o.scf.h5'),
+            'checkpoint_file': str(inpfile.with_suffix('.scf.h5')),
         },
         'response': {
-            'checkpoint_file': str(tmpdir / 'h2o.rsp.h5'),
+            'checkpoint_file': str(inpfile.with_suffix('.rsp.h5')),
         },
         'exciton': {
-            'checkpoint_file': str(tmpdir / 'h2o.exciton.h5'),
-        },
-        'loprop': {
-            'checkpoint_file': str(tmpdir / 'h2o.loprop.h5'),
+            'checkpoint_file': str(inpfile.with_suffix('.exciton.h5')),
         },
     }
 
@@ -89,32 +59,12 @@ def test_full_input(tmpdir):
 def test_error_in_input(tmpdir):
 
     if is_single_node():
-
-        with open(tmpdir / 'h2o.inp', 'w') as f:
-            f.write(
-                textwrap.dedent("""
-                    @jobs
-                    task: hf
-
-                    @method settings
-                    basis: cc-pvdz
-                    @end
-
-                    @molecule
-                    charge: 0
-                    multiplicity: 1
-                    units: au
-                    xyz:
-                    O   0.0   0.0   0.0
-                    H   0.0   1.4   1.1
-                    H   0.0  -1.4   1.1
-                    @end
-                    """))
+        here = Path(__file__).parent
+        inpfile = here / 'inputs' / 'water_error.inp'
 
         with pytest.raises(AssertionError) as info:
-            InputParser(str(tmpdir / 'h2o.inp'))
-
-        assert 'bad syntax' in str(info.value)
+            InputParser(str(inpfile))
+            assert 'bad syntax' in str(info.value)
 
 
 @pytest.mark.parametrize(

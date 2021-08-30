@@ -160,11 +160,20 @@ def _Molecule_more_info(self):
     width = 70
     mol_info = []
 
-    mol_info.append(f'Molecular charge            : {self.get_charge():.0f}'.ljust(width))
-    mol_info.append(f'Spin multiplicity           : {self.get_multiplicity():d}'.ljust(width))
-    mol_info.append(f'Number of atoms             : {self.number_of_atoms():d}'.ljust(width))
-    mol_info.append(f'Number of alpha electrons   : {self.number_of_alpha_electrons():d}'.ljust(width))
-    mol_info.append(f'Number of beta  electrons   : {self.number_of_beta_electrons():d}'.ljust(width))
+    mol_info.append(
+        f'Molecular charge            : {self.get_charge():.0f}'.ljust(width))
+    mol_info.append(
+        f'Spin multiplicity           : {self.get_multiplicity():d}'.ljust(
+            width))
+    mol_info.append(
+        f'Number of atoms             : {self.number_of_atoms():d}'.ljust(
+            width))
+    mol_info.append(
+        f'Number of alpha electrons   : {self.number_of_alpha_electrons():d}'.
+        ljust(width))
+    mol_info.append(
+        f'Number of beta  electrons   : {self.number_of_beta_electrons():d}'.
+        ljust(width))
 
     return '\n'.join(mol_info)
 
@@ -313,7 +322,8 @@ def _Molecule_write_xyz(self, xyz_filename):
         for elem_id, x, y, z in zip(elem_ids, xs, ys, zs):
             elem = ChemicalElement()
             elem.set_atom_type(elem_id)
-            fh.write(f'{elem.get_name():<6s} {x:22.12f} {y:22.12f} {z:22.12f}\n')
+            fh.write(
+                f'{elem.get_name():<6s} {x:22.12f} {y:22.12f} {z:22.12f}\n')
 
 def _Molecule_moments_of_inertia(self):
     """

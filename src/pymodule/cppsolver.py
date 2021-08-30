@@ -24,9 +24,9 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import time as tm
-import psutil
 import sys
 
 from .veloxchemlib import mpi_master, hartree_in_wavenumbers
@@ -37,8 +37,7 @@ from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
-from .checkpoint import check_rsp_hdf5
-from .checkpoint import append_rsp_solution_hdf5
+from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
 
 
 class ComplexResponse(LinearSolver):
@@ -568,7 +567,7 @@ class ComplexResponse(LinearSolver):
 
                     x_full = self.get_full_solution_vector(x)
                     if self.rank == mpi_master():
-                        xv = 2.0 * np.dot(x_full, v1[(op, w)])
+                        xv = np.dot(x_full, v1[(op, w)])
                         xvs.append((op, w, xv))
 
                     r_norms_2 = 2.0 * r.squared_norm(axis=0)
@@ -687,40 +686,44 @@ class ComplexResponse(LinearSolver):
                                                basis, scf_tensors)
 
             if self.is_converged:
-                key_0 = list(solutions.keys())[0]
-                x_0 = self.get_full_solution_vector(solutions[key_0])
-
                 if self.rank == mpi_master():
-                    avail_mem = psutil.virtual_memory().available
-                    write_solution_to_file = (
-                        avail_mem < sys.getsizeof(x_0) * len(solutions) * 2)
-                    full_solutions = {}
-
                     va = {op: v for op, v in zip(self.a_components, a_rhs)}
                     rsp_funcs = {}
+                    full_solutions = {}
+
+                    if self.checkpoint_file is not None:
+                        final_h5_fname = str(
+                            Path(self.checkpoint_file).with_suffix(
+                                '.solutions.h5'))
+                    else:
+                        final_h5_fname = 'rsp.solutions.h5'
+                    if self.rank == mpi_master():
+                        create_hdf5(final_h5_fname, molecule, basis,
+                                    dft_dict['dft_func_label'],
+                                    pe_dict['potfile_text'])
 
                 for bop, w in solutions:
                     x = self.get_full_solution_vector(solutions[(bop, w)])
 
                     if self.rank == mpi_master():
                         for aop in self.a_components:
-                            rsp_funcs[(aop, bop, w)] = -2.0 * np.dot(va[aop], x)
+                            rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
+                            full_solutions[(bop, w)] = x
 
-                            if write_solution_to_file:
-                                append_rsp_solution_hdf5(
-                                    self.checkpoint_file,
-                                    '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
-                            else:
-                                full_solutions[(bop, w)] = x
+                            write_rsp_solution(
+                                final_h5_fname,
+                                '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
 
                 if self.rank == mpi_master():
-                    if write_solution_to_file:
-                        return {'response_functions': rsp_funcs}
-                    else:
-                        return {
-                            'response_functions': rsp_funcs,
-                            'solutions': full_solutions
-                        }
+                    checkpoint_text = 'Response solution vectors written to file: '
+                    checkpoint_text += final_h5_fname
+                    self.ostream.print_info(checkpoint_text)
+                    self.ostream.print_blank()
+
+                    return {
+                        'response_functions': rsp_funcs,
+                        'solutions': full_solutions
+                    }
 
         else:
             if self.is_converged:
@@ -734,7 +737,7 @@ class ComplexResponse(LinearSolver):
 
                 return {'focks': focks, 'kappas': kappas}
 
-        return {}
+        return None
 
     def get_full_solution_vector(self, solution):
         """

@@ -260,9 +260,9 @@ class PulsedResponse:
 
         # Launch the rsp_driver calculations on the selected frequencies
         results = self.rsp_driver.compute(molecule, ao_basis, scf_tensors)
-        results['pulse_settings'] = self.pulse_settings
 
         if self.rank == mpi_master():
+            results['pulse_settings'] = self.pulse_settings
             results['properties'] = {}
             # Loop over all directions
             for xyz1 in ['x', 'y', 'z']:

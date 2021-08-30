@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-import unittest
 import tempfile
 import random
 import pytest
@@ -18,7 +17,7 @@ from veloxchem.rsppolarizability import Polarizability
 
 
 @pytest.mark.solvers
-class TestLR(unittest.TestCase):
+class TestLR:
 
     def run_scf(self, task):
 
@@ -62,7 +61,7 @@ class TestLR(unittest.TestCase):
                 -lr_results['response_functions'][(a, b, w)] for w in ref_freqs
                 for a in 'xyz' for b in 'xyz'
             ])
-            self.assertTrue(np.max(np.abs(prop - ref_prop)) < 1.0e-4)
+            assert np.max(np.abs(prop - ref_prop)) < 1.0e-4
 
     def check_printout(self, lr_prop):
 
@@ -93,7 +92,7 @@ class TestLR(unittest.TestCase):
                     print_vals.append(float(content[3]))
             print_vals = np.array(print_vals)
 
-            self.assertTrue(np.max(np.abs(lr_vals - print_vals)) < 1e-6)
+            assert np.max(np.abs(lr_vals - print_vals)) < 1e-6
 
     def test_lr_hf(self):
 
@@ -209,7 +208,3 @@ class TestLR(unittest.TestCase):
         """
 
         self.run_lr(inpfile, potfile, xcfun_label, raw_data)
-
-
-if __name__ == "__main__":
-    unittest.main()

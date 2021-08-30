@@ -236,11 +236,11 @@ CVisualizationDriver::compute(CCubicGrid&               grid,
 {
     // grid information
 
-    auto x0 = grid.originX(), y0 = grid.originY(), z0 = grid.originZ();
+    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
 
-    auto dx = grid.stepSizeX(), dy = grid.stepSizeY(), dz = grid.stepSizeZ();
+    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
 
-    auto nx = grid.numPointsX(), ny = grid.numPointsY(), nz = grid.numPointsZ();
+    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
 
     // compute local grid on this MPI process
 
@@ -286,11 +286,11 @@ CVisualizationDriver::compute(CCubicGrid&             grid,
 {
     // grid information
 
-    auto x0 = grid.originX(), y0 = grid.originY(), z0 = grid.originZ();
+    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
 
-    auto dx = grid.stepSizeX(), dy = grid.stepSizeY(), dz = grid.stepSizeZ();
+    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
 
-    auto nx = grid.numPointsX(), ny = grid.numPointsY(), nz = grid.numPointsZ();
+    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
 
     // compute local grid on this MPI process
 
@@ -336,11 +336,11 @@ CVisualizationDriver::compute_omp(CCubicGrid&               grid,
 {
     // grid information
 
-    auto x0 = grid.originX(), y0 = grid.originY(), z0 = grid.originZ();
+    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
 
-    auto dx = grid.stepSizeX(), dy = grid.stepSizeY(), dz = grid.stepSizeZ();
+    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
 
-    auto nx = grid.numPointsX(), ny = grid.numPointsY(), nz = grid.numPointsZ();
+    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
 
     // sanity check
 
@@ -422,11 +422,11 @@ CVisualizationDriver::compute_omp(CCubicGrid&             grid,
 {
     // grid information
 
-    auto x0 = grid.originX(), y0 = grid.originY(), z0 = grid.originZ();
+    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
 
-    auto dx = grid.stepSizeX(), dy = grid.stepSizeY(), dz = grid.stepSizeZ();
+    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
 
-    auto nx = grid.numPointsX(), ny = grid.numPointsY(), nz = grid.numPointsZ();
+    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
 
     // sanity check
 

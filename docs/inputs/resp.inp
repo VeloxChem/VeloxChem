@@ -1,21 +1,21 @@
 @jobs
-task: loprop
+task: resp charges
 @end
 
 @method settings
-basis: def2-svp
+basis: 6-31g
+@end
+
+@resp charges
+equal charges: 2 = 3
 @end
 
 @molecule
 charge: 0
 multiplicity: 1
 units: au
-xyz:
+xyz:  
 O   0.0   0.0   0.0
 H   0.0   1.4   1.1
 H   0.0  -1.4   1.1
-@end
-
-@loprop
-localize: charges
-@end
+@end 

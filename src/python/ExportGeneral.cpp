@@ -36,16 +36,18 @@
 
 #include <string>
 
+#ifdef ENABLE_MKL
+#include "ConfigMKL.hpp"
+#endif
 #include "Codata.hpp"
 #include "ErrorHandler.hpp"
 #include "MpiFunc.hpp"
 #include "SpinBlock.hpp"
 #include "StringFormat.hpp"
-#ifdef ENABLE_MKL
-#include "ConfigMKL.hpp"
-#endif
+#include "TwoIndexes.hpp"
 
 namespace py = pybind11;
+using namespace py::literals;
 
 namespace vlx_general {  // vlx_general namespace
 
@@ -60,48 +62,6 @@ get_mpi_comm(py::object py_comm)
     if (!comm_ptr) throw py::error_already_set();
 
     return comm_ptr;
-}
-
-// Helper function for checking master node
-
-static bool
-is_mpi_master(py::object py_comm)
-{
-    if (py_comm.is_none())
-    {
-        return (mpi::rank(MPI_COMM_WORLD) == mpi::master());
-    }
-    else
-    {
-        auto comm = get_mpi_comm(py_comm);
-        return (mpi::rank(*comm) == mpi::master());
-    }
-}
-
-// Helper function for checking number of nodes
-
-static bool
-is_single_node(py::object py_comm)
-{
-    if (py_comm.is_none())
-    {
-        return (mpi::nodes(MPI_COMM_WORLD) == 1);
-    }
-    else
-    {
-        auto comm = get_mpi_comm(py_comm);
-        return (mpi::nodes(*comm) == 1);
-    }
-}
-
-// Helper function for checking number of nodes
-
-// Helper function for getting the size limit in MPI communication
-
-static int32_t
-mpi_size_limit()
-{
-    return static_cast<int32_t>(1 << 30) / 5 * 9;
 }
 
 // Helper functions for getting shape and strides from int32_t dimension
@@ -195,31 +155,19 @@ pointer_to_numpy(const int32_t* ptr, int32_t nRows, int32_t nColumns)
     return pointer_to_numpy(ptr, std::vector<int32_t>({nRows, nColumns}));
 }
 
-// Helper function for converting angular momentum
-
-static std::string
-string_to_angular_momentum(const int32_t angl)
-{
-    return fstr::to_AngularMomentum(angl);
-}
-
-static int32_t
-integer_to_angular_momentum(const std::string& label)
-{
-    return fstr::to_AngularMomentum(label);
-}
-
 // Exports classes/functions in src/general to python
 
 void
 export_general(py::module& m)
 {
     // configure MKL single dynamic library
+
 #ifdef ENABLE_MKL
     configure_mkl_rt();
 #endif
 
     // initialize mpi4py's C-API
+
     if (import_mpi4py() < 0)
     {
         // mpi4py calls the Python C API
@@ -228,6 +176,7 @@ export_general(py::module& m)
     }
 
     // szblock enum class
+
     // clang-format off
     py::enum_<szblock>(m, "szblock")
         .value("aa", szblock::aa)
@@ -236,41 +185,72 @@ export_general(py::module& m)
         .value("bb", szblock::bb);
     // clang-format on
 
+    // CTwoIndexes class
+
+    PyClass<CTwoIndexes>(m, "TwoIndexes")
+        .def(py::init<>())
+        .def(py::init<const int32_t, const int32_t>())
+        .def("first", &CTwoIndexes::first, "Gets first index from pair of indexes.")
+        .def("second", &CTwoIndexes::second, "Gets second index from pair of indexes.");
+
     // exposing functions
 
-    m.def("mpi_master", &mpi::master);
+    m.def("mpi_master", &mpi::master, "Gets default rank of master MPI process.");
+    m.def("mpi_initialized", &mpi::initialized, "Check if MPI has been initialized.");
+    m.def(
+        "mpi_size_limit",
+        []() -> int32_t { return static_cast<int32_t>(1 << 30) / 5 * 9; },
+        "Gets the size limit in MPI communication (below 2^31-1).");
+    m.def(
+        "is_mpi_master",
+        [](py::object py_comm) -> bool {
+            if (py_comm.is_none())
+                return (mpi::rank(MPI_COMM_WORLD) == mpi::master());
+            else
+                return (mpi::rank(*get_mpi_comm(py_comm)) == mpi::master());
+        },
+        "Checks if a MPI process is the master process.",
+        "py_comm"_a = py::none());
+    m.def(
+        "is_single_node",
+        [](py::object py_comm) -> bool {
+            if (py_comm.is_none())
+                return (mpi::nodes(MPI_COMM_WORLD) == 1);
+            else
+                return (mpi::nodes(*get_mpi_comm(py_comm)) == 1);
+        },
+        "Checks if there is only one MPI process in the communicator.",
+        "py_comm"_a = py::none());
 
-    m.def("is_mpi_master", &is_mpi_master, py::arg("py_comm") = py::none());
+    m.def("assert_msg_critical", &errors::assertMsgCritical, "Prints message and aborts in case of a critical error.", "condition"_a, "message"_a);
 
-    m.def("is_single_node", &is_single_node, py::arg("py_comm") = py::none());
+    m.def("bohr_in_angstroms", &units::getBohrValueInAngstroms, "Gets Bohr value in Angstroms.");
+    m.def("hartree_in_ev", &units::getHartreeValueInElectronVolts, "Gets Hartree value in electronvolts.");
+    m.def("hartree_in_kcalpermol", &units::getHartreeValueInKiloCaloriePerMole, "Gets Hartree value in kcal/mol.");
+    m.def("hartree_in_inverse_nm", &units::getHartreeValueInInverseNanometer, "Gets Hartree value in inverse nanometer.");
+    m.def("hartree_in_wavenumbers", &units::getHartreeValueInWavenumbers, "Gets Hartree value in reciprocal cm.");
+    m.def("boltzmann_in_evperkelvin", &units::getBoltzmannConstantInElectronVoltsPerKelvin, "Gets Boltzmann constant in eV/K.");
 
-    m.def("mpi_size_limit", &mpi_size_limit);
+    m.def("dipole_in_debye", &units::getDipoleInDebye, "Gets convertion factor for dipole moment (a.u. -> Debye).");
+    m.def("rotatory_strength_in_cgs", &units::getRotatoryStrengthInCGS, "Gets convertion factor for rotatory strength (a.u. -> 10^-40 cgs).");
+    m.def("molar_ellipticity_from_beta",
+          &units::getMolarEllipticityFromBeta,
+          "Gets factor needed for the calculation of the molar ellipticity from the electric-dipole magnetic-dipole polarizability beta.");
+    m.def("extinction_coefficient_from_molar_ellipticity",
+          &units::getExtinctionCoefficientFromMolarEllipticity,
+          "Gets factor needed for the calculation of extinction coefficient from molar ellipticity.");
+    m.def("fine_structure_constant", &units::getFineStructureConstant, "Gets fine-structure constant.");
 
-    m.def("mpi_initialized", &mpi::initialized);
-
-    m.def("assert_msg_critical", &errors::assertMsgCritical);
-
-    m.def("bohr_in_angstroms", &units::getBohrValueInAngstroms);
-
-    m.def("hartree_in_ev", &units::getHartreeValueInElectronVolts);
-
-    m.def("hartree_in_kcalpermol", &units::getHartreeValueInKiloCaloriePerMole);
-
-    m.def("hartree_in_wavenumbers", &units::getHartreeValueInWavenumbers);
-
-    m.def("dipole_in_debye", &units::getDipoleInDebye);
-
-    m.def("rotatory_strength_in_cgs", &units::getRotatoryStrengthInCGS);
-
-    m.def("molar_ellipticity_from_beta", &units::getMolarEllipticityFromBeta);
-
-    m.def("extinction_coefficient_from_molar_ellipticity", &units::getExtinctionCoefficientFromMolarEllipticity);
-
-    m.def("fine_structure_constant", &units::getFineStructureConstant);
-
-    m.def("to_angular_momentum", &string_to_angular_momentum);
-
-    m.def("to_angular_momentum", &integer_to_angular_momentum);
+    m.def(
+        "to_angular_momentum",
+        [](const int32_t angl) -> std::string { return fstr::to_AngularMomentum(angl); },
+        "Converts angular momentum integer to string.",
+        "angl"_a);
+    m.def(
+        "to_angular_momentum",
+        [](const std::string& label) -> int32_t { return fstr::to_AngularMomentum(label); },
+        "Converts angular momentum string to integer.",
+        "label"_a);
 }
 
 }  // namespace vlx_general

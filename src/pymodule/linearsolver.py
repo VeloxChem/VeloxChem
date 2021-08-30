@@ -237,12 +237,21 @@ class LinearSolver:
                 self.pe = True
 
         if self.pe:
+            from .polembed import PolEmbed
+
             if ('potfile' in method_dict and
                     'potfile' not in method_dict['pe_options']):
                 method_dict['pe_options']['potfile'] = method_dict['potfile']
             assert_msg_critical('potfile' in method_dict['pe_options'],
                                 'SCF driver: No potential file defined')
             self.pe_options = dict(method_dict['pe_options'])
+
+            cppe_potfile = None
+            if self.rank == mpi_master():
+                potfile = self.pe_options['potfile']
+                cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
+            cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
+            self.pe_options['potfile'] = cppe_potfile
 
         if self.electric_field is not None:
             assert_msg_critical(
@@ -660,26 +669,23 @@ class LinearSolver:
                                     np.matmul(da, fat.T) + np.matmul(db, fbt.T))
                     gao -= np.matmul(
                         np.matmul(fat.T, da) + np.matmul(fbt.T, db), S)
+                    gao *= 0.5
 
                     gmo = np.linalg.multi_dot([mo.T, gao, mo])
 
-                    if ifock < batch_ger:
-                        e2_ger[:, ifock] = -self.lrmat2vec(gmo, nocc,
-                                                           norb)[:half_size]
-                        if self.nonlinear:
-                            fock_ger[:, ifock] = np.linalg.multi_dot(
-                                [mo.T, fak.T, mo]).reshape(norb**2)
-                    else:
-                        e2_ung[:, ifock - batch_ger] = -self.lrmat2vec(
-                            gmo, nocc, norb)[:half_size]
-                        if self.nonlinear:
-                            fock_ung[:,
-                                     ifock - batch_ger] = np.linalg.multi_dot(
-                                         [mo.T, fak.T, mo]).reshape(norb**2)
+                    gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
+                                                      norb)[:half_size]
+                    fak_T_mo_vec = np.linalg.multi_dot([mo.T, fak.T,
+                                                        mo]).reshape(norb**2)
 
-            if self.rank == mpi_master():
-                e2_ger *= 0.5
-                e2_ung *= 0.5
+                    if ifock < batch_ger:
+                        e2_ger[:, ifock] = -gmo_vec_halfsize
+                        if self.nonlinear:
+                            fock_ger[:, ifock] = fak_T_mo_vec
+                    else:
+                        e2_ung[:, ifock - batch_ger] = -gmo_vec_halfsize
+                        if self.nonlinear:
+                            fock_ung[:, ifock - batch_ger] = fak_T_mo_vec
 
             vecs_e2_ger = DistributedArray(e2_ger, self.comm)
             vecs_e2_ung = DistributedArray(e2_ung, self.comm)
@@ -1310,7 +1316,8 @@ class LinearSolver:
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            matrices = tuple(0.5 * np.linalg.multi_dot([
+            factor = 0.5 * np.sqrt(2.0)
+            matrices = tuple(factor * np.linalg.multi_dot([
                 mo.T,
                 (np.linalg.multi_dot([S, D, P.T]) -
                  np.linalg.multi_dot([P.T, D, S])), mo
@@ -1409,7 +1416,8 @@ class LinearSolver:
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            matrices = tuple(0.5 * np.linalg.multi_dot([
+            factor = 0.5 * np.sqrt(2.0)
+            matrices = tuple(factor * np.linalg.multi_dot([
                 mo.T,
                 (np.linalg.multi_dot([S, D, P.conj().T]) -
                  np.linalg.multi_dot([P.conj().T, D, S])), mo

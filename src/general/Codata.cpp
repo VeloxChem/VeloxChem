@@ -59,6 +59,15 @@ getHartreeValueInKiloCaloriePerMole()
 }
 
 double
+getHartreeValueInInverseNanometer()
+{
+    // hartree-inverse meter relationship: 2.194 746 313 708 e7 m^-1
+    //                                     2.194 746 313 708 e-2 nm^-1
+
+    return 2.194746313708e-2;
+}
+
+double
 getHartreeValueInWavenumbers()
 {
     // hartree-inverse meter relationship: 2.194 746 313 708 e7 m^-1
@@ -92,6 +101,14 @@ getRotatoryStrengthInCGS()
     // 1 [a.u.] = 2 ea0 mu_B = 471.44360760 [10**(-40) cgs unit]
 
     return 471.44360760;
+}
+
+double
+getBoltzmannConstantInElectronVoltsPerKelvin()
+{
+    // Boltzmann constant: 8.617 3324 e-5 eV K^-1
+
+    return 8.6173324e-5;
 }
 
 double

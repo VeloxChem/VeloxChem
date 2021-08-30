@@ -1,7 +1,6 @@
 from mpi4py import MPI
 from pathlib import Path
 import numpy as np
-import unittest
 import pytest
 import sys
 try:
@@ -22,7 +21,7 @@ from veloxchem.firstorderprop import FirstOrderProperties
 from veloxchem.qqscheme import get_qq_scheme
 
 
-class TestScfRestricted(unittest.TestCase):
+class TestScfRestricted:
 
     def run_scf(self, inpfile, potfile, xcfun_label, efield, ref_e_scf,
                 ref_dip):
@@ -50,10 +49,10 @@ class TestScfRestricted(unittest.TestCase):
         if is_mpi_master(task.mpi_comm):
             e_scf = scf_drv.get_scf_energy()
             tol = 1.0e-5 if xcfun_label is not None else 1.0e-6
-            self.assertTrue(np.max(np.abs(e_scf - ref_e_scf)) < tol)
+            assert np.max(np.abs(e_scf - ref_e_scf)) < tol
 
             dip = scf_prop.get_property('dipole moment')
-            self.assertTrue(np.max(np.abs(dip - ref_dip)) < 1.0e-5)
+            assert np.max(np.abs(dip - ref_dip)) < 1.0e-5
 
     def test_scf_hf(self):
 
@@ -182,7 +181,7 @@ class TestScfRestricted(unittest.TestCase):
         solver = ScfDriver(task.mpi_comm, task.ostream)
         solver.comp_2e_fock_split_comm(fock, dens, mol, bas, screening)
 
-        self.assertEqual(fock.alpha_to_numpy(0).shape, dmat.shape)
+        assert fock.alpha_to_numpy(0).shape == dmat.shape
 
     def test_update_settings(self):
 
@@ -211,17 +210,13 @@ class TestScfRestricted(unittest.TestCase):
         scf_drv = ScfDriver(MPI.COMM_WORLD, OutputStream(None))
 
         for key, val in scf_dict.items():
-            self.assertTrue(getattr(scf_drv, key) != val)
+            assert getattr(scf_drv, key) != val
         for key, val in method_dict.items():
-            self.assertTrue(getattr(scf_drv, key) != val)
+            assert getattr(scf_drv, key) != val
 
         scf_drv.update_settings(scf_dict, method_dict)
 
         for key, val in scf_dict.items():
-            self.assertTrue(getattr(scf_drv, key) == val)
+            assert getattr(scf_drv, key) == val
         for key, val in method_dict.items():
-            self.assertTrue(getattr(scf_drv, key) == val)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert getattr(scf_drv, key) == val

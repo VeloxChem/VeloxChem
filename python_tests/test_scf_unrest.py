@@ -1,10 +1,5 @@
 from pathlib import Path
 import numpy as np
-import unittest
-try:
-    import cppe
-except ImportError:
-    pass
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
@@ -12,7 +7,7 @@ from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.firstorderprop import FirstOrderProperties
 
 
-class TestScfUnrestricted(unittest.TestCase):
+class TestScfUnrestricted:
 
     def run_scf(self, inpfile, potfile, xcfun_label, efield, ref_e_scf,
                 ref_dip):
@@ -40,11 +35,11 @@ class TestScfUnrestricted(unittest.TestCase):
         if is_mpi_master(task.mpi_comm):
             e_scf = scf_drv.get_scf_energy()
             tol = 1.0e-5 if xcfun_label is not None else 1.0e-6
-            self.assertTrue(np.max(np.abs(e_scf - ref_e_scf)) < tol)
+            assert np.max(np.abs(e_scf - ref_e_scf)) < tol
 
             if ref_dip is not None:
                 dip = scf_prop.get_property('dipole moment')
-                self.assertTrue(np.max(np.abs(dip - ref_dip)) < 1.0e-5)
+                assert np.max(np.abs(dip - ref_dip)) < 1.0e-5
 
     def test_scf_dft_blyp(self):
 
@@ -120,7 +115,3 @@ class TestScfUnrestricted(unittest.TestCase):
 
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)
-
-
-if __name__ == "__main__":
-    unittest.main()
