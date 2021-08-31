@@ -160,7 +160,7 @@ class OrbitalResponse:
                 self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Response solver: Undefined XC functional')
+                                'Orbital response solver: Undefined XC functional')
 
         # Timing and profiling
         if 'timing' in rsp_dict:

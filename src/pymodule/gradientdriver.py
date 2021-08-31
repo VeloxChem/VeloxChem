@@ -28,6 +28,10 @@ import sys
 from mpi4py import MPI
 
 from .outputstream import OutputStream
+from .veloxchemlib import XCFunctional
+from .veloxchemlib import XCIntegrator
+from .veloxchemlib import AODensityMatrix
+from veloxchem.veloxchemlib import denmat
 
 class GradientDriver:
     """
@@ -42,6 +46,11 @@ class GradientDriver:
         - gradient: The gradient.
         - flag: The type of gradient driver.
         - numerical: Perform numerical gradient calculation.
+        - do_four_point: Perform numerical gradient calculation using the five-point stencil method?
+        - dft: The flag for running DFT.
+        - grid_level: The accuracy level of DFT grid.
+        - xcfun: The XC functional.
+
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -64,6 +73,11 @@ class GradientDriver:
         # flag for two-point or four-point approximation
         self.do_four_point = False
 
+        # DFT information
+        self.dft = False
+        self.grid_level = 4
+        self.xcfun = XCFunctional()
+
     def update_settings(self, grad_dict, method_dict):
         """
         Updates settings in GradientDriver.
@@ -79,18 +93,21 @@ class GradientDriver:
             key = grad_dict['numerical'].lower()
             self.numerical = True if key in ['yes', 'y'] else False
 
-        # TODO: Analytical DFT gradient is not implemented yet
-        is_dft = False
-        if 'xcfun' in method_dict:
-            if method_dict['xcfun'] is not None:
-                is_dft = True
-                #self.numerical = True
+        # DFT
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
-            #self.numerical = True if key in ['yes', 'y'] else False
-            is_dft = True if key in ['yes', 'y'] else False
+            self.dft = True if key in ['yes', 'y'] else False
+        if 'grid_level' in method_dict:
+            self.grid_level = int(method_dict['grid_level'])
+        if 'xcfun' in method_dict:
+            if 'dft' not in method_dict:
+                self.dft = True
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'Gradient driver: Undefined XC functional')
 
-        if is_dft and not self.numerical:
+        # TODO: Analytical DFT gradient is not implemented yet
+        if self.dft and not self.numerical:
             self.numerical = True
             warn_msg = '*** Warning: Analytical DFT gradient is not yet implemented.'
             self.ostream.print_blank()
@@ -124,6 +141,7 @@ class GradientDriver:
                 self.numerical = True
 
 
+
     def compute(self, molecule, ao_basis=None, min_basis=None):
         """
         Performs calculation of numerical gradient.
@@ -137,6 +155,44 @@ class GradientDriver:
         """
 
         return
+
+    def grad_xc_contrib(self, molecule, ao_basis=None, min_basis=None):
+        """
+        Calculates the contribution of the exchange-correlation energy
+        to the analytical gradient.
+        
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param min_basis:
+            The minimal AO basis set.
+
+        :return:
+            The exchange-correlation contribution to the gradient.
+        """
+        # number of atoms
+        natm = molecule.number_of_atoms()
+
+        # exchange-correlation energy contribution to nuclear gradient
+        xc_contrib = np.zeros((natm, 3))
+
+        for i in range(natm):
+            # Only restricted SCF possible for the moment. 
+            density_matrix =  AODensityMatrix([self.scf_drv.scf_tensors['D'][0]], denmat.rest)
+            # density_grad_i = AODensityMatrix... #
+            # set to right type, 3 Matrices - x, y, z coords. of atom i
+            # compute density gradient for atom i
+            # ...
+            # create integrator object
+            xc_integrator = XCIntegrator(self.comm)
+            #xc_grad_i = xc_integrator.integrate_gradient(density_grad_i, molecule, ao_basis, min_basis)
+            xc_grad_i = xc_integrator.integrate_gradient(density_matrix, i, molecule, ao_basis, min_basis)
+            xc_contrib[i] = xc_grad_i.get_gradient()
+
+        return xc_contrib
+
+ 
 
     def grad_nuc_contrib(self, molecule):
         """
