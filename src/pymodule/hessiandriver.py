@@ -200,7 +200,8 @@ class HessianDriver:
     def vibrational_analysis(self, molecule, ao_basis, filename=None, rsp_drv=None):
         """
         Performs vibrational analysis (frequencies and normal modes)
-        based on the molecular Hessian employing the geomeTRIC module.
+        based on the molecular Hessian employing the geomeTRIC module:
+        J. Chem, Phys. 144, 214108. DOI: 10.1063/1.4952956
 
         :param molecule:
             The molecule.
@@ -218,6 +219,7 @@ class HessianDriver:
         coords = molecule.get_coordinates().reshape(natm*3)
 
         # square root of atomic masses needed for computing the reduced mass
+        # TODO:  think these are no longer needed..
         masses_sqrt = np.sqrt(molecule.masses_to_numpy())
         masses_sqrt_repeat = np.repeat(masses_sqrt, 3)
 
