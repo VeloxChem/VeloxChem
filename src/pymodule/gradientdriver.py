@@ -30,8 +30,11 @@ from mpi4py import MPI
 from .outputstream import OutputStream
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import XCIntegrator
+from .veloxchemlib import MolecularGrid
 from .veloxchemlib import AODensityMatrix
-from veloxchem.veloxchemlib import denmat
+from .veloxchemlib import denmat
+from .veloxchemlib import mpi_master
+from .distributedarray import DistributedArray
 
 class GradientDriver:
     """
@@ -64,7 +67,11 @@ class GradientDriver:
         if ostream is None:
             ostream = OutputStream(sys.stdout)
 
+        # MPI information
         self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+
         self.ostream = ostream
 
         self.gradient = None
@@ -155,6 +162,116 @@ class GradientDriver:
         """
 
         return
+
+    def init_dft(self, molecule, scf_tensors):
+        """
+        Initializes DFT.
+
+        :param molecule:
+            The molecule.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+
+        :return:
+            The dictionary of DFT information.
+        """
+
+        # generate integration grid
+        if self.dft:
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(self.grid_level)
+
+            grid_t0 = tm.time()
+            molgrid = grid_drv.generate(molecule)
+            n_grid_points = molgrid.number_of_points()
+            self.ostream.print_info(
+                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
+                format(n_grid_points,
+                       tm.time() - grid_t0))
+            self.ostream.print_blank()
+
+            if self.rank == mpi_master():
+                gs_density = AODensityMatrix([scf_tensors['D_alpha']],
+                                             denmat.rest)
+            else:
+                gs_density = AODensityMatrix()
+            gs_density.broadcast(self.rank, self.comm)
+
+            dft_func_label = self.xcfun.get_func_label().upper()
+        else:
+            molgrid = MolecularGrid()
+            gs_density = AODensityMatrix()
+            dft_func_label = 'HF'
+
+        return {
+            'molgrid': molgrid,
+            'gs_density': gs_density,
+            'dft_func_label': dft_func_label,
+        }
+
+    def grad_xc_contrib_distributed(self, molecule, ao_basis=None,
+                                    min_basis=None):
+        """
+        Calculates the contribution of the exchange-correlation energy
+        to the analytical gradient (MPI-parallel code)
+        
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param min_basis:
+            The minimal AO basis set.
+
+        :return:
+            The exchange-correlation contribution to the gradient.
+        """
+        
+        if self.rank == mpi_master():
+            natm = molecule.number_of_atoms()
+            xc_gradient = np.zeros((natm, 3))
+            atom_array = np.arange(natm)
+        else:
+            xc_gradient = None
+            atom_array = None
+
+        # Prepare the grid and ground state AO density matrix 
+        dft_dict = self.init_dft(molecule, self.scf_drv.scf_tensors)
+        molgrid = dft_dict['molgrid']
+        gs_density = dft_dict['gs_density']
+        dft_func_label = dft_dict['dft_func_label']
+
+        # Prepare xc_driver
+        xc_drv = XCIntegrator(self.comm)
+    
+        # Create a distributed array of atom indices:
+        atom_index = DistributedArray(atom_array, self.comm, distribute=True)
+
+        # Create a local variable to hold the derivative of the xc energy
+        # with respect to the atomic coords. of atoms in atom_indices:
+        # Should this be in the C layer??
+        local_xc_grad = np.zeros((atom_index.shape(0), 3))
+
+        for i in range(atom_index.shape(0)):
+            # This object could be of AODensityMatrix type with 3 components
+            # for x, y, and z derivatives, respectively.
+            # Not completely sure how/where this should be calculated...
+            density_grad_i = xc_drv.compute_density_deriv(molecule,
+                                    ao_basis, min_basis, molgrid, 
+                                    dft_func_label, atom_index[i])
+            
+            # compute the xc energy deriv wrt coordinates of atom i
+            local_xc_grad[i] = xc_drv.integrate_gradient(gs_density,
+                                    density_grad_i, molecule, ao_basis,
+                                    min_basis, dft_func_label)
+
+        # This code works only if natm is divisible by the size of the 
+        # MPI batch is; Not sure how to change the code to make this general...
+        # Should xc_gradient be part of a C object similary to the XCEnergy?
+        xc_gradient = self.comm.gather(local_xc_grad, root=mpi_master())
+
+        if self.rank == mpi_master():
+            return xc_gradient
+
 
     def grad_xc_contrib(self, molecule, ao_basis=None, min_basis=None):
         """
