@@ -243,9 +243,9 @@ def main():
     # Self-consistent field
 
     run_scf = task_type in [
-        'hf', 'rhf', 'rohf', 'uhf', 'scf', 'roscf', 'uscf', 'wavefunction', 'wave function',
-        'mp2', 'gradient', 'optimize', 'response', 'pulses', 'visualization',
-        'loprop'
+        'hf', 'rhf', 'rohf', 'uhf', 'scf', 'roscf', 'uscf', 'wavefunction',
+        'wave function', 'mp2', 'gradient', 'optimize', 'response', 'pulses',
+        'visualization', 'loprop'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:

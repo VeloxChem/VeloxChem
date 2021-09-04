@@ -185,8 +185,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
                         den_mat.alpha_to_numpy(0),
                         den_mat.beta_to_numpy(0),
                         self.scf_tensors['S'],
-                    )
-                )
+                    ))
 
     def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
