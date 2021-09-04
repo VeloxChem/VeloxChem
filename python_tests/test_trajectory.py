@@ -1,16 +1,24 @@
-from pathlib import Path
-import pytest
 import sys
+from pathlib import Path
+
+import pytest
+
 try:
     import MDAnalysis
 except ImportError:
     pass
 
-from veloxchem.veloxchemlib import is_mpi_master
+try:
+    import cppe
+except ImportError:
+    pass
+
 from veloxchem.mpitask import MpiTask
 from veloxchem.trajectorydriver import TrajectoryDriver
+from veloxchem.veloxchemlib import is_mpi_master
 
 
+@pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
 class TestTrajectoryDriver:
 
     def run_trajectory(self, filename, ref_exc_energies, ref_osc_strengths):
