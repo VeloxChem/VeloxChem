@@ -1,13 +1,10 @@
-import sys
 from pathlib import Path
-
 import pytest
-
+import sys
 try:
     import MDAnalysis
 except ImportError:
     pass
-
 try:
     import cppe
 except ImportError:
