@@ -215,17 +215,17 @@ def _MolecularOrbitals_get_density(self, molecule):
         if nalpha == nbeta:
             return self.get_ao_density(nalpha + nbeta)
         else:
-            # Here call twice with 2*na, 2*nb respectively and then average
-            alpha_density = self.get_ao_density(2 * nalpha).alpha_to_numpy(0)
-            beta_density = self.get_ao_density(2 * nbeta).beta_to_numpy(0)
-            return AODensityMatrix([alpha_density, beta_density], denmat.unrest)
+            mo_coef = self.alpha_to_numpy()
+            mo_occ_alpha = mo_coef[:, :nalpha]
+            mo_occ_beta = mo_coef[:, :nbeta]
+            dalpha = np.matmul(mo_occ_alpha, mo_occ_alpha.T)
+            dbeta = np.matmul(mo_occ_beta, mo_occ_beta.T)
+            return AODensityMatrix([dalpha, dbeta], denmat.unrest)
 
     elif self.get_orbitals_type() == molorb.unrest:
-
         return self.get_ao_density(nalpha, nbeta)
 
     else:
-
         errmsg = "MolecularOrbitals.get_density:"
         errmsg += " Invalid molecular orbitals type"
         assert_msg_critical(False, errmsg)

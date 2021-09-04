@@ -27,11 +27,9 @@ from mpi4py import MPI
 import numpy as np
 import sys
 
-from .aodensitymatrix import AODensityMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import molorb
-from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
@@ -329,12 +327,3 @@ class ScfRestrictedOpenDriver(ScfDriver):
             fock_mat.set_fock_type(fockmat.unrestj, 0, 'beta')
 
         return
-
-    def gen_new_density(self, molecule):
-        c = self.mol_orbs.alpha_to_numpy()
-        na = molecule.number_of_alpha_electrons()
-        nb = molecule.number_of_beta_electrons()
-        da = c[:, :na] @ c[:, :na].T
-        db = c[:, :nb] @ c[:, :nb].T
-        ao_density = AODensityMatrix([da, db], denmat.unrest)
-        return ao_density
