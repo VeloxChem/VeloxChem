@@ -231,16 +231,31 @@ class RespChargesDriver:
                 output_dir.mkdir(parents=True, exist_ok=True)
             self.comm.barrier()
 
-        if self.rank == mpi_master() and self.weights is not None:
-            errmsg = 'RespChargesDriver: Number of weights does not match '
-            errmsg += 'number of conformers.'
-            assert_msg_critical(len(self.weights) == len(molecules), errmsg)
-            # normalize weights
-            sum_of_weights = sum(self.weights)
-            self.weights = [w / sum_of_weights for w in self.weights]
+        if self.rank == mpi_master():
+            if self.weights is not None and self.energies is not None:
+                # avoid conflict between weights and energies
+                errmsg = 'RespChargesDriver: Please do not specify weights and '
+                errmsg += 'energies at the same time.'
+                assert_msg_critical(False, errmsg)
 
-        if flag.lower() == 'resp' and not all(
-                [True if bas.get_label() == '6-31G*' else False for bas in basis_sets]):
+            elif self.weights is not None:
+                errmsg = 'RespChargesDriver: Number of weights does not match '
+                errmsg += 'number of conformers.'
+                assert_msg_critical(len(self.weights) == len(molecules), errmsg)
+                # normalize weights
+                sum_of_weights = sum(self.weights)
+                self.weights = [w / sum_of_weights for w in self.weights]
+
+            elif self.energies is not None:
+                errmsg = 'RespChargesDriver: Number of energies does not match '
+                errmsg += 'number of conformers.'
+                assert_msg_critical(
+                    len(self.energies) == len(molecules), errmsg)
+
+        use_631gs_basis = all(
+            [bas.get_label() in ['6-31G*', '6-31G_D_'] for bas in basis_sets])
+
+        if flag.lower() == 'resp' and not use_631gs_basis:
             cur_str = '*** Warning: Recommended basis set 6-31G* '
             cur_str += 'is not used!'
             self.ostream.print_header(cur_str.ljust(40))
@@ -305,22 +320,19 @@ class RespChargesDriver:
                 esp.append(esp_m)
                 scf_energies.append(scf_energy_m)
 
-        if self.rank == mpi_master() and self.energies is not None:
-            errmsg = 'RespChargesDriver: Number of energies does not match '
-            errmsg += 'number of conformers.'
-            assert_msg_critical(len(self.energies) == len(molecules), errmsg)
-        else:
-            self.energies = scf_energies
-
-        if self.rank == mpi_master() and self.weights is None:
-            self.weights = self.get_boltzmann_weights(self.energies,
-                                                      self.temperature)
+        if self.rank == mpi_master():
+            if self.energies is None:
+                self.energies = scf_energies
+            if self.weights is None:
+                self.weights = self.get_boltzmann_weights(
+                    self.energies, self.temperature)
 
         q = None
 
         if self.rank == mpi_master():
             if self.fitting_points is not None:
-                q = self.compute_esp_charges_on_fitting_points(molecules, grids, esp)
+                q = self.compute_esp_charges_on_fitting_points(
+                    molecules, grids, esp)
             elif flag.lower() == 'resp':
                 q = self.compute_resp_charges(molecules, grids, esp,
                                               self.weights)
@@ -457,8 +469,9 @@ class RespChargesDriver:
         coords = []
         for string in self.fitting_points:
             coords.append([float(j) for j in string.split()])
+        coords = np.array(coords)
 
-        n_points = len(coords)
+        n_points = coords.shape[0]
 
         constr = [0] * n_points
         for points in self.equal_charges:
@@ -486,11 +499,11 @@ class RespChargesDriver:
         # eq.10 & 11,  J. Am. Chem. Soc. 1992, 114, 9075-9079
         for i in range(n_points):
             for p in range(esp[0].size):
-                r_pi = np.linalg.norm(grids[0][p] - np.array(coords[i]))
+                r_pi = np.linalg.norm(grids[0][p] - coords[i])
                 b[i] += esp[0][p] / r_pi
                 for j in range(n_points):
-                    a[i, j] += 1.0 / (
-                        r_pi * np.linalg.norm(grids[0][p] - np.array(coords[j])))
+                    a[i, j] += 1.0 / (r_pi *
+                                      np.linalg.norm(grids[0][p] - coords[j]))
 
         # equivalent charge constraints
         j = 0
@@ -568,13 +581,11 @@ class RespChargesDriver:
                                              constr)
         q_new = np.concatenate((q0, np.zeros(b.size - n_atoms)), axis=None)
 
-        dq_norm = 1.0
-        it = 0
+        fitting_converged = False
+        current_iteration = 0
 
         # iterative RESP fitting procedure
-        while dq_norm > self.threshold and it < self.max_iter:
-
-            it += 1
+        for iteration in range(self.max_iter):
             q_old = q_new
 
             # add restraint to matrix a
@@ -594,10 +605,16 @@ class RespChargesDriver:
             q_new = np.linalg.solve(a_tot, b)
             dq_norm = np.linalg.norm(q_new - q_old)
 
-        errmsg = 'RespChargesDriver: Charge fitting is not converged!'
-        assert_msg_critical(dq_norm <= self.threshold, errmsg)
+            current_iteration = iteration
+            if dq_norm < self.threshold:
+                fitting_converged = True
+                break
 
-        cur_str = f'*** Charge fitting converged in {it} iterations.'
+        errmsg = 'RespChargesDriver: Charge fitting is not converged!'
+        assert_msg_critical(fitting_converged, errmsg)
+
+        cur_str = '*** Charge fitting converged in '
+        cur_str += f'{current_iteration+1} iterations.'
         self.ostream.print_header(cur_str.ljust(40))
         self.ostream.print_blank()
 

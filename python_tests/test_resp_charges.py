@@ -27,8 +27,10 @@ class TestRespCharges:
         chg_drv.update_settings(chg_dict, task.input_dict['method_settings'])
 
         q_resp = chg_drv.compute(task.molecule, task.ao_basis, 'resp')
-        # Note: in practice it is better to reset the weights before reusing
-        # the RespChargesDriver
+
+        # Note: reset weights and energies before reusing the RespChargesDriver
+        chg_drv.weights = None
+        chg_drv.energies = None
         q_esp = chg_drv.compute(task.molecule, task.ao_basis, 'esp')
 
         if is_mpi_master(task.mpi_comm):
