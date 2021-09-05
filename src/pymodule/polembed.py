@@ -30,7 +30,7 @@ try:
     import cppe
 except ImportError:
     raise ImportError('Unable to import cppe. Please install cppe via ' +
-                      '\'pip install cppe==0.2.1\'')
+                      '\'python3 -m pip install cppe==0.2.1\'')
 
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricFieldIntegralsDriver

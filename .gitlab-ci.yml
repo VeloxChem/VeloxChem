@@ -38,7 +38,6 @@ stages:
     - set +e && source /opt/intel/bin/compilervars.sh intel64 && set -e
     - export PATH=/opt/intel/intelpython3/bin:$PATH
     - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/intelpython3/lib
-    - python3 -m pip install --upgrade --user pip
 
 monkey:build:
   extends: .monkey:setup
@@ -52,14 +51,6 @@ monkey:build:
       - build
     expire_in: 2 hours
 
-monkey:pip_install:
-  extends: .monkey:setup
-  stage: build
-  variables:
-    VLX_NUM_BUILD_JOBS: "6"
-  script:
-    - python3 -m pip install .[qmmm]
-
 monkey:unit_tests:
   extends: .monkey:setup
   stage: test
@@ -70,8 +61,14 @@ monkey:unit_tests:
 monkey:python_tests:
   extends: .monkey:setup
   stage: test
-  needs: ["monkey:pip_install"]
+  variables:
+    VLX_NUM_BUILD_JOBS: "6"
   script:
+    - python3 -m venv --without-pip --clear venv
+    - source ./venv/bin/activate
+    - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+    - python3 get-pip.py
+    - python3 -m pip install pytest pytest-cov
+    - python3 -m pip install .[qmmm]
     - python3 -m pytest -v --cov=veloxchem --pyargs veloxchem
     - mpiexec -n 2 python3 -m pytest -v --pyargs veloxchem -m "solvers"
-    - echo y | python3 -m pip uninstall cppe

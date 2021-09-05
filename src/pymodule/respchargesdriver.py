@@ -175,12 +175,6 @@ class RespChargesDriver:
             The charges.
         """
 
-        try:
-            import MDAnalysis as mda
-        except ImportError:
-            raise ImportError('Unable to import MDAnalysis. Please install ' +
-                              'MDAnalysis via \'pip install MDAnalysis\'')
-
         molecules = []
         basis_sets = []
 
@@ -195,6 +189,13 @@ class RespChargesDriver:
             errmsg = 'RespChargesDriver: The \'xyz_file\' keyword is not '
             errmsg += 'specified.'
             assert_msg_critical(self.xyz_file is not None, errmsg)
+
+            try:
+                import MDAnalysis as mda
+            except ImportError:
+                raise ImportError(
+                    'Unable to import MDAnalysis. Please install ' +
+                    'MDAnalysis via \'python3 -m pip install MDAnalysis\'')
 
             u = mda.Universe(str(self.xyz_file))
             for ts in u.trajectory:

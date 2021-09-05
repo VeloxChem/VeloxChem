@@ -49,6 +49,7 @@ from .scffirstorderprop import ScfFirstOrderProperties
 from .scfgradientdriver import ScfGradientDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
+from .scfrestopendriver import ScfRestrictedOpenDriver
 from .slurminfo import get_slurm_maximum_hours
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XTBDriver
@@ -62,7 +63,8 @@ def select_scf_driver(task, scf_type):
     :param task:
         The MPI task.
     :param scf_type:
-        The type of SCF calculation (restricted or unrestricted).
+        The type of SCF calculation (restricted, unrestricted, or restricted
+        open-shell).
 
     :return:
         The SCF driver object.
@@ -77,10 +79,14 @@ def select_scf_driver(task, scf_type):
     nalpha = task.molecule.number_of_alpha_electrons()
     nbeta = task.molecule.number_of_beta_electrons()
 
-    if nalpha == nbeta and scf_type == 'restricted':
+    if scf_type == 'restricted' and nalpha == nbeta:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-    else:
+    elif scf_type == 'restricted' and nalpha != nbeta:
         scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
+    elif scf_type == 'unrestricted':
+        scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
+    elif scf_type == 'restricted_openshell':
+        scf_drv = ScfRestrictedOpenDriver(task.mpi_comm, task.ostream)
 
     return scf_drv
 
@@ -239,15 +245,19 @@ def main():
     # Self-consistent field
 
     run_scf = task_type in [
-        'hf', 'rhf', 'uhf', 'scf', 'uscf', 'wavefunction', 'wave function',
-        'mp2', 'gradient', 'optimize', 'response', 'pulses', 'visualization',
-        'loprop'
+        'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
+        'wave function', 'mp2', 'gradient', 'optimize', 'response', 'pulses',
+        'visualization', 'loprop'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
         run_scf = 'read_dalton' not in task.input_dict['visualization']['cubes']
 
-    scf_type = 'unrestricted' if task_type in ['uhf', 'uscf'] else 'restricted'
+    scf_type = 'restricted'
+    if task_type in ['uhf', 'uscf']:
+        scf_type = 'unrestricted'
+    elif task_type in ['rohf', 'roscf']:
+        scf_type = 'restricted_openshell'
 
     if run_scf:
         assert_msg_critical(task.molecule.number_of_atoms(),

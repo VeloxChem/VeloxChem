@@ -169,7 +169,6 @@ class InputParser:
             'scf': 'scf',
             'response': 'rsp',
             'exciton': 'exciton',
-            'loprop': 'loprop',
         }
 
         for job_type in abbrev:
@@ -180,21 +179,6 @@ class InputParser:
                     f_path.with_suffix(f'.{abbrev[job_type]}.h5'))
                 self.input_dict[job_type]['checkpoint_file'] = checkpoint_file
 
-        # verify options for loprop
-        verifyers = {
-            'loprop': {
-                'checkpoint_file': (lambda v: True, 'Always OK'),
-                'localize':
-                    (lambda v: v in ['charges'], 'localize: {} illegal value')
-            }
-        }
-
-        if 'loprop' in self.input_dict:
-            for option, value in self.input_dict['loprop'].items():
-                verify, msg = verifyers['loprop'][option]
-                if not verify(value):
-                    raise InputError(msg.format(value))
-
     def get_dict(self):
         """
         Gets the input dictonary.
@@ -204,10 +188,6 @@ class InputParser:
         """
 
         return self.input_dict
-
-
-class InputError(Exception):
-    pass
 
 
 def parse_seq_fixed(input_seq, flag='float'):
@@ -363,16 +343,17 @@ def parse_list(input_list):
 def parse_input(obj, keyword_types, input_dictionary):
     """
     Parses input keywords for object.
-    - 'str' for string input, such as 'checkpoint_file: mycheckpoint.h5'
-    - 'str_upper' for uppercase string input, such as 'qq_type: QQ_DEN'
-    - 'str_lower' for lowercase string input, such as 'coordsys: tric'
-    - 'int' for integer input, such as 'max_iter: 300'
-    - 'float' for floating-point input, such as 'eri_thresh: 1.0e-12'
-    - 'bool' for floating-point input, such as 'restart: no'
-    - 'list' for multi-line input, such as 'constraints'
-    - 'seq_fixed_int' for fixed-length integer sequence, such as 'cube_points: 80,80,80'
-    - 'seq_fixed' for fixed-length sequence, such as 'cube_origin: 0.0,0.0,0.0'
-    - 'seq_range' for sequence with range, such as 'frequencies: 0.0-0.1(0.02)'
+        - 'str' for string input, such as 'checkpoint_file: mycheckpoint.h5'
+        - 'str_upper' for uppercase string input, such as 'qq_type: QQ_DEN'
+        - 'str_lower' for lowercase string input, such as 'coordsys: tric'
+        - 'int' for integer input, such as 'max_iter: 300'
+        - 'float' for floating-point input, such as 'eri_thresh: 1.0e-12'
+        - 'bool' for floating-point input, such as 'restart: no'
+        - 'list' for multi-line input, such as 'constraints'
+        - 'seq_fixed_int' for fixed-length integer sequence, such as
+          'cube_points: 80,80,80'
+        - 'seq_fixed' for fixed-length sequence, such as 'cube_origin: 0.0,0.0,0.0'
+        - 'seq_range' for sequence with range, such as 'frequencies: 0.0-0.1(0.02)'
 
     :param obj:
         The object.
