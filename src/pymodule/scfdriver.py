@@ -101,7 +101,8 @@ class ScfDriver:
         - checkpoint_file: The name of checkpoint file.
         - ref_mol_orbs: The reference molecular orbitals read from checkpoint
           file.
-        - closed_shell: The flag for restricted SCF.
+        - scf_type: The type of SCF calculation (restricted, unrestricted, or
+          restricted open-shell).
         - dispersion: The flag for calculating D4 dispersion correction.
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
@@ -191,8 +192,7 @@ class ScfDriver:
         self.maximum_hours = None
 
         # closed shell?
-        self.closed_shell = True
-        self.restricted_open = False
+        self.scf_type = 'restricted'
 
         # D4 dispersion correction
         self.dispersion = False
@@ -352,7 +352,7 @@ class ScfDriver:
             self.den_guess = DensityGuess("RESTART", self.checkpoint_file)
             self.restart = self.den_guess.validate_checkpoint(
                 self.rank, self.comm, molecule.elem_ids_to_numpy(),
-                ao_basis.get_label(), self.closed_shell)
+                ao_basis.get_label(), self.scf_type)
 
         if self.restart:
             self.acc_type = "DIIS"
@@ -465,13 +465,7 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self.print_scf_energy()
-            if self.closed_shell:
-                s2 = 0.0
-            elif self.restricted_open:
-                s2 = molecule.get_multiplicity()
-            else:
-                s2 = self.compute_s2(molecule, self.scf_tensors['S'],
-                                     self.mol_orbs)
+            s2 = self.compute_s2(molecule, self.scf_tensors['S'], self.mol_orbs)
             self.print_ground_state(molecule, s2)
             self.mol_orbs.print_orbitals(molecule, ao_basis, False,
                                          self.ostream)
@@ -647,7 +641,7 @@ class ScfDriver:
                     for ef, mat in zip(self.electric_field, dipole_ints)
                 ])
 
-                if self.closed_shell:
+                if self.scf_type == 'restricted':
                     e_el += 2.0 * np.trace(
                         np.matmul(efpot, den_mat.alpha_to_numpy(0)))
                     fock_mat.add_matrix(DenseMatrix(efpot), 0)
@@ -704,7 +698,7 @@ class ScfDriver:
 
             self.update_mol_orbs_phase()
 
-            den_mat = self.gen_new_density(molecule)
+            den_mat = self.gen_new_density(molecule, self.scf_type)
 
             den_mat.broadcast(self.rank, self.comm)
 
@@ -950,21 +944,22 @@ class ScfDriver:
         if self.den_guess.guess_type == "RESTART":
 
             return self.den_guess.restart_density(molecule, self.rank,
-                                                  self.ostream)
+                                                  self.ostream, self.scf_type)
 
         # guess: superposition of atomic densities
         if self.den_guess.guess_type == "SAD":
 
             return self.den_guess.sad_density(molecule, ao_basis, min_basis,
-                                              ovl_mat, self.closed_shell,
-                                              self.comm, self.ostream)
+                                              ovl_mat, self.scf_type, self.comm,
+                                              self.ostream)
 
         # guess: projection of molecular orbitals from reduced basis
         if self.den_guess.guess_type == "PRCMO":
 
             if self.rank == mpi_master():
                 return self.den_guess.prcmo_density(molecule, ao_basis,
-                                                    min_basis, self.mol_orbs)
+                                                    min_basis, self.mol_orbs,
+                                                    self.scf_type)
             else:
                 return AODensityMatrix()
 
@@ -1065,7 +1060,7 @@ class ScfDriver:
 
         if self.dft and not self.first_step:
             if not self.xcfun.is_hybrid():
-                if self.closed_shell:
+                if self.scf_type == 'restricted':
                     fock_mat.scale(2.0, 0)
 
             self.molgrid.distribute(self.rank, self.nodes, self.comm)
@@ -1185,7 +1180,7 @@ class ScfDriver:
             fock_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
                                 local_comm)
             if self.dft and (not self.xcfun.is_hybrid()):
-                if self.closed_shell:
+                if self.scf_type == 'restricted':
                     fock_mat.scale(2.0, 0)
 
         # calculate Vxc on DFT nodes
@@ -1314,7 +1309,7 @@ class ScfDriver:
 
             if self.dft and not self.first_step:
                 fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
-                if not self.closed_shell:
+                if self.scf_type in ['unrestricted', 'restricted_openshell']:
                     fock_mat.add_matrix(vxc_mat.get_matrix(True), 0, 'beta')
 
             if self.pe and not self.first_step:
@@ -1433,19 +1428,22 @@ class ScfDriver:
                 self.mol_orbs = MolecularOrbitals([mo, mo_b], [ea, eb],
                                                   molorb.unrest)
 
-    def gen_new_density(self, molecule):
+    def gen_new_density(self, molecule, scf_type):
         """
         Generates density matrix from current molecular orbitals.
 
         :param molecule:
             The molecule.
+        :param scf_type:
+            The type of SCF calculation (restricted, unrestricted, or
+            restricted open-shell).
 
         :return:
             The density matrix.
         """
 
         if self.rank == mpi_master():
-            return self.mol_orbs.get_density(molecule)
+            return self.mol_orbs.get_density(molecule, scf_type)
 
         return AODensityMatrix()
 
@@ -1698,7 +1696,7 @@ class ScfDriver:
             The string with type of SCF calculation.
         """
 
-        return "Undefined"
+        return 'Undefined'
 
     def get_guess_type(self):
         """
@@ -1800,7 +1798,19 @@ class ScfDriver:
             Expectation value <S**2>.
         """
 
-        return None
+        nalpha = molecule.number_of_alpha_electrons()
+        nbeta = molecule.number_of_beta_electrons()
+
+        a_b = float(nalpha - nbeta) / 2.0
+        s2_exact = a_b * (a_b + 1.0)
+
+        Cocc_a = mol_orbs.alpha_to_numpy()[:, :nalpha].copy()
+        Cocc_b = mol_orbs.beta_to_numpy()[:, :nbeta].copy()
+
+        ovl_a_b = np.matmul(Cocc_a.T, np.matmul(smat, Cocc_b))
+        s2 = s2_exact + nbeta - np.sum(ovl_a_b**2)
+
+        return s2
 
     def print_ground_state(self, molecule, s2):
         """
@@ -1822,7 +1832,7 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         mult = molecule.get_multiplicity()
-        if self.closed_shell:
+        if self.scf_type == 'restricted':
             valstr = "Multiplicity (2S+1)           :{:5.1f}".format(mult)
             self.ostream.print_header(valstr.ljust(92))
 
@@ -1830,7 +1840,7 @@ class ScfDriver:
         valstr = "Magnetic Quantum Number (M_S) :{:5.1f}".format(sz)
         self.ostream.print_header(valstr.ljust(92))
 
-        if not self.closed_shell:
+        if self.scf_type in ['unrestricted', 'restricted_openshell']:
             valstr = "Expectation value of S**2     :{:8.4f}".format(s2)
             self.ostream.print_header(valstr.ljust(92))
 

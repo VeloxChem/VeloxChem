@@ -48,7 +48,7 @@ class TestROSetup:
         with patch('veloxchem.main.select_scf_driver') as mock_select:
             mock_select().is_converged = False
             main()
-        mock_select.assert_called_with(task, 'restricted_open')
+        mock_select.assert_called_with(task, 'restricted_openshell')
 
     def test_roscfdriverreturned(self, mock_argparse, mock_mpi, mock_roscf,
                                  input_dict, tmpdir):
@@ -59,7 +59,7 @@ class TestROSetup:
         task = mock_mpi()
         task.input_dict = input_dict
 
-        assert select_scf_driver(task, 'restricted_open') is mock_roscf()
+        assert select_scf_driver(task, 'restricted_openshell') is mock_roscf()
 
 
 @dataclass

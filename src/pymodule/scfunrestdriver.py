@@ -62,7 +62,7 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         super().__init__(comm, ostream)
 
-        self.closed_shell = False
+        self.scf_type = 'unrestricted'
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """
@@ -268,35 +268,6 @@ class ScfUnrestrictedDriver(ScfDriver):
                                      [eigs_a, eigs_b], molorb.unrest)
 
         return MolecularOrbitals()
-
-    def compute_s2(self, molecule, smat, mol_orbs):
-        """
-        Computes expectation value of the S**2 operator.
-
-        :param molecule:
-            The molecule.
-        :param smat:
-            The overlap matrix (numpy array).
-        :param mol_orbs:
-            The molecular orbitals.
-
-        :return:
-            Expectation value <S**2>.
-        """
-
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-
-        a_b = float(nalpha - nbeta) / 2.0
-        s2_exact = a_b * (a_b + 1.0)
-
-        Cocc_a = mol_orbs.alpha_to_numpy()[:, :nalpha].copy()
-        Cocc_b = mol_orbs.beta_to_numpy()[:, :nbeta].copy()
-
-        ovl_a_b = np.matmul(Cocc_a.T, np.matmul(smat, Cocc_b))
-        s2 = s2_exact + nbeta - np.sum(ovl_a_b**2)
-
-        return s2
 
     def get_scf_type(self):
         """

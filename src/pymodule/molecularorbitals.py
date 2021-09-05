@@ -197,12 +197,15 @@ def _MolecularOrbitals_print_coefficients(eigval, focc, iorb, coeffs, ao_map,
         ostream.print_header(valstr.ljust(92))
 
 
-def _MolecularOrbitals_get_density(self, molecule):
+def _MolecularOrbitals_get_density(self, molecule, scf_type):
     """
     Gets AO density matrix from molecular orbitals.
 
     :param molecule:
         The molecule.
+    :param scf_type:
+        The type of SCF calculation (restricted, unrestricted, or restricted
+        open-shell).
 
     :return:
         The AO density matrix.
@@ -211,19 +214,21 @@ def _MolecularOrbitals_get_density(self, molecule):
     nalpha = molecule.number_of_alpha_electrons()
     nbeta = molecule.number_of_beta_electrons()
 
-    if self.get_orbitals_type() == molorb.rest:
-        if nalpha == nbeta:
-            return self.get_ao_density(nalpha + nbeta)
-        else:
-            mo_coef = self.alpha_to_numpy()
-            mo_occ_alpha = mo_coef[:, :nalpha]
-            mo_occ_beta = mo_coef[:, :nbeta]
-            dalpha = np.matmul(mo_occ_alpha, mo_occ_alpha.T)
-            dbeta = np.matmul(mo_occ_beta, mo_occ_beta.T)
-            return AODensityMatrix([dalpha, dbeta], denmat.unrest)
+    if (self.get_orbitals_type() == molorb.rest and scf_type == 'restricted'):
+        return self.get_ao_density(nalpha + nbeta)
 
-    elif self.get_orbitals_type() == molorb.unrest:
+    elif (self.get_orbitals_type() == molorb.unrest and
+          scf_type == 'unrestricted'):
         return self.get_ao_density(nalpha, nbeta)
+
+    elif (self.get_orbitals_type() == molorb.rest and
+          scf_type == 'restricted_openshell'):
+        mo_coef = self.alpha_to_numpy()
+        mo_occ_alpha = mo_coef[:, :nalpha]
+        mo_occ_beta = mo_coef[:, :nbeta]
+        dalpha = np.matmul(mo_occ_alpha, mo_occ_alpha.T)
+        dbeta = np.matmul(mo_occ_beta, mo_occ_beta.T)
+        return AODensityMatrix([dalpha, dbeta], denmat.unrest)
 
     else:
         errmsg = "MolecularOrbitals.get_density:"
@@ -322,8 +327,7 @@ def _MolecularOrbitals_read_hdf5(fname):
 
 
 @staticmethod
-def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set,
-                                  restricted):
+def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set, scf_type):
     """
     Checks if the hdf5 file matches the given nuclear charges and basis set.
 
@@ -333,8 +337,9 @@ def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set,
         The nuclear charges.
     :param basis_set:
         Name of the basis set.
-    :param restricted:
-        The flag for restricted molecular orbitals.
+    :param scf_type:
+        The type of SCF calculation (restricted, unrestricted, or restricted
+        open-shell).
 
     :return:
         Whether the hdf5 file matches the given nuclear charges and basis set.
@@ -355,6 +360,7 @@ def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set,
         match_basis_set = (h5_basis_set.upper() == basis_set.upper())
 
     h5_restricted = ('beta_orbitals' not in hf and 'beta_energies' not in hf)
+    restricted = (scf_type in ['restricted', 'restricted_openshell'])
     match_restricted = (h5_restricted == restricted)
 
     hf.close()
