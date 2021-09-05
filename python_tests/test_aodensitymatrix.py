@@ -21,9 +21,6 @@ class TestAODensityMatrix:
         d_unrest = AODensityMatrix([data_a, data_b, data_c, data_d],
                                    denmat.unrest)
 
-        d_osrest = AODensityMatrix([data_a, data_b, data_c, data_d],
-                                   denmat.osrest)
-
         if is_mpi_master():
 
             here = Path(__file__).parent
@@ -36,7 +33,3 @@ class TestAODensityMatrix:
             d_unrest.write_hdf5(h5file)
             dummy = AODensityMatrix.read_hdf5(h5file)
             assert d_unrest == dummy
-
-            d_osrest.write_hdf5(h5file)
-            dummy = AODensityMatrix.read_hdf5(h5file)
-            assert d_osrest == dummy
