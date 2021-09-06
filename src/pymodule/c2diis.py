@@ -72,12 +72,11 @@ class CTwoDiis:
             self.error_vectors.append(
                 np.matmul(tmat.T, np.matmul(fa - fb, tmat)))
 
-    def compute_restricted_open_error_vectors(
-        self,
-        fock_matrices, fock_matrices_beta,
-        density_matrices, density_matrices_beta,
-        overlap_matrix, oao_matrix
-    ):
+    def compute_restricted_open_error_vectors(self, fock_matrices,
+                                              fock_matrices_beta,
+                                              density_matrices,
+                                              density_matrices_beta,
+                                              overlap_matrix, oao_matrix):
         """
         Computes error vectors for list of AO Fock matrices using (FDS - SDF)
         in orthogonal AO basis.

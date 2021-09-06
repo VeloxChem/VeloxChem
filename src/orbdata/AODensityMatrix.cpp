@@ -44,7 +44,7 @@ CAODensityMatrix::CAODensityMatrix(const std::vector<CDenseMatrix>& denMatrices,
 
     , _denType(denType)
 {
-    if ((denType == denmat::unrest) || (denType == denmat::umoij) || (denType == denmat::osrest))
+    if ((denType == denmat::unrest) || (denType == denmat::umoij))
     {
         errors::assertMsgCritical(denMatrices.size() % 2 == 0,
                                   "AODensityMatrix: Odd number of matrices for unrestricted or restricted open-shell density");
@@ -124,7 +124,7 @@ CAODensityMatrix::_getNumberOfMatricesPerDensity() const
         return 1;
     }
 
-    if ((_denType == denmat::unrest) || (_denType == denmat::umoij) || (_denType == denmat::osrest))
+    if ((_denType == denmat::unrest) || (_denType == denmat::umoij))
     {
         return 2;
     }
