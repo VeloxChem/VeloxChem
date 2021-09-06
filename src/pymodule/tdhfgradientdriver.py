@@ -84,6 +84,10 @@ class TdhfGradientDriver(GradientDriver):
         """
         Updates settings in gradient driver.
 
+        :param grad_dict:
+            The input dictionary of gradient settings group.
+		:param orbrsp_dict: 
+			The input dictionary of orbital response settings group.
         :param rsp_dict:
             The input dictionary of response settings  group.
         :param method_dict:

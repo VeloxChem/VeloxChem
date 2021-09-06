@@ -313,7 +313,7 @@ class HessianDriver:
             if self.raman_intensities is not None:
                 valstr += ' Raman scattering activities (in A**4/amu),'
             self.ostream.print_header(valstr)
-            if self.print_depolarization_ratio:
+            if self.raman_intensities is not None and self.print_depolarization_ratio:
                 valstr = ' parallel and perpendicular Raman scattering activities,'
                 valstr += ' depolarization ratios,'
                 self.ostream.print_header(valstr)
