@@ -124,6 +124,14 @@ class HessianDriver:
         if freq_dict is None:
             freq_dict = {}
 
+        # if this is True, numerical must also be True
+        if 'do_four_point' in freq_dict:
+            key = freq_dict['do_four_point'].lower()
+            self.do_four_point = True if key in ['yes', 'y'] else False
+            # if four-point is desired, numerical is also set to True
+            if self.do_four_point:
+                self.numerical = True
+
         # check if Hessianis to be calculated numerically
         if 'numerical' in freq_dict:
             key = freq_dict['numerical'].lower()

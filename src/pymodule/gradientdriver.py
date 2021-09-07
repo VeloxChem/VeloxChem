@@ -95,6 +95,15 @@ class GradientDriver:
             The input dicitonary of method settings group.
         """
 
+
+        # if this is True, numerical must also be True
+        if 'do_four_point' in grad_dict:
+            key = grad_dict['do_four_point'].lower()
+            self.do_four_point = True if key in ['yes', 'y'] else False
+            # if four-point is desired, numerical is also set to True
+            if self.do_four_point:
+                self.numerical = True
+
         # Numerical gradient?
         if 'numerical' in grad_dict:
             key = grad_dict['numerical'].lower()
@@ -126,14 +135,6 @@ class GradientDriver:
         # step size for finite differences
         if 'delta_h' in grad_dict:
             self.delta_h = float(grad_dict['delta_h'])
-
-        # TODO: if this is True, numerical must also be True
-        if 'do_four_point' in grad_dict:
-            key = grad_dict['do_four_point'].lower()
-            self.do_four_point = True if key in ['yes', 'y'] else False
-            # if four-point is desired, numerical is also set to True
-            if self.do_four_point:
-                self.numerical = True
 
         # Numerical derivative of dipole moment
         if 'dipole_deriv' in grad_dict:
