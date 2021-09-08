@@ -40,6 +40,7 @@
 #include "XCFuncType.hpp"
 #include "XCFunctional.hpp"
 #include "XCIntegrator.hpp"
+#include "DensityGrid.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -183,7 +184,7 @@ export_dft(py::module& m)
     // CDensityGridDriver class
 
     PyClass<CDensityGridDriver>(m, "DensityGridDriver")
-        .def(py::init(&vlx_general::create<CDensityGridDriver>), "comm"_a)
+        .def(py::init(&vlx_general::create<CDensityGridDriver>), "comm"_a = py::none())
         .def("generate",
              &CDensityGridDriver::generate,
              "Generates partitioned density grid for given molecule and type of exchange-correlation functional. Density grid generation is "
@@ -224,6 +225,92 @@ export_dft(py::module& m)
              "basis"_a,
              "molecularGrid"_a,
              "xcFuncLabel"_a);
+    
+    // CDensityGrid class
+
+    PyClass<CDensityGrid>(m, "DensityGrid")
+        .def(py::init<>())
+        .def(py::init<const CDensityGrid&>())
+        .def("number_of_points", &CDensityGrid::getNumberOfGridPoints)
+        .def("number_of_density_matrices", &CDensityGrid::getNumberOfDensityMatrices)
+        .def(
+             "density_aa_to_numpy",
+             [](const CDensityGrid& self, int32_t iDensityMatrix) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.alphaDensity(iDensityMatrix), self.getNumberOfGridPoints());
+             },
+             "Gets alpha density on grid as numpy array.",
+             "iDensityMatrix"_a)
+        .def(
+             "density_bb_to_numpy",
+             [](const CDensityGrid& self, int32_t iDensityMatrix) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.betaDensity(iDensityMatrix), self.getNumberOfGridPoints());
+             },
+             "Gets beta density on grid as numpy array.",
+             "iDensityMatrix"_a)
+        .def(
+             "gradient_norm_aa_to_numpy",
+             [](const CDensityGrid& self, int32_t iDensityMatrix) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.alphaDensityGradient(iDensityMatrix), self.getNumberOfGridPoints());
+             },
+            "Gets alpha density gradient norm on grid as numpy array.",
+             "iDensityMatrix"_a)
+        .def(
+             "gradient_norm_bb_to_numpy",
+             [](const CDensityGrid& self, int32_t iDensityMatrix) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.betaDensityGradient(iDensityMatrix), self.getNumberOfGridPoints());
+              },
+             "Gets beta density gradient norm on grid as numpy array.",
+             "iDensityMatrix"_a)
+        .def(
+             "gradient_product_ab_to_numpy",
+             [](const CDensityGrid& self, int32_t iDensityMatrix) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.mixedDensityGradient(iDensityMatrix), self.getNumberOfGridPoints());
+             },
+             "Gets mixed density gradient product on grid as numpy array.",
+             "iDensityMatrix"_a)
+        .def(
+             "gradient_x_aa_to_numpy",
+             [](const CDensityGrid& self, int32_t iDensityMatrix) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.alphaDensityGradientX(iDensityMatrix), self.getNumberOfGridPoints());
+              },
+             "Gets alpha density gradient X component on grid as numpy array.",
+             "iDensityMatrix"_a)
+        .def(
+             "gradient_y_aa_to_numpy",
+             [](const CDensityGrid& self, int32_t iDensityMatrix) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.alphaDensityGradientY(iDensityMatrix), self.getNumberOfGridPoints());
+             },
+             "Gets alpha density gradient Y component on grid as numpy array.",
+             "iDensityMatrix"_a)
+        .def(
+             "gradient_z_aa_to_numpy",
+             [](const CDensityGrid& self, int32_t iDensityMatrix) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.alphaDensityGradientZ(iDensityMatrix), self.getNumberOfGridPoints());
+             },
+             "Gets alpha density gradient Z component on grid as numpy array.",
+             "iDensityMatrix"_a)
+        .def(
+             "gradient_x_bb_to_numpy",
+             [](const CDensityGrid& self, int32_t iDensityMatrix) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.betaDensityGradientX(iDensityMatrix), self.getNumberOfGridPoints());
+              },
+             "Gets beta density gradient X component on grid as numpy array.",
+             "iDensityMatrix"_a)
+        .def(
+             "gradient_y_bb_to_numpy",
+             [](const CDensityGrid& self, int32_t iDensityMatrix) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.betaDensityGradientY(iDensityMatrix), self.getNumberOfGridPoints());
+             },
+             "Gets beta density gradient Y component on grid as numpy array.",
+             "iDensityMatrix"_a)
+        .def(
+             "gradient_z_bb_to_numpy",
+             [](const CDensityGrid& self, int32_t iDensityMatrix) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.betaDensityGradientZ(iDensityMatrix), self.getNumberOfGridPoints());
+             },
+             "Gets beta density gradient Z component on grid as numpy array.",
+             "iDensityMatrix"_a)
+        .def(py::self == py::self);
 
     // exposing functions
 
