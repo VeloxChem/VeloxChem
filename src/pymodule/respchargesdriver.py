@@ -474,9 +474,10 @@ class RespChargesDriver:
         n_points = coords.shape[0]
 
         constr = [0] * n_points
-        for points in self.equal_charges:
-            for i in range(len(points) - 1):
-                constr[points[i + 1] - 1] = points[i]
+        if self.equal_charges is not None:
+            for points in self.equal_charges:
+                for i in range(len(points) - 1):
+                    constr[points[i + 1] - 1] = points[i]
 
         # number of constraints
         n_c = 0
@@ -485,7 +486,7 @@ class RespChargesDriver:
                 n_c += 1
 
         self.print_header(1, esp[0].size, coords)
-        self.print_esp_fitting_points_header()
+        self.print_esp_fitting_points_header(len(molecules))
 
         # calculate matrix a and vector b
         a = np.zeros((n_points + 1 + n_c, n_points + 1 + n_c))
@@ -1093,11 +1094,19 @@ class RespChargesDriver:
         self.ostream.print_header(cur_str)
         self.ostream.print_header(31 * '-')
 
-    def print_esp_fitting_points_header(self):
+    def print_esp_fitting_points_header(self, n_conf):
         """
         Prints header for ESP charges calculation.
 
+        :param n_conf:
+            The number of conformers.
         """
+
+        self.ostream.print_blank()
+        if n_conf > 1:
+            cur_str = '*** Warning: Multiple conformers are given, '
+            cur_str += 'but only one can be processed!'
+            self.ostream.print_header(cur_str.ljust(40))
 
         self.ostream.print_blank()
         self.ostream.print_header('ESP Charges on Fitting Points')
