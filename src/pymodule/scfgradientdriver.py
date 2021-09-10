@@ -155,6 +155,7 @@ class ScfGradientDriver(GradientDriver):
                             )
 
         self.gradient += self.grad_nuc_contrib(molecule)
+        self.omega_ao = epsilon_dm_ao #TODO remove again
 
     def compute_numerical(self, molecule, ao_basis, min_basis=None):
         """
