@@ -175,7 +175,7 @@ class MpiTask:
                                                         basis_name, basis_path,
                                                         self.ostream)
                     self.min_basis = MolecularBasis.read(
-                        self.molecule, 'MIN-CC-PVDZ', basis_path)
+                        self.molecule, 'AO-START-GUESS', basis_path)
 
                     self.ostream.print_block(
                         self.ao_basis.get_string('Atomic Basis', self.molecule))
