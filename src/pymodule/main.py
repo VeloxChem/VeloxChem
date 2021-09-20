@@ -314,7 +314,7 @@ def main():
         if use_xtb:
             grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
             grad_drv.compute(task.molecule)
-        elif scf_drv.closed_shell:
+        elif scf_drv.scf_type == 'restricted':
             if 'gradient' in task.input_dict:
                 grad_dict = task.input_dict['gradient']
             else:
@@ -341,7 +341,7 @@ def main():
             grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
             opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
                                          'XTB')
-        elif scf_drv.closed_shell:
+        elif scf_drv.scf_type == 'restricted':
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
             opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
                                          'SCF')
@@ -366,7 +366,7 @@ def main():
 
     # Response
 
-    if task_type == 'response' and scf_drv.closed_shell:
+    if task_type == 'response' and scf_drv.scf_type == 'restricted':
         if 'response' in task.input_dict:
             rsp_dict = dict(task.input_dict['response'])
         else:
@@ -443,7 +443,7 @@ def main():
     # Pulsed Linear Response Theory
 
     if ((task_type == 'pulses' or 'pulses' in task.input_dict) and
-            scf_drv.closed_shell):
+            scf_drv.scf_type == 'restricted'):
         if 'pulses' in task.input_dict:
             prt_dict = task.input_dict['pulses']
         else:
@@ -463,7 +463,7 @@ def main():
 
     # MP2 perturbation theory
 
-    if task_type == 'mp2' and scf_drv.closed_shell:
+    if task_type == 'mp2' and scf_drv.scf_type == 'restricted':
         if 'mp2' in task.input_dict:
             mp2_dict = task.input_dict['mp2']
         else:

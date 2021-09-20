@@ -29,10 +29,10 @@
 
 TEST_F(CCodataTest, GetBohrValueInAngstroms)
 {
-    ASSERT_NEAR(0.52917721092, units::getBohrValueInAngstroms(), 1.0e-13);
+    ASSERT_NEAR(0.529177210903, units::getBohrValueInAngstroms(), 1.0e-13);
 }
 
 TEST_F(CCodataTest, GetHartreeValueInElectronVolts)
 {
-    ASSERT_NEAR(27.21138505, units::getHartreeValueInElectronVolts(), 1.0e-13);
+    ASSERT_NEAR(27.211386245988, units::getHartreeValueInElectronVolts(), 1.0e-13);
 }
