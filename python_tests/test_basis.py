@@ -90,8 +90,6 @@ class TestBasis:
 
             if not basis.is_file():
                 continue
-            if basis.name == 'MIN-CC-PVDZ':
-                continue
             if 'RI' in basis.name:
                 continue
 

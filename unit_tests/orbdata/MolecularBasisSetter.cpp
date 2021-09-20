@@ -124,7 +124,7 @@ getMinimalBasisForHeAtom()
 {
     CMolecularBasis mbas;
 
-    mbas.setLabel({"MIN-CC-PVDZ"});
+    mbas.setLabel({"AO-START-GUESS"});
 
     mbas.addAtomBasis(getMinimalBasisForHe());
 
@@ -136,7 +136,7 @@ getMinimalBasisForH2O()
 {
     CMolecularBasis mbas;
 
-    mbas.setLabel({"MIN-CC-PVDZ"});
+    mbas.setLabel({"AO-START-GUESS"});
 
     mbas.addAtomBasis(getMinimalBasisForO());
 
@@ -150,7 +150,7 @@ getMinimalBasisForNH3CH4()
 {
     CMolecularBasis mbas;
 
-    mbas.setLabel({"MIN-CC-PVDZ"});
+    mbas.setLabel({"AO-START-GUESS"});
 
     mbas.addAtomBasis(getMinimalBasisForC());
 
