@@ -249,8 +249,8 @@ class ScfHessianDriver(HessianDriver):
                     #density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
                     orben_plus = self.scf_drv.scf_tensors['E']
                     mo_plus = self.scf_drv.scf_tensors['C_alpha']
-                    # TODO: *2 for alpha+beta density?
-                    density_plus = self.scf_drv.scf_tensors['D_alpha']
+                    # *2 for alpha+beta density
+                    density_plus = 2.0 * self.scf_drv.scf_tensors['D_alpha']
                     omega_plus = grad_drv.omega_ao
                     #prop.compute(new_mol, ao_basis, density)
                     prop.compute(new_mol, ao_basis, density_plus)
@@ -271,8 +271,8 @@ class ScfHessianDriver(HessianDriver):
                     #density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
                     orben_minus = self.scf_drv.scf_tensors['E']
                     mo_minus = self.scf_drv.scf_tensors['C_alpha']
-                    # TODO: *2 for alpha+beta density?
-                    density_minus = self.scf_drv.scf_tensors['D_alpha']
+                    # *2 for alpha+beta density
+                    density_minus = 2.0 * self.scf_drv.scf_tensors['D_alpha']
                     omega_minus = grad_drv.omega_ao
                     #prop.compute(new_mol, ao_basis, density)
                     prop.compute(new_mol, ao_basis, density_minus)
