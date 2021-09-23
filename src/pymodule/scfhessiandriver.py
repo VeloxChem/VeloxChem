@@ -35,6 +35,7 @@ from .scfgradientdriver import ScfGradientDriver
 from .outputstream import OutputStream
 from .firstorderprop import FirstOrderProperties
 from .lrsolver import LinearResponseSolver
+from .veloxchemlib import ElectricDipoleIntegralsDriver
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -391,4 +392,57 @@ class ScfHessianDriver(HessianDriver):
 
         self.scf_drv.compute(molecule, ao_basis, min_basis)
         self.scf_drv.ostream.state = scf_ostream_state
+
+    def compute_dipole_integral_derivatives(self, molecule, ao_basis):
+        """
+        Computes numerical derivatives of dipole integrals.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+
+        :return:
+            The dipole integral derivatives.
+        """
+
+        # atom labels
+        labels = molecule.get_labels()
+
+        # number of atoms
+        natm = molecule.number_of_atoms()
+
+        # atom coordinates (nx3)
+        coords = molecule.get_coordinates()
+
+        # number of atomic orbitals
+        nao = self.scf_drv.scf_tensors['D_alpha'].shape[0]
+
+        # Dipole integrals driver
+        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+
+        # 3 dipole components x No. atoms x 3 atomic coordinates x No. basis x No. basis
+        dipole_integrals_gradient = np.zeros((3, natm, 3, nao, nao))
+
+        for i in range(natm):
+            for d in range(3):
+                coords[i, d] += self.delta_h
+                new_mol = Molecule(labels, coords, units='au')
+
+                dipole_mats_p = dipole_drv.compute(new_mol, ao_basis)
+                dipole_ints_p = (dipole_mats_p.x_to_numpy(), dipole_mats_p.y_to_numpy(),
+                               dipole_mats_p.z_to_numpy())
+
+                coords[i, d] -= 2.0 * self.delta_h
+                new_mol = Molecule(labels, coords, units='au')
+
+                dipole_mats_m = dipole_drv.compute(new_mol, ao_basis)
+                dipole_ints_m = (dipole_mats_m.x_to_numpy(), dipole_mats_m.y_to_numpy(),
+                               dipole_mats_m.z_to_numpy())
+
+                for c in range(3):
+                    dipole_integrals_gradient[c, i, d] = ( dipole_ints_p[c] - dipole_ints_m[c] ) / (2.0 * self.delta_h)
+
+        return dipole_integrals_gradient
+
 

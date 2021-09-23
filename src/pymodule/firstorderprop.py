@@ -103,8 +103,9 @@ class FirstOrderProperties:
             nuclear_dipole = np.sum((coords - origin).T * nuclear_charges,
                                     axis=1)
 
-            self.properties['dipole moment'] = (nuclear_dipole +
-                                                electronic_dipole)
+            self.properties['dipole moment'] = (nuclear_dipole
+                                                + electronic_dipole
+                                               )
 
     def get_property(self, key):
         """
