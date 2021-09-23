@@ -206,6 +206,19 @@ public:
                  const dengrid gridType);
     
     /**
+     Creates a density grid object.
+     
+     @param nGridPoints the number of grid points with density values.
+     @param nDensityMatrices the number of AO density matrices.
+     @param nComponents the number of components per single AO density matrix.
+     @param gridType the type of density grid.
+     */
+    CDensityGrid(const int32_t nGridPoints,
+                 const int32_t nDensityMatrices,
+                 const int32_t nComponents,
+                 const dengrid gridType);
+    
+    /**
      Creates a density grid object by copying other density grid object.
      
      @param source the density grid object.
@@ -472,6 +485,22 @@ public:
      @return the pointer to beta density gradient Z values.
      */
     double* betaDensityGradientZ(const int32_t iDensityMatrix);
+    
+    /**
+     Gets constant pointer to specific component of density grid.
+     
+     @param iComponent the index of density grid component.
+     @return the constant pointer to density grid component.
+     */
+    const double* getComponent(const int32_t iComponent) const;
+    
+    /**
+     Gets pointer to specific component of density grid.
+     
+     @param iComponent the index of density grid component.
+     @return the constant pointer to density grid component.
+     */
+    double* getComponent(const int32_t iComponent);
     
     /**
      Generates pair of screened molecular and density grids by removing grid points with specific density/density

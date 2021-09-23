@@ -476,7 +476,7 @@ def main():
             
         gop_drv = GlobalOptimizationDriver(task.mpi_comm, task.ostream)
         gop_drv.update_settings(gop_dict)
-        gop_drv.compute(task.molecule)
+        gop_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # All done
 

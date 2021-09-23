@@ -71,6 +71,18 @@ CDensityGrid::CDensityGrid(const int32_t nGridPoints,
     _densityValues = CMemBlock2D<double>(nGridPoints, _nDensityMatrices * ncomp);
 }
 
+CDensityGrid::CDensityGrid(const int32_t nGridPoints,
+                           const int32_t nDensityMatrices,
+                           const int32_t nComponents,
+                           const dengrid gridType)
+{
+    _gridType = gridType;
+    
+    _nDensityMatrices = nDensityMatrices;
+    
+    _densityValues = CMemBlock2D<double>(nGridPoints, _nDensityMatrices * nComponents);
+}
+
 CDensityGrid::CDensityGrid(const CDensityGrid& source)
 
     : _gridType(source._gridType)
@@ -525,6 +537,18 @@ CDensityGrid::betaDensityGradientZ(const int32_t iDensityMatrix)
     if (_gridType == dengrid::lima) return _densityValues.data(4 * _nDensityMatrices + iDensityMatrix);
     
     return nullptr;
+}
+
+const double*
+CDensityGrid::getComponent(const int32_t iComponent) const
+{
+    return _densityValues.data(iComponent);
+}
+
+double*
+CDensityGrid::getComponent(const int32_t iComponent)
+{
+    return _densityValues.data(iComponent);
 }
 
 void

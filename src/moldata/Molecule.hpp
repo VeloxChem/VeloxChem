@@ -391,11 +391,9 @@ class CMolecule
      Gets index of nearest atom with given atom label to specific atom.
 
      @param iAtom the index of requested atom.
-     @param atomLabel the label of requested atom type.
      @return the index of nearest atom to requested atom.
     */
-    int32_t getIndexOfNearestAtom(const int32_t      iAtom,
-                                  const std::string& atomLabel) const;
+    int32_t getIndexOfNearestAtom(const int32_t iAtom) const;
     
     
     /**

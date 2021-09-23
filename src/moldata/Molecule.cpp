@@ -722,8 +722,7 @@ CMolecule::getAtomIndexes(const std::string& atomLabel) const
 }
 
 int32_t
-CMolecule::getIndexOfNearestAtom(const int32_t      iAtom,
-                                 const std::string& atomLabel) const
+CMolecule::getIndexOfNearestAtom(const int32_t iAtom) const
 {
     // set up pointers to coordinates
     
@@ -741,37 +740,26 @@ CMolecule::getIndexOfNearestAtom(const int32_t      iAtom,
     
     const auto raz = coordz[iAtom];
     
-    // find nearest atom
+    // determine position of nearest atom
     
     int32_t idx = -1;
     
-    const auto indexes = getAtomIndexes(atomLabel);
-   
-    const auto nindexes = static_cast<int32_t>(indexes.size());
+    double rmin = 1.0e9;
     
-    if (nindexes > 0)
+    for (int32_t i = 0; i < getNumberOfAtoms(); i++)
     {
-        idx = indexes[0];
-        
-        double rmin = mathfunc::distance(rax, ray, raz,
-                                         coordx[idx],
-                                         coordy[idx],
-                                         coordz[idx]);
-        
-        for (int32_t i = 1; i < nindexes; i++)
+        if (i != iAtom)
         {
-            const auto cidx = indexes[i];
+            const double rab = mathfunc::distance(rax, ray, raz,
+                                                  coordx[i],
+                                                  coordy[i],
+                                                  coordz[i]);
             
-            const auto rab = mathfunc::distance(rax, ray, raz,
-                                                coordx[cidx],
-                                                coordy[cidx],
-                                                coordz[cidx]);
-            
-            if (rmin > rab)
+            if (rab < rmin)
             {
-                rmin = rmin;
+                rmin = rab;
                 
-                idx = cidx;
+                idx = i;
             }
         }
     }

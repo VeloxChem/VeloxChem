@@ -158,20 +158,19 @@ class CXCIntegrator
                                            const CMolecularGrid&    molecularGrid) const;
     
     /**
-        Computes exchange-correlation contribution to Kohn-Sham matrix for spin-unrestricted LDA case.
+     Computes exchange-correlation contribution to Kohn-Sham matrix for spin-unrestricted LDA case.
         
-        @param aoKohnShamMatrix the Kohn-Sham matrix.
-        @param gtoContainer the container of GTOs blocks.
-        @param xcGradientGrid the exchange-correlation functional gradient grid.
-        @param densityGrid the density grid.
-        @param molecularGrid the molecular grid.
-        */
-
-       void _compUnrestrictedContributionForLda(      CAOKohnShamMatrix& aoKohnShamMatrix,
-                                                const CGtoContainer*     gtoContainer,
-                                                const CXCGradientGrid&   xcGradientGrid,
-                                                const CDensityGrid&      densityGrid,
-                                                const CMolecularGrid&    molecularGrid) const;
+     @param aoKohnShamMatrix the Kohn-Sham matrix.
+     @param gtoContainer the container of GTOs blocks.
+     @param xcGradientGrid the exchange-correlation functional gradient grid.
+     @param densityGrid the density grid.
+     @param molecularGrid the molecular grid.
+    */
+    void _compUnrestrictedContributionForLda(      CAOKohnShamMatrix& aoKohnShamMatrix,
+                                             const CGtoContainer*     gtoContainer,
+                                             const CXCGradientGrid&   xcGradientGrid,
+                                             const CDensityGrid&      densityGrid,
+                                             const CMolecularGrid&    molecularGrid) const;
     
     /**
      Computes exchange-correlation contribution to Kohn-Sham matrix for spin-restricted GGA case.

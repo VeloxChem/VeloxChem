@@ -250,7 +250,7 @@ export_moldata(py::module& m)
         .def("min_distance", &CMolecule::getMinDistance, "Get minimal distance from external point to closest atom in molecule.",
              "coordinateX"_a, "coordinateY"_a, "coordinateZ"_a)
         .def("index_of_nearest_atom", &CMolecule::getIndexOfNearestAtom, "Gets index of nearest atom with specific label to given atom.",
-             "iAtom"_a, "atomLabel"_a)
+             "iAtom"_a)
         .def("coordination_number", &CMolecule::getCoordinationNummber, "Gets coordination number of specific atom.", "iAtom"_a, "radius"_a)
         .def(
             "number_of_alpha_electrons",

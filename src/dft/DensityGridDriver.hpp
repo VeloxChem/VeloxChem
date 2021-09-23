@@ -181,7 +181,6 @@ class CDensityGridDriver
                                                       const int32_t           gridOffset,
                                                       const int32_t           nGridPoints) const;
     
-
   /**
       Generates batch of spin-unrestricted density grid points for LDA case.
 
@@ -255,7 +254,6 @@ class CDensityGridDriver
                                                         const double*           gridCoordinatesZ,
                                                         const int32_t           gridOffset,
                                                         const int32_t           nGridPoints) const;
-    
     
     /**
      Distributes spin-restriced density values into density grid.

@@ -343,11 +343,23 @@ TEST_F(CMoleculeTest, GetIndexOfNearestAtom)
 {
     CMolecule mol = vlxmol::getMoleculeNH3CH4();
    
-    ASSERT_EQ(mol.getIndexOfNearestAtom(0, {"H"}), 3);
+    ASSERT_EQ(mol.getIndexOfNearestAtom(0), 2);
     
-    ASSERT_EQ(mol.getIndexOfNearestAtom(4, {"H"}), 8);
+    ASSERT_EQ(mol.getIndexOfNearestAtom(1), 0);
     
-    ASSERT_EQ(mol.getIndexOfNearestAtom(0, {"O"}), -1);
+    ASSERT_EQ(mol.getIndexOfNearestAtom(2), 0);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(3), 0);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(4), 5);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(5), 4);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(6), 4);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(7), 4);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(8), 4);
 }
 
 TEST_F(CMoleculeTest, AddAtom)

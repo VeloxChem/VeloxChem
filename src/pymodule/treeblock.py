@@ -57,11 +57,11 @@ class TreeBlock:
         if data is not None:
             for line in data:
                 keys = line.split()
-                self.atoms.append(keys[0])
-                self.ref_atoms.append(keys[3])
+                self.atoms.append(keys[0].upper())
+                self.ref_atoms.append(keys[3].upper())
                 self.bond_lengths.append(float(keys[1]))
                 self.bond_angles.append(float(keys[2]))
-                self.max_cnums.append(float(keys[4]))
+                self.max_cnums.append(int(keys[4]))
                 
     def name(self):
         """

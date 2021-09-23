@@ -26,16 +26,21 @@
 from mpi4py import MPI
 import numpy as np
 import time as tm
+import random as rn
+import math
 import sys
 
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import mpi_master
-from .veloxchemlib import CommonNeighbors
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
+from .veloxchemlib import CommonNeighbors
 from .molecule import Molecule
 from .treeblock import TreeBlock
+from .scfrestdriver import ScfRestrictedDriver
+from .scfgradientdriver import ScfGradientDriver
+from .optimizationdriver import OptimizationDriver
 
 class GlobalOptimizationDriver:
     """
@@ -136,7 +141,7 @@ class GlobalOptimizationDriver:
         # update tree growth unit
         self.tree_growth_unit = TreeBlock(self.block_data)
             
-    def compute(self, seed):
+    def compute(self, seed, ao_basis, min_basis):
         """
         Performs global optimization with given molecular seed.
         
@@ -145,7 +150,209 @@ class GlobalOptimizationDriver:
         """
         
         self.print_header()
-   
+    
+        # generate conformer candidates
+        molgeoms = []
+        for _ in range(self.max_conformers):
+            mol = self.generate_conformer(seed)
+            if mol is not None:
+                molgeoms.append(mol)
+        
+        # select unique conformer candidates
+        confgeoms = self.remove_duplicates(molgeoms)
+        
+        # optimize conformers
+        for i, confgeom in enumerate(confgeoms):
+        
+            self.ostream.print_blank()
+            cur_str = 'Full Geometry Optimization: Conformer Candidate {:d}'.format(i)
+            self.ostream.print_header(cur_str)
+            self.ostream.print_header(len(cur_str) * '=')
+            self.ostream.print_blank()
+    
+            scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
+            scf_drv.compute(seed, ao_basis, min_basis)
+            grad_drv = ScfGradientDriver(scf_drv, self.comm, self.ostream)
+            filename = 'conformer.{:d}'.format(i)
+            opt_drv = OptimizationDriver(filename, grad_drv, 'SCF')
+            opt_drv.compute(seed, ao_basis, min_basis)
+        
+    def generate_conformer(self, seed):
+        """
+        Generates conformer for given molecular seed.
+        
+        :param seed:
+            The molecular seed.
+        :return:
+            The generated molecular conformer.
+        """
+        
+        if self.growth_steps == 0:
+            return None
+        else:
+            cur_str = 'Generating conformer candidate...'
+            self.ostream.print_info(cur_str)
+            
+            mol = Molecule(seed)
+            
+            if self.popt_steps > 0:
+            
+                # add growth units with partial optimization
+                nsteps = self.growth_steps // self.popt_steps
+                if nsteps > 0:
+                    for _ in range(self.popt_steps):
+                        natoms = mol.number_of_atoms()
+                        for _ in range(nsteps):
+                            if not self.add_build_block(mol):
+                                return None
+                        print("Perform partial optimization...")
+                nsteps = self.growth_steps % self.popt_steps
+                
+                # add remaining growth units
+                if nsteps > 0:
+                    for _ in range(nsteps):
+                        if not self.add_build_block(mol):
+                            return None
+            else:
+            
+                # add growth units
+                for _ in range(self.growth_steps):
+                    if not self.add_build_block(mol):
+                        return None
+                
+            cur_str = '...done.'
+            self.ostream.print_info(cur_str)
+            return mol
+            
+    def add_build_block(self, molecule):
+        """
+        Adds the building block to given molecule.
+        
+        :param molecule:
+            The initial molecule.
+        :return:
+            True if build block is added to molecule, False otherwise.
+        """
+        
+        for i, atom in enumerate(self.tree_growth_unit.atoms):
+            atmxyz = self.select_new_coordinates(i, molecule)
+            if atmxyz is None:
+                return False
+            atmlbl = self.tree_growth_unit.atoms[i]
+            molecule.add_atom(atmlbl, atmxyz[0], atmxyz[1], atmxyz[2])
+        return True
+    
+    def select_ref_atom(self, index, molecule):
+        """
+        Select reference atom to append another atom in molecule.
+        
+        :param index:
+            The index of atom in tree block.
+        :param molecule:
+            The initial molecule.
+        :return:
+            The randomly selected reference atom.
+        """
+        ref_indexes = []
+        mfval = self.tree_growth_unit.max_cnums[index]
+        ref_atom = self.tree_growth_unit.ref_atoms[index]
+        for i in molecule.atom_indexes(ref_atom):
+            cfval = 1 + molecule.coordination_number(i, self.cna_bond)
+            if cfval <= mfval:
+                ref_indexes.append(i)
+        if len(ref_indexes) > 0:
+            return rn.choice(ref_indexes)
+        else:
+            return None
+        
+    def select_new_coordinates(self, index, molecule):
+        """
+        Select new coordinates of atom to be added to molecule.
+        
+        :param index:
+            The index of atom in tree block.
+        :param molecule:
+            The initial molecule.
+        :return:
+            The randomly selected coordinates of new atom.
+        """
+        
+        while True:
+        
+            # select reference atom
+            refids = self.select_ref_atom(index, molecule)
+            if refids is None:
+                return None
+            refxyz = molecule.get_atom_coordinates(refids)
+            radius = self.tree_growth_unit.bond_lengths[index]
+            radius /= bohr_in_angstroms()
+            
+            minrad = 0.6 * radius
+        
+            # generate spherical mesh
+            phi = np.linspace(0, np.pi, 10)
+            theta = np.linspace(0, 2 * np.pi, 10)
+            nx = refxyz[0] + radius * np.outer(np.sin(theta), np.cos(phi))
+            ny = refxyz[1] + radius * np.outer(np.sin(theta), np.sin(phi))
+            nz = refxyz[2] + radius * np.outer(np.cos(theta), np.ones_like(phi))
+        
+            # screen viable coordinates of new atom
+            coords = []
+            for x, y, z in zip(nx.flat, ny.flat, nz.flat):
+                if molecule.min_distance(x, y, z) > minrad:
+                    coords.append([x, y, z])
+                    
+            # select coordinates
+            if len(coords) > 0:
+                return rn.choice(coords)
+                
+        return None
+        
+    def remove_duplicates(self, molecules):
+        """
+        Removes duplicates from molecules list according to similarity index.
+           
+        :param molecules:
+            The list of molecules.
+        :return:
+            The list of unique molecules.
+        """
+           
+        if len(molecules) > 0:
+            molgeoms = []
+            for mol in molecules:
+                if len(molgeoms) == 0:
+                    molgeoms.append(mol)
+                else:
+                    self.add_unique(molgeoms, mol, 0.9)
+            return molgeoms
+        else:
+            return None
+                
+    def add_unique(self, molecules, molecule, jcutoff):
+        """
+        Adds molecule to list of unique molecules.
+       
+        :param molecules:
+            The list of unique molecules.
+        :param molecule:
+            The molecule to be added to list of unique molecules.
+        :param jcutoff:
+            The inclusion cut-off for similarity index.
+        """
+       
+        rcna = CommonNeighbors(molecule, self.cna_bond)
+        rcna.generate(self.cna_rcut)
+        
+        for mol in molecules:
+            lcna = CommonNeighbors(mol, self.cna_bond)
+            lcna.generate(self.cna_rcut)
+            jval = lcna.comp_cna(rcna)
+            if jval > jcutoff:
+                return
+        
+        molecules.append(molecule)
+    
     def print_header(self):
         """
         Prints header for the global optimization driver.

@@ -27,8 +27,6 @@
 
 #include <cmath>
 
-#include <mpi.h>
-
 #include "MpiFunc.hpp"
 #include "DensityGridDriver.hpp"
 #include "FunctionalParser.hpp"
@@ -206,6 +204,7 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
             ksmat.symmetrize();
 
         }
+        
         // delete GTOs container
         
         delete gtovec;
