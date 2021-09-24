@@ -95,6 +95,7 @@ from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .scffirstorderprop import ScfFirstOrderProperties
+from .forcefieldgenerator import ForceFieldGenerator
 
 # Python functions
 from .errorhandler import assert_msg_critical
