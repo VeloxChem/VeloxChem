@@ -24,7 +24,7 @@ class TestOptimizeXTB:
         opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
                                      'XTB')
         opt_drv.update_settings({'coordsys': 'tric'})
-        opt_mol = opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        opt_mol, opt_ene = opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         if is_mpi_master(task.mpi_comm):
             opt_coords = opt_mol.get_coordinates()
