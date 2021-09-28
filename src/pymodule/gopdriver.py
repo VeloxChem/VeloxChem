@@ -32,14 +32,15 @@ import sys
 
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import mpi_master
+from .veloxchemlib import hartree_in_kcalpermol
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .veloxchemlib import CommonNeighbors
 from .molecule import Molecule
 from .treeblock import TreeBlock
-from .scfrestdriver import ScfRestrictedDriver
-from .scfgradientdriver import ScfGradientDriver
+from .xtbdriver import XTBDriver
+from .xtbgradientdriver import XTBGradientDriver
 from .optimizationdriver import OptimizationDriver
 
 class GlobalOptimizationDriver:
@@ -141,10 +142,12 @@ class GlobalOptimizationDriver:
         # update tree growth unit
         self.tree_growth_unit = TreeBlock(self.block_data)
             
-    def compute(self, seed, ao_basis, min_basis):
+    def compute(self, filename, seed):
         """
         Performs global optimization with given molecular seed.
         
+        :param filename:
+            The name of input file.
         :param seed:
             The molecular seed.
         """
@@ -162,6 +165,9 @@ class GlobalOptimizationDriver:
         confgeoms = self.remove_duplicates(molgeoms)
         
         # optimize conformers
+        opt_dict = {'max_iter': '900', 'conv_energy': 1.0e-5, 
+                    'conv_grms': 1.0e-3, 'conv_gmax': 3.0e-3, 
+                    'conv_drms': 1.0e-3, 'conv_dmax': 3.0e-3}
         for i, confgeom in enumerate(confgeoms):
         
             self.ostream.print_blank()
@@ -169,14 +175,29 @@ class GlobalOptimizationDriver:
             self.ostream.print_header(cur_str)
             self.ostream.print_header(len(cur_str) * '=')
             self.ostream.print_blank()
-    
-            scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
-            scf_drv.compute(seed, ao_basis, min_basis)
-            grad_drv = ScfGradientDriver(scf_drv, self.comm, self.ostream)
-            filename = 'conformer.{:d}'.format(i)
-            opt_drv = OptimizationDriver(filename, grad_drv, 'SCF')
-            opt_drv.compute(seed, ao_basis, min_basis)
+            
+            xtb_drv = XTBDriver(self.comm)
+            xtb_drv.set_method('gfn2')
+            grad_drv = XTBGradientDriver(xtb_drv, self.comm, self.ostream)
+            fname = 'conformer.{:d}'.format(i)
+            opt_drv = OptimizationDriver(fname, grad_drv, 'XTB')
+            opt_drv.update_settings(opt_dict)
+            mol, ene = opt_drv.compute(confgeom, None, None)
+            self.conformer_energies.append(ene) 
+            self.conformer_geometries.append(mol)
+
+        # sort conformers according to energies 
+        zpairs = zip(self.conformer_energies, self.conformer_geometries) 
+        spairs = sorted(zpairs, key=lambda pair: pair[0])  
+        molenes = [x for x,_ in spairs]
+        molgeoms = [x for _,x in spairs]
+        self.conformer_energies = molenes 
+        self.conformer_geometries = molgeoms 
         
+        # print energies and geometries 
+        self.print_conformers(filename) 
+        
+
     def generate_conformer(self, seed):
         """
         Generates conformer for given molecular seed.
@@ -197,22 +218,31 @@ class GlobalOptimizationDriver:
             
             if self.popt_steps > 0:
             
-                # add growth units with partial optimization
+                # add growth units with optimization 
                 nsteps = self.growth_steps // self.popt_steps
                 if nsteps > 0:
-                    for _ in range(self.popt_steps):
+                    for i in range(self.popt_steps): 
                         natoms = mol.number_of_atoms()
                         for _ in range(nsteps):
                             if not self.add_build_block(mol):
                                 return None
-                        print("Perform partial optimization...")
-                nsteps = self.growth_steps % self.popt_steps
+                        fstr = 'xyz 1-{:d}'.format(natoms)
+                        opt_dict = {'max_iter': '900', 'constraints': ['$freeze', fstr]}
+                        xtb_drv = XTBDriver(self.comm)
+                        xtb_drv.set_method('gfn2')
+                        grad_drv = XTBGradientDriver(xtb_drv, self.comm, self.ostream)
+                        filename = 'partial.optimization.{:d}'.format(i)
+                        opt_drv = OptimizationDriver(filename, grad_drv, 'XTB')
+                        opt_drv.update_settings(opt_dict)
+                        mol = opt_drv.compute(mol, None, None)
                 
                 # add remaining growth units
+                nsteps = self.growth_steps % self.popt_steps
                 if nsteps > 0:
                     for _ in range(nsteps):
                         if not self.add_build_block(mol):
                             return None
+
             else:
             
                 # add growth units
@@ -287,7 +317,7 @@ class GlobalOptimizationDriver:
             radius = self.tree_growth_unit.bond_lengths[index]
             radius /= bohr_in_angstroms()
             
-            minrad = 0.6 * radius
+            minrad = 0.9 * radius
         
             # generate spherical mesh
             phi = np.linspace(0, np.pi, 10)
@@ -352,7 +382,35 @@ class GlobalOptimizationDriver:
                 return
         
         molecules.append(molecule)
-    
+
+    def print_conformers(self, filename): 
+        """                                                                                                                                                                                                                                                                                                     
+        Prints conformers data to output stream.
+        
+        :param filename:
+            The name of input file.
+        """
+        
+        self.ostream.print_blank()
+        self.ostream.print_header('Conformer Energies')
+        self.ostream.print_header(24 * '=')
+        self.ostream.print_blank()
+
+        line = '{:>10s}{:>20s} {:>25}{:>30s}'.format(
+            'Conformer', 'Energy (a.u.)', 'Relative Energy(a.u.)', 
+            'Relative Energy (kcal/mol)') 
+        self.ostream.print_header(line) 
+        self.ostream.print_header('-' * len(line))
+        for i, ene in enumerate(self.conformer_energies):
+            rel_ene = ene - self.conformer_energies[0]
+            line = '{:5d}{:22.12f}{:22.12f}   {:25.10f}     '.format(
+                i + 1, ene, rel_ene, rel_ene * hartree_in_kcalpermol())
+            self.ostream.print_header(line) 
+
+        for i, mol in enumerate(self.conformer_geometries):
+            fname = filename + '.conformer.{:d}.xyz'.format(i) 
+            mol.write_xyz(fname)
+
     def print_header(self):
         """
         Prints header for the global optimization driver.

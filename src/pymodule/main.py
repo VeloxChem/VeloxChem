@@ -338,7 +338,6 @@ def main():
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
             opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
                                          'SCF')
-
         opt_drv.update_settings(opt_dict)
         opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
@@ -476,7 +475,7 @@ def main():
             
         gop_drv = GlobalOptimizationDriver(task.mpi_comm, task.ostream)
         gop_drv.update_settings(gop_dict)
-        gop_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        gop_drv.compute(task.input_dict['filename'], task.molecule)
 
     # All done
 

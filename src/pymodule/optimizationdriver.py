@@ -80,6 +80,12 @@ class OptimizationDriver:
         self.constraints = None
         self.check_interval = 0
         self.max_iter = 300
+ 
+        self.conv_energy = None 
+        self.conv_grms = None 
+        self.conv_gmax = None 
+        self.conv_drms = None 
+        self.conv_dmax = None
 
         self.ref_xyz = None
 
@@ -105,6 +111,11 @@ class OptimizationDriver:
             'constraints': 'list',
             'check_interval': 'int',
             'max_iter': 'int',
+            'conv_energy': 'float', 
+            'conv_grms': 'float', 
+            'conv_gmax': 'float', 
+            'conv_drms': 'float', 
+            'conv_dmax': 'float',
             'ref_xyz': 'str',
             'cna': 'bool',
             'cna_bond': 'float',
@@ -137,7 +148,7 @@ class OptimizationDriver:
             The minimal AO basis set.
 
         :return:
-            The molecule with final geometry.
+            The tuple with final geometry, and energy of molecule.
         """
 
         self.print_header()
@@ -188,6 +199,7 @@ class OptimizationDriver:
                         coordsys=self.coordsys,
                         check=self.check_interval,
                         maxiter=self.max_iter,
+                        converge=self.conv_flags(), 
                         constraints=constr_filename,
                         input=filename,
                         logIni=str(log_ini))
@@ -196,9 +208,11 @@ class OptimizationDriver:
         labels = molecule.get_labels()
 
         if self.rank == mpi_master():
-            final_mol = Molecule(labels, coords.reshape(-1, 3), units='au')
+            final_mol = Molecule(labels, coords.reshape(-1, 3), units='au') 
+            final_ene = m.qm_energies[-1]
         else:
             final_mol = Molecule()
+            final_ene = None
         final_mol.broadcast(self.rank, self.comm)
 
         if self.rank == mpi_master():
@@ -224,8 +238,34 @@ class OptimizationDriver:
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
+            
+        return (final_mol,final_ene)
+    
+    def conv_flags(self): 
+        """
+        Generates convergence keywords for GeomTRIC. 
 
-        return final_mol
+        :return:
+            The convergence keywords for GeomTRIC. 
+        """
+
+        opt_flags = []
+        if self.conv_energy is not None: 
+            opt_flags.append('energy')
+            opt_flags.append(self.conv_energy) 
+        if self.conv_grms is not None: 
+            opt_flags.append('grms') 
+            opt_flags.append(self.conv_grms) 
+        if self.conv_gmax is not None:
+            opt_flags.append('gmax')
+            opt_flags.append(self.conv_gmax)
+        if self.conv_drms is not None:
+            opt_flags.append('drms')
+            opt_flags.append(self.conv_drms)
+        if self.conv_gmax is not None:
+            opt_flags.append('dmax')
+            opt_flags.append(self.conv_dmax)
+        return opt_flags
 
     def clean_up_file(self, *path_list):
         """
