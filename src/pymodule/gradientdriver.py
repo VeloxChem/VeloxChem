@@ -34,7 +34,9 @@ from .veloxchemlib import MolecularGrid
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import denmat
 from .veloxchemlib import mpi_master
+from .veloxchemlib import parse_xc_func
 from .distributedarray import DistributedArray
+from .errorhandler import assert_msg_critical
 
 class GradientDriver:
     """

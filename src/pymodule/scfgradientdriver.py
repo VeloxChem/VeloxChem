@@ -177,22 +177,32 @@ class ScfGradientDriver(GradientDriver):
 
         # atom coordinates (nx3)
         coords = molecule.get_coordinates()
+        # the number of atoms
+        natm = molecule.number_of_atoms()
 
-        self.gradient = np.zeros((molecule.number_of_atoms(), 3))
+        self.gradient = np.zeros((natm, 3))
+
+        # Gradient of the exchange and correlation energy
+        if self.dft:
+            self.xc_gradient = np.zeros((natm, 3))
 
         # First-order properties for gradient of dipole moment
         if self.dipole_deriv:
             prop = FirstOrderProperties(self.comm, self.ostream)
             # numerical gradient (3 dipole components x no. atoms x 3 atom coords)
-            self.dipole_gradient = np.zeros((3, molecule.number_of_atoms(), 3))
+            self.dipole_gradient = np.zeros((3, natm, 3))
 
         if not self.do_four_point:
-            for i in range(molecule.number_of_atoms()):
+            for i in range(natm):
                 for d in range(3):
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     e_plus = self.scf_drv.get_scf_energy()
+                    # TODO: numerical derivative of the xc energy;
+                    # remove when analytical derivative is working.
+                    if self.dft:
+                        xc_plus = self.scf_drv.scf_tensors['xc_energy']
 
                     if self.dipole_deriv:
                         density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
@@ -203,6 +213,10 @@ class ScfGradientDriver(GradientDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     e_minus = self.scf_drv.get_scf_energy()
+                    # TODO: numerical derivative of the xc energy;
+                    # remove when analytical derivative is working.
+                    if self.dft:
+                        xc_minus = self.scf_drv.scf_tensors['xc_energy']
 
                     if self.dipole_deriv:
                         density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
@@ -214,13 +228,15 @@ class ScfGradientDriver(GradientDriver):
 
                     coords[i, d] += self.delta_h
                     self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
-
-
+                    # TODO: numerical derivative of the xc energy;
+                    # remove when analytical derivative is working.
+                    if self.dft:
+                        self.xc_gradient[i, d] = (xc_plus - xc_minus) / (2.0 * self.delta_h)
         else:
             # Four-point numerical derivative approximation
             # for debugging of analytical gradient:
             # [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
-            for i in range(molecule.number_of_atoms()):
+            for i in range(natm):
                 for d in range(3):
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')

@@ -735,6 +735,13 @@ class ScfDriver:
             F_alpha = fock_mat.alpha_to_numpy(0)
             F_beta = fock_mat.beta_to_numpy(0)
 
+            # Saving the xc energy to be able to compute
+            # the numerical gradient.
+            if self.dft:
+                xc_energy = vxc_mat.get_energy()
+            else:
+                xc_energy = 0
+
             self.scf_tensors = {
                 'C': C_alpha,
                 'E': E_alpha,
@@ -749,6 +756,7 @@ class ScfDriver:
                 'D_beta': D_beta,
                 'F_alpha': F_alpha,
                 'F_beta': F_beta,
+                'xc_energy': xc_energy, # TODO: remove after analytical xc derivative works.
             }
 
             if self.is_converged:
