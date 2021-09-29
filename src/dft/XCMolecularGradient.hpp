@@ -39,8 +39,7 @@
 #include "XCGradientGrid.hpp"
 #include "DensityGrid.hpp"
 #include "GtoContainer.hpp"
-#include "MemBlock.hpp"
-#include "MemBlock2D.hpp"
+#include "DenseMatrix.hpp"
 
 /**
  Class CXCMolecularGradient implements integration of exchange-correlation contribution to molecular
@@ -95,12 +94,12 @@ public:
      @param xcFuncLabel the label of exchange-correlation functional.
      @return the molecular gradient.
      */
-    CMemBlock2D<double> integrate(const CMemBlock<int32_t> idsAtomic,
-                                  const CAODensityMatrix&  aoDensityMatrix,
-                                  const CMolecule&         molecule,
-                                  const CMolecularBasis&   basis,
-                                  const CMolecularGrid&    molecularGrid,
-                                  const std::string&       xcFuncLabel) const;
+    CDenseMatrix integrate(const std::vector<int32_t>& idsAtomic,
+                           const CAODensityMatrix&     aoDensityMatrix,
+                           const CMolecule&            molecule,
+                           const CMolecularBasis&      basis,
+                           const CMolecularGrid&       molecularGrid,
+                           const std::string&          xcFuncLabel) const;
 };
 
 #endif /* XCMolecularGradient_hpp */

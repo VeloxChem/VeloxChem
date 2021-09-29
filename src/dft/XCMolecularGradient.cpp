@@ -48,13 +48,13 @@ CXCMolecularGradient::~CXCMolecularGradient()
     
 }
 
-CMemBlock2D<double>
-CXCMolecularGradient::integrate(const CMemBlock<int32_t> idsAtomic,
-                                const CAODensityMatrix&  aoDensityMatrix,
-                                const CMolecule&         molecule,
-                                const CMolecularBasis&   basis,
-                                const CMolecularGrid&    molecularGrid,
-                                const std::string&       xcFuncLabel) const
+CDenseMatrix
+CXCMolecularGradient::integrate(const std::vector<int32_t>& idsAtomic,
+                                const CAODensityMatrix&     aoDensityMatrix,
+                                const CMolecule&            molecule,
+                                const CMolecularBasis&      basis,
+                                const CMolecularGrid&       molecularGrid,
+                                const std::string&          xcFuncLabel) const
 {
     // parse exchange-correlation functional data
 
@@ -68,15 +68,15 @@ CXCMolecularGradient::integrate(const CMemBlock<int32_t> idsAtomic,
     
     // create molecular gradient
     
-    const auto natoms = idsAtomic.size();
+    const auto natoms = static_cast<int32_t>(idsAtomic.size());
     
-    CMemBlock2D<double> molgrad(natoms, 3);
+    CDenseMatrix molgrad(3, natoms);
     
-    auto mgradx = molgrad.data(0);
+    auto mgradx = molgrad.row(0);
     
-    auto mgrady = molgrad.data(1);
+    auto mgrady = molgrad.row(1);
     
-    auto mgradz = molgrad.data(2);
+    auto mgradz = molgrad.row(2);
     
     if (aoDensityMatrix.isClosedShell())
     {
@@ -108,7 +108,8 @@ CXCMolecularGradient::integrate(const CMemBlock<int32_t> idsAtomic,
         
         for (int32_t i = 0; i < natoms; i++)
         {
-            auto gradgrid = graddrv.generate(aoDensityMatrix, molecule, basis, mgrid, i);
+            auto gradgrid = graddrv.generate(aoDensityMatrix, molecule, basis, mgrid,
+                                             idsAtomic[i]);
             
             // set up pointers to density gradient grid
             

@@ -49,11 +49,9 @@ TEST_F(CXCMolecularGradientTest, Integrate)
     
     auto dmat = vlxden::getRestDensityMatrixForH2O();
     
-    CMemBlock<int32_t> idsatm({0, 1, 2});
-    
     CXCMolecularGradient graddrv(MPI_COMM_WORLD);
     
-    auto mgrad = graddrv.integrate(idsatm, dmat, mh2o, mbas, mgrid, std::string("SLATER"));
+    auto mgrad = graddrv.integrate({1, 2}, dmat, mh2o, mbas, mgrid, std::string("SLATER"));
     
-    std::cout << mgrad; 
+    std::cout << mgrad.getString(); 
 }
