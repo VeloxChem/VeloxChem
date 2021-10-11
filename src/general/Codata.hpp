@@ -85,20 +85,12 @@ double getRotatoryStrengthInCGS();
 double getBoltzmannConstantInElectronVoltsPerKelvin();
 
 /**
- Gets factor needed for the calculation of the molar ellipticity from the
- electric-dipole magnetic-dipole polarizability beta.
+ Gets factor needed for the calculation of extinction coefficient from the
+ electric-dipole magnetic-dipole polarizability tensor beta.
 
  @return the factor.
  */
-double getMolarEllipticityFromBeta();
-
-/**
- Gets factor needed for the calculation of extinction coefficient from molar
- ellipticity.
-
- @return the factor.
- */
-double getExtinctionCoefficientFromMolarEllipticity();
+double getExtinctionCoefficientFromBeta();
 
 /**
  Gets fine-structure constant.
