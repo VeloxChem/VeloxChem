@@ -212,6 +212,16 @@ export_general(py::module& m)
         "Checks if a MPI process is the master process.",
         "py_comm"_a = py::none());
     m.def(
+        "mpi_barrier",
+        [](py::object py_comm) {
+            if (py_comm.is_none())
+                MPI_Barrier(MPI_COMM_WORLD);
+            else
+                MPI_Barrier(*get_mpi_comm(py_comm));
+        },
+        "Synchronize all MPI processes using barrier.",
+        "py_comm"_a = py::none());
+    m.def(
         "is_single_node",
         [](py::object py_comm) -> bool {
             if (py_comm.is_none())
