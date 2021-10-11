@@ -82,10 +82,10 @@ class TestCheckpoint:
         solver = LinearSolver(comm, ostream)
 
         labels = ['bger', 'bung', 'e2bger', 'e2bung']
-        solver.dist_bger = DistributedArray(np.random.rand(10, 7), comm)
-        solver.dist_bung = DistributedArray(np.random.rand(10, 7), comm)
-        solver.dist_e2bger = DistributedArray(np.random.rand(10, 7), comm)
-        solver.dist_e2bung = DistributedArray(np.random.rand(10, 7), comm)
+        solver.dist_bger = DistributedArray(np.random.rand(100, 7), comm)
+        solver.dist_bung = DistributedArray(np.random.rand(100, 7), comm)
+        solver.dist_e2bger = DistributedArray(np.random.rand(100, 7), comm)
+        solver.dist_e2bung = DistributedArray(np.random.rand(100, 7), comm)
         solver.nonlinear = False
 
         backup_data = {

@@ -66,46 +66,52 @@ class DistributedArray:
             return
 
         if self.rank == mpi_master():
-            # determine batch size for scatter
-            batch_size = mpi_size_limit() // array.itemsize
-            if array.ndim == 2 and array.shape[1] != 0:
-                batch_size //= array.shape[1]
-            batch_size //= self.nodes
-            batch_size = max(1, batch_size)
-
             # determine counts and displacements for scatter
             ave, res = divmod(array.shape[0], self.nodes)
             counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
             displacements = [sum(counts[:p]) for p in range(self.nodes)]
 
-            # determine number of batches for scatter
-            num_batches = max(counts) // batch_size
-            if max(counts) % batch_size != 0:
-                num_batches += 1
+            # determine batch size for number of columns
+            batch_size = mpi_size_limit() // (array.itemsize * array.shape[0])
+            batch_size = max(1, batch_size)
+            if array.ndim == 1:
+                n_total = 1
+            elif array.ndim == 2:
+                n_total = array.shape[1]
         else:
-            num_batches = None
+            counts = None
+            batch_size = None
+            n_total = None
+        batch_size = comm.bcast(batch_size, root=mpi_master())
+        n_total = comm.bcast(n_total, root=mpi_master())
 
-        num_batches = comm.bcast(num_batches, root=mpi_master())
+        if n_total == 0:
+            counts = comm.bcast(counts, root=mpi_master())
+            self.data = np.zeros((counts[self.rank], 0))
+            return
 
-        for batch_ind in range(num_batches):
+        for batch_start in range(0, n_total, batch_size):
+            batch_end = min(batch_start + batch_size, n_total)
+
             if self.rank == mpi_master():
-                array_list = []
-                for p in range(self.nodes):
-                    row_start = batch_size * batch_ind + displacements[p]
-                    row_end = min(row_start + batch_size,
-                                  counts[p] + displacements[p])
-                    array_list.append(array[row_start:row_end])
+                if array.ndim == 1:
+                    array_list = [
+                        array[displacements[p]:displacements[p] + counts[p]]
+                        for p in range(self.nodes)
+                    ]
+                elif array.ndim == 2:
+                    array_list = [
+                        array[displacements[p]:displacements[p] + counts[p],
+                              batch_start:batch_end] for p in range(self.nodes)
+                    ]
             else:
                 array_list = None
 
-            recv_data = comm.scatter(array_list, root=mpi_master())
-
+            recvbuf = comm.scatter(array_list, root=mpi_master())
             if self.data is None:
-                self.data = recv_data.copy()
-            elif self.data.ndim == 1:
-                self.data = np.hstack((self.data, recv_data))
-            elif self.data.ndim == 2:
-                self.data = np.vstack((self.data, recv_data))
+                self.data = recvbuf
+            else:
+                self.data = np.hstack((self.data, recvbuf))
 
     def __sizeof__(self):
         """
@@ -325,50 +331,50 @@ class DistributedArray:
 
         if rank == mpi_master():
             hf = h5py.File(fname, 'r')
-
             dset = hf[label]
 
             ave, res = divmod(dset.shape[0], nodes)
             counts = [ave + 1 if p < res else ave for p in range(nodes)]
             displacements = [sum(counts[:p]) for p in range(nodes)]
 
-            data = np.array(dset[0:1])
-            batch_size = mpi_size_limit() // data.itemsize
-            if data.ndim == 2 and data.shape[1] != 0:
-                batch_size //= data.shape[1]
+            # determine batch size for number of columns
+            itemsize = np.array(dset[0]).itemsize
+            batch_size = mpi_size_limit() // (itemsize * dset.shape[0])
             batch_size = max(1, batch_size)
-
-            pack_list = [batch_size] + counts
+            n_total = dset.shape[1]
         else:
-            pack_list = None
+            counts = None
+            batch_size = None
+            n_total = None
+        batch_size = comm.bcast(batch_size, root=mpi_master())
+        n_total = comm.bcast(n_total, root=mpi_master())
 
-        pack_list = comm.bcast(pack_list, root=mpi_master())
-        batch_size = pack_list[0]
-        counts = pack_list[1:]
+        data = None
+
+        if n_total == 0:
+            counts = comm.bcast(counts, root=mpi_master())
+            data = np.zeros((counts[rank], 0))
+
+        for batch_start in range(0, n_total, batch_size):
+            batch_end = min(batch_start + batch_size, n_total)
+
+            if rank == mpi_master():
+                array_list = [
+                    np.array(dset[displacements[i]:displacements[i] + counts[i],
+                                  batch_start:batch_end]) for i in range(nodes)
+                ]
+
+            else:
+                array_list = None
+
+            recvbuf = comm.scatter(array_list, root=mpi_master())
+            if data is None:
+                data = recvbuf
+            else:
+                data = np.hstack((data, recvbuf))
 
         if rank == mpi_master():
-            data = np.array(dset[displacements[0]:displacements[0] + counts[0]])
-
-            for i in range(1, nodes):
-                for batch_start in range(0, counts[i], batch_size):
-                    row_start = batch_start + displacements[i]
-                    row_end = min(row_start + batch_size,
-                                  counts[i] + displacements[i])
-                    comm.send(np.array(dset[row_start:row_end]),
-                              dest=i,
-                              tag=i + batch_start)
-
             hf.close()
-        else:
-            data = None
-
-            for batch_start in range(0, counts[rank], batch_size):
-                recv_data = comm.recv(source=mpi_master(),
-                                      tag=rank + batch_start)
-                if data is None:
-                    data = recv_data.copy()
-                else:
-                    data = np.vstack((data, recv_data))
 
         return cls(data, comm, distribute=False)
 
@@ -385,15 +391,21 @@ class DistributedArray:
             The time spent in writing to checkpoint file.
         """
 
-        counts = self.comm.allgather(self.shape(0))
-        displacements = [sum(counts[:p]) for p in range(self.nodes)]
-
-        batch_size = mpi_size_limit() // self.data.itemsize
-        if self.data.ndim == 2 and self.shape(1) != 0:
-            batch_size //= self.shape(1)
-        batch_size = max(1, batch_size)
-
         t0 = tm.time()
+
+        counts = self.comm.gather(self.shape(0))
+
+        if self.rank == mpi_master():
+            displacements = [sum(counts[:p]) for p in range(self.nodes)]
+
+            batch_size = mpi_size_limit() // (self.data.itemsize * sum(counts))
+            batch_size = max(1, batch_size)
+            n_total = self.shape(1)
+        else:
+            batch_size = None
+            n_total = None
+        batch_size = self.comm.bcast(batch_size, root=mpi_master())
+        n_total = self.comm.bcast(n_total, root=mpi_master())
 
         if self.rank == mpi_master():
             hf = h5py.File(fname, 'a')
@@ -402,23 +414,18 @@ class DistributedArray:
                                      dtype=self.data.dtype,
                                      compression='gzip')
 
-            dset[displacements[0]:displacements[0] + counts[0]] = self.data[:]
+        for batch_start in range(0, n_total, batch_size):
+            batch_end = min(batch_start + batch_size, n_total)
 
-            for i in range(1, self.nodes):
-                for batch_start in range(0, counts[i], batch_size):
-                    row_start = batch_start + displacements[i]
-                    row_end = min(row_start + batch_size,
-                                  counts[i] + displacements[i])
-                    recv_data = self.comm.recv(source=i, tag=i + batch_start)
-                    dset[row_start:row_end] = recv_data[:]
+            array_list = self.comm.gather(self.data[:, batch_start:batch_end],
+                                          root=mpi_master())
 
+            if self.rank == mpi_master():
+                for i in range(self.nodes):
+                    dset[displacements[i]:displacements[i] + counts[i],
+                         batch_start:batch_end] = array_list[i][:, :]
+
+        if self.rank == mpi_master():
             hf.close()
-        else:
-            for batch_start in range(0, counts[self.rank], batch_size):
-                row_start = batch_start
-                row_end = min(row_start + batch_size, counts[self.rank])
-                self.comm.send(self.data[row_start:row_end],
-                               dest=mpi_master(),
-                               tag=self.rank + batch_start)
 
         return tm.time() - t0
