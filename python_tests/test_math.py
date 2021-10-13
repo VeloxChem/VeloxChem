@@ -210,4 +210,4 @@ class TestMath:
             ref_vec = ref_eigvecs[:, k].copy()
             if np.dot(vec, ref_vec) < 0.0:
                 vec *= -1.0
-            assert np.max(np.abs(vec - ref_vec)) < 1.0e-13
+            assert np.max(np.abs(vec - ref_vec)) < 1.0e-12
