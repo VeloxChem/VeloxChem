@@ -110,6 +110,12 @@ class HessianDriver:
         self.temperature = 300
         self.pressure = 1.0
 
+        # Timing and profiling
+        self.timing = False
+        self.profiling = False
+        self.memory_profiling = False
+        self.memory_tracing = False
+
 
     def update_settings(self, method_dict, freq_dict=None):
         """
@@ -186,6 +192,20 @@ class HessianDriver:
             self.temperature = float(freq_dict['temperature'])
         if 'pressure' in freq_dict:
             self.pressure = float(freq_dict['pressure'])
+
+        # Timing and profiling
+        if 'timing' in freq_dict:
+            key = freq_dict['timing'].lower()
+            self.timing = True if key in ['yes', 'y'] else False
+        if 'profiling' in freq_dict:
+            key = freq_dict['profiling'].lower()
+            self.profiling = True if key in ['yes', 'y'] else False
+        if 'memory_profiling' in freq_dict:
+            key = freq_dict['memory_profiling'].lower()
+            self.memory_profiling = True if key in ['yes', 'y'] else False
+        if 'memory_tracing' in freq_dict:
+            key = freq_dict['memory_tracing'].lower()
+            self.memory_tracing = True if key in ['yes', 'y'] else False
 
         self.method_dict = dict(method_dict)
         self.freq_dict = dict(freq_dict)
