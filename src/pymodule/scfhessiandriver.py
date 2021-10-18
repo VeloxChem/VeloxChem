@@ -215,7 +215,7 @@ class ScfHessianDriver(HessianDriver):
                                     self.scf_drv.eri_thresh, molecule, ao_basis)
         eri_drv.compute(fock_uij, ao_density_uij, molecule, ao_basis, screening)
 
-		# TODO: how can this be done better?
+        # TODO: how can this be done better?
         fock_uij_numpy = np.zeros((natm,3,nao,nao))
         for i in range(natm):
             for x in range(3):
@@ -243,7 +243,7 @@ class ScfHessianDriver(HessianDriver):
 
 
         if self.pople:
-            self.compute_pople(molecule, ao_basis, -0.5 * ovlp_deriv_oo, cphf_ov)
+            self.compute_pople(molecule, ao_basis, -0.5 * ovlp_deriv_oo, cphf_ov, fock_uij_numpy)
         else:
             hessian_first_order_derivatives = self.compute_furche(molecule, ao_basis,
                                                          cphf_rhs, -0.5 * ovlp_deriv_oo, cphf_ov)
@@ -272,7 +272,7 @@ class ScfHessianDriver(HessianDriver):
                        + hessian_nuclear_nuclear ).transpose(0,2,1,3).reshape(3*natm, 3*natm)
 
 
-    def compute_pople(self, molecule, ao_basis, cphf_oo, cphf_ov):
+    def compute_pople(self, molecule, ao_basis, cphf_oo, cphf_ov, fock_uij):
         """
         Computes the analytical nuclear Hessian the Pople way.
         Int. J. Quantum Chem. Quantum Chem. Symp. 13, 225-241 (1979).
@@ -286,29 +286,74 @@ class ScfHessianDriver(HessianDriver):
             The oo block of the CPHF coefficients.
         :param cphf_ov:
             The ov block of the CPHF coefficients.
+        :param fock_uij:
+            The auxiliary Fock matrix constructed 
+            using the oo block of the CPHF coefficients
+            and two electron integrals.
         """
 
         natm = molecule.number_of_atoms()
         nocc = molecule.number_of_alpha_electrons()
         mo = self.scf_drv.scf_tensors['C']
         mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+        nao = mo.shape[0]
         density = self.scf_drv.scf_tensors['D_alpha']
         mo_energies = self.scf_drv.scf_tensors['E']
         eocc = mo_energies[:nocc]
         eo_diag = np.diag(eocc)
         epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
 
-
-        # Construct the perturbed MO coefficients, density matrix, and part of perturbed omega
-        mo_occ_perturbed = ( np.einsum('mj,xyij->xymi', mo_occ, cphf_oo)
-                           + np.einsum('ma,xyia->xymi', mo_vir, cphf_ov)
-                           )
-        perturbed_density = (  np.einsum('xymi,ni->xymn', mo_occ_perturbed, mo_occ)
-                             + np.einsum('mi,xyni->xymn', mo_occ, mo_occ_perturbed)
+        # Construct the perturbed density matrix, and perturbed omega
+        # TODO: consider if using the transpose makes the
+        # computation faster; consider using cphf coefficients in AO
+        # to compute the perturbed density matrix.
+        perturbed_density = ( 2 * np.einsum('mj,xyij,ni->xymn',
+                                        mo_occ, cphf_oo, mo_occ)
+                              + np.einsum('ma,xyia,ni->xymn',
+                                        mo_vir, cphf_ov, mo_occ)
+                              + np.einsum('mi,xyia,na->xymn',
+                                        mo_occ, cphf_ov, mo_vir)
                             )
-        orben_perturbed_density = (  np.einsum('xymi,ni,i->xymn', mo_occ_perturbed, mo_occ, eocc)
-                                   + np.einsum('mi,xyni,i->xymn', mo_occ, mo_occ_perturbed, eocc)
-                                    )
+        orben_perturbed_density = ( np.einsum('i,mj,xyij,ni->xymn',
+                                            eocc, mo_occ, cphf_oo, mo_occ)
+                                  + np.einsum('i,mi,xyij,nj->xymn',
+                                            eocc, mo_occ, cphf_oo, mo_occ)
+                                  + np.einsum('i,ma,xyia,ni->xymn',
+                                            eocc, mo_vir, cphf_ov, mo_occ)
+                                  +np.einsum('i,mi,xyia,na->xymn',
+                                            eocc, mo_occ, cphf_ov, mo_vir)
+                                 )
+
+        # Transform the CPHF coefficients to AO:
+        uia_ao = np.einsum('mk,xykb,nb->xymn', mo_occ, cphf_ov, mo_vir).reshape((3*natm, nao, nao))
+
+        # create AODensity and Fock matrix objects, contract with ERI
+        uia_ao_list = list([uia_ao[x] for x in range(natm * 3)])
+        ao_density_uia = AODensityMatrix(uia_ao_list, denmat.rest)
+
+        fock_uia = AOFockMatrix(ao_density_uia)
+
+        fock_flag = fockmat.rgenjk
+        for i in range(natm*3):
+            fock_uia.set_fock_type(fock_flag, i)
+
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = eri_drv.compute(get_qq_scheme(self.scf_drv.qq_type),
+                                    self.scf_drv.eri_thresh, molecule, ao_basis)
+        eri_drv.compute(fock_uia, ao_density_uia, molecule, ao_basis, screening)
+
+        fock_uia_numpy = np.zeros((natm,3,nao,nao))
+        for i in range(natm):
+            for x in range(3):
+                fock_uia_numpy[i,x] = fock_uia.to_numpy(3*i + x)
+
+        fock_cphf_oo = np.einsum('mi,xymn,nj->xyij', mo_occ, fock_uij, mo_occ)
+        
+        fock_cphf_ov = ( np.einsum('mi,xymn,nj->xyij', mo_occ, fock_uia_numpy, mo_occ)
+                        +np.einsum('mj,xymn,ni->xyij', mo_occ, fock_uia_numpy, mo_occ)
+                        )
+        
         # TODO: derivative of "epsilon" is missing. CPHF coefficients need to be contracted with ERI
 
 
