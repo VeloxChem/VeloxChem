@@ -243,7 +243,12 @@ class ScfHessianDriver(HessianDriver):
 
 
         if self.pople:
-            self.compute_pople(molecule, ao_basis, -0.5 * ovlp_deriv_oo, cphf_ov, fock_uij_numpy)
+            fock_deriv_oo = np.einsum('mi,xymn,nj->xyij', mo_occ, fock_deriv_ao, mo_occ)
+            # (ei+ej)S^\chi_ij
+            orben_ovlp_deriv_oo = np.einsum('ij,xyij->xyij', eoo, ovlp_deriv_oo)
+            hessian_first_order_derivatives = self.compute_pople(molecule, ao_basis, 
+                                             -0.5 * ovlp_deriv_oo, cphf_ov, fock_uij_numpy,
+                                              fock_deriv_oo, orben_ovlp_deriv_oo)
         else:
             hessian_first_order_derivatives = self.compute_furche(molecule, ao_basis,
                                                          cphf_rhs, -0.5 * ovlp_deriv_oo, cphf_ov)
@@ -272,7 +277,8 @@ class ScfHessianDriver(HessianDriver):
                        + hessian_nuclear_nuclear ).transpose(0,2,1,3).reshape(3*natm, 3*natm)
 
 
-    def compute_pople(self, molecule, ao_basis, cphf_oo, cphf_ov, fock_uij):
+    def compute_pople(self, molecule, ao_basis, cphf_oo, cphf_ov, fock_uij,
+                      fock_deriv_oo, orben_ovlp_deriv_oo):
         """
         Computes the analytical nuclear Hessian the Pople way.
         Int. J. Quantum Chem. Quantum Chem. Symp. 13, 225-241 (1979).
@@ -290,6 +296,13 @@ class ScfHessianDriver(HessianDriver):
             The auxiliary Fock matrix constructed 
             using the oo block of the CPHF coefficients
             and two electron integrals.
+        :param fock_deriv_oo:
+            The oo block of the derivative of the Fock matrix
+            with respect to nuclear coordinates
+        :param orben_ovlp_deriv_oo:
+            The oo block of the derivative of the overlap matrix
+            with respect to nuclear coordinates, multiplied with
+            orbital energies (ei+ej)S^\chi_ij 
         """
 
         natm = molecule.number_of_atoms()
@@ -350,28 +363,38 @@ class ScfHessianDriver(HessianDriver):
 
         fock_cphf_oo = np.einsum('mi,xymn,nj->xyij', mo_occ, fock_uij, mo_occ)
         
-        fock_cphf_ov = ( np.einsum('mi,xymn,nj->xyij', mo_occ, fock_uia_numpy, mo_occ)
-                        +np.einsum('mj,xymn,ni->xyij', mo_occ, fock_uia_numpy, mo_occ)
+        fock_cphf_ov = ( np.einsum('mi,xymn,nj->xyij', mo_occ, 
+                                   fock_uia_numpy, mo_occ)
+                        +np.einsum('mj,xymn,ni->xyij', mo_occ, 
+                                   fock_uia_numpy, mo_occ)
                         )
+        # Construct the derivative of the omega multipliers:
+        perturbed_omega_ao = - ( orben_perturbed_density
+                                + np.einsum('mi,xyij,nj->xymn', mo_occ, 
+                                            fock_deriv_oo, mo_occ)
+                                -0.5*np.einsum('mi,xyij,nj->xymn', mo_occ,
+                                                orben_ovlp_deriv_oo, mo_occ)
+                                + 2*np.einsum('mi,xyij,nj->xymn', mo_occ, 
+                                            fock_cphf_oo, mo_occ)
+                                + np.einsum('mi,xyij,nj->xymn', mo_occ, 
+                                            fock_cphf_ov, mo_occ)
+                                )
+
+        # First integral derivatives: partial Fock and overlap matrix derivatives
+        hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
+
+        for i in range(natm):
+            for j in range(natm):
+                # First derivative of the Fock matrix
+                fock_deriv_j = fock_deriv(molecule, ao_basis, density, j)
+                # First derivative of overlap matrix
+                ovlp_deriv_j = overlap_deriv(molecule, ao_basis, j)
+                # Add the contribution of the perturbed density matrix
+                hessian_first_integral_derivatives[i,j] += np.einsum('xmn,ymn->xy', 2*perturbed_density[i], fock_deriv_j)
+                hessian_first_integral_derivatives[i,j] += np.einsum('xmn,ymn->xy', 2*perturbed_omega_ao[i], ovlp_deriv_j)
         
-        # TODO: derivative of "epsilon" is missing. CPHF coefficients need to be contracted with ERI
+        return hessian_first_integral_derivatives
 
-
-        # analytical gradient
-        ###self.gradient = np.zeros((natm, 3))
-
-        ###for i in range(natm):
-        ###    d_ovlp = overlap_deriv(molecule, ao_basis, i)
-        ###    d_fock = fock_deriv(molecule, ao_basis, one_pdm_ao, i)
-        ###    d_eri = eri_deriv(molecule, ao_basis, i)
-
-        ###    self.gradient[i] += ( 2.0*np.einsum('mn,xmn->x', one_pdm_ao, d_fock)
-        ###                    +2.0*np.einsum('mn,xmn->x', epsilon_dm_ao, d_ovlp)
-        ###                    -2.0*np.einsum('mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
-        ###                    +1.0*np.einsum('mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
-        ###                    )
-
-        ###self.gradient += self.grad_nuc_contrib(molecule)
 
     def compute_furche(self, molecule, ao_basis, cphf_rhs, cphf_oo, cphf_ov):
         """
