@@ -14,7 +14,7 @@ def test_get_vlx_basis(capsys):
     for x in basis_files:
         if x.stem.upper()[:6] in ['ANO-L-', 'ANO-S-']:
             continue
-        if x.stem.upper() in ['STO-3G-OLD', 'AO-START-GUESS', 'CC-PVDZ-OPTGC']:
+        if x.stem.upper() in ['STO-3G-OLD', 'AO-START-GUESS']:
             continue
 
         with capsys.disabled():
@@ -41,7 +41,7 @@ def test_get_vlx_basis(capsys):
             vlx_basis_str = get_vlx_basis_string(bs_name,
                                                  str(bs_file),
                                                  use_gc_and_sp=False,
-                                                 optimize_general=False)
+                                                 optimize_general=True)
             with Path(str(bs_file)).open('w') as f_out:
                 f_out.write(vlx_basis_str)
             bse_basis = MolecularBasis.read(mol, bs_file.name, bs_file.parent)

@@ -255,7 +255,7 @@ if __name__ == '__main__':
     vlx_basis_str = get_vlx_basis_string(basis_name,
                                          output_name,
                                          use_gc_and_sp=False,
-                                         optimize_general=False)
+                                         optimize_general=True)
 
     if output_name is None:
         print(vlx_basis_str)
