@@ -445,6 +445,7 @@ class HessianDriver:
         for i in range(natm):
             z_a = nuclear_charges[i]
             r_a = coords[i]
+            # upper triangular part
             for j in range(natm):
                 if i != j:
                     z_b = nuclear_charges[j]
@@ -461,6 +462,10 @@ class HessianDriver:
                             nuc_contrib[i, i, k, l] += 3*z_a*z_b*(r_b[k] - r_a[k])*(r_b[l] - r_a[l]) / r**5
                             if k == l:
                                 nuc_contrib[i, i, k, l] -= z_a * z_b / r**3
+
+            # lower triangular part
+            ##for j in range(i):
+            ##    nuc_contrib[i,j] = nuc_contrib[j,i].T
 
 
         return nuc_contrib #.reshape(3*natm, 3*natm)
