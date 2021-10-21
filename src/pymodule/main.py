@@ -186,7 +186,11 @@ def main():
     if 'maximum_hours' in task.input_dict['jobs']:
         maximum_hours = float(task.input_dict['jobs']['maximum_hours'])
     else:
-        maximum_hours = get_slurm_maximum_hours()
+        if task.mpi_rank == mpi_master():
+            maximum_hours = get_slurm_maximum_hours()
+        else:
+            maximum_hours = None
+        maximum_hours = task.mpi_comm.bcast(maximum_hours, root=mpi_master())
 
     # Method settings
 
