@@ -184,6 +184,16 @@ class ScfHessianDriver(HessianDriver):
         cphf_ov = cphf_solution_dict['cphf_ov']
         ovlp_deriv_oo = cphf_solution_dict['ovlp_deriv_oo']
 
+        # Calculate the perturbed density matrix
+        # cphf_oo = -0.5*ovlp_deriv_oo
+        perturbed_density = ( - np.einsum('mj,xyij,ni->xymn',
+                                        mo_occ, ovlp_deriv_oo, mo_occ)
+                              + np.einsum('ma,xyia,ni->xymn',
+                                        mo_vir, cphf_ov, mo_occ)
+                              + np.einsum('mi,xyia,na->xymn',
+                                        mo_occ, cphf_ov, mo_vir)
+                            )
+
         # Parts related to first-order integral derivatives
         if self.pople:
             fock_uij = cphf_solution_dict['fock_uij']
@@ -193,7 +203,7 @@ class ScfHessianDriver(HessianDriver):
             orben_ovlp_deriv_oo = np.einsum('ij,xyij->xyij', eoo, ovlp_deriv_oo)
             hessian_first_order_derivatives = self.compute_pople(molecule, ao_basis,
                                              -0.5 * ovlp_deriv_oo, cphf_ov, fock_uij,
-                                              fock_deriv_oo, orben_ovlp_deriv_oo)
+                                              fock_deriv_oo, orben_ovlp_deriv_oo, perturbed_density)
         else:
             cphf_rhs = cphf_solution_dict['cphf_rhs']
             hessian_first_order_derivatives = self.compute_furche(molecule, ao_basis,
@@ -230,9 +240,12 @@ class ScfHessianDriver(HessianDriver):
         self.hessian = ( hessian_first_order_derivatives + hessian_2nd_order_derivatives
                        + hessian_nuclear_nuclear ).transpose(0,2,1,3).reshape(3*natm, 3*natm)
 
+        # Calculate the gradient of the dipole moment, needed for IR intensities
+        self.compute_dipole_gradient(molecule, ao_basis, perturbed_density)
+
 
     def compute_pople(self, molecule, ao_basis, cphf_oo, cphf_ov, fock_uij,
-                      fock_deriv_oo, orben_ovlp_deriv_oo):
+                      fock_deriv_oo, orben_ovlp_deriv_oo, perturbed_density):
         """
         Computes the analytical nuclear Hessian the Pople way.
         Int. J. Quantum Chem. Quantum Chem. Symp. 13, 225-241 (1979).
@@ -257,6 +270,8 @@ class ScfHessianDriver(HessianDriver):
             The oo block of the derivative of the overlap matrix
             with respect to nuclear coordinates, multiplied with
             orbital energies (ei+ej)S^\chi_ij
+        :param perturbed_density:
+            The perturbed density matrix.
         """
 
         natm = molecule.number_of_atoms()
@@ -275,13 +290,13 @@ class ScfHessianDriver(HessianDriver):
         # TODO: consider if using the transpose makes the
         # computation faster; consider using cphf coefficients in AO
         # to compute the perturbed density matrix.
-        perturbed_density = ( 2 * np.einsum('mj,xyij,ni->xymn',
-                                        mo_occ, cphf_oo, mo_occ)
-                              + np.einsum('ma,xyia,ni->xymn',
-                                        mo_vir, cphf_ov, mo_occ)
-                              + np.einsum('mi,xyia,na->xymn',
-                                        mo_occ, cphf_ov, mo_vir)
-                            )
+        ##perturbed_density = ( 2 * np.einsum('mj,xyij,ni->xymn',
+        ##                                mo_occ, cphf_oo, mo_occ)
+        ##                      + np.einsum('ma,xyia,ni->xymn',
+        ##                                mo_vir, cphf_ov, mo_occ)
+        ##                      + np.einsum('mi,xyia,na->xymn',
+        ##                                mo_occ, cphf_ov, mo_vir)
+        ##                    )
         orben_perturbed_density = ( np.einsum('i,mj,xyij,ni->xymn',
                                             eocc, mo_occ, cphf_oo, mo_occ)
                                   + np.einsum('i,mi,xyij,nj->xymn',
@@ -793,6 +808,50 @@ class ScfHessianDriver(HessianDriver):
         self.scf_drv.compute(molecule, ao_basis, min_basis)
         self.scf_drv.ostream.state = scf_ostream_state
 
+    def compute_dipole_gradient(self, molecule, ao_basis, perturbed_density):
+        """
+        Computes the analytical gradient of the dipole moment.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param perturbed_density:
+            The perturbed density matrix.
+        """
+
+        # Number of atoms and atomic charges
+        natm = molecule.number_of_atoms()
+        nuclear_charges = molecule.elem_ids_to_numpy()
+
+        density = self.scf_drv.scf_tensors['D_alpha']
+
+        # Dipole integrals
+        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+        dipole_mats = dipole_drv.compute(molecule, ao_basis)
+        dipole_ints = np.array((dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
+                       dipole_mats.z_to_numpy()))
+
+        # Initialize a local dipole gradient to zero
+        dipole_gradient = np.zeros((3, natm, 3))
+
+        # Put the nuclear contributions to the right place
+        natm_zeros = np.zeros((natm))
+        dipole_gradient[0] = np.vstack((nuclear_charges, natm_zeros, natm_zeros)).T
+        dipole_gradient[1] = np.vstack((natm_zeros, nuclear_charges, natm_zeros)).T
+        dipole_gradient[2] = np.vstack((natm_zeros, natm_zeros, nuclear_charges)).T
+
+        # TODO: replace once analytical integral derivatives are available
+        dipole_integrals_deriv = self.compute_dipole_integral_derivatives(molecule, ao_basis)
+
+        # Add the electronic contributions
+        dipole_gradient += -2 * (np.einsum('mn,caxmn->cax', density, dipole_integrals_deriv)
+                           + np.einsum('axmn,cmn->cax', perturbed_density, dipole_ints)
+                           )
+
+        self.dipole_gradient = dipole_gradient.reshape(3, 3 * natm)
+
+
     def compute_dipole_integral_derivatives(self, molecule, ao_basis):
         """
         Computes numerical derivatives of dipole integrals.
@@ -824,16 +883,19 @@ class ScfHessianDriver(HessianDriver):
         # 3 dipole components x No. atoms x 3 atomic coordinates x No. basis x No. basis
         dipole_integrals_gradient = np.zeros((3, natm, 3, nao, nao))
 
+        # smaller delta_h values can be used here
+        local_delta_h = 0.01 * self.delta_h
+
         for i in range(natm):
             for d in range(3):
-                coords[i, d] += self.delta_h
+                coords[i, d] += local_delta_h
                 new_mol = Molecule(labels, coords, units='au')
 
                 dipole_mats_p = dipole_drv.compute(new_mol, ao_basis)
                 dipole_ints_p = (dipole_mats_p.x_to_numpy(), dipole_mats_p.y_to_numpy(),
                                dipole_mats_p.z_to_numpy())
 
-                coords[i, d] -= 2.0 * self.delta_h
+                coords[i, d] -= 2.0 * local_delta_h
                 new_mol = Molecule(labels, coords, units='au')
 
                 dipole_mats_m = dipole_drv.compute(new_mol, ao_basis)
@@ -841,7 +903,7 @@ class ScfHessianDriver(HessianDriver):
                                dipole_mats_m.z_to_numpy())
 
                 for c in range(3):
-                    dipole_integrals_gradient[c, i, d] = ( dipole_ints_p[c] - dipole_ints_m[c] ) / (2.0 * self.delta_h)
+                    dipole_integrals_gradient[c, i, d] = ( dipole_ints_p[c] - dipole_ints_m[c] ) / (2.0 * local_delta_h)
 
         return dipole_integrals_gradient
 
