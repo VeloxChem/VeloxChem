@@ -94,39 +94,40 @@ def get_vlx_basis_string(basis_name,
 
             bool_mat = (coeff_mat != 0.0)
 
-            # Here we assume that bool_mat has semi-block-diagonal structure.
-            # For example: [[ True  True  True  True False]
-            #               [False False False  True False]
-            #               [False False False False  True]]
-            # Then we determine the starting and ending indices for the
-            # rows and columns of the blocks.
+            # An example bool_mat:
+            #   [[ True  True  True  True  True  True False]
+            #    [False False False  True False  True False]
+            #    [False False False False Fasle False  True]]
+            # Need to determine the row- and column-indices of the True values.
 
-            row_inds = []
+            row_indices_list = []
             row_start = 0
             for row in range(1, bool_mat.shape[0]):
                 if not (bool_mat[row, :] == bool_mat[row - 1, :]).all():
-                    row_inds.append((row_start, row))
+                    row_indices_list.append(list(range(row_start, row)))
                     row_start = row
-            row_inds.append((row_start, bool_mat.shape[0]))
+            if row_start != bool_mat.shape[0]:
+                row_indices_list.append(
+                    list(range(row_start, bool_mat.shape[0])))
 
-            col_inds = []
-            for (row_start, row_end) in row_inds:
-                true_val_inds = []
-                for col, val in enumerate(bool_mat[row_start]):
+            col_indices_list = []
+            for row_indices in row_indices_list:
+                col_indices = []
+                for col, val in enumerate(bool_mat[row_indices[0]]):
                     if val:
-                        true_val_inds.append(col)
-                col_inds.append((true_val_inds[0], true_val_inds[-1] + 1))
+                        col_indices.append(col)
+                col_indices_list.append(col_indices)
 
             # Go through the blocks and write basis set
 
-            for ((row_start, row_end), (col_start,
-                                        col_end)) in zip(row_inds, col_inds):
+            for (row_indices, col_indices) in zip(row_indices_list,
+                                                  col_indices_list):
 
                 # Form the exponent/coefficient matrix (column-wise)
 
-                matrix = np.vstack((expon_vec[col_start:col_end],
-                                    coeff_mat[row_start:row_end,
-                                              col_start:col_end])).T
+                expons = expon_vec[col_indices]
+                coeffs = coeff_mat[row_indices, :][:, col_indices]
+                matrix = np.vstack((expons, coeffs)).T
 
                 # Get number of primitives
 
