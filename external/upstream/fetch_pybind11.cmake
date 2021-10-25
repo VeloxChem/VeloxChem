@@ -22,7 +22,7 @@ else()
   FetchContent_Declare(pybind11
     QUIET
     URL
-      https://github.com/pybind/pybind11/archive/v2.6.0.tar.gz
+      https://github.com/pybind/pybind11/archive/v2.8.0.tar.gz
     )
   #set(PYBIND11_PYTHON_VERSION ${PYBIND11_PYTHON_VERSION})
   set(PYBIND11_TEST OFF CACHE BOOL "")
