@@ -55,15 +55,16 @@ include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_safeguards.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/alignment.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/math.cmake)
 
-# Currently, scikit-build does not support FindPython, so we convert the
-# provided hints ourselves.
-if(SKBUILD)
-  set(Python_EXECUTABLE "${PYTHON_EXECUTABLE}")
-  set(Python_INCLUDE_DIR "${PYTHON_INCLUDE_DIR}")
-  set(Python_LIBRARY "${PYTHON_LIBRARY}")
-  set(DUMMY "${PYTHON_VERSION_STRING}")  # Not needed, silences a warning
-endif()
 find_package(Python 3.6 REQUIRED COMPONENTS Interpreter Development NumPy)
+# add your site-packages to the search path automatically
+execute_process(
+  COMMAND
+    "${Python_EXECUTABLE}" -c
+    "import pybind11; print(pybind11.get_cmake_dir())"
+  OUTPUT_VARIABLE _tmp_dir
+  OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ECHO STDOUT)
+list(APPEND CMAKE_PREFIX_PATH "${_tmp_dir}")
+
 # download pybind11 if not available on the system
 include(${PROJECT_SOURCE_DIR}/external/upstream/fetch_pybind11.cmake)
 # TODO code coverage
