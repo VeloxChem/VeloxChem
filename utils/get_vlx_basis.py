@@ -44,7 +44,9 @@ def get_vlx_basis_string(basis_name,
 
     basis_title = basis_name
     if output_name is not None:
-        basis_title = f'{Path(output_name).name}  !{basis_name.upper()}'
+        basis_title = f'{Path(output_name).name}'
+        if basis_title.upper() != basis_name.upper():
+            basis_title += f'  !{basis_name.upper()}'
     vlx_basis_str = f'@BASIS_SET {basis_title}\n'
 
     # Go through elements (up to Rn)
@@ -155,7 +157,7 @@ def get_vlx_basis_string(basis_name,
                 if len(ang_mom) == 1:
                     if use_gc_and_sp:
                         ngc = matrix.shape[1] - 1
-                        shell_str = f'{ang_mom} {nprims:d}  {ngc:d}\n'
+                        shell_str = f'{ang_mom} {nprims:d}   {ngc:d}\n'
                         for i in range(matrix.shape[0]):
                             shell_str += f'{matrix[i, 0]:18.12e}'
                             for j in range(1, matrix.shape[1]):
@@ -164,7 +166,7 @@ def get_vlx_basis_string(basis_name,
                         atom_shells[ang_mom].append(shell_str)
                     else:
                         for j in range(1, matrix.shape[1]):
-                            shell_str = f'{ang_mom} {nprims:d}  1\n'
+                            shell_str = f'{ang_mom} {nprims:d}   1\n'
                             for i in range(matrix.shape[0]):
                                 shell_str += f'{matrix[i, 0]:18.12e}'
                                 shell_str += f'{matrix[i, j]:20.12e}'
@@ -174,7 +176,7 @@ def get_vlx_basis_string(basis_name,
                 elif ang_mom == 'SP':
                     assert matrix.shape[1] == 3
                     if use_gc_and_sp:
-                        shell_str = f'SP {nprims:d}  1\n'
+                        shell_str = f'SP {nprims:d}   1\n'
                         for i in range(matrix.shape[0]):
                             shell_str += f'{matrix[i, 0]:18.12e}'
                             shell_str += f'{matrix[i, 1]:20.12e}'
@@ -182,23 +184,23 @@ def get_vlx_basis_string(basis_name,
                             shell_str += '\n'
                         atom_shells['SP'].append(shell_str)
                     else:
-                        shell_str = f'S {nprims:d}  1\n'
+                        shell_str = f'S {nprims:d}   1\n'
                         for i in range(matrix.shape[0]):
                             shell_str += f'{matrix[i, 0]:18.12e}'
                             shell_str += f'{matrix[i, 1]:20.12e}'
                             shell_str += '\n'
-                        atom_shells['S'].append(shell_str)
-                        shell_str = f'P {nprims:d}  1\n'
+                        atom_shells['SP'].append(shell_str)
+                        shell_str = f'P {nprims:d}   1\n'
                         for i in range(matrix.shape[0]):
                             shell_str += f'{matrix[i, 0]:18.12e}'
                             shell_str += f'{matrix[i, 2]:20.12e}'
                             shell_str += '\n'
-                        atom_shells['P'].append(shell_str)
+                        atom_shells['SP'].append(shell_str)
 
                 elif ang_mom == 'SPD':
                     assert matrix.shape[1] == 4
                     if use_gc_and_sp:
-                        shell_str = f'SP {nprims:d}  1\n'
+                        shell_str = f'SP {nprims:d}   1\n'
                         for i in range(matrix.shape[0]):
                             shell_str += f'{matrix[i, 0]:18.12e}'
                             shell_str += f'{matrix[i, 1]:20.12e}'
@@ -206,19 +208,19 @@ def get_vlx_basis_string(basis_name,
                             shell_str += '\n'
                         atom_shells['SP'].append(shell_str)
                     else:
-                        shell_str = f'S {nprims:d}  1\n'
+                        shell_str = f'S {nprims:d}   1\n'
                         for i in range(matrix.shape[0]):
                             shell_str += f'{matrix[i, 0]:18.12e}'
                             shell_str += f'{matrix[i, 1]:20.12e}'
                             shell_str += '\n'
-                        atom_shells['S'].append(shell_str)
-                        shell_str = f'P {nprims:d}  1\n'
+                        atom_shells['SP'].append(shell_str)
+                        shell_str = f'P {nprims:d}   1\n'
                         for i in range(matrix.shape[0]):
                             shell_str += f'{matrix[i, 0]:18.12e}'
                             shell_str += f'{matrix[i, 2]:20.12e}'
                             shell_str += '\n'
-                        atom_shells['P'].append(shell_str)
-                    shell_str = f'D {nprims:d}  1\n'
+                        atom_shells['SP'].append(shell_str)
+                    shell_str = f'D {nprims:d}   1\n'
                     for i in range(matrix.shape[0]):
                         shell_str += f'{matrix[i, 0]:18.12e}'
                         shell_str += f'{matrix[i, 3]:20.12e}'

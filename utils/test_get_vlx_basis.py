@@ -37,7 +37,7 @@ def test_get_vlx_basis(capsys):
         bs_name = _basis_file_to_name(x.name)
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            bs_file = Path(temp_dir, bs_name.upper())
+            bs_file = Path(temp_dir, x.name.upper())
             vlx_basis_str = get_vlx_basis_string(bs_name,
                                                  str(bs_file),
                                                  use_gc_and_sp=False,
