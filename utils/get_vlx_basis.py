@@ -95,27 +95,44 @@ def get_vlx_basis_string(basis_name,
             bool_mat = (coeff_mat != 0.0)
 
             # An example bool_mat:
-            #   [[ True  True  True  True  True  True False]
-            #    [False False False  True False  True False]
-            #    [False False False False Fasle False  True]]
-            # Need to determine the row- and column-indices of the True values.
+            #   [[ True  True  True  True  True  True False False]
+            #   [[ True  True  True  True  True  True False False]
+            #    [False False False  True False  True False False]
+            #    [False False False False Fasle False  True False]]
+            #    [False False False False Fasle False False  True]]
 
-            row_indices_list = []
-            row_start = 0
-            for row in range(1, bool_mat.shape[0]):
-                if not (bool_mat[row, :] == bool_mat[row - 1, :]).all():
-                    row_indices_list.append(list(range(row_start, row)))
-                    row_start = row
-            if row_start != bool_mat.shape[0]:
-                row_indices_list.append(
-                    list(range(row_start, bool_mat.shape[0])))
+            # Find out identical rows and save row indices in groups
+
+            row_indices_list = [[row] for row in range(bool_mat.shape[0])]
+            while True:
+                merged_row_groups = False
+                pair_inds = [(a, b)
+                             for a in range(len(row_indices_list))
+                             for b in range(a + 1, len(row_indices_list))]
+                for a, b in pair_inds:
+                    row_a = bool_mat[row_indices_list[a][0], :]
+                    row_b = bool_mat[row_indices_list[b][0], :]
+                    if (row_a == row_b).all():
+                        row_indices_list[a] += row_indices_list[b]
+                        row_indices_list[b] = None
+                        merged_row_groups = True
+                        break
+                if merged_row_groups:
+                    row_indices_list = [
+                        row_indices for row_indices in row_indices_list
+                        if row_indices is not None
+                    ]
+                else:
+                    break
+
+            # Find out indices of non-zero columns for each row group
 
             col_indices_list = []
             for row_indices in row_indices_list:
-                col_indices = []
-                for col, val in enumerate(bool_mat[row_indices[0]]):
-                    if val:
-                        col_indices.append(col)
+                col_indices = [
+                    col for col, val in enumerate(bool_mat[row_indices[0]])
+                    if val
+                ]
                 col_indices_list.append(col_indices)
 
             # Go through the blocks and write basis set
