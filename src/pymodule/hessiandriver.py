@@ -80,7 +80,10 @@ class HessianDriver:
         if ostream is None:
             ostream = OutputStream(sys.stdout)
 
+        # MPI information
         self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
         self.ostream = ostream
 
         self.hessian = None
@@ -115,6 +118,9 @@ class HessianDriver:
         self.profiling = False
         self.memory_profiling = False
         self.memory_tracing = False
+
+        # DFT
+        self.dft = False
 
 
     def update_settings(self, method_dict, freq_dict=None):
@@ -168,6 +174,7 @@ class HessianDriver:
                 self.numerical_grad = True
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
+            self.dft = True if key in ['yes', 'y'] else False
             if key in ['yes', 'y']:
                 self.numerical = True
                 self.numerical_grad = True
@@ -283,9 +290,9 @@ class HessianDriver:
 
         # Calculate force constants
         self.force_constants = ( 4.0 * np.pi**2
-                            * (c * (self.frequencies / cm_to_m) )**2
-                            * self.reduced_masses * amu_to_kg
-                            )  * ( N_to_mdyne / m_to_A )
+                               * (c * (self.frequencies / cm_to_m) )**2
+                               * self.reduced_masses * amu_to_kg
+                               )  * ( N_to_mdyne / m_to_A )
 
         # Number of translational and rotational degrees of freedom
         if molecule.is_linear():
@@ -320,14 +327,14 @@ class HessianDriver:
             alpha_bar_sq = alpha_bar**2
 
             if self.print_depolarization_ratio:
-                int_pol = 45 * alpha_bar_sq +  4 * gamma_bar_sq
+                int_pol = 45 * alpha_bar_sq + 4 * gamma_bar_sq
                 int_depol = 3 * gamma_bar_sq
                 depol_ratio = int_depol / int_pol
 
             self.raman_intensities = (45 * alpha_bar_sq + 7 * gamma_bar_sq) * raman_conversion_factor
 
         # Now we can normalize the normal modes -- as done in geomeTRIC
-        self.normal_modes /= np.linalg.norm(self.normal_modes, axis=1)[:, np.newaxis] 
+        self.normal_modes /= np.linalg.norm(self.normal_modes, axis=1)[:, np.newaxis]
 
         title = 'Vibrational Analysis'
         self.ostream.print_header(title)
@@ -385,7 +392,7 @@ class HessianDriver:
                             raman_parallel_str += '{:^31.4f}'.format(int_pol[i])
                             raman_perpendicular_str += '{:^31.4f}'.format(int_depol[i])
                             depolarization_str += '{:^31.4f}'.format(depol_ratio[i])
-  
+
                 normal_mode_string += '{:^30s}{:>1s}'.format('X         Y         Z','|')
             self.ostream.print_line(index_string)
             self.ostream.print_line(freq_string)
