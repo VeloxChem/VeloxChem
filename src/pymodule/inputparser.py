@@ -93,7 +93,7 @@ class InputParser:
                 # skip first line if reading basis set
                 if (not self.is_basis_set) and (line[:10] == '@BASIS_SET'):
                     self.is_basis_set = True
-                    self.basis_set_name = line.split()[1]
+                    self.basis_set_name = line[10:].strip()
                     continue
 
                 # begin of group

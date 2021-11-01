@@ -124,7 +124,7 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
 
             int32_t numbatches = 0;
 
-            auto merror = MPI_Recv(&numbatches, 1, MPI_INT, cross_id, tag_id++, *cross_comm, &mstat);
+            auto merror = MPI_Recv(&numbatches, 1, MPI_INT32_T, cross_id, tag_id++, *cross_comm, &mstat);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -134,11 +134,11 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
             {
                 int32_t first = -1, second = -1;
 
-                merror = MPI_Recv(&first, 1, MPI_INT, cross_id, tag_id++, *cross_comm, &mstat);
+                merror = MPI_Recv(&first, 1, MPI_INT32_T, cross_id, tag_id++, *cross_comm, &mstat);
 
                 if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
-                merror = MPI_Recv(&second, 1, MPI_INT, cross_id, tag_id++, *cross_comm, &mstat);
+                merror = MPI_Recv(&second, 1, MPI_INT32_T, cross_id, tag_id++, *cross_comm, &mstat);
 
                 if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -159,7 +159,7 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
 
         auto numbatches = self.getNumberOfBatches();
 
-        auto merror = MPI_Send(&numbatches, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm);
+        auto merror = MPI_Send(&numbatches, 1, MPI_INT32_T, mpi::master(), tag_id++, *cross_comm);
 
         if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -173,11 +173,11 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
 
             auto second = genpairs[ibatch].second();
 
-            merror = MPI_Send(&first, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm);
+            merror = MPI_Send(&first, 1, MPI_INT32_T, mpi::master(), tag_id++, *cross_comm);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
-            merror = MPI_Send(&second, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm);
+            merror = MPI_Send(&second, 1, MPI_INT32_T, mpi::master(), tag_id++, *cross_comm);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 

@@ -113,25 +113,16 @@ getBoltzmannConstantInElectronVoltsPerKelvin()
 }
 
 double
-getMolarEllipticityFromBeta()
+getExtinctionCoefficientFromBeta()
 {
     // Avogadro constant: N_A = 6.022 140 76 e23 [mol^-1]
-    // Bohr radius: a0 = 0.5291 772 109 03 [Angstrom]
-    // Molar ellipticity in [deg cm^2 dmol^-1]
-    // factor = 288e-30 * pi^2 * N_A * a0^4 / 100
-
-    return 1.342294057057e-06;
-}
-
-double
-getExtinctionCoefficientFromMolarEllipticity()
-{
-    // Molar ellipticity in [deg cm^2 dmol^-1]
+    // inverse of fine-structure constant: c = 137.035 999 084
+    // Bohr radius: a0 = 0.5291 772 109 03 e-10 [m]
     // Extinction coefficient in [L mol^-1 cm^-1]
-    // J. A. Schellman, Chem Rev 1975, 75, 323-331.
-    // math.pi / (4.5 * math.log(10.0) * 1000.0)
 
-    return 3.031947452982e-04;
+    // factor = 16 * pi * N_A * 10 * a0^2 / (ln(10) * c^2)
+
+    return 19.603697575813566;
 }
 
 double

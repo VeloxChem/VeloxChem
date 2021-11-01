@@ -3,7 +3,7 @@ task: roscf
 @end
 
 @method settings
-basis: MIN-CC-PVDZ
+basis: AO-START-GUESS
 grid: 6
 @end
 

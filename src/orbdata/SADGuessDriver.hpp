@@ -124,6 +124,78 @@ class CSADGuessDriver
     std::vector<double> _getOcc4s4p(const double nocc) const;
 
     /**
+     Gets occupation numbers for 5s elements.
+
+     @param occ number of 5s orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc5s(double occ) const;
+
+    /**
+     Gets occupation numbers for 4d elements.
+
+     @param occ number of 4d orbitals.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc4d(double occ) const;
+
+    /**
+     Gets occupation numbers for 5p elements.
+
+     @param occ number of 5s5p orbitals.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc5s5p(double occ) const;
+
+    /**
+     Gets occupation numbers for 6s elements.
+
+     @param occ number of 6s orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc6s(double occ) const;
+
+    /**
+     Gets occupation numbers for 4f elements.
+
+     @param occ number of 4f orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc4f(double occ) const;
+
+    /**
+     Gets occupation numbers for 5d elements.
+
+     @param occ number of 5d orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc5d(double occ) const;
+
+    /**
+     Gets occupation numbers for 6p elements.
+
+     @param occ number of 6p orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc6s6p(double occ) const;
+
+    /**
+     Gets occupation numbers for 7s elements.
+
+     @param occ number of 7s orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc7s(double occ) const;
+
+    /**
+     Gets occupation numbers for 5f elements.
+
+     @param occ number of 5f orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc5f(double occ) const;
+
+    /**
      Computes SAD initial guess.
 
      @param molecule the molecule.

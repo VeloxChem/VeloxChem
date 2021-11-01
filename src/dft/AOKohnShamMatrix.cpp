@@ -247,7 +247,7 @@ CAOKohnShamMatrix::collect(int32_t rank, int32_t nodes, MPI_Comm comm, int32_t s
 
             std::vector<int32_t> xc_integers(4);
 
-            auto merror = MPI_Recv(xc_integers.data(), xc_integers.size(), MPI_INT, source, tag_id++, comm, &mstat);
+            auto merror = MPI_Recv(xc_integers.data(), xc_integers.size(), MPI_INT32_T, source, tag_id++, comm, &mstat);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectKohnShamMatrix: xc_integers");
 
@@ -303,7 +303,7 @@ CAOKohnShamMatrix::collect(int32_t rank, int32_t nodes, MPI_Comm comm, int32_t s
 
             std::vector<int32_t> xc_integers({nxcmats, nrows, ncols, rest});
 
-            auto merror = MPI_Send(xc_integers.data(), xc_integers.size(), MPI_INT, mpi::master(), tag_id++, comm);
+            auto merror = MPI_Send(xc_integers.data(), xc_integers.size(), MPI_INT32_T, mpi::master(), tag_id++, comm);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectKohnShamMatrix: xc_integers");
 

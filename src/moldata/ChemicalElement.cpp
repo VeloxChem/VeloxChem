@@ -2712,7 +2712,7 @@ CChemicalElement::_selectThuliumAtom()
 void
 CChemicalElement::_selectYtterbiumAtom()
 {
-    _atomicLabel.assign("Tm");
+    _atomicLabel.assign("Yb");
 
     _atomicNumber = 70;
 

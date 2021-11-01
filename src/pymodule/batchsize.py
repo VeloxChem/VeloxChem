@@ -62,6 +62,8 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
 
         # computes maximum batch size from available memory
         avail_mem = psutil.virtual_memory().available - mem_adjust
+        if 'SLURM_NTASKS_PER_NODE' in os.environ:
+            avail_mem //= int(os.environ['SLURM_NTASKS_PER_NODE'])
         mem_per_mat = n_ao**2 * ctypes.sizeof(ctypes.c_double)
         nthreads = int(os.environ['OMP_NUM_THREADS'])
         max_batch_size = int(avail_mem / mem_per_mat / (0.625 * nthreads))

@@ -335,7 +335,7 @@ class ScfDriver:
 
         if min_basis is None:
             if self.rank == mpi_master():
-                min_basis = MolecularBasis.read(molecule, 'MIN-CC-PVDZ')
+                min_basis = MolecularBasis.read(molecule, 'AO-START-GUESS')
             else:
                 min_basis = MolecularBasis()
             min_basis.broadcast(self.rank, self.comm)
