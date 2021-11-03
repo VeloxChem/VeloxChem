@@ -30,6 +30,8 @@ from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
 
+from .inputparser import parse_input
+ 
 class QuadraticResponseDriver:
     """
     Implements a general quadratic response driver 
@@ -124,72 +126,54 @@ class QuadraticResponseDriver:
         if method_dict is None:
             method_dict = {}
 
-        if 'grid_level' in method_dict:
-            self.grid_level = int(method_dict['grid_level'])
 
-        if 'xcfun' in method_dict:
-            if 'dft' not in method_dict:
-                self.dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Response solver: Undefined XC functional')
+        rsp_keywords = {
+            'b_frequencies': 'seq_range',
+            'c_frequencies': 'seq_range',
+            'damping': 'float',
+            'a_component': 'str',
+            'b_component': 'str',
+            'c_component': 'str',
+            'eri_thresh': 'float',
+            'qq_type': 'str_upper',
+            'batch_size': 'int',
+            'max_iter': 'int',
+            'conv_thresh': 'float',
+            'lindep_thresh': 'float',
+            'restart': 'bool',
+            'checkpoint_file': 'str',
+            'timing': 'bool',
+            'profiling': 'bool',
+            'memory_profiling': 'bool',
+            'memory_tracing': 'bool',
+        }
 
-        if 'b_frequencies' in rsp_dict:
-            self.b_frequencies = parse_seq_range(rsp_dict['b_frequencies'])
-
-        if 'c_frequencies' in rsp_dict:
-            self.c_frequencies = parse_seq_range(rsp_dict['c_frequencies'])
-
-        if 'a_component' in rsp_dict:
-            self.a_component = rsp_dict['a_component']
-        
-        if 'b_component' in rsp_dict:
-            self.b_component = rsp_dict['b_component']
-
-        if 'c_component' in rsp_dict:
-            self.c_component = rsp_dict['c_component']
-
-        if 'damping' in rsp_dict:
-            self.damping = float(rsp_dict['damping'])
-
-        if 'eri_thresh' in rsp_dict:
-            self.eri_thresh = float(rsp_dict['eri_thresh'])
-        if 'qq_type' in rsp_dict:
-            self.qq_type = rsp_dict['qq_type']
-        if 'batch_size' in rsp_dict:
-            self.batch_size = int(rsp_dict['batch_size'])
-
-        if 'max_iter' in rsp_dict:
-            self.max_iter = int(rsp_dict['max_iter'])
-        if 'conv_thresh' in rsp_dict:
-            self.conv_thresh = float(rsp_dict['conv_thresh'])
-        if 'lindep_thresh' in rsp_dict:
-            self.lindep_thresh = float(rsp_dict['lindep_thresh'])
-
-        if 'restart' in rsp_dict:
-            key = rsp_dict['restart'].lower()
-            self.restart = True if key == 'yes' else False
-        if 'checkpoint_file' in rsp_dict:
-            self.checkpoint_file = rsp_dict['checkpoint_file']
+        parse_input(self, rsp_keywords, rsp_dict)
 
         if 'program_start_time' in rsp_dict:
             self.program_start_time = rsp_dict['program_start_time']
         if 'maximum_hours' in rsp_dict:
             self.maximum_hours = rsp_dict['maximum_hours']
 
-        if 'timing' in rsp_dict:
-            key = rsp_dict['timing'].lower()
-            self.timing = True if key in ['yes', 'y'] else False
-        if 'profiling' in rsp_dict:
-            key = rsp_dict['profiling'].lower()
-            self.profiling = True if key in ['yes', 'y'] else False
-        if 'memory_profiling' in rsp_dict:
-            key = rsp_dict['memory_profiling'].lower()
-            self.memory_profiling = True if key in ['yes', 'y'] else False
-        if 'memory_tracing' in rsp_dict:
-            key = rsp_dict['memory_tracing'].lower()
-            self.memory_tracing = True if key in ['yes', 'y'] else False
-        
+        if 'xcfun' in method_dict:
+            errmsg = 'Quadratic response function Driver: The \'xcfun\' keyword is not supported in QRF '
+            errmsg += 'calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if 'potfile' in method_dict:
+            errmsg = 'QrfDriver: The \'potfile\' keyword is not supported in '
+            errmsg += 'QRF calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if 'electric_field' in method_dict:
+            errmsg = 'QrfDriver: The \'electric field\' keyword is not '
+            errmsg += 'supported in QRF calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -550,7 +534,7 @@ class QuadraticResponseDriver:
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
+        dist_focks = self.get_fock(mo, density_list, molecule, ao_basis,
                                      'real_and_imag')
         time_end_fock = time.time()
 
@@ -595,7 +579,7 @@ class QuadraticResponseDriver:
 
         :return:
             A dictonary of compounded E[3] tensors for the isotropic cubic
-            response function for TPA
+            response function for QRF
         """
 
         e3vec = {}
@@ -668,13 +652,13 @@ class QuadraticResponseDriver:
 
     def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
         """
-        Prints the results from the TPA calculation.
+        Prints the results from the QRF calculation.
 
         :param freqs:
             List of frequencies
         :param gamma:
             A dictonary containing the isotropic cubic response functions for
-            TPA
+            QRF
         :param comp:
             List of gamma tensors components
         :param t4_dict:
@@ -690,7 +674,7 @@ class QuadraticResponseDriver:
 
     def print_header(self):
         """
-        Prints TPA setup header to output stream.
+        Prints QRF setup header to output stream.
         """
 
         self.ostream.print_blank()
@@ -901,7 +885,7 @@ class QuadraticResponseDriver:
 
         return None
 
-    def get_fock_r(self, mo, D, molecule, ao_basis, fock_flag):
+    def get_fock(self, mo, D, molecule, ao_basis, fock_flag):
         """
         Computes and returns a list of Fock matrices
 
@@ -929,7 +913,7 @@ class QuadraticResponseDriver:
             else:
                 D_total = None
 
-            f_total = self.get_two_el_fock_mod_r(mo, molecule, ao_basis,
+            f_total = self.get_two_el_fock(mo, molecule, ao_basis,
                                                  D_total)
 
             nrows = f_total.data.shape[0]
@@ -941,12 +925,12 @@ class QuadraticResponseDriver:
             return DistributedArray(ff_data, self.comm, distribute=False)
 
         elif fock_flag == 'real':
-            return self.get_two_el_fock_mod_r(mo, molecule, ao_basis, D)
+            return self.get_two_el_fock(mo, molecule, ao_basis, D)
 
         else:
             return None
 
-    def get_two_el_fock_mod_r(self, mo, molecule, ao_basis, dabs):
+    def get_two_el_fock(self, mo, molecule, ao_basis, dabs):
         """
         Returns the two-electron part of the Fock matix in MO basis
 
@@ -1066,7 +1050,7 @@ class QuadraticResponseDriver:
 
     def print_component(self, label, freq, value, width):
         """
-        Prints TPA component.
+        Prints QRF component.
 
         :param label:
             The label

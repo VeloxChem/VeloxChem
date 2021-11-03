@@ -60,6 +60,8 @@ class SHG(ResponseProperty):
         rsp_dict['a_operator'] = 'dipole'
         rsp_dict['b_operator'] = 'dipole'
         rsp_dict['c_operator'] = 'dipole'
+        rsp_dict['a_component'] = 'xyz'
+        rsp_dict['b_component'] = 'xyz'
 
         if 'frequencies' not in rsp_dict:
             rsp_dict['frequencies'] = '0'

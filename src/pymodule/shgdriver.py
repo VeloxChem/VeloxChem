@@ -31,6 +31,8 @@ from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
 
+from .inputparser import parse_input
+
 from pathlib import Path
 
 class SHGDriver:
@@ -81,8 +83,7 @@ class SHGDriver:
         self.batch_size = None
 
         # cpp settings
-        self.b_frequencies = (0,)
-        self.c_frequencies = (0,)
+        self.frequencies = (0,)
         self.comp = None
         self.damping = 0.004556335294880438
         self.lindep_thresh = 1.0e-10
@@ -118,7 +119,7 @@ class SHGDriver:
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
-        Updates response and method settings in TPA driver
+        Updates response and method settings in SHG driver
 
         :param rsp_dict:
             The dictionary of response dict.
@@ -129,73 +130,56 @@ class SHGDriver:
         if method_dict is None:
             method_dict = {}
 
-        if 'grid_level' in method_dict:
-            self.grid_level = int(method_dict['grid_level'])
+        rsp_keywords = {
+            'frequencies': 'seq_range',
+            'damping': 'float',
+            'a_operator': 'str',
+            'b_operator': 'str',
+            'c_operator': 'str',
+            'eri_thresh': 'float',
+            'qq_type': 'str_upper',
+            'batch_size': 'int',
+            'max_iter': 'int',
+            'conv_thresh': 'float',
+            'lindep_thresh': 'float',
+            'restart': 'bool',
+            'checkpoint_file': 'str',
+            'timing': 'bool',
+            'profiling': 'bool',
+            'memory_profiling': 'bool',
+            'memory_tracing': 'bool',
+        }
 
-        if 'xcfun' in method_dict:
-            if 'dft' not in method_dict:
-                self.dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Response solver: Undefined XC functional')
-
-        if 'frequencies' in rsp_dict:
-            self.b_frequencies = parse_seq_range(rsp_dict['frequencies'])
-
-        if 'damping' in rsp_dict:
-            self.damping = float(rsp_dict['damping'])
+        parse_input(self, rsp_keywords, rsp_dict)
         
-        if 'a_operator' in rsp_dict:
-            self.a_operator = rsp_dict['a_operator']
-        
-        if 'b_operator' in rsp_dict:
-            self.b_operator = rsp_dict['b_operator']
-
-        if 'c_operator' in rsp_dict:
-            self.c_operator = rsp_dict['c_operator']
-
-        if 'eri_thresh' in rsp_dict:
-            self.eri_thresh = float(rsp_dict['eri_thresh'])
-        if 'qq_type' in rsp_dict:
-            self.qq_type = rsp_dict['qq_type']
-        if 'batch_size' in rsp_dict:
-            self.batch_size = int(rsp_dict['batch_size'])
-
-        if 'max_iter' in rsp_dict:
-            self.max_iter = int(rsp_dict['max_iter'])
-        if 'conv_thresh' in rsp_dict:
-            self.conv_thresh = float(rsp_dict['conv_thresh'])
-        if 'lindep_thresh' in rsp_dict:
-            self.lindep_thresh = float(rsp_dict['lindep_thresh'])
-
-        if 'restart' in rsp_dict:
-            key = rsp_dict['restart'].lower()
-            self.restart = True if key == 'yes' else False
-        if 'checkpoint_file' in rsp_dict:
-            self.checkpoint_file = rsp_dict['checkpoint_file']
-
         if 'program_start_time' in rsp_dict:
             self.program_start_time = rsp_dict['program_start_time']
         if 'maximum_hours' in rsp_dict:
             self.maximum_hours = rsp_dict['maximum_hours']
 
-        if 'timing' in rsp_dict:
-            key = rsp_dict['timing'].lower()
-            self.timing = True if key in ['yes', 'y'] else False
-        if 'profiling' in rsp_dict:
-            key = rsp_dict['profiling'].lower()
-            self.profiling = True if key in ['yes', 'y'] else False
-        if 'memory_profiling' in rsp_dict:
-            key = rsp_dict['memory_profiling'].lower()
-            self.memory_profiling = True if key in ['yes', 'y'] else False
-        if 'memory_tracing' in rsp_dict:
-            key = rsp_dict['memory_tracing'].lower()
-            self.memory_tracing = True if key in ['yes', 'y'] else False
+        if 'xcfun' in method_dict:
+            errmsg = 'ShgDriver: The \'xcfun\' keyword is not supported in SHG '
+            errmsg += 'calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if 'potfile' in method_dict:
+            errmsg = 'ShgDriver: The \'potfile\' keyword is not supported in '
+            errmsg += 'SHG calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if 'electric_field' in method_dict:
+            errmsg = 'ShgDriver: The \'electric field\' keyword is not '
+            errmsg += 'supported in SHG calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
         
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
-        Computes the isotropic quadratic response function 
+        Computes the isotropic quadratic response function for second-harmonic generation
 
         :param molecule:
             The molecule.
@@ -224,7 +208,7 @@ class SHGDriver:
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(nalpha == nbeta,
-                            'Quadatic response driver: not implemented for unrestricted case')
+                            'SHG Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_tensors['S']
@@ -263,13 +247,13 @@ class SHGDriver:
 
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
-        wa = [sum(x) for x in zip(self.b_frequencies, self.b_frequencies)]
+        wa = [sum(x) for x in zip(self.frequencies, self.frequencies)]
 
-        freqpairs = [wl for wl in zip(self.b_frequencies, self.b_frequencies)]
+        freqpairs = [wl for wl in zip(self.frequencies, self.frequencies)]
 
         if self.rank == mpi_master():
             A = {(op, w): v for op, v in zip('xyz', a_rhs) for w in wa}
-            B = {(op, w): v for op, v in zip('xyz', b_rhs) for w in self.b_frequencies}
+            B = {(op, w): v for op, v in zip('xyz', b_rhs) for w in self.frequencies}
 
             X = {
                 'x': 2 * self.ao2mo(mo, dipole_mats.x_to_numpy()),
@@ -625,7 +609,7 @@ class SHGDriver:
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
+        dist_focks = self.get_fock(mo, density_list, molecule, ao_basis,
                                      'real_and_imag')
         time_end_fock = time.time()
 
@@ -672,7 +656,7 @@ class SHGDriver:
 
         :return:
             A dictonary of compounded E[3] tensors for the isotropic cubic
-            response function for TPA
+            response function for SHG
         """
 
         e3vec = {}
@@ -795,13 +779,13 @@ class SHGDriver:
 
     def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
         """
-        Prints the results from the TPA calculation.
+        Prints the results from the SHG calculation.
 
         :param freqs:
             List of frequencies
         :param gamma:
             A dictonary containing the isotropic cubic response functions for
-            TPA
+            SHG
         :param comp:
             List of gamma tensors components
         :param t4_dict:
@@ -817,7 +801,7 @@ class SHGDriver:
 
     def print_header(self):
         """
-        Prints TPA setup header to output stream.
+        Prints SHG setup header to output stream.
         """
 
         self.ostream.print_blank()
@@ -1028,7 +1012,7 @@ class SHGDriver:
 
         return None
 
-    def get_fock_r(self, mo, D, molecule, ao_basis, fock_flag):
+    def get_fock(self, mo, D, molecule, ao_basis, fock_flag):
         """
         Computes and returns a list of Fock matrices
 
@@ -1056,7 +1040,7 @@ class SHGDriver:
             else:
                 D_total = None
 
-            f_total = self.get_two_el_fock_mod_r(mo, molecule, ao_basis,
+            f_total = self.get_two_el_fock(mo, molecule, ao_basis,
                                                  D_total)
 
             nrows = f_total.data.shape[0]
@@ -1068,12 +1052,12 @@ class SHGDriver:
             return DistributedArray(ff_data, self.comm, distribute=False)
 
         elif fock_flag == 'real':
-            return self.get_two_el_fock_mod_r(mo, molecule, ao_basis, D)
+            return self.get_two_el_fock(mo, molecule, ao_basis, D)
 
         else:
             return None
 
-    def get_two_el_fock_mod_r(self, mo, molecule, ao_basis, dabs):
+    def get_two_el_fock(self, mo, molecule, ao_basis, dabs):
         """
         Returns the two-electron part of the Fock matix in MO basis
 
@@ -1193,7 +1177,7 @@ class SHGDriver:
 
     def print_component(self, label, freq, value, width):
         """
-        Prints TPA component.
+        Prints SHG component.
 
         :param label:
             The label

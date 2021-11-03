@@ -683,7 +683,7 @@ class CubicResponseDriver:
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
+        dist_focks = self.get_fock(mo, density_list, molecule, ao_basis,
                                      'real_and_imag')
         time_end_fock = time.time()
 
@@ -1122,7 +1122,7 @@ class CubicResponseDriver:
 
         return None
 
-    def get_fock_r(self, mo, D, molecule, ao_basis, fock_flag):
+    def get_fock(self, mo, D, molecule, ao_basis, fock_flag):
         """
         Computes and returns a list of Fock matrices
 
@@ -1150,7 +1150,7 @@ class CubicResponseDriver:
             else:
                 D_total = None
 
-            f_total = self.get_two_el_fock_mod_r(mo, molecule, ao_basis,
+            f_total = self.get_two_el_fock(mo, molecule, ao_basis,
                                                  D_total)
 
             nrows = f_total.data.shape[0]
@@ -1162,12 +1162,12 @@ class CubicResponseDriver:
             return DistributedArray(ff_data, self.comm, distribute=False)
 
         elif fock_flag == 'real':
-            return self.get_two_el_fock_mod_r(mo, molecule, ao_basis, D)
+            return self.get_two_el_fock(mo, molecule, ao_basis, D)
 
         else:
             return None
 
-    def get_two_el_fock_mod_r(self, mo, molecule, ao_basis, dabs):
+    def get_two_el_fock(self, mo, molecule, ao_basis, dabs):
         """
         Returns the two-electron part of the Fock matix in MO basis
 
