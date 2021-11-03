@@ -81,15 +81,18 @@ class SHGDriver:
         self.batch_size = None
 
         # cpp settings
-        self.Bfrequencies = (0,)
-        self.Cfrequencies = (0,)
+        self.b_frequencies = (0,)
+        self.c_frequencies = (0,)
         self.comp = None
         self.damping = 0.004556335294880438
         self.lindep_thresh = 1.0e-10
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
-        self.acomponent = 'xyz'
-        self.bcomponent = 'xyz'
+        self.a_component = 'xyz'
+        self.b_component = 'xyz'
+        self.a_operator = 'dipole'
+        self.b_operator = 'dipole'
+        self.c_operator = 'dipole'
 
         # mpi information
         self.comm = comm
@@ -137,10 +140,19 @@ class SHGDriver:
                                 'Response solver: Undefined XC functional')
 
         if 'frequencies' in rsp_dict:
-            self.Bfrequencies = parse_seq_range(rsp_dict['frequencies'])
+            self.b_frequencies = parse_seq_range(rsp_dict['frequencies'])
 
         if 'damping' in rsp_dict:
             self.damping = float(rsp_dict['damping'])
+        
+        if 'a_operator' in rsp_dict:
+            self.a_operator = rsp_dict['a_operator']
+        
+        if 'b_operator' in rsp_dict:
+            self.b_operator = rsp_dict['b_operator']
+
+        if 'c_operator' in rsp_dict:
+            self.c_operator = rsp_dict['c_operator']
 
         if 'eri_thresh' in rsp_dict:
             self.eri_thresh = float(rsp_dict['eri_thresh'])
@@ -230,13 +242,12 @@ class SHGDriver:
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
         dipole_mats = dipole_drv.compute(molecule, ao_basis)
 
-        operator = 'dipole'
-
+        
         linear_solver = LinearSolver(self.comm, self.ostream)
-        a_rhs = linear_solver.get_complex_prop_grad(operator, self.acomponent,
+        a_rhs = linear_solver.get_complex_prop_grad(self.a_operator, self.a_component,
                                                     molecule, ao_basis,
                                                     scf_tensors)
-        b_rhs = linear_solver.get_complex_prop_grad(operator, self.bcomponent,
+        b_rhs = linear_solver.get_complex_prop_grad(self.b_operator, self.b_component,
                                                     molecule, ao_basis,
                                                     scf_tensors)
 
@@ -252,13 +263,13 @@ class SHGDriver:
 
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
-        wa = [sum(x) for x in zip(self.Bfrequencies, self.Bfrequencies)]
+        wa = [sum(x) for x in zip(self.b_frequencies, self.b_frequencies)]
 
-        freqpairs = [wl for wl in zip(self.Bfrequencies, self.Bfrequencies)]
+        freqpairs = [wl for wl in zip(self.b_frequencies, self.b_frequencies)]
 
         if self.rank == mpi_master():
             A = {(op, w): v for op, v in zip('xyz', a_rhs) for w in wa}
-            B = {(op, w): v for op, v in zip('xyz', b_rhs) for w in self.Bfrequencies}
+            B = {(op, w): v for op, v in zip('xyz', b_rhs) for w in self.b_frequencies}
 
             X = {
                 'x': 2 * self.ao2mo(mo, dipole_mats.x_to_numpy()),
@@ -271,12 +282,14 @@ class SHGDriver:
             X = None
             self.comp = None
 
+        AB = {}
+        AB.update(A)
+        AB.update(B)
 
         # Computing the first-order response vectors (3 per frequency)
-        Na_drv = ComplexResponse(self.comm, self.ostream)
+        N_drv = ComplexResponse(self.comm, self.ostream)
 
-        Na_drv.update_settings({
-            'frequencies': wa,
+        N_drv.update_settings({
             'damping': self.damping,
             'lindep_thresh': self.lindep_thresh,
             'conv_thresh': self.conv_thresh,
@@ -285,50 +298,26 @@ class SHGDriver:
             'qq_type': self.qq_type,
         })
 
-        Na_drv.timing = self.timing
-        Na_drv.memory_profiling = self.memory_profiling
-        Na_drv.batch_size = self.batch_size
-        Na_drv.restart = self.restart
-        Na_drv.program_start_time = self.program_start_time
-        Na_drv.maximum_hours = self.maximum_hours
+        N_drv.timing = self.timing
+        N_drv.memory_profiling = self.memory_profiling
+        N_drv.batch_size = self.batch_size
+        N_drv.restart = self.restart
+        N_drv.program_start_time = self.program_start_time
+        N_drv.maximum_hours = self.maximum_hours
         if self.checkpoint_file is not None:
-            Na_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
-            Na_drv.checkpoint_file += '_quada_1.h5'
+            N_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
+            N_drv.checkpoint_file += '_quadb_1.h5'
 
-        Na_results = Na_drv.compute(molecule, ao_basis, scf_tensors, A)
-
-        Nb_drv = ComplexResponse(self.comm, self.ostream)
-
-        Nb_drv.update_settings({
-            'frequencies': self.Bfrequencies,
-            'damping': self.damping,
-            'lindep_thresh': self.lindep_thresh,
-            'conv_thresh': self.conv_thresh,
-            'max_iter': self.max_iter,
-            'eri_thresh': self.eri_thresh,
-            'qq_type': self.qq_type,
-        })
-
-        Nb_drv.timing = self.timing
-        Nb_drv.memory_profiling = self.memory_profiling
-        Nb_drv.batch_size = self.batch_size
-        Nb_drv.restart = self.restart
-        Nb_drv.program_start_time = self.program_start_time
-        Nb_drv.maximum_hours = self.maximum_hours
-        if self.checkpoint_file is not None:
-            Nb_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
-            Nb_drv.checkpoint_file += '_quadb_1.h5'
-
-        Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, B)
+        N_results = N_drv.compute(molecule, ao_basis, scf_tensors, AB)
 
         kX = {}
         Focks = {}
 
-        kX = Nb_results['kappas']
+        kX = N_results['kappas']
 
-        kX.update(Na_results['kappas'])
+        #kX.update(Na_results['kappas'])
 
-        Focks = Nb_results['focks']
+        Focks = N_results['focks']
 
         profiler.check_memory_usage('CPP')
 
@@ -457,7 +446,7 @@ class SHGDriver:
         fock_dict = self.get_fock_dict(freqpairs, density_list, F0, mo, molecule,
                                        ao_basis)
 
-        e3_dict = self.get_e3(freqpairs, kX, fock_dict, nocc,norb)
+        e3_dict = self.get_e3(freqpairs, kX, fock_dict, Focks, nocc,norb)
 
         beta = {}
 
@@ -570,9 +559,6 @@ class SHGDriver:
                 D_lam_xz = self.transform_dens(k_x, D_z, S) + self.transform_dens(k_z, D_x, S)
                 D_lam_yz = self.transform_dens(k_y, D_z, S) + self.transform_dens(k_z, D_y, S)
 
-                density_list.append(D_x)
-                density_list.append(D_y)
-                density_list.append(D_z)
                 density_list.append(D_sig_x)
                 density_list.append(D_sig_y)
                 density_list.append(D_sig_z)
@@ -613,9 +599,6 @@ class SHGDriver:
 
 
         keys = [
-            'F_x',
-            'F_y',
-            'F_z',
             'F_sig_x',
             'F_sig_y',
             'F_sig_z',
@@ -668,7 +651,7 @@ class SHGDriver:
 
         return focks
 
-    def get_e3(self, wi, kX, fo, nocc, norb):
+    def get_e3(self, wi, kX, fo,fo2, nocc, norb):
         """
         Contracts E[3]
 
@@ -694,12 +677,15 @@ class SHGDriver:
 
         e3vec = {}
 
+        print("Focks")
+        print(fo2)
+
         for (wb,wc) in wi:
 
             vec_pack = np.array([
-                fo['F_x'][wb].data,
-                fo['F_y'][wb].data,
-                fo['F_z'][wb].data,
+                fo2[('x', wb)].data,
+                fo2[('y', wb)].data,
+                fo2[('z', wb)].data,
                 fo['F_sig_x'][wb].data,
                 fo['F_sig_y'][wb].data,
                 fo['F_sig_z'][wb].data,
@@ -707,16 +693,6 @@ class SHGDriver:
                 fo['F_lam_xz'][wb].data,
                 fo['F_lam_yz'][wb].data
             ]).T.copy()
-
-            'F_x',
-            'F_y',
-            'F_z',
-            'F_sig_x',
-            'F_sig_y',
-            'F_sig_z',
-            'F_lam_xy',
-            'F_lam_xz',
-            'F_lam_yz'
 
             vec_pack = self.collect_vectors_in_columns(vec_pack)
 
@@ -726,6 +702,11 @@ class SHGDriver:
             vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
 
             (F_x,F_y,F_z,F_sig_x, F_sig_y, F_sig_z, F_lam_xy,F_lam_xz,F_lam_yz) = vec_pack
+
+
+            F_x = np.conjugate(F_x).T
+            F_y = np.conjugate(F_y).T
+            F_z = np.conjugate(F_z).T
 
             F0_a = fo['F0']
 

@@ -78,16 +78,16 @@ class QuadraticResponseDriver:
         self.batch_size = None
 
         # cpp settings
-        self.Bfrequencies = (0,)
-        self.Cfrequencies = (0,)
+        self.b_frequencies = (0,)
+        self.c_frequencies = (0,)
         self.comp = None
         self.damping = 0.004556335294880438
         self.lindep_thresh = 1.0e-10
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
-        self.acomponent = 'z'
-        self.bcomponent = 'z'
-        self.ccomponent = 'z'
+        self.a_component = 'z'
+        self.b_component = 'z'
+        self.c_component = 'z'
 
         # mpi information
         self.comm = comm
@@ -134,20 +134,20 @@ class QuadraticResponseDriver:
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Response solver: Undefined XC functional')
 
-        if 'B_frequencies' in rsp_dict:
-            self.Bfrequencies = parse_seq_range(rsp_dict['B_frequencies'])
+        if 'b_frequencies' in rsp_dict:
+            self.b_frequencies = parse_seq_range(rsp_dict['b_frequencies'])
 
-        if 'C_frequencies' in rsp_dict:
-            self.Cfrequencies = parse_seq_range(rsp_dict['C_frequencies'])
+        if 'c_frequencies' in rsp_dict:
+            self.c_frequencies = parse_seq_range(rsp_dict['c_frequencies'])
 
-        if 'A_operator' in rsp_dict:
-            self.acomponent = rsp_dict['A_operator']
+        if 'a_component' in rsp_dict:
+            self.a_component = rsp_dict['a_component']
         
-        if 'B_operator' in rsp_dict:
-            self.bcomponent = rsp_dict['B_operator']
+        if 'b_component' in rsp_dict:
+            self.b_component = rsp_dict['b_component']
 
-        if 'C_operator' in rsp_dict:
-            self.ccomponent = rsp_dict['C_operator']
+        if 'c_component' in rsp_dict:
+            self.c_component = rsp_dict['c_component']
 
         if 'damping' in rsp_dict:
             self.damping = float(rsp_dict['damping'])
@@ -243,13 +243,13 @@ class QuadraticResponseDriver:
         operator = 'dipole'
 
         linear_solver = LinearSolver(self.comm, self.ostream)
-        a_rhs = linear_solver.get_complex_prop_grad(operator, self.acomponent,
+        a_rhs = linear_solver.get_complex_prop_grad(operator, self.a_component,
                                                     molecule, ao_basis,
                                                     scf_tensors)
-        b_rhs = linear_solver.get_complex_prop_grad(operator, self.bcomponent,
+        b_rhs = linear_solver.get_complex_prop_grad(operator, self.b_component,
                                                     molecule, ao_basis,
                                                     scf_tensors)
-        c_rhs = linear_solver.get_complex_prop_grad(operator, self.ccomponent,
+        c_rhs = linear_solver.get_complex_prop_grad(operator, self.c_component,
                                                     molecule, ao_basis,
                                                     scf_tensors)
 
@@ -267,14 +267,14 @@ class QuadraticResponseDriver:
 
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
-        wa = [sum(x) for x in zip(self.Bfrequencies, self.Cfrequencies)]
+        wa = [sum(x) for x in zip(self.b_frequencies, self.c_frequencies)]
 
-        freqpairs = [wl for wl in zip(self.Bfrequencies, self.Cfrequencies)]
+        freqpairs = [wl for wl in zip(self.b_frequencies, self.c_frequencies)]
 
         if self.rank == mpi_master():
             A = {(op, w): v for op, v in zip('A', a_rhs) for w in wa}
-            B = {(op, w): v for op, v in zip('B', b_rhs) for w in self.Bfrequencies}
-            C = {(op, w): v for op, v in zip('C', c_rhs) for w in self.Cfrequencies}
+            B = {(op, w): v for op, v in zip('B', b_rhs) for w in self.b_frequencies}
+            C = {(op, w): v for op, v in zip('C', c_rhs) for w in self.c_frequencies}
 
             X = {
                 'x': 2 * self.ao2mo(mo, dipole_mats.x_to_numpy()),
@@ -288,11 +288,15 @@ class QuadraticResponseDriver:
             self.comp = None
 
 
+        ABC = {}
+        ABC.update(A)
+        ABC.update(B)
+        ABC.update(C)
+
         # Computing the first-order response vectors (3 per frequency)
-        Na_drv = ComplexResponse(self.comm, self.ostream)
+        N_drv = ComplexResponse(self.comm, self.ostream)
 
-        Na_drv.update_settings({
-            'frequencies': wa,
+        N_drv.update_settings({
             'damping': self.damping,
             'lindep_thresh': self.lindep_thresh,
             'conv_thresh': self.conv_thresh,
@@ -301,76 +305,25 @@ class QuadraticResponseDriver:
             'qq_type': self.qq_type,
         })
 
-        Na_drv.timing = self.timing
-        Na_drv.memory_profiling = self.memory_profiling
-        Na_drv.batch_size = self.batch_size
-        Na_drv.restart = self.restart
-        Na_drv.program_start_time = self.program_start_time
-        Na_drv.maximum_hours = self.maximum_hours
+        N_drv.timing = self.timing
+        N_drv.memory_profiling = self.memory_profiling
+        N_drv.batch_size = self.batch_size
+        N_drv.restart = self.restart
+        N_drv.program_start_time = self.program_start_time
+        N_drv.maximum_hours = self.maximum_hours
         if self.checkpoint_file is not None:
-            Na_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
-            Na_drv.checkpoint_file += '_quada_1.h5'
+            N_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
+            N_drv.checkpoint_file += '_quada_1.h5'
 
-        Na_results = Na_drv.compute(molecule, ao_basis, scf_tensors, A)
-
-        Nb_drv = ComplexResponse(self.comm, self.ostream)
-
-        Nb_drv.update_settings({
-            'frequencies': self.Bfrequencies,
-            'damping': self.damping,
-            'lindep_thresh': self.lindep_thresh,
-            'conv_thresh': self.conv_thresh,
-            'max_iter': self.max_iter,
-            'eri_thresh': self.eri_thresh,
-            'qq_type': self.qq_type,
-        })
-
-        Nb_drv.timing = self.timing
-        Nb_drv.memory_profiling = self.memory_profiling
-        Nb_drv.batch_size = self.batch_size
-        Nb_drv.restart = self.restart
-        Nb_drv.program_start_time = self.program_start_time
-        Nb_drv.maximum_hours = self.maximum_hours
-        if self.checkpoint_file is not None:
-            Nb_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
-            Nb_drv.checkpoint_file += '_quadb_1.h5'
-
-        Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, B)
-
-        Nc_drv = ComplexResponse(self.comm, self.ostream)
-
-        Nc_drv.update_settings({
-            'frequencies': self.Cfrequencies,
-            'damping': self.damping,
-            'lindep_thresh': self.lindep_thresh,
-            'conv_thresh': self.conv_thresh,
-            'max_iter': self.max_iter,
-            'eri_thresh': self.eri_thresh,
-            'qq_type': self.qq_type,
-        })
-
-        Nc_drv.timing = self.timing
-        Nc_drv.memory_profiling = self.memory_profiling
-        Nc_drv.batch_size = self.batch_size
-        Nc_drv.restart = self.restart
-        Nc_drv.program_start_time = self.program_start_time
-        Nc_drv.maximum_hours = self.maximum_hours
-        if self.checkpoint_file is not None:
-            Nc_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
-            Nc_drv.checkpoint_file += '_quadc_1.h5'
-
-        Nc_results = Nc_drv.compute(molecule, ao_basis, scf_tensors, C)
+        N_results = N_drv.compute(molecule, ao_basis, scf_tensors, ABC)
 
         kX = {}
         Focks = {}
 
-        kX = Nb_results['kappas']
+        Focks = N_results['focks']
 
-        kX.update(Na_results['kappas'])
+        kX = N_results['kappas']
 
-        kX.update(Nc_results['kappas'])
-
-        Focks = Nb_results['focks']
 
         profiler.check_memory_usage('CPP')
 
@@ -450,11 +403,12 @@ class QuadraticResponseDriver:
         fock_dict = self.get_fock_dict(freqpairs, density_list, F0, mo, molecule,
                                        ao_basis)
 
-        e3_dict = self.get_e3(freqpairs, kX, fock_dict, nocc,norb)
 
-        op_a = X[self.acomponent]
-        op_b = X[self.bcomponent]
-        op_c = X[self.ccomponent]
+        e3_dict = self.get_e3(freqpairs, kX, fock_dict, Focks, nocc,norb)
+
+        op_a = X[self.a_component]
+        op_b = X[self.b_component]
+        op_c = X[self.c_component]
         
         result = {}
 
@@ -485,7 +439,7 @@ class QuadraticResponseDriver:
             A2 = NbA2Nc + NcA2Nb
 
             self.ostream.print_blank()
-            w_str = 'Quadratic response function at given frequencies: ' + '<< ' + str(self.acomponent) +';' + str(self.bcomponent) + ',' + str(self.ccomponent) + ' >> '
+            w_str = 'Quadratic response function at given frequencies: ' + '<< ' + str(self.a_component) +';' + str(self.b_component) + ',' + str(self.c_component) + ' >> '
             self.ostream.print_header(w_str)
             self.ostream.print_header('=' * (len(w_str) + 2))
             self.ostream.print_blank()
@@ -544,8 +498,6 @@ class QuadraticResponseDriver:
                 Dbc = self.transform_dens(kb, Dc, S)
                 Dcb = self.transform_dens(kc, Db, S)
 
-                density_list.append(Db)
-                density_list.append(Dc)
                 density_list.append(Dbc)
                 density_list.append(Dcb)
 
@@ -576,11 +528,8 @@ class QuadraticResponseDriver:
             self.print_fock_header()
 
         keys = [
-            'Fb',
-            'Fc',
             'Fbc',
             'Fcb',
-
         ]
 
         if self.checkpoint_file is not None:
@@ -625,7 +574,7 @@ class QuadraticResponseDriver:
 
         return focks
 
-    def get_e3(self, wi, kX, fo, nocc, norb):
+    def get_e3(self, wi, kX, fo,fo2, nocc, norb):
         """
         Contracts E[3]
 
@@ -654,10 +603,10 @@ class QuadraticResponseDriver:
         for (wb,wc) in wi:
 
             vec_pack = np.array([
-                fo['Fb'][wb].data,
-                fo['Fc'][wb].data,
                 fo['Fbc'][wb].data,
-                fo['Fcb'][wb].data
+                fo['Fcb'][wb].data,
+                fo2[('B', wb)].data,
+                fo2[('C', wc)].data
             ]).T.copy()
 
             vec_pack = self.collect_vectors_in_columns(vec_pack)
@@ -667,7 +616,10 @@ class QuadraticResponseDriver:
 
             vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
 
-            (fb, fc, fbc, fcb) = vec_pack
+            (fbc, fcb,fb,fc) = vec_pack
+
+            fb = np.conjugate(fb).T
+            fc = np.conjugate(fc).T
 
             F0_a = fo['F0']
 

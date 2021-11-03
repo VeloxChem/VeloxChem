@@ -57,6 +57,9 @@ class SHG(ResponseProperty):
         rsp_dict['response'] = 'quadratic'
         rsp_dict['residue'] = 'none'
         rsp_dict['complex'] = 'yes'
+        rsp_dict['a_operator'] = 'dipole'
+        rsp_dict['b_operator'] = 'dipole'
+        rsp_dict['c_operator'] = 'dipole'
 
         if 'frequencies' not in rsp_dict:
             rsp_dict['frequencies'] = '0'

@@ -53,7 +53,7 @@ class TestQrf(unittest.TestCase):
 
         method_settings = {}
 
-        rsp_settings = {'conv_thresh': 1.0e-4, 'B_frequencies': [0.2],'C_frequencies': [0.2],'damping': 0.1,'A_operator':'x','B_operator':'x','C_operator':'x'}
+        rsp_settings = {'conv_thresh': 1.0e-4, 'b_frequencies': [0.2],'c_frequencies': [0.2],'damping': 0.1,'a_component':'x','b_component':'x','c_component':'x'}
 
         qrf_prop = QuadraticResponseDriver(comm, ostream) 
 
@@ -61,13 +61,13 @@ class TestQrf(unittest.TestCase):
 
         qrf_result_xxx = qrf_prop.compute(molecule, ao_basis, scf_tensors)
 
-        rsp_settings = {'conv_thresh': 1.0e-4, 'B_frequencies': [0.2],'C_frequencies': [0.2],'damping': 0.1,'A_operator':'z','B_operator':'z','C_operator':'x'}
+        rsp_settings = {'conv_thresh': 1.0e-4, 'b_frequencies': [0.2],'c_frequencies': [0.2],'damping': 0.1,'a_component':'z','b_component':'z','c_component':'x'}
 
         qrf_prop.update_settings(rsp_settings, method_settings)
 
         qrf_result_zzx = qrf_prop.compute(molecule, ao_basis, scf_tensors)
 
-        rsp_settings = {'conv_thresh': 1.0e-4, 'B_frequencies': [0.2],'C_frequencies': [0.2],'damping': 0.1,'A_operator':'y','B_operator':'y','C_operator':'x'}
+        rsp_settings = {'conv_thresh': 1.0e-4, 'b_frequencies': [0.2],'c_frequencies': [0.2],'damping': 0.1,'a_component':'y','b_component':'y','c_component':'x'}
 
         qrf_prop.update_settings(rsp_settings, method_settings)
 

@@ -78,17 +78,17 @@ class CubicResponseDriver:
         self.batch_size = None
 
         # cpp settings
-        self.Bfrequencies = (0,)
-        self.Cfrequencies = (0,)
-        self.Dfrequencies = (0,)
+        self.b_frequencies = (0,)
+        self.c_frequencies = (0,)
+        self.d_frequencies = (0,)
         self.comp = None
         self.damping = 0.004556335294880438
         self.lindep_thresh = 1.0e-10
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
-        self.acomponent = 'z'
-        self.bcomponent = 'z'
-        self.ccomponent = 'z'
+        self.a_component = 'z'
+        self.b_component = 'z'
+        self.c_component = 'z'
         self.dcomponent = 'z'
 
         # mpi information
@@ -136,26 +136,26 @@ class CubicResponseDriver:
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Response solver: Undefined XC functional')
 
-        if 'B_frequencies' in rsp_dict:
-            self.Bfrequencies = parse_seq_range(rsp_dict['B_frequencies'])
+        if 'b_frequencies' in rsp_dict:
+            self.b_frequencies = parse_seq_range(rsp_dict['b_frequencies'])
 
-        if 'C_frequencies' in rsp_dict:
-            self.Cfrequencies = parse_seq_range(rsp_dict['C_frequencies'])
+        if 'c_frequencies' in rsp_dict:
+            self.c_frequencies = parse_seq_range(rsp_dict['c_frequencies'])
         
-        if 'D_frequencies' in rsp_dict:
-            self.Dfrequencies = parse_seq_range(rsp_dict['D_frequencies'])
+        if 'd_frequencies' in rsp_dict:
+            self.d_frequencies = parse_seq_range(rsp_dict['d_frequencies'])
 
-        if 'A_operator' in rsp_dict:
-            self.acomponent = rsp_dict['A_operator']
+        if 'a_component' in rsp_dict:
+            self.a_component = rsp_dict['a_component']
         
-        if 'B_operator' in rsp_dict:
-            self.bcomponent = rsp_dict['B_operator']
+        if 'b_component' in rsp_dict:
+            self.b_component = rsp_dict['b_component']
 
-        if 'C_operator' in rsp_dict:
-            self.ccomponent = rsp_dict['C_operator']
+        if 'c_component' in rsp_dict:
+            self.c_component = rsp_dict['c_component']
         
-        if 'D_operator' in rsp_dict:
-            self.dcomponent = rsp_dict['D_operator']
+        if 'd_component' in rsp_dict:
+            self.dcomponent = rsp_dict['d_component']
 
         if 'damping' in rsp_dict:
             self.damping = float(rsp_dict['damping'])
@@ -252,15 +252,15 @@ class CubicResponseDriver:
 
         linear_solver = LinearSolver(self.comm, self.ostream)
 
-        a_rhs = linear_solver.get_complex_prop_grad(operator, self.acomponent,
+        a_rhs = linear_solver.get_complex_prop_grad(operator, self.a_component,
                                                     molecule, ao_basis,
                                                     scf_tensors)
 
-        b_rhs = linear_solver.get_complex_prop_grad(operator, self.bcomponent,
+        b_rhs = linear_solver.get_complex_prop_grad(operator, self.b_component,
                                                     molecule, ao_basis,
                                                     scf_tensors)
 
-        c_rhs = linear_solver.get_complex_prop_grad(operator, self.ccomponent,
+        c_rhs = linear_solver.get_complex_prop_grad(operator, self.c_component,
                                                     molecule, ao_basis,
                                                     scf_tensors)
 
@@ -285,15 +285,15 @@ class CubicResponseDriver:
 
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
-        wa = [sum(x) for x in zip(self.Bfrequencies, self.Cfrequencies,self.Dfrequencies)]
+        wa = [sum(x) for x in zip(self.b_frequencies, self.c_frequencies,self.d_frequencies)]
 
-        freqpairs = [wl for wl in zip(self.Bfrequencies, self.Cfrequencies,self.Dfrequencies)]
+        freqpairs = [wl for wl in zip(self.b_frequencies, self.c_frequencies,self.d_frequencies)]
 
         if self.rank == mpi_master():
             A = {(op, w): v for op, v in zip('A', a_rhs) for w in wa}
-            B = {(op, w): v for op, v in zip('B', b_rhs) for w in self.Bfrequencies}
-            C = {(op, w): v for op, v in zip('C', c_rhs) for w in self.Cfrequencies}
-            D = {(op, w): v for op, v in zip('D', d_rhs) for w in self.Dfrequencies}
+            B = {(op, w): v for op, v in zip('B', b_rhs) for w in self.b_frequencies}
+            C = {(op, w): v for op, v in zip('C', c_rhs) for w in self.c_frequencies}
+            D = {(op, w): v for op, v in zip('D', d_rhs) for w in self.d_frequencies}
 
             X = {
                 'x': 2 * self.ao2mo(mo, dipole_mats.x_to_numpy()),
@@ -335,7 +335,7 @@ class CubicResponseDriver:
         Nb_drv = ComplexResponse(self.comm, self.ostream)
 
         Nb_drv.update_settings({
-            'frequencies': self.Bfrequencies,
+            'frequencies': self.b_frequencies,
             'damping': self.damping,
             'lindep_thresh': self.lindep_thresh,
             'conv_thresh': self.conv_thresh,
@@ -359,7 +359,7 @@ class CubicResponseDriver:
         Nc_drv = ComplexResponse(self.comm, self.ostream)
 
         Nc_drv.update_settings({
-            'frequencies': self.Cfrequencies,
+            'frequencies': self.c_frequencies,
             'damping': self.damping,
             'lindep_thresh': self.lindep_thresh,
             'conv_thresh': self.conv_thresh,
@@ -383,7 +383,7 @@ class CubicResponseDriver:
         Nd_drv = ComplexResponse(self.comm, self.ostream)
 
         Nd_drv.update_settings({
-            'frequencies': self.Cfrequencies,
+            'frequencies': self.c_frequencies,
             'damping': self.damping,
             'lindep_thresh': self.lindep_thresh,
             'conv_thresh': self.conv_thresh,
@@ -499,9 +499,9 @@ class CubicResponseDriver:
 
         e4_dict,s4_dict,r4_dict = self.get_e4(freqpairs, kX, fock_dict, nocc,norb,d_a_mo)
 
-        op_a = X[self.acomponent]
-        op_b = X[self.bcomponent]
-        op_c = X[self.ccomponent]
+        op_a = X[self.a_component]
+        op_b = X[self.b_component]
+        op_c = X[self.c_component]
         op_d = X[self.dcomponent]
         
         result = {}
@@ -528,7 +528,7 @@ class CubicResponseDriver:
             NaR4NbNcNd =  r4_dict[wb]
 
             self.ostream.print_blank()
-            w_str = 'Cubic response function: ' + '<< ' + str(self.acomponent) +';' + str(self.bcomponent) + ',' + str(self.ccomponent) +  ',' + str(self.dcomponent) + ' >> '
+            w_str = 'Cubic response function: ' + '<< ' + str(self.a_component) +';' + str(self.b_component) + ',' + str(self.c_component) +  ',' + str(self.dcomponent) + ' >> '
             self.ostream.print_header(w_str)
             self.ostream.print_header('=' * (len(w_str) + 2))
             self.ostream.print_blank()

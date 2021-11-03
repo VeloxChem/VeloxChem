@@ -53,7 +53,7 @@ class TestCrf(unittest.TestCase):
 
         method_settings = {}
 
-        rsp_settings = {'conv_thresh': 1.0e-4, 'B_frequencies': [0.2],'C_frequencies': [0.2],'damping': 0.1,'A_operator':'x','B_operator':'x','C_operator':'x'}
+        rsp_settings = {'conv_thresh': 1.0e-4, 'b_frequencies': [0.2],'c_frequencies': [0.2],'damping': 0.1,'a_component':'x','b_component':'x','c_component':'x'}
 
         crf_prop = CubicResponseDriver(comm, ostream) 
 
@@ -61,13 +61,13 @@ class TestCrf(unittest.TestCase):
 
         crf_result_xxx = crf_prop.compute(molecule, ao_basis, scf_tensors)
 
-        rsp_settings = {'conv_thresh': 1.0e-4, 'B_frequencies': [0.2],'C_frequencies': [0.2],'damping': 0.1,'A_operator':'z','B_operator':'z','C_operator':'x'}
+        rsp_settings = {'conv_thresh': 1.0e-4, 'b_frequencies': [0.2],'c_frequencies': [0.2],'damping': 0.1,'a_component':'z','b_component':'z','c_component':'x'}
 
         crf_prop.update_settings(rsp_settings, method_settings)
 
         crf_result_zzx = crf_prop.compute(molecule, ao_basis, scf_tensors)
 
-        rsp_settings = {'conv_thresh': 1.0e-4, 'B_frequencies': [0.2],'C_frequencies': [0.2],'damping': 0.1,'A_operator':'y','B_operator':'y','C_operator':'x'}
+        rsp_settings = {'conv_thresh': 1.0e-4, 'b_frequencies': [0.2],'c_frequencies': [0.2],'damping': 0.1,'a_component':'y','b_component':'y','c_component':'x'}
 
         crf_prop.update_settings(rsp_settings, method_settings)
 
