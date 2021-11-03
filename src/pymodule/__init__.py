@@ -95,6 +95,10 @@ from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .scffirstorderprop import ScfFirstOrderProperties
+from .cubicresponsedriver import CubicResponseDriver
+from .quadraticresponsedriver import QuadraticResponseDriver
+from .shgdriver import SHGDriver
+
 
 # Python functions
 from .errorhandler import assert_msg_critical

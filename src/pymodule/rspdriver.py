@@ -30,6 +30,7 @@ from .c6solver import C6Solver
 from .tdaexcidriver import TDAExciDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
+from .shgdriver import SHGDriver
 from .inputparser import parse_input
 
 
@@ -185,6 +186,22 @@ class ResponseDriver:
             self.is_converged = c6_solver.is_converged
 
             return c6_result
+            
+        # SHG
+
+        if (self.rsp_dict['response'] == 'quadratic' and
+                self.rsp_dict['complex'] == 'yes'):
+
+            shg_solver = SHGDriver(self.comm, self.ostream)
+
+            shg_solver.update_settings(self.rsp_dict, self.method_dict)
+
+            shg_results = shg_solver.compute(molecule, ao_basis, scf_tensors)
+
+            self.is_converged = shg_solver.is_converged
+
+            return shg_results
+
 
         # TPA
 

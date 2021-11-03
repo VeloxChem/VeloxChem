@@ -45,6 +45,7 @@ from .rspcustomproperty import CustomProperty
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rsppolarizability import Polarizability
 from .rsptpa import TPA
+from .rspshg import SHG
 from .scffirstorderprop import ScfFirstOrderProperties
 from .scfgradientdriver import ScfGradientDriver
 from .scfrestdriver import ScfRestrictedDriver
@@ -54,6 +55,7 @@ from .slurminfo import get_slurm_maximum_hours
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
+
 
 
 def select_scf_driver(task, scf_type):
@@ -155,6 +157,10 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
 
     elif prop_type == 'tpa':
         rsp_prop = TPA(rsp_dict, method_dict)
+
+    elif prop_type == 'shg':
+        rsp_prop = SHG(rsp_dict,method_dict)
+
 
     else:
         assert_msg_critical(False, 'input file: invalid response property')
