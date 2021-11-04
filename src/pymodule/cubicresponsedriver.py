@@ -30,6 +30,9 @@ from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
 
+
+from .inputparser import parse_input
+
 class CubicResponseDriver:
     """
     Implements a general quadratic response driver 
@@ -126,78 +129,55 @@ class CubicResponseDriver:
         if method_dict is None:
             method_dict = {}
 
-        if 'grid_level' in method_dict:
-            self.grid_level = int(method_dict['grid_level'])
 
-        if 'xcfun' in method_dict:
-            if 'dft' not in method_dict:
-                self.dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Response solver: Undefined XC functional')
+        rsp_keywords = {
+            'b_frequencies': 'seq_range',
+            'c_frequencies': 'seq_range',
+            'd_frequencies': 'seq_range',
+            'a_component': 'str',
+            'b_component': 'str',
+            'c_component': 'str',
+            'd_component': 'str',
+            'damping': 'float',
+            'eri_thresh': 'float',
+            'qq_type': 'str_upper',
+            'batch_size': 'int',
+            'max_iter': 'int',
+            'conv_thresh': 'float',
+            'lindep_thresh': 'float',
+            'restart': 'bool',
+            'checkpoint_file': 'str',
+            'timing': 'bool',
+            'profiling': 'bool',
+            'memory_profiling': 'bool',
+            'memory_tracing': 'bool',
+        }
 
-        if 'b_frequencies' in rsp_dict:
-            self.b_frequencies = parse_seq_range(rsp_dict['b_frequencies'])
-
-        if 'c_frequencies' in rsp_dict:
-            self.c_frequencies = parse_seq_range(rsp_dict['c_frequencies'])
-        
-        if 'd_frequencies' in rsp_dict:
-            self.d_frequencies = parse_seq_range(rsp_dict['d_frequencies'])
-
-        if 'a_component' in rsp_dict:
-            self.a_component = rsp_dict['a_component']
-        
-        if 'b_component' in rsp_dict:
-            self.b_component = rsp_dict['b_component']
-
-        if 'c_component' in rsp_dict:
-            self.c_component = rsp_dict['c_component']
-        
-        if 'd_component' in rsp_dict:
-            self.dcomponent = rsp_dict['d_component']
-
-        if 'damping' in rsp_dict:
-            self.damping = float(rsp_dict['damping'])
-
-        if 'eri_thresh' in rsp_dict:
-            self.eri_thresh = float(rsp_dict['eri_thresh'])
-        if 'qq_type' in rsp_dict:
-            self.qq_type = rsp_dict['qq_type']
-        if 'batch_size' in rsp_dict:
-            self.batch_size = int(rsp_dict['batch_size'])
-
-        if 'max_iter' in rsp_dict:
-            self.max_iter = int(rsp_dict['max_iter'])
-        if 'conv_thresh' in rsp_dict:
-            self.conv_thresh = float(rsp_dict['conv_thresh'])
-        if 'lindep_thresh' in rsp_dict:
-            self.lindep_thresh = float(rsp_dict['lindep_thresh'])
-
-        if 'restart' in rsp_dict:
-            key = rsp_dict['restart'].lower()
-            self.restart = True if key == 'yes' else False
-        if 'checkpoint_file' in rsp_dict:
-            self.checkpoint_file = rsp_dict['checkpoint_file']
+        parse_input(self, rsp_keywords, rsp_dict)
 
         if 'program_start_time' in rsp_dict:
             self.program_start_time = rsp_dict['program_start_time']
         if 'maximum_hours' in rsp_dict:
             self.maximum_hours = rsp_dict['maximum_hours']
 
-        if 'timing' in rsp_dict:
-            key = rsp_dict['timing'].lower()
-            self.timing = True if key in ['yes', 'y'] else False
-        if 'profiling' in rsp_dict:
-            key = rsp_dict['profiling'].lower()
-            self.profiling = True if key in ['yes', 'y'] else False
-        if 'memory_profiling' in rsp_dict:
-            key = rsp_dict['memory_profiling'].lower()
-            self.memory_profiling = True if key in ['yes', 'y'] else False
-        if 'memory_tracing' in rsp_dict:
-            key = rsp_dict['memory_tracing'].lower()
-            self.memory_tracing = True if key in ['yes', 'y'] else False
-        
+        if 'xcfun' in method_dict:
+            errmsg = 'CrfDriver: The \'xcfun\' keyword is not supported in Crf '
+            errmsg += 'calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if 'potfile' in method_dict:
+            errmsg = 'CrfDriver: The \'potfile\' keyword is not supported in '
+            errmsg += 'Crf calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if 'electric_field' in method_dict:
+            errmsg = 'CrfDriver: The \'electric field\' keyword is not '
+            errmsg += 'supported in Crf calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -306,12 +286,16 @@ class CubicResponseDriver:
             X = None
             self.comp = None
 
+        ABCD = {}
+        ABCD.update(A)
+        ABCD.update(B)
+        ABCD.update(C)
+        ABCD.update(D)
 
         # Computing the first-order response vectors (3 per frequency)
-        Na_drv = ComplexResponse(self.comm, self.ostream)
+        N_drv = ComplexResponse(self.comm, self.ostream)
 
-        Na_drv.update_settings({
-            'frequencies': wa,
+        N_drv.update_settings({
             'damping': self.damping,
             'lindep_thresh': self.lindep_thresh,
             'conv_thresh': self.conv_thresh,
@@ -320,103 +304,24 @@ class CubicResponseDriver:
             'qq_type': self.qq_type,
         })
 
-        Na_drv.timing = self.timing
-        Na_drv.memory_profiling = self.memory_profiling
-        Na_drv.batch_size = self.batch_size
-        Na_drv.restart = self.restart
-        Na_drv.program_start_time = self.program_start_time
-        Na_drv.maximum_hours = self.maximum_hours
+        N_drv.timing = self.timing
+        N_drv.memory_profiling = self.memory_profiling
+        N_drv.batch_size = self.batch_size
+        N_drv.restart = self.restart
+        N_drv.program_start_time = self.program_start_time
+        N_drv.maximum_hours = self.maximum_hours
         if self.checkpoint_file is not None:
-            Na_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
-            Na_drv.checkpoint_file += '_quada_1.h5'
+            N_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
+            N_drv.checkpoint_file += '_quada_1.h5'
 
-        Na_results = Na_drv.compute(molecule, ao_basis, scf_tensors, A)
-
-        Nb_drv = ComplexResponse(self.comm, self.ostream)
-
-        Nb_drv.update_settings({
-            'frequencies': self.b_frequencies,
-            'damping': self.damping,
-            'lindep_thresh': self.lindep_thresh,
-            'conv_thresh': self.conv_thresh,
-            'max_iter': self.max_iter,
-            'eri_thresh': self.eri_thresh,
-            'qq_type': self.qq_type,
-        })
-
-        Nb_drv.timing = self.timing
-        Nb_drv.memory_profiling = self.memory_profiling
-        Nb_drv.batch_size = self.batch_size
-        Nb_drv.restart = self.restart
-        Nb_drv.program_start_time = self.program_start_time
-        Nb_drv.maximum_hours = self.maximum_hours
-        if self.checkpoint_file is not None:
-            Nb_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
-            Nb_drv.checkpoint_file += '_quadb_1.h5'
-
-        Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, B)
-
-        Nc_drv = ComplexResponse(self.comm, self.ostream)
-
-        Nc_drv.update_settings({
-            'frequencies': self.c_frequencies,
-            'damping': self.damping,
-            'lindep_thresh': self.lindep_thresh,
-            'conv_thresh': self.conv_thresh,
-            'max_iter': self.max_iter,
-            'eri_thresh': self.eri_thresh,
-            'qq_type': self.qq_type,
-        })
-
-        Nc_drv.timing = self.timing
-        Nc_drv.memory_profiling = self.memory_profiling
-        Nc_drv.batch_size = self.batch_size
-        Nc_drv.restart = self.restart
-        Nc_drv.program_start_time = self.program_start_time
-        Nc_drv.maximum_hours = self.maximum_hours
-        if self.checkpoint_file is not None:
-            Nc_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
-            Nc_drv.checkpoint_file += '_quadc_1.h5'
-
-        Nc_results = Nc_drv.compute(molecule, ao_basis, scf_tensors, C)
-
-        Nd_drv = ComplexResponse(self.comm, self.ostream)
-
-        Nd_drv.update_settings({
-            'frequencies': self.c_frequencies,
-            'damping': self.damping,
-            'lindep_thresh': self.lindep_thresh,
-            'conv_thresh': self.conv_thresh,
-            'max_iter': self.max_iter,
-            'eri_thresh': self.eri_thresh,
-            'qq_type': self.qq_type,
-        })
-
-        Nd_drv.timing = self.timing
-        Nd_drv.memory_profiling = self.memory_profiling
-        Nd_drv.batch_size = self.batch_size
-        Nd_drv.restart = self.restart
-        Nd_drv.program_start_time = self.program_start_time
-        Nd_drv.maximum_hours = self.maximum_hours
-        if self.checkpoint_file is not None:
-            Nd_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
-            Nd_drv.checkpoint_file += '_quadc_1.h5'
-
-        Nd_results = Nd_drv.compute(molecule, ao_basis, scf_tensors, D)
+        N_results = N_drv.compute(molecule, ao_basis, scf_tensors, ABCD)
 
         kX = {}
         Focks = {}
 
-        kX = Nb_results['kappas']
+        kX = N_results['kappas']
 
-        kX.update(Na_results['kappas'])
-
-        kX.update(Nc_results['kappas'])
-
-        kX.update(Nd_results['kappas'])
-
-
-        Focks = Nb_results['focks']
+        Focks = N_results['focks']
 
         profiler.check_memory_usage('CPP')
 
@@ -450,9 +355,6 @@ class CubicResponseDriver:
             The SCF density in MO basis
         :param kX:
             A dictonary containing all the response matricies
-        :param track:
-            A list that contains all the information about which γ components
-            and at what freqs they are to be computed
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
@@ -463,8 +365,7 @@ class CubicResponseDriver:
             The profiler.
 
         :return:
-            A dictionary containing all the relevent terms to third-order
-            isotropic gradient
+
         """
 
         if self.rank == mpi_master():
@@ -497,12 +398,25 @@ class CubicResponseDriver:
         fock_dict = self.get_fock_dict(freqpairs, density_list, F0, mo, molecule,
                                        ao_basis)
 
-        e4_dict,s4_dict,r4_dict = self.get_e4(freqpairs, kX, fock_dict, nocc,norb,d_a_mo)
+        e4_dict,s4_dict,r4_dict = self.get_esr4(freqpairs, kX, fock_dict,Focks, nocc,norb,d_a_mo)
 
-        op_a = X[self.a_component]
-        op_b = X[self.b_component]
-        op_c = X[self.c_component]
-        op_d = X[self.dcomponent]
+
+        k_xy,f_xy = self.get_nxy(freqpairs, kX, fock_dict,Focks, nocc, norb,d_a_mo,X,molecule,ao_basis,scf_tensors)
+
+        if self.rank == mpi_master():
+            density_list_ii = self.get_densities_ii(freqpairs, kX,k_xy, S, D0, mo)
+        else:
+            density_list_ii = None
+
+        fock_dict_ii = self.get_fock_dict_ii(freqpairs, density_list, F0, mo, molecule,
+                                       ao_basis)
+
+        e3_dict = self.get_e3(freqpairs, kX, k_xy, Focks,fock_dict_ii,f_xy, nocc, norb)
+
+        A = X[self.a_component]
+        B = X[self.b_component]
+        C = X[self.c_component]
+        D = X[self.dcomponent]
         
         result = {}
 
@@ -519,13 +433,60 @@ class CubicResponseDriver:
             
             Nd = (LinearSolver.lrmat2vec(kX[('D',wd)].real, nocc, norb) +
                 1j * LinearSolver.lrmat2vec(kX[('D',wd)].imag, nocc, norb))
-            
+
+            Nbd = (LinearSolver.lrmat2vec(k_xy[('BD', wb,wd),wb+wd].real, nocc, norb) +
+                   1j * LinearSolver.lrmat2vec(k_xy[('BD', wb,wd),wb+wd].imag, nocc, norb))
+
+            Nbc = (LinearSolver.lrmat2vec(k_xy[('BC', wb,wc),wb+wc].real, nocc, norb) +
+                   1j * LinearSolver.lrmat2vec(k_xy[('BC', wb,wc),wb+wc].imag, nocc, norb))
+
+            Ncd = (LinearSolver.lrmat2vec(k_xy[('CD', wc,wd),wc+wd].real, nocc, norb) +
+                   1j * LinearSolver.lrmat2vec(k_xy[('CD', wc,wd),wc+wd].imag, nocc, norb))
 
             NaE4NbNcNd = np.dot(Na, e4_dict[wb])
 
             NaS4NbNcNd = np.dot(Na, s4_dict[wb])
 
             NaR4NbNcNd =  r4_dict[wb]
+
+            NaE3NbNcd = np.dot(Na,e3_dict[(('E3NbNcd'),(wb,wc,wd))])
+            NaE3NcNbd = np.dot(Na,e3_dict[(('E3NcNbd'),(wb,wc,wd))])
+            NaE3NdNbc = np.dot(Na,e3_dict[(('E3NdNbc'),(wb,wc,wd))])
+
+            # X3 terms
+            NaB3NcNd = np.dot(Na.T, self.x3_contract(kX[('C',wc)], kX[('D',wd)], B, d_a_mo, nocc, norb))
+            NaB3NdNc = np.dot(Na.T, self.x3_contract(kX[('D',wd)], kX[('C',wc)], B, d_a_mo, nocc, norb))
+
+            NaC3NbNd = np.dot(Na.T, self.x3_contract(kX[('B',wb)], kX[('D',wd)], C, d_a_mo, nocc, norb))
+            NaC3NdNb = np.dot(Na.T, self.x3_contract(kX[('D',wd)], kX[('B',wb)], C, d_a_mo, nocc, norb))
+
+            NaD3NbNc = np.dot(Na.T, self.x3_contract(kX[('B',wb)], kX[('C',wc)], D, d_a_mo, nocc, norb))
+            NaD3NcNb = np.dot(Na.T, self.x3_contract(kX[('C',wc)], kX[('B',wb)], D, d_a_mo, nocc, norb))
+
+            # X2 contraction
+            NaB2Ncd = np.dot(Na.T, self.x2_contract(k_xy[('CD', wc,wd),wc+wd], B, d_a_mo, nocc, norb))
+            NaC2Nbd = np.dot(Na.T, self.x2_contract(k_xy[('BD', wb,wd),wb+wd], C, d_a_mo, nocc, norb))
+            NaD2Nbc = np.dot(Na.T, self.x2_contract(k_xy[('BC', wb,wc),wb+wc], D, d_a_mo, nocc, norb))
+
+            # A3 terms 
+            NdA3NbNc = np.dot(self.a3_contract(kX[('B',wb)], kX[('C',wc)], A, d_a_mo, nocc, norb), Nd)
+            NdA3NcNb = np.dot(self.a3_contract(kX[('C',wc)], kX[('B',wb)], A, d_a_mo, nocc, norb), Nd)
+
+            NbA3NcNd = np.dot(self.a3_contract(kX[('C',wc)], kX[('D',wd)], A, d_a_mo, nocc, norb), Nb)
+            NbA3NdNc = np.dot(self.a3_contract(kX[('D',wd)], kX[('C',wc)], A, d_a_mo, nocc, norb), Nb)
+
+            NcA3NbNd = np.dot(self.a3_contract(kX[('B',wb)], kX[('D',wd)], A, d_a_mo, nocc, norb), Nc)
+            NcA3NdNb = np.dot(self.a3_contract(kX[('D',wd)], kX[('B',wb)], A, d_a_mo, nocc, norb), Nc)
+
+            # A2 contraction 
+            NbA2Ncd = np.dot(self.a2_contract(kX[('B',wb)], A, d_a_mo, nocc, norb), Ncd)
+            NcdA2Nb = np.dot(self.a2_contract(k_xy[('CD', wc,wd),wc+wd], A, d_a_mo, nocc, norb), Nb)
+
+            NcA2Nbd = np.dot(self.a2_contract(kX[('C',wc)], A, d_a_mo, nocc, norb), Nbd)
+            NbdA2Nc = np.dot(self.a2_contract(k_xy[('BD', wb,wd),wb+wd], A, d_a_mo, nocc, norb), Nc)
+
+            NdA2Nbc = np.dot(self.a2_contract(kX[('D',wd)], A, d_a_mo, nocc, norb), Nbc)
+            NbcA2Nd = np.dot(self.a2_contract(k_xy[('BC', wb,wc),wb+wc], A, d_a_mo, nocc, norb), Nd)
 
             self.ostream.print_blank()
             w_str = 'Cubic response function: ' + '<< ' + str(self.a_component) +';' + str(self.b_component) + ',' + str(self.c_component) +  ',' + str(self.dcomponent) + ' >> '
@@ -537,13 +498,142 @@ class CubicResponseDriver:
             width = len(title)
             self.ostream.print_header(title.ljust(width))
             self.ostream.print_header(('-' * len(title)).ljust(width))
-            self.print_component('T4',wb, NaE4NbNcNd-NaS4NbNcNd+NaR4NbNcNd, width)
-            result.update({wb: NaE4NbNcNd+NaS4NbNcNd-NaR4NbNcNd})
+            self.print_component('T4',wb, -(NaE4NbNcNd-NaS4NbNcNd+NaR4NbNcNd), width)
+            self.print_component('E3',wb, NaE3NbNcd+NaE3NcNbd+NaE3NdNbc, width)
+            self.print_component('X3',wb, NaB3NcNd+NaB3NdNc +NaC3NbNd+NaC3NdNb +NaD3NbNc +NaD3NcNb , width)
+            self.print_component('A3',wb, -(NdA3NbNc + NdA3NcNb + NbA3NcNd + NbA3NdNc + NcA3NbNd +NcA3NdNb)   , width)
+            self.print_component('X2',wb, NaB2Ncd + NaC2Nbd + NaD2Nbc, width)
+            self.print_component('A2',wb, NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc + NdA2Nbc + NbcA2Nd , width)
+            
+            result.update({('T4',wb): -(NaE4NbNcNd-NaS4NbNcNd+NaR4NbNcNd)})
+            result.update({('X3',wb): (NaB3NcNd+NaB3NdNc +NaC3NbNd+NaC3NdNb +NaD3NbNc +NaD3NcNb)})
+            result.update({('A3',wb): -(NdA3NbNc + NdA3NcNb + NbA3NcNd + NbA3NdNc + NcA3NbNd +NcA3NdNb)})
         
 
         profiler.check_memory_usage('End of QRF')
 
         return result
+
+    def a3_contract(self, k1, k2, A, D, nocc, norb):
+        """
+        Contracts the generalized dipole gradient tensor of rank 3 with two
+        first-order response matrices. A[3]N1N2 = -(1/6)[[k2,[k1,A]],D.T]
+
+        :param: k1:
+            First-order response matrix
+        :param: k2:
+            First-order response matrix
+        :param A:
+            A dipole intergral matrix
+        :param D:
+            Density matrix
+        :param nocc:
+            Number of occupied orbitals
+        :param norb:
+            Number of total orbtials
+
+        :return:
+            Returns a matrix
+        """
+
+        A3NxNy = self.commut(self.commut(k2.T, self.commut(k1.T, A)), D.T)
+        A3NxNy_c = (LinearSolver.lrmat2vec(A3NxNy.real, nocc, norb) +
+                    1j * LinearSolver.lrmat2vec(A3NxNy.imag, nocc, norb))
+        return -(1. / 6) * A3NxNy_c
+
+
+    def get_e3(self, wi, kX,k_xy, fo,fo2,fo3, nocc, norb):
+        """
+        Contracts E[3] for CRF
+
+        :param wi:
+            A list of freqs
+        :param kX:
+            A dict of the single index response matricies
+        :param kXY:
+            A dict of the two index response matrices
+        :param fo:
+            A dictonary of transformed Fock matricies from fock_dict
+        :param fo2:
+            A dictonarty of transfromed Fock matricies from fock_dict_two
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The total number of orbitals
+
+        :return:
+            A dictonary of compounded E[3] tensors for the isotropic cubic
+            response function for QRF
+        """
+
+        e3vec = {}
+
+        for (wb,wc,wd) in wi:
+
+            vec_pack = np.array([
+                fo[('B', wb)].data,
+                fo[('C', wc)].data,
+                fo[('D', wd)].data,
+                fo2['Fb_cd'][(wb,wc,wd)].data,
+                fo2['Fcd_b'][(wb,wc,wd)].data,
+                fo2['Fc_bd'][(wb,wc,wd)].data,
+                fo2['Fbd_c'][(wb,wc,wd)].data,
+                fo2['Fd_bc'][(wb,wc,wd)].data,
+                fo2['Fbc_d'][(wb,wc,wd)].data,
+                fo3[(('BC',wb,wc),wb+wc)].data,
+                fo3[(('BD',wb,wd),wb+wd)].data,
+                fo3[(('CD',wc,wd),wc+wd)].data,
+            ]).T.copy()
+
+            vec_pack = self.collect_vectors_in_columns(vec_pack)
+
+            if self.rank != mpi_master():
+                continue
+
+            vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
+
+            (fb, fc,fd,fb_cd,fcd_b,fc_bd,fbd_c,fd_bc,fbc_d,fbc,fbd,fcd) = vec_pack
+
+            fb = np.conjugate(fb).T
+            fc = np.conjugate(fc).T
+            fd = np.conjugate(fd).T
+            fbc = np.conjugate(fbc).T
+            fcd = np.conjugate(fcd).T
+            fbd = np.conjugate(fbd).T
+
+            F0_a = fo2['F0']
+
+            # E3NbNcd
+
+            kb = kX[('B', wb)].T
+            kcd = k_xy[('CD', wc,wd),wc+wd].T
+
+            xi = self.xi(kb, kcd, fb, fcd, F0_a)
+
+            e3fock = xi.T + (0.5 * fb_cd + 0.5*fcd_b).T
+            e3vec[('E3NbNcd',(wb,wc,wd))] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
+
+            # E3NcNbd
+
+            kc = kX[('C', wc)].T
+            kbd = k_xy[('BD', wb,wd),wb+wd].T
+
+            xi = self.xi(kc, kbd, fc, fbd, F0_a)
+
+            e3fock = xi.T + (0.5 * fc_bd + 0.5*fbd_c).T
+            e3vec[('E3NcNbd',(wb,wc,wd))] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
+
+            # E3NdNbc
+
+            kd = kX[('D', wd)].T
+            kbc = k_xy[('BC', wb,wc),wb+wc].T
+
+            xi = self.xi(kd, kbc, fd, fbc, F0_a)
+
+            e3fock = xi.T + (0.5 * fd_bc + 0.5*fbc_d).T
+            e3vec[('E3NdNbc',(wb,wc,wd))] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
+
+        return e3vec
 
     def get_densities(self, freqpairs, kX, S, D0, mo):
         """
@@ -575,6 +665,13 @@ class CubicResponseDriver:
                 kc = self.mo2ao(mo, kX[('C', wc)])
                 kd = self.mo2ao(mo, kX[('D', wd)])
 
+                if wb < 0:
+                    kb = -kb.conj().T
+                if wc < 0:
+                    kc = -kc.conj().T
+                if wd < 0:
+                    kd = -kd.conj().T
+
                 # create the first order single indexed densiteies #
 
                 Db = self.transform_dens(kb, D0, S)
@@ -603,10 +700,6 @@ class CubicResponseDriver:
                 Ddbc = self.transform_dens(kd, Dbc, S)
                 Ddcb = self.transform_dens(kd, Dcb, S)
 
-                density_list.append(Db)
-                density_list.append(Dc)
-                density_list.append(Dd)
-
                 density_list.append(Dbc)
                 density_list.append(Dcb)
                 density_list.append(Dbd)
@@ -622,6 +715,74 @@ class CubicResponseDriver:
                 density_list.append(Ddcb)
 
         return density_list
+
+
+    def get_densities_ii(self, freqpairs, kX, k_xy, S, D0, mo):
+        """
+        Computes the  densities needed for the  Fock
+        matrics 
+
+        :param wi:
+            A list of the frequencies
+        :param kX:
+            A dictonary with all the first-order response matrices
+        :param S:
+            The overlap matrix
+        :param D0:
+            The SCF density matrix in AO basis
+        :param mo:
+            A matrix containing the MO coefficents
+
+        :return:
+            A list of tranformed compounded densities
+        """
+
+        density_list = []
+
+        for (wb,wc,wd) in freqpairs:
+
+                # convert response matrix to ao basis #
+
+                kb = self.mo2ao(mo, kX[('B', wb)])
+                kc = self.mo2ao(mo, kX[('C', wc)])
+                kd = self.mo2ao(mo, kX[('D', wd)])
+
+                kbc = self.mo2ao(mo, k_xy[(('BC', wb,wc),wb+wc)])
+                kbd = self.mo2ao(mo, k_xy[(('BD', wb,wd),wb+wd)])
+                kcd = self.mo2ao(mo, k_xy[(('CD', wc,wd),wc+wd)])
+
+                # create the first order single indexed densiteies #
+
+                Db = self.transform_dens(kb, D0, S)
+                Dc = self.transform_dens(kc, D0, S)
+                Dd = self.transform_dens(kd, D0, S)
+
+                # create the second-order two indexed densities #
+
+                Dbc = self.transform_dens(kbc, D0, S)
+                Dbd = self.transform_dens(kbd, D0, S)
+                Dcd = self.transform_dens(kcd, D0, S)
+
+                # create the second-order three indexed densities #
+
+                Db_cd = self.transform_dens(kb, Dcd, S)
+                Dcd_b = self.transform_dens(kcd, Db, S)
+
+                Dc_bd = self.transform_dens(kc, Dbd, S)
+                Dbd_c = self.transform_dens(kbd, Dc, S)
+
+                Dd_bc = self.transform_dens(kd, Dbc, S)
+                Dbc_d = self.transform_dens(kbc, Dd, S)
+
+                density_list.append(Db_cd)
+                density_list.append(Dcd_b)
+                density_list.append(Dc_bd)
+                density_list.append(Dbd_c)
+                density_list.append(Dd_bc)
+                density_list.append(Dbc_d)
+
+        return density_list
+
 
     def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis):
         """
@@ -648,9 +809,6 @@ class CubicResponseDriver:
             self.print_fock_header()
 
         keys = [
-            'Fb',
-            'Fc',
-            'Fd',
             'Fbc',
             'Fcb',
             'Fbd',
@@ -707,9 +865,86 @@ class CubicResponseDriver:
 
         return focks
 
-    def get_e4(self, wi, kX, fo, nocc, norb,D0):
+    def get_fock_dict_ii(self, wi, density_list, F0, mo, molecule, ao_basis):
         """
-        Contracts E[4]
+        Computes the Fock matrices for a quadratic response function
+
+        :param wi:
+            A list of the frequencies
+        :param density_list:
+            A list of tranformed compounded densities
+        :param F0:
+            The Fock matrix in MO basis
+        :param mo:
+            A matrix containing the MO coefficents
+        :param molecule:
+            The molecule
+        :param ao_basis:
+            The AO basis set
+
+        :return:
+            A dictonary of compounded first-order Fock-matrices
+        """
+
+        if self.rank == mpi_master():
+            self.print_fock_header()
+
+        keys = [
+            'Fb_cd',
+            'Fcd_b',
+            'Fc_bd',
+            'Fbd_c',
+            'Fd_bc',
+            'Fbc_d',
+        ]
+
+        if self.checkpoint_file is not None:
+            fock_file = str(
+                Path(self.checkpoint_file).with_suffix('.crf_fock_2_full.h5'))
+        else:
+            fock_file = None
+
+        if self.restart:
+            if self.rank == mpi_master():
+                self.restart = check_distributed_focks(fock_file, keys, wi)
+            self.restart = self.comm.bcast(self.restart, mpi_master())
+
+        if self.restart:
+            focks = read_distributed_focks(fock_file, keys, wi, self.comm,
+                                           self.ostream)
+            focks['F0'] = F0
+            return focks
+
+        time_start_fock = time.time()
+        dist_focks = self.get_fock(mo, density_list, molecule, ao_basis,
+                                     'real_and_imag')
+        time_end_fock = time.time()
+
+        total_time_fock = time_end_fock - time_start_fock
+        self.print_fock_time(total_time_fock)
+        
+        focks = {'F0': F0}
+        for key in keys:
+            focks[key] = {}
+
+        fock_index = 0
+        for (wb,wc,wd) in wi:
+            for key in keys:
+                focks[key][(wb,wc,wd)] = DistributedArray(dist_focks.data[:, fock_index],
+                                                 self.comm,
+                                                 distribute=False)
+                fock_index += 1
+
+        write_distributed_focks(fock_file, focks, keys, wi, self.comm,
+                                self.ostream)
+
+        return focks
+
+
+
+    def get_esr4(self, wi, kX, fo,fo2, nocc, norb,D0):
+        """
+        Contracts E[4], S[4], R[4]
 
         :param wi:
             A list of freqs
@@ -727,8 +962,7 @@ class CubicResponseDriver:
             The total number of orbitals
 
         :return:
-            A dictonary of compounded E[3] tensors for the isotropic cubic
-            response function for TPA
+            A dictonary of E[4], S[4], R[4] tensor contractions 
         """
 
         e4_vec = {}
@@ -738,9 +972,9 @@ class CubicResponseDriver:
         for (wb,wc,wd) in wi:
 
             vec_pack = np.array([
-                fo['Fb'][wb].data,
-                fo['Fc'][wb].data,
-                fo['Fd'][wb].data,
+                fo2[('B', wb)].data,
+                fo2[('C', wc)].data,
+                fo2[('D', wd)].data,
                 fo['Fbc'][wb].data,
                 fo['Fcb'][wb].data,
                 fo['Fbd'][wb].data,
@@ -764,6 +998,17 @@ class CubicResponseDriver:
 
             (fb, fc, fd, fbc, fcb,fbd,fdb,fcd,fdc,fbcd,fbdc,fcbd,fcdb,fdbc,fdcb) = vec_pack
 
+            fb = np.conjugate(fb).T
+            fc = np.conjugate(fc).T
+            fd = np.conjugate(fd).T
+
+            if wb < 0:
+                fb = np.conjugate(fb).T
+            if wc < 0:
+                fc = np.conjugate(fc).T
+            if wd < 0:
+                fd = np.conjugate(fd).T
+
             F0_a = fo['F0']
 
             # Response
@@ -774,6 +1019,13 @@ class CubicResponseDriver:
 
             kd = kX[('D', wd)].T
 
+            if wb < 0:
+                kb = -kb.conj().T
+            if wc < 0:
+                kc = -kc.conj().T
+            if wd < 0:
+                kd = -kd.conj().T
+
             zi_bcd = self.zi(kb, kc, kd, fc, fd, fcd, fdc, F0_a)
 
             zi_cbd = self.zi(kc, kb, kd, fb, fd, fbd, fdb, F0_a)
@@ -782,14 +1034,19 @@ class CubicResponseDriver:
 
             e4fock = (zi_bcd + zi_cbd + zi_dbc) + ( fbcd + fbdc + fcbd + fcdb + fdbc + fdcb )
 
-
             e4vec = 2./ 6 * self.anti_sym(LinearSolver.lrmat2vec(e4fock.T, nocc, norb))
-
 
             ka = kX[('A', (wb+wc+wd))]
             kb = kX[('B', wb)]
             kc = kX[('C', wc)]
             kd = kX[('D', wd)]
+
+            if wb < 0:
+                kb = -kb.conj().T
+            if wc < 0:
+                kc = -kc.conj().T
+            if wd < 0:
+                kd = -kd.conj().T
 
             s4_term =  wb * self.s4(kb, kc, kd, D0, nocc, norb)
 
@@ -812,6 +1069,13 @@ class CubicResponseDriver:
 
             Nd_h = self.flip_xy(Nd)
 
+            if wb < 0:
+                Nb_h = self.flip_yz(Nb_h)
+            if wc < 0:
+                Nc_h = self.flip_yz(Nc_h)
+            if wd < 0:
+                Nd_h = self.flip_yz(Nd_h)
+
             r4_term = - 1j * self.damping * np.dot(Nd_h, self.s4_for_r4(ka.T, kb, kc, D0, nocc, norb))
 
             r4_term += -1j * self.damping * np.dot(Nc_h, self.s4_for_r4(ka.T, kb, kd, D0, nocc, norb))
@@ -831,6 +1095,192 @@ class CubicResponseDriver:
             r4_vec.update({wb: r4_term})
 
         return e4_vec, s4_vec, r4_vec
+
+    def flip_yz(self, X):
+        """
+        This method takes a first-order response vector with a given sign of
+        the frequency and returns the first-order response vector with reversed
+        frequency argument.
+
+        :param X:
+            A response vector N(ω,x) = (Z,-Y^*)
+
+        :return:
+            A response vector with reversed optical frequency N(-ω,x) =
+            (Y,-Z^*)
+        """
+
+        if X.ndim == 1:
+            new_yz = np.zeros_like(X)
+            half_len = X.shape[0] // 2
+            new_yz[:half_len] = -X.real[half_len:] + 1j * X.imag[half_len:]
+            new_yz[half_len:] = -X.real[:half_len] + 1j * X.imag[:half_len]
+            return new_yz
+
+        return None
+
+    def get_nxy(self, wi, kX, fo,fo2, nocc, norb,d_a_mo,X,molecule,ao_basis,scf_tensors):
+        """
+        Computed NXY
+
+        :param wi:
+            A list of freqs
+        :param kX:
+            A dict of the single index response matricies
+        :param kXY:
+            A dict of the two index response matrices
+        :param fo:
+            A dictonary of transformed Fock matricies from fock_dict
+        :param fo2:
+            A dictonarty of transfromed Fock matricies from fock_dict_two
+        :param nocc:
+            The number of occupied orbitals
+        :param norb:
+            The total number of orbitals
+
+        :return:
+            A dictonary of E[4], S[4], R[4] tensor contractions 
+        """
+
+        BC = {}
+        CD = {}
+        BD = {}
+
+        XY = {}
+
+        for (wb,wc,wd) in wi:
+
+            vec_pack = np.array([
+                fo2[('B', wb)].data,
+                fo2[('C', wc)].data,
+                fo2[('D', wd)].data,
+                fo['Fbc'][wb].data,
+                fo['Fcb'][wb].data,
+                fo['Fbd'][wb].data,
+                fo['Fdb'][wb].data,
+                fo['Fcd'][wb].data,
+                fo['Fdc'][wb].data,
+                fo['Fbcd'][wb].data,
+                fo['Fbdc'][wb].data,
+                fo['Fcbd'][wb].data,
+                fo['Fcdb'][wb].data,
+                fo['Fdbc'][wb].data,
+                fo['Fdcb'][wb].data,
+            ]).T.copy()
+
+            vec_pack = self.collect_vectors_in_columns(vec_pack)
+
+            if self.rank != mpi_master():
+                continue
+
+            vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
+
+            (fb, fc, fd, fbc, fcb,fbd,fdb,fcd,fdc,fbcd,fbdc,fcbd,fcdb,fdbc,fdcb) = vec_pack
+
+            fb = np.conjugate(fb).T
+            fc = np.conjugate(fc).T
+            fd = np.conjugate(fd).T
+
+            F0_a = fo['F0']
+
+            # Response
+
+            kb = kX[('B', wb)].T
+
+            kc = kX[('C', wc)].T
+
+            kd = kX[('D', wd)].T
+
+            B = X['x']
+            C = X['y']
+            D = X['z']
+
+            Nb = (LinearSolver.lrmat2vec(kX[('B',wb)].real, nocc, norb) +
+                1j * LinearSolver.lrmat2vec(kX[('B',wb)].imag, nocc, norb))
+
+            Nc = (LinearSolver.lrmat2vec(kX[('C',wc)].real, nocc, norb) +
+                1j * LinearSolver.lrmat2vec(kX[('C',wc)].imag, nocc, norb))
+            
+            Nd = (LinearSolver.lrmat2vec(kX[('D',wd)].real, nocc, norb) +
+                1j * LinearSolver.lrmat2vec(kX[('D',wd)].imag, nocc, norb))
+            
+
+        # BC
+
+            xi = self.xi(kb, kc, fb, fc, F0_a)
+
+            e3fock = xi.T + (0.5 * fbc + 0.5*fcb).T
+            E3NbNc = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
+
+            C2Nb = self.x2_contract(kX[('B',wb)], C, d_a_mo, nocc, norb)
+            B2Nc = self.x2_contract(kX[('C',wc)], B, d_a_mo, nocc, norb)
+
+            BC.update({(('BC',wb,wc),wb+wc): (E3NbNc - C2Nb  - B2Nc)})
+
+        
+        # BD
+
+            xi = self.xi(kb, kd, fb, fd, F0_a)
+
+            e3fock = xi.T + (0.5 * fbd + 0.5*fdb).T
+            E3NbNd = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
+
+            D2Nb = self.x2_contract(kX[('B',wb)], D, d_a_mo, nocc, norb)
+            B2Nd = self.x2_contract(kX[('D',wd)], B, d_a_mo, nocc, norb)
+
+            BD.update({ (('BD',wb,wd),wb+wd): (E3NbNd - D2Nb  - B2Nd)})
+
+        # CD
+
+            xi = self.xi(kc, kd, fc, fd, F0_a)
+
+            e3fock = xi.T + (0.5 * fcd + 0.5*fdc).T
+            E3NcNd = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
+
+            C2Nd = self.x2_contract(kX[('D',wd)], C, d_a_mo, nocc, norb)
+            D2Nc = self.x2_contract(kX[('C',wc)], D, d_a_mo, nocc, norb)
+
+            CD.update({ (('CD',wc,wd),wc+wd): (E3NcNd - C2Nd  - D2Nc)})
+
+            XY.update(BC)
+            XY.update(BD)
+            XY.update(CD)
+
+
+        Nxy_drv = ComplexResponse(self.comm, self.ostream)
+
+        Nxy_drv.update_settings({
+            'damping': self.damping,
+            'lindep_thresh': self.lindep_thresh,
+            'conv_thresh': self.conv_thresh,
+            'max_iter': self.max_iter,
+            'eri_thresh': self.eri_thresh,
+            'qq_type': self.qq_type,
+        })
+
+        Nxy_drv.timing = self.timing
+        Nxy_drv.memory_profiling = self.memory_profiling
+        Nxy_drv.batch_size = self.batch_size
+        Nxy_drv.restart = self.restart
+        Nxy_drv.program_start_time = self.program_start_time
+        Nxy_drv.maximum_hours = self.maximum_hours
+        if self.checkpoint_file is not None:
+            Nxy_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
+            Nxy_drv.checkpoint_file += '_crf_2.h5'
+
+        Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_tensors, XY)
+
+        kX = {}
+        Focks = {}
+
+        kX = Nxy_results['kappas']
+
+        Focks = Nxy_results['focks']
+
+
+        return kX,Focks
+
+
 
     def collect_vectors_in_columns(self, sendbuf):
         """
@@ -1000,6 +1450,35 @@ class CubicResponseDriver:
 
         return np.matmul(A, B) - np.matmul(B, A)
 
+    def x3_contract(self, k1, k2, X, D, nocc, norb):
+        """
+        Contracts the generalized dipole gradient tensor of rank 3 with two
+        first-order response matrices. X[3]N1N2 = (1/2)[[k2,[k1,X]],D.T]
+
+        :param: k1:
+            First-order response matrix
+        :param: k2:
+            First-order response matrix
+        :param X:
+            Dipole intergral matrix
+        :param D:
+            Density matrix
+        :param nocc:
+            Number of occupied orbitals
+        :param norb:
+            Number of total orbtials
+
+        :return:
+            Returns a matrix
+        """
+
+        X3NxNy = self.commut(self.commut(k2, self.commut(k1, X)), D.T)
+        X3NxNy_c = (LinearSolver.lrmat2vec(X3NxNy.real, nocc, norb) +
+                    1j * LinearSolver.lrmat2vec(X3NxNy.imag, nocc, norb))
+        return (1. / 2) * X3NxNy_c
+
+
+
     def x2_contract(self, k, X, D, nocc, norb):
         """
         Contracts the generalized dipole gradient tensor of rank 2 with a
@@ -1053,30 +1532,6 @@ class CubicResponseDriver:
                   1j * LinearSolver.lrmat2vec(ANx.imag, nocc, norb))
         return -(1. / 2) * A2Nx_c
 
-    def xi(self, kA, kB, Fa, Fb, F0):
-        """
-        Returns a matrix used for the E[4] contraction
-
-        :param kA:
-            First-order response matrix
-        :param kB:
-            First-order response matrix
-        :param Fa:
-            First-order perturbed Fock matrix
-        :param Fb:
-            First-order perturbed Fock matrix
-        :param F0:
-            SCF Fock matrix
-
-        :return:
-            Returns a matrix
-        """
-
-        return 0.5 * (self.commut(kA,
-                                  self.commut(kB, F0) + 2 * Fb) +
-                      self.commut(kB,
-                                  self.commut(kA, F0) + 2 * Fa))
-
     
     def zi(self, kB, kC, kD, Fc, Fd, Fbc, Fcb, F0):
         """
@@ -1121,6 +1576,30 @@ class CubicResponseDriver:
             return new_vec
 
         return None
+
+    def xi(self, kA, kB, Fa, Fb, F0):
+        """
+
+        :param kA:
+            First-order response matrix
+        :param kB:
+            First-order response matrix
+        :param Fa:
+            First-order perturbed Fock matrix
+        :param Fb:
+            First-order perturbed Fock matrix
+        :param F0:
+            SCF Fock matrix
+
+        :return:
+            Returns a matrix
+        """
+
+        return 0.5 * (self.commut(kA,
+                                  self.commut(kB, F0) + 2 * Fb) +
+                      self.commut(kB,
+                                  self.commut(kA, F0) + 2 * Fa))
+
 
     def get_fock(self, mo, D, molecule, ao_basis, fock_flag):
         """

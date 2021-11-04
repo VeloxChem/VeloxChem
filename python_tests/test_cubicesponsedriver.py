@@ -24,7 +24,7 @@ class TestCrf(unittest.TestCase):
         H   .7586020000 0.0  -.5042840000
         H   .7586020000  0.0   .5042840000"""
 
-        basis_set_label = '6-31G'
+        basis_set_label = 'aug-cc-pVDZ'
 
         scf_settings = {'conv_thresh': 1.0e-6}
 
@@ -53,54 +53,42 @@ class TestCrf(unittest.TestCase):
 
         method_settings = {}
 
-        rsp_settings = {'conv_thresh': 1.0e-4, 'b_frequencies': [0.2],'c_frequencies': [0.2],'damping': 0.1,'a_component':'x','b_component':'x','c_component':'x'}
+        rsp_settings = {'conv_thresh': 1.0e-8, 'b_frequencies': [0.2], 
+                        'c_frequencies': [0.2], 'd_frequencies': [0.2],
+                        'a_component': 'y','b_component': 'y','c_component': 'z',
+                        'd_component': 'z', 'damping': 0.1}
 
         crf_prop = CubicResponseDriver(comm, ostream) 
 
         crf_prop.update_settings(rsp_settings, method_settings)
 
-        crf_result_xxx = crf_prop.compute(molecule, ao_basis, scf_tensors)
-
-        rsp_settings = {'conv_thresh': 1.0e-4, 'b_frequencies': [0.2],'c_frequencies': [0.2],'damping': 0.1,'a_component':'z','b_component':'z','c_component':'x'}
-
-        crf_prop.update_settings(rsp_settings, method_settings)
-
-        crf_result_zzx = crf_prop.compute(molecule, ao_basis, scf_tensors)
-
-        rsp_settings = {'conv_thresh': 1.0e-4, 'b_frequencies': [0.2],'c_frequencies': [0.2],'damping': 0.1,'a_component':'y','b_component':'y','c_component':'x'}
-
-        crf_prop.update_settings(rsp_settings, method_settings)
-
-        crf_result_yyx = crf_prop.compute(molecule, ao_basis, scf_tensors)
+        crf_result_yyzz = crf_prop.compute(molecule, ao_basis, scf_tensors)
         
-        # x-component 
+        # yyzz-component 
 
-        self.assertTrue(abs(crf_result_xxx[0.2].real - ref_result['xxx'].real) < 1.0e-4)
+        self.assertTrue(abs(crf_result_yyzz[('T4',0.2)].real - ref_result['T4'].real) < 1.0e-4)
 
-        self.assertTrue(abs(crf_result_xxx[0.2].imag - ref_result['xxx'].imag) < 1.0e-4)
+        self.assertTrue(abs(crf_result_yyzz[('T4',0.2)].imag - ref_result['T4'].imag) < 1.0e-4)
         
-        # y-component 
-        
-        self.assertTrue(abs(crf_result_yyx[0.2].real - ref_result['yyx'].real) < 1.0e-4)
+        self.assertTrue(abs(crf_result_yyzz[('X3',0.2)].real - ref_result['X3'].real) < 1.0e-4)
 
-        self.assertTrue(abs(crf_result_yyx[0.2].imag - ref_result['yyx'].imag) < 1.0e-4)
+        self.assertTrue(abs(crf_result_yyzz[('X3',0.2)].imag - ref_result['X3'].imag) < 1.0e-4)
 
-        # z-component 
-        
-        self.assertTrue(abs(crf_result_zzx[0.2].real - ref_result['zzx'].real) < 1.0e-4)
+        self.assertTrue(abs(crf_result_yyzz[('A3',0.2)].real - ref_result['A3'].real) < 1.0e-4)
 
-        self.assertTrue(abs(crf_result_zzx[0.2].imag - ref_result['zzx'].imag) < 1.0e-4)
-
+        self.assertTrue(abs(crf_result_yyzz[('A3',0.2)].imag - ref_result['A3'].imag) < 1.0e-4)
 
     def test_crf(self):
 
         w = 0.2
 
+        # YYZZ component DALTON aug-cc-pVDZ
         ref_result = { 
-            'xxx': 29.16175897 + 28.05788008j,
-            'zzx': 27.37219617 + 32.23620966j,
-            'yyx': -5.260931+ 2.081018j,
+            'T4': -2.65974591 + 11.26931601j,
+             'X3': -3.53089306 + 17.45460417j,
+             'A3': 10.88586429 + 3.80260981j
         }
+
 
         self.run_crf(w, ref_result)
 
