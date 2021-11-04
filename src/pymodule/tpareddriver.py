@@ -105,9 +105,9 @@ class TpaReducedDriver(TpaDriver):
 
         for w in wi:
             # convert response matrix to ao basis #
-            kx = self.mo2ao(mo, kX['Nb'][('x', w)]).T
-            ky = self.mo2ao(mo, kX['Nb'][('y', w)]).T
-            kz = self.mo2ao(mo, kX['Nb'][('z', w)]).T
+            kx = self.mo2ao(mo, kX['Nb'][('x', w)])
+            ky = self.mo2ao(mo, kX['Nb'][('y', w)])
+            kz = self.mo2ao(mo, kX['Nb'][('z', w)])
 
             # create the first order single indexed densiteies #
             Dx = self.transform_dens(kx, D0, S)
@@ -196,7 +196,7 @@ class TpaReducedDriver(TpaDriver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
+        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
                                      'real')
         time_end_fock = time.time()
 
@@ -428,17 +428,17 @@ class TpaReducedDriver(TpaDriver):
         density_list = []
 
         for w in wi:
-            k_sig_xx = self.mo2ao(mo, kXY[(('N_sig_xx', w), 2 * w)]).T
-            k_sig_yy = self.mo2ao(mo, kXY[(('N_sig_yy', w), 2 * w)]).T
-            k_sig_zz = self.mo2ao(mo, kXY[(('N_sig_zz', w), 2 * w)]).T
+            k_sig_xx = self.mo2ao(mo, kXY[(('N_sig_xx', w), 2 * w)])
+            k_sig_yy = self.mo2ao(mo, kXY[(('N_sig_yy', w), 2 * w)])
+            k_sig_zz = self.mo2ao(mo, kXY[(('N_sig_zz', w), 2 * w)])
 
-            k_sig_xy = self.mo2ao(mo, kXY[(('N_sig_xy', w), 2 * w)]).T
-            k_sig_xz = self.mo2ao(mo, kXY[(('N_sig_xz', w), 2 * w)]).T
-            k_sig_yz = self.mo2ao(mo, kXY[(('N_sig_yz', w), 2 * w)]).T
+            k_sig_xy = self.mo2ao(mo, kXY[(('N_sig_xy', w), 2 * w)])
+            k_sig_xz = self.mo2ao(mo, kXY[(('N_sig_xz', w), 2 * w)])
+            k_sig_yz = self.mo2ao(mo, kXY[(('N_sig_yz', w), 2 * w)])
 
-            kx = self.mo2ao(mo, kX['Nb'][('x', w)]).T
-            ky = self.mo2ao(mo, kX['Nb'][('y', w)]).T
-            kz = self.mo2ao(mo, kX['Nb'][('z', w)]).T
+            kx = self.mo2ao(mo, kX['Nb'][('x', w)])
+            ky = self.mo2ao(mo, kX['Nb'][('y', w)])
+            kz = self.mo2ao(mo, kX['Nb'][('z', w)])
 
             kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
             ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
@@ -534,7 +534,7 @@ class TpaReducedDriver(TpaDriver):
                                           self.ostream)
 
         time_start_fock = time.time()
-        dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
+        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
                                      'real_and_imag')
         time_end_fock = time.time()
 

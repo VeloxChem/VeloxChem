@@ -108,9 +108,9 @@ class TpaFullDriver(TpaDriver):
 
             # convert response matrix to ao basis #
 
-            kx = self.mo2ao(mo, kX['Nb'][('x', w)]).T
-            ky = self.mo2ao(mo, kX['Nb'][('y', w)]).T
-            kz = self.mo2ao(mo, kX['Nb'][('z', w)]).T
+            kx = self.mo2ao(mo, kX['Nb'][('x', w)])
+            ky = self.mo2ao(mo, kX['Nb'][('y', w)])
+            kz = self.mo2ao(mo, kX['Nb'][('z', w)])
 
             kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
             ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
@@ -277,7 +277,7 @@ class TpaFullDriver(TpaDriver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
+        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
                                      'real_and_imag')
         time_end_fock = time.time()
 
@@ -684,6 +684,8 @@ class TpaFullDriver(TpaDriver):
             x2_yy_ = self.x2_contract(ky_.T, mu_y, d_a_mo, nocc, norb)
             x2_zz_ = self.x2_contract(kz_.T, mu_z, d_a_mo, nocc, norb)
 
+
+
             key = (('N_lamtau_xx', w), 0)
             mat = (6 * xi_xx + 2 * xi_yy + 2 * xi_zz + 0.5 * f_lamtau_xx).T
             xy_dict[key] = self.anti_sym(
@@ -763,25 +765,25 @@ class TpaFullDriver(TpaDriver):
         density_list = []
 
         for w in wi:
-            k_sig_xx = self.mo2ao(mo, kXY[(('N_sig_xx', w), 2 * w)]).T
-            k_sig_yy = self.mo2ao(mo, kXY[(('N_sig_yy', w), 2 * w)]).T
-            k_sig_zz = self.mo2ao(mo, kXY[(('N_sig_zz', w), 2 * w)]).T
+            k_sig_xx = self.mo2ao(mo, kXY[(('N_sig_xx', w), 2 * w)])
+            k_sig_yy = self.mo2ao(mo, kXY[(('N_sig_yy', w), 2 * w)])
+            k_sig_zz = self.mo2ao(mo, kXY[(('N_sig_zz', w), 2 * w)])
 
-            k_sig_xy = self.mo2ao(mo, kXY[(('N_sig_xy', w), 2 * w)]).T
-            k_sig_xz = self.mo2ao(mo, kXY[(('N_sig_xz', w), 2 * w)]).T
-            k_sig_yz = self.mo2ao(mo, kXY[(('N_sig_yz', w), 2 * w)]).T
+            k_sig_xy = self.mo2ao(mo, kXY[(('N_sig_xy', w), 2 * w)])
+            k_sig_xz = self.mo2ao(mo, kXY[(('N_sig_xz', w), 2 * w)])
+            k_sig_yz = self.mo2ao(mo, kXY[(('N_sig_yz', w), 2 * w)])
 
-            k_lamtau_xx = self.mo2ao(mo, kXY[(('N_lamtau_xx', w), 0)]).T
-            k_lamtau_yy = self.mo2ao(mo, kXY[(('N_lamtau_yy', w), 0)]).T
-            k_lamtau_zz = self.mo2ao(mo, kXY[(('N_lamtau_zz', w), 0)]).T
+            k_lamtau_xx = self.mo2ao(mo, kXY[(('N_lamtau_xx', w), 0)])
+            k_lamtau_yy = self.mo2ao(mo, kXY[(('N_lamtau_yy', w), 0)])
+            k_lamtau_zz = self.mo2ao(mo, kXY[(('N_lamtau_zz', w), 0)])
 
-            k_lamtau_xy = self.mo2ao(mo, kXY[(('N_lamtau_xy', w), 0)]).T
-            k_lamtau_xz = self.mo2ao(mo, kXY[(('N_lamtau_xz', w), 0)]).T
-            k_lamtau_yz = self.mo2ao(mo, kXY[(('N_lamtau_yz', w), 0)]).T
+            k_lamtau_xy = self.mo2ao(mo, kXY[(('N_lamtau_xy', w), 0)])
+            k_lamtau_xz = self.mo2ao(mo, kXY[(('N_lamtau_xz', w), 0)])
+            k_lamtau_yz = self.mo2ao(mo, kXY[(('N_lamtau_yz', w), 0)])
 
-            kx = self.mo2ao(mo, kX['Nb'][('x', w)]).T
-            ky = self.mo2ao(mo, kX['Nb'][('y', w)]).T
-            kz = self.mo2ao(mo, kX['Nb'][('z', w)]).T
+            kx = self.mo2ao(mo, kX['Nb'][('x', w)])
+            ky = self.mo2ao(mo, kX['Nb'][('y', w)])
+            kz = self.mo2ao(mo, kX['Nb'][('z', w)])
 
             kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
             ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
@@ -868,7 +870,7 @@ class TpaFullDriver(TpaDriver):
 
             Dz += self.transform_dens(kz, D_lamtau_zz, S)
             Dz += self.transform_dens(k_lamtau_zz, Dc_z, S)
-
+            
             density_list.append(Dx)
             density_list.append(Dy)
             density_list.append(Dz)
@@ -916,7 +918,7 @@ class TpaFullDriver(TpaDriver):
                                           self.ostream)
 
         time_start_fock = time.time()
-        dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
+        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
                                      'real_and_imag')
         time_end_fock = time.time()
 
@@ -1600,81 +1602,7 @@ class TpaFullDriver(TpaDriver):
             'r4': r4_term,
         }
 
-    def s4(self, k1, k2, k3, D, nocc, norb):
-        """
-        Returns the contraction of S[4] for S[4] dict
 
-        :param k1:
-            A response matrix
-        :param k2:
-            A response matrix
-        :param k3:
-            A response matrix
-        :param D:
-            A density matrix
-        :param nocc:
-            The number of occupied orbtials
-        :param norb:
-            The number of total orbitals
-
-        :return:
-            The contraction of S[4] for S[4] dict
-        """
-
-        S4_123 = self.s4_contract(k1, k2, k3, D, nocc, norb)
-        S4_132 = self.s4_contract(k1, k3, k2, D, nocc, norb)
-
-        return S4_123 + S4_132
-
-    def s4_contract(self, k1, k2, k3, D, nocc, norb):
-        """
-        Returns the contraction of S[4] for S[4] dict
-
-        :param k1:
-            A response matrix
-        :param k2:
-            A response matrix
-        :param k3:
-            A response matrix
-        :param D:
-            A density matrix
-        :param nocc:
-            The number of occupied orbtials
-        :param norb:
-            The number of total orbitals
-
-        :return:
-            The contraction of S[4] for S[4] dict
-        """
-
-        S4N1N2N3 = self.commut(self.commut(k3, self.commut(k2, k1)), D.T)
-        S4N1N2N3_c = (LinearSolver.lrmat2vec(S4N1N2N3.real, nocc, norb) +
-                      1j * LinearSolver.lrmat2vec(S4N1N2N3.imag, nocc, norb))
-        return (2. / 6) * S4N1N2N3_c
-
-    def s4_for_r4(self, k1, k2, k3, D, nocc, norb):
-        """
-        Returns the contraction of S[4] for the contraction of R[4]
-
-        :param k1:
-            A response matrix
-        :param k2:
-            A response matrix
-        :param k3:
-            A response matrix
-        :param D:
-            A density matrix
-        :param nocc:
-            The number of occupied orbtials
-        :param norb:
-            The number of total orbitals
-
-        :return:
-            The contraction of S[4] for the contraction of R[4]
-        """
-
-        S4_123 = self.s4_contract(k1, k2, k3, D, nocc, norb)
-        return S4_123
 
     def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
         """

@@ -1,0 +1,1032 @@
+#
+#                           VELOXCHEM 1.0-RC2
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
+import numpy as np
+import time as tm
+import sys
+
+from .veloxchemlib import ElectronRepulsionIntegralsDriver
+from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .veloxchemlib import LinearMomentumIntegralsDriver
+from .veloxchemlib import AngularMomentumIntegralsDriver
+from .veloxchemlib import AODensityMatrix
+from .veloxchemlib import AOFockMatrix
+from .veloxchemlib import DenseMatrix
+from .veloxchemlib import GridDriver
+from .veloxchemlib import XCFunctional
+from .veloxchemlib import XCIntegrator
+from .veloxchemlib import MolecularGrid
+from .veloxchemlib import mpi_master
+from .veloxchemlib import denmat
+from .veloxchemlib import fockmat
+from .veloxchemlib import molorb
+from .veloxchemlib import parse_xc_func
+from .distributedarray import DistributedArray
+from .subcommunicators import SubCommunicators
+from .molecularorbitals import MolecularOrbitals
+from .visualizationdriver import VisualizationDriver
+from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
+from .qqscheme import get_qq_scheme
+from .qqscheme import get_qq_type
+from .checkpoint import write_rsp_hdf5
+from .batchsize import get_batch_size
+from .batchsize import get_number_of_batches
+from .linearsolver import LinearSolver
+from mpi4py import MPI
+
+class NonLinearSolver:
+    """
+    Implements nonlinear solver.
+
+    :param comm:
+        The MPI communicator.
+    :param use_split_comm:
+        The flag for using split communicators.
+
+    Instance variables
+        - eri_thresh: The electron repulsion integrals screening threshold.
+        - qq_type: The electron repulsion integrals screening scheme.
+        - batch_size: The batch size for computation of Fock matrices.
+        - dft: The flag for running DFT.
+        - grid_level: The accuracy level of DFT grid.
+        - xcfun: The XC functional.
+        - pe: The flag for running polarizable embedding calculation.
+        - pe_options: The dictionary with options for polarizable embedding.
+        - use_split_comm: The flag for using split communicators.
+        - split_comm_ratio: The list of ratios for split communicators.
+        - electric_field: The static electric field.
+        - conv_thresh: The convergence threshold for the solver.
+        - max_iter: The maximum number of solver iterations.
+        - cur_iter: Index of the current iteration.
+        - small_thresh: The norm threshold for a vector to be considered a zero
+          vector.
+        - lindep_thresh: The threshold for removing linear dependence in the
+          trial vectors.
+        - is_converged: The flag for convergence.
+        - comm: The MPI communicator.
+        - rank: The MPI rank.
+        - nodes: Number of MPI processes.
+        - ostream: The output stream.
+        - restart: The flag for restarting from checkpoint file.
+        - checkpoint_file: The name of checkpoint file.
+        - program_start_time: The start time of the program.
+        - maximum_hours: The timelimit in hours.
+        - timing: The flag for printing timing information.
+        - profiling: The flag for printing profiling information.
+        - memory_profiling: The flag for printing memory usage.
+        - memory_tracing: The flag for tracing memory allocation.
+        - filename: The filename.
+        - dist_bger: The distributed gerade trial vectors.
+        - dist_bung: The distributed ungerade trial vectors.
+        - dist_e2bger: The distributed gerade sigma vectors.
+        - dist_e2bung: The distributed ungerade sigma vectors.
+        - nonlinear: The flag for running linear solver in nonlinear response.
+        - dist_fock_ger: The distributed gerade Fock matrices in MO.
+        - dist_fock_ung: The distributed ungerade Fock matrices in MO.
+    """
+
+    def __init__(self, comm, ostream):
+        """
+        Initializes linear solver to default setup.
+        """
+
+        # ERI settings
+        self.eri_thresh = 1.0e-15
+        self.qq_type = 'QQ_DEN'
+        self.batch_size = None
+
+        # dft
+        self.dft = False
+        self.grid_level = 4
+        self.xcfun = XCFunctional()
+
+        # polarizable embedding
+        self.pe = False
+        self.pe_options = {}
+
+        # split communicators
+        self.use_split_comm = False
+        self.split_comm_ratio = None
+
+        # static electric field
+        self.electric_field = None
+
+        # solver setup
+        self.conv_thresh = 1.0e-4
+        self.max_iter = 150
+        self.cur_iter = 0
+        self.small_thresh = 1.0e-10
+        self.lindep_thresh = 1.0e-6
+        self.is_converged = False
+
+        # mpi information
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+
+        # output stream
+        self.ostream = ostream
+
+        # restart information
+        self.restart = True
+        self.checkpoint_file = None
+
+        # information for graceful exit
+        self.program_start_time = None
+        self.maximum_hours = None
+
+        # timing and profiling
+        self.timing = False
+        self.profiling = False
+        self.memory_profiling = False
+        self.memory_tracing = False
+
+        # filename
+        self.filename = None
+
+        self.dist_bger = None
+        self.dist_bung = None
+        self.dist_e2bger = None
+        self.dist_e2bung = None
+
+        self.nonlinear = False
+        self.dist_fock_ger = None
+        self.dist_fock_ung = None
+
+    def update_settings(self, rsp_dict, method_dict=None):
+        """
+        Updates response and method settings in linear solver.
+
+        :param rsp_dict:
+            The dictionary of response dict.
+        :param method_dict:
+            The dictionary of method settings.
+        """
+
+        if method_dict is None:
+            method_dict = {}
+
+        rsp_keywords = {
+            'b_frequencies': 'seq_range',
+            'c_frequencies': 'seq_range',
+            'd_frequencies': 'seq_range',
+            'a_component': 'str',
+            'b_component': 'str',
+            'c_component': 'str',
+            'd_component': 'str',
+            'damping': 'float',
+            'eri_thresh': 'float',
+            'qq_type': 'str_upper',
+            'batch_size': 'int',
+            'max_iter': 'int',
+            'conv_thresh': 'float',
+            'lindep_thresh': 'float',
+            'restart': 'bool',
+            'checkpoint_file': 'str',
+            'timing': 'bool',
+            'profiling': 'bool',
+            'memory_profiling': 'bool',
+            'memory_tracing': 'bool',
+        }
+
+        parse_input(self, rsp_keywords, rsp_dict)
+
+        if 'program_start_time' in rsp_dict:
+            self.program_start_time = rsp_dict['program_start_time']
+        if 'maximum_hours' in rsp_dict:
+            self.maximum_hours = rsp_dict['maximum_hours']
+
+        if 'xcfun' in method_dict:
+            errmsg = 'NonLinearDriver: The \'xcfun\' keyword is not supported in Nlr '
+            errmsg += 'calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if 'potfile' in method_dict:
+            errmsg = 'NonLinearDriver: The \'potfile\' keyword is not supported in '
+            errmsg += 'Nlr calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if 'electric_field' in method_dict:
+            errmsg = 'NonLinearDriver: The \'electric field\' keyword is not '
+            errmsg += 'supported in Nlr calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+    def init_eri(self, molecule, basis):
+        """
+        Initializes ERI.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+
+        :return:
+            The dictionary of ERI information.
+        """
+
+        if self.use_split_comm:
+            self.use_split_comm = ((self.dft or self.pe) and self.nodes >= 8)
+
+        if self.use_split_comm:
+            screening = None
+            valstr = 'ERI'
+            if self.dft:
+                valstr += '/DFT'
+            if self.pe:
+                valstr += '/PE'
+            self.ostream.print_info(
+                'Using sub-communicators for {}.'.format(valstr))
+            self.ostream.print_blank()
+        else:
+            eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+            screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                        self.eri_thresh, molecule, basis)
+
+        return {
+            'screening': screening,
+        }
+
+    def init_dft(self, molecule, scf_tensors):
+        """
+        Initializes DFT.
+
+        :param molecule:
+            The molecule.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+
+        :return:
+            The dictionary of DFT information.
+        """
+
+        # generate integration grid
+        if self.dft:
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(self.grid_level)
+
+            grid_t0 = tm.time()
+            molgrid = grid_drv.generate(molecule)
+            n_grid_points = molgrid.number_of_points()
+            self.ostream.print_info(
+                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
+                format(n_grid_points,
+                       tm.time() - grid_t0))
+            self.ostream.print_blank()
+
+            if self.rank == mpi_master():
+                gs_density = AODensityMatrix([scf_tensors['D_alpha']],
+                                             denmat.rest)
+            else:
+                gs_density = AODensityMatrix()
+            gs_density.broadcast(self.rank, self.comm)
+
+            dft_func_label = self.xcfun.get_func_label().upper()
+        else:
+            molgrid = MolecularGrid()
+            gs_density = AODensityMatrix()
+            dft_func_label = 'HF'
+
+        return {
+            'molgrid': molgrid,
+            'gs_density': gs_density,
+            'dft_func_label': dft_func_label,
+        }
+
+    def init_pe(self, molecule, basis):
+        """
+        Initializes polarizable embedding.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+
+        :return:
+            The dictionary of polarizable embedding information.
+        """
+
+        # set up polarizable embedding
+        if self.pe:
+            from .polembed import PolEmbed
+            pe_drv = PolEmbed(molecule, basis, self.pe_options, self.comm)
+            V_es = pe_drv.compute_multipole_potential_integrals()
+
+            cppe_info = 'Using CPPE {} for polarizable embedding.'.format(
+                pe_drv.get_cppe_version())
+            self.ostream.print_info(cppe_info)
+            self.ostream.print_blank()
+
+            pot_info = "Reading polarizable embedding potential: {}".format(
+                self.pe_options['potfile'])
+            self.ostream.print_info(pot_info)
+            self.ostream.print_blank()
+
+            with open(str(self.pe_options['potfile']), 'r') as f_pot:
+                potfile_text = '\n'.join(f_pot.readlines())
+        else:
+            pe_drv = None
+            V_es = None
+            potfile_text = ''
+
+        return {
+            'pe_drv': pe_drv,
+            'V_es': V_es,
+            'potfile_text': potfile_text,
+        }
+
+
+    def compute(self, molecule, basis, scf_tensors, v1=None):
+        """
+        Solves for the nonlinear response functions.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param v1:
+            The gradients on the right-hand side. If not provided, v1 will be
+            computed for the B operator.
+
+        :return:
+            A dictionary containing response functions, solutions, etc.
+        """
+
+        return None
+
+
+    def comp_nlr_fock(self, mo, D, molecule, ao_basis, fock_flag):
+        """-
+        Computes and returns a list of Fock matrices
+
+        :param mo:
+            The MO coefficients
+        :param D:
+            A list of densities
+        :param molecule:
+            The molecule
+        :param ao_basis:
+            The AO basis set
+        :param fock_flag:
+            The type of Fock matrices
+
+        :return:
+            A list of Fock matrices
+        """
+
+        if fock_flag == 'real_and_imag':
+            if self.rank == mpi_master():
+                D_total = []
+                for da in D:
+                    D_total.append(da.real)
+                    D_total.append(da.imag)
+            else:
+                D_total = None
+
+            f_total = self.comp_two_el_int(mo, molecule, ao_basis,
+                                                 D_total)
+
+            nrows = f_total.data.shape[0]
+            half_ncols = f_total.data.shape[1] // 2
+            ff_data = np.zeros((nrows, half_ncols), dtype=np.complex128)
+            for i in range(half_ncols):
+                ff_data[:, i] = (f_total.data[:, 2 * i] +
+                                 1j * f_total.data[:, 2 * i + 1])
+            return DistributedArray(ff_data, self.comm, distribute=False)
+
+        elif fock_flag == 'real':
+            return self.comp_two_el_int(mo, molecule, ao_basis, D)
+
+        else:
+            return None
+
+    def comp_two_el_int(self, mo, molecule, ao_basis, dabs):
+        """
+        Returns the two-electron part of the Fock matix in MO basis
+
+        :param mo:
+            The MO coefficients
+        :param molecule:
+            The molecule
+        :param ao_basis:
+            The AO basis set
+        :param dabs:
+            A list of densitiy matrices
+
+        :return:
+            A tuple containing the two-electron part of the Fock matix (in MO
+            basis)
+        """
+
+        eri_driver = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = eri_driver.compute(get_qq_scheme(self.qq_type),
+                                       self.eri_thresh, molecule, ao_basis)
+
+        # determine number of batches
+
+        if self.rank == mpi_master():
+            n_total = len(dabs)
+            n_ao = dabs[0].shape[0]
+            norb = mo.shape[1]
+        else:
+            n_total = None
+            n_ao = None
+
+        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
+        num_batches = get_number_of_batches(n_total, batch_size, self.comm)
+
+        # go through batches
+
+        dist_fabs = None
+
+        if self.rank == mpi_master():
+            batch_str = 'Processing Fock builds...'
+            batch_str += ' (batch size: {:d})'.format(batch_size)
+            self.ostream.print_info(batch_str)
+
+        for batch_ind in range(num_batches):
+
+            if self.rank == mpi_master():
+                self.ostream.print_info('  batch {}/{}'.format(
+                    batch_ind + 1, num_batches))
+                self.ostream.flush()
+
+            # form density matrices
+
+            if self.rank == mpi_master():
+                batch_start = batch_size * batch_ind
+                batch_end = min(batch_start + batch_size, n_total)
+                dts = [
+                    np.ascontiguousarray(dab)
+                    for dab in dabs[batch_start:batch_end]
+                ]
+                dens = AODensityMatrix(dts, denmat.rest)
+            else:
+                dens = AODensityMatrix()
+
+            dens.broadcast(self.rank, self.comm)
+
+            fock = AOFockMatrix(dens)
+            for i in range(fock.number_of_fock_matrices()):
+                fock.set_fock_type(fockmat.rgenjk, i)
+
+            eri_driver.compute(fock, dens, molecule, ao_basis, screening)
+            fock.reduce_sum(self.rank, self.nodes, self.comm)
+
+            if self.rank == mpi_master():
+                nfocks = fock.number_of_fock_matrices()
+                fock_mo = np.zeros((norb**2, nfocks))
+                for i in range(nfocks):
+                    fock_mo[:, i] = self.ao2mo(mo,
+                                               fock.to_numpy(i).T).reshape(-1)
+            else:
+                fock_mo = None
+
+            dist_fock_mo = DistributedArray(fock_mo, self.comm)
+
+            if dist_fabs is None:
+                dist_fabs = DistributedArray(dist_fock_mo.data,
+                                             self.comm,
+                                             distribute=False)
+            else:
+                dist_fabs.append(dist_fock_mo, axis=1)
+
+        self.ostream.print_blank()
+
+        return dist_fabs
+
+
+    def flip_yz(self, X):
+        """
+        This method takes a first-order response vector with a given sign of
+        the frequency and returns the first-order response vector with reversed
+        frequency argument.
+
+        :param X:
+            A response vector N(ω,x) = (Z,-Y^*)
+
+        :return:
+            A response vector with reversed optical frequency N(-ω,x) =
+            (Y,-Z^*)
+        """
+
+        if X.ndim == 1:
+            new_yz = np.zeros_like(X)
+            half_len = X.shape[0] // 2
+            new_yz[:half_len] = -X.real[half_len:] + 1j * X.imag[half_len:]
+            new_yz[half_len:] = -X.real[:half_len] + 1j * X.imag[:half_len]
+            return new_yz
+
+        return None
+
+    def print_fock_header(self):
+        """
+        Prints header for Fock computation
+        """
+
+        title = 'Fock Matrix Computation'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
+    def print_fock_time(self, time):
+        """
+        Prints time for Fock computation
+
+        :param time:
+            Total time to compute Fock matrices
+        """
+
+        cur_str = 'Time spent in Fock matrices: {:.2f} sec'.format(time)
+        self.ostream.print_info(cur_str)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def print_component(self, label, value, width):
+        """
+        Prints TPA component.
+
+        :param label:
+            The label
+        :param freq:
+            The frequency
+        :param value:
+            The complex value
+        :param width:
+            The width for the output
+        """
+
+        w_str = '{:<9s} {:20.8f} {:20.8f}j'.format(
+            label, value.real, value.imag)
+        self.ostream.print_header(w_str.ljust(width))
+
+
+    def s4(self, k1, k2, k3, D, nocc, norb):
+        """
+        Returns the contraction of S[4] for S[4] dict
+
+        :param k1:
+            A response matrix
+        :param k2:
+            A response matrix
+        :param k3:
+            A response matrix
+        :param D:
+            A density matrix
+        :param nocc:
+            The number of occupied orbtials
+        :param norb:
+            The number of total orbitals
+
+        :return:
+            The contraction of S[4] for S[4] dict
+        """
+
+        S4_123 = self.s4_contract(k1, k2, k3, D, nocc, norb)
+        S4_132 = self.s4_contract(k1, k3, k2, D, nocc, norb)
+
+        return S4_123 + S4_132
+
+    def s4_contract(self, k1, k2, k3, D, nocc, norb):
+        """
+        Returns the contraction of S[4] for S[4] dict
+
+        :param k1:
+            A response matrix
+        :param k2:
+            A response matrix
+        :param k3:
+            A response matrix
+        :param D:
+            A density matrix
+        :param nocc:
+            The number of occupied orbtials
+        :param norb:
+            The number of total orbitals
+
+        :return:
+            The contraction of S[4] for S[4] dict
+        """
+
+        S4N1N2N3 = self.commut(self.commut(k3, self.commut(k2, k1)), D.T)
+        S4N1N2N3_c = (LinearSolver.lrmat2vec(S4N1N2N3.real, nocc, norb) +
+                      1j * LinearSolver.lrmat2vec(S4N1N2N3.imag, nocc, norb))
+        return (2. / 6) * S4N1N2N3_c
+
+    def flip_xy(self, X):
+        """
+        Swaps upper and lower parts of a response vector. This is used when
+        rewriting the R^[4] tensor contraction in terms of S^[4] tensor
+        contractions.
+
+        :param X:
+            A response vector v = (Z,-Y^*)
+
+        :return:
+            A response vector of the form v' = (-Y^*,Z)
+        """
+
+        if X.ndim == 1:
+            new_xy = np.zeros_like(X)
+            half_len = X.shape[0] // 2
+            new_xy[:half_len] = X[half_len:]
+            new_xy[half_len:] = X[:half_len]
+            return new_xy
+
+        return None
+
+    def s4_for_r4(self, k1, k2, k3, D, nocc, norb):
+        """
+        Returns the contraction of S[4] for the contraction of R[4]
+
+        :param k1:
+            A response matrix
+        :param k2:
+            A response matrix
+        :param k3:
+            A response matrix
+        :param D:
+            A density matrix
+        :param nocc:
+            The number of occupied orbtials
+        :param norb:
+            The number of total orbitals
+
+        :return:
+            The contraction of S[4] for the contraction of R[4]
+        """
+
+        S4_123 = self.s4_contract(k1, k2, k3, D, nocc, norb)
+
+        return S4_123
+
+    def collect_vectors_in_columns(self, sendbuf):
+        """
+        Collects vectors into 2d array (column-wise).
+
+        :param sendbuf:
+            The 2d array containing the vector segments in columns.
+
+        :return:
+            A 2d array containing the full vectors in columns.
+        """
+
+        counts = self.comm.gather(sendbuf.size, root=mpi_master())
+        if self.rank == mpi_master():
+            displacements = [sum(counts[:p]) for p in range(self.nodes)]
+            recvbuf = np.zeros(sum(counts), dtype=sendbuf.dtype).reshape(
+                -1, sendbuf.shape[1])
+        else:
+            displacements = None
+            recvbuf = None
+
+        if sendbuf.dtype == np.float64:
+            mpi_data_type = MPI.DOUBLE
+        elif sendbuf.dtype == np.complex128:
+            mpi_data_type = MPI.C_DOUBLE_COMPLEX
+
+        self.comm.Gatherv(sendbuf,
+                          [recvbuf, counts, displacements, mpi_data_type],
+                          root=mpi_master())
+
+        return recvbuf
+
+    def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
+        """
+        Prints the results from the TPA calculation.
+
+        :param freqs:
+            List of frequencies
+        :param gamma:
+            A dictonary containing the isotropic cubic response functions for
+            TPA
+        :param comp:
+            List of gamma tensors components
+        :param t4_dict:
+            A dictonary containing the isotropic T[4] contractions
+        :param t3_dict:
+            A dictonary containing the isotropic T[3] contractions
+        :param tpa_dict:
+            A dictonary containing the isotropic X[3], A[3], X[2], A[2]
+            contractions
+        """
+
+        return None
+
+    def print_header(self):
+        """
+        Prints TPA setup header to output stream.
+        """
+
+        self.ostream.print_blank()
+
+        title = 'Two-Photon Absorbtion Driver Setup'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
+        width = 50
+
+        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
+            self.eri_thresh)
+        self.ostream.print_header(cur_str.ljust(width))
+        cur_str = 'Convergance Threshold           : {:.1e}'.format(
+            self.conv_thresh)
+        self.ostream.print_header(cur_str.ljust(width))
+        cur_str = 'Max. Number of Iterations       : {:d}'.format(self.max_iter)
+        self.ostream.print_header(cur_str.ljust(width))
+        cur_str = 'Damping Parameter               : {:.6e}'.format(
+            self.damping)
+        self.ostream.print_header(cur_str.ljust(width))
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def flip_yz(self, X):
+        """
+        This method takes a first-order response vector with a given sign of
+        the frequency and returns the first-order response vector with reversed
+        frequency argument.
+
+        :param X:
+            A response vector N(ω,x) = (Z,-Y^*)
+
+        :return:
+            A response vector with reversed optical frequency N(-ω,x) =
+            (Y,-Z^*)
+        """
+
+        if X.ndim == 1:
+            new_yz = np.zeros_like(X)
+            half_len = X.shape[0] // 2
+            new_yz[:half_len] = -X.real[half_len:] + 1j * X.imag[half_len:]
+            new_yz[half_len:] = -X.real[:half_len] + 1j * X.imag[:half_len]
+            return new_yz
+
+        return None
+
+    def transform_dens(self, k, D, S):
+        """
+        Creates the perturbed density
+
+        :param k:
+            Response vector in matrix form in AO basis
+        :param D:
+            The density that is to be perturbed in AO basis
+        :param S:
+            Overlap matrix
+
+        :return:
+            [k,D]
+        """
+
+        return (np.linalg.multi_dot([k, S, D]) -
+                np.linalg.multi_dot([D, S, k]))
+
+    def mo2ao(self, mo, A):
+        """
+        Transform a matrix to atomic basis
+
+        :param mo:
+            molecular orbital coefficent matrix
+        :param A:
+            The matrix in MO basis that is the converted to AO basis
+
+        :return:
+            The matrix in AO basis
+        """
+
+        return np.linalg.multi_dot([mo, A, mo.T])
+
+    def ao2mo(self, mo, A):
+        """
+        Transform a matrix to molecular basis
+
+        :param mo:
+            molecular orbital coefficent matrix
+        :param A:
+            The matrix in AO basis that is the converted to MO basis
+
+        :return:
+            The matrix in MO basis
+        """
+
+        return np.linalg.multi_dot([mo.T, A, mo])
+
+    def commut(self, A, B):
+        """
+        Commutes two matricies A and B
+
+        :param A:
+            Matrix A.
+        :param B:
+            Matrix B.
+
+        :return:
+            AB - BA
+        """
+
+        return np.matmul(A, B) - np.matmul(B, A)
+
+    def x3_contract(self, k1, k2, X, D, nocc, norb):
+        """
+        Contracts the generalized dipole gradient tensor of rank 3 with two
+        first-order response matrices. X[3]N1N2 = (1/2)[[k2,[k1,X]],D.T]
+
+        :param: k1:
+            First-order response matrix
+        :param: k2:
+            First-order response matrix
+        :param X:
+            Dipole intergral matrix
+        :param D:
+            Density matrix
+        :param nocc:
+            Number of occupied orbitals
+        :param norb:
+            Number of total orbtials
+
+        :return:
+            Returns a matrix
+        """
+
+        X3NxNy = self.commut(self.commut(k2, self.commut(k1, X)), D.T)
+        X3NxNy_c = (LinearSolver.lrmat2vec(X3NxNy.real, nocc, norb) +
+                    1j * LinearSolver.lrmat2vec(X3NxNy.imag, nocc, norb))
+        return (1. / 2) * X3NxNy_c
+
+
+
+    def x2_contract(self, k, X, D, nocc, norb):
+        """
+        Contracts the generalized dipole gradient tensor of rank 2 with a
+        second-order response matrix. X[2]N1 = [[k1,X],D.T]
+
+        :param: k:
+            Respose vector in matrix representation
+        :param X:
+            Property operator in matrix represatiation
+        :param D:
+            Density matrix
+        :param nocc:
+            Number of occupied orbitals
+        :param norb:
+            Number of total orbtials
+
+        :return:
+            Returns a matrix
+        """
+
+        XNx = self.commut(self.commut(k, X), D.T)
+        X2Nx_c = (LinearSolver.lrmat2vec(XNx.real, nocc, norb) +
+                  1j * LinearSolver.lrmat2vec(XNx.imag, nocc, norb))
+        return X2Nx_c
+
+
+    def a2_contract(self, k, A, D, nocc, norb):
+        """
+        Contracts the generalized dipole gradient tensor of rank 2 with a
+        second-order response matrix. A[2]N1 = -(1 / 2)[[k1,X],D.T]
+
+        # Note that the sign needs further investigation.
+
+        :param: k:
+            Respose vector in matrix representation
+        :param A:
+            Property operator in matrix represatiation
+        :param D:
+            Density matrix
+        :param nocc:
+            Number of occupied orbitals
+        :param norb:
+            Number of total orbtials
+
+        :return:
+            Returns a matrix
+        """
+
+        ANx = self.commut(self.commut(k.T, A), D.T)
+        A2Nx_c = (LinearSolver.lrmat2vec(ANx.real, nocc, norb) +
+                  1j * LinearSolver.lrmat2vec(ANx.imag, nocc, norb))
+        return -(1. / 2) * A2Nx_c
+
+    def a3_contract(self, k1, k2, A, D, nocc, norb):
+        """
+        Contracts the generalized dipole gradient tensor of rank 3 with two
+        first-order response matrices. A[3]N1N2 = -(1/6)[[k2,[k1,A]],D.T]
+
+        :param: k1:
+            First-order response matrix
+        :param: k2:
+            First-order response matrix
+        :param A:
+            A dipole intergral matrix
+        :param D:
+            Density matrix
+        :param nocc:
+            Number of occupied orbitals
+        :param norb:
+            Number of total orbtials
+
+        :return:
+            Returns a matrix
+        """
+
+        A3NxNy = self.commut(self.commut(k2.T, self.commut(k1.T, A)), D.T)
+        A3NxNy_c = (LinearSolver.lrmat2vec(A3NxNy.real, nocc, norb) +
+                    1j * LinearSolver.lrmat2vec(A3NxNy.imag, nocc, norb))
+        return -(1. / 6) * A3NxNy_c
+
+    def zi(self, kB, kC, kD, Fc, Fd, Fbc, Fcb, F0):
+        """
+        Returns a matrix used for the E[4] contraction
+
+        :param kA:
+            First-order response matrix
+        :param kB:
+            First-order response matrix
+        :param Fa:
+            First-order perturbed Fock matrix
+        :param Fb:
+            First-order perturbed Fock matrix
+        :param F0:
+            SCF Fock matrix
+
+        :return:
+            Returns a matrix
+        """
+        M1 = self.commut(kC, self.commut(kD, F0) + 3 * Fd)
+        M2 = self.commut(kD, self.commut(kC, F0) + 3 * Fc) 
+        
+        return (self.commut(kB, M1 + M2 + 3*(Fbc+ Fcb) ) )
+
+
+    def anti_sym(self, vec):
+        """
+        Returns an antisymetrized vector
+
+        :param vec:
+            The vector to be anti-symetrized
+
+        :return:
+            An antisymetrized vector
+        """
+
+        if vec.ndim == 1:
+            new_vec = np.zeros_like(vec)
+            half_len = vec.shape[0] // 2
+            new_vec[:half_len] = vec[:half_len]
+            new_vec[half_len:] = -vec[half_len:]
+            return new_vec
+
+        return None
+
+    def xi(self, kA, kB, Fa, Fb, F0):
+        """
+
+        :param kA:
+            First-order response matrix
+        :param kB:
+            First-order response matrix
+        :param Fa:
+            First-order perturbed Fock matrix
+        :param Fb:
+            First-order perturbed Fock matrix
+        :param F0:
+            SCF Fock matrix
+
+        :return:
+            Returns a matrix
+        """
+
+        return 0.5 * (self.commut(kA,
+                                  self.commut(kB, F0) + 2 * Fb) +
+                      self.commut(kB,
+                                  self.commut(kA, F0) + 2 * Fa))
