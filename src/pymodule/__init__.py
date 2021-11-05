@@ -99,6 +99,7 @@ from .orbitalresponse import OrbitalResponse
 from .tdhfgradientdriver import TdhfGradientDriver
 from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
+from .cphfsolver import CphfSolver
 from .tdhfhessiandriver import TdhfHessianDriver
 from .xtbhessiandriver import XTBHessianDriver
 
