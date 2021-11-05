@@ -25,37 +25,25 @@
 
 import numpy as np
 import time as tm
-import sys
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import LinearMomentumIntegralsDriver
-from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
-from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver
 from .veloxchemlib import XCFunctional
-from .veloxchemlib import XCIntegrator
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
-from .veloxchemlib import molorb
-from .veloxchemlib import parse_xc_func
 from .distributedarray import DistributedArray
-from .subcommunicators import SubCommunicators
-from .molecularorbitals import MolecularOrbitals
-from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .qqscheme import get_qq_scheme
-from .qqscheme import get_qq_type
-from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .linearsolver import LinearSolver
 from mpi4py import MPI
+
 
 class NonLinearSolver:
     """
@@ -99,13 +87,6 @@ class NonLinearSolver:
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation.
         - filename: The filename.
-        - dist_bger: The distributed gerade trial vectors.
-        - dist_bung: The distributed ungerade trial vectors.
-        - dist_e2bger: The distributed gerade sigma vectors.
-        - dist_e2bung: The distributed ungerade sigma vectors.
-        - nonlinear: The flag for running linear solver in nonlinear response.
-        - dist_fock_ger: The distributed gerade Fock matrices in MO.
-        - dist_fock_ung: The distributed ungerade Fock matrices in MO.
     """
 
     def __init__(self, comm, ostream):
@@ -167,14 +148,6 @@ class NonLinearSolver:
         # filename
         self.filename = None
 
-        self.dist_bger = None
-        self.dist_bung = None
-        self.dist_e2bger = None
-        self.dist_e2bung = None
-
-        self.nonlinear = False
-        self.dist_fock_ger = None
-        self.dist_fock_ung = None
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -360,7 +333,6 @@ class NonLinearSolver:
             'potfile_text': potfile_text,
         }
 
-
     def compute(self, molecule, basis, scf_tensors, v1=None):
         """
         Solves for the nonlinear response functions.
@@ -381,10 +353,9 @@ class NonLinearSolver:
 
         return None
 
-
     def comp_nlr_fock(self, mo, D, molecule, ao_basis, fock_flag):
         """-
-        Computes and returns a list of Fock matrices
+        Computes and returns a list of Fock matrices 
 
         :param mo:
             The MO coefficients
@@ -410,8 +381,7 @@ class NonLinearSolver:
             else:
                 D_total = None
 
-            f_total = self.comp_two_el_int(mo, molecule, ao_basis,
-                                                 D_total)
+            f_total = self.comp_two_el_int(mo, molecule, ao_basis, D_total)
 
             nrows = f_total.data.shape[0]
             half_ncols = f_total.data.shape[1] // 2
@@ -522,7 +492,6 @@ class NonLinearSolver:
 
         return dist_fabs
 
-
     def flip_yz(self, X):
         """
         This method takes a first-order response vector with a given sign of
@@ -583,10 +552,9 @@ class NonLinearSolver:
             The width for the output
         """
 
-        w_str = '{:<9s} {:20.8f} {:20.8f}j'.format(
-            label, value.real, value.imag)
+        w_str = '{:<9s} {:20.8f} {:20.8f}j'.format(label, value.real,
+                                                   value.imag)
         self.ostream.print_header(w_str.ljust(width))
-
 
     def s4(self, k1, k2, k3, D, nocc, norb):
         """
@@ -769,29 +737,6 @@ class NonLinearSolver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def flip_yz(self, X):
-        """
-        This method takes a first-order response vector with a given sign of
-        the frequency and returns the first-order response vector with reversed
-        frequency argument.
-
-        :param X:
-            A response vector N(ω,x) = (Z,-Y^*)
-
-        :return:
-            A response vector with reversed optical frequency N(-ω,x) =
-            (Y,-Z^*)
-        """
-
-        if X.ndim == 1:
-            new_yz = np.zeros_like(X)
-            half_len = X.shape[0] // 2
-            new_yz[:half_len] = -X.real[half_len:] + 1j * X.imag[half_len:]
-            new_yz[half_len:] = -X.real[:half_len] + 1j * X.imag[:half_len]
-            return new_yz
-
-        return None
-
     def transform_dens(self, k, D, S):
         """
         Creates the perturbed density
@@ -807,8 +752,7 @@ class NonLinearSolver:
             [k,D]
         """
 
-        return (np.linalg.multi_dot([k, S, D]) -
-                np.linalg.multi_dot([D, S, k]))
+        return (np.linalg.multi_dot([k, S, D]) - np.linalg.multi_dot([D, S, k]))
 
     def mo2ao(self, mo, A):
         """
@@ -882,8 +826,6 @@ class NonLinearSolver:
                     1j * LinearSolver.lrmat2vec(X3NxNy.imag, nocc, norb))
         return (1. / 2) * X3NxNy_c
 
-
-
     def x2_contract(self, k, X, D, nocc, norb):
         """
         Contracts the generalized dipole gradient tensor of rank 2 with a
@@ -908,7 +850,6 @@ class NonLinearSolver:
         X2Nx_c = (LinearSolver.lrmat2vec(XNx.real, nocc, norb) +
                   1j * LinearSolver.lrmat2vec(XNx.imag, nocc, norb))
         return X2Nx_c
-
 
     def a2_contract(self, k, A, D, nocc, norb):
         """
@@ -983,10 +924,9 @@ class NonLinearSolver:
             Returns a matrix
         """
         M1 = self.commut(kC, self.commut(kD, F0) + 3 * Fd)
-        M2 = self.commut(kD, self.commut(kC, F0) + 3 * Fc) 
-        
-        return (self.commut(kB, M1 + M2 + 3*(Fbc+ Fcb) ) )
+        M2 = self.commut(kD, self.commut(kC, F0) + 3 * Fc)
 
+        return (self.commut(kB, M1 + M2 + 3 * (Fbc + Fcb)))
 
     def anti_sym(self, vec):
         """

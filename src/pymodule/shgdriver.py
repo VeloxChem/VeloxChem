@@ -1,40 +1,21 @@
-from mpi4py import MPI
 import numpy as np
 import time
 import re
-import time as tm
-
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import denmat
-from .veloxchemlib import fockmat
 from .veloxchemlib import mpi_master
-from .qqscheme import get_qq_scheme
 from .profiler import Profiler
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonLinearSolver
-from .aofockmatrix import AOFockMatrix
-from .aodensitymatrix import AODensityMatrix
 from .distributedarray import DistributedArray
-from .inputparser import parse_seq_range
 from .errorhandler import assert_msg_critical
-from .batchsize import get_batch_size
-from .batchsize import get_number_of_batches
 from .scffirstorderprop import ScfFirstOrderProperties
-
-from .veloxchemlib import XCFunctional
-from .veloxchemlib import XCIntegrator
-from .veloxchemlib import parse_xc_func
-from .veloxchemlib import GridDriver
-
 from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
-
 from .inputparser import parse_input
-
 from pathlib import Path
+
 
 class SHGDriver(NonLinearSolver):
     """
@@ -152,7 +133,7 @@ class SHGDriver(NonLinearSolver):
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
-        
+
         if 'program_start_time' in rsp_dict:
             self.program_start_time = rsp_dict['program_start_time']
         if 'maximum_hours' in rsp_dict:
@@ -175,8 +156,6 @@ class SHGDriver(NonLinearSolver):
             errmsg += 'supported in SHG calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
-
-        
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -208,8 +187,9 @@ class SHGDriver(NonLinearSolver):
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(nalpha == nbeta,
-                            'SHG Driver: not implemented for unrestricted case')
+        assert_msg_critical(
+            nalpha == nbeta,
+            'SHG Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_tensors['S']
@@ -227,14 +207,13 @@ class SHGDriver(NonLinearSolver):
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
         dipole_mats = dipole_drv.compute(molecule, ao_basis)
 
-        
         linear_solver = LinearSolver(self.comm, self.ostream)
-        a_rhs = linear_solver.get_complex_prop_grad(self.a_operator, self.a_component,
-                                                    molecule, ao_basis,
-                                                    scf_tensors)
-        b_rhs = linear_solver.get_complex_prop_grad(self.b_operator, self.b_component,
-                                                    molecule, ao_basis,
-                                                    scf_tensors)
+        a_rhs = linear_solver.get_complex_prop_grad(self.a_operator,
+                                                    self.a_component, molecule,
+                                                    ao_basis, scf_tensors)
+        b_rhs = linear_solver.get_complex_prop_grad(self.b_operator,
+                                                    self.b_component, molecule,
+                                                    ao_basis, scf_tensors)
 
         if self.rank == mpi_master():
             inv_sqrt_2 = 1.0 / np.sqrt(2.0)
@@ -245,7 +224,6 @@ class SHGDriver(NonLinearSolver):
             for ind in range(len(a_rhs)):
                 a_rhs[ind] *= inv_sqrt_2
 
-
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
         wa = [sum(x) for x in zip(self.frequencies, self.frequencies)]
@@ -254,7 +232,8 @@ class SHGDriver(NonLinearSolver):
 
         if self.rank == mpi_master():
             A = {(op, w): v for op, v in zip('xyz', a_rhs) for w in wa}
-            B = {(op, w): v for op, v in zip('xyz', b_rhs) for w in self.frequencies}
+            B = {(op, w): v for op, v in zip('xyz', b_rhs)
+                 for w in self.frequencies}
 
             X = {
                 'x': 2 * self.ao2mo(mo, dipole_mats.x_to_numpy()),
@@ -263,7 +242,6 @@ class SHGDriver(NonLinearSolver):
             }
 
         else:
-            v1 = None
             X = None
             self.comp = None
 
@@ -308,45 +286,44 @@ class SHGDriver(NonLinearSolver):
 
         # Compute the isotropic parallel beta vector
 
-        beta = self.compute_quad_components(Focks, freqpairs, X,
-                                               d_a_mo, kX, self.comp,
-                                               scf_tensors, molecule, ao_basis,
-                                               profiler)
+        beta = self.compute_quad_components(Focks, freqpairs, X, d_a_mo, kX,
+                                            self.comp, scf_tensors, molecule,
+                                            ao_basis, profiler)
 
-        # Compute dipole vector 
+        # Compute dipole vector
         scf_prop = ScfFirstOrderProperties(self.comm, self.ostream)
         scf_prop.compute(molecule, ao_basis, scf_tensors)
         dip = list(scf_prop.get_property('dipole moment'))
-        # Norm of dipole 
+        # Norm of dipole
         dip_norm = np.linalg.norm(scf_prop.get_property('dipole moment'))
 
         # Compute isotropic beta along molecular dipole
 
         self.ostream.print_blank()
-        w_str = 'Electronic dipole moment: ' 
+        w_str = 'Electronic dipole moment: '
         self.ostream.print_header(w_str)
         self.ostream.print_header('=' * (len(w_str) + 2))
-        title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
-                'Component', 'Frequency', 'Real', 'Imaginary')      
+        title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format('Component',
+                                                        'Frequency', 'Real',
+                                                        'Imaginary')
         width = len(title)
         self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('-' * len(title)).ljust(width))  
+        self.ostream.print_header(('-' * len(title)).ljust(width))
         self.print_component('μ_x', 0, dip[0], width)
         self.print_component('μ_y', 0, dip[1], width)
         self.print_component('μ_z', 0, dip[2], width)
-        self.print_component('|μ|', 0,  dip_norm, width)
+        self.print_component('|μ|', 0, dip_norm, width)
         self.ostream.print_blank()
-        w_str = 'Averaged first-order hyperpolarizability: ' 
+        w_str = 'Averaged first-order hyperpolarizability: '
         self.ostream.print_header(w_str)
         self.ostream.print_header('=' * (len(w_str) + 2))
-
 
         beta_bar = {}
 
         for key in beta.keys():
             betaa = 0
             for a in range(len(beta[key])):
-                betaa += 1/dip_norm * dip[a] * beta[key][a]
+                betaa += 1 / dip_norm * dip[a] * beta[key][a]
 
             self.ostream.print_blank()
 
@@ -355,10 +332,9 @@ class SHGDriver(NonLinearSolver):
             self.print_component('β_x', key, beta[key][0], width)
             self.print_component('β_y', key, beta[key][1], width)
             self.print_component('β_z', key, beta[key][2], width)
-            self.print_component('β ||', key, 1/5 * betaa, width)
+            self.print_component('β ||', key, 1 / 5 * betaa, width)
             beta_bar = {key: betaa}
 
-        
         self.ostream.print_blank()
         valstr = '*** Time spent in quadratic response calculation: {:.2f} sec ***'.format(
             time.time() - start_time)
@@ -373,7 +349,7 @@ class SHGDriver(NonLinearSolver):
         return beta
 
     def compute_quad_components(self, Focks, freqpairs, X, d_a_mo, kX, track,
-                               scf_tensors, molecule, ao_basis, profiler):
+                                scf_tensors, molecule, ao_basis, profiler):
         """
         Computes all the relevent terms to compute a general quadratic response function
 
@@ -428,33 +404,62 @@ class SHGDriver(NonLinearSolver):
         profiler.check_memory_usage('1st densities')
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(freqpairs, density_list, F0, mo, molecule,
-                                       ao_basis)
+        fock_dict = self.get_fock_dict(freqpairs, density_list, F0, mo,
+                                       molecule, ao_basis)
 
-        e3_dict = self.get_e3(freqpairs, kX, fock_dict, Focks, nocc,norb)
+        e3_dict = self.get_e3(freqpairs, kX, fock_dict, Focks, nocc, norb)
 
         beta = {}
 
         Na = {}
-        Nb = {}        
+        Nb = {}
 
-        for (wb,wc) in freqpairs:
+        for (wb, wc) in freqpairs:
 
-            Na = {'x' : (LinearSolver.lrmat2vec(kX[('x',wb+wc)].real, nocc, norb) + 1j * LinearSolver.lrmat2vec(kX[('x',wb+wc)].imag, nocc, norb)),
-                  'y' : (LinearSolver.lrmat2vec(kX[('y',wb+wc)].real, nocc, norb) + 1j * LinearSolver.lrmat2vec(kX[('y',wb+wc)].imag, nocc, norb)),
-                  'z' : (LinearSolver.lrmat2vec(kX[('z',wb+wc)].real, nocc, norb) + 1j * LinearSolver.lrmat2vec(kX[('z',wb+wc)].imag, nocc, norb))}
+            Na = {
+                'x':
+                    (LinearSolver.lrmat2vec(kX[('x', wb + wc)].real, nocc,
+                                            norb) + 1j *
+                     LinearSolver.lrmat2vec(kX[('x', wb + wc)].imag, nocc, norb)
+                    ),
+                'y':
+                    (LinearSolver.lrmat2vec(kX[('y', wb + wc)].real, nocc,
+                                            norb) + 1j *
+                     LinearSolver.lrmat2vec(kX[('y', wb + wc)].imag, nocc, norb)
+                    ),
+                'z':
+                    (LinearSolver.lrmat2vec(kX[('z', wb + wc)].real, nocc,
+                                            norb) + 1j *
+                     LinearSolver.lrmat2vec(kX[('z', wb + wc)].imag, nocc, norb)
+                    )
+            }
 
+            Nb = {
+                'x':
+                    (LinearSolver.lrmat2vec(kX[('x', wb)].real, nocc, norb) +
+                     1j * LinearSolver.lrmat2vec(kX[('x', wb)].imag, nocc, norb)
+                    ),
+                'y':
+                    (LinearSolver.lrmat2vec(kX[('y', wb)].real, nocc, norb) +
+                     1j * LinearSolver.lrmat2vec(kX[('y', wb)].imag, nocc, norb)
+                    ),
+                'z':
+                    (LinearSolver.lrmat2vec(kX[('z', wb)].real, nocc, norb) +
+                     1j * LinearSolver.lrmat2vec(kX[('z', wb)].imag, nocc, norb)
+                    )
+            }
 
-            Nb = {'x' : (LinearSolver.lrmat2vec(kX[('x',wb)].real, nocc, norb) +1j * LinearSolver.lrmat2vec(kX[('x',wb)].imag, nocc, norb)),
-                  'y' : (LinearSolver.lrmat2vec(kX[('y',wb)].real, nocc, norb) +1j * LinearSolver.lrmat2vec(kX[('y',wb)].imag, nocc, norb)),
-                  'z' : (LinearSolver.lrmat2vec(kX[('z',wb)].real, nocc, norb) + 1j * LinearSolver.lrmat2vec(kX[('z',wb)].imag, nocc, norb))}
+            NaE3NbNc_x = np.dot(Na['x'].T, e3_dict[('sig_x', wb)]) + 2 * np.dot(
+                Na['y'].T, e3_dict[('lam_xy', wb)]) + 2 * np.dot(
+                    Na['z'].T, e3_dict[('lam_xz', wb)])
 
+            NaE3NbNc_y = np.dot(Na['y'].T, e3_dict[('sig_y', wb)]) + 2 * np.dot(
+                Na['x'].T, e3_dict[('lam_xy', wb)]) + 2 * np.dot(
+                    Na['z'].T, e3_dict[('lam_yz', wb)])
 
-            NaE3NbNc_x = np.dot(Na['x'].T, e3_dict[('sig_x',wb)]) + 2*np.dot(Na['y'].T, e3_dict[('lam_xy',wb)]) + 2*np.dot(Na['z'].T, e3_dict[('lam_xz',wb)])
-
-            NaE3NbNc_y = np.dot(Na['y'].T, e3_dict[('sig_y',wb)]) + 2*np.dot(Na['x'].T, e3_dict[('lam_xy',wb)]) + 2*np.dot(Na['z'].T, e3_dict[('lam_yz',wb)])
-
-            NaE3NbNc_z = np.dot(Na['z'].T, e3_dict[('sig_z',wb)]) + 2*np.dot(Na['y'].T, e3_dict[('lam_yz',wb)]) + 2*np.dot(Na['x'].T, e3_dict[('lam_xz',wb)])
+            NaE3NbNc_z = np.dot(Na['z'].T, e3_dict[('sig_z', wb)]) + 2 * np.dot(
+                Na['y'].T, e3_dict[('lam_yz', wb)]) + 2 * np.dot(
+                    Na['x'].T, e3_dict[('lam_xz', wb)])
 
             A2_x = 0
             A2_y = 0
@@ -468,33 +473,108 @@ class SHGDriver(NonLinearSolver):
 
                 #A2 contractions
 
-                A2_x -= np.dot(Nb[eta].T, self.a2_contract(kX[(eta,wb)], X['x'], d_a_mo, nocc, norb) ) +  np.dot(Nb[eta].T, self.a2_contract(kX[(eta,wb)], X['x'], d_a_mo, nocc, norb) ) 
-                A2_x -= np.dot(Nb['x'].T, self.a2_contract(kX[(eta,wb)], X[eta], d_a_mo, nocc, norb) ) + np.dot(Nb[eta].T, self.a2_contract(kX[('x',wb)], X[eta], d_a_mo, nocc, norb) )
-                A2_x -= np.dot(Nb[eta].T, self.a2_contract(kX[('x',wb)], X[eta], d_a_mo, nocc, norb) ) + np.dot(Nb['x'].T, self.a2_contract(kX[(eta,wb)], X[eta], d_a_mo, nocc, norb) )  
+                A2_x -= np.dot(
+                    Nb[eta].T,
+                    self.a2_contract(
+                        kX[(eta, wb)], X['x'], d_a_mo, nocc, norb)) + np.dot(
+                            Nb[eta].T,
+                            self.a2_contract(kX[(eta, wb)], X['x'], d_a_mo,
+                                             nocc, norb))
+                A2_x -= np.dot(
+                    Nb['x'].T,
+                    self.a2_contract(
+                        kX[(eta, wb)], X[eta], d_a_mo, nocc, norb)) + np.dot(
+                            Nb[eta].T,
+                            self.a2_contract(kX[('x', wb)], X[eta], d_a_mo,
+                                             nocc, norb))
+                A2_x -= np.dot(
+                    Nb[eta].T,
+                    self.a2_contract(
+                        kX[('x', wb)], X[eta], d_a_mo, nocc, norb)) + np.dot(
+                            Nb['x'].T,
+                            self.a2_contract(kX[(eta, wb)], X[eta], d_a_mo,
+                                             nocc, norb))
 
-                A2_y -= np.dot(Nb[eta].T, self.a2_contract(kX[(eta,wb)], X['y'], d_a_mo, nocc, norb) ) +  np.dot(Nb[eta].T, self.a2_contract(kX[(eta,wb)], X['y'], d_a_mo, nocc, norb) )
-                A2_y -= np.dot(Nb['y'].T, self.a2_contract(kX[(eta,wb)], X[eta], d_a_mo, nocc, norb) ) + np.dot(Nb[eta].T, self.a2_contract(kX[('y',wb)], X[eta], d_a_mo, nocc, norb) )
-                A2_y -= np.dot(Nb[eta].T, self.a2_contract(kX[('y',wb)], X[eta], d_a_mo, nocc, norb) ) + np.dot(Nb['y'].T, self.a2_contract(kX[(eta,wb)], X[eta], d_a_mo, nocc, norb) )
+                A2_y -= np.dot(
+                    Nb[eta].T,
+                    self.a2_contract(
+                        kX[(eta, wb)], X['y'], d_a_mo, nocc, norb)) + np.dot(
+                            Nb[eta].T,
+                            self.a2_contract(kX[(eta, wb)], X['y'], d_a_mo,
+                                             nocc, norb))
+                A2_y -= np.dot(
+                    Nb['y'].T,
+                    self.a2_contract(
+                        kX[(eta, wb)], X[eta], d_a_mo, nocc, norb)) + np.dot(
+                            Nb[eta].T,
+                            self.a2_contract(kX[('y', wb)], X[eta], d_a_mo,
+                                             nocc, norb))
+                A2_y -= np.dot(
+                    Nb[eta].T,
+                    self.a2_contract(
+                        kX[('y', wb)], X[eta], d_a_mo, nocc, norb)) + np.dot(
+                            Nb['y'].T,
+                            self.a2_contract(kX[(eta, wb)], X[eta], d_a_mo,
+                                             nocc, norb))
 
-                A2_z -= np.dot(Nb[eta].T, self.a2_contract(kX[(eta,wb)], X['z'], d_a_mo, nocc, norb) ) +  np.dot(Nb[eta].T, self.a2_contract(kX[(eta,wb)], X['z'], d_a_mo, nocc, norb) ) 
-                A2_z -= np.dot(Nb['z'].T, self.a2_contract(kX[(eta,wb)], X[eta], d_a_mo, nocc, norb) ) + np.dot(Nb[eta].T, self.a2_contract(kX[('z',wb)], X[eta], d_a_mo, nocc, norb) )
-                A2_z -= np.dot(Nb[eta].T, self.a2_contract(kX[('z',wb)], X[eta], d_a_mo, nocc, norb) ) + np.dot(Nb['z'].T, self.a2_contract(kX[(eta,wb)], X[eta], d_a_mo, nocc, norb) )  
+                A2_z -= np.dot(
+                    Nb[eta].T,
+                    self.a2_contract(
+                        kX[(eta, wb)], X['z'], d_a_mo, nocc, norb)) + np.dot(
+                            Nb[eta].T,
+                            self.a2_contract(kX[(eta, wb)], X['z'], d_a_mo,
+                                             nocc, norb))
+                A2_z -= np.dot(
+                    Nb['z'].T,
+                    self.a2_contract(
+                        kX[(eta, wb)], X[eta], d_a_mo, nocc, norb)) + np.dot(
+                            Nb[eta].T,
+                            self.a2_contract(kX[('z', wb)], X[eta], d_a_mo,
+                                             nocc, norb))
+                A2_z -= np.dot(
+                    Nb[eta].T,
+                    self.a2_contract(
+                        kX[('z', wb)], X[eta], d_a_mo, nocc, norb)) + np.dot(
+                            Nb['z'].T,
+                            self.a2_contract(kX[(eta, wb)], X[eta], d_a_mo,
+                                             nocc, norb))
 
-                # X2 contractions 
+                # X2 contractions
 
-                X2_x -= 2*np.dot(Na['x'].T, self.x2_contract(kX[(eta,wb)], X[eta], d_a_mo, nocc, norb) )
-                X2_x -= 2*np.dot(Na[eta].T, self.x2_contract(kX[(eta,wb)], X['x'], d_a_mo, nocc, norb) )
-                X2_x -= 2*np.dot(Na[eta].T, self.x2_contract(kX[('x',wb)], X[eta], d_a_mo, nocc, norb) )
+                X2_x -= 2 * np.dot(
+                    Na['x'].T,
+                    self.x2_contract(kX[(eta, wb)], X[eta], d_a_mo, nocc, norb))
+                X2_x -= 2 * np.dot(
+                    Na[eta].T,
+                    self.x2_contract(kX[(eta, wb)], X['x'], d_a_mo, nocc, norb))
+                X2_x -= 2 * np.dot(
+                    Na[eta].T,
+                    self.x2_contract(kX[('x', wb)], X[eta], d_a_mo, nocc, norb))
 
-                X2_y -= 2*np.dot(Na['y'].T, self.x2_contract(kX[(eta,wb)], X[eta], d_a_mo, nocc, norb) )
-                X2_y -= 2*np.dot(Na[eta].T, self.x2_contract(kX[(eta,wb)], X['y'], d_a_mo, nocc, norb) )
-                X2_y -= 2*np.dot(Na[eta].T, self.x2_contract(kX[('y',wb)], X[eta], d_a_mo, nocc, norb) )
+                X2_y -= 2 * np.dot(
+                    Na['y'].T,
+                    self.x2_contract(kX[(eta, wb)], X[eta], d_a_mo, nocc, norb))
+                X2_y -= 2 * np.dot(
+                    Na[eta].T,
+                    self.x2_contract(kX[(eta, wb)], X['y'], d_a_mo, nocc, norb))
+                X2_y -= 2 * np.dot(
+                    Na[eta].T,
+                    self.x2_contract(kX[('y', wb)], X[eta], d_a_mo, nocc, norb))
 
-                X2_z -= 2*np.dot(Na['z'].T, self.x2_contract(kX[(eta,wb)], X[eta], d_a_mo, nocc, norb) )
-                X2_z -= 2*np.dot(Na[eta].T, self.x2_contract(kX[(eta,wb)], X['z'], d_a_mo, nocc, norb) )
-                X2_z -= 2*np.dot(Na[eta].T, self.x2_contract(kX[('z',wb)], X[eta], d_a_mo, nocc, norb) )
+                X2_z -= 2 * np.dot(
+                    Na['z'].T,
+                    self.x2_contract(kX[(eta, wb)], X[eta], d_a_mo, nocc, norb))
+                X2_z -= 2 * np.dot(
+                    Na[eta].T,
+                    self.x2_contract(kX[(eta, wb)], X['z'], d_a_mo, nocc, norb))
+                X2_z -= 2 * np.dot(
+                    Na[eta].T,
+                    self.x2_contract(kX[('z', wb)], X[eta], d_a_mo, nocc, norb))
 
-            beta.update({wb : (NaE3NbNc_x + A2_x + X2_x, NaE3NbNc_y + A2_y + X2_y, NaE3NbNc_z + A2_z + X2_z)})
+            beta.update({
+                wb: (NaE3NbNc_x + A2_x + X2_x, NaE3NbNc_y + A2_y + X2_y,
+                     NaE3NbNc_z + A2_z + X2_z)
+            })
 
         profiler.check_memory_usage('End of SHG')
 
@@ -520,36 +600,45 @@ class SHGDriver(NonLinearSolver):
 
         density_list = []
 
-        for (wb,wc) in freqpairs:
+        for (wb, wc) in freqpairs:
 
-                # convert response matrix to ao basis #
+            # convert response matrix to ao basis #
 
-                k_x = self.mo2ao(mo, kX[('x', wb)])
-                k_y = self.mo2ao(mo, kX[('y', wb)])
-                k_z = self.mo2ao(mo, kX[('z', wb)])
+            k_x = self.mo2ao(mo, kX[('x', wb)])
+            k_y = self.mo2ao(mo, kX[('y', wb)])
+            k_z = self.mo2ao(mo, kX[('z', wb)])
 
-                # create the first order single indexed densiteies #
+            # create the first order single indexed densiteies #
 
-                D_x = self.transform_dens(k_x, D0, S)
-                D_y = self.transform_dens(k_y, D0, S)
-                D_z = self.transform_dens(k_z, D0, S)
+            D_x = self.transform_dens(k_x, D0, S)
+            D_y = self.transform_dens(k_y, D0, S)
+            D_z = self.transform_dens(k_z, D0, S)
 
-                # create the first order two indexed densities #
-                
-                D_sig_x = 4 * self.transform_dens(k_x, D_x, S) + 2 * (self.transform_dens(k_x, D_x, S) + self.transform_dens(k_y, D_y, S)+ self.transform_dens(k_z, D_z, S))
-                D_sig_y = 4 * self.transform_dens(k_y, D_y, S) + 2 * (self.transform_dens(k_x, D_x, S) + self.transform_dens(k_y, D_y, S)+ self.transform_dens(k_z, D_z, S))
-                D_sig_z = 4 * self.transform_dens(k_z, D_z, S) + 2 * (self.transform_dens(k_x, D_x, S) + self.transform_dens(k_y, D_y, S)+ self.transform_dens(k_z, D_z, S))
+            # create the first order two indexed densities #
 
-                D_lam_xy = self.transform_dens(k_x, D_y, S) + self.transform_dens(k_y, D_x, S)
-                D_lam_xz = self.transform_dens(k_x, D_z, S) + self.transform_dens(k_z, D_x, S)
-                D_lam_yz = self.transform_dens(k_y, D_z, S) + self.transform_dens(k_z, D_y, S)
+            D_sig_x = 4 * self.transform_dens(k_x, D_x, S) + 2 * (
+                self.transform_dens(k_x, D_x, S) + self.transform_dens(
+                    k_y, D_y, S) + self.transform_dens(k_z, D_z, S))
+            D_sig_y = 4 * self.transform_dens(k_y, D_y, S) + 2 * (
+                self.transform_dens(k_x, D_x, S) + self.transform_dens(
+                    k_y, D_y, S) + self.transform_dens(k_z, D_z, S))
+            D_sig_z = 4 * self.transform_dens(k_z, D_z, S) + 2 * (
+                self.transform_dens(k_x, D_x, S) + self.transform_dens(
+                    k_y, D_y, S) + self.transform_dens(k_z, D_z, S))
 
-                density_list.append(D_sig_x)
-                density_list.append(D_sig_y)
-                density_list.append(D_sig_z)
-                density_list.append(D_lam_xy)
-                density_list.append(D_lam_xz)
-                density_list.append(D_lam_yz)
+            D_lam_xy = self.transform_dens(k_x, D_y, S) + self.transform_dens(
+                k_y, D_x, S)
+            D_lam_xz = self.transform_dens(k_x, D_z, S) + self.transform_dens(
+                k_z, D_x, S)
+            D_lam_yz = self.transform_dens(k_y, D_z, S) + self.transform_dens(
+                k_z, D_y, S)
+
+            density_list.append(D_sig_x)
+            density_list.append(D_sig_y)
+            density_list.append(D_sig_z)
+            density_list.append(D_lam_xy)
+            density_list.append(D_lam_xz)
+            density_list.append(D_lam_yz)
 
         return density_list
 
@@ -577,19 +666,13 @@ class SHGDriver(NonLinearSolver):
 
         if self.rank == mpi_master():
             self.print_fock_header()
-        
+
         ww = []
-        for (wb,wc) in wi:
+        for (wb, wc) in wi:
             ww.append(wb)
 
-
         keys = [
-            'F_sig_x',
-            'F_sig_y',
-            'F_sig_z',
-            'F_lam_xy',
-            'F_lam_xz',
-            'F_lam_yz'
+            'F_sig_x', 'F_sig_y', 'F_sig_z', 'F_lam_xy', 'F_lam_xz', 'F_lam_yz'
         ]
 
         if self.checkpoint_file is not None:
@@ -611,32 +694,32 @@ class SHGDriver(NonLinearSolver):
 
         time_start_fock = time.time()
         dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                     'real_and_imag')
+                                        'real_and_imag')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
         self.print_fock_time(total_time_fock)
-        
+
         focks = {'F0': F0}
         for key in keys:
             focks[key] = {}
 
         fock_index = 0
-        
-        for (wb,wc) in wi:
+
+        for (wb, wc) in wi:
             for key in keys:
-                focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index],
-                                                 self.comm,
-                                                 distribute=False)
+                focks[key][wb] = DistributedArray(dist_focks.data[:,
+                                                                  fock_index],
+                                                  self.comm,
+                                                  distribute=False)
                 fock_index += 1
-                
 
         write_distributed_focks(fock_file, focks, keys, ww, self.comm,
                                 self.ostream)
 
         return focks
 
-    def get_e3(self, wi, kX, fo,fo2, nocc, norb):
+    def get_e3(self, wi, kX, fo, fo2, nocc, norb):
         """
         Contracts E[3]
 
@@ -662,18 +745,13 @@ class SHGDriver(NonLinearSolver):
 
         e3vec = {}
 
-        for (wb,wc) in wi:
+        for (wb, wc) in wi:
 
             vec_pack = np.array([
-                fo2[('x', wb)].data,
-                fo2[('y', wb)].data,
-                fo2[('z', wb)].data,
-                fo['F_sig_x'][wb].data,
-                fo['F_sig_y'][wb].data,
-                fo['F_sig_z'][wb].data,
-                fo['F_lam_xy'][wb].data,
-                fo['F_lam_xz'][wb].data,
-                fo['F_lam_yz'][wb].data
+                fo2[('x', wb)].data, fo2[('y', wb)].data, fo2[('z', wb)].data,
+                fo['F_sig_x'][wb].data, fo['F_sig_y'][wb].data,
+                fo['F_sig_z'][wb].data, fo['F_lam_xy'][wb].data,
+                fo['F_lam_xz'][wb].data, fo['F_lam_yz'][wb].data
             ]).T.copy()
 
             vec_pack = self.collect_vectors_in_columns(vec_pack)
@@ -683,8 +761,8 @@ class SHGDriver(NonLinearSolver):
 
             vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
 
-            (F_x,F_y,F_z,F_sig_x, F_sig_y, F_sig_z, F_lam_xy,F_lam_xz,F_lam_yz) = vec_pack
-
+            (F_x, F_y, F_z, F_sig_x, F_sig_y, F_sig_z, F_lam_xy, F_lam_xz,
+             F_lam_yz) = vec_pack
 
             F_x = np.conjugate(F_x).T
             F_y = np.conjugate(F_y).T
@@ -702,11 +780,14 @@ class SHGDriver(NonLinearSolver):
 
             # Make all Xi terms
 
-            xi_sig_x = 3 * self.xi(k_x, k_x, F_x, F_x, F0_a) + self.xi(k_y, k_y, F_y, F_y, F0_a) + self.xi(k_z, k_z, F_z, F_z, F0_a) 
+            xi_sig_x = 3 * self.xi(k_x, k_x, F_x, F_x, F0_a) + self.xi(
+                k_y, k_y, F_y, F_y, F0_a) + self.xi(k_z, k_z, F_z, F_z, F0_a)
 
-            xi_sig_y = 3 * self.xi(k_y, k_y, F_y, F_y, F0_a) + self.xi(k_z, k_z, F_z, F_z, F0_a)  + self.xi(k_z, k_z, F_z, F_z, F0_a) 
+            xi_sig_y = 3 * self.xi(k_y, k_y, F_y, F_y, F0_a) + self.xi(
+                k_z, k_z, F_z, F_z, F0_a) + self.xi(k_z, k_z, F_z, F_z, F0_a)
 
-            xi_sig_z = 3 * self.xi(k_z, k_z, F_z, F_z, F0_a) + self.xi(k_y, k_y, F_y, F_y, F0_a)  + self.xi(k_x, k_x, F_x, F_x, F0_a)
+            xi_sig_z = 3 * self.xi(k_z, k_z, F_z, F_z, F0_a) + self.xi(
+                k_y, k_y, F_y, F_y, F0_a) + self.xi(k_x, k_x, F_x, F_x, F0_a)
 
             xi_lam_xy = self.xi(k_x, k_y, F_x, F_y, F0_a)
 
@@ -730,20 +811,25 @@ class SHGDriver(NonLinearSolver):
 
             # Anti sym the Fock matrices and convert them to vectors
 
-            e3vec[('sig_x',wb)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock_sig_x, nocc, norb))
+            e3vec[('sig_x', wb)] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(e3fock_sig_x, nocc, norb))
 
-            e3vec[('sig_y',wb)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock_sig_y, nocc, norb))
+            e3vec[('sig_y', wb)] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(e3fock_sig_y, nocc, norb))
 
-            e3vec[('sig_z',wb)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock_sig_z, nocc, norb))
+            e3vec[('sig_z', wb)] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(e3fock_sig_z, nocc, norb))
 
-            e3vec[('lam_xy',wb)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock_lam_xy, nocc, norb))
+            e3vec[('lam_xy', wb)] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(e3fock_lam_xy, nocc, norb))
 
-            e3vec[('lam_xz',wb)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock_lam_xz, nocc, norb))
+            e3vec[('lam_xz', wb)] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(e3fock_lam_xz, nocc, norb))
 
-            e3vec[('lam_yz',wb)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock_lam_yz, nocc, norb))
+            e3vec[('lam_yz', wb)] = self.anti_sym(
+                -2 * LinearSolver.lrmat2vec(e3fock_lam_yz, nocc, norb))
 
         return e3vec
-
 
     def print_header(self):
         """
@@ -791,4 +877,3 @@ class SHGDriver(NonLinearSolver):
         w_str = '{:<9s} {:12.4f} {:20.8f} {:20.8f}j'.format(
             label, freq, value.real, value.imag)
         self.ostream.print_header(w_str.ljust(width))
-
