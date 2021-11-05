@@ -1004,3 +1004,33 @@ class TpaDriver(NonLinearSolver):
         w_str = '{:<9s} {:12.4f} {:20.8f} {:20.8f}j'.format(
             label, freq, value.real, value.imag)
         self.ostream.print_header(w_str.ljust(width))
+
+
+    def print_header(self):
+        """
+        Prints TPA setup header to output stream.
+        """
+
+        self.ostream.print_blank()
+
+        title = 'Two-Photon Absorbtion Driver Setup'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
+        width = 50
+
+        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
+            self.eri_thresh)
+        self.ostream.print_header(cur_str.ljust(width))
+        cur_str = 'Convergance Threshold           : {:.1e}'.format(
+            self.conv_thresh)
+        self.ostream.print_header(cur_str.ljust(width))
+        cur_str = 'Max. Number of Iterations       : {:d}'.format(self.max_iter)
+        self.ostream.print_header(cur_str.ljust(width))
+        cur_str = 'Damping Parameter               : {:.6e}'.format(
+            self.damping)
+        self.ostream.print_header(cur_str.ljust(width))
+
+        self.ostream.print_blank()
+        self.ostream.flush()

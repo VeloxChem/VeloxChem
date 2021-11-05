@@ -351,7 +351,7 @@ class SHGDriver(NonLinearSolver):
     def compute_quad_components(self, Focks, freqpairs, X, d_a_mo, kX, track,
                                 scf_tensors, molecule, ao_basis, profiler):
         """
-        Computes all the relevent terms to compute a general quadratic response function
+        Computes all the relevent terms to compute the isotropic quadratic response function used for SHG
 
         :param w:
             A list of all the frequencies
@@ -361,9 +361,6 @@ class SHGDriver(NonLinearSolver):
             The SCF density in MO basis
         :param kX:
             A dictonary containing all the response matricies
-        :param track:
-            A list that contains all the information about which γ components
-            and at what freqs they are to be computed
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
@@ -374,8 +371,7 @@ class SHGDriver(NonLinearSolver):
             The profiler.
 
         :return:
-            A dictionary containing all the relevent terms to third-order
-            isotropic gradient
+            A dictionary containing all the relevent terms for SHG
         """
 
         if self.rank == mpi_master():
@@ -583,7 +579,7 @@ class SHGDriver(NonLinearSolver):
     def get_densities(self, freqpairs, kX, S, D0, mo):
         """
 
-        :param wi:
+        :param freqpairs:
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
@@ -644,8 +640,8 @@ class SHGDriver(NonLinearSolver):
 
     def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis):
         """
-        Computes the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the
-        isotropic cubic response function
+        Computes the compounded Fock matrics used for the
+        isotropic quadratic response function used for SHG
 
         :param wi:
             A list of the frequencies
@@ -727,12 +723,10 @@ class SHGDriver(NonLinearSolver):
             A list of freqs
         :param kX:
             A dict of the single index response matricies
-        :param kXY:
-            A dict of the two index response matrices
         :param fo:
             A dictonary of transformed Fock matricies from fock_dict
         :param fo2:
-            A dictonarty of transfromed Fock matricies from fock_dict_two
+            A dictonarty of transfromed Fock matricies from subspace of response solver
         :param nocc:
             The number of occupied orbitals
         :param norb:
@@ -838,7 +832,7 @@ class SHGDriver(NonLinearSolver):
 
         self.ostream.print_blank()
 
-        title = 'Two-Photon Absorbtion Driver Setup'
+        title = 'SHG Driver Setup'
         self.ostream.print_header(title)
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()

@@ -232,7 +232,7 @@ class QuadraticResponseDriver(NonLinearSolver):
             for ind in range(len(c_rhs)):
                 c_rhs[ind] *= inv_sqrt_2
 
-        # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
+        # Storing the dipole integral matrices used for the X[2] and
         # A[2] contractions in MO basis
         wa = [sum(x) for x in zip(self.b_frequencies, self.c_frequencies)]
 
@@ -314,17 +314,14 @@ class QuadraticResponseDriver(NonLinearSolver):
         """
         Computes all the relevent terms to compute a general quadratic response function
 
-        :param w:
+        :param freqparis:
             A list of all the frequencies
         :param X:
-            A dictonary of matricies containing all the dipole integrals
+            A dictonary of matricies containing all the property integrals
         :param d_a_mo:
             The SCF density in MO basis
         :param kX:
             A dictonary containing all the response matricies
-        :param track:
-            A list that contains all the information about which γ components
-            and at what freqs they are to be computed
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
@@ -335,8 +332,7 @@ class QuadraticResponseDriver(NonLinearSolver):
             The profiler.
 
         :return:
-            A dictionary containing all the relevent terms to third-order
-            isotropic gradient
+            A dictionary containing all the relevent terms for quadratic response
         """
 
         if self.rank == mpi_master():
@@ -427,7 +423,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
     def get_densities(self, freqpairs, kX, S, D0, mo):
         """
-        Computes the  densities needed for the  Fock
+        Computes the  densities needed for the perturbed Fock
         matrics 
 
         :param wi:
@@ -442,7 +438,7 @@ class QuadraticResponseDriver(NonLinearSolver):
             A matrix containing the MO coefficents
 
         :return:
-            A list of tranformed compounded densities
+            A list of tranformed densities
         """
 
         density_list = []
@@ -500,7 +496,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         if self.checkpoint_file is not None:
             fock_file = str(
-                Path(self.checkpoint_file).with_suffix('.tpa_fock_1_full.h5'))
+                Path(self.checkpoint_file).with_suffix('.qrf_fock.h5'))
         else:
             fock_file = None
 
@@ -549,12 +545,10 @@ class QuadraticResponseDriver(NonLinearSolver):
             A list of freqs
         :param kX:
             A dict of the single index response matricies
-        :param kXY:
-            A dict of the two index response matrices
         :param fo:
             A dictonary of transformed Fock matricies from fock_dict
         :param fo2:
-            A dictonarty of transfromed Fock matricies from fock_dict_two
+            A dictonarty of transfromed Fock matricies from subspace of response solver
         :param nocc:
             The number of occupied orbitals
         :param norb:

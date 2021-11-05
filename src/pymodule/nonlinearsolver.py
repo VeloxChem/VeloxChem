@@ -151,7 +151,7 @@ class NonLinearSolver:
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
-        Updates response and method settings in linear solver.
+        Updates response and method settings in nonlinear solver.
 
         :param rsp_dict:
             The dictionary of response dict.
@@ -540,7 +540,7 @@ class NonLinearSolver:
 
     def print_component(self, label, value, width):
         """
-        Prints TPA component.
+        Prints response function components.
 
         :param label:
             The label
@@ -558,7 +558,7 @@ class NonLinearSolver:
 
     def s4(self, k1, k2, k3, D, nocc, norb):
         """
-        Returns the contraction of S[4] for S[4] dict
+        Used for the contraction of the S[4] tensor with three response vectors
 
         :param k1:
             A response matrix
@@ -584,7 +584,7 @@ class NonLinearSolver:
 
     def s4_contract(self, k1, k2, k3, D, nocc, norb):
         """
-        Returns the contraction of S[4] for S[4] dict
+        Returns the contraction of the S[4] tensor 
 
         :param k1:
             A response matrix
@@ -610,9 +610,7 @@ class NonLinearSolver:
 
     def flip_xy(self, X):
         """
-        Swaps upper and lower parts of a response vector. This is used when
-        rewriting the R^[4] tensor contraction in terms of S^[4] tensor
-        contractions.
+        Swaps upper and lower parts of a response vector. 
 
         :param X:
             A response vector v = (Z,-Y^*)
@@ -685,57 +683,6 @@ class NonLinearSolver:
                           root=mpi_master())
 
         return recvbuf
-
-    def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
-        """
-        Prints the results from the TPA calculation.
-
-        :param freqs:
-            List of frequencies
-        :param gamma:
-            A dictonary containing the isotropic cubic response functions for
-            TPA
-        :param comp:
-            List of gamma tensors components
-        :param t4_dict:
-            A dictonary containing the isotropic T[4] contractions
-        :param t3_dict:
-            A dictonary containing the isotropic T[3] contractions
-        :param tpa_dict:
-            A dictonary containing the isotropic X[3], A[3], X[2], A[2]
-            contractions
-        """
-
-        return None
-
-    def print_header(self):
-        """
-        Prints TPA setup header to output stream.
-        """
-
-        self.ostream.print_blank()
-
-        title = 'Two-Photon Absorbtion Driver Setup'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
-
-        width = 50
-
-        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
-            self.eri_thresh)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Convergance Threshold           : {:.1e}'.format(
-            self.conv_thresh)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Max. Number of Iterations       : {:d}'.format(self.max_iter)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Damping Parameter               : {:.6e}'.format(
-            self.damping)
-        self.ostream.print_header(cur_str.ljust(width))
-
-        self.ostream.print_blank()
-        self.ostream.flush()
 
     def transform_dens(self, k, D, S):
         """
@@ -950,6 +897,7 @@ class NonLinearSolver:
 
     def xi(self, kA, kB, Fa, Fb, F0):
         """
+        Returns a matrix used for the E[3] contraction
 
         :param kA:
             First-order response matrix
