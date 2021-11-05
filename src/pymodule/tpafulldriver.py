@@ -1582,17 +1582,17 @@ class TpaFullDriver(TpaDriver):
             Nc_h = self.flip_xy(Nc)
             Nd_h = self.flip_xy(Nd)
 
-            r4_term += 1j * self.damping * np.dot(
+            r4_term += -1j * self.damping * np.dot(
                 Nd_h, self.s4_for_r4(kA.T, kB, kC, D0, nocc, norb))
-            r4_term += 1j * self.damping * np.dot(
+            r4_term += -1j * self.damping * np.dot(
                 Nc_h, self.s4_for_r4(kA.T, kB, kD, D0, nocc, norb))
-            r4_term += 1j * self.damping * np.dot(
+            r4_term += -1j * self.damping * np.dot(
                 Nd_h, self.s4_for_r4(kA.T, kC, kB, D0, nocc, norb))
-            r4_term += 1j * self.damping * np.dot(
+            r4_term += -1j * self.damping * np.dot(
                 Nb_h, self.s4_for_r4(kA.T, kC, kD, D0, nocc, norb))
-            r4_term += 1j * self.damping * np.dot(
+            r4_term += -1j * self.damping * np.dot(
                 Nc_h, self.s4_for_r4(kA.T, kD, kB, D0, nocc, norb))
-            r4_term += 1j * self.damping * np.dot(
+            r4_term += -1j * self.damping * np.dot(
                 Nb_h, self.s4_for_r4(kA.T, kD, kC, D0, nocc, norb))
 
         return {
