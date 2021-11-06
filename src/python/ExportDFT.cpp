@@ -29,6 +29,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include <memory>
 
@@ -315,6 +316,10 @@ export_dft(py::module& m)
     // exposing functions
 
     m.def("to_xcfun", &to_xcfun, "Converts string label to its enumerate class value.", "label"_a);
+
+    m.def("available_functionals",
+          &vxcfuncs::getAvailableFunctionals,
+          "Gets a list of available exchange-correlation functionals.");
 
     m.def("parse_xc_func",
           &vxcfuncs::getExchangeCorrelationFunctional,
