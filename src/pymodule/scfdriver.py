@@ -378,6 +378,10 @@ class ScfDriver:
         if self.dft:
             assert_msg_critical(self.xcfun is not None,
                                 'SCF driver: Undefined XC functional')
+            if isinstance(self.xcfun, str):
+                self.xcfun = parse_xc_func(self.xcfun.upper())
+                assert_msg_critical(not self.xcfun.is_undefined(),
+                                    'SCF driver: Undefined XC functional')
 
         # initial guess
         if self.restart:

@@ -35,7 +35,6 @@ from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver
-from .veloxchemlib import XCFunctional
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
@@ -120,7 +119,7 @@ class LinearSolver:
         # dft
         self.dft = False
         self.grid_level = 4
-        self.xcfun = XCFunctional()
+        self.xcfun = None
 
         # polarizable embedding
         self.pe = False
@@ -227,7 +226,7 @@ class LinearSolver:
                 self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Linear solver: Undefined XC functional')
+                                'LinearSolver: Undefined XC functional')
 
         if 'pe_options' not in method_dict:
             method_dict['pe_options'] = {}
@@ -243,7 +242,7 @@ class LinearSolver:
                     'potfile' not in method_dict['pe_options']):
                 method_dict['pe_options']['potfile'] = method_dict['potfile']
             assert_msg_critical('potfile' in method_dict['pe_options'],
-                                'SCF driver: No potential file defined')
+                                'LinearSolver: No potential file defined')
             self.pe_options = dict(method_dict['pe_options'])
 
             cppe_potfile = None
@@ -256,10 +255,10 @@ class LinearSolver:
         if self.electric_field is not None:
             assert_msg_critical(
                 len(self.electric_field) == 3,
-                'Linear solver: Expecting 3 values in \'electric field\' input')
+                'LinearSolver: Expecting 3 values in \'electric field\' input')
             assert_msg_critical(
                 not self.pe,
-                'Linear solver: \'electric field\' input is incompatible ' +
+                'LinearSolver: \'electric field\' input is incompatible ' +
                 'with polarizable embedding')
             # disable restart of calculation with static electric field since
             # checkpoint file does not contain information about the electric
@@ -314,8 +313,16 @@ class LinearSolver:
             The dictionary of DFT information.
         """
 
-        # generate integration grid
         if self.dft:
+            # check dft setup
+            assert_msg_critical(self.xcfun is not None,
+                                'LinearSolver: Undefined XC functional')
+            if isinstance(self.xcfun, str):
+                self.xcfun = parse_xc_func(self.xcfun.upper())
+                assert_msg_critical(not self.xcfun.is_undefined(),
+                                    'LinearSolver: Undefined XC functional')
+
+            # generate integration grid
             grid_drv = GridDriver(self.comm)
             grid_drv.set_level(self.grid_level)
 
@@ -544,12 +551,12 @@ class LinearSolver:
         if self.rank == mpi_master():
             assert_msg_critical(
                 vecs_ger.data.ndim == 2 and vecs_ung.data.ndim == 2,
-                'LinearResponse.e2n_half_size: '
+                'LinearSolver.e2n_half_size: '
                 'invalid shape of trial vectors')
 
             assert_msg_critical(
                 vecs_ger.shape(0) == vecs_ung.shape(0),
-                'LinearResponse.e2n_half_size: '
+                'LinearSolver.e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
             mo = scf_tensors['C_alpha']
@@ -1128,10 +1135,12 @@ class LinearSolver:
             A tuple containing gerade and ungerade parts of gradient.
         """
 
-        assert_msg_critical(grad.ndim == 1, 'decomp_grad: Expecting a 1D array')
+        assert_msg_critical(grad.ndim == 1,
+                            'LinearSolver.decomp_grad: Expecting a 1D array')
 
-        assert_msg_critical(grad.shape[0] % 2 == 0,
-                            'decomp_grad: size of array should be even')
+        assert_msg_critical(
+            grad.shape[0] % 2 == 0,
+            'LinearSolver.decomp_grad: size of array should be even')
 
         half_size = grad.shape[0] // 2
 
@@ -1260,7 +1269,7 @@ class LinearSolver:
                 'dipole', 'electric dipole', 'electric_dipole',
                 'linear_momentum', 'linear momentum', 'angular_momentum',
                 'angular momentum', 'magnetic dipole', 'magnetic_dipole'
-            ], 'get_prop_grad: unsupported operator {}'.format(operator))
+            ], f'LinearSolver.get_prop_grad: unsupported operator {operator}')
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
@@ -1357,7 +1366,8 @@ class LinearSolver:
                 'linear_momentum', 'linear momentum', 'angular_momentum',
                 'angular momentum', 'magnetic dipole', 'magnetic_dipole'
             ],
-            'get_complex_prop_grad: unsupported operator {}'.format(operator))
+            f'LinearSolver.get_complex_prop_grad: unsupported operator {operator}'
+        )
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
