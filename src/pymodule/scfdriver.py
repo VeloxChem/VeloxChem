@@ -262,7 +262,6 @@ class ScfDriver:
         """
 
         width = 80
-
         for group in self.input_keywords:
             self.ostream.print_header('=' * width)
             self.ostream.print_header(f'  @{group}'.ljust(width))

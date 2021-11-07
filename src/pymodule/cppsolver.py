@@ -36,7 +36,6 @@ from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
 from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
 
 
@@ -79,6 +78,15 @@ class ComplexResponse(LinearSolver):
         self.frequencies = (0,)
         self.damping = 1000.0 / hartree_in_wavenumbers()
 
+        self.input_keywords['response'].update({
+            'a_operator': ('str_lower', 'A operator'),
+            'a_components': ('str_lower', 'Cartesian components of A operator'),
+            'b_operator': ('str_lower', 'B operator'),
+            'b_components': ('str_lower', 'Cartesian components of B operator'),
+            'frequencies': ('seq_range', 'frequencies'),
+            'damping': ('float', 'damping parameter'),
+        })
+
     def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in complex liner response solver.
@@ -93,17 +101,6 @@ class ComplexResponse(LinearSolver):
             method_dict = {}
 
         super().update_settings(rsp_dict, method_dict)
-
-        rsp_keywords = {
-            'a_operator': 'str_lower',
-            'a_components': 'str_lower',
-            'b_operator': 'str_lower',
-            'b_components': 'str_lower',
-            'frequencies': 'seq_range',
-            'damping': 'float',
-        }
-
-        parse_input(self, rsp_keywords, rsp_dict)
 
     def get_precond(self, orb_ene, nocc, norb, w, d):
         """
