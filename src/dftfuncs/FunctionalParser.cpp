@@ -46,7 +46,7 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 {
     auto availFuncs = getAvailableFunctionals();
 
-    if (std::find(availFuncs.begin(), availFuncs.end(), xcLabel) != availFuncs.end())
+    if (std::find(availFuncs.begin(), availFuncs.end(), fstr::upcase(xcLabel)) != availFuncs.end())
     {
         // pure spin-polarized Slater exchange functional
 
