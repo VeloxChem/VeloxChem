@@ -24,6 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from .veloxchemlib import hartree_in_ev
+from .veloxchemlib import rotatory_strength_in_cgs
 from .rspproperty import ResponseProperty
 
 
@@ -176,7 +177,8 @@ class Absorption(ResponseProperty):
         ostream.print_header(('-' * len(valstr)).ljust(92))
         for s, R in enumerate(self.rsp_property['rotatory_strengths']):
             valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
-            valstr += '    Rot.Str. {:11.4f}'.format(R)
-            valstr += '    [10**(-40) (esu**2)*(cm**2)]'
+            valstr += '    Rot.Str. '
+            valstr += f'{(R / rotatory_strength_in_cgs()):13.6f} a.u.'
+            valstr += f'{R:11.4f} [10**(-40) cgs]'
             ostream.print_header(valstr.ljust(92))
         ostream.print_blank()
