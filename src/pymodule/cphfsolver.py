@@ -217,6 +217,14 @@ class CphfSolver(LinearSolver):
             dist_rhs.append(DistributedArray(cphf_rhs[k], self.comm))
 
         # setup and precondition trial vectors
+        # TODO: remove renormalize=False
+        dist_trials = self.setup_trials(molecule, precond, dist_rhs, renormalize=False)
+
+        self.not_norm_dist_trials = dist_trials
+
+        # construct the sigma (E*t) vectors
+        self.build_sigmas(molecule, basis, scf_tensors, dist_trials, skip=True)
+
         dist_trials = self.setup_trials(molecule, precond, dist_rhs)
 
         # construct the sigma (E*t) vectors
@@ -239,6 +247,11 @@ class CphfSolver(LinearSolver):
 
             self.cur_iter = iteration
             num_vecs = self.dist_trials.shape(1)
+
+            print(iteration, num_vecs)
+            print()
+            #print(self.dist_trials.data)
+            #print()
 
             for x in range(3 * natm):
                 # CPHF RHS in reduced space
@@ -267,6 +280,8 @@ class CphfSolver(LinearSolver):
                     relative_residual_norm[x] = r_norm
 
                 if relative_residual_norm[x] < self.conv_thresh:
+                    print("Coordinate has converged (iteration, coordinate, shape): ", iteration, x, u.data.shape)
+                    print("Solution:\n", u.data)
                     solutions[x] = u
                 else:
                     residuals[x] = dist_residual
@@ -333,7 +348,7 @@ class CphfSolver(LinearSolver):
 
 
 
-    def build_sigmas(self, molecule, basis, scf_tensors, dist_trials):
+    def build_sigmas(self, molecule, basis, scf_tensors, dist_trials, skip=False):
         """
         Apply orbital Hessian matrix to a set of trial vectors.
         Appends sigma and trial vectors to member variable.
@@ -375,9 +390,18 @@ class CphfSolver(LinearSolver):
             vec_ao = np.linalg.multi_dot([mo_occ, vec, mo_vir.T])
             vec_list.append(vec_ao)
 
+        # TODO: remove variable
+        if skip:
+            self.vec_ao_list = vec_list
+        
         # create density and Fock matrices, contract with two-electron integrals
         dens = AODensityMatrix(vec_list, denmat.rest)
         fock = AOFockMatrix(dens)
+
+        fock_flag = fockmat.rgenjk
+        # TODO: add dft
+        for i in range(num_vecs):
+            fock.set_fock_type(fock_flag, i)
 
         # TODO: replace empty dictionary by timing_dict
         self.comp_lr_fock(fock, dens, molecule, basis, eri_dict, dft_dict, pe_dict, {})
@@ -387,10 +411,17 @@ class CphfSolver(LinearSolver):
 
         for ifock in range(num_vecs):
             fock_vec = fock.alpha_to_numpy(ifock)
+            #TODO: remove this printout
+            if skip and ifock == 0:
+                print("Diagonal part in MO:\n")
+                print(dist_trials.get_full_vector(ifock).reshape(nocc, nvir)) 
+                print() 
+                print("eov:\n")
+                print(eov)
 
             cphf_mo = (- np.linalg.multi_dot([mo_occ.T, fock_vec, mo_vir])
                        - np.linalg.multi_dot([mo_vir.T, fock_vec, mo_occ]).T
-                       + dist_trials.get_full_vector(col).reshape(nocc, nvir) * eov
+                       + dist_trials.get_full_vector(ifock).reshape(nocc, nvir) * eov
                       )
             sigmas[:, ifock] = cphf_mo.reshape(nocc*nvir)
 
@@ -398,18 +429,26 @@ class CphfSolver(LinearSolver):
 
         # append new sigma and trial vectors
         # TODO: create new function for this?
-        if self.dist_sigmas is None:
-            self.dist_sigmas = DistributedArray(dist_sigmas.data,
+
+        if skip:
+            # TODO: remove this variable
+            self.sigma_init_guess = DistributedArray(dist_sigmas.data,
                                                 self.comm,
                                                 distribute=False)
         else:
-            self.dist_sigmas.append(dist_sigmas, axis=1)
-        if self.dist_trials is None:
-            self.dist_trials = DistributedArray(dist_trials.data,
-                                                self.comm,
-                                                distribute=False)
-        else:
-            self.dist_trials.append(dist_trials, axis=1)
+            if self.dist_sigmas is None:
+                self.dist_sigmas = DistributedArray(dist_sigmas.data,
+                                                    self.comm,
+                                                    distribute=False)
+            else:
+                self.dist_sigmas.append(dist_sigmas, axis=1)
+
+            if self.dist_trials is None:
+                self.dist_trials = DistributedArray(dist_trials.data,
+                                                    self.comm,
+                                                    distribute=False)
+            else:
+                self.dist_trials.append(dist_trials, axis=1)
 
 
     def setup_trials(self, molecule, precond, dist_rhs, old_trials=None, renormalize=True):
@@ -444,6 +483,11 @@ class CphfSolver(LinearSolver):
                 trials.append(v.data[:])
             
         dist_trials = DistributedArray(np.array(trials).T, self.comm, distribute=False)
+
+        # TODO: remove variable
+        if old_trials is None:
+            self.initial_guess = dist_trials.data
+            
 
         if dist_trials.data.size == 0:
             dist_trials.data = np.zeros((dist_trials.shape(0), 0))

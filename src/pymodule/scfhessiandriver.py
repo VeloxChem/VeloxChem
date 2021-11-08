@@ -114,6 +114,12 @@ class ScfHessianDriver(HessianDriver):
             cphf_dict = {}
         self.cphf_dict = dict(cphf_dict)
 
+        if 'conv_thresh' in cphf_dict:
+            self.conv_thresh = float(cphf_dict['conv_thresh'])
+
+        if 'max_iter' in cphf_dict:
+            self.max_iter = int(cphf_dict['max_iter']) 
+
         # check if Raman intensities are to be calculated (numerically)
         if 'do_raman' in freq_dict:
             key = freq_dict['do_raman'].lower()
@@ -505,6 +511,8 @@ class ScfHessianDriver(HessianDriver):
             contracted with the two-electron integrals).
         """
 
+        # TODO: remove; add profiler
+        start = tm.time()
         density = self.scf_drv.scf_tensors['D_alpha']
         #overlap = self.scf_drv.scf_tensors['S']
         natm = molecule.number_of_atoms()
@@ -585,6 +593,8 @@ class ScfHessianDriver(HessianDriver):
         ###                                                 cphf_rhs[i,x], dft_dict, self.profiler)
 
 
+        stop = tm.time()
+        print("CPHF took %.2f s." % (stop-start) )
         return {
             'cphf_ov': cphf_ov,
             'cphf_rhs': cphf_rhs,
@@ -643,12 +653,19 @@ class ScfHessianDriver(HessianDriver):
         # the RHS divided by orbital-energy differences
         cphf_guess = cphf_rhs / eov
 
+        # TODO: delete this variable
+        self.initial_guess = cphf_guess
+
+        print("CPHF guess 0:\n", cphf_guess[0])
         if self.rank == mpi_master():
             # Create AODensityMatrix object from CPHF guess in AO
             cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ, cphf_guess, mo_vir)
             cphf_ao_list = list([cphf_ao[x] for x in range(3*natm)])
             # create AODensityMatrix object
             ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
+
+            #TODO: remove this variable:
+            self.cphf_ao_list = cphf_ao_list
         else:
             ao_density_cphf = AODensityMatrix()
         ao_density_cphf.broadcast(self.rank, self.comm)
@@ -719,6 +736,13 @@ class ScfHessianDriver(HessianDriver):
                 for i in range(3*natm):
                     fock_cphf_numpy[i] = fock_cphf.to_numpy(i)
 
+                    if i == 0 and self.iter_count == 0:
+                        print("Diagonal part in MO:\n")
+                        print(v.reshape(3*natm, nocc, nvir)[i])
+                        print()
+                        print("eov:\n")
+                        print(eov)
+
                 cphf_mo = (-np.einsum('mi,xmn,na->xia', mo_occ, fock_cphf_numpy, mo_vir)
                           - np.einsum('ma,xmn,ni->xia', mo_vir, fock_cphf_numpy, mo_occ)
                           + v.reshape(3*natm, nocc, nvir) * eov)
@@ -739,6 +763,8 @@ class ScfHessianDriver(HessianDriver):
 
             return cphf_mo.reshape(3 * natm * nocc * nvir)
 
+        print("CPHF guess:\n", cphf_guess[0])
+        self.matvec_init_guess = cphf_matvec(cphf_guess.reshape(3*natm * nocc * nvir))
 
         # Matrix-vector product for preconditioner using the
         # inverse of the diagonal (i.e. eocc - evir)
