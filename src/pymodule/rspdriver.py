@@ -112,6 +112,9 @@ class ResponseDriver:
                 self.solver = TDAExciDriver(self.comm, self.ostream)
             else:
                 self.solver = LinearResponseEigenSolver(self.comm, self.ostream)
+            self.solver.input_keywords['response'].update({
+                'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),
+            })
 
         # Linear response solver
         elif (self.rsp_dict['response'] == 'linear' and
@@ -143,6 +146,8 @@ class ResponseDriver:
                   self.rsp_dict['tpa_type'].lower() == 'reduced'):
                 self.solver = TpaReducedDriver(self.comm, self.ostream)
 
+        self.solver.update_settings(self.rsp_dict, self.method_dict)
+
     def compute(self, molecule, ao_basis, scf_tensors):
         """
         Performs molecular property calculation using molecular data
@@ -160,8 +165,6 @@ class ResponseDriver:
 
         assert_msg_critical(self.solver is not None,
                             'ResponseDriver: solver not initialized')
-
-        self.solver.update_settings(self.rsp_dict, self.method_dict)
 
         result = self.solver.compute(molecule, ao_basis, scf_tensors)
 
