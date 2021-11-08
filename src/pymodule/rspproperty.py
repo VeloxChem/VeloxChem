@@ -24,6 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from .rspdriver import ResponseDriver
+from .errorhandler import assert_msg_critical
 
 
 class ResponseProperty:
@@ -50,6 +51,8 @@ class ResponseProperty:
         self.rsp_dict = rsp_dict
         self.method_dict = method_dict
 
+        self.rsp_driver = None
+
     def init_driver(self, comm, ostream):
         """
         Initializes response driver.
@@ -62,6 +65,21 @@ class ResponseProperty:
 
         self.rsp_driver = ResponseDriver(comm, ostream)
         self.rsp_driver.update_settings(self.rsp_dict, self.method_dict)
+
+    def print_keywords(self):
+        """
+        Prints input keywords for response property.
+        """
+
+        assert_msg_critical(
+            self.rsp_driver is not None,
+            'ResponseProperty: response driver not initialized')
+
+        assert_msg_critical(
+            self.rsp_driver.solver is not None,
+            'ResponseProperty: response solver not initialized')
+
+        self.rsp_driver.solver.print_keywords()
 
     def compute(self, molecule, basis, scf_tensors):
         """

@@ -79,6 +79,7 @@ class LinearResponseEigenSolver(LinearSolver):
         super().__init__(comm, ostream)
 
         self.nstates = 3
+        self.tamm_dancoff = False
 
         self.nto = False
         self.nto_pairs = None
@@ -88,6 +89,7 @@ class LinearResponseEigenSolver(LinearSolver):
         self.cube_points = [80, 80, 80]
 
         self.input_keywords['response'].update({
+            'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),
             'nstates': ('int', 'number of excited states'),
             'nto': ('bool', 'analyze natural transition orbitals'),
             'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
@@ -111,6 +113,10 @@ class LinearResponseEigenSolver(LinearSolver):
             method_dict = {}
 
         super().update_settings(rsp_dict, method_dict)
+
+        assert_msg_critical(
+            not self.tamm_dancoff,
+            'LinearResponseEigenSolver: cannot use Tamm-Dancoff approximation')
 
         if self.cube_origin is not None:
             assert_msg_critical(
