@@ -219,6 +219,7 @@ class LinearSolver:
                 text += f'  {val[1]}'.ljust(width - 35)
                 self.ostream.print_header(text)
         self.ostream.print_header('=' * width)
+        self.ostream.flush()
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
