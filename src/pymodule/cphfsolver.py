@@ -494,9 +494,17 @@ class CphfSolver(LinearSolver):
 
         if old_trials is not None:
             # t = t - (b (b.T t))
-            bT_new_trials = old_trials.matmul_AtB_allreduce(dist_trials)
-            dist_trials_proj = dist_trials.matmul_AB_no_gather(bT_new_trials)
-            dist_trials.data -= dist_trials_proj.data 
+            #bT_new_trials = old_trials.matmul_AtB_allreduce(dist_trials)
+            #dist_trials_proj = dist_trials.matmul_AB_no_gather(bT_new_trials)
+            #dist_trials.data -= dist_trials_proj.data
+            
+            # b b.T
+            bT_new_trials = np.matmul(old_trials.data, old_trials.data.T)
+            # (b b.T) t
+            dist_trials_proj = np.matmul(bT_new_trials, dist_trials.data)
+            # t = t - (b b.T) t
+            dist_trials.data -= dist_trials_proj
+ 
 
         # remove linear dependencies and orthonormalize trial vectors
         if renormalize:
