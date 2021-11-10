@@ -57,7 +57,7 @@ class TPA(ResponseProperty):
             method_dict = dict(method_dict)
 
         rsp_dict['property'] = 'tpa'
-        rsp_dict['response'] = 'cubic'
+        rsp_dict['order'] = 'cubic'
         rsp_dict['residue'] = 'none'
         rsp_dict['complex'] = 'yes'
 

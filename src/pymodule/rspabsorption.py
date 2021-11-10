@@ -59,7 +59,7 @@ class Absorption(ResponseProperty):
             method_dict = dict(method_dict)
 
         rsp_dict['property'] = 'absorption'
-        rsp_dict['response'] = 'linear'
+        rsp_dict['order'] = 'linear'
         rsp_dict['residue'] = 'single'
         rsp_dict['complex'] = 'no'
 

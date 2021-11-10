@@ -58,8 +58,8 @@ class CustomProperty(ResponseProperty):
             method_dict = dict(method_dict)
 
         rsp_dict['property'] = 'custom'
-        if 'response' not in rsp_dict:
-            rsp_dict['response'] = 'linear'
+        if 'order' not in rsp_dict:
+            rsp_dict['order'] = 'linear'
         rsp_dict['residue'] = 'none'
         rsp_dict['onlystatic'] = 'no'
         if 'complex' not in rsp_dict:

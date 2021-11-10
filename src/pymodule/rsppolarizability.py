@@ -58,7 +58,7 @@ class Polarizability(ResponseProperty):
             method_dict = dict(method_dict)
 
         rsp_dict['property'] = 'polarizability'
-        rsp_dict['response'] = 'linear'
+        rsp_dict['order'] = 'linear'
         rsp_dict['residue'] = 'none'
         rsp_dict['onlystatic'] = 'no'
         if 'complex' not in rsp_dict:

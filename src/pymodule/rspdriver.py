@@ -105,7 +105,7 @@ class ResponseDriver:
         parse_input(self, rsp_keywords, self.rsp_dict)
 
         # Linear response eigensolver
-        if (self.rsp_dict['response'] == 'linear' and
+        if (self.rsp_dict['order'] == 'linear' and
                 self.rsp_dict['residue'] == 'single' and
                 self.rsp_dict['complex'] == 'no'):
             if self.tamm_dancoff:
@@ -117,27 +117,27 @@ class ResponseDriver:
             })
 
         # Linear response solver
-        elif (self.rsp_dict['response'] == 'linear' and
+        elif (self.rsp_dict['order'] == 'linear' and
               self.rsp_dict['residue'] == 'none' and
               self.rsp_dict['complex'] == 'no'):
             self.solver = LinearResponseSolver(self.comm, self.ostream)
 
         # Complex linear response solver
-        elif (self.rsp_dict['response'] == 'linear' and
+        elif (self.rsp_dict['order'] == 'linear' and
               self.rsp_dict['residue'] == 'none' and
               self.rsp_dict['onlystatic'] == 'no' and
               self.rsp_dict['complex'] == 'yes'):
             self.solver = ComplexResponse(self.comm, self.ostream)
 
         # C6 linear response solver
-        elif (self.rsp_dict['response'] == 'linear' and
+        elif (self.rsp_dict['order'] == 'linear' and
               self.rsp_dict['residue'] == 'none' and
               self.rsp_dict['onlystatic'] == 'yes' and
               self.rsp_dict['complex'] == 'yes'):
             self.solver = C6Solver(self.comm, self.ostream)
 
         # TPA
-        elif (self.rsp_dict['response'] == 'cubic' and
+        elif (self.rsp_dict['order'] == 'cubic' and
               self.rsp_dict['complex'] == 'yes'):
             if ('tpa_type' not in self.rsp_dict or
                     self.rsp_dict['tpa_type'].lower() == 'full'):

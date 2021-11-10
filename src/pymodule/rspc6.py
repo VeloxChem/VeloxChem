@@ -60,7 +60,7 @@ class C6(ResponseProperty):
             method_dict = dict(method_dict)
 
         rsp_dict['property'] = 'c6'
-        rsp_dict['response'] = 'linear'
+        rsp_dict['order'] = 'linear'
         rsp_dict['residue'] = 'none'
         rsp_dict['onlystatic'] = 'yes'
         rsp_dict['complex'] = 'yes'
