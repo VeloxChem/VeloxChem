@@ -44,6 +44,7 @@ from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .qqscheme import get_qq_scheme
 #from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
+from scipy.sparse import linalg
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -59,7 +60,9 @@ class CphfSolver(LinearSolver):
     :param ostream:
         The output stream.
 
-    ##Instance variables
+    Instance variables
+        - use_subspace_solver: flag to use subspace solver 
+          instead of conjugate gradient.
     ##    - a_operator: The A operator.
     ##    - frequencies: The frequencies.
     """
@@ -77,12 +80,14 @@ class CphfSolver(LinearSolver):
 
         super().__init__(comm, ostream)
 
+        self.use_subspace_solver = False 
 
-    def update_settings(self, orbrsp_dict, method_dict=None):
+
+    def update_settings(self, cphf_dict, method_dict=None):
         """
         Updates response and method settings in CPHF solver.
 
-        :param orbrsp_dict:
+        :param cphf_dict:
             The dictionary of CPHF (orbital response) settings.
         :param method_dict:
             The dictionary of method settings.
@@ -91,7 +96,18 @@ class CphfSolver(LinearSolver):
         if method_dict is None:
             method_dict = {}
 
-        super().update_settings(orbrsp_dict, method_dict)
+        super().update_settings(cphf_dict, method_dict)
+    
+        if 'use_subspace_solver' in cphf_dict:
+            key = cphf_dict['use_subspace_solver'].lower()
+            self.use_subspace_solver = True if key in ['yes', 'y'] else False
+
+        self.profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
 
 ##        rsp_keywords = {
 ##            'a_operator': 'str_lower',
@@ -105,6 +121,31 @@ class CphfSolver(LinearSolver):
 
 
     def compute(self, molecule, basis, scf_tensors):
+        """
+        Performs CPHF calculation for a molecule and a basis set.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+
+        :return:
+            A dictionary containing the RHS and solution (ov block)
+            of the CPHF equations, the derivative of the AO Fock matrix,
+            partial derivative of the overlap matrix (oo block),
+            and an auxiliary Fock matrix (oo block of the CPHF coefficients
+            contracted with the two-electron integrals).
+        """
+
+        if self.use_subspace_solver:
+            return self.compute_subspace_solver(molecule, basis, scf_tensors)
+        else:
+            return self.compute_conjugate_gradient(molecule, basis, scf_tensors)
+
+
+    def compute_subspace_solver(self, molecule, basis, scf_tensors):
         """
         Performs CPHF calculation for a molecule and a basis set.
 
@@ -135,13 +176,6 @@ class CphfSolver(LinearSolver):
         omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
         evir = mo_energies[nocc:]
         eov = eocc.reshape(-1, 1) - evir
-
-        profiler = Profiler({
-            'timing': self.timing,
-            'profiling': self.profiling,
-            'memory_profiling': self.memory_profiling,
-            'memory_tracing': self.memory_tracing,
-        })
 
         self.start_time = tm.time()
 
@@ -217,14 +251,6 @@ class CphfSolver(LinearSolver):
             dist_rhs.append(DistributedArray(cphf_rhs[k], self.comm))
 
         # setup and precondition trial vectors
-        # TODO: remove renormalize=False
-        dist_trials = self.setup_trials(molecule, precond, dist_rhs, renormalize=False)
-
-        self.not_norm_dist_trials = dist_trials
-
-        # construct the sigma (E*t) vectors
-        self.build_sigmas(molecule, basis, scf_tensors, dist_trials, skip=True)
-
         dist_trials = self.setup_trials(molecule, precond, dist_rhs)
 
         # construct the sigma (E*t) vectors
@@ -240,18 +266,13 @@ class CphfSolver(LinearSolver):
 
             iter_start_time = tm.time()
 
-            profiler.start_timer(iteration, 'ReducedSpace')
+            self.profiler.start_timer(iteration, 'ReducedSpace')
 
             # Orbital Hessian in reduced subspace
             orbhess_red = self.dist_trials.matmul_AtB(self.dist_sigmas)
 
             self.cur_iter = iteration
             num_vecs = self.dist_trials.shape(1)
-
-            print(iteration, num_vecs)
-            print()
-            #print(self.dist_trials.data)
-            #print()
 
             for x in range(3 * natm):
                 # CPHF RHS in reduced space
@@ -280,8 +301,6 @@ class CphfSolver(LinearSolver):
                     relative_residual_norm[x] = r_norm
 
                 if relative_residual_norm[x] < self.conv_thresh:
-                    print("Coordinate has converged (iteration, coordinate, shape): ", iteration, x, u.data.shape)
-                    print("Solution:\n", u.data)
                     solutions[x] = u
                 else:
                     residuals[x] = dist_residual
@@ -293,7 +312,7 @@ class CphfSolver(LinearSolver):
                     '{:d} trial vectors in reduced space'.format(num_vecs))
                 self.ostream.print_blank()
 
-                profiler.print_memory_subspace(
+                self.profiler.print_memory_subspace(
                     {
                         'dist_trials': self.dist_trials,
                         'dist_sigmas': self.dist_sigmas,
@@ -302,14 +321,14 @@ class CphfSolver(LinearSolver):
                         'residuals': residuals,
                     }, self.ostream)
 
-                profiler.check_memory_usage(
+                self.profiler.check_memory_usage(
                     'Iteration {:d} subspace'.format(iteration + 1))
 
-                profiler.print_memory_tracing(self.ostream)
+                self.profiler.print_memory_tracing(self.ostream)
 
                 ##self.print_iteration(relative_residual_norm, )
 
-            profiler.stop_timer(iteration, 'ReducedSpace')
+            self.profiler.stop_timer(iteration, 'ReducedSpace')
 
             # check convergence
             self.check_convergence(relative_residual_norm)
@@ -317,30 +336,39 @@ class CphfSolver(LinearSolver):
             if self.is_converged:
                 break
 
-            profiler.start_timer(iteration, 'Orthonorm.')
+            self.profiler.start_timer(iteration, 'Orthonorm.')
 
             # update trial vectors
             new_trials = self.setup_trials(molecule, precond, residuals, self.dist_trials)
 
-            profiler.stop_timer(iteration, 'Orthonorm.')
+            self.profiler.stop_timer(iteration, 'Orthonorm.')
 
-            profiler.start_timer(iteration, 'FockBuild')
+            self.profiler.start_timer(iteration, 'FockBuild')
 
             # update sigma vectors
             self.build_sigmas(molecule, basis, scf_tensors, new_trials)
 
-            profiler.stop_timer(iteration, 'FockBuild')
-            profiler.check_memory_usage(
+            self.profiler.stop_timer(iteration, 'FockBuild')
+            self.profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
 
         # converged?
         if self.rank == mpi_master():
             self.print_convergence('Coupled-Perturbed Hartree-Fock')
 
+        # transform Distributed arrays into numpy arrays
+        # TODO: decide whether using Distributed arrays in
+        # ScfHessianDriver is more convenient/efficient etc.
+        
+        cphf_ov = np.zeros((natm, 3, nocc, nvir))
+
+        for i in range(natm):
+            for x in range(3):
+                cphf_ov[i,x] = solutions[3*i+x].data.reshape(nocc,nvir)
 
         return {
-            'cphf_ov': solutions,
-            'cphf_rhs': cphf_rhs,
+            'cphf_ov': cphf_ov,
+            'cphf_rhs': cphf_rhs.reshape(natm,3,nocc,nvir),
             'ovlp_deriv_oo': ovlp_deriv_oo,
             'fock_deriv_ao': fock_deriv_ao,
             'fock_uij': fock_uij_numpy,
@@ -348,7 +376,7 @@ class CphfSolver(LinearSolver):
 
 
 
-    def build_sigmas(self, molecule, basis, scf_tensors, dist_trials, skip=False):
+    def build_sigmas(self, molecule, basis, scf_tensors, dist_trials):
         """
         Apply orbital Hessian matrix to a set of trial vectors.
         Appends sigma and trial vectors to member variable.
@@ -390,9 +418,6 @@ class CphfSolver(LinearSolver):
             vec_ao = np.linalg.multi_dot([mo_occ, vec, mo_vir.T])
             vec_list.append(vec_ao)
 
-        # TODO: remove variable
-        if skip:
-            self.vec_ao_list = vec_list
         
         # create density and Fock matrices, contract with two-electron integrals
         dens = AODensityMatrix(vec_list, denmat.rest)
@@ -411,13 +436,6 @@ class CphfSolver(LinearSolver):
 
         for ifock in range(num_vecs):
             fock_vec = fock.alpha_to_numpy(ifock)
-            #TODO: remove this printout
-            if skip and ifock == 0:
-                print("Diagonal part in MO:\n")
-                print(dist_trials.get_full_vector(ifock).reshape(nocc, nvir)) 
-                print() 
-                print("eov:\n")
-                print(eov)
 
             cphf_mo = (- np.linalg.multi_dot([mo_occ.T, fock_vec, mo_vir])
                        - np.linalg.multi_dot([mo_vir.T, fock_vec, mo_occ]).T
@@ -429,26 +447,19 @@ class CphfSolver(LinearSolver):
 
         # append new sigma and trial vectors
         # TODO: create new function for this?
-
-        if skip:
-            # TODO: remove this variable
-            self.sigma_init_guess = DistributedArray(dist_sigmas.data,
+        if self.dist_sigmas is None:
+            self.dist_sigmas = DistributedArray(dist_sigmas.data,
                                                 self.comm,
                                                 distribute=False)
         else:
-            if self.dist_sigmas is None:
-                self.dist_sigmas = DistributedArray(dist_sigmas.data,
-                                                    self.comm,
-                                                    distribute=False)
-            else:
-                self.dist_sigmas.append(dist_sigmas, axis=1)
+            self.dist_sigmas.append(dist_sigmas, axis=1)
 
-            if self.dist_trials is None:
-                self.dist_trials = DistributedArray(dist_trials.data,
-                                                    self.comm,
-                                                    distribute=False)
-            else:
-                self.dist_trials.append(dist_trials, axis=1)
+        if self.dist_trials is None:
+            self.dist_trials = DistributedArray(dist_trials.data,
+                                                self.comm,
+                                                distribute=False)
+        else:
+            self.dist_trials.append(dist_trials, axis=1)
 
 
     def setup_trials(self, molecule, precond, dist_rhs, old_trials=None, renormalize=True):
@@ -483,11 +494,6 @@ class CphfSolver(LinearSolver):
                 trials.append(v.data[:])
             
         dist_trials = DistributedArray(np.array(trials).T, self.comm, distribute=False)
-
-        # TODO: remove variable
-        if old_trials is None:
-            self.initial_guess = dist_trials.data
-            
 
         if dist_trials.data.size == 0:
             dist_trials.data = np.zeros((dist_trials.shape(0), 0))
@@ -565,5 +571,318 @@ class CphfSolver(LinearSolver):
         self.ostream.print_blank()
         self.ostream.flush()
 
+
+    def compute_conjugate_gradient(self, molecule, basis, scf_tensors):
+        """
+        Computes the coupled-perturbed Hartree-Fock (CPHF) coefficients.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors
+            The SCF tensors.
+
+        :return:
+            A dictionary containing the RHS and solution (ov block)
+            of the CPHF equations, the derivative of the AO Fock matrix,
+            partial derivative of the overlap matrix (oo block),
+            and an auxiliary Fock matrix (oo block of the CPHF coefficients
+            contracted with the two-electron integrals).
+        """
+
+        # TODO: remove; add profiler
+        self.profiler.start_timer(0, 'ComputeCPHF CG algorithm')
+        self.start_time = tm.time()
+
+        # ERI information
+        eri_dict = self.init_eri(molecule, basis)
+        # DFT information
+        dft_dict = self.init_dft(molecule, scf_tensors)
+        # PE information
+        pe_dict = self.init_pe(molecule, basis)
+
+        density = scf_tensors['D_alpha']
+        #overlap = self.scf_drv.scf_tensors['S']
+        natm = molecule.number_of_atoms()
+        mo = scf_tensors['C_alpha']
+        nao = mo.shape[0]
+        nocc = molecule.number_of_alpha_electrons()
+        nvir = nao - nocc
+        mo_occ = mo[:, :nocc]
+        mo_vir = mo[:, nocc:]
+        mo_energies = scf_tensors['E']
+        eocc = mo_energies[:nocc]
+        eoo = eocc.reshape(-1, 1) + eocc #ei+ej
+        omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
+        evir = mo_energies[nocc:]
+        eov = eocc.reshape(-1, 1) - evir
+
+
+        # preparing the CPHF RHS
+
+        ovlp_deriv_ao = np.zeros((natm, 3, nao, nao))
+        fock_deriv_ao = np.zeros((natm, 3, nao, nao))
+
+        # import the integral derivatives
+        for i in range(natm):
+            ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
+            fock_deriv_ao[i] = fock_deriv(molecule, basis, density, i)
+
+        # transform integral derivatives to MO basis
+        ovlp_deriv_ov = np.einsum('mi,xymn,na->xyia', mo_occ, ovlp_deriv_ao, mo_vir)
+        ovlp_deriv_oo = np.einsum('mi,xymn,nj->xyij', mo_occ, ovlp_deriv_ao, mo_occ)
+        fock_deriv_ov = np.einsum('mi,xymn,na->xyia', mo_occ, fock_deriv_ao, mo_vir)
+        orben_ovlp_deriv_ov = np.einsum('i,xyia->xyia', eocc, ovlp_deriv_ov)
+
+        # the oo part of the CPHF coefficients in AO basis,
+        # transforming the oo overlap derivative back to AO basis (not equal to the initial one)
+        uij_ao = np.einsum('mi,axij,nj->axmn', mo_occ, -0.5 * ovlp_deriv_oo, mo_occ).reshape((3*natm, nao, nao))
+        uij_ao_list = list([uij_ao[x] for x in range(natm * 3)])
+
+        # create AODensity and Fock matrix objects, contract with ERI
+        ao_density_uij = AODensityMatrix(uij_ao_list, denmat.rest)
+        fock_uij = AOFockMatrix(ao_density_uij)
+        #fock_flag = fockmat.rgenjk
+        #fock_uij.set_fock_type(fock_flag, 1)
+        ###eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        ###screening = eri_drv.compute(get_qq_scheme(self.scf_drv.qq_type),
+        ###                            self.scf_drv.eri_thresh, molecule, basis)
+        ###eri_drv.compute(fock_uij, ao_density_uij, molecule, basis, screening)
+
+        # TODO: replace empty dictionary with timing_dict
+        self.comp_lr_fock(fock_uij, ao_density_uij, molecule, basis, eri_dict, dft_dict, pe_dict, {})
+
+        # TODO: how can this be done better?
+        fock_uij_numpy = np.zeros((natm,3,nao,nao))
+        for i in range(natm):
+            for x in range(3):
+                fock_uij_numpy[i,x] = fock_uij.to_numpy(3*i + x)
+
+        # transform to MO basis
+        fock_uij_mo = np.einsum('mi,axmn,nb->axib', mo_occ, fock_uij_numpy, mo_vir)
+
+        # sum up the terms of the RHS
+        cphf_rhs = fock_deriv_ov - orben_ovlp_deriv_ov + 2 * fock_uij_mo
+
+        # Create an OrbitalResponse object
+        # TODO: not needed anymore, but copy cphf_dict
+        #orbrsp_drv = OrbitalResponse(self.comm, self.ostream)
+        #orbrsp_drv.update_settings(orbrsp_dict=self.cphf_dict, method_dict=self.method_dict)
+        #dft_dict = orbrsp_drv.init_dft(molecule, self.scf_drv.scf_tensors)
+
+        cphf_ov = np.zeros((natm, 3, nocc, nvir))
+
+        # Solve the CPHF equations
+        cphf_ov = self.solve_cphf(molecule, basis, scf_tensors,
+                                  cphf_rhs.reshape(3*natm, nocc, nvir), # TODO: possibly change the shape
+                                  dft_dict)
+        ###for i in range(natm):
+        ###    for x in range(3):
+        ###        # Call compute_lambda for all atoms and coordinates
+        ###        cphf_ov[i,x] = orbrsp_drv.compute_lambda(molecule, basis,
+        ###                                                 self.scf_drv.scf_tensors,
+        ###                                                 cphf_rhs[i,x], dft_dict, self.profiler)
+
+
+        self.profiler.stop_timer(0, 'ComputeCPHF CG algorithm')
+        if self.rank == mpi_master():
+            self.print_convergence('Coupled-Perturbed Hartree-Fock: CG algorithm')
+
+        return {
+            'cphf_ov': cphf_ov,
+            'cphf_rhs': cphf_rhs,
+            'ovlp_deriv_oo': ovlp_deriv_oo,
+            'fock_deriv_ao': fock_deriv_ao,
+            'fock_uij': fock_uij_numpy,
+        }
+
+
+    def solve_cphf(self, molecule, basis, scf_tensors, cphf_rhs, dft_dict):
+        """
+        Solves the CPHF equations for all atomic coordinates to obtain the ov block
+        of the CPHF coefficients.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param cphf_rhs:
+            The right-hand side of the CPHF equations for all atomic coordinates.
+        :param dft_dict:
+            The dictionary of DFT settings.
+
+        :returns:
+            The ov block of the CPHF coefficients.
+        """
+
+        # count variable for conjugate gradient iterations
+        # self.iter_count = 0
+
+        # ERI information
+        eri_dict = self.init_eri(molecule, basis)
+        # DFT information
+        dft_dict = self.init_dft(molecule, scf_tensors)
+        # PE information
+        pe_dict = self.init_pe(molecule, basis)
+
+        nocc = molecule.number_of_alpha_electrons()
+        natm = molecule.number_of_atoms()
+
+        if self.rank == mpi_master():
+            mo = scf_tensors['C']
+            nao = mo.shape[0]
+            mo_energies = scf_tensors['E']
+
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+            nvir = mo_vir.shape[1]
+
+            eocc = mo_energies[:nocc]
+            evir = mo_energies[nocc:]
+            eov = eocc.reshape(-1, 1) - evir
+        else:
+            nvir = None
+            eov = None
+        nvir = self.comm.bcast(nvir, root=mpi_master())
+        eov = self.comm.bcast(eov, root=mpi_master())
+
+        # Calculate the initial guess for the CPHF coefficients given by
+        # the RHS divided by orbital-energy differences
+        cphf_guess = cphf_rhs / eov
+
+        if self.rank == mpi_master():
+            # Create AODensityMatrix object from CPHF guess in AO
+            cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ, cphf_guess, mo_vir)
+            cphf_ao_list = list([cphf_ao[x] for x in range(3*natm)])
+            # create AODensityMatrix object
+            ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
+        else:
+            ao_density_cphf = AODensityMatrix()
+        ao_density_cphf.broadcast(self.rank, self.comm)
+
+        # ERI driver
+        #eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        #screening = eri_drv.compute(get_qq_scheme(self.scf_drv.qq_type),
+        #                            self.scf_drv.eri_thresh, molecule, basis)
+
+        molgrid = dft_dict['molgrid']
+        gs_density = dft_dict['gs_density']
+
+        # Create a Fock Matrix Object (initialized with zeros)
+        fock_cphf = AOFockMatrix(ao_density_cphf)
+        fock_flag = fockmat.rgenjk
+
+        # TODO: can this be done more efficiently, Zilvinas? (C layer)
+        for i in range(3*natm):
+            if self.dft:
+                if self.xcfun.is_hybrid():
+                    fock_flag = fockmat.rgenjkx
+                    fact_xc = self.xcfun.get_frac_exact_exchange()
+                    fock_cphf.set_scale_factor(fact_xc, i)
+                else:
+                    fock_flag = fockmat.rgenj
+
+            fock_cphf.set_fock_type(fock_flag, i)
+
+        # Matrix-vector product of orbital Hessian with trial vector
+        def cphf_matvec(v):
+            """
+            Function to carry out matrix multiplication of CPHF coefficient
+            vector with orbital Hessian matrix.
+            """
+
+            self.profiler.start_timer(self.cur_iter, 'CG')
+
+            # Create AODensityMatrix object from lambda in AO
+            if self.rank == mpi_master():
+                cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ, v.reshape(3*natm, nocc, nvir), mo_vir)
+                cphf_ao_list = list([cphf_ao[x] for x in range(3*natm)])
+                ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
+            else:
+                ao_density_cphf = AODensityMatrix()
+            ao_density_cphf.broadcast(self.rank, self.comm)
+
+            # TODO: replace the empty dictionary with timing_dict
+            self.comp_lr_fock(fock_cphf, ao_density_cphf, molecule, basis, eri_dict, dft_dict, pe_dict, {})
+            #eri_drv.compute(fock_cphf, ao_density_cphf, molecule, basis,
+            #                screening)
+            if self.dft:
+                #t0 = tm.time()
+                if not self.xcfun.is_hybrid():
+                    for i in range(3*natm):
+                        fock_cphf.scale(2.0, i)
+                xc_drv = XCIntegrator(self.comm)
+                molgrid.distribute(self.rank, self.nodes, self.comm)
+                xc_drv.integrate(fock_cphf, ao_density_cphf, gs_density,
+                                 molecule, basis, molgrid,
+                                 self.xcfun.get_func_label())
+                #if timing_dict is not None:
+                #    timing_dict['DFT'] = tm.time() - t0
+
+            fock_cphf.reduce_sum(self.rank, self.nodes, self.comm)
+
+            # Transform to MO basis (symmetrized w.r.t. occ. and virt.)
+            # and add diagonal part
+            if self.rank == mpi_master():
+                fock_cphf_numpy = np.zeros((3*natm,nao,nao))
+                for i in range(3*natm):
+                    fock_cphf_numpy[i] = fock_cphf.to_numpy(i)
+
+                cphf_mo = (-np.einsum('mi,xmn,na->xia', mo_occ, fock_cphf_numpy, mo_vir)
+                          - np.einsum('ma,xmn,ni->xia', mo_vir, fock_cphf_numpy, mo_occ)
+                          + v.reshape(3*natm, nocc, nvir) * eov)
+            else:
+                cphf_mo = None
+
+            cphf_mo = self.comm.bcast(cphf_mo, root=mpi_master())
+
+            self.profiler.stop_timer(self.cur_iter, 'CG')
+
+            self.profiler.check_memory_usage(
+                'CG Iteration {:d}'.format(self.cur_iter + 1))
+
+            self.profiler.print_memory_tracing(self.ostream)
+
+            # increase iteration counter every time this function is called
+            self.cur_iter += 1
+
+            return cphf_mo.reshape(3 * natm * nocc * nvir)
+
+        # Matrix-vector product for preconditioner using the
+        # inverse of the diagonal (i.e. eocc - evir)
+        def precond_matvec(v):
+            """
+            Function that defines the matrix-vector product
+            required by the pre-conditioner for the conjugate gradient.
+            It is an approximation for the inverse of matrix A in Ax = b.
+            """
+            current_v = v.reshape(3*natm, nocc, nvir)
+            M_dot_v = current_v / eov
+
+            return M_dot_v.reshape(3 * natm * nocc * nvir)
+
+        # 5) Define the linear operators and run conjugate gradient
+        LinOp = linalg.LinearOperator((3*natm * nocc * nvir, 3*natm * nocc * nvir),
+                                      matvec=cphf_matvec)
+        PrecondOp = linalg.LinearOperator((3*natm * nocc * nvir, 3*natm * nocc * nvir),
+                                          matvec=precond_matvec)
+
+        b = cphf_rhs.reshape(3*natm * nocc * nvir)
+        x0 = cphf_guess.reshape(3*natm * nocc * nvir)
+
+        cphf_coefficients_ov, cg_conv = linalg.cg(A=LinOp,
+                                                b=b,
+                                                x0=x0,
+                                                M=PrecondOp,
+                                                tol=self.conv_thresh,
+                                                atol=0,
+                                                maxiter=self.max_iter)
+
+        self.is_converged = (cg_conv == 0)
+
+        return cphf_coefficients_ov.reshape(natm, 3, nocc, nvir)
 
 
