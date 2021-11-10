@@ -14,5 +14,3 @@ dependencies:
   - pybind11>=2.6
   - pytest
   - python>=3.6
-  - pip:
-    - loprop
