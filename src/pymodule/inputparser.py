@@ -284,9 +284,9 @@ def parse_bool(input_bool):
         return input_bool
 
     elif isinstance(input_bool, str):
-        if input_bool.lower() in ['yes', 'y']:
+        if input_bool.lower() in ['true', 'yes', 'y']:
             return True
-        elif input_bool.lower() in ['no', 'n']:
+        elif input_bool.lower() in ['false', 'no', 'n']:
             return False
         else:
             assert_msg_critical(
