@@ -69,8 +69,6 @@ class NonLinearSolver:
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
         - cur_iter: Index of the current iteration.
-        - small_thresh: The norm threshold for a vector to be considered a zero
-          vector.
         - lindep_thresh: The threshold for removing linear dependence in the
           trial vectors.
         - is_converged: The flag for convergence.
@@ -119,7 +117,6 @@ class NonLinearSolver:
         self.conv_thresh = 1.0e-4
         self.max_iter = 150
         self.cur_iter = 0
-        self.small_thresh = 1.0e-10
         self.lindep_thresh = 1.0e-6
         self.is_converged = False
 

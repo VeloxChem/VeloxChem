@@ -1,4 +1,5 @@
 from mpi4py import MPI
+import pytest
 import sys
 
 from veloxchem.veloxchemlib import mpi_master
@@ -9,6 +10,7 @@ from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
+@pytest.mark.solvers
 class TestCrf:
 
     def run_scf(self):

@@ -1,4 +1,5 @@
 from pathlib import Path
+import pytest
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
@@ -6,6 +7,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.rspshg import SHG
 
 
+@pytest.mark.solvers
 class TestSHG:
 
     def run_scf(self, task):

@@ -1,26 +1,27 @@
+from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import time
+import sys
 import re
 
-from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import mpi_master
+from .veloxchemlib import (ElectricDipoleIntegralsDriver, mpi_master)
 from .profiler import Profiler
+from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonLinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
-from .checkpoint import check_distributed_focks
-from .checkpoint import read_distributed_focks
-from .checkpoint import write_distributed_focks
+from .checkpoint import (check_distributed_focks, read_distributed_focks,
+                         write_distributed_focks)
 
 from .inputparser import parse_input
 
 
 class CubicResponseDriver(NonLinearSolver):
     """
-    Implements a general quadratic response driver
+    Implements a general cubic response driver
 
     :param comm:
         The MPI communicator.
@@ -53,10 +54,18 @@ class CubicResponseDriver(NonLinearSolver):
         - memory_tracing: The flag for tracing memory allocation.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
-        Initializes the quadratic response driver
+        Initializes the cubic response driver.
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
+
+        super().__init__(comm, ostream)
 
         self.is_converged = False
 
@@ -164,7 +173,7 @@ class CubicResponseDriver(NonLinearSolver):
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
-        Computes a quadratic response function.
+        Computes a cubic response function.
 
         :param molecule:
             The molecule.
@@ -337,7 +346,7 @@ class CubicResponseDriver(NonLinearSolver):
     def compute_cubic_components(self, Focks, freqpairs, X, d_a_mo, kX, track,
                                  scf_tensors, molecule, ao_basis, profiler):
         """
-        Computes all the relevent terms to compute a general quadratic response function
+        Computes all the relevent terms to compute a general cubic response function
 
         :param w:
             A list of all the frequencies
@@ -846,7 +855,7 @@ class CubicResponseDriver(NonLinearSolver):
 
     def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis):
         """
-        Computes the Fock matrices for a quadratic response function
+        Computes the Fock matrices for a cubic response function
 
         :param wi:
             A list of the frequencies
@@ -928,7 +937,7 @@ class CubicResponseDriver(NonLinearSolver):
 
     def get_fock_dict_ii(self, wi, density_list, F0, mo, molecule, ao_basis):
         """
-        Computes the Fock matrices for a quadratic response function
+        Computes the Fock matrices for a cubic response function
 
         :param wi:
             A list of the frequencies

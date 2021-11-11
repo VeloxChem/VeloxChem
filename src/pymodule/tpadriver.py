@@ -81,6 +81,8 @@ class TpaDriver(NonLinearSolver):
         absorption (TPA)
         """
 
+        super().__init__(comm, ostream)
+
         self.is_converged = False
 
         # ERI settings

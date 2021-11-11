@@ -1,20 +1,22 @@
+from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import time
+import sys
 import re
-from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import mpi_master
+
+from .veloxchemlib import (ElectricDipoleIntegralsDriver, mpi_master)
 from .profiler import Profiler
+from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonLinearSolver
 from .distributedarray import DistributedArray
-from .errorhandler import assert_msg_critical
 from .scffirstorderprop import ScfFirstOrderProperties
-from .checkpoint import check_distributed_focks
-from .checkpoint import read_distributed_focks
-from .checkpoint import write_distributed_focks
+from .errorhandler import assert_msg_critical
+from .checkpoint import (check_distributed_focks, read_distributed_focks,
+                         write_distributed_focks)
 from .inputparser import parse_input
-from pathlib import Path
 
 
 class SHGDriver(NonLinearSolver):
@@ -52,11 +54,19 @@ class SHGDriver(NonLinearSolver):
         - memory_tracing: The flag for tracing memory allocation.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes the isotropic quadratic response driver for second harmonic
         generation (SHG).
         """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
+
+        super().__init__(comm, ostream)
 
         self.is_converged = False
 
