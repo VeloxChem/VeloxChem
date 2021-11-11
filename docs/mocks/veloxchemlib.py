@@ -25,6 +25,7 @@ DenseMatrix = Mock()
 AOKohnShamMatrix = Mock()
 XTBDriver = Mock()
 
+available_functionals = Mock()
 mpi_master = Mock()
 mpi_size_limit = Mock()
 mpi_initialized = Mock()

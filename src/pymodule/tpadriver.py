@@ -36,7 +36,7 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonLinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
+from .inputparser import parse_input, get_keyword_type
 
 
 class TpaDriver(NonLinearSolver):
@@ -120,6 +120,44 @@ class TpaDriver(NonLinearSolver):
         self.memory_profiling = False
         self.memory_tracing = False
 
+        # input keywords
+        self.input_keywords = {
+            'response': {
+                'frequencies': ('seq_range', 'frequencies'),
+                'damping': ('float', 'damping parameter'),
+                'eri_thresh': ('float', 'ERI screening threshold'),
+                'qq_type': ('str_upper', 'ERI screening scheme'),
+                'batch_size': ('int', 'batch size for Fock build'),
+                'conv_thresh': ('float', 'convergence threshold'),
+                'max_iter': ('int', 'maximum number of iterations'),
+                'lindep_thresh': ('float', 'threshold for linear dependence'),
+                'restart': ('bool', 'restart from checkpoint file'),
+                'checkpoint_file': ('str', 'name of checkpoint file'),
+                'timing': ('bool', 'print timing information'),
+                'profiling': ('bool', 'print profiling information'),
+                'memory_profiling': ('bool', 'print memory usage'),
+                'memory_tracing': ('bool', 'trace memory allocation'),
+            },
+        }
+
+    def print_keywords(self):
+        """
+        Prints input keywords.
+        """
+
+        width = 80
+        for group in self.input_keywords:
+            self.ostream.print_header('=' * width)
+            self.ostream.print_header(f'  @{group}'.ljust(width))
+            self.ostream.print_header('-' * width)
+            for key, val in self.input_keywords[group].items():
+                text = f'  {key}'.ljust(20)
+                text += f'  {get_keyword_type(val[0])}'.ljust(15)
+                text += f'  {val[1]}'.ljust(width - 35)
+                self.ostream.print_header(text)
+        self.ostream.print_header('=' * width)
+        self.ostream.flush()
+
     def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in TPA driver
@@ -134,20 +172,7 @@ class TpaDriver(NonLinearSolver):
             method_dict = {}
 
         rsp_keywords = {
-            'frequencies': 'seq_range',
-            'damping': 'float',
-            'eri_thresh': 'float',
-            'qq_type': 'str_upper',
-            'batch_size': 'int',
-            'max_iter': 'int',
-            'conv_thresh': 'float',
-            'lindep_thresh': 'float',
-            'restart': 'bool',
-            'checkpoint_file': 'str',
-            'timing': 'bool',
-            'profiling': 'bool',
-            'memory_profiling': 'bool',
-            'memory_tracing': 'bool',
+            key: val[0] for key, val in self.input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)

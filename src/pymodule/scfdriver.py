@@ -52,7 +52,7 @@ from .molecularorbitals import MolecularOrbitals
 from .subcommunicators import SubCommunicators
 from .signalhandler import SignalHandler
 from .denguess import DensityGuess
-from .inputparser import parse_input
+from .inputparser import parse_input, get_keyword_type
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
@@ -228,6 +228,52 @@ class ScfDriver:
         # filename
         self.filename = None
 
+        # input keywords
+        self.input_keywords = {
+            'scf': {
+                'acc_type':
+                    ('str_upper', 'type of SCF convergence accelerator'),
+                'max_iter': ('int', 'maximum number of SCF iterations'),
+                'conv_thresh': ('float', 'SCF convergence threshold'),
+                'qq_type': ('str_upper', 'ERI screening scheme'),
+                'eri_thresh': ('float', 'ERI screening threshold'),
+                'restart': ('bool', 'restart from checkpoint file'),
+                'checkpoint_file': ('str', 'name of checkpoint file'),
+                'timing': ('bool', 'print timing information'),
+                'profiling': ('bool', 'print profiling information'),
+                'memory_profiling': ('bool', 'print memory usage'),
+                'memory_tracing': ('bool', 'trace memory allocation'),
+            },
+            'method_settings': {
+                'dispersion': ('bool', 'use D4 dispersion correction'),
+                'dft': ('bool', 'use DFT'),
+                'xcfun': ('str_upper', 'exchange-correlation functional'),
+                'grid_level': ('int', 'accuracy level of DFT grid'),
+                'pe': ('bool', 'use polarizable embedding'),
+                'potfile': ('str', 'potential file for polarizable embedding'),
+                'electric_field': ('seq_fixed', 'static electric field'),
+                'use_split_comm': ('bool', 'use split communicators'),
+            },
+        }
+
+    def print_keywords(self):
+        """
+        Prints input keywords in SCF driver.
+        """
+
+        width = 80
+        for group in self.input_keywords:
+            self.ostream.print_header('=' * width)
+            self.ostream.print_header(f'  @{group}'.ljust(width))
+            self.ostream.print_header('-' * width)
+            for key, val in self.input_keywords[group].items():
+                text = f'  {key}'.ljust(20)
+                text += f'  {get_keyword_type(val[0])}'.ljust(15)
+                text += f'  {val[1]}'.ljust(width - 35)
+                self.ostream.print_header(text)
+        self.ostream.print_header('=' * width)
+        self.ostream.flush()
+
     def update_settings(self, scf_dict, method_dict=None):
         """
         Updates settings in SCF driver.
@@ -242,17 +288,7 @@ class ScfDriver:
             method_dict = {}
 
         scf_keywords = {
-            'acc_type': 'str_upper',
-            'max_iter': 'int',
-            'conv_thresh': 'float',
-            'qq_type': 'str_upper',
-            'eri_thresh': 'float',
-            'restart': 'bool',
-            'checkpoint_file': 'str',
-            'timing': 'bool',
-            'profiling': 'bool',
-            'memory_profiling': 'bool',
-            'memory_tracing': 'bool',
+            key: val[0] for key, val in self.input_keywords['scf'].items()
         }
 
         parse_input(self, scf_keywords, scf_dict)
@@ -265,12 +301,8 @@ class ScfDriver:
             self.filename = scf_dict['filename']
 
         method_keywords = {
-            'dispersion': 'bool',
-            'dft': 'bool',
-            'grid_level': 'int',
-            'pe': 'bool',
-            'electric_field': 'seq_fixed',
-            'use_split_comm': 'bool',
+            key: val[0]
+            for key, val in self.input_keywords['method_settings'].items()
         }
 
         parse_input(self, method_keywords, method_dict)
@@ -346,6 +378,10 @@ class ScfDriver:
         if self.dft:
             assert_msg_critical(self.xcfun is not None,
                                 'SCF driver: Undefined XC functional')
+            if isinstance(self.xcfun, str):
+                self.xcfun = parse_xc_func(self.xcfun.upper())
+                assert_msg_critical(not self.xcfun.is_undefined(),
+                                    'SCF driver: Undefined XC functional')
 
         # initial guess
         if self.restart:

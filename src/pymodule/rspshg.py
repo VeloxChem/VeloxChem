@@ -54,7 +54,7 @@ class SHG(ResponseProperty):
             method_dict = dict(method_dict)
 
         rsp_dict['property'] = 'shg'
-        rsp_dict['response'] = 'quadratic'
+        rsp_dict['order'] = 'quadratic'
         rsp_dict['residue'] = 'none'
         rsp_dict['complex'] = 'yes'
         rsp_dict['a_operator'] = 'dipole'

@@ -23,7 +23,12 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
+import sys
+
 from .rspdriver import ResponseDriver
+from .outputstream import OutputStream
+from .errorhandler import assert_msg_critical
 
 
 class ResponseProperty:
@@ -42,7 +47,7 @@ class ResponseProperty:
         - rsp_property: The dictionary of response property.
     """
 
-    def __init__(self, rsp_dict, method_dict=None):
+    def __init__(self, rsp_dict=None, method_dict=None):
         """
         Initializes response property/spectroscopy.
         """
@@ -50,7 +55,9 @@ class ResponseProperty:
         self.rsp_dict = rsp_dict
         self.method_dict = method_dict
 
-    def init_driver(self, comm, ostream):
+        self.rsp_driver = None
+
+    def init_driver(self, comm=None, ostream=None):
         """
         Initializes response driver.
 
@@ -60,8 +67,29 @@ class ResponseProperty:
             The output stream.
         """
 
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
+
         self.rsp_driver = ResponseDriver(comm, ostream)
         self.rsp_driver.update_settings(self.rsp_dict, self.method_dict)
+
+    def print_keywords(self):
+        """
+        Prints input keywords for response property.
+        """
+
+        assert_msg_critical(
+            self.rsp_driver is not None,
+            'ResponseProperty: response driver not initialized')
+
+        assert_msg_critical(
+            self.rsp_driver.solver is not None,
+            'ResponseProperty: response solver not initialized')
+
+        self.rsp_driver.solver.print_keywords()
 
     def compute(self, molecule, basis, scf_tensors):
         """

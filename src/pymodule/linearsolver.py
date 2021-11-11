@@ -35,7 +35,6 @@ from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver
-from .veloxchemlib import XCFunctional
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
@@ -48,7 +47,7 @@ from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
+from .inputparser import parse_input, get_keyword_type
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .checkpoint import write_rsp_hdf5
@@ -120,7 +119,7 @@ class LinearSolver:
         # dft
         self.dft = False
         self.grid_level = 4
-        self.xcfun = XCFunctional()
+        self.xcfun = None
 
         # polarizable embedding
         self.pe = False
@@ -166,14 +165,61 @@ class LinearSolver:
         # filename
         self.filename = None
 
+        # distributed arrays
         self.dist_bger = None
         self.dist_bung = None
         self.dist_e2bger = None
         self.dist_e2bung = None
 
+        # nonlinear flag and distributed Fock matrices
         self.nonlinear = False
         self.dist_fock_ger = None
         self.dist_fock_ung = None
+
+        # input keywords
+        self.input_keywords = {
+            'response': {
+                'eri_thresh': ('float', 'ERI screening threshold'),
+                'qq_type': ('str_upper', 'ERI screening scheme'),
+                'batch_size': ('int', 'batch size for Fock build'),
+                'conv_thresh': ('float', 'convergence threshold'),
+                'max_iter': ('int', 'maximum number of iterations'),
+                'lindep_thresh': ('float', 'threshold for linear dependence'),
+                'restart': ('bool', 'restart from checkpoint file'),
+                'checkpoint_file': ('str', 'name of checkpoint file'),
+                'timing': ('bool', 'print timing information'),
+                'profiling': ('bool', 'print profiling information'),
+                'memory_profiling': ('bool', 'print memory usage'),
+                'memory_tracing': ('bool', 'trace memory allocation'),
+            },
+            'method_settings': {
+                'dft': ('bool', 'use DFT'),
+                'xcfun': ('str_upper', 'exchange-correlation functional'),
+                'grid_level': ('int', 'accuracy level of DFT grid'),
+                'pe': ('bool', 'use polarizable embedding'),
+                'potfile': ('str', 'potential file for polarizable embedding'),
+                'electric_field': ('seq_fixed', 'static electric field'),
+                'use_split_comm': ('bool', 'use split communicators'),
+            },
+        }
+
+    def print_keywords(self):
+        """
+        Prints input keywords in linear solver.
+        """
+
+        width = 80
+        for group in self.input_keywords:
+            self.ostream.print_header('=' * width)
+            self.ostream.print_header(f'  @{group}'.ljust(width))
+            self.ostream.print_header('-' * width)
+            for key, val in self.input_keywords[group].items():
+                text = f'  {key}'.ljust(20)
+                text += f'  {get_keyword_type(val[0])}'.ljust(15)
+                text += f'  {val[1]}'.ljust(width - 35)
+                self.ostream.print_header(text)
+        self.ostream.print_header('=' * width)
+        self.ostream.flush()
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -189,18 +235,7 @@ class LinearSolver:
             method_dict = {}
 
         rsp_keywords = {
-            'eri_thresh': 'float',
-            'qq_type': 'str_upper',
-            'batch_size': 'int',
-            'conv_thresh': 'float',
-            'max_iter': 'int',
-            'lindep_thresh': 'float',
-            'restart': 'bool',
-            'checkpoint_file': 'str',
-            'timing': 'bool',
-            'profiling': 'bool',
-            'memory_profiling': 'bool',
-            'memory_tracing': 'bool',
+            key: val[0] for key, val in self.input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -213,11 +248,8 @@ class LinearSolver:
             self.filename = rsp_dict['filename']
 
         method_keywords = {
-            'dft': 'bool',
-            'grid_level': 'int',
-            'pe': 'bool',
-            'electric_field': 'seq_fixed',
-            'use_split_comm': 'bool',
+            key: val[0]
+            for key, val in self.input_keywords['method_settings'].items()
         }
 
         parse_input(self, method_keywords, method_dict)
@@ -227,7 +259,7 @@ class LinearSolver:
                 self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Linear solver: Undefined XC functional')
+                                'LinearSolver: Undefined XC functional')
 
         if 'pe_options' not in method_dict:
             method_dict['pe_options'] = {}
@@ -243,7 +275,7 @@ class LinearSolver:
                     'potfile' not in method_dict['pe_options']):
                 method_dict['pe_options']['potfile'] = method_dict['potfile']
             assert_msg_critical('potfile' in method_dict['pe_options'],
-                                'SCF driver: No potential file defined')
+                                'LinearSolver: No potential file defined')
             self.pe_options = dict(method_dict['pe_options'])
 
             cppe_potfile = None
@@ -256,10 +288,10 @@ class LinearSolver:
         if self.electric_field is not None:
             assert_msg_critical(
                 len(self.electric_field) == 3,
-                'Linear solver: Expecting 3 values in \'electric field\' input')
+                'LinearSolver: Expecting 3 values in \'electric field\' input')
             assert_msg_critical(
                 not self.pe,
-                'Linear solver: \'electric field\' input is incompatible ' +
+                'LinearSolver: \'electric field\' input is incompatible ' +
                 'with polarizable embedding')
             # disable restart of calculation with static electric field since
             # checkpoint file does not contain information about the electric
@@ -314,8 +346,16 @@ class LinearSolver:
             The dictionary of DFT information.
         """
 
-        # generate integration grid
         if self.dft:
+            # check dft setup
+            assert_msg_critical(self.xcfun is not None,
+                                'LinearSolver: Undefined XC functional')
+            if isinstance(self.xcfun, str):
+                self.xcfun = parse_xc_func(self.xcfun.upper())
+                assert_msg_critical(not self.xcfun.is_undefined(),
+                                    'LinearSolver: Undefined XC functional')
+
+            # generate integration grid
             grid_drv = GridDriver(self.comm)
             grid_drv.set_level(self.grid_level)
 
@@ -544,12 +584,12 @@ class LinearSolver:
         if self.rank == mpi_master():
             assert_msg_critical(
                 vecs_ger.data.ndim == 2 and vecs_ung.data.ndim == 2,
-                'LinearResponse.e2n_half_size: '
+                'LinearSolver.e2n_half_size: '
                 'invalid shape of trial vectors')
 
             assert_msg_critical(
                 vecs_ger.shape(0) == vecs_ung.shape(0),
-                'LinearResponse.e2n_half_size: '
+                'LinearSolver.e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
             mo = scf_tensors['C_alpha']
@@ -1128,10 +1168,12 @@ class LinearSolver:
             A tuple containing gerade and ungerade parts of gradient.
         """
 
-        assert_msg_critical(grad.ndim == 1, 'decomp_grad: Expecting a 1D array')
+        assert_msg_critical(grad.ndim == 1,
+                            'LinearSolver.decomp_grad: Expecting a 1D array')
 
-        assert_msg_critical(grad.shape[0] % 2 == 0,
-                            'decomp_grad: size of array should be even')
+        assert_msg_critical(
+            grad.shape[0] % 2 == 0,
+            'LinearSolver.decomp_grad: size of array should be even')
 
         half_size = grad.shape[0] // 2
 
@@ -1260,7 +1302,7 @@ class LinearSolver:
                 'dipole', 'electric dipole', 'electric_dipole',
                 'linear_momentum', 'linear momentum', 'angular_momentum',
                 'angular momentum', 'magnetic dipole', 'magnetic_dipole'
-            ], 'get_prop_grad: unsupported operator {}'.format(operator))
+            ], f'LinearSolver.get_prop_grad: unsupported operator {operator}')
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
@@ -1357,7 +1399,8 @@ class LinearSolver:
                 'linear_momentum', 'linear momentum', 'angular_momentum',
                 'angular momentum', 'magnetic dipole', 'magnetic_dipole'
             ],
-            'get_complex_prop_grad: unsupported operator {}'.format(operator))
+            f'LinearSolver.get_complex_prop_grad: unsupported operator {operator}'
+        )
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
