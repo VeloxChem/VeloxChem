@@ -148,7 +148,6 @@ class NonLinearSolver:
         # filename
         self.filename = None
 
-
     def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in nonlinear solver.
@@ -355,7 +354,7 @@ class NonLinearSolver:
 
     def comp_nlr_fock(self, mo, D, molecule, ao_basis, fock_flag):
         """-
-        Computes and returns a list of Fock matrices 
+        Computes and returns a list of Fock matrices.
 
         :param mo:
             The MO coefficients
@@ -610,7 +609,7 @@ class NonLinearSolver:
 
     def flip_xy(self, X):
         """
-        Swaps upper and lower parts of a response vector. 
+        Swaps upper and lower parts of a response vector.
 
         :param X:
             A response vector v = (Z,-Y^*)

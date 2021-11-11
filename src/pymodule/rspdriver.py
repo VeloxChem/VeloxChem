@@ -186,7 +186,7 @@ class ResponseDriver:
             self.is_converged = c6_solver.is_converged
 
             return c6_result
-            
+
         # SHG
 
         if (self.rsp_dict['response'] == 'quadratic' and
@@ -201,7 +201,6 @@ class ResponseDriver:
             self.is_converged = shg_solver.is_converged
 
             return shg_results
-
 
         # TPA
 

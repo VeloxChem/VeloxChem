@@ -83,7 +83,7 @@ class TpaFullDriver(TpaDriver):
     def get_densities(self, wi, kX, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded Fock
-        matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
+        matrices F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
         function. Note: All densities are 1/3 of those in the paper, and all
         the Fock matrices are later scaled by 3.
 
@@ -218,7 +218,7 @@ class TpaFullDriver(TpaDriver):
 
     def get_fock_dict(self, wi, density_list, F0_a, mo, molecule, ao_basis):
         """
-        Computes the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the
+        Computes the compounded Fock matrices F^{σ},F^{λ+τ},F^{σλτ} used for the
         isotropic cubic response function
 
         :param wi:
@@ -278,7 +278,7 @@ class TpaFullDriver(TpaDriver):
 
         time_start_fock = time.time()
         dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                     'real_and_imag')
+                                        'real_and_imag')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -684,8 +684,6 @@ class TpaFullDriver(TpaDriver):
             x2_yy_ = self.x2_contract(ky_.T, mu_y, d_a_mo, nocc, norb)
             x2_zz_ = self.x2_contract(kz_.T, mu_z, d_a_mo, nocc, norb)
 
-
-
             key = (('N_lamtau_xx', w), 0)
             mat = (6 * xi_xx + 2 * xi_yy + 2 * xi_zz + 0.5 * f_lamtau_xx).T
             xy_dict[key] = self.anti_sym(
@@ -742,7 +740,7 @@ class TpaFullDriver(TpaDriver):
     def get_densities_II(self, wi, kX, kXY, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded
-        second-order Fock matrics used for the isotropic cubic response
+        second-order Fock matrices used for the isotropic cubic response
         function
 
         :param wi:
@@ -870,7 +868,7 @@ class TpaFullDriver(TpaDriver):
 
             Dz += self.transform_dens(kz, D_lamtau_zz, S)
             Dz += self.transform_dens(k_lamtau_zz, Dc_z, S)
-            
+
             density_list.append(Dx)
             density_list.append(Dy)
             density_list.append(Dz)
@@ -879,7 +877,7 @@ class TpaFullDriver(TpaDriver):
 
     def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis):
         """
-        Computes the compounded second-order Fock matrics used for the
+        Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
 
         :param wi:
@@ -919,7 +917,7 @@ class TpaFullDriver(TpaDriver):
 
         time_start_fock = time.time()
         dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                     'real_and_imag')
+                                        'real_and_imag')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -1601,8 +1599,6 @@ class TpaFullDriver(TpaDriver):
             's4': s4_term,
             'r4': r4_term,
         }
-
-
 
     def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
         """

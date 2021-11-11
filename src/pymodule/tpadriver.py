@@ -28,22 +28,15 @@ from pathlib import Path
 import numpy as np
 import time
 
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import denmat, fockmat
 from .veloxchemlib import mpi_master, hartree_in_wavenumbers
-from .qqscheme import get_qq_scheme
 from .profiler import Profiler
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonLinearSolver
-from .aofockmatrix import AOFockMatrix
-from .aodensitymatrix import AODensityMatrix
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
-from .batchsize import get_batch_size
-from .batchsize import get_number_of_batches
 
 
 class TpaDriver(NonLinearSolver):
@@ -490,7 +483,7 @@ class TpaDriver(NonLinearSolver):
     def get_densities(self, wi, kX, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded Fock
-        matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
+        matrices F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
         function
 
         :param wi:
@@ -512,7 +505,7 @@ class TpaDriver(NonLinearSolver):
 
     def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis):
         """
-        Computes the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the
+        Computes the compounded Fock matrices F^{σ},F^{λ+τ},F^{σλτ} used for the
         isotropic cubic response function
 
         :param wi:
@@ -595,7 +588,7 @@ class TpaDriver(NonLinearSolver):
     def get_densities_II(self, wi, kX, kXY, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded
-        second-order Fock matrics used for the isotropic cubic response
+        second-order Fock matrices used for the isotropic cubic response
         function
 
         :param wi:
@@ -619,7 +612,7 @@ class TpaDriver(NonLinearSolver):
 
     def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis):
         """
-        Computes the compounded second-order Fock matrics used for the
+        Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
 
         :param wi:
@@ -1004,33 +997,3 @@ class TpaDriver(NonLinearSolver):
         w_str = '{:<9s} {:12.4f} {:20.8f} {:20.8f}j'.format(
             label, freq, value.real, value.imag)
         self.ostream.print_header(w_str.ljust(width))
-
-
-    def print_header(self):
-        """
-        Prints TPA setup header to output stream.
-        """
-
-        self.ostream.print_blank()
-
-        title = 'Two-Photon Absorbtion Driver Setup'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
-
-        width = 50
-
-        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
-            self.eri_thresh)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Convergance Threshold           : {:.1e}'.format(
-            self.conv_thresh)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Max. Number of Iterations       : {:d}'.format(self.max_iter)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Damping Parameter               : {:.6e}'.format(
-            self.damping)
-        self.ostream.print_header(cur_str.ljust(width))
-
-        self.ostream.print_blank()
-        self.ostream.flush()

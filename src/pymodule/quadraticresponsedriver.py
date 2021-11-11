@@ -1,7 +1,7 @@
+from pathlib import Path
 import numpy as np
 import time
 import re
-
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
@@ -19,7 +19,7 @@ from .inputparser import parse_input
 
 class QuadraticResponseDriver(NonLinearSolver):
     """
-    Implements a general quadratic response driver 
+    Implements a general quadratic response driver.
 
     :param comm:
         The MPI communicator.
@@ -140,7 +140,8 @@ class QuadraticResponseDriver(NonLinearSolver):
             self.maximum_hours = rsp_dict['maximum_hours']
 
         if 'xcfun' in method_dict:
-            errmsg = 'Quadratic response function Driver: The \'xcfun\' keyword is not supported in QRF '
+            errmsg = 'Quadratic response function Driver: '
+            errmsg += 'The \'xcfun\' keyword is not supported in QRF '
             errmsg += 'calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
@@ -159,7 +160,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
-        Computes a quadratic response function 
+        Computes a quadratic response function.
 
         :param molecule:
             The molecule.
@@ -297,8 +298,8 @@ class QuadraticResponseDriver(NonLinearSolver):
                                                  kX, self.comp, scf_tensors,
                                                  molecule, ao_basis, profiler)
 
-        valstr = '*** Time spent in quadratic response calculation: {:.2f} sec ***'.format(
-            time.time() - start_time)
+        valstr = '*** Time spent in quadratic response calculation: '
+        valstr += '{:.2f} sec ***'.format(time.time() - start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
         self.ostream.flush()
@@ -423,8 +424,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
     def get_densities(self, freqpairs, kX, S, D0, mo):
         """
-        Computes the  densities needed for the perturbed Fock
-        matrics 
+        Computes the  densities needed for the perturbed Fock matrices.
 
         :param wi:
             A list of the frequencies

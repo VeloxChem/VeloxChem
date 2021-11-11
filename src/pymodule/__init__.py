@@ -99,7 +99,6 @@ from .cubicresponsedriver import CubicResponseDriver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .shgdriver import SHGDriver
 
-
 # Python functions
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_type

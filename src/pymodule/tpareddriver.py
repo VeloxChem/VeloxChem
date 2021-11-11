@@ -83,7 +83,7 @@ class TpaReducedDriver(TpaDriver):
     def get_densities(self, wi, kX, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded Fock
-        matrics F^{σ} used for the reduced iostropic cubic response function
+        matrices F^{σ} used for the reduced iostropic cubic response function
 
 
         :param wi:
@@ -146,7 +146,7 @@ class TpaReducedDriver(TpaDriver):
 
     def get_fock_dict(self, wi, density_list, F0_a, mo, molecule, ao_basis):
         """
-        Computes the compounded Fock matrics F^{σ}  used for the reduced
+        Computes the compounded Fock matrices F^{σ}  used for the reduced
         isotropic cubic response function
 
         :param wi:
@@ -197,7 +197,7 @@ class TpaReducedDriver(TpaDriver):
 
         time_start_fock = time.time()
         dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                     'real')
+                                        'real')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -404,7 +404,7 @@ class TpaReducedDriver(TpaDriver):
     def get_densities_II(self, wi, kX, kXY, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded
-        second-order Fock matrics used for the reduced isotropic cubic response
+        second-order Fock matrices used for the reduced isotropic cubic response
         function. Note: All densities are 1/3 of those in the paper, and all
         the Fock matrices are later scaled by 3.
 
@@ -495,7 +495,7 @@ class TpaReducedDriver(TpaDriver):
 
     def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis):
         """
-        Computes the compounded second-order Fock matrics used for the
+        Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
 
         :param wi:
@@ -535,7 +535,7 @@ class TpaReducedDriver(TpaDriver):
 
         time_start_fock = time.time()
         dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                     'real_and_imag')
+                                        'real_and_imag')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock

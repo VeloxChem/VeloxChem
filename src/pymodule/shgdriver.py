@@ -54,7 +54,8 @@ class SHGDriver(NonLinearSolver):
 
     def __init__(self, comm, ostream):
         """
-        Initializes the isotropic quadratic response driver for second harmonic generation (SHG)
+        Initializes the isotropic quadratic response driver for second harmonic
+        generation (SHG).
         """
 
         self.is_converged = False
@@ -159,7 +160,8 @@ class SHGDriver(NonLinearSolver):
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
-        Computes the isotropic quadratic response function for second-harmonic generation
+        Computes the isotropic quadratic response function for second-harmonic
+        generation.
 
         :param molecule:
             The molecule.
@@ -273,13 +275,7 @@ class SHGDriver(NonLinearSolver):
 
         N_results = N_drv.compute(molecule, ao_basis, scf_tensors, AB)
 
-        kX = {}
-        Focks = {}
-
         kX = N_results['kappas']
-
-        #kX.update(Na_results['kappas'])
-
         Focks = N_results['focks']
 
         profiler.check_memory_usage('CPP')
@@ -318,6 +314,8 @@ class SHGDriver(NonLinearSolver):
         self.ostream.print_header(w_str)
         self.ostream.print_header('=' * (len(w_str) + 2))
 
+        # TODO: look into beta_bar
+
         beta_bar = {}
 
         for key in beta.keys():
@@ -336,8 +334,8 @@ class SHGDriver(NonLinearSolver):
             beta_bar = {key: betaa}
 
         self.ostream.print_blank()
-        valstr = '*** Time spent in quadratic response calculation: {:.2f} sec ***'.format(
-            time.time() - start_time)
+        valstr = '*** Time spent in quadratic response calculation: '
+        valstr += '{:.2f} sec ***'.format(time.time() - start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
         self.ostream.flush()
@@ -351,7 +349,8 @@ class SHGDriver(NonLinearSolver):
     def compute_quad_components(self, Focks, freqpairs, X, d_a_mo, kX, track,
                                 scf_tensors, molecule, ao_basis, profiler):
         """
-        Computes all the relevent terms to compute the isotropic quadratic response function used for SHG
+        Computes all the relevent terms to compute the isotropic quadratic
+        response function used for SHG.
 
         :param w:
             A list of all the frequencies
@@ -467,7 +466,7 @@ class SHGDriver(NonLinearSolver):
 
             for eta in 'xyz':
 
-                #A2 contractions
+                # A2 contractions
 
                 A2_x -= np.dot(
                     Nb[eta].T,
@@ -640,7 +639,7 @@ class SHGDriver(NonLinearSolver):
 
     def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis):
         """
-        Computes the compounded Fock matrics used for the
+        Computes the compounded Fock matrices used for the
         isotropic quadratic response function used for SHG
 
         :param wi:

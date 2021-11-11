@@ -1,7 +1,7 @@
+from pathlib import Path
 import numpy as np
 import time
 import re
-
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
@@ -164,7 +164,7 @@ class CubicResponseDriver(NonLinearSolver):
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
-        Computes a quadratic response function 
+        Computes a quadratic response function.
 
         :param molecule:
             The molecule.
@@ -594,8 +594,8 @@ class CubicResponseDriver(NonLinearSolver):
                                       NbA3NdNc + NcA3NbNd + NcA3NdNb)
             })
             result.update({
-                ('A2', wb, wc, wd): NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc +
-                                    NdA2Nbc + NbcA2Nd
+                ('A2', wb, wc, wd):
+                    (NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc + NdA2Nbc + NbcA2Nd)
             })
 
         profiler.check_memory_usage('End of QRF')
@@ -701,8 +701,7 @@ class CubicResponseDriver(NonLinearSolver):
 
     def get_densities(self, freqpairs, kX, S, D0, mo):
         """
-        Computes the  densities needed for the  Fock
-        matrics 
+        Computes the  densities needed for the Fock matrices.
 
         :param wi:
             A list of the frequencies
@@ -775,8 +774,7 @@ class CubicResponseDriver(NonLinearSolver):
 
     def get_densities_ii(self, freqpairs, kX, k_xy, S, D0, mo):
         """
-        Computes the  densities needed for the  Fock
-        matrics 
+        Computes the  densities needed for the Fock matrices.
 
         :param wi:
             A list of the frequencies
@@ -1018,7 +1016,7 @@ class CubicResponseDriver(NonLinearSolver):
             The total number of orbitals
 
         :return:
-            A dictonary of E[4], S[4], R[4] tensor contractions 
+            A dictonary of E[4], S[4], R[4] tensor contractions.
         """
 
         e4_vec = {}
@@ -1154,7 +1152,7 @@ class CubicResponseDriver(NonLinearSolver):
             The total number of orbitals
 
         :return:
-            A dictonary of E[4], S[4], R[4] tensor contractions 
+            A dictonary of E[4], S[4], R[4] tensor contractions.
         """
 
         BC = {}
