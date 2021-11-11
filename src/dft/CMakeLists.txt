@@ -3,6 +3,7 @@ target_sources(vlxobjs
     AOKohnShamMatrix.cpp
     DensityGrid.cpp
     DensityGridDriver.cpp
+    DensityGridQuad.cpp
     GridDriver.cpp
     GtoFunc.cpp
     GtoFuncForGGA.cpp
@@ -12,6 +13,7 @@ target_sources(vlxobjs
     MolecularGrid.cpp
     PartitionFunc.cpp
     PrimitiveFunctional.cpp
+    XCCubicHessianGrid.cpp
     XCFunctional.cpp
     XCGradientGrid.cpp
     XCHessianGrid.cpp

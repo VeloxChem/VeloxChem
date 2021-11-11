@@ -87,15 +87,15 @@ monkey:deploy:
   extends: .monkey:setup
   stage: deploy
   variables:
-    TARBALL: "build/veloxchem.tar.bz2"
+    TARBALL: "build_deploy/veloxchem.tar.bz2"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_TITLE =~ /\[conda-build\]/i'
   script:
     - export PATH=/home/roberto/Software/cmake-3.19.6/bin:$PATH
-    - cmake -S. -Bbuild -DPython_EXECUTABLE=$(type -P python3) &> /dev/null
-    - cmake --build build --target package_source
+    - cmake -S. -Bbuild_deploy -DPython_EXECUTABLE=$(type -P python3)
+    - cmake --build build_deploy --target package_source
     - python3 -m pip install requests  # though it appears to be already installed
     - python3 .gitlab/trigger.py
         --tarball "$TARBALL"
