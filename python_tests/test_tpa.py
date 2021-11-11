@@ -50,7 +50,7 @@ class TestTPA:
 
         if is_mpi_master(task.mpi_comm):
             tpa_result = tpa_prop.rsp_property
-            
+
             for key in [
                     't4_dict',
                     't3_dict',
@@ -73,13 +73,13 @@ class TestTPA:
         w = 0.05
 
         ref_result = {
-            't4_dict': 11.43851057-0.00543839j,
+            't4_dict': 11.43851057 - 0.00543839j,
             't3_dict': -42.19841751 - 0.28695214j,
             'NaX3NyNz': -81.62345190 - 0.35812832j,
             'NaA3NxNy': -27.21320341 - 0.03029788j,
             'NaX2Nyz': 270.69041328 + 2.67837597j,
             'NxA2Nyz': 270.83461366 + 0.52758094j,
-            'gamma': 401.928432962+2.52514003939j,
+            'gamma': 401.928432962 + 2.52514003939j,
         }
 
         here = Path(__file__).parent
