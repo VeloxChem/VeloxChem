@@ -239,12 +239,18 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         freqpairs = [wl for wl in zip(self.b_frequencies, self.c_frequencies)]
 
+        ABC = {}
+
         if self.rank == mpi_master():
             A = {(op, w): v for op, v in zip('A', a_rhs) for w in wa}
             B = {(op, w): v for op, v in zip('B', b_rhs)
                  for w in self.b_frequencies}
             C = {(op, w): v for op, v in zip('C', c_rhs)
                  for w in self.c_frequencies}
+
+            ABC.update(A)
+            ABC.update(B)
+            ABC.update(C)
 
             X = {
                 'x': 2 * self.ao2mo(mo, dipole_mats.x_to_numpy()),
@@ -255,11 +261,6 @@ class QuadraticResponseDriver(NonLinearSolver):
         else:
             X = None
             self.comp = None
-
-        ABC = {}
-        ABC.update(A)
-        ABC.update(B)
-        ABC.update(C)
 
         # Computing the first-order response vectors (3 per frequency)
         N_drv = ComplexResponse(self.comm, self.ostream)
@@ -367,56 +368,62 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         e3_dict = self.get_e3(freqpairs, kX, fock_dict, Focks, nocc, norb)
 
-        op_a = X[self.a_component]
-        op_b = X[self.b_component]
-        op_c = X[self.c_component]
-
         result = {}
 
-        for (wb, wc) in freqpairs:
+        if self.rank == mpi_master():
 
-            Na = (LinearSolver.lrmat2vec(kX[('A', wb + wc)].real, nocc, norb) +
-                  1j *
-                  LinearSolver.lrmat2vec(kX[('A', wb + wc)].imag, nocc, norb))
+            op_a = X[self.a_component]
+            op_b = X[self.b_component]
+            op_c = X[self.c_component]
 
-            Nb = (LinearSolver.lrmat2vec(kX[('B', wb)].real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kX[('B', wb)].imag, nocc, norb))
+            for (wb, wc) in freqpairs:
 
-            Nc = (LinearSolver.lrmat2vec(kX[('C', wc)].real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kX[('C', wc)].imag, nocc, norb))
+                Na = (LinearSolver.lrmat2vec(kX[('A', wb + wc)].real, nocc,
+                                             norb) +
+                      1j * LinearSolver.lrmat2vec(kX[
+                          ('A', wb + wc)].imag, nocc, norb))
 
-            C2Nb = self.x2_contract(kX[('B', wb)], op_c, d_a_mo, nocc, norb)
-            B2Nc = self.x2_contract(kX[('C', wc)], op_b, d_a_mo, nocc, norb)
+                Nb = (
+                    LinearSolver.lrmat2vec(kX[('B', wb)].real, nocc, norb) +
+                    1j * LinearSolver.lrmat2vec(kX[('B', wb)].imag, nocc, norb))
 
-            A2Nc = self.a2_contract(kX[('C', wc)], op_a, d_a_mo, nocc, norb)
-            A2Nb = self.a2_contract(kX[('B', wb)], op_a, d_a_mo, nocc, norb)
+                Nc = (
+                    LinearSolver.lrmat2vec(kX[('C', wc)].real, nocc, norb) +
+                    1j * LinearSolver.lrmat2vec(kX[('C', wc)].imag, nocc, norb))
 
-            NaE3NbNc = np.dot(Na.T, e3_dict[wb])
-            NaC2Nb = np.dot(Na.T, C2Nb)
-            NaB2Nc = np.dot(Na.T, B2Nc)
-            NbA2Nc = np.dot(Nb.T, A2Nc)
-            NcA2Nb = np.dot(Nc.T, A2Nb)
+                C2Nb = self.x2_contract(kX[('B', wb)], op_c, d_a_mo, nocc, norb)
+                B2Nc = self.x2_contract(kX[('C', wc)], op_b, d_a_mo, nocc, norb)
 
-            X2 = NaC2Nb + NaB2Nc
-            A2 = NbA2Nc + NcA2Nb
+                A2Nc = self.a2_contract(kX[('C', wc)], op_a, d_a_mo, nocc, norb)
+                A2Nb = self.a2_contract(kX[('B', wb)], op_a, d_a_mo, nocc, norb)
 
-            self.ostream.print_blank()
-            w_str = 'Quadratic response function at given frequencies: ' + '<< ' + str(
-                self.a_component) + ';' + str(self.b_component) + ',' + str(
+                NaE3NbNc = np.dot(Na.T, e3_dict[wb])
+                NaC2Nb = np.dot(Na.T, C2Nb)
+                NaB2Nc = np.dot(Na.T, B2Nc)
+                NbA2Nc = np.dot(Nb.T, A2Nc)
+                NcA2Nb = np.dot(Nc.T, A2Nb)
+
+                X2 = NaC2Nb + NaB2Nc
+                A2 = NbA2Nc + NcA2Nb
+
+                self.ostream.print_blank()
+                w_str = 'Quadratic response function at given frequencies: '
+                w_str += '<< ' + str(self.a_component) + ';'
+                w_str += str(self.b_component) + ',' + str(
                     self.c_component) + ' >> '
-            self.ostream.print_header(w_str)
-            self.ostream.print_header('=' * (len(w_str) + 2))
-            self.ostream.print_blank()
-            title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
-                'Component', 'Frequency', 'Real', 'Imaginary')
-            width = len(title)
-            self.ostream.print_header(title.ljust(width))
-            self.ostream.print_header(('-' * len(title)).ljust(width))
-            self.print_component('X2', wb, -X2, width)
-            self.print_component('A2', wb, -A2, width)
-            self.print_component('E3', wb, NaE3NbNc, width)
-            self.print_component('β', wb, NaE3NbNc - A2 - X2, width)
-            result.update({wb: NaE3NbNc - A2 - X2})
+                self.ostream.print_header(w_str)
+                self.ostream.print_header('=' * (len(w_str) + 2))
+                self.ostream.print_blank()
+                title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
+                    'Component', 'Frequency', 'Real', 'Imaginary')
+                width = len(title)
+                self.ostream.print_header(title.ljust(width))
+                self.ostream.print_header(('-' * len(title)).ljust(width))
+                self.print_component('X2', wb, -X2, width)
+                self.print_component('A2', wb, -A2, width)
+                self.print_component('E3', wb, NaE3NbNc, width)
+                self.print_component('β', wb, NaE3NbNc - A2 - X2, width)
+                result.update({wb: NaE3NbNc - A2 - X2})
 
         profiler.check_memory_usage('End of QRF')
 

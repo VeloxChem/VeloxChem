@@ -1,8 +1,7 @@
 from mpi4py import MPI
 import sys
-import pytest
 
-from veloxchem.veloxchemlib import is_single_node
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -10,8 +9,6 @@ from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
-@pytest.mark.skipif(not is_single_node(),
-                    reason='This test only runs on single node')
 class TestQrf:
 
     def run_scf(self):
@@ -94,20 +91,28 @@ class TestQrf:
 
         qrf_result_yyx = qrf_prop.compute(molecule, ao_basis, scf_tensors)
 
-        # x-component
+        if comm.Get_rank() == mpi_master():
 
-        assert abs(qrf_result_xxx[0.2].real - ref_result['xxx'].real) < 1.0e-4
-        assert abs(qrf_result_xxx[0.2].imag - ref_result['xxx'].imag) < 1.0e-4
+            # x-component
 
-        # y-component
+            assert abs(qrf_result_xxx[0.2].real -
+                       ref_result['xxx'].real) < 1.0e-4
+            assert abs(qrf_result_xxx[0.2].imag -
+                       ref_result['xxx'].imag) < 1.0e-4
 
-        assert abs(qrf_result_yyx[0.2].real - ref_result['yyx'].real) < 1.0e-4
-        assert abs(qrf_result_yyx[0.2].imag - ref_result['yyx'].imag) < 1.0e-4
+            # y-component
 
-        # z-component
+            assert abs(qrf_result_yyx[0.2].real -
+                       ref_result['yyx'].real) < 1.0e-4
+            assert abs(qrf_result_yyx[0.2].imag -
+                       ref_result['yyx'].imag) < 1.0e-4
 
-        assert abs(qrf_result_zzx[0.2].real - ref_result['zzx'].real) < 1.0e-4
-        assert abs(qrf_result_zzx[0.2].imag - ref_result['zzx'].imag) < 1.0e-4
+            # z-component
+
+            assert abs(qrf_result_zzx[0.2].real -
+                       ref_result['zzx'].real) < 1.0e-4
+            assert abs(qrf_result_zzx[0.2].imag -
+                       ref_result['zzx'].imag) < 1.0e-4
 
     def test_qrf(self):
 
