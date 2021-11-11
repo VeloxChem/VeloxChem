@@ -1,8 +1,7 @@
 from mpi4py import MPI
 import sys
-import pytest
 
-from veloxchem.veloxchemlib import is_single_node
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.cubicresponsedriver import CubicResponseDriver
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -10,8 +9,6 @@ from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
-@pytest.mark.skipif(not is_single_node(),
-                    reason='This test only runs on single node')
 class TestCrf:
 
     def run_scf(self):
@@ -70,23 +67,25 @@ class TestCrf:
 
         crf_result_yyzz = crf_prop.compute(molecule, ao_basis, scf_tensors)
 
-        assert abs(crf_result_yyzz[('T4', wb, wc, wd)].real -
-                   ref_result['T4'].real) < 1.0e-6
+        if comm.Get_rank() == mpi_master():
 
-        assert abs(crf_result_yyzz[('T4', wb, wc, wd)].imag -
-                   ref_result['T4'].imag) < 1.0e-6
+            assert abs(crf_result_yyzz[('T4', wb, wc, wd)].real -
+                       ref_result['T4'].real) < 1.0e-6
 
-        assert abs(crf_result_yyzz[('X3', wb, wc, wd)].real -
-                   ref_result['X3'].real) < 1.0e-6
+            assert abs(crf_result_yyzz[('T4', wb, wc, wd)].imag -
+                       ref_result['T4'].imag) < 1.0e-6
 
-        assert abs(crf_result_yyzz[('X3', wb, wc, wd)].imag -
-                   ref_result['X3'].imag) < 1.0e-6
+            assert abs(crf_result_yyzz[('X3', wb, wc, wd)].real -
+                       ref_result['X3'].real) < 1.0e-6
 
-        assert abs(crf_result_yyzz[('A3', wb, wc, wd)].real -
-                   ref_result['A3'].real) < 1.0e-6
+            assert abs(crf_result_yyzz[('X3', wb, wc, wd)].imag -
+                       ref_result['X3'].imag) < 1.0e-6
 
-        assert abs(crf_result_yyzz[('A3', wb, wc, wd)].imag -
-                   ref_result['A3'].imag) < 1.0e-6
+            assert abs(crf_result_yyzz[('A3', wb, wc, wd)].real -
+                       ref_result['A3'].real) < 1.0e-6
+
+            assert abs(crf_result_yyzz[('A3', wb, wc, wd)].imag -
+                       ref_result['A3'].imag) < 1.0e-6
 
     def test_crf(self):
 

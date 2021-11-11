@@ -259,6 +259,8 @@ class CubicResponseDriver(NonLinearSolver):
                              self.d_frequencies)
         ]
 
+        ABCD = {}
+
         if self.rank == mpi_master():
             A = {(op, w): v for op, v in zip('A', a_rhs) for w in wa}
             B = {(op, w): v for op, v in zip('B', b_rhs)
@@ -267,6 +269,11 @@ class CubicResponseDriver(NonLinearSolver):
                  for w in self.c_frequencies}
             D = {(op, w): v for op, v in zip('D', d_rhs)
                  for w in self.d_frequencies}
+
+            ABCD.update(A)
+            ABCD.update(B)
+            ABCD.update(C)
+            ABCD.update(D)
 
             X = {
                 'x': 2 * self.ao2mo(mo, dipole_mats.x_to_numpy()),
@@ -277,12 +284,6 @@ class CubicResponseDriver(NonLinearSolver):
         else:
             X = None
             self.comp = None
-
-        ABCD = {}
-        ABCD.update(A)
-        ABCD.update(B)
-        ABCD.update(C)
-        ABCD.update(D)
 
         # Computing the first-order response vectors (3 per frequency)
         N_drv = ComplexResponse(self.comm, self.ostream)
@@ -407,196 +408,202 @@ class CubicResponseDriver(NonLinearSolver):
         e3_dict = self.get_e3(freqpairs, kX, k_xy, Focks, fock_dict_ii, f_xy,
                               nocc, norb)
 
-        A = X[self.a_component]
-        B = X[self.b_component]
-        C = X[self.c_component]
-        D = X[self.d_component]
-
         result = {}
 
-        for (wb, wc, wd) in freqpairs:
+        if self.rank == mpi_master():
 
-            Na = (LinearSolver.lrmat2vec(kX[('A', wb + wc + wd)].real, nocc,
-                                         norb) +
-                  1j * LinearSolver.lrmat2vec(kX[
-                      ('A', wb + wc + wd)].imag, nocc, norb))
+            A = X[self.a_component]
+            B = X[self.b_component]
+            C = X[self.c_component]
+            D = X[self.d_component]
 
-            Nb = (LinearSolver.lrmat2vec(kX[('B', wb)].real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kX[('B', wb)].imag, nocc, norb))
+            for (wb, wc, wd) in freqpairs:
 
-            Nc = (LinearSolver.lrmat2vec(kX[('C', wc)].real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kX[('C', wc)].imag, nocc, norb))
+                Na = (LinearSolver.lrmat2vec(kX[('A', wb + wc + wd)].real, nocc,
+                                             norb) +
+                      1j * LinearSolver.lrmat2vec(kX[
+                          ('A', wb + wc + wd)].imag, nocc, norb))
 
-            Nd = (LinearSolver.lrmat2vec(kX[('D', wd)].real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kX[('D', wd)].imag, nocc, norb))
+                Nb = (
+                    LinearSolver.lrmat2vec(kX[('B', wb)].real, nocc, norb) +
+                    1j * LinearSolver.lrmat2vec(kX[('B', wb)].imag, nocc, norb))
 
-            Nbd = (LinearSolver.lrmat2vec(k_xy[('BD', wb, wd), wb + wd].real,
-                                          nocc, norb) +
-                   1j * LinearSolver.lrmat2vec(
-                       k_xy[('BD', wb, wd), wb + wd].imag, nocc, norb))
+                Nc = (
+                    LinearSolver.lrmat2vec(kX[('C', wc)].real, nocc, norb) +
+                    1j * LinearSolver.lrmat2vec(kX[('C', wc)].imag, nocc, norb))
 
-            Nbc = (LinearSolver.lrmat2vec(k_xy[('BC', wb, wc), wb + wc].real,
-                                          nocc, norb) +
-                   1j * LinearSolver.lrmat2vec(
-                       k_xy[('BC', wb, wc), wb + wc].imag, nocc, norb))
+                Nd = (
+                    LinearSolver.lrmat2vec(kX[('D', wd)].real, nocc, norb) +
+                    1j * LinearSolver.lrmat2vec(kX[('D', wd)].imag, nocc, norb))
 
-            Ncd = (LinearSolver.lrmat2vec(k_xy[('CD', wc, wd), wc + wd].real,
-                                          nocc, norb) +
-                   1j * LinearSolver.lrmat2vec(
-                       k_xy[('CD', wc, wd), wc + wd].imag, nocc, norb))
+                Nbd = LinearSolver.lrmat2vec(
+                    k_xy[('BD', wb, wd), wb + wd].real, nocc,
+                    norb) + 1j * LinearSolver.lrmat2vec(
+                        k_xy[('BD', wb, wd), wb + wd].imag, nocc, norb)
 
-            NaE4NbNcNd = np.dot(Na, e4_dict[wb])
+                Nbc = LinearSolver.lrmat2vec(
+                    k_xy[('BC', wb, wc), wb + wc].real, nocc,
+                    norb) + 1j * LinearSolver.lrmat2vec(
+                        k_xy[('BC', wb, wc), wb + wc].imag, nocc, norb)
 
-            NaS4NbNcNd = np.dot(Na, s4_dict[wb])
+                Ncd = LinearSolver.lrmat2vec(
+                    k_xy[('CD', wc, wd), wc + wd].real, nocc,
+                    norb) + 1j * LinearSolver.lrmat2vec(
+                        k_xy[('CD', wc, wd), wc + wd].imag, nocc, norb)
 
-            NaR4NbNcNd = r4_dict[wb]
+                NaE4NbNcNd = np.dot(Na, e4_dict[wb])
 
-            NaE3NbNcd = np.dot(Na, e3_dict[(('E3NbNcd'), (wb, wc, wd))])
-            NaE3NcNbd = np.dot(Na, e3_dict[(('E3NcNbd'), (wb, wc, wd))])
-            NaE3NdNbc = np.dot(Na, e3_dict[(('E3NdNbc'), (wb, wc, wd))])
+                NaS4NbNcNd = np.dot(Na, s4_dict[wb])
 
-            # X3 terms
-            NaB3NcNd = np.dot(
-                Na.T,
-                self.x3_contract(kX[('C', wc)], kX[('D', wd)], B, d_a_mo, nocc,
-                                 norb))
-            NaB3NdNc = np.dot(
-                Na.T,
-                self.x3_contract(kX[('D', wd)], kX[('C', wc)], B, d_a_mo, nocc,
-                                 norb))
+                NaR4NbNcNd = r4_dict[wb]
 
-            NaC3NbNd = np.dot(
-                Na.T,
-                self.x3_contract(kX[('B', wb)], kX[('D', wd)], C, d_a_mo, nocc,
-                                 norb))
-            NaC3NdNb = np.dot(
-                Na.T,
-                self.x3_contract(kX[('D', wd)], kX[('B', wb)], C, d_a_mo, nocc,
-                                 norb))
+                NaE3NbNcd = np.dot(Na, e3_dict[(('E3NbNcd'), (wb, wc, wd))])
+                NaE3NcNbd = np.dot(Na, e3_dict[(('E3NcNbd'), (wb, wc, wd))])
+                NaE3NdNbc = np.dot(Na, e3_dict[(('E3NdNbc'), (wb, wc, wd))])
 
-            NaD3NbNc = np.dot(
-                Na.T,
-                self.x3_contract(kX[('B', wb)], kX[('C', wc)], D, d_a_mo, nocc,
-                                 norb))
-            NaD3NcNb = np.dot(
-                Na.T,
-                self.x3_contract(kX[('C', wc)], kX[('B', wb)], D, d_a_mo, nocc,
-                                 norb))
+                # X3 terms
+                NaB3NcNd = np.dot(
+                    Na.T,
+                    self.x3_contract(kX[('C', wc)], kX[('D', wd)], B, d_a_mo,
+                                     nocc, norb))
+                NaB3NdNc = np.dot(
+                    Na.T,
+                    self.x3_contract(kX[('D', wd)], kX[('C', wc)], B, d_a_mo,
+                                     nocc, norb))
 
-            # X2 contraction
-            NaB2Ncd = np.dot(
-                Na.T,
-                self.x2_contract(k_xy[('CD', wc, wd), wc + wd], B, d_a_mo, nocc,
-                                 norb))
-            NaC2Nbd = np.dot(
-                Na.T,
-                self.x2_contract(k_xy[('BD', wb, wd), wb + wd], C, d_a_mo, nocc,
-                                 norb))
-            NaD2Nbc = np.dot(
-                Na.T,
-                self.x2_contract(k_xy[('BC', wb, wc), wb + wc], D, d_a_mo, nocc,
-                                 norb))
+                NaC3NbNd = np.dot(
+                    Na.T,
+                    self.x3_contract(kX[('B', wb)], kX[('D', wd)], C, d_a_mo,
+                                     nocc, norb))
+                NaC3NdNb = np.dot(
+                    Na.T,
+                    self.x3_contract(kX[('D', wd)], kX[('B', wb)], C, d_a_mo,
+                                     nocc, norb))
 
-            # A3 contraction
-            NdA3NbNc = np.dot(
-                self.a3_contract(kX[('B', wb)], kX[('C', wc)], A, d_a_mo, nocc,
-                                 norb), Nd)
-            NdA3NcNb = np.dot(
-                self.a3_contract(kX[('C', wc)], kX[('B', wb)], A, d_a_mo, nocc,
-                                 norb), Nd)
+                NaD3NbNc = np.dot(
+                    Na.T,
+                    self.x3_contract(kX[('B', wb)], kX[('C', wc)], D, d_a_mo,
+                                     nocc, norb))
+                NaD3NcNb = np.dot(
+                    Na.T,
+                    self.x3_contract(kX[('C', wc)], kX[('B', wb)], D, d_a_mo,
+                                     nocc, norb))
 
-            NbA3NcNd = np.dot(
-                self.a3_contract(kX[('C', wc)], kX[('D', wd)], A, d_a_mo, nocc,
-                                 norb), Nb)
-            NbA3NdNc = np.dot(
-                self.a3_contract(kX[('D', wd)], kX[('C', wc)], A, d_a_mo, nocc,
-                                 norb), Nb)
+                # X2 contraction
+                NaB2Ncd = np.dot(
+                    Na.T,
+                    self.x2_contract(k_xy[('CD', wc, wd), wc + wd], B, d_a_mo,
+                                     nocc, norb))
+                NaC2Nbd = np.dot(
+                    Na.T,
+                    self.x2_contract(k_xy[('BD', wb, wd), wb + wd], C, d_a_mo,
+                                     nocc, norb))
+                NaD2Nbc = np.dot(
+                    Na.T,
+                    self.x2_contract(k_xy[('BC', wb, wc), wb + wc], D, d_a_mo,
+                                     nocc, norb))
 
-            NcA3NbNd = np.dot(
-                self.a3_contract(kX[('B', wb)], kX[('D', wd)], A, d_a_mo, nocc,
-                                 norb), Nc)
-            NcA3NdNb = np.dot(
-                self.a3_contract(kX[('D', wd)], kX[('B', wb)], A, d_a_mo, nocc,
-                                 norb), Nc)
+                # A3 contraction
+                NdA3NbNc = np.dot(
+                    self.a3_contract(kX[('B', wb)], kX[('C', wc)], A, d_a_mo,
+                                     nocc, norb), Nd)
+                NdA3NcNb = np.dot(
+                    self.a3_contract(kX[('C', wc)], kX[('B', wb)], A, d_a_mo,
+                                     nocc, norb), Nd)
 
-            # A2 contraction
-            NbA2Ncd = np.dot(
-                self.a2_contract(kX[('B', wb)], A, d_a_mo, nocc, norb), Ncd)
-            NcdA2Nb = np.dot(
-                self.a2_contract(k_xy[('CD', wc, wd), wc + wd], A, d_a_mo, nocc,
-                                 norb), Nb)
+                NbA3NcNd = np.dot(
+                    self.a3_contract(kX[('C', wc)], kX[('D', wd)], A, d_a_mo,
+                                     nocc, norb), Nb)
+                NbA3NdNc = np.dot(
+                    self.a3_contract(kX[('D', wd)], kX[('C', wc)], A, d_a_mo,
+                                     nocc, norb), Nb)
 
-            NcA2Nbd = np.dot(
-                self.a2_contract(kX[('C', wc)], A, d_a_mo, nocc, norb), Nbd)
-            NbdA2Nc = np.dot(
-                self.a2_contract(k_xy[('BD', wb, wd), wb + wd], A, d_a_mo, nocc,
-                                 norb), Nc)
+                NcA3NbNd = np.dot(
+                    self.a3_contract(kX[('B', wb)], kX[('D', wd)], A, d_a_mo,
+                                     nocc, norb), Nc)
+                NcA3NdNb = np.dot(
+                    self.a3_contract(kX[('D', wd)], kX[('B', wb)], A, d_a_mo,
+                                     nocc, norb), Nc)
 
-            NdA2Nbc = np.dot(
-                self.a2_contract(kX[('D', wd)], A, d_a_mo, nocc, norb), Nbc)
-            NbcA2Nd = np.dot(
-                self.a2_contract(k_xy[('BC', wb, wc), wb + wc], A, d_a_mo, nocc,
-                                 norb), Nd)
+                # A2 contraction
+                NbA2Ncd = np.dot(
+                    self.a2_contract(kX[('B', wb)], A, d_a_mo, nocc, norb), Ncd)
+                NcdA2Nb = np.dot(
+                    self.a2_contract(k_xy[('CD', wc, wd), wc + wd], A, d_a_mo,
+                                     nocc, norb), Nb)
 
-            # Cubic response function
-            Gamma = -(NaE4NbNcNd - NaS4NbNcNd - NaR4NbNcNd) - (
-                NaE3NbNcd + NaE3NcNbd + NaE3NdNbc)
-            Gamma += NaB3NcNd + NaB3NdNc + NaC3NbNd + NaC3NdNb + NaD3NbNc + NaD3NcNb
-            Gamma += -(NdA3NbNc + NdA3NcNb + NbA3NcNd + NbA3NdNc + NcA3NbNd +
-                       NcA3NdNb)
-            Gamma += NaB2Ncd + NaC2Nbd + NaD2Nbc
-            Gamma += NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc + NdA2Nbc + NbcA2Nd
+                NcA2Nbd = np.dot(
+                    self.a2_contract(kX[('C', wc)], A, d_a_mo, nocc, norb), Nbd)
+                NbdA2Nc = np.dot(
+                    self.a2_contract(k_xy[('BD', wb, wd), wb + wd], A, d_a_mo,
+                                     nocc, norb), Nc)
 
-            self.ostream.print_blank()
-            w_str = 'Cubic response function: ' + '<< ' + str(
-                self.a_component) + ';' + str(self.b_component) + ',' + str(
-                    self.c_component) + ',' + str(
-                        self.d_component) + ' >> ' + ' (' + str(
-                            wb) + ' ,' + str(wc) + ',' + str(wd) + ')'
-            self.ostream.print_header(w_str)
-            self.ostream.print_header('=' * (len(w_str) + 2))
-            self.ostream.print_blank()
-            title = '{:<9s}  {:>20s} {:>21s}'.format('Component', 'Real',
-                                                     'Imaginary')
-            width = len(title)
-            self.ostream.print_header(title.ljust(width))
-            self.ostream.print_header(('-' * len(title)).ljust(width))
-            self.print_component('E3', -(NaE3NbNcd + NaE3NcNbd + NaE3NdNbc),
-                                 width)
-            self.print_component('T4', -(NaE4NbNcNd - NaS4NbNcNd - NaR4NbNcNd),
-                                 width)
-            self.print_component('X2', NaB2Ncd + NaC2Nbd + NaD2Nbc, width)
-            self.print_component(
-                'X3',
-                NaB3NcNd + NaB3NdNc + NaC3NbNd + NaC3NdNb + NaD3NbNc + NaD3NcNb,
-                width)
-            self.print_component(
-                'A2', NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc + NdA2Nbc + NbcA2Nd,
-                width)
-            self.print_component(
-                'A3', -(NdA3NbNc + NdA3NcNb + NbA3NcNd + NbA3NdNc + NcA3NbNd +
-                        NcA3NdNb), width)
-            self.print_component('γ', Gamma, width)
-            self.ostream.print_blank()
-            result.update({
-                ('E3', wb, wc, wd): -(NaE3NbNcd + NaE3NcNbd + NaE3NdNbc)
-            })
-            result.update({
-                ('T4', wb, wc, wd): -(NaE4NbNcNd - NaS4NbNcNd - NaR4NbNcNd)
-            })
-            result.update({
-                ('X3', wb, wc, wd): (NaB3NcNd + NaB3NdNc + NaC3NbNd + NaC3NdNb +
-                                     NaD3NbNc + NaD3NcNb)
-            })
-            result.update({('X2', wb, wc, wd): NaB2Ncd + NaC2Nbd + NaD2Nbc})
-            result.update({
-                ('A3', wb, wc, wd): -(NdA3NbNc + NdA3NcNb + NbA3NcNd +
-                                      NbA3NdNc + NcA3NbNd + NcA3NdNb)
-            })
-            result.update({
-                ('A2', wb, wc, wd):
-                    (NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc + NdA2Nbc + NbcA2Nd)
-            })
+                NdA2Nbc = np.dot(
+                    self.a2_contract(kX[('D', wd)], A, d_a_mo, nocc, norb), Nbc)
+                NbcA2Nd = np.dot(
+                    self.a2_contract(k_xy[('BC', wb, wc), wb + wc], A, d_a_mo,
+                                     nocc, norb), Nd)
+
+                # Cubic response function
+                Gamma = -(NaE4NbNcNd - NaS4NbNcNd - NaR4NbNcNd) - (
+                    NaE3NbNcd + NaE3NcNbd + NaE3NdNbc)
+                Gamma += NaB3NcNd + NaB3NdNc + NaC3NbNd + NaC3NdNb + NaD3NbNc + NaD3NcNb
+                Gamma += -(NdA3NbNc + NdA3NcNb + NbA3NcNd + NbA3NdNc +
+                           NcA3NbNd + NcA3NdNb)
+                Gamma += NaB2Ncd + NaC2Nbd + NaD2Nbc
+                Gamma += NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc + NdA2Nbc + NbcA2Nd
+
+                self.ostream.print_blank()
+                w_str = 'Cubic response function: ' + '<< ' + str(
+                    self.a_component) + ';' + str(self.b_component) + ',' + str(
+                        self.c_component) + ',' + str(
+                            self.d_component) + ' >> ' + ' (' + str(
+                                wb) + ' ,' + str(wc) + ',' + str(wd) + ')'
+                self.ostream.print_header(w_str)
+                self.ostream.print_header('=' * (len(w_str) + 2))
+                self.ostream.print_blank()
+                title = '{:<9s}  {:>20s} {:>21s}'.format(
+                    'Component', 'Real', 'Imaginary')
+                width = len(title)
+                self.ostream.print_header(title.ljust(width))
+                self.ostream.print_header(('-' * len(title)).ljust(width))
+                self.print_component('E3', -(NaE3NbNcd + NaE3NcNbd + NaE3NdNbc),
+                                     width)
+                self.print_component('T4',
+                                     -(NaE4NbNcNd - NaS4NbNcNd - NaR4NbNcNd),
+                                     width)
+                self.print_component('X2', NaB2Ncd + NaC2Nbd + NaD2Nbc, width)
+                self.print_component(
+                    'X3', NaB3NcNd + NaB3NdNc + NaC3NbNd + NaC3NdNb + NaD3NbNc +
+                    NaD3NcNb, width)
+                self.print_component(
+                    'A2',
+                    NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc + NdA2Nbc + NbcA2Nd,
+                    width)
+                self.print_component(
+                    'A3', -(NdA3NbNc + NdA3NcNb + NbA3NcNd + NbA3NdNc +
+                            NcA3NbNd + NcA3NdNb), width)
+                self.print_component('γ', Gamma, width)
+                self.ostream.print_blank()
+                result.update({
+                    ('E3', wb, wc, wd): -(NaE3NbNcd + NaE3NcNbd + NaE3NdNbc)
+                })
+                result.update({
+                    ('T4', wb, wc, wd): -(NaE4NbNcNd - NaS4NbNcNd - NaR4NbNcNd)
+                })
+                result.update({
+                    ('X3', wb, wc, wd): (NaB3NcNd + NaB3NdNc + NaC3NbNd +
+                                         NaC3NdNb + NaD3NbNc + NaD3NcNb)
+                })
+                result.update({('X2', wb, wc, wd): NaB2Ncd + NaC2Nbd + NaD2Nbc})
+                result.update({
+                    ('A3', wb, wc, wd): -(NdA3NbNc + NdA3NcNb + NbA3NcNd +
+                                          NbA3NdNc + NcA3NbNd + NcA3NdNb)
+                })
+                result.update({
+                    ('A2', wb, wc, wd): (NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc +
+                                         NdA2Nbc + NbcA2Nd)
+                })
 
         profiler.check_memory_usage('End of QRF')
 
