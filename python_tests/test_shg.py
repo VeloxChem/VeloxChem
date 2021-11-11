@@ -1,14 +1,11 @@
 from pathlib import Path
-import pytest
 
-from veloxchem.veloxchemlib import is_single_node
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.rspshg import SHG
 
 
-@pytest.mark.skipif(not is_single_node(),
-                    reason='This test only runs on single node')
 class TestSHG:
 
     def run_scf(self, task):
@@ -40,20 +37,22 @@ class TestSHG:
         shg_prop.compute(task.molecule, task.ao_basis, scf_tensors)
         shg_result = shg_prop.rsp_property
 
-        # x-component
+        if task.mpi_rank == mpi_master():
 
-        assert abs(shg_result[0.2][0].real - ref_result['x'].real) < 1.0e-6
-        assert abs(shg_result[0.2][0].imag - ref_result['x'].imag) < 1.0e-6
+            # x-component
 
-        # y-component
+            assert abs(shg_result[0.2][0].real - ref_result['x'].real) < 1.0e-6
+            assert abs(shg_result[0.2][0].imag - ref_result['x'].imag) < 1.0e-6
 
-        assert abs(shg_result[0.2][1].real - ref_result['y'].real) < 1.0e-6
-        assert abs(shg_result[0.2][1].imag - ref_result['y'].imag) < 1.0e-6
+            # y-component
 
-        # z-component
+            assert abs(shg_result[0.2][1].real - ref_result['y'].real) < 1.0e-6
+            assert abs(shg_result[0.2][1].imag - ref_result['y'].imag) < 1.0e-6
 
-        assert abs(shg_result[0.2][2].real - ref_result['z'].real) < 1.0e-6
-        assert abs(shg_result[0.2][2].imag - ref_result['z'].imag) < 1.0e-6
+            # z-component
+
+            assert abs(shg_result[0.2][2].real - ref_result['z'].real) < 1.0e-6
+            assert abs(shg_result[0.2][2].imag - ref_result['z'].imag) < 1.0e-6
 
     def test_shg(self):
 
