@@ -23,7 +23,6 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import time
@@ -131,8 +130,9 @@ class TpaDriver(NonLinearSolver):
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(nalpha == nbeta,
-                            'TPA Driver: not implemented for unrestricted case')
+        assert_msg_critical(
+            nalpha == nbeta,
+            'TPA Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_tensors['S']
@@ -772,37 +772,6 @@ class TpaDriver(NonLinearSolver):
             'x2': -(1. / 15) * na_x2_nyz,
             'a2': -(1. / 15) * nx_a2_nyz,
         }
-
-    def collect_vectors_in_columns(self, sendbuf):
-        """
-        Collects vectors into 2d array (column-wise).
-
-        :param sendbuf:
-            The 2d array containing the vector segments in columns.
-
-        :return:
-            A 2d array containing the full vectors in columns.
-        """
-
-        counts = self.comm.gather(sendbuf.size, root=mpi_master())
-        if self.rank == mpi_master():
-            displacements = [sum(counts[:p]) for p in range(self.nodes)]
-            recvbuf = np.zeros(sum(counts), dtype=sendbuf.dtype).reshape(
-                -1, sendbuf.shape[1])
-        else:
-            displacements = None
-            recvbuf = None
-
-        if sendbuf.dtype == np.float64:
-            mpi_data_type = MPI.DOUBLE
-        elif sendbuf.dtype == np.complex128:
-            mpi_data_type = MPI.C_DOUBLE_COMPLEX
-
-        self.comm.Gatherv(sendbuf,
-                          [recvbuf, counts, displacements, mpi_data_type],
-                          root=mpi_master())
-
-        return recvbuf
 
     def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
         """

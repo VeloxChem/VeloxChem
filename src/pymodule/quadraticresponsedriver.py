@@ -528,8 +528,10 @@ class QuadraticResponseDriver(NonLinearSolver):
         for (wb, wc) in wi:
 
             vec_pack = np.array([
-                fo['Fbc'][wb].data, fo['Fcb'][wb].data, fo2[('B', wb)].data,
-                fo2[('C', wc)].data
+                fo['Fbc'][wb].data,
+                fo['Fcb'][wb].data,
+                fo2[('B', wb)].data,
+                fo2[('C', wc)].data,
             ]).T.copy()
 
             vec_pack = self.collect_vectors_in_columns(vec_pack)

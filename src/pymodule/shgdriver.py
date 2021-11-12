@@ -282,7 +282,7 @@ class SHGDriver(NonLinearSolver):
             self.ostream.print_header(w_str)
             self.ostream.print_header('=' * (len(w_str) + 2))
 
-            beta_bar = {}
+            # beta_bar = {}
 
             for key in beta.keys():
                 betaa = 0
@@ -296,7 +296,8 @@ class SHGDriver(NonLinearSolver):
                 self.print_component('beta_y', key, beta[key][1], width)
                 self.print_component('beta_z', key, beta[key][2], width)
                 self.print_component('beta ||', key, 1 / 5 * betaa, width)
-                beta_bar = {key: betaa}
+
+                # beta_bar = {key: betaa}
 
             self.ostream.print_blank()
             valstr = '*** Time spent in quadratic response calculation: '
