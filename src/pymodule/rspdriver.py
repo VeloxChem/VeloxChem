@@ -31,6 +31,8 @@ from .tdaexcidriver import TDAExciDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
 from .shgdriver import SHGDriver
+from .quadraticresponsedriver import QuadraticResponseDriver
+from .cubicresponsedriver import CubicResponseDriver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 
@@ -154,6 +156,17 @@ class ResponseDriver:
             self.solver.input_keywords['response'].update({
                 'tpa_type': ('str_lower', 'full or reduced TPA calculation'),
             })
+
+        # Quadratic response driver
+        if (self.prop_type == 'custom' and
+                self.rsp_dict['order'] == 'quadratic' and
+                self.rsp_dict['complex'] == 'yes'):
+            self.solver = QuadraticResponseDriver(self.comm, self.ostream)
+
+        # Cubic response driver
+        if (self.prop_type == 'custom' and self.rsp_dict['order'] == 'cubic' and
+                self.rsp_dict['complex'] == 'yes'):
+            self.solver = CubicResponseDriver(self.comm, self.ostream)
 
         self.solver.update_settings(self.rsp_dict, self.method_dict)
 

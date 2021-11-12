@@ -31,7 +31,7 @@ import sys
 import re
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, hartree_in_wavenumbers
 from .profiler import Profiler
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
@@ -82,7 +82,7 @@ class CubicResponseDriver(NonLinearSolver):
         self.c_frequencies = (0,)
         self.d_frequencies = (0,)
         self.comp = None
-        self.damping = 0.004556335294880438
+        self.damping = 1000.0 / hartree_in_wavenumbers()
         self.lindep_thresh = 1.0e-10
         self.conv_thresh = 1.0e-4
         self.max_iter = 50

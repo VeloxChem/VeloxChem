@@ -929,3 +929,21 @@ class NonLinearSolver:
                                   self.commut(kB, F0) + 2 * Fb) +
                       self.commut(kB,
                                   self.commut(kA, F0) + 2 * Fa))
+
+    def complex_lrmat2vec(self, mat, nocc, norb):
+        """
+        Converts complex matrix to vector.
+
+        :param mat:
+            The complex matrix.
+        :param nocc:
+            Number of occupied orbitals.
+        :param norb:
+            Number of orbitals.
+
+        :return:
+            The complex vector.
+        """
+
+        return (LinearSolver.lrmat2vec(mat.real, nocc, norb) +
+                1j * LinearSolver.lrmat2vec(mat.imag, nocc, norb))
