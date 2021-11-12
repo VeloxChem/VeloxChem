@@ -41,12 +41,15 @@ class SHG(ResponseProperty):
         - rsp_property: The dictionary of response property.
     """
 
-    def __init__(self, rsp_dict, method_dict=None):
+    def __init__(self, rsp_dict=None, method_dict=None):
         """
         Initializes the polarizability property.
         """
 
-        rsp_dict = dict(rsp_dict)
+        if rsp_dict is None:
+            rsp_dict = {}
+        else:
+            rsp_dict = dict(rsp_dict)
 
         if method_dict is None:
             method_dict = {}
@@ -60,8 +63,8 @@ class SHG(ResponseProperty):
         rsp_dict['a_operator'] = 'dipole'
         rsp_dict['b_operator'] = 'dipole'
         rsp_dict['c_operator'] = 'dipole'
-        rsp_dict['a_component'] = 'xyz'
-        rsp_dict['b_component'] = 'xyz'
+        rsp_dict['a_components'] = 'xyz'
+        rsp_dict['b_components'] = 'xyz'
 
         if 'frequencies' not in rsp_dict:
             rsp_dict['frequencies'] = '0'

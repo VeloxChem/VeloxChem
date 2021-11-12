@@ -5,7 +5,8 @@ import time
 import sys
 import re
 
-from .veloxchemlib import (ElectricDipoleIntegralsDriver, mpi_master)
+from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .veloxchemlib import mpi_master, hartree_in_wavenumbers
 from .profiler import Profiler
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
@@ -14,9 +15,9 @@ from .nonlinearsolver import NonLinearSolver
 from .distributedarray import DistributedArray
 from .scffirstorderprop import ScfFirstOrderProperties
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
-from .inputparser import parse_input
 
 
 class SHGDriver(NonLinearSolver):
@@ -30,9 +31,6 @@ class SHGDriver(NonLinearSolver):
 
     Instance variables
         - is_converged: The flag for convergence.
-        - eri_thresh: The electron repulsion integrals screening threshold.
-        - qq_type: The electron repulsion integrals screening scheme.
-        - batch_size: The batch size for computation of Fock matrices.
         - frequencies: The frequencies.
         - comp: The list of all the gamma tensor components
         - damping: The damping parameter.
@@ -40,18 +38,11 @@ class SHGDriver(NonLinearSolver):
           trial vectors.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
-        - comm: The MPI communicator.
-        - rank: The MPI rank.
-        - nodes: Number of MPI processes.
-        - ostream: The output stream.
-        - restart: The flag for restarting from checkpoint file.
-        - checkpoint_file: The name of checkpoint file.
-        - program_start_time: The start time of the program.
-        - maximum_hours: The timelimit in hours.
-        - timing: The flag for printing timing information.
-        - profiling: The flag for printing profiling information.
-        - memory_profiling: The flag for printing memory usage.
-        - memory_tracing: The flag for tracing memory allocation.
+        - a_operator: The A operator.
+        - b_operator: The B operator.
+        - c_operator: The C operator.
+        - a_components: Cartesian components of the A operator.
+        - b_components: Cartesian components of the B operator.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -70,45 +61,28 @@ class SHGDriver(NonLinearSolver):
 
         self.is_converged = False
 
-        # ERI settings
-        self.eri_thresh = 1.0e-15
-        self.qq_type = 'QQ_DEN'
-        self.batch_size = None
-
         # cpp settings
         self.frequencies = (0,)
         self.comp = None
-        self.damping = 0.004556335294880438
+        self.damping = 1000.0 / hartree_in_wavenumbers()
         self.lindep_thresh = 1.0e-10
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
-        self.a_component = 'xyz'
-        self.b_component = 'xyz'
+
         self.a_operator = 'dipole'
         self.b_operator = 'dipole'
         self.c_operator = 'dipole'
+        self.a_components = 'xyz'
+        self.b_components = 'xyz'
 
-        # mpi information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
-
-        # output stream
-        self.ostream = ostream
-
-        # restart information
-        self.restart = True
-        self.checkpoint_file = None
-
-        # information for graceful exit
-        self.program_start_time = None
-        self.maximum_hours = None
-
-        # timing and profiling
-        self.timing = False
-        self.profiling = False
-        self.memory_profiling = False
-        self.memory_tracing = False
+        # input keywords
+        self.input_keywords['response'].update({
+            'frequencies': ('seq_range', 'frequencies'),
+            'damping': ('float', 'damping parameter'),
+            'a_operator': ('str_lower', 'A operator'),
+            'b_operator': ('str_lower', 'B operator'),
+            'c_operator': ('str_lower', 'C operator'),
+        })
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -124,23 +98,7 @@ class SHGDriver(NonLinearSolver):
             method_dict = {}
 
         rsp_keywords = {
-            'frequencies': 'seq_range',
-            'damping': 'float',
-            'a_operator': 'str',
-            'b_operator': 'str',
-            'c_operator': 'str',
-            'eri_thresh': 'float',
-            'qq_type': 'str_upper',
-            'batch_size': 'int',
-            'max_iter': 'int',
-            'conv_thresh': 'float',
-            'lindep_thresh': 'float',
-            'restart': 'bool',
-            'checkpoint_file': 'str',
-            'timing': 'bool',
-            'profiling': 'bool',
-            'memory_profiling': 'bool',
-            'memory_tracing': 'bool',
+            key: val[0] for key, val in self.input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -221,10 +179,10 @@ class SHGDriver(NonLinearSolver):
 
         linear_solver = LinearSolver(self.comm, self.ostream)
         a_rhs = linear_solver.get_complex_prop_grad(self.a_operator,
-                                                    self.a_component, molecule,
+                                                    self.a_components, molecule,
                                                     ao_basis, scf_tensors)
         b_rhs = linear_solver.get_complex_prop_grad(self.b_operator,
-                                                    self.b_component, molecule,
+                                                    self.b_components, molecule,
                                                     ao_basis, scf_tensors)
 
         if self.rank == mpi_master():

@@ -5,7 +5,8 @@ import time
 import sys
 import re
 
-from .veloxchemlib import (ElectricDipoleIntegralsDriver, mpi_master)
+from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .veloxchemlib import mpi_master
 from .profiler import Profiler
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
@@ -13,9 +14,9 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonLinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
-from .inputparser import parse_input
 
 
 class QuadraticResponseDriver(NonLinearSolver):
@@ -29,28 +30,15 @@ class QuadraticResponseDriver(NonLinearSolver):
 
     Instance variables
         - is_converged: The flag for convergence.
-        - eri_thresh: The electron repulsion integrals screening threshold.
-        - qq_type: The electron repulsion integrals screening scheme.
-        - batch_size: The batch size for computation of Fock matrices.
-        - frequencies: The frequencies.
         - comp: The list of all the gamma tensor components
         - damping: The damping parameter.
         - lindep_thresh: The threshold for removing linear dependence in the
           trial vectors.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
-        - comm: The MPI communicator.
-        - rank: The MPI rank.
-        - nodes: Number of MPI processes.
-        - ostream: The output stream.
-        - restart: The flag for restarting from checkpoint file.
-        - checkpoint_file: The name of checkpoint file.
-        - program_start_time: The start time of the program.
-        - maximum_hours: The timelimit in hours.
-        - timing: The flag for printing timing information.
-        - profiling: The flag for printing profiling information.
-        - memory_profiling: The flag for printing memory usage.
-        - memory_tracing: The flag for tracing memory allocation.
+        - a_components: Cartesian components of the A operator.
+        - b_components: Cartesian components of the B operator.
+        - c_components: Cartesian components of the C operator.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -68,11 +56,6 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         self.is_converged = False
 
-        # ERI settings
-        self.eri_thresh = 1.0e-15
-        self.qq_type = 'QQ_DEN'
-        self.batch_size = None
-
         # cpp settings
         self.b_frequencies = (0,)
         self.c_frequencies = (0,)
@@ -81,31 +64,20 @@ class QuadraticResponseDriver(NonLinearSolver):
         self.lindep_thresh = 1.0e-10
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
-        self.a_component = 'z'
-        self.b_component = 'z'
-        self.c_component = 'z'
 
-        # mpi information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
+        self.a_components = 'z'
+        self.b_components = 'z'
+        self.c_components = 'z'
 
-        # output stream
-        self.ostream = ostream
-
-        # restart information
-        self.restart = True
-        self.checkpoint_file = None
-
-        # information for graceful exit
-        self.program_start_time = None
-        self.maximum_hours = None
-
-        # timing and profiling
-        self.timing = False
-        self.profiling = False
-        self.memory_profiling = False
-        self.memory_tracing = False
+        # input keywords
+        self.input_keywords['response'].update({
+            'b_frequencies': ('seq_range', 'B frequencies'),
+            'c_frequencies': ('seq_range', 'C frequencies'),
+            'damping': ('float', 'damping parameter'),
+            'a_components': ('str_lower', 'Cartesian components of A operator'),
+            'b_components': ('str_lower', 'Cartesian components of B operator'),
+            'c_components': ('str_lower', 'Cartesian components of C operator'),
+        })
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -121,24 +93,7 @@ class QuadraticResponseDriver(NonLinearSolver):
             method_dict = {}
 
         rsp_keywords = {
-            'b_frequencies': 'seq_range',
-            'c_frequencies': 'seq_range',
-            'damping': 'float',
-            'a_component': 'str',
-            'b_component': 'str',
-            'c_component': 'str',
-            'eri_thresh': 'float',
-            'qq_type': 'str_upper',
-            'batch_size': 'int',
-            'max_iter': 'int',
-            'conv_thresh': 'float',
-            'lindep_thresh': 'float',
-            'restart': 'bool',
-            'checkpoint_file': 'str',
-            'timing': 'bool',
-            'profiling': 'bool',
-            'memory_profiling': 'bool',
-            'memory_tracing': 'bool',
+            key: val[0] for key, val in self.input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -220,13 +175,13 @@ class QuadraticResponseDriver(NonLinearSolver):
         operator = 'dipole'
 
         linear_solver = LinearSolver(self.comm, self.ostream)
-        a_rhs = linear_solver.get_complex_prop_grad(operator, self.a_component,
+        a_rhs = linear_solver.get_complex_prop_grad(operator, self.a_components,
                                                     molecule, ao_basis,
                                                     scf_tensors)
-        b_rhs = linear_solver.get_complex_prop_grad(operator, self.b_component,
+        b_rhs = linear_solver.get_complex_prop_grad(operator, self.b_components,
                                                     molecule, ao_basis,
                                                     scf_tensors)
-        c_rhs = linear_solver.get_complex_prop_grad(operator, self.c_component,
+        c_rhs = linear_solver.get_complex_prop_grad(operator, self.c_components,
                                                     molecule, ao_basis,
                                                     scf_tensors)
 
@@ -381,9 +336,9 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         if self.rank == mpi_master():
 
-            op_a = X[self.a_component]
-            op_b = X[self.b_component]
-            op_c = X[self.c_component]
+            op_a = X[self.a_components]
+            op_b = X[self.b_components]
+            op_c = X[self.c_components]
 
             for (wb, wc) in freqpairs:
 
@@ -417,9 +372,9 @@ class QuadraticResponseDriver(NonLinearSolver):
 
                 self.ostream.print_blank()
                 w_str = 'Quadratic response function at given frequencies: '
-                w_str += '<< ' + str(self.a_component) + ';'
-                w_str += str(self.b_component) + ',' + str(
-                    self.c_component) + ' >> '
+                w_str += '<< {};{},{} >>'.format(self.a_components,
+                                                 self.b_components,
+                                                 self.c_components)
                 self.ostream.print_header(w_str)
                 self.ostream.print_header('=' * (len(w_str) + 2))
                 self.ostream.print_blank()
@@ -431,7 +386,9 @@ class QuadraticResponseDriver(NonLinearSolver):
                 self.print_component('X2', wb, -X2, width)
                 self.print_component('A2', wb, -A2, width)
                 self.print_component('E3', wb, NaE3NbNc, width)
-                self.print_component('β', wb, NaE3NbNc - A2 - X2, width)
+                self.print_component('beta', wb, NaE3NbNc - A2 - X2, width)
+                self.ostream.print_blank()
+                self.ostream.flush()
                 result.update({wb: NaE3NbNc - A2 - X2})
 
         profiler.check_memory_usage('End of QRF')
@@ -618,7 +575,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         self.ostream.print_blank()
 
-        title = 'Two-Photon Absorbtion Driver Setup'
+        title = 'Quadratic Response Driver Setup'
         self.ostream.print_header(title)
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()

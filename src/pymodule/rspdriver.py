@@ -151,6 +151,9 @@ class ResponseDriver:
             elif ('tpa_type' in self.rsp_dict and
                   self.rsp_dict['tpa_type'].lower() == 'reduced'):
                 self.solver = TpaReducedDriver(self.comm, self.ostream)
+            self.solver.input_keywords['response'].update({
+                'tpa_type': ('str_lower', 'full or reduced TPA calculation'),
+            })
 
         self.solver.update_settings(self.rsp_dict, self.method_dict)
 

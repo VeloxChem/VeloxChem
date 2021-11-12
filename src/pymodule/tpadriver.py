@@ -36,7 +36,7 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonLinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input, get_keyword_type
+from .inputparser import parse_input
 
 
 class TpaDriver(NonLinearSolver):
@@ -51,9 +51,6 @@ class TpaDriver(NonLinearSolver):
 
     Instance variables
         - is_converged: The flag for convergence.
-        - eri_thresh: The electron repulsion integrals screening threshold.
-        - qq_type: The electron repulsion integrals screening scheme.
-        - batch_size: The batch size for computation of Fock matrices.
         - frequencies: The frequencies.
         - comp: The list of all the gamma tensor components
         - damping: The damping parameter.
@@ -61,18 +58,6 @@ class TpaDriver(NonLinearSolver):
           trial vectors.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
-        - comm: The MPI communicator.
-        - rank: The MPI rank.
-        - nodes: Number of MPI processes.
-        - ostream: The output stream.
-        - restart: The flag for restarting from checkpoint file.
-        - checkpoint_file: The name of checkpoint file.
-        - program_start_time: The start time of the program.
-        - maximum_hours: The timelimit in hours.
-        - timing: The flag for printing timing information.
-        - profiling: The flag for printing profiling information.
-        - memory_profiling: The flag for printing memory usage.
-        - memory_tracing: The flag for tracing memory allocation.
     """
 
     def __init__(self, comm, ostream):
@@ -85,11 +70,6 @@ class TpaDriver(NonLinearSolver):
 
         self.is_converged = False
 
-        # ERI settings
-        self.eri_thresh = 1.0e-15
-        self.qq_type = 'QQ_DEN'
-        self.batch_size = None
-
         # cpp settings
         self.frequencies = (0,)
         self.comp = None
@@ -98,65 +78,11 @@ class TpaDriver(NonLinearSolver):
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
 
-        # mpi information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
-
-        # output stream
-        self.ostream = ostream
-
-        # restart information
-        self.restart = True
-        self.checkpoint_file = None
-
-        # information for graceful exit
-        self.program_start_time = None
-        self.maximum_hours = None
-
-        # timing and profiling
-        self.timing = False
-        self.profiling = False
-        self.memory_profiling = False
-        self.memory_tracing = False
-
         # input keywords
-        self.input_keywords = {
-            'response': {
-                'frequencies': ('seq_range', 'frequencies'),
-                'damping': ('float', 'damping parameter'),
-                'eri_thresh': ('float', 'ERI screening threshold'),
-                'qq_type': ('str_upper', 'ERI screening scheme'),
-                'batch_size': ('int', 'batch size for Fock build'),
-                'conv_thresh': ('float', 'convergence threshold'),
-                'max_iter': ('int', 'maximum number of iterations'),
-                'lindep_thresh': ('float', 'threshold for linear dependence'),
-                'restart': ('bool', 'restart from checkpoint file'),
-                'checkpoint_file': ('str', 'name of checkpoint file'),
-                'timing': ('bool', 'print timing information'),
-                'profiling': ('bool', 'print profiling information'),
-                'memory_profiling': ('bool', 'print memory usage'),
-                'memory_tracing': ('bool', 'trace memory allocation'),
-            },
-        }
-
-    def print_keywords(self):
-        """
-        Prints input keywords.
-        """
-
-        width = 80
-        for group in self.input_keywords:
-            self.ostream.print_header('=' * width)
-            self.ostream.print_header(f'  @{group}'.ljust(width))
-            self.ostream.print_header('-' * width)
-            for key, val in self.input_keywords[group].items():
-                text = f'  {key}'.ljust(20)
-                text += f'  {get_keyword_type(val[0])}'.ljust(15)
-                text += f'  {val[1]}'.ljust(width - 35)
-                self.ostream.print_header(text)
-        self.ostream.print_header('=' * width)
-        self.ostream.flush()
+        self.input_keywords['response'].update({
+            'frequencies': ('seq_range', 'frequencies'),
+            'damping': ('float', 'damping parameter'),
+        })
 
     def update_settings(self, rsp_dict, method_dict=None):
         """

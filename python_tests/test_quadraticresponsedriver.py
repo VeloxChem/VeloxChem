@@ -54,9 +54,9 @@ class TestQrf:
             'b_frequencies': [0.2],
             'c_frequencies': [0.2],
             'damping': 0.1,
-            'a_component': 'x',
-            'b_component': 'x',
-            'c_component': 'x'
+            'a_components': 'x',
+            'b_components': 'x',
+            'c_components': 'x'
         }
 
         qrf_prop = QuadraticResponseDriver(comm, ostream)
@@ -70,9 +70,9 @@ class TestQrf:
             'b_frequencies': [0.2],
             'c_frequencies': [0.2],
             'damping': 0.1,
-            'a_component': 'z',
-            'b_component': 'z',
-            'c_component': 'x'
+            'a_components': 'z',
+            'b_components': 'z',
+            'c_components': 'x'
         }
 
         qrf_prop.update_settings(rsp_settings, method_settings)
@@ -84,9 +84,9 @@ class TestQrf:
             'b_frequencies': [0.2],
             'c_frequencies': [0.2],
             'damping': 0.1,
-            'a_component': 'y',
-            'b_component': 'y',
-            'c_component': 'x'
+            'a_components': 'y',
+            'b_components': 'y',
+            'c_components': 'x'
         }
 
         qrf_prop.update_settings(rsp_settings, method_settings)

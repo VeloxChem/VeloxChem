@@ -5,7 +5,8 @@ import time
 import sys
 import re
 
-from .veloxchemlib import (ElectricDipoleIntegralsDriver, mpi_master)
+from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .veloxchemlib import mpi_master
 from .profiler import Profiler
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
@@ -13,10 +14,9 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonLinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
-
-from .inputparser import parse_input
 
 
 class CubicResponseDriver(NonLinearSolver):
@@ -30,28 +30,12 @@ class CubicResponseDriver(NonLinearSolver):
 
     Instance variables
         - is_converged: The flag for convergence.
-        - eri_thresh: The electron repulsion integrals screening threshold.
-        - qq_type: The electron repulsion integrals screening scheme.
-        - batch_size: The batch size for computation of Fock matrices.
-        - frequencies: The frequencies.
         - comp: The list of all the gamma tensor components
         - damping: The damping parameter.
         - lindep_thresh: The threshold for removing linear dependence in the
           trial vectors.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
-        - comm: The MPI communicator.
-        - rank: The MPI rank.
-        - nodes: Number of MPI processes.
-        - ostream: The output stream.
-        - restart: The flag for restarting from checkpoint file.
-        - checkpoint_file: The name of checkpoint file.
-        - program_start_time: The start time of the program.
-        - maximum_hours: The timelimit in hours.
-        - timing: The flag for printing timing information.
-        - profiling: The flag for printing profiling information.
-        - memory_profiling: The flag for printing memory usage.
-        - memory_tracing: The flag for tracing memory allocation.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -69,11 +53,6 @@ class CubicResponseDriver(NonLinearSolver):
 
         self.is_converged = False
 
-        # ERI settings
-        self.eri_thresh = 1.0e-15
-        self.qq_type = 'QQ_DEN'
-        self.batch_size = None
-
         # cpp settings
         self.b_frequencies = (0,)
         self.c_frequencies = (0,)
@@ -83,32 +62,23 @@ class CubicResponseDriver(NonLinearSolver):
         self.lindep_thresh = 1.0e-10
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
-        self.a_component = 'z'
-        self.b_component = 'z'
-        self.c_component = 'z'
-        self.d_component = 'z'
 
-        # mpi information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
+        self.a_components = 'z'
+        self.b_components = 'z'
+        self.c_components = 'z'
+        self.d_components = 'z'
 
-        # output stream
-        self.ostream = ostream
-
-        # restart information
-        self.restart = True
-        self.checkpoint_file = None
-
-        # information for graceful exit
-        self.program_start_time = None
-        self.maximum_hours = None
-
-        # timing and profiling
-        self.timing = False
-        self.profiling = False
-        self.memory_profiling = False
-        self.memory_tracing = False
+        # input keywords
+        self.input_keywords['response'].update({
+            'b_frequencies': ('seq_range', 'B frequencies'),
+            'c_frequencies': ('seq_range', 'C frequencies'),
+            'd_frequencies': ('seq_range', 'D frequencies'),
+            'damping': ('float', 'damping parameter'),
+            'a_components': ('str_lower', 'Cartesian components of A operator'),
+            'b_components': ('str_lower', 'Cartesian components of B operator'),
+            'c_components': ('str_lower', 'Cartesian components of C operator'),
+            'd_components': ('str_lower', 'Cartesian components of D operator'),
+        })
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -124,26 +94,7 @@ class CubicResponseDriver(NonLinearSolver):
             method_dict = {}
 
         rsp_keywords = {
-            'b_frequencies': 'seq_range',
-            'c_frequencies': 'seq_range',
-            'd_frequencies': 'seq_range',
-            'a_component': 'str',
-            'b_component': 'str',
-            'c_component': 'str',
-            'd_component': 'str',
-            'damping': 'float',
-            'eri_thresh': 'float',
-            'qq_type': 'str_upper',
-            'batch_size': 'int',
-            'max_iter': 'int',
-            'conv_thresh': 'float',
-            'lindep_thresh': 'float',
-            'restart': 'bool',
-            'checkpoint_file': 'str',
-            'timing': 'bool',
-            'profiling': 'bool',
-            'memory_profiling': 'bool',
-            'memory_tracing': 'bool',
+            key: val[0] for key, val in self.input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -225,19 +176,19 @@ class CubicResponseDriver(NonLinearSolver):
 
         linear_solver = LinearSolver(self.comm, self.ostream)
 
-        a_rhs = linear_solver.get_complex_prop_grad(operator, self.a_component,
+        a_rhs = linear_solver.get_complex_prop_grad(operator, self.a_components,
                                                     molecule, ao_basis,
                                                     scf_tensors)
 
-        b_rhs = linear_solver.get_complex_prop_grad(operator, self.b_component,
+        b_rhs = linear_solver.get_complex_prop_grad(operator, self.b_components,
                                                     molecule, ao_basis,
                                                     scf_tensors)
 
-        c_rhs = linear_solver.get_complex_prop_grad(operator, self.c_component,
+        c_rhs = linear_solver.get_complex_prop_grad(operator, self.c_components,
                                                     molecule, ao_basis,
                                                     scf_tensors)
 
-        d_rhs = linear_solver.get_complex_prop_grad(operator, self.d_component,
+        d_rhs = linear_solver.get_complex_prop_grad(operator, self.d_components,
                                                     molecule, ao_basis,
                                                     scf_tensors)
 
@@ -421,10 +372,10 @@ class CubicResponseDriver(NonLinearSolver):
 
         if self.rank == mpi_master():
 
-            A = X[self.a_component]
-            B = X[self.b_component]
-            C = X[self.c_component]
-            D = X[self.d_component]
+            A = X[self.a_components]
+            B = X[self.b_components]
+            C = X[self.c_components]
+            D = X[self.d_components]
 
             for (wb, wc, wd) in freqpairs:
 
@@ -563,16 +514,14 @@ class CubicResponseDriver(NonLinearSolver):
                 Gamma += NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc + NdA2Nbc + NbcA2Nd
 
                 self.ostream.print_blank()
-                w_str = 'Cubic response function: ' + '<< ' + str(
-                    self.a_component) + ';' + str(self.b_component) + ',' + str(
-                        self.c_component) + ',' + str(
-                            self.d_component) + ' >> ' + ' (' + str(
-                                wb) + ' ,' + str(wc) + ',' + str(wd) + ')'
+                w_str = 'Cubic response function: << {};{},{},{} >>  ({},{},{})'.format(
+                    self.a_components, self.b_components, self.c_components,
+                    self.d_components, str(wb), str(wc), str(wd))
                 self.ostream.print_header(w_str)
                 self.ostream.print_header('=' * (len(w_str) + 2))
                 self.ostream.print_blank()
-                title = '{:<9s}  {:>20s} {:>21s}'.format(
-                    'Component', 'Real', 'Imaginary')
+                title = '{:<9s} {:>20s} {:>21s}'.format('Component', 'Real',
+                                                        'Imaginary')
                 width = len(title)
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
@@ -592,7 +541,7 @@ class CubicResponseDriver(NonLinearSolver):
                 self.print_component(
                     'A3', -(NdA3NbNc + NdA3NcNb + NbA3NcNd + NbA3NdNc +
                             NcA3NbNd + NcA3NdNb), width)
-                self.print_component('γ', Gamma, width)
+                self.print_component('gamma', Gamma, width)
                 self.ostream.print_blank()
                 result.update({
                     ('E3', wb, wc, wd): -(NaE3NbNcd + NaE3NcNbd + NaE3NdNbc)
@@ -1221,9 +1170,9 @@ class CubicResponseDriver(NonLinearSolver):
 
             kd = kX[('D', wd)].T
 
-            B = X[self.b_component]
-            C = X[self.c_component]
-            D = X[self.d_component]
+            B = X[self.b_components]
+            C = X[self.c_components]
+            D = X[self.d_components]
 
             # BC
 

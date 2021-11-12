@@ -23,6 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
 import numpy as np
 import time as tm
 
@@ -35,14 +36,13 @@ from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
+from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
+from .inputparser import parse_input, get_keyword_type
 from .qqscheme import get_qq_scheme
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
-from .linearsolver import LinearSolver
-from mpi4py import MPI
 
 
 class NonLinearSolver:
@@ -68,7 +68,6 @@ class NonLinearSolver:
         - electric_field: The static electric field.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
-        - cur_iter: Index of the current iteration.
         - lindep_thresh: The threshold for removing linear dependence in the
           trial vectors.
         - is_converged: The flag for convergence.
@@ -116,7 +115,6 @@ class NonLinearSolver:
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 150
-        self.cur_iter = 0
         self.lindep_thresh = 1.0e-6
         self.is_converged = False
 
@@ -145,6 +143,42 @@ class NonLinearSolver:
         # filename
         self.filename = None
 
+        # input keywords
+        self.input_keywords = {
+            'response': {
+                'eri_thresh': ('float', 'ERI screening threshold'),
+                'qq_type': ('str_upper', 'ERI screening scheme'),
+                'batch_size': ('int', 'batch size for Fock build'),
+                'max_iter': ('int', 'maximum number of iterations'),
+                'conv_thresh': ('float', 'convergence threshold'),
+                'lindep_thresh': ('float', 'threshold for linear dependence'),
+                'restart': ('bool', 'restart from checkpoint file'),
+                'checkpoint_file': ('str', 'name of checkpoint file'),
+                'timing': ('bool', 'print timing information'),
+                'profiling': ('bool', 'print profiling information'),
+                'memory_profiling': ('bool', 'print memory usage'),
+                'memory_tracing': ('bool', 'trace memory allocation'),
+            },
+        }
+
+    def print_keywords(self):
+        """
+        Prints input keywords.
+        """
+
+        width = 80
+        for group in self.input_keywords:
+            self.ostream.print_header('=' * width)
+            self.ostream.print_header(f'  @{group}'.ljust(width))
+            self.ostream.print_header('-' * width)
+            for key, val in self.input_keywords[group].items():
+                text = f'  {key}'.ljust(20)
+                text += f'  {get_keyword_type(val[0])}'.ljust(15)
+                text += f'  {val[1]}'.ljust(width - 35)
+                self.ostream.print_header(text)
+        self.ostream.print_header('=' * width)
+        self.ostream.flush()
+
     def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in nonlinear solver.
@@ -159,26 +193,7 @@ class NonLinearSolver:
             method_dict = {}
 
         rsp_keywords = {
-            'b_frequencies': 'seq_range',
-            'c_frequencies': 'seq_range',
-            'd_frequencies': 'seq_range',
-            'a_component': 'str',
-            'b_component': 'str',
-            'c_component': 'str',
-            'd_component': 'str',
-            'damping': 'float',
-            'eri_thresh': 'float',
-            'qq_type': 'str_upper',
-            'batch_size': 'int',
-            'max_iter': 'int',
-            'conv_thresh': 'float',
-            'lindep_thresh': 'float',
-            'restart': 'bool',
-            'checkpoint_file': 'str',
-            'timing': 'bool',
-            'profiling': 'bool',
-            'memory_profiling': 'bool',
-            'memory_tracing': 'bool',
+            key: val[0] for key, val in self.input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)

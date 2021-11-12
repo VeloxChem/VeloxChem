@@ -84,6 +84,8 @@ from .lreigensolver import LinearResponseEigenSolver
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
 from .c6solver import C6Solver
+from .quadraticresponsedriver import QuadraticResponseDriver
+from .cubicresponsedriver import CubicResponseDriver
 from .respchargesdriver import RespChargesDriver
 from .rspproperty import ResponseProperty
 from .rsplinabscross import LinearAbsorptionCrossSection
@@ -91,6 +93,8 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .rspc6 import C6
+from .rspshg import SHG
+from .rsptpa import TPA
 from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
