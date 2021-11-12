@@ -297,7 +297,7 @@ class SHGDriver(NonLinearSolver):
                 # beta_bar = {key: betaa}
 
             self.ostream.print_blank()
-            valstr = '*** Time spent in quadratic response calculation: '
+            valstr = '*** Time spent in SHG calculation: '
             valstr += '{:.2f} sec ***'.format(time.time() - start_time)
             self.ostream.print_header(valstr)
             self.ostream.print_blank()

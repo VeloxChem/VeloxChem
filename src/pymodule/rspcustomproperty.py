@@ -101,6 +101,9 @@ class CustomProperty(ResponseProperty):
             The output stream.
         """
 
+        if self.rsp_dict['order'] != 'linear':
+            return
+
         width = 92
 
         freqs = parse_seq_range(self.rsp_dict['frequencies'])

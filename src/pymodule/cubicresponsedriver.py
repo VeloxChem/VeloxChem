@@ -799,14 +799,17 @@ class CubicResponseDriver(NonLinearSolver):
         else:
             fock_file = None
 
+        fock_freqs = [wb for (wb, wc, wd) in wi]
+
         if self.restart:
             if self.rank == mpi_master():
-                self.restart = check_distributed_focks(fock_file, keys, wi)
+                self.restart = check_distributed_focks(fock_file, keys,
+                                                       fock_freqs)
             self.restart = self.comm.bcast(self.restart, mpi_master())
 
         if self.restart:
-            focks = read_distributed_focks(fock_file, keys, wi, self.comm,
-                                           self.ostream)
+            focks = read_distributed_focks(fock_file, keys, fock_freqs,
+                                           self.comm, self.ostream)
             focks['F0'] = F0
             return focks
 
@@ -823,7 +826,7 @@ class CubicResponseDriver(NonLinearSolver):
             focks[key] = {}
 
         fock_index = 0
-        for (wb, wc, wd) in wi:
+        for wb in fock_freqs:
             for key in keys:
                 focks[key][wb] = DistributedArray(dist_focks.data[:,
                                                                   fock_index],
@@ -831,7 +834,7 @@ class CubicResponseDriver(NonLinearSolver):
                                                   distribute=False)
                 fock_index += 1
 
-        write_distributed_focks(fock_file, focks, keys, wi, self.comm,
+        write_distributed_focks(fock_file, focks, keys, fock_freqs, self.comm,
                                 self.ostream)
 
         return focks
