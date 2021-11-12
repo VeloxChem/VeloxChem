@@ -1,3 +1,28 @@
+#
+#                           VELOXCHEM 1.0-RC2
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from mpi4py import MPI
 from pathlib import Path
 import numpy as np
@@ -14,7 +39,6 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonLinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 
@@ -93,34 +117,7 @@ class CubicResponseDriver(NonLinearSolver):
         if method_dict is None:
             method_dict = {}
 
-        rsp_keywords = {
-            key: val[0] for key, val in self.input_keywords['response'].items()
-        }
-
-        parse_input(self, rsp_keywords, rsp_dict)
-
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
-
-        if 'xcfun' in method_dict:
-            errmsg = 'CrfDriver: The \'xcfun\' keyword is not supported in Crf '
-            errmsg += 'calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if 'potfile' in method_dict:
-            errmsg = 'CrfDriver: The \'potfile\' keyword is not supported in '
-            errmsg += 'Crf calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if 'electric_field' in method_dict:
-            errmsg = 'CrfDriver: The \'electric field\' keyword is not '
-            errmsg += 'supported in Crf calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
+        super().update_settings(rsp_dict, method_dict)
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -154,7 +151,7 @@ class CubicResponseDriver(NonLinearSolver):
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'Cubic response driver: not implemented for unrestricted case')
+            'CubicResponseDriver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_tensors['S']
@@ -269,11 +266,7 @@ class CubicResponseDriver(NonLinearSolver):
 
         N_results = N_drv.compute(molecule, ao_basis, scf_tensors, ABCD)
 
-        kX = {}
-        Focks = {}
-
         kX = N_results['kappas']
-
         Focks = N_results['focks']
 
         profiler.check_memory_usage('CPP')
@@ -282,8 +275,8 @@ class CubicResponseDriver(NonLinearSolver):
                                                    kX, self.comp, scf_tensors,
                                                    molecule, ao_basis, profiler)
 
-        valstr = '*** Time spent in cubic response calculation: {:.2f} sec ***'.format(
-            time.time() - start_time)
+        valstr = '*** Time spent in cubic response calculation: '
+        valstr += '{:.2f} sec ***'.format(time.time() - start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
         self.ostream.flush()
@@ -504,14 +497,16 @@ class CubicResponseDriver(NonLinearSolver):
                     self.a2_contract(k_xy[('BC', wb, wc), wb + wc], A, d_a_mo,
                                      nocc, norb), Nd)
 
-                # Cubic response function
-                Gamma = -(NaE4NbNcNd - NaS4NbNcNd - NaR4NbNcNd) - (
-                    NaE3NbNcd + NaE3NcNbd + NaE3NdNbc)
-                Gamma += NaB3NcNd + NaB3NdNc + NaC3NbNd + NaC3NdNb + NaD3NbNc + NaD3NcNb
-                Gamma += -(NdA3NbNc + NdA3NcNb + NbA3NcNd + NbA3NdNc +
+                val_E3 = -(NaE3NbNcd + NaE3NcNbd + NaE3NdNbc)
+                val_T4 = -(NaE4NbNcNd - NaS4NbNcNd - NaR4NbNcNd)
+                val_X2 = NaB2Ncd + NaC2Nbd + NaD2Nbc
+                val_X3 = NaB3NcNd + NaB3NdNc + NaC3NbNd + NaC3NdNb + NaD3NbNc + NaD3NcNb
+                val_A2 = NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc + NdA2Nbc + NbcA2Nd
+                val_A3 = -(NdA3NbNc + NdA3NcNb + NbA3NcNd + NbA3NdNc +
                            NcA3NbNd + NcA3NdNb)
-                Gamma += NaB2Ncd + NaC2Nbd + NaD2Nbc
-                Gamma += NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc + NdA2Nbc + NbcA2Nd
+
+                # Cubic response function
+                gamma = val_T4 + val_E3 + val_X3 + val_A3 + val_X2 + val_A2
 
                 self.ostream.print_blank()
                 w_str = 'Cubic response function: << {};{},{},{} >>  ({},{},{})'.format(
@@ -520,48 +515,27 @@ class CubicResponseDriver(NonLinearSolver):
                 self.ostream.print_header(w_str)
                 self.ostream.print_header('=' * (len(w_str) + 2))
                 self.ostream.print_blank()
+
                 title = '{:<9s} {:>20s} {:>21s}'.format('Component', 'Real',
                                                         'Imaginary')
                 width = len(title)
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
-                self.print_component('E3', -(NaE3NbNcd + NaE3NcNbd + NaE3NdNbc),
-                                     width)
-                self.print_component('T4',
-                                     -(NaE4NbNcNd - NaS4NbNcNd - NaR4NbNcNd),
-                                     width)
-                self.print_component('X2', NaB2Ncd + NaC2Nbd + NaD2Nbc, width)
-                self.print_component(
-                    'X3', NaB3NcNd + NaB3NdNc + NaC3NbNd + NaC3NdNb + NaD3NbNc +
-                    NaD3NcNb, width)
-                self.print_component(
-                    'A2',
-                    NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc + NdA2Nbc + NbcA2Nd,
-                    width)
-                self.print_component(
-                    'A3', -(NdA3NbNc + NdA3NcNb + NbA3NcNd + NbA3NdNc +
-                            NcA3NbNd + NcA3NdNb), width)
-                self.print_component('gamma', Gamma, width)
+                self.print_component('E3', val_E3, width)
+                self.print_component('T4', val_T4, width)
+                self.print_component('X2', val_X2, width)
+                self.print_component('X3', val_X3, width)
+                self.print_component('A2', val_A2, width)
+                self.print_component('A3', val_A3, width)
+                self.print_component('gamma', gamma, width)
                 self.ostream.print_blank()
-                result.update({
-                    ('E3', wb, wc, wd): -(NaE3NbNcd + NaE3NcNbd + NaE3NdNbc)
-                })
-                result.update({
-                    ('T4', wb, wc, wd): -(NaE4NbNcNd - NaS4NbNcNd - NaR4NbNcNd)
-                })
-                result.update({
-                    ('X3', wb, wc, wd): (NaB3NcNd + NaB3NdNc + NaC3NbNd +
-                                         NaC3NdNb + NaD3NbNc + NaD3NcNb)
-                })
-                result.update({('X2', wb, wc, wd): NaB2Ncd + NaC2Nbd + NaD2Nbc})
-                result.update({
-                    ('A3', wb, wc, wd): -(NdA3NbNc + NdA3NcNb + NbA3NcNd +
-                                          NbA3NdNc + NcA3NbNd + NcA3NdNb)
-                })
-                result.update({
-                    ('A2', wb, wc, wd): (NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc +
-                                         NdA2Nbc + NbcA2Nd)
-                })
+
+                result.update({('E3', wb, wc, wd): val_E3})
+                result.update({('T4', wb, wc, wd): val_T4})
+                result.update({('X3', wb, wc, wd): val_X3})
+                result.update({('X2', wb, wc, wd): val_X2})
+                result.update({('A3', wb, wc, wd): val_A3})
+                result.update({('A2', wb, wc, wd): val_A2})
 
         profiler.check_memory_usage('End of QRF')
 
@@ -1238,11 +1212,7 @@ class CubicResponseDriver(NonLinearSolver):
 
         Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_tensors, XY)
 
-        kX = {}
-        Focks = {}
-
         kX = Nxy_results['kappas']
-
         Focks = Nxy_results['focks']
 
         return kX, Focks

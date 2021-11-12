@@ -1,3 +1,28 @@
+#
+#                           VELOXCHEM 1.0-RC2
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from mpi4py import MPI
 from pathlib import Path
 import numpy as np
@@ -15,7 +40,6 @@ from .nonlinearsolver import NonLinearSolver
 from .distributedarray import DistributedArray
 from .scffirstorderprop import ScfFirstOrderProperties
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 
@@ -97,34 +121,7 @@ class SHGDriver(NonLinearSolver):
         if method_dict is None:
             method_dict = {}
 
-        rsp_keywords = {
-            key: val[0] for key, val in self.input_keywords['response'].items()
-        }
-
-        parse_input(self, rsp_keywords, rsp_dict)
-
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
-
-        if 'xcfun' in method_dict:
-            errmsg = 'ShgDriver: The \'xcfun\' keyword is not supported in SHG '
-            errmsg += 'calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if 'potfile' in method_dict:
-            errmsg = 'ShgDriver: The \'potfile\' keyword is not supported in '
-            errmsg += 'SHG calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if 'electric_field' in method_dict:
-            errmsg = 'ShgDriver: The \'electric field\' keyword is not '
-            errmsg += 'supported in SHG calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
+        super().update_settings(rsp_dict, method_dict)
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -285,8 +282,6 @@ class SHGDriver(NonLinearSolver):
             self.ostream.print_header(w_str)
             self.ostream.print_header('=' * (len(w_str) + 2))
 
-            # TODO: look into beta_bar
-
             beta_bar = {}
 
             for key in beta.keys():
@@ -295,7 +290,6 @@ class SHGDriver(NonLinearSolver):
                     betaa += 1 / dip_norm * dip[a] * beta[key][a]
 
                 self.ostream.print_blank()
-
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
                 self.print_component('β_x', key, beta[key][0], width)
@@ -381,6 +375,7 @@ class SHGDriver(NonLinearSolver):
         Nb = {}
 
         if self.rank == mpi_master():
+
             for (wb, wc) in freqpairs:
 
                 Na = {
@@ -648,7 +643,12 @@ class SHGDriver(NonLinearSolver):
             ww.append(wb)
 
         keys = [
-            'F_sig_x', 'F_sig_y', 'F_sig_z', 'F_lam_xy', 'F_lam_xz', 'F_lam_yz'
+            'F_sig_x',
+            'F_sig_y',
+            'F_sig_z',
+            'F_lam_xy',
+            'F_lam_xz',
+            'F_lam_yz',
         ]
 
         if self.checkpoint_file is not None:

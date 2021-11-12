@@ -36,7 +36,6 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonLinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
 
 
 class TpaDriver(NonLinearSolver):
@@ -97,34 +96,7 @@ class TpaDriver(NonLinearSolver):
         if method_dict is None:
             method_dict = {}
 
-        rsp_keywords = {
-            key: val[0] for key, val in self.input_keywords['response'].items()
-        }
-
-        parse_input(self, rsp_keywords, rsp_dict)
-
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
-
-        if 'xcfun' in method_dict:
-            errmsg = 'TpaDriver: The \'xcfun\' keyword is not supported in TPA '
-            errmsg += 'calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if 'potfile' in method_dict:
-            errmsg = 'TpaDriver: The \'potfile\' keyword is not supported in '
-            errmsg += 'TPA calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if 'electric_field' in method_dict:
-            errmsg = 'TpaDriver: The \'electric field\' keyword is not '
-            errmsg += 'supported in TPA calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
+        super().update_settings(rsp_dict, method_dict)
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -160,7 +132,7 @@ class TpaDriver(NonLinearSolver):
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(nalpha == nbeta,
-                            'TpaDriver: not implemented for unrestricted case')
+                            'TPA Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_tensors['S']

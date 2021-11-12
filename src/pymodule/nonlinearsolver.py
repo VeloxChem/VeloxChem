@@ -204,20 +204,20 @@ class NonLinearSolver:
             self.maximum_hours = rsp_dict['maximum_hours']
 
         if 'xcfun' in method_dict:
-            errmsg = 'NonLinearDriver: The \'xcfun\' keyword is not supported in Nlr '
-            errmsg += 'calculation.'
+            errmsg = 'NonLinearSolver: The \'xcfun\' keyword is not supported '
+            errmsg += 'in nonlinear response calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
         if 'potfile' in method_dict:
-            errmsg = 'NonLinearDriver: The \'potfile\' keyword is not supported in '
-            errmsg += 'Nlr calculation.'
+            errmsg = 'NonLinearSolver: The \'potfile\' keyword is not supported '
+            errmsg += 'in nonlinear response calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
         if 'electric_field' in method_dict:
-            errmsg = 'NonLinearDriver: The \'electric field\' keyword is not '
-            errmsg += 'supported in Nlr calculation.'
+            errmsg = 'NonLinearSolver: The \'electric field\' keyword is not '
+            errmsg += 'supported in nonlinear response calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 

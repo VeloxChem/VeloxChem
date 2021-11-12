@@ -1,3 +1,28 @@
+#
+#                           VELOXCHEM 1.0-RC2
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from mpi4py import MPI
 from pathlib import Path
 import numpy as np
@@ -14,7 +39,6 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonLinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 
@@ -92,35 +116,7 @@ class QuadraticResponseDriver(NonLinearSolver):
         if method_dict is None:
             method_dict = {}
 
-        rsp_keywords = {
-            key: val[0] for key, val in self.input_keywords['response'].items()
-        }
-
-        parse_input(self, rsp_keywords, rsp_dict)
-
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
-
-        if 'xcfun' in method_dict:
-            errmsg = 'Quadratic response function Driver: '
-            errmsg += 'The \'xcfun\' keyword is not supported in QRF '
-            errmsg += 'calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if 'potfile' in method_dict:
-            errmsg = 'QrfDriver: The \'potfile\' keyword is not supported in '
-            errmsg += 'QRF calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if 'electric_field' in method_dict:
-            errmsg = 'QrfDriver: The \'electric field\' keyword is not '
-            errmsg += 'supported in QRF calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
+        super().update_settings(rsp_dict, method_dict)
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -154,7 +150,7 @@ class QuadraticResponseDriver(NonLinearSolver):
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'Quadatic response driver: not implemented for unrestricted case')
+            'QuadaticResponseDriver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_tensors['S']
@@ -250,12 +246,8 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         N_results = N_drv.compute(molecule, ao_basis, scf_tensors, ABC)
 
-        kX = {}
-        Focks = {}
-
-        Focks = N_results['focks']
-
         kX = N_results['kappas']
+        Focks = N_results['focks']
 
         profiler.check_memory_usage('CPP')
 
@@ -378,6 +370,7 @@ class QuadraticResponseDriver(NonLinearSolver):
                 self.ostream.print_header(w_str)
                 self.ostream.print_header('=' * (len(w_str) + 2))
                 self.ostream.print_blank()
+
                 title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
                     'Component', 'Frequency', 'Real', 'Imaginary')
                 width = len(title)
@@ -389,6 +382,7 @@ class QuadraticResponseDriver(NonLinearSolver):
                 self.print_component('beta', wb, NaE3NbNc - A2 - X2, width)
                 self.ostream.print_blank()
                 self.ostream.flush()
+
                 result.update({wb: NaE3NbNc - A2 - X2})
 
         profiler.check_memory_usage('End of QRF')
@@ -462,10 +456,7 @@ class QuadraticResponseDriver(NonLinearSolver):
         if self.rank == mpi_master():
             self.print_fock_header()
 
-        keys = [
-            'Fbc',
-            'Fcb',
-        ]
+        keys = ['Fbc', 'Fcb']
 
         if self.checkpoint_file is not None:
             fock_file = str(
