@@ -231,7 +231,7 @@ class SHGDriver(NonLinearSolver):
 
         if self.checkpoint_file is not None:
             N_drv.checkpoint_file = str(
-                Path(self.checkpoint_file).with_suffix('.shg_1.h5'))
+                Path(self.checkpoint_file).with_suffix('.shg.h5'))
 
         N_results = N_drv.compute(molecule, ao_basis, scf_tensors, AB)
 

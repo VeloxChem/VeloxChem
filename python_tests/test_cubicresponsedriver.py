@@ -1,12 +1,9 @@
-from mpi4py import MPI
 import pytest
-import sys
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.cubicresponsedriver import CubicResponseDriver
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
@@ -16,9 +13,10 @@ class TestCrf:
     def run_scf(self):
 
         molecule_string = """
-        O   0.0   0.0   0.0
-        H   .7586020000 0.0  -.5042840000
-        H   .7586020000  0.0   .5042840000"""
+            O  0.0           0.0  0.0
+            H   .7586020000  0.0  -.5042840000
+            H   .7586020000  0.0   .5042840000
+        """
 
         basis_set_label = 'aug-cc-pVDZ'
 
@@ -27,30 +25,23 @@ class TestCrf:
         molecule = Molecule.read_str(molecule_string, units='ang')
         molecule.set_charge(0)
         molecule.set_multiplicity(1)
-        method_settings = {}
 
         basis = MolecularBasis.read(molecule, basis_set_label)
 
-        comm = MPI.COMM_WORLD
-        ostream = OutputStream(sys.stdout)
-
-        scf_drv = ScfRestrictedDriver(comm, ostream)
-        scf_drv.update_settings(scf_settings, method_settings)
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.update_settings(scf_settings)
         scf_drv.compute(molecule, basis)
 
         return scf_drv.scf_tensors, molecule, basis
 
     def run_crf(self, ref_result):
 
-        comm = MPI.COMM_WORLD
-        ostream = OutputStream(sys.stdout)
-
         scf_tensors, molecule, ao_basis = self.run_scf()
 
-        method_settings = {}
         wb = -0.1
         wc = 0.3
         wd = -0.4
+
         rsp_settings = {
             'conv_thresh': 1.0e-8,
             'b_frequencies': [wb],
@@ -63,13 +54,11 @@ class TestCrf:
             'damping': 0.1
         }
 
-        crf_prop = CubicResponseDriver(comm, ostream)
-
-        crf_prop.update_settings(rsp_settings, method_settings)
-
+        crf_prop = CubicResponseDriver()
+        crf_prop.update_settings(rsp_settings)
         crf_result_yyzz = crf_prop.compute(molecule, ao_basis, scf_tensors)
 
-        if comm.Get_rank() == mpi_master():
+        if is_mpi_master():
 
             assert abs(crf_result_yyzz[('T4', wb, wc, wd)].real -
                        ref_result['T4'].real) < 1.0e-6

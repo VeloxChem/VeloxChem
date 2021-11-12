@@ -615,8 +615,7 @@ class NonLinearSolver:
         """
 
         S4N1N2N3 = self.commut(self.commut(k3, self.commut(k2, k1)), D.T)
-        S4N1N2N3_c = (LinearSolver.lrmat2vec(S4N1N2N3.real, nocc, norb) +
-                      1j * LinearSolver.lrmat2vec(S4N1N2N3.imag, nocc, norb))
+        S4N1N2N3_c = self.complex_lrmat2vec(S4N1N2N3, nocc, norb)
         return (2. / 6) * S4N1N2N3_c
 
     def flip_xy(self, X):
@@ -780,8 +779,7 @@ class NonLinearSolver:
         """
 
         X3NxNy = self.commut(self.commut(k2, self.commut(k1, X)), D.T)
-        X3NxNy_c = (LinearSolver.lrmat2vec(X3NxNy.real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(X3NxNy.imag, nocc, norb))
+        X3NxNy_c = self.complex_lrmat2vec(X3NxNy, nocc, norb)
         return (1. / 2) * X3NxNy_c
 
     def x2_contract(self, k, X, D, nocc, norb):
@@ -805,8 +803,7 @@ class NonLinearSolver:
         """
 
         XNx = self.commut(self.commut(k, X), D.T)
-        X2Nx_c = (LinearSolver.lrmat2vec(XNx.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(XNx.imag, nocc, norb))
+        X2Nx_c = self.complex_lrmat2vec(XNx, nocc, norb)
         return X2Nx_c
 
     def a2_contract(self, k, A, D, nocc, norb):
@@ -832,8 +829,7 @@ class NonLinearSolver:
         """
 
         ANx = self.commut(self.commut(k.T, A), D.T)
-        A2Nx_c = (LinearSolver.lrmat2vec(ANx.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(ANx.imag, nocc, norb))
+        A2Nx_c = self.complex_lrmat2vec(ANx, nocc, norb)
         return -(1. / 2) * A2Nx_c
 
     def a3_contract(self, k1, k2, A, D, nocc, norb):
@@ -859,8 +855,7 @@ class NonLinearSolver:
         """
 
         A3NxNy = self.commut(self.commut(k2.T, self.commut(k1.T, A)), D.T)
-        A3NxNy_c = (LinearSolver.lrmat2vec(A3NxNy.real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(A3NxNy.imag, nocc, norb))
+        A3NxNy_c = self.complex_lrmat2vec(A3NxNy, nocc, norb)
         return -(1. / 6) * A3NxNy_c
 
     def zi(self, kB, kC, kD, Fc, Fd, Fbc, Fcb, F0):

@@ -1,12 +1,9 @@
-from mpi4py import MPI
 import pytest
-import sys
 
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
@@ -16,9 +13,10 @@ class TestQrf:
     def run_scf(self):
 
         molecule_string = """
-        O   0.0   0.0   0.0
-        H   .7586020000 0.0  -.5042840000
-        H   .7586020000  0.0   .5042840000"""
+            O  0.0           0.0  0.0
+            H   .7586020000  0.0  -.5042840000
+            H   .7586020000  0.0   .5042840000
+        """
 
         basis_set_label = '6-31G'
 
@@ -27,27 +25,18 @@ class TestQrf:
         molecule = Molecule.read_str(molecule_string, units='ang')
         molecule.set_charge(0)
         molecule.set_multiplicity(1)
-        method_settings = {}
 
         basis = MolecularBasis.read(molecule, basis_set_label)
 
-        comm = MPI.COMM_WORLD
-        ostream = OutputStream(sys.stdout)
-
-        scf_drv = ScfRestrictedDriver(comm, ostream)
-        scf_drv.update_settings(scf_settings, method_settings)
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.update_settings(scf_settings)
         scf_drv.compute(molecule, basis)
 
         return scf_drv.scf_tensors, molecule, basis
 
     def run_qrf(self, w, ref_result):
 
-        comm = MPI.COMM_WORLD
-        ostream = OutputStream(sys.stdout)
-
         scf_tensors, molecule, ao_basis = self.run_scf()
-
-        method_settings = {}
 
         rsp_settings = {
             'conv_thresh': 1.0e-4,
@@ -59,10 +48,8 @@ class TestQrf:
             'c_components': 'x'
         }
 
-        qrf_prop = QuadraticResponseDriver(comm, ostream)
-
-        qrf_prop.update_settings(rsp_settings, method_settings)
-
+        qrf_prop = QuadraticResponseDriver()
+        qrf_prop.update_settings(rsp_settings)
         qrf_result_xxx = qrf_prop.compute(molecule, ao_basis, scf_tensors)
 
         rsp_settings = {
@@ -75,8 +62,7 @@ class TestQrf:
             'c_components': 'x'
         }
 
-        qrf_prop.update_settings(rsp_settings, method_settings)
-
+        qrf_prop.update_settings(rsp_settings)
         qrf_result_zzx = qrf_prop.compute(molecule, ao_basis, scf_tensors)
 
         rsp_settings = {
@@ -89,11 +75,10 @@ class TestQrf:
             'c_components': 'x'
         }
 
-        qrf_prop.update_settings(rsp_settings, method_settings)
-
+        qrf_prop.update_settings(rsp_settings)
         qrf_result_yyx = qrf_prop.compute(molecule, ao_basis, scf_tensors)
 
-        if comm.Get_rank() == mpi_master():
+        if is_mpi_master():
 
             # x-component
 

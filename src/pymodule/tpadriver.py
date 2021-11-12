@@ -678,12 +678,9 @@ class TpaDriver(NonLinearSolver):
             ka_y = kX['Na'][('y', w)]
             ka_z = kX['Na'][('z', w)]
 
-            na_x = (LinearSolver.lrmat2vec(ka_x.real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(ka_x.imag, nocc, norb))
-            na_y = (LinearSolver.lrmat2vec(ka_y.real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(ka_y.imag, nocc, norb))
-            na_z = (LinearSolver.lrmat2vec(ka_z.real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(ka_z.imag, nocc, norb))
+            na_x = self.complex_lrmat2vec(ka_x, nocc, norb)
+            na_y = self.complex_lrmat2vec(ka_y, nocc, norb)
+            na_z = self.complex_lrmat2vec(ka_z, nocc, norb)
 
             t3term = (np.dot(na_x, e3_dict['f_iso_x'][w]) +
                       np.dot(na_y, e3_dict['f_iso_y'][w]) +
@@ -736,18 +733,15 @@ class TpaDriver(NonLinearSolver):
         ka_na = inp_dict['Na_ka']
         A = inp_dict['A']
 
-        Na = (LinearSolver.lrmat2vec(ka_na.real, nocc, norb) +
-              1j * LinearSolver.lrmat2vec(ka_na.imag, nocc, norb))
+        Na = self.complex_lrmat2vec(ka_na, nocc, norb)
 
         if inp_dict['flag'] == 'CD':
             kcd = inp_dict['kcd']
             kb = inp_dict['kb']
             B = inp_dict['B']
 
-            Ncd = (LinearSolver.lrmat2vec(kcd.real, nocc, norb) +
-                   1j * LinearSolver.lrmat2vec(kcd.imag, nocc, norb))
-            Nb = (LinearSolver.lrmat2vec(kb.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kb.imag, nocc, norb))
+            Ncd = self.complex_lrmat2vec(kcd, nocc, norb)
+            Nb = self.complex_lrmat2vec(kb, nocc, norb)
 
             na_x2_nyz += np.dot(Na.T, self.x2_contract(kcd, B, da, nocc, norb))
             nx_a2_nyz += np.dot(self.a2_contract(kb, A, da, nocc, norb), Ncd)
@@ -758,10 +752,8 @@ class TpaDriver(NonLinearSolver):
             kc = -inp_dict['kc_kb'].T.conj()  # gets kc from kb
             C = inp_dict['C']
 
-            Nbd = (LinearSolver.lrmat2vec(kbd.real, nocc, norb) +
-                   1j * LinearSolver.lrmat2vec(kbd.imag, nocc, norb))
-            Nc = (LinearSolver.lrmat2vec(kc.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kc.imag, nocc, norb))
+            Nbd = self.complex_lrmat2vec(kbd, nocc, norb)
+            Nc = self.complex_lrmat2vec(kc, nocc, norb)
 
             na_x2_nyz += np.dot(Na.T, self.x2_contract(kbd, C, da, nocc, norb))
             nx_a2_nyz += np.dot(self.a2_contract(kc, A, da, nocc, norb), Nbd)

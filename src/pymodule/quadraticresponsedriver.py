@@ -28,7 +28,6 @@ from pathlib import Path
 import numpy as np
 import time
 import sys
-import re
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master, hartree_in_wavenumbers
@@ -169,7 +168,6 @@ class QuadraticResponseDriver(NonLinearSolver):
         dipole_mats = dipole_drv.compute(molecule, ao_basis)
 
         operator = 'dipole'
-
         linear_solver = LinearSolver(self.comm, self.ostream)
         a_rhs = linear_solver.get_complex_prop_grad(operator, self.a_components,
                                                     molecule, ao_basis,
@@ -183,12 +181,15 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         if self.rank == mpi_master():
             inv_sqrt_2 = 1.0 / np.sqrt(2.0)
-            b_rhs = list(b_rhs)
-            for ind in range(len(b_rhs)):
-                b_rhs[ind] *= inv_sqrt_2
+
             a_rhs = list(a_rhs)
             for ind in range(len(a_rhs)):
                 a_rhs[ind] *= inv_sqrt_2
+
+            b_rhs = list(b_rhs)
+            for ind in range(len(b_rhs)):
+                b_rhs[ind] *= inv_sqrt_2
+
             c_rhs = list(c_rhs)
             for ind in range(len(c_rhs)):
                 c_rhs[ind] *= inv_sqrt_2
@@ -217,7 +218,6 @@ class QuadraticResponseDriver(NonLinearSolver):
                 'y': 2 * self.ao2mo(mo, dipole_mats.y_to_numpy()),
                 'z': 2 * self.ao2mo(mo, dipole_mats.z_to_numpy())
             }
-
         else:
             X = None
             self.comp = None
@@ -225,24 +225,18 @@ class QuadraticResponseDriver(NonLinearSolver):
         # Computing the first-order response vectors (3 per frequency)
         N_drv = ComplexResponse(self.comm, self.ostream)
 
-        N_drv.update_settings({
-            'damping': self.damping,
-            'lindep_thresh': self.lindep_thresh,
-            'conv_thresh': self.conv_thresh,
-            'max_iter': self.max_iter,
-            'eri_thresh': self.eri_thresh,
-            'qq_type': self.qq_type,
-        })
+        cpp_keywords = {
+            'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
+            'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
+            'program_start_time', 'maximum_hours'
+        }
 
-        N_drv.timing = self.timing
-        N_drv.memory_profiling = self.memory_profiling
-        N_drv.batch_size = self.batch_size
-        N_drv.restart = self.restart
-        N_drv.program_start_time = self.program_start_time
-        N_drv.maximum_hours = self.maximum_hours
+        for key in cpp_keywords:
+            setattr(N_drv, key, getattr(self, key))
+
         if self.checkpoint_file is not None:
-            N_drv.checkpoint_file = re.sub(r'\.h5$', r'', self.checkpoint_file)
-            N_drv.checkpoint_file += '_quada_1.h5'
+            N_drv.checkpoint_file = str(
+                Path(self.checkpoint_file).with_suffix('.qrf.h5'))
 
         N_results = N_drv.compute(molecule, ao_basis, scf_tensors, ABC)
 
@@ -334,18 +328,9 @@ class QuadraticResponseDriver(NonLinearSolver):
 
             for (wb, wc) in freqpairs:
 
-                Na = (LinearSolver.lrmat2vec(kX[('A', wb + wc)].real, nocc,
-                                             norb) +
-                      1j * LinearSolver.lrmat2vec(kX[
-                          ('A', wb + wc)].imag, nocc, norb))
-
-                Nb = (
-                    LinearSolver.lrmat2vec(kX[('B', wb)].real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(kX[('B', wb)].imag, nocc, norb))
-
-                Nc = (
-                    LinearSolver.lrmat2vec(kX[('C', wc)].real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(kX[('C', wc)].imag, nocc, norb))
+                Na = self.complex_lrmat2vec(kX[('A', wb + wc)], nocc, norb)
+                Nb = self.complex_lrmat2vec(kX[('B', wb)], nocc, norb)
+                Nc = self.complex_lrmat2vec(kX[('C', wc)], nocc, norb)
 
                 C2Nb = self.x2_contract(kX[('B', wb)], op_c, d_a_mo, nocc, norb)
                 B2Nc = self.x2_contract(kX[('C', wc)], op_b, d_a_mo, nocc, norb)
@@ -556,6 +541,7 @@ class QuadraticResponseDriver(NonLinearSolver):
             xi = self.xi(kb, kc, fb, fc, F0_a)
 
             e3fock = xi.T + (0.5 * fbc + 0.5 * fcb).T
+
             e3vec[wb] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
 

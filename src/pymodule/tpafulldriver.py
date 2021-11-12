@@ -1308,14 +1308,10 @@ class TpaFullDriver(TpaDriver):
         kb_nb_nc = inp_dict['Nc_Nb_kb']
         kd_nd = inp_dict['Nd_kd']
 
-        Na = (LinearSolver.lrmat2vec(ka_na.real, nocc, norb) +
-              1j * LinearSolver.lrmat2vec(ka_na.imag, nocc, norb))
-        Nb = (LinearSolver.lrmat2vec(kb_nb.real, nocc, norb) +
-              1j * LinearSolver.lrmat2vec(kb_nb.imag, nocc, norb))
-        Nc_Nb = (LinearSolver.lrmat2vec(kb_nb_nc.real, nocc, norb) +
-                 1j * LinearSolver.lrmat2vec(kb_nb_nc.imag, nocc, norb))
-        Nd = (LinearSolver.lrmat2vec(kd_nd.real, nocc, norb) +
-              1j * LinearSolver.lrmat2vec(kd_nd.imag, nocc, norb))
+        Na = self.complex_lrmat2vec(ka_na, nocc, norb)
+        Nb = self.complex_lrmat2vec(kb_nb, nocc, norb)
+        Nc_Nb = self.complex_lrmat2vec(kb_nb_nc, nocc, norb)
+        Nd = self.complex_lrmat2vec(kd_nd, nocc, norb)
 
         Nc = self.flip_yz(Nc_Nb)  # gets Nc from Nb
 
@@ -1393,12 +1389,9 @@ class TpaFullDriver(TpaDriver):
                 ka_y = kX['Na'][('y', w)]
                 ka_z = kX['Na'][('z', w)]
 
-                na_x = (LinearSolver.lrmat2vec(ka_x.real, nocc, norb) +
-                        1j * LinearSolver.lrmat2vec(ka_x.imag, nocc, norb))
-                na_y = (LinearSolver.lrmat2vec(ka_y.real, nocc, norb) +
-                        1j * LinearSolver.lrmat2vec(ka_y.imag, nocc, norb))
-                na_z = (LinearSolver.lrmat2vec(ka_z.real, nocc, norb) +
-                        1j * LinearSolver.lrmat2vec(ka_z.imag, nocc, norb))
+                na_x = self.complex_lrmat2vec(ka_x, nocc, norb)
+                na_y = self.complex_lrmat2vec(ka_y, nocc, norb)
+                na_z = self.complex_lrmat2vec(ka_z, nocc, norb)
 
                 t4term = (np.dot(na_x, e4_dict['f_iso_x'][ww] - S4[('x', ww)]) +
                           np.dot(na_y, e4_dict['f_iso_y'][ww] - S4[('y', ww)]) +
@@ -1567,12 +1560,9 @@ class TpaFullDriver(TpaDriver):
             kb_nb_nc = inp_dict['Nc_Nb_kb']
             kd_nd = inp_dict['Nd_kd']
 
-            Nb = (LinearSolver.lrmat2vec(kb_nb.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kb_nb.imag, nocc, norb))
-            Nc_Nb = (LinearSolver.lrmat2vec(kb_nb_nc.real, nocc, norb) +
-                     1j * LinearSolver.lrmat2vec(kb_nb_nc.imag, nocc, norb))
-            Nd = (LinearSolver.lrmat2vec(kd_nd.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kd_nd.imag, nocc, norb))
+            Nb = self.complex_lrmat2vec(kb_nb, nocc, norb)
+            Nc_Nb = self.complex_lrmat2vec(kb_nb_nc, nocc, norb)
+            Nd = self.complex_lrmat2vec(kd_nd, nocc, norb)
 
             Nc = self.flip_yz(Nc_Nb)  # gets Nc from Nb
 
