@@ -266,7 +266,7 @@ class CubicResponseDriver(NonLinearSolver):
         kX = N_results['kappas']
         Focks = N_results['focks']
 
-        profiler.check_memory_usage('CPP')
+        profiler.check_memory_usage('1st CPP')
 
         cubic_dict = self.compute_cubic_components(Focks, freqpairs, X, d_a_mo,
                                                    kX, self.comp, scf_tensors,
@@ -340,11 +340,17 @@ class CubicResponseDriver(NonLinearSolver):
         fock_dict = self.get_fock_dict(freqpairs, density_list, F0, mo,
                                        molecule, ao_basis)
 
+        profiler.check_memory_usage('1st Focks')
+
         e4_dict, s4_dict, r4_dict = self.get_esr4(freqpairs, kX, fock_dict,
                                                   Focks, nocc, norb, d_a_mo)
 
+        profiler.check_memory_usage('E[4]')
+
         k_xy, f_xy = self.get_nxy(freqpairs, kX, fock_dict, Focks, nocc, norb,
                                   d_a_mo, X, molecule, ao_basis, scf_tensors)
+
+        profiler.check_memory_usage('2nd CPP')
 
         if self.rank == mpi_master():
             density_list_ii = self.get_densities_ii(freqpairs, kX, k_xy, S, D0,
@@ -352,11 +358,17 @@ class CubicResponseDriver(NonLinearSolver):
         else:
             density_list_ii = None
 
+        profiler.check_memory_usage('2nd densities')
+
         fock_dict_ii = self.get_fock_dict_ii(freqpairs, density_list_ii, F0, mo,
                                              molecule, ao_basis)
 
+        profiler.check_memory_usage('2nd Focks')
+
         e3_dict = self.get_e3(freqpairs, kX, k_xy, Focks, fock_dict_ii, f_xy,
                               nocc, norb)
+
+        profiler.check_memory_usage('E[3]')
 
         result = {}
 
@@ -505,12 +517,12 @@ class CubicResponseDriver(NonLinearSolver):
                 self.print_component('gamma', gamma, width)
                 self.ostream.print_blank()
 
-                result.update({('E3', wb, wc, wd): val_E3})
-                result.update({('T4', wb, wc, wd): val_T4})
-                result.update({('X3', wb, wc, wd): val_X3})
-                result.update({('X2', wb, wc, wd): val_X2})
-                result.update({('A3', wb, wc, wd): val_A3})
-                result.update({('A2', wb, wc, wd): val_A2})
+                result[('E3', wb, wc, wd)] = val_E3
+                result[('T4', wb, wc, wd)] = val_T4
+                result[('X3', wb, wc, wd)] = val_X3
+                result[('X2', wb, wc, wd)] = val_X2
+                result[('A3', wb, wc, wd)] = val_A3
+                result[('A2', wb, wc, wd)] = val_A2
 
         profiler.check_memory_usage('End of CRF')
 
@@ -1025,9 +1037,9 @@ class CubicResponseDriver(NonLinearSolver):
             r4_term += -1j * self.damping * np.dot(
                 Nb_h, self.s4_for_r4(ka.T, kd, kc, D0, nocc, norb))
 
-            e4_vec.update({wb: e4vec})
-            s4_vec.update({wb: s4_term})
-            r4_vec.update({wb: r4_term})
+            e4_vec[wb] = e4vec
+            s4_vec[wb] = s4_term
+            r4_vec[wb] = r4_term
 
         return e4_vec, s4_vec, r4_vec
 
@@ -1117,7 +1129,7 @@ class CubicResponseDriver(NonLinearSolver):
             C2Nb = 0.5 * self.x2_contract(kX[('B', wb)], C, d_a_mo, nocc, norb)
             B2Nc = 0.5 * self.x2_contract(kX[('C', wc)], B, d_a_mo, nocc, norb)
 
-            BC.update({(('BC', wb, wc), wb + wc): (E3NbNc - C2Nb - B2Nc)})
+            BC[(('BC', wb, wc), wb + wc)] = E3NbNc - C2Nb - B2Nc
 
             # BD
 
@@ -1129,7 +1141,7 @@ class CubicResponseDriver(NonLinearSolver):
             D2Nb = 0.5 * self.x2_contract(kX[('B', wb)], D, d_a_mo, nocc, norb)
             B2Nd = 0.5 * self.x2_contract(kX[('D', wd)], B, d_a_mo, nocc, norb)
 
-            BD.update({(('BD', wb, wd), wb + wd): (E3NbNd - D2Nb - B2Nd)})
+            BD[(('BD', wb, wd), wb + wd)] = E3NbNd - D2Nb - B2Nd
 
             # CD
 
@@ -1141,7 +1153,7 @@ class CubicResponseDriver(NonLinearSolver):
             C2Nd = 0.5 * self.x2_contract(kX[('D', wd)], C, d_a_mo, nocc, norb)
             D2Nc = 0.5 * self.x2_contract(kX[('C', wc)], D, d_a_mo, nocc, norb)
 
-            CD.update({(('CD', wc, wd), wc + wd): (E3NcNd - C2Nd - D2Nc)})
+            CD[(('CD', wc, wd), wc + wd)] = E3NcNd - C2Nd - D2Nc
 
             XY.update(BC)
             XY.update(BD)

@@ -359,13 +359,17 @@ class SHGDriver(NonLinearSolver):
         else:
             density_list = None
 
-        profiler.check_memory_usage('1st densities')
+        profiler.check_memory_usage('Densities')
 
         #  computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(freqpairs, density_list, F0, mo,
                                        molecule, ao_basis)
 
+        profiler.check_memory_usage('Focks')
+
         e3_dict = self.get_e3(freqpairs, kX, fock_dict, Focks, nocc, norb)
+
+        profiler.check_memory_usage('E[3]')
 
         beta = {}
 
@@ -489,13 +493,11 @@ class SHGDriver(NonLinearSolver):
                         self.x2_contract(kX[('z', wb)], X[eta], d_a_mo, nocc,
                                          norb))
 
-                beta.update({
-                    wb: (
-                        NaE3NbNc_x + A2_x + X2_x,
-                        NaE3NbNc_y + A2_y + X2_y,
-                        NaE3NbNc_z + A2_z + X2_z,
-                    )
-                })
+                beta[wb] = (
+                    NaE3NbNc_x + A2_x + X2_x,
+                    NaE3NbNc_y + A2_y + X2_y,
+                    NaE3NbNc_z + A2_z + X2_z,
+                )
 
         profiler.check_memory_usage('End of SHG')
 

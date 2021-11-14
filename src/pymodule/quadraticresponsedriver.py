@@ -310,13 +310,17 @@ class QuadraticResponseDriver(NonLinearSolver):
         else:
             density_list = None
 
-        profiler.check_memory_usage('1st densities')
+        profiler.check_memory_usage('Densities')
 
         #  computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(freqpairs, density_list, F0, mo,
                                        molecule, ao_basis)
 
+        profiler.check_memory_usage('Focks')
+
         e3_dict = self.get_e3(freqpairs, kX, fock_dict, Focks, nocc, norb)
+
+        profiler.check_memory_usage('E[3]')
 
         result = {}
 
@@ -344,8 +348,10 @@ class QuadraticResponseDriver(NonLinearSolver):
                 NbA2Nc = np.dot(Nb.T, A2Nc)
                 NcA2Nb = np.dot(Nc.T, A2Nb)
 
-                X2 = NaC2Nb + NaB2Nc
-                A2 = NbA2Nc + NcA2Nb
+                val_X2 = -(NaC2Nb + NaB2Nc)
+                val_A2 = -(NbA2Nc + NcA2Nb)
+                val_E3 = NaE3NbNc
+                beta = val_E3 + val_A2 + val_X2
 
                 self.ostream.print_blank()
                 w_str = 'Quadratic response function at given frequencies: '
@@ -361,14 +367,14 @@ class QuadraticResponseDriver(NonLinearSolver):
                 width = len(title)
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
-                self.print_component('X2', wb, -X2, width)
-                self.print_component('A2', wb, -A2, width)
-                self.print_component('E3', wb, NaE3NbNc, width)
-                self.print_component('beta', wb, NaE3NbNc - A2 - X2, width)
+                self.print_component('X2', wb, val_X2, width)
+                self.print_component('A2', wb, val_A2, width)
+                self.print_component('E3', wb, val_E3, width)
+                self.print_component('beta', wb, beta, width)
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-                result.update({wb: NaE3NbNc - A2 - X2})
+                result[wb] = beta
 
         profiler.check_memory_usage('End of QRF')
 
