@@ -389,114 +389,48 @@ class SHGDriver(NonLinearSolver):
                     'z': self.complex_lrmat2vec(kX[('z', wb)], nocc, norb),
                 }
 
-                NaE3NbNc_x = np.dot(Na['x'].T, e3_dict[('sig_x', wb)])
-                NaE3NbNc_x += 2 * np.dot(Na['y'].T, e3_dict[('lam_xy', wb)])
-                NaE3NbNc_x += 2 * np.dot(Na['z'].T, e3_dict[('lam_xz', wb)])
+                NaE3NbNc = {'x': 0.0, 'y': 0.0, 'z': 0.0}
 
-                NaE3NbNc_y = np.dot(Na['y'].T, e3_dict[('sig_y', wb)])
-                NaE3NbNc_y += 2 * np.dot(Na['x'].T, e3_dict[('lam_xy', wb)])
-                NaE3NbNc_y += 2 * np.dot(Na['z'].T, e3_dict[('lam_yz', wb)])
+                NaE3NbNc['x'] += np.dot(Na['x'].T, e3_dict[('sig_x', wb)])
+                NaE3NbNc['x'] += 2 * np.dot(Na['y'].T, e3_dict[('lam_xy', wb)])
+                NaE3NbNc['x'] += 2 * np.dot(Na['z'].T, e3_dict[('lam_xz', wb)])
 
-                NaE3NbNc_z = np.dot(Na['z'].T, e3_dict[('sig_z', wb)])
-                NaE3NbNc_z += 2 * np.dot(Na['y'].T, e3_dict[('lam_yz', wb)])
-                NaE3NbNc_z += 2 * np.dot(Na['x'].T, e3_dict[('lam_xz', wb)])
+                NaE3NbNc['y'] += np.dot(Na['y'].T, e3_dict[('sig_y', wb)])
+                NaE3NbNc['y'] += 2 * np.dot(Na['z'].T, e3_dict[('lam_yz', wb)])
+                NaE3NbNc['y'] += 2 * np.dot(Na['x'].T, e3_dict[('lam_xy', wb)])
 
-                A2_x = 0.0
-                A2_y = 0.0
-                A2_z = 0.0
+                NaE3NbNc['z'] += np.dot(Na['z'].T, e3_dict[('sig_z', wb)])
+                NaE3NbNc['z'] += 2 * np.dot(Na['x'].T, e3_dict[('lam_xz', wb)])
+                NaE3NbNc['z'] += 2 * np.dot(Na['y'].T, e3_dict[('lam_yz', wb)])
 
-                X2_x = 0.0
-                X2_y = 0.0
-                X2_z = 0.0
+                A2 = {'x': 0.0, 'y': 0.0, 'z': 0.0}
+                X2 = {'x': 0.0, 'y': 0.0, 'z': 0.0}
+
+                # pre-compute terms for A2 and X2
+                a2_kX_X = {}
+                x2_kX_X = {}
+                for cart_1 in 'xyz':
+                    for cart_2 in 'xyz':
+                        a2_kX_X[cart_1 + cart_2] = self.a2_contract(
+                            kX[(cart_1, wb)], X[cart_2], d_a_mo, nocc, norb)
+                        x2_kX_X[cart_1 + cart_2] = self.x2_contract(
+                            kX[(cart_1, wb)], X[cart_2], d_a_mo, nocc, norb)
 
                 for eta in 'xyz':
-
-                    # A2 contractions
-
-                    A2_x -= 2 * np.dot(
-                        Nb[eta].T,
-                        self.a2_contract(kX[(eta, wb)], X['x'], d_a_mo, nocc,
-                                         norb))
-                    A2_x -= 2 * np.dot(
-                        Nb['x'].T,
-                        self.a2_contract(kX[(eta, wb)], X[eta], d_a_mo, nocc,
-                                         norb))
-                    A2_x -= 2 * np.dot(
-                        Nb[eta].T,
-                        self.a2_contract(kX[('x', wb)], X[eta], d_a_mo, nocc,
-                                         norb))
-
-                    A2_y -= 2 * np.dot(
-                        Nb[eta].T,
-                        self.a2_contract(kX[(eta, wb)], X['y'], d_a_mo, nocc,
-                                         norb))
-                    A2_y -= 2 * np.dot(
-                        Nb['y'].T,
-                        self.a2_contract(kX[(eta, wb)], X[eta], d_a_mo, nocc,
-                                         norb))
-                    A2_y -= 2 * np.dot(
-                        Nb[eta].T,
-                        self.a2_contract(kX[('y', wb)], X[eta], d_a_mo, nocc,
-                                         norb))
-
-                    A2_z -= 2 * np.dot(
-                        Nb[eta].T,
-                        self.a2_contract(kX[(eta, wb)], X['z'], d_a_mo, nocc,
-                                         norb))
-                    A2_z -= 2 * np.dot(
-                        Nb['z'].T,
-                        self.a2_contract(kX[(eta, wb)], X[eta], d_a_mo, nocc,
-                                         norb))
-                    A2_z -= 2 * np.dot(
-                        Nb[eta].T,
-                        self.a2_contract(kX[('z', wb)], X[eta], d_a_mo, nocc,
-                                         norb))
-
-                    # X2 contractions
-
-                    X2_x -= 2 * np.dot(
-                        Na['x'].T,
-                        self.x2_contract(kX[(eta, wb)], X[eta], d_a_mo, nocc,
-                                         norb))
-                    X2_x -= 2 * np.dot(
-                        Na[eta].T,
-                        self.x2_contract(kX[(eta, wb)], X['x'], d_a_mo, nocc,
-                                         norb))
-                    X2_x -= 2 * np.dot(
-                        Na[eta].T,
-                        self.x2_contract(kX[('x', wb)], X[eta], d_a_mo, nocc,
-                                         norb))
-
-                    X2_y -= 2 * np.dot(
-                        Na['y'].T,
-                        self.x2_contract(kX[(eta, wb)], X[eta], d_a_mo, nocc,
-                                         norb))
-                    X2_y -= 2 * np.dot(
-                        Na[eta].T,
-                        self.x2_contract(kX[(eta, wb)], X['y'], d_a_mo, nocc,
-                                         norb))
-                    X2_y -= 2 * np.dot(
-                        Na[eta].T,
-                        self.x2_contract(kX[('y', wb)], X[eta], d_a_mo, nocc,
-                                         norb))
-
-                    X2_z -= 2 * np.dot(
-                        Na['z'].T,
-                        self.x2_contract(kX[(eta, wb)], X[eta], d_a_mo, nocc,
-                                         norb))
-                    X2_z -= 2 * np.dot(
-                        Na[eta].T,
-                        self.x2_contract(kX[(eta, wb)], X['z'], d_a_mo, nocc,
-                                         norb))
-                    X2_z -= 2 * np.dot(
-                        Na[eta].T,
-                        self.x2_contract(kX[('z', wb)], X[eta], d_a_mo, nocc,
-                                         norb))
+                    for cart in 'xyz':
+                        # A2 contractions
+                        A2[cart] -= 2 * np.dot(Nb[eta].T, a2_kX_X[eta + cart])
+                        A2[cart] -= 2 * np.dot(Nb[cart].T, a2_kX_X[eta + eta])
+                        A2[cart] -= 2 * np.dot(Nb[eta].T, a2_kX_X[cart + eta])
+                        # X2 contractions
+                        X2[cart] -= 2 * np.dot(Na[eta].T, x2_kX_X[eta + cart])
+                        X2[cart] -= 2 * np.dot(Na[cart].T, x2_kX_X[eta + eta])
+                        X2[cart] -= 2 * np.dot(Na[eta].T, x2_kX_X[cart + eta])
 
                 beta[wb] = (
-                    NaE3NbNc_x + A2_x + X2_x,
-                    NaE3NbNc_y + A2_y + X2_y,
-                    NaE3NbNc_z + A2_z + X2_z,
+                    NaE3NbNc['x'] + A2['x'] + X2['x'],
+                    NaE3NbNc['y'] + A2['y'] + X2['y'],
+                    NaE3NbNc['z'] + A2['z'] + X2['z'],
                 )
 
         profiler.check_memory_usage('End of SHG')
