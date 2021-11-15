@@ -2,7 +2,6 @@ import numpy as np
 import time
 import re
 
-
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
 from .profiler import Profiler
@@ -15,7 +14,8 @@ from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
 from .inputparser import parse_input
-
+from .veloxchemlib import XCFunctional
+from .veloxchemlib import XCIntegrator
 
 class QuadraticResponseDriver(NonLinearSolver):
     """
@@ -63,6 +63,11 @@ class QuadraticResponseDriver(NonLinearSolver):
         self.eri_thresh = 1.0e-15
         self.qq_type = 'QQ_DEN'
         self.batch_size = None
+        self.order = 'quadratic'
+
+        self.dft = True
+        self.grid_level = 4
+        self.xcfun = XCFunctional()
 
         # cpp settings
         self.b_frequencies = (0,)
@@ -138,12 +143,6 @@ class QuadraticResponseDriver(NonLinearSolver):
             self.program_start_time = rsp_dict['program_start_time']
         if 'maximum_hours' in rsp_dict:
             self.maximum_hours = rsp_dict['maximum_hours']
-
-        if 'xcfun' in method_dict:
-            errmsg = 'Quadratic response function Driver: The \'xcfun\' keyword is not supported in QRF '
-            errmsg += 'calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
 
         if 'potfile' in method_dict:
             errmsg = 'QrfDriver: The \'potfile\' keyword is not supported in '
@@ -354,15 +353,17 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            density_list = self.get_densities(freqpairs, kX, S, D0, mo)
+            d_dft1,d_hf = self.get_densities(freqpairs, kX, S, D0, mo)
+            dft_dict = self.init_dft(molecule, scf_tensors)
         else:
-            density_list = None
+            dw1 = None
+            dw2 = None
 
         profiler.check_memory_usage('1st densities')
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(freqpairs, density_list, F0, mo,
-                                       molecule, ao_basis)
+        fock_dict = self.get_fock_dict(freqpairs, d_hf,d_dft1, F0, mo,
+                                       molecule, ao_basis,dft_dict)
 
         e3_dict = self.get_e3(freqpairs, kX, fock_dict, Focks, nocc, norb)
 
@@ -441,7 +442,9 @@ class QuadraticResponseDriver(NonLinearSolver):
             A list of tranformed densities
         """
 
-        density_list = []
+        d_dft1 = []
+        d_hf = []
+        
 
         for (wb, wc) in freqpairs:
 
@@ -459,13 +462,24 @@ class QuadraticResponseDriver(NonLinearSolver):
 
             Dbc = self.transform_dens(kb, Dc, S)
             Dcb = self.transform_dens(kc, Db, S)
+            
+            d_freq = []
+            d_freq.append(Db.real)
+            d_freq.append(Dc.real)
+            d_freq.append((Dbc+Dcb).real)
+            d_freq.append(Db.imag)
+            d_freq.append(Dc.imag)
+            d_freq.append((Dbc+Dcb).imag)
 
-            density_list.append(Dbc)
-            density_list.append(Dcb)
+            d_dft1.append(d_freq)
 
-        return density_list
+            d_hf.append(Dbc)
+            d_hf.append(Dcb)
 
-    def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis):
+
+        return d_dft1,d_hf
+
+    def get_fock_dict(self, wi, d_hf,d_dft1, F0, mo, molecule, ao_basis, dft_dict = None):
         """
         Computes the Fock matrices for a quadratic response function
 
@@ -512,8 +526,8 @@ class QuadraticResponseDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                        'real_and_imag')
+        dist_focks = self.comp_nlr_fock(mo, d_hf, molecule, ao_basis,
+                                        'real_and_imag',dft_dict, d_dft1)
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock

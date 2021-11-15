@@ -26,6 +26,7 @@
 #include "XCIntegrator.hpp"
 
 #include <cmath>
+#include <iostream> 
 
 #include <mpi.h>
 
@@ -79,6 +80,8 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
         // generate reference density grid
         
         CDensityGridDriver dgdrv(_locComm);
+
+        std::cout << " Hej SCF" << std::endl;
         
         auto refdengrid = dgdrv.generate(aoDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
 
@@ -339,14 +342,14 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
     
     CXCHessianGrid vxc2grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
-
+    
     CXCCubicHessianGrid vxc3grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
     
     fvxc.compute(vxcgrid, gsdengrid);
     
     fvxc.compute(vxc2grid, gsdengrid);
 
-    //fvxc.compute(vxc3grid, gsdengrid);
+    // fvxc.compute(vxc3grid, gsdengrid);
     
     // compute perturbed density grid
     
@@ -3545,7 +3548,7 @@ CXCIntegrator::_distUnrestrictedBatchForGga(      CDenseMatrix&        subMatrix
 
 void
 CXCIntegrator::_distUnrestrictedBatchForGgaA(      CDenseMatrix&        subMatrixa,
-                                                  CDenseMatrix&        subMatrixb,
+                                                   CDenseMatrix&        subMatrixb,
                                              const CXCGradientGrid*     xcGradientGrid,
                                              const CDensityGrid*        densityGrid,
                                              const CMemBlock2D<double>& braGtoValues,
@@ -4090,11 +4093,11 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
                     {
                         fvxc += bgaos[m] * kgaos[m] * gridWeights[moff + m]
                         
-                             * (2  * grho_aaa[moff + m] * rhow1a[moff + m] * rhow2a[moff + m] + 2 * grho_aab[moff + m] 
+                             * ( grho_aaa[moff + m] * rhow1a[moff + m] * rhow2a[moff + m] 
                              
-                             * (rhow1a[moff + m] * rhow2b[moff + m] + rhow2a[moff + m] * rhow1b[moff + m]) 
+                             + 2 * grho_aab[moff + m] * rhow1a[moff + m] * rhow2b[moff + m] 
                              
-                             + 2 * grho_abb[moff + m] * rhow1b[moff + m] * rhow2b[moff + m]
+                             +  grho_abb[moff + m] * rhow1b[moff + m] * rhow2b[moff + m]
                              
                              +  grho_aa[moff + m] * rhow12a[moff + m] + grho_ab[moff + m] * rhow12b[moff + m] );
                     }
@@ -4153,11 +4156,11 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
                     {
                         fvxc += bgaos[l] * kgaos[l] * gridWeights[loff + l]
 
-                             * (2  * grho_aaa[loff + l] * rhow1a[loff + l] * rhow2a[loff + l] + 2 * grho_aab[loff + l] 
+                             * ( grho_aaa[loff + l] * rhow1a[loff + l] * rhow2a[loff + l] 
                              
-                             * (rhow1a[loff + l] * rhow2b[loff + l] + rhow2a[loff + l] * rhow1b[loff + l]) 
+                             + 2 * grho_aab[loff + l] * rhow1a[loff + l] * rhow2b[loff + l] 
                              
-                             + 2 * grho_abb[loff + l] * rhow1b[loff + l] * rhow2b[loff + l]
+                             +  grho_abb[loff + l] * rhow1b[loff + l] * rhow2b[loff + l]
                              
                              +  grho_aa[loff + l] * rhow12a[loff + l] + grho_ab[loff + l] * rhow12b[loff + l] );
                     }

@@ -46,7 +46,8 @@ namespace vxcfuncs {  // vxcfuncs namespace
                                     &vxcfuncs::Becke88FuncGradientB,
                                     &vxcfuncs::Becke88FuncHessianAB,
                                     &vxcfuncs::Becke88FuncHessianA,
-                                    &vxcfuncs::Becke88FuncHessianB); 
+                                    &vxcfuncs::Becke88FuncHessianB,
+                                    &vxcfuncs::Becke88FuncCubicHessianAB); 
     }
     
     void
@@ -252,7 +253,6 @@ namespace vxcfuncs {  // vxcfuncs namespace
         }
     }
     
-    
     void Becke88FuncHessianAB(      CXCHessianGrid& xcHessianGrid,
                               const double          factor,
                               const CDensityGrid&   densityGrid)
@@ -352,4 +352,11 @@ namespace vxcfuncs {  // vxcfuncs namespace
         
     }
     
+    void Becke88FuncCubicHessianAB(     CXCCubicHessianGrid& xcCubicHessianGrid,
+                                  const double          factor,
+                                  const CDensityGrid&   densityGrid)
+    {
+
+    }
+
 }  // namespace vxcfuncs

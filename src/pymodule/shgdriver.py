@@ -320,6 +320,9 @@ class SHGDriver(NonLinearSolver):
 
         beta_bar = {}
 
+        print("beta")
+        print(beta.keys())
+
         for key in beta.keys():
             betaa = 0
             for a in range(len(beta[key])):

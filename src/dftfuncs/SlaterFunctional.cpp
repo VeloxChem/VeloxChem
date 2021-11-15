@@ -46,7 +46,8 @@ namespace vxcfuncs {  // vxcfuncs namespace
                                     &vxcfuncs::SlaterFuncGradientB,
                                     &vxcfuncs::SlaterFuncHessianAB,
                                     &vxcfuncs::SlaterFuncHessianA,
-                                    &vxcfuncs::SlaterFuncHessianB);
+                                    &vxcfuncs::SlaterFuncHessianB,
+                                    &vxcfuncs::SlaterFuncCubicHessianAB);
     }
     
     void
@@ -261,4 +262,41 @@ namespace vxcfuncs {  // vxcfuncs namespace
         }
     }
     
+    void
+    SlaterFuncCubicHessianAB(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                             const double          factor,
+                             const CDensityGrid&   densityGrid)
+    {
+        double frg = -factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0) / 3.0;
+        
+        double fp = -2.0 / 3.0;
+        
+        // determine number of grid points
+        
+        auto ngpoints = densityGrid.getNumberOfGridPoints();
+        
+        // set up pointers to density grid data
+        
+        auto rhoa = densityGrid.alphaDensity(0);
+        
+        auto rhob = densityGrid.betaDensity(0);
+        
+        // set up pointers to functional data
+        
+        auto grho_aaa = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::rhoa);
+        
+        auto grho_aab = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::rhob);
+
+        auto grho_abb = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhob, xcvars::rhob);
+        
+        #pragma omp simd aligned(rhoa, rhob, grho_aaa,grho_aab, grho_abb: VLX_ALIGN)
+        for (int32_t i = 0; i < ngpoints; i++)
+        {
+            grho_aaa[i] += frg * std::pow(rhoa[i], fp);
+            
+            grho_aab[i] += frg * std::pow(rhob[i], fp);
+
+            grho_abb[i] += frg * std::pow(rhob[i], fp);
+        }
+    }
 }  // namespace vxcfuncs
