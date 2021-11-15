@@ -57,6 +57,7 @@ from .xtbgradientdriver import XTBGradientDriver
 from .tdhfgradientdriver import TdhfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
 from .tdhfhessiandriver import TdhfHessianDriver
+from .cphfsolver import CphfSolver
 
 def select_scf_driver(task, scf_type):
     """
@@ -253,7 +254,7 @@ def main():
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'gradient', 'optimize', 'response', 'pulses',
-        'visualization', 'loprop', 'frequencies', 'freq'
+        'visualization', 'loprop', 'frequencies', 'freq', 'cphf'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -367,6 +368,18 @@ def main():
         hessian_drv.compute(task.molecule, task.ao_basis)
         # TODO: add output file name for geomeTRIC vibrational analysis
         hessian_drv.vibrational_analysis(task.molecule, task.ao_basis)
+
+    # TODO: maybe remove (this was included for testing the MPI-parallelization)
+    if task_type in ['cphf']:
+        if 'cphf_settings' in task.input_dict:
+            cphf_dict = task.input_dict['cphf_settings']
+        else:
+            cphf_dict = {}
+
+        cphf_drv = CphfSolver(task.mpi_comm, task.ostream)
+        cphf_drv.update_settings(cphf_dict, method_dict)
+        cphf_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors) 
+    
 
     # Response
 

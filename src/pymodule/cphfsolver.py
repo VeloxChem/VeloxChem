@@ -153,6 +153,9 @@ class CphfSolver(LinearSolver):
             nalpha == nbeta,
             'CphfSolver: not implemented for unrestricted case')
 
+        if self.rank == mpi_master():
+            self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
+
         if self.use_subspace_solver:
             return self.compute_subspace_solver(molecule, basis, scf_tensors)
         else:
@@ -176,6 +179,7 @@ class CphfSolver(LinearSolver):
 
         self.start_time = tm.time()
 
+        self.profiler.start_timer(0, 'ComputeCPHF iterative subspace algorithm')
         self.profiler.start_timer(0, 'CPHF RHS')
 
         if self.rank == mpi_master():
@@ -340,6 +344,13 @@ class CphfSolver(LinearSolver):
             self.profiler.stop_timer(iteration, 'FockBuild')
             self.profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
+
+        self.profiler.stop_timer(0, 'ComputeCPHF iterative subspace algorithm')
+        self.profiler.print_timing(self.ostream)
+        self.profiler.print_profiling_summary(self.ostream)
+
+        self.profiler.check_memory_usage('End of ComputeCPHF iterative subspace algorithm')
+        self.profiler.print_memory_usage(self.ostream)
 
         # converged?
         if self.rank == mpi_master():
@@ -660,7 +671,7 @@ class CphfSolver(LinearSolver):
         self.profiler.print_memory_usage(self.ostream)
 
         if self.rank == mpi_master():
-            self.print_convergence('Coupled-Perturbed Hartree-Fock: CG algorithm')
+            self.print_convergence('Coupled-Perturbed Hartree-Fock')
 
             return {
                 'cphf_ov': cphf_ov,
@@ -971,5 +982,30 @@ class CphfSolver(LinearSolver):
                 rel_res = relative_residual_norm[3*i+x]
                 output_iter = 'Residual Norm: {:.8f}'.format(rel_res)
                 self.ostream.print_line(coord_label + output_iter)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def print_cphf_header(self, title):
+        self.ostream.print_blank()
+        self.ostream.print_header('{:s} Setup'.format(title))
+        self.ostream.print_header('=' * (len(title) + 8))
+        self.ostream.print_blank()
+
+        str_width = 70
+
+        # print general info
+        cur_str = 'Solver Type                     : '
+        if self.use_subspace_solver:
+            cur_str += 'Iterative Subspace Algorithm'
+        else:
+            cur_str += 'Conjugate Gradient'
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = 'Convergence Threshold           : {:.1e}'.format(
+            self.conv_thresh)
+        self.ostream.print_header(cur_str.ljust(str_width))
+
         self.ostream.print_blank()
         self.ostream.flush()
