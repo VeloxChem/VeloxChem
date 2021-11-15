@@ -1187,7 +1187,8 @@ class ExcitonModelDriver:
         self.ostream.print_header(('-' * len(valstr)).ljust(80))
         for s, R in enumerate(rot_str):
             valstr = 'Excited State {:>5s}: '.format('S' + str(s + 1))
-            valstr += '    Rot.Str. {:11.4f}'.format(R)
-            valstr += '    [10**(-40) (esu**2)*(cm**2)]'
+            valstr += '    Rot.Str. '
+            valstr += f'{(R / rotatory_strength_in_cgs()):13.6f} a.u.'
+            valstr += f'{R:11.4f} [10**(-40) cgs]'
             self.ostream.print_header(valstr.ljust(80))
         self.ostream.print_blank()

@@ -42,12 +42,15 @@ class CustomProperty(ResponseProperty):
         - rsp_property: The dictionary of response property.
     """
 
-    def __init__(self, rsp_dict, method_dict=None):
+    def __init__(self, rsp_dict=None, method_dict=None):
         """
         Initializes a custom, user-defined  property.
         """
 
-        rsp_dict = dict(rsp_dict)
+        if rsp_dict is None:
+            rsp_dict = {}
+        else:
+            rsp_dict = dict(rsp_dict)
 
         if method_dict is None:
             method_dict = {}
@@ -55,8 +58,8 @@ class CustomProperty(ResponseProperty):
             method_dict = dict(method_dict)
 
         rsp_dict['property'] = 'custom'
-        if 'response' not in rsp_dict:
-            rsp_dict['response'] = 'linear'
+        if 'order' not in rsp_dict:
+            rsp_dict['order'] = 'linear'
         rsp_dict['residue'] = 'none'
         rsp_dict['onlystatic'] = 'no'
         if 'complex' not in rsp_dict:

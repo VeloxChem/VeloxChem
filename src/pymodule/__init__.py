@@ -39,6 +39,7 @@ from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import ExcitationVector
 
 # C++ functions
+from .veloxchemlib import available_functionals
 from .veloxchemlib import mpi_master
 from .veloxchemlib import mpi_initialized
 from .veloxchemlib import ao_matrix_to_veloxchem

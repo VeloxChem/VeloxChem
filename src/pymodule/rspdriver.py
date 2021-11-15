@@ -30,6 +30,7 @@ from .c6solver import C6Solver
 from .tdaexcidriver import TDAExciDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
+from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 
 
@@ -74,7 +75,8 @@ class ResponseDriver:
         # output stream
         self.ostream = ostream
 
-        # convergence
+        # solver and convergence flag
+        self.solver = None
         self.is_converged = False
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -102,6 +104,50 @@ class ResponseDriver:
 
         parse_input(self, rsp_keywords, self.rsp_dict)
 
+        # Linear response eigensolver
+        if (self.rsp_dict['order'] == 'linear' and
+                self.rsp_dict['residue'] == 'single' and
+                self.rsp_dict['complex'] == 'no'):
+            if self.tamm_dancoff:
+                self.solver = TDAExciDriver(self.comm, self.ostream)
+            else:
+                self.solver = LinearResponseEigenSolver(self.comm, self.ostream)
+            self.solver.input_keywords['response'].update({
+                'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),
+            })
+
+        # Linear response solver
+        elif (self.rsp_dict['order'] == 'linear' and
+              self.rsp_dict['residue'] == 'none' and
+              self.rsp_dict['complex'] == 'no'):
+            self.solver = LinearResponseSolver(self.comm, self.ostream)
+
+        # Complex linear response solver
+        elif (self.rsp_dict['order'] == 'linear' and
+              self.rsp_dict['residue'] == 'none' and
+              self.rsp_dict['onlystatic'] == 'no' and
+              self.rsp_dict['complex'] == 'yes'):
+            self.solver = ComplexResponse(self.comm, self.ostream)
+
+        # C6 linear response solver
+        elif (self.rsp_dict['order'] == 'linear' and
+              self.rsp_dict['residue'] == 'none' and
+              self.rsp_dict['onlystatic'] == 'yes' and
+              self.rsp_dict['complex'] == 'yes'):
+            self.solver = C6Solver(self.comm, self.ostream)
+
+        # TPA
+        elif (self.rsp_dict['order'] == 'cubic' and
+              self.rsp_dict['complex'] == 'yes'):
+            if ('tpa_type' not in self.rsp_dict or
+                    self.rsp_dict['tpa_type'].lower() == 'full'):
+                self.solver = TpaFullDriver(self.comm, self.ostream)
+            elif ('tpa_type' in self.rsp_dict and
+                  self.rsp_dict['tpa_type'].lower() == 'reduced'):
+                self.solver = TpaReducedDriver(self.comm, self.ostream)
+
+        self.solver.update_settings(self.rsp_dict, self.method_dict)
+
     def compute(self, molecule, ao_basis, scf_tensors):
         """
         Performs molecular property calculation using molecular data
@@ -117,95 +163,14 @@ class ResponseDriver:
             The results from the actual response solver.
         """
 
-        # Linear response eigensolver
+        assert_msg_critical(self.solver is not None,
+                            'ResponseDriver: solver not initialized')
 
-        if (self.rsp_dict['response'] == 'linear' and
-                self.rsp_dict['residue'] == 'single' and
-                self.rsp_dict['complex'] == 'no'):
+        result = self.solver.compute(molecule, ao_basis, scf_tensors)
 
-            if self.tamm_dancoff:
-                solver = TDAExciDriver(self.comm, self.ostream)
-            else:
-                solver = LinearResponseEigenSolver(self.comm, self.ostream)
+        self.is_converged = self.solver.is_converged
 
-            solver.update_settings(self.rsp_dict, self.method_dict)
-
-            result = solver.compute(molecule, ao_basis, scf_tensors)
-
-            self.is_converged = solver.is_converged
-
-            return result
-
-        # Linear response solver
-
-        if (self.rsp_dict['response'] == 'linear' and
-                self.rsp_dict['residue'] == 'none' and
-                self.rsp_dict['complex'] == 'no'):
-
-            solver = LinearResponseSolver(self.comm, self.ostream)
-
-            solver.update_settings(self.rsp_dict, self.method_dict)
-
-            result = solver.compute(molecule, ao_basis, scf_tensors)
-
-            self.is_converged = solver.is_converged
-
-            return result
-
-        # Complex linear response solver
-
-        if (self.rsp_dict['response'] == 'linear' and
-                self.rsp_dict['residue'] == 'none' and
-                self.rsp_dict['onlystatic'] == 'no' and
-                self.rsp_dict['complex'] == 'yes'):
-
-            clr_solver = ComplexResponse(self.comm, self.ostream)
-
-            clr_solver.update_settings(self.rsp_dict, self.method_dict)
-
-            clr_result = clr_solver.compute(molecule, ao_basis, scf_tensors)
-
-            self.is_converged = clr_solver.is_converged
-
-            return clr_result
-
-        # C6 linear response solver
-
-        if (self.rsp_dict['response'] == 'linear' and
-                self.rsp_dict['residue'] == 'none' and
-                self.rsp_dict['onlystatic'] == 'yes' and
-                self.rsp_dict['complex'] == 'yes'):
-
-            c6_solver = C6Solver(self.comm, self.ostream)
-
-            c6_solver.update_settings(self.rsp_dict, self.method_dict)
-
-            c6_result = c6_solver.compute(molecule, ao_basis, scf_tensors)
-
-            self.is_converged = c6_solver.is_converged
-
-            return c6_result
-
-        # TPA
-
-        if (self.rsp_dict['response'] == 'cubic' and
-                self.rsp_dict['complex'] == 'yes'):
-
-            if ('tpa_type' not in self.rsp_dict or
-                    self.rsp_dict['tpa_type'].lower() == 'full'):
-                tpa_solver = TpaFullDriver(self.comm, self.ostream)
-
-            elif ('tpa_type' in self.rsp_dict and
-                  self.rsp_dict['tpa_type'].lower() == 'reduced'):
-                tpa_solver = TpaReducedDriver(self.comm, self.ostream)
-
-            tpa_solver.update_settings(self.rsp_dict, self.method_dict)
-
-            tpa_result = tpa_solver.compute(molecule, ao_basis, scf_tensors)
-
-            self.is_converged = tpa_solver.is_converged
-
-            return tpa_result
+        return result
 
     def prop_str(self):
         """

@@ -284,9 +284,9 @@ def parse_bool(input_bool):
         return input_bool
 
     elif isinstance(input_bool, str):
-        if input_bool.lower() in ['yes', 'y']:
+        if input_bool.lower() in ['true', 'yes', 'y']:
             return True
-        elif input_bool.lower() in ['no', 'n']:
+        elif input_bool.lower() in ['false', 'no', 'n']:
             return False
         else:
             assert_msg_critical(
@@ -404,3 +404,28 @@ def parse_input(obj, keyword_types, input_dictionary):
         else:
             err_type = f'parse_input: invalid keyword type for \'{key}\''
             assert_msg_critical(False, err_type)
+
+
+def get_keyword_type(keyword_type):
+    """
+    Gets keyword type for printing.
+        - 'str', 'str_upper', 'str_lower' -> 'string'
+        - 'int' -> 'integer'
+        - 'float' -> 'float'
+        - 'bool' -> 'boolean'
+        - 'list' -> 'multiple-lines'
+        - 'seq_fixed_int', 'seq_fixed', 'seq_range' -> 'sequence'
+    """
+
+    return {
+        'str': 'string',
+        'str_upper': 'string',
+        'str_lower': 'string',
+        'int': 'integer',
+        'float': 'float',
+        'bool': 'boolean',
+        'list': 'multiple-lines',
+        'seq_fixed_int': 'sequence',
+        'seq_fixed': 'sequence',
+        'seq_range': 'sequence',
+    }[keyword_type]

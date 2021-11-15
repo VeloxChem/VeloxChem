@@ -42,7 +42,6 @@ from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
 from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
 
 
@@ -88,6 +87,16 @@ class LinearResponseEigenSolver(LinearSolver):
         self.cube_stepsize = None
         self.cube_points = [80, 80, 80]
 
+        self.input_keywords['response'].update({
+            'nstates': ('int', 'number of excited states'),
+            'nto': ('bool', 'analyze natural transition orbitals'),
+            'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
+            'detach_attach': ('bool', 'analyze detachment/attachment density'),
+            'cube_origin': ('seq_fixed', 'origin of cubic grid points'),
+            'cube_stepsize': ('seq_fixed', 'step size of cubic grid points'),
+            'cube_points': ('seq_fixed_int', 'number of cubic grid points'),
+        })
+
     def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in linear response eigensolver.
@@ -102,18 +111,6 @@ class LinearResponseEigenSolver(LinearSolver):
             method_dict = {}
 
         super().update_settings(rsp_dict, method_dict)
-
-        rsp_keywords = {
-            'nstates': 'int',
-            'nto': 'bool',
-            'nto_pairs': 'int',
-            'detach_attach': 'bool',
-            'cube_origin': 'seq_fixed',
-            'cube_stepsize': 'seq_fixed',
-            'cube_points': 'seq_fixed_int',
-        }
-
-        parse_input(self, rsp_keywords, rsp_dict)
 
         if self.cube_origin is not None:
             assert_msg_critical(
@@ -230,7 +227,7 @@ class LinearResponseEigenSolver(LinearSolver):
                                             dft_dict, pe_dict,
                                             rsp_vector_labels)
 
-        iter_per_trail_in_hours = None
+        iter_per_trial_in_hours = None
 
         # start iterations
         for iteration in range(self.max_iter):
@@ -390,8 +387,8 @@ class LinearResponseEigenSolver(LinearSolver):
                 n_new_trials = None
             n_new_trials = self.comm.bcast(n_new_trials, root=mpi_master())
 
-            if iter_per_trail_in_hours is not None:
-                next_iter_in_hours = iter_per_trail_in_hours * n_new_trials
+            if iter_per_trial_in_hours is not None:
+                next_iter_in_hours = iter_per_trial_in_hours * n_new_trials
                 if self.need_graceful_exit(next_iter_in_hours):
                     self.graceful_exit(molecule, basis, dft_dict, pe_dict,
                                        rsp_vector_labels)
@@ -403,7 +400,7 @@ class LinearResponseEigenSolver(LinearSolver):
                                timing_dict)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
-            iter_per_trail_in_hours = iter_in_hours / n_new_trials
+            iter_per_trial_in_hours = iter_in_hours / n_new_trials
 
             profiler.stop_timer(iteration, 'FockBuild')
             if self.dft or self.pe:
@@ -761,7 +758,7 @@ class LinearResponseEigenSolver(LinearSolver):
             The input trial vectors.
 
         :return:
-            A tuple of distributed trail vectors after preconditioning.
+            A tuple of distributed trial vectors after preconditioning.
         """
 
         pa = precond.data[:, 0]
