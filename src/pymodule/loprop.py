@@ -100,7 +100,7 @@ class LoPropDriver:
 
             # obtain occupied & virtual orbital lists
             ao_per_atom, ao_occ, ao_vir = self.get_ao_indices(molecule, basis)
-
+            
             # TO transforation: re-arrange S
             S0 = S[re_arranged_indices, :][:, re_arranged_indices]
 
@@ -193,9 +193,9 @@ class LoPropDriver:
             # unpact response vectors to matrix form
             nocc = molecule.number_of_alpha_electrons()
             norb = n_mo
-            kappa_x = self.vec2mat(Nx, nocc, norb)
-            kappa_y = self.vec2mat(Ny, nocc, norb)
-            kappa_z = self.vec2mat(Nz, nocc, norb)
+            kappa_x = self.lr2mat(Nx, nocc, norb)
+            kappa_y = self.lr2mat(Ny, nocc, norb)
+            kappa_z = self.lr2mat(Nz, nocc, norb)
 
             # perturbed densities
             # factor of 2 from spin-adapted excitation vectors
@@ -261,7 +261,7 @@ class LoPropDriver:
                 coord_matrix[i][i] = molecule_coord[i]
                 for j in range(i + 1, natoms):
                     # a!=b: rab = (ra-rb)/2
-                    rij = 0.5 * np.abs(molecule_coord[i] - molecule_coord[j])
+                    rij = 0.5 * np.abs(molecule_coord[i] + molecule_coord[j])
                     coord_matrix[i][j] = rij
                     coord_matrix[j][i] = rij
 
@@ -302,8 +302,8 @@ class LoPropDriver:
                     Rb = molecule_coord[b]
                     Fab[a, b] = self.penalty_fc(za, Ra, zb, Rb)
                     Fab[b, a] = Fab[a][b]
-                for a in range(natoms):
-                    Fab[a, a] += -sum(Fab[a, :])
+            for a in range(natoms):
+                Fab[a, a] += -sum(Fab[a, :])
 
             Lab = Fab + 2.0 * np.max(np.abs(Fab))
 
@@ -369,8 +369,6 @@ class LoPropDriver:
                                                      atom_pol_matrix[2, 1])
                 atom_polarizabilities[i, 5] = atom_pol_matrix[2, 2]
 
-            atom_polarizabilities = atom_polarizabilities * (
-                bohr_in_angstroms()**3)
             self.print_results(molecule, natoms, Qab, local_polarizabilities,
                                molecule_polarizabilities, atom_polarizabilities)
 
@@ -399,7 +397,7 @@ class LoPropDriver:
         """
 
         RBS = np.array([
-            0, 0.25, 0.25, 1.45, 1.05, 0.85, 0.7, 0.65, 0.5, 0.43, 1.8, 1.5,
+            0, 0.25, 0.25, 1.45, 1.05, 0.85, 0.7, 0.65, 0.6, 0.5, 0.43, 1.8, 1.5,
             1.25, 1.1, 1.0, 1.0, 1.0, 1.0
         ]) / bohr_in_angstroms()
 
@@ -414,7 +412,7 @@ class LoPropDriver:
         f = 0.5 * np.exp(-2 * (rab2 / (ra + rb)**2))
         return f
 
-    def vec2mat(self, vec, nocc, norb):
+    def lr2mat(self, vec, nocc, norb):
         """
         Unpack response vector to matrix form.
 
@@ -463,7 +461,6 @@ class LoPropDriver:
         :return:
             ao_per_atom, ao_occ, and ao_vir
         """
-
         ao_count = dict(S=1, P=3, D=5, F=7, G=9, H=11, I=13)
 
         basis_info = {}
@@ -560,7 +557,7 @@ class LoPropDriver:
         self.ostream.print_blank()
 
         # print localized chagres
-        title = 'LoProp localized charges'
+        title = 'LoProp Charges (a.u.)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * len(title))
 
@@ -570,7 +567,7 @@ class LoPropDriver:
             self.ostream.print_header(output_iter)
         self.ostream.print_blank()
 
-        title = 'LoProp Localised polarizabilities'
+        title = 'LoProp Polarizabilities (a.u)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * len(title))
 
