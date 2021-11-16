@@ -59,19 +59,19 @@ class TestQrf(unittest.TestCase):
 
         qrf_prop.update_settings(rsp_settings, method_settings)
 
-        qrf_result_xxx = qrf_prop.compute(molecule, ao_basis, scf_tensors)
+        qrf_result_xxx = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
 
         rsp_settings = {'conv_thresh': 1.0e-4, 'b_frequencies': [0.2],'c_frequencies': [0.2],'damping': 0.1,'a_component':'z','b_component':'z','c_component':'x'}
 
         qrf_prop.update_settings(rsp_settings, method_settings)
 
-        qrf_result_zzx = qrf_prop.compute(molecule, ao_basis, scf_tensors)
+        qrf_result_zzx = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
 
         rsp_settings = {'conv_thresh': 1.0e-4, 'b_frequencies': [0.2],'c_frequencies': [0.2],'damping': 0.1,'a_component':'y','b_component':'y','c_component':'x'}
 
         qrf_prop.update_settings(rsp_settings, method_settings)
 
-        qrf_result_yyx = qrf_prop.compute(molecule, ao_basis, scf_tensors)
+        qrf_result_yyx = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
         
         # x-component 
 

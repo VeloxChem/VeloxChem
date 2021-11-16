@@ -80,8 +80,6 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
         // generate reference density grid
         
         CDensityGridDriver dgdrv(_locComm);
-
-        std::cout << " Hej SCF" << std::endl;
         
         auto refdengrid = dgdrv.generate(aoDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
 
@@ -289,12 +287,15 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
         // symmetrize Kohn-Sham matrix
         
         ksmat.symmetrize();
-        
+        std::cout << "within Integrate lin" << std::endl;
+        std::cout << ksmat.getString() << std::endl;
         // add Kohn-Sham contribution to Fock matrix
         
         for (int32_t i = 0; i < ksmat.getNumberOfMatrices(); i++)
         {
             aoFockMatrix.addOneElectronMatrix(ksmat.getReferenceToMatrix(i), i); 
+            std::cout << "within Integrate lin fock" << std::endl;
+            std::cout << aoFockMatrix.getString() << std::endl;
         }
     }
     else
@@ -343,15 +344,17 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     
     CXCHessianGrid vxc2grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
     
-    CXCCubicHessianGrid vxc3grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
+    CXCCubicHessianGrid vxc3grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());  
     
     fvxc.compute(vxcgrid, gsdengrid);
     
     fvxc.compute(vxc2grid, gsdengrid);
 
-    // fvxc.compute(vxc3grid, gsdengrid);
+    fvxc.compute(vxc3grid, gsdengrid);
     
-    // compute perturbed density grid
+    std::cout << "TEST " << std::endl;
+
+    // compute perturbed density 
     
     auto rwdengrid = dgdrv.generate(rwDensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType());
 
@@ -383,11 +386,16 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     
     ksmat.symmetrize();
     
+    std::cout << "within Integrate quad" << std::endl;
+    std::cout << ksmat.getString() << std::endl;
+    
     // add Kohn-Sham contribution to Fock matrix
     
     for (int32_t i = 0; i < ksmat.getNumberOfMatrices(); i++)
     {
         aoFockMatrix.addOneElectronMatrix(ksmat.getReferenceToMatrix(i), i); 
+        std::cout << "within Integrate quad fock" << std::endl;
+        std::cout << aoFockMatrix.getString() << std::endl;
     }
 
 }
@@ -4024,6 +4032,8 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
                                           const int32_t              nGridPoints) const
 {
     // set up AOs blocks
+
+    int32_t idex = 0;
     
     auto naos = aoKohnShamMatrix->getNumberOfRows();
     
@@ -4055,17 +4065,19 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
         
         // set up pointer to perturbed density
         
-        auto rhow1a = rwDensityGrid->alphaDensity(i);
+        auto rhow1a = rwDensityGrid->alphaDensity((i -1) + 1 + idex);
         
-        auto rhow1b = rwDensityGrid->betaDensity(i);
+        auto rhow1b = rwDensityGrid->betaDensity((i -1) + 1 + idex);
 
-        auto rhow2a = rwDensityGrid->alphaDensity(2 * i + 1);
+        auto rhow2a = rwDensityGrid->alphaDensity((i -1) + 2 + idex);
+
+        auto rhow2b = rwDensityGrid->betaDensity((i -1) + 2 + idex);
+
+        idex +=  1;
         
-        auto rhow2b = rwDensityGrid->betaDensity(2 * i + 1);
+        auto rhow12a = rw2DensityGrid->alphaDensity(i);
         
-        auto rhow12a = rw2DensityGrid->alphaDensity(3 * i + 2);
-        
-        auto rhow12b = rw2DensityGrid->betaDensity(3 * i + 2);
+        auto rhow12b = rw2DensityGrid->betaDensity(i);
 
         // loop over AOs blocks
         
@@ -4091,7 +4103,7 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
                     
                     for (int32_t m = 0; m < nGridPoints; m++)
                     {
-                        fvxc += bgaos[m] * kgaos[m] * gridWeights[moff + m]
+                       fvxc += bgaos[m] * kgaos[m] * gridWeights[moff + m]
                         
                              * ( grho_aaa[moff + m] * rhow1a[moff + m] * rhow2a[moff + m] 
                              
@@ -4100,6 +4112,7 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
                              +  grho_abb[moff + m] * rhow1b[moff + m] * rhow2b[moff + m]
                              
                              +  grho_aa[moff + m] * rhow12a[moff + m] + grho_ab[moff + m] * rhow12b[moff + m] );
+
                     }
                     
                     xcBuffer.at(idx) = fvxc;
@@ -4163,6 +4176,7 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
                              +  grho_abb[loff + l] * rhow1b[loff + l] * rhow2b[loff + l]
                              
                              +  grho_aa[loff + l] * rhow12a[loff + l] + grho_ab[loff + l] * rhow12b[loff + l] );
+
                     }
                     
                     xcBuffer.at(idx) = fvxc;

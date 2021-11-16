@@ -132,6 +132,30 @@ namespace vxcfuncs {  // vxcfuncs namespace
    void SlaterFuncCubicHessianAB(      CXCCubicHessianGrid& xcCubicHessianGrid,
                                  const double         factor,
                                  const CDensityGrid&  densityGrid);
+  
+    /**
+    Implements second order derivatives of spin-polarized Slater functional 1/2 [Ex(2 rho_a) + Ex(2rho_b)] with Ex(rho) = -3/4 (3/pi) (rho)^4/3 for
+    dengrid::ab case.
+
+    @param xcHessianGrid the exchange-correlation hessian grid.
+    @param factor the scale factor of functional contribution.
+    @param densityGrid the density grid.
+    */
+   void SlaterFuncCubicHessianA(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                                 const double         factor,
+                                 const CDensityGrid&  densityGrid);
+
+    /**
+    Implements second order derivatives of spin-polarized Slater functional 1/2 [Ex(2 rho_a) + Ex(2rho_b)] with Ex(rho) = -3/4 (3/pi) (rho)^4/3 for
+    dengrid::ab case.
+
+    @param xcHessianGrid the exchange-correlation hessian grid.
+    @param factor the scale factor of functional contribution.
+    @param densityGrid the density grid.
+    */
+   void SlaterFuncCubicHessianB(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                                 const double         factor,
+                                 const CDensityGrid&  densityGrid);
     
 }  // namespace vxcfuncs
 

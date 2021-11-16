@@ -105,6 +105,18 @@ class CPrimitiveFunctional
      */
     std::function<def_vxc3_func_typ> _abThirdOrderFunction;
 
+     /**
+     The functions for computing second derrivatives of primitive exchange-correlation functional for density
+     grid of dengrid::ab type.
+     */
+    std::function<def_vxc3_func_typ> _aThirdOrderFunction;
+
+    /**
+     The functions for computing second derrivatives of primitive exchange-correlation functional for density
+     grid of dengrid::ab type.
+     */
+    std::function<def_vxc3_func_typ> _bThirdOrderFunction;
+
 public:
     /**
      Creates an empty primitive exchange-correlation functional object.
@@ -152,7 +164,9 @@ public:
                          const std::function<def_vxc2_func_typ>& abSecondOrderFunction,
                          const std::function<def_vxc2_func_typ>& aSecondOrderFunction,
                          const std::function<def_vxc2_func_typ>& bSecondOrderFunction,
-                         const std::function<def_vxc3_func_typ>& abThirdOrderFunction); 
+                         const std::function<def_vxc3_func_typ>& abThirdOrderFunction,
+                         const std::function<def_vxc3_func_typ>& aThirdOrderFunction,
+                         const std::function<def_vxc3_func_typ>& bThirdOrderFunction); 
 
     /**
      Creates a primitive exchange-correlation functional object by copying other primitive exchange-correlation functional
