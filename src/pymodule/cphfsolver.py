@@ -675,7 +675,7 @@ class CphfSolver(LinearSolver):
 
             return {
                 'cphf_ov': cphf_ov,
-                'cphf_rhs': cphf_rhs,
+                'cphf_rhs': cphf_rhs.reshape(natm,3,nocc,nvir),
                 'ovlp_deriv_oo': ovlp_deriv_oo,
                 'fock_deriv_ao': fock_deriv_ao,
                 'fock_uij': fock_uij_numpy,
