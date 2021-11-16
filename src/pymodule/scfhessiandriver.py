@@ -920,8 +920,10 @@ class ScfHessianDriver(HessianDriver):
                     orben_plus = self.scf_drv.scf_tensors['E']
                     mo_plus = self.scf_drv.scf_tensors['C_alpha']
                     # *2 for alpha+beta density
+					# TODO: remove omega gradient
+					# (it was needed for debugging the analytical Hessian)
                     density_plus = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                    omega_plus = grad_drv.omega_ao
+                    #omega_plus = grad_drv.omega_ao
                     #prop.compute(new_mol, ao_basis, density)
                     prop.compute(new_mol, ao_basis, density_plus)
                     mu_plus = prop.get_property('dipole moment')
@@ -943,7 +945,7 @@ class ScfHessianDriver(HessianDriver):
                     mo_minus = self.scf_drv.scf_tensors['C_alpha']
                     # *2 for alpha+beta density
                     density_minus = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                    omega_minus = grad_drv.omega_ao
+                    #omega_minus = grad_drv.omega_ao
                     #prop.compute(new_mol, ao_basis, density)
                     prop.compute(new_mol, ao_basis, density_minus)
                     mu_minus = prop.get_property('dipole moment')
@@ -967,8 +969,8 @@ class ScfHessianDriver(HessianDriver):
                     hessian[i, d, :, :] = (grad_plus - grad_minus) / (2.0 * self.delta_h)
                     self.orben_grad[i, d, :] = (orben_plus - orben_minus) / (2.0 * self.delta_h)
                     self.mo_grad[i, d, :, :] = (mo_plus - mo_minus) / (2.0 * self.delta_h)
-                    self.density_grad[i, d, :, :] = (density_plus - density_minus) / (2.0 * self.delta_h)
-                    self.omega_grad[i, d, :, :] = (omega_plus - omega_minus) / (2.0 * self.delta_h)
+                    #self.density_grad[i, d, :, :] = (density_plus - density_minus) / (2.0 * self.delta_h)
+                    #self.omega_grad[i, d, :, :] = (omega_plus - omega_minus) / (2.0 * self.delta_h)
 
 
         else:

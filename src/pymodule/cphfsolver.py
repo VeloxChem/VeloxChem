@@ -84,6 +84,7 @@ class CphfSolver(LinearSolver):
 
         self.use_subspace_solver = False
         self.print_residuals = False
+        self.max_iter = 25
 
 
     def update_settings(self, cphf_dict, method_dict=None):
