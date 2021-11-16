@@ -98,7 +98,7 @@ class HessianDriver:
         self.pol_gradient = None
         self.raman_intensities = None
         self.flag = None
-        self.numerical = True
+        self.numerical = False
         self.numerical_grad = False
         self.delta_h = 0.001
         # flag for two-point or four-point approximation
@@ -148,15 +148,6 @@ class HessianDriver:
         if 'numerical' in freq_dict:
             key = freq_dict['numerical'].lower()
             self.numerical = True if key in ['yes', 'y'] else False
-            ## TODO: analytical Hessian not yet implemented
-            #if not self.numerical:
-            #    self.numerical = True
-            #    self.ostream.print_blank()
-            #    warn_msg = '*** Warning: Analytical Hessian is not yet implemented.'
-            #    self.ostream.print_header(warn_msg.ljust(56))
-            #    warn_msg = '    Hessian will be calculated numerically instead.'
-            #    self.ostream.print_header(warn_msg.ljust(56))
-            #    self.ostream.flush()
 
         # check if gradient is to be calculated numerically
         if 'numerical_grad' in freq_dict:
@@ -172,12 +163,21 @@ class HessianDriver:
             if method_dict['xcfun'] is not None:
                 self.numerical = True
                 self.numerical_grad = True
+                self.dft = True
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
             self.dft = True if key in ['yes', 'y'] else False
             if key in ['yes', 'y']:
                 self.numerical = True
                 self.numerical_grad = True
+
+        if self.dft:
+            self.ostream.print_blank()
+            warn_msg = '*** Warning: Analytical Hessian is not yet implemented for DFT methods.'
+            self.ostream.print_header(warn_msg.ljust(56))
+            warn_msg = '    Hessian will be calculated numerically instead.'
+            self.ostream.print_header(warn_msg.ljust(56))
+            self.ostream.flush()
 
         # print vibrational analysis (frequencies and normal modes)
         if 'print_vib_analysis' in freq_dict:
