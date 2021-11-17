@@ -66,7 +66,7 @@ class FirstOrderProperties:
 
     def compute(self, molecule, basis, total_density):
         """
-        Computes SCF first-order properties.
+        Computes first-order properties.
 
         :param molecule:
             The molecule

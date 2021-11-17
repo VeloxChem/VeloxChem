@@ -303,7 +303,10 @@ def main():
 
             # SCF first-order properties
             scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
-            total_density = scf_tensors['D_alpha'] + scf_tensors['D_beta']
+            if task.mpi_rank == mpi_master():
+                total_density = scf_tensors['D_alpha'] + scf_tensors['D_beta']
+            else:
+                total_density = None
             scf_prop.compute(task.molecule, task.ao_basis, total_density)
             if task.mpi_rank == mpi_master():
                 scf_prop.print_properties(task.molecule)

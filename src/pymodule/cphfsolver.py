@@ -185,22 +185,27 @@ class CphfSolver(LinearSolver):
 
         if self.rank == mpi_master():
             mo_energies = scf_tensors['E']
-            nao = mo_energies.shape[0]
+            # nmo is sometimes different than nao (because of linear
+            # dependencies which get removed during SCF)
+            nmo = mo_energies.shape[0]
             nocc = molecule.number_of_alpha_electrons()
-            nvir = nao - nocc
+            nvir = nmo - nocc
+            nao = scf_tensors['C_alpha'].shape[0]
             eocc = mo_energies[:nocc]
             evir = mo_energies[nocc:]
             eov = eocc.reshape(-1, 1) - evir
         else:
             mo_energies = None
             eov = None
+            nao = None
 
         mo_energies = self.comm.bcast(mo_energies, root=mpi_master())
         eov = self.comm.bcast(eov, root=mpi_master())
-        nao = mo_energies.shape[0]
+        nao = self.comm.bcast(nao, root=mpi_master())
+        nmo = mo_energies.shape[0]
         nocc = molecule.number_of_alpha_electrons()
         natm =  molecule.number_of_atoms()
-        nvir = nao - nocc
+        nvir = nmo - nocc
 
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors)
 
@@ -399,11 +404,14 @@ class CphfSolver(LinearSolver):
             natm = molecule.number_of_atoms()
             mo = scf_tensors['C_alpha']
             nao = mo.shape[0]
+            mo_energies = scf_tensors['E']
+            # nmo is sometimes different than nao (because of linear
+            # dependencies which get removed during SCF)
+            nmo = mo_energies.shape[0]
             nocc = molecule.number_of_alpha_electrons()
-            nvir = nao - nocc
+            nvir = nmo - nocc
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
-            mo_energies = scf_tensors['E']
             eocc = mo_energies[:nocc]
             evir = mo_energies[nocc:]
             eov = eocc.reshape(-1, 1) - evir
@@ -626,22 +634,27 @@ class CphfSolver(LinearSolver):
 
         if self.rank == mpi_master():
             mo_energies = scf_tensors['E']
-            nao = mo_energies.shape[0]
+            # nmo is sometimes different than nao (because of linear
+            # dependencies which get removed during SCF)
+            nmo = mo_energies.shape[0]
+            nao = scf_tensors['C_alpha'].shape[0]
             nocc = molecule.number_of_alpha_electrons()
-            nvir = nao - nocc
+            nvir = nmo - nocc
             eocc = mo_energies[:nocc]
             evir = mo_energies[nocc:]
             eov = eocc.reshape(-1, 1) - evir
         else:
             mo_energies = None
             eov = None
+            nao = None
 
         mo_energies = self.comm.bcast(mo_energies, root=mpi_master())
         eov = self.comm.bcast(eov, root=mpi_master())
-        nao = mo_energies.shape[0]
+        nao = self.comm.bcast(nao, root=mpi_master())
+        nmo = mo_energies.shape[0]
         nocc = molecule.number_of_alpha_electrons()
         natm =  molecule.number_of_atoms()
-        nvir = nao - nocc
+        nvir = nmo - nocc
 
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors)
 
@@ -672,6 +685,7 @@ class CphfSolver(LinearSolver):
         self.profiler.print_memory_usage(self.ostream)
 
         if self.rank == mpi_master():
+            self.ostream.print_blank()
             self.print_convergence('Coupled-Perturbed Hartree-Fock')
 
             return {
@@ -803,6 +817,14 @@ class CphfSolver(LinearSolver):
             # increase iteration counter every time this function is called
             self.cur_iter += 1
 
+            if self.rank == mpi_master():
+                if self.print_residuals:
+                    residual_norms = np.zeros(3*natm)
+                    for i in range(natm):
+                        for x in range(3):
+                            residual_norms[3*i+x] = np.linalg.norm(cphf_mo[i,x] - cphf_rhs[i,x])
+                    self.print_iteration(residual_norms, molecule)
+
             return cphf_mo.reshape(3 * natm * nocc * nvir)
 
         # Matrix-vector product for preconditioner using the
@@ -864,12 +886,15 @@ class CphfSolver(LinearSolver):
             #overlap = self.scf_drv.scf_tensors['S']
             natm = molecule.number_of_atoms()
             mo = scf_tensors['C_alpha']
+            mo_energies = scf_tensors['E']
             nao = mo.shape[0]
+            # nmo is sometimes different than nao (because of linear
+            # dependencies which get removed during SCF)
+            nmo = mo_energies.shape[0]
             nocc = molecule.number_of_alpha_electrons()
-            nvir = nao - nocc
+            nvir = nmo - nocc
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
-            mo_energies = scf_tensors['E']
             eocc = mo_energies[:nocc]
             eoo = eocc.reshape(-1, 1) + eocc #ei+ej
             omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
@@ -907,13 +932,15 @@ class CphfSolver(LinearSolver):
             ao_density_uij = AODensityMatrix()
             mo_energies = None
             eov = None
+            nao = None
 
         mo_energies = self.comm.bcast(mo_energies, root=mpi_master())
         eov = self.comm.bcast(eov, root=mpi_master())
-        nao = mo_energies.shape[0]
+        nao = self.comm.bcast(nao, root=mpi_master())
+        nmo = mo_energies.shape[0]
         nocc = molecule.number_of_alpha_electrons()
         natm =  molecule.number_of_atoms()
-        nvir = nao - nocc
+        nvir = nmo - nocc
         ao_density_uij.broadcast(self.rank, self.comm)
 
         fock_uij = AOFockMatrix(ao_density_uij)
@@ -954,6 +981,21 @@ class CphfSolver(LinearSolver):
         else:
             return {}
 
+    def print_iteration_cg(self, residual_norm):
+        """
+        Prints information of the iteration.
+
+        :param residual_norm:
+            Residual norm.
+        """
+        width = 92
+        output_header = '*** Iteration:   {:2d} '.format(self.cur_iter)
+        output_header += '  * Residual Norm: '
+        output_header += '{:.5e}'.format(residual_norm)
+        self.ostream.print_header(output_header.ljust(width))
+        self.ostream.flush()
+
+
 
     def print_iteration(self, relative_residual_norm, molecule):
         """
@@ -976,12 +1018,20 @@ class CphfSolver(LinearSolver):
         self.ostream.print_header(output_header.ljust(width))
         self.ostream.print_blank()
         coord = 'xyz'
+
+        # TODO: change power based on the convergence threshold
+        if self.conv_thresh < 1e-4:
+            power = int(str(self.conv_thresh).split("-")[1]) + 1
+        else:
+            power = 5
+        residual_norm_string = 'Residual Norm: {:.%df}' % (power)    
+    
         for i in range(natm):
             for x in range(3):
                 coord_label = '{:16s}'.format('   '+str(i+1)+' '
                                              +atom_symbols[i]+'('+coord[x]+')')
                 rel_res = relative_residual_norm[3*i+x]
-                output_iter = 'Residual Norm: {:.8f}'.format(rel_res)
+                output_iter = residual_norm_string.format(rel_res)
                 self.ostream.print_line(coord_label + output_iter)
         self.ostream.print_blank()
         self.ostream.flush()

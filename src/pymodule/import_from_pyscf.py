@@ -213,6 +213,12 @@ def fock_deriv(molecule, basis, density, i=0, unit="au"):
     #gs_dm = np.einsum('mi,ni->mn', pyscf_scf.mo_coeff[:,:nocc],
     #                   pyscf_scf.mo_coeff[:,:nocc])
     nao = density.shape[0]
+    
+    if nao != pyscf_molecule.nao:
+        error_text = "vlx and pyscf number of atomic orbitals are different!"
+        error_text +="\nCheck if the basis sets are defined the same way."
+        raise ValueError(error_text)    
+
     pyscf_grad = grad.RHF(pyscf_scf)
 
     # The "-" sign is due to the fact that pyscf computes -(nabla m n | t p)
