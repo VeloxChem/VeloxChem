@@ -191,7 +191,7 @@ CXCFunctional::compute(      CXCHessianGrid& xcHessianGrid,
 
 void
 CXCFunctional::compute(      CXCCubicHessianGrid& xcCubicHessianGrid,
-                       const CDensityGrid&   densityGrid) const
+                       const CDensityGrid&        densityGrid) const
 {
     xcCubicHessianGrid.zero();
     

@@ -27,6 +27,8 @@
 
 #include <cmath>
 
+#include <iostream>
+
 #include "MathConst.hpp"
 
 namespace vxcfuncs {  // vxcfuncs namespace
@@ -269,7 +271,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
                              const double          factor,
                              const CDensityGrid&   densityGrid)
     {
-        double frg = -factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0) * (-2 /9);
+        double frg = -factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0) * (-2.0 / 9.0);
         
         double fp = -5.0 / 3.0;
         
@@ -297,6 +299,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
             grho_bbb[i] += frg * std::pow(rhob[i], fp);
 
         }
+
     }
 
     void
@@ -304,7 +307,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
                              const double          factor,
                              const CDensityGrid&   densityGrid)
     {
-        double frg = -factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0) * (-2 /9);
+        double frg = -factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0) * (-2.0 / 9.0);
         
         double fp = -5.0 / 3.0;
         
@@ -332,7 +335,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
                              const double          factor,
                              const CDensityGrid&   densityGrid)
     {
-        double frg = -factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0) * (-2 /9);
+        double frg = -factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0) * (-2.0 / 9.0);
         
         double fp = -5.0 / 3.0;
         

@@ -44,6 +44,7 @@ from .batchsize import get_number_of_batches
 from .linearsolver import LinearSolver
 from mpi4py import MPI
 from .veloxchemlib import XCIntegrator
+from .veloxchemlib import parse_xc_func
 
 
 
@@ -195,10 +196,14 @@ class NonLinearSolver:
             self.maximum_hours = rsp_dict['maximum_hours']
 
         if 'xcfun' in method_dict:
-            errmsg = 'NonLinearDriver: The \'xcfun\' keyword is not supported in Nlr '
-            errmsg += 'calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
+            if 'dft' not in method_dict:
+                self.dft = True
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+
+            print("self.xcfun")
+            print(self.xcfun)
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'Nonlinear solver: Undefined XC functional')
 
         if 'potfile' in method_dict:
             errmsg = 'NonLinearDriver: The \'potfile\' keyword is not supported in '
@@ -374,6 +379,11 @@ class NonLinearSolver:
             A list of Fock matrices
         """
 
+        print("d_dft_1")
+        print(d_dft_1)
+        print("d_dft_2")
+        print(d_dft_2)
+
         if fock_flag == 'real_and_imag':
 
             if d_dft_1 and d_dft_2:
@@ -455,13 +465,13 @@ class NonLinearSolver:
                 if dens_1:
                     dts1 = [
                     np.ascontiguousarray(dab)
-                    for dab in dens_1[batch_start:batch_end] ]
+                    for dab in dens_1 ]
                     dens1 = AODensityMatrix(dts1, denmat.rest)
 
                 if dens_2:
                     dts2 = [
                     np.ascontiguousarray(dab)
-                    for dab in dens_2[batch_start:batch_end] ]
+                    for dab in dens_2 ]
                     dens2 = AODensityMatrix(dts2, denmat.rest)
                 
             else:
@@ -488,30 +498,28 @@ class NonLinearSolver:
 
                 for i in range(fock.number_of_fock_matrices()):
                     fock.set_fock_type(fock_flag, i)
-                
-                print("first ")
-                print(fock)
-
+            
                 if not self.xcfun.is_hybrid():
                     for ifock in range(fock.number_of_fock_matrices()):
                         fock.scale(2.0, ifock)
 
-            if self.dft:
+            eri_driver.compute(fock, dens2, molecule, ao_basis, screening)
+            print("after 2 int ")
+            print(fock) 
+
+            if self.dft: 
                 xc_drv = XCIntegrator(self.comm)
 
                 molgrid = dft_dict['molgrid']
                 gs_density = dft_dict['gs_density']
 
+                molgrid.distribute(self.rank, self.nodes, self.comm)
                 xc_drv.integrate(fock, dens1, dens2, gs_density, molecule, ao_basis,
                                  molgrid, self.xcfun.get_func_label())
                 print("After XC ")
                 print(fock)
-            
-
-            eri_driver.compute(fock, dens2, molecule, ao_basis, screening)
+        
             fock.reduce_sum(self.rank, self.nodes, self.comm)
-            print("after 2 int ")
-            print(fock) 
 
             if self.rank == mpi_master():
                 nfocks = fock.number_of_fock_matrices()

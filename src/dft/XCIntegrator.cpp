@@ -251,7 +251,7 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
     
     CXCHessianGrid vxc2grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
-    
+
     fvxc.compute(vxcgrid, gsdengrid);
     
     fvxc.compute(vxc2grid, gsdengrid);
@@ -287,15 +287,13 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
         // symmetrize Kohn-Sham matrix
         
         ksmat.symmetrize();
-        std::cout << "within Integrate lin" << std::endl;
-        std::cout << ksmat.getString() << std::endl;
+
         // add Kohn-Sham contribution to Fock matrix
         
         for (int32_t i = 0; i < ksmat.getNumberOfMatrices(); i++)
         {
             aoFockMatrix.addOneElectronMatrix(ksmat.getReferenceToMatrix(i), i); 
-            std::cout << "within Integrate lin fock" << std::endl;
-            std::cout << aoFockMatrix.getString() << std::endl;
+
         }
     }
     else
@@ -317,6 +315,8 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
                          const std::string&      xcFuncLabel) const
 {
     // parse exchange-correlation functional data
+
+    std::cout << "rw2DensityMatrix " << rw2DensityMatrix << std::endl;
     
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
     
@@ -339,7 +339,7 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     refdengrid.getScreenedGridsPair(gsdengrid, mgrid, 0, _thresholdOfDensity, fvxc.getFunctionalType());
     
     // compute gradient and hessian of exchange-correlation functional
-    
+
     CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
     
     CXCHessianGrid vxc2grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
@@ -350,9 +350,11 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     
     fvxc.compute(vxc2grid, gsdengrid);
 
+    std::cout << "Test 1" << std::endl;
+
     fvxc.compute(vxc3grid, gsdengrid);
-    
-    std::cout << "TEST " << std::endl;
+
+    std::cout << "Test 2" << std::endl;
 
     // compute perturbed density 
     
@@ -360,15 +362,15 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
 
     auto rw2dengrid = dgdrv.generate(rw2DensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType());
 
-        // set up number of perturbedf density matrix dimensions
+        // set up number of perturbed denstries and matrix dimensions
     
-    auto ndmat = rwDensityMatrix.getNumberOfDensityMatrices();
+    auto ndmat = rw2DensityMatrix.getNumberOfDensityMatrices();
     
     auto nrow = gsDensityMatrix.getNumberOfRows(0);
     
     auto ncol = gsDensityMatrix.getNumberOfColumns(0);
     
-    // allocate perturbed Kohn-Sham matrix
+    // allocate perturbed Kohn-Sham matrices
         
     CAOKohnShamMatrix ksmat(nrow, ncol, ndmat, true);
         
@@ -384,18 +386,18 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     
     // symmetrize Kohn-Sham matrix
     
-    ksmat.symmetrize();
+    ksmat.symmetrize(); 
     
-    std::cout << "within Integrate quad" << std::endl;
-    std::cout << ksmat.getString() << std::endl;
+    std::cout << "v_xc" << std::endl;
+    std::cout << ksmat << std::endl;
+
     
     // add Kohn-Sham contribution to Fock matrix
     
     for (int32_t i = 0; i < ksmat.getNumberOfMatrices(); i++)
     {
         aoFockMatrix.addOneElectronMatrix(ksmat.getReferenceToMatrix(i), i); 
-        std::cout << "within Integrate quad fock" << std::endl;
-        std::cout << aoFockMatrix.getString() << std::endl;
+
     }
 
 }
@@ -906,6 +908,8 @@ CXCIntegrator::_compRestrictedContributionForLda(      CAOKohnShamMatrix&   aoKo
                                                  const CMolecularGrid&      molecularGrid) const
 {
     // initialize Kohn-Sham matrix to zero
+
+    std::cout << "_compRestrictedContributionForLda" << std::endl;
     
     aoKohnShamMatrix.zero();
     
@@ -915,9 +919,11 @@ CXCIntegrator::_compRestrictedContributionForLda(      CAOKohnShamMatrix&   aoKo
     
     omptaks.set(molecularGrid.getNumberOfGridPoints());
     
+ 
     auto ntasks = omptaks.getNumberOfTasks();
     
     auto tbsizes = omptaks.getTaskSizes();
+
     
     auto tbpositions = omptaks.getTaskPositions();
     
@@ -1607,15 +1613,19 @@ CXCIntegrator::_compRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
                                           const int32_t              nGridPoints) const
 {
     // set up number of AOs
+
+    std::cout << " _compRestrictedBatchForLda" << std::endl;
     
     auto naos = gtoContainer->getNumberOfAtomicOrbitals();
+
+    std::cout << " _compRestrictedBatchForLda A1" << std::endl;
     
     // determine number of grid blocks
     
     auto blockdim = _getSizeOfBlock();
     
     auto nblocks = nGridPoints / blockdim;
-    
+    std::cout << " _compRestrictedBatchForLda A2 " << std::endl;
     // allocate XC contribution buffer
     
     auto bufdim = _getNumberOfAOsInBuffer();
@@ -4033,13 +4043,27 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
 {
     // set up AOs blocks
 
-    int32_t idex = 0;
-    
+    int idex = 0;
+
+    std::cout << "_distRestrictedBatchForLda "  << std::endl;
+    std::cout << "xcHessianGrid " << xcHessianGrid->getNumberOfGridPoints() << std::endl;
+    std::cout << "xcCubicHessianGrid " << xcCubicHessianGrid->getNumberOfGridPoints() << std::endl;
+    std::cout << "rw2DensityGrid " << rw2DensityGrid->getNumberOfGridPoints() << std::endl;
+    std::cout << "rwDensityGrid " << rwDensityGrid->getNumberOfGridPoints() << std::endl;
+
     auto naos = aoKohnShamMatrix->getNumberOfRows();
     
+    std::cout << "A "  << std::endl;
+
     auto bufdim = _getNumberOfAOsInBuffer();
+
+    std::cout << "B "  << std::endl;
     
     auto nblock = naos / bufdim;
+
+    std::cout << "idex " << idex << std::endl;
+
+    std::cout << "nblocks: " << nblock << " naos : " << naos << " bufdim " << bufdim << " gto " << gtoValues.data(0) <<  std::endl; 
     
     // set up pointers to exchange-correlation functional derrivatives
 
@@ -4052,10 +4076,20 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
     auto grho_aab = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::rhob);
 
     auto grho_abb = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhob, xcvars::rhob);
+
+
+    std::cout << " grho_aaa " << grho_aaa << std::endl;
+
+    std::cout << " grho_aab " << grho_aab << std::endl;
+
+    std::cout << " grho_abb " << grho_abb << std::endl;
+
     
     // set up loop over number of matrices
     
     auto nmat = aoKohnShamMatrix->getNumberOfMatrices();
+
+    std::cout << " nmat " << nmat << std::endl;
     
     for (int32_t i = 0; i < nmat; i++)
     {
@@ -4065,19 +4099,25 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
         
         // set up pointer to perturbed density
         
-        auto rhow1a = rwDensityGrid->alphaDensity((i -1) + 1 + idex);
+        auto rhow1a = rwDensityGrid->alphaDensity(i + idex);
         
-        auto rhow1b = rwDensityGrid->betaDensity((i -1) + 1 + idex);
+        auto rhow1b = rwDensityGrid->betaDensity(i + idex);
 
-        auto rhow2a = rwDensityGrid->alphaDensity((i -1) + 2 + idex);
+        auto rhow2a = rwDensityGrid->alphaDensity(i + 1 + idex);
 
-        auto rhow2b = rwDensityGrid->betaDensity((i -1) + 2 + idex);
+        auto rhow2b = rwDensityGrid->betaDensity(i + 1 + idex);
 
-        idex +=  1;
+        idex++;
         
         auto rhow12a = rw2DensityGrid->alphaDensity(i);
         
         auto rhow12b = rw2DensityGrid->betaDensity(i);
+
+        std::cout << " i = " << i << std::endl;
+        std::cout << "rhow12b " << std::endl;
+        std::cout <<  rw2DensityGrid->alphaDensity(i) << std::endl;
+        std::cout <<  rw2DensityGrid->betaDensity(i) << std::endl;
+
 
         // loop over AOs blocks
         
@@ -4092,28 +4132,22 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
             for (int32_t k = curao; k < (curao + bufdim); k++)
             {
                 auto bgaos = gtoValues.data(k);
-                
                 for (int32_t l = k; l < naos; l++)
                 {
                     auto kgaos = gtoValues.data(l);
-                    
                     double fvxc = 0.0;
                     
                     auto moff = gridOffset + gridBlockPosition;
-                    
                     for (int32_t m = 0; m < nGridPoints; m++)
                     {
-                       fvxc += bgaos[m] * kgaos[m] * gridWeights[moff + m]
-                        
-                             * ( grho_aaa[moff + m] * rhow1a[moff + m] * rhow2a[moff + m] 
+                       fvxc += bgaos[m] * kgaos[m] * gridWeights[moff + m] * ( grho_aaa[moff + m] *  rhow1a[moff + m]  * rhow2a[moff + m]  
                              
                              + 2 * grho_aab[moff + m] * rhow1a[moff + m] * rhow2b[moff + m] 
                              
                              +  grho_abb[moff + m] * rhow1b[moff + m] * rhow2b[moff + m]
                              
-                             +  grho_aa[moff + m] * rhow12a[moff + m] + grho_ab[moff + m] * rhow12b[moff + m] );
-
-                    }
+                             +  grho_aa[moff + m] * rhow12a[moff + m] + grho_ab[moff + m] * rhow12b[moff + m] );                            
+                    } 
                     
                     xcBuffer.at(idx) = fvxc;
                     
@@ -4125,6 +4159,8 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
         
             #pragma omp critical
             {
+
+                std::cout << "test 2" << std::endl;
                 idx = 0;
             
                 for (int32_t k = curao; k < (curao + bufdim); k++)
@@ -4167,15 +4203,13 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
                     
                     for (int32_t l = 0; l < nGridPoints; l++)
                     {
-                        fvxc += bgaos[l] * kgaos[l] * gridWeights[loff + l]
-
-                             * ( grho_aaa[loff + l] * rhow1a[loff + l] * rhow2a[loff + l] 
+                        fvxc += bgaos[l] * kgaos[l] * gridWeights[loff + l] * ( grho_aaa[loff + l] * rhow1a[loff + l] * rhow2a[loff + l] 
                              
                              + 2 * grho_aab[loff + l] * rhow1a[loff + l] * rhow2b[loff + l] 
                              
                              +  grho_abb[loff + l] * rhow1b[loff + l] * rhow2b[loff + l]
                              
-                             +  grho_aa[loff + l] * rhow12a[loff + l] + grho_ab[loff + l] * rhow12b[loff + l] );
+                             +  grho_aa[loff + l] * rhow12a[loff + l] + grho_ab[loff + l] * rhow12b[loff + l] ); 
 
                     }
                     

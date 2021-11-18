@@ -16,6 +16,7 @@ from .checkpoint import write_distributed_focks
 from .inputparser import parse_input
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import XCIntegrator
+from .veloxchemlib import parse_xc_func
 
 class QuadraticResponseDriver(NonLinearSolver):
     """
@@ -146,6 +147,16 @@ class QuadraticResponseDriver(NonLinearSolver):
             self.program_start_time = rsp_dict['program_start_time']
         if 'maximum_hours' in rsp_dict:
             self.maximum_hours = rsp_dict['maximum_hours']
+        
+        if 'xcfun' in method_dict:
+            if 'dft' not in method_dict:
+                self.dft = True
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+
+            print("self.xcfun")
+            print(self.xcfun)
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'Nonlinear solver: Undefined XC functional')
 
         if 'potfile' in method_dict:
             errmsg = 'QrfDriver: The \'potfile\' keyword is not supported in '
