@@ -498,15 +498,14 @@ class NonLinearSolver:
 
                 for i in range(fock.number_of_fock_matrices()):
                     fock.set_fock_type(fock_flag, i)
-            
-                if not self.xcfun.is_hybrid():
-                    for ifock in range(fock.number_of_fock_matrices()):
-                        fock.scale(2.0, ifock)
 
             eri_driver.compute(fock, dens2, molecule, ao_basis, screening)
+            if self.dft and not self.xcfun.is_hybrid():
+                for ifock in range(fock.number_of_fock_matrices()):
+                    fock.scale(2.0, ifock)
+
             print("after 2 int ")
             print(fock) 
-
             if self.dft: 
                 xc_drv = XCIntegrator(self.comm)
 

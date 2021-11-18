@@ -271,7 +271,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
                              const double          factor,
                              const CDensityGrid&   densityGrid)
     {
-        double frg = -factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0) * (-2.0 / 9.0);
+        double frg = factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0) * (2.0 / 9.0);
         
         double fp = -5.0 / 3.0;
         
@@ -307,7 +307,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
                              const double          factor,
                              const CDensityGrid&   densityGrid)
     {
-        double frg = -factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0) * (-2.0 / 9.0);
+        double frg = factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0) * (2.0 / 9.0);
         
         double fp = -5.0 / 3.0;
         
@@ -335,7 +335,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
                              const double          factor,
                              const CDensityGrid&   densityGrid)
     {
-        double frg = -factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0) * (-2.0 / 9.0);
+        double frg = factor * std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0) * (2.0 / 9.0);
         
         double fp = -5.0 / 3.0;
         
