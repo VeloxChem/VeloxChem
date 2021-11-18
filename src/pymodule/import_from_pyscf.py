@@ -1,11 +1,14 @@
 # import veloxchem as vlx
+from .molecule import Molecule
 from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import ao_matrix_to_veloxchem
 from .veloxchemlib import ao_matrix_to_dalton
+from .veloxchemlib import ElectricDipoleIntegralsDriver
 import numpy as np
 import sys
+import h5py
 
 try:
     import pyscf
@@ -40,7 +43,45 @@ def get_molecule_string(molecule):
 
     return mol_string
 
-def overlap_deriv(molecule, basis, i=0, unit="au"):
+def write_2d_array_hdf5(fname, arrays, labels='xyz', atom_index=0):
+    """
+    Writes the one-electron integral derivatives to the checkpoint file. 
+
+    :param fname:
+        Name of the checkpoint file. 
+        The file must be created before calling this routine.
+    :param arrays:
+        The one-electron integral derivatives (with 3 components: x, y, z)
+    :param labels:
+        The list of labels (x, y, and z)
+    :param atom_index:
+        The index of the atom with respect to which the derivatives
+        are calculated.
+
+    :return:
+        True if checkpoint file is written. False if checkpoint file is not
+        valid.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str))
+
+    if not valid_checkpoint:
+        return False
+
+    try:
+        hf = h5py.File(fname, 'a')
+    except:
+        return False
+
+    for label, array in zip(labels, arrays):
+        full_label= str(atom_index) + label
+        hf.create_dataset(full_label, data=array, compression='gzip')
+    hf.close()
+    return True
+
+
+def overlap_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
+                  chk_file=None):
     """
     Imports the derivatives of the overlap matrix
     from pyscf and converts it to veloxchem format
@@ -52,9 +93,14 @@ def overlap_deriv(molecule, basis, i=0, unit="au"):
     :param i:
         the index of the atom for which the derivatives
         are computed.
+    :param full_deriv:
+        True, to compute ( nabla m | n ) + ( m | nabla n) 
+        False, to compute (nabla m | n) only.
     :param unit:
         the units to be used for the molecular geometry;
         possible values: "au" (default), "Angstrom"
+    :param chk_file:
+        the hdf5 checkpoint file name.
 
     :return:
         a numpy array of shape 3 x nao x nao
@@ -80,8 +126,9 @@ def overlap_deriv(molecule, basis, i=0, unit="au"):
 
     overlap_deriv_atom_i[:,ki:kf] = pyscf_ovlp_deriv[:,ki:kf]
 
-    # (nabla m | n) + (m | nabla n)
-    overlap_deriv_atom_i += overlap_deriv_atom_i.transpose(0,2,1)
+    if full_deriv:
+        # (nabla m | n) + (m | nabla n)
+        overlap_deriv_atom_i += overlap_deriv_atom_i.transpose(0,2,1)
 
     # Transform the oo block to MO basis
     #pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
@@ -111,7 +158,164 @@ def overlap_deriv(molecule, basis, i=0, unit="au"):
                                  basis, molecule).to_numpy()
                                 )
 
+    if chk_file is not None:
+        write_2d_array_hdf5(chk_file, vlx_ovlp_deriv_atom_i, labels='xyz',
+                            atom_index=i)
+
     return vlx_ovlp_deriv_atom_i
+
+def compute_dipole_integral_derivatives(molecule, ao_basis, i, unit="au",
+                                        delta_h=1e-5, chk_file=None):
+    """
+    Computes numerical derivatives of dipole integrals.
+
+    :param molecule:
+        The molecule.
+    :param ao_basis:
+        The AO basis set.
+    :param i:
+        The atom index.
+    :param delta_h:
+        The step for the numerical derivative.
+    :chk_file:
+        The name of the checkpoint file. 
+
+    :return:
+        The dipole integral derivatives.
+    """
+
+    # atom labels
+    labels = molecule.get_labels()
+
+    # number of atoms
+    natm = molecule.number_of_atoms()
+
+    # atom coordinates (nx3)
+    coords = molecule.get_coordinates()
+
+    # number of atomic orbitals
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = ao_basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+    nao = pyscf_molecule.nao
+
+    # Dipole integrals driver
+    dipole_drv = ElectricDipoleIntegralsDriver()
+
+    # 3 dipole components x 3 atomic coordinates
+    # x No. basis x No. basis
+    dipole_integrals_gradient = np.zeros((3, 3, nao, nao))
+
+    for d in range(3):
+        coords[i, d] += delta_h
+        new_mol = Molecule(labels, coords, units='au')
+
+        dipole_mats_p = dipole_drv.compute(new_mol, ao_basis)
+        dipole_ints_p = (dipole_mats_p.x_to_numpy(), 
+                         dipole_mats_p.y_to_numpy(),
+                         dipole_mats_p.z_to_numpy())
+
+        coords[i, d] -= 2.0 * delta_h
+        new_mol = Molecule(labels, coords, units='au')
+
+        dipole_mats_m = dipole_drv.compute(new_mol, ao_basis)
+        dipole_ints_m = (dipole_mats_m.x_to_numpy(),
+                         dipole_mats_m.y_to_numpy(),
+                         dipole_mats_m.z_to_numpy())
+
+        for c in range(3):
+            dipole_integrals_gradient[c, d] = (
+                ( dipole_ints_p[c] - dipole_ints_m[c] ) / (2.0 * delta_h)
+            )
+    if chk_file is not None:
+        write_2d_array_hdf5(chk_file,
+                dipole_integrals_gradient.reshape(3*3,nao,nao),
+                labels=['xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'],
+                atom_index=i)        
+
+    return dipole_integrals_gradient
+
+
+def kinen_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
+                  chk_file=None):
+    """
+    Imports the derivatives of the kinetic energy matrix
+    from pyscf and converts it to veloxchem format
+    kinetic energy matric element: ( m | 0.5 (nabla_e)**2 | m )
+    (where nabla_e acts on electronic coordinates)
+
+    :param molecule:
+        the vlx molecule object
+    :param basis:
+        the vlx basis object
+    :param i:
+        the index of the atom for which the derivatives
+        are computed.
+    :param full_deriv:
+        True, to compute ( nabla m | 0.5 (nabla_e)**2 | n ) 
+                       + ( m | 0.5 (nabla_e)**2 | nabla n ) 
+        False, to compute (nabla m | nabla_e | n) only.
+    :param unit:
+        the units to be used for the molecular geometry;
+        possible values: "au" (default), "Angstrom"
+    :param chk_file:
+        the hdf5 checkpoint file name.
+
+    :return:
+        a numpy array of shape 3 x nao x nao
+        (nao = number of atomic orbitals)
+        corresponding to the derivative of the kinetic energy matrix
+        with repsect to the x, y and z coords. of atom i.
+    """
+
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+
+    # TODO:check sign; correct mistakes in comments.
+    # The "-" sign is due to the fact that pyscf computes -(nabla m | n)
+    pyscf_kinen_deriv = - pyscf_molecule.intor('int1e_ipkin', aosym='s1')
+    ao_slices = pyscf_molecule.aoslice_by_atom()
+
+    # Get the AO indeces corresponding to atom i
+    ki, kf = ao_slices[i, 2:]
+
+    kinen_deriv_atom_i = np.zeros(pyscf_kinen_deriv.shape)
+
+    kinen_deriv_atom_i[:,ki:kf] = pyscf_kinen_deriv[:,ki:kf]
+
+    if full_deriv:
+        # (nabla m | n) + (m | nabla n)
+        kinen_deriv_atom_i += kinen_deriv_atom_i.transpose(0,2,1)
+
+    vlx_kinen_deriv_atom_i = np.zeros(kinen_deriv_atom_i.shape)
+
+
+    # Transform each component (x,y,z) to veloxchem format
+    vlx_kinen_deriv_atom_i[0] = ( ao_matrix_to_veloxchem(
+                                 DenseMatrix(kinen_deriv_atom_i[0]),
+                                 basis, molecule).to_numpy()
+                                )
+
+    vlx_kinen_deriv_atom_i[1] = ( ao_matrix_to_veloxchem(
+                                 DenseMatrix(kinen_deriv_atom_i[1]),
+                                 basis, molecule).to_numpy()
+                                )
+
+    vlx_kinen_deriv_atom_i[2] = ( ao_matrix_to_veloxchem(
+                                 DenseMatrix(kinen_deriv_atom_i[2]),
+                                 basis, molecule).to_numpy()
+                                )
+
+    if chk_file is not None:
+        write_2d_array_hdf5(chk_file, vlx_kinen_deriv_atom_i, labels='xyz',
+                            atom_index=i)
+
+    return vlx_kinen_deriv_atom_i
 
 
 def hcore_deriv(molecule, basis, i=0, unit="au"):
