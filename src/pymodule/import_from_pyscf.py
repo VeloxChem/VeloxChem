@@ -239,11 +239,11 @@ def compute_dipole_integral_derivatives(molecule, ao_basis, i, unit="au",
 
 
 def kinen_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
-                  chk_file=None):
+                chk_file=None):
     """
     Imports the derivatives of the kinetic energy matrix
     from pyscf and converts it to veloxchem format
-    kinetic energy matric element: ( m | 0.5 (nabla_e)**2 | m )
+    kinetic energy matrix element: ( m | 0.5 (nabla_e)**2 | n )
     (where nabla_e acts on electronic coordinates)
 
     :param molecule:
@@ -277,8 +277,7 @@ def kinen_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
                                  basis=pyscf_basis, unit=unit)
 
     # TODO:check sign; correct mistakes in comments.
-    # The "-" sign is due to the fact that pyscf computes -(nabla m | n)
-    pyscf_kinen_deriv = - pyscf_molecule.intor('int1e_ipkin', aosym='s1')
+    pyscf_kinen_deriv = -pyscf_molecule.intor('int1e_ipkin', aosym='s1')
     ao_slices = pyscf_molecule.aoslice_by_atom()
 
     # Get the AO indeces corresponding to atom i
@@ -316,6 +315,146 @@ def kinen_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
                             atom_index=i)
 
     return vlx_kinen_deriv_atom_i
+
+def pyscf_hcore_deriv_generator(molecule, basis, i=0, unit="au"):
+    """
+    Copy of the pyscf hcore_generator which computes the Core Hamiltonian
+    derivatives.
+    """
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+
+    # The atomic charge of atom i -- required for the derivative of 1/RA
+    Z = molecule.elem_ids_to_numpy()[i]
+
+    h = pyscf_molecule.intor('int1e_ipkin', comp=3)
+    h+= pyscf_molecule.intor('int1e_ipnuc', comp=3)
+
+    ao_slices = pyscf_molecule.aoslice_by_atom()
+
+    shl0, shl1, p0, p1 = ao_slices[i] 
+    with pyscf_molecule.with_rinv_at_nucleus(i):
+        vrinv = pyscf_molecule.intor('int1e_iprinv', comp=3) # <\nabla|1/r|>
+        vrinv *= -pyscf_molecule.atom_charge(i)
+    vrinv[:,p0:p1] -= h[:,p0:p1]
+
+    hcore_deriv_i = vrinv + vrinv.transpose(0,2,1)
+
+    vlx_hcore_deriv_atom_i = np.zeros(hcore_deriv_i.shape)
+
+
+    # Transform each compnent (x,y,z) to veloxchem format
+    vlx_hcore_deriv_atom_i[0] = ( ao_matrix_to_veloxchem(
+                                 DenseMatrix(hcore_deriv_i[0]),
+                                 basis, molecule).to_numpy()
+                                )
+
+    vlx_hcore_deriv_atom_i[1] = ( ao_matrix_to_veloxchem(
+                                 DenseMatrix(hcore_deriv_i[1]),
+                                 basis, molecule).to_numpy()
+                                )
+
+    vlx_hcore_deriv_atom_i[2] = ( ao_matrix_to_veloxchem(
+                                 DenseMatrix(hcore_deriv_i[2]),
+                                 basis, molecule).to_numpy()
+                                )
+
+    return vlx_hcore_deriv_atom_i
+    
+
+
+
+def coulomb_attract_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
+                          chk_file=None):
+    """
+    Imports the derivatives of the nuclear-electron Coulomb energy matrix
+    from pyscf and converts it to veloxchem format
+    Coulomb energy matrix element: ( m | 1/RA | n )
+
+    :param molecule:
+        the vlx molecule object
+    :param basis:
+        the vlx basis object
+    :param i:
+        the index of the atom for which the derivatives
+        are computed.
+    :param full_deriv:
+        True, to compute ( nabla m | 1/RA | n ) 
+                       + ( m | 1/RA | nabla n )
+                       + ( m | nabla 1/RA | n ) 
+        False, to compute (nabla m | 1/RA | n) + (m | nabla 1/RA | n) only.
+    :param unit:
+        the units to be used for the molecular geometry;
+        possible values: "au" (default), "Angstrom"
+    :param chk_file:
+        the hdf5 checkpoint file name.
+
+    :return:
+        a numpy array of shape 3 x nao x nao
+        (nao = number of atomic orbitals)
+        corresponding to the derivative of the kinetic energy matrix
+        with repsect to the x, y and z coords. of atom i.
+    """
+
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+
+    # The atomic charge of atom i -- required for the derivative of 1/RA
+    Z = molecule.elem_ids_to_numpy()[i]
+
+    # TODO:check sign; correct mistakes in comments.
+    pyscf_ipnuc_deriv = -pyscf_molecule.intor('int1e_ipnuc', aosym='s1')
+
+    with pyscf_molecule.with_rinv_at_nucleus(i):
+        pyscf_iprinv_deriv = pyscf_molecule.intor('int1e_iprinv', aosym='s1')
+        pyscf_iprinv_deriv *= -Z 
+
+    ao_slices = pyscf_molecule.aoslice_by_atom()
+
+    # Get the AO indeces corresponding to atom i
+    ki, kf = ao_slices[i, 2:]
+
+    ipnuc_deriv_atom_i = np.zeros(pyscf_ipnuc_deriv.shape)
+
+    ipnuc_deriv_atom_i[:,ki:kf] = pyscf_ipnuc_deriv[:,ki:kf]
+
+    if full_deriv:
+        # (nabla m | 1/RA | n) + (m | 1/RA | nabla n)
+        ipnuc_deriv_atom_i += ipnuc_deriv_atom_i.transpose(0,2,1)
+        # TODO: write term explicitly and figure out why the transpose has to
+        # be summed up here
+        pyscf_iprinv_deriv += pyscf_iprinv_deriv.transpose(0,2,1)
+
+    vlx_coulomb_att_deriv_atom_i = np.zeros(ipnuc_deriv_atom_i.shape)
+
+
+    # Transform each component (x,y,z) to veloxchem format
+    vlx_coulomb_att_deriv_atom_i[0] = ( ao_matrix_to_veloxchem(
+                DenseMatrix(pyscf_iprinv_deriv[0] + ipnuc_deriv_atom_i[0]),
+                                 basis, molecule).to_numpy()
+                                )
+
+    vlx_coulomb_att_deriv_atom_i[1] = ( ao_matrix_to_veloxchem(
+                 DenseMatrix(pyscf_iprinv_deriv[1] + ipnuc_deriv_atom_i[1]),
+                                 basis, molecule).to_numpy()
+                                )
+
+    vlx_coulomb_att_deriv_atom_i[2] = ( ao_matrix_to_veloxchem(
+               DenseMatrix(pyscf_iprinv_deriv[2] + ipnuc_deriv_atom_i[2]),
+                                 basis, molecule).to_numpy()
+                                )
+
+    if chk_file is not None:
+        write_2d_array_hdf5(chk_file, vlx_coulomb_att_deriv_atom_i, labels='xyz',
+                            atom_index=i)
+
+    return vlx_coulomb_att_deriv_atom_i
 
 
 def hcore_deriv(molecule, basis, i=0, unit="au"):
@@ -472,7 +611,8 @@ def fock_deriv(molecule, basis, density, i=0, unit="au"):
     return vlx_fock_deriv_atom_i
 
 
-def eri_deriv(molecule, basis, i=0, unit="au"):
+def eri_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
+              chk_file=None):
     """
     Imports the derivatives of the electron repulsion integrals
     from pyscf and converts them to veloxchem format
@@ -484,9 +624,17 @@ def eri_deriv(molecule, basis, i=0, unit="au"):
     :param i:
         the index of the atom for which the derivatives
         are computed.
+    :param full_deriv:
+        True, to compute ( nabla m n | p q )
+                       + ( m nabla n | p q )
+                       + ( m n | nabla p q )
+                       + ( m n | p nabla q )
+        False, to compute ( nabla m n | p q ) only.
     :param unit:
         the units to be used for the molecular geometry;
         possible values: "au" (default), "Angstrom"
+    :param chk_file:
+        the hdf5 checkpoint file name.
 
     :return:
         a numpy array with the derivatives for atom i
@@ -510,12 +658,14 @@ def eri_deriv(molecule, basis, i=0, unit="au"):
 
     eri_deriv_atom_i = np.zeros(pyscf_eri_deriv.shape)
 
-    #   (nabla m n | t p) + ( m nabla n | t p)
-    # + (m n | nabla t p) + (m n | t nabla p)
     eri_deriv_atom_i[:, ki:kf] = pyscf_eri_deriv[:, ki:kf]
-    eri_deriv_atom_i += ( eri_deriv_atom_i.transpose(0,2,1,4,3)
-                         + eri_deriv_atom_i.transpose(0,3,4,1,2)
-                         + eri_deriv_atom_i.transpose(0,4,3,2,1) )
+
+    if full_deriv:
+        #   (nabla m n | t p) + ( m nabla n | t p)
+        # + (m n | nabla t p) + (m n | t nabla p)
+        eri_deriv_atom_i += ( eri_deriv_atom_i.transpose(0,2,1,4,3)
+                             + eri_deriv_atom_i.transpose(0,3,4,1,2)
+                             + eri_deriv_atom_i.transpose(0,4,3,2,1) )
 
     vlx_eri_deriv_atom_i = np.zeros(eri_deriv_atom_i.shape)
 
@@ -528,6 +678,10 @@ def eri_deriv(molecule, basis, i=0, unit="au"):
                     vt = basis_set_map[t]
                     vp = basis_set_map[p]
                     vlx_eri_deriv_atom_i[:,vm,vn,vt,vp] = eri_deriv_atom_i[:,m,n,t,p]
+
+    if chk_file is not None:
+        write_2d_array_hdf5(chk_file, vlx_eri_deriv_atom_i, labels='xyz',
+                            atom_index=i) 
 
     return vlx_eri_deriv_atom_i
 
