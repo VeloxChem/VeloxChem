@@ -87,8 +87,8 @@ class TdhfGradientDriver(GradientDriver):
 
         :param grad_dict:
             The input dictionary of gradient settings group.
-		:param orbrsp_dict: 
-			The input dictionary of orbital response settings group.
+        :param orbrsp_dict: 
+            The input dictionary of orbital response settings group.
         :param rsp_dict:
             The input dictionary of response settings  group.
         :param method_dict:
@@ -143,9 +143,8 @@ class TdhfGradientDriver(GradientDriver):
                 self.state_deriv_index < rsp_results['eigenvalues'].size,
                 'TdhfGradientDriver: not enough states calculated')
 
-        self.print_header()
+            self.print_header()
 
-        # self.print_header()
         start_time = tm.time()
 
         if self.numerical:
@@ -153,15 +152,16 @@ class TdhfGradientDriver(GradientDriver):
         else:
             self.compute_analytical(molecule, basis, rsp_results)
 
-        # print gradient
-        self.print_geometry(molecule)
-        self.print_gradient(molecule)
-
-        valstr = '*** Time spent in gradient calculation: '
-        valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.flush()
+        if self.rank == mpi_master():
+            # print gradient
+            self.print_geometry(molecule)
+            self.print_gradient(molecule)
+    
+            valstr = '*** Time spent in gradient calculation: '
+            valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
 
 
     def compute_analytical(self, molecule, basis, rsp_results):
@@ -188,61 +188,67 @@ class TdhfGradientDriver(GradientDriver):
         scf_tensors = self.scf_drv.scf_tensors
 
         # compute orbital response
-        orbrsp_drv.update_settings(self.orbrsp_dict, self.rsp_dict, self.method_dict)
+        orbrsp_drv.update_settings(self.orbrsp_dict, self.rsp_dict,
+                                   self.method_dict)
         orbrsp_results = orbrsp_drv.compute(molecule, basis, scf_tensors,
                                             rsp_results)
 
-        natm = molecule.number_of_atoms()
-        # TODO: the following is available on the master node only
-        # only alpha part:
-        gs_dm = self.scf_drv.scf_tensors['D_alpha']
-        omega_ao = orbrsp_results['omega_ao']
-        # spin summation already included:
-        xpy = orbrsp_results['x_plus_y_ao']
-        xmy = orbrsp_results['x_minus_y_ao']
-        rel_dm_ao = orbrsp_results['relaxed_density_ao']
+        if self.rank == mpi_master():
+            natm = molecule.number_of_atoms()
+            # TODO: the following is available on the master node only
+            # only alpha part:
+            gs_dm = self.scf_drv.scf_tensors['D_alpha']
+            omega_ao = orbrsp_results['omega_ao']
+            # spin summation already included:
+            xpy = orbrsp_results['x_plus_y_ao']
+            xmy = orbrsp_results['x_minus_y_ao']
+            rel_dm_ao = orbrsp_results['relaxed_density_ao']
 
-        # analytical gradient
-        # self.gradient = np.zeros((natm, 3))
-        self.gradient = self.grad_nuc_contrib(molecule)
+            # analytical gradient
+            # self.gradient = np.zeros((natm, 3))
+            self.gradient = self.grad_nuc_contrib(molecule)
 
-        # loop over atoms and contract integral derivatives with density matrices
-        # add the corresponding contribution to the gradient
-        for i in range(natm):
-            # taking integral derivatives from pyscf
-            d_ovlp = overlap_deriv(molecule, basis, i)
-            d_fock = fock_deriv(molecule, basis, gs_dm, i)
-            d_eri = eri_deriv(molecule, basis, i)
+            # loop over atoms and contract integral derivatives with density matrices
+            # add the corresponding contribution to the gradient
+            for i in range(natm):
+                # taking integral derivatives from pyscf
+                d_ovlp = overlap_deriv(molecule, basis, i)
+                d_fock = fock_deriv(molecule, basis, gs_dm, i)
+                d_eri = eri_deriv(molecule, basis, i)
 
-            self.gradient[i] += ( np.einsum('mn,xmn->x', 2.0 * gs_dm + rel_dm_ao, d_fock)
-                             +1.0 * np.einsum('mn,xmn->x', 2.0 * omega_ao, d_ovlp)
-                             -2.0 * np.einsum('mt,np,xmtnp->x', gs_dm, gs_dm, d_eri)
-                             +1.0 * np.einsum('mt,np,xmnpt->x', gs_dm, gs_dm, d_eri)
-                             +1.0 * np.einsum('mn,pt,xtpmn->x', xpy, xpy - xpy.T, d_eri)
-                             -0.5 * np.einsum('mn,pt,xtnmp->x', xpy, xpy - xpy.T, d_eri)
-                             +1.0 * np.einsum('mn,pt,xtpmn->x', xmy, xmy + xmy.T, d_eri)
-                             -0.5 * np.einsum('mn,pt,xtnmp->x', xmy, xmy + xmy.T, d_eri)
-                            )
+                self.gradient[i] += ( np.einsum('mn,xmn->x', 2.0 * gs_dm + rel_dm_ao, d_fock)
+                                 +1.0 * np.einsum('mn,xmn->x', 2.0 * omega_ao, d_ovlp)
+                                 -2.0 * np.einsum('mt,np,xmtnp->x', gs_dm, gs_dm, d_eri)
+                                 +1.0 * np.einsum('mt,np,xmnpt->x', gs_dm, gs_dm, d_eri)
+                                 +1.0 * np.einsum('mn,pt,xtpmn->x', xpy, xpy - xpy.T, d_eri)
+                                 -0.5 * np.einsum('mn,pt,xtnmp->x', xpy, xpy - xpy.T, d_eri)
+                                 +1.0 * np.einsum('mn,pt,xtpmn->x', xmy, xmy + xmy.T, d_eri)
+                                 -0.5 * np.einsum('mn,pt,xtnmp->x', xmy, xmy + xmy.T, d_eri)
+                                )
 
 
         # Calculate the relaxed and unrelaxed excited-state dipole moment
         firstorderprop = FirstOrderProperties(self.comm, self.ostream)
 
-        # unrelaxed density and dipole moment
-        unrel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
-                         orbrsp_results['unrelaxed_density_ao'])
+        if self.rank == mpi_master():
+            # unrelaxed density and dipole moment
+            unrel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
+                             orbrsp_results['unrelaxed_density_ao'])
+        else:
+            unrel_density = None
         firstorderprop.compute(molecule, basis, unrel_density)
         if self.rank == mpi_master():
             if self.do_first_order_prop:
                 title = method + ' Unrelaxed Dipole Moment for Excited State ' + str(self.state_deriv_index + 1)
                 firstorderprop.print_properties(molecule, title)
 
-        # relaxed density and dipole moment
-        if 'relaxed_density_ao' in orbrsp_results:
-            rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
-                           orbrsp_results['relaxed_density_ao'])
-            firstorderprop.compute(molecule, basis, rel_density)
-            self.relaxed_dipole_moment = firstorderprop.get_property('dipole moment')
+            # relaxed density and dipole moment
+            if 'relaxed_density_ao' in orbrsp_results:
+                rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
+                               orbrsp_results['relaxed_density_ao'])
+                # TODO: consider computing the relaxed dipole moment in parallel? 
+                firstorderprop.compute(molecule, basis, rel_density)
+                self.relaxed_dipole_moment = firstorderprop.get_property('dipole moment')
 
             if self.rank == mpi_master():
                 # TODO: Remove warning once TDDFT orbital response is fully implemented
