@@ -95,6 +95,7 @@ class OrbitalResponse:
 
         # Excited state information, default to first excited state
         self.state_deriv_index = 0
+        self.mp2 = False
 
         # Timing and profiling
         self.timing = False
@@ -275,7 +276,7 @@ class OrbitalResponse:
         # 4) Write the linear operator for matrix-vector product
         # 5) Run the conjugate gradient
 
-        if rsp_results is None:
+        if self.mp2:
             # This is the MP2 routine
             rhs_results = self.compute_rhs(molecule, basis, scf_tensors,
                                            profiler)

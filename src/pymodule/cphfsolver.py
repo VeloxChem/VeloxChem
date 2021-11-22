@@ -906,9 +906,11 @@ class CphfSolver(LinearSolver):
             fock_deriv_ao = np.zeros((natm, 3, nao, nao))
 
             # import the integral derivatives
+            self.profiler.start_timer(0, 'import integral derivatives from pyscf')
             for i in range(natm):
                 ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
                 fock_deriv_ao[i] = fock_deriv(molecule, basis, density, i)
+            self.profiler.stop_timer(0, 'import integral derivatives from pyscf')
 
             # transform integral derivatives to MO basis
             ovlp_deriv_ov = np.einsum('mi,xymn,na->xyia', mo_occ, 

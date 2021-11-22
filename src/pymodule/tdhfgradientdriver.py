@@ -20,6 +20,7 @@ from .import_from_pyscf import overlap_deriv
 from .import_from_pyscf import fock_deriv
 from .import_from_pyscf import eri_deriv
 
+# TODO: Enable MPI parallelization
 
 class TdhfGradientDriver(GradientDriver):
     """
