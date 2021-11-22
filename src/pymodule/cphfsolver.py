@@ -180,7 +180,7 @@ class CphfSolver(LinearSolver):
 
         self.start_time = tm.time()
 
-        self.profiler.start_timer(0, 'ComputeCPHF iterative subspace algorithm')
+        self.profiler.start_timer(0, 'Total subspace')
         self.profiler.start_timer(0, 'CPHF RHS')
 
         if self.rank == mpi_master():
@@ -351,7 +351,7 @@ class CphfSolver(LinearSolver):
             self.profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
 
-        self.profiler.stop_timer(0, 'ComputeCPHF iterative subspace algorithm')
+        self.profiler.stop_timer(0, 'Total subspace')
         self.profiler.print_timing(self.ostream)
         self.profiler.print_profiling_summary(self.ostream)
 
@@ -618,7 +618,7 @@ class CphfSolver(LinearSolver):
             contracted with the two-electron integrals).
         """
 
-        self.profiler.start_timer(0, 'ComputeCPHF CG algorithm')
+        self.profiler.start_timer(0, 'Total CG')
         self.start_time = tm.time()
 
         # ERI information
@@ -677,7 +677,7 @@ class CphfSolver(LinearSolver):
                                   cphf_rhs.reshape(3*natm, nocc, nvir), # TODO: possibly change the shape
                                   dft_dict)
 
-        self.profiler.stop_timer(0, 'ComputeCPHF CG algorithm')
+        self.profiler.stop_timer(0, 'Total CG')
         self.profiler.print_timing(self.ostream)
         self.profiler.print_profiling_summary(self.ostream)
 
@@ -906,11 +906,11 @@ class CphfSolver(LinearSolver):
             fock_deriv_ao = np.zeros((natm, 3, nao, nao))
 
             # import the integral derivatives
-            self.profiler.start_timer(0, 'import integral derivatives from pyscf')
+            self.profiler.start_timer(0, 'derivs')
             for i in range(natm):
                 ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
                 fock_deriv_ao[i] = fock_deriv(molecule, basis, density, i)
-            self.profiler.stop_timer(0, 'import integral derivatives from pyscf')
+            self.profiler.stop_timer(0, 'derivs')
 
             # transform integral derivatives to MO basis
             ovlp_deriv_ov = np.einsum('mi,xymn,na->xyia', mo_occ, 
