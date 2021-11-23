@@ -4100,7 +4100,9 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
                        
                             ( grho_aaa[moff + m] *  ( rhow1a[moff + m]  * rhow2a[moff + m] + rhow2a[moff + m]  * rhow1a[moff + m])  
                              
-                             + 2 * grho_aab[moff + m] * (rhow1a[moff + m] * rhow2b[moff + m] + rhow2a[moff + m] * rhow1b[moff + m])
+                             +  grho_aab[moff + m] * (rhow1a[moff + m] * rhow2b[moff + m] + rhow2a[moff + m] * rhow1b[moff + m]
+                             
+                                                   +   rhow1b[moff + m] * rhow2a[moff + m] + rhow2b[moff + m] * rhow1a[moff + m] )
                              
                              +  grho_abb[moff + m] * ( rhow1b[moff + m] * rhow2b[moff + m] + rhow2b[moff + m] * rhow1b[moff + m])
                              
@@ -4164,7 +4166,9 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
                         
                             ( grho_aaa[loff + l] * (rhow1a[loff + l] * rhow2a[loff + l] + rhow2a[loff + l] * rhow1a[loff + l] )
                              
-                             + 2 * grho_aab[loff + l] * (rhow1a[loff + l] * rhow2b[loff + l] + rhow2a[loff + l] * rhow1b[loff + l] )
+                             +  grho_aab[loff + l] * (rhow1a[loff + l] * rhow2b[loff + l] + rhow2a[loff + l] * rhow1b[loff + l] 
+                             
+                                                 +   rhow1b[loff + l] * rhow2a[loff + l] + rhow2b[loff + l] * rhow1a[loff + l] )
                              
                              +  grho_abb[loff + l] * (rhow1b[loff + l] * rhow2b[loff + l] + rhow2b[loff + l] * rhow1b[loff + l] ) 
                              
