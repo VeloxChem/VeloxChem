@@ -153,8 +153,6 @@ class QuadraticResponseDriver(NonLinearSolver):
                 self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
 
-            print("self.xcfun")
-            print(self.xcfun)
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Nonlinear solver: Undefined XC functional')
 
@@ -275,6 +273,9 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         # Computing the first-order response vectors (3 per frequency)
         N_drv = ComplexResponse(self.comm, self.ostream)
+
+        print("self.damping")
+        print(self.damping)
 
         N_drv.update_settings({
             'damping': self.damping,
@@ -405,13 +406,6 @@ class QuadraticResponseDriver(NonLinearSolver):
             A2Nc = self.a2_contract(kX[('C', wc)], op_a, d_a_mo, nocc, norb)
             A2Nb = self.a2_contract(kX[('B', wb)], op_a, d_a_mo, nocc, norb)
 
-            print("Na")
-            print(Na)
-            print("Nb")
-            print(Nb)
-            print("e3_dict[wb]")
-            print(e3_dict[wb])
-
             NaE3NbNc = np.dot(Na.T, e3_dict[wb])
             NaC2Nb = np.dot(Na.T, C2Nb)
             NaB2Nc = np.dot(Na.T, B2Nc)
@@ -422,21 +416,22 @@ class QuadraticResponseDriver(NonLinearSolver):
             A2 = NbA2Nc + NcA2Nb
 
             self.ostream.print_blank()
-            w_str = 'Quadratic response function at given frequencies: ' + '<< ' + str(
+            w_str = 'Quadratic response function: ' + '<< ' + str(
                 self.a_component) + ';' + str(self.b_component) + ',' + str(
-                    self.c_component) + ' >> '
+                    self.c_component) + ' >> ' +  ' (' + str(
+                            wb) + ' ,' + str(wc) + ')'
             self.ostream.print_header(w_str)
             self.ostream.print_header('=' * (len(w_str) + 2))
             self.ostream.print_blank()
-            title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
-                'Component', 'Frequency', 'Real', 'Imaginary')
+            title = '{:<9s}  {:>20s} {:>21s}'.format(
+                'Component', 'Real', 'Imaginary')
             width = len(title)
             self.ostream.print_header(title.ljust(width))
             self.ostream.print_header(('-' * len(title)).ljust(width))
-            self.print_component('X2', wb, -X2, width)
-            self.print_component('A2', wb, -A2, width)
-            self.print_component('E3', wb, NaE3NbNc, width)
-            self.print_component('β', wb, NaE3NbNc - A2 - X2, width)
+            self.print_component('X2', -X2, width)
+            self.print_component('A2', -A2, width)
+            self.print_component('E3', NaE3NbNc, width)
+            self.print_component('β', NaE3NbNc - A2 - X2, width)
             result.update({wb: NaE3NbNc - A2 - X2})
 
         profiler.check_memory_usage('End of QRF')
@@ -616,12 +611,6 @@ class QuadraticResponseDriver(NonLinearSolver):
 
             xi = self.xi(kb, kc, fb, fc, F0_a)
 
-            print("fb")
-            print(fb)
-
-            print("fbc_cb")
-            print(fbc_cb)
-
             e3fock = xi.T + (0.5 *fbc_cb).T
             e3vec[wb] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
@@ -657,7 +646,7 @@ class QuadraticResponseDriver(NonLinearSolver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def print_component(self, label, freq, value, width):
+    def print_component(self, label, value, width):
         """
         Prints QRF component.
 
@@ -671,6 +660,6 @@ class QuadraticResponseDriver(NonLinearSolver):
             The width for the output
         """
 
-        w_str = '{:<9s} {:12.4f} {:20.8f} {:20.8f}j'.format(
-            label, freq, value.real, value.imag)
+        w_str = '{:<9s} {:20.8f} {:20.8f}j'.format(
+            label, value.real, value.imag)
         self.ostream.print_header(w_str.ljust(width))

@@ -115,7 +115,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
                              const CDensityGrid&   densityGrid);
     
     /**
-     Implements second order derivatives of spin-polarized Becke (1988) functional for dengrid::ab case.
+     Implements third order derivatives of spin-polarized Becke (1988) functional for dengrid::ab case.
      
      @param xcHessianGrid the exchange-correlation hessian grid.
      @param factor the scale factor of functional contribution.
@@ -124,6 +124,30 @@ namespace vxcfuncs {  // vxcfuncs namespace
     void Becke88FuncCubicHessianAB(     CXCCubicHessianGrid& xcCubicHessianGrid,
                                   const double         factor,
                                   const CDensityGrid&  densityGrid);
+
+    /**
+     Implements third order derivatives of spin-polarized Becke (1988) functional for dengrid::ab case.
+     
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param factor the scale factor of functional contribution.
+     @param densityGrid the density grid.
+     */
+
+    void Becke88FuncCubicHessianA(       CXCCubicHessianGrid& xcCubicHessianGrid,
+                                   const double         factor,
+                                   const CDensityGrid&  densityGrid);
+
+     /**
+     Implements third order derivatives of spin-polarized Becke (1988) functional for dengrid::ab case.
+     
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param factor the scale factor of functional contribution.
+     @param densityGrid the density grid.
+     */
+       
+    void Becke88FuncCubicHessianB(       CXCCubicHessianGrid& xcCubicHessianGrid,
+                                   const double         factor,
+                                   const CDensityGrid&  densityGrid);
 }  // namespace vxcfuncs
 
 #endif /* Becke88Functional_hpp */

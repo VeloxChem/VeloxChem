@@ -200,8 +200,6 @@ class NonLinearSolver:
                 self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
 
-            print("self.xcfun")
-            print(self.xcfun)
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Nonlinear solver: Undefined XC functional')
 
@@ -379,11 +377,6 @@ class NonLinearSolver:
             A list of Fock matrices
         """
 
-        print("d_dft_1")
-        print(d_dft_1)
-        print("d_dft_2")
-        print(d_dft_2)
-
         if fock_flag == 'real_and_imag':
 
             if d_dft_1 and d_dft_2:
@@ -504,8 +497,6 @@ class NonLinearSolver:
                 for ifock in range(fock.number_of_fock_matrices()):
                     fock.scale(2.0, ifock)
 
-            print("after 2 int ")
-            print(fock) 
             if self.dft: 
                 xc_drv = XCIntegrator(self.comm)
 
@@ -515,8 +506,7 @@ class NonLinearSolver:
                 molgrid.distribute(self.rank, self.nodes, self.comm)
                 xc_drv.integrate(fock, dens1, dens2, gs_density, molecule, ao_basis,
                                  molgrid, self.xcfun.get_func_label())
-                print("After XC ")
-                print(fock)
+
         
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 

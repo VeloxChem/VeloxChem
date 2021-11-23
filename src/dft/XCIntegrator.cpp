@@ -382,9 +382,6 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     
     ksmat.symmetrize(); 
     
-    std::cout << "v_xc" << std::endl;
-    std::cout << ksmat << std::endl;
-
     
     // add Kohn-Sham contribution to Fock matrix
     
@@ -4843,6 +4840,8 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                                           const int32_t              nGridPoints) const
 {
     // set up AOs blocks
+
+    int idex = 0;
     
     auto naos = aoKohnShamMatrix->getNumberOfRows();
     
@@ -4970,59 +4969,61 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
         
         // set up pointers to perturbed density gradient norms
         
-        auto rhow1a = rwDensityGrid->alphaDensity(i);
+        auto rhow1a = rwDensityGrid->alphaDensity(i + idex);
         
-        auto rhow1b = rwDensityGrid->betaDensity(i);
+        auto rhow1b = rwDensityGrid->betaDensity(i + idex);
 
-        auto rhow2a = rwDensityGrid->alphaDensity(i);
+        auto xiw1a = rwDensityGrid->alphaDensity(i + idex);
         
-        auto rhow2b = rwDensityGrid->betaDensity(i);
+        auto xiw1b = rwDensityGrid->betaDensity(i + idex);
+        
+        auto xiw1c = rwDensityGrid->alphaDensity(i + idex);
 
-        auto xiw1a = rwDensityGrid->alphaDensity(i);
+        auto gradw1a_x = rwDensityGrid->alphaDensityGradientX(i + idex);
         
-        auto xiw1b = rwDensityGrid->betaDensity(i);
+        auto gradw1a_y = rwDensityGrid->alphaDensityGradientY(i + idex);
+        
+        auto gradw1a_z = rwDensityGrid->alphaDensityGradientZ(i + idex);
+        
+        auto gradw1b_x = rwDensityGrid->betaDensityGradientX(i + idex);
+        
+        auto gradw1b_y = rwDensityGrid->betaDensityGradientY(i + idex);
+        
+        auto gradw1b_z = rwDensityGrid->betaDensityGradientZ(i + idex);
 
-        auto xiw2a = rwDensityGrid->alphaDensity(i);
+        auto rhow2a = rwDensityGrid->alphaDensity(i + 1 +  idex);
         
-        auto xiw2b = rwDensityGrid->betaDensity(i);
+        auto rhow2b = rwDensityGrid->betaDensity(i + 1 +  idex);
+
+        auto xiw2a = rwDensityGrid->alphaDensity(i + 1 +  idex);
+        
+        auto xiw2b = rwDensityGrid->betaDensity(i + 1 +  idex);
+
+        auto xiw2c = rwDensityGrid->betaDensity(i + 1 +  idex); 
+
+        auto gradw2a_x = rwDensityGrid->alphaDensityGradientX(i + 1 +  idex);
+        
+        auto gradw2a_y = rwDensityGrid->alphaDensityGradientY(i + 1 +  idex);
+        
+        auto gradw2a_z = rwDensityGrid->alphaDensityGradientZ(i + 1 +  idex);
+        
+        auto gradw2b_x = rwDensityGrid->betaDensityGradientX(i + 1 +  idex);
+        
+        auto gradw2b_y = rwDensityGrid->betaDensityGradientY(i + 1 +  idex);
+        
+        auto gradw2b_z = rwDensityGrid->betaDensityGradientZ(i + 1 +  idex);
+
+        // Second order terms
 
         auto xiw12a = rwDensityGrid->alphaDensity(i);
         
         auto xiw12b = rwDensityGrid->betaDensity(i);
-
-        auto xiw1c = rwDensityGrid->alphaDensity(i);
-        
-        auto xiw2c = rwDensityGrid->betaDensity(i); 
 
         auto xiw12c = rwDensityGrid->betaDensity(i);
 
         auto rhow12a = rwDensityGrid->alphaDensity(i);
         
         auto rhow12b = rwDensityGrid->betaDensity(i);
-        
-        auto gradw1a_x = rwDensityGrid->alphaDensityGradientX(i);
-        
-        auto gradw1a_y = rwDensityGrid->alphaDensityGradientY(i);
-        
-        auto gradw1a_z = rwDensityGrid->alphaDensityGradientZ(i);
-        
-        auto gradw1b_x = rwDensityGrid->betaDensityGradientX(i);
-        
-        auto gradw1b_y = rwDensityGrid->betaDensityGradientY(i);
-        
-        auto gradw1b_z = rwDensityGrid->betaDensityGradientZ(i);
-
-        auto gradw2a_x = rwDensityGrid->alphaDensityGradientX(i);
-        
-        auto gradw2a_y = rwDensityGrid->alphaDensityGradientY(i);
-        
-        auto gradw2a_z = rwDensityGrid->alphaDensityGradientZ(i);
-        
-        auto gradw2b_x = rwDensityGrid->betaDensityGradientX(i);
-        
-        auto gradw2b_y = rwDensityGrid->betaDensityGradientY(i);
-        
-        auto gradw2b_z = rwDensityGrid->betaDensityGradientZ(i);
 
         auto gradw12a_x = rwDensityGrid->alphaDensityGradientX(i);
         
@@ -5035,6 +5036,8 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
         auto gradw12b_y = rwDensityGrid->betaDensityGradientY(i);
         
         auto gradw12b_z = rwDensityGrid->betaDensityGradientZ(i);
+
+        idex++;
         
         // loop over AOs blocks
         
