@@ -32,6 +32,7 @@ from .molecule import Molecule
 from .gradientdriver import GradientDriver
 from .outputstream import OutputStream
 from .firstorderprop import FirstOrderProperties
+from .veloxchemlib import mpi_master
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -110,15 +111,16 @@ class ScfGradientDriver(GradientDriver):
         else:
             self.compute_analytical(molecule, ao_basis)
 
-        # print gradient
-        self.print_geometry(molecule)
-        self.print_gradient(molecule)
+        if self.rank == mpi_master():
+            # print gradient
+            self.print_geometry(molecule)
+            self.print_gradient(molecule)
 
-        valstr = '*** Time spent in gradient calculation: '
-        valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.flush()
+            valstr = '*** Time spent in gradient calculation: '
+            valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
 
     def compute_analytical(self, molecule, ao_basis):
         """
@@ -130,32 +132,33 @@ class ScfGradientDriver(GradientDriver):
         :param ao_basis:
             The AO basis set.
         """
-        natm = molecule.number_of_atoms()
-        nocc = molecule.number_of_alpha_electrons()
-        mo = self.scf_drv.scf_tensors['C_alpha']
-        mo_occ = mo[:, :nocc].copy()
-        one_pdm_ao = self.scf_drv.scf_tensors['D_alpha']
-        mo_energies = self.scf_drv.scf_tensors['E_alpha']
-        eocc = mo_energies[:nocc]
-        eo_diag = np.diag(eocc)
-        epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
+        if self.rank == mpi_master():
+            natm = molecule.number_of_atoms()
+            nocc = molecule.number_of_alpha_electrons()
+            mo = self.scf_drv.scf_tensors['C_alpha']
+            mo_occ = mo[:, :nocc].copy()
+            one_pdm_ao = self.scf_drv.scf_tensors['D_alpha']
+            mo_energies = self.scf_drv.scf_tensors['E_alpha']
+            eocc = mo_energies[:nocc]
+            eo_diag = np.diag(eocc)
+            epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
 
-        # analytical gradient
-        self.gradient = np.zeros((natm, 3))
+            # analytical gradient
+            self.gradient = np.zeros((natm, 3))
 
-        for i in range(natm):
-            d_ovlp = overlap_deriv(molecule, ao_basis, i)
-            d_fock = fock_deriv(molecule, ao_basis, one_pdm_ao, i)
-            d_eri = eri_deriv(molecule, ao_basis, i)
+            for i in range(natm):
+                d_ovlp = overlap_deriv(molecule, ao_basis, i)
+                d_fock = fock_deriv(molecule, ao_basis, one_pdm_ao, i)
+                d_eri = eri_deriv(molecule, ao_basis, i)
 
-            self.gradient[i] += ( 2.0*np.einsum('mn,xmn->x', one_pdm_ao, d_fock)
-                            +2.0*np.einsum('mn,xmn->x', epsilon_dm_ao, d_ovlp)
-                            -2.0*np.einsum('mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
-                            +1.0*np.einsum('mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
-                            )
+                self.gradient[i] += ( 2.0*np.einsum('mn,xmn->x', one_pdm_ao, d_fock)
+                                +2.0*np.einsum('mn,xmn->x', epsilon_dm_ao, d_ovlp)
+                                -2.0*np.einsum('mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
+                                +1.0*np.einsum('mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
+                                )
 
-        self.gradient += self.grad_nuc_contrib(molecule)
-        self.omega_ao = epsilon_dm_ao #TODO remove again
+            self.gradient += self.grad_nuc_contrib(molecule)
+            self.omega_ao = epsilon_dm_ao #TODO remove again
 
     def compute_numerical(self, molecule, ao_basis, min_basis=None):
         """

@@ -633,15 +633,15 @@ class OrbitalResponse:
         # print solver-specific info
 
         if state_deriv_index is not None:
-            cur_str = 'Excited State of Interest       : ' + str(state_deriv_index +
+            cur_str = 'Excited State of Interest   : ' + str(state_deriv_index +
                                                                  1)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         # print general info
 
-        cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
+        cur_str = 'Max. Number of Iterations   : ' + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Convergence Threshold           : {:.1e}'.format(
+        cur_str = 'Convergence Threshold       : {:.1e}'.format(
             self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 

@@ -20,7 +20,6 @@ from .import_from_pyscf import overlap_deriv
 from .import_from_pyscf import fock_deriv
 from .import_from_pyscf import eri_deriv
 
-# TODO: Enable MPI parallelization
 
 class TdhfGradientDriver(GradientDriver):
     """
@@ -143,7 +142,7 @@ class TdhfGradientDriver(GradientDriver):
                 self.state_deriv_index < rsp_results['eigenvalues'].size,
                 'TdhfGradientDriver: not enough states calculated')
 
-            self.print_header()
+            self.print_header(self.state_deriv_index)
 
         start_time = tm.time()
 
@@ -288,11 +287,17 @@ class TdhfGradientDriver(GradientDriver):
         # atom coordinates (nx3)
         coords = molecule.get_coordinates()
 
-        # numerical gradient
-        self.gradient = np.zeros((molecule.number_of_atoms(), 3))
+        # number of atoms
+        natm = molecule.number_of_atoms()
+
+        if self.rank == mpi_master():
+            # numerical gradient
+            self.gradient = np.zeros((natm, 3))
+        else:
+            self.gradient = None
 
         if not self.do_four_point:
-            for i in range(molecule.number_of_atoms()):
+            for i in range(natm):
                 for d in range(3):
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
@@ -301,8 +306,9 @@ class TdhfGradientDriver(GradientDriver):
                     rsp_drv.is_converged = False  # only needed for RPA
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
-                    exc_en_plus = rsp_results['eigenvalues'][self.state_deriv_index]
-                    e_plus = self.scf_drv.get_scf_energy() + exc_en_plus
+                    if self.rank == mpi_master():
+                        exc_en_plus = rsp_results['eigenvalues'][self.state_deriv_index]
+                        e_plus = self.scf_drv.get_scf_energy() + exc_en_plus
 
                     coords[i, d] -= 2.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
@@ -310,17 +316,19 @@ class TdhfGradientDriver(GradientDriver):
                     rsp_drv.is_converged = False
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        self.scf_drv.scf_tensors)
-                    exc_en_minus = rsp_results['eigenvalues'][self.state_deriv_index]
-                    e_minus = self.scf_drv.get_scf_energy() + exc_en_minus
+                    if self.rank == mpi_master():
+                        exc_en_minus = rsp_results['eigenvalues'][self.state_deriv_index]
+                        e_minus = self.scf_drv.get_scf_energy() + exc_en_minus
+
+                        self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
 
                     coords[i, d] += self.delta_h
-                    self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
 
         else:
             # Four-point numerical derivative approximation
             # for debugging of analytical gradient:
             # [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
-            for i in range(molecule.number_of_atoms()):
+            for i in range(natm):
                 for d in range(3):
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
@@ -329,8 +337,9 @@ class TdhfGradientDriver(GradientDriver):
                     rsp_drv.is_converged = False  # only needed for RPA
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
-                    exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
-                    e_plus1 = self.scf_drv.get_scf_energy() + exc_en
+                    if self.rank == mpi_master():
+                        exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
+                        e_plus1 = self.scf_drv.get_scf_energy() + exc_en
 
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
@@ -339,8 +348,9 @@ class TdhfGradientDriver(GradientDriver):
                     rsp_drv.is_converged = False  # only needed for RPA
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
-                    exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
-                    e_plus2 = self.scf_drv.get_scf_energy() + exc_en
+                    if self.rank == mpi_master():
+                        exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
+                        e_plus2 = self.scf_drv.get_scf_energy() + exc_en
 
                     coords[i, d] -= 3.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
@@ -348,8 +358,9 @@ class TdhfGradientDriver(GradientDriver):
                     rsp_drv.is_converged = False
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        self.scf_drv.scf_tensors)
-                    exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
-                    e_minus1 = self.scf_drv.get_scf_energy() + exc_en
+                    if self.rank == mpi_master():
+                        exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
+                        e_minus1 = self.scf_drv.get_scf_energy() + exc_en
 
                     coords[i, d] -= self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
@@ -357,13 +368,15 @@ class TdhfGradientDriver(GradientDriver):
                     rsp_drv.is_converged = False
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        self.scf_drv.scf_tensors)
-                    exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
-                    e_minus2 = self.scf_drv.get_scf_energy() + exc_en
+                    if self.rank == mpi_master():
+                        exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
+                        e_minus2 = self.scf_drv.get_scf_energy() + exc_en
+
+                        # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
+                        self.gradient[i, d] = (e_minus2 - 8.0 * e_minus1
+                                               + 8.0 * e_plus1 - e_plus2) / (12.0 * self.delta_h)
 
                     coords[i, d] += 2.0 * self.delta_h
-                    # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
-                    self.gradient[i, d] = (e_minus2 - 8.0 * e_minus1
-                                           + 8.0 * e_plus1 - e_plus2) / (12.0 * self.delta_h)
 
 
         self.ostream.print_blank()
@@ -532,5 +545,4 @@ class TdhfGradientDriver(GradientDriver):
                                 + 8 * lr_results_p1['response_functions'][component_dict[aop], component_dict[bop], 0.0]
                                 - lr_results_p2['response_functions'][component_dict[aop], component_dict[bop], 0.0] ) /
                                 (12.0 * self.delta_h) )
-
 

@@ -418,13 +418,43 @@ class GradientDriver:
         self.ostream.flush()
 
 
-    def print_header(self):
+    def print_header(self, state_deriv_index=None):
         """
         Prints gradient calculation setup details to output stream.
         """
 
+        str_width = 60
+
         self.ostream.print_blank()
         self.ostream.print_header(self.flag)
         self.ostream.print_header((len(self.flag) + 2) * '=')
+        self.ostream.flush()
+
+       	cur_str = 'Gradient Type               : '
+        
+        if self.numerical:
+            cur_str += 'Numerical'
+            cur_str2 = 'Numerical Method            : '
+            if self.do_four_point:
+                cur_str2 += 'Five-Point Stencil'
+            else:
+                cur_str2 += 'Symmetric Difference Quotient'
+        else:
+            cur_str += 'Analytical'
+
+        if self.numerical or state_deriv_index is not None:
+            self.ostream.print_blank()
+            self.ostream.print_header(cur_str.ljust(str_width))
+        if self.numerical:
+            self.ostream.print_header(cur_str2.ljust(str_width))
+
+        # print solver-specific info
+
+        if state_deriv_index is not None:
+            cur_str = 'Excited State of Interest   : ' + str(state_deriv_index +
+                                                                 1)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         self.ostream.print_blank()
         self.ostream.flush()
+

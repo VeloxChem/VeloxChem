@@ -435,7 +435,9 @@ def main():
                 tdhfgrad_drv.update_settings(grad_dict, rsp_dict,
                                              orbrsp_dict, method_dict)
                 tdhfgrad_drv.compute(task.molecule, task.ao_basis,
-                                     rsp_prop.rsp_driver, rsp_prop.rsp_property)
+                                     rsp_prop.rsp_driver.solver, rsp_prop.rsp_property)
+                                     # solver is the actual RPA/TDA driver
+                                     # with rsp_prop.rsp_driver it works for TDA, but not RPA
 
             # Excited state Hessian and vibrational analysis
             if 'frequencies' in task.input_dict:
