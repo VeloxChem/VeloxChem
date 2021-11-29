@@ -96,10 +96,6 @@ class RpaOrbitalResponse(OrbitalResponse):
             exc_vec = exc_vec.reshape(nocc, nvir).copy()
             deexc_vec = deexc_vec.reshape(nocc, nvir).copy()
 
-            # TODO: remove factor once RPA vectors are properly normalized
-            # exc_vec *= np.sqrt(2)
-            # deexc_vec *= np.sqrt(2)
-
             # Construct plus/minus combinations of excitation and de-excitation part
             xpy = exc_vec + deexc_vec
             xmy = exc_vec - deexc_vec

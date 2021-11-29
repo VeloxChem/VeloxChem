@@ -958,6 +958,7 @@ class ScfHessianDriver(HessianDriver):
                             #for bop in lr_drv.b_components:
                             for bop in range(3):
                                 self.pol_gradient[aop, bop, 3*i + d] = (
+                                    # TODO: careful with the hard-coded frequency!!
                                     ( lr_results_p['response_functions'][component_dict[aop], component_dict[bop], 0.0]
                                     - lr_results_m['response_functions'][component_dict[aop], component_dict[bop], 0.0] ) /
                                     (2.0 * self.delta_h) )

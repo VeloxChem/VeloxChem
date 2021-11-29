@@ -219,7 +219,7 @@ class GradientDriver:
         """
         Calculates the contribution of the exchange-correlation energy
         to the analytical gradient (MPI-parallel code)
-        
+
         :param molecule:
             The molecule.
         :param ao_basis:
@@ -230,7 +230,7 @@ class GradientDriver:
         :return:
             The exchange-correlation contribution to the gradient.
         """
-        
+
         if self.rank == mpi_master():
             natm = molecule.number_of_atoms()
             xc_gradient = np.zeros((natm, 3))
@@ -240,7 +240,7 @@ class GradientDriver:
             xc_gradient = None
             atom_array = None
 
-        # Prepare the grid and ground state AO density matrix 
+        # Prepare the grid and ground-state AO density matrix
         dft_dict = self.init_dft(molecule, self.scf_drv.scf_tensors)
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
@@ -264,15 +264,15 @@ class GradientDriver:
         # for x, y, and z derivatives, respectively.
         # Not completely sure how/where this should be calculated...
         #density_grad_i = xc_drv.compute_density_deriv(molecule,
-        #                            ao_basis, min_basis, molgrid, 
+        #                            ao_basis, min_basis, molgrid,
         #                            dft_func_label, atom_index)
-            
+
         # compute the xc energy deriv wrt coordinates of atom i
         local_xc_grad = xc_grad_drv.integrate_gradient(gs_density,
                                     density_grad_i, molecule, ao_basis,
                                     min_basis, dft_func_label)
 
-        # This code works only if natm is divisible by the size of the 
+        # This code works only if natm is divisible by the size of the
         # MPI batch is; Not sure how to change the code to make this general...
         # Should xc_gradient be part of a C object similary to the XCEnergy?
 
@@ -286,7 +286,7 @@ class GradientDriver:
         """
         Calculates the contribution of the exchange-correlation energy
         to the analytical gradient.
-        
+
         :param molecule:
             The molecule.
         :param ao_basis:
@@ -304,7 +304,7 @@ class GradientDriver:
         xc_contrib = np.zeros((natm, 3))
 
         for i in range(natm):
-            # Only restricted SCF possible for the moment. 
+            # Only restricted SCF possible for the moment.
             density_matrix =  AODensityMatrix([self.scf_drv.scf_tensors['D'][0]], denmat.rest)
             # density_grad_i = AODensityMatrix... #
             # set to right type, 3 Matrices - x, y, z coords. of atom i
@@ -318,7 +318,7 @@ class GradientDriver:
 
         return xc_contrib
 
- 
+
 
     def grad_nuc_contrib(self, molecule):
         """
@@ -431,7 +431,7 @@ class GradientDriver:
         self.ostream.flush()
 
        	cur_str = 'Gradient Type               : '
-        
+
         if self.numerical:
             cur_str += 'Numerical'
             cur_str2 = 'Numerical Method            : '
@@ -439,6 +439,8 @@ class GradientDriver:
                 cur_str2 += 'Five-Point Stencil'
             else:
                 cur_str2 += 'Symmetric Difference Quotient'
+            cur_str3 = 'Finite Difference Step Size : '
+            cur_str3 += str(self.delta_h) + ' a.u.'
         else:
             cur_str += 'Analytical'
 
@@ -447,6 +449,7 @@ class GradientDriver:
             self.ostream.print_header(cur_str.ljust(str_width))
         if self.numerical:
             self.ostream.print_header(cur_str2.ljust(str_width))
+            self.ostream.print_header(cur_str3.ljust(str_width))
 
         # print solver-specific info
 

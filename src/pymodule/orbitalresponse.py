@@ -247,11 +247,7 @@ class OrbitalResponse:
         })
 
         if self.rank == mpi_master():
-            if rsp_results is not None:
-                self.print_orbrsp_header('Orbital Response Driver',
-                                     self.state_deriv_index)
-            else:
-                self.print_orbrsp_header('Orbital Response Driver', None)
+            self.print_orbrsp_header('Orbital Response Driver')
 
         # DFT information
 
@@ -622,7 +618,7 @@ class OrbitalResponse:
 
         return lambda_multipliers.reshape(nocc, nvir)
 
-    def print_orbrsp_header(self, title, state_deriv_index):
+    def print_orbrsp_header(self, title):
         self.ostream.print_blank()
         self.ostream.print_header('{:s} Setup'.format(title))
         self.ostream.print_header('=' * (len(title) + 8))
@@ -632,12 +628,10 @@ class OrbitalResponse:
 
         # print solver-specific info
 
-        if state_deriv_index is not None:
-            cur_str = 'Excited State of Interest   : ' + str(state_deriv_index +
-                                                                 1)
-            self.ostream.print_header(cur_str.ljust(str_width))
-
-        # print general info
+        #if state_deriv_index is not None:
+        #    cur_str = 'Excited State of Interest   : ' + str(state_deriv_index +
+        #                                                         1)
+        #    self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = 'Max. Number of Iterations   : ' + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
