@@ -333,19 +333,7 @@ class ExcitonModelDriver:
 
             if self.rank == mpi_master():
                 self.ostream.print_block(monomer.get_string())
-
-                valstr = 'Molecular charge            : {:.0f}'.format(
-                    monomer.get_charge())
-                self.ostream.print_header(valstr.ljust(70))
-                valstr = 'Spin multiplicity           : {:d}'.format(
-                    monomer.get_multiplicity())
-                self.ostream.print_header(valstr.ljust(70))
-                valstr = 'Number of alpha electrons   : {:d}'.format(
-                    monomer.number_of_alpha_electrons())
-                self.ostream.print_header(valstr.ljust(70))
-                valstr = 'Number of beta  electrons   : {:d}'.format(
-                    monomer.number_of_beta_electrons())
-                self.ostream.print_header(valstr.ljust(70))
+                self.ostream.print_block(monomer.more_info())
                 self.ostream.print_blank()
                 self.ostream.print_blank()
 
@@ -549,19 +537,7 @@ class ExcitonModelDriver:
 
                 if self.rank == mpi_master():
                     self.ostream.print_block(dimer.get_string())
-
-                    valstr = 'Molecular charge            : {:.0f}'.format(
-                        dimer.get_charge())
-                    self.ostream.print_header(valstr.ljust(70))
-                    valstr = 'Spin multiplicity           : {:d}'.format(
-                        dimer.get_multiplicity())
-                    self.ostream.print_header(valstr.ljust(70))
-                    valstr = 'Number of alpha electrons   : {:d}'.format(
-                        dimer.number_of_alpha_electrons())
-                    self.ostream.print_header(valstr.ljust(70))
-                    valstr = 'Number of beta  electrons   : {:d}'.format(
-                        dimer.number_of_beta_electrons())
-                    self.ostream.print_header(valstr.ljust(70))
+                    self.ostream.print_block(dimer.more_info())
                     self.ostream.print_blank()
                     self.ostream.print_blank()
 
