@@ -101,8 +101,13 @@ class LoPropDriver:
             # obtain occupied & virtual orbital lists
             ao_per_atom, ao_occ, ao_vir = self.get_ao_indices(molecule, basis)
             
-            # TO transforation: re-arrange S
-            S0 = S[re_arranged_indices, :][:, re_arranged_indices]
+            # T0 transforation: re-arrange S
+            T0 = np.zeros((n_ao, n_ao))
+            for a in range(natoms):
+                for i,j in enumerate(re_arranged_indices): 
+                    T0[j,i] = 1
+	    
+            S0 = np.linalg.multi_dot([T0.T, S, T0])
 
             # T1 transformation: Gram-Schmidt
             T1 = np.zeros((n_ao, n_ao))
@@ -153,11 +158,10 @@ class LoPropDriver:
                     T4[ao_v, ao_v_1] = T4_virtual[ao_v_ind, ao_v_1_ind]
 
             # total transformation T becomes:
-            T = np.linalg.multi_dot([T1, T2, T3, T4])
+            T = np.linalg.multi_dot([T0, T1, T2, T3, T4])
 
             # obtain density matrix D in loprop basis set
             T_inv = np.linalg.pinv(T)
-            D = D[re_arranged_indices, :][:, re_arranged_indices]
             D_loprop = np.linalg.multi_dot([T_inv, D, T_inv.T])
 
             # calculated localized charges
@@ -204,9 +208,6 @@ class LoPropDriver:
             Dz = 2.0 * np.linalg.multi_dot([C, kappa_z, C.T])
 
             # convert purterbed density to loprop basis
-            Dx = Dx[re_arranged_indices, :][:, re_arranged_indices]
-            Dy = Dy[re_arranged_indices, :][:, re_arranged_indices]
-            Dz = Dz[re_arranged_indices, :][:, re_arranged_indices]
             Dx_loprop = np.linalg.multi_dot([T_inv, Dx, T_inv.T])
             Dy_loprop = np.linalg.multi_dot([T_inv, Dy, T_inv.T])
             Dz_loprop = np.linalg.multi_dot([T_inv, Dz, T_inv.T])
@@ -223,9 +224,6 @@ class LoPropDriver:
             z_ao = dipole_mats.z_to_numpy()
 
             # convert to loprop basis
-            x_ao = x_ao[re_arranged_indices, :][:, re_arranged_indices]
-            y_ao = y_ao[re_arranged_indices, :][:, re_arranged_indices]
-            z_ao = z_ao[re_arranged_indices, :][:, re_arranged_indices]
             x_ao_loprop = np.linalg.multi_dot([T.T, x_ao, T])
             y_ao_loprop = np.linalg.multi_dot([T.T, y_ao, T])
             z_ao_loprop = np.linalg.multi_dot([T.T, z_ao, T])
