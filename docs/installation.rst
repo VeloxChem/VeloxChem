@@ -14,21 +14,14 @@ Installing from source
 Build prerequisites
 +++++++++++++++++++
 
-- A C++ compiler fully compliant with the C++11 standard.
-- A installation of Python >=3.6 that includes the interpreter, the development
+- Build tool providing the ``make`` utility
+- C++ compiler fully compliant with the C++11 standard
+- Linear algebra libraries implementing the BLAS and LAPACK interfaces (e.g. 
+  Intel MKL, OpenBLAS or Cray LibSci)
+- MPI library (e.g. MPICH, Intel MPI or Open MPI)
+- Installation of Python >=3.6 that includes the interpreter, the development
   header files, and the development libraries.
-- A build tool providing the ``make`` utility.
-- The `pybind11 <https://pybind11.readthedocs.io>`_ (>=2.6) header-only library
-- A library implementing the MPI standard.
-- Linear algebra libraries implementing the BLAS and LAPACK interfaces.
-- The following Python modules:
-
-  - `h5py <https://www.h5py.org/>`_
-  - `psutil <https://psutil.readthedocs.io/en/latest/>`_
-  - `MPI4Py <https://mpi4py.readthedocs.io/>`_
-  - `NumPy <https://numpy.org>`_
-  - `LoProp <https://pypi.org/project/LoProp/>`_
-  - `geomeTRIC <https://github.com/leeping/geomeTRIC>`_
+- The `MPI4Py <https://mpi4py.readthedocs.io/>`_ module for Python
 
 Optional, add-on dependencies:
 
@@ -52,37 +45,28 @@ greatly simplify the installation of VeloxChem.
 
     $ cd veloxchem
 
-- Create and activate the Conda environment::
+- Create and activate the conda environment::
 
-    $ conda create --name <name> python=3.x
-    $ conda activate <name>
+    $ conda env create -f <environment_file>
+    $ conda activate vlxenv
 
-  VeloxChem requires at least Python 3.6
+  This will create and activate a conda environment named ``vlxenv``. In this
+  environment all the build dependencies will be installed from the ``conda-forge``
+  channel, including the C++ compiler, MPI, `NumPy <https://numpy.org>`__, 
+  `MPI4Py <https://mpi4py.readthedocs.io/>`__, etc. We provide two
+  options for the ``<environment_file>`` that specifies different linear algebra
+  backend for your conda environment:
 
-- Install standard build dependencies::
+  - ``mkl_env.yml`` which installs the Intel Math Kernel Library,
+  - ``openblas_env.yml`` which installs the OpenBLAS library.
 
-    $ conda env update --file <environment> --prune
+  Note that the MPICH library will be installed by the ``yml`` file. If you prefer
+  another MPI library such as Open MPI, you can edit the ``yml`` file and replace
+  ``mpich`` by ``openmpi``. Read more about the yml file in 
+  `this page 
+  <https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#create-env-file-manually>`__.
 
-  This will install, among other, the C++ compiler and NumPy. The
-  ``environment.yml`` file specifies the packages needed.  They will be
-  installed from the ``conda-forge`` channel.
-  VeloxChem can use different linear algebra backends and we provide two
-  environment files you can use to set up your conda environment:
-
-    - ``mkl_env.yml`` which installs the Intel Math Kernel Library,
-    - ``openblas_env.yml`` which installs the OpenBLAS library.
-
-- Install MPI and `Mpi4Py <https://mpi4py.readthedocs.io/>`_.
-
-  - To use `OpenMPI <https://www.open-mpi.org/>`_::
-
-      $ conda install openmpi mpi4py -c conda-forge
-
-  - To use `MPICH <https://www.mpich.org/>`_::
-
-      $ conda install mpich mpi4py -c conda-forge
-
-- Build and install VeloxChem in the Conda environment::
+- Build and install VeloxChem in the conda environment::
 
     $ python -m pip install .
 
@@ -90,70 +74,49 @@ greatly simplify the installation of VeloxChem.
   C++ sources in parallel. This behavior can be controlled *via* the
   ``VLX_NUM_BUILD_JOBS`` environment variable::
 
-    $ env VLX_NUM_BUILD_JOBS=N python -m pip install .
+    $ VLX_NUM_BUILD_JOBS=N python -m pip install .
 
-  will install VeloxChem using ``N`` parallel processes.
+  which will install VeloxChem using ``N`` cores.
 
-- The environment now contains all that is necessary to run VeloxChem. You can deactivate it by issuing::
+- The environment now contains all that is necessary to run VeloxChem. You can deactivate it by
+  ::
 
     $ conda deactivate
-
-
-- Use VeloxChem in Jupyter notebook ::
-
-    conda install jupyter
-    ipython kernel install --name vlx
-    jupyter notebook
-    # choose "vlx" in the drop-down menu under "New"
 
 Cray platform (x86-64 or ARM processor)
 +++++++++++++++++++++++++++++++++++++++
 
-- Load cray modules::
+- Load cray modules
+  ::
 
     $ module swap PrgEnv-cray PrgEnv-gnu
-    $ module load cray-hdf5
-    $ module load cray-python/3.6.5.7
+    $ module load cray-python
 
-- Create and activate a `virtual enviroment <https://docs.python.org/3.6/tutorial/venv.html>`_::
+- Create and activate a `virtual enviroment <https://docs.python.org/3.6/tutorial/venv.html>`_
+  ::
 
-    $ python3 -m venv vlx
-    $ source vlx/bin/activate
-    $ python -m pip install -U pip
+    $ python3 -m venv vlxenv
+    $ source vlxenv/bin/activate
+    $ python -m pip install --upgrade pip
 
-  Once the virtual environment is activated, you can just use ``python`` to invoke the interpreter.
+- Install `Mpi4Py <https://mpi4py.readthedocs.io/>`_
+  ::
 
-- Install `Mpi4Py <https://mpi4py.readthedocs.io/>`_.
+    $ CC=cc MPICC=cc python3 -m pip install --no-deps --no-binary=mpi4py mpi4py
 
-    1. Download a recent version of the source distribution::
+- Use the compiler wrapper to compile VeloxChem::
 
-         $ curl -LO https://bitbucket.org/mpi4py/mpi4py/downloads/mpi4py-X.Y.Z.tar.gz
-
-    2. Unzip the archive::
-
-         $ tar xf mpi4py-X.Y.Z.tar.gz
-         $ cd mpi4py-X.Y.Z
-
-    3. Append the following lines to ``mpi.cfg``::
-
-        [cray]
-        mpicc         = cc
-        mpicxx        = CC
-        extra_compile_args   = -shared
-        extra_link_args      = -Wl,-rpath,/opt/cray/pe/mpt/7.7.9/gni/mpich-gnu/8.2/lib
-
-    4. Build and install Mpi4Py::
-
-        $ python setup.py build --mpi=cray
-        $ python setup.py install
-
-- Use the compiler wrapper to compile VeloxChem ::
-
-    $ export CXX=CC
     $ cd veloxchem
-    $ python -m pip install .
+    $ CXX=CC python3 -m pip install .
 
   This will also take care of installing the additional necessary Python modules.
+
+  If you are installing VeloxChem on a HPC cluster, please run the compilation on an interactive node::
+
+    $ salloc -N 1 ...
+    $ CXX=CC VLX_NUM_BUILD_JOBS=N srun -n 1 python3 -m pip install .
+
+  where *N* is the number of cores on the node.
 
 Debian-based Linux
 ++++++++++++++++++
@@ -223,32 +186,13 @@ Windows
 
 - Soon to come!
 
-
-Installing binaries
-^^^^^^^^^^^^^^^^^^^
-
-Docker
-++++++
-
-A docker image with pre-compiled veloxchem based on ubuntu:18.04 is available
-on `Docker Hub <https://hub.docker.com/r/veloxchem/veloxchem>`_.
-
-.. code-block:: bash
-
-    $ docker run -it veloxchem/veloxchem:1.0rc1
-    # root@fcc794d899c7:/veloxchem# which vlx
-    /usr/local/bin/vlx
-
-.. _external-dependencies:
-
-Dependencies
-^^^^^^^^^^^^
+External dependencies
+^^^^^^^^^^^^^^^^^^^^^
 
 If you wish to use functionality offered through interfaces with other software
 packages, you will first need to install them.  Currently, interfaces to add-on
 dependencies `XTB <https://github.com/grimme-lab/xtb>`_ and `CPPE (v0.2.1)
 <https://github.com/maxscheurer/cppe/releases/tag/v0.2.1>`_  are available.
-
 
 The CPPE library for polarizable embedding
 ++++++++++++++++++++++++++++++++++++++++++
@@ -280,7 +224,6 @@ Alternatively, you can compile it without using ``pip``:
 
     # Set up python path
     $ export PYTHONPATH=/path/to/your/cppe/build/stage/lib:$PYTHONPATH
-
 
 The XTB package for semiempirical methods
 +++++++++++++++++++++++++++++++++++++++++
