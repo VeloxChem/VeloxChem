@@ -90,22 +90,20 @@ class LoPropDriver:
             n_ao = C.shape[0]
             n_mo = C.shape[1]
 
-            # re-arrange AOs according to principal quantum number
+            # re-arrange AOs
             re_arranged_indices = []
             for i in range(molecule.number_of_atoms()):
                 indices, angmoms = get_basis_function_indices_for_atom(
                     molecule, basis, i)
-                re_arranged_indices.append(indices)
-            re_arranged_indices = np.concatenate(re_arranged_indices)
+                re_arranged_indices += indices
 
             # obtain occupied & virtual orbital lists
             ao_per_atom, ao_occ, ao_vir = self.get_ao_indices(molecule, basis)
 
             # T0 transforation: re-arrange S
             T0 = np.zeros((n_ao, n_ao))
-            for a in range(natoms):
-                for i, j in enumerate(re_arranged_indices):
-                    T0[j, i] = 1
+            for ind, new_ind in enumerate(re_arranged_indices):
+                T0[new_ind, ind] = 1.0
             S0 = np.linalg.multi_dot([T0.T, S, T0])
 
             # T1 transformation: Gram-Schmidt
