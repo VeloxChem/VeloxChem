@@ -12,3 +12,5 @@ dependencies:
   - pip
   - pybind11>=2.6
   - python>=3.6
+  - mdanalysis
+  - pytest
