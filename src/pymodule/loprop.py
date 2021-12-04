@@ -100,13 +100,12 @@ class LoPropDriver:
 
             # obtain occupied & virtual orbital lists
             ao_per_atom, ao_occ, ao_vir = self.get_ao_indices(molecule, basis)
-            
+
             # T0 transforation: re-arrange S
             T0 = np.zeros((n_ao, n_ao))
             for a in range(natoms):
-                for i,j in enumerate(re_arranged_indices): 
-                    T0[j,i] = 1
-	    
+                for i, j in enumerate(re_arranged_indices):
+                    T0[j, i] = 1
             S0 = np.linalg.multi_dot([T0.T, S, T0])
 
             # T1 transformation: Gram-Schmidt
@@ -395,12 +394,12 @@ class LoPropDriver:
         """
 
         RBS = np.array([
-            0, 0.25, 0.25, 1.45, 1.05, 0.85, 0.7, 0.65, 0.6, 0.5, 0.43, 1.8, 1.5,
-            1.25, 1.1, 1.0, 1.0, 1.0, 1.0
+            0, 0.25, 0.25, 1.45, 1.05, 0.85, 0.7, 0.65, 0.6, 0.5, 0.43, 1.8,
+            1.5, 1.25, 1.1, 1.0, 1.0, 1.0, 1.0
         ]) / bohr_in_angstroms()
 
-        assert_msg_critical(za <= 17 or zb <= 17,
-                            'LoPropDriver: we currently support up to Cl')
+        assert_msg_critical(za <= 18 and zb <= 18,
+                            'LoPropDriver: we currently support up to Ar')
 
         ra = RBS[za]
         rb = RBS[zb]
@@ -478,8 +477,8 @@ class LoPropDriver:
 
             # Note: This function supports up to Ar but is limited by the RBS
             # radius list in penalty_fc
-            assert_msg_critical(element_id <= 17,
-                                'LoPropDriver: we currently support up to Cl')
+            assert_msg_critical(element_id <= 18,
+                                'LoPropDriver: we currently support up to Ar')
 
             # H and He: 1s
             ao_occ.append(iterr)
