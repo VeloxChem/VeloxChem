@@ -31,7 +31,7 @@ Optional, add-on dependencies:
 See :ref:`external-dependencies` for instructions on how to get these add-ons.
 
 We recommend to always use a `virtual enviroment
-<https://docs.python.org/3.6/tutorial/venv.html>`_, in order to avoid clashes
+<https://docs.python.org/3/tutorial/venv.html>`_, in order to avoid clashes
 between dependencies.
 
 With Anaconda
@@ -92,7 +92,7 @@ Cray platform (x86-64 or ARM processor)
     $ module swap PrgEnv-cray PrgEnv-gnu
     $ module load cray-python
 
-- Create and activate a `virtual enviroment <https://docs.python.org/3.6/tutorial/venv.html>`_
+- Create and activate a `virtual enviroment <https://docs.python.org/3/tutorial/venv.html>`_
   ::
 
     $ python3 -m venv vlxenv
@@ -121,55 +121,54 @@ Cray platform (x86-64 or ARM processor)
 Debian-based Linux
 ++++++++++++++++++
 
-- Install Intel Math Kernel Library from https://software.intel.com/en-us/articles/installing-intel-free-libs-and-python-apt-repo Note that this requires superuser privileges::
+- Install Intel Math Kernel Library from `this page <https://software.intel.com/en-us/articles/installing-intel-free-libs-and-python-apt-repo>`__. Note that this requires superuser privileges::
 
     $ wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
-    $ apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
+    $ sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
     $ sudo sh -c 'echo deb https://apt.repos.intel.com/mkl all main > /etc/apt/sources.list.d/intel-mkl.list'
     $ sudo apt-get update
-    $ sudo apt-get install intel-mkl-64bit
+    $ sudo apt-get install intel-mkl-64bit-2019.1-053
+    $ source /opt/intel/mkl/bin/mklvars.sh intel64
 
 - Install MPI and Python::
 
-    $ sudo apt-get install mpich python3 python3-dev python3-pip
+    $ sudo apt-get install git mpich python3 python3-dev python3-pip python3-venv
 
-- Create and activate a `virtual enviroment <https://docs.python.org/3.6/tutorial/venv.html>`_::
+- Create and activate a `virtual enviroment <https://docs.python.org/3/tutorial/venv.html>`_::
 
-    $ python3 -m venv vlx
-    $ source vlx/bin/activate
-    $ python -m pip install -U pip
+    $ python3 -m venv vlxenv
+    $ source vlxenv/bin/activate
+    $ python3 -m pip install --upgrade pip wheel
 
-- Install VeloxChem ::
+- Install VeloxChem::
 
-    $ cd veloxchem
-    $ python -m pip install .
+    $ python3 -m pip install git+https://gitlab.com/veloxchem/veloxchem
 
 RPM-based Linux
 +++++++++++++++
 
-- Install Math Kernel Library from https://software.intel.com/en-us/articles/installing-intel-free-libs-and-python-yum-repo Note that this requires superuser privileges::
+- Install Math Kernel Library from `this page <https://software.intel.com/en-us/articles/installing-intel-free-libs-and-python-yum-repo>`__. Note that this requires superuser privileges::
 
+    $ sudo yum install yum-utils
     $ sudo yum-config-manager --add-repo https://yum.repos.intel.com/mkl/setup/intel-mkl.repo
     $ sudo rpm --import https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
     $ sudo yum install intel-mkl-64bit
+    $ source /opt/intel/mkl/bin/mklvars.sh intel64
 
 - Install MPI and Python::
 
-    $ sudo yum install mpich-3.2-devel python3-devel
-    $ sudo ln -s /usr/lib64/mpich-3.2/bin/mpirun /usr/bin/mpirun
-    $ sudo ln -s /usr/lib64/mpich-3.2/bin/mpicxx /usr/bin/mpicxx
-    $ sudo ln -s /usr/lib64/mpich-3.2/bin/mpicc /usr/bin/mpicc
+    $ sudo yum install gcc gcc-g++ mpich mpich-devel python3 python3-devel python3-pip
+    $ export PATH=/usr/lib64/mpich/bin:$PATH
 
-- Create and activate a `virtual enviroment <https://docs.python.org/3.6/tutorial/venv.html>`_::
+- Create and activate a `virtual enviroment <https://docs.python.org/3/tutorial/venv.html>`_::
 
-    $ python3 -m venv vlx
-    $ source vlx/bin/activate
-    $ python -m pip install -U pip
+    $ python3 -m venv vlxenv
+    $ source vlxenv/bin/activate
+    $ python3 -m pip install --upgrade pip wheel
 
 - Install VeloxChem ::
 
-    $ cd veloxchem
-    $ python -m pip install .
+    $ python3 -m pip install git+https://gitlab.com/veloxchem/veloxchem
 
 PowerLinux
 ++++++++++
