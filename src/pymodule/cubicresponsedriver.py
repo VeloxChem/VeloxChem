@@ -1024,17 +1024,17 @@ class CubicResponseDriver(NonLinearSolver):
             Nc_h = self.flip_xy(Nc)
             Nd_h = self.flip_xy(Nd)
 
-            r4_term = -1j * self.damping * np.dot(
+            r4_term = 1j * self.damping * np.dot(
                 Nd_h, self.s4_for_r4(ka.T, kb, kc, D0, nocc, norb))
-            r4_term += -1j * self.damping * np.dot(
+            r4_term += 1j * self.damping * np.dot(
                 Nc_h, self.s4_for_r4(ka.T, kb, kd, D0, nocc, norb))
-            r4_term += -1j * self.damping * np.dot(
+            r4_term += 1j * self.damping * np.dot(
                 Nd_h, self.s4_for_r4(ka.T, kc, kb, D0, nocc, norb))
-            r4_term += -1j * self.damping * np.dot(
+            r4_term += 1j * self.damping * np.dot(
                 Nb_h, self.s4_for_r4(ka.T, kc, kd, D0, nocc, norb))
-            r4_term += -1j * self.damping * np.dot(
+            r4_term += 1j * self.damping * np.dot(
                 Nc_h, self.s4_for_r4(ka.T, kd, kb, D0, nocc, norb))
-            r4_term += -1j * self.damping * np.dot(
+            r4_term += 1j * self.damping * np.dot(
                 Nb_h, self.s4_for_r4(ka.T, kd, kc, D0, nocc, norb))
 
             e4_vec[wb] = e4vec
