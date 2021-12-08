@@ -358,7 +358,7 @@ class NonLinearSolver:
 
         return None
 
-    def comp_nlr_fock(self, mo, molecule, ao_basis, fock_flag, dft_dict = None, d_dft_1 = None, d_dft_2 = None):
+    def comp_nlr_fock(self, mo, molecule, ao_basis, fock_flag, dft_dict = None, d_dft_1 = None, d_dft_2 = None, mode=None):
         """-
         Computes and returns a list of Fock matrices 
 
@@ -380,9 +380,9 @@ class NonLinearSolver:
         if fock_flag == 'real_and_imag':
 
             if d_dft_1 and d_dft_2:
-                f_total = self.comp_two_el_int(mo, molecule, ao_basis,dft_dict,d_dft_1,d_dft_2)
+                f_total = self.comp_two_el_int(mo, molecule, ao_basis,dft_dict,d_dft_1,d_dft_2,mode)
             if d_dft_1 and not d_dft_2 :
-                f_total = self.comp_two_el_int(mo, molecule, ao_basis,dft_dict,d_dft_1)
+                f_total = self.comp_two_el_int(mo, molecule, ao_basis,dft_dict,d_dft_1,mode)
 
             nrows = f_total.data.shape[0]
             half_ncols = f_total.data.shape[1] // 2
@@ -398,7 +398,7 @@ class NonLinearSolver:
         else:
             return None
 
-    def comp_two_el_int(self, mo, molecule, ao_basis , dft_dict = None, dens_1 = None, dens_2 = None):
+    def comp_two_el_int(self, mo, molecule, ao_basis , dft_dict = None, dens_1 = None, dens_2 = None,mode=None):
         """
         Returns the two-electron part of the Fock matix in MO basis
 
@@ -415,6 +415,12 @@ class NonLinearSolver:
             A tuple containing the two-electron part of the Fock matix (in MO
             basis)
         """
+
+        print("in comp 2 el")
+        print("dens_1")
+        print(len(dens_1))
+        print("dens_2")
+        print(len(dens_2))
 
         eri_driver = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_driver.compute(get_qq_scheme(self.qq_type),
@@ -505,7 +511,7 @@ class NonLinearSolver:
 
                 molgrid.distribute(self.rank, self.nodes, self.comm)
                 xc_drv.integrate(fock, dens1, dens2, gs_density, molecule, ao_basis,
-                                 molgrid, self.xcfun.get_func_label())
+                                 molgrid, self.xcfun.get_func_label(),mode)
 
         
             fock.reduce_sum(self.rank, self.nodes, self.comm)

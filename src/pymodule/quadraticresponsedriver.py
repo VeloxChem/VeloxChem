@@ -249,6 +249,12 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         freqpairs = [wl for wl in zip(self.b_frequencies, self.c_frequencies)]
 
+
+        print("wa")
+        print(wa)
+        print("freqpairs")
+        print(freqpairs)
+
         if self.rank == mpi_master():
             A = {(op, w): v for op, v in zip('A', a_rhs) for w in wa}
             B = {(op, w): v for op, v in zip('B', b_rhs)
@@ -406,7 +412,7 @@ class QuadraticResponseDriver(NonLinearSolver):
             A2Nc = self.a2_contract(kX[('C', wc)], op_a, d_a_mo, nocc, norb)
             A2Nb = self.a2_contract(kX[('B', wb)], op_a, d_a_mo, nocc, norb)
 
-            NaE3NbNc = np.dot(Na.T, e3_dict[wb])
+            NaE3NbNc = np.dot(Na.T, e3_dict[(wb, wc)])
             NaC2Nb = np.dot(Na.T, C2Nb)
             NaB2Nc = np.dot(Na.T, B2Nc)
             NbA2Nc = np.dot(Nb.T, A2Nc)
@@ -432,7 +438,7 @@ class QuadraticResponseDriver(NonLinearSolver):
             self.print_component('A2', -A2, width)
             self.print_component('E3', NaE3NbNc, width)
             self.print_component('β', NaE3NbNc - A2 - X2, width)
-            result.update({wb: NaE3NbNc - A2 - X2})
+            result.update({(wb, wc): NaE3NbNc - A2 - X2})
 
         profiler.check_memory_usage('End of QRF')
 
@@ -479,8 +485,8 @@ class QuadraticResponseDriver(NonLinearSolver):
             Dcb = self.transform_dens(kc, Db, S)
 
             d_dft1.append(Db.real)
-            d_dft1.append(Dc.real)
             d_dft1.append(Db.imag)
+            d_dft1.append(Dc.real)
             d_dft1.append(Dc.imag)
             d_dft2.append((Dbc+Dcb).real)
             d_dft2.append((Dbc+Dcb).imag)
@@ -535,7 +541,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         time_start_fock = time.time()
         dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis,
-                                        'real_and_imag',dft_dict, d_first,d_sec)
+                                        'real_and_imag',dft_dict, d_first,d_sec,'qrf')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -548,7 +554,7 @@ class QuadraticResponseDriver(NonLinearSolver):
         fock_index = 0
         for (wb, wc) in wi:
             for key in keys:
-                focks[key][wb] = DistributedArray(dist_focks.data[:,
+                focks[key][(wb, wc)] = DistributedArray(dist_focks.data[:,
                                                                   fock_index],
                                                   self.comm,
                                                   distribute=False)
@@ -586,7 +592,7 @@ class QuadraticResponseDriver(NonLinearSolver):
         for (wb, wc) in wi:
 
             vec_pack = np.array([
-                fo['Fbc,Fcb'][wb].data, fo2[('B', wb)].data,
+                fo['Fbc,Fcb'][(wb, wc)].data, fo2[('B', wb)].data,
                 fo2[('C', wc)].data
             ]).T.copy()
 
@@ -612,7 +618,7 @@ class QuadraticResponseDriver(NonLinearSolver):
             xi = self.xi(kb, kc, fb, fc, F0_a)
 
             e3fock = xi.T + (0.5 *fbc_cb).T
-            e3vec[wb] = self.anti_sym(
+            e3vec[(wb, wc)] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
 
         return e3vec

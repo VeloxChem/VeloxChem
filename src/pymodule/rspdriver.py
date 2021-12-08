@@ -196,7 +196,7 @@ class ResponseDriver:
 
             shg_solver.update_settings(self.rsp_dict, self.method_dict)
 
-            shg_results = shg_solver.compute(molecule, ao_basis, scf_tensors)
+            shg_results = shg_solver.compute(molecule, ao_basis, scf_tensors,self.method_dict)
 
             self.is_converged = shg_solver.is_converged
 

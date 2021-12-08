@@ -645,7 +645,174 @@ CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGridAB,
 }
 
 void
-CDensityGrid::getScreenedGridPairUnrestricted(       CDensityGrid&   densityGridAB,
+CDensityGrid::makenewdens(            CDensityGrid&   densityGridAB,
+                                      CMolecularGrid& molecularGridab,
+                                const CDensityGrid&   rwDensityGrid,
+                                const xcfun           xcFuncType,
+                                      int32_t         numdens,
+                                const std::string&    quadMode ) const
+{    
+    if (_gridType != dengrid::ab) return;
+    
+    // set grid points data
+    
+    auto npoints = getNumberOfGridPoints();
+    
+    int32_t ipoints = 0;
+
+    // set up pointers to source density
+
+    auto rwdenptr = &rwDensityGrid;
+    
+    // set up pointers to destination density
+
+    if (xcFuncType == xcfun::lda)
+    {
+        if (quadMode == "shg")
+        {
+            int idx = 0;
+            int idx_2 = 0;
+
+            for (int32_t j = 0; j < numdens / 12 ; j++)
+            {
+
+                auto rho_sig_xa_r = densityGridAB.alphaDensity(j + idx_2);
+                
+                auto rho_sig_xa_i = densityGridAB.alphaDensity(j + idx_2 + 1);
+
+                auto rho_sig_ya_r = densityGridAB.alphaDensity(j + idx_2 + 2);
+
+                auto rho_sig_ya_i = densityGridAB.alphaDensity(j + idx_2 + 3);
+
+                auto rho_sig_za_r = densityGridAB.alphaDensity(j + idx_2 + 4);
+                
+                auto rho_sig_za_i = densityGridAB.alphaDensity(j + idx_2 + 5);
+
+                auto rho_lam_xya_r = densityGridAB.alphaDensity(j + idx_2 + 6);
+                
+                auto rho_lam_xya_i = densityGridAB.alphaDensity(j + idx_2 + 7);
+
+                auto rho_lam_xza_r = densityGridAB.alphaDensity(j + idx_2 + 8);
+
+                auto rho_lam_xza_i = densityGridAB.alphaDensity(j + idx_2 + 9);
+
+                auto rho_lam_yza_r = densityGridAB.alphaDensity(j + idx_2 + 10);
+                
+                auto rho_lam_yza_i = densityGridAB.alphaDensity(j + idx_2 + 11);
+
+                idx_2 = idx_2 + 11;
+
+                // alpha
+                
+                auto rhowxa_r = rwdenptr->alphaDensity(j + idx);
+
+                auto rhowxa_i = rwdenptr->alphaDensity(j + idx + 1);
+
+                auto rhowya_r = rwdenptr->alphaDensity(j + idx + 2);
+
+                auto rhowya_i = rwdenptr->alphaDensity(j + idx + 3);
+
+                auto rhowza_r = rwdenptr->alphaDensity(j + idx + 4);
+                
+                auto rhowza_i = rwdenptr->alphaDensity(j + idx + 5);
+
+                idx = idx + 5;
+
+                for (int32_t i = 0; i < npoints; i++)
+                {
+                    
+                    auto alpha_r = 2 * (rhowxa_r[i]*rhowxa_r[i] + rhowya_r[i]*rhowya_r[i] + rhowza_r[i]*rhowza_r[i])
+                                        
+                                    -2 * (rhowxa_i[i]*rhowxa_i[i] + rhowya_i[i]*rhowya_i[i] + rhowza_i[i]*rhowza_i[i]);
+
+                    auto alpha_i = 2 * (rhowxa_r[i]*rhowxa_i[i] + rhowya_r[i]*rhowya_i[i] + rhowza_r[i]*rhowza_i[i]
+                    
+                                        + rhowxa_i[i]*rhowxa_r[i] + rhowya_i[i]*rhowya_r[i] + rhowza_i[i]*rhowza_r[i]);
+
+                    rho_sig_xa_r[ipoints] = 4 * (rhowxa_r[i]*rhowxa_r[i] - rhowxa_i[i]*rhowxa_i[i] ) + alpha_r ;
+
+                    rho_sig_xa_i[ipoints] = 4 * (rhowxa_r[i]*rhowxa_i[i] + rhowxa_i[i]*rhowxa_r[i]) + alpha_i ;
+
+                    rho_sig_ya_r[ipoints] = 4 * (rhowya_r[i]*rhowya_r[i] - rhowya_i[i]*rhowya_i[i] ) + alpha_r;
+                    
+                    rho_sig_ya_i[ipoints] = 4 * (rhowya_r[i]*rhowya_i[i] + rhowya_i[i]*rhowya_r[i]) + alpha_i;
+
+                    rho_sig_za_r[ipoints] = 4 * (rhowza_r[i]*rhowza_r[i] - rhowza_i[i]*rhowza_i[i] ) + alpha_r;
+                    
+                    rho_sig_za_i[ipoints] = 4 *(rhowza_r[i]*rhowza_i[i] + rhowza_i[i]*rhowza_r[i]) + alpha_i;
+
+                    rho_lam_xya_r[ipoints] = 2 * (rhowxa_r[i]*rhowya_r[i]-rhowxa_i[i]*rhowya_i[i] 
+
+                                                + rhowya_r[i]*rhowxa_r[i] - rhowya_i[i]*rhowxa_i[i]);
+
+                    rho_lam_xya_i[ipoints] = 2 * (rhowxa_r[i]*rhowya_i[i] + rhowxa_i[i]*rhowya_r[i] 
+                                                
+                                                +   rhowya_r[i]*rhowxa_i[i] + rhowya_i[i]*rhowxa_r[i]) ;
+
+                    rho_lam_xza_r[ipoints] = 2 * (rhowxa_r[i]*rhowza_r[i]-rhowxa_i[i]*rhowza_i[i] 
+
+                                                + rhowza_r[i]*rhowxa_r[i] - rhowza_i[i]*rhowxa_i[i]);
+
+                    rho_lam_xza_i[ipoints] = 2 * (rhowxa_r[i]*rhowza_i[i] + rhowxa_i[i]*rhowza_r[i] 
+                                                
+                                                +   rhowza_r[i]*rhowxa_i[i] + rhowza_i[i]*rhowxa_r[i]) ;
+
+                    rho_lam_yza_r[ipoints] = 2 * (rhowya_r[i]*rhowza_r[i] - rhowya_i[i]*rhowza_i[i]
+                                                
+                                                + rhowza_r[i]*rhowya_r[i] -  rhowza_i[i]*rhowya_i[i]) ;
+
+                    rho_lam_yza_i[ipoints] = 2 * (rhowya_r[i]*rhowza_i[i] + rhowya_i[i]*rhowza_r[i] 
+                                                
+                                                +   rhowza_r[i]*rhowya_i[i] + rhowza_i[i]*rhowya_r[i]) ;
+
+                    ipoints++;
+                }           
+            }
+        }
+        else
+        {   
+            int idx = 0;
+            int idx_2 = 0;
+
+            for (int32_t j = 0; j < numdens / 2 ; j++)
+            {
+
+                auto rhorho_r = densityGridAB.alphaDensity(j + idx_2);
+
+                auto rhorho_i = densityGridAB.alphaDensity(j + idx_2 + 1);
+
+                idx_2++;
+
+                auto rhow1a_r = rwdenptr->alphaDensity(j + idx);
+
+                auto rhow1a_i = rwdenptr->alphaDensity(j + 1 + idx);
+
+                auto rhow2a_r = rwdenptr->alphaDensity(j + 2 + idx);
+
+                auto rhow2a_i = rwdenptr->alphaDensity(j + 3 + idx);
+
+                idx = idx + 3;
+
+                for (int32_t i = 0; i < npoints; i++)
+                {
+                    rhorho_r[ipoints] = rhow1a_r[i]*rhow2a_r[i] - rhow1a_i[i]*rhow2a_i[i] 
+                                        
+                                    + rhow2a_r[i]*rhow1a_r[i] - rhow2a_i[i]*rhow1a_i[i];
+
+                    rhorho_i[ipoints] =  rhow1a_r[i]*rhow2a_i[i] + rhow1a_i[i]*rhow2a_r[i]
+
+                                    +  rhow2a_r[i]*rhow1a_i[i] + rhow2a_i[i]*rhow1a_r[i];
+                    
+                    ipoints++;
+                }
+            }
+        }
+    }
+}
+
+
+void
+CDensityGrid::getScreenedGridPairUnrestricted(        CDensityGrid&   densityGridAB,
                                                       CDensityGrid&   densityGridA,
                                                       CDensityGrid&   densityGridB,
                                                       CMolecularGrid& molecularGridab,
@@ -657,7 +824,7 @@ CDensityGrid::getScreenedGridPairUnrestricted(       CDensityGrid&   densityGrid
 {
     // create density grid
 
-    densityGridAB      = CDensityGrid(getNumberOfGridPoints(), 1, xcFuncType, dengrid::ab);
+    densityGridAB = CDensityGrid(getNumberOfGridPoints(), 1, xcFuncType, dengrid::ab);
 
     densityGridA = CDensityGrid(getNumberOfGridPoints(), 1, xcFuncType, dengrid::lima);
 
