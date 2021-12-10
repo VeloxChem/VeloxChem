@@ -68,8 +68,8 @@ def get_command_output(command):
     try:
         output = subprocess.check_output(command)
     except subprocess.CalledProcessError:
-        print()
-        print("*** Error: Unable to execute '{}'".format(" ".join(command)))
+        cmd_line = " ".join(command)
+        print(f"\n*** Error: Failed to execute '{cmd_line}'")
         sys.exit(1)
     return output.decode("utf-8")
 
@@ -82,13 +82,14 @@ def check_cray():
 
 def check_dir(dirname, label):
     if not os.path.isdir(dirname):
-        print("*** Error: {} dir {} does not exist!".format(label, dirname))
+        print(f"*** Error: {label} dir {dirname} does not exist!")
         sys.exit(1)
 
 
-def generate_setup(
-    template_file, setup_file, user_flag=None, build_lib=Path("build/lib")
-):
+def generate_setup(template_file,
+                   setup_file,
+                   user_flag=None,
+                   build_lib=Path("build/lib")):
 
     if isinstance(template_file, str):
         template_file = Path(template_file)
@@ -140,7 +141,7 @@ def generate_setup(
         sys.exit(1)
 
     if cxx in ["icpc", "g++", "clang++"]:
-        print("*** Error: {} is not a MPI compiler!".format(cxx))
+        print(f"*** Error: {cxx} is not a MPI compiler!")
         sys.exit(1)
 
     if cxx in ["mpiicpc", "mpicxx", "mpiCXX"]:
@@ -152,14 +153,13 @@ def generate_setup(
     cxxname = cxxname.split()[0]
 
     if cxxname in ["icc", "gcc", "clang"]:
-        print("*** Error: {} is not a c++ compiler!".format(cxx))
+        print(f"*** Error: {cxx} is not a c++ compiler!")
         sys.exit(1)
 
     use_intel = cxxname == "icpc"
     use_gnu = re.match(r"(.*(c|g|gnu-c)\+\+)", cxxname)
     use_clang = cxxname in ["clang++", "Crayclang"] or re.match(
-        r".*-clang\+\+", cxxname
-    )
+        r".*-clang\+\+", cxxname)
 
     if not (use_intel or use_gnu or use_clang):
         print("*** Error: Unrecognized c++ compiler!")
@@ -189,24 +189,18 @@ def generate_setup(
 
     # check whether MKL is in conda environment
     if "MKLROOT" not in os.environ:
-        has_lib = (
-            Path(sys.prefix, "lib/libmkl_core.so").is_file()
-            or Path(sys.prefix, "lib/libmkl_core.dylib").is_file()
-        )
+        has_lib = (Path(sys.prefix, "lib/libmkl_core.so").is_file() or
+                   Path(sys.prefix, "lib/libmkl_core.dylib").is_file())
         has_header = Path(sys.prefix, "include/mkl.h").is_file()
         if is_conda and has_lib and has_header:
             os.environ["MKLROOT"] = sys.prefix
 
     # check whether OpenBLAS is in conda environment
     if "OPENBLASROOT" not in os.environ:
-        has_lib = (
-            Path(sys.prefix, "lib/libopenblas.so").is_file()
-            or Path(sys.prefix, "lib/libopenblas.dylib").is_file()
-        )
-        has_header = (
-            Path(sys.prefix, "include/lapacke.h").is_file()
-            and Path(sys.prefix, "include/cblas.h").is_file()
-        )
+        has_lib = (Path(sys.prefix, "lib/libopenblas.so").is_file() or
+                   Path(sys.prefix, "lib/libopenblas.dylib").is_file())
+        has_header = (Path(sys.prefix, "include/lapacke.h").is_file() and
+                      Path(sys.prefix, "include/cblas.h").is_file())
         if is_conda and has_lib and has_header:
             os.environ["OPENBLASROOT"] = sys.prefix
 
@@ -236,15 +230,14 @@ def generate_setup(
         check_dir(mkl_dir, "mkl lib")
 
         math_lib = f"MATH_INC := -I{mkl_inc}"
-        math_lib += "\n" + f"MATH_LIB := -L{mkl_dir}"
+        math_lib += f"\nMATH_LIB := -L{mkl_dir}"
         if is_macos:
             math_lib += (
-                "\n" + f"MATH_LIB += -Wl,-rpath,{mkl_dir} -lmkl_rt -lpthread -lm -ldl"
+                f"\nMATH_LIB += -Wl,-rpath,{mkl_dir} -lmkl_rt -lpthread -lm -ldl"
             )
         else:
             math_lib += (
-                "\n" + "MATH_LIB += -lmkl_rt -Wl,--no-as-needed -lpthread -lm -ldl"
-            )
+                "\nMATH_LIB += -lmkl_rt -Wl,--no-as-needed -lpthread -lm -ldl")
 
         if is_linux and not use_intel:
             conf = {
@@ -284,15 +277,13 @@ def generate_setup(
         openblas_dir = os.path.join(os.environ["OPENBLASROOT"], "lib")
         check_dir(openblas_dir, "openblas lib")
 
-        math_lib = "MATH_INC := -I{}".format(openblas_inc)
-        math_lib += "\n" + "MATH_LIB := -L{}".format(openblas_dir)
-        math_lib += "\n" + "MATH_LIB += -Wl,-rpath,{}".format(openblas_dir)
+        math_lib = f"MATH_INC := -I{openblas_inc}"
+        math_lib += f"\nMATH_LIB := -L{openblas_dir}"
+        math_lib += f"\nMATH_LIB += -Wl,-rpath,{openblas_dir}"
         openblas_flag = "-lopenblas"
         if use_intel:
             openblas_flag += " -lifcore"
-        math_lib += "\n" + "MATH_LIB += {} {} {}".format(
-            openblas_flag, omp_flag, "-lpthread -lm -ldl"
-        )
+        math_lib += f"\nMATH_LIB += {openblas_flag} {omp_flag} -lpthread -lm -ldl"
 
     # cray-libsci flags
 
@@ -300,9 +291,7 @@ def generate_setup(
         print("Cray LibSci")
 
         math_lib = "MATH_INC := "
-        math_lib += "\n" + "MATH_LIB := {} {}".format(
-            omp_flag, "-lpthread -lm -ldl"
-        )
+        math_lib += f"\nMATH_LIB := {omp_flag} -lpthread -lm -ldl"
 
     # extra flags for mac
 
@@ -334,14 +323,14 @@ def generate_setup(
     else:
         xtb_dir = Path(xtb_root, "lib")
         has_xtb_lib = (xtb_dir / "libxtb.so").is_file() or (
-            xtb_dir / "libxtb.dylib"
-        ).is_file()
+            xtb_dir / "libxtb.dylib").is_file()
     # support files
     xtb_path = Path(xtb_root, "share/xtb")
-    xtb_params = ["param_gfn0-xtb.txt", "param_gfn1-xtb.txt", "param_gfn2-xtb.txt"]
+    xtb_params = [
+        "param_gfn0-xtb.txt", "param_gfn1-xtb.txt", "param_gfn2-xtb.txt"
+    ]
     has_xtb_share = xtb_path.is_dir() and all(
-        [(xtb_path / x).is_file() for x in xtb_params]
-    )
+        [(xtb_path / x).is_file() for x in xtb_params])
 
     if has_xtb_header and has_xtb_lib and has_xtb_share:
         use_xtb = True
@@ -357,7 +346,8 @@ def generate_setup(
     gtest_root = os.getenv("GTESTROOT", sys.prefix)
     # include
     gtest_inc = Path(gtest_root, "include")
-    has_gtest_header = gtest_inc.is_dir() and (gtest_inc / "gtest/gtest.h").is_file()
+    has_gtest_header = gtest_inc.is_dir() and (gtest_inc /
+                                               "gtest/gtest.h").is_file()
     # library
     _lib = Path(f"{gtest_root}/lib")
     has_gtest_lib = False
@@ -394,13 +384,14 @@ def generate_setup(
                 print(f"PYTHON_INC = -I{python_include_path}", file=f_mkfile)
                 print(f"PYTHON_INC += -I{mpi4py.get_include()}", file=f_mkfile)
                 print(f"PYTHON_INC += -I{numpy.get_include()}", file=f_mkfile)
-                print(f"PYTHON_INC += -isystem {pybind11.get_include()}", file=f_mkfile)
+                print(f"PYTHON_INC += -isystem {pybind11.get_include()}",
+                      file=f_mkfile)
                 # Note: use -isystem to suppress warnings from pybind11
 
                 build_lib_str = (build_lib / "veloxchem").resolve()
                 vlx_target_str = "$(BUILD_LIB)/veloxchemlib" + ext_suffix
-                print("BUILD_LIB := {}".format(build_lib_str), file=f_mkfile)
-                print("VLX_TARGET := {}".format(vlx_target_str), file=f_mkfile)
+                print(f"BUILD_LIB := {build_lib_str}", file=f_mkfile)
+                print(f"VLX_TARGET := {vlx_target_str}", file=f_mkfile)
                 print("", file=f_mkfile)
 
                 print("USE_MPI := true", file=f_mkfile)
@@ -418,8 +409,7 @@ def generate_setup(
                 print("", file=f_mkfile)
 
                 print(
-                    "PYTHON :=",
-                    "python{}.{}".format(sys.version_info[0], sys.version_info[1]),
+                    f"PYTHON := python{sys.version_info[0]}.{sys.version_info[1]}",
                     file=f_mkfile,
                 )
                 print("", file=f_mkfile)
@@ -450,7 +440,7 @@ def generate_setup(
             else:
                 print(line, end="", file=f_mkfile)
 
-    print("*** Successfully generated {}".format(setup_file))
+    print(f"*** Successfully generated {setup_file}")
     sys.stdout.flush()
 
 
@@ -464,7 +454,7 @@ if __name__ == "__main__":
         setup_file = os.path.join("src", "Makefile.setup")
 
     if not os.path.isfile(template_file):
-        print("*** Error: Cannot find template file {}".format(template_file))
+        print(f"*** Error: Cannot find template file {template_file}")
         sys.exit(1)
 
     user_flag = None
