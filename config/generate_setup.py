@@ -235,7 +235,7 @@ def generate_setup(
             mkl_dir = os.path.join(os.environ["MKLROOT"], "lib")
         check_dir(mkl_dir, "mkl lib")
 
-        math_lib = f"MATH_INC := -isystem {mkl_inc}"
+        math_lib = f"MATH_INC := -I{mkl_inc}"
         math_lib += "\n" + f"MATH_LIB := -L{mkl_dir}"
         if is_macos:
             math_lib += (
@@ -284,7 +284,7 @@ def generate_setup(
         openblas_dir = os.path.join(os.environ["OPENBLASROOT"], "lib")
         check_dir(openblas_dir, "openblas lib")
 
-        math_lib = "MATH_INC := -isystem {}".format(openblas_inc)
+        math_lib = "MATH_INC := -I{}".format(openblas_inc)
         math_lib += "\n" + "MATH_LIB := -L{}".format(openblas_dir)
         math_lib += "\n" + "MATH_LIB += -Wl,-rpath,{}".format(openblas_dir)
         openblas_flag = "-lopenblas"
@@ -391,10 +391,11 @@ def generate_setup(
 
                 python_include_path = sysconfig.get_path("include")
                 print("# Python-related headers files", file=f_mkfile)
-                print(f"PYTHON_INC = -isystem {python_include_path}", file=f_mkfile)
-                print(f"PYTHON_INC += -isystem {mpi4py.get_include()}", file=f_mkfile)
-                print(f"PYTHON_INC += -isystem {numpy.get_include()}", file=f_mkfile)
+                print(f"PYTHON_INC = -I{python_include_path}", file=f_mkfile)
+                print(f"PYTHON_INC += -I{mpi4py.get_include()}", file=f_mkfile)
+                print(f"PYTHON_INC += -I{numpy.get_include()}", file=f_mkfile)
                 print(f"PYTHON_INC += -isystem {pybind11.get_include()}", file=f_mkfile)
+                # Note: use -isystem to suppress warnings from pybind11
 
                 build_lib_str = (build_lib / "veloxchem").resolve()
                 vlx_target_str = "$(BUILD_LIB)/veloxchemlib" + ext_suffix
