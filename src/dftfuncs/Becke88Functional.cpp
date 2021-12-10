@@ -511,7 +511,6 @@ namespace vxcfuncs {  // vxcfuncs namespace
                         +  36*xb4*fb*(6*(1 + xb2) + (-1 + 2*xb2)*ashb2)))/(std::pow(1 + xb2,2.5)*denom4_b);
 
 
-
             // Alpha
 
             gmix_aaa[i] += factor*(ff2_a*alpha10_2_a + ff1_a * alpha20_a + grada[i]*(ff3_a*alpha10_2_a*alpha01_a 

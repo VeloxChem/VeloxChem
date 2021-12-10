@@ -416,12 +416,6 @@ class NonLinearSolver:
             basis)
         """
 
-        print("in comp 2 el")
-        print("dens_1")
-        print(len(dens_1))
-        print("dens_2")
-        print(len(dens_2))
-
         eri_driver = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_driver.compute(get_qq_scheme(self.qq_type),
                                        self.eri_thresh, molecule, ao_basis)

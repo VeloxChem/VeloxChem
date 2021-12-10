@@ -72,24 +72,24 @@ class TestQrf(unittest.TestCase):
         qrf_prop.update_settings(rsp_settings, method_settings)
 
         qrf_result_yyx = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
-        
+
         # x-component 
 
-        self.assertTrue(abs(qrf_result_xxx[(-0.1,0.3)].real - ref_result['xxx'].real) < 1.0e-5)
+        self.assertTrue(abs(qrf_result_xxx[(-0.1,0.3)].real - ref_result['xxx'].real) < 1.0e-4)
 
-        self.assertTrue(abs(qrf_result_xxx[(-0.1,0.3)].imag - ref_result['xxx'].imag) < 1.0e-5)
+        self.assertTrue(abs(qrf_result_xxx[(-0.1,0.3)].imag - ref_result['xxx'].imag) < 1.0e-4)
         
         # y-component 
         
-        self.assertTrue(abs(qrf_result_yyx[(-0.1,0.3)].real - ref_result['yyx'].real) < 1.0e-5)
+        self.assertTrue(abs(qrf_result_yyx[(-0.1,0.3)].real - ref_result['yyx'].real) < 1.0e-4)
 
-        self.assertTrue(abs(qrf_result_yyx[(-0.1,0.3)].imag - ref_result['yyx'].imag) < 1.0e-5)
+        self.assertTrue(abs(qrf_result_yyx[(-0.1,0.3)].imag - ref_result['yyx'].imag) < 1.0e-4)
 
         # z-component 
         
-        self.assertTrue(abs(qrf_result_zzx[(-0.1,0.3)].real - ref_result['zzx'].real) < 1.0e-5)
+        self.assertTrue(abs(qrf_result_zzx[(-0.1,0.3)].real - ref_result['zzx'].real) < 1.0e-4)
 
-        self.assertTrue(abs(qrf_result_zzx[(-0.1,0.3)].imag - ref_result['zzx'].imag) < 1.0e-5)
+        self.assertTrue(abs(qrf_result_zzx[(-0.1,0.3)].imag - ref_result['zzx'].imag) < 1.0e-4)
 
 
     def test_qrf(self):

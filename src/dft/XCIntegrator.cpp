@@ -360,10 +360,8 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     auto rwdengridc = CDensityGrid(mgrid.getNumberOfGridPoints(), rw2DensityMatrix.getNumberOfDensityMatrices(), fvxc.getFunctionalType(), dengrid::ab);
 
     rwdengridc.makenewdens(rwdengridc,mgrid,rwdengrid,fvxc.getFunctionalType(),rw2DensityMatrix.getNumberOfDensityMatrices(),quadMode);
-    
+            
     // set up number of perturbed denstries and matrix dimensions
-
-    std::cout << "number of dens " << rwdengridc.getNumberOfDensityMatrices() << std::endl;
     
     auto ndmat = rw2DensityMatrix.getNumberOfDensityMatrices();
     
@@ -379,7 +377,6 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     {
 
         _compRestrictedContributionForLda(ksmat, gtovec, vxc2grid, vxc3grid, rwdengridc, rw2dengrid, mgrid,quadMode);
-        
         
     }
         
@@ -4259,19 +4256,16 @@ CXCIntegrator::_distRestrictedBatchForLdaShg(   CAOKohnShamMatrix*   aoKohnShamM
     for (int32_t i = 0; i < nmat; i++)
     {
         // set up pointer to Kohn-Sham matrix
-        
+
         auto ksmat = aoKohnShamMatrix->getMatrix(i);
         
         // set up pointer to perturbed density
         
         auto rhow1a = rwDensityGrid->alphaDensity(i);
         
-        //auto rhow1b = rwDensityGrid->betaDensity(i);
-
         auto rhow12a = rw2DensityGrid->alphaDensity(i);
         
         auto rhow12b = rw2DensityGrid->betaDensity(i);
-
 
         // loop over AOs blocks
         
@@ -5053,93 +5047,94 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
     
     // set up pointers to exchange-correlation functional derrivatives
 
-    auto grho_aa = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::rhoa);
+    auto df2000 = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::rhoa);
     
-    auto grho_ab = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::rhob);
+    auto df1100 = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::rhob);
     
-    auto gmix_aa = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::grada);
+    auto df1010 = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::grada);
     
-    auto gmix_ab = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::gradb);
-
-    auto gmix_ba = xcHessianGrid->xcHessianValues(xcvars::rhob, xcvars::grada);
+    auto df1001 = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::gradb);
     
-    auto gmix_ac = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::gradab);
+    auto df10001 = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::gradab);
+        
+    auto df0020 = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::grada);
     
-    auto gmix_bc = xcHessianGrid->xcHessianValues(xcvars::rhob, xcvars::gradab);
+    auto df0011 = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::gradb);
     
-    auto ggrad_aa = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::grada);
+    auto df00101 = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::gradab);
     
-    auto ggrad_ab = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::gradb);
+    auto df00002 = xcHessianGrid->xcHessianValues(xcvars::gradab, xcvars::gradab);
     
-    auto ggrad_ac = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::gradab);
+    auto df0010 = xcGradientGrid->xcGradientValues(xcvars::grada);
     
-    auto ggrad_bc = xcHessianGrid->xcHessianValues(xcvars::gradb, xcvars::gradab);
+    auto df00001 = xcGradientGrid->xcGradientValues(xcvars::gradab);
+
+    auto df00011 =  xcHessianGrid->xcHessianValues(xcvars::gradb ,xcvars::gradab);
     
-    auto ggrad_cc = xcHessianGrid->xcHessianValues(xcvars::gradab, xcvars::gradab);
+    auto df01001 =   xcHessianGrid->xcHessianValues(xcvars::rhob ,xcvars::gradab);
+
+    auto df0110  = xcHessianGrid->xcHessianValues(xcvars::rhob ,xcvars::grada);
+
+    auto df3000 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa,xcvars::rhoa );
+
+    auto df2100 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa,xcvars::rhob );
+
+    auto df1200 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhob,xcvars::rhob );
+
+    auto df2010 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa,xcvars::grada );
+
+    auto df0030 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::grada,xcvars::grada );
+
+    auto df0021 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::grada,xcvars::gradb );
+
+    auto df0012 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::gradb,xcvars::gradb );
+
+    auto df00201 =  xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::grada,xcvars::gradab );
+
+    auto df00111 =  xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::gradb,xcvars::gradab );
+
+    auto df00102 =  xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::gradab,xcvars::gradab );
+
+    auto df00003 =  xcCubicHessianGrid->xcCubicHessianValues(xcvars::gradab, xcvars::gradab,xcvars::gradab );
+
+    auto df2001 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa,xcvars::gradb );
+
+    auto df1110 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhob,xcvars::grada );
+
+    auto df1101 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhob,xcvars::gradb );
+
+    auto df20001 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa,xcvars::gradab );
+
+    auto df11001 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhob,xcvars::gradab );
+
+    auto df1020 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::grada ,xcvars::grada );
+
+    auto df1011 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::grada ,xcvars::gradb );
+
+    auto df1002 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::gradb ,xcvars::gradb);
+
+    auto df10101 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::grada ,xcvars::gradab);
+
+    auto df10002 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::gradab ,xcvars::gradab);
+
+    auto df01002 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::gradab ,xcvars::gradab);
+
+    auto df0120 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::grada ,xcvars::grada);
+
+    auto df0111 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::grada ,xcvars::gradb);
+
+    auto df01101 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::grada ,xcvars::gradab);
+
+    auto df10011 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::gradb ,xcvars::gradab);
     
-    auto ggrad_a = xcGradientGrid->xcGradientValues(xcvars::grada);
-    
-    auto ggrad_c = xcGradientGrid->xcGradientValues(xcvars::gradab);
+    auto df01011 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::gradb ,xcvars::gradab);
 
-    auto grho_aaa = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa,xcvars::rhoa );
+    auto df0210 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::rhob ,xcvars::grada);
 
-    auto grho_aab = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa,xcvars::rhob );
+    auto df02001 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::rhob ,xcvars::gradab);
 
-    auto grho_abb = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhob,xcvars::rhob );
+    auto df00021 =  xcCubicHessianGrid->xcCubicHessianValues(xcvars::gradb, xcvars::gradb ,xcvars::gradab);
 
-    auto gmix_aaa = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa,xcvars::grada );
-
-    auto ggrad_aaa = xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::grada,xcvars::grada );
-
-    auto ggrad_aab = xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::grada,xcvars::gradb );
-
-    auto ggrad_abb = xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::gradb,xcvars::gradb );
-
-    auto ggrad_aac =  xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::grada,xcvars::gradab );
-
-    auto ggrad_abc =  xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::gradb,xcvars::gradab );
-
-    auto ggrad_acc =  xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::gradab,xcvars::gradab );
-
-    auto ggrad_bbc =  xcCubicHessianGrid->xcCubicHessianValues(xcvars::gradb, xcvars::gradb,xcvars::gradab );
-
-    auto ggrad_ccc =  xcCubicHessianGrid->xcCubicHessianValues(xcvars::gradab, xcvars::gradab,xcvars::gradab );
-
-    auto gmix_aab = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa,xcvars::gradb );
-
-    auto gmix_aba = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhob,xcvars::grada );
-
-    auto gmix_abb = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhob,xcvars::gradb );
-
-    auto gmix_bba = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::rhob,xcvars::grada );
-
-    auto gmix_aac = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa,xcvars::gradab );
-
-    auto gmix_abc = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhob,xcvars::gradab );
-
-    auto gmix_bac = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::rhoa,xcvars::gradab );
-
-    auto gmix_bbc = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::rhob,xcvars::gradab );
-
-    auto ggradmix_aaa = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::grada ,xcvars::grada );
-
-    auto ggradmix_aab = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::grada ,xcvars::gradb );
-
-    auto ggradmix_abb = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::gradb ,xcvars::gradb );
-
-    auto ggradmix_baa = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::grada ,xcvars::grada );
-
-    auto ggradmix_bab = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::grada ,xcvars::gradb );
-
-    auto ggradmix_aac = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::grada ,xcvars::gradab );
-
-    auto ggradmix_acc = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::gradab ,xcvars::gradab );
-
-    auto ggradmix_bac = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::grada ,xcvars::gradab );
-
-    auto ggradmix_bbc = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::gradb ,xcvars::gradab );
-
-    auto ggradmix_bcc = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::gradab ,xcvars::gradab );
 
     // set up pointers to ground state density gradient norms
     
@@ -5217,27 +5212,27 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
 
         // Second order terms
 
-        auto xiw12a = rwDensityGrid->alphaDensity(i);
+        auto xiw12a = rw2DensityGrid->alphaDensity(i);
         
-        auto xiw12b = rwDensityGrid->betaDensity(i);
+        auto xiw12b = rw2DensityGrid->betaDensity(i);
 
-        auto xiw12c = rwDensityGrid->betaDensity(i);
+        auto xiw12c = rw2DensityGrid->betaDensity(i);
 
-        auto rhow12a = rwDensityGrid->alphaDensity(i);
+        auto rhow12a = rw2DensityGrid->alphaDensity(i);
         
-        auto rhow12b = rwDensityGrid->betaDensity(i);
+        auto rhow12b = rw2DensityGrid->betaDensity(i);
 
-        auto gradw12a_x = rwDensityGrid->alphaDensityGradientX(i);
+        auto gradw12a_x = rw2DensityGrid->alphaDensityGradientX(i);
         
-        auto gradw12a_y = rwDensityGrid->alphaDensityGradientY(i);
+        auto gradw12a_y = rw2DensityGrid->alphaDensityGradientY(i);
         
-        auto gradw12a_z = rwDensityGrid->alphaDensityGradientZ(i);
+        auto gradw12a_z = rw2DensityGrid->alphaDensityGradientZ(i);
         
-        auto gradw12b_x = rwDensityGrid->betaDensityGradientX(i);
+        auto gradw12b_x = rw2DensityGrid->betaDensityGradientX(i);
         
-        auto gradw12b_y = rwDensityGrid->betaDensityGradientY(i);
+        auto gradw12b_y = rw2DensityGrid->betaDensityGradientY(i);
         
-        auto gradw12b_z = rwDensityGrid->betaDensityGradientZ(i);
+        auto gradw12b_z = rw2DensityGrid->betaDensityGradientZ(i);
 
         idex++;
         
@@ -5375,141 +5370,161 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
 
                         double D3 = xiw1b[moff + m]  * xiw2b[moff + m] + xiw2b[moff + m]  * xiw1b[moff + m];
 
-                        double E1 =  xiw1c[moff + m]  * xiw2c[moff + m] + xiw2c[moff + m]  * xiw1c[moff + m] ;
+                        double E1 =  xiw1c[moff + m] * xiw2c[moff + m] + xiw2c[moff + m]  * xiw1c[moff + m] ;
 
                         // First term
 
                         // Third-order contributions
 
-                        double frhow12 = grho_aaa[moff + m] * A1 
+                        double frhow12 = df3000[moff + m] * A1 
                         
-                                       + grho_aab[moff + m] * A2
+                                       + df2100[moff + m] * A2
 
-                                       + grho_abb[moff + m] * A3 ;
+                                       + df1200[moff + m] * A3 ;
 
-                        frhow12 += gmix_aaa[moff + m] * B1
+                        frhow12 += df2010[moff + m] * B1
                         
-                                 + gmix_aab[moff + m] * B2
+                                 + df2001[moff + m] * B2
 
-                                 + gmix_aba[moff + m] * B3 
+                                 + df1110[moff + m] * B3 
                                 
-                                 + gmix_abb[moff + m] * B4;
+                                 + df1101[moff + m] * B4;
 
-                        frhow12 += gmix_aac[moff + m] * C1
+                        frhow12 += df20001[moff + m] * C1
                                 
-                                 + gmix_abc[moff + m] * C2;
+                                 + df11001[moff + m] * C2;
 
-                        frhow12 += ggradmix_aaa[moff + m] * D1 
+                        frhow12 += df1020[moff + m] * D1 
                         
-                                 + ggradmix_aab[moff + m] * D2
+                                 + df1011[moff + m] * D2
 
-                                 + ggradmix_abb[moff + m] * D3;
+                                 + df1002[moff + m] * D3;
 
-                        frhow12 += ggradmix_acc[moff + m] * E1;
+                        frhow12 += df10002[moff + m]*E1;
 
                         // Second-order contributions
 
-                        frhow12 += grho_aa[moff + m] * rhow12a[moff + m]  + grho_ab[moff + m] * rhow12b[moff + m];   
+                        frhow12 += df2000[moff + m] * rhow12a[moff + m]  + df1100[moff + m] * rhow12b[moff + m];   
 
-                        frhow12 += gmix_aa[moff + m] * xiw12a[moff + m]  + gmix_ab[moff + m] * xiw12b[moff + m];
+                        frhow12 += df1010[moff + m] * xiw12a[moff + m]  + df1001[moff + m] * xiw12b[moff + m];
 
-                        frhow12 += gmix_ac[moff + m] * xiw12c[moff + m];
+                        frhow12 += df10001[moff + m] * xiw12c[moff + m];
 
-                        fvxc += w * frhow12 * bgaos[m] * kgaos[m];    
+                        fvxc += w * frhow12 * a0;    
 
                         // Second term
                         
                         // Third-order contributions
 
-                        double fxiw12 =  gmix_aaa[moff + m] * A1 
+                        double fxiw12 =  df2010[moff + m] * A1 
                         
-                                       + gmix_aab[moff + m] * A2
+                                       + df1110[moff + m] * A2
 
-                                       + gmix_bba[moff + m] * A3;
+                                       + df0210[moff + m] * A3;
 
-                        fxiw12 +=  ggradmix_aaa[moff + m] * B1
+                        fxiw12 +=  df1020[moff + m] * B1
 
-                                +  ggradmix_aab[moff + m] * B2
+                                +  df1011[moff + m] * B2
 
-                                +  ggradmix_baa[moff + m]  * B3
+                                +  df0120[moff + m]  * B3
                                 
-                                +  ggradmix_bab[moff + m] * B4;
+                                +  df0111[moff + m] * B4;
 
-                        fxiw12 += gmix_aac[moff + m] * C1 
+                        fxiw12 += df10101[moff + m] * C1 
                                 
-                               +  gmix_bac[moff + m] * C2;
+                               +  df01101[moff + m] * C2;
 
-                        fxiw12 += ggrad_aaa[moff + m] * D1
+                        fxiw12 += df0030[moff + m] * D1
                         
-                                + ggrad_aab[moff + m] * D2
+                                + df0021[moff + m] * D2
 
-                                + ggrad_abb[moff + m] * D3;
+                                + df0012[moff + m] * D3;
 
-                        fxiw12 += ggrad_acc[moff + m] *  E1;
+                        fxiw12 += df00102[moff + m] *  E1;
 
                         // Second-order contribution
 
-                        fxiw12 += gmix_aa[moff + m] * rhow12a[moff + m]  + gmix_ba[moff + m] * rhow12b[moff + m];
+                        fxiw12 += df1010[moff + m] * rhow12a[moff + m]  + df0110[moff + m] * rhow12b[moff + m];
 
-                        fxiw12 += ggrad_aa[moff + m] * xiw12a[moff + m]  + ggrad_ab[moff + m] * xiw12b[moff + m];
+                        fxiw12 += df0020[moff + m] * xiw12a[moff + m]  + df0011[moff + m] * xiw12b[moff + m];
 
-                        fxiw12 += ggrad_ac[moff + m] * xiw12c[moff + m];
+                        fxiw12 += df00101[moff + m] * xiw12c[moff + m];
 
                         // Third term
 
-                        double fxiw12c = gmix_aac[moff + m] * A1  
+                        double fxiw12c = df20001[moff + m] * A1  
                         
-                                       + gmix_abc[moff + m] * A2
+                                       + df11001[moff + m] * A2
 
-                                       + gmix_bbc[moff + m] * A3; 
+                                       + df02001[moff + m] * A3; 
 
-                        fxiw12c +=  ggradmix_aac[moff + m] * B1
+                        fxiw12c +=  df10101[moff + m] * B1
                         
-                                +  ggradmix_aac[moff + m]  * B2
+                                +  df10011[moff + m]  * B2
 
-                                +  ggradmix_bac[moff + m] * B3
+                                +  df01101[moff + m] * B3
                                 
-                                +  ggradmix_bac[moff + m] * B4;
+                                +  df01011[moff + m] * B4;
 
-                        fxiw12c += ggradmix_acc[moff + m] * C1
+                        fxiw12c += df10002[moff + m] * C1
                                 
-                                 + ggradmix_bcc[moff + m] * C2;
+                                 + df01002[moff + m] * C2;
 
-                        fxiw12c +=  ggrad_aac[moff + m] * D1
+                        fxiw12c +=  df00201[moff + m] * D1
                         
-                                 + ggrad_abc[moff + m] * D2
+                                 + df00111[moff + m] * D2
 
-                                 + ggrad_bbc[moff + m] * D3;
+                                 + df00021[moff + m] * D3;
 
-                        fxiw12c += ggrad_ccc[moff + m] * xiw1c[moff + m] * xiw2c[moff + m];
+                        fxiw12c += df00003[moff + m] * E1;
 
                         // Second-order terms
 
-                        fxiw12c += gmix_ac[moff + m] * rhow12a[moff + m] + gmix_bc[moff + m] * rhow12b[moff + m];
+                        fxiw12c += df10001[moff + m] * rhow12a[moff + m] + df01001[moff + m] * rhow12b[moff + m];
 
-                        fxiw12c += ggrad_ac[moff + m] * xiw12a[moff + m] + ggrad_bc[moff + m] * xiw12b[moff + m];
+                        fxiw12c += df00101[moff + m] * xiw12a[moff + m] + df00011[moff + m] * xiw12b[moff + m];
 
-                        fxiw12c += ggrad_cc[moff + m] * xiw12c[moff + m];
+                        fxiw12c += df00002[moff + m] * xiw12c[moff + m];
 
                         // Fourth term
 
-                        double zetaa1 = rxw1a * rxa + ryw1a * rya + rzw1a * rza;
+                        double x_term = (znva - grada_x[moff + m] * grada_x[moff + m] * znva3) * ax 
+
+                                      - grada_x[moff + m] * grada_y[moff + m] * znva3 * ay
+
+                                      - grada_x[moff + m] * grada_z[moff + m] * znva3 * az;
+
+                        
+                        double y_term = -grada_x[moff+m] * grada_y[moff+m] *znva3 * ax 
+                        
+                                        + (znva - grada_y[moff + m] * grada_y[moff + m] * znva3) * ay
+                                        
+                                        - grada_y[moff + m] * grada_z[moff + m] * znva3 * az   ;
+
+
+                        double z_term = -grada_x[moff+m] * grada_z[moff+m] *znva3 * ax 
+
+                                       - grada_y[moff + m] * grada_z[moff + m] * znva3 * ay
+
+                                       + (znva - grada_z[moff + m] * grada_z[moff + m] * znva3) * az;
 
                         double ar = ax * rxa + ay * rya + az * rza;
 
-                        double ab1 = ax * rxw1a + ay * ryw1a + az * rzw1a - ar * zetaa1;
+                        double zetaa1 = rxw1a * rxa + ryw1a * rya + rzw1a * rza;
+
+                        double ab1 = znva * (ax * rxw1a + ay * ryw1a + az * rzw1a - ar * zetaa1);
 
                         double zetaa2 = rxw2a * rxa + ryw2a * rya + rzw2a * rza;
 
-                        double ab2 = ax * rxw2a + ay * ryw2a + az * rzw2a - ar * zetaa2;
+                        double ab2 = znva * (ax * rxw2a + ay * ryw2a + az * rzw2a - ar * zetaa2);
 
                         double zetab1 = rxw1b * rxb + ryw1b * ryb + rzw1b * rzb;
                         
                         double zetac1 = grada_x[moff + m] * rxw1b + grada_y[moff + m] * ryw1b
                         
-                                     + grada_z[moff + m] * rzw1b + gradb_x[moff + m] * rxw1a
+                                      + grada_z[moff + m] * rzw1b + gradb_x[moff + m] * rxw1a
                         
-                                     + gradb_y[moff + m] * ryw1a + gradb_z[moff + m] * rzw1a;
+                                      + gradb_y[moff + m] * ryw1a + gradb_z[moff + m] * rzw1a;
 
                         double zetab2 = rxw2b * rxb + ryw2b * ryb + rzw2b * rzb;
                         
@@ -5519,25 +5534,25 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                         
                                      + gradb_y[moff + m] * ryw2a + gradb_z[moff + m] * rzw2a;
 
-                        double facr1 = gmix_aa[moff + m] * rhow1a[moff + m] + gmix_ab[moff + m] * rhow1b[moff + m]
+                        double facr1 = df1010[moff + m] * rhow1a[moff + m] + df0110[moff + m] * rhow1b[moff + m]
                         
-                                    + ggrad_aa[moff + m] * zetaa1 + ggrad_ab[moff + m] * zetab1 + ggrad_ac[moff + m] * zetac1;
+                                    + df0020[moff + m] * zetaa1 + df0011[moff + m] * zetab1 + df00101[moff + m] * zetac1;
 
-                        double facr2 = gmix_aa[moff + m] * rhow2a[moff + m] + gmix_ab[moff + m] * rhow2b[moff + m]
+                        double facr2 = df1010[moff + m] * rhow2a[moff + m] + df0110[moff + m] * rhow2b[moff + m]
                         
-                                    + ggrad_aa[moff + m] * zetaa2 + ggrad_ab[moff + m] * zetab2 + ggrad_ac[moff + m] * zetac2;
+                                    + df0020[moff + m] * zetaa2 + df0011[moff + m] * zetab2 + df00101[moff + m] * zetac2;
 
                         fvxc += w * ( facr1 * ab2 +  facr2 * ab1 ) ;
 
                         // Fifth term
 
-                        double facz1 = gmix_ac[moff + m] * rhow1a[moff + m] +  gmix_bc[moff + m] * rhow1b[moff + m]
+                        double facz1 = df10001[moff + m] * rhow1a[moff + m] +  df01001[moff + m] * rhow1b[moff + m]
                         
-                                    + ggrad_ac[moff + m] * zetaa1 + ggrad_bc[moff + m] * zetab1 + ggrad_cc[moff + m] * zetac1;
+                                    + df00101[moff + m] * zetaa1 + df00011[moff + m] * zetab1 + df00002[moff + m] * zetac1;
                         
-                        double facz2 = gmix_ac[moff + m] * rhow2a[moff + m] +  gmix_bc[moff + m] * rhow2b[moff + m]
+                        double facz2 = df10001[moff + m] * rhow2a[moff + m] +  df01001[moff + m] * rhow2b[moff + m]
                         
-                                    + ggrad_ac[moff + m] * zetaa2 + ggrad_bc[moff + m] * zetab2 + ggrad_cc[moff + m] * zetac2;
+                                    + df00101[moff + m] * zetaa2 + df00011[moff + m] * zetab2 + df00002[moff + m] * zetac2;
 
                         double abw1 = ax * rxw1a + ay * ryw1a + az * rzw1a;
 
@@ -5610,19 +5625,19 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                                         + xigrad_xzz * rhowp_zx *  xigrad_yzz * rhowp_zy +  xigrad_zzz * rhowp_zz;
 
 
-                        double t = ax * xi3xw1xw2_x + ay * xi3xw1xw2_y + az * xi3xw1xw2_z;
+                        double xi3 = ax * xi3xw1xw2_x + ay * xi3xw1xw2_y + az * xi3xw1xw2_z;
 
                         double zetaa12 = rxw12a * rxa + ryw12a * rya + rzw12a * rza;
 
-                        double ab12 =  ax * rxw12a + ay * ryw12a + az * rzw12a - ar * zetaa12;
+                        double ab12 = znva * (ax * rxw12a + ay * ryw12a + az * rzw12a - ar * zetaa12);
     
-                         fvxc += w * 2 * ggrad_a[moff + m] * (ab12 + t) ;
+                         fvxc += w  * df0010[moff + m] * (ab12 + xi3) ;
 
                          // Seventh term
 
                          double abw12 = ax * rxw12a + ay * ryw12a + az * rzw12a;
 
-                         fvxc += w * ggrad_c[moff + m] * abw12 ;
+                         fvxc += w * df00001[moff + m] * abw12 ;
                 
                     }
                     
@@ -5790,120 +5805,119 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                         double D3 = xiw1b[loff + l]  * xiw2b[loff + l] + xiw2b[loff + l]  * xiw1b[loff + l];
 
                         double E1 =  xiw1c[loff + l]  * xiw2c[loff + l] + xiw2c[loff + l]  * xiw1c[loff + l] ;
-
                         // First term
 
                         // Third-order contributions
 
-                        double frhow12 = grho_aaa[loff + l] * A1 
+                        double frhow12 = df3000[loff + l] * A1 
                         
-                                       + grho_aab[loff + l] * A2
+                                       + df2100[loff + l] * A2
 
-                                       + grho_abb[loff + l] * A3 ;
+                                       + df1200[loff + l] * A3 ;
 
-                        frhow12 += gmix_aaa[loff + l] * B1
+                        frhow12 += df2010[loff + l] * B1
                         
-                                 + gmix_aab[loff + l] * B2
+                                 + df2001[loff + l] * B2
 
-                                 + gmix_aba[loff + l] * B3 
+                                 + df1110[loff + l] * B3 
                                 
-                                 + gmix_abb[loff + l] * B4;
+                                 + df1101[loff + l] * B4;
 
-                        frhow12 += gmix_aac[loff + l] * C1
+                        frhow12 += df20001[loff + l] * C1
                                 
-                                 + gmix_abc[loff + l] * C2;
+                                 + df11001[loff + l] * C2;
 
-                        frhow12 += ggradmix_aaa[loff + l] * D1 
+                        frhow12 += df1020[loff + l] * D1 
                         
-                                 + ggradmix_aab[loff + l] * D2
+                                 + df1011[loff + l] * D2
 
-                                 + ggradmix_abb[loff + l] * D3;
+                                 + df1002[loff + l] * D3;
 
-                        frhow12 += ggradmix_acc[loff + l] * E1;
+                        frhow12 += df10002[loff + l]*E1;
 
                         // Second-order contributions
 
-                        frhow12 += grho_aa[loff + l] * rhow12a[loff + l]  + grho_ab[loff + l] * rhow12b[loff + l];   
+                        frhow12 += df2000[loff + l] * rhow12a[loff + l]  + df1100[loff + l] * rhow12b[loff + l];   
 
-                        frhow12 += gmix_aa[loff + l] * xiw12a[loff + l]  + gmix_ab[loff + l] * xiw12b[loff + l];
+                        frhow12 += df1010[loff + l] * xiw12a[loff + l]  + df1001[loff + l] * xiw12b[loff + l];
 
-                        frhow12 += gmix_ac[loff + l] * xiw12c[loff + l];
+                        frhow12 += df10001[loff + l] * xiw12c[loff + l];
 
-                        fvxc += w * frhow12 * bgaos[l] * kgaos[l];    
+                        fvxc += w * frhow12 * a0;    
 
                         // Second term
                         
                         // Third-order contributions
 
-                        double fxiw12 =  gmix_aaa[loff + l] * A1 
+                        double fxiw12 =  df2010[loff + l] * A1 
                         
-                                       + gmix_aab[loff + l] * A2
+                                       + df1110[loff + l] * A2
 
-                                       + gmix_bba[loff + l] * A3;
+                                       + df0210[loff + l] * A3;
 
-                        fxiw12 +=  ggradmix_aaa[loff + l] * B1
+                        fxiw12 +=  df1020[loff + l] * B1
 
-                                +  ggradmix_aab[loff + l] * B2
+                                +  df1011[loff + l] * B2
 
-                                +  ggradmix_baa[loff + l]  * B3
+                                +  df0120[loff + l]  * B3
                                 
-                                +  ggradmix_bab[loff + l] * B4;
+                                +  df0111[loff + l] * B4;
 
-                        fxiw12 += gmix_aac[loff + l] * C1 
+                        fxiw12 += df10101[loff + l] * C1 
                                 
-                               +  gmix_bac[loff + l] * C2;
+                               +  df01101[loff + l] * C2;
 
-                        fxiw12 += ggrad_aaa[loff + l] * D1
+                        fxiw12 += df0030[loff + l] * D1
                         
-                                + ggrad_aab[loff + l] * D2
+                                + df0021[loff + l] * D2
 
-                                + ggrad_abb[loff + l] * D3;
+                                + df0012[loff + l] * D3;
 
-                        fxiw12 += ggrad_acc[loff + l] *  E1;
+                        fxiw12 += df00102[loff + l] *  E1;
 
                         // Second-order contribution
 
-                        fxiw12 += gmix_aa[loff + l] * rhow12a[loff + l]  + gmix_ba[loff + l] * rhow12b[loff + l];
+                        fxiw12 += df1010[loff + l] * rhow12a[loff + l]  + df0110[loff + l] * rhow12b[loff + l];
 
-                        fxiw12 += ggrad_aa[loff + l] * xiw12a[loff + l]  + ggrad_ab[loff + l] * xiw12b[loff + l];
+                        fxiw12 += df0020[loff + l] * xiw12a[loff + l]  + df0011[loff + l] * xiw12b[loff + l];
 
-                        fxiw12 += ggrad_ac[loff + l] * xiw12c[loff + l];
+                        fxiw12 += df00101[loff + l] * xiw12c[loff + l];
 
                         // Third term
 
-                        double fxiw12c = gmix_aac[loff + l] * A1  
+                        double fxiw12c = df20001[loff + l] * A1  
                         
-                                       + gmix_abc[loff + l] * A2
+                                       + df11001[loff + l] * A2
 
-                                       + gmix_bbc[loff + l] * A3; 
+                                       + df02001[loff + l] * A3; 
 
-                        fxiw12c +=  ggradmix_aac[loff + l] * B1
+                        fxiw12c +=  df10101[loff + l] * B1
                         
-                                +  ggradmix_aac[loff + l]  * B2
+                                +  df10011[loff + l]  * B2
 
-                                +  ggradmix_bac[loff + l] * B3
+                                +  df01101[loff + l] * B3
                                 
-                                +  ggradmix_bac[loff + l] * B4;
+                                +  df01011[loff + l] * B4;
 
-                        fxiw12c += ggradmix_acc[loff + l] * C1
+                        fxiw12c += df10002[loff + l] * C1
                                 
-                                 + ggradmix_bcc[loff + l] * C2;
+                                 + df01002[loff + l] * C2;
 
-                        fxiw12c +=  ggrad_aac[loff + l] * D1
+                        fxiw12c +=  df00201[loff + l] * D1
                         
-                                 + ggrad_abc[loff + l] * D2
+                                 + df00111[loff + l] * D2
 
-                                 + ggrad_bbc[loff + l] * D3;
+                                 + df00021[loff + l] * D3;
 
-                        fxiw12c += ggrad_ccc[loff + l] * xiw1c[loff + l] * xiw2c[loff + l];
+                        fxiw12c += df00003[loff + l] * E1;
 
                         // Second-order terms
 
-                        fxiw12c += gmix_ac[loff + l] * rhow12a[loff + l] + gmix_bc[loff + l] * rhow12b[loff + l];
+                        fxiw12c += df10001[loff + l] * rhow12a[loff + l] + df01001[loff + l] * rhow12b[loff + l];
 
-                        fxiw12c += ggrad_ac[loff + l] * xiw12a[loff + l] + ggrad_bc[loff + l] * xiw12b[loff + l];
+                        fxiw12c += df00101[loff + l] * xiw12a[loff + l] + df00011[loff + l] * xiw12b[loff + l];
 
-                        fxiw12c += ggrad_cc[loff + l] * xiw12c[loff + l];
+                        fxiw12c += df00002[loff + l] * xiw12c[loff + l];
 
                         // Fourth term
 
@@ -5911,11 +5925,11 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
 
                         double ar = ax * rxa + ay * rya + az * rza;
 
-                        double ab1 = ax * rxw1a + ay * ryw1a + az * rzw1a - ar * zetaa1;
+                        double ab1 = znva * (ax * rxw1a + ay * ryw1a + az * rzw1a - ar * zetaa1);
 
                         double zetaa2 = rxw2a * rxa + ryw2a * rya + rzw2a * rza;
 
-                        double ab2 = ax * rxw2a + ay * ryw2a + az * rzw2a - ar * zetaa2;
+                        double ab2 = znva * (ax * rxw2a + ay * ryw2a + az * rzw2a - ar * zetaa2);
 
                         double zetab1 = rxw1b * rxb + ryw1b * ryb + rzw1b * rzb;
                         
@@ -5933,25 +5947,25 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                         
                                      + gradb_y[loff + l] * ryw2a + gradb_z[loff + l] * rzw2a;
 
-                        double facr1 = gmix_aa[loff + l] * rhow1a[loff + l] + gmix_ab[loff + l] * rhow1b[loff + l]
+                        double facr1 = df1010[loff + l] * rhow1a[loff + l] + df0110[loff + l] * rhow1b[loff + l]
                         
-                                    + ggrad_aa[loff + l] * zetaa1 + ggrad_ab[loff + l] * zetab1 + ggrad_ac[loff + l] * zetac1;
+                                    + df0020[loff + l] * zetaa1 + df0011[loff + l] * zetab1 + df00101[loff + l] * zetac1;
 
-                        double facr2 = gmix_aa[loff + l] * rhow2a[loff + l] + gmix_ab[loff + l] * rhow2b[loff + l]
+                        double facr2 = df1010[loff + l] * rhow2a[loff + l] + df0110[loff + l] * rhow2b[loff + l]
                         
-                                    + ggrad_aa[loff + l] * zetaa2 + ggrad_ab[loff + l] * zetab2 + ggrad_ac[loff + l] * zetac2;
+                                    + df0020[loff + l] * zetaa2 + df0011[loff + l] * zetab2 + df00101[loff + l] * zetac2;
 
                         fvxc += w * ( facr1 * ab2 +  facr2 * ab1 ) ;
 
                         // Fifth term
 
-                        double facz1 = gmix_ac[loff + l] * rhow1a[loff + l] +  gmix_bc[loff + l] * rhow1b[loff + l]
+                        double facz1 = df10001[loff + l] * rhow1a[loff + l] +  df01001[loff + l] * rhow1b[loff + l]
                         
-                                    + ggrad_ac[loff + l] * zetaa1 + ggrad_bc[loff + l] * zetab1 + ggrad_cc[loff + l] * zetac1;
+                                    + df00101[loff + l] * zetaa1 + df00011[loff + l] * zetab1 + df00002[loff + l] * zetac1;
                         
-                        double facz2 = gmix_ac[loff + l] * rhow2a[loff + l] +  gmix_bc[loff + l] * rhow2b[loff + l]
+                        double facz2 = df10001[loff + l] * rhow2a[loff + l] +  df01001[loff + l] * rhow2b[loff + l]
                         
-                                    + ggrad_ac[loff + l] * zetaa2 + ggrad_bc[loff + l] * zetab2 + ggrad_cc[loff + l] * zetac2;
+                                    + df00101[loff + l] * zetaa2 + df00011[loff + l] * zetab2 + df00002[loff + l] * zetac2;
 
                         double abw1 = ax * rxw1a + ay * ryw1a + az * rzw1a;
 
@@ -6024,19 +6038,19 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                                         + xigrad_xzz * rhowp_zx *  xigrad_yzz * rhowp_zy +  xigrad_zzz * rhowp_zz;
 
 
-                        double t = ax * xi3xw1xw2_x + ay * xi3xw1xw2_y + az * xi3xw1xw2_z;
+                        double xi3 = ax * xi3xw1xw2_x + ay * xi3xw1xw2_y + az * xi3xw1xw2_z;
 
                         double zetaa12 = rxw12a * rxa + ryw12a * rya + rzw12a * rza;
 
-                        double ab12 =  ax * rxw12a + ay * ryw12a + az * rzw12a - ar * zetaa12;
+                        double ab12 = znva * (ax * rxw12a + ay * ryw12a + az * rzw12a - ar * zetaa12);
     
-                         fvxc += w * 2 * ggrad_a[loff + l] * (ab12 + t) ;
+                         fvxc += w  * df0010[loff + l] * (ab12 + xi3) ;
 
                          // Seventh term
 
                          double abw12 = ax * rxw12a + ay * ryw12a + az * rzw12a;
 
-                         fvxc += w * ggrad_c[loff + l] * abw12 ;
+                         fvxc += w * df00001[loff + l] * abw12 ;
 
                     }
                     

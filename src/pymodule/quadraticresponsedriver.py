@@ -249,12 +249,6 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         freqpairs = [wl for wl in zip(self.b_frequencies, self.c_frequencies)]
 
-
-        print("wa")
-        print(wa)
-        print("freqpairs")
-        print(freqpairs)
-
         if self.rank == mpi_master():
             A = {(op, w): v for op, v in zip('A', a_rhs) for w in wa}
             B = {(op, w): v for op, v in zip('B', b_rhs)
@@ -279,9 +273,6 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         # Computing the first-order response vectors (3 per frequency)
         N_drv = ComplexResponse(self.comm, self.ostream)
-
-        print("self.damping")
-        print(self.damping)
 
         N_drv.update_settings({
             'damping': self.damping,
@@ -519,7 +510,7 @@ class QuadraticResponseDriver(NonLinearSolver):
             self.print_fock_header()
 
         keys = [
-            'Fbc,Fcb',
+            'Fbc+Fcb',
         ]
 
         if self.checkpoint_file is not None:
@@ -592,7 +583,7 @@ class QuadraticResponseDriver(NonLinearSolver):
         for (wb, wc) in wi:
 
             vec_pack = np.array([
-                fo['Fbc,Fcb'][(wb, wc)].data, fo2[('B', wb)].data,
+                fo['Fbc+Fcb'][(wb, wc)].data, fo2[('B', wb)].data,
                 fo2[('C', wc)].data
             ]).T.copy()
 

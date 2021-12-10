@@ -328,9 +328,6 @@ class SHGDriver(NonLinearSolver):
 
         beta_bar = {}
 
-        print("beta")
-        print(beta.keys())
-
         for key in beta.keys():
             betaa = 0
             for a in range(len(beta[key])):
@@ -691,11 +688,6 @@ class SHGDriver(NonLinearSolver):
             self.print_fock_header()
 
         ww = []
-
-        print("d_dft1")
-        print(len(d_dft1))
-        print("d_dft2")
-        print(len(d_dft2))
 
         for (wb, wc) in wi:
             ww.append(wb)
