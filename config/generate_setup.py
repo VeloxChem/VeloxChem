@@ -30,7 +30,7 @@ import platform
 import re
 import subprocess
 import sys
-from distutils.sysconfig import get_config_var, get_python_inc
+import sysconfig
 from pathlib import Path
 
 # we import these modules to get their include directories
@@ -96,7 +96,8 @@ def generate_setup(
     if isinstance(setup_file, str):
         setup_file = Path(setup_file)
 
-    ext_suffix = get_config_var("EXT_SUFFIX") or get_config_var("SO")
+    ext_suffix = (sysconfig.get_config_var("EXT_SUFFIX") or
+                  sysconfig.get_config_var("SO"))
 
     # OS information
 
@@ -242,7 +243,7 @@ def generate_setup(
             )
         else:
             math_lib += (
-                "\n" + f"MATH_LIB += -lmkl_rt -Wl,--no-as-needed -lpthread -lm -ldl"
+                "\n" + "MATH_LIB += -lmkl_rt -Wl,--no-as-needed -lpthread -lm -ldl"
             )
 
         if is_linux and not use_intel:
@@ -388,8 +389,9 @@ def generate_setup(
                 print("# Automatically generated settings", file=f_mkfile)
                 print("", file=f_mkfile)
 
+                python_include_path = sysconfig.get_path("include")
                 print("# Python-related headers files", file=f_mkfile)
-                print(f"PYTHON_INC = -isystem {get_python_inc()}", file=f_mkfile)
+                print(f"PYTHON_INC = -isystem {python_include_path}", file=f_mkfile)
                 print(f"PYTHON_INC += -isystem {mpi4py.get_include()}", file=f_mkfile)
                 print(f"PYTHON_INC += -isystem {numpy.get_include()}", file=f_mkfile)
                 print(f"PYTHON_INC += -isystem {pybind11.get_include()}", file=f_mkfile)
