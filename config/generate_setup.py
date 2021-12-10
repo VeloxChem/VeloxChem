@@ -201,15 +201,18 @@ def generate_setup(template_file, setup_file, build_lib=Path("build/lib")):
             os.environ["OPENBLASROOT"] = sys.prefix
 
     use_mkl = ("MKLROOT" in os.environ)
-    use_openblas = ("OPENBLASROOT" in os.environ)
+    use_openblas = (("OPENBLASROOT" in os.environ) or
+                    ("OPENBLAS_INCLUDE_DIR" in os.environ and
+                     "OPENBLAS_LIBRARY" in os.environ))
     use_craylibsci = ("CRAY_LIBSCI_VERSION" in os.environ)
 
     if not (use_mkl or use_openblas or use_craylibsci):
         print()
         print("*** Error: Unable to find math library!")
         print("***        Please make sure that you have set MKLROOT or")
-        print("***        OPENBLASROOT. OpenBLAS can be downloaded from")
-        print("***        https://github.com/xianyi/OpenBLAS")
+        print("***        OPENBLASROOT (or OPENBLAS_INCLUDE_DIR and")
+        print("***        OPENBLAS_LIBRARY). OpenBLAS can be downloaded")
+        print("***        from https://github.com/xianyi/OpenBLAS")
         sys.exit(1)
 
     # ==> mkl flags <==
@@ -265,10 +268,16 @@ def generate_setup(template_file, setup_file, build_lib=Path("build/lib")):
     elif use_openblas:
         print("OpenBLAS")
 
-        openblas_inc = os.path.join(os.environ["OPENBLASROOT"], "include")
+        if "OPENBLASROOT" in os.environ:
+            openblas_inc = os.path.join(os.environ["OPENBLASROOT"], "include")
+        else:
+            openblas_inc = os.environ["OPENBLAS_INCLUDE_DIR"]
         check_dir(openblas_inc, "openblas include")
 
-        openblas_dir = os.path.join(os.environ["OPENBLASROOT"], "lib")
+        if "OPENBLASROOT" in os.environ:
+            openblas_dir = os.path.join(os.environ["OPENBLASROOT"], "lib")
+        else:
+            openblas_dir = os.environ["OPENBLAS_LIBRARY"]
         check_dir(openblas_dir, "openblas lib")
 
         math_lib = f"MATH_INC := -I{openblas_inc}"
@@ -337,6 +346,8 @@ def generate_setup(template_file, setup_file, build_lib=Path("build/lib")):
 
     gtest_root = os.getenv("GTESTROOT", None)
     gtest_lib = os.getenv("GTESTLIB", None)
+    if (gtest_root is not None) and (gtest_lib is None):
+        gtest_lib = Path(gtest_root, "lib", "libgtest.a")
 
     if (gtest_root is not None) and (not Path(gtest_root, "include").is_dir()):
         gtest_root = None
@@ -401,7 +412,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build/lib")):
                     print(xtb_lib, file=f_mkfile)
                     print("", file=f_mkfile)
 
-                if gtest_root is not None and gtest_lib is not None:
+                if (gtest_root is not None) and (gtest_lib is not None):
                     print("GST_ROOT :=", gtest_root, file=f_mkfile)
                     print("GST_LIB :=", gtest_lib, file=f_mkfile)
                     print("", file=f_mkfile)
