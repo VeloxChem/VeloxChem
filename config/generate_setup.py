@@ -86,10 +86,7 @@ def check_dir(dirname, label):
         sys.exit(1)
 
 
-def generate_setup(template_file,
-                   setup_file,
-                   user_flag=None,
-                   build_lib=Path("build/lib")):
+def generate_setup(template_file, setup_file, build_lib=Path("build/lib")):
 
     if isinstance(template_file, str):
         template_file = Path(template_file)
@@ -100,34 +97,33 @@ def generate_setup(template_file,
     ext_suffix = (sysconfig.get_config_var("EXT_SUFFIX") or
                   sysconfig.get_config_var("SO"))
 
-    # OS information
+    # ==> OS information <==
 
     print("*** Checking operating system... ", end="")
 
-    is_linux = "Linux" == platform.system()
-    is_macos = "Darwin" == platform.system()
-    if not (is_linux or is_macos):
-        print()
-        print("*** Error: Unsupported OS!")
-        print("***        Only Linux and MacOS are supported.")
-        sys.exit(1)
+    is_linux = (platform.system() == "Linux")
+    is_macos = (platform.system() == "Darwin")
 
     if is_linux:
         print("Linux")
     elif is_macos:
         print("MacOS")
+    else:
+        print()
+        print("*** Error: Unsupported OS!")
+        print("***        Only Linux and MacOS are supported.")
+        sys.exit(1)
 
-    # compiler information
+    # ==> compiler information <==
 
     print("*** Checking c++ compiler... ", end="")
 
     if check_cray():
         cxx, cxx_path = find_exe([os.environ["CXX"]])
+    elif "MPICXX" in os.environ:
+        cxx, cxx_path = find_exe([os.environ["MPICXX"]])
     else:
-        if isinstance(user_flag, str) and user_flag.lower() == "gnu":
-            cxx, cxx_path = find_exe(["mpicxx", "mpiicpc", "mpiCXX"])
-        else:
-            cxx, cxx_path = find_exe(["mpiicpc", "mpicxx", "mpiCXX"])
+        cxx, cxx_path = find_exe(["mpiicpc", "mpicxx", "mpiCXX"])
 
     print(cxx)
 
@@ -136,8 +132,7 @@ def generate_setup(template_file,
         if check_cray():
             print("***        Please make sure that CXX is correctly set.")
         else:
-            print("***        Please make sure that mpiicpc, mpicxx, or")
-            print("***        mpiCXX is in your PATH.")
+            print("***        Please make sure that MPICXX is correctly set.")
         sys.exit(1)
 
     if cxx in ["icpc", "g++", "clang++"]:
@@ -156,7 +151,7 @@ def generate_setup(template_file,
         print(f"*** Error: {cxx} is not a c++ compiler!")
         sys.exit(1)
 
-    use_intel = cxxname == "icpc"
+    use_intel = (cxxname == "icpc")
     use_gnu = re.match(r"(.*(c|g|gnu-c)\+\+)", cxxname)
     use_clang = cxxname in ["clang++", "Crayclang"] or re.match(
         r".*-clang\+\+", cxxname)
@@ -166,12 +161,13 @@ def generate_setup(template_file,
         print("***        Only Intel, GNU, and Clang compilers are supported.")
         sys.exit(1)
 
-    # cxx and omp flags
+    # ==> openmp flags <==
 
     if use_intel:
-        cxx_flags = "-xHost -qopenmp"
         if check_cray():
             cxx_flags = "-qopenmp"
+        else:
+            cxx_flags = "-xHost -qopenmp"
         omp_flag = "-liomp5"
     elif use_gnu:
         cxx_flags = "-fopenmp"
@@ -180,7 +176,7 @@ def generate_setup(template_file,
         cxx_flags = "-Xpreprocessor -fopenmp"
         omp_flag = "-lomp"
 
-    # math library
+    # ==> math library <==
 
     print("*** Checking math library... ", end="")
 
@@ -188,15 +184,15 @@ def generate_setup(template_file,
     is_conda = os.path.exists(os.path.join(sys.prefix, "conda-meta"))
 
     # check whether MKL is in conda environment
-    if "MKLROOT" not in os.environ:
+    if is_conda and ("MKLROOT" not in os.environ):
         has_lib = (Path(sys.prefix, "lib/libmkl_core.so").is_file() or
                    Path(sys.prefix, "lib/libmkl_core.dylib").is_file())
         has_header = Path(sys.prefix, "include/mkl.h").is_file()
-        if is_conda and has_lib and has_header:
+        if has_lib and has_header:
             os.environ["MKLROOT"] = sys.prefix
 
     # check whether OpenBLAS is in conda environment
-    if "OPENBLASROOT" not in os.environ:
+    if is_conda and ("OPENBLASROOT" not in os.environ):
         has_lib = (Path(sys.prefix, "lib/libopenblas.so").is_file() or
                    Path(sys.prefix, "lib/libopenblas.dylib").is_file())
         has_header = (Path(sys.prefix, "include/lapacke.h").is_file() and
@@ -204,9 +200,9 @@ def generate_setup(template_file,
         if is_conda and has_lib and has_header:
             os.environ["OPENBLASROOT"] = sys.prefix
 
-    use_mkl = "MKLROOT" in os.environ
-    use_openblas = "OPENBLASROOT" in os.environ
-    use_craylibsci = "CRAY_LIBSCI_VERSION" in os.environ
+    use_mkl = ("MKLROOT" in os.environ)
+    use_openblas = ("OPENBLASROOT" in os.environ)
+    use_craylibsci = ("CRAY_LIBSCI_VERSION" in os.environ)
 
     if not (use_mkl or use_openblas or use_craylibsci):
         print()
@@ -216,7 +212,7 @@ def generate_setup(template_file,
         print("***        https://github.com/xianyi/OpenBLAS")
         sys.exit(1)
 
-    # mkl flags
+    # ==> mkl flags <==
 
     if use_mkl:
         print("MKL")
@@ -232,12 +228,10 @@ def generate_setup(template_file,
         math_lib = f"MATH_INC := -I{mkl_inc}"
         math_lib += f"\nMATH_LIB := -L{mkl_dir}"
         if is_macos:
-            math_lib += (
-                f"\nMATH_LIB += -Wl,-rpath,{mkl_dir} -lmkl_rt -lpthread -lm -ldl"
-            )
+            math_lib += f"\nMATH_LIB += -Wl,-rpath,{mkl_dir} -lmkl_rt"
         else:
-            math_lib += (
-                "\nMATH_LIB += -lmkl_rt -Wl,--no-as-needed -lpthread -lm -ldl")
+            math_lib += "\nMATH_LIB += -lmkl_rt -Wl,--no-as-needed"
+        math_lib += " -lpthread -lm -ldl"
 
         if is_linux and not use_intel:
             conf = {
@@ -257,8 +251,8 @@ def generate_setup(template_file,
         replacer = SearchReplace(conf)
 
         # read in src/general/ConfigMKL.hpp.in
-        conf_mkl_in = Path("src/general/ConfigMKL.hpp.in")
-        conf_mkl = Path("src/general/ConfigMKL.hpp")
+        conf_mkl_in = Path("src", "general", "ConfigMKL.hpp.in")
+        conf_mkl = Path("src", "general", "ConfigMKL.hpp")
 
         with conf_mkl_in.open("r") as f:
             contents = "".join(f.readlines())
@@ -266,7 +260,7 @@ def generate_setup(template_file,
         with conf_mkl.open("w") as f:
             f.write(replacer.replace(contents))
 
-    # openblas flags
+    # ==> openblas flags <==
 
     elif use_openblas:
         print("OpenBLAS")
@@ -285,7 +279,7 @@ def generate_setup(template_file,
             openblas_flag += " -lifcore"
         math_lib += f"\nMATH_LIB += {openblas_flag} {omp_flag} -lpthread -lm -ldl"
 
-    # cray-libsci flags
+    # ==> cray-libsci flags <==
 
     elif use_craylibsci:
         print("Cray LibSci")
@@ -293,82 +287,63 @@ def generate_setup(template_file,
         math_lib = "MATH_INC := "
         math_lib += f"\nMATH_LIB := {omp_flag} -lpthread -lm -ldl"
 
-    # extra flags for mac
+    # ==> extra flags for mac <==
 
-    maclibs = ""
     if is_macos:
         maclibs = "-undefined dynamic_lookup"
+    else:
+        maclibs = ""
 
-    # lto flag
+    # ==> lto flag <==
 
-    lto_flag = ""
     if use_gnu:
         lto_flag = "-fno-lto"
+    else:
+        lto_flag = ""
 
-    # xtb package
+    # ==> xtb package <==
 
-    use_xtb = False
     xtb_root = os.getenv("XTBHOME", sys.prefix)
-    # include
+
+    # xtb include
     xtb_inc = Path(xtb_root, "include")
     if not xtb_inc.is_dir():
         xtb_inc = Path(xtb_root, "include", "xtb")
     has_xtb_header = xtb_inc.is_dir() and (xtb_inc / "xtb.h").is_file()
-    # library
-    has_xtb_lib = False
-    _lib64 = Path(xtb_root, "lib64")
-    if (_lib64 / "libxtb.so").is_file() or (_lib64 / "libxtb.dylib").is_file():
-        xtb_dir = _lib64
-        has_xtb_lib = True
-    else:
+
+    # xtb library
+    xtb_dir = Path(xtb_root, "lib64")
+    if not xtb_dir.is_dir():
         xtb_dir = Path(xtb_root, "lib")
-        has_xtb_lib = (xtb_dir / "libxtb.so").is_file() or (
-            xtb_dir / "libxtb.dylib").is_file()
-    # support files
+    has_xtb_lib = ((xtb_dir / "libxtb.so").is_file() or
+                   (xtb_dir / "libxtb.dylib").is_file())
+
+    # xtb parameter files
     xtb_path = Path(xtb_root, "share/xtb")
     xtb_params = [
         "param_gfn0-xtb.txt", "param_gfn1-xtb.txt", "param_gfn2-xtb.txt"
     ]
-    has_xtb_share = xtb_path.is_dir() and all(
-        [(xtb_path / x).is_file() for x in xtb_params])
+    has_xtb_share = (xtb_path.is_dir() and
+                     all([(xtb_path / x).is_file() for x in xtb_params]))
 
-    if has_xtb_header and has_xtb_lib and has_xtb_share:
-        use_xtb = True
-
+    use_xtb = (has_xtb_header and has_xtb_lib and has_xtb_share)
+    if use_xtb:
         xtb_lib = f"XTB_INC := -I{str(xtb_inc)}\n"
         xtb_lib += f"XTB_LIB := -L{str(xtb_dir)} -Wl,-rpath,{str(xtb_dir)} -lxtb\n"
         xtb_lib += f"XTB_PATH := {str(xtb_path)}\n"
-
         print(f"*** Checking XTB... {xtb_root}")
 
-    # google test lib
+    # ==> google test <==
 
-    gtest_root = os.getenv("GTESTROOT", sys.prefix)
-    # include
-    gtest_inc = Path(gtest_root, "include")
-    has_gtest_header = gtest_inc.is_dir() and (gtest_inc /
-                                               "gtest/gtest.h").is_file()
-    # library
-    _lib = Path(f"{gtest_root}/lib")
-    has_gtest_lib = False
-    gtest_lib = None
-    if _lib.is_dir():
-        if (_lib / "libgtest.a").is_file():
-            has_gtest_lib = True
-            gtest_lib = _lib / "libgtest.a"
-        elif (_lib / "libgtest.so").is_file():
-            has_gtest_lib = True
-            gtest_lib = _lib / "libgtest.so"
-        elif (_lib / "libgtest.dylib").is_file():
-            has_gtest_lib = True
-            gtest_lib = _lib / "libgtest.dylib"
+    gtest_root = os.getenv("GTESTROOT", None)
+    gtest_lib = os.getenv("GTESTLIB", None)
 
-    if not (has_gtest_header and has_gtest_lib):
+    if (gtest_root is not None) and (not Path(gtest_root, "include").is_dir()):
         gtest_root = None
-        gtest_inc = None
+    if (gtest_lib is not None) and (not Path(gtest_lib).is_file()):
         gtest_lib = None
 
-    # print Makefile.setup
+    # ==> write Makefile.setup <==
 
     with template_file.open("r", encoding='utf-8') as f_temp:
         lines = f_temp.readlines()
@@ -395,14 +370,10 @@ def generate_setup(template_file,
                 print("", file=f_mkfile)
 
                 print("USE_MPI := true", file=f_mkfile)
-                print(
-                    "USE_MKL := {}".format("true" if use_mkl else "false"),
-                    file=f_mkfile,
-                )
-                print(
-                    "USE_XTB := {}".format("true" if use_xtb else "false"),
-                    file=f_mkfile,
-                )
+                print("USE_MKL := {}".format("true" if use_mkl else "false"),
+                      file=f_mkfile)
+                print("USE_XTB := {}".format("true" if use_xtb else "false"),
+                      file=f_mkfile)
                 print("", file=f_mkfile)
 
                 print(math_lib, file=f_mkfile)
@@ -410,8 +381,7 @@ def generate_setup(template_file,
 
                 print(
                     f"PYTHON := python{sys.version_info[0]}.{sys.version_info[1]}",
-                    file=f_mkfile,
-                )
+                    file=f_mkfile)
                 print("", file=f_mkfile)
 
                 print("CXX :=", cxx, file=f_mkfile)
@@ -457,8 +427,4 @@ if __name__ == "__main__":
         print(f"*** Error: Cannot find template file {template_file}")
         sys.exit(1)
 
-    user_flag = None
-    if len(sys.argv) > 1:
-        user_flag = sys.argv[1]
-
-    generate_setup(template_file, setup_file, user_flag)
+    generate_setup(template_file, setup_file)
