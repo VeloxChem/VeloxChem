@@ -31,7 +31,6 @@
 #ifdef MSMPI_VER
 #define PyMPI_HAVE_MPI_Message 1
 #endif
-#include <mpi4py/mpi4py.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 

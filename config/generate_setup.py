@@ -400,8 +400,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build/lib")):
                 print(f"PYTHON_INC := -I{python_include_path}", file=f_mkfile)
                 print(f"PYTHON_INC += -I{mpi4py.get_include()}", file=f_mkfile)
                 print(f"PYTHON_INC += -I{numpy.get_include()}", file=f_mkfile)
-                print(f"PYTHON_INC += -isystem {pybind11.get_include()}",
-                      file=f_mkfile)
+                print(f"PYTHON_INC += -I{pybind11.get_include()}", file=f_mkfile)
                 print("", file=f_mkfile)
 
                 # additional settings
