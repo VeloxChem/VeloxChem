@@ -337,9 +337,10 @@ def generate_setup(template_file, setup_file, build_lib=Path("build/lib")):
 
     use_xtb = (has_xtb_header and has_xtb_lib and has_xtb_share)
     if use_xtb:
-        xtb_lib = f"XTB_INC := -I{str(xtb_inc)}\n"
-        xtb_lib += f"XTB_LIB := -L{str(xtb_dir)} -Wl,-rpath,{str(xtb_dir)} -lxtb\n"
-        xtb_lib += f"XTB_PATH := {str(xtb_path)}\n"
+        xtb_lib = f"XTB_INC := -I{str(xtb_inc)}"
+        xtb_lib += f"\nXTB_LIB := -L{str(xtb_dir)}"
+        xtb_lib += f"\nXTB_LIB += -Wl,-rpath,{str(xtb_dir)} -lxtb"
+        xtb_lib += f"\nXTB_PATH := {str(xtb_path)}"
         print(f"*** Checking XTB... {xtb_root}")
 
     # ==> google test <==
@@ -365,21 +366,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build/lib")):
                 print("# Automatically generated settings", file=f_mkfile)
                 print("", file=f_mkfile)
 
-                python_include_path = sysconfig.get_path("include")
-                print("# Python-related headers files", file=f_mkfile)
-                print(f"PYTHON_INC = -I{python_include_path}", file=f_mkfile)
-                print(f"PYTHON_INC += -I{mpi4py.get_include()}", file=f_mkfile)
-                print(f"PYTHON_INC += -I{numpy.get_include()}", file=f_mkfile)
-                print(f"PYTHON_INC += -isystem {pybind11.get_include()}",
-                      file=f_mkfile)
-                # Note: use -isystem to suppress warnings from pybind11
-
-                build_lib_str = (build_lib / "veloxchem").resolve()
-                vlx_target_str = "$(BUILD_LIB)/veloxchemlib" + ext_suffix
-                print(f"BUILD_LIB := {build_lib_str}", file=f_mkfile)
-                print(f"VLX_TARGET := {vlx_target_str}", file=f_mkfile)
-                print("", file=f_mkfile)
-
+                # MPI, MKL and XTB
                 print("USE_MPI := true", file=f_mkfile)
                 print("USE_MKL := {}".format("true" if use_mkl else "false"),
                       file=f_mkfile)
@@ -387,31 +374,44 @@ def generate_setup(template_file, setup_file, build_lib=Path("build/lib")):
                       file=f_mkfile)
                 print("", file=f_mkfile)
 
-                print(math_lib, file=f_mkfile)
+                # build path
+                build_lib_str = str((build_lib / "veloxchem").resolve())
+                vlx_target_str = f"$(BUILD_LIB){os.sep}veloxchemlib{ext_suffix}"
+                print(f"BUILD_LIB := {build_lib_str}", file=f_mkfile)
+                print(f"VLX_TARGET := {vlx_target_str}", file=f_mkfile)
                 print("", file=f_mkfile)
 
-                print(
-                    f"PYTHON := python{sys.version_info[0]}.{sys.version_info[1]}",
-                    file=f_mkfile)
-                print("", file=f_mkfile)
-
+                # C++
                 print("CXX :=", cxx, file=f_mkfile)
                 print("", file=f_mkfile)
-
                 print("CXX_REL_FLG :=", cxx_flags, file=f_mkfile)
                 print("CXX_DEB_FLG :=", cxx_flags, file=f_mkfile)
                 print("", file=f_mkfile)
 
+                # math library
+                print(math_lib, file=f_mkfile)
+                print("", file=f_mkfile)
+
+                # python
+                python_version = f"{sys.version_info[0]}.{sys.version_info[1]}"
+                print(f"PYTHON := python{python_version}", file=f_mkfile)
+                print("", file=f_mkfile)
+                python_include_path = sysconfig.get_path("include")
+                print(f"PYTHON_INC := -I{python_include_path}", file=f_mkfile)
+                print(f"PYTHON_INC += -I{mpi4py.get_include()}", file=f_mkfile)
+                print(f"PYTHON_INC += -I{numpy.get_include()}", file=f_mkfile)
+                print(f"PYTHON_INC += -isystem {pybind11.get_include()}",
+                      file=f_mkfile)
+                print("", file=f_mkfile)
+
+                # additional settings
                 print("MACLIBS :=", maclibs, file=f_mkfile)
                 print("", file=f_mkfile)
-
                 print("LTOFLAG :=", lto_flag, file=f_mkfile)
                 print("", file=f_mkfile)
-
                 if use_xtb:
                     print(xtb_lib, file=f_mkfile)
                     print("", file=f_mkfile)
-
                 if (gtest_root is not None) and (gtest_lib is not None):
                     print("GST_ROOT :=", gtest_root, file=f_mkfile)
                     print("GST_LIB :=", gtest_lib, file=f_mkfile)
