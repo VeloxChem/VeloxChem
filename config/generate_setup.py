@@ -86,7 +86,7 @@ def check_dir(dirname, label):
         sys.exit(1)
 
 
-def generate_setup(template_file, setup_file, build_lib=Path("build/lib")):
+def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
 
     if isinstance(template_file, str):
         template_file = Path(template_file)
@@ -185,18 +185,18 @@ def generate_setup(template_file, setup_file, build_lib=Path("build/lib")):
 
     # check whether MKL is in conda environment
     if is_conda and ("MKLROOT" not in os.environ):
-        has_lib = (Path(sys.prefix, "lib/libmkl_core.so").is_file() or
-                   Path(sys.prefix, "lib/libmkl_core.dylib").is_file())
-        has_header = Path(sys.prefix, "include/mkl.h").is_file()
+        has_lib = (Path(sys.prefix, "lib", "libmkl_core.so").is_file() or
+                   Path(sys.prefix, "lib", "libmkl_core.dylib").is_file())
+        has_header = Path(sys.prefix, "include", "mkl.h").is_file()
         if has_lib and has_header:
             os.environ["MKLROOT"] = sys.prefix
 
     # check whether OpenBLAS is in conda environment
     if is_conda and ("OPENBLASROOT" not in os.environ):
-        has_lib = (Path(sys.prefix, "lib/libopenblas.so").is_file() or
-                   Path(sys.prefix, "lib/libopenblas.dylib").is_file())
-        has_header = (Path(sys.prefix, "include/lapacke.h").is_file() and
-                      Path(sys.prefix, "include/cblas.h").is_file())
+        has_lib = (Path(sys.prefix, "lib", "libopenblas.so").is_file() or
+                   Path(sys.prefix, "lib", "libopenblas.dylib").is_file())
+        has_header = (Path(sys.prefix, "include", "lapacke.h").is_file() and
+                      Path(sys.prefix, "include", "cblas.h").is_file())
         if is_conda and has_lib and has_header:
             os.environ["OPENBLASROOT"] = sys.prefix
 
@@ -328,7 +328,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build/lib")):
                    (xtb_dir / "libxtb.dylib").is_file())
 
     # xtb parameter files
-    xtb_path = Path(xtb_root, "share/xtb")
+    xtb_path = Path(xtb_root, "share", "xtb")
     xtb_params = [
         "param_gfn0-xtb.txt", "param_gfn1-xtb.txt", "param_gfn2-xtb.txt"
     ]
