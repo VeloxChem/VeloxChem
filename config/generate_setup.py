@@ -80,9 +80,9 @@ def check_cray():
     return False
 
 
-def check_dir(dirname, label):
-    if not os.path.isdir(dirname):
-        print(f"*** Error: {label} dir {dirname} does not exist!")
+def check_dir(dir_path, label):
+    if not dir_path.is_dir():
+        print(f"*** Error: {label} dir {dir_path} does not exist!")
         sys.exit(1)
 
 
@@ -197,7 +197,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
                    Path(sys.prefix, "lib", "libopenblas.dylib").is_file())
         has_header = (Path(sys.prefix, "include", "lapacke.h").is_file() and
                       Path(sys.prefix, "include", "cblas.h").is_file())
-        if is_conda and has_lib and has_header:
+        if has_lib and has_header:
             os.environ["OPENBLASROOT"] = sys.prefix
 
     use_mkl = ("MKLROOT" in os.environ)
@@ -220,12 +220,12 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
     if use_mkl:
         print("MKL")
 
-        mkl_inc = os.path.join(os.environ["MKLROOT"], "include")
+        mkl_inc = Path(os.environ["MKLROOT"], "include")
         check_dir(mkl_inc, "mkl include")
 
-        mkl_dir = os.path.join(os.environ["MKLROOT"], "lib", "intel64")
-        if not os.path.isdir(mkl_dir):
-            mkl_dir = os.path.join(os.environ["MKLROOT"], "lib")
+        mkl_dir = Path(os.environ["MKLROOT"], "lib", "intel64")
+        if not mkl_dir.is_dir():
+            mkl_dir = Path(os.environ["MKLROOT"], "lib")
         check_dir(mkl_dir, "mkl lib")
 
         math_lib = f"MATH_INC := -I{mkl_inc}"
@@ -269,15 +269,15 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
         print("OpenBLAS")
 
         if "OPENBLASROOT" in os.environ:
-            openblas_inc = os.path.join(os.environ["OPENBLASROOT"], "include")
+            openblas_inc = Path(os.environ["OPENBLASROOT"], "include")
         else:
-            openblas_inc = os.environ["OPENBLAS_INCLUDE_DIR"]
+            openblas_inc = Path(os.environ["OPENBLAS_INCLUDE_DIR"])
         check_dir(openblas_inc, "openblas include")
 
         if "OPENBLASROOT" in os.environ:
-            openblas_dir = os.path.join(os.environ["OPENBLASROOT"], "lib")
+            openblas_dir = Path(os.environ["OPENBLASROOT"], "lib")
         else:
-            openblas_dir = os.environ["OPENBLAS_LIBRARY"]
+            openblas_dir = Path(os.environ["OPENBLAS_LIBRARY"])
         check_dir(openblas_dir, "openblas lib")
 
         math_lib = f"MATH_INC := -I{openblas_inc}"
@@ -318,7 +318,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
     xtb_inc = Path(xtb_root, "include")
     if not xtb_inc.is_dir():
         xtb_inc = Path(xtb_root, "include", "xtb")
-    has_xtb_header = xtb_inc.is_dir() and (xtb_inc / "xtb.h").is_file()
+    has_xtb_header = (xtb_inc / "xtb.h").is_file()
 
     # xtb library
     xtb_dir = Path(xtb_root, "lib64")
@@ -332,15 +332,14 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
     xtb_params = [
         "param_gfn0-xtb.txt", "param_gfn1-xtb.txt", "param_gfn2-xtb.txt"
     ]
-    has_xtb_share = (xtb_path.is_dir() and
-                     all([(xtb_path / x).is_file() for x in xtb_params]))
+    has_xtb_share = all([(xtb_path / x).is_file() for x in xtb_params])
 
     use_xtb = (has_xtb_header and has_xtb_lib and has_xtb_share)
     if use_xtb:
-        xtb_lib = f"XTB_INC := -I{str(xtb_inc)}"
-        xtb_lib += f"\nXTB_LIB := -L{str(xtb_dir)}"
-        xtb_lib += f"\nXTB_LIB += -Wl,-rpath,{str(xtb_dir)} -lxtb"
-        xtb_lib += f"\nXTB_PATH := {str(xtb_path)}"
+        xtb_lib = f"XTB_INC := -I{xtb_inc}"
+        xtb_lib += f"\nXTB_LIB := -L{xtb_dir}"
+        xtb_lib += f"\nXTB_LIB += -Wl,-rpath,{xtb_dir} -lxtb"
+        xtb_lib += f"\nXTB_PATH := {xtb_path}"
         print(f"*** Checking XTB... {xtb_root}")
 
     # ==> google test <==
@@ -400,7 +399,8 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
                 print(f"PYTHON_INC := -I{python_include_path}", file=f_mkfile)
                 print(f"PYTHON_INC += -I{mpi4py.get_include()}", file=f_mkfile)
                 print(f"PYTHON_INC += -I{numpy.get_include()}", file=f_mkfile)
-                print(f"PYTHON_INC += -I{pybind11.get_include()}", file=f_mkfile)
+                print(f"PYTHON_INC += -I{pybind11.get_include()}",
+                      file=f_mkfile)
                 print("", file=f_mkfile)
 
                 # additional settings
@@ -426,14 +426,11 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
 
 if __name__ == "__main__":
 
-    template_file = "Setup.template"
-    setup_file = os.path.join(os.pardir, "src", "Makefile.setup")
+    config_dir = Path(__file__).parent
+    template_file = config_dir / "Setup.template"
+    setup_file = config_dir.parent / "src" / "Makefile.setup"
 
-    if not os.path.isfile(template_file):
-        template_file = os.path.join("config", "Setup.template")
-        setup_file = os.path.join("src", "Makefile.setup")
-
-    if not os.path.isfile(template_file):
+    if not template_file.is_file():
         print(f"*** Error: Cannot find template file {template_file}")
         sys.exit(1)
 

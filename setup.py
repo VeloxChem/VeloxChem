@@ -38,19 +38,14 @@ from setuptools.command.build_ext import build_ext
 # path, add it back if needed.
 if "" not in sys.path:
     sys.path.insert(0, "")
-
 from config.generate_setup import generate_setup
 
 
-def read(rel_path):
-    here = Path(__file__).parent
-    f = here / rel_path
-    with f.open("r") as fp:
-        return fp.read()
-
-
 def get_version(rel_path):
-    for line in read(rel_path).splitlines():
+    abs_path = Path(__file__).parent / rel_path
+    with abs_path.open("r") as fh:
+        lines = fh.readlines()
+    for line in lines:
         if line.startswith("__version__"):
             delim = '"' if '"' in line else "'"
             return line.split(delim)[1]
@@ -59,12 +54,14 @@ def get_version(rel_path):
 
 
 class MakefileExtension(Extension):
+
     def __init__(self, name, sourcedir=""):
         Extension.__init__(self, name, sources=[])
         self.sourcedir = Path(sourcedir).resolve()
 
 
 class MakefileBuild(build_ext):
+
     def run(self):
         build_lib = Path(self.build_lib)
         if not build_lib.exists():
@@ -72,7 +69,9 @@ class MakefileBuild(build_ext):
 
         f = Path("src", "Makefile.setup")
         template = Path("config", "Setup.template")
-        generate_setup(template_file=template, setup_file=f, build_lib=build_lib)
+        generate_setup(template_file=template,
+                       setup_file=f,
+                       build_lib=build_lib)
 
         for ext in self.extensions:
             self.build_extension(ext)
@@ -86,7 +85,7 @@ class MakefileBuild(build_ext):
         build_cmd = [
             "make",
             "-C",
-            f"{ext.sourcedir}/src",
+            str(ext.sourcedir / "src"),
             "release",
             "-s",
             f"-j{int(njobs):d}",
@@ -101,14 +100,15 @@ class MakefileBuild(build_ext):
 
 
 setup(
-    version=get_version("src/pymodule/__init__.py"),
+    version=get_version(Path("src", "pymodule", "__init__.py")),
     package_data={
-        "veloxchem":
         # glob and sort
-        [str(_) for _ in sorted(Path("basis").resolve().glob("**"))],
+        "veloxchem": [
+            str(p) for p in sorted(Path("basis").resolve().glob("**"))
+        ],
     },
     package_dir={
-        "veloxchem": str(Path("src/pymodule").resolve()),
+        "veloxchem": str(Path("src", "pymodule").resolve()),
     },
     ext_modules=[
         MakefileExtension("src"),
