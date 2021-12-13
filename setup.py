@@ -67,10 +67,10 @@ class MakefileBuild(build_ext):
         if not build_lib.exists():
             build_lib.mkdir(parents=True)
 
-        f = Path("src", "Makefile.setup")
-        template = Path("config", "Setup.template")
-        generate_setup(template_file=template,
-                       setup_file=f,
+        setup_file = Path("src", "Makefile.setup")
+        template_file = Path("config", "Setup.template")
+        generate_setup(template_file=template_file,
+                       setup_file=setup_file,
                        build_lib=build_lib)
 
         for ext in self.extensions:
