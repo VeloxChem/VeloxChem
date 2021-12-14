@@ -83,7 +83,7 @@ class TpaReducedDriver(TpaDriver):
     def get_densities(self, wi, kX, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded Fock
-        matrics F^{σ} used for the reduced iostropic cubic response function
+        matrices F^{σ} used for the reduced iostropic cubic response function
 
 
         :param wi:
@@ -105,9 +105,9 @@ class TpaReducedDriver(TpaDriver):
 
         for w in wi:
             # convert response matrix to ao basis #
-            kx = self.mo2ao(mo, kX['Nb'][('x', w)]).T
-            ky = self.mo2ao(mo, kX['Nb'][('y', w)]).T
-            kz = self.mo2ao(mo, kX['Nb'][('z', w)]).T
+            kx = self.mo2ao(mo, kX['Nb'][('x', w)])
+            ky = self.mo2ao(mo, kX['Nb'][('y', w)])
+            kz = self.mo2ao(mo, kX['Nb'][('z', w)])
 
             # create the first order single indexed densiteies #
             Dx = self.transform_dens(kx, D0, S)
@@ -146,7 +146,7 @@ class TpaReducedDriver(TpaDriver):
 
     def get_fock_dict(self, wi, density_list, F0_a, mo, molecule, ao_basis):
         """
-        Computes the compounded Fock matrics F^{σ}  used for the reduced
+        Computes the compounded Fock matrices F^{σ}  used for the reduced
         isotropic cubic response function
 
         :param wi:
@@ -196,8 +196,8 @@ class TpaReducedDriver(TpaDriver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
-                                     'real')
+        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
+                                        'real')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -404,7 +404,7 @@ class TpaReducedDriver(TpaDriver):
     def get_densities_II(self, wi, kX, kXY, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded
-        second-order Fock matrics used for the reduced isotropic cubic response
+        second-order Fock matrices used for the reduced isotropic cubic response
         function. Note: All densities are 1/3 of those in the paper, and all
         the Fock matrices are later scaled by 3.
 
@@ -428,17 +428,17 @@ class TpaReducedDriver(TpaDriver):
         density_list = []
 
         for w in wi:
-            k_sig_xx = self.mo2ao(mo, kXY[(('N_sig_xx', w), 2 * w)]).T
-            k_sig_yy = self.mo2ao(mo, kXY[(('N_sig_yy', w), 2 * w)]).T
-            k_sig_zz = self.mo2ao(mo, kXY[(('N_sig_zz', w), 2 * w)]).T
+            k_sig_xx = self.mo2ao(mo, kXY[(('N_sig_xx', w), 2 * w)])
+            k_sig_yy = self.mo2ao(mo, kXY[(('N_sig_yy', w), 2 * w)])
+            k_sig_zz = self.mo2ao(mo, kXY[(('N_sig_zz', w), 2 * w)])
 
-            k_sig_xy = self.mo2ao(mo, kXY[(('N_sig_xy', w), 2 * w)]).T
-            k_sig_xz = self.mo2ao(mo, kXY[(('N_sig_xz', w), 2 * w)]).T
-            k_sig_yz = self.mo2ao(mo, kXY[(('N_sig_yz', w), 2 * w)]).T
+            k_sig_xy = self.mo2ao(mo, kXY[(('N_sig_xy', w), 2 * w)])
+            k_sig_xz = self.mo2ao(mo, kXY[(('N_sig_xz', w), 2 * w)])
+            k_sig_yz = self.mo2ao(mo, kXY[(('N_sig_yz', w), 2 * w)])
 
-            kx = self.mo2ao(mo, kX['Nb'][('x', w)]).T
-            ky = self.mo2ao(mo, kX['Nb'][('y', w)]).T
-            kz = self.mo2ao(mo, kX['Nb'][('z', w)]).T
+            kx = self.mo2ao(mo, kX['Nb'][('x', w)])
+            ky = self.mo2ao(mo, kX['Nb'][('y', w)])
+            kz = self.mo2ao(mo, kX['Nb'][('z', w)])
 
             kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
             ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
@@ -495,7 +495,7 @@ class TpaReducedDriver(TpaDriver):
 
     def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis):
         """
-        Computes the compounded second-order Fock matrics used for the
+        Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
 
         :param wi:
@@ -534,8 +534,8 @@ class TpaReducedDriver(TpaDriver):
                                           self.ostream)
 
         time_start_fock = time.time()
-        dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
-                                     'real_and_imag')
+        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
+                                        'real_and_imag')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock

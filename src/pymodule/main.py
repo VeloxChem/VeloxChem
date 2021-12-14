@@ -46,6 +46,7 @@ from .rsplinabscross import LinearAbsorptionCrossSection
 from .rsppolarizability import Polarizability
 from .rsptpa import TPA
 from .firstorderprop import FirstOrderProperties
+from .rspshg import SHG
 from .scfgradientdriver import ScfGradientDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -158,6 +159,9 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
 
     elif prop_type == 'tpa':
         rsp_prop = TPA(rsp_dict, method_dict)
+
+    elif prop_type == 'shg':
+        rsp_prop = SHG(rsp_dict, method_dict)
 
     else:
         assert_msg_critical(False, 'input file: invalid response property')
