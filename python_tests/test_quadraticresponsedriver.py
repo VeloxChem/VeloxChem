@@ -94,6 +94,13 @@ class TestQrf:
 #                       ref_result['yyx'].real) < 1.0e-4
 #            assert abs(qrf_result_yyx[0.2].imag -
 #                       ref_result['yyx'].imag) < 1.0e-4
+#            # z-component
+#
+#            assert abs(qrf_result_zzx[0.2].real -
+#                       ref_result['zzx'].real) < 1.0e-4
+#            assert abs(qrf_result_zzx[0.2].imag -
+#                       ref_result['zzx'].imag) < 1.0e-4
+
 # qrf_dft branch version
         qrf_result_yyx = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
 
@@ -115,13 +122,6 @@ class TestQrf:
 
         self.assertTrue(abs(qrf_result_zzx[(0.2,0.2)].imag - ref_result['zzx'].imag) < 1.0e-4)
 #>>>>>>> qrf_dft
-
-            # z-component
-
-            assert abs(qrf_result_zzx[0.2].real -
-                       ref_result['zzx'].real) < 1.0e-4
-            assert abs(qrf_result_zzx[0.2].imag -
-                       ref_result['zzx'].imag) < 1.0e-4
 
     def test_qrf(self):
 
