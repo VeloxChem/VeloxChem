@@ -23,7 +23,6 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-# TODO TEST
 from mpi4py import MPI
 import time as tm
 
