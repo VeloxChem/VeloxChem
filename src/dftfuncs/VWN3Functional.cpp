@@ -46,7 +46,10 @@ namespace vxcfuncs {  // vxcfuncs namespace
                                     &vxcfuncs::VWN3FuncGradientB,
                                     &vxcfuncs::VWN3FuncHessianAB,
                                     &vxcfuncs::VWN3FuncHessianA,
-                                    &vxcfuncs::VWN3FuncHessianB);
+                                    &vxcfuncs::VWN3FuncHessianB,
+                                    &vxcfuncs::VWN3FuncCubicHessianAB,
+                                    &vxcfuncs::VWN3FuncCubicHessianA,
+                                    &vxcfuncs::VWN3FuncCubicHessianB);
     }
     
     void
@@ -697,4 +700,29 @@ namespace vxcfuncs {  // vxcfuncs namespace
         }
     }
     
+    void
+    VWN3FuncCubicHessianAB(       CXCCubicHessianGrid& xcCubicHessianGrid,
+                            const double          factor,
+                            const CDensityGrid&   densityGrid)
+    {
+    }
+
+
+    void
+    VWN3FuncCubicHessianA(        CXCCubicHessianGrid& xcCubicHessianGrid,
+                            const double          factor,
+                            const CDensityGrid&   densityGrid)
+    {
+
+    }
+
+
+    void
+    VWN3FuncCubicHessianB(        CXCCubicHessianGrid& xcCubicHessianGrid,
+                            const double          factor,
+                            const CDensityGrid&   densityGrid)
+    {
+
+    }
+
 }  // namespace vxcfuncs

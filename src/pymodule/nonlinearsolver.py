@@ -43,6 +43,10 @@ from .inputparser import parse_input, get_keyword_type
 from .qqscheme import get_qq_scheme
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
+from .linearsolver import LinearSolver
+from mpi4py import MPI
+from .veloxchemlib import XCIntegrator
+from .veloxchemlib import parse_xc_func
 
 
 class NonLinearSolver:
@@ -204,10 +208,12 @@ class NonLinearSolver:
             self.maximum_hours = rsp_dict['maximum_hours']
 
         if 'xcfun' in method_dict:
-            errmsg = 'NonLinearSolver: The \'xcfun\' keyword is not supported '
-            errmsg += 'in nonlinear response calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
+            if 'dft' not in method_dict:
+                self.dft = True
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'Nonlinear solver: Undefined XC functional')
 
         if 'potfile' in method_dict:
             errmsg = 'NonLinearSolver: The \'potfile\' keyword is not supported '
@@ -273,7 +279,7 @@ class NonLinearSolver:
         if self.dft:
             grid_drv = GridDriver(self.comm)
             grid_drv.set_level(self.grid_level)
-
+            
             grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule)
             n_grid_points = molgrid.number_of_points()
@@ -364,7 +370,7 @@ class NonLinearSolver:
 
         return None
 
-    def comp_nlr_fock(self, mo, D, molecule, ao_basis, fock_flag):
+    def comp_nlr_fock(self, mo, molecule, ao_basis, fock_flag, dft_dict = None, d_dft_1 = None, d_dft_2 = None, mode=None):
         """-
         Computes and returns a list of Fock matrices.
 
@@ -384,15 +390,11 @@ class NonLinearSolver:
         """
 
         if fock_flag == 'real_and_imag':
-            if self.rank == mpi_master():
-                D_total = []
-                for da in D:
-                    D_total.append(da.real)
-                    D_total.append(da.imag)
-            else:
-                D_total = None
 
-            f_total = self.comp_two_el_int(mo, molecule, ao_basis, D_total)
+            if d_dft_1 and d_dft_2:
+                f_total = self.comp_two_el_int(mo, molecule, ao_basis,dft_dict,d_dft_1,d_dft_2,mode)
+            if d_dft_1 and not d_dft_2 :
+                f_total = self.comp_two_el_int(mo, molecule, ao_basis,dft_dict,d_dft_1,mode)
 
             nrows = f_total.data.shape[0]
             half_ncols = f_total.data.shape[1] // 2
@@ -403,12 +405,12 @@ class NonLinearSolver:
             return DistributedArray(ff_data, self.comm, distribute=False)
 
         elif fock_flag == 'real':
-            return self.comp_two_el_int(mo, molecule, ao_basis, D)
+            return self.comp_two_el_int(mo, molecule, ao_basis, d_hf)
 
         else:
             return None
 
-    def comp_two_el_int(self, mo, molecule, ao_basis, dabs):
+    def comp_two_el_int(self, mo, molecule, ao_basis , dft_dict = None, dens_1 = None, dens_2 = None,mode=None):
         """
         Returns the two-electron part of the Fock matix in MO basis
 
@@ -433,13 +435,13 @@ class NonLinearSolver:
         # determine number of batches
 
         if self.rank == mpi_master():
-            n_total = len(dabs)
-            n_ao = dabs[0].shape[0]
+            n_total = len(dens_2)
+            n_ao = dens_2[0].shape[0]
             norb = mo.shape[1]
         else:
             n_total = None
             n_ao = None
-
+        
         batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
@@ -464,21 +466,60 @@ class NonLinearSolver:
             if self.rank == mpi_master():
                 batch_start = batch_size * batch_ind
                 batch_end = min(batch_start + batch_size, n_total)
-                dts = [
+
+                if dens_1:
+                    dts1 = [
                     np.ascontiguousarray(dab)
-                    for dab in dabs[batch_start:batch_end]
-                ]
-                dens = AODensityMatrix(dts, denmat.rest)
+                    for dab in dens_1 ]
+                    dens1 = AODensityMatrix(dts1, denmat.rest)
+
+                if dens_2:
+                    dts2 = [
+                    np.ascontiguousarray(dab)
+                    for dab in dens_2 ]
+                    dens2 = AODensityMatrix(dts2, denmat.rest)
+                
             else:
-                dens = AODensityMatrix()
+                dens1 = AODensityMatrix()
+                dens2 = AODensityMatrix()
+            
+            if dens_1:
+                dens1.broadcast(self.rank, self.comm)
+            if dens_2:
+                dens2.broadcast(self.rank, self.comm)
 
-            dens.broadcast(self.rank, self.comm)
-
-            fock = AOFockMatrix(dens)
+            fock = AOFockMatrix(dens2)
             for i in range(fock.number_of_fock_matrices()):
                 fock.set_fock_type(fockmat.rgenjk, i)
 
-            eri_driver.compute(fock, dens, molecule, ao_basis, screening)
+            if self.dft:
+                if self.xcfun.is_hybrid():
+                    fock_flag = fockmat.rgenjkx
+                    fact_xc = self.xcfun.get_frac_exact_exchange()
+                    for i in range(fock.number_of_fock_matrices()):
+                        fock.set_scale_factor(fact_xc, i)
+                else:
+                    fock_flag = fockmat.rgenj
+
+                for i in range(fock.number_of_fock_matrices()):
+                    fock.set_fock_type(fock_flag, i)
+
+            eri_driver.compute(fock, dens2, molecule, ao_basis, screening)
+            if self.dft and not self.xcfun.is_hybrid():
+                for ifock in range(fock.number_of_fock_matrices()):
+                    fock.scale(2.0, ifock)
+
+            if self.dft: 
+                xc_drv = XCIntegrator(self.comm)
+
+                molgrid = dft_dict['molgrid']
+                gs_density = dft_dict['gs_density']
+
+                molgrid.distribute(self.rank, self.nodes, self.comm)
+                xc_drv.integrate(fock, dens1, dens2, gs_density, molecule, ao_basis,
+                                 molgrid, self.xcfun.get_func_label(),mode)
+
+        
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
             if self.rank == mpi_master():

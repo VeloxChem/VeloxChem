@@ -489,6 +489,23 @@ public:
                               const double          densityThreshold,
                               const xcfun           xcFuncType) const;
 
+    /**
+     Generates pair of screened molecular and density grids by removing grid points with specific density/density
+     gradient values bellow given threshold. NOTE: This method is exclusive to dengrid::ab type.
+     
+     @param densityGridab the screened density grid.
+     @param molecularGridab the screened molecular grid.
+     @param iDensityMatrix the index of density matrix.
+     @param densityThreshold the screening threshold for density values.
+     @param xcFuncType the type of exchange-correlation functional.
+     */
+     void makenewdens(                CDensityGrid&   densityGridAB,
+                                      CMolecularGrid& molecularGridab,
+                                const CDensityGrid&   rwDensityGrid,
+                                const xcfun           xcFuncType,
+                                      int32_t             numdens,
+                                const std::string&      quadMode) const;
+
 
     /**
      Generates pair of screened molecular and density grids by removing grid points with specific density/density

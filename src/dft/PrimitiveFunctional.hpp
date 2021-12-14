@@ -34,11 +34,14 @@
 #include "XCFuncType.hpp"
 #include "XCGradientGrid.hpp"
 #include "XCHessianGrid.hpp"
+#include "XCCubicHessianGrid.hpp"
 #include "DensityGrid.hpp"
 
 using def_vxc_func_typ = void(CXCGradientGrid&, const double factor, const CDensityGrid&);
 
 using def_vxc2_func_typ = void(CXCHessianGrid&, const double factor, const CDensityGrid&);
+
+using def_vxc3_func_typ = void(CXCCubicHessianGrid&, const double factor, const CDensityGrid&);
 
 // using def_vxc2_func_typ = void(CXCGradientGrid&, const CDensityGrid&);
 
@@ -96,6 +99,24 @@ class CPrimitiveFunctional
      */
     std::function<def_vxc2_func_typ> _bSecondOrderFunction;
     
+    /**
+     The functions for computing second derrivatives of primitive exchange-correlation functional for density
+     grid of dengrid::ab type.
+     */
+    std::function<def_vxc3_func_typ> _abThirdOrderFunction;
+
+     /**
+     The functions for computing second derrivatives of primitive exchange-correlation functional for density
+     grid of dengrid::ab type.
+     */
+    std::function<def_vxc3_func_typ> _aThirdOrderFunction;
+
+    /**
+     The functions for computing second derrivatives of primitive exchange-correlation functional for density
+     grid of dengrid::ab type.
+     */
+    std::function<def_vxc3_func_typ> _bThirdOrderFunction;
+
 public:
     /**
      Creates an empty primitive exchange-correlation functional object.
@@ -122,7 +143,31 @@ public:
                          const std::function<def_vxc2_func_typ>& abSecondOrderFunction,
                          const std::function<def_vxc2_func_typ>& aSecondOrderFunction,
                          const std::function<def_vxc2_func_typ>& bSecondOrderFunction);
-    
+
+    /**
+     Creates a primitive exchange-correlation functional object.
+     
+     @param label the label of primitive exchange-correlation functional.
+     @param xcFuncType the type of primitive exchange-correlation functional.
+     @param abFirstOrderFunction the first-order derivative function (dengrid::ab).
+     @param aFirstOrderFunction the first-order derivative function (dengrid::lima).
+     @param bFirstOrderFunction the first-order derivative function (dengrid::limb).
+     @param abSecondOrderFunction the second-order derivative function (dengrid::ab).
+     @param aSecondOrderFunction the second-order derivative function (dengrid::lima).
+     @param bSecondOrderFunction the second-order derivative function (dengrid::limb).
+     */
+    CPrimitiveFunctional(const std::string&                      label,
+                         const xcfun                             xcFuncType,
+                         const std::function<def_vxc_func_typ>&  abFirstOrderFunction,
+                         const std::function<def_vxc_func_typ>&  aFirstOrderFunction,
+                         const std::function<def_vxc_func_typ>&  bFirstOrderFunction,
+                         const std::function<def_vxc2_func_typ>& abSecondOrderFunction,
+                         const std::function<def_vxc2_func_typ>& aSecondOrderFunction,
+                         const std::function<def_vxc2_func_typ>& bSecondOrderFunction,
+                         const std::function<def_vxc3_func_typ>& abThirdOrderFunction,
+                         const std::function<def_vxc3_func_typ>& aThirdOrderFunction,
+                         const std::function<def_vxc3_func_typ>& bThirdOrderFunction); 
+
     /**
      Creates a primitive exchange-correlation functional object by copying other primitive exchange-correlation functional
      object.
@@ -209,6 +254,17 @@ public:
      @param densityGrid the density grid object.
      */
     void compute(      CXCHessianGrid& xcHessianGrid,
+                 const double          factor,
+                 const CDensityGrid&   densityGrid) const;
+    
+    /**
+     Computes second derivative of exchange-correlation functional for given density grid.
+     
+     @param xcHessianGrid the exchange-correlation hessian grid object.
+     @param factor the scaling factor of functional contribution.
+     @param densityGrid the density grid object.
+     */
+    void compute(      CXCCubicHessianGrid& xcCubicHessianGrid,
                  const double          factor,
                  const CDensityGrid&   densityGrid) const;
     

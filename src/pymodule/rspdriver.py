@@ -142,7 +142,21 @@ class ResponseDriver:
         # SHG
         if (self.rsp_dict['order'] == 'quadratic' and
                 self.rsp_dict['complex'] == 'yes'):
+# master branch<<<<<<< HEAD
             self.solver = SHGDriver(self.comm, self.ostream)
+# qrf_dft branch version
+#
+#            shg_solver = SHGDriver(self.comm, self.ostream)
+#
+#            shg_solver.update_settings(self.rsp_dict, self.method_dict)
+#
+#            shg_results = shg_solver.compute(molecule, ao_basis, scf_tensors,self.method_dict)
+#
+#            self.is_converged = shg_solver.is_converged
+#
+#            return shg_results
+#
+#>>>>>>> qrf_dft
 
         # TPA
         elif (self.rsp_dict['order'] == 'cubic' and

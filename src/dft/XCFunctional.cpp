@@ -189,6 +189,18 @@ CXCFunctional::compute(      CXCHessianGrid& xcHessianGrid,
     }
 }
 
+void
+CXCFunctional::compute(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                       const CDensityGrid&        densityGrid) const
+{
+    xcCubicHessianGrid.zero();
+    
+    for (size_t i = 0; i < _primitiveFunctionals.size(); i++)
+    {
+        _primitiveFunctionals[i].compute(xcCubicHessianGrid, _weightsOfPrimitiveFunctionals[i], densityGrid);
+    }
+}
+
 std::string
 CXCFunctional::getLabel() const
 {

@@ -37,10 +37,16 @@ from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonLinearSolver
 from .distributedarray import DistributedArray
-from .scffirstorderprop import ScfFirstOrderProperties
+from .firstorderprop import FirstOrderProperties
 from .errorhandler import assert_msg_critical
-from .checkpoint import (check_distributed_focks, read_distributed_focks,
-                         write_distributed_focks)
+from .checkpoint import check_distributed_focks
+from .checkpoint import read_distributed_focks
+from .checkpoint import write_distributed_focks
+from .inputparser import parse_input
+from pathlib import Path
+from .veloxchemlib import XCFunctional
+from .veloxchemlib import XCIntegrator
+from .veloxchemlib import parse_xc_func
 
 
 class SHGDriver(NonLinearSolver):
@@ -77,12 +83,23 @@ class SHGDriver(NonLinearSolver):
         if comm is None:
             comm = MPI.COMM_WORLD
 
+# master
         if ostream is None:
             ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 
         self.is_converged = False
+# qrf_dft
+        self.dft = False
+        self.grid_level = 4
+        self.xcfun = XCFunctional()
+
+        # ERI settings
+        self.eri_thresh = 1.0e-15
+        self.qq_type = 'QQ_DEN'
+        self.batch_size = None
+#>>>>>>> qrf_dft
 
         # cpp settings
         self.frequencies = (0,)
@@ -120,9 +137,56 @@ class SHGDriver(NonLinearSolver):
         if method_dict is None:
             method_dict = {}
 
-        super().update_settings(rsp_dict, method_dict)
+# Everything is done below
+#        super().update_settings(rsp_dict, method_dict)
 
-    def compute(self, molecule, ao_basis, scf_tensors):
+        rsp_keywords = {
+            'frequencies': 'seq_range',
+            'damping': 'float',
+            'a_operator': 'str',
+            'b_operator': 'str',
+            'c_operator': 'str',
+            'eri_thresh': 'float',
+            'qq_type': 'str_upper',
+            'batch_size': 'int',
+            'max_iter': 'int',
+            'conv_thresh': 'float',
+            'lindep_thresh': 'float',
+            'restart': 'bool',
+            'checkpoint_file': 'str',
+            'timing': 'bool',
+            'profiling': 'bool',
+            'memory_profiling': 'bool',
+            'memory_tracing': 'bool',
+        }            
+
+        if 'xcfun' in method_dict:
+            self.dft = True
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'Nonlinear solver: Undefined XC functional')
+
+        parse_input(self, rsp_keywords, rsp_dict)
+
+        if 'program_start_time' in rsp_dict:
+            self.program_start_time = rsp_dict['program_start_time']
+        if 'maximum_hours' in rsp_dict:
+            self.maximum_hours = rsp_dict['maximum_hours']
+
+        if 'potfile' in method_dict:
+            errmsg = 'ShgDriver: The \'potfile\' keyword is not supported in '
+            errmsg += 'SHG calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        if 'electric_field' in method_dict:
+            errmsg = 'ShgDriver: The \'electric field\' keyword is not '
+            errmsg += 'supported in SHG calculation.'
+            if self.rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+    def compute(self, molecule, ao_basis, scf_tensors,method_settings):
         """
         Computes the isotropic quadratic response function for second-harmonic
         generation.
@@ -220,6 +284,7 @@ class SHGDriver(NonLinearSolver):
         # Computing the first-order response vectors (3 per frequency)
         N_drv = ComplexResponse(self.comm, self.ostream)
 
+# from master branch:
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
@@ -228,6 +293,16 @@ class SHGDriver(NonLinearSolver):
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
+# qrf_dft branch version:
+#        N_drv.update_settings({
+#            'damping': self.damping,
+#            'lindep_thresh': self.lindep_thresh,
+#            'conv_thresh': self.conv_thresh,
+#            'max_iter': self.max_iter,
+#            'eri_thresh': self.eri_thresh,
+#            'qq_type': self.qq_type,
+#        },method_settings)
+#>>>>>>> qrf_dft
 
         if self.checkpoint_file is not None:
             N_drv.checkpoint_file = str(
@@ -355,15 +430,17 @@ class SHGDriver(NonLinearSolver):
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            density_list = self.get_densities(freqpairs, kX, S, D0, mo)
+            d_dft1,d_dft2 = self.get_densities(freqpairs, kX, S, D0, mo)
+            dft_dict = self.init_dft(molecule, scf_tensors)
         else:
-            density_list = None
+            d_dft1 = None
+            d_dft2 = None
 
         profiler.check_memory_usage('Densities')
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(freqpairs, density_list, F0, mo,
-                                       molecule, ao_basis)
+        fock_dict = self.get_fock_dict(freqpairs, d_dft1,d_dft2, F0, mo,
+                                       molecule, ao_basis,dft_dict)
 
         profiler.check_memory_usage('Focks')
 
@@ -455,7 +532,8 @@ class SHGDriver(NonLinearSolver):
             A list of tranformed compounded densities
         """
 
-        density_list = []
+        d_dft1 = []
+        d_dft2 = []  
 
         for (wb, wc) in freqpairs:
 
@@ -495,16 +573,29 @@ class SHGDriver(NonLinearSolver):
             D_lam_yz = (self.transform_dens(k_y, D_z, S) +
                         self.transform_dens(k_z, D_y, S))
 
-            density_list.append(D_sig_x)
-            density_list.append(D_sig_y)
-            density_list.append(D_sig_z)
-            density_list.append(D_lam_xy)
-            density_list.append(D_lam_xz)
-            density_list.append(D_lam_yz)
+            d_dft1.append(D_x.real)
+            d_dft1.append(D_x.imag)
+            d_dft1.append(D_y.real)
+            d_dft1.append(D_y.imag)
+            d_dft1.append(D_z.real)
+            d_dft1.append(D_z.imag)
 
-        return density_list
+            d_dft2.append(D_sig_x.real)
+            d_dft2.append(D_sig_x.imag)
+            d_dft2.append(D_sig_y.real)
+            d_dft2.append(D_sig_y.imag)
+            d_dft2.append(D_sig_z.real)
+            d_dft2.append(D_sig_z.imag)
+            d_dft2.append(D_lam_xy.real)
+            d_dft2.append(D_lam_xy.imag)
+            d_dft2.append(D_lam_xz.real)
+            d_dft2.append(D_lam_xz.imag)
+            d_dft2.append(D_lam_yz.real)
+            d_dft2.append(D_lam_yz.imag)
 
-    def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis):
+        return d_dft1,d_dft2
+
+    def get_fock_dict(self, wi, d_dft1, d_dft2, F0, mo, molecule, ao_basis,dft_dict = None):
         """
         Computes the compounded Fock matrices used for the
         isotropic quadratic response function used for SHG
@@ -558,8 +649,8 @@ class SHGDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                        'real_and_imag')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis,
+                                        'real_and_imag',dft_dict,d_dft1, d_dft2,'shg')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock

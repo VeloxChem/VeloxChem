@@ -225,7 +225,27 @@ export_dft(py::module& m)
              "molecule"_a,
              "basis"_a,
              "molecularGrid"_a,
-             "xcFuncLabel"_a);
+             "xcFuncLabel"_a)
+        .def("integrate",
+             vlx_general::overload_cast_<CAOFockMatrix&,
+                                         const CAODensityMatrix&,
+                                         const CAODensityMatrix&,
+                                         const CAODensityMatrix&,
+                                         const CMolecule&,
+                                         const CMolecularBasis&,
+                                         const CMolecularGrid&,
+                                         const std::string&,
+                                         const std::string&>()(&CXCIntegrator::integrate, py::const_),
+             "Integrate exchange-correlation functional contribution to first order Fock matrices and adds it to AO Fock matrix.",
+             "aoFockMatrix"_a,
+             "rwDensityMatrix"_a,
+             "rw12DensityMatrix"_a,
+             "gsDensityMatrix"_a,
+             "molecule"_a,
+             "basis"_a,
+             "molecularGrid"_a,
+             "xcFuncLabel"_a,
+              "quadMode"_a);
     
     // CDensityGrid class
 
