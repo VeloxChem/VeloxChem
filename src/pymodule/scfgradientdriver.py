@@ -102,7 +102,8 @@ class ScfGradientDriver(GradientDriver):
         :param min_basis:
             The minimal AO basis set.
         """
-        self.print_header()
+        if self.rank == mpi_master():
+            self.print_header()
 
         start_time = tm.time()
 
