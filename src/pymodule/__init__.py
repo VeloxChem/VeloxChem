@@ -31,6 +31,8 @@ from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
+from .veloxchemlib import GridDriver
+from .veloxchemlib import DensityGridDriver
 from .veloxchemlib import SADGuessDriver
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import DenseMatrix

@@ -186,15 +186,23 @@ export_dft(py::module& m)
 
     PyClass<CDensityGridDriver>(m, "DensityGridDriver")
         .def(py::init(&vlx_general::create<CDensityGridDriver>), "comm"_a = py::none())
-        .def("generate",
-             &CDensityGridDriver::generate,
-             "Generates partitioned density grid for given molecule and type of exchange-correlation functional. Density grid generation is "
-             "distributed within domain of MPI communicator.",
-             "aoDensityMatrix"_a,
-             "molecule"_a,
-             "basis"_a,
-             "molecularGrid"_a,
-             "xcFunctional"_a);
+        .def(
+            "generate",
+            [](CDensityGridDriver&       self,
+               const CAODensityMatrix&   aoDensityMatrix,
+               const CMolecule&          molecule,
+               const CMolecularBasis&    basis,
+               const CMolecularGrid&     molecularGrid,
+               const std::string&        xcFunctionalType) -> CDensityGrid {
+                return self.generate(aoDensityMatrix, molecule, basis, molecularGrid, to_xcfun(xcFunctionalType));
+            },
+            "Generates partitioned density grid for given molecule and type of exchange-correlation functional. Density grid generation is "
+            "distributed within domain of MPI communicator.",
+            "aoDensityMatrix"_a,
+            "molecule"_a,
+            "basis"_a,
+            "molecularGrid"_a,
+            "xcFunctionalType"_a);
 
     // CXCIntegrator class
 
