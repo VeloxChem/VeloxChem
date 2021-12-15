@@ -73,7 +73,7 @@ class TestMain:
         # unrestricted
 
         here = Path(__file__).parent
-        inpfile = here / 'inputs' / 'water_unrest.inp'
+        inpfile = here / 'inputs' / 'water_triplet.inp'
 
         task = MpiTask([str(inpfile), None])
         scf_type = 'unrestricted'
