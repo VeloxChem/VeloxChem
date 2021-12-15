@@ -603,8 +603,7 @@ class ScfDriver:
                                         " {:.1e}.".format(self.eri_thresh))
                 self.ostream.print_blank()
 
-        den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
-                                          ovl_mat)
+        den_mat = self.comp_guess_density(molecule, ao_basis, min_basis)
 
         den_mat.broadcast(self.rank, self.comm)
 
@@ -958,7 +957,7 @@ class ScfDriver:
 
         return npot_mat
 
-    def comp_guess_density(self, molecule, ao_basis, min_basis, ovl_mat):
+    def comp_guess_density(self, molecule, ao_basis, min_basis):
         """
         Computes initial density guess for SCF using superposition of atomic
         densities or molecular orbitals projection methods.
@@ -969,8 +968,6 @@ class ScfDriver:
             The AO basis set.
         :param min_basis:
             The minimal AO basis set.
-        :param ovl_mat:
-            The overlap matrix between minimal and full AO basis.
 
         :return:
             The density matrix.
@@ -986,7 +983,7 @@ class ScfDriver:
         if self.den_guess.guess_type == "SAD":
 
             return self.den_guess.sad_density(molecule, ao_basis, min_basis,
-                                              ovl_mat, self.scf_type, self.comm,
+                                              self.scf_type, self.comm,
                                               self.ostream)
 
         # guess: projection of molecular orbitals from reduced basis

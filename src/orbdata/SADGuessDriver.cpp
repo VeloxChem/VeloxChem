@@ -35,6 +35,7 @@
 #include "DensityMatrixType.hpp"
 #include "ErrorHandler.hpp"
 #include "MpiFunc.hpp"
+#include "OverlapIntegralsDriver.hpp"
 #include "PartialCharges.hpp"
 #include "StringFormat.hpp"
 
@@ -585,9 +586,7 @@ CAODensityMatrix
 CSADGuessDriver::compute(const CMolecule&       molecule,
                          const CMolecularBasis& basis_1,
                          const CMolecularBasis& basis_2,
-                         const COverlapMatrix&  S12,
-                         const COverlapMatrix&  S22,
-                         const bool             closedShell) const
+                         const std::string&     densityType) const
 {
     CAODensityMatrix dsad;
 
@@ -595,7 +594,13 @@ CSADGuessDriver::compute(const CMolecule&       molecule,
     {
         // generate SAD guess
 
-        dsad = _compSADGuess(molecule, basis_1, basis_2, S12, S22, closedShell);
+        COverlapIntegralsDriver ovldrv(_locComm);
+
+        auto S12 = ovldrv.compute(molecule, basis_1, basis_2);
+
+        auto S22 = ovldrv.compute(molecule, basis_2);
+
+        dsad = _compSADGuess(molecule, basis_1, basis_2, S12, S22, densityType);
     }
 
     return dsad;
@@ -607,7 +612,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
                                const CMolecularBasis& basis_2,
                                const COverlapMatrix&  S12,
                                const COverlapMatrix&  S22,
-                               const bool             closedShell) const
+                               const std::string&     densityType) const
 {
     auto natoms = molecule.getNumberOfAtoms();
 
@@ -786,7 +791,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
         // update csad_beta
 
-        if (!closedShell)
+        if (fstr::upcase(densityType) == std::string("UNRESTRICTED"))
         {
             for (int32_t j = 0; j < naodim_2; j++)
             {
@@ -804,18 +809,22 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     std::vector<CDenseMatrix> dsad;
 
-    if (closedShell)
+    if (fstr::upcase(densityType) == std::string("RESTRICTED"))
     {
         dsad.push_back(denblas::multABt(csad_alpha, csad_alpha));
 
         return CAODensityMatrix(dsad, denmat::rest);
     }
-    else
+    else if (fstr::upcase(densityType) == std::string("UNRESTRICTED"))
     {
         dsad.push_back(denblas::multABt(csad_alpha, csad_alpha));
 
         dsad.push_back(denblas::multABt(csad_beta, csad_beta));
 
         return CAODensityMatrix(dsad, denmat::unrest);
+    }
+    else
+    {
+        return CAODensityMatrix();
     }
 }

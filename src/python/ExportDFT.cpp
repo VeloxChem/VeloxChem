@@ -32,6 +32,7 @@
 #include <pybind11/stl.h>
 
 #include <memory>
+#include <string>
 
 #include "DensityGrid.hpp"
 #include "DensityGridDriver.hpp"
