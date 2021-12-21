@@ -24,6 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import time as tm
 
@@ -191,6 +192,11 @@ class NonLinearSolver:
             self.program_start_time = rsp_dict['program_start_time']
         if 'maximum_hours' in rsp_dict:
             self.maximum_hours = rsp_dict['maximum_hours']
+        if 'filename' in rsp_dict:
+            self.filename = rsp_dict['filename']
+            if 'checkpoint_file' not in rsp_dict:
+                self.checkpoint_file = str(
+                    Path(self.filename).with_suffix('.rsp.h5'))
 
         if 'xcfun' in method_dict:
             errmsg = 'NonLinearSolver: The \'xcfun\' keyword is not supported '

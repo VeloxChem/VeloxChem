@@ -35,6 +35,7 @@ def test_full_input(tmpdir):
         'method_settings': {
             'basis': 'aug-cc-pvdz',
         },
+        'scf': {},
         'molecule': {
             'charge': '0',
             'multiplicity': '1',
