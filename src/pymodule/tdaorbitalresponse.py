@@ -105,8 +105,23 @@ class TdaOrbitalResponse(OrbitalResponse):
 
             # 2) Construct the right-hand side
             dm_ao_rhs = AODensityMatrix([unrel_dm_ao, exc_vec_ao], denmat.rest)
+
+            if self.dft:
+                # 3) Construct density matrices for E[3] term:
+                # XCIntegrator expects a DM with real and imaginary part,
+                # so we set the imaginary part to zero.
+                perturbed_dm_ao = AODensityMatrix([exc_vec_ao, 0*exc_vec_ao],
+                                                   denmat.rest)
+                # TODO: check if this should actually be zero.
+                # This term would correspond to the derivative of the 
+                #  perturbed dm with respect to the MO coefficients.
+                zero_dm_ao = AODensityMatrix([0*exc_vec_ao, 0*exc_vec_ao],
+                                              denmat.rest)
         else:
             dm_ao_rhs = AODensityMatrix()
+            if self.dft:
+                perturbed_dm_ao = AODensityMatrix()
+                zero_dm_ao =  AODensityMatrix()
 
         dm_ao_rhs.broadcast(self.rank, self.comm)
 
@@ -116,16 +131,28 @@ class TdaOrbitalResponse(OrbitalResponse):
         # Fock matrices with corresponding type
         fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
         fock_ao_rhs.set_fock_type(fockmat.rgenjk, 1)
+
         if self.dft:
+            perturbed_dm_ao.broadcast(self.rank, self.comm)
+            zero_dm_ao.broadcast(self.rank, self.comm)
+            # Fock matrix for computing gxc
+            fock_gxc_ao = AOFockMatrix(perturbed_dm_ao)
             if self.xcfun.is_hybrid():
                 fact_xc = self.xcfun.get_frac_exact_exchange()
                 for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
                     fock_ao_rhs.set_scale_factor(fact_xc, ifock)
+                for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
+                    fock_gxc_ao.set_scale_factor(fact_xc, ifock)
                 fock_ao_rhs.set_fock_type(fockmat.restjkx, 0)
                 fock_ao_rhs.set_fock_type(fockmat.rgenjkx, 1)
+                fock_gxc_ao.set_fock_type(fockmat.rgenjkx, 0)
+                fock_gxc_ao.set_fock_type(fockmat.rgenjkx, 1)
             else:
                 fock_ao_rhs.set_fock_type(fockmat.restj, 0)
                 fock_ao_rhs.set_fock_type(fockmat.rgenj, 1)
+                fock_gxc_ao.set_fock_type(fockmat.rgenj, 0)
+                fock_gxc_ao.set_fock_type(fockmat.rgenj, 1)
+
 
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
@@ -138,14 +165,19 @@ class TdaOrbitalResponse(OrbitalResponse):
             if not self.xcfun.is_hybrid():
                 fock_ao_rhs.scale(2.0, 0)
                 fock_ao_rhs.scale(2.0, 1)
+                fock_gxc_ao.scale(2.0, 0)
             xc_drv = XCIntegrator(self.comm)
             molgrid.distribute(self.rank, self.nodes, self.comm)
             xc_drv.integrate(fock_ao_rhs, dm_ao_rhs, gs_density,
-                             molecule, basis, molgrid, self.xcfun.get_func_label())
+                             molecule, basis, molgrid,
+                             self.xcfun.get_func_label())
+            xc_drv.integrate(fock_gxc_ao, perturbed_dm_ao, zero_dm_ao,
+                             gs_density, molecule, basis, molgrid,
+                             self.xcfun.get_func_label(), "quadratic")
+
+            fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
             #if timing_dict is not None:
             #    timing_dict['DFT'] = tm.time() - t0
-
-		    # TODO: The DFT E[3] term is missing here!!
 
         fock_ao_rhs.reduce_sum(self.rank, self.nodes, self.comm)
 
@@ -163,6 +195,18 @@ class TdaOrbitalResponse(OrbitalResponse):
 
             rhs_mo = fmo_rhs_0 + np.linalg.multi_dot(
                 [mo_occ.T, sdp_pds, mo_vir])
+
+            # TODO: Check if the DFT E[3] term is correct.
+            # Add DFT E[3] contribution to the RHS:
+            if self.dft:
+                print("\nRHS:before gxc:\n")
+                print(rhs_mo)
+                gxc_ao = fock_gxc_ao.alpha_to_numpy(0)
+                gxc_mo =  np.linalg.multi_dot([mo_occ.T, gxc_ao, mo_vir])
+                rhs_mo += 0.5*gxc_mo
+                print("\nDFT, added gxc:\n")
+                print(rhs_mo)
+
 
         profiler.stop_timer(0, 'RHS')
 
