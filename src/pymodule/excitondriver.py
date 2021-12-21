@@ -228,8 +228,7 @@ class ExcitonModelDriver:
         if 'filename' in exciton_dict:
             self.filename = exciton_dict['filename']
             if 'checkpoint_file' not in exciton_dict:
-                self.checkpoint_file = str(
-                    Path(self.filename).with_suffix('.exciton.h5'))
+                self.checkpoint_file = f'{self.filename}.exciton.h5'
 
         method_keywords = {
             key: val[0]
