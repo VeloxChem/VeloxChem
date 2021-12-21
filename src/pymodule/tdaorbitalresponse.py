@@ -141,6 +141,8 @@ class TdaOrbitalResponse(OrbitalResponse):
                 fact_xc = self.xcfun.get_frac_exact_exchange()
                 for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
                     fock_ao_rhs.set_scale_factor(fact_xc, ifock)
+                for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
+                    fock_gxc_ao.set_scale_factor(fact_xc, ifock)
                 fock_ao_rhs.set_fock_type(fockmat.restjkx, 0)
                 fock_ao_rhs.set_fock_type(fockmat.rgenjkx, 1)
                 fock_gxc_ao.set_fock_type(fockmat.rgenjkx, 0)
@@ -163,6 +165,7 @@ class TdaOrbitalResponse(OrbitalResponse):
             if not self.xcfun.is_hybrid():
                 fock_ao_rhs.scale(2.0, 0)
                 fock_ao_rhs.scale(2.0, 1)
+                fock_gxc_ao.scale(2.0, 0)
             xc_drv = XCIntegrator(self.comm)
             molgrid.distribute(self.rank, self.nodes, self.comm)
             xc_drv.integrate(fock_ao_rhs, dm_ao_rhs, gs_density,
@@ -200,7 +203,7 @@ class TdaOrbitalResponse(OrbitalResponse):
                 print(rhs_mo)
                 gxc_ao = fock_gxc_ao.alpha_to_numpy(0)
                 gxc_mo =  np.linalg.multi_dot([mo_occ.T, gxc_ao, mo_vir])
-                rhs_mo += 2*gxc_mo
+                rhs_mo += 0.5*gxc_mo
                 print("\nDFT, added gxc:\n")
                 print(rhs_mo)
 
