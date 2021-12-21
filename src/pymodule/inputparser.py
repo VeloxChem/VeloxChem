@@ -395,6 +395,25 @@ def parse_input(obj, keyword_types, input_dictionary):
             assert_msg_critical(False, err_type)
 
 
+def print_keywords(input_keywords, ostream):
+    """
+    Prints input keywords to output stream.
+    """
+
+    width = 80
+    for group in input_keywords:
+        ostream.print_header('=' * width)
+        ostream.print_header(f'  @{group}'.ljust(width))
+        ostream.print_header('-' * width)
+        for key, val in input_keywords[group].items():
+            text = f'  {key}'.ljust(20)
+            text += f'  {get_keyword_type(val[0])}'.ljust(15)
+            text += f'  {val[1]}'.ljust(width - 35)
+            ostream.print_header(text)
+    ostream.print_header('=' * width)
+    ostream.flush()
+
+
 def get_keyword_type(keyword_type):
     """
     Gets keyword type for printing.

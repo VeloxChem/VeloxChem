@@ -52,7 +52,7 @@ from .molecularorbitals import MolecularOrbitals
 from .subcommunicators import SubCommunicators
 from .signalhandler import SignalHandler
 from .denguess import DensityGuess
-from .inputparser import parse_input, get_keyword_type
+from .inputparser import parse_input, print_keywords
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
@@ -261,18 +261,7 @@ class ScfDriver:
         Prints input keywords in SCF driver.
         """
 
-        width = 80
-        for group in self.input_keywords:
-            self.ostream.print_header('=' * width)
-            self.ostream.print_header(f'  @{group}'.ljust(width))
-            self.ostream.print_header('-' * width)
-            for key, val in self.input_keywords[group].items():
-                text = f'  {key}'.ljust(20)
-                text += f'  {get_keyword_type(val[0])}'.ljust(15)
-                text += f'  {val[1]}'.ljust(width - 35)
-                self.ostream.print_header(text)
-        self.ostream.print_header('=' * width)
-        self.ostream.flush()
+        print_keywords(self.input_keywords, self.ostream)
 
     def update_settings(self, scf_dict, method_dict=None):
         """

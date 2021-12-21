@@ -70,6 +70,7 @@ from .molecularorbitals import MolecularOrbitals
 from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
+from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfgradientdriver import ScfGradientDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
