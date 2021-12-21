@@ -203,6 +203,12 @@ class ExcitonModelDriver:
 
         parse_input(self, exciton_keywords, exciton_dict)
 
+        if 'filename' in exciton_dict:
+            self.filename = exciton_dict['filename']
+            if 'checkpoint_file' not in exciton_dict:
+                self.checkpoint_file = str(
+                    Path(self.filename).with_suffix('.exciton.h5'))
+
         method_keywords = {
             'dft': 'bool',
             'grid_level': 'int',

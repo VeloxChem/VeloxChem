@@ -88,6 +88,9 @@ from .cppsolver import ComplexResponse
 from .c6solver import C6Solver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
+from .shgdriver import SHGDriver
+from .tpafulldriver import TPAFullDriver
+from .tpareddriver import TPAReducedDriver
 from .respchargesdriver import RespChargesDriver
 from .rspproperty import ResponseProperty
 from .rsplinabscross import LinearAbsorptionCrossSection
@@ -102,9 +105,6 @@ from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .scffirstorderprop import ScfFirstOrderProperties
-from .cubicresponsedriver import CubicResponseDriver
-from .quadraticresponsedriver import QuadraticResponseDriver
-from .shgdriver import SHGDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical

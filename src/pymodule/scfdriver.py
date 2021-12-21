@@ -299,6 +299,9 @@ class ScfDriver:
             self.maximum_hours = scf_dict['maximum_hours']
         if 'filename' in scf_dict:
             self.filename = scf_dict['filename']
+            if 'checkpoint_file' not in scf_dict:
+                self.checkpoint_file = str(
+                    Path(self.filename).with_suffix('.scf.h5'))
 
         method_keywords = {
             key: val[0]

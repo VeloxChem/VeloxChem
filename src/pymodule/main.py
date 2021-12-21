@@ -219,6 +219,8 @@ def main():
         else:
             exciton_dict = {}
 
+        exciton_dict['filename'] = task.input_dict['filename']
+
         exciton_dict['program_start_time'] = program_start_time
         exciton_dict['maximum_hours'] = maximum_hours
 
