@@ -20,12 +20,10 @@ class TestRespCharges:
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        inp_path = Path(inpfile)
-        filename = str(inp_path.with_name(inp_path.stem))
         chg_dict = {
             'number_layers': number_layers,
-            'filename': filename,
             'fitting_points': fitting_points,
+            'filename': task.input_dict['filename'],
         }
 
         chg_drv = RespChargesDriver(task.mpi_comm, task.ostream)
@@ -39,13 +37,14 @@ class TestRespCharges:
         if is_mpi_master(task.mpi_comm):
             assert np.max(np.abs(q_fit - ref_charges)) < 1.0e-6
 
-            pdb_file = Path(filename).with_suffix('.pdb')
+            pdb_file = Path(chg_drv.filename).with_suffix('.pdb')
             if pdb_file.is_file():
                 pdb_file.unlink()
-            scf_h5_file = Path(filename).with_suffix('.scf.h5')
+            scf_h5_file = Path(chg_drv.filename).with_suffix('.scf.h5')
             if scf_h5_file.is_file():
                 scf_h5_file.unlink()
-            scf_final_h5_file = Path(filename).with_suffix('.scf.tensors.h5')
+            scf_final_h5_file = Path(
+                chg_drv.filename).with_suffix('.scf.tensors.h5')
             if scf_final_h5_file.is_file():
                 scf_final_h5_file.unlink()
 

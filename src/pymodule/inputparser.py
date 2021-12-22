@@ -23,6 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from datetime import datetime
 from pathlib import PurePath
 import numpy as np
 import sys
@@ -421,8 +422,11 @@ def get_keyword_type(keyword_type):
         - 'int' -> 'integer'
         - 'float' -> 'float'
         - 'bool' -> 'boolean'
-        - 'list' -> 'multiple-lines'
+        - 'list' -> 'multi-line'
         - 'seq_fixed_int', 'seq_fixed', 'seq_range' -> 'sequence'
+
+    :return:
+        The keyword type for printing.
     """
 
     return {
@@ -432,8 +436,19 @@ def get_keyword_type(keyword_type):
         'int': 'integer',
         'float': 'float',
         'bool': 'boolean',
-        'list': 'multiple-lines',
+        'list': 'multi-line',
         'seq_fixed_int': 'sequence',
         'seq_fixed': 'sequence',
         'seq_range': 'sequence',
     }[keyword_type]
+
+
+def get_datetime_string():
+    """
+    Gets datetime string.
+
+    :return:
+        The datetime string (ISO format with ':' replaced by '.').
+    """
+
+    return datetime.now().isoformat().replace(':', '.')

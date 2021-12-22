@@ -219,10 +219,9 @@ def main():
         else:
             exciton_dict = {}
 
-        exciton_dict['filename'] = task.input_dict['filename']
-
         exciton_dict['program_start_time'] = program_start_time
         exciton_dict['maximum_hours'] = maximum_hours
+        exciton_dict['filename'] = task.input_dict['filename']
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
         exciton_drv.update_settings(exciton_dict, method_dict)
@@ -278,10 +277,9 @@ def main():
         else:
             scf_dict = {}
 
-        scf_dict['filename'] = task.input_dict['filename']
-
         scf_dict['program_start_time'] = program_start_time
         scf_dict['maximum_hours'] = maximum_hours
+        scf_dict['filename'] = task.input_dict['filename']
 
         if use_xtb:
             if 'potfile' in method_dict:
@@ -339,14 +337,14 @@ def main():
         else:
             opt_dict = {}
 
+        opt_dict['filename'] = task.input_dict['filename']
+
         if use_xtb:
             grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
-            opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
-                                         'XTB')
+            opt_drv = OptimizationDriver(grad_drv, 'XTB')
         elif scf_drv.scf_type == 'restricted':
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
-            opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
-                                         'SCF')
+            opt_drv = OptimizationDriver(grad_drv, 'SCF')
 
         opt_drv.update_settings(opt_dict)
         opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
@@ -359,10 +357,9 @@ def main():
         else:
             rsp_dict = {}
 
-        rsp_dict['filename'] = task.input_dict['filename']
-
         rsp_dict['program_start_time'] = program_start_time
         rsp_dict['maximum_hours'] = maximum_hours
+        rsp_dict['filename'] = task.input_dict['filename']
 
         if 'eri_thresh' not in rsp_dict:
             rsp_dict['eri_thresh'] = scf_drv.eri_thresh

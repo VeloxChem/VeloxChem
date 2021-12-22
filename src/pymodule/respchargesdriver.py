@@ -39,7 +39,7 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
-from .inputparser import parse_input
+from .inputparser import parse_input, get_datetime_string
 from .errorhandler import assert_msg_critical
 
 
@@ -95,6 +95,9 @@ class RespChargesDriver:
         # outputstream
         self.ostream = ostream
 
+        # filename
+        self.filename = f'veloxchem_esp_{get_datetime_string()}'
+
         # conformers
         self.xyz_file = None
         self.net_charge = 0.0
@@ -103,7 +106,6 @@ class RespChargesDriver:
         self.weights = None
         self.energies = None
         self.temperature = 293.15
-        self.filename = 'veloxchem_electrostatic_potential_input'
 
         # grid information
         self.number_layers = 4
