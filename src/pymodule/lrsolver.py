@@ -423,12 +423,10 @@ class LinearResponseSolver(LinearSolver):
                 rsp_funcs = {}
                 full_solutions = {}
 
+                # create h5 file for response solutions
                 if self.checkpoint_file is not None:
                     final_h5_fname = str(
                         Path(self.checkpoint_file).with_suffix('.solutions.h5'))
-                else:
-                    final_h5_fname = 'rsp.solutions.h5'
-                if self.rank == mpi_master():
                     create_hdf5(final_h5_fname, molecule, basis,
                                 dft_dict['dft_func_label'],
                                 pe_dict['potfile_text'])
@@ -441,15 +439,19 @@ class LinearResponseSolver(LinearSolver):
                         rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
                         full_solutions[(bop, w)] = x
 
-                        write_rsp_solution(
-                            final_h5_fname,
-                            '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
+                        # write to h5 file for response solutions
+                        if self.checkpoint_file is not None:
+                            write_rsp_solution(
+                                final_h5_fname,
+                                '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
 
             if self.rank == mpi_master():
-                checkpoint_text = 'Response solution vectors written to file: '
-                checkpoint_text += final_h5_fname
-                self.ostream.print_info(checkpoint_text)
-                self.ostream.print_blank()
+                # print information about h5 file for response solutions
+                if self.checkpoint_file is not None:
+                    checkpoint_text = 'Response solution vectors written to file: '
+                    checkpoint_text += final_h5_fname
+                    self.ostream.print_info(checkpoint_text)
+                    self.ostream.print_blank()
 
                 return {
                     'response_functions': rsp_funcs,

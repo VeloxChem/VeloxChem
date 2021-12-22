@@ -726,11 +726,11 @@ class TDAExciDriver(LinearSolver):
             The TDA eigenvectors (in columns).
         """
 
-        if self.checkpoint_file is not None:
-            final_h5_fname = str(
-                Path(self.checkpoint_file).with_suffix('.solutions.h5'))
-        else:
-            final_h5_fname = 'rsp.solutions.h5'
+        if self.checkpoint_file is None:
+            return
+
+        final_h5_fname = str(
+            Path(self.checkpoint_file).with_suffix('.solutions.h5'))
 
         create_hdf5(final_h5_fname, molecule, basis, dft_func_label,
                     potfile_text)

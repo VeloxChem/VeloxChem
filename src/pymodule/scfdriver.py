@@ -1931,11 +1931,11 @@ class ScfDriver:
             The AO basis set.
         """
 
-        if self.checkpoint_file is not None:
-            final_h5_fname = str(
-                Path(self.checkpoint_file).with_suffix('.tensors.h5'))
-        else:
-            final_h5_fname = 'scf.tensors.h5'
+        if self.checkpoint_file is None:
+            return
+
+        final_h5_fname = str(
+            Path(self.checkpoint_file).with_suffix('.tensors.h5'))
 
         if self.dft:
             xc_label = self.xcfun.get_func_label()

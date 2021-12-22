@@ -445,12 +445,10 @@ class LinearResponseEigenSolver(LinearSolver):
             if self.rank == mpi_master():
                 eigvecs = np.zeros((x_0.size, self.nstates))
 
+                # create h5 file for response solutions
                 if self.checkpoint_file is not None:
                     final_h5_fname = str(
                         Path(self.checkpoint_file).with_suffix('.solutions.h5'))
-                else:
-                    final_h5_fname = 'rsp.solutions.h5'
-                if self.rank == mpi_master():
                     create_hdf5(final_h5_fname, molecule, basis,
                                 dft_dict['dft_func_label'],
                                 pe_dict['potfile_text'])
@@ -530,8 +528,10 @@ class LinearResponseEigenSolver(LinearSolver):
 
                     eigvecs[:, s] = eigvec[:]
 
-                    write_rsp_solution(final_h5_fname, 'S{:d}'.format(s + 1),
-                                       eigvec)
+                    # write to h5 file for response solutions
+                    if self.checkpoint_file is not None:
+                        write_rsp_solution(final_h5_fname,
+                                           'S{:d}'.format(s + 1), eigvec)
 
             if self.nto or self.detach_attach:
                 self.ostream.print_blank()
@@ -561,10 +561,11 @@ class LinearResponseEigenSolver(LinearSolver):
                 if self.detach_attach:
                     ret_dict['density_cubes'] = dens_cube_files
 
-                checkpoint_text = 'Response solution vectors written to file: '
-                checkpoint_text += final_h5_fname
-                self.ostream.print_info(checkpoint_text)
-                self.ostream.print_blank()
+                if self.checkpoint_file is not None:
+                    checkpoint_text = 'Response solution vectors written to file: '
+                    checkpoint_text += final_h5_fname
+                    self.ostream.print_info(checkpoint_text)
+                    self.ostream.print_blank()
 
                 return ret_dict
 
