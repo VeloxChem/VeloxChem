@@ -39,7 +39,7 @@ from .veloxchemlib import fockmat
 from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input, print_keywords
+from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
@@ -141,7 +141,7 @@ class NonLinearSolver:
         self.memory_tracing = False
 
         # filename
-        self.filename = None
+        self.filename = f'veloxchem_rsp_{get_datetime_string()}'
 
         # input keywords
         self.input_keywords = {

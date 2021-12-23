@@ -47,7 +47,7 @@ from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input, print_keywords
+from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .checkpoint import write_rsp_hdf5
@@ -163,7 +163,7 @@ class LinearSolver:
         self.memory_tracing = False
 
         # filename
-        self.filename = None
+        self.filename = f'veloxchem_rsp_{get_datetime_string()}'
 
         # distributed arrays
         self.dist_bger = None

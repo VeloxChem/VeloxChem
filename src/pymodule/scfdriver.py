@@ -52,7 +52,7 @@ from .molecularorbitals import MolecularOrbitals
 from .subcommunicators import SubCommunicators
 from .signalhandler import SignalHandler
 from .denguess import DensityGuess
-from .inputparser import parse_input, print_keywords
+from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
@@ -226,7 +226,7 @@ class ScfDriver:
         self.memory_tracing = False
 
         # filename
-        self.filename = None
+        self.filename = f'veloxchem_scf_{get_datetime_string()}'
 
         # input keywords
         self.input_keywords = {

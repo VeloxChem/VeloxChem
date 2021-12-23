@@ -52,7 +52,7 @@ from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .rspabsorption import Absorption
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input, print_keywords
+from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
 from .checkpoint import read_rsp_hdf5
 from .checkpoint import write_rsp_hdf5
@@ -158,7 +158,7 @@ class ExcitonModelDriver:
         self.checkpoint_file = None
 
         # filename
-        self.filename = None
+        self.filename = f'veloxchem_exciton_{get_datetime_string()}'
 
         # input keywords
         self.input_keywords = {
