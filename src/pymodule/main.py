@@ -26,35 +26,34 @@
 from mpi4py import MPI
 import time as tm
 
-from .veloxchemlib import mpi_initialized
-from .veloxchemlib import mpi_master
-from .cli import cli
-from .errorhandler import assert_msg_critical
-from .excitondriver import ExcitonModelDriver
-from .loprop import LoPropDriver
-from .mp2driver import Mp2Driver
+from .veloxchemlib import mpi_initialized, mpi_master
 from .mpitask import MpiTask
-from .optimizationdriver import OptimizationDriver
-from .trajectorydriver import TrajectoryDriver
-from .pulsedrsp import PulsedResponse
-from .respchargesdriver import RespChargesDriver
-from .rspabsorption import Absorption
-from .rspc6 import C6
-from .rspcdspec import CircularDichroismSpectrum
-from .rspcustomproperty import CustomProperty
-from .rsplinabscross import LinearAbsorptionCrossSection
-from .rsppolarizability import Polarizability
-from .rsptpa import TPA
-from .rspshg import SHG
-from .scffirstorderprop import ScfFirstOrderProperties
-from .scfgradientdriver import ScfGradientDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
-from .slurminfo import get_slurm_maximum_hours
+from .scffirstorderprop import ScfFirstOrderProperties
+from .respchargesdriver import RespChargesDriver
+from .excitondriver import ExcitonModelDriver
+from .mp2driver import Mp2Driver
+from .loprop import LoPropDriver
+from .trajectorydriver import TrajectoryDriver
+from .scfgradientdriver import ScfGradientDriver
+from .optimizationdriver import OptimizationDriver
+from .pulsedrsp import PulsedResponse
+from .rsppolarizability import Polarizability
+from .rspabsorption import Absorption
+from .rsplinabscross import LinearAbsorptionCrossSection
+from .rspcdspec import CircularDichroismSpectrum
+from .rspc6 import C6
+from .rspshg import SHG
+from .rsptpa import TPA
+from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
+from .cli import cli
+from .errorhandler import assert_msg_critical
+from .slurminfo import get_slurm_maximum_hours
 
 
 def select_scf_driver(task, scf_type):
@@ -151,14 +150,14 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     elif prop_type == 'c6':
         rsp_prop = C6(rsp_dict, method_dict)
 
-    elif prop_type == 'custom':
-        rsp_prop = CustomProperty(rsp_dict, method_dict)
-
     elif prop_type == 'tpa':
         rsp_prop = TPA(rsp_dict, method_dict)
 
     elif prop_type == 'shg':
         rsp_prop = SHG(rsp_dict, method_dict)
+
+    elif prop_type == 'custom':
+        rsp_prop = CustomProperty(rsp_dict, method_dict)
 
     else:
         assert_msg_critical(False, 'input file: invalid response property')
