@@ -367,13 +367,9 @@ namespace vxcfuncs {  // vxcfuncs namespace
         // set up pointers to density grid data
         
         auto rhoa = densityGrid.alphaDensity(0);
-        
-        auto rhob = densityGrid.betaDensity(0);
-        
+                
         auto grada = densityGrid.alphaDensityGradient(0);
-        
-        auto gradb = densityGrid.betaDensityGradient(0);
-        
+                
         // set up pointers to functional data
 
         auto df2010 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::grada);
@@ -384,9 +380,9 @@ namespace vxcfuncs {  // vxcfuncs namespace
         
         auto df0030 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::grada, xcvars::grada, xcvars::grada);        
                 
-        double fp = 4.0/3.0;
-        
-        double fb = 0.0042;
+        double BETA = 0.0042;
+
+        double BETA2 = BETA*BETA;
 
         #pragma omp simd aligned(rhoa,rhob, grada, gradb, df2010, df1020,df3000,df0030: VLX_ALIGN)
 
@@ -394,71 +390,71 @@ namespace vxcfuncs {  // vxcfuncs namespace
         {
 
             // Alpha 
+            
+            double alpha = grada[i]*std::pow(rhoa[i],-4.0/3.0);
 
-            double ra = std::pow(rhoa[i], -fp);
+            double a2 = alpha*alpha;
             
-            double xa = grada[i] / ra;
+            double a3 = alpha*a2;
             
-            double xa2 = xa * xa;
-            
-            double xa3 = xa * xa2;
-            
-            double xa4 = xa3 * xa;
+            double a4 = alpha*a3;
 
-            double xa5 = xa4 * xa;
-            
-            double asha = std::asinh(xa);
+            double a5 = alpha*a4;
 
-            double asha2 = asha * asha;
-            
-            double alpha10_a = -fp * xa / rhoa[i];
-            
-            double alpha20_a = -7.0 / 3.0 * alpha10_a / rhoa[i];
+            double asha = std::asinh(alpha);
 
-            double alpha21_a = alpha20_a / grada[i];
-            
-            double alpha30_a = -10.0 / 3.0 * alpha20_a / rhoa[i];
+            double asha2= asha*asha;
 
-            double alpha01_a = 1.0 / ra;
-            
-            double alpha11_a = -fp * alpha01_a / rhoa[i];
-            
-            double alpha10_2_a = alpha10_a * alpha10_a;
-            
-            double sq1a2_a = std::sqrt(1.0 + xa2);
-            
-            double denom_a = 1.0 + 6.0 * xa * fb * asha;
-            
-            double denom2_a = denom_a * denom_a;
-            
-            double denom3_a = denom2_a * denom_a;
+            double alpha10 = -4.0/3.0*alpha/rhoa[i];   
 
-            double denom4_a = denom3_a*denom_a;
-            
-            double ff1_a = fb * (6 * xa2 * fb - sq1a2_a) / (sq1a2_a * denom2_a);
-            
-            double ff2_a = (6.0 * fb * fb * (4.0 * xa + xa3*(3.0 - 12.0 * sq1a2_a * fb) 
-            
-                        + 2.0 * (std::pow(1.0 + xa2, 1.5) - 3.0 * xa4 * fb) * asha)) / (std::pow(1.0 + xa2, 1.5) * denom3_a);
-            
-            double ff3_a = (6*fb*(6 + 5*xa2 + 2*xa4  - 12*xa*(6 + 16*xa2 + 7*xa4)*fb*asha 
-	    
-                         + 36*sq1a2_a*fb*(-xa2*(3 + 2*xa2) + 6*xa5*fb*asha - std::pow(1 + xa2,2.0)*asha2)
+            double alpha20 = -7.0/3.0*alpha10/rhoa[i];
 
-                        +  36*xa4*fb*(6*(1 + xa2) + (-1 + 2*xa2)*asha2)))/(std::pow(1 + xa2,2.5)*denom4_a);
+            double alpha30 = -10./3.0*alpha20/rhoa[i]; 
+
+            double alpha01 = std::pow(rhoa[i],-4.0/3.0);   
+
+            double alpha11 = -4.0/3.0*alpha01/rhoa[i]; 
+
+            double alpha21 = alpha20/grada[i];       
+
+            double alpha10_2 = alpha10*alpha10;
+
+            double sq1a2 = std::sqrt(1 + a2);
+
+            double denom= 1 + 6*alpha*BETA*asha;
+
+            double denom2 = denom*denom;
+
+            double denom3 = denom2*denom;
+
+            double denom4 = denom3*denom;
+                  
+            double ff1 = BETA*(6*a2*BETA - sq1a2)/(sq1a2*denom2);
+
+            double ff2 = (6*BETA2*(4*alpha + a3*(3 - 12*sq1a2*BETA) + 
+                            2*(pow(1 + a2,1.5) - 3*a4*BETA)*asha))/ (pow(1 + a2,1.5)*denom3);
+            
+            double ff3 = (6*BETA2*(6 + 5*a2 + 2*a4 
+	                    - 12*alpha*(6 + 16*a2 + 7*a4)*BETA*asha + 
+	                36*sq1a2*BETA*(-a2*(3 + 2*a2) + 6*a5*BETA*asha - 
+	                std::pow(1 + a2,2.0)*asha2) + 36*a4*BETA2*(6*(1 + a2) + (-1 + 2*a2)*asha2)))/(std::pow(1 + a2,2.5)*denom4);
 
 
-            // Alpha
+            df2010[i] += factor*(ff2*alpha10_2 + ff1 * alpha20 +
+                          grada[i]*(ff3*alpha10_2*alpha01 + 
+                                 2*ff2*alpha11*alpha10 +
+                                 ff2*alpha20*alpha01 + ff1*alpha21));
 
-            df2010[i] += factor*(ff2_a*alpha10_2_a + ff1_a * alpha20_a + grada[i]*(ff3_a*alpha10_2_a*alpha01_a 
-            + 2*ff2_a*alpha11_a*alpha10_a + ff2_a*alpha20_a*alpha01_a + ff1_a*alpha21_a));
+            df1020[i] += factor*(2*ff2*alpha10*alpha01 + 2*ff1*alpha11 +
+                          grada[i]*(ff3*alpha01*alpha01*alpha10 + 
+                                 2*ff2*alpha11*alpha01));
+    
+            df3000[i] += factor*grada[i]*(ff3 * alpha10_2*alpha10 +
+                                3*ff2*alpha10*alpha20 +
+                                ff1*alpha30);
 
-            df1020[i] += factor*(2*ff2_a*alpha10_a*alpha01_a + 2*ff1_a*alpha11_a + grada[i]*(ff3_a*alpha01_a*alpha01_a*alpha10_a + 
-                                 2*ff2_a*alpha11_a*alpha01_a));
-            
-            df3000[i] += factor*grada[i]*(ff3_a * alpha10_2_a*alpha10_a + 3*ff2_a*alpha10_a*alpha20_a + ff1_a*alpha30_a);
-
-            df0030[i] += factor*(3*ff2_a*alpha01_a*alpha01_a + grada[i]*ff3_a*std::pow(alpha01_a,3.0));
+            df0030[i] += factor*(3*ff2*alpha01*alpha01 +
+                          grada[i]*ff3*pow(alpha01,3.0));
 
         }
     }
