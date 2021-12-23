@@ -714,6 +714,7 @@ CDensityGridQuad::makenewdens(        CDensityGridQuad&   densityGridAB,
         }
         else
         {   
+            
             for (int32_t j = 0; j < numdens / 2 ; j++)
             {                
                 auto rhow1a_r = rwDensityGrid.alphaDensity(4 * j);
@@ -858,29 +859,29 @@ CDensityGridQuad::makenewdens(        CDensityGridQuad&   densityGridAB,
                     
                     double rxw1_r = gradw1a_x_r[i];
                     
-                    double ryw1_r = gradw1a_x_r[i];
+                    double ryw1_r = gradw1a_y_r[i];
                     
-                    double rzw1_r = gradw1a_x_r[i];
+                    double rzw1_r = gradw1a_z_r[i];
 
                     double rxw1_i = gradw1a_x_i[i];
                     
-                    double ryw1_i = gradw1a_x_i[i];
+                    double ryw1_i = gradw1a_y_i[i];
                     
-                    double rzw1_i = gradw1a_x_i[i];
+                    double rzw1_i = gradw1a_z_i[i];
 
                     // RW2 densities
 
                     double rxw2_r = gradw2a_x_r[i];
                     
-                    double ryw2_r = gradw2a_x_r[i];
+                    double ryw2_r = gradw2a_y_r[i];
                     
-                    double rzw2_r = gradw2a_x_r[i];
+                    double rzw2_r = gradw2a_z_r[i];
 
                     double rxw2_i = gradw2a_x_i[i];
                     
-                    double ryw2_i = gradw2a_x_i[i];
+                    double ryw2_i = gradw2a_y_i[i];
                     
-                    double rzw2_i = gradw2a_x_i[i];
+                    double rzw2_i = gradw2a_z_i[i];
 
                     // Xi terms
 

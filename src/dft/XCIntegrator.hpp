@@ -258,7 +258,7 @@ class CXCIntegrator
                                            const CXCHessianGrid&      xcHessianGrid,
                                            const CXCCubicHessianGrid& xcCubicHessianGrid,
                                            const CDensityGrid&        gsDensityGrid,
-                                           const CDensityGrid&        rwDensityGrid,
+                                           const CDensityGridQuad&    rwDensityGrid,
                                            const CDensityGrid&        rw2DensityGrid,
                                            const CMolecularGrid&      molecularGrid) const;
 
@@ -500,7 +500,7 @@ class CXCIntegrator
                                     const CXCHessianGrid*      xcHessianGrid,
                                     const CXCCubicHessianGrid* xcCubicHessianGrid,
                                     const CDensityGrid*        gsDensityGrid,
-                                    const CDensityGrid*        rwDensityGrid,
+                                    const CDensityGridQuad*    rwDensityGrid,
                                     const CDensityGrid*        rw2DensityGrid,
                                     const double*              gridCoordinatesX,
                                     const double*              gridCoordinatesY,
@@ -1067,7 +1067,7 @@ class CXCIntegrator
                                     const CXCHessianGrid*      xcHessianGrid,
                                     const CXCCubicHessianGrid* xcCubicHessianGrid,
                                     const CDensityGrid*        gsDensityGrid,
-                                    const CDensityGrid*        rwDensityGrid,
+                                    const CDensityGridQuad*    rwDensityGrid,
                                     const CDensityGrid*        rw2DensityGrid,
                                     const CMemBlock2D<double>& gtoValues,
                                     const CMemBlock2D<double>& gtoValuesX,
