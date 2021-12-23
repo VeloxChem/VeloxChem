@@ -61,9 +61,9 @@ CDensityGridQuad::CDensityGridQuad(const int32_t nGridPoints,
     
     int32_t ncomp = 0;
     
-    if (xcFuncType == xcfun::lda) ncomp = (_gridType == dengrid::ab) ? 2 : 1;
+    if (xcFuncType == xcfun::lda) ncomp = (_gridType == dengrid::ab) ? 1 : 1;
     
-    if (xcFuncType == xcfun::gga) ncomp = (_gridType == dengrid::ab) ? 11 : 5;
+    if (xcFuncType == xcfun::gga) ncomp = (_gridType == dengrid::ab) ? 23 : 5;
     
     // NOTE: this needs to be checked with mgga functionals implementation
     
@@ -183,67 +183,55 @@ CDensityGridQuad::rhow1rhow2(const int32_t iDensityMatrix)
 }
 
 const double*
-CDensityGridQuad::betaDensity(const int32_t iDensityMatrix) const
+CDensityGridQuad::rhow1xiw2(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::lima) return _densityValues.data(iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 double*
-CDensityGridQuad::betaDensity(const int32_t iDensityMatrix)
+CDensityGridQuad::rhow1xiw2(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::lima) return _densityValues.data(iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 const double*
-CDensityGridQuad::alphaDensityGradient(const int32_t iDensityMatrix) const
+CDensityGridQuad::rhow1xicw2(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(2 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::limb) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 double*
-CDensityGridQuad::alphaDensityGradient(const int32_t iDensityMatrix)
+CDensityGridQuad::rhow1xicw2(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(2 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::limb) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 const double*
-CDensityGridQuad::betaDensityGradient(const int32_t iDensityMatrix) const
+CDensityGridQuad::xiw1xiw2(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(3 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::lima) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 double*
-CDensityGridQuad::betaDensityGradient(const int32_t iDensityMatrix)
+CDensityGridQuad::xiw1xiw2(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(3 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::lima) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 const double*
-CDensityGridQuad::mixedDensityGradient(const int32_t iDensityMatrix) const
+CDensityGridQuad::xiw1xicw2(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(4 * _nDensityMatrices + iDensityMatrix);
 
@@ -251,7 +239,7 @@ CDensityGridQuad::mixedDensityGradient(const int32_t iDensityMatrix) const
 }
 
 double*
-CDensityGridQuad::mixedDensityGradient(const int32_t iDensityMatrix)
+CDensityGridQuad::xiw1xicw2(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(4 * _nDensityMatrices + iDensityMatrix);
     
@@ -259,122 +247,290 @@ CDensityGridQuad::mixedDensityGradient(const int32_t iDensityMatrix)
 }
 
 const double*
-CDensityGridQuad::alphaDensityGradientX(const int32_t iDensityMatrix) const
+CDensityGridQuad::rxw1rhow2(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(5 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::limb) return _densityValues.data(2 * _nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 double*
-CDensityGridQuad::alphaDensityGradientX(const int32_t iDensityMatrix)
+CDensityGridQuad::rxw1rhow2(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(5 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::limb) return _densityValues.data(2 * _nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 const double*
-CDensityGridQuad::alphaDensityGradientY(const int32_t iDensityMatrix) const
+CDensityGridQuad::ryw1rhow2(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(6 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::limb) return _densityValues.data(3 * _nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 double*
-CDensityGridQuad::alphaDensityGradientY(const int32_t iDensityMatrix)
+CDensityGridQuad::ryw1rhow2(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(6 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::limb) return _densityValues.data(3 * _nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 const double*
-CDensityGridQuad::alphaDensityGradientZ(const int32_t iDensityMatrix) const
+CDensityGridQuad::rzw1rhow2(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(7 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::limb) return _densityValues.data(4 * _nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 double*
-CDensityGridQuad::alphaDensityGradientZ(const int32_t iDensityMatrix)
+CDensityGridQuad::rzw1rhow2(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(7 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::limb) return _densityValues.data(4 * _nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 const double*
-CDensityGridQuad::betaDensityGradientX(const int32_t iDensityMatrix) const
+CDensityGridQuad::rxw1xiw2(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(8 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::lima) return _densityValues.data(2 * _nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 double*
-CDensityGridQuad::betaDensityGradientX(const int32_t iDensityMatrix)
+CDensityGridQuad::rxw1xiw2(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(8 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::lima) return _densityValues.data(2 * _nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 const double*
-CDensityGridQuad::betaDensityGradientY(const int32_t iDensityMatrix) const
+CDensityGridQuad::ryw1xiw2(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(9 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::lima) return _densityValues.data(3 * _nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 double*
-CDensityGridQuad::betaDensityGradientY(const int32_t iDensityMatrix)
+CDensityGridQuad::ryw1xiw2(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(9 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::lima) return _densityValues.data(3 * _nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 const double*
-CDensityGridQuad::betaDensityGradientZ(const int32_t iDensityMatrix) const
+CDensityGridQuad::rzw1xiw2(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(10 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::lima) return _densityValues.data(4 * _nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
 double*
-CDensityGridQuad::betaDensityGradientZ(const int32_t iDensityMatrix)
+CDensityGridQuad::rzw1xiw2(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(10 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::lima) return _densityValues.data(4 * _nDensityMatrices + iDensityMatrix);
-    
+        
+    return nullptr;
+}
+
+const double*
+CDensityGridQuad::rxw1xicw2(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(11 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+double*
+CDensityGridQuad::rxw1xicw2(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(11 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+const double*
+CDensityGridQuad::ryw1xicw2(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(12 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+double*
+CDensityGridQuad::ryw1xicw2(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(12 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+const double*
+CDensityGridQuad::rzw1xicw2(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(13 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+double*
+CDensityGridQuad::rzw1xicw2(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(13 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+const double*
+CDensityGridQuad::rxw1rxw2(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(14 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+double*
+CDensityGridQuad::rxw1rxw2(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(14 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+const double*
+CDensityGridQuad::rxw1ryw2(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(15 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+double*
+CDensityGridQuad::rxw1ryw2(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(15 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+const double*
+CDensityGridQuad::rxw1rzw2(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(16 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+double*
+CDensityGridQuad::rxw1rzw2(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(16 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+const double*
+CDensityGridQuad::ryw1rxw2(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(17 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+double*
+CDensityGridQuad::ryw1rxw2(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(17 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+const double*
+CDensityGridQuad::ryw1ryw2(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(18 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+double*
+CDensityGridQuad::ryw1ryw2(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(18 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+const double*
+CDensityGridQuad::ryw1rzw2(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(19 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+double*
+CDensityGridQuad::ryw1rzw2(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(19 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+const double*
+CDensityGridQuad::rzw1rxw2(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(20 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+double*
+CDensityGridQuad::rzw1rxw2(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(20 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+const double*
+CDensityGridQuad::rzw1ryw2(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(21 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+double*
+CDensityGridQuad::rzw1ryw2(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(21 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+const double*
+CDensityGridQuad::rzw1rzw2(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(22 * _nDensityMatrices + iDensityMatrix);
+        
+    return nullptr;
+}
+
+double*
+CDensityGridQuad::rzw1rzw2(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(22 * _nDensityMatrices + iDensityMatrix);
+        
     return nullptr;
 }
 
@@ -592,97 +748,97 @@ CDensityGridQuad::makenewdens(        CDensityGridQuad&   densityGridAB,
                 
                 auto gradw2a_z_i = rwDensityGrid.alphaDensityGradientZ(4 * j + 3);
 
-                auto A_r = densityGridAB.rhow1rhow2(28 * j );
+                auto A_r = densityGridAB.rhow1rhow2(2 * j );
 
-                auto A_i = densityGridAB.rhow1rhow2(28 * j + 1);
+                auto A_i = densityGridAB.rhow1rhow2(2 * j + 1);
 
-                auto B_r = densityGridAB.rhow1rhow2(28 * j  + 2);
+                auto B_r = densityGridAB.rhow1xiw2(2 * j );
 
-                auto B_i = densityGridAB.rhow1rhow2(28 * j + 3);
+                auto B_i = densityGridAB.rhow1xiw2(2 * j + 1);
 
-                auto C_r = densityGridAB.rhow1rhow2(28 * j + 4 );
+                auto C_r = densityGridAB.rhow1xicw2(2 * j );
 
-                auto C_i = densityGridAB.rhow1rhow2(28 * j + 5);
+                auto C_i = densityGridAB.rhow1xicw2(2 * j + 1);
 
-                auto D_r = densityGridAB.rhow1rhow2(28 * j + 6);
+                auto D_r = densityGridAB.xiw1xiw2(2 * j);
 
-                auto D_i = densityGridAB.rhow1rhow2(28 * j + 7);
+                auto D_i = densityGridAB.xiw1xiw2(2 * j + 1);
 
-                auto E_r = densityGridAB.rhow1rhow2(28 * j + 8);
+                auto E_r = densityGridAB.xiw1xicw2(2 * j);
 
-                auto E_i = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto E_i = densityGridAB.xiw1xicw2(2 * j + 1);
 
-                auto Xrho_r = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Xrho_r = densityGridAB.rxw1rhow2(2 * j);
 
-                auto Xrho_i = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Xrho_i = densityGridAB.rxw1rhow2(2 * j + 1);
 
-                auto Yrho_r = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Yrho_r = densityGridAB.ryw1rhow2(2 * j);
 
-                auto Yrho_i = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Yrho_i = densityGridAB.ryw1rhow2(2 * j + 1);
 
-                auto Zrho_r = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Zrho_r = densityGridAB.rzw1rhow2(2 * j);
 
-                auto Zrho_i = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Zrho_i = densityGridAB.rzw1rhow2(2 * j + 1);
                  
-                auto Xxi_r = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Xxi_r = densityGridAB.rxw1xiw2(2 * j);
 
-                auto Xxi_i = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Xxi_i = densityGridAB.rxw1xiw2(2 * j + 1);
 
-                auto Yxi_r = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Yxi_r = densityGridAB.ryw1xiw2(2 * j);
 
-                auto Yxi_i = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Yxi_i = densityGridAB.ryw1xiw2(2 * j + 1);
 
-                auto Zxi_r = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Zxi_r = densityGridAB.rzw1xiw2(2 * j);
 
-                auto Zxi_i = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Zxi_i = densityGridAB.rzw1xiw2(2 * j + 1);
 
-                auto Xxic_r = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Xxic_r = densityGridAB.rxw1xicw2(2 * j);
 
-                auto Xxic_i = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Xxic_i = densityGridAB.rxw1xicw2(2 * j + 1);
 
-                auto Yxic_r = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Yxic_r = densityGridAB.ryw1xicw2(2 * j);
 
-                auto Yxic_i = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Yxic_i = densityGridAB.ryw1xicw2(2 * j + 1);
 
-                auto Zxic_r = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Zxic_r = densityGridAB.rzw1xicw2(2 * j);
 
-                auto Zxic_i = densityGridAB.rhow1rhow2(28 * j + 9);
+                auto Zxic_i = densityGridAB.rzw1xicw2(2 * j + 1);
 
-                auto Rxx_r = densityGridAB.rhow1rhow2(28 * j + 10);
+                auto Rxx_r = densityGridAB.rxw1rxw2(2 * j);
 
-                auto Rxx_i = densityGridAB.rhow1rhow2(28 * j + 11);
+                auto Rxx_i = densityGridAB.rxw1rxw2(2 * j + 1);
 
-                auto Rxy_r = densityGridAB.rhow1rhow2(28 * j + 12);
+                auto Rxy_r = densityGridAB.rxw1ryw2(2 * j);
 
-                auto Rxy_i = densityGridAB.rhow1rhow2(28 * j + 13);
+                auto Rxy_i = densityGridAB.rxw1ryw2(2 * j + 1);
 
-                auto Rxz_r = densityGridAB.rhow1rhow2(28 * j + 14);
+                auto Rxz_r = densityGridAB.rxw1rzw2(2 * j);
 
-                auto Rxz_i = densityGridAB.rhow1rhow2(28 * j + 15);
+                auto Rxz_i = densityGridAB.rxw1rzw2(2 * j + 1);
 
-                auto Ryx_r = densityGridAB.rhow1rhow2(28 * j + 16);
+                auto Ryx_r = densityGridAB.ryw1rxw2(2 * j);
 
-                auto Ryx_i = densityGridAB.rhow1rhow2(28 * j + 17);
+                auto Ryx_i = densityGridAB.ryw1rxw2(2 * j + 1);
 
-                auto Ryy_r = densityGridAB.rhow1rhow2(28 * j + 18);
+                auto Ryy_r = densityGridAB.ryw1ryw2(2 * j);
 
-                auto Ryy_i = densityGridAB.rhow1rhow2(28 * j + 19);
+                auto Ryy_i = densityGridAB.ryw1ryw2(2 * j + 1);
 
-                auto Ryz_r = densityGridAB.rhow1rhow2(28 * j + 20);
+                auto Ryz_r = densityGridAB.ryw1rzw2(2 * j);
 
-                auto Ryz_i = densityGridAB.rhow1rhow2(28 * j + 21);
+                auto Ryz_i = densityGridAB.ryw1rzw2(2 * j + 1);
 
-                auto Rzx_r = densityGridAB.rhow1rhow2(28 * j + 22);
+                auto Rzx_r = densityGridAB.rzw1rxw2(2 * j);
 
-                auto Rzx_i = densityGridAB.rhow1rhow2(28 * j + 23);
+                auto Rzx_i = densityGridAB.rzw1rxw2(2 * j + 1);
 
-                auto Rzy_r = densityGridAB.rhow1rhow2(28 * j + 24);
+                auto Rzy_r = densityGridAB.rzw1ryw2(2 * j);
 
-                auto Rzy_i = densityGridAB.rhow1rhow2(28 * j + 25);
+                auto Rzy_i = densityGridAB.rzw1ryw2(2 * j + 1);
 
-                auto Rzz_r = densityGridAB.rhow1rhow2(28 * j + 26);
+                auto Rzz_r = densityGridAB.rzw1rzw2(2 * j);
 
-                auto Rzz_i = densityGridAB.rhow1rhow2(28 * j + 27);
+                auto Rzz_i = densityGridAB.rzw1rzw2(2 * j + 1);
 
                 int32_t ipoints = 0;
 

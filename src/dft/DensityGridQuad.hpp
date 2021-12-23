@@ -183,7 +183,7 @@ public:
     @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density values.
      */
-    const double* betaDensity(const int32_t iDensityMatrix) const;
+    const double* rhow1xiw2(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to beta density values.
@@ -191,7 +191,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density values.
      */
-    double* betaDensity(const int32_t iDensityMatrix);
+    double* rhow1xiw2(const int32_t iDensityMatrix);
     
     /**
      Gets constant pointer to alpha density gradient norm values.
@@ -199,7 +199,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient norm values.
      */
-    const double* alphaDensityGradient(const int32_t iDensityMatrix) const;
+    const double* rhow1xicw2(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to alpha density gradient norm values.
@@ -207,7 +207,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient norm values.
      */
-    double* alphaDensityGradient(const int32_t iDensityMatrix);
+    double* rhow1xicw2(const int32_t iDensityMatrix);
     
     /**
      Gets constant pointer to beta density gradient norm values.
@@ -215,7 +215,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient norm values.
      */
-    const double* betaDensityGradient(const int32_t iDensityMatrix) const;
+    const double* xiw1xiw2(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to beta density gradient norm values.
@@ -223,7 +223,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient norm values.
      */
-    double* betaDensityGradient(const int32_t iDensityMatrix);
+    double* xiw1xiw2(const int32_t iDensityMatrix);
     
     /**
      Gets constant pointer to alpha * beta density gradients product values.
@@ -231,7 +231,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha * beta density gradients product values.
      */
-    const double* mixedDensityGradient(const int32_t iDensityMatrix) const;
+    const double* xiw1xicw2(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to alpha * beta density gradients product values.
@@ -239,7 +239,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha * beta density gradients product values.
      */
-    double* mixedDensityGradient(const int32_t iDensityMatrix);
+    double* xiw1xicw2(const int32_t iDensityMatrix);
     
     /**
      Gets constant pointer to alpha density gradient X values.
@@ -247,7 +247,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient X values.
      */
-    const double* alphaDensityGradientX(const int32_t iDensityMatrix) const;
+    const double* rxw1rhow2(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to alpha density gradient X values.
@@ -255,7 +255,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient X values.
      */
-    double* alphaDensityGradientX(const int32_t iDensityMatrix);
+    double* rxw1rhow2(const int32_t iDensityMatrix);
     
     /**
      Gets constant pointer to alpha density gradient Y values.
@@ -263,7 +263,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient Y values.
      */
-    const double* alphaDensityGradientY(const int32_t iDensityMatrix) const;
+    const double* ryw1rhow2(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to alpha density gradient Y values.
@@ -271,7 +271,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient Y values.
      */
-    double* alphaDensityGradientY(const int32_t iDensityMatrix);
+    double* ryw1rhow2(const int32_t iDensityMatrix);
     
     /**
      Gets constant pointer to alpha density gradient Z values.
@@ -279,7 +279,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient Z values.
      */
-    const double* alphaDensityGradientZ(const int32_t iDensityMatrix) const;
+    const double* rzw1rhow2(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to alpha density gradient Z values.
@@ -287,7 +287,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient Z values.
      */
-    double* alphaDensityGradientZ(const int32_t iDensityMatrix);
+    double* rzw1rhow2(const int32_t iDensityMatrix);
     
     /**
      Gets constant pointer to beta density gradient X values.
@@ -295,7 +295,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient X values.
      */
-    const double* betaDensityGradientX(const int32_t iDensityMatrix) const;
+    const double* rxw1xiw2(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to beta density gradient X values.
@@ -303,7 +303,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient X values.
      */
-    double* betaDensityGradientX(const int32_t iDensityMatrix);
+    double* rxw1xiw2(const int32_t iDensityMatrix);
     
     /**
      Gets constant pointer to beta density gradient Y values.
@@ -311,7 +311,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Y values.
      */
-    const double* betaDensityGradientY(const int32_t iDensityMatrix) const;
+    const double* ryw1xiw2(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to beta density gradient Y values.
@@ -319,7 +319,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Y values.
      */
-    double* betaDensityGradientY(const int32_t iDensityMatrix);
+    double* ryw1xiw2(const int32_t iDensityMatrix);
     
     /**
      Gets constant pointer to beta density gradient Z values.
@@ -327,7 +327,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
      */
-    const double* betaDensityGradientZ(const int32_t iDensityMatrix) const;
+    const double* rzw1xiw2(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to beta density gradient Z values.
@@ -335,8 +335,202 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
      */
-    double* betaDensityGradientZ(const int32_t iDensityMatrix);
+    double* rzw1xiw2(const int32_t iDensityMatrix);
     
+
+      /**
+     Gets constant pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    const double* rxw1xicw2(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    double* rxw1xicw2(const int32_t iDensityMatrix);
+
+          /**
+     Gets constant pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    const double* ryw1xicw2(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    double* ryw1xicw2(const int32_t iDensityMatrix);
+
+          /**
+     Gets constant pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    const double* rzw1xicw2(const int32_t iDensityMatrix) const;
+    
+    /**
+     Gets pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    double* rzw1xicw2(const int32_t iDensityMatrix);
+
+      /**
+     Gets constant pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    const double* rxw1rxw2(const int32_t iDensityMatrix) const;
+
+      /**
+     Gets pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    double* rxw1rxw2(const int32_t iDensityMatrix);
+
+      /**
+     Gets constant pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    const double* rxw1ryw2(const int32_t iDensityMatrix) const;
+
+      /**
+     Gets pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    double* rxw1ryw2(const int32_t iDensityMatrix);
+
+      /**
+     Gets constant pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    const double* rxw1rzw2(const int32_t iDensityMatrix) const;
+
+      /**
+     Gets pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    double* rxw1rzw2(const int32_t iDensityMatrix);
+
+      /**
+     Gets constant pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    const double* ryw1rxw2(const int32_t iDensityMatrix) const;
+
+      /**
+     Gets pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    double* ryw1rxw2(const int32_t iDensityMatrix);
+
+      /**
+     Gets constant pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    const double* ryw1ryw2(const int32_t iDensityMatrix) const;
+
+      /**
+     Gets pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    double* ryw1ryw2(const int32_t iDensityMatrix);
+
+      /**
+     Gets constant pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    const double* ryw1rzw2(const int32_t iDensityMatrix) const;
+
+      /**
+     Gets pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    double* ryw1rzw2(const int32_t iDensityMatrix);
+
+      /**
+     Gets constant pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    const double* rzw1rxw2(const int32_t iDensityMatrix) const;
+
+      /**
+     Gets pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    double* rzw1rxw2(const int32_t iDensityMatrix);
+
+      /**
+     Gets constant pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    const double* rzw1ryw2(const int32_t iDensityMatrix) const;
+
+      /**
+     Gets pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    double* rzw1ryw2(const int32_t iDensityMatrix);
+
+      /**
+     Gets constant pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    const double* rzw1rzw2(const int32_t iDensityMatrix) const;
+
+      /**
+     Gets pointer to beta density gradient Z values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient Z values.
+     */
+    double* rzw1rzw2(const int32_t iDensityMatrix);
+
+
 
     /**
      Generates pair of screened molecular and density grids by removing grid points with specific density/density
