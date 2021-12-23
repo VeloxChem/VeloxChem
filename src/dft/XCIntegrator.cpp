@@ -360,6 +360,10 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     auto rwdengridc = CDensityGrid(mgrid.getNumberOfGridPoints(), rw2DensityMatrix.getNumberOfDensityMatrices(), fvxc.getFunctionalType(), dengrid::ab);
 
     rwdengridc.makenewdens(rwdengridc,mgrid,rwdengrid,fvxc.getFunctionalType(),rw2DensityMatrix.getNumberOfDensityMatrices(),quadMode);
+
+    auto rwdengridc2 = CDensityGridQuad(mgrid.getNumberOfGridPoints(), rw2DensityMatrix.getNumberOfDensityMatrices(), fvxc.getFunctionalType(), dengrid::ab);
+
+    rwdengridc2.makenewdens(rwdengridc2,mgrid,gsdengrid,rwdengrid,fvxc.getFunctionalType(),rw2DensityMatrix.getNumberOfDensityMatrices(),quadMode);
             
     // set up number of perturbed denstries and matrix dimensions
     
@@ -376,13 +380,13 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     if (fvxc.getFunctionalType() == xcfun::lda)
     {
 
-        _compRestrictedContributionForLda(ksmat, gtovec, vxc2grid, vxc3grid, rwdengridc, rw2dengrid, mgrid,quadMode);
+        _compRestrictedContributionForLda(ksmat, gtovec, vxc2grid, vxc3grid, rwdengridc2, rw2dengrid, mgrid,quadMode);
         
     }
         
     if (fvxc.getFunctionalType() == xcfun::gga)
     {
-        _compRestrictedContributionForGga(ksmat, gtovec, vxcgrid, vxc2grid, vxc3grid, gsdengrid, rwdengrid, rw2dengrid, mgrid);
+        _compRestrictedContributionForGga(ksmat, gtovec, vxcgrid, vxc2grid, vxc3grid, gsdengrid, rwdengridc, rw2dengrid, mgrid);
     }
     
     // symmetrize Kohn-Sham matrix
@@ -900,7 +904,7 @@ CXCIntegrator::_compRestrictedContributionForLda(      CAOKohnShamMatrix&   aoKo
                                                  const CGtoContainer*       gtoContainer,
                                                  const CXCHessianGrid&      xcHessianGrid,
                                                  const CXCCubicHessianGrid& xcCubicHessianGrid,
-                                                 const CDensityGrid&        rwDensityGrid,
+                                                 const CDensityGridQuad&        rwDensityGrid,
                                                  const CDensityGrid&        rw2DensityGrid,
                                                  const CMolecularGrid&      molecularGrid,
                                                  const std::string&         quadMode) const
@@ -1599,7 +1603,7 @@ CXCIntegrator::_compRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
                                           const CGtoContainer*       gtoContainer,
                                           const CXCHessianGrid*      xcHessianGrid,
                                           const CXCCubicHessianGrid* xcCubicHessianGrid,
-                                          const CDensityGrid*        rwDensityGrid,
+                                          const CDensityGridQuad*        rwDensityGrid,
                                           const CDensityGrid*        rw2DensityGrid,
                                           const double*              gridCoordinatesX,
                                           const double*              gridCoordinatesY,
@@ -4221,7 +4225,7 @@ CXCIntegrator::_distRestrictedBatchForLdaShg(   CAOKohnShamMatrix*   aoKohnShamM
                                                 CMemBlock<double>&   xcBuffer,
                                           const CXCHessianGrid*      xcHessianGrid,
                                           const CXCCubicHessianGrid* xcCubicHessianGrid,
-                                          const CDensityGrid*        rwDensityGrid,
+                                          const CDensityGridQuad*        rwDensityGrid,
                                           const CDensityGrid*        rw2DensityGrid,
                                           const CMemBlock2D<double>& gtoValues,
                                           const double*              gridWeights,
@@ -4261,7 +4265,7 @@ CXCIntegrator::_distRestrictedBatchForLdaShg(   CAOKohnShamMatrix*   aoKohnShamM
         
         // set up pointer to perturbed density
         
-        auto rhow1a = rwDensityGrid->alphaDensity(i);
+        auto rhow1a = rwDensityGrid->rhow1rhow2(i);
         
         auto rhow12a = rw2DensityGrid->alphaDensity(i);
         

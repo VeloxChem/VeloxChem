@@ -41,6 +41,7 @@
 #include "XCCubicHessianGrid.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "DensityGrid.hpp"
+#include "DensityGridQuad.hpp"
 #include "GtoContainer.hpp"
 #include "AOFockMatrix.hpp"
 #include "MemBlock.hpp"
@@ -170,7 +171,7 @@ class CXCIntegrator
                                            const CGtoContainer*       gtoContainer,
                                            const CXCHessianGrid&      xcHessianGrid,
                                            const CXCCubicHessianGrid& xcCubicHessianGrid,
-                                           const CDensityGrid&        rwDensityGrid,
+                                           const CDensityGridQuad&        rwDensityGrid,
                                            const CDensityGrid&        rw2DensityGrid,
                                            const CMolecularGrid&      molecularGrid,
                                            const std::string&         quadMode) const;
@@ -330,7 +331,7 @@ class CXCIntegrator
                                     const CGtoContainer*       gtoContainer,
                                     const CXCHessianGrid*      xcHessianGrid,
                                     const CXCCubicHessianGrid* xcCubicHessianGrid,
-                                    const CDensityGrid*        rwDensityGrid,
+                                    const CDensityGridQuad*        rwDensityGrid,
                                     const CDensityGrid*        rw2DensityGrid,
                                     const double*              gridCoordinatesX,
                                     const double*              gridCoordinatesY,
@@ -677,7 +678,7 @@ class CXCIntegrator
                                           CMemBlock<double>&   xcBuffer,
                                     const CXCHessianGrid*      xcHessianGrid,
                                     const CXCCubicHessianGrid* xcCubicHessianGrid,
-                                    const CDensityGrid*        rwDensityGrid,
+                                    const CDensityGridQuad*        rwDensityGrid,
                                     const CDensityGrid*        rw2DensityGrid,
                                     const CMemBlock2D<double>& gtoValues,
                                     const double*              gridWeights,
