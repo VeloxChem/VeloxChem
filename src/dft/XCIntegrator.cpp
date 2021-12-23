@@ -5605,9 +5605,281 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                     
                     for (int32_t l = 0; l < nGridPoints; l++)
                     {
-                        
-                        double w = gridWeights[loff + l];
 
+                        double w = gridWeights[loff + l];
+                        
+                        double znva = 1.0 / ngrada[loff + l];
+
+                        double znva3 = 1.0 / std::pow(ngrada[loff + l],3);
+
+                        double znva5 = 1.0 / std::pow(ngrada[loff + l],5);
+                        
+                        double znvb = 1.0 / ngradb[loff + l];
+                        
+                        double rxa = znva * grada_x[loff + l];
+                        
+                        double rya = znva * grada_y[loff + l];
+                        
+                        double rza = znva * grada_z[loff + l];
+                        
+                        double rxb = znvb * gradb_x[loff + l];
+                        
+                        double ryb = znvb * gradb_y[loff + l];
+                        
+                        double rzb = znvb * gradb_z[loff + l];
+
+                        double rxw12a = gradw12a_x[loff + l];
+                        
+                        double ryw12a = gradw12a_y[loff + l];
+                        
+                        double rzw12a = gradw12a_z[loff + l];
+                        
+                        double rxw12b = gradw12b_x[loff + l];
+                        
+                        double ryw12b = gradw12b_y[loff + l];
+                        
+                        double rzw12b = gradw12b_z[loff + l];
+
+                        double xiw12a = rxw12a * rxa + ryw12a * rya + rzw12a * rza;
+
+                        double xiw12b = rxw12b * rxb + ryw12b * ryb + rzw12b * rzb;
+
+                        // "#¤" ! NEEDS TO BE FIXED
+
+                        double xiw12c = rxw12a * rxa + ryw12a * rya + rzw12a * rza;
+                        
+                        // GTOs values
+                        
+                        auto a0 = bgaos[l] * kgaos[l];
+                        
+                        auto ax = bgaox[l] * kgaos[l] + bgaos[l] * kgaox[l];
+                        
+                        auto ay = bgaoy[l] * kgaos[l] + bgaos[l] * kgaoy[l];
+                        
+                        auto az = bgaoz[l] * kgaos[l] + bgaos[l] * kgaoz[l];
+
+                        // First term
+
+                        double frhow12 = (df3000[loff + l]  
+                        
+                                       + 2.0 * df2100[loff + l] 
+
+                                       + df1200[loff + l] )*rhow1rhow2[loff + l] ;
+
+                        frhow12 += (df2010[loff + l] 
+                        
+                                 + df2001[loff + l] 
+
+                                 + df1110[loff + l] 
+                                
+                                 + df1101[loff + l]) * rhow1xiw2[loff + l];
+
+                        frhow12 += (df20001[loff + l] 
+                                
+                                 + df11001[loff + l]) * rhow1xicw2[loff + l];
+
+                        frhow12 += (df1020[loff + l]  
+                        
+                                 + 2.0 * df1011[loff + l] 
+
+                                 + df1002[loff + l] ) * xiw1xiw2[loff + l];
+
+                        frhow12 += df10002[loff + l]*xiw1xicw2[loff + l];
+
+                        frhow12 += df2000[loff + l] * rhow12a[loff + l]  + df1100[loff + l] * rhow12b[loff + l];   
+
+                        frhow12 += df1010[loff + l] * xiw12a  + df1001[loff + l] * xiw12b;
+
+                        frhow12 += df10001[loff + l] * xiw12c;
+
+                        fvxc += w * frhow12 * a0;    
+
+                        // Second term
+
+                        double fxiw12 =  (df2010[loff + l] 
+                        
+                                       + 2.0 *  df1110[loff + l] 
+
+                                       + df0210[loff + l]) * rhow1rhow2[loff + l];
+
+                        fxiw12 +=  (df1020[loff + l] 
+
+                                +  df1011[loff + l] 
+
+                                +  df0120[loff + l] 
+                                
+                                +  df0111[loff + l] ) * rhow1xiw2[loff + l];
+
+                        fxiw12 += (df10101[loff + l]  
+                                
+                               +  df01101[loff + l] ) * rhow1xicw2[loff + l];
+
+                        fxiw12 += (df0030[loff + l] 
+                        
+                                + 2.0 * df0021[loff + l] 
+
+                                + df0012[loff + l]) * xiw1xiw2[loff + l];
+
+                        fxiw12 += df00102[loff + l] *  xiw1xicw2[loff + l];
+
+                        fxiw12 += df1010[loff + l] * rhow12a[loff + l]  + df0110[loff + l] * rhow12b[loff + l];
+
+                        fxiw12 += df0020[loff + l] * xiw12a  + df0011[loff + l] * xiw12b;
+
+                        fxiw12 += df00101[loff + l] * xiw12c;
+
+                        // Third term
+
+                        double fxiw12c = (df20001[loff + l] 
+                        
+                                       + 2.0* df11001[loff + l] 
+
+                                       + df02001[loff + l]) * rhow1rhow2[loff + l]; 
+
+                        fxiw12c +=  (df10101[loff + l] 
+                        
+                                +  df10011[loff + l]  
+
+                                +  df01101[loff + l] 
+                                
+                                +  df01011[loff + l]) * rhow1xiw2[loff + l];
+
+                        fxiw12c += (df10002[loff + l] 
+                                
+                                 + df01002[loff + l]) * rhow1xicw2[loff + l];
+
+                        fxiw12c +=  (df00201[loff + l] 
+                        
+                                 + df00111[loff + l] 
+
+                                 + df00021[loff + l]) * xiw1xiw2[loff + l];
+
+                        fxiw12c += df00003[loff + l] * xiw1xicw2[loff + l];
+
+                        fxiw12c += df10001[loff + l] * rhow12a[loff + l] + df01001[loff + l] * rhow12b[loff + l];
+
+                        fxiw12c += df00101[loff + l] * xiw12a  + df00011[loff + l] * xiw12b;
+
+                        fxiw12c += df00002[loff + l] * xiw12c;
+
+                        // Fourth term
+
+                        double x_term = (znva - grada_x[loff + l] * grada_x[loff + l] * znva3) * ax 
+
+                                      - grada_x[loff + l] * grada_y[loff + l] * znva3 * ay
+
+                                      - grada_x[loff + l] * grada_z[loff + l] * znva3 * az;
+
+                        
+                        double y_term = -grada_x[loff + l] * grada_y[loff + l] *znva3 * ax 
+                        
+                                        + (znva - grada_y[loff + l] * grada_y[loff + l] * znva3) * ay
+                                        
+                                        - grada_y[loff + l] * grada_z[loff + l] * znva3 * az   ;
+
+
+                        double z_term = -grada_x[loff + l] * grada_z[loff + l] *znva3 * ax 
+
+                                       - grada_y[loff + l] * grada_z[loff + l] * znva3 * ay
+
+                                       + (znva - grada_z[loff + l] * grada_z[loff + l] * znva3) * az;
+
+                        double rho_term = (x_term * rxw1rhow2[loff + l] +   y_term * ryw1rhow2[loff + l] + z_term * rzw1rhow2[loff + l]);
+
+                        double xi_term =  (x_term * rxw1xiw2[loff + l]  +   y_term * ryw1xiw2[loff + l]  + z_term *  rzw1xiw2[loff + l]);
+
+                        double xic_term = (x_term * rxw1xicw2[loff + l] +   y_term * ryw1xicw2[loff + l] + z_term * rzw1xicw2[loff + l]);
+
+                        double facr = df1010[loff + l] * rho_term
+                        
+                                    + df0110[loff + l] * rho_term
+                        
+                                    + df0020[loff + l] * xi_term 
+                                    
+                                    + df0011[loff + l] * xi_term 
+                                    
+                                    + df00101[loff + l] * xic_term;
+
+                        fvxc += w *  facr;
+
+                        // Fifth term
+
+                        double rho_term_c = ax * rxw1rhow2[loff + l] +  ay * ryw1rhow2[loff + l] + az * rzw1rhow2[loff + l];
+
+                        double xi_term_c =  ax * rxw1xiw2[loff + l]  +  ay * ryw1xiw2[loff + l]  + az * rzw1xiw2[loff + l];
+
+                        double xic_term_c = ax * rxw1xicw2[loff + l] +  ay * ryw1xicw2[loff + l] + az * rzw1xicw2[loff + l];
+
+                        double facz = df10001[loff + l] * rho_term_c 
+                        
+                                    + df01001[loff + l] * rho_term_c
+                        
+                                    + df00101[loff + l] * xi_term_c
+                                    
+                                    + df00011[loff + l] * xi_term_c 
+                                    
+                                    + df00002[loff + l] * xic_term_c;
+
+                        fvxc += w * facz;
+
+                        // Sixth term 
+
+                        double xigrad_xxy =  3 * grada_x[loff + l] * grada_x[loff + l] * grada_y[loff + l] * znva5 - grada_y[loff + l] * znva3;
+
+                        double xigrad_xxz =  3 * grada_x[loff + l] * grada_x[loff + l] * grada_z[loff + l] * znva5 - grada_z[loff + l] * znva3;
+
+                        double xigrad_xyy =  3 * grada_y[loff + l] * grada_y[loff + l] * grada_x[loff + l] * znva5 - grada_x[loff + l] * znva3;
+
+                        double xigrad_xzz =   3 * grada_z[loff + l] * grada_z[loff + l] * grada_x[loff + l] * znva5 - grada_z[loff + l] * znva3;
+                        
+                        double xigrad_yzz =   3 * grada_z[loff + l] * grada_z[loff + l] * grada_y[loff + l] * znva5 - grada_z[loff + l] * znva3;
+
+                        double xigrad_yyz =  3 *  grada_y[loff + l] * grada_y[loff + l] * grada_z[loff + l] * znva5 - grada_z[loff + l] * znva3;
+
+                        double xigrad_xyz =   3 * grada_x[loff + l] * grada_y[loff + l] * grada_z[loff + l] * znva5;
+
+                        double xigrad_xxx =  grada_x[loff + l] * grada_x[loff + l] * grada_x[loff + l] * znva5 -  3 * grada_x[loff + l] * znva3;
+
+                        double xigrad_yyy =  grada_y[loff + l] * grada_y[loff + l] * grada_y[loff + l] * znva5 - 3 *grada_y[loff + l] * znva3;
+
+                        double xigrad_zzz =  grada_z[loff + l] * grada_z[loff + l] * grada_z[loff + l] * znva5 - 3 *grada_z[loff + l] * znva3;
+
+                        double xi3xw1xw2_x = xigrad_xxx * rxw1rxw2[loff + l] *  xigrad_xxy * rxw1ryw2[loff + l] +  xigrad_xxz * rxw1rzw2[loff + l] 
+                                    
+                                        + xigrad_xxy * ryw1rxw2[loff + l] *  xigrad_xyy * ryw1ryw2[loff + l] +  xigrad_xyz * ryw1rzw2[loff + l]
+                                        
+                                        + xigrad_xxz * rzw1rxw2[loff + l] *  xigrad_xyz * rzw1ryw2[loff + l] +  xigrad_xzz * rzw1rzw2[loff + l];
+                                        
+                                        
+                        double xi3xw1xw2_y = xigrad_xxy * rxw1rxw2[loff + l] *  xigrad_xyy * rxw1ryw2[loff + l] +  xigrad_xyz * rxw1rzw2[loff + l] 
+                                    
+                                        + xigrad_xyy * ryw1rxw2[loff + l] *  xigrad_yyy * ryw1ryw2[loff + l] +  xigrad_yyz * ryw1rzw2[loff + l]
+                                        
+                                        + xigrad_xyz * rzw1rxw2[loff + l] *  xigrad_yyz * rzw1ryw2[loff + l] +  xigrad_yzz * rzw1rzw2[loff + l];           
+                                        
+                                    
+                        double xi3xw1xw2_z = xigrad_xxx * rxw1rxw2[loff + l] *  xigrad_xyz * rxw1ryw2[loff + l] +  xigrad_xzz * rxw1rzw2[loff + l] 
+                                    
+                                        + xigrad_xyz * ryw1rxw2[loff + l] *  xigrad_yyz * ryw1ryw2[loff + l] +  xigrad_yzz * ryw1rzw2[loff + l]
+                                        
+                                        + xigrad_xzz * rzw1rxw2[loff + l] *  xigrad_yzz * rzw1ryw2[loff + l] +  xigrad_zzz * rzw1rzw2[loff + l];
+
+
+                        double xi3 = ax * xi3xw1xw2_x + ay * xi3xw1xw2_y + az * xi3xw1xw2_z;
+
+                        double zetaa12 = rxw12a * rxa + ryw12a * rya + rzw12a * rza;
+
+                        double ar = ax * rxa + ay * rya + az * rza;
+
+                        double ab12 = znva * (ax * rxw12a + ay * ryw12a + az * rzw12a - ar * zetaa12);
+    
+                         fvxc += w  * df0010[loff + l] * (ab12 + xi3) ;
+
+                         // Seventh term
+
+                         double abw12 = ax * rxw12a + ay * ryw12a + az * rzw12a;    
+
+                         fvxc += w * df00001[loff + l] * abw12 ;
 
                     }
                     
