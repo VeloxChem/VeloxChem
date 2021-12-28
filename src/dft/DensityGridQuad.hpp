@@ -231,7 +231,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha * beta density gradients product values.
      */
-    const double* xiw1xicw2(const int32_t iDensityMatrix) const;
+    const double* xicw1xicw2(const int32_t iDensityMatrix) const;
     
     /**
      Gets pointer to alpha * beta density gradients product values.
@@ -239,7 +239,7 @@ public:
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha * beta density gradients product values.
      */
-    double* xiw1xicw2(const int32_t iDensityMatrix);
+    double* xicw1xicw2(const int32_t iDensityMatrix);
     
     /**
      Gets constant pointer to alpha density gradient X values.
