@@ -24,6 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from collections import deque
+from datetime import datetime
 from pathlib import Path
 import numpy as np
 import time as tm
@@ -124,6 +125,7 @@ class ScfDriver:
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation using
+        - program_end_time: The end time of the program.
         - filename: The filename.
     """
 
@@ -188,9 +190,6 @@ class ScfDriver:
         self.checkpoint_file = None
         self.ref_mol_orbs = None
 
-        self.program_start_time = None
-        self.maximum_hours = None
-
         # closed shell?
         self.scf_type = 'restricted'
 
@@ -224,6 +223,9 @@ class ScfDriver:
         self.profiling = False
         self.memory_profiling = False
         self.memory_tracing = False
+
+        # program end time for graceful exit
+        self.program_end_time = None
 
         # filename
         self.filename = f'veloxchem_scf_{get_datetime_string()}'
@@ -282,10 +284,8 @@ class ScfDriver:
 
         parse_input(self, scf_keywords, scf_dict)
 
-        if 'program_start_time' in scf_dict:
-            self.program_start_time = scf_dict['program_start_time']
-        if 'maximum_hours' in scf_dict:
-            self.maximum_hours = scf_dict['maximum_hours']
+        if 'program_end_time' in scf_dict:
+            self.program_end_time = scf_dict['program_end_time']
         if 'filename' in scf_dict:
             self.filename = scf_dict['filename']
             if 'checkpoint_file' not in scf_dict:
@@ -798,9 +798,9 @@ class ScfDriver:
             True if a graceful exit is needed, False otherwise.
         """
 
-        if self.maximum_hours is not None:
-            remaining_hours = (self.maximum_hours -
-                               (tm.time() - self.program_start_time) / 3600)
+        if self.program_end_time is not None:
+            remaining_hours = (self.program_end_time -
+                               datetime.now()).total_seconds() / 3600
             # exit gracefully when the remaining time is not sufficient to
             # complete the next iteration (plus 25% to be on the safe side).
             if remaining_hours < iter_in_hours * 1.25:

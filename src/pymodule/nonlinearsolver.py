@@ -77,13 +77,12 @@ class NonLinearSolver:
         - ostream: The output stream.
         - restart: The flag for restarting from checkpoint file.
         - checkpoint_file: The name of checkpoint file.
-        - program_start_time: The start time of the program.
-        - maximum_hours: The timelimit in hours.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation.
         - filename: The filename.
+        - program_end_time: The end time of the program.
     """
 
     def __init__(self, comm, ostream):
@@ -130,15 +129,14 @@ class NonLinearSolver:
         self.restart = True
         self.checkpoint_file = None
 
-        # information for graceful exit
-        self.program_start_time = None
-        self.maximum_hours = None
-
         # timing and profiling
         self.timing = False
         self.profiling = False
         self.memory_profiling = False
         self.memory_tracing = False
+
+        # program end time for graceful exit
+        self.program_end_time = None
 
         # filename
         self.filename = f'veloxchem_rsp_{get_datetime_string()}'
@@ -187,10 +185,8 @@ class NonLinearSolver:
 
         parse_input(self, rsp_keywords, rsp_dict)
 
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
+        if 'program_end_time' in rsp_dict:
+            self.program_end_time = rsp_dict['program_end_time']
         if 'filename' in rsp_dict:
             self.filename = rsp_dict['filename']
             if 'checkpoint_file' not in rsp_dict:

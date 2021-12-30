@@ -23,6 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from datetime import datetime
 import numpy as np
 import time as tm
 import sys
@@ -90,12 +91,11 @@ class LinearSolver:
         - ostream: The output stream.
         - restart: The flag for restarting from checkpoint file.
         - checkpoint_file: The name of checkpoint file.
-        - program_start_time: The start time of the program.
-        - maximum_hours: The timelimit in hours.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation.
+        - program_end_time: The end time of the program.
         - filename: The filename.
         - dist_bger: The distributed gerade trial vectors.
         - dist_bung: The distributed ungerade trial vectors.
@@ -152,15 +152,14 @@ class LinearSolver:
         self.restart = True
         self.checkpoint_file = None
 
-        # information for graceful exit
-        self.program_start_time = None
-        self.maximum_hours = None
-
         # timing and profiling
         self.timing = False
         self.profiling = False
         self.memory_profiling = False
         self.memory_tracing = False
+
+        # program end time for graceful exit
+        self.program_end_time = None
 
         # filename
         self.filename = f'veloxchem_rsp_{get_datetime_string()}'
@@ -229,10 +228,8 @@ class LinearSolver:
 
         parse_input(self, rsp_keywords, rsp_dict)
 
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
+        if 'program_end_time' in rsp_dict:
+            self.program_end_time = rsp_dict['program_end_time']
         if 'filename' in rsp_dict:
             self.filename = rsp_dict['filename']
             if 'checkpoint_file' not in rsp_dict:
@@ -1050,9 +1047,9 @@ class LinearSolver:
             True if a graceful exit is needed, False otherwise.
         """
 
-        if self.maximum_hours is not None:
-            remaining_hours = (self.maximum_hours -
-                               (tm.time() - self.program_start_time) / 3600)
+        if self.program_end_time is not None:
+            remaining_hours = (self.program_end_time -
+                               datetime.now()).total_seconds() / 3600
             # exit gracefully when the remaining time is not sufficient to
             # complete the next iteration (plus 25% to be on the safe side).
             if remaining_hours < next_iter_in_hours * 1.25:

@@ -25,7 +25,6 @@
 
 import subprocess
 import os
-import re
 
 
 def get_slurm_job_id():
@@ -81,7 +80,7 @@ def get_command_output(command):
     return output
 
 
-def get_slurm_maximum_hours():
+def get_slurm_end_time():
     """
     Gets SLURM timelimit in hours.
 
@@ -97,26 +96,8 @@ def get_slurm_maximum_hours():
 
         if scontrol_output is not None:
             for line in scontrol_output.splitlines():
-                if 'TimeLimit=' in line:
-                    match = re.search(
-                        r'TimeLimit=(\d+-)?(\d{2}):(\d{2}):(\d{2})', line)
-
-                    if match is not None:
-                        if match.group(1) is not None:
-                            days = match.group(1).replace('-', '')
-                        else:
-                            days = 0
-                        hours = match.group(2)
-                        minutes = match.group(3)
-                        seconds = match.group(4)
-
-                        try:
-                            max_hours = (int(days) * 24 + int(hours) +
-                                         int(minutes) / 60 +
-                                         int(seconds) / 3600)
-                        except ValueError:
-                            max_hours = None
-
-                        return max_hours
+                if 'EndTime=' in line:
+                    end_time_string = line.split('EndTime=')[1].split()[0]
+                    return end_time_string
 
     return None

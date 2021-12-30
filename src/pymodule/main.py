@@ -24,7 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-import time as tm
+from datetime import datetime, timedelta
 
 from .veloxchemlib import mpi_initialized, mpi_master
 from .mpitask import MpiTask
@@ -53,7 +53,7 @@ from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
-from .slurminfo import get_slurm_maximum_hours
+from .slurminfo import get_slurm_end_time
 
 
 def select_scf_driver(task, scf_type):
@@ -170,7 +170,7 @@ def main():
     Runs VeloxChem with command line arguments.
     """
 
-    program_start_time = tm.time()
+    program_start_time = datetime.now()
 
     assert_msg_critical(mpi_initialized(), "MPI not initialized")
 
@@ -188,12 +188,15 @@ def main():
 
     if 'maximum_hours' in task.input_dict['jobs']:
         maximum_hours = float(task.input_dict['jobs']['maximum_hours'])
+        program_end_time = program_start_time + timedelta(hours=maximum_hours)
     else:
         if task.mpi_rank == mpi_master():
-            maximum_hours = get_slurm_maximum_hours()
+            end_time_string = get_slurm_end_time()
+            program_end_time = datetime.fromisoformat(end_time_string)
         else:
-            maximum_hours = None
-        maximum_hours = task.mpi_comm.bcast(maximum_hours, root=mpi_master())
+            program_end_time = None
+        program_end_time = task.mpi_comm.bcast(program_end_time,
+                                               root=mpi_master())
 
     # Method settings
 
@@ -218,8 +221,7 @@ def main():
         else:
             exciton_dict = {}
 
-        exciton_dict['program_start_time'] = program_start_time
-        exciton_dict['maximum_hours'] = maximum_hours
+        exciton_dict['program_end_time'] = program_end_time
         exciton_dict['filename'] = task.input_dict['filename']
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
@@ -276,8 +278,7 @@ def main():
         else:
             scf_dict = {}
 
-        scf_dict['program_start_time'] = program_start_time
-        scf_dict['maximum_hours'] = maximum_hours
+        scf_dict['program_end_time'] = program_end_time
         scf_dict['filename'] = task.input_dict['filename']
 
         if use_xtb:
@@ -356,8 +357,7 @@ def main():
         else:
             rsp_dict = {}
 
-        rsp_dict['program_start_time'] = program_start_time
-        rsp_dict['maximum_hours'] = maximum_hours
+        rsp_dict['program_end_time'] = program_end_time
         rsp_dict['filename'] = task.input_dict['filename']
 
         if 'eri_thresh' not in rsp_dict:

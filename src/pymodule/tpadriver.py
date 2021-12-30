@@ -189,7 +189,7 @@ class TPADriver(NonLinearSolver):
         cpp_keywords = {
             'frequencies', 'damping', 'lindep_thresh', 'conv_thresh',
             'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
-            'batch_size', 'restart', 'program_start_time', 'maximum_hours'
+            'batch_size', 'restart', 'program_end_time'
         }
 
         for key in cpp_keywords:
