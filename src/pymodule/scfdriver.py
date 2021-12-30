@@ -363,8 +363,6 @@ class ScfDriver:
                 min_basis = MolecularBasis()
             min_basis.broadcast(self.rank, self.comm)
 
-        self.timing_dict = {}
-
         # check dft setup
         if self.dft:
             assert_msg_critical(self.xcfun is not None,
@@ -646,15 +644,18 @@ class ScfDriver:
             else:
                 self.num_iter = i
 
+            profiler.set_timing_key(f'Iteration {self.num_iter:d}')
+
             iter_start_time = tm.time()
 
-            profiler.start_timer(self.num_iter, 'FockBuild')
+            profiler.start_timer('FockBuild')
 
             vxc_mat, e_pe, V_pe = self.comp_2e_fock(fock_mat, den_mat, molecule,
-                                                    ao_basis, qq_data, e_grad)
+                                                    ao_basis, qq_data, e_grad,
+                                                    profiler)
 
-            profiler.stop_timer(self.num_iter, 'FockBuild')
-            profiler.start_timer(self.num_iter, 'CompEnergy')
+            profiler.stop_timer('FockBuild')
+            profiler.start_timer('CompEnergy')
 
             e_el = self.comp_energy(fock_mat, vxc_mat, e_pe, kin_mat, npot_mat,
                                     den_mat)
@@ -703,7 +704,7 @@ class ScfDriver:
                 'diff_density': diff_den,
             })
 
-            profiler.stop_timer(self.num_iter, 'CompEnergy')
+            profiler.stop_timer('CompEnergy')
             profiler.check_memory_usage('Iteration {:d} Fock build'.format(
                 self.num_iter))
 
@@ -714,7 +715,7 @@ class ScfDriver:
             if self.is_converged:
                 break
 
-            profiler.start_timer(self.num_iter, 'FockDiag')
+            profiler.start_timer('FockDiag')
 
             self.store_diis_data(i, fock_mat, den_mat)
 
@@ -728,9 +729,7 @@ class ScfDriver:
 
             den_mat.broadcast(self.rank, self.comm)
 
-            profiler.stop_timer(self.num_iter, 'FockDiag')
-            if (self.dft or self.pe) and not self.first_step:
-                profiler.update_timer(self.num_iter, self.timing_dict)
+            profiler.stop_timer('FockDiag')
 
             profiler.check_memory_usage('Iteration {:d} Fock diag.'.format(
                 self.num_iter))
@@ -1008,7 +1007,8 @@ class ScfDriver:
                      molecule,
                      basis,
                      screening,
-                     e_grad=None):
+                     e_grad=None,
+                     profiler=None):
         """
         Computes Fock/Kohn-Sham matrix (only 2e part).
 
@@ -1024,6 +1024,8 @@ class ScfDriver:
             The screening container object.
         :param e_grad:
             The electronic gradient.
+        :param profiler:
+            The profiler.
 
         :return:
             The AO Kohn-Sham (Vxc) matrix.
@@ -1035,7 +1037,7 @@ class ScfDriver:
 
         else:
             vxc_mat, e_pe, V_pe = self.comp_2e_fock_single_comm(
-                fock_mat, den_mat, molecule, basis, screening, e_grad)
+                fock_mat, den_mat, molecule, basis, screening, e_grad, profiler)
 
         return vxc_mat, e_pe, V_pe
 
@@ -1045,7 +1047,8 @@ class ScfDriver:
                                  molecule,
                                  basis,
                                  screening,
-                                 e_grad=None):
+                                 e_grad=None,
+                                 profiler=None):
         """
         Computes Fock/Kohn-Sham matrix on single communicator.
 
@@ -1061,6 +1064,8 @@ class ScfDriver:
             The screening container object.
         :param e_grad:
             The electronic gradient.
+        :param profiler:
+            The profiler.
 
         :return:
             The AO Kohn-Sham (Vxc) matrix.
@@ -1072,15 +1077,14 @@ class ScfDriver:
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         xc_drv = XCIntegrator(self.comm)
 
-        if self.timing and not self.first_step:
-            eri_t0 = tm.time()
+        eri_t0 = tm.time()
 
         eri_drv.compute(fock_mat, den_mat, molecule, basis, screening)
         fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
-        if self.timing and not self.first_step:
-            self.timing_dict['ERI'] = tm.time() - eri_t0
-            vxc_t0 = tm.time()
+        if self.timing:
+            profiler.add_timing_info('ERI', tm.time() - eri_t0)
+        vxc_t0 = tm.time()
 
         if self.dft and not self.first_step:
             if not self.xcfun.is_hybrid():
@@ -1094,10 +1098,9 @@ class ScfDriver:
         else:
             vxc_mat = None
 
-        if self.timing and not self.first_step:
-            if self.dft:
-                self.timing_dict['DFT'] = tm.time() - vxc_t0
-            pe_t0 = tm.time()
+        if self.timing and self.dft:
+            profiler.add_timing_info('DFT', tm.time() - vxc_t0)
+        pe_t0 = tm.time()
 
         if self.pe and not self.first_step:
             self.pe_drv.V_es = self.V_es.copy()
@@ -1107,9 +1110,8 @@ class ScfDriver:
         else:
             e_pe, V_pe = 0.0, None
 
-        if self.timing and not self.first_step:
-            if self.pe:
-                self.timing_dict['PE'] = tm.time() - pe_t0
+        if self.timing and self.pe:
+            profiler.add_timing_info('PE', tm.time() - pe_t0)
 
         return vxc_mat, e_pe, V_pe
 

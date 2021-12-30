@@ -187,8 +187,6 @@ class LinearResponseEigenSolver(LinearSolver):
         # PE information
         pe_dict = self.init_pe(molecule, basis)
 
-        timing_dict = {}
-
         rsp_vector_labels = [
             'LR_eigen_bger_half_size',
             'LR_eigen_bung_half_size',
@@ -214,7 +212,7 @@ class LinearResponseEigenSolver(LinearSolver):
             bger, bung = self.setup_trials(igs, None)
 
             self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                               eri_dict, dft_dict, pe_dict, timing_dict)
+                               eri_dict, dft_dict, pe_dict)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -234,7 +232,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
             iter_start_time = tm.time()
 
-            profiler.start_timer(iteration, 'ReducedSpace')
+            profiler.set_timing_key(f'Iteration {iteration+1}')
+
+            profiler.start_timer('ReducedSpace')
 
             self.cur_iter = iteration
 
@@ -358,7 +358,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 self.print_iteration(relative_residual_norm, wn)
 
-            profiler.stop_timer(iteration, 'ReducedSpace')
+            profiler.stop_timer('ReducedSpace')
 
             # check convergence
             self.check_convergence(relative_residual_norm)
@@ -366,7 +366,7 @@ class LinearResponseEigenSolver(LinearSolver):
             if self.is_converged:
                 break
 
-            profiler.start_timer(iteration, 'Orthonorm.')
+            profiler.start_timer('Orthonorm.')
 
             # update trial vectors
             precond = {
@@ -379,7 +379,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
             exresiduals.clear()
 
-            profiler.stop_timer(iteration, 'Orthonorm.')
+            profiler.stop_timer('Orthonorm.')
 
             if self.rank == mpi_master():
                 n_new_trials = new_trials_ger.shape(1) + new_trials_ung.shape(1)
@@ -393,18 +393,16 @@ class LinearResponseEigenSolver(LinearSolver):
                     self.graceful_exit(molecule, basis, dft_dict, pe_dict,
                                        rsp_vector_labels)
 
-            profiler.start_timer(iteration, 'FockBuild')
+            profiler.start_timer('FockBuild')
 
             self.e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
                                scf_tensors, eri_dict, dft_dict, pe_dict,
-                               timing_dict)
+                               profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials
 
-            profiler.stop_timer(iteration, 'FockBuild')
-            if self.dft or self.pe:
-                profiler.update_timer(iteration, timing_dict)
+            profiler.stop_timer('FockBuild')
 
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
@@ -822,8 +820,6 @@ class LinearResponseEigenSolver(LinearSolver):
         # PE information
         pe_dict = self.init_pe(molecule, basis)
 
-        timing_dict = {}
-
         # generate initial guess from scratch
 
         igs = {}
@@ -850,7 +846,7 @@ class LinearResponseEigenSolver(LinearSolver):
         bger, bung = self.setup_trials(igs, precond=None, renormalize=False)
 
         self.e2n_half_size(bger, bung, molecule, basis, scf_tensors, eri_dict,
-                           dft_dict, pe_dict, timing_dict)
+                           dft_dict, pe_dict)
 
         if self.rank == mpi_master():
             E2 = np.zeros((2 * n_exc, 2 * n_exc))

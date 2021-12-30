@@ -538,8 +538,16 @@ class LinearSolver:
 
         return None
 
-    def e2n_half_size(self, vecs_ger, vecs_ung, molecule, basis, scf_tensors,
-                      eri_dict, dft_dict, pe_dict, timing_dict):
+    def e2n_half_size(self,
+                      vecs_ger,
+                      vecs_ung,
+                      molecule,
+                      basis,
+                      scf_tensors,
+                      eri_dict,
+                      dft_dict,
+                      pe_dict,
+                      profiler=None):
         """
         Computes the E2 b matrix vector product.
 
@@ -559,8 +567,8 @@ class LinearSolver:
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
-        :param timing_dict:
-            The dictionary containing timing information.
+        :param profiler:
+            The profiler.
 
         :return:
             The gerade and ungerade E2 b matrix vector product in half-size.
@@ -658,7 +666,7 @@ class LinearSolver:
             fock = AOFockMatrix(dens)
 
             self.comp_lr_fock(fock, dens, molecule, basis, eri_dict, dft_dict,
-                              pe_dict, timing_dict)
+                              pe_dict, profiler)
 
             e2_ger = None
             e2_ung = None
@@ -731,8 +739,15 @@ class LinearSolver:
 
         self.ostream.print_blank()
 
-    def comp_lr_fock(self, fock, dens, molecule, basis, eri_dict, dft_dict,
-                     pe_dict, timing_dict):
+    def comp_lr_fock(self,
+                     fock,
+                     dens,
+                     molecule,
+                     basis,
+                     eri_dict,
+                     dft_dict,
+                     pe_dict,
+                     profiler=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -750,8 +765,8 @@ class LinearSolver:
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
-        :param timing_dict:
-            The dictionary containing timing information.
+        :param profiler:
+            The profiler.
         """
 
         screening = eri_dict['screening']
@@ -786,8 +801,8 @@ class LinearSolver:
             t0 = tm.time()
             eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
             eri_drv.compute(fock, dens, molecule, basis, screening)
-            if timing_dict is not None:
-                timing_dict['ERI'] = tm.time() - t0
+            if profiler is not None:
+                profiler.add_timing_info('ERI', tm.time() - t0)
 
             if self.dft:
                 t0 = tm.time()
@@ -798,8 +813,8 @@ class LinearSolver:
                 molgrid.distribute(self.rank, self.nodes, self.comm)
                 xc_drv.integrate(fock, dens, gs_density, molecule, basis,
                                  molgrid, self.xcfun.get_func_label())
-                if timing_dict is not None:
-                    timing_dict['DFT'] = tm.time() - t0
+                if profiler is not None:
+                    profiler.add_timing_info('DFT', tm.time() - t0)
 
             if self.pe:
                 t0 = tm.time()
@@ -809,8 +824,8 @@ class LinearSolver:
                     e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
                     if self.rank == mpi_master():
                         fock.add_matrix(DenseMatrix(V_pe), ifock)
-                if timing_dict is not None:
-                    timing_dict['PE'] = tm.time() - t0
+                if profiler is not None:
+                    profiler.add_timing_info('PE', tm.time() - t0)
 
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
