@@ -45,7 +45,7 @@ CXCCubicHessianGrid::CXCCubicHessianGrid(const int32_t nGridPoints,
     
     if (_xcGridType == xcfun::lda) ncomp = (_densityGridType == dengrid::ab) ? 4 : 1;
     
-    if (_xcGridType == xcfun::gga) ncomp = (_densityGridType == dengrid::ab) ? 30 : 3;
+    if (_xcGridType == xcfun::gga) ncomp = (_densityGridType == dengrid::ab) ? 31 : 3;
     
     // NOTE: this needs to be checked with mgga functionals implementation
     if (_xcGridType == xcfun::mgga) ncomp = (_densityGridType == dengrid::ab) ? 28 : 6;
@@ -356,9 +356,18 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
         {
             if (jVariableType == xcvars::rhob)
             {
-                if (kVariableType == xcvars::grada)
+                 if (kVariableType == xcvars::rhob)
                 {
                     if (_densityGridType == dengrid::ab) return _xcValues.data(15);
+                    
+                    if (_densityGridType == dengrid::lima) return nullptr;
+                    
+                    if (_densityGridType == dengrid::limb) return nullptr;
+                }
+
+                if (kVariableType == xcvars::grada)
+                {
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(16);
                     
                     if (_densityGridType == dengrid::lima) return nullptr;
                     
@@ -367,7 +376,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             
                 if (kVariableType == xcvars::gradab)
                  {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(16);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(17);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -378,7 +387,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::grada)
                  {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(17);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(18);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -386,7 +395,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
                 }
                 if (kVariableType == xcvars::gradb)
                  {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(18);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(19);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -394,7 +403,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
                 }
                 if (kVariableType == xcvars::gradab)
                  {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(19);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(20);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -405,7 +414,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::gradab)
                  {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(20);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(21);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -416,7 +425,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::gradab)
                  {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(21);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(22);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -430,7 +439,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::grada)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(22);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(23);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -438,7 +447,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
                 }
                 if (kVariableType == xcvars::gradb)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(23);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(24);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -446,7 +455,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
                 }
                 if (kVariableType == xcvars::gradab)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(24);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(25);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -457,7 +466,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::gradb)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(25);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(26);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -465,7 +474,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
                 }
                 if (kVariableType == xcvars::gradab)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(26);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(27);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -476,7 +485,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::gradab)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(27);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(28);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -490,7 +499,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::gradab)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(28);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(29);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -504,7 +513,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::gradab)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(29);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(30);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -738,9 +747,18 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
         {
             if (jVariableType == xcvars::rhob)
             {
-                if (kVariableType == xcvars::grada)
+                if (kVariableType == xcvars::rhob)
                 {
                     if (_densityGridType == dengrid::ab) return _xcValues.data(15);
+                    
+                    if (_densityGridType == dengrid::lima) return nullptr;
+                    
+                    if (_densityGridType == dengrid::limb) return nullptr;
+                }
+
+                if (kVariableType == xcvars::grada)
+                {
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(16);
                     
                     if (_densityGridType == dengrid::lima) return nullptr;
                     
@@ -749,7 +767,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             
                 if (kVariableType == xcvars::gradab)
                  {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(16);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(17);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -760,7 +778,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::grada)
                  {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(17);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(18);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -768,7 +786,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
                 }
                 if (kVariableType == xcvars::gradb)
                  {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(18);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(19);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -776,7 +794,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
                 }
                 if (kVariableType == xcvars::gradab)
                  {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(19);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(20);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -787,7 +805,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::gradab)
                  {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(20);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(21);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -798,7 +816,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::gradab)
                  {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(21);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(22);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -812,7 +830,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::grada)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(22);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(23);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -820,7 +838,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
                 }
                 if (kVariableType == xcvars::gradb)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(23);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(24);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -828,7 +846,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
                 }
                 if (kVariableType == xcvars::gradab)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(24);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(25);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -839,7 +857,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::gradb)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(25);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(26);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -847,7 +865,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
                 }
                 if (kVariableType == xcvars::gradab)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(26);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(27);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -858,7 +876,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::gradab)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(27);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(28);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -872,7 +890,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::gradab)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(28);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(29);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 
@@ -886,7 +904,7 @@ CXCCubicHessianGrid::xcCubicHessianValues(const xcvars iVariableType,
             {
                 if (kVariableType == xcvars::gradab)
                 {
-                    if (_densityGridType == dengrid::ab) return _xcValues.data(29);
+                    if (_densityGridType == dengrid::ab) return _xcValues.data(30);
                 
                     if (_densityGridType == dengrid::lima) return nullptr;
                 

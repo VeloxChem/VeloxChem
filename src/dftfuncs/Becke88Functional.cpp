@@ -26,6 +26,7 @@
 #include "Becke88Functional.hpp"
 
 #include <cmath>
+#include <iostream>
 
 #include "MathConst.hpp"
 
@@ -64,6 +65,10 @@ namespace vxcfuncs {  // vxcfuncs namespace
         double fp = 4.0 / 3.0;
         
         double fre = -factor * fb;
+
+        double BETA = 0.0042;
+
+        double BETA2 = BETA*BETA;
         
         // determine number of grid points
         
@@ -83,15 +88,15 @@ namespace vxcfuncs {  // vxcfuncs namespace
         
         auto fexc = xcGradientGrid.xcFunctionalValues();
         
-        auto grhoa = xcGradientGrid.xcGradientValues(xcvars::rhoa);
+        auto df1000 = xcGradientGrid.xcGradientValues(xcvars::rhoa);
         
-        auto grhob = xcGradientGrid.xcGradientValues(xcvars::rhob);
+        auto df0100 = xcGradientGrid.xcGradientValues(xcvars::rhob);
         
-        auto ggrada = xcGradientGrid.xcGradientValues(xcvars::grada);
+        auto df0010 = xcGradientGrid.xcGradientValues(xcvars::grada);
         
-        auto ggradb = xcGradientGrid.xcGradientValues(xcvars::gradb);
+        auto df0001 = xcGradientGrid.xcGradientValues(xcvars::gradb);
         
-        #pragma omp simd aligned(rhoa, rhob, grada, gradb, fexc, grhoa, grhob, ggrada, ggradb: VLX_ALIGN)
+        #pragma omp simd aligned(rhoa, rhob, grada, gradb, fexc, df1000, df0100, df0010, df0001: VLX_ALIGN)
         for (int32_t i = 0; i < ngpoints; i++)
         {
             double ra = std::pow(rhoa[i], fp);
@@ -126,15 +131,71 @@ namespace vxcfuncs {  // vxcfuncs namespace
             
             double ff1b = fb * (6.0 * xb * xb * fb - fsqb) / (fsqb * fdb * fdb);
 
+
+            // Alpha 
+            
+            double alpha = grada[i]*std::pow(rhoa[i],-4.0/3.0);
+
+            double a2 = alpha*alpha;
+            
+            double a3 = alpha*a2;
+            
+            double a4 = alpha*a3;
+
+            double a5 = alpha*a4;
+
+            double asha = std::asinh(alpha);
+
+            double asha2= asha*asha;
+
+            double alpha10 = -4.0/3.0*alpha/rhoa[i];   
+
+            double alpha20 = -7.0/3.0*alpha10/rhoa[i];
+
+            double alpha30 = -10./3.0*alpha20/rhoa[i]; 
+
+            double alpha01 = std::pow(rhoa[i],-4.0/3.0);   
+
+            double alpha11 = -4.0/3.0*alpha01/rhoa[i]; 
+
+            double alpha21 = alpha20/grada[i];       
+
+            double alpha10_2 = alpha10*alpha10;
+
+            double sq1a2 = std::sqrt(1 + a2);
+
+            double denom= 1 + 6*alpha*BETA*asha;
+
+            double denom2 = denom*denom;
+
+            double denom3 = denom2*denom;
+
+            double denom4 = denom3*denom;
+
+            double ff  = -alpha*BETA/(1.0 +6.0 *alpha*BETA*asha);
+                  
+            double ff1 = BETA*( 6.0 *a2*BETA - sq1a2)/(sq1a2*denom2);
+
+            double ff2 = (6.0 *BETA2*(4.0 *alpha + a3*(3.0 - 12.0 *sq1a2*BETA) + 
+                            2.0 *(std::pow(1.0 + a2 ,1.5) - 3.0 *a4*BETA)*asha))/ (std::pow(1.0 + a2,1.5)*denom3);
+            
+            double ff3 = (6.0 *BETA2*(6.0 + 5.0 *a2 + 2.0*a4 
+	                    - 12.0 *alpha*(6.0 + 16.0 *a2 + 7.0 *a4)*BETA*asha + 
+	                36.0*sq1a2*BETA*(-a2*(3.0 + 2.0*a2) + 6.0 *a5*BETA*asha - 
+	                std::pow(1.0 + a2 ,2.0) * asha2) + 36.0 *a4*BETA2*(6.0 *(1.0 + a2) + (-1.0 + 2.0 *a2 )*asha2)))/(std::pow(1.0 + a2, 2.5)*denom4);
+
+
             fexc[i] += fre * (fea + feb);
             
-            grhoa[i] += factor * grada[i] * ff1a * faa10;
+            df1000[i] += factor*grada[i]* ff1 *alpha10;
             
-            ggrada[i] += factor*(ffa + xa * ff1a);
+            df0010[i] += factor*(ff + grada[i]*ff1*alpha01);
             
-            grhob[i] += factor * gradb[i] * ff1b * fab10;
+            df0100[i] += factor * gradb[i] * ff1b * fab10;
             
-            ggradb[i] += factor * (ffb + xb * ff1b);
+            df0001[i] += factor * (ffb + xb * ff1b);
+
+            
         }
     }
     
@@ -261,9 +322,9 @@ namespace vxcfuncs {  // vxcfuncs namespace
     {
         // functional prefactors
         
-        double fb = 0.0042;
-        
-        double fp = 4.0 / 3.0;
+        double BETA = 0.0042;
+
+        double BETA2 = BETA*BETA;
         
         // determine number of grid points
         
@@ -281,60 +342,75 @@ namespace vxcfuncs {  // vxcfuncs namespace
         
         // set up pointers to functional data
         
-        auto grho_aa = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::rhoa);
+        auto df2000 = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::rhoa);
         
         //auto grho_bb = xcHessianGrid.xcHessianValues(xcvars::rhob, xcvars::rhob);
         
-        auto gmix_aa = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::grada);
+        auto df1010 = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::grada);
         
         //auto gmix_bb = xcHessianGrid.xcHessianValues(xcvars::rhob, xcvars::gradb);
         
-        auto ggrad_aa = xcHessianGrid.xcHessianValues(xcvars::grada, xcvars::grada);
+        auto df0020 = xcHessianGrid.xcHessianValues(xcvars::grada, xcvars::grada);
         
         //auto ggrad_bb = xcHessianGrid.xcHessianValues(xcvars::gradb, xcvars::gradb);
         
-        #pragma omp simd aligned(rhoa, grada, grho_aa, gmix_aa, ggrad_aa: VLX_ALIGN)
+        #pragma omp simd aligned(rhoa, grada, df2000, df1010, df0020: VLX_ALIGN)
         for (int32_t i = 0; i < ngpoints; i++)
         {
-            double ra = std::pow(rhoa[i], fp);
             
-            double xa = grada[i] / ra;
+            double alpha = grada[i]*std::pow(rhoa[i],-4.0/3.0);
+
+            double a2 = alpha*alpha;
             
-            double xa2 = xa * xa;
+            double a3 = alpha*a2;
             
-            double xa3 = xa * xa2;
+            double a4 = alpha*a3;
+
+            double a5 = alpha*a4;
+
+            double asha = std::asinh(alpha);
+
+            double asha2= asha*asha;
+
+            double alpha10 = -4.0/3.0*alpha/rhoa[i];   
+
+            double alpha20 = -7.0/3.0*alpha10/rhoa[i];
+
+            double alpha30 = -10./3.0*alpha20/rhoa[i]; 
+
+            double alpha01 = std::pow(rhoa[i],-4.0/3.0);   
+
+            double alpha11 = -4.0/3.0*alpha01/rhoa[i]; 
+
+            double alpha21 = alpha20/grada[i];       
+
+            double alpha10_2 = alpha10*alpha10;
+
+            double sq1a2 = std::sqrt(1 + a2);
+
+            double denom= 1 + 6*alpha*BETA*asha;
+
+            double denom2 = denom*denom;
+
+            double denom3 = denom2*denom;
+
+            double denom4 = denom3*denom;
+                  
+            double ff1 = BETA*( 6.0 *a2*BETA - sq1a2)/(sq1a2*denom2);
+
+            double ff2 = (6.0 *BETA2*(4.0 *alpha + a3*(3.0 - 12.0 *sq1a2*BETA) + 
+                            2.0 *(std::pow(1.0 + a2 ,1.5) - 3.0 *a4*BETA)*asha))/ (std::pow(1.0 + a2,1.5)*denom3);
             
-            double xa4 = xa3 * xa;
+            double ff3 = (6.0 *BETA2*(6.0 + 5.0 *a2 + 2.0*a4 
+	                    - 12.0 *alpha*(6.0 + 16.0 *a2 + 7.0 *a4)*BETA*asha + 
+	                36.0*sq1a2*BETA*(-a2*(3.0 + 2.0*a2) + 6.0 *a5*BETA*asha - 
+	                std::pow(1.0 + a2 ,2.0) * asha2) + 36.0 *a4*BETA2*(6.0 *(1.0 + a2) + (-1.0 + 2.0 *a2 )*asha2)))/(std::pow(1.0 + a2, 2.5)*denom4);
+
+            df1010[i] += factor* (ff1 * alpha10 + grada[i] * (ff2 * alpha10* alpha01 + ff1 * alpha11));
             
-            double asha = std::asinh(xa);
+            df2000[i] += factor * grada[i] * (ff2 * alpha10_2 + ff1 * alpha20);
             
-            double alpha10 = -fp * xa / rhoa[i];
-            
-            double alpha20 = -7.0 / 3.0 * alpha10 / rhoa[i];
-            
-            double alpha01 = 1.0 / ra;
-            
-            double alpha11 = -fp * alpha01 / rhoa[i];
-            
-            double alpha10_2 = alpha10 * alpha10;
-            
-            double sq1a2 = std::sqrt(1.0 + xa2);
-            
-            double denom = 1.0 + 6.0 * xa * fb * asha;
-            
-            double denom2 = denom * denom;
-            
-            double denom3 = denom2 * denom;
-            
-            double ff1 = fb * (6 * xa2 * fb - sq1a2) / (sq1a2 * denom2);
-                
-            double ff2 = (6.0 * fb * fb * (4.0 * xa + xa3*(3.0 - 12.0 * sq1a2 * fb) + 2.0 * (std::pow(1.0 + xa2, 1.5) - 3.0 * xa4 * fb) * asha)) / (std::pow(1.0 + xa2, 1.5) * denom3);
-            
-            gmix_aa[i] += factor* (ff1 * alpha10 + grada[i] * (ff2 * alpha10* alpha01 + ff1 * alpha11));
-            
-            grho_aa[i] += factor * grada[i] * (ff2 * alpha10_2 + ff1 * alpha20);
-            
-            ggrad_aa[i] += factor * (2.0 * ff1 * alpha01 + grada[i] * (ff2 * alpha01 * alpha01));
+            df0020[i] += factor * (2.0 * ff1 * alpha01 + grada[i] * (ff2 * alpha01 * alpha01));
             
             // FIX ME: Add beta part
         }
@@ -429,32 +505,32 @@ namespace vxcfuncs {  // vxcfuncs namespace
 
             double denom4 = denom3*denom;
                   
-            double ff1 = BETA*(6*a2*BETA - sq1a2)/(sq1a2*denom2);
+            double ff1 = BETA*( 6.0 *a2*BETA - sq1a2)/(sq1a2*denom2);
 
-            double ff2 = (6*BETA2*(4*alpha + a3*(3 - 12*sq1a2*BETA) + 
-                            2*(pow(1 + a2,1.5) - 3*a4*BETA)*asha))/ (pow(1 + a2,1.5)*denom3);
+            double ff2 = (6.0 *BETA2*(4.0 *alpha + a3*(3.0 - 12.0 *sq1a2*BETA) + 
+                            2.0 *(std::pow(1.0 + a2 ,1.5) - 3.0 *a4*BETA)*asha))/ (std::pow(1.0 + a2,1.5)*denom3);
             
-            double ff3 = (6*BETA2*(6 + 5*a2 + 2*a4 
-	                    - 12*alpha*(6 + 16*a2 + 7*a4)*BETA*asha + 
-	                36*sq1a2*BETA*(-a2*(3 + 2*a2) + 6*a5*BETA*asha - 
-	                std::pow(1 + a2,2.0)*asha2) + 36*a4*BETA2*(6*(1 + a2) + (-1 + 2*a2)*asha2)))/(std::pow(1 + a2,2.5)*denom4);
+            double ff3 = (6.0 *BETA2*(6.0 + 5.0 *a2 + 2.0*a4 
+	                    - 12.0 *alpha*(6.0 + 16.0 *a2 + 7.0 *a4)*BETA*asha + 
+	                36.0*sq1a2*BETA*(-a2*(3.0 + 2.0*a2) + 6.0 *a5*BETA*asha - 
+	                std::pow(1.0 + a2 ,2.0) * asha2) + 36.0 *a4*BETA2*(6.0 *(1.0 + a2) + (-1.0 + 2.0 *a2 )*asha2)))/(std::pow(1.0 + a2, 2.5)*denom4);
 
 
             df2010[i] += factor*(ff2*alpha10_2 + ff1 * alpha20 +
                           grada[i]*(ff3*alpha10_2*alpha01 + 
-                                 2*ff2*alpha11*alpha10 +
+                                 2.0*ff2*alpha11*alpha10 +
                                  ff2*alpha20*alpha01 + ff1*alpha21));
 
             df1020[i] += factor*(2*ff2*alpha10*alpha01 + 2*ff1*alpha11 +
                           grada[i]*(ff3*alpha01*alpha01*alpha10 + 
-                                 2*ff2*alpha11*alpha01));
+                                 2.0*ff2*alpha11*alpha01));
     
             df3000[i] += factor*grada[i]*(ff3 * alpha10_2*alpha10 +
-                                3*ff2*alpha10*alpha20 +
+                                3.0*ff2*alpha10*alpha20 +
                                 ff1*alpha30);
 
-            df0030[i] += factor*(3*ff2*alpha01*alpha01 +
-                          grada[i]*ff3*pow(alpha01,3.0));
+            df0030[i] += factor*(3.0*ff2*alpha01*alpha01 +
+                          grada[i]*ff3*std::pow(alpha01,3.0));
 
         }
     }

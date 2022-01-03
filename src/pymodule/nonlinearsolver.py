@@ -479,7 +479,7 @@ class NonLinearSolver:
             fock = AOFockMatrix(dens2)
             for i in range(fock.number_of_fock_matrices()):
                 fock.set_fock_type(fockmat.rgenjk, i)
-
+            
             if self.dft:
                 if self.xcfun.is_hybrid():
                     fock_flag = fockmat.rgenjkx

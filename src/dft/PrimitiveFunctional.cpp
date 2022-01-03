@@ -24,6 +24,7 @@
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 #include "PrimitiveFunctional.hpp"
+#include <iostream>
 
 CPrimitiveFunctional::CPrimitiveFunctional()
 
@@ -49,34 +50,6 @@ CPrimitiveFunctional::CPrimitiveFunctional()
 
     , _bThirdOrderFunction(nullptr)
 {
-}
-
-CPrimitiveFunctional::CPrimitiveFunctional(const std::string&                      label,
-                                           const xcfun                             xcFuncType,
-                                           const std::function<def_vxc_func_typ>&  abFirstOrderFunction,
-                                           const std::function<def_vxc_func_typ>&  aFirstOrderFunction,
-                                           const std::function<def_vxc_func_typ>&  bFirstOrderFunction,
-                                           const std::function<def_vxc2_func_typ>& abSecondOrderFunction,
-                                           const std::function<def_vxc2_func_typ>& aSecondOrderFunction,
-                                           const std::function<def_vxc2_func_typ>& bSecondOrderFunction)
-
-    : _label(label)
-
-    , _xcFuncType(xcFuncType)
-
-    , _abFirstOrderFunction(abFirstOrderFunction)
-
-    , _aFirstOrderFunction(aFirstOrderFunction)
-
-    , _bFirstOrderFunction(bFirstOrderFunction)
-
-    , _abSecondOrderFunction(abSecondOrderFunction)
-
-    , _aSecondOrderFunction(aSecondOrderFunction)
-
-    , _bSecondOrderFunction(bSecondOrderFunction)
-{
-    
 }
 
 CPrimitiveFunctional::CPrimitiveFunctional(const std::string&                      label,
@@ -281,6 +254,7 @@ CPrimitiveFunctional::compute(      CXCCubicHessianGrid& xcCubicHessianGrid,
                               const double          factor,
                               const CDensityGrid&   densityGrid) const
 {
+
     if (densityGrid.getDensityGridType() == dengrid::ab) _abThirdOrderFunction(xcCubicHessianGrid, factor, densityGrid);
     
     if (densityGrid.getDensityGridType() == dengrid::lima) _aThirdOrderFunction(xcCubicHessianGrid, factor, densityGrid);

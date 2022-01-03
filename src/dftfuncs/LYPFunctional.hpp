@@ -112,7 +112,39 @@ namespace vxcfuncs {  // vxcfuncs namespace
     void LYPFuncHessianB(      CXCHessianGrid& xcHessianGrid,
                          const double          factor,
                          const CDensityGrid&   densityGrid);
+
+    /**
+     Implements second order derivatives of spin-polarized Lee, Yang and Parr functional for dengrid::ab case.
+     
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param factor the scale factor of functional contribution.
+     @param densityGrid the density grid.
+     */
+    void LYPFuncCubicHessianAB(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                          const double          factor,
+                          const CDensityGrid&   densityGrid);
     
+    /**
+     Implements second order derivatives of spin-polarized Lee, Yang and Parr functional for dengrid::lima case.
+     
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param factor the scale factor of functional contribution.
+     @param densityGrid the density grid.
+     */
+    void LYPFuncCubicHessianA(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                         const double          factor,
+                         const CDensityGrid&   densityGrid);
+    
+    /**
+     Implements second order derivatives of spin-polarized Lee, Yang and Parr functional for dengrid::lima case.
+     
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param factor the scale factor of functional contribution.
+     @param densityGrid the density grid.
+     */
+    void LYPFuncCubicHessianB(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                         const double          factor,
+                         const CDensityGrid&   densityGrid);   
 }  // namespace vxcfuncs
 
 #endif /* LYPFunctional_hpp */
