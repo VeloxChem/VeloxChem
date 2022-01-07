@@ -191,8 +191,7 @@ def main():
         program_end_time = program_start_time + timedelta(hours=maximum_hours)
     else:
         if task.mpi_rank == mpi_master():
-            end_time_string = get_slurm_end_time()
-            program_end_time = datetime.fromisoformat(end_time_string)
+            program_end_time = get_slurm_end_time()
         else:
             program_end_time = None
         program_end_time = task.mpi_comm.bcast(program_end_time,

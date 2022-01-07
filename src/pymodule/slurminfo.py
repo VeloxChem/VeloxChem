@@ -23,6 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from datetime import datetime
 import subprocess
 import os
 
@@ -82,10 +83,10 @@ def get_command_output(command):
 
 def get_slurm_end_time():
     """
-    Gets SLURM timelimit in hours.
+    Gets SLURM end time.
 
     :return:
-        The SLURM timelimit in hours (None if not a SLURM job).
+        The SLURM end time as a datetime object (None if not a SLURM job).
     """
 
     job_id = get_slurm_job_id()
@@ -98,6 +99,27 @@ def get_slurm_end_time():
             for line in scontrol_output.splitlines():
                 if 'EndTime=' in line:
                     end_time_string = line.split('EndTime=')[1].split()[0]
-                    return end_time_string
+                    return datetime_from_isoformat(end_time_string)
 
     return None
+
+
+def datetime_from_isoformat(datetime_string):
+    """
+    Gets datetime object from string YYYY-MM-DDTHH:MM:SS.
+
+    :return:
+        The datetime object.
+    """
+
+    try:
+        dt = datetime.fromisoformat(datetime_string)
+
+    except AttributeError:
+        date_string, time_string = datetime_string.split('T')
+        year, month, day = date_string.split('-')
+        hour, minute, second = time_string.split(':')
+        dt = datetime(int(year), int(month), int(day), int(hour), int(minute),
+                      int(second))
+
+    return dt
