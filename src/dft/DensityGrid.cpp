@@ -542,6 +542,8 @@ CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGridAB,
     densityGridAB = CDensityGrid(getNumberOfGridPoints(), 1, xcFuncType, _gridType);
     
     // generate screened molecular grid
+
+    std::cout << "densityThreshold" << densityThreshold << std::endl;
     
     molecularGridab = getScreenedGrid(molecularGridab, iDensityMatrix, densityThreshold, xcFuncType);
     

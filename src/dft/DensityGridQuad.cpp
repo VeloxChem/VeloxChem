@@ -1176,8 +1176,6 @@ CDensityGridQuad::makenewdens2(       CDensityGridQuad&   densityGridAB,
                 
                 auto rhowza_i = rwdenptr->alphaDensity(6 * j + 5);
 
-                int32_t ipoints = 0;
-
                 for (int32_t i = 0; i < npoints; i++)
                 {
                     
@@ -1189,43 +1187,42 @@ CDensityGridQuad::makenewdens2(       CDensityGridQuad&   densityGridAB,
                     
                                         + rhowxa_i[i]*rhowxa_r[i] + rhowya_i[i]*rhowya_r[i] + rhowza_i[i]*rhowza_r[i]);
 
-                    rho_sig_xa_r[ipoints] = 4 * (rhowxa_r[i]*rhowxa_r[i] - rhowxa_i[i]*rhowxa_i[i] ) + alpha_r ;
+                    rho_sig_xa_r[i] = 4 * (rhowxa_r[i]*rhowxa_r[i] - rhowxa_i[i]*rhowxa_i[i] ) + alpha_r ;
 
-                    rho_sig_xa_i[ipoints] = 4 * (rhowxa_r[i]*rhowxa_i[i] + rhowxa_i[i]*rhowxa_r[i]) + alpha_i ;
+                    rho_sig_xa_i[i] = 4 * (rhowxa_r[i]*rhowxa_i[i] + rhowxa_i[i]*rhowxa_r[i]) + alpha_i ;
 
-                    rho_sig_ya_r[ipoints] = 4 * (rhowya_r[i]*rhowya_r[i] - rhowya_i[i]*rhowya_i[i] ) + alpha_r;
+                    rho_sig_ya_r[i] = 4 * (rhowya_r[i]*rhowya_r[i] - rhowya_i[i]*rhowya_i[i] ) + alpha_r;
                     
-                    rho_sig_ya_i[ipoints] = 4 * (rhowya_r[i]*rhowya_i[i] + rhowya_i[i]*rhowya_r[i]) + alpha_i;
+                    rho_sig_ya_i[i] = 4 * (rhowya_r[i]*rhowya_i[i] + rhowya_i[i]*rhowya_r[i]) + alpha_i;
 
-                    rho_sig_za_r[ipoints] = 4 * (rhowza_r[i]*rhowza_r[i] - rhowza_i[i]*rhowza_i[i] ) + alpha_r;
+                    rho_sig_za_r[i] = 4 * (rhowza_r[i]*rhowza_r[i] - rhowza_i[i]*rhowza_i[i] ) + alpha_r;
                     
-                    rho_sig_za_i[ipoints] = 4 *(rhowza_r[i]*rhowza_i[i] + rhowza_i[i]*rhowza_r[i]) + alpha_i;
+                    rho_sig_za_i[i] = 4 *(rhowza_r[i]*rhowza_i[i] + rhowza_i[i]*rhowza_r[i]) + alpha_i;
 
-                    rho_lam_xya_r[ipoints] = 2 * (rhowxa_r[i]*rhowya_r[i]-rhowxa_i[i]*rhowya_i[i] 
+                    rho_lam_xya_r[i] = 2 * (rhowxa_r[i]*rhowya_r[i]-rhowxa_i[i]*rhowya_i[i] 
 
                                                 + rhowya_r[i]*rhowxa_r[i] - rhowya_i[i]*rhowxa_i[i]);
 
-                    rho_lam_xya_i[ipoints] = 2 * (rhowxa_r[i]*rhowya_i[i] + rhowxa_i[i]*rhowya_r[i] 
+                    rho_lam_xya_i[i] = 2 * (rhowxa_r[i]*rhowya_i[i] + rhowxa_i[i]*rhowya_r[i] 
                                                 
                                                 +   rhowya_r[i]*rhowxa_i[i] + rhowya_i[i]*rhowxa_r[i]) ;
 
-                    rho_lam_xza_r[ipoints] = 2 * (rhowxa_r[i]*rhowza_r[i]-rhowxa_i[i]*rhowza_i[i] 
+                    rho_lam_xza_r[i] = 2 * (rhowxa_r[i]*rhowza_r[i]-rhowxa_i[i]*rhowza_i[i] 
 
                                                 + rhowza_r[i]*rhowxa_r[i] - rhowza_i[i]*rhowxa_i[i]);
 
-                    rho_lam_xza_i[ipoints] = 2 * (rhowxa_r[i]*rhowza_i[i] + rhowxa_i[i]*rhowza_r[i] 
+                    rho_lam_xza_i[i] = 2 * (rhowxa_r[i]*rhowza_i[i] + rhowxa_i[i]*rhowza_r[i] 
                                                 
                                                 +   rhowza_r[i]*rhowxa_i[i] + rhowza_i[i]*rhowxa_r[i]) ;
 
-                    rho_lam_yza_r[ipoints] = 2 * (rhowya_r[i]*rhowza_r[i] - rhowya_i[i]*rhowza_i[i]
+                    rho_lam_yza_r[i] = 2 * (rhowya_r[i]*rhowza_r[i] - rhowya_i[i]*rhowza_i[i]
                                                 
                                                 + rhowza_r[i]*rhowya_r[i] -  rhowza_i[i]*rhowya_i[i]) ;
 
-                    rho_lam_yza_i[ipoints] = 2 * (rhowya_r[i]*rhowza_i[i] + rhowya_i[i]*rhowza_r[i] 
+                    rho_lam_yza_i[i] = 2 * (rhowya_r[i]*rhowza_i[i] + rhowya_i[i]*rhowza_r[i] 
                                                 
                                                 +   rhowza_r[i]*rhowya_i[i] + rhowza_i[i]*rhowya_r[i]) ;
 
-                    ipoints++;
                 }           
             }
         }
@@ -1247,19 +1244,16 @@ CDensityGridQuad::makenewdens2(       CDensityGridQuad&   densityGridAB,
 
                 auto rhow2a_i = rwDensityGrid.alphaDensity(4 * j + 3);
 
-                int32_t ipoints = 0;
-
                 for (int32_t i = 0; i < npoints; i++)
                 {
-                    rhorho_r[ipoints] = rhow1a_r[i]*rhow2a_r[i] - rhow1a_i[i]*rhow2a_i[i] 
+                    rhorho_r[i] = rhow1a_r[i]*rhow2a_r[i] - rhow1a_i[i]*rhow2a_i[i] 
                                         
                                         + rhow2a_r[i]*rhow1a_r[i] - rhow2a_i[i]*rhow1a_i[i];
 
-                    rhorho_i[ipoints] =  rhow1a_r[i]*rhow2a_i[i] + rhow1a_i[i]*rhow2a_r[i]
+                    rhorho_i[i] =  rhow1a_r[i]*rhow2a_i[i] + rhow1a_i[i]*rhow2a_r[i]
 
                                         +  rhow2a_r[i]*rhow1a_i[i] + rhow2a_i[i]*rhow1a_r[i];
                     
-                    ipoints++;
                 }
             }
         }
@@ -1354,24 +1348,37 @@ CDensityGridQuad::makenewdens2(       CDensityGridQuad&   densityGridAB,
                 
                 auto rxw1rhow2_lam_yza_i = densityGridAB.rhow1rhow2(12 * j + 11);
 
-                int32_t ipoints = 0;
-
                 for (int32_t i = 0; i < npoints; i++)
                 {
-                    rhow1rhow2_sig_xa_r[ipoints] = rhow1a_r[i]*rhow2a_r[i] - rhow1a_i[i]*rhow2a_i[i] 
+                    rhow1rhow2_sig_xa_r[i] = rhow1a_r[i]*rhow2a_r[i] - rhow1a_i[i]*rhow2a_i[i] 
                                         
                                         + rhow2a_r[i]*rhow1a_r[i] - rhow2a_i[i]*rhow1a_i[i];
 
-                    rhow1rhow2_sig_xa_r[ipoints] =  rhow1a_r[i]*rhow2a_i[i] + rhow1a_i[i]*rhow2a_r[i]
+                    rhow1rhow2_sig_xa_r[i] =  rhow1a_r[i]*rhow2a_i[i] + rhow1a_i[i]*rhow2a_r[i]
 
                                         +  rhow2a_r[i]*rhow1a_i[i] + rhow2a_i[i]*rhow1a_r[i];
                     
-                    ipoints++;
                 }
             }
         }
         else
         {   
+            auto ngrada = gsDensityGrid.alphaDensityGradient(0);
+
+            auto grada_x = gsDensityGrid.alphaDensityGradientX(0);
+
+            auto grada_y = gsDensityGrid.alphaDensityGradientY(0);
+
+            auto grada_z = gsDensityGrid.alphaDensityGradientZ(0);
+
+            auto ngradb = gsDensityGrid.betaDensityGradient(0);
+
+            auto gradb_x = gsDensityGrid.betaDensityGradientX(0);
+
+            auto gradb_y = gsDensityGrid.betaDensityGradientY(0);
+
+            auto gradb_z = gsDensityGrid.betaDensityGradientZ(0);
+
             for (int32_t j = 0; j < numdens / 2 ; j++)
             {                
                 auto rhow1a_r = rwDensityGrid.alphaDensity(4 * j);
@@ -1460,10 +1467,21 @@ CDensityGridQuad::makenewdens2(       CDensityGridQuad&   densityGridAB,
 
                 auto rzw1rzw2_i = densityGridAB.rzw1rzw2(2 * j + 1);
 
-                int32_t ipoints = 0;
+                auto xiw1xiw2_r = densityGridAB.xiw1xiw2(2 * j);
+
+                auto xiw1xiw2_i = densityGridAB.xiw1xiw2(2 * j + 1);
 
                 for (int32_t i = 0; i < npoints; i++)
                 {                    
+                    // GS densities 
+
+                    double znva = 1.0 / ngrada[i];
+                    
+                    double rxa = znva * grada_x[i];
+                    
+                    double rya = znva * grada_y[i];
+                    
+                    double rza = znva * grada_z[i];
 
                     // RW1 densities
                     
@@ -1495,115 +1513,143 @@ CDensityGridQuad::makenewdens2(       CDensityGridQuad&   densityGridAB,
 
                     // Densities for terms 1-3
 
-                    rhow1rhow2_r[ipoints] = rhow1a_r[i]*rhow2a_r[i] - rhow1a_i[i]*rhow2a_i[i] 
-                                        
-                                          + rhow2a_r[i]*rhow1a_r[i] - rhow2a_i[i]*rhow1a_i[i];
+                    double xiw1_r = rxw1_r * rxa + ryw1_r * rya + rzw1_r * rza;
+                
+                    double xiw2_r = rxw2_r * rxa + ryw2_r * rya + rzw2_r * rza;
 
-                    rhow1rhow2_i[ipoints] =  rhow1a_r[i]*rhow2a_i[i] + rhow1a_i[i]*rhow2a_r[i]
+                    xiw1xiw2_r[i] = xiw1_r*xiw2_r  + xiw2_r*xiw1_r ;
 
-                                          +  rhow2a_r[i]*rhow1a_i[i] + rhow2a_i[i]*rhow1a_r[i];
+                    xiw1xiw2_i[i] = 0.0; 
 
-                    // Fourth and fifth terms
+                    rhow1rhow2_r[i] = 2.0 * (rhow1a_r[i]*rhow2a_r[i] - rhow1a_i[i]*rhow2a_i[i]);
 
-                    rxw1rhow2_r[ipoints] = 2.0 *(rxw1_r * rhow2a_r[i] -  rxw1_i * rhow2a_i[i]
+                    rhow1rhow2_i[i] = 2.0 * (rhow1a_r[i]*rhow2a_i[i] + rhow1a_i[i]*rhow2a_r[i]);
+
+                    // 10
+
+                    rxw1rhow2_r[i] = 2.0 *(rxw1_r * rhow2a_r[i] -  rxw1_i * rhow2a_i[i]
 
                                            + rxw2_r * rhow1a_r[i] -  rxw2_i * rhow1a_i[i]);
 
-                    rxw1rhow2_i[ipoints] = 2.0 *(rxw1_r * rhow2a_i[i] +  rxw1_i * rhow2a_r[i]
+                    rxw1rhow2_i[i] = 2.0 *(rxw1_r * rhow2a_i[i] +  rxw1_i * rhow2a_r[i]
 
                                           + rxw2_r * rhow1a_i[i] + rxw2_i * rhow1a_r[i]);
 
-                    ryw1rhow2_r[ipoints] = 2.0 *(ryw1_r * rhow2a_r[i] -  ryw1_i * rhow2a_i[i]
+                    ryw1rhow2_r[i] = 2.0 *(ryw1_r * rhow2a_r[i] -  ryw1_i * rhow2a_i[i]
 
                                           + ryw2_r * rhow1a_r[i] -  ryw2_i * rhow1a_i[i]);
 
-                    ryw1rhow2_i[ipoints] = 2.0 *(ryw1_r * rhow2a_i[i] +  ryw1_i * rhow2a_r[i]
+                    ryw1rhow2_i[i] = 2.0 *(ryw1_r * rhow2a_i[i] +  ryw1_i * rhow2a_r[i]
 
                                         + ryw2_r * rhow1a_i[i] +  ryw2_i * rhow1a_r[i]);
 
-                    rzw1rhow2_r[ipoints] =2.0 *(rzw1_r * rhow2a_r[i] -  rzw1_i * rhow2a_i[i]
+                    rzw1rhow2_r[i] =2.0 *(rzw1_r * rhow2a_r[i] -  rzw1_i * rhow2a_i[i]
 
                                         + rzw2_r * rhow1a_r[i] -  rzw2_i * rhow1a_i[i]);
 
-                    rzw1rhow2_i[ipoints] =2.0 * (rzw1_r * rhow2a_i[i] +  rzw1_i * rhow2a_r[i]
+                    rzw1rhow2_i[i] = 2.0 * (rzw1_r * rhow2a_i[i] +  rzw1_i * rhow2a_r[i]
 
                                          + rzw2_r * rhow1a_i[i] +  rzw2_i * rhow1a_r[i]);
 
+                    // Term 11 
+
+                    // rhow1rxw2_r[i] =      (rxw2_r * rhow1a_r[i] -  rxw1_i * rhow2a_i[i]
+
+                    //                        + rxw2_r * rhow1a_r[i] -  rxw2_i * rhow1a_i[i]);
+
+                    // rhow1rxw2_i[i] = 2.0 *(rxw1_r * rhow2a_i[i] +  rxw1_i * rhow2a_r[i]
+
+                    //                       + rxw2_r * rhow1a_i[i] + rxw2_i * rhow1a_r[i]);
+
+                    // rhow1ryw2_r[i] = 2.0 *(ryw1_r * rhow2a_r[i] -  ryw1_i * rhow2a_i[i]
+
+                    //                       + ryw2_r * rhow1a_r[i] -  ryw2_i * rhow1a_i[i]);
+
+                    // rhow1ryw2_i[i] = 2.0 *(ryw1_r * rhow2a_i[i] +  ryw1_i * rhow2a_r[i]
+
+                    //                     + ryw2_r * rhow1a_i[i] +  ryw2_i * rhow1a_r[i]);
+
+                    // rhow1rzw2_r[i] =2.0 *(rzw1_r * rhow2a_r[i] -  rzw1_i * rhow2a_i[i]
+
+                    //                     + rzw2_r * rhow1a_r[i] -  rzw2_i * rhow1a_i[i]);
+
+                    // rhow1rzw2_i[i] =2.0 * (rzw1_r * rhow2a_i[i] +  rzw1_i * rhow2a_r[i]
+
+                    //                      + rzw2_r * rhow1a_i[i] +  rzw2_i * rhow1a_r[i]);
+
                     // Sixth term 
                     
-                    rxw1rxw2_r[ipoints] = rxw1_r * rxw2_r - rxw1_i * rxw2_i
+                    rxw1rxw2_r[i] = rxw1_r * rxw2_r - rxw1_i * rxw2_i
                                         
                                         + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
 
-                    rxw1rxw2_i[ipoints] = rxw1_r * rxw2_i + rxw1_r * rxw2_i
+                    rxw1rxw2_i[i] = rxw1_r * rxw2_i + rxw1_r * rxw2_i
                     
                                         + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
 
-                    rxw1ryw2_r[ipoints] = rxw1_r * ryw2_r - rxw1_i * ryw2_i
+                    rxw1ryw2_r[i] = rxw1_r * ryw2_r - rxw1_i * ryw2_i
                     
                                         + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
 
-                    rxw1ryw2_i[ipoints] = rxw1_r * ryw2_i + rxw1_r * ryw2_i
+                    rxw1ryw2_i[i] = rxw1_r * ryw2_i + rxw1_r * ryw2_i
                     
                                         + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
 
-                    rxw1rzw2_r[ipoints] = rxw1_r * rzw2_r - rxw1_i * rzw2_i
+                    rxw1rzw2_r[i] = rxw1_r * rzw2_r - rxw1_i * rzw2_i
                     
                                         + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
 
-                    rxw1rzw2_i[ipoints] = rxw1_r * rzw2_i + rxw1_r * rzw2_i
+                    rxw1rzw2_i[i] = rxw1_r * rzw2_i + rxw1_r * rzw2_i
                     
                                         + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
 
-                    ryw1rxw2_r[ipoints] = ryw1_r * rxw2_r - ryw1_i * rxw2_i
+                    ryw1rxw2_r[i] = ryw1_r * rxw2_r - ryw1_i * rxw2_i
                     
                                         + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
 
-                    ryw1rxw2_i[ipoints] = ryw1_r * rxw2_i + ryw1_r * rxw2_i
+                    ryw1rxw2_i[i] = ryw1_r * rxw2_i + ryw1_r * rxw2_i
                                         
                                         + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
 
-                    ryw1ryw2_r[ipoints] = ryw1_r * ryw2_r - ryw1_i * ryw2_i
+                    ryw1ryw2_r[i] = ryw1_r * ryw2_r - ryw1_i * ryw2_i
                     
                                         + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
 
-                    ryw1ryw2_i[ipoints] = ryw1_r * ryw2_i + ryw1_r * ryw2_i
+                    ryw1ryw2_i[i] = ryw1_r * ryw2_i + ryw1_r * ryw2_i
                     
                                         + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
 
-                    ryw1rzw2_r[ipoints] = ryw1_r * rzw2_r - ryw1_i * rzw2_i
+                    ryw1rzw2_r[i] = ryw1_r * rzw2_r - ryw1_i * rzw2_i
                     
                                         + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
 
-                    ryw1rzw2_i[ipoints] = ryw1_r * rzw2_i + ryw1_r * rzw2_i
+                    ryw1rzw2_i[i] = ryw1_r * rzw2_i + ryw1_r * rzw2_i
                     
                                         + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
 
-                    rzw1rxw2_r[ipoints] = rzw1_r * rxw2_r - rzw1_i * rxw2_i
+                    rzw1rxw2_r[i] = rzw1_r * rxw2_r - rzw1_i * rxw2_i
                     
                                         + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
 
-                    rzw1rxw2_i[ipoints] = rzw1_r * rxw2_i + rzw1_r * rxw2_i
+                    rzw1rxw2_i[i] = rzw1_r * rxw2_i + rzw1_r * rxw2_i
                     
                                         + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
 
-                    rzw1ryw2_r[ipoints] = rzw1_r * ryw2_r - rzw1_i * ryw2_i
+                    rzw1ryw2_r[i] = rzw1_r * ryw2_r - rzw1_i * ryw2_i
                     
                                         + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
 
-                    rzw1ryw2_i[ipoints] = rzw1_r * ryw2_i + rzw1_r * ryw2_i
+                    rzw1ryw2_i[i] = rzw1_r * ryw2_i + rzw1_r * ryw2_i
                     
                                         + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
 
-                    rzw1rzw2_r[ipoints] = rzw1_r * rzw2_r - rzw1_i * rzw2_i
+                    rzw1rzw2_r[i] = rzw1_r * rzw2_r - rzw1_i * rzw2_i
                     
                                         + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
 
-                    rzw1rzw2_i[ipoints] = rzw1_r * rzw2_i + rzw1_r * rzw2_i
+                    rzw1rzw2_i[i] = rzw1_r * rzw2_i + rzw1_r * rzw2_i
                                     
                                         + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
-
-                    ipoints++;
                 }
             }
         }

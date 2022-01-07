@@ -521,7 +521,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
                                  2.0*ff2*alpha11*alpha10 +
                                  ff2*alpha20*alpha01 + ff1*alpha21));
 
-            df1020[i] += factor*(2*ff2*alpha10*alpha01 + 2*ff1*alpha11 +
+            df1020[i] += factor*(2.0*ff2*alpha10*alpha01 + 2.0*ff1*alpha11 +
                           grada[i]*(ff3*alpha01*alpha01*alpha10 + 
                                  2.0*ff2*alpha11*alpha01));
     
