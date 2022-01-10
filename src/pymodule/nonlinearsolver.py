@@ -477,8 +477,7 @@ class NonLinearSolver:
                 dens2.broadcast(self.rank, self.comm)
 
             fock = AOFockMatrix(dens2)
-            for i in range(fock.number_of_fock_matrices()):
-                fock.set_fock_type(fockmat.rgenjk, i)
+            fock_flag = fockmat.rgenjk
             
             if self.dft:
                 if self.xcfun.is_hybrid():
@@ -489,14 +488,13 @@ class NonLinearSolver:
                 else:
                     fock_flag = fockmat.rgenj
 
-                for i in range(fock.number_of_fock_matrices()):
-                    fock.set_fock_type(fock_flag, i)
+            for i in range(fock.number_of_fock_matrices()):
+                fock.set_fock_type(fock_flag, i)
 
             eri_driver.compute(fock, dens2, molecule, ao_basis, screening)
             if self.dft and not self.xcfun.is_hybrid():
                 for ifock in range(fock.number_of_fock_matrices()):
                     fock.scale(2.0, ifock)
-
             if self.dft: 
                 xc_drv = XCIntegrator(self.comm)
 
@@ -507,7 +505,6 @@ class NonLinearSolver:
                 xc_drv.integrate(fock, dens1, dens2, gs_density, molecule, ao_basis,
                                  molgrid, self.xcfun.get_func_label(),mode)
 
-        
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
             if self.rank == mpi_master():

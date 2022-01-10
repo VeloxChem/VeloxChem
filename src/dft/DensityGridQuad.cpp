@@ -1467,10 +1467,6 @@ CDensityGridQuad::makenewdens2(       CDensityGridQuad&   densityGridAB,
 
                 auto rzw1rzw2_i = densityGridAB.rzw1rzw2(2 * j + 1);
 
-                auto xiw1xiw2_r = densityGridAB.xiw1xiw2(2 * j);
-
-                auto xiw1xiw2_i = densityGridAB.xiw1xiw2(2 * j + 1);
-
                 for (int32_t i = 0; i < npoints; i++)
                 {                    
                     // GS densities 
@@ -1513,14 +1509,6 @@ CDensityGridQuad::makenewdens2(       CDensityGridQuad&   densityGridAB,
 
                     // Densities for terms 1-3
 
-                    double xiw1_r = rxw1_r * rxa + ryw1_r * rya + rzw1_r * rza;
-                
-                    double xiw2_r = rxw2_r * rxa + ryw2_r * rya + rzw2_r * rza;
-
-                    xiw1xiw2_r[i] = xiw1_r*xiw2_r  + xiw2_r*xiw1_r ;
-
-                    xiw1xiw2_i[i] = 0.0; 
-
                     rhow1rhow2_r[i] = 2.0 * (rhow1a_r[i]*rhow2a_r[i] - rhow1a_i[i]*rhow2a_i[i]);
 
                     rhow1rhow2_i[i] = 2.0 * (rhow1a_r[i]*rhow2a_i[i] + rhow1a_i[i]*rhow2a_r[i]);
@@ -1547,35 +1535,10 @@ CDensityGridQuad::makenewdens2(       CDensityGridQuad&   densityGridAB,
 
                                         + rzw2_r * rhow1a_r[i] -  rzw2_i * rhow1a_i[i]);
 
-                    rzw1rhow2_i[i] = 2.0 * (rzw1_r * rhow2a_i[i] +  rzw1_i * rhow2a_r[i]
+                    rzw1rhow2_i[i] =2.0 * (rzw1_r * rhow2a_i[i] +  rzw1_i * rhow2a_r[i]
 
                                          + rzw2_r * rhow1a_i[i] +  rzw2_i * rhow1a_r[i]);
 
-                    // Term 11 
-
-                    // rhow1rxw2_r[i] =      (rxw2_r * rhow1a_r[i] -  rxw1_i * rhow2a_i[i]
-
-                    //                        + rxw2_r * rhow1a_r[i] -  rxw2_i * rhow1a_i[i]);
-
-                    // rhow1rxw2_i[i] = 2.0 *(rxw1_r * rhow2a_i[i] +  rxw1_i * rhow2a_r[i]
-
-                    //                       + rxw2_r * rhow1a_i[i] + rxw2_i * rhow1a_r[i]);
-
-                    // rhow1ryw2_r[i] = 2.0 *(ryw1_r * rhow2a_r[i] -  ryw1_i * rhow2a_i[i]
-
-                    //                       + ryw2_r * rhow1a_r[i] -  ryw2_i * rhow1a_i[i]);
-
-                    // rhow1ryw2_i[i] = 2.0 *(ryw1_r * rhow2a_i[i] +  ryw1_i * rhow2a_r[i]
-
-                    //                     + ryw2_r * rhow1a_i[i] +  ryw2_i * rhow1a_r[i]);
-
-                    // rhow1rzw2_r[i] =2.0 *(rzw1_r * rhow2a_r[i] -  rzw1_i * rhow2a_i[i]
-
-                    //                     + rzw2_r * rhow1a_r[i] -  rzw2_i * rhow1a_i[i]);
-
-                    // rhow1rzw2_i[i] =2.0 * (rzw1_r * rhow2a_i[i] +  rzw1_i * rhow2a_r[i]
-
-                    //                      + rzw2_r * rhow1a_i[i] +  rzw2_i * rhow1a_r[i]);
 
                     // Sixth term 
                     
