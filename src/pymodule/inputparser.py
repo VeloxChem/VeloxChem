@@ -23,8 +23,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from datetime import datetime
 from pathlib import PurePath
+from datetime import datetime
 import numpy as np
 import sys
 import re

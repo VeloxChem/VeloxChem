@@ -316,8 +316,9 @@ class RespChargesDriver:
                 scf_drv.compute(mol, bas)
 
             else:
-                filename = Path(self.filename).name + f'_conformer_{ind+1}'
-                filename = str(output_dir / filename)
+                filename = str(
+                    output_dir /
+                    (Path(self.filename).name + f'_conformer_{ind+1}'))
                 ostream = OutputStream(filename + '.out')
                 # select SCF driver
                 if nalpha == nbeta:
@@ -363,10 +364,10 @@ class RespChargesDriver:
                                              self.weights)
             if self.fitting_points is None:
                 if not use_xyz_file:
-                    filename = str(output_dir / self.filename)
+                    filename = str(output_dir / Path(self.filename).name)
                 else:
-                    filename = Path(self.filename).name + '_conformer'
-                    filename = str(output_dir / filename)
+                    filename = str(output_dir /
+                                   (Path(self.filename).name + '_conformer'))
 
                 self.write_pdb_file(filename, molecules, q)
 
