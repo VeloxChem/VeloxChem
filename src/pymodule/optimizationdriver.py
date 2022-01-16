@@ -105,7 +105,7 @@ class OptimizationDriver:
         Updates settings in optimization driver.
 
         :param opt_dict:
-            The input dictionary of optimize group.
+            The dictionary of optimize input.
         """
 
         opt_keywords = {

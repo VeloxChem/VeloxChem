@@ -92,7 +92,7 @@ class ComplexResponse(LinearSolver):
         Updates response and method settings in complex liner response solver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """

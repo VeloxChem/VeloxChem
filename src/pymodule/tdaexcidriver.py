@@ -119,7 +119,7 @@ class TDAExciDriver(LinearSolver):
         driver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """

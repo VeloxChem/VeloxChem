@@ -270,9 +270,9 @@ class ScfDriver:
         Updates settings in SCF driver.
 
         :param scf_dict:
-            The input dictionary of scf group.
+            The dictionary of scf input.
         :param method_dict:
-            The input dicitonary of method settings group.
+            The dicitonary of method settings.
         """
 
         if method_dict is None:

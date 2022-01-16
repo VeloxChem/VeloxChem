@@ -112,9 +112,9 @@ class SHGDriver(NonLinearSolver):
         Updates response and method settings in SHG driver
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
-            The dictionary of method rsp_dict.
+            The dictionary of method settings.
         """
 
         if method_dict is None:

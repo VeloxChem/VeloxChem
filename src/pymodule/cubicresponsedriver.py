@@ -108,9 +108,9 @@ class CubicResponseDriver(NonLinearSolver):
         Updates response and method settings
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
-            The dictionary of method rsp_dict.
+            The dictionary of method settings.
         """
 
         if method_dict is None:

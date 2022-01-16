@@ -102,9 +102,9 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     :param mol_orbs:
         The molecular orbitals.
     :param rsp_dict:
-        The input dictionary of response group.
+        The dictionary of response input.
     :param method_dict:
-        The input dictionary of method settings group.
+        The dictionary of method settings.
 
     :return:
         The response property object.

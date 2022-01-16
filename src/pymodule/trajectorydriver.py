@@ -122,13 +122,13 @@ class TrajectoryDriver:
         Updates settings in trajectory driver.
 
         :param traj_dict:
-            The input dictionary of trajectory group.
+            The dictionary of trajectory input.
         :param spect_dict:
-            The input dictionary of spectrum settings group.
+            The dictionary of spectrum input.
         :param rsp_dict:
-            The input dictionary of response settings group.
+            The dictionary of response input.
         :param method_dict:
-            The input dicitonary of method settings group.
+            The dicitonary of method settings.
         """
 
         time_factor = 1.0

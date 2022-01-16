@@ -68,7 +68,7 @@ class RespChargesDriver:
         - temperature: The temperature for Boltzmann weight factors.
         - net_charge: The charge of the molecule.
         - multiplicity: The multiplicity of the molecule.
-        - method_dict: The input dictionary of the method settings group.
+        - method_dict: The dictionary of method settings.
         - max_iter: The maximum number of iterations of the RESP fit.
         - threshold: The convergence threshold of the RESP fit.
         - filename: The filename for the calculation.
@@ -159,9 +159,9 @@ class RespChargesDriver:
         Updates settings in RESP charges driver.
 
         :param resp_dict:
-            The input dictionary of RESP charges group.
+            The dictionary of RESP charges input.
         :param method_dict:
-            The input dicitonary of method settings group.
+            The dicitonary of method settings.
         """
 
         resp_keywords = {

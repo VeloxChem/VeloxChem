@@ -102,7 +102,7 @@ class LinearResponseEigenSolver(LinearSolver):
         Updates response and method settings in linear response eigensolver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """

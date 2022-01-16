@@ -89,7 +89,7 @@ class LinearResponseSolver(LinearSolver):
         Updates response and method settings in linear response solver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """
