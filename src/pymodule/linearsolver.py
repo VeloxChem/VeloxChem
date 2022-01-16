@@ -421,9 +421,9 @@ class LinearSolver:
             'potfile_text': potfile_text,
         }
 
-    def read_vectors(self, rsp_vector_labels):
+    def read_checkpoint(self, rsp_vector_labels):
         """
-        Reads vectors from checkpoint file.
+        Reads distributed arrays from checkpoint file.
 
         :param rsp_vector_labels:
             The list of labels of vectors.
