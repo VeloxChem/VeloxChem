@@ -23,30 +23,21 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import time
 
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import denmat, fockmat
 from .veloxchemlib import mpi_master, hartree_in_wavenumbers
-from .qqscheme import get_qq_scheme
 from .profiler import Profiler
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonLinearSolver
-from .aofockmatrix import AOFockMatrix
-from .aodensitymatrix import AODensityMatrix
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
-from .batchsize import get_batch_size
-from .batchsize import get_number_of_batches
 
 
-class TpaDriver(NonLinearSolver):
+class TPADriver(NonLinearSolver):
     """
     Implements the isotropic cubic response driver for two-photon absorption
     (TPA)
@@ -58,9 +49,6 @@ class TpaDriver(NonLinearSolver):
 
     Instance variables
         - is_converged: The flag for convergence.
-        - eri_thresh: The electron repulsion integrals screening threshold.
-        - qq_type: The electron repulsion integrals screening scheme.
-        - batch_size: The batch size for computation of Fock matrices.
         - frequencies: The frequencies.
         - comp: The list of all the gamma tensor components
         - damping: The damping parameter.
@@ -68,18 +56,6 @@ class TpaDriver(NonLinearSolver):
           trial vectors.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
-        - comm: The MPI communicator.
-        - rank: The MPI rank.
-        - nodes: Number of MPI processes.
-        - ostream: The output stream.
-        - restart: The flag for restarting from checkpoint file.
-        - checkpoint_file: The name of checkpoint file.
-        - program_start_time: The start time of the program.
-        - maximum_hours: The timelimit in hours.
-        - timing: The flag for printing timing information.
-        - profiling: The flag for printing profiling information.
-        - memory_profiling: The flag for printing memory usage.
-        - memory_tracing: The flag for tracing memory allocation.
     """
 
     def __init__(self, comm, ostream):
@@ -88,12 +64,9 @@ class TpaDriver(NonLinearSolver):
         absorption (TPA)
         """
 
-        self.is_converged = False
+        super().__init__(comm, ostream)
 
-        # ERI settings
-        self.eri_thresh = 1.0e-15
-        self.qq_type = 'QQ_DEN'
-        self.batch_size = None
+        self.is_converged = False
 
         # cpp settings
         self.frequencies = (0,)
@@ -103,27 +76,11 @@ class TpaDriver(NonLinearSolver):
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
 
-        # mpi information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
-
-        # output stream
-        self.ostream = ostream
-
-        # restart information
-        self.restart = True
-        self.checkpoint_file = None
-
-        # information for graceful exit
-        self.program_start_time = None
-        self.maximum_hours = None
-
-        # timing and profiling
-        self.timing = False
-        self.profiling = False
-        self.memory_profiling = False
-        self.memory_tracing = False
+        # input keywords
+        self.input_keywords['response'].update({
+            'frequencies': ('seq_range', 'frequencies'),
+            'damping': ('float', 'damping parameter'),
+        })
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -138,47 +95,7 @@ class TpaDriver(NonLinearSolver):
         if method_dict is None:
             method_dict = {}
 
-        rsp_keywords = {
-            'frequencies': 'seq_range',
-            'damping': 'float',
-            'eri_thresh': 'float',
-            'qq_type': 'str_upper',
-            'batch_size': 'int',
-            'max_iter': 'int',
-            'conv_thresh': 'float',
-            'lindep_thresh': 'float',
-            'restart': 'bool',
-            'checkpoint_file': 'str',
-            'timing': 'bool',
-            'profiling': 'bool',
-            'memory_profiling': 'bool',
-            'memory_tracing': 'bool',
-        }
-
-        parse_input(self, rsp_keywords, rsp_dict)
-
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
-
-        if 'xcfun' in method_dict:
-            errmsg = 'TpaDriver: The \'xcfun\' keyword is not supported in TPA '
-            errmsg += 'calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if 'potfile' in method_dict:
-            errmsg = 'TpaDriver: The \'potfile\' keyword is not supported in '
-            errmsg += 'TPA calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if 'electric_field' in method_dict:
-            errmsg = 'TpaDriver: The \'electric field\' keyword is not '
-            errmsg += 'supported in TPA calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
+        super().update_settings(rsp_dict, method_dict)
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -213,8 +130,9 @@ class TpaDriver(NonLinearSolver):
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(nalpha == nbeta,
-                            'TpaDriver: not implemented for unrestricted case')
+        assert_msg_critical(
+            nalpha == nbeta,
+            'TPA Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_tensors['S']
@@ -271,7 +189,7 @@ class TpaDriver(NonLinearSolver):
         cpp_keywords = {
             'frequencies', 'damping', 'lindep_thresh', 'conv_thresh',
             'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
-            'batch_size', 'restart', 'program_start_time', 'maximum_hours'
+            'batch_size', 'restart', 'program_end_time'
         }
 
         for key in cpp_keywords:
@@ -490,7 +408,7 @@ class TpaDriver(NonLinearSolver):
     def get_densities(self, wi, kX, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded Fock
-        matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
+        matrices F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
         function
 
         :param wi:
@@ -512,7 +430,7 @@ class TpaDriver(NonLinearSolver):
 
     def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis):
         """
-        Computes the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the
+        Computes the compounded Fock matrices F^{σ},F^{λ+τ},F^{σλτ} used for the
         isotropic cubic response function
 
         :param wi:
@@ -595,7 +513,7 @@ class TpaDriver(NonLinearSolver):
     def get_densities_II(self, wi, kX, kXY, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded
-        second-order Fock matrics used for the isotropic cubic response
+        second-order Fock matrices used for the isotropic cubic response
         function
 
         :param wi:
@@ -619,7 +537,7 @@ class TpaDriver(NonLinearSolver):
 
     def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis):
         """
-        Computes the compounded second-order Fock matrics used for the
+        Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
 
         :param wi:
@@ -760,12 +678,9 @@ class TpaDriver(NonLinearSolver):
             ka_y = kX['Na'][('y', w)]
             ka_z = kX['Na'][('z', w)]
 
-            na_x = (LinearSolver.lrmat2vec(ka_x.real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(ka_x.imag, nocc, norb))
-            na_y = (LinearSolver.lrmat2vec(ka_y.real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(ka_y.imag, nocc, norb))
-            na_z = (LinearSolver.lrmat2vec(ka_z.real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(ka_z.imag, nocc, norb))
+            na_x = self.complex_lrmat2vec(ka_x, nocc, norb)
+            na_y = self.complex_lrmat2vec(ka_y, nocc, norb)
+            na_z = self.complex_lrmat2vec(ka_z, nocc, norb)
 
             t3term = (np.dot(na_x, e3_dict['f_iso_x'][w]) +
                       np.dot(na_y, e3_dict['f_iso_y'][w]) +
@@ -818,18 +733,15 @@ class TpaDriver(NonLinearSolver):
         ka_na = inp_dict['Na_ka']
         A = inp_dict['A']
 
-        Na = (LinearSolver.lrmat2vec(ka_na.real, nocc, norb) +
-              1j * LinearSolver.lrmat2vec(ka_na.imag, nocc, norb))
+        Na = self.complex_lrmat2vec(ka_na, nocc, norb)
 
         if inp_dict['flag'] == 'CD':
             kcd = inp_dict['kcd']
             kb = inp_dict['kb']
             B = inp_dict['B']
 
-            Ncd = (LinearSolver.lrmat2vec(kcd.real, nocc, norb) +
-                   1j * LinearSolver.lrmat2vec(kcd.imag, nocc, norb))
-            Nb = (LinearSolver.lrmat2vec(kb.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kb.imag, nocc, norb))
+            Ncd = self.complex_lrmat2vec(kcd, nocc, norb)
+            Nb = self.complex_lrmat2vec(kb, nocc, norb)
 
             na_x2_nyz += np.dot(Na.T, self.x2_contract(kcd, B, da, nocc, norb))
             nx_a2_nyz += np.dot(self.a2_contract(kb, A, da, nocc, norb), Ncd)
@@ -840,10 +752,8 @@ class TpaDriver(NonLinearSolver):
             kc = -inp_dict['kc_kb'].T.conj()  # gets kc from kb
             C = inp_dict['C']
 
-            Nbd = (LinearSolver.lrmat2vec(kbd.real, nocc, norb) +
-                   1j * LinearSolver.lrmat2vec(kbd.imag, nocc, norb))
-            Nc = (LinearSolver.lrmat2vec(kc.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kc.imag, nocc, norb))
+            Nbd = self.complex_lrmat2vec(kbd, nocc, norb)
+            Nc = self.complex_lrmat2vec(kc, nocc, norb)
 
             na_x2_nyz += np.dot(Na.T, self.x2_contract(kbd, C, da, nocc, norb))
             nx_a2_nyz += np.dot(self.a2_contract(kc, A, da, nocc, norb), Nbd)
@@ -854,37 +764,6 @@ class TpaDriver(NonLinearSolver):
             'x2': -(1. / 15) * na_x2_nyz,
             'a2': -(1. / 15) * nx_a2_nyz,
         }
-
-    def collect_vectors_in_columns(self, sendbuf):
-        """
-        Collects vectors into 2d array (column-wise).
-
-        :param sendbuf:
-            The 2d array containing the vector segments in columns.
-
-        :return:
-            A 2d array containing the full vectors in columns.
-        """
-
-        counts = self.comm.gather(sendbuf.size, root=mpi_master())
-        if self.rank == mpi_master():
-            displacements = [sum(counts[:p]) for p in range(self.nodes)]
-            recvbuf = np.zeros(sum(counts), dtype=sendbuf.dtype).reshape(
-                -1, sendbuf.shape[1])
-        else:
-            displacements = None
-            recvbuf = None
-
-        if sendbuf.dtype == np.float64:
-            mpi_data_type = MPI.DOUBLE
-        elif sendbuf.dtype == np.complex128:
-            mpi_data_type = MPI.C_DOUBLE_COMPLEX
-
-        self.comm.Gatherv(sendbuf,
-                          [recvbuf, counts, displacements, mpi_data_type],
-                          root=mpi_master())
-
-        return recvbuf
 
     def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
         """
@@ -1004,33 +883,3 @@ class TpaDriver(NonLinearSolver):
         w_str = '{:<9s} {:12.4f} {:20.8f} {:20.8f}j'.format(
             label, freq, value.real, value.imag)
         self.ostream.print_header(w_str.ljust(width))
-
-
-    def print_header(self):
-        """
-        Prints TPA setup header to output stream.
-        """
-
-        self.ostream.print_blank()
-
-        title = 'Two-Photon Absorbtion Driver Setup'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
-
-        width = 50
-
-        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
-            self.eri_thresh)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Convergance Threshold           : {:.1e}'.format(
-            self.conv_thresh)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Max. Number of Iterations       : {:d}'.format(self.max_iter)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Damping Parameter               : {:.6e}'.format(
-            self.damping)
-        self.ostream.print_header(cur_str.ljust(width))
-
-        self.ostream.print_blank()
-        self.ostream.flush()

@@ -24,38 +24,36 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-import time as tm
+from datetime import datetime, timedelta
 
-from .veloxchemlib import mpi_initialized
-from .veloxchemlib import mpi_master
-from .cli import cli
-from .errorhandler import assert_msg_critical
-from .excitondriver import ExcitonModelDriver
-from .loprop import LoPropDriver
-from .mp2driver import Mp2Driver
+from .veloxchemlib import mpi_initialized, mpi_master
 from .mpitask import MpiTask
-from .optimizationdriver import OptimizationDriver
-from .trajectorydriver import TrajectoryDriver
-from .pulsedrsp import PulsedResponse
-from .respchargesdriver import RespChargesDriver
-from .rspabsorption import Absorption
-from .rspc6 import C6
-from .rspcdspec import CircularDichroismSpectrum
-from .rspcustomproperty import CustomProperty
-from .rsplinabscross import LinearAbsorptionCrossSection
-from .rsppolarizability import Polarizability
-from .rsptpa import TPA
-from .rspshg import SHG
-from .scffirstorderprop import ScfFirstOrderProperties
-from .scfgradientdriver import ScfGradientDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
-from .slurminfo import get_slurm_maximum_hours
+from .scffirstorderprop import ScfFirstOrderProperties
+from .respchargesdriver import RespChargesDriver
+from .excitondriver import ExcitonModelDriver
+from .mp2driver import Mp2Driver
+from .loprop import LoPropDriver
+from .trajectorydriver import TrajectoryDriver
+from .scfgradientdriver import ScfGradientDriver
+from .optimizationdriver import OptimizationDriver
+from .pulsedrsp import PulsedResponse
+from .rsppolarizability import Polarizability
+from .rspabsorption import Absorption
+from .rsplinabscross import LinearAbsorptionCrossSection
+from .rspcdspec import CircularDichroismSpectrum
+from .rspc6 import C6
+from .rspshg import SHG
+from .rsptpa import TPA
+from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
-
+from .cli import cli
+from .errorhandler import assert_msg_critical
+from .slurminfo import get_slurm_end_time
 
 
 def select_scf_driver(task, scf_type):
@@ -152,15 +150,14 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     elif prop_type == 'c6':
         rsp_prop = C6(rsp_dict, method_dict)
 
-    elif prop_type == 'custom':
-        rsp_prop = CustomProperty(rsp_dict, method_dict)
-
     elif prop_type == 'tpa':
         rsp_prop = TPA(rsp_dict, method_dict)
 
     elif prop_type == 'shg':
-        rsp_prop = SHG(rsp_dict,method_dict)
+        rsp_prop = SHG(rsp_dict, method_dict)
 
+    elif prop_type == 'custom':
+        rsp_prop = CustomProperty(rsp_dict, method_dict)
 
     else:
         assert_msg_critical(False, 'input file: invalid response property')
@@ -173,7 +170,7 @@ def main():
     Runs VeloxChem with command line arguments.
     """
 
-    program_start_time = tm.time()
+    program_start_time = datetime.now()
 
     assert_msg_critical(mpi_initialized(), "MPI not initialized")
 
@@ -191,12 +188,14 @@ def main():
 
     if 'maximum_hours' in task.input_dict['jobs']:
         maximum_hours = float(task.input_dict['jobs']['maximum_hours'])
+        program_end_time = program_start_time + timedelta(hours=maximum_hours)
     else:
         if task.mpi_rank == mpi_master():
-            maximum_hours = get_slurm_maximum_hours()
+            program_end_time = get_slurm_end_time()
         else:
-            maximum_hours = None
-        maximum_hours = task.mpi_comm.bcast(maximum_hours, root=mpi_master())
+            program_end_time = None
+        program_end_time = task.mpi_comm.bcast(program_end_time,
+                                               root=mpi_master())
 
     # Method settings
 
@@ -221,8 +220,8 @@ def main():
         else:
             exciton_dict = {}
 
-        exciton_dict['program_start_time'] = program_start_time
-        exciton_dict['maximum_hours'] = maximum_hours
+        exciton_dict['program_end_time'] = program_end_time
+        exciton_dict['filename'] = task.input_dict['filename']
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
         exciton_drv.update_settings(exciton_dict, method_dict)
@@ -278,10 +277,8 @@ def main():
         else:
             scf_dict = {}
 
+        scf_dict['program_end_time'] = program_end_time
         scf_dict['filename'] = task.input_dict['filename']
-
-        scf_dict['program_start_time'] = program_start_time
-        scf_dict['maximum_hours'] = maximum_hours
 
         if use_xtb:
             if 'potfile' in method_dict:
@@ -339,14 +336,14 @@ def main():
         else:
             opt_dict = {}
 
+        opt_dict['filename'] = task.input_dict['filename']
+
         if use_xtb:
             grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
-            opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
-                                         'XTB')
+            opt_drv = OptimizationDriver(grad_drv, 'XTB')
         elif scf_drv.scf_type == 'restricted':
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
-            opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
-                                         'SCF')
+            opt_drv = OptimizationDriver(grad_drv, 'SCF')
 
         opt_drv.update_settings(opt_dict)
         opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
@@ -359,10 +356,8 @@ def main():
         else:
             rsp_dict = {}
 
+        rsp_dict['program_end_time'] = program_end_time
         rsp_dict['filename'] = task.input_dict['filename']
-
-        rsp_dict['program_start_time'] = program_start_time
-        rsp_dict['maximum_hours'] = maximum_hours
 
         if 'eri_thresh' not in rsp_dict:
             rsp_dict['eri_thresh'] = scf_drv.eri_thresh

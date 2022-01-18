@@ -178,70 +178,6 @@ public:
     double* rhow1rhow2(const int32_t iDensityMatrix);
     
     /**
-     Gets constant pointer to beta density values.
-     
-    @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density values.
-     */
-    const double* rhow1xiw2(const int32_t iDensityMatrix) const;
-    
-    /**
-     Gets pointer to beta density values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density values.
-     */
-    double* rhow1xiw2(const int32_t iDensityMatrix);
-    
-    /**
-     Gets constant pointer to alpha density gradient norm values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to alpha density gradient norm values.
-     */
-    const double* rhow1xicw2(const int32_t iDensityMatrix) const;
-    
-    /**
-     Gets pointer to alpha density gradient norm values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to alpha density gradient norm values.
-     */
-    double* rhow1xicw2(const int32_t iDensityMatrix);
-    
-    /**
-     Gets constant pointer to beta density gradient norm values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient norm values.
-     */
-    const double* xiw1xiw2(const int32_t iDensityMatrix) const;
-    
-    /**
-     Gets pointer to beta density gradient norm values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient norm values.
-     */
-    double* xiw1xiw2(const int32_t iDensityMatrix);
-    
-    /**
-     Gets constant pointer to alpha * beta density gradients product values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to alpha * beta density gradients product values.
-     */
-    const double* xicw1xicw2(const int32_t iDensityMatrix) const;
-    
-    /**
-     Gets pointer to alpha * beta density gradients product values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to alpha * beta density gradients product values.
-     */
-    double* xicw1xicw2(const int32_t iDensityMatrix);
-    
-    /**
      Gets constant pointer to alpha density gradient X values.
      
      @param iDensityMatrix the index of density matrix.
@@ -288,104 +224,7 @@ public:
      @return the pointer to alpha density gradient Z values.
      */
     double* rzw1rhow2(const int32_t iDensityMatrix);
-    
-    /**
-     Gets constant pointer to beta density gradient X values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient X values.
-     */
-    const double* rxw1xiw2(const int32_t iDensityMatrix) const;
-    
-    /**
-     Gets pointer to beta density gradient X values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient X values.
-     */
-    double* rxw1xiw2(const int32_t iDensityMatrix);
-    
-    /**
-     Gets constant pointer to beta density gradient Y values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient Y values.
-     */
-    const double* ryw1xiw2(const int32_t iDensityMatrix) const;
-    
-    /**
-     Gets pointer to beta density gradient Y values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient Y values.
-     */
-    double* ryw1xiw2(const int32_t iDensityMatrix);
-    
-    /**
-     Gets constant pointer to beta density gradient Z values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient Z values.
-     */
-    const double* rzw1xiw2(const int32_t iDensityMatrix) const;
-    
-    /**
-     Gets pointer to beta density gradient Z values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient Z values.
-     */
-    double* rzw1xiw2(const int32_t iDensityMatrix);
-    
-
-      /**
-     Gets constant pointer to beta density gradient Z values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient Z values.
-     */
-    const double* rxw1xicw2(const int32_t iDensityMatrix) const;
-    
-    /**
-     Gets pointer to beta density gradient Z values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient Z values.
-     */
-    double* rxw1xicw2(const int32_t iDensityMatrix);
-
-          /**
-     Gets constant pointer to beta density gradient Z values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient Z values.
-     */
-    const double* ryw1xicw2(const int32_t iDensityMatrix) const;
-    
-    /**
-     Gets pointer to beta density gradient Z values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient Z values.
-     */
-    double* ryw1xicw2(const int32_t iDensityMatrix);
-
-          /**
-     Gets constant pointer to beta density gradient Z values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient Z values.
-     */
-    const double* rzw1xicw2(const int32_t iDensityMatrix) const;
-    
-    /**
-     Gets pointer to beta density gradient Z values.
-     
-     @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient Z values.
-     */
-    double* rzw1xicw2(const int32_t iDensityMatrix);
-
+ 
       /**
      Gets constant pointer to beta density gradient Z values.
      
@@ -530,8 +369,6 @@ public:
      */
     double* rzw1rzw2(const int32_t iDensityMatrix);
 
-
-
     /**
      Generates pair of screened molecular and density grids by removing grid points with specific density/density
      gradient values bellow given threshold. NOTE: This method is exclusive to dengrid::ab type.
@@ -544,26 +381,6 @@ public:
      */
      void makenewdens(                CDensityGridQuad&   densityGridAB,
                                       CMolecularGrid& molecularGridab,
-                                const CDensityGrid&   gsDensityGrid,
-                                const CDensityGrid&   rwDensityGrid,
-                                const xcfun           xcFuncType,
-                                      int32_t             numdens,
-                                const std::string&      quadMode) const;
-
-
-    /**
-     Generates pair of screened molecular and density grids by removing grid points with specific density/density
-     gradient values bellow given threshold. NOTE: This method is exclusive to dengrid::ab type.
-     
-     @param densityGridab the screened density grid.
-     @param molecularGridab the screened molecular grid.
-     @param iDensityMatrix the index of density matrix.
-     @param densityThreshold the screening threshold for density values.
-     @param xcFuncType the type of exchange-correlation functional.
-     */
-     void makenewdens2(                CDensityGridQuad&   densityGridAB,
-                                      CMolecularGrid& molecularGridab,
-                                const CDensityGrid&   gsDensityGrid,
                                 const CDensityGrid&   rwDensityGrid,
                                 const xcfun           xcFuncType,
                                       int32_t             numdens,

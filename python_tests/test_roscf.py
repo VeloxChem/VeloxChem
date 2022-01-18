@@ -1,6 +1,5 @@
 from pathlib import Path
 from unittest.mock import patch
-from dataclasses import dataclass
 from pytest import approx
 import numpy as np
 import pytest
@@ -9,12 +8,11 @@ from veloxchem.veloxchemlib import (ElectronRepulsionIntegralsDriver,
                                     GridDriver, is_single_node, denmat)
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.aofockmatrix import AOFockMatrix
-from veloxchem.main import main, select_scf_driver
 from veloxchem.mpitask import MpiTask
-from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
-from veloxchem.qqscheme import get_qq_scheme
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.molecule import Molecule
+from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
+from veloxchem.main import main, select_scf_driver
+from veloxchem.qqscheme import get_qq_scheme
 
 
 @patch('veloxchem.main.ScfRestrictedOpenDriver')
@@ -54,12 +52,14 @@ class TestROSetup:
         assert select_scf_driver(task, 'restricted_openshell') is mock_roscf()
 
 
-@dataclass
 class ROSCF_Helper:
-    scf_drv: ScfRestrictedOpenDriver
-    mol: Molecule
-    bas: MolecularBasis
-    mats: dict
+
+    def __init__(self, scf_drv, mol, bas, mats):
+
+        self.scf_drv = scf_drv
+        self.mol = mol
+        self.bas = bas
+        self.mats = mats
 
     def __iter__(self):
         i = 0
@@ -434,18 +434,12 @@ class TestRODFT:
 
     @pytest.mark.parametrize(
         'scf_setup',
-        [
-            (None, -3.269190923863),
-            ('slater', -3.064460757711),
-            ('b3lyp', -3.315910830402),
-        ],
+        [(None, -3.269190923863), ('slater', -3.064460757711)],
         indirect=True,
-        ids=['rohf', 'slater', 'b3lyp'],
+        ids=['rohf', 'slater'],
+        # TODO: add b3lyp test
     )
     def test_initial_total_energy(self, scf_setup):
-        xcfun = scf_setup[0].scf_drv.xcfun
-        if xcfun and xcfun.get_func_label() == "B3LYP":
-            pytest.skip('missing accuracy')
         scf, ref_energy = scf_setup
         total_energy = scf.energy()
         assert total_energy == approx(ref_energy)
@@ -482,15 +476,12 @@ class TestRODFT:
 
     @pytest.mark.parametrize(
         'scf_setup',
-        [('slater', -1.242752026437), ('slda', -1.43873045822),
-         ('b3lyp', -1.20470566061)],
+        [('slater', -1.242752026437), ('slda', -1.43873045822)],
         indirect=True,
-        ids=['slater', 'slda', 'b3lyp'],
+        ids=['slater', 'slda'],
+        # TODO: add b3lyp test
     )
     def test_initial_xc_energy(self, scf_setup):
-        xcfun = scf_setup[0].scf_drv.xcfun
-        if xcfun and xcfun.get_func_label() == "B3LYP":
-            pytest.skip('missing accuracy')
         scf, ref_energy = scf_setup
         scf.e2()
         e_xc = scf.comp_xc_energy()

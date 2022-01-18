@@ -23,6 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
 import numpy as np
 import time as tm
 
@@ -35,18 +36,15 @@ from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
+from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
+from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
-from .linearsolver import LinearSolver
-from mpi4py import MPI
-from .veloxchemlib import XCIntegrator
 from .veloxchemlib import parse_xc_func
-
-
+from .veloxchemlib import XCIntegrator
 
 class NonLinearSolver:
     """
@@ -71,9 +69,6 @@ class NonLinearSolver:
         - electric_field: The static electric field.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
-        - cur_iter: Index of the current iteration.
-        - small_thresh: The norm threshold for a vector to be considered a zero
-          vector.
         - lindep_thresh: The threshold for removing linear dependence in the
           trial vectors.
         - is_converged: The flag for convergence.
@@ -83,13 +78,12 @@ class NonLinearSolver:
         - ostream: The output stream.
         - restart: The flag for restarting from checkpoint file.
         - checkpoint_file: The name of checkpoint file.
-        - program_start_time: The start time of the program.
-        - maximum_hours: The timelimit in hours.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation.
         - filename: The filename.
+        - program_end_time: The end time of the program.
     """
 
     def __init__(self, comm, ostream):
@@ -121,8 +115,6 @@ class NonLinearSolver:
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 150
-        self.cur_iter = 0
-        self.small_thresh = 1.0e-10
         self.lindep_thresh = 1.0e-6
         self.is_converged = False
 
@@ -138,19 +130,42 @@ class NonLinearSolver:
         self.restart = True
         self.checkpoint_file = None
 
-        # information for graceful exit
-        self.program_start_time = None
-        self.maximum_hours = None
-
         # timing and profiling
         self.timing = False
         self.profiling = False
         self.memory_profiling = False
         self.memory_tracing = False
 
-        # filename
-        self.filename = None
+        # program end time for graceful exit
+        self.program_end_time = None
 
+        # filename
+        self.filename = f'veloxchem_rsp_{get_datetime_string()}'
+
+        # input keywords
+        self.input_keywords = {
+            'response': {
+                'eri_thresh': ('float', 'ERI screening threshold'),
+                'qq_type': ('str_upper', 'ERI screening scheme'),
+                'batch_size': ('int', 'batch size for Fock build'),
+                'max_iter': ('int', 'maximum number of iterations'),
+                'conv_thresh': ('float', 'convergence threshold'),
+                'lindep_thresh': ('float', 'threshold for linear dependence'),
+                'restart': ('bool', 'restart from checkpoint file'),
+                'checkpoint_file': ('str', 'name of checkpoint file'),
+                'timing': ('bool', 'print timing information'),
+                'profiling': ('bool', 'print profiling information'),
+                'memory_profiling': ('bool', 'print memory usage'),
+                'memory_tracing': ('bool', 'trace memory allocation'),
+            },
+        }
+
+    def print_keywords(self):
+        """
+        Prints input keywords in nonlinear solver.
+        """
+
+        print_keywords(self.input_keywords, self.ostream)
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -166,34 +181,17 @@ class NonLinearSolver:
             method_dict = {}
 
         rsp_keywords = {
-            'b_frequencies': 'seq_range',
-            'c_frequencies': 'seq_range',
-            'd_frequencies': 'seq_range',
-            'a_component': 'str',
-            'b_component': 'str',
-            'c_component': 'str',
-            'd_component': 'str',
-            'damping': 'float',
-            'eri_thresh': 'float',
-            'qq_type': 'str_upper',
-            'batch_size': 'int',
-            'max_iter': 'int',
-            'conv_thresh': 'float',
-            'lindep_thresh': 'float',
-            'restart': 'bool',
-            'checkpoint_file': 'str',
-            'timing': 'bool',
-            'profiling': 'bool',
-            'memory_profiling': 'bool',
-            'memory_tracing': 'bool',
+            key: val[0] for key, val in self.input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
 
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
+        if 'program_end_time' in rsp_dict:
+            self.program_end_time = rsp_dict['program_end_time']
+        if 'filename' in rsp_dict:
+            self.filename = rsp_dict['filename']
+            if 'checkpoint_file' not in rsp_dict:
+                self.checkpoint_file = f'{self.filename}.rsp.h5'
 
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
@@ -204,14 +202,14 @@ class NonLinearSolver:
                                 'Nonlinear solver: Undefined XC functional')
 
         if 'potfile' in method_dict:
-            errmsg = 'NonLinearDriver: The \'potfile\' keyword is not supported in '
-            errmsg += 'Nlr calculation.'
+            errmsg = 'NonLinearSolver: The \'potfile\' keyword is not supported '
+            errmsg += 'in nonlinear response calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
         if 'electric_field' in method_dict:
-            errmsg = 'NonLinearDriver: The \'electric field\' keyword is not '
-            errmsg += 'supported in Nlr calculation.'
+            errmsg = 'NonLinearSolver: The \'electric field\' keyword is not '
+            errmsg += 'supported in nonlinear response calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
@@ -267,7 +265,7 @@ class NonLinearSolver:
         if self.dft:
             grid_drv = GridDriver(self.comm)
             grid_drv.set_level(self.grid_level)
-            
+
             grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule)
             n_grid_points = molgrid.number_of_points()
@@ -497,7 +495,6 @@ class NonLinearSolver:
                     fock.scale(2.0, ifock)
             if self.dft: 
                 xc_drv = XCIntegrator(self.comm)
-
                 molgrid = dft_dict['molgrid']
                 gs_density = dft_dict['gs_density']
 
@@ -505,6 +502,146 @@ class NonLinearSolver:
                 xc_drv.integrate(fock, dens1, dens2, gs_density, molecule, ao_basis,
                                  molgrid, self.xcfun.get_func_label(),mode)
 
+            fock.reduce_sum(self.rank, self.nodes, self.comm)
+
+            if self.rank == mpi_master():
+                nfocks = fock.number_of_fock_matrices()
+                fock_mo = np.zeros((norb**2, nfocks))
+                for i in range(nfocks):
+                    fock_mo[:, i] = self.ao2mo(mo,
+                                               fock.to_numpy(i).T).reshape(-1)
+            else:
+                fock_mo = None
+
+            dist_fock_mo = DistributedArray(fock_mo, self.comm)
+
+            if dist_fabs is None:
+                dist_fabs = DistributedArray(dist_fock_mo.data,
+                                             self.comm,
+                                             distribute=False)
+            else:
+                dist_fabs.append(dist_fock_mo, axis=1)
+
+        self.ostream.print_blank()
+
+        return dist_fabs
+
+
+    def comp_nlr_fock_cubic(self, mo, D, molecule, ao_basis, fock_flag):
+        """-
+        Computes and returns a list of Fock matrices.
+
+        :param mo:
+            The MO coefficients
+        :param D:
+            A list of densities
+        :param molecule:
+            The molecule
+        :param ao_basis:
+            The AO basis set
+        :param fock_flag:
+            The type of Fock matrices
+
+        :return:
+            A list of Fock matrices
+        """
+
+        if fock_flag == 'real_and_imag':
+            if self.rank == mpi_master():
+                D_total = []
+                for da in D:
+                    D_total.append(da.real)
+                    D_total.append(da.imag)
+            else:
+                D_total = None
+
+            f_total = self.comp_two_el_int_cubic(mo, molecule, ao_basis, D_total)
+
+            nrows = f_total.data.shape[0]
+            half_ncols = f_total.data.shape[1] // 2
+            ff_data = np.zeros((nrows, half_ncols), dtype=np.complex128)
+            for i in range(half_ncols):
+                ff_data[:, i] = (f_total.data[:, 2 * i] +
+                                 1j * f_total.data[:, 2 * i + 1])
+            return DistributedArray(ff_data, self.comm, distribute=False)
+
+        elif fock_flag == 'real':
+            return self.comp_two_el_int_cubic(mo, molecule, ao_basis, D)
+
+        else:
+            return None
+
+    def comp_two_el_int_cubic(self, mo, molecule, ao_basis, dabs):
+        """
+        Returns the two-electron part of the Fock matix in MO basis
+
+        :param mo:
+            The MO coefficients
+        :param molecule:
+            The molecule
+        :param ao_basis:
+            The AO basis set
+        :param dabs:
+            A list of densitiy matrices
+
+        :return:
+            A tuple containing the two-electron part of the Fock matix (in MO
+            basis)
+        """
+
+        eri_driver = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = eri_driver.compute(get_qq_scheme(self.qq_type),
+                                       self.eri_thresh, molecule, ao_basis)
+
+        # determine number of batches
+
+        if self.rank == mpi_master():
+            n_total = len(dabs)
+            n_ao = dabs[0].shape[0]
+            norb = mo.shape[1]
+        else:
+            n_total = None
+            n_ao = None
+
+        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
+        num_batches = get_number_of_batches(n_total, batch_size, self.comm)
+
+        # go through batches
+
+        dist_fabs = None
+
+        if self.rank == mpi_master():
+            batch_str = 'Processing Fock builds...'
+            batch_str += ' (batch size: {:d})'.format(batch_size)
+            self.ostream.print_info(batch_str)
+
+        for batch_ind in range(num_batches):
+
+            if self.rank == mpi_master():
+                self.ostream.print_info('  batch {}/{}'.format(
+                    batch_ind + 1, num_batches))
+                self.ostream.flush()
+
+            # form density matrices
+
+            if self.rank == mpi_master():
+                batch_start = batch_size * batch_ind
+                batch_end = min(batch_start + batch_size, n_total)
+                dts = [
+                    np.ascontiguousarray(dab)
+                    for dab in dabs[batch_start:batch_end]
+                ]
+                dens = AODensityMatrix(dts, denmat.rest)
+            else:
+                dens = AODensityMatrix()
+
+            dens.broadcast(self.rank, self.comm)
+
+            fock = AOFockMatrix(dens)
+            for i in range(fock.number_of_fock_matrices()):
+                fock.set_fock_type(fockmat.rgenjk, i)
+
+            eri_driver.compute(fock, dens, molecule, ao_basis, screening)
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
             if self.rank == mpi_master():
@@ -641,13 +778,12 @@ class NonLinearSolver:
         """
 
         S4N1N2N3 = self.commut(self.commut(k3, self.commut(k2, k1)), D.T)
-        S4N1N2N3_c = (LinearSolver.lrmat2vec(S4N1N2N3.real, nocc, norb) +
-                      1j * LinearSolver.lrmat2vec(S4N1N2N3.imag, nocc, norb))
+        S4N1N2N3_c = self.complex_lrmat2vec(S4N1N2N3, nocc, norb)
         return (2. / 6) * S4N1N2N3_c
 
     def flip_xy(self, X):
         """
-        Swaps upper and lower parts of a response vector. 
+        Swaps upper and lower parts of a response vector.
 
         :param X:
             A response vector v = (Z,-Y^*)
@@ -806,8 +942,7 @@ class NonLinearSolver:
         """
 
         X3NxNy = self.commut(self.commut(k2, self.commut(k1, X)), D.T)
-        X3NxNy_c = (LinearSolver.lrmat2vec(X3NxNy.real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(X3NxNy.imag, nocc, norb))
+        X3NxNy_c = self.complex_lrmat2vec(X3NxNy, nocc, norb)
         return (1. / 2) * X3NxNy_c
 
     def x2_contract(self, k, X, D, nocc, norb):
@@ -831,8 +966,7 @@ class NonLinearSolver:
         """
 
         XNx = self.commut(self.commut(k, X), D.T)
-        X2Nx_c = (LinearSolver.lrmat2vec(XNx.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(XNx.imag, nocc, norb))
+        X2Nx_c = self.complex_lrmat2vec(XNx, nocc, norb)
         return X2Nx_c
 
     def a2_contract(self, k, A, D, nocc, norb):
@@ -858,8 +992,7 @@ class NonLinearSolver:
         """
 
         ANx = self.commut(self.commut(k.T, A), D.T)
-        A2Nx_c = (LinearSolver.lrmat2vec(ANx.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(ANx.imag, nocc, norb))
+        A2Nx_c = self.complex_lrmat2vec(ANx, nocc, norb)
         return -(1. / 2) * A2Nx_c
 
     def a3_contract(self, k1, k2, A, D, nocc, norb):
@@ -885,8 +1018,7 @@ class NonLinearSolver:
         """
 
         A3NxNy = self.commut(self.commut(k2.T, self.commut(k1.T, A)), D.T)
-        A3NxNy_c = (LinearSolver.lrmat2vec(A3NxNy.real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(A3NxNy.imag, nocc, norb))
+        A3NxNy_c = self.complex_lrmat2vec(A3NxNy, nocc, norb)
         return -(1. / 6) * A3NxNy_c
 
     def zi(self, kB, kC, kD, Fc, Fd, Fbc, Fcb, F0):
@@ -955,3 +1087,21 @@ class NonLinearSolver:
                                   self.commut(kB, F0) + 2 * Fb) +
                       self.commut(kB,
                                   self.commut(kA, F0) + 2 * Fa))
+
+    def complex_lrmat2vec(self, mat, nocc, norb):
+        """
+        Converts complex matrix to vector.
+
+        :param mat:
+            The complex matrix.
+        :param nocc:
+            Number of occupied orbitals.
+        :param norb:
+            Number of orbitals.
+
+        :return:
+            The complex vector.
+        """
+
+        return (LinearSolver.lrmat2vec(mat.real, nocc, norb) +
+                1j * LinearSolver.lrmat2vec(mat.imag, nocc, norb))

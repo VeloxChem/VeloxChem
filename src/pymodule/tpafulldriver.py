@@ -34,13 +34,14 @@ from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
-from .tpadriver import TpaDriver
+from .nonlinearsolver import NonLinearSolver
+from .tpadriver import TPADriver
 from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
 
 
-class TpaFullDriver(TpaDriver):
+class TPAFullDriver(TPADriver):
     """
     Implements the full isotropic cubic response driver for two-photon
     absorption (TPA)
@@ -83,7 +84,7 @@ class TpaFullDriver(TpaDriver):
     def get_densities(self, wi, kX, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded Fock
-        matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
+        matrices F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
         function. Note: All densities are 1/3 of those in the paper, and all
         the Fock matrices are later scaled by 3.
 
@@ -218,7 +219,7 @@ class TpaFullDriver(TpaDriver):
 
     def get_fock_dict(self, wi, density_list, F0_a, mo, molecule, ao_basis):
         """
-        Computes the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the
+        Computes the compounded Fock matrices F^{σ},F^{λ+τ},F^{σλτ} used for the
         isotropic cubic response function
 
         :param wi:
@@ -277,8 +278,8 @@ class TpaFullDriver(TpaDriver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                     'real_and_imag')
+        dist_focks = self.comp_nlr_fock_cubic(mo, density_list, molecule, ao_basis,
+                                        'real_and_imag')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -528,7 +529,7 @@ class TpaFullDriver(TpaDriver):
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
-            'program_start_time', 'maximum_hours'
+            'program_end_time'
         }
 
         for key in cpp_keywords:
@@ -684,8 +685,6 @@ class TpaFullDriver(TpaDriver):
             x2_yy_ = self.x2_contract(ky_.T, mu_y, d_a_mo, nocc, norb)
             x2_zz_ = self.x2_contract(kz_.T, mu_z, d_a_mo, nocc, norb)
 
-
-
             key = (('N_lamtau_xx', w), 0)
             mat = (6 * xi_xx + 2 * xi_yy + 2 * xi_zz + 0.5 * f_lamtau_xx).T
             xy_dict[key] = self.anti_sym(
@@ -742,7 +741,7 @@ class TpaFullDriver(TpaDriver):
     def get_densities_II(self, wi, kX, kXY, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded
-        second-order Fock matrics used for the isotropic cubic response
+        second-order Fock matrices used for the isotropic cubic response
         function
 
         :param wi:
@@ -870,7 +869,7 @@ class TpaFullDriver(TpaDriver):
 
             Dz += self.transform_dens(kz, D_lamtau_zz, S)
             Dz += self.transform_dens(k_lamtau_zz, Dc_z, S)
-            
+
             density_list.append(Dx)
             density_list.append(Dy)
             density_list.append(Dz)
@@ -879,7 +878,7 @@ class TpaFullDriver(TpaDriver):
 
     def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis):
         """
-        Computes the compounded second-order Fock matrics used for the
+        Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
 
         :param wi:
@@ -918,8 +917,8 @@ class TpaFullDriver(TpaDriver):
                                           self.ostream)
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                     'real_and_imag')
+        dist_focks = self.comp_nlr_fock_cubic(mo, density_list, molecule, ao_basis,
+                                        'real_and_imag')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -1310,14 +1309,10 @@ class TpaFullDriver(TpaDriver):
         kb_nb_nc = inp_dict['Nc_Nb_kb']
         kd_nd = inp_dict['Nd_kd']
 
-        Na = (LinearSolver.lrmat2vec(ka_na.real, nocc, norb) +
-              1j * LinearSolver.lrmat2vec(ka_na.imag, nocc, norb))
-        Nb = (LinearSolver.lrmat2vec(kb_nb.real, nocc, norb) +
-              1j * LinearSolver.lrmat2vec(kb_nb.imag, nocc, norb))
-        Nc_Nb = (LinearSolver.lrmat2vec(kb_nb_nc.real, nocc, norb) +
-                 1j * LinearSolver.lrmat2vec(kb_nb_nc.imag, nocc, norb))
-        Nd = (LinearSolver.lrmat2vec(kd_nd.real, nocc, norb) +
-              1j * LinearSolver.lrmat2vec(kd_nd.imag, nocc, norb))
+        Na = self.complex_lrmat2vec(ka_na, nocc, norb)
+        Nb = self.complex_lrmat2vec(kb_nb, nocc, norb)
+        Nc_Nb = self.complex_lrmat2vec(kb_nb_nc, nocc, norb)
+        Nd = self.complex_lrmat2vec(kd_nd, nocc, norb)
 
         Nc = self.flip_yz(Nc_Nb)  # gets Nc from Nb
 
@@ -1395,12 +1390,9 @@ class TpaFullDriver(TpaDriver):
                 ka_y = kX['Na'][('y', w)]
                 ka_z = kX['Na'][('z', w)]
 
-                na_x = (LinearSolver.lrmat2vec(ka_x.real, nocc, norb) +
-                        1j * LinearSolver.lrmat2vec(ka_x.imag, nocc, norb))
-                na_y = (LinearSolver.lrmat2vec(ka_y.real, nocc, norb) +
-                        1j * LinearSolver.lrmat2vec(ka_y.imag, nocc, norb))
-                na_z = (LinearSolver.lrmat2vec(ka_z.real, nocc, norb) +
-                        1j * LinearSolver.lrmat2vec(ka_z.imag, nocc, norb))
+                na_x = self.complex_lrmat2vec(ka_x, nocc, norb)
+                na_y = self.complex_lrmat2vec(ka_y, nocc, norb)
+                na_z = self.complex_lrmat2vec(ka_z, nocc, norb)
 
                 t4term = (np.dot(na_x, e4_dict['f_iso_x'][ww] - S4[('x', ww)]) +
                           np.dot(na_y, e4_dict['f_iso_y'][ww] - S4[('y', ww)]) +
@@ -1569,12 +1561,9 @@ class TpaFullDriver(TpaDriver):
             kb_nb_nc = inp_dict['Nc_Nb_kb']
             kd_nd = inp_dict['Nd_kd']
 
-            Nb = (LinearSolver.lrmat2vec(kb_nb.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kb_nb.imag, nocc, norb))
-            Nc_Nb = (LinearSolver.lrmat2vec(kb_nb_nc.real, nocc, norb) +
-                     1j * LinearSolver.lrmat2vec(kb_nb_nc.imag, nocc, norb))
-            Nd = (LinearSolver.lrmat2vec(kd_nd.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kd_nd.imag, nocc, norb))
+            Nb = self.complex_lrmat2vec(kb_nb, nocc, norb)
+            Nc_Nb = self.complex_lrmat2vec(kb_nb_nc, nocc, norb)
+            Nd = self.complex_lrmat2vec(kd_nd, nocc, norb)
 
             Nc = self.flip_yz(Nc_Nb)  # gets Nc from Nb
 
@@ -1582,17 +1571,17 @@ class TpaFullDriver(TpaDriver):
             Nc_h = self.flip_xy(Nc)
             Nd_h = self.flip_xy(Nd)
 
-            r4_term += -1j * self.damping * np.dot(
+            r4_term += 1j * self.damping * np.dot(
                 Nd_h, self.s4_for_r4(kA.T, kB, kC, D0, nocc, norb))
-            r4_term += -1j * self.damping * np.dot(
+            r4_term += 1j * self.damping * np.dot(
                 Nc_h, self.s4_for_r4(kA.T, kB, kD, D0, nocc, norb))
-            r4_term += -1j * self.damping * np.dot(
+            r4_term += 1j * self.damping * np.dot(
                 Nd_h, self.s4_for_r4(kA.T, kC, kB, D0, nocc, norb))
-            r4_term += -1j * self.damping * np.dot(
+            r4_term += 1j * self.damping * np.dot(
                 Nb_h, self.s4_for_r4(kA.T, kC, kD, D0, nocc, norb))
-            r4_term += -1j * self.damping * np.dot(
+            r4_term += 1j * self.damping * np.dot(
                 Nc_h, self.s4_for_r4(kA.T, kD, kB, D0, nocc, norb))
-            r4_term += -1j * self.damping * np.dot(
+            r4_term += 1j * self.damping * np.dot(
                 Nb_h, self.s4_for_r4(kA.T, kD, kC, D0, nocc, norb))
 
         return {
@@ -1601,8 +1590,6 @@ class TpaFullDriver(TpaDriver):
             's4': s4_term,
             'r4': r4_term,
         }
-
-
 
     def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
         """

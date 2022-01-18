@@ -35,6 +35,7 @@ def test_full_input(tmpdir):
         'method_settings': {
             'basis': 'aug-cc-pvdz',
         },
+        'scf': {},
         'molecule': {
             'charge': '0',
             'multiplicity': '1',
@@ -42,15 +43,6 @@ def test_full_input(tmpdir):
             'xyz': ['O 0.0 0.0 0.0', 'H 0.0 1.4 1.1', 'H 0.0 -1.4 1.1'],
         },
         'filename': str(inpfile.with_name(inpfile.stem)),
-        'scf': {
-            'checkpoint_file': str(inpfile.with_suffix('.scf.h5')),
-        },
-        'response': {
-            'checkpoint_file': str(inpfile.with_suffix('.rsp.h5')),
-        },
-        'exciton': {
-            'checkpoint_file': str(inpfile.with_suffix('.exciton.h5')),
-        },
     }
 
     assert ip.input_dict == expected

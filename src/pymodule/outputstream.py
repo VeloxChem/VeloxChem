@@ -283,7 +283,7 @@ class OutputStream:
 
         self.print_separator()
         self.print_title('')
-        self.print_title('VELOXCHEM 1.0-RC2')
+        self.print_title('VELOXCHEM')
         self.print_title('AN ELECTRONIC STRUCTURE CODE')
         self.print_title('')
         self.print_title('Copyright (C) 2018-2021 VeloxChem developers.')

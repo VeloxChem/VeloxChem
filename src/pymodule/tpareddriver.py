@@ -34,13 +34,15 @@ from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
-from .tpadriver import TpaDriver
+from .nonlinearsolver import NonLinearSolver
+from .tpadriver import TPADriver
 from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
 
 
-class TpaReducedDriver(TpaDriver):
+
+class TPAReducedDriver(TPADriver):
     """
     Implements the reduced isotropic cubic response driver for two-photon
     absorption (TPA)
@@ -83,7 +85,7 @@ class TpaReducedDriver(TpaDriver):
     def get_densities(self, wi, kX, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded Fock
-        matrics F^{σ} used for the reduced iostropic cubic response function
+        matrices F^{σ} used for the reduced iostropic cubic response function
 
 
         :param wi:
@@ -146,7 +148,7 @@ class TpaReducedDriver(TpaDriver):
 
     def get_fock_dict(self, wi, density_list, F0_a, mo, molecule, ao_basis):
         """
-        Computes the compounded Fock matrics F^{σ}  used for the reduced
+        Computes the compounded Fock matrices F^{σ}  used for the reduced
         isotropic cubic response function
 
         :param wi:
@@ -196,8 +198,7 @@ class TpaReducedDriver(TpaDriver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                     'real')
+        dist_focks = self.comp_nlr_fock_cubic(mo, density_list, molecule, ao_basis,'real')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -268,7 +269,7 @@ class TpaReducedDriver(TpaDriver):
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
-            'program_start_time', 'maximum_hours'
+            'program_end_time'
         }
 
         for key in cpp_keywords:
@@ -404,7 +405,7 @@ class TpaReducedDriver(TpaDriver):
     def get_densities_II(self, wi, kX, kXY, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded
-        second-order Fock matrics used for the reduced isotropic cubic response
+        second-order Fock matrices used for the reduced isotropic cubic response
         function. Note: All densities are 1/3 of those in the paper, and all
         the Fock matrices are later scaled by 3.
 
@@ -495,7 +496,7 @@ class TpaReducedDriver(TpaDriver):
 
     def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis):
         """
-        Computes the compounded second-order Fock matrics used for the
+        Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
 
         :param wi:
@@ -534,8 +535,8 @@ class TpaReducedDriver(TpaDriver):
                                           self.ostream)
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                     'real_and_imag')
+        dist_focks = self.comp_nlr_fock_cubic(mo, density_list, molecule, ao_basis,
+                                        'real_and_imag')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock

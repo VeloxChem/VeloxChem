@@ -119,6 +119,8 @@ class TestExciton:
 
         task = MpiTask([inpfile, None])
         exciton_dict = task.input_dict['exciton']
+        # filename is necessary for checkpoint file
+        exciton_dict['filename'] = task.input_dict['filename']
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
         exciton_drv.update_settings(exciton_dict, method_dict)
