@@ -89,7 +89,7 @@ class LinearResponseSolver(LinearSolver):
         Updates response and method settings in linear response solver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -206,7 +206,7 @@ class LinearResponseSolver(LinearSolver):
 
         # read initial guess from restart file
         if self.restart:
-            self.read_vectors(rsp_vector_labels)
+            self.read_checkpoint(rsp_vector_labels)
 
         # generate initial guess from scratch
         else:

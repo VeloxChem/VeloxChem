@@ -71,7 +71,7 @@ class TPAFullDriver(TPADriver):
         Updates response and method settings for TPA
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """

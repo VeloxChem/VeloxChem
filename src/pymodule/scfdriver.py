@@ -23,9 +23,9 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from collections import deque
-from datetime import datetime
 from pathlib import Path
+from datetime import datetime
+from collections import deque
 import numpy as np
 import time as tm
 import math
@@ -270,9 +270,9 @@ class ScfDriver:
         Updates settings in SCF driver.
 
         :param scf_dict:
-            The input dictionary of scf group.
+            The dictionary of scf input.
         :param method_dict:
-            The input dicitonary of method settings group.
+            The dicitonary of method settings.
         """
 
         if method_dict is None:
@@ -325,6 +325,9 @@ class ScfDriver:
             cppe_potfile = None
             if self.rank == mpi_master():
                 potfile = self.pe_options['potfile']
+                if not Path(potfile).is_file():
+                    potfile = str(
+                        Path(self.filename).parent / Path(potfile).name)
                 cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
             cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
             self.pe_options['potfile'] = cppe_potfile

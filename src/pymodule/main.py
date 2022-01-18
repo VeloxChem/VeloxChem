@@ -63,8 +63,8 @@ def select_scf_driver(task, scf_type):
     :param task:
         The MPI task.
     :param scf_type:
-        The type of SCF calculation (restricted, unrestricted, or restricted
-        open-shell).
+        The type of SCF calculation (restricted, unrestricted, or
+        restricted_openshell).
 
     :return:
         The SCF driver object.
@@ -87,6 +87,8 @@ def select_scf_driver(task, scf_type):
         scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
     elif scf_type == 'restricted_openshell':
         scf_drv = ScfRestrictedOpenDriver(task.mpi_comm, task.ostream)
+    else:
+        assert_msg_critical(False, f'SCF: invalide scf_type {scf_type}')
 
     return scf_drv
 
@@ -100,7 +102,7 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     :param mol_orbs:
         The molecular orbitals.
     :param rsp_dict:
-        The dictionary of response dict.
+        The dictionary of response input.
     :param method_dict:
         The dictionary of method settings.
 
@@ -115,6 +117,7 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
         assert_msg_critical(task.mpi_size == 1 or task.mpi_size <= n_ov,
                             'Response: too many MPI processes')
 
+    # check property type
     if 'property' in rsp_dict:
         prop_type = rsp_dict['property'].lower()
     else:
@@ -160,9 +163,35 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
         rsp_prop = CustomProperty(rsp_dict, method_dict)
 
     else:
-        assert_msg_critical(False, 'input file: invalid response property')
+        assert_msg_critical(
+            False, f'Response: invalide response property {prop_type}')
 
     return rsp_prop
+
+
+def updated_dict_with_eri_settings(settings_dict, scf_drv):
+    """
+    Returns an updated dictionary with ERI settings from SCF driver.
+
+    :param settings_dict:
+        The original dictionary of settings.
+    :param scf_drv:
+        The SCF driver.
+
+    :return:
+        An updated dictionary with updated ERI settings.
+    """
+
+    new_dict = dict(settings_dict)
+
+    if 'eri_thresh' not in new_dict:
+        new_dict['eri_thresh'] = scf_drv.eri_thresh
+    if 'qq_type' not in new_dict:
+        new_dict['qq_type'] = scf_drv.qq_type
+    if not scf_drv.restart:
+        new_dict['restart'] = 'no'
+
+    return new_dict
 
 
 def main():
@@ -184,7 +213,7 @@ def main():
     task = MpiTask([args.input_file, args.output_file], MPI.COMM_WORLD)
     task_type = task.input_dict['jobs']['task'].lower()
 
-    # Timelimit in hours
+    # Timelimit
 
     if 'maximum_hours' in task.input_dict['jobs']:
         maximum_hours = float(task.input_dict['jobs']['maximum_hours'])
@@ -198,27 +227,21 @@ def main():
                                                root=mpi_master())
 
     # Method settings
+    # Note: the @pe group is added to method_dict as pe_options
 
-    if 'method_settings' in task.input_dict:
-        method_dict = dict(task.input_dict['method_settings'])
-    else:
-        method_dict = {}
+    method_dict = (dict(task.input_dict['method_settings'])
+                   if 'method_settings' in task.input_dict else {})
 
-    if 'pe' in task.input_dict:
-        # add @pe group to method_dict as pe_options
-        method_dict['pe_options'] = dict(task.input_dict['pe'])
-    else:
-        method_dict['pe_options'] = {}
+    method_dict['pe_options'] = (dict(task.input_dict['pe'])
+                                 if 'pe' in task.input_dict else {})
 
     use_xtb = ('xtb' in method_dict)
 
     # Exciton model
 
     if task_type == 'exciton':
-        if 'exciton' in task.input_dict:
-            exciton_dict = task.input_dict['exciton']
-        else:
-            exciton_dict = {}
+        exciton_dict = (task.input_dict['exciton']
+                        if 'exciton' in task.input_dict else {})
 
         exciton_dict['program_end_time'] = program_end_time
         exciton_dict['filename'] = task.input_dict['filename']
@@ -230,18 +253,12 @@ def main():
     # Spectrum from trajectory
 
     if task_type == 'trajectory':
-        if 'trajectory' in task.input_dict:
-            traj_dict = dict(task.input_dict['trajectory'])
-        else:
-            traj_dict = {}
-        if 'spectrum_settings' in task.input_dict:
-            spect_dict = dict(task.input_dict['spectrum_settings'])
-        else:
-            spect_dict = {}
-        if 'response' in task.input_dict:
-            rsp_dict = dict(task.input_dict['response'])
-        else:
-            rsp_dict = {}
+        traj_dict = (dict(task.input_dict['trajectory'])
+                     if 'trajectory' in task.input_dict else {})
+        spect_dict = (dict(task.input_dict['spectrum_settings'])
+                      if 'spectrum_settings' in task.input_dict else {})
+        rsp_dict = (dict(task.input_dict['response'])
+                    if 'response' in task.input_dict else {})
 
         traj_dict['filename'] = task.input_dict['filename']
         traj_dict['charges'] = task.input_dict['charges']
@@ -272,10 +289,7 @@ def main():
         assert_msg_critical(task.molecule.number_of_atoms(),
                             'Molecule: no atoms found in molecule')
 
-        if 'scf' in task.input_dict:
-            scf_dict = task.input_dict['scf']
-        else:
-            scf_dict = {}
+        scf_dict = task.input_dict['scf'] if 'scf' in task.input_dict else {}
 
         scf_dict['program_end_time'] = program_end_time
         scf_dict['filename'] = task.input_dict['filename']
@@ -331,10 +345,8 @@ def main():
             if task.mpi_rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
-        if 'optimize' in task.input_dict:
-            opt_dict = task.input_dict['optimize']
-        else:
-            opt_dict = {}
+        opt_dict = (task.input_dict['optimize']
+                    if 'optimize' in task.input_dict else {})
 
         opt_dict['filename'] = task.input_dict['filename']
 
@@ -351,20 +363,13 @@ def main():
     # Response
 
     if task_type == 'response' and scf_drv.scf_type == 'restricted':
-        if 'response' in task.input_dict:
-            rsp_dict = dict(task.input_dict['response'])
-        else:
-            rsp_dict = {}
+        rsp_dict = (dict(task.input_dict['response'])
+                    if 'response' in task.input_dict else {})
 
         rsp_dict['program_end_time'] = program_end_time
         rsp_dict['filename'] = task.input_dict['filename']
 
-        if 'eri_thresh' not in rsp_dict:
-            rsp_dict['eri_thresh'] = scf_drv.eri_thresh
-        if 'qq_type' not in rsp_dict:
-            rsp_dict['qq_type'] = scf_drv.qq_type
-        if not scf_drv.restart:
-            rsp_dict['restart'] = 'no'
+        rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
         rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
         rsp_prop.init_driver(task.mpi_comm, task.ostream)
@@ -379,18 +384,10 @@ def main():
 
     if ((task_type == 'pulses' or 'pulses' in task.input_dict) and
             scf_drv.scf_type == 'restricted'):
-        if 'pulses' in task.input_dict:
-            prt_dict = task.input_dict['pulses']
-        else:
-            prt_dict = {}
+        prt_dict = (task.input_dict['pulses']
+                    if 'pulses' in task.input_dict else {})
 
-        cpp_dict = {}
-        if 'eri_thresh' not in cpp_dict:
-            cpp_dict['eri_thresh'] = scf_drv.eri_thresh
-        if 'qq_type' not in cpp_dict:
-            cpp_dict['qq_type'] = scf_drv.qq_type
-        if not scf_drv.restart:
-            cpp_dict['restart'] = 'no'
+        cpp_dict = updated_dict_with_eri_settings({}, scf_drv)
 
         pulsed_response = PulsedResponse(task.mpi_comm, task.ostream)
         pulsed_response.update_settings(prt_dict, cpp_dict, method_dict)
@@ -399,15 +396,9 @@ def main():
     # MP2 perturbation theory
 
     if task_type == 'mp2' and scf_drv.scf_type == 'restricted':
-        if 'mp2' in task.input_dict:
-            mp2_dict = task.input_dict['mp2']
-        else:
-            mp2_dict = {}
+        mp2_dict = task.input_dict['mp2'] if 'mp2' in task.input_dict else {}
 
-        if 'eri_thresh' not in mp2_dict:
-            mp2_dict['eri_thresh'] = scf_drv.eri_thresh
-        if 'qq_type' not in mp2_dict:
-            mp2_dict['qq_type'] = scf_drv.qq_type
+        mp2_dict = updated_dict_with_eri_settings(mp2_dict, scf_drv)
 
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
         mp2_drv.update_settings(mp2_dict, method_dict)
@@ -416,10 +407,8 @@ def main():
     # Cube file
 
     if task_type == 'visualization':
-        if 'visualization' in task.input_dict:
-            cube_dict = task.input_dict['visualization']
-        else:
-            cube_dict = {}
+        cube_dict = (task.input_dict['visualization']
+                     if 'visualization' in task.input_dict else {})
 
         if 'read_dalton' not in task.input_dict['visualization']['cubes']:
             mol_orbs.broadcast(task.mpi_rank, task.mpi_comm)

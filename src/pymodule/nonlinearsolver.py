@@ -172,7 +172,7 @@ class NonLinearSolver:
         Updates response and method settings in nonlinear solver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """

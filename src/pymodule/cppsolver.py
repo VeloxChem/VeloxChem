@@ -92,7 +92,7 @@ class ComplexResponse(LinearSolver):
         Updates response and method settings in complex liner response solver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -365,7 +365,7 @@ class ComplexResponse(LinearSolver):
 
         # read initial guess from restart file
         if self.restart:
-            self.read_vectors(rsp_vector_labels)
+            self.read_checkpoint(rsp_vector_labels)
 
         # generate initial guess from scratch
         else:

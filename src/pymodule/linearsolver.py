@@ -23,6 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from pathlib import Path
 from datetime import datetime
 import numpy as np
 import time as tm
@@ -214,7 +215,7 @@ class LinearSolver:
         Updates response and method settings in linear solver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -269,6 +270,9 @@ class LinearSolver:
             cppe_potfile = None
             if self.rank == mpi_master():
                 potfile = self.pe_options['potfile']
+                if not Path(potfile).is_file():
+                    potfile = str(
+                        Path(self.filename).parent / Path(potfile).name)
                 cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
             cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
             self.pe_options['potfile'] = cppe_potfile
@@ -417,9 +421,9 @@ class LinearSolver:
             'potfile_text': potfile_text,
         }
 
-    def read_vectors(self, rsp_vector_labels):
+    def read_checkpoint(self, rsp_vector_labels):
         """
-        Reads vectors from checkpoint file.
+        Reads distributed arrays from checkpoint file.
 
         :param rsp_vector_labels:
             The list of labels of vectors.
