@@ -977,15 +977,15 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
 
                         rho_lam_xy_i[i] =  (rhow_kx_r[i]*rhow_ky_i[i] + rhow_kx_i[i]*rhow_ky_r[i] 
                                                     
-                                                    +   rhow_ky_r[i]*rhow_kx_i[i] + rhow_ky_i[i]*rhow_kx_r[i]) ;
+                                        +   rhow_ky_r[i]*rhow_kx_i[i] + rhow_ky_i[i]*rhow_kx_r[i]) ;
 
                         rho_lam_xz_i[i] = (rhow_kx_r[i]*rhow_kz_i[i] + rhow_kx_i[i]*rhow_kz_r[i] 
                                                     
-                                                    +   rhow_kz_r[i]*rhow_kx_i[i] + rhow_kz_i[i]*rhow_kx_r[i]) ;                        
+                                      +   rhow_kz_r[i]*rhow_kx_i[i] + rhow_kz_i[i]*rhow_kx_r[i]) ;                        
 
                         rho_lam_yz_i[i] =  (rhow_ky_r[i]*rhow_kz_i[i] + rhow_ky_i[i]*rhow_kz_r[i] 
                                                     
-                                                    +   rhow_kz_r[i]*rhow_ky_i[i] + rhow_kz_i[i]*rhow_ky_r[i]) ;
+                                      +   rhow_kz_r[i]*rhow_ky_i[i] + rhow_kz_i[i]*rhow_ky_r[i]) ;
                         
                         // rxw1rhow2 real
 
@@ -1011,6 +1011,30 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
 
                                                      + gradxw_kz_r[i] * rhow_ky_r[i] -  gradxw_kz_i[i] * rhow_ky_i[i]);
 
+                        // rxw1rhow2 imag
+
+                        jj_i = 4.0 * (gradxw_kx_r[i] * rhow_kx_i[i] + gradxw_ky_r[i] * rhow_ky_i[i] + gradxw_kz_r[i] * rhow_kz_i[i]
+
+                                      + gradxw_kx_i[i] * rhow_kx_r[i] + gradxw_ky_i[i] * rhow_ky_r[i] + gradxw_kz_i[i] * rhow_kz_r[i]);
+
+                        rxw1rhow2_sig_x_i[i] = 8.0 * (gradxw_kx_r[i] * rhow_kx_i[i] +  gradxw_kx_i[i] * rhow_kx_r[i]) + jj_i; 
+
+                        rxw1rhow2_sig_y_i[i] = 8.0 * (gradxw_ky_r[i] * rhow_ky_i[i] +  gradxw_ky_i[i] * rhow_ky_r[i]) + jj_i; 
+
+                        rxw1rhow2_sig_z_i[i] = 8.0 * (gradxw_kz_r[i] * rhow_kz_i[i] +  gradxw_kz_i[i] * rhow_kz_r[i]) + jj_i; 
+
+                        rxw1rhow2_lam_xy_i[i] = 2.0 *(gradxw_kx_r[i] * rhow_ky_i[i] +  gradxw_kx_i[i] * rhow_ky_r[i]
+
+                                                     + gradxw_ky_r[i] * rhow_kx_i[i] +  gradxw_ky_i[i] * rhow_kx_r[i]);
+                        
+                        rxw1rhow2_lam_xz_i[i] = 2.0 *(gradxw_kx_r[i] * rhow_kz_i[i] +  gradxw_kx_i[i] * rhow_kz_r[i]
+
+                                                     + gradxw_kz_r[i] * rhow_kx_i[i] +  gradxw_kz_i[i] * rhow_kx_r[i]);
+                        
+                        rxw1rhow2_lam_yz_i[i] = 2.0 *(gradxw_ky_r[i] * rhow_kz_i[i] +  gradxw_ky_i[i] * rhow_kz_r[i]
+
+                                                     + gradxw_kz_r[i] * rhow_ky_i[i] +  gradxw_kz_i[i] * rhow_ky_r[i]);
+
                         // ryw1rhow2 real
 
                         jj_r = 4.0 * (gradyw_kx_r[i] * rhow_kx_r[i] + gradyw_ky_r[i] * rhow_ky_r[i] + gradyw_kz_r[i] * rhow_kz_r[i])
@@ -1034,6 +1058,31 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
                         ryw1rhow2_lam_yz_r[i] = 2.0 *(gradyw_ky_r[i] * rhow_kz_r[i] -  gradyw_ky_i[i] * rhow_kz_i[i]
 
                                                      + gradyw_kz_r[i] * rhow_ky_r[i] -  gradyw_kz_i[i] * rhow_ky_i[i]);
+
+                        
+                        // ryw1rhow2 imag
+
+                        jj_i = 4.0 * (gradyw_kx_r[i] * rhow_kx_i[i] + gradyw_ky_r[i] * rhow_ky_i[i] + gradyw_kz_r[i] * rhow_kz_i[i]
+
+                                      + gradyw_kx_i[i] * rhow_kx_r[i] + gradyw_ky_i[i] * rhow_ky_r[i] + gradyw_kz_i[i] * rhow_kz_r[i]);
+
+                        ryw1rhow2_sig_x_i[i] = 8.0 * (gradyw_kx_r[i] * rhow_kx_i[i] +  gradyw_kx_i[i] * rhow_kx_r[i]) + jj_i; 
+
+                        ryw1rhow2_sig_y_i[i] = 8.0 * (gradyw_ky_r[i] * rhow_ky_i[i] +  gradyw_ky_i[i] * rhow_ky_r[i]) + jj_i; 
+
+                        ryw1rhow2_sig_z_i[i] = 8.0 * (gradyw_kz_r[i] * rhow_kz_i[i] +  gradyw_kz_i[i] * rhow_kz_r[i]) + jj_i; 
+
+                        ryw1rhow2_lam_xy_i[i] = 2.0 *(gradyw_kx_r[i] * rhow_ky_i[i] +  gradyw_kx_i[i] * rhow_ky_r[i]
+
+                                                     + gradyw_ky_r[i] * rhow_kx_i[i] +  gradyw_ky_i[i] * rhow_kx_r[i]);
+                        
+                        ryw1rhow2_lam_xz_i[i] = 2.0 *(gradyw_kx_r[i] * rhow_kz_i[i] +  gradyw_kx_i[i] * rhow_kz_r[i]
+
+                                                     + gradyw_kz_r[i] * rhow_kx_i[i] +  gradyw_kz_i[i] * rhow_kx_r[i]);
+                        
+                        ryw1rhow2_lam_yz_i[i] = 2.0 *(gradyw_ky_r[i] * rhow_kz_i[i] +  gradyw_ky_i[i] * rhow_kz_r[i]
+
+                                                     + gradyw_kz_r[i] * rhow_ky_i[i] +  gradyw_kz_i[i] * rhow_ky_r[i]);
 
                         // rzw1rhow2 real
 
@@ -1059,6 +1108,29 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
 
                                                      + gradzw_kz_r[i] * rhow_ky_r[i] -  gradzw_kz_i[i] * rhow_ky_i[i]);
 
+                        // rzw1rhow2 imag
+
+                        jj_i = 4.0 * (gradzw_kx_r[i] * rhow_kx_i[i] + gradzw_ky_r[i] * rhow_ky_i[i] + gradzw_kz_r[i] * rhow_kz_i[i]
+
+                                      + gradzw_kx_i[i] * rhow_kx_r[i] + gradzw_ky_i[i] * rhow_ky_r[i] + gradzw_kz_i[i] * rhow_kz_r[i]);
+
+                        rzw1rhow2_sig_x_i[i] = 8.0 * (gradzw_kx_r[i] * rhow_kx_i[i] +  gradzw_kx_i[i] * rhow_kx_r[i]) + jj_i; 
+
+                        rzw1rhow2_sig_y_i[i] = 8.0 * (gradzw_ky_r[i] * rhow_ky_i[i] +  gradzw_ky_i[i] * rhow_ky_r[i]) + jj_i; 
+
+                        rzw1rhow2_sig_z_i[i] = 8.0 * (gradzw_kz_r[i] * rhow_kz_i[i] +  gradzw_kz_i[i] * rhow_kz_r[i]) + jj_i; 
+
+                        rzw1rhow2_lam_xy_i[i] = 2.0 *(gradzw_kx_r[i] * rhow_ky_i[i] +  gradzw_kx_i[i] * rhow_ky_r[i]
+
+                                                     + gradzw_ky_r[i] * rhow_kx_i[i] +  gradzw_ky_i[i] * rhow_kx_r[i]);
+                        
+                        rzw1rhow2_lam_xz_i[i] = 2.0 *(gradzw_kx_r[i] * rhow_kz_i[i] +  gradzw_kx_i[i] * rhow_kz_r[i]
+
+                                                     + gradzw_kz_r[i] * rhow_kx_i[i] +  gradzw_kz_i[i] * rhow_kx_r[i]);
+                        
+                        rzw1rhow2_lam_yz_i[i] = 2.0 *(gradzw_ky_r[i] * rhow_kz_i[i] +  gradzw_ky_i[i] * rhow_kz_r[i]
+
+                                                     + gradzw_kz_r[i] * rhow_ky_i[i] +  gradzw_kz_i[i] * rhow_ky_r[i]);
 
                         // rxw1rxw2
 
@@ -1085,6 +1157,31 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
                                              + gradxw_kz_r[i] * gradxw_ky_r[i] - gradxw_kz_i[i] * gradxw_ky_i[i]; 
 
 
+                        // rxw1rxw2 imag
+
+                        jj_i = 2.0 * (gradxw_kx_r[i] * gradxw_kx_i[i] + gradxw_ky_r[i] * gradxw_ky_i[i] + gradxw_kz_r[i] * gradxw_kz_i[i]
+
+                                     +  gradxw_kx_i[i] * gradxw_kx_r[i] + gradxw_ky_i[i] * gradxw_ky_r[i] + gradxw_kz_i[i] * gradxw_kz_r[i]);
+
+                        rxw1rxw2_sig_x_i[i] = 4.0 * (gradxw_kx_r[i] * gradxw_kx_i[i] + gradxw_kx_i[i] * gradxw_kx_r[i] ) + jj_i;
+
+                        rxw1rxw2_sig_y_i[i] = 4.0 * (gradxw_ky_r[i] * gradxw_ky_i[i] + gradxw_ky_i[i] * gradxw_ky_r[i] ) + jj_i;
+
+                        rxw1rxw2_sig_z_i[i] = 4.0 * (gradxw_kz_r[i] * gradxw_kz_i[i] + gradxw_kz_i[i] * gradxw_kz_r[i] ) + jj_i;
+
+                        rxw1rxw2_lam_xy_i[i] = gradxw_kx_r[i] * gradxw_ky_i[i] + gradxw_kx_i[i] * gradxw_ky_r[i]
+
+                                             + gradxw_ky_r[i] * gradxw_kx_i[i] + gradxw_ky_i[i] * gradxw_kx_r[i];
+
+                        rxw1rxw2_lam_xz_i[i] = gradxw_kx_r[i] * gradxw_kz_i[i] + gradxw_kx_i[i] * gradxw_kz_r[i]
+
+                                             + gradxw_kz_r[i] * gradxw_kx_i[i] + gradxw_kz_i[i] * gradxw_kx_r[i];     
+
+                        rxw1rxw2_lam_yz_i[i] = gradxw_ky_r[i] * gradxw_kz_i[i] + gradxw_ky_i[i] * gradxw_kz_r[i]
+
+                                             + gradxw_kz_r[i] * gradxw_ky_i[i] + gradxw_kz_i[i] * gradxw_ky_r[i]; 
+
+
                         // rxw1ryw2
 
                         jj_r = 2.0 * (gradxw_kx_r[i] * gradyw_kx_r[i] + gradxw_ky_r[i] * gradyw_ky_r[i] + gradxw_kz_r[i] * gradyw_kz_r[i])
@@ -1108,6 +1205,30 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
                         rxw1ryw2_lam_yz_r[i] = gradxw_ky_r[i] * gradyw_kz_r[i] - gradxw_ky_i[i] * gradyw_kz_i[i]
 
                                              + gradxw_kz_r[i] * gradyw_ky_r[i] - gradxw_kz_i[i] * gradyw_ky_i[i]; 
+
+                        // rxw1ryw2 imag
+
+                        jj_i = 2.0 * (gradxw_kx_r[i] * gradyw_kx_i[i] + gradxw_ky_r[i] * gradyw_ky_i[i] + gradxw_kz_r[i] * gradyw_kz_i[i]
+
+                                     + gradxw_kx_i[i] * gradyw_kx_r[i] + gradxw_ky_i[i] * gradyw_ky_r[i] + gradxw_kz_i[i] * gradyw_kz_r[i]);
+
+                        rxw1ryw2_sig_x_i[i] = 4.0 * (gradxw_kx_r[i] * gradyw_kx_i[i] + gradxw_kx_i[i] * gradyw_kx_r[i] ) + jj_i;
+
+                        rxw1ryw2_sig_y_i[i] = 4.0 * (gradxw_ky_r[i] * gradyw_ky_i[i] + gradxw_ky_i[i] * gradyw_ky_r[i] ) + jj_i;
+
+                        rxw1ryw2_sig_z_i[i] = 4.0 * (gradxw_kz_r[i] * gradyw_kz_i[i] + gradxw_kz_i[i] * gradyw_kz_r[i] ) + jj_i;
+
+                        rxw1ryw2_lam_xy_i[i] = gradxw_kx_r[i] * gradyw_ky_i[i] + gradxw_kx_i[i] * gradyw_ky_r[i]
+
+                                             + gradxw_ky_r[i] * gradyw_kx_i[i] + gradxw_ky_i[i] * gradyw_kx_r[i];
+
+                        rxw1ryw2_lam_xz_i[i] = gradxw_kx_r[i] * gradyw_kz_i[i] + gradxw_kx_i[i] * gradyw_kz_r[i]
+
+                                             + gradxw_kz_r[i] * gradyw_kx_i[i] + gradxw_kz_i[i] * gradyw_kx_r[i];     
+
+                        rxw1ryw2_lam_yz_i[i] = gradxw_ky_r[i] * gradyw_kz_i[i] + gradxw_ky_i[i] * gradyw_kz_r[i]
+
+                                             + gradxw_kz_r[i] * gradyw_ky_i[i] + gradxw_kz_i[i] * gradyw_ky_r[i];
 
                         // rxw1rzw2
 
@@ -1133,6 +1254,30 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
 
                                              + gradxw_kz_r[i] * gradzw_ky_r[i] - gradxw_kz_i[i] * gradzw_ky_i[i]; 
                         
+                        // rxw1rzw2 imag
+
+                        jj_i = 2.0 * (gradxw_kx_r[i] * gradzw_kx_i[i] + gradxw_ky_r[i] * gradzw_ky_i[i] + gradxw_kz_r[i] * gradzw_kz_i[i]
+
+                                    + gradxw_kx_i[i] * gradzw_kx_r[i] + gradxw_ky_i[i] * gradzw_ky_r[i] + gradxw_kz_i[i] * gradzw_kz_r[i]);
+
+                        rxw1rzw2_sig_x_i[i] = 4.0 * (gradxw_kx_r[i] * gradzw_kx_i[i] + gradxw_kx_i[i] * gradzw_kx_r[i] ) + jj_i;
+
+                        rxw1rzw2_sig_y_i[i] = 4.0 * (gradxw_ky_r[i] * gradzw_ky_i[i] + gradxw_ky_i[i] * gradzw_ky_r[i] ) + jj_i;
+
+                        rxw1rzw2_sig_z_i[i] = 4.0 * (gradxw_kz_r[i] * gradzw_kz_i[i] + gradxw_kz_i[i] * gradzw_kz_r[i] ) + jj_i;
+
+                        rxw1rzw2_lam_xy_i[i] = gradxw_kx_r[i] * gradzw_ky_i[i] + gradxw_kx_i[i] * gradzw_ky_r[i]
+
+                                             + gradxw_ky_r[i] * gradzw_kx_i[i] + gradxw_ky_i[i] * gradzw_kx_r[i];
+
+                        rxw1rzw2_lam_xz_i[i] = gradxw_kx_r[i] * gradzw_kz_i[i] + gradxw_kx_i[i] * gradzw_kz_r[i]
+
+                                             + gradxw_kz_r[i] * gradzw_kx_i[i] + gradxw_kz_i[i] * gradzw_kx_r[i];     
+
+                        rxw1rzw2_lam_yz_i[i] = gradxw_ky_r[i] * gradzw_kz_i[i] + gradxw_ky_i[i] * gradzw_kz_r[i]
+
+                                             + gradxw_kz_r[i] * gradzw_ky_i[i] + gradxw_kz_i[i] * gradzw_ky_r[i]; 
+
                         // ryw1rxw2
 
                         ryw1rxw2_sig_x_r[i] = rxw1ryw2_sig_x_r[i];
@@ -1146,6 +1291,21 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
                         ryw1rxw2_lam_xz_r[i] = rxw1ryw2_lam_xz_r[i];     
 
                         ryw1rxw2_lam_yz_r[i] = rxw1ryw2_lam_yz_r[i];
+
+
+                        // ryw1rxw2 imag
+
+                        ryw1rxw2_sig_x_i[i] = rxw1ryw2_sig_x_i[i];
+
+                        ryw1rxw2_sig_y_i[i] = rxw1ryw2_sig_y_i[i];
+
+                        ryw1rxw2_sig_z_i[i] = rxw1ryw2_sig_z_i[i];
+
+                        ryw1rxw2_lam_xy_i[i] = rxw1ryw2_lam_xy_i[i];
+
+                        ryw1rxw2_lam_xz_i[i] = rxw1ryw2_lam_xz_i[i];     
+
+                        ryw1rxw2_lam_yz_i[i] = rxw1ryw2_lam_yz_i[i];
 
 
                         // ryw1ryw2
@@ -1172,6 +1332,30 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
 
                                              + gradyw_kz_r[i] * gradyw_ky_r[i] - gradyw_kz_i[i] * gradyw_ky_i[i]; 
 
+                        // ryw1ryw2 imag
+
+                        jj_i = 2.0 * (gradyw_kx_r[i] * gradyw_kx_i[i] + gradyw_ky_r[i] * gradyw_ky_i[i] + gradyw_kz_r[i] * gradyw_kz_i[i]
+
+                                    + gradyw_kx_i[i] * gradyw_kx_r[i] + gradyw_ky_i[i] * gradyw_ky_r[i] + gradyw_kz_i[i] * gradyw_kz_r[i]);
+
+                        ryw1ryw2_sig_x_i[i] = 4.0 * (gradyw_kx_r[i] * gradyw_kx_i[i] + gradyw_kx_i[i] * gradyw_kx_r[i] ) + jj_i;
+
+                        ryw1ryw2_sig_y_i[i] = 4.0 * (gradyw_ky_r[i] * gradyw_ky_i[i] + gradyw_ky_i[i] * gradyw_ky_r[i] ) + jj_i;
+
+                        ryw1ryw2_sig_z_i[i] = 4.0 * (gradyw_kz_r[i] * gradyw_kz_i[i] + gradyw_kz_i[i] * gradyw_kz_r[i] ) + jj_i;
+
+                        ryw1ryw2_lam_xy_i[i] = gradyw_kx_r[i] * gradyw_ky_i[i] + gradyw_kx_i[i] * gradyw_ky_r[i]
+
+                                             + gradyw_ky_r[i] * gradyw_kx_i[i] + gradyw_ky_i[i] * gradyw_kx_r[i];
+
+                        ryw1ryw2_lam_xz_i[i] = gradyw_kx_r[i] * gradyw_kz_i[i] + gradyw_kx_i[i] * gradyw_kz_r[i]
+
+                                             + gradyw_kz_r[i] * gradyw_kx_i[i] + gradyw_kz_i[i] * gradyw_kx_r[i];     
+
+                        ryw1ryw2_lam_yz_i[i] = gradyw_ky_r[i] * gradyw_kz_i[i] + gradyw_ky_i[i] * gradyw_kz_r[i]
+
+                                             + gradyw_kz_r[i] * gradyw_ky_i[i] + gradyw_kz_i[i] * gradyw_ky_r[i]; 
+
 
                         // ryw1rzw2
 
@@ -1197,6 +1381,30 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
 
                                              + gradyw_kz_r[i] * gradzw_ky_r[i] - gradyw_kz_i[i] * gradzw_ky_i[i]; 
 
+                        // ryw1rzw2 imag
+
+                        jj_i = 2.0 * (gradyw_kx_r[i] * gradzw_kx_i[i] + gradyw_ky_r[i] * gradzw_ky_i[i] + gradyw_kz_r[i] * gradzw_kz_i[i]
+
+                                     + gradyw_kx_i[i] * gradzw_kx_r[i] + gradyw_ky_i[i] * gradzw_ky_r[i] + gradyw_kz_i[i] * gradzw_kz_r[i]);
+
+                        ryw1rzw2_sig_x_i[i] = 4.0 * (gradyw_kx_r[i] * gradzw_kx_i[i] + gradyw_kx_i[i] * gradzw_kx_r[i] ) + jj_i;
+
+                        ryw1rzw2_sig_y_i[i] = 4.0 * (gradyw_ky_r[i] * gradzw_ky_i[i] + gradyw_ky_i[i] * gradzw_ky_r[i] ) + jj_i;
+
+                        ryw1rzw2_sig_z_i[i] = 4.0 * (gradyw_kz_r[i] * gradzw_kz_i[i] + gradyw_kz_i[i] * gradzw_kz_r[i] ) + jj_i;
+
+                        ryw1rzw2_lam_xy_i[i] = gradyw_kx_r[i] * gradzw_ky_i[i] + gradyw_kx_i[i] * gradzw_ky_r[i]
+
+                                             + gradyw_ky_r[i] * gradzw_kx_i[i] + gradyw_ky_i[i] * gradzw_kx_r[i];
+
+                        ryw1rzw2_lam_xz_i[i] = gradyw_kx_r[i] * gradzw_kz_i[i] + gradyw_kx_i[i] * gradzw_kz_r[i]
+
+                                             + gradyw_kz_r[i] * gradzw_kx_i[i] + gradyw_kz_i[i] * gradzw_kx_r[i];     
+
+                        ryw1rzw2_lam_yz_i[i] = gradyw_ky_r[i] * gradzw_kz_i[i] + gradyw_ky_i[i] * gradzw_kz_r[i]
+
+                                             + gradyw_kz_r[i] * gradzw_ky_i[i] + gradyw_kz_i[i] * gradzw_ky_r[i]; 
+
                         // rzw1rxw2
 
                         rzw1rxw2_sig_x_r[i] = rxw1rzw2_sig_x_r[i] ;
@@ -1211,6 +1419,19 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
 
                         rzw1rxw2_lam_yz_r[i] = rxw1rzw2_lam_yz_r[i]; 
 
+                        // rzw1rxw2 imag
+
+                        rzw1rxw2_sig_x_i[i] = rxw1rzw2_sig_x_i[i] ;
+
+                        rzw1rxw2_sig_y_i[i] = rxw1rzw2_sig_y_i[i] ;
+
+                        rzw1rxw2_sig_z_i[i] = rxw1rzw2_sig_z_i[i];
+
+                        rzw1rxw2_lam_xy_i[i] = rxw1rzw2_lam_xy_i[i];
+
+                        rzw1rxw2_lam_xz_i[i] = rxw1rzw2_lam_xz_i[i];     
+
+                        rzw1rxw2_lam_yz_i[i] = rxw1rzw2_lam_yz_i[i]; 
 
                         // rzw1ryw2
 
@@ -1226,6 +1447,20 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
 
                         rzw1ryw2_lam_yz_r[i] = ryw1rzw2_lam_yz_r[i]; 
 
+                        // rzw1ryw2 imag
+
+                        rzw1ryw2_sig_x_i[i] = ryw1rzw2_sig_x_i[i] ;
+
+                        rzw1ryw2_sig_y_i[i] = ryw1rzw2_sig_y_i[i] ;
+
+                        rzw1ryw2_sig_z_i[i] = ryw1rzw2_sig_z_i[i];
+
+                        rzw1ryw2_lam_xy_i[i] = ryw1rzw2_lam_xy_i[i];
+
+                        rzw1ryw2_lam_xz_i[i] = ryw1rzw2_lam_xz_i[i];     
+
+                        rzw1ryw2_lam_yz_i[i] = ryw1rzw2_lam_yz_i[i];
+
                         
                         // rzw1rzw2
 
@@ -1233,23 +1468,47 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
 
                               -2.0 * (gradzw_kx_i[i] * gradzw_kx_i[i] + gradzw_ky_i[i] * gradzw_ky_i[i] + gradzw_kz_i[i] * gradzw_kz_i[i]);
 
-                        ryw1rzw2_sig_x_r[i] = 4.0 * (gradzw_kx_r[i] * gradzw_kx_r[i] - gradzw_kx_i[i] * gradzw_kx_i[i] ) + jj_r;
+                        rzw1rzw2_sig_x_r[i] = 4.0 * (gradzw_kx_r[i] * gradzw_kx_r[i] - gradzw_kx_i[i] * gradzw_kx_i[i] ) + jj_r;
 
-                        ryw1rzw2_sig_y_r[i] = 4.0 * (gradzw_ky_r[i] * gradzw_ky_r[i] - gradzw_ky_i[i] * gradzw_ky_i[i] ) + jj_r;
+                        rzw1rzw2_sig_y_r[i] = 4.0 * (gradzw_ky_r[i] * gradzw_ky_r[i] - gradzw_ky_i[i] * gradzw_ky_i[i] ) + jj_r;
 
-                        ryw1rzw2_sig_z_r[i] = 4.0 * (gradzw_kz_r[i] * gradzw_kz_r[i] - gradzw_kz_i[i] * gradzw_kz_i[i] ) + jj_r;
+                        rzw1rzw2_sig_z_r[i] = 4.0 * (gradzw_kz_r[i] * gradzw_kz_r[i] - gradzw_kz_i[i] * gradzw_kz_i[i] ) + jj_r;
 
-                        ryw1rzw2_lam_xy_r[i] = gradzw_kx_r[i] * gradzw_ky_r[i] - gradzw_kx_i[i] * gradzw_ky_i[i]
+                        rzw1rzw2_lam_xy_r[i] = gradzw_kx_r[i] * gradzw_ky_r[i] - gradzw_kx_i[i] * gradzw_ky_i[i]
 
                                              + gradzw_ky_r[i] * gradzw_kx_r[i] - gradzw_ky_i[i] * gradzw_kx_i[i];
 
-                        ryw1rzw2_lam_xz_r[i] = gradzw_kx_r[i] * gradzw_kz_r[i] - gradzw_kx_i[i] * gradzw_kz_i[i]
+                        rzw1rzw2_lam_xz_r[i] = gradzw_kx_r[i] * gradzw_kz_r[i] - gradzw_kx_i[i] * gradzw_kz_i[i]
 
                                              + gradzw_kz_r[i] * gradzw_kx_r[i] - gradzw_kz_i[i] * gradzw_kx_i[i];     
 
-                        ryw1rzw2_lam_yz_r[i] = gradzw_ky_r[i] * gradzw_kz_r[i] - gradzw_ky_i[i] * gradzw_kz_i[i]
+                        rzw1rzw2_lam_yz_r[i] = gradzw_ky_r[i] * gradzw_kz_r[i] - gradzw_ky_i[i] * gradzw_kz_i[i]
 
                                              + gradzw_kz_r[i] * gradzw_ky_r[i] - gradzw_kz_i[i] * gradzw_ky_i[i]; 
+
+                        // rzw1rzw2 imag
+
+                        jj_i = 2.0 * (gradzw_kx_r[i] * gradzw_kx_i[i] + gradzw_ky_r[i] * gradzw_ky_i[i] + gradzw_kz_r[i] * gradzw_kz_i[i]
+
+                                    + gradzw_kx_i[i] * gradzw_kx_r[i] + gradzw_ky_i[i] * gradzw_ky_r[i] + gradzw_kz_i[i] * gradzw_kz_r[i]);
+
+                        rzw1rzw2_sig_x_i[i] = 4.0 * (gradzw_kx_r[i] * gradzw_kx_i[i] + gradzw_kx_i[i] * gradzw_kx_r[i] ) + jj_i;
+
+                        rzw1rzw2_sig_y_i[i] = 4.0 * (gradzw_ky_r[i] * gradzw_ky_i[i] + gradzw_ky_i[i] * gradzw_ky_r[i] ) + jj_i;
+
+                        rzw1rzw2_sig_z_i[i] = 4.0 * (gradzw_kz_r[i] * gradzw_kz_i[i] + gradzw_kz_i[i] * gradzw_kz_r[i] ) + jj_i;
+
+                        rzw1rzw2_lam_xy_i[i] = gradzw_kx_r[i] * gradzw_ky_i[i] + gradzw_kx_i[i] * gradzw_ky_r[i]
+
+                                             + gradzw_ky_r[i] * gradzw_kx_i[i] + gradzw_ky_i[i] * gradzw_kx_r[i];
+
+                        rzw1rzw2_lam_xz_i[i] = gradzw_kx_r[i] * gradzw_kz_i[i] + gradzw_kx_i[i] * gradzw_kz_r[i]
+
+                                             + gradzw_kz_r[i] * gradzw_kx_i[i] + gradzw_kz_i[i] * gradzw_kx_r[i];     
+
+                        rzw1rzw2_lam_yz_i[i] = gradzw_ky_r[i] * gradzw_kz_i[i] + gradzw_ky_i[i] * gradzw_kz_r[i]
+
+                                             + gradzw_kz_r[i] * gradzw_ky_i[i] + gradzw_kz_i[i] * gradzw_ky_r[i]; 
 
                     }           
                 }
