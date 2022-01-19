@@ -142,27 +142,6 @@ public:
                          const std::function<def_vxc_func_typ>&  bFirstOrderFunction,
                          const std::function<def_vxc2_func_typ>& abSecondOrderFunction,
                          const std::function<def_vxc2_func_typ>& aSecondOrderFunction,
-                         const std::function<def_vxc2_func_typ>& bSecondOrderFunction);
-
-    /**
-     Creates a primitive exchange-correlation functional object.
-     
-     @param label the label of primitive exchange-correlation functional.
-     @param xcFuncType the type of primitive exchange-correlation functional.
-     @param abFirstOrderFunction the first-order derivative function (dengrid::ab).
-     @param aFirstOrderFunction the first-order derivative function (dengrid::lima).
-     @param bFirstOrderFunction the first-order derivative function (dengrid::limb).
-     @param abSecondOrderFunction the second-order derivative function (dengrid::ab).
-     @param aSecondOrderFunction the second-order derivative function (dengrid::lima).
-     @param bSecondOrderFunction the second-order derivative function (dengrid::limb).
-     */
-    CPrimitiveFunctional(const std::string&                      label,
-                         const xcfun                             xcFuncType,
-                         const std::function<def_vxc_func_typ>&  abFirstOrderFunction,
-                         const std::function<def_vxc_func_typ>&  aFirstOrderFunction,
-                         const std::function<def_vxc_func_typ>&  bFirstOrderFunction,
-                         const std::function<def_vxc2_func_typ>& abSecondOrderFunction,
-                         const std::function<def_vxc2_func_typ>& aSecondOrderFunction,
                          const std::function<def_vxc2_func_typ>& bSecondOrderFunction,
                          const std::function<def_vxc3_func_typ>& abThirdOrderFunction,
                          const std::function<def_vxc3_func_typ>& aThirdOrderFunction,

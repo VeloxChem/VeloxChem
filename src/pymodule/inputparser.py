@@ -24,6 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from pathlib import PurePath
+from datetime import datetime
 import numpy as np
 import sys
 import re
@@ -164,20 +165,9 @@ class InputParser:
             f_path = PurePath(self.inpname)
         self.input_dict['filename'] = str(f_path.with_name(f_path.stem))
 
-        # update checkpoint filename
-        abbrev = {
-            'scf': 'scf',
-            'response': 'rsp',
-            'exciton': 'exciton',
-        }
-
-        for job_type in abbrev:
-            if job_type not in self.input_dict:
-                self.input_dict[job_type] = {}
-            if 'checkpoint_file' not in self.input_dict[job_type]:
-                checkpoint_file = str(
-                    f_path.with_suffix(f'.{abbrev[job_type]}.h5'))
-                self.input_dict[job_type]['checkpoint_file'] = checkpoint_file
+        # initializes scf group if not defined in input file
+        if 'scf' not in self.input_dict:
+            self.input_dict['scf'] = {}
 
     def get_dict(self):
         """
@@ -406,6 +396,26 @@ def parse_input(obj, keyword_types, input_dictionary):
             assert_msg_critical(False, err_type)
 
 
+def print_keywords(input_keywords, ostream):
+    """
+    Prints input keywords to output stream.
+    """
+
+    width = 80
+    for group in input_keywords:
+        group_print = group.replace('_', ' ')
+        ostream.print_header('=' * width)
+        ostream.print_header(f'  @{group_print}'.ljust(width))
+        ostream.print_header('-' * width)
+        for key, val in input_keywords[group].items():
+            text = f'  {key}'.ljust(20)
+            text += f'  {get_keyword_type(val[0])}'.ljust(15)
+            text += f'  {val[1]}'.ljust(width - 35)
+            ostream.print_header(text)
+    ostream.print_header('=' * width)
+    ostream.flush()
+
+
 def get_keyword_type(keyword_type):
     """
     Gets keyword type for printing.
@@ -413,8 +423,11 @@ def get_keyword_type(keyword_type):
         - 'int' -> 'integer'
         - 'float' -> 'float'
         - 'bool' -> 'boolean'
-        - 'list' -> 'multiple-lines'
+        - 'list' -> 'multi-line'
         - 'seq_fixed_int', 'seq_fixed', 'seq_range' -> 'sequence'
+
+    :return:
+        The keyword type for printing.
     """
 
     return {
@@ -424,8 +437,19 @@ def get_keyword_type(keyword_type):
         'int': 'integer',
         'float': 'float',
         'bool': 'boolean',
-        'list': 'multiple-lines',
+        'list': 'multi-line',
         'seq_fixed_int': 'sequence',
         'seq_fixed': 'sequence',
         'seq_range': 'sequence',
     }[keyword_type]
+
+
+def get_datetime_string():
+    """
+    Gets datetime string.
+
+    :return:
+        The datetime string (ISO format with ':' replaced by '.').
+    """
+
+    return datetime.now().isoformat().replace(':', '.')

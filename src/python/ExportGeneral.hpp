@@ -31,7 +31,6 @@
 #ifdef MSMPI_VER
 #define PyMPI_HAVE_MPI_Message 1
 #endif
-#include <mpi4py/mpi4py.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
@@ -126,7 +125,7 @@ CMemBlock<T>
 numpy_to_memblock(const py::array_t<T>& arr)
 {
     std::string errmsg("numpy_to_memblock: Expecting a C-style contiguous numpy array");
-    auto c_style = py::detail::check_flags(arr.ptr(), py::array::c_style);
+    auto        c_style = py::detail::check_flags(arr.ptr(), py::array::c_style);
     errors::assertMsgCritical(c_style, errmsg);
     return CMemBlock<T>(arr.data(), arr.size(), numa::serial);
 }

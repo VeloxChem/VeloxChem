@@ -83,23 +83,12 @@ class SHGDriver(NonLinearSolver):
         if comm is None:
             comm = MPI.COMM_WORLD
 
-# master
         if ostream is None:
             ostream = OutputStream(sys.stdout)
 
         super().__init__(comm, ostream)
 
         self.is_converged = False
-# qrf_dft
-        self.dft = False
-        self.grid_level = 4
-        self.xcfun = XCFunctional()
-
-        # ERI settings
-        self.eri_thresh = 1.0e-15
-        self.qq_type = 'QQ_DEN'
-        self.batch_size = None
-#>>>>>>> qrf_dft
 
         # cpp settings
         self.frequencies = (0,)
@@ -129,64 +118,17 @@ class SHGDriver(NonLinearSolver):
         Updates response and method settings in SHG driver
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
-            The dictionary of method rsp_dict.
+            The dictionary of method settings.
         """
 
         if method_dict is None:
             method_dict = {}
 
-# Everything is done below
-#        super().update_settings(rsp_dict, method_dict)
+        super().update_settings(rsp_dict, method_dict)
 
-        rsp_keywords = {
-            'frequencies': 'seq_range',
-            'damping': 'float',
-            'a_operator': 'str',
-            'b_operator': 'str',
-            'c_operator': 'str',
-            'eri_thresh': 'float',
-            'qq_type': 'str_upper',
-            'batch_size': 'int',
-            'max_iter': 'int',
-            'conv_thresh': 'float',
-            'lindep_thresh': 'float',
-            'restart': 'bool',
-            'checkpoint_file': 'str',
-            'timing': 'bool',
-            'profiling': 'bool',
-            'memory_profiling': 'bool',
-            'memory_tracing': 'bool',
-        }            
-
-        if 'xcfun' in method_dict:
-            self.dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
-
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Nonlinear solver: Undefined XC functional')
-
-        parse_input(self, rsp_keywords, rsp_dict)
-
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
-
-        if 'potfile' in method_dict:
-            errmsg = 'ShgDriver: The \'potfile\' keyword is not supported in '
-            errmsg += 'SHG calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if 'electric_field' in method_dict:
-            errmsg = 'ShgDriver: The \'electric field\' keyword is not '
-            errmsg += 'supported in SHG calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-    def compute(self, molecule, ao_basis, scf_tensors,method_settings):
+    def compute(self, molecule, ao_basis, scf_tensors):
         """
         Computes the isotropic quadratic response function for second-harmonic
         generation.
@@ -213,6 +155,8 @@ class SHGDriver(NonLinearSolver):
             self.print_header()
 
         start_time = time.time()
+
+        dft_dict = self.init_dft(molecule, scf_tensors)
 
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
@@ -282,27 +226,23 @@ class SHGDriver(NonLinearSolver):
             self.comp = None
 
         # Computing the first-order response vectors (3 per frequency)
+
+
         N_drv = ComplexResponse(self.comm, self.ostream)
 
-# from master branch:
+        if self.dft:
+            print(dft_dict)
+            method_settings = {'xcfun': dft_dict['dft_func_label'], 'grid_level': self.grid_level}
+            N_drv.update_settings({},method_settings)
+       
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
-            'program_start_time', 'maximum_hours'
+            'program_end_time'
         }
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
-# qrf_dft branch version:
-#        N_drv.update_settings({
-#            'damping': self.damping,
-#            'lindep_thresh': self.lindep_thresh,
-#            'conv_thresh': self.conv_thresh,
-#            'max_iter': self.max_iter,
-#            'eri_thresh': self.eri_thresh,
-#            'qq_type': self.qq_type,
-#        },method_settings)
-#>>>>>>> qrf_dft
 
         if self.checkpoint_file is not None:
             N_drv.checkpoint_file = str(

@@ -377,9 +377,7 @@ export_orbdata(py::module& m)
              "molecule"_a,
              "basis_1"_a,
              "basis_2"_a,
-             "S12"_a,
-             "S22"_a,
-             "closedShell"_a);
+             "densityType"_a);
 
     // exposing functions
 

@@ -40,6 +40,7 @@ from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
+                         
 
 
 class CubicResponseDriver(NonLinearSolver):
@@ -108,9 +109,9 @@ class CubicResponseDriver(NonLinearSolver):
         Updates response and method settings
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
-            The dictionary of method rsp_dict.
+            The dictionary of method settings.
         """
 
         if method_dict is None:
@@ -251,7 +252,7 @@ class CubicResponseDriver(NonLinearSolver):
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
-            'program_start_time', 'maximum_hours'
+            'program_end_time'
         }
 
         for key in cpp_keywords:
@@ -826,7 +827,7 @@ class CubicResponseDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
+        dist_focks = self.comp_nlr_fock_cubic(mo, density_list, molecule, ao_basis,
                                         'real_and_imag')
         time_end_fock = time.time()
 
@@ -902,7 +903,7 @@ class CubicResponseDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
+        dist_focks = self.comp_nlr_fock_cubic(mo, density_list, molecule, ao_basis,
                                         'real_and_imag')
         time_end_fock = time.time()
 
@@ -1164,7 +1165,7 @@ class CubicResponseDriver(NonLinearSolver):
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
-            'program_start_time', 'maximum_hours'
+            'program_end_time'
         }
 
         for key in cpp_keywords:

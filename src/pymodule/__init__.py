@@ -31,6 +31,8 @@ from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
+from .veloxchemlib import GridDriver
+from .veloxchemlib import DensityGridDriver
 from .veloxchemlib import SADGuessDriver
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import DenseMatrix
@@ -68,6 +70,7 @@ from .molecularorbitals import MolecularOrbitals
 from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
+from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfgradientdriver import ScfGradientDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
@@ -86,6 +89,9 @@ from .cppsolver import ComplexResponse
 from .c6solver import C6Solver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
+from .shgdriver import SHGDriver
+from .tpafulldriver import TPAFullDriver
+from .tpareddriver import TPAReducedDriver
 from .respchargesdriver import RespChargesDriver
 from .rspproperty import ResponseProperty
 from .rsplinabscross import LinearAbsorptionCrossSection
@@ -106,10 +112,6 @@ from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
 from .cphfsolver import CphfSolver
 from .tdhfhessiandriver import TdhfHessianDriver
-from .xtbhessiandriver import XTBHessianDriver
-from .cubicresponsedriver import CubicResponseDriver
-from .quadraticresponsedriver import QuadraticResponseDriver
-from .shgdriver import SHGDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical

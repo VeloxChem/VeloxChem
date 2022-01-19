@@ -46,7 +46,10 @@ namespace vxcfuncs {  // vxcfuncs namespace
                                     &vxcfuncs::LYPFuncGradientB,
                                     &vxcfuncs::LYPFuncHessianAB,
                                     &vxcfuncs::LYPFuncHessianA,
-                                    &vxcfuncs::LYPFuncHessianB);
+                                    &vxcfuncs::LYPFuncHessianB,
+                                    &vxcfuncs::LYPFuncCubicHessianAB,
+                                    &vxcfuncs::LYPFuncCubicHessianA,
+                                    &vxcfuncs::LYPFuncCubicHessianB);
     }
     
     void
@@ -673,6 +676,31 @@ namespace vxcfuncs {  // vxcfuncs namespace
     LYPFuncHessianB(      CXCHessianGrid& xcHessianGrid,
                     const double          factor,
                     const CDensityGrid&   densityGrid)
+    {
+        
+    }
+
+
+    void
+    LYPFuncCubicHessianAB(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                     const double          factor,
+                     const CDensityGrid&   densityGrid)
+    {
+        
+    }
+
+    void
+    LYPFuncCubicHessianA(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                     const double          factor,
+                     const CDensityGrid&   densityGrid)
+    {
+        
+    }
+
+    void
+    LYPFuncCubicHessianB(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                     const double          factor,
+                     const CDensityGrid&   densityGrid)
     {
         
     }

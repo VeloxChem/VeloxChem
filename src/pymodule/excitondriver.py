@@ -52,7 +52,7 @@ from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .rspabsorption import Absorption
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
+from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
 from .checkpoint import read_rsp_hdf5
 from .checkpoint import write_rsp_hdf5
@@ -157,6 +157,32 @@ class ExcitonModelDriver:
         self.restart = True
         self.checkpoint_file = None
 
+        # filename
+        self.filename = f'veloxchem_exciton_{get_datetime_string()}'
+
+        # input keywords
+        self.input_keywords = {
+            'exciton': {
+                'nstates': ('int', 'number of locally excited (LE) states'),
+                'ct_nocc': ('int', 'number of occupied MOs for CT states'),
+                'ct_nvir': ('int', 'number of unoccupied MOs for CT states'),
+                'restart': ('bool', 'restart from checkpoint file'),
+                'checkpoint_file': ('str', 'name of checkpoint file'),
+            },
+            'method_settings': {
+                'dft': ('bool', 'use DFT'),
+                'xcfun': ('str_upper', 'exchange-correlation functional'),
+                'grid_level': ('int', 'accuracy level of DFT grid'),
+            },
+        }
+
+    def print_keywords(self):
+        """
+        Prints input keywords in exciton model driver.
+        """
+
+        print_keywords(self.input_keywords, self.ostream)
+
     def update_settings(self, exciton_dict, method_dict=None):
         """
         Updates settings in exciton model driver.
@@ -194,18 +220,19 @@ class ExcitonModelDriver:
             self.charges += [float(q)] * int(n)
 
         exciton_keywords = {
-            'nstates': 'int',
-            'ct_nocc': 'int',
-            'ct_nvir': 'int',
-            'restart': 'bool',
-            'checkpoint_file': 'str',
+            key: val[0] for key, val in self.input_keywords['exciton'].items()
         }
 
         parse_input(self, exciton_keywords, exciton_dict)
 
+        if 'filename' in exciton_dict:
+            self.filename = exciton_dict['filename']
+            if 'checkpoint_file' not in exciton_dict:
+                self.checkpoint_file = f'{self.filename}.exciton.h5'
+
         method_keywords = {
-            'dft': 'bool',
-            'grid_level': 'int',
+            key: val[0]
+            for key, val in self.input_keywords['method_settings'].items()
         }
 
         parse_input(self, method_keywords, method_dict)

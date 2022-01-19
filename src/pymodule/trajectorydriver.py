@@ -40,7 +40,7 @@ from .scfrestdriver import ScfRestrictedDriver
 from .outputstream import OutputStream
 from .rspabsorption import Absorption
 from .subcommunicators import SubCommunicators
-from .inputparser import parse_seq_range
+from .inputparser import parse_seq_range, get_datetime_string
 
 
 class TrajectoryDriver:
@@ -99,7 +99,7 @@ class TrajectoryDriver:
         self.mm_pol_region = None
         self.mm_nonpol_region = None
 
-        self.filename = 'veloxchem_trajectory_input'
+        self.filename = f'veloxchem_traj_{get_datetime_string()}'
         self.method_dict = None
         self.description = 'N/A'
 
@@ -122,13 +122,13 @@ class TrajectoryDriver:
         Updates settings in trajectory driver.
 
         :param traj_dict:
-            The input dictionary of trajectory group.
+            The dictionary of trajectory input.
         :param spect_dict:
-            The input dictionary of spectrum settings group.
+            The dictionary of spectrum input.
         :param rsp_dict:
-            The input dictionary of response settings group.
+            The dictionary of response input.
         :param method_dict:
-            The input dicitonary of method settings group.
+            The dicitonary of method settings.
         """
 
         time_factor = 1.0

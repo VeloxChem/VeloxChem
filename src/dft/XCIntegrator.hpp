@@ -41,6 +41,7 @@
 #include "XCCubicHessianGrid.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "DensityGrid.hpp"
+#include "DensityGridQuad.hpp"
 #include "GtoContainer.hpp"
 #include "AOFockMatrix.hpp"
 #include "MemBlock.hpp"
@@ -170,7 +171,7 @@ class CXCIntegrator
                                            const CGtoContainer*       gtoContainer,
                                            const CXCHessianGrid&      xcHessianGrid,
                                            const CXCCubicHessianGrid& xcCubicHessianGrid,
-                                           const CDensityGrid&        rwDensityGrid,
+                                           const CDensityGridQuad&        rwDensityGrid,
                                            const CDensityGrid&        rw2DensityGrid,
                                            const CMolecularGrid&      molecularGrid,
                                            const std::string&         quadMode) const;
@@ -257,7 +258,7 @@ class CXCIntegrator
                                            const CXCHessianGrid&      xcHessianGrid,
                                            const CXCCubicHessianGrid& xcCubicHessianGrid,
                                            const CDensityGrid&        gsDensityGrid,
-                                           const CDensityGrid&        rwDensityGrid,
+                                           const CDensityGridQuad&    rwDensityGrid,
                                            const CDensityGrid&        rw2DensityGrid,
                                            const CMolecularGrid&      molecularGrid) const;
 
@@ -330,7 +331,7 @@ class CXCIntegrator
                                     const CGtoContainer*       gtoContainer,
                                     const CXCHessianGrid*      xcHessianGrid,
                                     const CXCCubicHessianGrid* xcCubicHessianGrid,
-                                    const CDensityGrid*        rwDensityGrid,
+                                    const CDensityGridQuad*        rwDensityGrid,
                                     const CDensityGrid*        rw2DensityGrid,
                                     const double*              gridCoordinatesX,
                                     const double*              gridCoordinatesY,
@@ -499,7 +500,7 @@ class CXCIntegrator
                                     const CXCHessianGrid*      xcHessianGrid,
                                     const CXCCubicHessianGrid* xcCubicHessianGrid,
                                     const CDensityGrid*        gsDensityGrid,
-                                    const CDensityGrid*        rwDensityGrid,
+                                    const CDensityGridQuad*    rwDensityGrid,
                                     const CDensityGrid*        rw2DensityGrid,
                                     const double*              gridCoordinatesX,
                                     const double*              gridCoordinatesY,
@@ -647,37 +648,11 @@ class CXCIntegrator
      @param gridBlockPosition the block position in grids batch.
      @param nGridPoints the number of grid points in grid block.
      */
-    void _distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+    void _distRestrictedBatchForLda(   CAOKohnShamMatrix*   aoKohnShamMatrix,
                                           CMemBlock<double>&   xcBuffer,
                                     const CXCHessianGrid*      xcHessianGrid,
                                     const CXCCubicHessianGrid* xcCubicHessianGrid,
-                                    const CDensityGrid*        rwDensityGrid,
-                                    const CDensityGrid*        rw2DensityGrid,
-                                    const CMemBlock2D<double>& gtoValues,
-                                    const double*              gridWeights,
-                                    const int32_t              gridOffset,
-                                    const int32_t              gridBlockPosition,
-                                    const int32_t              nGridPoints) const;
-
-    /**
-     Distributes exchange-correlation contribution to perturbed Kohn-Sham matrix from batch of grid points
-     for spin-restricted LDA case.
-
-     @param aoKohnShamMatrix the pointer to Kohn-Sham matrix.
-     @param xcBuffer the exchange-correlation buffer.
-     @param xcHessianGrid the pointer to exchange-correlation hessian grid.
-     @param rwDensityGrid the pointer to perturbed density grid.
-     @param gtoValues the pointer to GTOS values on grid.
-     @param gridWeights the pointer to grid weights.
-     @param gridOffset the offset of grids batch in density grid.
-     @param gridBlockPosition the block position in grids batch.
-     @param nGridPoints the number of grid points in grid block.
-     */
-    void _distRestrictedBatchForLdaShg(   CAOKohnShamMatrix*   aoKohnShamMatrix,
-                                          CMemBlock<double>&   xcBuffer,
-                                    const CXCHessianGrid*      xcHessianGrid,
-                                    const CXCCubicHessianGrid* xcCubicHessianGrid,
-                                    const CDensityGrid*        rwDensityGrid,
+                                    const CDensityGridQuad*        rwDensityGrid,
                                     const CDensityGrid*        rw2DensityGrid,
                                     const CMemBlock2D<double>& gtoValues,
                                     const double*              gridWeights,
@@ -1040,7 +1015,6 @@ class CXCIntegrator
                                     const int32_t              gridOffset,
                                     const int32_t              gridBlockPosition,
                                     const int32_t              nGridPoints) const;
-
    /**
      Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
      for spin-restricted GGA case.
@@ -1066,7 +1040,7 @@ class CXCIntegrator
                                     const CXCHessianGrid*      xcHessianGrid,
                                     const CXCCubicHessianGrid* xcCubicHessianGrid,
                                     const CDensityGrid*        gsDensityGrid,
-                                    const CDensityGrid*        rwDensityGrid,
+                                    const CDensityGridQuad*    rwDensityGrid,
                                     const CDensityGrid*        rw2DensityGrid,
                                     const CMemBlock2D<double>& gtoValues,
                                     const CMemBlock2D<double>& gtoValuesX,
@@ -1076,7 +1050,8 @@ class CXCIntegrator
                                     const int32_t              gridOffset,
                                     const int32_t              gridBlockPosition,
                                     const int32_t              nGridPoints) const;
-    
+
+
     /**
      Computes exchange-correlation contribution to perturbed Kohn-Sham matrix from restricted density.
      

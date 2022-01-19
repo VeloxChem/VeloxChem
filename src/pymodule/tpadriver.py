@@ -37,7 +37,7 @@ from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
 
 
-class TpaDriver(NonLinearSolver):
+class TPADriver(NonLinearSolver):
     """
     Implements the isotropic cubic response driver for two-photon absorption
     (TPA)
@@ -87,7 +87,7 @@ class TpaDriver(NonLinearSolver):
         Updates response and method settings in TPA driver
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -189,7 +189,7 @@ class TpaDriver(NonLinearSolver):
         cpp_keywords = {
             'frequencies', 'damping', 'lindep_thresh', 'conv_thresh',
             'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
-            'batch_size', 'restart', 'program_start_time', 'maximum_hours'
+            'batch_size', 'restart', 'program_end_time'
         }
 
         for key in cpp_keywords:

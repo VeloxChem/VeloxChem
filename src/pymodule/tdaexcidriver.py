@@ -119,7 +119,7 @@ class TDAExciDriver(LinearSolver):
         driver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -202,8 +202,6 @@ class TDAExciDriver(LinearSolver):
         # PE information
         pe_dict = self.init_pe(molecule, basis)
 
-        timing_dict = {}
-
         # set up trial excitation vectors on master node
 
         diag_mat, trial_mat = self.gen_trial_vectors(mol_orbs, molecule)
@@ -239,7 +237,9 @@ class TDAExciDriver(LinearSolver):
 
         for i in range(self.max_iter):
 
-            profiler.start_timer(i, 'FockBuild')
+            profiler.set_timing_key(f'Iteration {i+1}')
+
+            profiler.start_timer('FockBuild')
 
             # perform linear transformation of trial vectors
 
@@ -248,10 +248,10 @@ class TDAExciDriver(LinearSolver):
                     trial_mat, scf_tensors, molecule)
 
                 self.comp_lr_fock(fock, tdens, molecule, basis, eri_dict,
-                                  dft_dict, pe_dict, timing_dict)
+                                  dft_dict, pe_dict, profiler)
 
-            profiler.stop_timer(i, 'FockBuild')
-            profiler.start_timer(i, 'ReducedSpace')
+            profiler.stop_timer('FockBuild')
+            profiler.start_timer('ReducedSpace')
 
             # solve eigenvalues problem on master node
 
@@ -274,11 +274,9 @@ class TDAExciDriver(LinearSolver):
 
                 self.print_iter_data(i)
 
-            profiler.stop_timer(i, 'ReducedSpace')
-            if self.dft or self.pe:
-                profiler.update_timer(i, timing_dict)
+            profiler.stop_timer('ReducedSpace')
 
-            profiler.check_memory_usage('Iteration {:d}'.format(i + 1))
+            profiler.check_memory_usage(f'Iteration {i+1}')
 
             profiler.print_memory_tracing(self.ostream)
 
@@ -726,11 +724,11 @@ class TDAExciDriver(LinearSolver):
             The TDA eigenvectors (in columns).
         """
 
-        if self.checkpoint_file is not None:
-            final_h5_fname = str(
-                Path(self.checkpoint_file).with_suffix('.solutions.h5'))
-        else:
-            final_h5_fname = 'rsp.solutions.h5'
+        if self.checkpoint_file is None:
+            return
+
+        final_h5_fname = str(
+            Path(self.checkpoint_file).with_suffix('.solutions.h5'))
 
         create_hdf5(final_h5_fname, molecule, basis, dft_func_label,
                     potfile_text)
