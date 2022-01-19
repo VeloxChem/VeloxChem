@@ -4,6 +4,7 @@ task: response
 
 @method settings
 basis: 6-31G
+xcfun: slater
 @end
 
 @response
@@ -16,9 +17,9 @@ damping: 0.1
 @molecule
 charge: 0
 multiplicity: 1
-units: ang
+units: au
 xyz:  
-H    0.7586020000      0.0000000000        -0.5042840000
-H    0.7586020000      0.0000000000         0.5042840000
-O    0.0000000000      0.0000000000         0.0000000000
+O   0.0   0.0   0.0
+H   0.0   1.4   1.1
+H   0.0  -1.4   1.1
 @end 

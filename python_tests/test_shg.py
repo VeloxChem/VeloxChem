@@ -61,9 +61,9 @@ class TestSHG:
         w = 0.2
 
         ref_result = {
-            'x': 163.69097360 + 177.80276777j,
+            'x': 0 + 0j,
             'y': 0 + 0j,
-            'z': 0 + 0J,
+            'z': 155.93642496 + 99.03258296J,
         }
 
         here = Path(__file__).parent
