@@ -434,18 +434,12 @@ class TestRODFT:
 
     @pytest.mark.parametrize(
         'scf_setup',
-        [
-            (None, -3.269190923863),
-            ('slater', -3.064460757711),
-            ('b3lyp', -3.315910830402),
-        ],
+        [(None, -3.269190923863), ('slater', -3.064460757711)],
         indirect=True,
-        ids=['rohf', 'slater', 'b3lyp'],
+        ids=['rohf', 'slater'],
+        # TODO: add b3lyp test
     )
     def test_initial_total_energy(self, scf_setup):
-        xcfun = scf_setup[0].scf_drv.xcfun
-        if xcfun and xcfun.get_func_label() == "B3LYP":
-            pytest.skip('missing accuracy')
         scf, ref_energy = scf_setup
         total_energy = scf.energy()
         assert total_energy == approx(ref_energy)
@@ -482,15 +476,12 @@ class TestRODFT:
 
     @pytest.mark.parametrize(
         'scf_setup',
-        [('slater', -1.242752026437), ('slda', -1.43873045822),
-         ('b3lyp', -1.20470566061)],
+        [('slater', -1.242752026437), ('slda', -1.43873045822)],
         indirect=True,
-        ids=['slater', 'slda', 'b3lyp'],
+        ids=['slater', 'slda'],
+        # TODO: add b3lyp test
     )
     def test_initial_xc_energy(self, scf_setup):
-        xcfun = scf_setup[0].scf_drv.xcfun
-        if xcfun and xcfun.get_func_label() == "B3LYP":
-            pytest.skip('missing accuracy')
         scf, ref_energy = scf_setup
         scf.e2()
         e_xc = scf.comp_xc_energy()

@@ -26,7 +26,6 @@
 from os.path import isfile
 import time as tm
 
-from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import SADGuessDriver
 from .veloxchemlib import mpi_master
 from .molecularorbitals import MolecularOrbitals
@@ -148,8 +147,8 @@ class DensityGuess:
 
         return den_mat
 
-    def sad_density(self, molecule, ao_basis, min_basis, overlap_matrix,
-                    scf_type, comm, ostream):
+    def sad_density(self, molecule, ao_basis, min_basis, scf_type, comm,
+                    ostream):
         """
         Computes initial AO density using superposition of atomic densities
         scheme.
@@ -160,8 +159,6 @@ class DensityGuess:
             The AO basis.
         :param min_basis:
             The minimal AO basis for generation of atomic densities.
-        :param overlap_matrix:
-            The AO overlap matrix.
         :param scf_type:
             The type of SCF calculation (restricted, unrestricted, or
             restricted open-shell).
@@ -176,18 +173,14 @@ class DensityGuess:
 
         if self._guess_type == 'SAD':
 
-            ovl_drv = OverlapIntegralsDriver(comm)
-
-            ovl_mat_sb = ovl_drv.compute(molecule, min_basis, ao_basis)
-
             t0 = tm.time()
 
             sad_drv = SADGuessDriver(comm)
 
-            is_closed_shell = (scf_type == 'restricted')
+            density_type = 'restricted' if scf_type == 'restricted' else 'unrestricted'
 
-            den_mat = sad_drv.compute(molecule, min_basis, ao_basis, ovl_mat_sb,
-                                      overlap_matrix, is_closed_shell)
+            den_mat = sad_drv.compute(molecule, min_basis, ao_basis,
+                                      density_type)
 
             if comm.Get_rank() == mpi_master():
 

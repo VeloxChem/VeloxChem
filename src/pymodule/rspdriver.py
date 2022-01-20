@@ -28,8 +28,11 @@ from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .c6solver import C6Solver
 from .tdaexcidriver import TDAExciDriver
-from .tpafulldriver import TpaFullDriver
-from .tpareddriver import TpaReducedDriver
+from .tpafulldriver import TPAFullDriver
+from .tpareddriver import TPAReducedDriver
+from .shgdriver import SHGDriver
+from .quadraticresponsedriver import QuadraticResponseDriver
+from .cubicresponsedriver import CubicResponseDriver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 
@@ -136,15 +139,34 @@ class ResponseDriver:
               self.rsp_dict['complex'] == 'yes'):
             self.solver = C6Solver(self.comm, self.ostream)
 
+        # SHG
+        if (self.rsp_dict['order'] == 'quadratic' and
+                self.rsp_dict['complex'] == 'yes'):
+            self.solver = SHGDriver(self.comm, self.ostream)
+
         # TPA
         elif (self.rsp_dict['order'] == 'cubic' and
               self.rsp_dict['complex'] == 'yes'):
             if ('tpa_type' not in self.rsp_dict or
                     self.rsp_dict['tpa_type'].lower() == 'full'):
-                self.solver = TpaFullDriver(self.comm, self.ostream)
+                self.solver = TPAFullDriver(self.comm, self.ostream)
             elif ('tpa_type' in self.rsp_dict and
                   self.rsp_dict['tpa_type'].lower() == 'reduced'):
-                self.solver = TpaReducedDriver(self.comm, self.ostream)
+                self.solver = TPAReducedDriver(self.comm, self.ostream)
+            self.solver.input_keywords['response'].update({
+                'tpa_type': ('str_lower', 'full or reduced TPA calculation'),
+            })
+
+        # Quadratic response driver
+        if (self.prop_type == 'custom' and
+                self.rsp_dict['order'] == 'quadratic' and
+                self.rsp_dict['complex'] == 'yes'):
+            self.solver = QuadraticResponseDriver(self.comm, self.ostream)
+
+        # Cubic response driver
+        if (self.prop_type == 'custom' and self.rsp_dict['order'] == 'cubic' and
+                self.rsp_dict['complex'] == 'yes'):
+            self.solver = CubicResponseDriver(self.comm, self.ostream)
 
         self.solver.update_settings(self.rsp_dict, self.method_dict)
 

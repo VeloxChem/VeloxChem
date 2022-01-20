@@ -120,32 +120,33 @@ class MpiTask:
             self.input_dict = InputParser(input_fname, output_fname).get_dict()
             self.ostream.print_blank()
 
-            for key in self.input_dict:
-                if key == 'molecule':
+            for group_key, group_val in self.input_dict.items():
+                if group_key == 'molecule':
                     continue
-                if not isinstance(self.input_dict[key], dict):
+
+                if not group_val:
                     continue
-                if list(self.input_dict[key].keys()) == ['checkpoint_file']:
-                    continue
-                self.ostream.print_info('@{:s}'.format(key))
-                for key_2 in self.input_dict[key]:
-                    if key_2 == 'checkpoint_file':
-                        continue
-                    if isinstance(self.input_dict[key][key_2], str):
-                        self.ostream.print_info('{:s}: {:s}'.format(
-                            key_2, self.input_dict[key][key_2]))
-                    elif isinstance(self.input_dict[key][key_2], list):
-                        self.ostream.print_info('{:s}:'.format(key_2))
-                        for line in self.input_dict[key][key_2]:
-                            self.ostream.print_info(line)
-                self.ostream.print_info('@end')
-                self.ostream.print_blank()
+
+                if isinstance(group_val, dict):
+                    self.ostream.print_info(f'@{group_key}')
+                    for param_key, param_val in group_val.items():
+                        if isinstance(param_val, str):
+                            self.ostream.print_info(f'{param_key}: {param_val}')
+                        elif isinstance(param_val, list):
+                            self.ostream.print_info(f'{param_key}:')
+                            for line in param_val:
+                                self.ostream.print_info(line)
+                    self.ostream.print_info('@end')
+                    self.ostream.print_blank()
+
+                elif isinstance(group_val, list):
+                    self.ostream.print_info(f'@{group_key}')
+                    for line in group_val:
+                        self.ostream.print_info(line)
+                    self.ostream.print_info('@end')
+                    self.ostream.print_blank()
 
             # create molecule
-
-            self.ostream.print_info('Parsing @molecule group...')
-            self.ostream.print_info('...done.')
-            self.ostream.print_blank()
 
             if ('molecule' in self.input_dict and
                     'xyz' in self.input_dict['molecule']):
@@ -156,10 +157,6 @@ class MpiTask:
                 self.ostream.print_blank()
 
             # create basis set
-
-            self.ostream.print_info('Parsing @method settings group...')
-            self.ostream.print_info('...done.')
-            self.ostream.print_blank()
 
             if 'xtb' not in self.input_dict['method_settings']:
                 basis_path = '.'
