@@ -180,8 +180,8 @@ class CphfSolver(LinearSolver):
 
         self.start_time = tm.time()
 
-        self.profiler.start_timer(0, 'Total subspace')
-        self.profiler.start_timer(0, 'CPHF RHS')
+        self.profiler.start_timer('Total subspace')
+        self.profiler.start_timer('CPHF RHS')
 
         if self.rank == mpi_master():
             mo_energies = scf_tensors['E']
@@ -217,7 +217,7 @@ class CphfSolver(LinearSolver):
         else:
             cphf_rhs = None 
 
-        self.profiler.stop_timer(0, 'CPHF RHS')
+        self.profiler.stop_timer('CPHF RHS')
 
         # Initialize trial and sigma vectors
         self.dist_trials = None
@@ -253,7 +253,7 @@ class CphfSolver(LinearSolver):
 
             iter_start_time = tm.time()
 
-            self.profiler.start_timer(iteration, 'ReducedSpace')
+            self.profiler.start_timer('Iter ' + str(iteration) + ' ReducedSpace')
 
             # Orbital Hessian in reduced subspace
             orbhess_red = self.dist_trials.matmul_AtB(self.dist_sigmas)
@@ -264,7 +264,7 @@ class CphfSolver(LinearSolver):
             for x in range(3 * natm):
                 if (iteration > 0 and
                         relative_residual_norm[x] < self.conv_thresh):
-                    continue 
+                    continue
 
                 # CPHF RHS in reduced space
                 cphf_rhs_red = self.dist_trials.matmul_AtB(dist_rhs[x])
@@ -326,7 +326,7 @@ class CphfSolver(LinearSolver):
                 if self.print_residuals: 
                     self.print_iteration(relative_residual_norm, molecule)
 
-            self.profiler.stop_timer(iteration, 'ReducedSpace')
+            self.profiler.stop_timer('Iter ' + str(iteration) + 'ReducedSpace')
 
             # check convergence
             self.check_convergence(relative_residual_norm)
@@ -334,24 +334,24 @@ class CphfSolver(LinearSolver):
             if self.is_converged:
                 break
 
-            self.profiler.start_timer(iteration, 'Orthonorm.')
+            self.profiler.start_timer('Iter ' + str(iteration) + 'Orthonorm.')
 
             # update trial vectors
             new_trials = self.setup_trials(molecule, dist_precond,
                                            residuals, self.dist_trials)
 
-            self.profiler.stop_timer(iteration, 'Orthonorm.')
+            self.profiler.stop_timer('Iter ' + str(iteration) + 'Orthonorm.')
 
-            self.profiler.start_timer(iteration, 'FockBuild')
+            self.profiler.start_timer('Iter ' + str(iteration) + 'FockBuild')
 
             # update sigma vectors
             self.build_sigmas(molecule, basis, scf_tensors, new_trials)
 
-            self.profiler.stop_timer(iteration, 'FockBuild')
+            self.profiler.stop_timer('Iter ' + str(iteration) + 'FockBuild')
             self.profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
 
-        self.profiler.stop_timer(0, 'Total subspace')
+        self.profiler.stop_timer('Total subspace')
         self.profiler.print_timing(self.ostream)
         self.profiler.print_profiling_summary(self.ostream)
 
@@ -618,7 +618,7 @@ class CphfSolver(LinearSolver):
             contracted with the two-electron integrals).
         """
 
-        self.profiler.start_timer(0, 'Total CG')
+        self.profiler.start_timer('Total CG')
         self.start_time = tm.time()
 
         # ERI information
@@ -630,7 +630,7 @@ class CphfSolver(LinearSolver):
         # Timing information
         timing_dict = {}
 
-        self.profiler.start_timer(0, 'CPHF RHS')
+        self.profiler.start_timer('CPHF RHS')
 
         if self.rank == mpi_master():
             mo_energies = scf_tensors['E']
@@ -666,7 +666,7 @@ class CphfSolver(LinearSolver):
         else:
             cphf_rhs = None 
 
-        self.profiler.stop_timer(0, 'CPHF RHS')
+        self.profiler.stop_timer('CPHF RHS')
 
         cphf_rhs = self.comm.bcast(cphf_rhs, root=mpi_master())
 
@@ -677,7 +677,7 @@ class CphfSolver(LinearSolver):
                                   cphf_rhs.reshape(3*natm, nocc, nvir), # TODO: possibly change the shape
                                   dft_dict)
 
-        self.profiler.stop_timer(0, 'Total CG')
+        self.profiler.stop_timer('Total CG')
         self.profiler.print_timing(self.ostream)
         self.profiler.print_profiling_summary(self.ostream)
 
@@ -775,7 +775,7 @@ class CphfSolver(LinearSolver):
             vector with orbital Hessian matrix.
             """
 
-            self.profiler.start_timer(self.cur_iter, 'CG')
+            self.profiler.start_timer('Iter ' + str(self.cur_iter) + 'CG')
 
             # Create AODensityMatrix object from lambda in AO
             if self.rank == mpi_master():
@@ -807,7 +807,7 @@ class CphfSolver(LinearSolver):
 
             cphf_mo = self.comm.bcast(cphf_mo, root=mpi_master())
 
-            self.profiler.stop_timer(self.cur_iter, 'CG')
+            self.profiler.stop_timer('Iter ' + str(self.cur_iter) + 'CG')
 
             self.profiler.check_memory_usage(
                 'CG Iteration {:d}'.format(self.cur_iter + 1))
@@ -906,11 +906,11 @@ class CphfSolver(LinearSolver):
             fock_deriv_ao = np.zeros((natm, 3, nao, nao))
 
             # import the integral derivatives
-            self.profiler.start_timer(0, 'derivs')
+            self.profiler.start_timer('derivs')
             for i in range(natm):
                 ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
                 fock_deriv_ao[i] = fock_deriv(molecule, basis, density, i)
-            self.profiler.stop_timer(0, 'derivs')
+            self.profiler.stop_timer('derivs')
 
             # transform integral derivatives to MO basis
             ovlp_deriv_ov = np.einsum('mi,xymn,na->xyia', mo_occ, 

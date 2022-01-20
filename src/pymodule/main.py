@@ -37,12 +37,6 @@ from .excitondriver import ExcitonModelDriver
 from .mp2driver import Mp2Driver
 from .loprop import LoPropDriver
 from .trajectorydriver import TrajectoryDriver
-from .scfgradientdriver import ScfGradientDriver
-from .xtbgradientdriver import XTBGradientDriver
-from .tdhfgradientdriver import TdhfGradientDriver
-from .scfhessiandriver import ScfHessianDriver
-from .tdhfhessiandriver import TdhfHessianDriver
-from .cphfsolver import CphfSolver
 from .optimizationdriver import OptimizationDriver
 from .pulsedrsp import PulsedResponse
 from .rsppolarizability import Polarizability
@@ -52,6 +46,11 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpa import TPA
+from .scfgradientdriver import ScfGradientDriver
+from .tdhfgradientdriver import TdhfGradientDriver
+from .scfhessiandriver import ScfHessianDriver
+from .tdhfhessiandriver import TdhfHessianDriver
+from .cphfsolver import CphfSolver
 from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XTBDriver
@@ -59,6 +58,7 @@ from .xtbgradientdriver import XTBGradientDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_end_time
+
 
 def select_scf_driver(task, scf_type):
     """
