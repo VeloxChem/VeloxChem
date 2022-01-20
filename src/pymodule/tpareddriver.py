@@ -34,13 +34,15 @@ from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
-from .tpadriver import TpaDriver
+from .nonlinearsolver import NonLinearSolver
+from .tpadriver import TPADriver
 from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
 
 
-class TpaReducedDriver(TpaDriver):
+
+class TPAReducedDriver(TPADriver):
     """
     Implements the reduced isotropic cubic response driver for two-photon
     absorption (TPA)
@@ -70,7 +72,7 @@ class TpaReducedDriver(TpaDriver):
         Updates response and method settings for TPA
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -196,8 +198,7 @@ class TpaReducedDriver(TpaDriver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                        'real')
+        dist_focks = self.comp_nlr_fock_cubic(mo, density_list, molecule, ao_basis,'real')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -268,7 +269,7 @@ class TpaReducedDriver(TpaDriver):
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
-            'program_start_time', 'maximum_hours'
+            'program_end_time'
         }
 
         for key in cpp_keywords:
@@ -534,7 +535,7 @@ class TpaReducedDriver(TpaDriver):
                                           self.ostream)
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
+        dist_focks = self.comp_nlr_fock_cubic(mo, density_list, molecule, ao_basis,
                                         'real_and_imag')
         time_end_fock = time.time()
 

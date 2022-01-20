@@ -69,6 +69,7 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
         max_batch_size = int(avail_mem / mem_per_mat / (0.625 * nthreads))
         max_batch_size = max(1, max_batch_size)
 
+        # note: batch_size will be zero if n_total is zero
         if batch_size is None:
             batch_size = min(n_total, max_batch_size)
 
@@ -94,11 +95,14 @@ def get_number_of_batches(n_total, batch_size, comm):
 
     num_batches = None
 
+    # note: num_batches will be zero if batch_size is zero
     if comm.Get_rank() == mpi_master():
-        # get number of batches
-        num_batches = n_total // batch_size
-        if n_total % batch_size != 0:
-            num_batches += 1
+        if batch_size > 0:
+            num_batches = n_total // batch_size
+            if n_total % batch_size != 0:
+                num_batches += 1
+        else:
+            num_batches = 0
 
     num_batches = comm.bcast(num_batches, root=mpi_master())
 

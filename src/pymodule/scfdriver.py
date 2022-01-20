@@ -23,8 +23,9 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from collections import deque
 from pathlib import Path
+from datetime import datetime
+from collections import deque
 import numpy as np
 import time as tm
 import math
@@ -52,7 +53,7 @@ from .molecularorbitals import MolecularOrbitals
 from .subcommunicators import SubCommunicators
 from .signalhandler import SignalHandler
 from .denguess import DensityGuess
-from .inputparser import parse_input, get_keyword_type
+from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
@@ -124,6 +125,7 @@ class ScfDriver:
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation using
+        - program_end_time: The end time of the program.
         - filename: The filename.
     """
 
@@ -188,9 +190,6 @@ class ScfDriver:
         self.checkpoint_file = None
         self.ref_mol_orbs = None
 
-        self.program_start_time = None
-        self.maximum_hours = None
-
         # closed shell?
         self.scf_type = 'restricted'
 
@@ -225,8 +224,11 @@ class ScfDriver:
         self.memory_profiling = False
         self.memory_tracing = False
 
+        # program end time for graceful exit
+        self.program_end_time = None
+
         # filename
-        self.filename = None
+        self.filename = f'veloxchem_scf_{get_datetime_string()}'
 
         # input keywords
         self.input_keywords = {
@@ -261,27 +263,16 @@ class ScfDriver:
         Prints input keywords in SCF driver.
         """
 
-        width = 80
-        for group in self.input_keywords:
-            self.ostream.print_header('=' * width)
-            self.ostream.print_header(f'  @{group}'.ljust(width))
-            self.ostream.print_header('-' * width)
-            for key, val in self.input_keywords[group].items():
-                text = f'  {key}'.ljust(20)
-                text += f'  {get_keyword_type(val[0])}'.ljust(15)
-                text += f'  {val[1]}'.ljust(width - 35)
-                self.ostream.print_header(text)
-        self.ostream.print_header('=' * width)
-        self.ostream.flush()
+        print_keywords(self.input_keywords, self.ostream)
 
     def update_settings(self, scf_dict, method_dict=None):
         """
         Updates settings in SCF driver.
 
         :param scf_dict:
-            The input dictionary of scf group.
+            The dictionary of scf input.
         :param method_dict:
-            The input dicitonary of method settings group.
+            The dicitonary of method settings.
         """
 
         if method_dict is None:
@@ -293,12 +284,12 @@ class ScfDriver:
 
         parse_input(self, scf_keywords, scf_dict)
 
-        if 'program_start_time' in scf_dict:
-            self.program_start_time = scf_dict['program_start_time']
-        if 'maximum_hours' in scf_dict:
-            self.maximum_hours = scf_dict['maximum_hours']
+        if 'program_end_time' in scf_dict:
+            self.program_end_time = scf_dict['program_end_time']
         if 'filename' in scf_dict:
             self.filename = scf_dict['filename']
+            if 'checkpoint_file' not in scf_dict:
+                self.checkpoint_file = f'{self.filename}.scf.h5'
 
         method_keywords = {
             key: val[0]
@@ -334,6 +325,9 @@ class ScfDriver:
             cppe_potfile = None
             if self.rank == mpi_master():
                 potfile = self.pe_options['potfile']
+                if not Path(potfile).is_file():
+                    potfile = str(
+                        Path(self.filename).parent / Path(potfile).name)
                 cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
             cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
             self.pe_options['potfile'] = cppe_potfile
@@ -371,8 +365,6 @@ class ScfDriver:
             else:
                 min_basis = MolecularBasis()
             min_basis.broadcast(self.rank, self.comm)
-
-        self.timing_dict = {}
 
         # check dft setup
         if self.dft:
@@ -603,8 +595,7 @@ class ScfDriver:
                                         " {:.1e}.".format(self.eri_thresh))
                 self.ostream.print_blank()
 
-        den_mat = self.comp_guess_density(molecule, ao_basis, min_basis,
-                                          ovl_mat)
+        den_mat = self.comp_guess_density(molecule, ao_basis, min_basis)
 
         den_mat.broadcast(self.rank, self.comm)
 
@@ -656,15 +647,18 @@ class ScfDriver:
             else:
                 self.num_iter = i
 
+            profiler.set_timing_key(f'Iteration {self.num_iter:d}')
+
             iter_start_time = tm.time()
 
-            profiler.start_timer(self.num_iter, 'FockBuild')
+            profiler.start_timer('FockBuild')
 
             vxc_mat, e_pe, V_pe = self.comp_2e_fock(fock_mat, den_mat, molecule,
-                                                    ao_basis, qq_data, e_grad)
+                                                    ao_basis, qq_data, e_grad,
+                                                    profiler)
 
-            profiler.stop_timer(self.num_iter, 'FockBuild')
-            profiler.start_timer(self.num_iter, 'CompEnergy')
+            profiler.stop_timer('FockBuild')
+            profiler.start_timer('CompEnergy')
 
             e_el = self.comp_energy(fock_mat, vxc_mat, e_pe, kin_mat, npot_mat,
                                     den_mat)
@@ -713,7 +707,7 @@ class ScfDriver:
                 'diff_density': diff_den,
             })
 
-            profiler.stop_timer(self.num_iter, 'CompEnergy')
+            profiler.stop_timer('CompEnergy')
             profiler.check_memory_usage('Iteration {:d} Fock build'.format(
                 self.num_iter))
 
@@ -724,7 +718,7 @@ class ScfDriver:
             if self.is_converged:
                 break
 
-            profiler.start_timer(self.num_iter, 'FockDiag')
+            profiler.start_timer('FockDiag')
 
             self.store_diis_data(i, fock_mat, den_mat)
 
@@ -738,9 +732,7 @@ class ScfDriver:
 
             den_mat.broadcast(self.rank, self.comm)
 
-            profiler.stop_timer(self.num_iter, 'FockDiag')
-            if (self.dft or self.pe) and not self.first_step:
-                profiler.update_timer(self.num_iter, self.timing_dict)
+            profiler.stop_timer('FockDiag')
 
             profiler.check_memory_usage('Iteration {:d} Fock diag.'.format(
                 self.num_iter))
@@ -817,9 +809,9 @@ class ScfDriver:
             True if a graceful exit is needed, False otherwise.
         """
 
-        if self.maximum_hours is not None:
-            remaining_hours = (self.maximum_hours -
-                               (tm.time() - self.program_start_time) / 3600)
+        if self.program_end_time is not None:
+            remaining_hours = (self.program_end_time -
+                               datetime.now()).total_seconds() / 3600
             # exit gracefully when the remaining time is not sufficient to
             # complete the next iteration (plus 25% to be on the safe side).
             if remaining_hours < iter_in_hours * 1.25:
@@ -966,7 +958,7 @@ class ScfDriver:
 
         return npot_mat
 
-    def comp_guess_density(self, molecule, ao_basis, min_basis, ovl_mat):
+    def comp_guess_density(self, molecule, ao_basis, min_basis):
         """
         Computes initial density guess for SCF using superposition of atomic
         densities or molecular orbitals projection methods.
@@ -977,8 +969,6 @@ class ScfDriver:
             The AO basis set.
         :param min_basis:
             The minimal AO basis set.
-        :param ovl_mat:
-            The overlap matrix between minimal and full AO basis.
 
         :return:
             The density matrix.
@@ -994,7 +984,7 @@ class ScfDriver:
         if self.den_guess.guess_type == "SAD":
 
             return self.den_guess.sad_density(molecule, ao_basis, min_basis,
-                                              ovl_mat, self.scf_type, self.comm,
+                                              self.scf_type, self.comm,
                                               self.ostream)
 
         # guess: projection of molecular orbitals from reduced basis
@@ -1028,7 +1018,8 @@ class ScfDriver:
                      molecule,
                      basis,
                      screening,
-                     e_grad=None):
+                     e_grad=None,
+                     profiler=None):
         """
         Computes Fock/Kohn-Sham matrix (only 2e part).
 
@@ -1044,6 +1035,8 @@ class ScfDriver:
             The screening container object.
         :param e_grad:
             The electronic gradient.
+        :param profiler:
+            The profiler.
 
         :return:
             The AO Kohn-Sham (Vxc) matrix.
@@ -1055,7 +1048,7 @@ class ScfDriver:
 
         else:
             vxc_mat, e_pe, V_pe = self.comp_2e_fock_single_comm(
-                fock_mat, den_mat, molecule, basis, screening, e_grad)
+                fock_mat, den_mat, molecule, basis, screening, e_grad, profiler)
 
         return vxc_mat, e_pe, V_pe
 
@@ -1065,7 +1058,8 @@ class ScfDriver:
                                  molecule,
                                  basis,
                                  screening,
-                                 e_grad=None):
+                                 e_grad=None,
+                                 profiler=None):
         """
         Computes Fock/Kohn-Sham matrix on single communicator.
 
@@ -1081,6 +1075,8 @@ class ScfDriver:
             The screening container object.
         :param e_grad:
             The electronic gradient.
+        :param profiler:
+            The profiler.
 
         :return:
             The AO Kohn-Sham (Vxc) matrix.
@@ -1092,15 +1088,14 @@ class ScfDriver:
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         xc_drv = XCIntegrator(self.comm)
 
-        if self.timing and not self.first_step:
-            eri_t0 = tm.time()
+        eri_t0 = tm.time()
 
         eri_drv.compute(fock_mat, den_mat, molecule, basis, screening)
         fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
-        if self.timing and not self.first_step:
-            self.timing_dict['ERI'] = tm.time() - eri_t0
-            vxc_t0 = tm.time()
+        if self.timing:
+            profiler.add_timing_info('ERI', tm.time() - eri_t0)
+        vxc_t0 = tm.time()
 
         if self.dft and not self.first_step:
             if not self.xcfun.is_hybrid():
@@ -1114,10 +1109,9 @@ class ScfDriver:
         else:
             vxc_mat = None
 
-        if self.timing and not self.first_step:
-            if self.dft:
-                self.timing_dict['DFT'] = tm.time() - vxc_t0
-            pe_t0 = tm.time()
+        if self.timing and self.dft:
+            profiler.add_timing_info('DFT', tm.time() - vxc_t0)
+        pe_t0 = tm.time()
 
         if self.pe and not self.first_step:
             self.pe_drv.V_es = self.V_es.copy()
@@ -1127,9 +1121,8 @@ class ScfDriver:
         else:
             e_pe, V_pe = 0.0, None
 
-        if self.timing and not self.first_step:
-            if self.pe:
-                self.timing_dict['PE'] = tm.time() - pe_t0
+        if self.timing and self.pe:
+            profiler.add_timing_info('PE', tm.time() - pe_t0)
 
         return vxc_mat, e_pe, V_pe
 
@@ -1951,11 +1944,11 @@ class ScfDriver:
             The AO basis set.
         """
 
-        if self.checkpoint_file is not None:
-            final_h5_fname = str(
-                Path(self.checkpoint_file).with_suffix('.tensors.h5'))
-        else:
-            final_h5_fname = 'scf.tensors.h5'
+        if self.checkpoint_file is None:
+            return
+
+        final_h5_fname = str(
+            Path(self.checkpoint_file).with_suffix('.tensors.h5'))
 
         if self.dft:
             xc_label = self.xcfun.get_func_label()

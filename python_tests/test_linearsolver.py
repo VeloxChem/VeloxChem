@@ -1,6 +1,6 @@
 from mpi4py import MPI
+from datetime import datetime, timedelta
 import numpy as np
-import time as tm
 
 from veloxchem.veloxchemlib import denmat
 from veloxchem.molecule import Molecule
@@ -91,8 +91,7 @@ class TestLinearSolver:
         ostream = OutputStream(None)
 
         solver = LinearSolver(comm, ostream)
-        solver.maximum_hours = 1.0
-        solver.program_start_time = tm.time()
+        solver.program_end_time = datetime.now() + timedelta(hours=1.0)
 
         assert solver.need_graceful_exit(1.5)
         assert not solver.need_graceful_exit(0.5)

@@ -34,6 +34,7 @@
 #include <string>
 #include <vector>
 
+#include "AtomicRadii.hpp"
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
 #include "CoordinationNumber.hpp"
@@ -43,7 +44,6 @@
 #include "Molecule.hpp"
 #include "PartialCharges.hpp"
 #include "StringFormat.hpp"
-#include "AtomicRadii.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -291,14 +291,14 @@ export_moldata(py::module& m)
             "Gets VDW radii for molecule.")
         .def(
             "mk_radii_to_numpy",
-            [](const CMolecule& self) ->py::array_t<double> {
+            [](const CMolecule& self) -> py::array_t<double> {
                 auto atomradii = self.getMkRadii();
                 return vlx_general::pointer_to_numpy(atomradii.data(), static_cast<int32_t>(atomradii.size()));
             },
             "Gets MK radii for molecule.")
         .def(
             "covalent_radii_to_numpy",
-            [](const CMolecule& self) ->py::array_t<double> {
+            [](const CMolecule& self) -> py::array_t<double> {
                 auto atomradii = self.getCovalentRadii();
                 return vlx_general::pointer_to_numpy(atomradii.data(), static_cast<int32_t>(atomradii.size()));
             },

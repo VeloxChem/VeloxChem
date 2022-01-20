@@ -21,17 +21,18 @@ class TestQrf(unittest.TestCase):
 
         molecule_string = """
         O   0.0   0.0   0.0
-        H   .7586020000 0.0  -.5042840000
-        H   .7586020000  0.0   .5042840000"""
+        H   0.0   1.4   1.1
+        H   0.0  -1.4   1.1
+        """
 
         basis_set_label = '6-31G'
 
         scf_settings = {'conv_thresh': 1.0e-6}
 
-        molecule = vlx.Molecule.read_str(molecule_string, units='ang')
+        molecule = vlx.Molecule.read_str(molecule_string, units='au')
         molecule.set_charge(0)
         molecule.set_multiplicity(1)
-        method_settings = {'xcfun': 'SLATER', 'grid_level': 6}
+        method_settings = {'xcfun': 'becke88', 'grid_level': 6}
 
         basis = vlx.MolecularBasis.read(molecule, basis_set_label)
 
@@ -51,53 +52,56 @@ class TestQrf(unittest.TestCase):
 
         scf_tensors,molecule,ao_basis = self.run_scf()
 
-        method_settings = {'xcfun': 'SLATER', 'grid_level': 6}
+        method_settings = {'xcfun': 'becke88', 'grid_level': 4}
 
-        rsp_settings = {'conv_thresh': 1.0e-6, 'b_frequencies': [-0.1],'c_frequencies': [0.3],'damping': 0.1,'a_component':'x','b_component':'x','c_component':'x'}
+        rsp_settings = {'conv_thresh': 1.0e-6, 'b_frequencies': [-0.1],'c_frequencies': [0.3],'damping': 0.1,'a_components':'x','b_components':'x','c_components':'z'}
 
         qrf_prop = QuadraticResponseDriver(comm, ostream) 
 
         qrf_prop.update_settings(rsp_settings, method_settings)
 
-        qrf_result_xxx = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
+        qrf_result_xxz = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
 
-        rsp_settings = {'conv_thresh': 1.0e-6, 'b_frequencies': [-0.1],'c_frequencies': [0.3],'damping': 0.1,'a_component':'z','b_component':'z','c_component':'x'}
-
-        qrf_prop.update_settings(rsp_settings, method_settings)
-
-        qrf_result_zzx = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
-
-        rsp_settings = {'conv_thresh': 1.0e-6, 'b_frequencies': [-0.1],'c_frequencies': [0.3],'damping': 0.1,'a_component':'y','b_component':'y','c_component':'x'}
+        rsp_settings = {'conv_thresh': 1.0e-6, 'b_frequencies': [-0.1],'c_frequencies': [0.3],'damping': 0.1,'a_components':'y','b_components':'z','c_components':'y'}
 
         qrf_prop.update_settings(rsp_settings, method_settings)
 
-        qrf_result_yyx = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
+        qrf_result_yzy = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
+
+        rsp_settings = {'conv_thresh': 1.0e-6, 'b_frequencies': [-0.1],'c_frequencies': [0.3],'damping': 0.1,'a_components':'z','b_components':'z','c_components':'z'}
+
+        qrf_prop.update_settings(rsp_settings, method_settings)
+
+        qrf_result_zzz = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
+
+        thresh = 1.0e-3
 
         # x-component 
 
-        self.assertTrue(abs(qrf_result_xxx[(-0.1,0.3)].real - ref_result['xxx'].real) < 1.0e-4)
+        self.assertTrue(abs(qrf_result_xxz[(-0.1,0.3)].real - ref_result['xxz'].real) < thresh)
 
-        self.assertTrue(abs(qrf_result_xxx[(-0.1,0.3)].imag - ref_result['xxx'].imag) < 1.0e-4)
+        self.assertTrue(abs(qrf_result_xxz[(-0.1,0.3)].imag - ref_result['xxz'].imag) < thresh)
         
         # y-component 
         
-        self.assertTrue(abs(qrf_result_yyx[(-0.1,0.3)].real - ref_result['yyx'].real) < 1.0e-4)
+        self.assertTrue(abs(qrf_result_yzy[(-0.1,0.3)].real - ref_result['yzy'].real) < thresh)
 
-        self.assertTrue(abs(qrf_result_yyx[(-0.1,0.3)].imag - ref_result['yyx'].imag) < 1.0e-4)
+        self.assertTrue(abs(qrf_result_yzy[(-0.1,0.3)].imag - ref_result['yzy'].imag) <thresh)
 
         # z-component 
         
-        self.assertTrue(abs(qrf_result_zzx[(-0.1,0.3)].real - ref_result['zzx'].real) < 1.0e-4)
+        self.assertTrue(abs(qrf_result_zzz[(-0.1,0.3)].real - ref_result['zzz'].real) < thresh)
 
-        self.assertTrue(abs(qrf_result_zzx[(-0.1,0.3)].imag - ref_result['zzx'].imag) < 1.0e-4)
+        self.assertTrue(abs(qrf_result_zzz[(-0.1,0.3)].imag - ref_result['zzz'].imag) < thresh)
+
 
 
     def test_qrf(self):
 
         ref_result = { 
-            'xxx': 36.088147 + 29.283161j,
-            'zzx': 32.539982 + 16.600985j,
-            'yyx': 1.880527 + 5.129818j,
+            'xxz': -1.513761 - 1.466785j,
+            'yzy': 43.072851 + 52.375763j,
+            'zzz': -6.803330 + 3.803646j,
         }
 
         self.run_qrf(ref_result)

@@ -23,6 +23,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from pathlib import Path
+from datetime import datetime
 import numpy as np
 import time as tm
 import sys
@@ -47,7 +49,7 @@ from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input, get_keyword_type
+from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .checkpoint import write_rsp_hdf5
@@ -90,12 +92,11 @@ class LinearSolver:
         - ostream: The output stream.
         - restart: The flag for restarting from checkpoint file.
         - checkpoint_file: The name of checkpoint file.
-        - program_start_time: The start time of the program.
-        - maximum_hours: The timelimit in hours.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation.
+        - program_end_time: The end time of the program.
         - filename: The filename.
         - dist_bger: The distributed gerade trial vectors.
         - dist_bung: The distributed ungerade trial vectors.
@@ -152,18 +153,17 @@ class LinearSolver:
         self.restart = False
         self.checkpoint_file = None
 
-        # information for graceful exit
-        self.program_start_time = None
-        self.maximum_hours = None
-
         # timing and profiling
         self.timing = False
         self.profiling = False
         self.memory_profiling = False
         self.memory_tracing = False
 
+        # program end time for graceful exit
+        self.program_end_time = None
+
         # filename
-        self.filename = None
+        self.filename = f'veloxchem_rsp_{get_datetime_string()}'
 
         # distributed arrays
         self.dist_bger = None
@@ -208,25 +208,14 @@ class LinearSolver:
         Prints input keywords in linear solver.
         """
 
-        width = 80
-        for group in self.input_keywords:
-            self.ostream.print_header('=' * width)
-            self.ostream.print_header(f'  @{group}'.ljust(width))
-            self.ostream.print_header('-' * width)
-            for key, val in self.input_keywords[group].items():
-                text = f'  {key}'.ljust(20)
-                text += f'  {get_keyword_type(val[0])}'.ljust(15)
-                text += f'  {val[1]}'.ljust(width - 35)
-                self.ostream.print_header(text)
-        self.ostream.print_header('=' * width)
-        self.ostream.flush()
+        print_keywords(self.input_keywords, self.ostream)
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in linear solver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -240,12 +229,12 @@ class LinearSolver:
 
         parse_input(self, rsp_keywords, rsp_dict)
 
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
+        if 'program_end_time' in rsp_dict:
+            self.program_end_time = rsp_dict['program_end_time']
         if 'filename' in rsp_dict:
             self.filename = rsp_dict['filename']
+            if 'checkpoint_file' not in rsp_dict:
+                self.checkpoint_file = f'{self.filename}.rsp.h5'
 
         method_keywords = {
             key: val[0]
@@ -281,6 +270,9 @@ class LinearSolver:
             cppe_potfile = None
             if self.rank == mpi_master():
                 potfile = self.pe_options['potfile']
+                if not Path(potfile).is_file():
+                    potfile = str(
+                        Path(self.filename).parent / Path(potfile).name)
                 cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
             cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
             self.pe_options['potfile'] = cppe_potfile
@@ -429,9 +421,9 @@ class LinearSolver:
             'potfile_text': potfile_text,
         }
 
-    def read_vectors(self, rsp_vector_labels):
+    def read_checkpoint(self, rsp_vector_labels):
         """
-        Reads vectors from checkpoint file.
+        Reads distributed arrays from checkpoint file.
 
         :param rsp_vector_labels:
             The list of labels of vectors.
@@ -547,8 +539,16 @@ class LinearSolver:
 
         return None
 
-    def e2n_half_size(self, vecs_ger, vecs_ung, molecule, basis, scf_tensors,
-                      eri_dict, dft_dict, pe_dict, timing_dict):
+    def e2n_half_size(self,
+                      vecs_ger,
+                      vecs_ung,
+                      molecule,
+                      basis,
+                      scf_tensors,
+                      eri_dict,
+                      dft_dict,
+                      pe_dict,
+                      profiler=None):
         """
         Computes the E2 b matrix vector product.
 
@@ -568,8 +568,8 @@ class LinearSolver:
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
-        :param timing_dict:
-            The dictionary containing timing information.
+        :param profiler:
+            The profiler.
 
         :return:
             The gerade and ungerade E2 b matrix vector product in half-size.
@@ -667,7 +667,7 @@ class LinearSolver:
             fock = AOFockMatrix(dens)
 
             self.comp_lr_fock(fock, dens, molecule, basis, eri_dict, dft_dict,
-                              pe_dict, timing_dict)
+                              pe_dict, profiler)
 
             e2_ger = None
             e2_ung = None
@@ -740,8 +740,15 @@ class LinearSolver:
 
         self.ostream.print_blank()
 
-    def comp_lr_fock(self, fock, dens, molecule, basis, eri_dict, dft_dict,
-                     pe_dict, timing_dict):
+    def comp_lr_fock(self,
+                     fock,
+                     dens,
+                     molecule,
+                     basis,
+                     eri_dict,
+                     dft_dict,
+                     pe_dict,
+                     profiler=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -759,8 +766,8 @@ class LinearSolver:
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
-        :param timing_dict:
-            The dictionary containing timing information.
+        :param profiler:
+            The profiler.
         """
 
         screening = eri_dict['screening']
@@ -795,8 +802,8 @@ class LinearSolver:
             t0 = tm.time()
             eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
             eri_drv.compute(fock, dens, molecule, basis, screening)
-            if timing_dict is not None:
-                timing_dict['ERI'] = tm.time() - t0
+            if profiler is not None:
+                profiler.add_timing_info('ERI', tm.time() - t0)
 
             if self.dft:
                 t0 = tm.time()
@@ -807,8 +814,8 @@ class LinearSolver:
                 molgrid.distribute(self.rank, self.nodes, self.comm)
                 xc_drv.integrate(fock, dens, gs_density, molecule, basis,
                                  molgrid, self.xcfun.get_func_label())
-                if timing_dict is not None:
-                    timing_dict['DFT'] = tm.time() - t0
+                if profiler is not None:
+                    profiler.add_timing_info('DFT', tm.time() - t0)
 
             if self.pe:
                 t0 = tm.time()
@@ -818,8 +825,8 @@ class LinearSolver:
                     e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
                     if self.rank == mpi_master():
                         fock.add_matrix(DenseMatrix(V_pe), ifock)
-                if timing_dict is not None:
-                    timing_dict['PE'] = tm.time() - t0
+                if profiler is not None:
+                    profiler.add_timing_info('PE', tm.time() - t0)
 
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
@@ -1044,9 +1051,9 @@ class LinearSolver:
             True if a graceful exit is needed, False otherwise.
         """
 
-        if self.maximum_hours is not None:
-            remaining_hours = (self.maximum_hours -
-                               (tm.time() - self.program_start_time) / 3600)
+        if self.program_end_time is not None:
+            remaining_hours = (self.program_end_time -
+                               datetime.now()).total_seconds() / 3600
             # exit gracefully when the remaining time is not sufficient to
             # complete the next iteration (plus 25% to be on the safe side).
             if remaining_hours < next_iter_in_hours * 1.25:

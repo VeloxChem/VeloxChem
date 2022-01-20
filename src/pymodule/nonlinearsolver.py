@@ -39,15 +39,12 @@ from .veloxchemlib import fockmat
 from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input, get_keyword_type
+from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
-from .linearsolver import LinearSolver
-from mpi4py import MPI
-from .veloxchemlib import XCIntegrator
 from .veloxchemlib import parse_xc_func
-
+from .veloxchemlib import XCIntegrator
 
 class NonLinearSolver:
     """
@@ -81,13 +78,12 @@ class NonLinearSolver:
         - ostream: The output stream.
         - restart: The flag for restarting from checkpoint file.
         - checkpoint_file: The name of checkpoint file.
-        - program_start_time: The start time of the program.
-        - maximum_hours: The timelimit in hours.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation.
         - filename: The filename.
+        - program_end_time: The end time of the program.
     """
 
     def __init__(self, comm, ostream):
@@ -134,18 +130,17 @@ class NonLinearSolver:
         self.restart = True
         self.checkpoint_file = None
 
-        # information for graceful exit
-        self.program_start_time = None
-        self.maximum_hours = None
-
         # timing and profiling
         self.timing = False
         self.profiling = False
         self.memory_profiling = False
         self.memory_tracing = False
 
+        # program end time for graceful exit
+        self.program_end_time = None
+
         # filename
-        self.filename = None
+        self.filename = f'veloxchem_rsp_{get_datetime_string()}'
 
         # input keywords
         self.input_keywords = {
@@ -167,28 +162,17 @@ class NonLinearSolver:
 
     def print_keywords(self):
         """
-        Prints input keywords.
+        Prints input keywords in nonlinear solver.
         """
 
-        width = 80
-        for group in self.input_keywords:
-            self.ostream.print_header('=' * width)
-            self.ostream.print_header(f'  @{group}'.ljust(width))
-            self.ostream.print_header('-' * width)
-            for key, val in self.input_keywords[group].items():
-                text = f'  {key}'.ljust(20)
-                text += f'  {get_keyword_type(val[0])}'.ljust(15)
-                text += f'  {val[1]}'.ljust(width - 35)
-                self.ostream.print_header(text)
-        self.ostream.print_header('=' * width)
-        self.ostream.flush()
+        print_keywords(self.input_keywords, self.ostream)
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in nonlinear solver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -202,10 +186,12 @@ class NonLinearSolver:
 
         parse_input(self, rsp_keywords, rsp_dict)
 
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
+        if 'program_end_time' in rsp_dict:
+            self.program_end_time = rsp_dict['program_end_time']
+        if 'filename' in rsp_dict:
+            self.filename = rsp_dict['filename']
+            if 'checkpoint_file' not in rsp_dict:
+                self.checkpoint_file = f'{self.filename}.rsp.h5'
 
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
@@ -279,7 +265,7 @@ class NonLinearSolver:
         if self.dft:
             grid_drv = GridDriver(self.comm)
             grid_drv.set_level(self.grid_level)
-            
+
             grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule)
             n_grid_points = molgrid.number_of_points()
@@ -372,7 +358,7 @@ class NonLinearSolver:
 
     def comp_nlr_fock(self, mo, molecule, ao_basis, fock_flag, dft_dict = None, d_dft_1 = None, d_dft_2 = None, mode=None):
         """-
-        Computes and returns a list of Fock matrices.
+        Computes and returns a list of Fock matrices 
 
         :param mo:
             The MO coefficients
@@ -489,9 +475,8 @@ class NonLinearSolver:
                 dens2.broadcast(self.rank, self.comm)
 
             fock = AOFockMatrix(dens2)
-            for i in range(fock.number_of_fock_matrices()):
-                fock.set_fock_type(fockmat.rgenjk, i)
-
+            fock_flag = fockmat.rgenjk
+            
             if self.dft:
                 if self.xcfun.is_hybrid():
                     fock_flag = fockmat.rgenjkx
@@ -501,17 +486,15 @@ class NonLinearSolver:
                 else:
                     fock_flag = fockmat.rgenj
 
-                for i in range(fock.number_of_fock_matrices()):
-                    fock.set_fock_type(fock_flag, i)
+            for i in range(fock.number_of_fock_matrices()):
+                fock.set_fock_type(fock_flag, i)
 
             eri_driver.compute(fock, dens2, molecule, ao_basis, screening)
             if self.dft and not self.xcfun.is_hybrid():
                 for ifock in range(fock.number_of_fock_matrices()):
                     fock.scale(2.0, ifock)
-
             if self.dft: 
                 xc_drv = XCIntegrator(self.comm)
-
                 molgrid = dft_dict['molgrid']
                 gs_density = dft_dict['gs_density']
 
@@ -519,7 +502,146 @@ class NonLinearSolver:
                 xc_drv.integrate(fock, dens1, dens2, gs_density, molecule, ao_basis,
                                  molgrid, self.xcfun.get_func_label(),mode)
 
-        
+            fock.reduce_sum(self.rank, self.nodes, self.comm)
+
+            if self.rank == mpi_master():
+                nfocks = fock.number_of_fock_matrices()
+                fock_mo = np.zeros((norb**2, nfocks))
+                for i in range(nfocks):
+                    fock_mo[:, i] = self.ao2mo(mo,
+                                               fock.to_numpy(i).T).reshape(-1)
+            else:
+                fock_mo = None
+
+            dist_fock_mo = DistributedArray(fock_mo, self.comm)
+
+            if dist_fabs is None:
+                dist_fabs = DistributedArray(dist_fock_mo.data,
+                                             self.comm,
+                                             distribute=False)
+            else:
+                dist_fabs.append(dist_fock_mo, axis=1)
+
+        self.ostream.print_blank()
+
+        return dist_fabs
+
+
+    def comp_nlr_fock_cubic(self, mo, D, molecule, ao_basis, fock_flag):
+        """-
+        Computes and returns a list of Fock matrices.
+
+        :param mo:
+            The MO coefficients
+        :param D:
+            A list of densities
+        :param molecule:
+            The molecule
+        :param ao_basis:
+            The AO basis set
+        :param fock_flag:
+            The type of Fock matrices
+
+        :return:
+            A list of Fock matrices
+        """
+
+        if fock_flag == 'real_and_imag':
+            if self.rank == mpi_master():
+                D_total = []
+                for da in D:
+                    D_total.append(da.real)
+                    D_total.append(da.imag)
+            else:
+                D_total = None
+
+            f_total = self.comp_two_el_int_cubic(mo, molecule, ao_basis, D_total)
+
+            nrows = f_total.data.shape[0]
+            half_ncols = f_total.data.shape[1] // 2
+            ff_data = np.zeros((nrows, half_ncols), dtype=np.complex128)
+            for i in range(half_ncols):
+                ff_data[:, i] = (f_total.data[:, 2 * i] +
+                                 1j * f_total.data[:, 2 * i + 1])
+            return DistributedArray(ff_data, self.comm, distribute=False)
+
+        elif fock_flag == 'real':
+            return self.comp_two_el_int_cubic(mo, molecule, ao_basis, D)
+
+        else:
+            return None
+
+    def comp_two_el_int_cubic(self, mo, molecule, ao_basis, dabs):
+        """
+        Returns the two-electron part of the Fock matix in MO basis
+
+        :param mo:
+            The MO coefficients
+        :param molecule:
+            The molecule
+        :param ao_basis:
+            The AO basis set
+        :param dabs:
+            A list of densitiy matrices
+
+        :return:
+            A tuple containing the two-electron part of the Fock matix (in MO
+            basis)
+        """
+
+        eri_driver = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = eri_driver.compute(get_qq_scheme(self.qq_type),
+                                       self.eri_thresh, molecule, ao_basis)
+
+        # determine number of batches
+
+        if self.rank == mpi_master():
+            n_total = len(dabs)
+            n_ao = dabs[0].shape[0]
+            norb = mo.shape[1]
+        else:
+            n_total = None
+            n_ao = None
+
+        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
+        num_batches = get_number_of_batches(n_total, batch_size, self.comm)
+
+        # go through batches
+
+        dist_fabs = None
+
+        if self.rank == mpi_master():
+            batch_str = 'Processing Fock builds...'
+            batch_str += ' (batch size: {:d})'.format(batch_size)
+            self.ostream.print_info(batch_str)
+
+        for batch_ind in range(num_batches):
+
+            if self.rank == mpi_master():
+                self.ostream.print_info('  batch {}/{}'.format(
+                    batch_ind + 1, num_batches))
+                self.ostream.flush()
+
+            # form density matrices
+
+            if self.rank == mpi_master():
+                batch_start = batch_size * batch_ind
+                batch_end = min(batch_start + batch_size, n_total)
+                dts = [
+                    np.ascontiguousarray(dab)
+                    for dab in dabs[batch_start:batch_end]
+                ]
+                dens = AODensityMatrix(dts, denmat.rest)
+            else:
+                dens = AODensityMatrix()
+
+            dens.broadcast(self.rank, self.comm)
+
+            fock = AOFockMatrix(dens)
+            for i in range(fock.number_of_fock_matrices()):
+                fock.set_fock_type(fockmat.rgenjk, i)
+
+            eri_driver.compute(fock, dens, molecule, ao_basis, screening)
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
             if self.rank == mpi_master():

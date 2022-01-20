@@ -32,8 +32,6 @@
 #include "DensityMatrixType.hpp"
 #include "MolecularBasisSetter.hpp"
 #include "MoleculeSetter.hpp"
-#include "OverlapIntegralsDriver.hpp"
-#include "OverlapMatrix.hpp"
 #include "SADGuessDriver.hpp"
 #include "CheckFunctions.hpp"
 
@@ -150,8 +148,6 @@ TEST_F(CSADGuessDriverTest, OccupationNumbers)
 
 TEST_F(CSADGuessDriverTest, InitialGuess)
 {
-    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
-
     CSADGuessDriver saddrv(MPI_COMM_WORLD);
 
     auto h2o = vlxmol::getMoleculeH2O();
@@ -160,11 +156,7 @@ TEST_F(CSADGuessDriverTest, InitialGuess)
 
     auto ao_basis = vlxbas::getMolecularBasisForH2O();
 
-    auto S12 = ovldrv.compute(h2o, min_basis, ao_basis);
-
-    auto S22 = ovldrv.compute(h2o, ao_basis);
-
-    auto dsad = saddrv.compute(h2o, min_basis, ao_basis, S12, S22, true);
+    auto dsad = saddrv.compute(h2o, min_basis, ao_basis, "restricted");
 
     ASSERT_EQ(1, dsad.getNumberOfDensityMatrices());
 

@@ -28,7 +28,6 @@ from pathlib import Path
 import numpy as np
 import time
 import sys
-import re
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master, hartree_in_wavenumbers
@@ -39,10 +38,8 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonLinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
-from .checkpoint import check_distributed_focks
-from .checkpoint import read_distributed_focks
-from .checkpoint import write_distributed_focks
-from .inputparser import parse_input
+from .checkpoint import (check_distributed_focks, read_distributed_focks,
+                         write_distributed_focks)
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import parse_xc_func
@@ -80,21 +77,9 @@ class QuadraticResponseDriver(NonLinearSolver):
         if ostream is None:
             ostream = OutputStream(sys.stdout)
 
-# master branch, everything done in parent class init
         super().__init__(comm, ostream)
 
         self.is_converged = False
-# qrf_dft branch
-#        # ERI settings
-#        self.eri_thresh = 1.0e-15
-#        self.qq_type = 'QQ_DEN'
-#        self.batch_size = None
-        self.order = 'quadratic'
-#
-#        self.dft = False
-#        self.grid_level = 4
-#        self.xcfun = XCFunctional()
-#>>>>>>> qrf_dft
 
         # cpp settings
         self.b_frequencies = (0,)
@@ -124,68 +109,15 @@ class QuadraticResponseDriver(NonLinearSolver):
         Updates response and method settings
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
-            The dictionary of method rsp_dict.
+            The dictionary of method settings.
         """
 
         if method_dict is None:
             method_dict = {}
 
-        if 'xcfun' in method_dict.keys():
-            self.dft = True
-
-# master branch version
-#        super().update_settings(rsp_dict, method_dict)
-# qrf_dft branch version
-        rsp_keywords = {
-            'b_frequencies': 'seq_range',
-            'c_frequencies': 'seq_range',
-            'damping': 'float',
-            'a_component': 'str',
-            'b_component': 'str',
-            'c_component': 'str',
-            'eri_thresh': 'float',
-            'qq_type': 'str_upper',
-            'batch_size': 'int',
-            'max_iter': 'int',
-            'conv_thresh': 'float',
-            'lindep_thresh': 'float',
-            'restart': 'bool',
-            'checkpoint_file': 'str',
-            'timing': 'bool',
-            'profiling': 'bool',
-            'memory_profiling': 'bool',
-            'memory_tracing': 'bool',
-        }
-
-        parse_input(self, rsp_keywords, rsp_dict)
-
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
-
-        if 'xcfun' in method_dict:
-            if 'dft' not in method_dict:
-                self.dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
-
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Nonlinear solver: Undefined XC functional')
-
-        if 'potfile' in method_dict:
-            errmsg = 'QrfDriver: The \'potfile\' keyword is not supported in '
-            errmsg += 'QRF calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if 'electric_field' in method_dict:
-            errmsg = 'QrfDriver: The \'electric field\' keyword is not '
-            errmsg += 'supported in QRF calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-#>>>>>>> qrf_dft
+        super().update_settings(rsp_dict, method_dict)
 
     def compute(self, molecule, ao_basis, scf_tensors,method_settings):
         """
@@ -295,25 +227,16 @@ class QuadraticResponseDriver(NonLinearSolver):
         # Computing the first-order response vectors (3 per frequency)
         N_drv = ComplexResponse(self.comm, self.ostream)
 
-# master branch version
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
-            'program_start_time', 'maximum_hours'
+            'program_end_time'
         }
+
+        N_drv.update_settings({},method_settings)
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
-# qrf_dft branch version
-#        N_drv.update_settings({
-#            'damping': self.damping,
-#            'lindep_thresh': self.lindep_thresh,
-#            'conv_thresh': self.conv_thresh,
-#            'max_iter': self.max_iter,
-#            'eri_thresh': self.eri_thresh,
-#            'qq_type': self.qq_type,            
-#        },method_settings)
-#>>>>>>> qrf_dft
 
         if self.checkpoint_file is not None:
             N_drv.checkpoint_file = str(
@@ -387,16 +310,16 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            d_dft1, d_dft2 = self.get_densities(freqpairs, kX, S, D0, mo)
+            firstorderdens,secorderdens = self.get_densities(freqpairs, kX, S, D0, mo)
             dft_dict = self.init_dft(molecule, scf_tensors)
         else:
-            d_dft1 = None
-            d_dft2 = None
+            firstorderdens = None
+            secorderdens = None
 
         profiler.check_memory_usage('Densities')
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(freqpairs,d_dft1, d_dft2, F0, mo,
+        fock_dict = self.get_fock_dict(freqpairs, firstorderdens, secorderdens, F0, mo,
                                        molecule, ao_basis,dft_dict)
 
         profiler.check_memory_usage('Focks')
@@ -409,101 +332,55 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         if self.rank == mpi_master():
 
-# master branch version
-#            op_a = X[self.a_components]
-#            op_b = X[self.b_components]
-#            op_c = X[self.c_components]
-#
-#            for (wb, wc) in freqpairs:
-#
-#                Na = self.complex_lrmat2vec(kX[('A', wb + wc)], nocc, norb)
-#                Nb = self.complex_lrmat2vec(kX[('B', wb)], nocc, norb)
-#                Nc = self.complex_lrmat2vec(kX[('C', wc)], nocc, norb)
-#
-#                C2Nb = self.x2_contract(kX[('B', wb)], op_c, d_a_mo, nocc, norb)
-#                B2Nc = self.x2_contract(kX[('C', wc)], op_b, d_a_mo, nocc, norb)
-#
-#                A2Nc = self.a2_contract(kX[('C', wc)], op_a, d_a_mo, nocc, norb)
-#                A2Nb = self.a2_contract(kX[('B', wb)], op_a, d_a_mo, nocc, norb)
-#
-#                NaE3NbNc = np.dot(Na.T, e3_dict[wb])
-#                NaC2Nb = np.dot(Na.T, C2Nb)
-#                NaB2Nc = np.dot(Na.T, B2Nc)
-#                NbA2Nc = np.dot(Nb.T, A2Nc)
-#                NcA2Nb = np.dot(Nc.T, A2Nb)
-#
-#                val_X2 = -(NaC2Nb + NaB2Nc)
-#                val_A2 = -(NbA2Nc + NcA2Nb)
-#                val_E3 = NaE3NbNc
-#                beta = val_E3 + val_A2 + val_X2
-#
-#                self.ostream.print_blank()
-#                w_str = 'Quadratic response function at given frequencies: '
-#                w_str += '<< {};{},{} >>'.format(self.a_components,
-#                                                 self.b_components,
-#                                                 self.c_components)
-#                self.ostream.print_header(w_str)
-#                self.ostream.print_header('=' * (len(w_str) + 2))
-#                self.ostream.print_blank()
-#
-#                title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
-#                    'Component', 'Frequency', 'Real', 'Imaginary')
-#                width = len(title)
-#                self.ostream.print_header(title.ljust(width))
-#                self.ostream.print_header(('-' * len(title)).ljust(width))
-#                self.print_component('X2', wb, val_X2, width)
-#                self.print_component('A2', wb, val_A2, width)
-#                self.print_component('E3', wb, val_E3, width)
-#                self.print_component('beta', wb, beta, width)
-#                self.ostream.print_blank()
-#                self.ostream.flush()
-#
-#                result[wb] = beta
-# qrf_dft branch version
-            Na = (LinearSolver.lrmat2vec(kX[('A', wb + wc)].real, nocc, norb) +
-                  1j *
-                  LinearSolver.lrmat2vec(kX[('A', wb + wc)].imag, nocc, norb))
+            op_a = X[self.a_components]
+            op_b = X[self.b_components]
+            op_c = X[self.c_components]
 
-            Nb = (LinearSolver.lrmat2vec(kX[('B', wb)].real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kX[('B', wb)].imag, nocc, norb))
+            for (wb, wc) in freqpairs:
 
-            Nc = (LinearSolver.lrmat2vec(kX[('C', wc)].real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kX[('C', wc)].imag, nocc, norb))
+                Na = self.complex_lrmat2vec(kX[('A', wb + wc)], nocc, norb)
+                Nb = self.complex_lrmat2vec(kX[('B', wb)], nocc, norb)
+                Nc = self.complex_lrmat2vec(kX[('C', wc)], nocc, norb)
 
-            C2Nb = self.x2_contract(kX[('B', wb)], op_c, d_a_mo, nocc, norb)
-            B2Nc = self.x2_contract(kX[('C', wc)], op_b, d_a_mo, nocc, norb)
+                C2Nb = self.x2_contract(kX[('B', wb)], op_c, d_a_mo, nocc, norb)
+                B2Nc = self.x2_contract(kX[('C', wc)], op_b, d_a_mo, nocc, norb)
 
-            A2Nc = self.a2_contract(kX[('C', wc)], op_a, d_a_mo, nocc, norb)
-            A2Nb = self.a2_contract(kX[('B', wb)], op_a, d_a_mo, nocc, norb)
+                A2Nc = self.a2_contract(kX[('C', wc)], op_a, d_a_mo, nocc, norb)
+                A2Nb = self.a2_contract(kX[('B', wb)], op_a, d_a_mo, nocc, norb)
 
-            NaE3NbNc = np.dot(Na.T, e3_dict[(wb, wc)])
-            NaC2Nb = np.dot(Na.T, C2Nb)
-            NaB2Nc = np.dot(Na.T, B2Nc)
-            NbA2Nc = np.dot(Nb.T, A2Nc)
-            NcA2Nb = np.dot(Nc.T, A2Nb)
+                NaE3NbNc = np.dot(Na.T, e3_dict[wb])
+                NaC2Nb = np.dot(Na.T, C2Nb)
+                NaB2Nc = np.dot(Na.T, B2Nc)
+                NbA2Nc = np.dot(Nb.T, A2Nc)
+                NcA2Nb = np.dot(Nc.T, A2Nb)
 
-            X2 = NaC2Nb + NaB2Nc
-            A2 = NbA2Nc + NcA2Nb
+                val_X2 = -(NaC2Nb + NaB2Nc)
+                val_A2 = -(NbA2Nc + NcA2Nb)
+                val_E3 = NaE3NbNc
+                beta = val_E3 + val_A2 + val_X2
 
-            self.ostream.print_blank()
-            w_str = 'Quadratic response function: ' + '<< ' + str(
-                self.a_component) + ';' + str(self.b_component) + ',' + str(
-                    self.c_component) + ' >> ' +  ' (' + str(
-                            wb) + ' ,' + str(wc) + ')'
-            self.ostream.print_header(w_str)
-            self.ostream.print_header('=' * (len(w_str) + 2))
-            self.ostream.print_blank()
-            title = '{:<9s}  {:>20s} {:>21s}'.format(
-                'Component', 'Real', 'Imaginary')
-            width = len(title)
-            self.ostream.print_header(title.ljust(width))
-            self.ostream.print_header(('-' * len(title)).ljust(width))
-            self.print_component('X2', -X2, width)
-            self.print_component('A2', -A2, width)
-            self.print_component('E3', NaE3NbNc, width)
-            self.print_component('β', NaE3NbNc - A2 - X2, width)
-            result.update({(wb, wc): NaE3NbNc - A2 - X2})
-#>>>>>>> qrf_dft
+                self.ostream.print_blank()
+                w_str = 'Quadratic response function at given frequencies: '
+                w_str += '<< {};{},{} >>'.format(self.a_components,
+                                                 self.b_components,
+                                                 self.c_components)
+                self.ostream.print_header(w_str)
+                self.ostream.print_header('=' * (len(w_str) + 2))
+                self.ostream.print_blank()
+
+                title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
+                    'Component', 'Frequency', 'Real', 'Imaginary')
+                width = len(title)
+                self.ostream.print_header(title.ljust(width))
+                self.ostream.print_header(('-' * len(title)).ljust(width))
+                self.print_component('X2', wb, val_X2, width)
+                self.print_component('A2', wb, val_A2, width)
+                self.print_component('E3', wb, val_E3, width)
+                self.print_component('beta', wb, beta, width)
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+                result[(wb,wc)] = beta
 
         profiler.check_memory_usage('End of QRF')
 
@@ -528,8 +405,8 @@ class QuadraticResponseDriver(NonLinearSolver):
             A list of tranformed densities
         """
 
-        d_dft1 = []
-        d_dft2 = []        
+        firstorderdens = []
+        secorderdens = []
 
         for (wb, wc) in freqpairs:
 
@@ -548,17 +425,16 @@ class QuadraticResponseDriver(NonLinearSolver):
             Dbc = self.transform_dens(kb, Dc, S)
             Dcb = self.transform_dens(kc, Db, S)
 
-            d_dft1.append(Db.real)
-            d_dft1.append(Db.imag)
-            d_dft1.append(Dc.real)
-            d_dft1.append(Dc.imag)
-            d_dft2.append((Dbc+Dcb).real)
-            d_dft2.append((Dbc+Dcb).imag)
-            
+            firstorderdens.append(Db.real)
+            firstorderdens.append(Db.imag)
+            firstorderdens.append(Dc.real)
+            firstorderdens.append(Dc.imag)
+            secorderdens.append((Dbc+Dcb).real)
+            secorderdens.append((Dbc+Dcb).imag)
 
-        return d_dft1,d_dft2
+        return firstorderdens,secorderdens
 
-    def get_fock_dict(self, wi, d_first, d_sec, F0, mo, molecule, ao_basis, dft_dict = None):
+    def get_fock_dict(self, wi, firstorderdens,secorderdens, F0, mo, molecule, ao_basis,dft_dict = None):
         """
         Computes the Fock matrices for a quadratic response function
 
@@ -582,13 +458,7 @@ class QuadraticResponseDriver(NonLinearSolver):
         if self.rank == mpi_master():
             self.print_fock_header()
 
-# master branch version
-#        keys = ['Fbc', 'Fcb']
-# qrf_dft branch version
-        keys = [
-            'Fbc+Fcb',
-        ]
-#>>>>>>> qrf_dft
+        keys = ['FbcFcb']
 
         if self.checkpoint_file is not None:
             fock_file = str(
@@ -612,7 +482,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         time_start_fock = time.time()
         dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis,
-                                        'real_and_imag',dft_dict, d_first,d_sec,'qrf')
+                                        'real_and_imag',dft_dict,firstorderdens,secorderdens,'qrf')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -625,7 +495,7 @@ class QuadraticResponseDriver(NonLinearSolver):
         fock_index = 0
         for wb in fock_freqs:
             for key in keys:
-                focks[key][(wb, wc)] = DistributedArray(dist_focks.data[:,
+                focks[key][wb] = DistributedArray(dist_focks.data[:,
                                                                   fock_index],
                                                   self.comm,
                                                   distribute=False)
@@ -663,15 +533,9 @@ class QuadraticResponseDriver(NonLinearSolver):
         for (wb, wc) in wi:
 
             vec_pack = np.array([
-# master branch version
-#                fo['Fbc'][wb].data,
-#                fo['Fcb'][wb].data,
-#                fo2[('B', wb)].data,
-#                fo2[('C', wc)].data,
-# qrf_dft branch version
-                fo['Fbc+Fcb'][(wb, wc)].data, fo2[('B', wb)].data,
-                fo2[('C', wc)].data
-#>>>>>>> qrf_dft
+                fo['FbcFcb'][wb].data,
+                fo2[('B', wb)].data,
+                fo2[('C', wc)].data,
             ]).T.copy()
 
             vec_pack = self.collect_vectors_in_columns(vec_pack)
@@ -681,7 +545,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
             vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
 
-            (fbc_cb, fb, fc) = vec_pack
+            (fbcfcb, fb, fc) = vec_pack
 
             fb = np.conjugate(fb).T
             fc = np.conjugate(fc).T
@@ -695,14 +559,9 @@ class QuadraticResponseDriver(NonLinearSolver):
 
             xi = self.xi(kb, kc, fb, fc, F0_a)
 
-# master
-#            e3fock = xi.T + (0.5 * fbc + 0.5 * fcb).T
-#
-#            e3vec[wb] = self.anti_sym(
-# qrf_dft
-            e3fock = xi.T + (0.5 *fbc_cb).T
-            e3vec[(wb, wc)] = self.anti_sym(
-#>>>>>>> qrf_dft
+            e3fock = xi.T + 0.5 * fbcfcb.T
+
+            e3vec[wb] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
 
         return e3vec
@@ -736,7 +595,7 @@ class QuadraticResponseDriver(NonLinearSolver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def print_component(self, label, value, width):
+    def print_component(self, label, freq, value, width):
         """
         Prints QRF component.
 
@@ -750,6 +609,6 @@ class QuadraticResponseDriver(NonLinearSolver):
             The width for the output
         """
 
-        w_str = '{:<9s} {:20.8f} {:20.8f}j'.format(
-            label, value.real, value.imag)
+        w_str = '{:<9s} {:12.4f} {:20.8f} {:20.8f}j'.format(
+            label, freq, value.real, value.imag)
         self.ostream.print_header(w_str.ljust(width))

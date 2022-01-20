@@ -24,17 +24,16 @@ class TestInitialGuess:
         # compute overlap
 
         ovldrv = OverlapIntegralsDriver(task.mpi_comm)
-        S12 = ovldrv.compute(molecule, min_basis, ao_basis)
-        S22 = ovldrv.compute(molecule, ao_basis)
+        S = ovldrv.compute(molecule, ao_basis)
 
         # compute initial guess
 
         saddrv = SADGuessDriver(task.mpi_comm)
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, True)
+        D = saddrv.compute(molecule, min_basis, ao_basis, 'restricted')
 
         # matrix to numpy
 
-        overlap = S22.to_numpy()
+        overlap = S.to_numpy()
         density = D.alpha_to_numpy(0)
 
         if is_mpi_master(task.mpi_comm):
@@ -61,7 +60,7 @@ class TestInitialGuess:
         molecule.set_charge(charge + 2)
         molecule.set_multiplicity(multiplicity)
 
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, True)
+        D = saddrv.compute(molecule, min_basis, ao_basis, 'restricted')
 
         density_a = D.alpha_to_numpy(0)
 
@@ -78,7 +77,7 @@ class TestInitialGuess:
         molecule.set_charge(charge - 2)
         molecule.set_multiplicity(multiplicity)
 
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, True)
+        D = saddrv.compute(molecule, min_basis, ao_basis, 'restricted')
 
         density_a = D.alpha_to_numpy(0)
 
@@ -95,7 +94,7 @@ class TestInitialGuess:
         molecule.set_charge(charge + 1)
         molecule.set_multiplicity(multiplicity + 1)
 
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, False)
+        D = saddrv.compute(molecule, min_basis, ao_basis, 'unrestricted')
 
         density_a = D.alpha_to_numpy(0)
         density_b = D.beta_to_numpy(0)
@@ -114,7 +113,7 @@ class TestInitialGuess:
         molecule.set_charge(charge - 1)
         molecule.set_multiplicity(multiplicity + 1)
 
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, False)
+        D = saddrv.compute(molecule, min_basis, ao_basis, 'unrestricted')
 
         density_a = D.alpha_to_numpy(0)
         density_b = D.beta_to_numpy(0)
@@ -133,7 +132,7 @@ class TestInitialGuess:
         molecule.set_charge(charge)
         molecule.set_multiplicity(multiplicity + 2)
 
-        D = saddrv.compute(molecule, min_basis, ao_basis, S12, S22, False)
+        D = saddrv.compute(molecule, min_basis, ao_basis, 'unrestricted')
 
         density_a = D.alpha_to_numpy(0)
         density_b = D.beta_to_numpy(0)

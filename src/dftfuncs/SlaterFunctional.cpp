@@ -299,7 +299,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
             grho_bbb[i] += frg * std::pow(rhob[i], fp);
 
         }
-
+        
     }
 
     void
