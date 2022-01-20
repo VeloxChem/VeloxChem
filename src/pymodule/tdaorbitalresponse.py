@@ -68,7 +68,7 @@ class TdaOrbitalResponse(OrbitalResponse):
             unrelaxed one-particle density.
         """
 
-        profiler.start_timer(0, 'RHS')
+        profiler.start_timer('RHS')
 
         # Workflow:
         # 1) Construct the necessary density matrices
@@ -164,7 +164,7 @@ class TdaOrbitalResponse(OrbitalResponse):
             rhs_mo = fmo_rhs_0 + np.linalg.multi_dot(
                 [mo_occ.T, sdp_pds, mo_vir])
 
-        profiler.stop_timer(0, 'RHS')
+        profiler.stop_timer('RHS')
 
         if self.rank == mpi_master():
             return {

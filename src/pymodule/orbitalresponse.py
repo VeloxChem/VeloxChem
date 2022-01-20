@@ -296,7 +296,7 @@ class OrbitalResponse:
         lambda_multipliers = self.compute_lambda(molecule, basis, scf_tensors,
                                                  rhs_mo, dft_dict, profiler)
 
-        profiler.start_timer(0, 'omega')
+        profiler.start_timer('omega')
 
         # Prerequesites for the overlap matrix multipliers
         if self.rank == mpi_master():
@@ -383,7 +383,7 @@ class OrbitalResponse:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        profiler.stop_timer(0, 'omega')
+        profiler.stop_timer('omega')
 
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
@@ -532,7 +532,7 @@ class OrbitalResponse:
             vector with orbital Hessian matrix.
             """
 
-            profiler.start_timer(self.iter_count, 'CG')
+            profiler.start_timer('Iter ' + str(self.iter_count) + 'CG')
 
             # Create AODensityMatrix object from lambda in AO
             if self.rank == mpi_master():
@@ -572,7 +572,7 @@ class OrbitalResponse:
 
             lambda_mo = self.comm.bcast(lambda_mo, root=mpi_master())
 
-            profiler.stop_timer(self.iter_count, 'CG')
+            profiler.stop_timer('Iter ' + str(self.iter_count) + 'CG')
 
             profiler.check_memory_usage(
                 'CG Iteration {:d}'.format(self.iter_count + 1))
