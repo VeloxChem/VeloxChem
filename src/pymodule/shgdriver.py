@@ -225,7 +225,6 @@ class SHGDriver(NonLinearSolver):
         N_drv = ComplexResponse(self.comm, self.ostream)
 
         if self.dft:
-            print(dft_dict)
             method_settings = {'xcfun': dft_dict['dft_func_label'], 'grid_level': self.grid_level}
             N_drv.update_settings({},method_settings)
 

@@ -21,7 +21,7 @@ class TestSHG:
 
         return scf_drv.scf_tensors
 
-    def run_shg(self, inpfile, w, ref_result):
+    def run_shg(self, inpfile, ref_result):
 
         task = MpiTask([inpfile, None])
 
@@ -39,35 +39,35 @@ class TestSHG:
         shg_prop.compute(task.molecule, task.ao_basis, scf_tensors)
         shg_result = shg_prop.rsp_property
 
+        print(shg_result)
+
         if task.mpi_rank == mpi_master():
 
             # x-component
 
-            assert abs(shg_result[0.2][0].real - ref_result['x'].real) < 1.0e-6
-            assert abs(shg_result[0.2][0].imag - ref_result['x'].imag) < 1.0e-6
+            assert abs(shg_result[0.1][0].real - ref_result['x'].real) < 1.0e-6
+            assert abs(shg_result[0.1][0].imag - ref_result['x'].imag) < 1.0e-6
 
             # y-component
 
-            assert abs(shg_result[0.2][1].real - ref_result['y'].real) < 1.0e-6
-            assert abs(shg_result[0.2][1].imag - ref_result['y'].imag) < 1.0e-6
+            assert abs(shg_result[0.1][1].real - ref_result['y'].real) < 1.0e-6
+            assert abs(shg_result[0.1][1].imag - ref_result['y'].imag) < 1.0e-6
 
             # z-component
 
-            assert abs(shg_result[0.2][2].real - ref_result['z'].real) < 1.0e-6
-            assert abs(shg_result[0.2][2].imag - ref_result['z'].imag) < 1.0e-6
+            assert abs(shg_result[0.1][2].real - ref_result['z'].real) < 1.0e-6
+            assert abs(shg_result[0.1][2].imag - ref_result['z'].imag) < 1.0e-6
 
     def test_shg(self):
 
-        w = 0.2
 
         ref_result = {
             'x': 0 + 0j,
             'y': 0 + 0j,
-            'z': 155.93642496 + 99.03258296J,
+            'z': 58.6164183 + 230.4197039j,
         }
-
         here = Path(__file__).parent
 
         inpfile = str(here / 'inputs' / 'water_shg.inp')
 
-        self.run_shg(inpfile, w, ref_result)
+        self.run_shg(inpfile, ref_result)

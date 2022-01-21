@@ -1652,7 +1652,7 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
 
                     rhow1rhow2_i[i] = 2.0 * (rhow1a_r[i]*rhow2a_i[i] + rhow1a_i[i]*rhow2a_r[i]);
 
-                    // 10
+                    // 6-7
 
                     rxw1rhow2_r[i] = 2.0 *(rxw1_r * rhow2a_r[i] -  rxw1_i * rhow2a_i[i]
 
@@ -1679,7 +1679,7 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
                                          + rzw2_r * rhow1a_i[i] +  rzw2_i * rhow1a_r[i]);
 
 
-                    // Sixth term 
+                    // 12
                     
                     rxw1rxw2_r[i] = rxw1_r * rxw2_r - rxw1_i * rxw2_i
                                         
