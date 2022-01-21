@@ -101,7 +101,7 @@ class CphfSolver(LinearSolver):
             method_dict = {}
 
         super().update_settings(cphf_dict, method_dict)
-    
+
         if 'use_subspace_solver' in cphf_dict:
             key = cphf_dict['use_subspace_solver'].lower()
             self.use_subspace_solver = True if key in ['yes', 'y'] else False
@@ -323,7 +323,7 @@ class CphfSolver(LinearSolver):
                 self.profiler.print_memory_tracing(self.ostream)
 
                 # TODO: Create a print_iteration routine
-                if self.print_residuals: 
+                if self.print_residuals:
                     self.print_iteration(relative_residual_norm, molecule)
 
             self.profiler.stop_timer('Iter ' + str(iteration) + 'ReducedSpace')
@@ -469,7 +469,7 @@ class CphfSolver(LinearSolver):
             fock = AOFockMatrix(dens)
 
             self.comp_lr_fock(fock, dens, molecule, basis, eri_dict,
-                              dft_dict, pe_dict, timing_dict)
+                              dft_dict, pe_dict, self.profiler)
 
             sigmas = None
 
@@ -731,6 +731,8 @@ class CphfSolver(LinearSolver):
 
         nocc = molecule.number_of_alpha_electrons()
         natm = molecule.number_of_atoms()
+        # degrees of freedom from rhs (can be different from number of atoms)
+        dof = cphf_rhs.shape[0]
 
         if self.rank == mpi_master():
             mo = scf_tensors['C']
@@ -757,7 +759,7 @@ class CphfSolver(LinearSolver):
         if self.rank == mpi_master():
             # Create AODensityMatrix object from CPHF guess in AO
             cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ, cphf_guess, mo_vir)
-            cphf_ao_list = list([cphf_ao[x] for x in range(3*natm)])
+            cphf_ao_list = list([cphf_ao[x] for x in range(dof)])
             # create AODensityMatrix object
             ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
         else:
@@ -780,28 +782,28 @@ class CphfSolver(LinearSolver):
             # Create AODensityMatrix object from lambda in AO
             if self.rank == mpi_master():
                 cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ,
-                                    v.reshape(3*natm, nocc, nvir), mo_vir)
-                cphf_ao_list = list([cphf_ao[x] for x in range(3*natm)])
+                                    v.reshape(dof, nocc, nvir), mo_vir)
+                cphf_ao_list = list([cphf_ao[x] for x in range(dof)])
                 ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
             else:
                 ao_density_cphf = AODensityMatrix()
             ao_density_cphf.broadcast(self.rank, self.comm)
 
             self.comp_lr_fock(fock_cphf, ao_density_cphf, molecule,
-                              basis, eri_dict, dft_dict, pe_dict, timing_dict)
- 
+                              basis, eri_dict, dft_dict, pe_dict, self.profiler)
+
             # Transform to MO basis (symmetrized w.r.t. occ. and virt.)
             # and add diagonal part
             if self.rank == mpi_master():
-                fock_cphf_numpy = np.zeros((3*natm,nao,nao))
-                for i in range(3*natm):
+                fock_cphf_numpy = np.zeros((dof,nao,nao))
+                for i in range(dof):
                     fock_cphf_numpy[i] = fock_cphf.to_numpy(i)
 
                 cphf_mo = (-np.einsum('mi,xmn,na->xia', mo_occ,
                                       fock_cphf_numpy, mo_vir)
                           - np.einsum('ma,xmn,ni->xia', mo_vir,
                                       fock_cphf_numpy, mo_occ)
-                          + v.reshape(3*natm, nocc, nvir) * eov)
+                          + v.reshape(dof, nocc, nvir) * eov)
             else:
                 cphf_mo = None
 
@@ -819,13 +821,12 @@ class CphfSolver(LinearSolver):
 
             if self.rank == mpi_master():
                 if self.print_residuals:
-                    residual_norms = np.zeros(3*natm)
-                    for i in range(natm):
-                        for x in range(3):
-                            residual_norms[3*i+x] = np.linalg.norm(cphf_mo[i,x] - cphf_rhs[i,x])
+                    residual_norms = np.zeros(dof)
+                    for i in range(dof):
+                        residual_norms[i] = np.linalg.norm(cphf_mo[i] - cphf_rhs[i])
                     self.print_iteration(residual_norms, molecule)
 
-            return cphf_mo.reshape(3 * natm * nocc * nvir)
+            return cphf_mo.reshape(dof * nocc * nvir)
 
         # Matrix-vector product for preconditioner using the
         # inverse of the diagonal (i.e. eocc - evir)
@@ -835,21 +836,21 @@ class CphfSolver(LinearSolver):
             required by the pre-conditioner for the conjugate gradient.
             It is an approximation for the inverse of matrix A in Ax = b.
             """
-            current_v = v.reshape(3*natm, nocc, nvir)
+            current_v = v.reshape(dof, nocc, nvir)
             M_dot_v = current_v / eov
 
-            return M_dot_v.reshape(3 * natm * nocc * nvir)
+            return M_dot_v.reshape(dof * nocc * nvir)
 
         # 5) Define the linear operators and run conjugate gradient
-        LinOp = linalg.LinearOperator((3*natm * nocc * nvir,
-                                       3*natm * nocc * nvir),
+        LinOp = linalg.LinearOperator((dof * nocc * nvir,
+                                       dof * nocc * nvir),
                                        matvec=cphf_matvec)
-        PrecondOp = linalg.LinearOperator((3*natm * nocc * nvir,
-                                           3*natm * nocc * nvir),
+        PrecondOp = linalg.LinearOperator((dof * nocc * nvir,
+                                           dof * nocc * nvir),
                                            matvec=precond_matvec)
 
-        b = cphf_rhs.reshape(3*natm * nocc * nvir)
-        x0 = cphf_guess.reshape(3*natm * nocc * nvir)
+        b = cphf_rhs.reshape(dof * nocc * nvir)
+        x0 = cphf_guess.reshape(dof * nocc * nvir)
 
         cphf_coefficients_ov, cg_conv = linalg.cg(A=LinOp,
                                                 b=b,
@@ -861,13 +862,13 @@ class CphfSolver(LinearSolver):
 
         self.is_converged = (cg_conv == 0)
 
-        return cphf_coefficients_ov.reshape(natm, 3, nocc, nvir)
+        return cphf_coefficients_ov.reshape(int(dof/3), 3, nocc, nvir)
 
 
 
     def compute_rhs(self, molecule, basis, scf_tensors):
         """
-        Computes the right hand side for the CPHF equations for 
+        Computes the right hand side for the CPHF equations for
         all atomic coordinates.
 
         :param molecule:
@@ -958,7 +959,7 @@ class CphfSolver(LinearSolver):
         timing_dict = {}
 
         self.comp_lr_fock(fock_uij, ao_density_uij, molecule,
-                          basis, eri_dict, dft_dict, pe_dict, timing_dict)
+                          basis, eri_dict, dft_dict, pe_dict, self.profiler)
 
         if self.rank == mpi_master():
             # TODO: how can this be done better?
@@ -968,12 +969,12 @@ class CphfSolver(LinearSolver):
                     fock_uij_numpy[i,x] = fock_uij.to_numpy(3*i + x)
 
             # transform to MO basis
-            fock_uij_mo = np.einsum('mi,axmn,nb->axib', mo_occ, 
+            fock_uij_mo = np.einsum('mi,axmn,nb->axib', mo_occ,
                                     fock_uij_numpy, mo_vir)
 
             # sum up the terms of the RHS
-            cphf_rhs = (fock_deriv_ov - orben_ovlp_deriv_ov 
-                        + 2 * fock_uij_mo) 
+            cphf_rhs = (fock_deriv_ov - orben_ovlp_deriv_ov
+                        + 2 * fock_uij_mo)
             return {
                 'cphf_rhs': cphf_rhs,
                 'ovlp_deriv_oo': ovlp_deriv_oo,
