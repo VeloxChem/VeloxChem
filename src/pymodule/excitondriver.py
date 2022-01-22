@@ -469,23 +469,7 @@ class ExcitonModelDriver:
                 dimer = Molecule(monomer_a, monomer_b)
                 dimer.check_multiplicity()
 
-                if self.rank == mpi_master():
-                    self.ostream.print_block(dimer.get_string())
-                    self.ostream.print_block(dimer.more_info())
-                    self.ostream.print_blank()
-                    self.ostream.print_blank()
-
-                    self.ostream.print_block(
-                        basis.get_string('Atomic Basis', dimer))
-                    self.ostream.flush()
-
                 # 1e integrals
-                kin_drv = KineticEnergyIntegralsDriver(self.comm)
-                kin_mat = kin_drv.compute(dimer, basis)
-
-                npot_drv = NuclearPotentialIntegralsDriver(self.comm)
-                npot_mat = npot_drv.compute(dimer, basis)
-
                 dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
                 dipole_drv.origin = self.center_of_mass
                 dipole_mats = dipole_drv.compute(dimer, basis)
@@ -496,21 +480,6 @@ class ExcitonModelDriver:
                 angmom_drv = AngularMomentumIntegralsDriver(self.comm)
                 angmom_drv.origin = self.center_of_mass
                 angmom_mats = angmom_drv.compute(dimer, basis)
-
-                # dft grid
-                if self.dft:
-                    grid_drv = GridDriver(self.comm)
-                    grid_drv.set_level(self.grid_level)
-
-                    grid_t0 = tm.time()
-                    dimer_molgrid = grid_drv.generate(dimer)
-                    n_grid_points = dimer_molgrid.number_of_points()
-                    dimer_molgrid.distribute(self.rank, self.nodes, self.comm)
-                    self.ostream.print_info(
-                        'Molecular grid with {} points generated in {:.2f} sec.'
-                        .format(n_grid_points,
-                                tm.time() - grid_t0))
-                    self.ostream.print_blank()
 
                 if self.rank == mpi_master():
                     dipole_ints = (dipole_mats.x_to_numpy(),
@@ -525,104 +494,29 @@ class ExcitonModelDriver:
                                    angmom_mats.y_to_numpy(),
                                    angmom_mats.z_to_numpy())
 
-                    # get indices of monomer AOs in dimer
-                    ao_inds_A, ao_inds_B = get_dimer_ao_indices(
-                        monomer_a, monomer_b, basis, basis)
-
-                    # assemble MO coefficient matrix
-
-                    #         occ.A     occ.B     vir.A     vir.B
-                    #      +---------+---------+---------+---------+
-                    #      |         |         |         |         |
-                    # ao.A |  CoccA  |         |  CvirA  |         |
-                    #      |         |         |         |         |
-                    #      +---------+---------+---------+---------+
-                    #      |         |         |         |         |
-                    # ao.B |         |  CoccB  |         |  CvirB  |
-                    #      |         |         |         |         |
-                    #      +---------+---------+---------+---------+
-
                     CA = self.monomers[ind_A]['mo']
                     CB = self.monomers[ind_B]['mo']
 
-                    nao_A = CA.shape[0]
-                    nao_B = CB.shape[0]
-                    nmo_A = CA.shape[1]
-                    nmo_B = CB.shape[1]
-
                     nocc_A = monomer_a.number_of_alpha_electrons()
                     nocc_B = monomer_b.number_of_alpha_electrons()
-                    nvir_A = nmo_A - nocc_A
-                    nvir_B = nmo_B - nocc_B
+                    nvir_A = CA.shape[1] - nocc_A
+                    nvir_B = CB.shape[1] - nocc_B
 
                     nocc = nocc_A + nocc_B
                     nvir = nvir_A + nvir_B
 
-                    mo = np.zeros((nao_A + nao_B, nmo_A + nmo_B))
-
-                    for row in range(nao_A):
-                        mo[ao_inds_A[row], :nocc_A] = CA[row, :nocc_A]
-                        mo[ao_inds_A[row], nocc:nocc + nvir_A] = CA[row,
-                                                                    nocc_A:]
-
-                    for row in range(nao_B):
-                        mo[ao_inds_B[row], nocc_A:nocc] = CB[row, :nocc_B]
-                        mo[ao_inds_B[row], nocc + nvir_A:] = CB[row, nocc_B:]
-
+                    mo = self.assemble_mo_coefficients(monomer_a, monomer_b,
+                                                       basis, CA, CB)
                     mo_occ = mo[:, :nocc].copy()
                     mo_vir = mo[:, nocc:].copy()
-
-                    # compute density matrix
-                    dens = np.matmul(mo_occ, mo_occ.T)
-                    dens_mat = AODensityMatrix([dens], denmat.rest)
                 else:
-                    dens_mat = AODensityMatrix()
+                    mo = None
 
-                dens_mat.broadcast(self.rank, self.comm)
+                dimer_prop = self.dimer_properties(dimer, basis, mo)
 
-                # compute Fock matrix
-                fock_mat = AOFockMatrix(dens_mat)
-
-                if self.dft:
-                    xcfun = parse_xc_func(self.xcfun_label.upper())
-                    if xcfun.is_hybrid():
-                        fock_mat.set_fock_type(fockmat.restjkx, 0)
-                        fock_mat.set_scale_factor(
-                            xcfun.get_frac_exact_exchange(), 0)
-                    else:
-                        fock_mat.set_fock_type(fockmat.restj, 0)
-                else:
-                    fock_mat.set_fock_type(fockmat.restjk, 0)
-
-                eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-                screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                            self.eri_thresh, dimer, basis)
-                eri_drv.compute(fock_mat, dens_mat, dimer, basis, screening)
-                fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
-
-                if self.dft:
-                    if not xcfun.is_hybrid():
-                        fock_mat.scale(2.0, 0)
-
-                    xc_drv = XCIntegrator(self.comm)
-                    vxc_mat = xc_drv.integrate(dens_mat, dimer, basis,
-                                               dimer_molgrid, self.xcfun_label)
-                    vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
+                dimer_energy = dimer_prop['energy']
 
                 if self.rank == mpi_master():
-
-                    # compute dimer energy
-
-                    hcore = kin_mat.to_numpy() - npot_mat.to_numpy()
-                    fock = hcore + fock_mat.to_numpy(0)
-
-                    dimer_energy = dimer.nuclear_repulsion_energy()
-                    dimer_energy += np.sum(dens * (hcore + fock))
-                    if self.dft:
-                        dimer_energy += vxc_mat.get_energy()
-
-                    self.ostream.print_blank()
-
                     valstr = 'Excitonic Couplings'
                     self.ostream.print_header(valstr)
                     self.ostream.print_header('=' * (len(valstr) + 2))
@@ -632,15 +526,6 @@ class ExcitonModelDriver:
                     self.ostream.print_header(valstr.ljust(72))
                     self.ostream.print_blank()
                     self.ostream.flush()
-
-                    # compute Fock in MO basis
-
-                    if self.dft:
-                        fock += vxc_mat.get_matrix().to_numpy()
-
-                    fock_mo = np.matmul(mo.T, np.matmul(fock, mo))
-                    fock_occ = fock_mo[:nocc, :nocc].copy()
-                    fock_vir = fock_mo[nocc:, nocc:].copy()
 
                     # assemble TDA CI vectors
 
@@ -741,6 +626,7 @@ class ExcitonModelDriver:
                 tfock_mat = AOFockMatrix(tdens_mat)
 
                 if self.dft:
+                    xcfun = dimer_prop['xcfun']
                     if xcfun.is_hybrid():
                         fock_flag = fockmat.rgenjkx
                         fact_xc = xcfun.get_frac_exact_exchange()
@@ -754,16 +640,26 @@ class ExcitonModelDriver:
                 for s in range(tfock_mat.number_of_fock_matrices()):
                     tfock_mat.set_fock_type(fock_flag, s)
 
+                eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+                screening = dimer_prop['screening']
                 eri_drv.compute(tfock_mat, tdens_mat, dimer, basis, screening)
+
                 if self.dft:
                     if not xcfun.is_hybrid():
                         for s in range(tfock_mat.number_of_fock_matrices()):
                             tfock_mat.scale(2.0, s)
+                    xc_drv = XCIntegrator(self.comm)
+                    dens_mat = dimer_prop['dens_mat']
+                    dimer_molgrid = dimer_prop['dimer_molgrid']
                     xc_drv.integrate(tfock_mat, tdens_mat, dens_mat, dimer,
                                      basis, dimer_molgrid, self.xcfun_label)
                 tfock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
                 if self.rank == mpi_master():
+                    fock_mo = dimer_prop['fock_mo']
+                    fock_occ = fock_mo[:nocc, :nocc].copy()
+                    fock_vir = fock_mo[nocc:, nocc:].copy()
+
                     sigma_vectors = []
 
                     for s in range(tfock_mat.number_of_fock_matrices()):
@@ -1082,8 +978,6 @@ class ExcitonModelDriver:
             The monomer molecule.
         :param basis:
             The AO basis.
-        :param min_basis:
-            The minimal AO basis set.
 
         :return:
             The dictionary that contains TDA properties.
@@ -1170,6 +1064,177 @@ class ExcitonModelDriver:
                         [np.sum(tdens * angmom_ints[d].T) for d in range(3)]))
 
         return tda_prop
+
+    def assemble_mo_coefficients(self, monomer_a, monomer_b, basis, mo_a, mo_b):
+        """
+        Assembles MO coefficients matrices of monomers A and B.
+
+        :param monomer_a:
+            The molecule of monomer A.
+        :param monomer_b:
+            The molecule of monomer B.
+        :param basis:
+            The AO basis.
+        :param mo_a:
+            The MO coefficients of monomer A.
+        :param mo_b:
+            The MO coefficients of monomer B.
+
+        :return:
+            The MO coefficients matrix for dimer AB.
+        """
+
+        # get indices of monomer AOs in dimer
+        ao_inds_A, ao_inds_B = get_dimer_ao_indices(monomer_a, monomer_b, basis,
+                                                    basis)
+
+        # assemble MO coefficient matrix
+
+        #         occ.A     occ.B     vir.A     vir.B
+        #      +---------+---------+---------+---------+
+        #      |         |         |         |         |
+        # ao.A |  CoccA  |         |  CvirA  |         |
+        #      |         |         |         |         |
+        #      +---------+---------+---------+---------+
+        #      |         |         |         |         |
+        # ao.B |         |  CoccB  |         |  CvirB  |
+        #      |         |         |         |         |
+        #      +---------+---------+---------+---------+
+
+        nao_A, nmo_A = mo_a.shape[0], mo_a.shape[1]
+        nao_B, nmo_B = mo_b.shape[0], mo_b.shape[1]
+
+        nocc_A = monomer_a.number_of_alpha_electrons()
+        nocc_B = monomer_b.number_of_alpha_electrons()
+        nvir_A = nmo_A - nocc_A
+
+        nocc = nocc_A + nocc_B
+
+        mo = np.zeros((nao_A + nao_B, nmo_A + nmo_B))
+
+        for row in range(nao_A):
+            mo[ao_inds_A[row], :nocc_A] = mo_a[row, :nocc_A]
+            mo[ao_inds_A[row], nocc:nocc + nvir_A] = mo_a[row, nocc_A:]
+
+        for row in range(nao_B):
+            mo[ao_inds_B[row], nocc_A:nocc] = mo_b[row, :nocc_B]
+            mo[ao_inds_B[row], nocc + nvir_A:] = mo_b[row, nocc_B:]
+
+        return mo
+
+    def dimer_properties(self, dimer, basis, mo):
+        """
+        Computes dimer properties.
+
+        :param dimer:
+            The dimer molecule.
+        :param basis:
+            The AO basis.
+        :param mo:
+            The MO coefficients of dimer.
+
+        :return:
+            A dictionary containing dimer properties.
+        """
+
+        if self.rank == mpi_master():
+            self.ostream.print_block(dimer.get_string())
+            self.ostream.print_block(dimer.more_info())
+            self.ostream.print_blank()
+            self.ostream.print_blank()
+
+            self.ostream.print_block(basis.get_string('Atomic Basis', dimer))
+            self.ostream.flush()
+
+        # 1e integrals
+        kin_drv = KineticEnergyIntegralsDriver(self.comm)
+        kin_mat = kin_drv.compute(dimer, basis)
+
+        npot_drv = NuclearPotentialIntegralsDriver(self.comm)
+        npot_mat = npot_drv.compute(dimer, basis)
+
+        # dft grid
+        if self.dft:
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(self.grid_level)
+
+            grid_t0 = tm.time()
+            dimer_molgrid = grid_drv.generate(dimer)
+            n_grid_points = dimer_molgrid.number_of_points()
+            dimer_molgrid.distribute(self.rank, self.nodes, self.comm)
+            self.ostream.print_info(
+                'Molecular grid with {} points generated in {:.2f} sec.'.format(
+                    n_grid_points,
+                    tm.time() - grid_t0))
+            self.ostream.print_blank()
+        else:
+            dimer_molgrid = None
+
+        if self.rank == mpi_master():
+            # compute density matrix
+            nocc = dimer.number_of_alpha_electrons()
+            mo_occ = mo[:, :nocc].copy()
+            dens = np.matmul(mo_occ, mo_occ.T)
+            dens_mat = AODensityMatrix([dens], denmat.rest)
+        else:
+            dens_mat = AODensityMatrix()
+
+        dens_mat.broadcast(self.rank, self.comm)
+
+        # compute Fock matrix
+        fock_mat = AOFockMatrix(dens_mat)
+
+        if self.dft:
+            xcfun = parse_xc_func(self.xcfun_label.upper())
+            if xcfun.is_hybrid():
+                fock_mat.set_fock_type(fockmat.restjkx, 0)
+                fock_mat.set_scale_factor(xcfun.get_frac_exact_exchange(), 0)
+            else:
+                fock_mat.set_fock_type(fockmat.restj, 0)
+        else:
+            xcfun = None
+            fock_mat.set_fock_type(fockmat.restjk, 0)
+
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                    self.eri_thresh, dimer, basis)
+        eri_drv.compute(fock_mat, dens_mat, dimer, basis, screening)
+        fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
+
+        if self.dft:
+            if not xcfun.is_hybrid():
+                fock_mat.scale(2.0, 0)
+
+            xc_drv = XCIntegrator(self.comm)
+            vxc_mat = xc_drv.integrate(dens_mat, dimer, basis, dimer_molgrid,
+                                       self.xcfun_label)
+            vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
+
+        if self.rank == mpi_master():
+            # compute dimer energy
+            hcore = kin_mat.to_numpy() - npot_mat.to_numpy()
+            fock = hcore + fock_mat.to_numpy(0)
+            dimer_energy = dimer.nuclear_repulsion_energy()
+            dimer_energy += np.sum(dens * (hcore + fock))
+            if self.dft:
+                dimer_energy += vxc_mat.get_energy()
+                fock += vxc_mat.get_matrix().to_numpy()
+            # compute Fock in MO basis
+            fock_mo = np.matmul(mo.T, np.matmul(fock, mo))
+        else:
+            dimer_energy = None
+            fock_mo = None
+
+        self.ostream.print_blank()
+
+        return {
+            'energy': dimer_energy,
+            'fock_mo': fock_mo,
+            'density': dens_mat,
+            'screening': screening,
+            'molgrid': dimer_molgrid,
+            'xcfun': xcfun,
+        }
 
     def print_banner(self, title):
         """
