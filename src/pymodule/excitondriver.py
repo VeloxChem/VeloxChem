@@ -306,27 +306,27 @@ class ExcitonModelDriver:
             self.print_title(total_LE_states, total_CT_states)
 
         # dimer indices
-        dimer_id = np.zeros((nfragments, nfragments), dtype=np.int32)
+        dimer_ids = np.zeros((nfragments, nfragments), dtype=np.int32)
         dimer_count = 0
         for ind_A in range(nfragments):
-            dimer_id[ind_A, ind_A] = -1
+            dimer_ids[ind_A, ind_A] = -1
             for ind_B in range(ind_A + 1, nfragments):
-                dimer_id[ind_A, ind_B] = dimer_count
-                dimer_id[ind_B, ind_A] = dimer_count
+                dimer_ids[ind_A, ind_B] = dimer_count
+                dimer_ids[ind_B, ind_A] = dimer_count
                 dimer_count += 1
 
         # indices of diabatic excited states
-        excitation_id = np.zeros((nfragments, nfragments), dtype=np.int32)
+        excitation_ids = np.zeros((nfragments, nfragments), dtype=np.int32)
         for ind_A in range(nfragments):
             # LE
-            excitation_id[ind_A, ind_A] = ind_A * self.nstates
+            excitation_ids[ind_A, ind_A] = ind_A * self.nstates
             for ind_B in range(ind_A + 1, nfragments):
                 ct_id = nfragments * self.nstates
-                ct_id += dimer_id[ind_A][ind_B] * ct_states * 2
+                ct_id += dimer_ids[ind_A, ind_B] * ct_states * 2
                 # CT(A->B)
-                excitation_id[ind_A, ind_B] = ct_id
+                excitation_ids[ind_A, ind_B] = ct_id
                 # CT(B->A)
-                excitation_id[ind_B, ind_A] = ct_id + ct_states
+                excitation_ids[ind_B, ind_A] = ct_id + ct_states
 
         if self.dft:
             dft_func_label = self.xcfun_label
@@ -376,7 +376,7 @@ class ExcitonModelDriver:
 
                 for s in range(self.nstates):
                     # LE excitation energy
-                    h = excitation_id[ind, ind] + s
+                    h = excitation_ids[ind, ind] + s
                     self.H[h, h] = self.monomers[ind]['exc_energies'][s]
 
                     # LE transition dipole
@@ -505,10 +505,8 @@ class ExcitonModelDriver:
                     nocc = nocc_A + nocc_B
                     nvir = nvir_A + nvir_B
 
-                    mo = self.assemble_mo_coefficients(monomer_a, monomer_b,
-                                                       basis, CA, CB)
-                    mo_occ = mo[:, :nocc].copy()
-                    mo_vir = mo[:, nocc:].copy()
+                    mo = self.dimer_mo_coefficients(monomer_a, monomer_b, basis,
+                                                    CA, CB)
                 else:
                     mo = None
 
@@ -534,71 +532,21 @@ class ExcitonModelDriver:
 
                     CI_vectors = []
 
-                    #          vir.A     vir.B                vir.A     vir.B
-                    #       +---------+---------+          +---------+---------+
-                    # occ.A |  LE(A)  |         |    occ.A |         |         |
-                    #       +---------+---------+          +---------+---------+
-                    # occ.B |         |         |    occ.B |         |  LE(B)  |
-                    #       +---------+---------+          +---------+---------+
+                    CI_vectors += self.dimer_excitation_vectors_LE_A(
+                        vectors_A, ind_A, nocc_A, nvir_A, nocc, nvir,
+                        excitation_ids)
 
-                    for sA in range(self.nstates):
-                        vec_A = vectors_A[:, sA].reshape(nocc_A, nvir_A)
-                        ci_vec = np.zeros((nocc, nvir))
-                        ci_vec[:nocc_A, :nvir_A] = vec_A[:, :]
-                        CI_vectors.append({
-                            'vec': ci_vec,
-                            'frag': 'A',
-                            'type': 'LE',
-                            'index': excitation_id[ind_A, ind_A] + sA,
-                            'name': '{}e({})'.format(ind_A + 1, sA + 1),
-                        })
+                    CI_vectors += self.dimer_excitation_vectors_LE_B(
+                        vectors_B, ind_B, nocc_A, nvir_A, nocc, nvir,
+                        excitation_ids)
 
-                    for sB in range(self.nstates):
-                        vec_B = vectors_B[:, sB].reshape(nocc_B, nvir_B)
-                        ci_vec = np.zeros((nocc, nvir))
-                        ci_vec[nocc_A:, nvir_A:] = vec_B[:, :]
-                        CI_vectors.append({
-                            'vec': ci_vec,
-                            'frag': 'B',
-                            'type': 'LE',
-                            'index': excitation_id[ind_B, ind_B] + sB,
-                            'name': '{}e({})'.format(ind_B + 1, sB + 1),
-                        })
+                    CI_vectors += self.dimer_excitation_vectors_CT_AB(
+                        ind_A, ind_B, nocc_A, nvir_A, nocc, nvir,
+                        excitation_ids)
 
-                    #          vir.A     vir.B                vir.A     vir.B
-                    #       +---------+---------+          +---------+---------+
-                    # occ.A |         |  CT(AB) |    occ.A |         |         |
-                    #       +---------+---------+          +---------+---------+
-                    # occ.B |         |         |    occ.B |  CT(BA) |         |
-                    #       +---------+---------+          +---------+---------+
-
-                    for oA in range(self.ct_nocc):
-                        for vB in range(self.ct_nvir):
-                            ctAB = oA * self.ct_nvir + vB
-                            ci_vec = np.zeros((nocc, nvir))
-                            ci_vec[nocc_A - 1 - oA][nvir_A + vB] = 1.0
-                            CI_vectors.append({
-                                'vec': ci_vec,
-                                'frag': 'AB',
-                                'type': 'CT',
-                                'index': excitation_id[ind_A, ind_B] + ctAB,
-                                'name': '{}+(H{}){}-(L{})'.format(
-                                    ind_A + 1, oA, ind_B + 1, vB),
-                            })
-
-                    for oB in range(self.ct_nocc):
-                        for vA in range(self.ct_nvir):
-                            ctBA = oB * self.ct_nvir + vA
-                            ci_vec = np.zeros((nocc, nvir))
-                            ci_vec[nocc - 1 - oB][vA] = 1.0
-                            CI_vectors.append({
-                                'vec': ci_vec,
-                                'frag': 'BA',
-                                'type': 'CT',
-                                'index': excitation_id[ind_B, ind_A] + ctBA,
-                                'name': '{}-(L{}){}+(H{})'.format(
-                                    ind_A + 1, vA, ind_B + 1, oB),
-                            })
+                    CI_vectors += self.dimer_excitation_vectors_CT_BA(
+                        ind_A, ind_B, nocc_A, nvir_A, nocc, nvir,
+                        excitation_ids)
 
                     # update excited state information in self.state_info
                     for vec in CI_vectors:
@@ -610,79 +558,18 @@ class ExcitonModelDriver:
                     # create masked CI_vectors containing LE(A), CT(AB), CT(BA)
                     mask_ci_vectors = CI_vectors[:self.nstates] + CI_vectors[
                         self.nstates * 2:]
-
-                # compute sigma vectors for LE(A), CT(AB), CT(BA)
-                if self.rank == mpi_master():
-                    tdens = []
-                    for vec in mask_ci_vectors:
-                        tdens.append(
-                            np.matmul(mo_occ, np.matmul(vec['vec'], mo_vir.T)))
-                    tdens_mat = AODensityMatrix(tdens, denmat.rest)
                 else:
-                    tdens_mat = AODensityMatrix()
+                    mask_ci_vectors = None
 
-                tdens_mat.broadcast(self.rank, self.comm)
+                # compute sigma vectors
+                sigma_vectors = self.dimer_sigma_vectors(
+                    dimer, basis, dimer_prop, mo, mask_ci_vectors)
 
-                tfock_mat = AOFockMatrix(tdens_mat)
-
-                if self.dft:
-                    xcfun = dimer_prop['xcfun']
-                    if xcfun.is_hybrid():
-                        fock_flag = fockmat.rgenjkx
-                        fact_xc = xcfun.get_frac_exact_exchange()
-                        for s in range(tfock_mat.number_of_fock_matrices()):
-                            tfock_mat.set_scale_factor(fact_xc, s)
-                    else:
-                        fock_flag = fockmat.rgenj
-                else:
-                    fock_flag = fockmat.rgenjk
-
-                for s in range(tfock_mat.number_of_fock_matrices()):
-                    tfock_mat.set_fock_type(fock_flag, s)
-
-                eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-                screening = dimer_prop['screening']
-                eri_drv.compute(tfock_mat, tdens_mat, dimer, basis, screening)
-
-                if self.dft:
-                    if not xcfun.is_hybrid():
-                        for s in range(tfock_mat.number_of_fock_matrices()):
-                            tfock_mat.scale(2.0, s)
-                    xc_drv = XCIntegrator(self.comm)
-                    dens_mat = dimer_prop['dens_mat']
-                    dimer_molgrid = dimer_prop['dimer_molgrid']
-                    xc_drv.integrate(tfock_mat, tdens_mat, dens_mat, dimer,
-                                     basis, dimer_molgrid, self.xcfun_label)
-                tfock_mat.reduce_sum(self.rank, self.nodes, self.comm)
+                # compute couplings
+                # sigma_vectors contains LE(A), CT(AB), CT(BA)
+                # CI_vectors[self.nstates:] contains LE(B), CT(AB), CT(BA)
 
                 if self.rank == mpi_master():
-                    fock_mo = dimer_prop['fock_mo']
-                    fock_occ = fock_mo[:nocc, :nocc].copy()
-                    fock_vir = fock_mo[nocc:, nocc:].copy()
-
-                    sigma_vectors = []
-
-                    for s in range(tfock_mat.number_of_fock_matrices()):
-                        tfock = tfock_mat.to_numpy(s)
-                        sigma_vec = np.matmul(mo_occ.T,
-                                              np.matmul(tfock, mo_vir))
-
-                        sigma_vec -= np.matmul(fock_occ,
-                                               mask_ci_vectors[s]['vec'])
-                        sigma_vec += np.matmul(mask_ci_vectors[s]['vec'],
-                                               fock_vir)
-
-                        sigma_vectors.append({
-                            'vec': sigma_vec,
-                            'frag': mask_ci_vectors[s]['frag'],
-                            'type': mask_ci_vectors[s]['type'],
-                            'index': mask_ci_vectors[s]['index'],
-                            'name': mask_ci_vectors[s]['name'],
-                        })
-
-                    # compute couplings
-                    # sigma_vectors contains LE(A), CT(AB), CT(BA)
-                    # CI_vectors[self.nstates:] contains LE(B), CT(AB), CT(BA)
 
                     for svec in sigma_vectors:
                         for cvec in CI_vectors[self.nstates:]:
@@ -717,6 +604,9 @@ class ExcitonModelDriver:
                     # compute CT excitation energies and transition dipoles
                     # sigma_vectors[self.nstates:] contains CT(AB), CT(BA)
 
+                    mo_occ = mo[:, :nocc].copy()
+                    mo_vir = mo[:, nocc:].copy()
+
                     for ivec, svec in enumerate(sigma_vectors[self.nstates:]):
 
                         # the CI vector that corresponds to svec
@@ -750,6 +640,10 @@ class ExcitonModelDriver:
 
                     # three-body CT-CT couplings
 
+                    fock_mo = dimer_prop['fock_mo']
+                    fock_occ = fock_mo[:nocc, :nocc]
+                    fock_vir = fock_mo[nocc:, nocc:]
+
                     for ind_C in range(nfragments):
                         if ind_C == ind_A or ind_C == ind_B:
                             continue
@@ -760,8 +654,8 @@ class ExcitonModelDriver:
                                 for vB in range(self.ct_nvir):
                                     ctCA = oC * self.ct_nvir + vA
                                     ctCB = oC * self.ct_nvir + vB
-                                    ctCA += excitation_id[ind_C, ind_A]
-                                    ctCB += excitation_id[ind_C, ind_B]
+                                    ctCA += excitation_ids[ind_C, ind_A]
+                                    ctCB += excitation_ids[ind_C, ind_B]
 
                                     coupling = fock_vir[vA, nvir_A + vB]
 
@@ -784,8 +678,8 @@ class ExcitonModelDriver:
                                 for oB in range(self.ct_nocc):
                                     ctAC = oA * self.ct_nvir + vC
                                     ctBC = oB * self.ct_nvir + vC
-                                    ctAC += excitation_id[ind_A, ind_C]
-                                    ctBC += excitation_id[ind_B, ind_C]
+                                    ctAC += excitation_ids[ind_A, ind_C]
+                                    ctBC += excitation_ids[ind_B, ind_C]
 
                                     coupling = -fock_occ[nocc_A - 1 - oA,
                                                          nocc - 1 - oB]
@@ -1065,9 +959,9 @@ class ExcitonModelDriver:
 
         return tda_prop
 
-    def assemble_mo_coefficients(self, monomer_a, monomer_b, basis, mo_a, mo_b):
+    def dimer_mo_coefficients(self, monomer_a, monomer_b, basis, mo_a, mo_b):
         """
-        Assembles MO coefficients matrices of monomers A and B.
+        Gets MO coefficients matrices of monomers A and B.
 
         :param monomer_a:
             The molecule of monomer A.
@@ -1235,6 +1129,293 @@ class ExcitonModelDriver:
             'molgrid': dimer_molgrid,
             'xcfun': xcfun,
         }
+
+    def dimer_excitation_vectors_LE_A(self, vectors_A, ind_A, nocc_A, nvir_A,
+                                      nocc, nvir, excitation_ids):
+        """
+        Gets dimer excitation vectors for LE states on monomer A.
+
+        :param vectors_A:
+            The excitation vectors of monomer A.
+        :param ind_A:
+            The index of monomer A.
+        :param nocc_A:
+            The number of occupied MOs in monomer A.
+        :param nvir_A:
+            The number of unoccupied MOs in monomer A.
+        :param nocc:
+            The number of occupied MOs in dimer.
+        :param nvir:
+            The number of unoccupied MOs in dimer.
+        :param excitation_ids:
+            The indices of diabatic excited states.
+
+        :return:
+            A list containing the excitation vectors of LE(A) states.
+        """
+
+        #          vir.A     vir.B
+        #       +---------+---------+
+        # occ.A |  LE(A)  |         |
+        #       +---------+---------+
+        # occ.B |         |         |
+        #       +---------+---------+
+
+        CI_vectors = []
+
+        for sA in range(self.nstates):
+            vec_A = vectors_A[:, sA].reshape(nocc_A, nvir_A)
+            ci_vec = np.zeros((nocc, nvir))
+            ci_vec[:nocc_A, :nvir_A] = vec_A[:, :]
+            CI_vectors.append({
+                'vec': ci_vec,
+                'frag': 'A',
+                'type': 'LE',
+                'index': excitation_ids[ind_A, ind_A] + sA,
+                'name': '{}e({})'.format(ind_A + 1, sA + 1),
+            })
+
+        return CI_vectors
+
+    def dimer_excitation_vectors_LE_B(self, vectors_B, ind_B, nocc_A, nvir_A,
+                                      nocc, nvir, excitation_ids):
+        """
+        Gets dimer excitation vectors for LE states on monomer B.
+
+        :param vectors_B:
+            The excitation vectors of monomer B.
+        :param ind_B:
+            The index of monomer B.
+        :param nocc_A:
+            The number of occupied MOs in monomer A.
+        :param nvir_A:
+            The number of unoccupied MOs in monomer A.
+        :param nocc:
+            The number of occupied MOs in dimer.
+        :param nvir:
+            The number of unoccupied MOs in dimer.
+        :param excitation_ids:
+            The indices of diabatic excited states.
+
+        :return:
+            A list containing the excitation vectors of LE(B) states.
+        """
+
+        #          vir.A     vir.B
+        #       +---------+---------+
+        # occ.A |         |         |
+        #       +---------+---------+
+        # occ.B |         |  LE(B)  |
+        #       +---------+---------+
+
+        CI_vectors = []
+
+        nocc_B = nocc - nocc_A
+        nvir_B = nvir - nvir_A
+
+        for sB in range(self.nstates):
+            vec_B = vectors_B[:, sB].reshape(nocc_B, nvir_B)
+            ci_vec = np.zeros((nocc, nvir))
+            ci_vec[nocc_A:, nvir_A:] = vec_B[:, :]
+            CI_vectors.append({
+                'vec': ci_vec,
+                'frag': 'B',
+                'type': 'LE',
+                'index': excitation_ids[ind_B, ind_B] + sB,
+                'name': '{}e({})'.format(ind_B + 1, sB + 1),
+            })
+
+        return CI_vectors
+
+    def dimer_excitation_vectors_CT_AB(self, ind_A, ind_B, nocc_A, nvir_A, nocc,
+                                       nvir, excitation_ids):
+        """
+        Gets dimer excitation vectors for CT states (A->B).
+
+        :param ind_A:
+            The index of monomer A.
+        :param ind_B:
+            The index of monomer B.
+        :param nocc_A:
+            The number of occupied MOs in monomer A.
+        :param nvir_A:
+            The number of unoccupied MOs in monomer A.
+        :param nocc:
+            The number of occupied MOs in dimer.
+        :param nvir:
+            The number of unoccupied MOs in dimer.
+        :param excitation_ids:
+            The indices of diabatic excited states.
+
+        :return:
+            A list containing the excitation vectors of CT(A->B) states.
+        """
+
+        #          vir.A     vir.B
+        #       +---------+---------+
+        # occ.A |         |  CT(AB) |
+        #       +---------+---------+
+        # occ.B |         |         |
+        #       +---------+---------+
+
+        CI_vectors = []
+
+        for oA in range(self.ct_nocc):
+            for vB in range(self.ct_nvir):
+                ctAB = oA * self.ct_nvir + vB
+                ci_vec = np.zeros((nocc, nvir))
+                ci_vec[nocc_A - 1 - oA][nvir_A + vB] = 1.0
+                CI_vectors.append({
+                    'vec': ci_vec,
+                    'frag': 'AB',
+                    'type': 'CT',
+                    'index': excitation_ids[ind_A, ind_B] + ctAB,
+                    'name': '{}+(H{}){}-(L{})'.format(ind_A + 1, oA, ind_B + 1,
+                                                      vB),
+                })
+
+        return CI_vectors
+
+    def dimer_excitation_vectors_CT_BA(self, ind_A, ind_B, nocc_A, nvir_A, nocc,
+                                       nvir, excitation_ids):
+        """
+        Gets dimer excitation vectors for CT states (B->A).
+
+        :param ind_A:
+            The index of monomer A.
+        :param ind_B:
+            The index of monomer B.
+        :param nocc_A:
+            The number of occupied MOs in monomer A.
+        :param nvir_A:
+            The number of unoccupied MOs in monomer A.
+        :param nocc:
+            The number of occupied MOs in dimer.
+        :param nvir:
+            The number of unoccupied MOs in dimer.
+        :param excitation_ids:
+            The indices of diabatic excited states.
+
+        :return:
+            A list containing the excitation vectors of CT(B->A) states.
+        """
+
+        #          vir.A     vir.B
+        #       +---------+---------+
+        # occ.A |         |         |
+        #       +---------+---------+
+        # occ.B |  CT(BA) |         |
+        #       +---------+---------+
+
+        CI_vectors = []
+
+        for oB in range(self.ct_nocc):
+            for vA in range(self.ct_nvir):
+                ctBA = oB * self.ct_nvir + vA
+                ci_vec = np.zeros((nocc, nvir))
+                ci_vec[nocc - 1 - oB][vA] = 1.0
+                CI_vectors.append({
+                    'vec': ci_vec,
+                    'frag': 'BA',
+                    'type': 'CT',
+                    'index': excitation_ids[ind_B, ind_A] + ctBA,
+                    'name': '{}-(L{}){}+(H{})'.format(ind_A + 1, vA, ind_B + 1,
+                                                      oB),
+                })
+
+        return CI_vectors
+
+    def dimer_sigma_vectors(self, dimer, basis, dimer_prop, mo, ci_vectors):
+        """
+        Computes sigma vectors from dimer CI vectors.
+
+        :param dimer:
+            The dimer molecule.
+        :param basis:
+            The AO basis.
+        :param dimer_prop:
+            The dictionary containing dimer properties.
+        :param mo:
+            The MO coefficients of dimer.
+        :param ci_vectors:
+            The CI vectors.
+
+        :return:
+            A list containing the sigma vectors of dimer.
+        """
+
+        # compute sigma vectors for LE(A), CT(AB), CT(BA)
+        if self.rank == mpi_master():
+            nocc = dimer.number_of_alpha_electrons()
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+
+            tdens = []
+            for vec in ci_vectors:
+                tdens.append(np.matmul(mo_occ, np.matmul(vec['vec'], mo_vir.T)))
+            tdens_mat = AODensityMatrix(tdens, denmat.rest)
+        else:
+            tdens_mat = AODensityMatrix()
+
+        tdens_mat.broadcast(self.rank, self.comm)
+
+        tfock_mat = AOFockMatrix(tdens_mat)
+
+        if self.dft:
+            xcfun = dimer_prop['xcfun']
+            if xcfun.is_hybrid():
+                fock_flag = fockmat.rgenjkx
+                fact_xc = xcfun.get_frac_exact_exchange()
+                for s in range(tfock_mat.number_of_fock_matrices()):
+                    tfock_mat.set_scale_factor(fact_xc, s)
+            else:
+                fock_flag = fockmat.rgenj
+        else:
+            fock_flag = fockmat.rgenjk
+
+        for s in range(tfock_mat.number_of_fock_matrices()):
+            tfock_mat.set_fock_type(fock_flag, s)
+
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = dimer_prop['screening']
+        eri_drv.compute(tfock_mat, tdens_mat, dimer, basis, screening)
+
+        if self.dft:
+            if not xcfun.is_hybrid():
+                for s in range(tfock_mat.number_of_fock_matrices()):
+                    tfock_mat.scale(2.0, s)
+            xc_drv = XCIntegrator(self.comm)
+            dens_mat = dimer_prop['density']
+            dimer_molgrid = dimer_prop['molgrid']
+            xc_drv.integrate(tfock_mat, tdens_mat, dens_mat, dimer, basis,
+                             dimer_molgrid, self.xcfun_label)
+        tfock_mat.reduce_sum(self.rank, self.nodes, self.comm)
+
+        if self.rank == mpi_master():
+            sigma_vectors = []
+
+            fock_mo = dimer_prop['fock_mo']
+            fock_occ = fock_mo[:nocc, :nocc].copy()
+            fock_vir = fock_mo[nocc:, nocc:].copy()
+
+            for s in range(tfock_mat.number_of_fock_matrices()):
+                tfock = tfock_mat.to_numpy(s)
+                sigma_vec = np.matmul(mo_occ.T, np.matmul(tfock, mo_vir))
+
+                sigma_vec -= np.matmul(fock_occ, ci_vectors[s]['vec'])
+                sigma_vec += np.matmul(ci_vectors[s]['vec'], fock_vir)
+
+                sigma_vectors.append({
+                    'vec': sigma_vec,
+                    'frag': ci_vectors[s]['frag'],
+                    'type': ci_vectors[s]['type'],
+                    'index': ci_vectors[s]['index'],
+                    'name': ci_vectors[s]['name'],
+                })
+        else:
+            sigma_vectors = None
+
+        return sigma_vectors
 
     def print_banner(self, title):
         """
