@@ -254,7 +254,7 @@ class ExcitonModelDriver:
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
-    def compute(self, molecule, basis, min_basis):
+    def compute(self, molecule, basis, min_basis=None):
         """
         Executes exciton model calculation and writes checkpoint file.
 
@@ -263,7 +263,7 @@ class ExcitonModelDriver:
         :param basis:
             The AO basis.
         :param min_basis:
-            The minimal AO basis for generating initial guess.
+            The minimal AO basis set.
         """
 
         # sanity check
@@ -330,8 +330,14 @@ class ExcitonModelDriver:
 
         if self.dft:
             dft_func_label = self.xcfun_label
+            method_dict = {
+                'dft': 'yes',
+                'grid_level': self.grid_level,
+                'xcfun': dft_func_label,
+            }
         else:
             dft_func_label = 'HF'
+            method_dict = {'dft': 'no'}
 
         rsp_vector_labels = [
             'dimer_indices',
@@ -358,110 +364,15 @@ class ExcitonModelDriver:
             monomer.set_charge(self.charges[ind])
             monomer.check_multiplicity()
 
-            if self.rank == mpi_master():
-                self.ostream.print_block(monomer.get_string())
-                self.ostream.print_block(monomer.more_info())
-                self.ostream.print_blank()
-                self.ostream.print_blank()
+            scf_tensors = self.monomer_scf(method_dict, ind, monomer, basis)
 
-                self.ostream.print_block(
-                    basis.get_string('Atomic Basis', monomer))
-                self.ostream.flush()
-
-            # 1e integral
-            dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-            dipole_drv.origin = self.center_of_mass
-            dipole_mats = dipole_drv.compute(monomer, basis)
-
-            linmom_drv = LinearMomentumIntegralsDriver(self.comm)
-            linmom_mats = linmom_drv.compute(monomer, basis)
-
-            angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-            angmom_drv.origin = self.center_of_mass
-            angmom_mats = angmom_drv.compute(monomer, basis)
+            tda_prop = self.monomer_tda(method_dict, ind, scf_tensors, monomer,
+                                        basis)
 
             if self.rank == mpi_master():
-                dipole_ints = (dipole_mats.x_to_numpy(),
-                               dipole_mats.y_to_numpy(),
-                               dipole_mats.z_to_numpy())
-
-                linmom_ints = (linmom_mats.x_to_numpy(),
-                               linmom_mats.y_to_numpy(),
-                               linmom_mats.z_to_numpy())
-
-                angmom_ints = (angmom_mats.x_to_numpy(),
-                               angmom_mats.y_to_numpy(),
-                               angmom_mats.z_to_numpy())
-
-            if self.dft:
-                method_dict = {
-                    'dft': 'yes',
-                    'grid_level': self.grid_level,
-                    'xcfun': self.xcfun_label
-                }
-            else:
-                method_dict = {'dft': 'no'}
-
-            # SCF checkpoint file
-            monomer_scf_h5 = f'monomer_{ind + 1}.scf.h5'
-            if self.checkpoint_file is not None:
-                monomer_scf_h5 = Path(
-                    self.checkpoint_file).with_suffix(f'.{monomer_scf_h5}')
-
-            # SCF calculation
-            scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
-            scf_drv.update_settings(
-                {
-                    'qq_type': self.qq_type,
-                    'eri_thresh': self.eri_thresh,
-                    'conv_thresh': self.scf_conv_thresh,
-                    'max_iter': self.scf_max_iter,
-                    'restart': 'yes' if self.restart else 'no',
-                    'checkpoint_file': str(monomer_scf_h5),
-                }, method_dict)
-            scf_drv.compute(monomer, basis, min_basis)
-
-            if self.rank == mpi_master():
-                self.monomers[ind]['mo'] = scf_drv.scf_tensors['C_alpha'].copy()
-
-            # update ERI screening threshold
-            if self.eri_thresh > scf_drv.eri_thresh and scf_drv.eri_thresh > 0:
-                self.eri_thresh = scf_drv.eri_thresh
-
-            # TDA checkpoint file
-            monomer_rsp_h5 = f'monomer_{ind + 1}.rsp.h5'
-            if self.checkpoint_file is not None:
-                monomer_rsp_h5 = Path(
-                    self.checkpoint_file).with_suffix(f'.{monomer_rsp_h5}')
-
-            # TDA calculation
-            abs_spec = Absorption(
-                {
-                    'tamm_dancoff': 'yes',
-                    'nstates': self.nstates,
-                    'qq_type': self.qq_type,
-                    'eri_thresh': self.eri_thresh,
-                    'conv_thresh': self.tda_conv_thresh,
-                    'max_iter': self.tda_max_iter,
-                    'restart': 'yes' if self.restart else 'no',
-                    'checkpoint_file': str(monomer_rsp_h5),
-                }, method_dict)
-            abs_spec.init_driver(self.comm, self.ostream)
-            abs_spec.compute(monomer, basis, scf_drv.scf_tensors)
-
-            if self.rank == mpi_master():
-                abs_spec.print_property(self.ostream)
-                self.ostream.flush()
-
-                self.monomers[ind]['exc_energies'] = abs_spec.get_property(
-                    'eigenvalues').copy()
-                self.monomers[ind]['exc_vectors'] = abs_spec.get_property(
-                    'eigenvectors').copy()
-
-                nocc = monomer.number_of_alpha_electrons()
-                nvir = self.monomers[ind]['mo'].shape[1] - nocc
-                mo_occ = self.monomers[ind]['mo'][:, :nocc].copy()
-                mo_vir = self.monomers[ind]['mo'][:, nocc:].copy()
+                self.monomers[ind]['mo'] = scf_tensors['C_alpha'].copy()
+                self.monomers[ind]['exc_energies'] = tda_prop['exc_energies']
+                self.monomers[ind]['exc_vectors'] = tda_prop['exc_vectors']
 
                 for s in range(self.nstates):
                     # LE excitation energy
@@ -469,15 +380,11 @@ class ExcitonModelDriver:
                     self.H[h, h] = self.monomers[ind]['exc_energies'][s]
 
                     # LE transition dipole
-                    vec = self.monomers[ind]['exc_vectors'][:, s].copy()
-                    tdens = math.sqrt(2.0) * np.matmul(
-                        mo_occ, np.matmul(vec.reshape(nocc, nvir), mo_vir.T))
-                    self.trans_dipoles[h, :] = np.array(
-                        [np.sum(tdens * dipole_ints[d].T) for d in range(3)])
-                    self.velo_trans_dipoles[h, :] = np.array(
-                        [np.sum(tdens * linmom_ints[d].T) for d in range(3)])
-                    self.magn_trans_dipoles[h, :] = np.array(
-                        [np.sum(tdens * angmom_ints[d].T) for d in range(3)])
+                    self.trans_dipoles[h, :] = tda_prop['trans_dipoles'][s]
+                    self.velo_trans_dipoles[
+                        h, :] = tda_prop['velo_trans_dipoles'][s]
+                    self.magn_trans_dipoles[
+                        h, :] = tda_prop['magn_trans_dipoles'][s]
 
             valstr = '*** Time used in monomer calculation:'
             valstr += ' {:.2f} sec'.format(tm.time() - monomer_start_time)
@@ -1106,6 +1013,163 @@ class ExcitonModelDriver:
                 self.ostream.print_blank()
 
             self.ostream.flush()
+
+    def monomer_scf(self, method_dict, ind, monomer, basis, min_basis=None):
+        """
+        Runs monomer SCF calculation.
+
+        :param method_dict:
+            The dictionary of method settings.
+        :param ind:
+            The index of the monomer.
+        :param monomer:
+            The monomer molecule.
+        :param basis:
+            The AO basis.
+        :param min_basis:
+            The minimal AO basis set.
+
+        :return:
+            The SCF tensors.
+        """
+
+        # molecule and basis info
+        if self.rank == mpi_master():
+            self.ostream.print_block(monomer.get_string())
+            self.ostream.print_block(monomer.more_info())
+            self.ostream.print_blank()
+            self.ostream.print_blank()
+
+            self.ostream.print_block(basis.get_string('Atomic Basis', monomer))
+            self.ostream.flush()
+
+        # checkpoint file for SCF
+        monomer_scf_h5 = f'monomer_{ind + 1}.scf.h5'
+        if self.checkpoint_file is not None:
+            monomer_scf_h5 = Path(
+                self.checkpoint_file).with_suffix(f'.{monomer_scf_h5}')
+
+        # SCF calculation
+        scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
+        scf_drv.update_settings(
+            {
+                'qq_type': self.qq_type,
+                'eri_thresh': self.eri_thresh,
+                'conv_thresh': self.scf_conv_thresh,
+                'max_iter': self.scf_max_iter,
+                'restart': 'yes' if self.restart else 'no',
+                'checkpoint_file': str(monomer_scf_h5),
+            }, method_dict)
+        scf_drv.compute(monomer, basis, min_basis)
+
+        # update ERI screening threshold
+        if self.eri_thresh > scf_drv.eri_thresh and scf_drv.eri_thresh > 0:
+            self.eri_thresh = scf_drv.eri_thresh
+
+        return scf_drv.scf_tensors
+
+    def monomer_tda(self, method_dict, ind, scf_tensors, monomer, basis):
+        """
+        Runs monomer TDDFT-TDA calculation.
+
+        :param method_dict:
+            The dictionary of method settings.
+        :param ind:
+            The index of the monomer.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param monomer:
+            The monomer molecule.
+        :param basis:
+            The AO basis.
+        :param min_basis:
+            The minimal AO basis set.
+
+        :return:
+            The dictionary that contains TDA properties.
+        """
+
+        # checkpoint file for TDA
+        monomer_rsp_h5 = f'monomer_{ind + 1}.rsp.h5'
+        if self.checkpoint_file is not None:
+            monomer_rsp_h5 = Path(
+                self.checkpoint_file).with_suffix(f'.{monomer_rsp_h5}')
+
+        # TDA calculation
+        abs_spec = Absorption(
+            {
+                'tamm_dancoff': 'yes',
+                'nstates': self.nstates,
+                'qq_type': self.qq_type,
+                'eri_thresh': self.eri_thresh,
+                'conv_thresh': self.tda_conv_thresh,
+                'max_iter': self.tda_max_iter,
+                'restart': 'yes' if self.restart else 'no',
+                'checkpoint_file': str(monomer_rsp_h5),
+            }, method_dict)
+        abs_spec.init_driver(self.comm, self.ostream)
+        abs_spec.compute(monomer, basis, scf_tensors)
+
+        # 1e integrals
+        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+        dipole_drv.origin = self.center_of_mass
+        dipole_mats = dipole_drv.compute(monomer, basis)
+
+        linmom_drv = LinearMomentumIntegralsDriver(self.comm)
+        linmom_mats = linmom_drv.compute(monomer, basis)
+
+        angmom_drv = AngularMomentumIntegralsDriver(self.comm)
+        angmom_drv.origin = self.center_of_mass
+        angmom_mats = angmom_drv.compute(monomer, basis)
+
+        # TDA properties
+        tda_prop = {}
+
+        if self.rank == mpi_master():
+            abs_spec.print_property(self.ostream)
+            self.ostream.flush()
+
+            tda_prop['exc_energies'] = abs_spec.get_property(
+                'eigenvalues').copy()
+            tda_prop['exc_vectors'] = abs_spec.get_property(
+                'eigenvectors').copy()
+
+            mo = scf_tensors['C_alpha']
+
+            nocc = monomer.number_of_alpha_electrons()
+            nvir = mo.shape[1] - nocc
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+
+            dipole_ints = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
+                           dipole_mats.z_to_numpy())
+
+            linmom_ints = (linmom_mats.x_to_numpy(), linmom_mats.y_to_numpy(),
+                           linmom_mats.z_to_numpy())
+
+            angmom_ints = (angmom_mats.x_to_numpy(), angmom_mats.y_to_numpy(),
+                           angmom_mats.z_to_numpy())
+
+            # LE transition dipoles
+            tda_prop['trans_dipoles'] = []
+            tda_prop['velo_trans_dipoles'] = []
+            tda_prop['magn_trans_dipoles'] = []
+
+            for s in range(self.nstates):
+                vec = tda_prop['exc_vectors'][:, s].copy()
+                tdens = math.sqrt(2.0) * np.matmul(
+                    mo_occ, np.matmul(vec.reshape(nocc, nvir), mo_vir.T))
+                tda_prop['trans_dipoles'].append(
+                    np.array(
+                        [np.sum(tdens * dipole_ints[d].T) for d in range(3)]))
+                tda_prop['velo_trans_dipoles'].append(
+                    np.array(
+                        [np.sum(tdens * linmom_ints[d].T) for d in range(3)]))
+                tda_prop['magn_trans_dipoles'].append(
+                    np.array(
+                        [np.sum(tdens * angmom_ints[d].T) for d in range(3)]))
+
+        return tda_prop
 
     def print_banner(self, title):
         """
