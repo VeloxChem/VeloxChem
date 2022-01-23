@@ -305,28 +305,8 @@ class ExcitonModelDriver:
         if self.rank == mpi_master():
             self.print_title(total_LE_states, total_CT_states)
 
-        # dimer indices
-        dimer_ids = np.zeros((nfragments, nfragments), dtype=np.int32)
-        dimer_count = 0
-        for ind_A in range(nfragments):
-            dimer_ids[ind_A, ind_A] = -1
-            for ind_B in range(ind_A + 1, nfragments):
-                dimer_ids[ind_A, ind_B] = dimer_count
-                dimer_ids[ind_B, ind_A] = dimer_count
-                dimer_count += 1
-
         # indices of diabatic excited states
-        excitation_ids = np.zeros((nfragments, nfragments), dtype=np.int32)
-        for ind_A in range(nfragments):
-            # LE
-            excitation_ids[ind_A, ind_A] = ind_A * self.nstates
-            for ind_B in range(ind_A + 1, nfragments):
-                ct_id = nfragments * self.nstates
-                ct_id += dimer_ids[ind_A, ind_B] * ct_states * 2
-                # CT(A->B)
-                excitation_ids[ind_A, ind_B] = ct_id
-                # CT(B->A)
-                excitation_ids[ind_B, ind_A] = ct_id + ct_states
+        excitation_ids = self.get_excitation_ids()
 
         if self.dft:
             dft_func_label = self.xcfun_label
@@ -364,15 +344,19 @@ class ExcitonModelDriver:
             monomer.set_charge(self.charges[ind])
             monomer.check_multiplicity()
 
-            scf_tensors = self.monomer_scf(method_dict, ind, monomer, basis)
+            one_elec_ints = self.get_one_elec_integrals(monomer, basis)
 
-            tda_prop = self.monomer_tda(method_dict, ind, scf_tensors, monomer,
-                                        basis)
+            scf_tensors = self.monomer_scf(method_dict, ind, monomer, basis)
+            tda_results = self.monomer_tda(method_dict, ind, monomer, basis,
+                                           scf_tensors)
 
             if self.rank == mpi_master():
                 self.monomers[ind]['mo'] = scf_tensors['C_alpha'].copy()
-                self.monomers[ind]['exc_energies'] = tda_prop['exc_energies']
-                self.monomers[ind]['exc_vectors'] = tda_prop['exc_vectors']
+                self.monomers[ind]['exc_energies'] = tda_results['exc_energies']
+                self.monomers[ind]['exc_vectors'] = tda_results['exc_vectors']
+
+                trans_dipoles = self.get_LE_trans_dipoles(
+                    monomer, basis, one_elec_ints, scf_tensors, tda_results)
 
                 for s in range(self.nstates):
                     # LE excitation energy
@@ -380,11 +364,9 @@ class ExcitonModelDriver:
                     self.H[h, h] = self.monomers[ind]['exc_energies'][s]
 
                     # LE transition dipole
-                    self.trans_dipoles[h, :] = tda_prop['trans_dipoles'][s]
-                    self.velo_trans_dipoles[
-                        h, :] = tda_prop['velo_trans_dipoles'][s]
-                    self.magn_trans_dipoles[
-                        h, :] = tda_prop['magn_trans_dipoles'][s]
+                    self.trans_dipoles[h, :] = trans_dipoles['electric'][s]
+                    self.velo_trans_dipoles[h, :] = trans_dipoles['velocity'][s]
+                    self.magn_trans_dipoles[h, :] = trans_dipoles['magnetic'][s]
 
             valstr = '*** Time used in monomer calculation:'
             valstr += ' {:.2f} sec'.format(tm.time() - monomer_start_time)
@@ -469,31 +451,9 @@ class ExcitonModelDriver:
                 dimer = Molecule(monomer_a, monomer_b)
                 dimer.check_multiplicity()
 
-                # 1e integrals
-                dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-                dipole_drv.origin = self.center_of_mass
-                dipole_mats = dipole_drv.compute(dimer, basis)
-
-                linmom_drv = LinearMomentumIntegralsDriver(self.comm)
-                linmom_mats = linmom_drv.compute(dimer, basis)
-
-                angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-                angmom_drv.origin = self.center_of_mass
-                angmom_mats = angmom_drv.compute(dimer, basis)
+                one_elec_ints = self.get_one_elec_integrals(dimer, basis)
 
                 if self.rank == mpi_master():
-                    dipole_ints = (dipole_mats.x_to_numpy(),
-                                   dipole_mats.y_to_numpy(),
-                                   dipole_mats.z_to_numpy())
-
-                    linmom_ints = (linmom_mats.x_to_numpy(),
-                                   linmom_mats.y_to_numpy(),
-                                   linmom_mats.z_to_numpy())
-
-                    angmom_ints = (angmom_mats.x_to_numpy(),
-                                   angmom_mats.y_to_numpy(),
-                                   angmom_mats.z_to_numpy())
-
                     CA = self.monomers[ind_A]['mo']
                     CB = self.monomers[ind_B]['mo']
 
@@ -512,14 +472,13 @@ class ExcitonModelDriver:
 
                 dimer_prop = self.dimer_properties(dimer, basis, mo)
 
-                dimer_energy = dimer_prop['energy']
-
                 if self.rank == mpi_master():
                     valstr = 'Excitonic Couplings'
                     self.ostream.print_header(valstr)
                     self.ostream.print_header('=' * (len(valstr) + 2))
                     self.ostream.print_blank()
 
+                    dimer_energy = dimer_prop['energy']
                     valstr = 'Dimer Energy:{:20.10f} a.u.'.format(dimer_energy)
                     self.ostream.print_header(valstr.ljust(72))
                     self.ostream.print_blank()
@@ -565,11 +524,11 @@ class ExcitonModelDriver:
                 sigma_vectors = self.dimer_sigma_vectors(
                     dimer, basis, dimer_prop, mo, mask_ci_vectors)
 
-                # compute couplings
-                # sigma_vectors contains LE(A), CT(AB), CT(BA)
-                # CI_vectors[self.nstates:] contains LE(B), CT(AB), CT(BA)
-
                 if self.rank == mpi_master():
+
+                    # compute couplings
+                    # sigma_vectors contains LE(A), CT(AB), CT(BA)
+                    # CI_vectors[self.nstates:] contains LE(B), CT(AB), CT(BA)
 
                     for svec in sigma_vectors:
                         for cvec in CI_vectors[self.nstates:]:
@@ -602,39 +561,30 @@ class ExcitonModelDriver:
                         self.ostream.print_blank()
 
                     # compute CT excitation energies and transition dipoles
-                    # sigma_vectors[self.nstates:] contains CT(AB), CT(BA)
+                    # mask_ci_vectors[self.nstates:] contains CT(AB) and CT(BA)
+                    # sigma_vectors[self.nstates:] contains CT(AB) and CT(BA)
 
-                    mo_occ = mo[:, :nocc].copy()
-                    mo_vir = mo[:, nocc:].copy()
+                    trans_dipoles = self.get_CT_trans_dipoles(
+                        dimer, basis, one_elec_ints, mo,
+                        mask_ci_vectors[self.nstates:])
 
-                    for ivec, svec in enumerate(sigma_vectors[self.nstates:]):
-
-                        # the CI vector that corresponds to svec
-                        cvec = CI_vectors[ivec + self.nstates * 2]
-
-                        # CT excitation energy
-                        energy = np.sum(svec['vec'] * cvec['vec'])
-
+                    for ivec, (cvec, svec) in enumerate(
+                            zip(mask_ci_vectors[self.nstates:],
+                                sigma_vectors[self.nstates:])):
+                        energy = np.vdot(svec['vec'], cvec['vec'])
                         self.H[svec['index'], svec['index']] = energy
 
                         valstr = '{} excitation energy:'.format(svec['type'])
                         valstr += '  {:>26s}'.format(svec['name'])
-
                         valstr += '  {:20.12f}'.format(energy)
                         self.ostream.print_header(valstr.ljust(72))
 
-                        # CT transition dipole
-                        tdens = math.sqrt(2.0) * np.matmul(
-                            mo_occ, np.matmul(cvec['vec'], mo_vir.T))
-                        self.trans_dipoles[svec['index'], :] = np.array([
-                            np.sum(tdens * dipole_ints[d].T) for d in range(3)
-                        ])
-                        self.velo_trans_dipoles[svec['index'], :] = np.array([
-                            np.sum(tdens * linmom_ints[d].T) for d in range(3)
-                        ])
-                        self.magn_trans_dipoles[svec['index'], :] = np.array([
-                            np.sum(tdens * angmom_ints[d].T) for d in range(3)
-                        ])
+                        self.trans_dipoles[
+                            cvec['index'], :] = trans_dipoles['electric'][ivec]
+                        self.velo_trans_dipoles[
+                            cvec['index'], :] = trans_dipoles['velocity'][ivec]
+                        self.magn_trans_dipoles[
+                            cvec['index'], :] = trans_dipoles['magnetic'][ivec]
 
                     self.ostream.print_blank()
 
@@ -804,6 +754,84 @@ class ExcitonModelDriver:
 
             self.ostream.flush()
 
+    def get_excitation_ids(self):
+        """
+        Gets excitation indices.
+
+        :return:
+            A 2d numpy array containing indices of the LE and CT excitations.
+        """
+
+        nfragments = len(self.natoms)
+        ct_states = self.ct_nocc * self.ct_nvir
+
+        # dimer indices
+        dimer_ids = np.zeros((nfragments, nfragments), dtype=np.int32)
+        dimer_count = 0
+        for ind_A in range(nfragments):
+            dimer_ids[ind_A, ind_A] = -1
+            for ind_B in range(ind_A + 1, nfragments):
+                dimer_ids[ind_A, ind_B] = dimer_count
+                dimer_ids[ind_B, ind_A] = dimer_count
+                dimer_count += 1
+
+        # indices of diabatic excited states
+        excitation_ids = np.zeros((nfragments, nfragments), dtype=np.int32)
+        for ind_A in range(nfragments):
+            # LE
+            excitation_ids[ind_A, ind_A] = ind_A * self.nstates
+            for ind_B in range(ind_A + 1, nfragments):
+                ct_id = (nfragments * self.nstates +
+                         dimer_ids[ind_A, ind_B] * ct_states * 2)
+                # CT(A->B)
+                excitation_ids[ind_A, ind_B] = ct_id
+                # CT(B->A)
+                excitation_ids[ind_B, ind_A] = ct_id + ct_states
+
+        return excitation_ids
+
+    def get_one_elec_integrals(self, molecule, basis):
+        """
+        Gets one-electron integrals (center-of-mass as gauge-origin).
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis.
+
+        :return:
+            The electric, velocity and magnetic dipole integrals in AO basis.
+        """
+
+        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+        dipole_drv.origin = self.center_of_mass
+        dipole_mats = dipole_drv.compute(molecule, basis)
+
+        linmom_drv = LinearMomentumIntegralsDriver(self.comm)
+        linmom_mats = linmom_drv.compute(molecule, basis)
+
+        angmom_drv = AngularMomentumIntegralsDriver(self.comm)
+        angmom_drv.origin = self.center_of_mass
+        angmom_mats = angmom_drv.compute(molecule, basis)
+
+        if self.rank == mpi_master():
+            dipole_ints = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
+                           dipole_mats.z_to_numpy())
+            linmom_ints = (linmom_mats.x_to_numpy(), linmom_mats.y_to_numpy(),
+                           linmom_mats.z_to_numpy())
+            angmom_ints = (angmom_mats.x_to_numpy(), angmom_mats.y_to_numpy(),
+                           angmom_mats.z_to_numpy())
+        else:
+            dipole_ints = None
+            linmom_ints = None
+            angmom_ints = None
+
+        return {
+            'electric_dipole': dipole_ints,
+            'linear_momentum': linmom_ints,
+            'angular_momentum': angmom_ints,
+        }
+
     def monomer_scf(self, method_dict, ind, monomer, basis, min_basis=None):
         """
         Runs monomer SCF calculation.
@@ -858,7 +886,7 @@ class ExcitonModelDriver:
 
         return scf_drv.scf_tensors
 
-    def monomer_tda(self, method_dict, ind, scf_tensors, monomer, basis):
+    def monomer_tda(self, method_dict, ind, monomer, basis, scf_tensors):
         """
         Runs monomer TDDFT-TDA calculation.
 
@@ -866,12 +894,12 @@ class ExcitonModelDriver:
             The dictionary of method settings.
         :param ind:
             The index of the monomer.
-        :param scf_tensors:
-            The dictionary of tensors from converged SCF wavefunction.
         :param monomer:
             The monomer molecule.
         :param basis:
             The AO basis.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
 
         :return:
             The dictionary that contains TDA properties.
@@ -898,66 +926,73 @@ class ExcitonModelDriver:
         abs_spec.init_driver(self.comm, self.ostream)
         abs_spec.compute(monomer, basis, scf_tensors)
 
-        # 1e integrals
-        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-        dipole_drv.origin = self.center_of_mass
-        dipole_mats = dipole_drv.compute(monomer, basis)
-
-        linmom_drv = LinearMomentumIntegralsDriver(self.comm)
-        linmom_mats = linmom_drv.compute(monomer, basis)
-
-        angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-        angmom_drv.origin = self.center_of_mass
-        angmom_mats = angmom_drv.compute(monomer, basis)
-
-        # TDA properties
-        tda_prop = {}
-
+        # TDA results
         if self.rank == mpi_master():
             abs_spec.print_property(self.ostream)
             self.ostream.flush()
 
-            tda_prop['exc_energies'] = abs_spec.get_property(
-                'eigenvalues').copy()
-            tda_prop['exc_vectors'] = abs_spec.get_property(
-                'eigenvectors').copy()
+            tda_results = {
+                'exc_energies': abs_spec.get_property('eigenvalues').copy(),
+                'exc_vectors': abs_spec.get_property('eigenvectors').copy(),
+            }
+        else:
+            tda_results = None
 
-            mo = scf_tensors['C_alpha']
+        return tda_results
 
-            nocc = monomer.number_of_alpha_electrons()
-            nvir = mo.shape[1] - nocc
-            mo_occ = mo[:, :nocc].copy()
-            mo_vir = mo[:, nocc:].copy()
+    def get_LE_trans_dipoles(self, monomer, basis, one_elec_ints, scf_tensors,
+                             tda_results):
+        """
+        Gets transition dipole for LE states.
 
-            dipole_ints = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
-                           dipole_mats.z_to_numpy())
+        :param monomer:
+            The monomer molecule.
+        :param basis:
+            The AO basis.
+        :param one_elec_ints:
+            The dictionary of one-electron integrals.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param tda_results:
+            The dictionary of eigenvalues and eigenvectors from TDDFT-TDA.
 
-            linmom_ints = (linmom_mats.x_to_numpy(), linmom_mats.y_to_numpy(),
-                           linmom_mats.z_to_numpy())
+        :return:
+            The dictionary containing the electric, velocity and magnetic
+            transition dipoles for LE states.
+        """
 
-            angmom_ints = (angmom_mats.x_to_numpy(), angmom_mats.y_to_numpy(),
-                           angmom_mats.z_to_numpy())
+        dipole_ints = one_elec_ints['electric_dipole']
+        linmom_ints = one_elec_ints['linear_momentum']
+        angmom_ints = one_elec_ints['angular_momentum']
 
-            # LE transition dipoles
-            tda_prop['trans_dipoles'] = []
-            tda_prop['velo_trans_dipoles'] = []
-            tda_prop['magn_trans_dipoles'] = []
+        mo = scf_tensors['C_alpha']
+        nocc = monomer.number_of_alpha_electrons()
+        nvir = mo.shape[1] - nocc
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
 
-            for s in range(self.nstates):
-                vec = tda_prop['exc_vectors'][:, s].copy()
-                tdens = math.sqrt(2.0) * np.matmul(
-                    mo_occ, np.matmul(vec.reshape(nocc, nvir), mo_vir.T))
-                tda_prop['trans_dipoles'].append(
-                    np.array(
-                        [np.sum(tdens * dipole_ints[d].T) for d in range(3)]))
-                tda_prop['velo_trans_dipoles'].append(
-                    np.array(
-                        [np.sum(tdens * linmom_ints[d].T) for d in range(3)]))
-                tda_prop['magn_trans_dipoles'].append(
-                    np.array(
-                        [np.sum(tdens * angmom_ints[d].T) for d in range(3)]))
+        trans_dipoles = []
+        velo_trans_dipoles = []
+        magn_trans_dipoles = []
 
-        return tda_prop
+        sqrt_2 = math.sqrt(2.0)
+
+        for s in range(self.nstates):
+            vec = tda_results['exc_vectors'][:, s].copy()
+            tdens = sqrt_2 * np.matmul(
+                mo_occ, np.matmul(vec.reshape(nocc, nvir), mo_vir.T))
+            trans_dipoles.append(
+                np.array([np.sum(tdens * dipole_ints[d].T) for d in range(3)]))
+            velo_trans_dipoles.append(
+                np.array([np.sum(tdens * linmom_ints[d].T) for d in range(3)]))
+            magn_trans_dipoles.append(
+                np.array([np.sum(tdens * angmom_ints[d].T) for d in range(3)]))
+
+        return {
+            'electric': trans_dipoles,
+            'velocity': velo_trans_dipoles,
+            'magnetic': magn_trans_dipoles,
+        }
 
     def dimer_mo_coefficients(self, monomer_a, monomer_b, basis, mo_a, mo_b):
         """
@@ -1416,6 +1451,56 @@ class ExcitonModelDriver:
             sigma_vectors = None
 
         return sigma_vectors
+
+    def get_CT_trans_dipoles(self, dimer, basis, one_elec_ints, mo,
+                             ct_exc_vectors):
+        """
+        Gets transition dipole for CT states.
+
+        :param dimer:
+            The dimer molecule.
+        :param basis:
+            The AO basis.
+        :param one_elec_ints:
+            The dictionary of one-electron integrals.
+        :param mo:
+            The MO coefficients of dimer.
+        :param ct_exc_vectors:
+            The list of CT excitation vectors.
+
+        :return:
+            The dictionary containing the electric, velocity and magnetic
+            transition dipoles for CT states.
+        """
+
+        dipole_ints = one_elec_ints['electric_dipole']
+        linmom_ints = one_elec_ints['linear_momentum']
+        angmom_ints = one_elec_ints['angular_momentum']
+
+        nocc = dimer.number_of_alpha_electrons()
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+
+        trans_dipoles = []
+        velo_trans_dipoles = []
+        magn_trans_dipoles = []
+
+        sqrt_2 = math.sqrt(2.0)
+
+        for cvec in ct_exc_vectors:
+            tdens = sqrt_2 * np.matmul(mo_occ, np.matmul(cvec['vec'], mo_vir.T))
+            trans_dipoles.append(
+                np.array([np.sum(tdens * dipole_ints[d].T) for d in range(3)]))
+            velo_trans_dipoles.append(
+                np.array([np.sum(tdens * linmom_ints[d].T) for d in range(3)]))
+            magn_trans_dipoles.append(
+                np.array([np.sum(tdens * angmom_ints[d].T) for d in range(3)]))
+
+        return {
+            'electric': trans_dipoles,
+            'velocity': velo_trans_dipoles,
+            'magnetic': magn_trans_dipoles,
+        }
 
     def print_banner(self, title):
         """
