@@ -113,7 +113,7 @@ class TdaOrbitalResponse(OrbitalResponse):
                 perturbed_dm_ao = AODensityMatrix([exc_vec_ao, 0*exc_vec_ao],
                                                    denmat.rest)
                 # TODO: check if this should actually be zero.
-                # This term would correspond to the derivative of the 
+                # This term would correspond to the derivative of the
                 #  perturbed dm with respect to the MO coefficients.
                 zero_dm_ao = AODensityMatrix([0*exc_vec_ao, 0*exc_vec_ao],
                                               denmat.rest)
@@ -171,6 +171,7 @@ class TdaOrbitalResponse(OrbitalResponse):
             xc_drv.integrate(fock_ao_rhs, dm_ao_rhs, gs_density,
                              molecule, basis, molgrid,
                              self.xcfun.get_func_label())
+            # TODO: E[3] contribution correct for LDA, but not for GGA
             xc_drv.integrate(fock_gxc_ao, perturbed_dm_ao, zero_dm_ao,
                              gs_density, molecule, basis, molgrid,
                              self.xcfun.get_func_label(), "quadratic")
@@ -203,7 +204,7 @@ class TdaOrbitalResponse(OrbitalResponse):
                 print(rhs_mo)
                 gxc_ao = fock_gxc_ao.alpha_to_numpy(0)
                 gxc_mo =  np.linalg.multi_dot([mo_occ.T, gxc_ao, mo_vir])
-                rhs_mo += 0.5*gxc_mo
+                rhs_mo += 0.25*gxc_mo
                 print("\nDFT, added gxc:\n")
                 print(rhs_mo)
 
