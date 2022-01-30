@@ -25,14 +25,14 @@ class TestQrf(unittest.TestCase):
         H   0.0  -1.4   1.1
         """
 
-        basis_set_label = '6-31G'
+        basis_set_label = 'cc-pVDZ'
 
         scf_settings = {'conv_thresh': 1.0e-6}
 
         molecule = vlx.Molecule.read_str(molecule_string, units='au')
         molecule.set_charge(0)
         molecule.set_multiplicity(1)
-        method_settings = {'xcfun': 'becke88', 'grid_level': 6}
+        method_settings = {'xcfun': 'b3lyp', 'grid_level': 4}
 
         basis = vlx.MolecularBasis.read(molecule, basis_set_label)
 
@@ -52,7 +52,7 @@ class TestQrf(unittest.TestCase):
 
         scf_tensors,molecule,ao_basis = self.run_scf()
 
-        method_settings = {'xcfun': 'becke88', 'grid_level': 4}
+        method_settings = {'xcfun': 'b3lyp', 'grid_level': 4}
 
         rsp_settings = {'conv_thresh': 1.0e-6, 'b_frequencies': [-0.1],'c_frequencies': [0.3],'damping': 0.1,'a_components':'x','b_components':'x','c_components':'z'}
 
@@ -99,9 +99,9 @@ class TestQrf(unittest.TestCase):
     def test_qrf(self):
 
         ref_result = { 
-            'xxz': -1.513761 - 1.466785j,
-            'yzy': 43.072851 + 52.375763j,
-            'zzz': -6.803330 + 3.803646j,
+            'xxz': 1.893733806672778+2.4615609240441643j,
+            'yzy': 24.52654292764868+11.22800902489504j,
+            'zzz': 13.51752879736258+18.681411175542237j,
         }
 
         self.run_qrf(ref_result)
