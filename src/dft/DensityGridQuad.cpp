@@ -958,7 +958,6 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
                                                     
                                                     +  rhow_kz_r[i]*rhow_ky_r[i] -  rhow_kz_i[i]*rhow_ky_i[i]) ;
 
-
                         // RhoRho imag
 
                         double jj_i = 2.0 * (rhow_kx_r[i]*rhow_kx_i[i] + rhow_ky_r[i]*rhow_ky_i[i] + rhow_kz_r[i]*rhow_kz_i[i]
@@ -1059,7 +1058,6 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
 
                                                      + gradyw_kz_r[i] * rhow_ky_r[i] -  gradyw_kz_i[i] * rhow_ky_i[i]);
 
-                        
                         // ryw1rhow2 imag
 
                         jj_i = 4.0 * (gradyw_kx_r[i] * rhow_kx_i[i] + gradyw_ky_r[i] * rhow_ky_i[i] + gradyw_kz_r[i] * rhow_kz_i[i]
@@ -1156,7 +1154,6 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
 
                                              + gradxw_kz_r[i] * gradxw_ky_r[i] - gradxw_kz_i[i] * gradxw_ky_i[i]; 
 
-
                         // rxw1rxw2 imag
 
                         jj_i = 2.0 * (gradxw_kx_r[i] * gradxw_kx_i[i] + gradxw_ky_r[i] * gradxw_ky_i[i] + gradxw_kz_r[i] * gradxw_kz_i[i]
@@ -1180,7 +1177,6 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
                         rxw1rxw2_lam_yz_i[i] = gradxw_ky_r[i] * gradxw_kz_i[i] + gradxw_ky_i[i] * gradxw_kz_r[i]
 
                                              + gradxw_kz_r[i] * gradxw_ky_i[i] + gradxw_kz_i[i] * gradxw_ky_r[i]; 
-
 
                         // rxw1ryw2
 
