@@ -5034,13 +5034,23 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                     for (int32_t m = 0; m < nGridPoints; m++)
                     {
 
+                        //  NOTATIONS 
+
+                        //  {a,b,c} ∈ {x,y,z}  spatial components
+
+                        //  {σ,σ',σ''}  ∈ {α,β} spin components
+
                         // Integration weights
 
                         double w = gridWeights[moff + m];
 
-                        // GTOs values
+                        //  (φ_g φ_k) Product of atomic orbitals evaluated on the grid
                         
                         auto omega = bgaos[m] * kgaos[m];
+
+                        // ∇_a (φ_g φ_k) Gradient of product of atomic orbitals evaluated on the grid 
+
+                        // {a,b,c} ∈ {x,y,z}  spatial components
                         
                         auto xomega = bgaox[m] * kgaos[m] + bgaos[m] * kgaox[m];
                         
@@ -5048,7 +5058,7 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                         
                         auto zomega = bgaoz[m] * kgaos[m] + bgaos[m] * kgaoz[m];
 
-                        // 1/Norm 
+                        // znva =  1 / ||∇ρ_α|| - One over the norm of the unperturbed ground state density at a grid point
 
                         double znva =  1.0 / ngrada[moff + m];
 
@@ -5056,7 +5066,24 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
 
                         double znva5 = 1.0 / std::pow(ngrada[moff + m],5.0);
 
-                        // xigrad
+                        // Two-times transformed densities on the grid ρ_α^{ω1,ω2}
+
+                        double rxw12a = gradw12a_x[moff + m];
+                        
+                        double ryw12a = gradw12a_y[moff + m];
+                        
+                        double rzw12a = gradw12a_z[moff + m];
+
+
+                        // Deritiatives of |∇X| 
+
+                        //  where 
+                        
+                        // |∇X| = (∇ ρ_α * ∇ ρ_β)  or 
+
+                        // |∇X| = ||∇ ρ_α|| = ( (∇_x ρ_α)^2 + (∇_y ρ_α)^2 + (∇_z ρ_α)^2 ) ^(1/2)
+
+                        // ∂|∇X| / (∂∇_a ρ_σ )  
                                                 
                         double xigrad_x = znva * grada_x[moff + m];
                         
@@ -5064,11 +5091,7 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                         
                         double xigrad_z = znva * grada_z[moff + m];
 
-                        double rxw12a = gradw12a_x[moff + m];
-                        
-                        double ryw12a = gradw12a_y[moff + m];
-                        
-                        double rzw12a = gradw12a_z[moff + m];
+                        // ∂^2|∇X| / (∂∇_a ρσ ∂∇_b ρ_ σ')
 
                         double xigrad_xx = (znva - grada_x[moff + m] * grada_x[moff + m] * znva3);
 
@@ -5081,14 +5104,44 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                         double xigrad_xz =  - grada_x[moff + m] * grada_z[moff + m] * znva3;
 
                         double xigrad_yz =  - grada_y[moff + m] * grada_z[moff + m] * znva3;
+
+                        //  ∂^3|∇X| / (∂∇_a ρσ ∂∇_b ρ_ σ' ∂∇_c ρ_σ'')
+
+                        double xigrad_xxy =   3.0  * grada_x[moff + m] * grada_x[moff + m] * grada_y[moff + m] * znva5 - grada_y[moff + m] * znva3;
+
+                        double xigrad_xxz =   3.0  * grada_x[moff + m] * grada_x[moff + m] * grada_z[moff + m] * znva5 - grada_z[moff + m] * znva3;
+
+                        double xigrad_xyy =   3.0  * grada_x[moff + m] * grada_y[moff + m] * grada_y[moff + m] * znva5 - grada_x[moff + m] * znva3;
+
+                        double xigrad_xzz =   3.0  * grada_x[moff + m] * grada_z[moff + m] * grada_z[moff + m] * znva5 - grada_x[moff + m] * znva3;
                         
-                        // Dot products of vectors 
+                        double xigrad_yzz =   3.0  * grada_y[moff + m] * grada_z[moff + m] * grada_z[moff + m] * znva5 - grada_y[moff + m] * znva3;
+
+                        double xigrad_yyz =   3.0  * grada_y[moff + m] * grada_y[moff + m] * grada_z[moff + m] * znva5 - grada_z[moff + m] * znva3;
+
+                        double xigrad_xyz =   3.0  * grada_x[moff + m] * grada_y[moff + m] * grada_z[moff + m] * znva5;
+
+                        double xigrad_xxx =  3.0 * grada_x[moff + m] * grada_x[moff + m] * grada_x[moff + m] * znva5 - 3.0  * grada_x[moff + m] * znva3;
+
+                        double xigrad_yyy =  3.0 * grada_y[moff + m] * grada_y[moff + m] * grada_y[moff + m] * znva5 - 3.0  * grada_y[moff + m] * znva3;
+
+                        double xigrad_zzz =  3.0 * grada_z[moff + m] * grada_z[moff + m] * grada_z[moff + m] * znva5 - 3.0  * grada_z[moff + m] * znva3;
+                        
+                        // Various required quantities
+
+                        // ∂|∇X| / (∂∇_a ρ_σ )  * ρ^{w1,w2}_σ' 
 
                         double xigrad_dot_rw12a = (xigrad_x * rxw12a + xigrad_y * ryw12a + xigrad_z * rzw12a);
 
+                        // ∂|∇X| / (∂∇_a ρ_σ )  * Ω_σ 
+
                         double xigrad_dot_omega = (xigrad_x * xomega + xigrad_y * yomega + xigrad_z * zomega );
 
+                        // ∂|∇X| / (∂∇_a ρ_σ )  * ∇ρ^{w1} ρ^{w2}
+
                         double xigrad_dot_rw1rw2 = xigrad_x * rxw1rhow2[moff + m] + xigrad_y * ryw1rhow2[moff + m] + xigrad_z * rzw1rhow2[moff + m];
+
+                        // ∇ρ^{w1} ∇ρ^{w2}
                         
                         double rw1_dot_rw2 = rxw1rxw2[moff + m] + ryw1ryw2[moff + m] + rzw1rzw2[moff + m]; 
 
@@ -5116,20 +5169,23 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
 
                         // Second-order density terms
 
-                        // Term 1
+                        // Term 1 -  ∂^2 e_ xc / (∂ρ_σ ∂ρ_σ')
+
                         double first = w * (df2000[moff + m] * rhow12a[moff + m] + df1100[moff + m] * rhow12a[moff + m]) * omega;
 
-                        // Term 2
+                        // Term 2  - ∂^2 e_xc /(∂ρ_σ ∂∇ρ_σ′) 
+
                         double second = w * (df1010[moff + m] + df1001[moff + m])  * xigrad_dot_rw12a * omega;
 
                         second += w * df10001[moff + m] * 2.0 * grad_dot_rw12 * omega;  
                         
-                        // Term 3
+                        // Term 3 - ∂^2 e_xc /(∂∇ρ_σ ∂ρ_σ′) 
+
                         double third = w * (df1010[moff + m] + df0110[moff + m] ) * xigrad_dot_omega * rhow12a[moff + m];
 
                         third += w * (df10001[moff + m ] + df01001[moff + m]) * grad_dot_omega * rhow12a[moff + m];
 
-                        // Term 4
+                        // Term 4 -  ∂^2 e_xc /(∂∇ρ_σ ∂∇ρ_σ′) 
 
                         double fourth = w * df0010[moff + m] * ( (xigrad_xx  * xomega + xigrad_xy  * yomega +  xigrad_xz  * zomega )* rxw12a
 
@@ -5148,14 +5204,12 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                         fourth += w * df00002[moff + m ] * grad_dot_omega * (2.0 * grad_dot_rw12);
 
                         fourth += w * (df0020[moff + m] + df0011[moff + m])* xigrad_dot_omega * xigrad_dot_rw12a;
-
-                        // Third-order rho terms.
                         
-                        // Term 5 
+                        // Term 5 - ∂^3 e_ xc / (∂ρ_σ ∂ρ_σ' ∂ρ_σ'')
 
                         double fifth = w * (df3000[moff + m] + 2.0 * df2100[moff + m] + df1200[moff + m]) * rhow1rhow2[moff + m] * omega;
 
-                        // Term 6 and 7  note that xigrad_dot_rw1rw2 must be permuted
+                        // Term 6 and 7  -  ∂^3 e_ xc / (∂ρ_σ ∂ρ_σ' ∂∇ρ_σ'') + ∂^3 e_ xc / (∂ρ_σ ∂∇ρ_σ' ∂ρ_σ'')
 
                         double seventh = w * (df2010[moff + m] + df2001[moff + m] ) * xigrad_dot_rw1rw2 * omega; 
 
@@ -5163,7 +5217,7 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
 
                         seventh += w * 2.0 * (df20001[moff + m] + df11001[moff + m] ) * grad_dot_rw1rw2 * omega;
 
-                        // Term 8
+                        // Term 8 - ∂^3 e_ xc / (∂ρ_σ ∂∇ρ_σ' ∂∇ρ_σ'')
 
                         double eighth  = w * (df1020[moff + m] + 2.0 * df1011[moff + m] + df1002[moff + m] ) * xigrad_dot_rw1_xigrad_dot_rw2 * omega;
 
@@ -5181,13 +5235,13 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                         
                         eighth += w * 2.0 * df10001[moff + m] * rw1_dot_rw2 * omega;
 
-                        // Term 9
+                        // Term 9 -  ∂^3 e_ xc / (∂∇ρ_σ ∂ρ_σ' ∂ρ_σ'')
 
                         double ninth = w * (df2010[moff + m] + 2.0 * df1110[moff + m] + df0210[moff + m] ) * rhow1rhow2[moff + m] * xigrad_dot_omega;
 
                         ninth += w * (df20001[moff + m] + 2.0 * df11001[moff + m] + df02001[moff + m]) *  grad_dot_omega * rhow1rhow2[moff + m];
 
-                        // Term 10 and 11  note that rzw1rhow2 must be permuted
+                        // Term 10 and 11  -  ∂^3 e_ xc / (∂∇ρ_σ ∂∇ρ_σ' ∂ρ_σ'') + ∂^3 e_ xc / (∂∇ρ_σ ∂ρ_σ' ∂∇ρ_σ'')
 
                         double tenth = w * (df1010[moff + m] + df0110[moff + m] ) * 
                         
@@ -5199,37 +5253,29 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                                                                                                                                 
                                                                                                                                 );
 
+                        //   ∂^3 e_ xc / (∂|∇X| ∂|∇Y| ∂ρ_σ'') * ∂|∇Y|/ ∂∇_a ρ_σ' * ( ∇_a ρ^{ω1}_σ'  ρ^{ω2}_σ''   ) * ∂|∇X|/ ∂∇_b ρ_σ * ∇_b Ω 
+
+
                         tenth += w * (df1020[moff + m ] + df1011[moff + m ] + df0120[moff + m ] + df0111[moff + m ] ) * xigrad_dot_rw1rhow2 * xigrad_dot_omega;
 
                         tenth += w * (df10001[moff + m] + df01001[moff + m]) * omega_dot_rw1rhow2;
 
-                        tenth += w * (df10101[moff + m] + df10011[moff + m]+  df01101[moff + m] + df0111[moff + m] )* xigrad_dot_rw1rhow2 * grad_dot_omega;
+                        // ∂^3 e_ xc / (∂(∇ρ_α * ∇ρ_β)  ∂∇ρ_σ'  ∂ρ_σ'') * ∂|∇ρ_σ'|/ ∂∇_a ρ_σ' * ( ∇_a ρ^{ω1}_σ'  ρ^{ω2}_σ''   ) * ∂(∇ρ_α * ∇ρ_β)/ ∂∇_b ρ_σ * ∇_b Ω
+
+                        tenth += w * (df10101[moff + m] + df10011[moff + m]+  df01101[moff + m] + df0111[moff + m] + df01011[moff + m] )* xigrad_dot_rw1rhow2 * grad_dot_omega;
+
+                        // ∂^3 e_ xc / ( ∂∇ρ_σ  ∂ (∇ρ_α * ∇ρ_β) ∂ρ_σ'') * ∂ (∇ρ_α * ∇ρ_β)/ ∂∇_a ρ_σ' * ( ∇_a ρ^{ω1}_σ'  ρ^{ω2}_σ''   ) * ∂|∇ρ_σ|/ ∂∇_b ρ_σ * ∇_b Ω
 
                         tenth += w * (df10101[moff + m] + df10011[moff + m]+  df01101[moff + m] + df0111[moff + m] ) * grad_dot_rw1rhow2 * xigrad_dot_omega;
 
                         tenth += w * (df10002[moff + m] + df01002[moff + m] ) * grad_dot_rw1rhow2 * grad_dot_omega;
+ 
 
-                        // Term 12
+                        // Term 12  - ∂^3 e_ xc / (∂∇ρ_σ ∂∇ρ_σ' ∂∇ρ_σ'')
 
-                        double xigrad_xxy =   3.0  * grada_x[moff + m] * grada_x[moff + m] * grada_y[moff + m] * znva5 - grada_y[moff + m] * znva3;
+                        // Contractions
 
-                        double xigrad_xxz =   3.0  * grada_x[moff + m] * grada_x[moff + m] * grada_z[moff + m] * znva5 - grada_z[moff + m] * znva3;
-
-                        double xigrad_xyy =   3.0  * grada_x[moff + m] * grada_y[moff + m] * grada_y[moff + m] * znva5 - grada_x[moff + m] * znva3;
-
-                        double xigrad_xzz =   3.0  * grada_x[moff + m] * grada_z[moff + m] * grada_z[moff + m] * znva5 - grada_x[moff + m] * znva3;
-                        
-                        double xigrad_yzz =   3.0  * grada_y[moff + m] * grada_z[moff + m] * grada_z[moff + m] * znva5 - grada_y[moff + m] * znva3;
-
-                        double xigrad_yyz =   3.0  * grada_y[moff + m] * grada_y[moff + m] * grada_z[moff + m] * znva5 - grada_z[moff + m] * znva3;
-
-                        double xigrad_xyz =   3.0  * grada_x[moff + m] * grada_y[moff + m] * grada_z[moff + m] * znva5;
-
-                        double xigrad_xxx =  3.0 * grada_x[moff + m] * grada_x[moff + m] * grada_x[moff + m] * znva5 - 3.0  * grada_x[moff + m] * znva3;
-
-                        double xigrad_yyy =  3.0 * grada_y[moff + m] * grada_y[moff + m] * grada_y[moff + m] * znva5 - 3.0  * grada_y[moff + m] * znva3;
-
-                        double xigrad_zzz =  3.0 * grada_z[moff + m] * grada_z[moff + m] * grada_z[moff + m] * znva5 - 3.0  * grada_z[moff + m] * znva3;
+                        //  ∂^3||∇ρ_α|| / (∂∇_a ρσ ∂∇_b ρ_ σ' ∂∇_c ρ_σ'')  Ω_a  ∇_b ρ^{w1} ∇_c ρ^{w2} 
 
                         double twelthfirst =  xigrad_xxx * xomega * rxw1rxw2[moff + m]
                                             + xigrad_xxy * xomega * rxw1ryw2[moff + m]
@@ -5259,7 +5305,11 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                                             + xigrad_yzz * zomega * rzw1ryw2[moff + m]
                                             + xigrad_zzz * zomega * rzw1rzw2[moff + m];
 
-                        double twelthsecond  = xigrad_xx * xigrad_x * xomega * rxw1rxw2[moff + m]
+
+                        //  ∂^2||∇ρ_α|| / (∂∇_a ρσ ∂∇_b ρ_ σ') ∇_a ρ^{w1} ∇_b ρ^{w2}   (∂|∇X| / (∂∇_c ρσ ) *  Ω_c )
+
+
+                        double twelthsecond = xigrad_xx * xigrad_x * xomega * rxw1rxw2[moff + m]
                                             + xigrad_xx * xigrad_y * yomega * rxw1rxw2[moff + m]
                                             + xigrad_xx * xigrad_z * zomega * rxw1rxw2[moff + m]
                                             + xigrad_xy * xigrad_x * xomega * rxw1ryw2[moff + m]
@@ -5286,6 +5336,10 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                                             + xigrad_zz * xigrad_x * xomega * rzw1rzw2[moff + m]
                                             + xigrad_zz * xigrad_y * yomega * rzw1rzw2[moff + m]
                                             + xigrad_zz * xigrad_z * zomega * rzw1rzw2[moff + m];
+
+
+                        //  ∂^2||∇ρ_α|| / (∂∇_a ρ_σ ∂∇_b ρ_ σ')  * ∂|∇X| / (∂∇_c ρσ ) *  Ω_a  * ( ∇_c ρ^{w1}  ∇_b ρ^{w2} + ∇_b ρ^{w1}  ∇_c ρ^{w2} )   
+
 
                         double twelththird   =    xigrad_xx * xigrad_x * xomega * (rxw1rxw2[moff + m] + rxw1rxw2[moff + m])
                                                 + xigrad_xx * xigrad_y * xomega * (ryw1rxw2[moff + m] + rxw1ryw2[moff + m])
@@ -5314,7 +5368,8 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                                                 + xigrad_zz * xigrad_x * zomega * (rxw1rzw2[moff + m] + rzw1rxw2[moff + m])
                                                 + xigrad_zz * xigrad_y * zomega * (ryw1rzw2[moff + m] + rzw1ryw2[moff + m])
                                                 + xigrad_zz * xigrad_z * zomega * (rzw1rzw2[moff + m] + rzw1rzw2[moff + m]);
-                        
+
+                        //   ∂^2 (∇ρ_α * ∇ρ_β) / (∂∇_a ρ_σ ∂∇_b ρ_ σ'') * (∂||∇ρ_α|| / (∂∇_c ρ_σ' ) *  Ω_a * ∇_c ρ^{w1} ∇_b ρ^{w2} 
 
                         double twelthfourth_gam =       xigrad_x * xomega * rxw1rxw2[moff + m]
                                                     +   xigrad_x * yomega * rxw1ryw2[moff + m]
@@ -5325,6 +5380,8 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                                                     +   xigrad_z * xomega * rzw1rxw2[moff + m]
                                                     +   xigrad_z * yomega * rzw1ryw2[moff + m]
                                                     +   xigrad_z * zomega * rzw1rzw2[moff + m];
+
+                        //  ∂^2 (∇ρ_α * ∇ρ_β) / (∂∇_a ρ_σ ∂∇_b ρ_ σ'') *  (∂(∇ρ_α * ∇ρ_β) / (∂∇_c ρ_σ' ) *  Ω_a  * ∇_c ρ^{w1} ∇_b ρ^{w2}
 
                         double twelthfifth_gam =    (xigrad_x * grada_x[moff + m] + grada_x[moff +m] * xigrad_x) * rxw1rxw2[moff +m]
                                                 +   (xigrad_x * grada_y[moff + m] + grada_x[moff +m] * xigrad_y) * rxw1ryw2[moff +m]
@@ -5345,21 +5402,46 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
 
                         // second-term mixed density gradient
 
+                        //  All of these terms are from 
+
+                        //  ∂^2 e_ xc / (∂|∇X| ∂|∇Y| )    ∂^2 ∂|∇Y| / (∂∇_a ρ_σ' ∂∇_b ρ_ σ'') * (∂|∇X| / (∂∇_c ρσ ) *  Ω_c ) * ∇_a ρ^{w1} ∇_b ρ^{w2}  
+
+                        //  ∂^2 e_ xc / (∂(∇ρ_α * ∇ρ_β)  ∂∇ρ_σ' )    ∂^2||∇ρ_α|| / (∂∇_a ρ_σ' ∂∇_b ρ_ σ'') ∇_a ρ^{w1} ∇_b ρ^{w2}  *  (∂(∇ρ_α * ∇ρ_β) / (∂∇_c ρσ ) *  Ω_c )
+
                         twelfth += w * (df00101[moff + m] + df00011[moff +m]) * ngrada[moff + m] * twelthsecond;
 
+                        //   ∂^2 e_ xc / (  ∂∇ρ_σ  ∂(∇ρ_α * ∇ρ_β))  ∂^2(∇ρ_α * ∇ρ_β) / (∂∇_a ρ_σ' ∂∇_b ρ_ σ'') ∇_a ρ^{w1} ∇_b ρ^{w2}  * (∂||∇ρ_α|| / (∂∇_c ρσ ) *  Ω_c )
+
                         twelfth += w * (df00101[moff + m] + df00011[moff +m]) * xigrad_dot_omega * rw1_dot_rw2;
+
+                        //  ∂^2 e_ xc / (  ∂(∇ρ_α * ∇ρ_β)  ∂(∇ρ_α * ∇ρ_β))  * ∂^2(∇ρ_α * ∇ρ_β) / (∂∇_a ρ_σ' ∂∇_b ρ_ σ'') ∇_a ρ^{w1} ∇_b ρ^{w2} * (∂(∇ρ_α * ∇ρ_β) / (∂∇_c ρσ ) *  Ω_c )
 
                         twelfth += w * df00002[moff + m] * grad_dot_omega * rw1_dot_rw2;
 
                         // third-term mixed denisty gradient
 
+                        // All of these terms are from 
+
+                        //  ∂^2 e_ xc / (∂|∇X| ∂|∇Y| )    ∂^2 ∂|∇X| / (∂∇_a ρ_σ ∂∇_b ρ_ σ'') * (∂|∇Y| / (∂∇_c ρ_σ' ) *  Ω_a  * ∇_c ρ^{w1} ∇_b ρ^{w2}  
+
+                        //  ∂^2 e_ xc / (∂(∇ρ_α * ∇ρ_β)  ∂∇ρ_σ' ) *  ∂^2 (∇ρ_α * ∇ρ_β) / (∂∇_a ρ_σ ∂∇_b ρ_ σ'') * (∂||∇ρ_α|| / (∂∇_c ρ_σ' ) *  Ω_a * ∇_c ρ^{w1} ∇_b ρ^{w2}  
+
                         twelfth += w *  (df00101[moff + m] + df00011[moff +m]) * twelthfourth_gam;
 
+                        //   ∂^2 e_ xc / (  ∂∇ρ_σ  ∂(∇ρ_α * ∇ρ_β)) *  ∂^2 ||∇ρ_α|| / (∂∇_a ρ_σ ∂∇_b ρ_ σ'')  *  (∂(∇ρ_α * ∇ρ_β) / (∂∇_c ρ_σ' ) *  Ω_a  * ∇_c ρ^{w1} ∇_b ρ^{w2} 
+
                         twelfth += w * df00101[moff + m] * ngrada[moff + m] * twelththird;
+
+                        // ∂^2 e_ xc / ( ∂(∇ρ_α * ∇ρ_β)  ∂(∇ρ_α * ∇ρ_β))  * ∂^2 (∇ρ_α * ∇ρ_β) / (∂∇_a ρ_σ ∂∇_b ρ_ σ'') *  (∂(∇ρ_α * ∇ρ_β) / (∂∇_c ρ_σ' ) *  Ω_a  * ∇_c ρ^{w1} ∇_b ρ^{w2}
 
                         twelfth += w * df00002[moff +m] * ngrada[moff + m] * twelthfourth_gam;
                         
                         // Fourth terms 
+
+                         // All of these terms are from 
+
+                        //  ∂^3 e_ xc / (∂|∇X| ∂|∇Y| ∂|∇Z| )  * (∂|∇X| / (∂∇_a ρ_σ ) * (∂|∇Y| / (∂∇_b ρ_σ' ) * (∂|∇Z| / (∂∇_c ρ_σ'' ) *  Ω_a  * ∇_b ρ^{w1} ∇_c ρ^{w2}  
+
 
                         twelfth += w * (df00201[moff + m] + df00111[moff + m]) * twelthfifth_gam * xigrad_dot_omega;
 
@@ -5371,7 +5453,6 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
 
                         twelfth += w * df00003[moff + m] * ngrada[moff + m] * ngrada[moff +m] * grad_dot_omega;
                                      
-
                         fvxc += first;
                         fvxc += second;
                         fvxc += third;
@@ -5616,7 +5697,7 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
 
                         tenth += w * (df10001[loff + l] + df01001[loff + l]) * omega_dot_rw1rhow2;
 
-                        tenth += w * (df10101[loff + l] + df10011[loff + l]+  df01101[loff + l] + df0111[loff + l] )* xigrad_dot_rw1rhow2 * grad_dot_omega;
+                        tenth += w * (df10101[loff + l] + df10011[loff + l]+  df01101[loff + l] + df0111[loff + l] +  df01011[loff + l] )* xigrad_dot_rw1rhow2 * grad_dot_omega;
 
                         tenth += w * (df10101[loff + l] + df10011[loff + l]+  df01101[loff + l] + df0111[loff + l] ) * grad_dot_rw1rhow2 * xigrad_dot_omega;
 

@@ -428,8 +428,6 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
                 auto rho_lam_yz_r = densityGridAB.rhow1rhow2(12 * j + 10);
                 
                 auto rho_lam_yz_i = densityGridAB.rhow1rhow2(12 * j + 11);
-
-                // First-order densities  where rhow_kx_r =  Re[ sum_pq ( [kx,D]_pq * Ω_pq )   ]
                 
                 auto rhow_kx_r = rwdenptr->alphaDensity(6 * j );
 
@@ -1648,7 +1646,6 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
 
                     rhow1rhow2_i[i] = 2.0 * (rhow1a_r[i]*rhow2a_i[i] + rhow1a_i[i]*rhow2a_r[i]);
 
-                    // 6-7
 
                     rxw1rhow2_r[i] = 2.0 *(rxw1_r * rhow2a_r[i] -  rxw1_i * rhow2a_i[i]
 
@@ -1674,9 +1671,6 @@ CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
 
                                          + rzw2_r * rhow1a_i[i] +  rzw2_i * rhow1a_r[i]);
 
-
-                    // 12
-                    
                     rxw1rxw2_r[i] = rxw1_r * rxw2_r - rxw1_i * rxw2_i
                                         
                                         + rxw2_r * rxw1_r - rxw2_i * rxw1_i;

@@ -164,14 +164,16 @@ class CXCIntegrator
      @param aoKohnShamMatrix the spin-restricted exchange-correlation contribution to perturbed Kohn-Sham matrix.
      @param gtoContainer the container of GTOs blocks.
      @param xcHessianGrid the exchange-correlation functional hessian grid.
-     @param rwDensityGrid the perturbed densities grid.
+     @param xcCubicHessianGrid the exchange-correlation functional cubic hessian grid.
+     @param rwDensityGrid the products of perturbed one-time transformed densities evaluated on the grid.
+     @param rw2DensityGrid the two-time transformed densities evaluated on the grid.
      @param molecularGrid the molecular grid.
      */
     void _compRestrictedContributionForLda(      CAOKohnShamMatrix&   aoKohnShamMatrix,
                                            const CGtoContainer*       gtoContainer,
                                            const CXCHessianGrid&      xcHessianGrid,
                                            const CXCCubicHessianGrid& xcCubicHessianGrid,
-                                           const CDensityGridQuad&        rwDensityGrid,
+                                           const CDensityGridQuad&    rwDensityGrid,
                                            const CDensityGrid&        rw2DensityGrid,
                                            const CMolecularGrid&      molecularGrid,
                                            const std::string&         quadMode) const;
@@ -248,8 +250,10 @@ class CXCIntegrator
      @param gtoContainer the container of GTOs blocks.
      @param xcGradientGrid the exchange-correlation functional gradient grid.
      @param xcHessianGrid the exchange-correlation functional hessian grid.
+     @param xcCubicHessianGrid the exchange-correlation functional cubic hessian grid.
      @param gsDensityGrid the ground state density grid.
-     @param rwDensityGrid the perturbed densities grid.
+     @param rwDensityGrid the products of perturbed one-time transformed densities evaluated on the grid.
+     @param rw2DensityGrid the two-time transformed densities evaluated on the grid.
      @param molecularGrid the molecular grid.
      */
     void _compRestrictedContributionForGga(      CAOKohnShamMatrix&   aoKohnShamMatrix,
@@ -319,7 +323,8 @@ class CXCIntegrator
      @param aoKohnShamMatrix the perturbed Kohn-Sham matrix.
      @param gtoContainer the container of GTOs blocks.
      @param xcHessianGrid the exchange-correlation functional hessian grid.
-     @param rwDensityGrid the perturbed density grid.
+     @param rwDensityGrid the products of perturbed one-time transformed densities evaluated on the grid.
+     @param rw2DensityGrid the two-time transformed densities evaluated on the grid.
      @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
      @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
      @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
@@ -331,7 +336,7 @@ class CXCIntegrator
                                     const CGtoContainer*       gtoContainer,
                                     const CXCHessianGrid*      xcHessianGrid,
                                     const CXCCubicHessianGrid* xcCubicHessianGrid,
-                                    const CDensityGridQuad*        rwDensityGrid,
+                                    const CDensityGridQuad*    rwDensityGrid,
                                     const CDensityGrid*        rw2DensityGrid,
                                     const double*              gridCoordinatesX,
                                     const double*              gridCoordinatesY,
@@ -486,7 +491,8 @@ class CXCIntegrator
      @param xcGradientGrid the exchange-correlation functional gradient grid.
      @param xcHessianGrid the exchange-correlation functional hessian grid.
      @param gsDensityGrid the pointer to ground state density grid.
-     @param rwDensityGrid he pointer to perturbed density grid.
+     @param rwDensityGrid the products of perturbed one-time transformed densities evaluated on the grid.
+     @param rw2DensityGrid the two-time transformed densities evaluated on the grid.
      @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
      @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
      @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
@@ -641,7 +647,8 @@ class CXCIntegrator
      @param aoKohnShamMatrix the pointer to Kohn-Sham matrix.
      @param xcBuffer the exchange-correlation buffer.
      @param xcHessianGrid the pointer to exchange-correlation hessian grid.
-     @param rwDensityGrid the pointer to perturbed density grid.
+     @param rwDensityGrid the products of perturbed one-time transformed densities evaluated on the grid.
+     @param rw2DensityGrid the two-time transformed densities evaluated on the grid..
      @param gtoValues the pointer to GTOS values on grid.
      @param gridWeights the pointer to grid weights.
      @param gridOffset the offset of grids batch in density grid.
@@ -652,7 +659,7 @@ class CXCIntegrator
                                           CMemBlock<double>&   xcBuffer,
                                     const CXCHessianGrid*      xcHessianGrid,
                                     const CXCCubicHessianGrid* xcCubicHessianGrid,
-                                    const CDensityGridQuad*        rwDensityGrid,
+                                    const CDensityGridQuad*    rwDensityGrid,
                                     const CDensityGrid*        rw2DensityGrid,
                                     const CMemBlock2D<double>& gtoValues,
                                     const double*              gridWeights,
@@ -1023,8 +1030,10 @@ class CXCIntegrator
      @param xcBuffer the exchange-correlation buffer.
      @param xcGradientGrid the pointer to exchange-correlation gradient grid.
      @param xcHessianGrid the pointer to exchange-correlation hessian grid.
+     @param xcCubicHessianGrid the pointer to exchange-correlation cubic hessian grid.
      @param gsDensityGrid the pointer to ground state density grid.
-     @param rwDensityGrid the pointer to perturbed density grid.
+     @param rwDensityGrid the products of perturbed one-time transformed densities evaluated on the grid.
+     @param rw2DensityGrid the two-time transformed densities evaluated on the grid.
      @param gtoValues the pointer to GTOS values on grid.
      @param gtoValuesX the GTOs gradient along X axis values buffer.
      @param gtoValuesY the GTOs gradient along Y axis values buffer.
