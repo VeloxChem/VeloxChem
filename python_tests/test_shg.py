@@ -9,6 +9,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.shgdriver import SHGDriver
+from veloxchem.veloxchemlib import is_mpi_master
 
 
 @pytest.mark.solvers
@@ -55,22 +56,25 @@ class TestSHG:
 
         shg_prop = SHGDriver(comm, ostream)
         shg_prop.update_settings(rsp_settings, method_settings)
-        shg_result= shg_prop.compute(molecule, ao_basis, scf_tensors)
 
-        # x-component
+        if is_mpi_master():
+            
+            shg_result= shg_prop.compute(molecule, ao_basis, scf_tensors)
 
-        assert abs(shg_result[0.1][0].real - ref_result['x'].real) < 1.0e-6
-        assert abs(shg_result[0.1][0].imag - ref_result['x'].imag) < 1.0e-6
+            # x-component
 
-        # y-component
+            assert abs(shg_result[0.1][0].real - ref_result['x'].real) < 1.0e-6
+            assert abs(shg_result[0.1][0].imag - ref_result['x'].imag) < 1.0e-6
 
-        assert abs(shg_result[0.1][1].real - ref_result['y'].real) < 1.0e-6
-        assert abs(shg_result[0.1][1].imag - ref_result['y'].imag) < 1.0e-6
+            # y-component
 
-        # z-component
+            assert abs(shg_result[0.1][1].real - ref_result['y'].real) < 1.0e-6
+            assert abs(shg_result[0.1][1].imag - ref_result['y'].imag) < 1.0e-6
 
-        assert abs(shg_result[0.1][2].real - ref_result['z'].real) < 1.0e-6
-        assert abs(shg_result[0.1][2].imag - ref_result['z'].imag) < 1.0e-6
+            # z-component
+
+            assert abs(shg_result[0.1][2].real - ref_result['z'].real) < 1.0e-6
+            assert abs(shg_result[0.1][2].imag - ref_result['z'].imag) < 1.0e-6
 
     def test_shg(self):
 

@@ -60,41 +60,44 @@ class TestQrf(unittest.TestCase):
 
         qrf_prop.update_settings(rsp_settings, method_settings)
 
-        qrf_result_xxz = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
+        if is_mpi_master():
+            qrf_result_xxz = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
 
         rsp_settings = {'conv_thresh': 1.0e-6, 'b_frequencies': [-0.1],'c_frequencies': [0.3],'damping': 0.1,'a_components':'y','b_components':'z','c_components':'y'}
 
         qrf_prop.update_settings(rsp_settings, method_settings)
 
-        qrf_result_yzy = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
+        if is_mpi_master():
+            qrf_result_yzy = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
 
         rsp_settings = {'conv_thresh': 1.0e-6, 'b_frequencies': [-0.1],'c_frequencies': [0.3],'damping': 0.1,'a_components':'z','b_components':'z','c_components':'z'}
 
         qrf_prop.update_settings(rsp_settings, method_settings)
-
-        qrf_result_zzz = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
-
-        thresh = 1.0e-3
+        
+        if is_mpi_master():
+            qrf_result_zzz = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
+        
+        thresh = 1.0e-4
 
         # x-component 
 
-        self.assertTrue(abs(qrf_result_xxz[(-0.1,0.3)].real - ref_result['xxz'].real) < thresh)
+        if is_mpi_master():
+             
+             self.assertTrue(abs(qrf_result_xxz[(-0.1,0.3)].real - ref_result['xxz'].real) < thresh)
 
-        self.assertTrue(abs(qrf_result_xxz[(-0.1,0.3)].imag - ref_result['xxz'].imag) < thresh)
-        
-        # y-component 
-        
-        self.assertTrue(abs(qrf_result_yzy[(-0.1,0.3)].real - ref_result['yzy'].real) < thresh)
+             self.assertTrue(abs(qrf_result_xxz[(-0.1,0.3)].imag - ref_result['xxz'].imag) < thresh)
+            
+            # y-component 
+            
+             self.assertTrue(abs(qrf_result_yzy[(-0.1,0.3)].real - ref_result['yzy'].real) < thresh)
 
-        self.assertTrue(abs(qrf_result_yzy[(-0.1,0.3)].imag - ref_result['yzy'].imag) <thresh)
+             self.assertTrue(abs(qrf_result_yzy[(-0.1,0.3)].imag - ref_result['yzy'].imag) <thresh)
 
-        # z-component 
-        
-        self.assertTrue(abs(qrf_result_zzz[(-0.1,0.3)].real - ref_result['zzz'].real) < thresh)
+            # z-component 
+            
+             self.assertTrue(abs(qrf_result_zzz[(-0.1,0.3)].real - ref_result['zzz'].real) < thresh)
 
-        self.assertTrue(abs(qrf_result_zzz[(-0.1,0.3)].imag - ref_result['zzz'].imag) < thresh)
-
-
+             self.assertTrue(abs(qrf_result_zzz[(-0.1,0.3)].imag - ref_result['zzz'].imag) < thresh)
 
     def test_qrf(self):
 
