@@ -361,11 +361,12 @@ class SHGDriver(NonLinearSolver):
         norb = self.comm.bcast(norb, root=mpi_master())
 
         nocc = molecule.number_of_alpha_electrons()
-
+        
+        dft_dict = self.init_dft(molecule, scf_tensors)
+        
         # computing all compounded first-order densities
         if self.rank == mpi_master():
             d_dft1,d_dft2 = self.get_densities(freqpairs, kX, S, D0, mo)
-            dft_dict = self.init_dft(molecule, scf_tensors)
         else:
             d_dft1 = None
             d_dft2 = None

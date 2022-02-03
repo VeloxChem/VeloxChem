@@ -1,88 +1,73 @@
 from pathlib import Path
 import pytest
-from mpi4py import MPI
-import veloxchem as vlx
-import sys
-
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.shgdriver import SHGDriver
-from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.rspshg import SHG
 
 
 @pytest.mark.solvers
 class TestSHG:
 
-    def run_scf(self):
+    def run_scf(self, task):
 
-        molecule_string = """
-        O   0.0   0.0   0.0
-        H   0.0   1.4   1.1
-        H   0.0  -1.4   1.1
-        """
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
-        basis_set_label = 'cc-pVDZ'
+        scf_drv.update_settings(task.input_dict['scf'],
+                                task.input_dict['method_settings'])
 
-        scf_settings = {'conv_thresh': 1.0e-6}
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        molecule = vlx.Molecule.read_str(molecule_string, units='au')
-        molecule.set_charge(0)
-        molecule.set_multiplicity(1)
-        method_settings = {'xcfun': 'b3lyp', 'grid_level': 4}
+        return scf_drv.scf_tensors
 
-        basis = vlx.MolecularBasis.read(molecule, basis_set_label)
+    def run_shg(self, inpfile, w, ref_result):
 
-        comm = MPI.COMM_WORLD
-        ostream = vlx.OutputStream(sys.stdout)
+        task = MpiTask([inpfile, None])
 
-        scf_drv = vlx.ScfRestrictedDriver(comm, ostream)
-        scf_drv.update_settings(scf_settings, method_settings)
-        scf_drv.compute(molecule, basis)
+        task.input_dict['scf']['checkpoint_file'] = None
 
-        return scf_drv.scf_tensors,molecule,basis
+        scf_tensors = self.run_scf(task)
 
-    def run_shg(self, ref_result):
+        shg_prop = SHG({
+            'damping': task.input_dict['response']['damping'],
+            'frequencies': task.input_dict['response']['frequencies'],
+            'conv_thresh': '1.0e-8',
+        })
 
-        comm = MPI.COMM_WORLD
-        ostream = vlx.OutputStream(sys.stdout)
+        shg_prop.init_driver(task.mpi_comm, task.ostream)
+        shg_prop.compute(task.molecule, task.ao_basis, scf_tensors)
+        shg_result = shg_prop.rsp_property
 
-        method_settings = {'xcfun': 'b3lyp', 'grid_level': 4}
-
-        scf_tensors,molecule,ao_basis = self.run_scf()
-
-        rsp_settings = {'conv_thresh': 1.0e-6, 'frequencies': [0.1],'damping': 0.1}
-
-        shg_prop = SHGDriver(comm, ostream)
-        shg_prop.update_settings(rsp_settings, method_settings)
-
-        if is_mpi_master():
-            
-            shg_result= shg_prop.compute(molecule, ao_basis, scf_tensors)
+        if task.mpi_rank == mpi_master():
 
             # x-component
 
-            assert abs(shg_result[0.1][0].real - ref_result['x'].real) < 1.0e-6
-            assert abs(shg_result[0.1][0].imag - ref_result['x'].imag) < 1.0e-6
+            assert abs(shg_result[0.2][0].real - ref_result['x'].real) < 1.0e-6
+            assert abs(shg_result[0.2][0].imag - ref_result['x'].imag) < 1.0e-6
 
             # y-component
 
-            assert abs(shg_result[0.1][1].real - ref_result['y'].real) < 1.0e-6
-            assert abs(shg_result[0.1][1].imag - ref_result['y'].imag) < 1.0e-6
+            assert abs(shg_result[0.2][1].real - ref_result['y'].real) < 1.0e-6
+            assert abs(shg_result[0.2][1].imag - ref_result['y'].imag) < 1.0e-6
 
             # z-component
 
-            assert abs(shg_result[0.1][2].real - ref_result['z'].real) < 1.0e-6
-            assert abs(shg_result[0.1][2].imag - ref_result['z'].imag) < 1.0e-6
+            assert abs(shg_result[0.2][2].real - ref_result['z'].real) < 1.0e-6
+            assert abs(shg_result[0.2][2].imag - ref_result['z'].imag) < 1.0e-6
 
     def test_shg(self):
 
+        w = 0.2
 
         ref_result = {
-            'x': 0 + 0j,
+            'x': 163.69097360 + 177.80276777j,
             'y': 0 + 0j,
-            'z': 100.98592528 + 56.88987624j,
+            'z': 0 + 0J,
         }
 
-        self.run_shg(ref_result)
+        here = Path(__file__).parent
+
+        inpfile = str(here / 'inputs' / 'water_shg.inp')
+
+        self.run_shg(inpfile, w, ref_result)

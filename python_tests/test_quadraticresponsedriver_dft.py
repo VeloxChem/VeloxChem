@@ -1,21 +1,14 @@
-from mpi4py import MPI
-from pathlib import Path
-import unittest
 import pytest
-import sys
-import veloxchem as vlx
 
 from veloxchem.veloxchemlib import is_mpi_master
-from veloxchem.outputstream import OutputStream
 from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
-from veloxchem.mpitask import MpiTask
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
-class TestQrf(unittest.TestCase):
-    """
-    Tests the qrf code 
-    """
+@pytest.mark.solvers
+class TestQrf:
 
     def run_scf(self):
 
@@ -29,17 +22,15 @@ class TestQrf(unittest.TestCase):
 
         scf_settings = {'conv_thresh': 1.0e-6}
 
-        molecule = vlx.Molecule.read_str(molecule_string, units='au')
+        molecule = Molecule.read_str(molecule_string, units='au')
         molecule.set_charge(0)
         molecule.set_multiplicity(1)
+
         method_settings = {'xcfun': 'b3lyp', 'grid_level': 4}
 
-        basis = vlx.MolecularBasis.read(molecule, basis_set_label)
+        basis = MolecularBasis.read(molecule, basis_set_label)
 
-        comm = MPI.COMM_WORLD
-        ostream = vlx.OutputStream(sys.stdout)
-
-        scf_drv = vlx.ScfRestrictedDriver(comm, ostream)
+        scf_drv = ScfRestrictedDriver()
         scf_drv.update_settings(scf_settings, method_settings)
         scf_drv.compute(molecule, basis)
 
@@ -47,35 +38,51 @@ class TestQrf(unittest.TestCase):
 
     def run_qrf(self, ref_result):
 
-        comm = MPI.COMM_WORLD
-        ostream = vlx.OutputStream(sys.stdout)
-
         scf_tensors,molecule,ao_basis = self.run_scf()
 
         method_settings = {'xcfun': 'b3lyp', 'grid_level': 4}
 
-        rsp_settings = {'conv_thresh': 1.0e-6, 'b_frequencies': [-0.1],'c_frequencies': [0.3],'damping': 0.1,'a_components':'x','b_components':'x','c_components':'z'}
+        rsp_settings = {
+            'conv_thresh': 1.0e-6, 
+            'b_frequencies': [-0.1],
+            'c_frequencies': [0.3],
+            'damping': 0.1,
+            'a_components':'x',
+            'b_components':'x',
+            'c_components':'z'
+            }
 
-        qrf_prop = QuadraticResponseDriver(comm, ostream) 
+        qrf_prop = QuadraticResponseDriver()
 
         qrf_prop.update_settings(rsp_settings, method_settings)
 
-        if is_mpi_master():
-            qrf_result_xxz = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
+        qrf_result_xxz = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
 
-        rsp_settings = {'conv_thresh': 1.0e-6, 'b_frequencies': [-0.1],'c_frequencies': [0.3],'damping': 0.1,'a_components':'y','b_components':'z','c_components':'y'}
+        rsp_settings = {'conv_thresh': 1.0e-6, 
+        'b_frequencies': [-0.1],
+        'c_frequencies': [0.3],
+        'damping': 0.1,
+        'a_components':'y',
+        'b_components':'z',
+        'c_components':'y'
+        }
 
         qrf_prop.update_settings(rsp_settings, method_settings)
 
-        if is_mpi_master():
-            qrf_result_yzy = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
+        qrf_result_yzy = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
 
-        rsp_settings = {'conv_thresh': 1.0e-6, 'b_frequencies': [-0.1],'c_frequencies': [0.3],'damping': 0.1,'a_components':'z','b_components':'z','c_components':'z'}
+        rsp_settings = {'conv_thresh': 1.0e-6, 
+        'b_frequencies': [-0.1],
+        'c_frequencies': [0.3],
+        'damping': 0.1,
+        'a_components':'z',
+        'b_components':'z',
+        'c_components':'z'
+        }
 
         qrf_prop.update_settings(rsp_settings, method_settings)
         
-        if is_mpi_master():
-            qrf_result_zzz = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
+        qrf_result_zzz = qrf_prop.compute(molecule, ao_basis, scf_tensors,method_settings)
         
         thresh = 1.0e-4
 
@@ -83,21 +90,21 @@ class TestQrf(unittest.TestCase):
 
         if is_mpi_master():
              
-             self.assertTrue(abs(qrf_result_xxz[(-0.1,0.3)].real - ref_result['xxz'].real) < thresh)
+            assert abs(qrf_result_xxz[(-0.1,0.3)].real - ref_result['xxz'].real) < thresh
 
-             self.assertTrue(abs(qrf_result_xxz[(-0.1,0.3)].imag - ref_result['xxz'].imag) < thresh)
+            assert abs(qrf_result_xxz[(-0.1,0.3)].imag - ref_result['xxz'].imag) < thresh
             
             # y-component 
             
-             self.assertTrue(abs(qrf_result_yzy[(-0.1,0.3)].real - ref_result['yzy'].real) < thresh)
+            assert abs(qrf_result_yzy[(-0.1,0.3)].real - ref_result['yzy'].real) < thresh
 
-             self.assertTrue(abs(qrf_result_yzy[(-0.1,0.3)].imag - ref_result['yzy'].imag) <thresh)
+            assert abs(qrf_result_yzy[(-0.1,0.3)].imag - ref_result['yzy'].imag) < thresh
 
             # z-component 
             
-             self.assertTrue(abs(qrf_result_zzz[(-0.1,0.3)].real - ref_result['zzz'].real) < thresh)
+            assert abs(qrf_result_zzz[(-0.1,0.3)].real - ref_result['zzz'].real) < thresh
 
-             self.assertTrue(abs(qrf_result_zzz[(-0.1,0.3)].imag - ref_result['zzz'].imag) < thresh)
+            assert abs(qrf_result_zzz[(-0.1,0.3)].imag - ref_result['zzz'].imag) < thresh
 
     def test_qrf(self):
 
@@ -109,6 +116,3 @@ class TestQrf(unittest.TestCase):
 
         self.run_qrf(ref_result)
 
-
-if __name__ == '__main__':
-    unittest.main()

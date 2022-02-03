@@ -45,6 +45,8 @@ from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import XCIntegrator
+from veloxchem.veloxchemlib import is_mpi_master
+
 
 class NonLinearSolver:
     """
@@ -374,25 +376,20 @@ class NonLinearSolver:
         :return:
             A list of Fock matrices
         """
-
+        
         if fock_flag == 'real_and_imag':
-
-            if d_dft_1 and d_dft_2:
-                f_total = self.comp_two_el_int(mo, molecule, ao_basis,dft_dict,d_dft_1,d_dft_2,mode)
-            if d_dft_1 and not d_dft_2 :
-                f_total = self.comp_two_el_int(mo, molecule, ao_basis,dft_dict,d_dft_1,mode)
-
+            f_total = self.comp_two_el_int(mo, molecule, ao_basis,dft_dict,d_dft_1,d_dft_2,mode)
             nrows = f_total.data.shape[0]
             half_ncols = f_total.data.shape[1] // 2
             ff_data = np.zeros((nrows, half_ncols), dtype=np.complex128)
             for i in range(half_ncols):
                 ff_data[:, i] = (f_total.data[:, 2 * i] +
-                                 1j * f_total.data[:, 2 * i + 1])
+                                1j * f_total.data[:, 2 * i + 1])
+                                
             return DistributedArray(ff_data, self.comm, distribute=False)
 
         elif fock_flag == 'real':
             return self.comp_two_el_int(mo, molecule, ao_basis, d_hf)
-
         else:
             return None
 
@@ -453,25 +450,32 @@ class NonLinearSolver:
                 batch_start = batch_size * batch_ind
                 batch_end = min(batch_start + batch_size, n_total)
 
-                if dens_1:
+                if self.dft:
                     dts1 = [
                     np.ascontiguousarray(dab)
                     for dab in dens_1 ]
-                    dens1 = AODensityMatrix(dts1, denmat.rest)
 
-                if dens_2:
                     dts2 = [
-                    np.ascontiguousarray(dab)
-                    for dab in dens_2 ]
+                        np.ascontiguousarray(dab)
+                        for dab in dens_2 ]
+                        
+                    dens1 = AODensityMatrix(dts1, denmat.rest) 
+
                     dens2 = AODensityMatrix(dts2, denmat.rest)
-                
+                else:
+                    dts2 = [
+                        np.ascontiguousarray(dab)
+                        for dab in dens_2 ]
+
+                    dens2 = AODensityMatrix(dts2, denmat.rest)
             else:
                 dens1 = AODensityMatrix()
                 dens2 = AODensityMatrix()
             
-            if dens_1:
+            if self.dft:
                 dens1.broadcast(self.rank, self.comm)
-            if dens_2:
+                dens2.broadcast(self.rank, self.comm)
+            else:
                 dens2.broadcast(self.rank, self.comm)
 
             fock = AOFockMatrix(dens2)

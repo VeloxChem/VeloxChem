@@ -307,11 +307,12 @@ class QuadraticResponseDriver(NonLinearSolver):
         norb = self.comm.bcast(norb, root=mpi_master())
 
         nocc = molecule.number_of_alpha_electrons()
+        
+        dft_dict = self.init_dft(molecule, scf_tensors)
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
             firstorderdens,secorderdens = self.get_densities(freqpairs, kX, S, D0, mo)
-            dft_dict = self.init_dft(molecule, scf_tensors)
         else:
             firstorderdens = None
             secorderdens = None
