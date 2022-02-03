@@ -359,7 +359,9 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
 
     auto rwdengridc = CDensityGridQuad(mgrid.getNumberOfGridPoints(), rw2DensityMatrix.getNumberOfDensityMatrices(), fvxc.getFunctionalType(), dengrid::ab);
 
-    rwdengridc.makenewdens(rwdengridc,mgrid,rwdengrid,fvxc.getFunctionalType(),rw2DensityMatrix.getNumberOfDensityMatrices(),quadMode);
+    // Compute all and store all products of first-order transformed denisites 
+
+    rwdengridc.DensityProd(rwdengridc,mgrid,rwdengrid,fvxc.getFunctionalType(),rw2DensityMatrix.getNumberOfDensityMatrices(),quadMode);
             
     // set up number of perturbed denstries and matrix dimensions
     

@@ -262,7 +262,6 @@ class NonLinearSolver:
         :return:
             The dictionary of DFT information.
         """
-
         # generate integration grid
         if self.dft:
             grid_drv = GridDriver(self.comm)
@@ -358,7 +357,7 @@ class NonLinearSolver:
 
         return None
 
-    def comp_nlr_fock(self, mo, molecule, ao_basis, fock_flag, dft_dict = None, d_dft_1 = None, d_dft_2 = None, mode=None):
+    def comp_nlr_fock(self, mo, molecule, ao_basis, fock_flag, dft_dict = None, first_order_dens = None, second_order_dens = None, mode=None):
         """-
         Computes and returns a list of Fock matrices 
 
@@ -377,23 +376,21 @@ class NonLinearSolver:
             A list of Fock matrices
         """
         
+        f_total = self.comp_two_el_int(mo, molecule, ao_basis,dft_dict,first_order_dens,second_order_dens,mode)
+        nrows = f_total.data.shape[0]
+        half_ncols = f_total.data.shape[1] // 2
+        ff_data = np.zeros((nrows, half_ncols), dtype=np.complex128)
         if fock_flag == 'real_and_imag':
-            f_total = self.comp_two_el_int(mo, molecule, ao_basis,dft_dict,d_dft_1,d_dft_2,mode)
-            nrows = f_total.data.shape[0]
-            half_ncols = f_total.data.shape[1] // 2
-            ff_data = np.zeros((nrows, half_ncols), dtype=np.complex128)
             for i in range(half_ncols):
                 ff_data[:, i] = (f_total.data[:, 2 * i] +
                                 1j * f_total.data[:, 2 * i + 1])
-                                
             return DistributedArray(ff_data, self.comm, distribute=False)
-
         elif fock_flag == 'real':
-            return self.comp_two_el_int(mo, molecule, ao_basis, d_hf)
+            return f_total
         else:
             return None
 
-    def comp_two_el_int(self, mo, molecule, ao_basis , dft_dict = None, dens_1 = None, dens_2 = None,mode=None):
+    def comp_two_el_int(self, mo, molecule, ao_basis , dft_dict = None, first_order_dens = None, second_order_dens = None, mode=None):
         """
         Returns the two-electron part of the Fock matix in MO basis
 
@@ -418,8 +415,8 @@ class NonLinearSolver:
         # determine number of batches
 
         if self.rank == mpi_master():
-            n_total = len(dens_2)
-            n_ao = dens_2[0].shape[0]
+            n_total = len(second_order_dens)
+            n_ao = second_order_dens[0].shape[0]
             norb = mo.shape[1]
         else:
             n_total = None
@@ -453,11 +450,11 @@ class NonLinearSolver:
                 if self.dft:
                     dts1 = [
                     np.ascontiguousarray(dab)
-                    for dab in dens_1 ]
+                    for dab in first_order_dens ]
 
                     dts2 = [
                         np.ascontiguousarray(dab)
-                        for dab in dens_2 ]
+                        for dab in second_order_dens ]
                         
                     dens1 = AODensityMatrix(dts1, denmat.rest) 
 
@@ -465,7 +462,7 @@ class NonLinearSolver:
                 else:
                     dts2 = [
                         np.ascontiguousarray(dab)
-                        for dab in dens_2 ]
+                        for dab in second_order_dens ]
 
                     dens2 = AODensityMatrix(dts2, denmat.rest)
             else:
@@ -506,146 +503,6 @@ class NonLinearSolver:
                 xc_drv.integrate(fock, dens1, dens2, gs_density, molecule, ao_basis,
                                  molgrid, self.xcfun.get_func_label(),mode)
 
-            fock.reduce_sum(self.rank, self.nodes, self.comm)
-
-            if self.rank == mpi_master():
-                nfocks = fock.number_of_fock_matrices()
-                fock_mo = np.zeros((norb**2, nfocks))
-                for i in range(nfocks):
-                    fock_mo[:, i] = self.ao2mo(mo,
-                                               fock.to_numpy(i).T).reshape(-1)
-            else:
-                fock_mo = None
-
-            dist_fock_mo = DistributedArray(fock_mo, self.comm)
-
-            if dist_fabs is None:
-                dist_fabs = DistributedArray(dist_fock_mo.data,
-                                             self.comm,
-                                             distribute=False)
-            else:
-                dist_fabs.append(dist_fock_mo, axis=1)
-
-        self.ostream.print_blank()
-
-        return dist_fabs
-
-
-    def comp_nlr_fock_cubic(self, mo, D, molecule, ao_basis, fock_flag):
-        """-
-        Computes and returns a list of Fock matrices.
-
-        :param mo:
-            The MO coefficients
-        :param D:
-            A list of densities
-        :param molecule:
-            The molecule
-        :param ao_basis:
-            The AO basis set
-        :param fock_flag:
-            The type of Fock matrices
-
-        :return:
-            A list of Fock matrices
-        """
-
-        if fock_flag == 'real_and_imag':
-            if self.rank == mpi_master():
-                D_total = []
-                for da in D:
-                    D_total.append(da.real)
-                    D_total.append(da.imag)
-            else:
-                D_total = None
-
-            f_total = self.comp_two_el_int_cubic(mo, molecule, ao_basis, D_total)
-
-            nrows = f_total.data.shape[0]
-            half_ncols = f_total.data.shape[1] // 2
-            ff_data = np.zeros((nrows, half_ncols), dtype=np.complex128)
-            for i in range(half_ncols):
-                ff_data[:, i] = (f_total.data[:, 2 * i] +
-                                 1j * f_total.data[:, 2 * i + 1])
-            return DistributedArray(ff_data, self.comm, distribute=False)
-
-        elif fock_flag == 'real':
-            return self.comp_two_el_int_cubic(mo, molecule, ao_basis, D)
-
-        else:
-            return None
-
-    def comp_two_el_int_cubic(self, mo, molecule, ao_basis, dabs):
-        """
-        Returns the two-electron part of the Fock matix in MO basis
-
-        :param mo:
-            The MO coefficients
-        :param molecule:
-            The molecule
-        :param ao_basis:
-            The AO basis set
-        :param dabs:
-            A list of densitiy matrices
-
-        :return:
-            A tuple containing the two-electron part of the Fock matix (in MO
-            basis)
-        """
-
-        eri_driver = ElectronRepulsionIntegralsDriver(self.comm)
-        screening = eri_driver.compute(get_qq_scheme(self.qq_type),
-                                       self.eri_thresh, molecule, ao_basis)
-
-        # determine number of batches
-
-        if self.rank == mpi_master():
-            n_total = len(dabs)
-            n_ao = dabs[0].shape[0]
-            norb = mo.shape[1]
-        else:
-            n_total = None
-            n_ao = None
-
-        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
-        num_batches = get_number_of_batches(n_total, batch_size, self.comm)
-
-        # go through batches
-
-        dist_fabs = None
-
-        if self.rank == mpi_master():
-            batch_str = 'Processing Fock builds...'
-            batch_str += ' (batch size: {:d})'.format(batch_size)
-            self.ostream.print_info(batch_str)
-
-        for batch_ind in range(num_batches):
-
-            if self.rank == mpi_master():
-                self.ostream.print_info('  batch {}/{}'.format(
-                    batch_ind + 1, num_batches))
-                self.ostream.flush()
-
-            # form density matrices
-
-            if self.rank == mpi_master():
-                batch_start = batch_size * batch_ind
-                batch_end = min(batch_start + batch_size, n_total)
-                dts = [
-                    np.ascontiguousarray(dab)
-                    for dab in dabs[batch_start:batch_end]
-                ]
-                dens = AODensityMatrix(dts, denmat.rest)
-            else:
-                dens = AODensityMatrix()
-
-            dens.broadcast(self.rank, self.comm)
-
-            fock = AOFockMatrix(dens)
-            for i in range(fock.number_of_fock_matrices()):
-                fock.set_fock_type(fockmat.rgenjk, i)
-
-            eri_driver.compute(fock, dens, molecule, ao_basis, screening)
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
             if self.rank == mpi_master():

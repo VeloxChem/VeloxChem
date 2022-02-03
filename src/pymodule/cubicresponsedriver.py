@@ -686,19 +686,30 @@ class CubicResponseDriver(NonLinearSolver):
             Ddbc = self.transform_dens(kd, Dbc, S)
             Ddcb = self.transform_dens(kd, Dcb, S)
 
-            density_list.append(Dbc)
-            density_list.append(Dcb)
-            density_list.append(Dbd)
-            density_list.append(Ddb)
-            density_list.append(Ddc)
-            density_list.append(Dcd)
-
-            density_list.append(Dbcd)
-            density_list.append(Dbdc)
-            density_list.append(Dcbd)
-            density_list.append(Dcdb)
-            density_list.append(Ddbc)
-            density_list.append(Ddcb)
+            density_list.append(Dbc.real)
+            density_list.append(Dbc.imag)
+            density_list.append(Dcb.real)
+            density_list.append(Dcb.imag)
+            density_list.append(Dbd.real)
+            density_list.append(Dbd.imag)
+            density_list.append(Ddb.real)
+            density_list.append(Ddb.imag)
+            density_list.append(Ddc.real)
+            density_list.append(Ddc.imag)
+            density_list.append(Dcd.real)
+            density_list.append(Dcd.imag)
+            density_list.append(Dbcd.real)
+            density_list.append(Dbcd.imag)
+            density_list.append(Dbdc.real)
+            density_list.append(Dbdc.imag)
+            density_list.append(Dcbd.real)
+            density_list.append(Dcbd.imag)
+            density_list.append(Dcdb.real)
+            density_list.append(Dcdb.imag)
+            density_list.append(Ddbc.real)
+            density_list.append(Ddbc.imag)
+            density_list.append(Ddcb.real)
+            density_list.append(Ddcb.imag)
 
         return density_list
 
@@ -758,12 +769,19 @@ class CubicResponseDriver(NonLinearSolver):
             Dd_bc = self.transform_dens(kd, Dbc, S)
             Dbc_d = self.transform_dens(kbc, Dd, S)
 
-            density_list.append(Db_cd)
-            density_list.append(Dcd_b)
-            density_list.append(Dc_bd)
-            density_list.append(Dbd_c)
-            density_list.append(Dd_bc)
-            density_list.append(Dbc_d)
+            density_list.append(Db_cd.real)
+            density_list.append(Db_cd.imag)
+            density_list.append(Dcd_b.real)
+            density_list.append(Dcd_b.imag)
+            density_list.append(Dc_bd.real)
+            density_list.append(Dc_bd.imag)
+            density_list.append(Dbd_c.real)
+            density_list.append(Dbd_c.imag)
+            density_list.append(Dd_bc.real)
+            density_list.append(Dd_bc.imag)
+            density_list.append(Dbc_d.real)
+            density_list.append(Dbc_d.imag)
+
 
         return density_list
 
@@ -827,8 +845,8 @@ class CubicResponseDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock_cubic(mo, density_list, molecule, ao_basis,
-                                        'real_and_imag')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis,
+                                        'real_and_imag',{},None,density_list,'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -903,8 +921,8 @@ class CubicResponseDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock_cubic(mo, density_list, molecule, ao_basis,
-                                        'real_and_imag')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis,
+                                        'real_and_imag',{},None,density_list,'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock

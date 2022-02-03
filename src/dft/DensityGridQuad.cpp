@@ -375,7 +375,7 @@ CDensityGridQuad::rzw1rzw2(const int32_t iDensityMatrix)
 }
 
 void
-CDensityGridQuad::makenewdens(       CDensityGridQuad&   densityGridAB,
+CDensityGridQuad::DensityProd(        CDensityGridQuad& densityGridAB,
                                       CMolecularGrid& molecularGridab,
                                 const CDensityGrid&   rwDensityGrid,
                                 const xcfun           xcFuncType,

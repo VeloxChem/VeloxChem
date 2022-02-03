@@ -379,7 +379,7 @@ public:
      @param numdens the number of densities.
      @param quadMode a string that specifies which densities should be combined. 
      */
-     void makenewdens(                CDensityGridQuad&   densityGridAB,
+     void DensityProd(                CDensityGridQuad&   densityGridAB,
                                       CMolecularGrid& molecularGridab,
                                 const CDensityGrid&   rwDensityGrid,
                                 const xcfun           xcFuncType,
