@@ -39,7 +39,7 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
-from .inputparser import parse_input
+from .inputparser import parse_input, print_keywords, get_datetime_string
 from .errorhandler import assert_msg_critical
 
 
@@ -60,7 +60,7 @@ class RespChargesDriver:
         - number_layers: The number of layers of scaled van der Waals surfaces.
         - density: The density of grid points in points per square Angstrom.
         - equal_charges: The charges that are constrained to be equal.
-        - restrained_hydrogens: If hydrogens should be restrained or not.
+        - restrain_hydrogen: If hydrogens should be restrained or not.
         - weak_restraint: The strength of the restraint in first stage of RESP fit.
         - strong_restraint: The strength of the restraint in second stage of RESP fit.
         - weights: The weight factors of different conformers.
@@ -68,7 +68,7 @@ class RespChargesDriver:
         - temperature: The temperature for Boltzmann weight factors.
         - net_charge: The charge of the molecule.
         - multiplicity: The multiplicity of the molecule.
-        - method_dict: The input dictionary of the method settings group.
+        - method_dict: The dictionary of method settings.
         - max_iter: The maximum number of iterations of the RESP fit.
         - threshold: The convergence threshold of the RESP fit.
         - filename: The filename for the calculation.
@@ -95,6 +95,9 @@ class RespChargesDriver:
         # outputstream
         self.ostream = ostream
 
+        # filename
+        self.filename = f'veloxchem_esp_{get_datetime_string()}'
+
         # conformers
         self.xyz_file = None
         self.net_charge = 0.0
@@ -103,7 +106,6 @@ class RespChargesDriver:
         self.weights = None
         self.energies = None
         self.temperature = 293.15
-        self.filename = 'veloxchem_electrostatic_potential_input'
 
         # grid information
         self.number_layers = 4
@@ -114,37 +116,57 @@ class RespChargesDriver:
 
         # resp fitting
         self.equal_charges = None
-        self.restrained_hydrogens = False
+        self.restrain_hydrogen = False
         self.weak_restraint = 0.0005
         self.strong_restraint = 0.001
         self.max_iter = 50
         self.threshold = 1.0e-6
+
+        # input keywords
+        self.input_keywords = {
+            'resp_charges': {
+                'number_layers':
+                    ('int', 'number of layers of scaled vdW surfaces'),
+                'density': ('float', 'density of points in each layer'),
+                'restrain_hydrogen': ('bool', 'restrain hydrogen atoms'),
+                'weak_restraint':
+                    ('float', 'strength of restraint in 1st RESP stage'),
+                'strong_restraint':
+                    ('float', 'strength of restraint in 2nd RESP stage'),
+                'max_iter': ('int', 'maximum iterations in RESP fit'),
+                'threshold': ('float', 'convergence threshold of RESP fit'),
+                'xyz_file': ('str', 'xyz file containing the conformers'),
+                'net_charge': ('float', 'net charge of the molecule'),
+                'multiplicity': ('int', 'spin multiplicity of the molecule'),
+                'weights': ('seq_fixed', 'weight factors of conformers'),
+                'energies': ('seq_fixed', 'energies of conformers'),
+                'temperature':
+                    ('float', 'temperature for Boltzmann weight factor'),
+                'fitting_points':
+                    ('list', 'points on which ESP charges are computed'),
+            },
+        }
+
+    def print_keywords(self):
+        """
+        Prints input keywords in SCF driver.
+        """
+
+        print_keywords(self.input_keywords, self.ostream)
 
     def update_settings(self, resp_dict, method_dict=None):
         """
         Updates settings in RESP charges driver.
 
         :param resp_dict:
-            The input dictionary of RESP charges group.
+            The dictionary of RESP charges input.
         :param method_dict:
-            The input dicitonary of method settings group.
+            The dicitonary of method settings.
         """
 
         resp_keywords = {
-            'number_layers': 'int',
-            'density': 'float',
-            'restrained_hydrogens': 'bool',
-            'weak_restraint': 'float',
-            'strong_restraint': 'float',
-            'max_iter': 'int',
-            'threshold': 'float',
-            'xyz_file': 'str',
-            'net_charge': 'float',
-            'multiplicity': 'int',
-            'weights': 'seq_fixed',
-            'energies': 'seq_fixed',
-            'temperature': 'float',
-            'fitting_points': 'list',
+            key: val[0]
+            for key, val in self.input_keywords['resp_charges'].items()
         }
 
         parse_input(self, resp_keywords, resp_dict)
@@ -294,8 +316,9 @@ class RespChargesDriver:
                 scf_drv.compute(mol, bas)
 
             else:
-                filename = Path(self.filename).name + f'_conformer_{ind+1}'
-                filename = str(output_dir / filename)
+                filename = str(
+                    output_dir /
+                    (Path(self.filename).name + f'_conformer_{ind+1}'))
                 ostream = OutputStream(filename + '.out')
                 # select SCF driver
                 if nalpha == nbeta:
@@ -341,10 +364,10 @@ class RespChargesDriver:
                                              self.weights)
             if self.fitting_points is None:
                 if not use_xyz_file:
-                    filename = str(output_dir / self.filename)
+                    filename = str(output_dir / Path(self.filename).name)
                 else:
-                    filename = Path(self.filename).name + '_conformer'
-                    filename = str(output_dir / filename)
+                    filename = str(output_dir /
+                                   (Path(self.filename).name + '_conformer'))
 
                 self.write_pdb_file(filename, molecules, q)
 
@@ -592,7 +615,7 @@ class RespChargesDriver:
             # add restraint to matrix a
             rstr = np.zeros(b.size)
             for i in range(n_atoms):
-                if (not self.restrained_hydrogens and
+                if (not self.restrain_hydrogen and
                         molecules[0].get_labels()[i] == 'H'):
                     continue
                 elif constr[i] == -1:
@@ -1071,8 +1094,8 @@ class RespChargesDriver:
                 self.strong_restraint)
 
         self.ostream.print_header(cur_str.ljust(str_width))
-        str_restrained_hydrogens = 'Yes' if self.restrained_hydrogens else 'No'
-        cur_str = 'Restrained Hydrogens         :  ' + str_restrained_hydrogens
+        str_restrain_hydrogen = 'Yes' if self.restrain_hydrogen else 'No'
+        cur_str = 'Restrained Hydrogens         :  ' + str_restrain_hydrogen
         self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = 'Max. Number of Iterations    :  ' + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))

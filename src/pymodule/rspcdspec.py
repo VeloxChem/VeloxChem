@@ -25,9 +25,7 @@
 
 from .veloxchemlib import (
     hartree_in_ev,
-    hartree_in_wavenumbers,
-    molar_ellipticity_from_beta,
-    extinction_coefficient_from_molar_ellipticity,
+    extinction_coefficient_from_beta,
 )
 from .rspproperty import ResponseProperty
 from .inputparser import parse_seq_range
@@ -48,12 +46,15 @@ class CircularDichroismSpectrum(ResponseProperty):
         - rsp_property: The dictionary of response property.
     """
 
-    def __init__(self, rsp_dict, method_dict=None):
+    def __init__(self, rsp_dict=None, method_dict=None):
         """
         Initialized the circular dichroism spectrum property.
         """
 
-        rsp_dict = dict(rsp_dict)
+        if rsp_dict is None:
+            rsp_dict = {}
+        else:
+            rsp_dict = dict(rsp_dict)
 
         if method_dict is None:
             method_dict = {}
@@ -61,7 +62,7 @@ class CircularDichroismSpectrum(ResponseProperty):
             method_dict = dict(method_dict)
 
         rsp_dict['property'] = 'circular dichroism spectrum'
-        rsp_dict['response'] = 'linear'
+        rsp_dict['order'] = 'linear'
         rsp_dict['residue'] = 'none'
         rsp_dict['onlystatic'] = 'no'
         rsp_dict['complex'] = 'yes'
@@ -107,21 +108,16 @@ class CircularDichroismSpectrum(ResponseProperty):
             if w == 0.0:
                 continue
 
-            Gxx = self.rsp_property['response_functions'][('x', 'x', w)].imag
-            Gyy = self.rsp_property['response_functions'][('y', 'y', w)].imag
-            Gzz = self.rsp_property['response_functions'][('z', 'z', w)].imag
+            Gxx = -self.rsp_property['response_functions'][('x', 'x', w)].imag
+            Gyy = -self.rsp_property['response_functions'][('y', 'y', w)].imag
+            Gzz = -self.rsp_property['response_functions'][('z', 'z', w)].imag
 
             Gxx /= w
             Gyy /= w
             Gzz /= w
 
-            Delta_epsilon_factor = (
-                extinction_coefficient_from_molar_ellipticity() *
-                molar_ellipticity_from_beta())
-
             beta = -(Gxx + Gyy + Gzz) / (3.0 * w)
-            w_wavenumber = w * hartree_in_wavenumbers()
-            Delta_epsilon = beta * w_wavenumber**2 * Delta_epsilon_factor
+            Delta_epsilon = beta * w**2 * extinction_coefficient_from_beta()
 
             spectrum.append((w, Delta_epsilon))
 

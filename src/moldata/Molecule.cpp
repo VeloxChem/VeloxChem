@@ -562,7 +562,7 @@ CMolecule::getMkRadii() const
 
     for (int32_t i = 0; i < getNumberOfAtoms(); i++)
     {
-        if (_idsElemental.data()[i] < mk_radii.size())
+        if (_idsElemental.data()[i] < static_cast<int32_t>(mk_radii.size()))
         {
             atomradii.push_back(mk_radii[_idsElemental.data()[i]]);
         }

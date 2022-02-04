@@ -23,29 +23,21 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import time
 
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import denmat, fockmat
 from .veloxchemlib import mpi_master, hartree_in_wavenumbers
-from .qqscheme import get_qq_scheme
 from .profiler import Profiler
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
-from .aofockmatrix import AOFockMatrix
-from .aodensitymatrix import AODensityMatrix
+from .nonlinearsolver import NonLinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
-from .batchsize import get_batch_size
-from .batchsize import get_number_of_batches
 
 
-class TpaDriver:
+class TPADriver(NonLinearSolver):
     """
     Implements the isotropic cubic response driver for two-photon absorption
     (TPA)
@@ -57,9 +49,6 @@ class TpaDriver:
 
     Instance variables
         - is_converged: The flag for convergence.
-        - eri_thresh: The electron repulsion integrals screening threshold.
-        - qq_type: The electron repulsion integrals screening scheme.
-        - batch_size: The batch size for computation of Fock matrices.
         - frequencies: The frequencies.
         - comp: The list of all the gamma tensor components
         - damping: The damping parameter.
@@ -67,18 +56,6 @@ class TpaDriver:
           trial vectors.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
-        - comm: The MPI communicator.
-        - rank: The MPI rank.
-        - nodes: Number of MPI processes.
-        - ostream: The output stream.
-        - restart: The flag for restarting from checkpoint file.
-        - checkpoint_file: The name of checkpoint file.
-        - program_start_time: The start time of the program.
-        - maximum_hours: The timelimit in hours.
-        - timing: The flag for printing timing information.
-        - profiling: The flag for printing profiling information.
-        - memory_profiling: The flag for printing memory usage.
-        - memory_tracing: The flag for tracing memory allocation.
     """
 
     def __init__(self, comm, ostream):
@@ -87,12 +64,9 @@ class TpaDriver:
         absorption (TPA)
         """
 
-        self.is_converged = False
+        super().__init__(comm, ostream)
 
-        # ERI settings
-        self.eri_thresh = 1.0e-15
-        self.qq_type = 'QQ_DEN'
-        self.batch_size = None
+        self.is_converged = False
 
         # cpp settings
         self.frequencies = (0,)
@@ -102,34 +76,18 @@ class TpaDriver:
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
 
-        # mpi information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
-
-        # output stream
-        self.ostream = ostream
-
-        # restart information
-        self.restart = True
-        self.checkpoint_file = None
-
-        # information for graceful exit
-        self.program_start_time = None
-        self.maximum_hours = None
-
-        # timing and profiling
-        self.timing = False
-        self.profiling = False
-        self.memory_profiling = False
-        self.memory_tracing = False
+        # input keywords
+        self.input_keywords['response'].update({
+            'frequencies': ('seq_range', 'frequencies'),
+            'damping': ('float', 'damping parameter'),
+        })
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in TPA driver
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -137,47 +95,7 @@ class TpaDriver:
         if method_dict is None:
             method_dict = {}
 
-        rsp_keywords = {
-            'frequencies': 'seq_range',
-            'damping': 'float',
-            'eri_thresh': 'float',
-            'qq_type': 'str_upper',
-            'batch_size': 'int',
-            'max_iter': 'int',
-            'conv_thresh': 'float',
-            'lindep_thresh': 'float',
-            'restart': 'bool',
-            'checkpoint_file': 'str',
-            'timing': 'bool',
-            'profiling': 'bool',
-            'memory_profiling': 'bool',
-            'memory_tracing': 'bool',
-        }
-
-        parse_input(self, rsp_keywords, rsp_dict)
-
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
-
-        if 'xcfun' in method_dict:
-            errmsg = 'TpaDriver: The \'xcfun\' keyword is not supported in TPA '
-            errmsg += 'calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if 'potfile' in method_dict:
-            errmsg = 'TpaDriver: The \'potfile\' keyword is not supported in '
-            errmsg += 'TPA calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if 'electric_field' in method_dict:
-            errmsg = 'TpaDriver: The \'electric field\' keyword is not '
-            errmsg += 'supported in TPA calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
+        super().update_settings(rsp_dict, method_dict)
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -212,8 +130,9 @@ class TpaDriver:
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(nalpha == nbeta,
-                            'TpaDriver: not implemented for unrestricted case')
+        assert_msg_critical(
+            nalpha == nbeta,
+            'TPA Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_tensors['S']
@@ -270,7 +189,7 @@ class TpaDriver:
         cpp_keywords = {
             'frequencies', 'damping', 'lindep_thresh', 'conv_thresh',
             'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
-            'batch_size', 'restart', 'program_start_time', 'maximum_hours'
+            'batch_size', 'restart', 'program_end_time'
         }
 
         for key in cpp_keywords:
@@ -489,7 +408,7 @@ class TpaDriver:
     def get_densities(self, wi, kX, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded Fock
-        matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
+        matrices F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
         function
 
         :param wi:
@@ -511,7 +430,7 @@ class TpaDriver:
 
     def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis):
         """
-        Computes the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the
+        Computes the compounded Fock matrices F^{σ},F^{λ+τ},F^{σλτ} used for the
         isotropic cubic response function
 
         :param wi:
@@ -594,7 +513,7 @@ class TpaDriver:
     def get_densities_II(self, wi, kX, kXY, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded
-        second-order Fock matrics used for the isotropic cubic response
+        second-order Fock matrices used for the isotropic cubic response
         function
 
         :param wi:
@@ -618,7 +537,7 @@ class TpaDriver:
 
     def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis):
         """
-        Computes the compounded second-order Fock matrics used for the
+        Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
 
         :param wi:
@@ -759,12 +678,9 @@ class TpaDriver:
             ka_y = kX['Na'][('y', w)]
             ka_z = kX['Na'][('z', w)]
 
-            na_x = (LinearSolver.lrmat2vec(ka_x.real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(ka_x.imag, nocc, norb))
-            na_y = (LinearSolver.lrmat2vec(ka_y.real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(ka_y.imag, nocc, norb))
-            na_z = (LinearSolver.lrmat2vec(ka_z.real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(ka_z.imag, nocc, norb))
+            na_x = self.complex_lrmat2vec(ka_x, nocc, norb)
+            na_y = self.complex_lrmat2vec(ka_y, nocc, norb)
+            na_z = self.complex_lrmat2vec(ka_z, nocc, norb)
 
             t3term = (np.dot(na_x, e3_dict['f_iso_x'][w]) +
                       np.dot(na_y, e3_dict['f_iso_y'][w]) +
@@ -817,18 +733,15 @@ class TpaDriver:
         ka_na = inp_dict['Na_ka']
         A = inp_dict['A']
 
-        Na = (LinearSolver.lrmat2vec(ka_na.real, nocc, norb) +
-              1j * LinearSolver.lrmat2vec(ka_na.imag, nocc, norb))
+        Na = self.complex_lrmat2vec(ka_na, nocc, norb)
 
         if inp_dict['flag'] == 'CD':
             kcd = inp_dict['kcd']
             kb = inp_dict['kb']
             B = inp_dict['B']
 
-            Ncd = (LinearSolver.lrmat2vec(kcd.real, nocc, norb) +
-                   1j * LinearSolver.lrmat2vec(kcd.imag, nocc, norb))
-            Nb = (LinearSolver.lrmat2vec(kb.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kb.imag, nocc, norb))
+            Ncd = self.complex_lrmat2vec(kcd, nocc, norb)
+            Nb = self.complex_lrmat2vec(kb, nocc, norb)
 
             na_x2_nyz += np.dot(Na.T, self.x2_contract(kcd, B, da, nocc, norb))
             nx_a2_nyz += np.dot(self.a2_contract(kb, A, da, nocc, norb), Ncd)
@@ -839,10 +752,8 @@ class TpaDriver:
             kc = -inp_dict['kc_kb'].T.conj()  # gets kc from kb
             C = inp_dict['C']
 
-            Nbd = (LinearSolver.lrmat2vec(kbd.real, nocc, norb) +
-                   1j * LinearSolver.lrmat2vec(kbd.imag, nocc, norb))
-            Nc = (LinearSolver.lrmat2vec(kc.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kc.imag, nocc, norb))
+            Nbd = self.complex_lrmat2vec(kbd, nocc, norb)
+            Nc = self.complex_lrmat2vec(kc, nocc, norb)
 
             na_x2_nyz += np.dot(Na.T, self.x2_contract(kbd, C, da, nocc, norb))
             nx_a2_nyz += np.dot(self.a2_contract(kc, A, da, nocc, norb), Nbd)
@@ -853,37 +764,6 @@ class TpaDriver:
             'x2': -(1. / 15) * na_x2_nyz,
             'a2': -(1. / 15) * nx_a2_nyz,
         }
-
-    def collect_vectors_in_columns(self, sendbuf):
-        """
-        Collects vectors into 2d array (column-wise).
-
-        :param sendbuf:
-            The 2d array containing the vector segments in columns.
-
-        :return:
-            A 2d array containing the full vectors in columns.
-        """
-
-        counts = self.comm.gather(sendbuf.size, root=mpi_master())
-        if self.rank == mpi_master():
-            displacements = [sum(counts[:p]) for p in range(self.nodes)]
-            recvbuf = np.zeros(sum(counts), dtype=sendbuf.dtype).reshape(
-                -1, sendbuf.shape[1])
-        else:
-            displacements = None
-            recvbuf = None
-
-        if sendbuf.dtype == np.float64:
-            mpi_data_type = MPI.DOUBLE
-        elif sendbuf.dtype == np.complex128:
-            mpi_data_type = MPI.C_DOUBLE_COMPLEX
-
-        self.comm.Gatherv(sendbuf,
-                          [recvbuf, counts, displacements, mpi_data_type],
-                          root=mpi_master())
-
-        return recvbuf
 
     def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
         """
@@ -965,244 +845,6 @@ class TpaDriver:
 
         return sorted(comp_iso, key=comp_iso.index)
 
-    def flip_xy(self, X):
-        """
-        Swaps upper and lower parts of a response vector. This is used when
-        rewriting the R^[4] tensor contraction in terms of S^[4] tensor
-        contractions.
-
-        :param X:
-            A response vector v = (Z,-Y^*)
-
-        :return:
-            A response vector of the form v' = (-Y^*,Z)
-        """
-
-        if X.ndim == 1:
-            new_xy = np.zeros_like(X)
-            half_len = X.shape[0] // 2
-            new_xy[:half_len] = X[half_len:]
-            new_xy[half_len:] = X[:half_len]
-            return new_xy
-
-        return None
-
-    def flip_yz(self, X):
-        """
-        This method takes a first-order response vector with a given sign of
-        the frequency and returns the first-order response vector with reversed
-        frequency argument.
-
-        :param X:
-            A response vector N(ω,x) = (Z,-Y^*)
-
-        :return:
-            A response vector with reversed optical frequency N(-ω,x) =
-            (Y,-Z^*)
-        """
-
-        if X.ndim == 1:
-            new_yz = np.zeros_like(X)
-            half_len = X.shape[0] // 2
-            new_yz[:half_len] = -X.real[half_len:] + 1j * X.imag[half_len:]
-            new_yz[half_len:] = -X.real[:half_len] + 1j * X.imag[:half_len]
-            return new_yz
-
-        return None
-
-    def transform_dens(self, k, D, S):
-        """
-        Creates the perturbed density
-
-        :param k:
-            Response vector in matrix form in AO basis
-        :param D:
-            The density that is to be perturbed in AO basis
-        :param S:
-            Overlap matrix
-
-        :return:
-            [k,D]
-        """
-
-        return (np.linalg.multi_dot([k.T, S, D]) -
-                np.linalg.multi_dot([D, S, k.T]))
-
-    def mo2ao(self, mo, A):
-        """
-        Transform a matrix to atomic basis
-
-        :param mo:
-            molecular orbital coefficent matrix
-        :param A:
-            The matrix in MO basis that is the converted to AO basis
-
-        :return:
-            The matrix in AO basis
-        """
-
-        return np.linalg.multi_dot([mo, A, mo.T])
-
-    def ao2mo(self, mo, A):
-        """
-        Transform a matrix to molecular basis
-
-        :param mo:
-            molecular orbital coefficent matrix
-        :param A:
-            The matrix in AO basis that is the converted to MO basis
-
-        :return:
-            The matrix in MO basis
-        """
-
-        return np.linalg.multi_dot([mo.T, A, mo])
-
-    def commut(self, A, B):
-        """
-        Commutes two matricies A and B
-
-        :param A:
-            Matrix A.
-        :param B:
-            Matrix B.
-
-        :return:
-            AB - BA
-        """
-
-        return np.matmul(A, B) - np.matmul(B, A)
-
-    def x2_contract(self, k, X, D, nocc, norb):
-        """
-        Contracts the generalized dipole gradient tensor of rank 2 with a
-        second-order response matrix. X[2]N1 = [[k1,X],D.T]
-
-        :param: k:
-            Respose vector in matrix representation
-        :param X:
-            Property operator in matrix represatiation
-        :param D:
-            Density matrix
-        :param nocc:
-            Number of occupied orbitals
-        :param norb:
-            Number of total orbtials
-
-        :return:
-            Returns a matrix
-        """
-
-        XNx = self.commut(self.commut(k, X), D.T)
-        X2Nx_c = (LinearSolver.lrmat2vec(XNx.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(XNx.imag, nocc, norb))
-        return X2Nx_c
-
-    def x3_contract(self, k1, k2, X, D, nocc, norb):
-        """
-        Contracts the generalized dipole gradient tensor of rank 3 with two
-        first-order response matrices. X[3]N1N2 = (1/2)[[k2,[k1,X]],D.T]
-
-        :param: k1:
-            First-order response matrix
-        :param: k2:
-            First-order response matrix
-        :param X:
-            Dipole intergral matrix
-        :param D:
-            Density matrix
-        :param nocc:
-            Number of occupied orbitals
-        :param norb:
-            Number of total orbtials
-
-        :return:
-            Returns a matrix
-        """
-
-        X3NxNy = self.commut(self.commut(k2, self.commut(k1, X)), D.T)
-        X3NxNy_c = (LinearSolver.lrmat2vec(X3NxNy.real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(X3NxNy.imag, nocc, norb))
-        return (1. / 2) * X3NxNy_c
-
-    def a3_contract(self, k1, k2, A, D, nocc, norb):
-        """
-        Contracts the generalized dipole gradient tensor of rank 3 with two
-        first-order response matrices. A[3]N1N2 = -(1/6)[[k2,[k1,A]],D.T]
-
-        :param: k1:
-            First-order response matrix
-        :param: k2:
-            First-order response matrix
-        :param A:
-            A dipole intergral matrix
-        :param D:
-            Density matrix
-        :param nocc:
-            Number of occupied orbitals
-        :param norb:
-            Number of total orbtials
-
-        :return:
-            Returns a matrix
-        """
-
-        A3NxNy = self.commut(self.commut(k2.T, self.commut(k1.T, A)), D.T)
-        A3NxNy_c = (LinearSolver.lrmat2vec(A3NxNy.real, nocc, norb) +
-                    1j * LinearSolver.lrmat2vec(A3NxNy.imag, nocc, norb))
-        return -(1. / 6) * A3NxNy_c
-
-    def a2_contract(self, k, A, D, nocc, norb):
-        """
-        Contracts the generalized dipole gradient tensor of rank 2 with a
-        second-order response matrix. A[2]N1 = -(1 / 2)[[k1,X],D.T]
-
-        # Note that the sign needs further investigation.
-
-        :param: k:
-            Respose vector in matrix representation
-        :param A:
-            Property operator in matrix represatiation
-        :param D:
-            Density matrix
-        :param nocc:
-            Number of occupied orbitals
-        :param norb:
-            Number of total orbtials
-
-        :return:
-            Returns a matrix
-        """
-
-        ANx = self.commut(self.commut(k.T, A), D.T)
-        A2Nx_c = (LinearSolver.lrmat2vec(ANx.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(ANx.imag, nocc, norb))
-        return -(1. / 2) * A2Nx_c
-
-    def xi(self, kA, kB, Fa, Fb, F0):
-        """
-        Returns a matrix used for the E[4] contraction
-
-        :param kA:
-            First-order response matrix
-        :param kB:
-            First-order response matrix
-        :param Fa:
-            First-order perturbed Fock matrix
-        :param Fb:
-            First-order perturbed Fock matrix
-        :param F0:
-            SCF Fock matrix
-
-        :return:
-            Returns a matrix
-        """
-
-        return 0.5 * (self.commut(kA,
-                                  self.commut(kB, F0) + 2 * Fb) +
-                      self.commut(kB,
-                                  self.commut(kA, F0) + 2 * Fa))
-
     def phi(self, kA, kB, Fb, F0):
         """
         Returns a matrix used for the E[3] contraction
@@ -1223,189 +865,6 @@ class TpaDriver:
         """
 
         return self.commut(kA, self.commut(kB, F0) + 3 * Fb)
-
-    def anti_sym(self, vec):
-        """
-        Returns an antisymetrized vector
-
-        :param vec:
-            The vector to be anti-symetrized
-
-        :return:
-            An antisymetrized vector
-        """
-
-        if vec.ndim == 1:
-            new_vec = np.zeros_like(vec)
-            half_len = vec.shape[0] // 2
-            new_vec[:half_len] = vec[:half_len]
-            new_vec[half_len:] = -vec[half_len:]
-            return new_vec
-
-        return None
-
-    def get_fock_r(self, mo, D, molecule, ao_basis, fock_flag):
-        """
-        Computes and returns a list of Fock matrices
-
-        :param mo:
-            The MO coefficients
-        :param D:
-            A list of densities
-        :param molecule:
-            The molecule
-        :param ao_basis:
-            The AO basis set
-        :param fock_flag:
-            The type of Fock matrices
-
-        :return:
-            A list of Fock matrices
-        """
-
-        if fock_flag == 'real_and_imag':
-            if self.rank == mpi_master():
-                D_total = []
-                for da in D:
-                    D_total.append(da.real)
-                    D_total.append(da.imag)
-            else:
-                D_total = None
-
-            f_total = self.get_two_el_fock_mod_r(mo, molecule, ao_basis,
-                                                 D_total)
-
-            nrows = f_total.data.shape[0]
-            half_ncols = f_total.data.shape[1] // 2
-            ff_data = np.zeros((nrows, half_ncols), dtype=np.complex128)
-            for i in range(half_ncols):
-                ff_data[:, i] = (f_total.data[:, 2 * i] +
-                                 1j * f_total.data[:, 2 * i + 1])
-            return DistributedArray(ff_data, self.comm, distribute=False)
-
-        elif fock_flag == 'real':
-            return self.get_two_el_fock_mod_r(mo, molecule, ao_basis, D)
-
-        else:
-            return None
-
-    def get_two_el_fock_mod_r(self, mo, molecule, ao_basis, dabs):
-        """
-        Returns the two-electron part of the Fock matix in MO basis
-
-        :param mo:
-            The MO coefficients
-        :param molecule:
-            The molecule
-        :param ao_basis:
-            The AO basis set
-        :param dabs:
-            A list of densitiy matrices
-
-        :return:
-            A tuple containing the two-electron part of the Fock matix (in MO
-            basis)
-        """
-
-        eri_driver = ElectronRepulsionIntegralsDriver(self.comm)
-        screening = eri_driver.compute(get_qq_scheme(self.qq_type),
-                                       self.eri_thresh, molecule, ao_basis)
-
-        # determine number of batches
-
-        if self.rank == mpi_master():
-            n_total = len(dabs)
-            n_ao = dabs[0].shape[0]
-            norb = mo.shape[1]
-        else:
-            n_total = None
-            n_ao = None
-
-        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
-        num_batches = get_number_of_batches(n_total, batch_size, self.comm)
-
-        # go through batches
-
-        dist_fabs = None
-
-        if self.rank == mpi_master():
-            batch_str = 'Processing Fock builds...'
-            batch_str += ' (batch size: {:d})'.format(batch_size)
-            self.ostream.print_info(batch_str)
-
-        for batch_ind in range(num_batches):
-
-            if self.rank == mpi_master():
-                self.ostream.print_info('  batch {}/{}'.format(
-                    batch_ind + 1, num_batches))
-                self.ostream.flush()
-
-            # form density matrices
-
-            if self.rank == mpi_master():
-                batch_start = batch_size * batch_ind
-                batch_end = min(batch_start + batch_size, n_total)
-                dts = [
-                    np.ascontiguousarray(dab)
-                    for dab in dabs[batch_start:batch_end]
-                ]
-                dens = AODensityMatrix(dts, denmat.rest)
-            else:
-                dens = AODensityMatrix()
-
-            dens.broadcast(self.rank, self.comm)
-
-            fock = AOFockMatrix(dens)
-            for i in range(fock.number_of_fock_matrices()):
-                fock.set_fock_type(fockmat.rgenjk, i)
-
-            eri_driver.compute(fock, dens, molecule, ao_basis, screening)
-            fock.reduce_sum(self.rank, self.nodes, self.comm)
-
-            if self.rank == mpi_master():
-                nfocks = fock.number_of_fock_matrices()
-                fock_mo = np.zeros((norb**2, nfocks))
-                for i in range(nfocks):
-                    fock_mo[:, i] = self.ao2mo(mo,
-                                               fock.to_numpy(i).T).reshape(-1)
-            else:
-                fock_mo = None
-
-            dist_fock_mo = DistributedArray(fock_mo, self.comm)
-
-            if dist_fabs is None:
-                dist_fabs = DistributedArray(dist_fock_mo.data,
-                                             self.comm,
-                                             distribute=False)
-            else:
-                dist_fabs.append(dist_fock_mo, axis=1)
-
-        self.ostream.print_blank()
-
-        return dist_fabs
-
-    def print_fock_header(self):
-        """
-        Prints header for Fock computation
-        """
-
-        title = 'Fock Matrix Computation'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
-
-    def print_fock_time(self, time):
-        """
-        Prints time for Fock computation
-
-        :param time:
-            Total time to compute Fock matrices
-        """
-
-        cur_str = 'Time spent in Fock matrices: {:.2f} sec'.format(time)
-        self.ostream.print_info(cur_str)
-        self.ostream.print_blank()
-        self.ostream.flush()
 
     def print_component(self, label, freq, value, width):
         """

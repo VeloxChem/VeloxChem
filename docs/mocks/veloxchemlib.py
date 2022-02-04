@@ -25,6 +25,7 @@ DenseMatrix = Mock()
 AOKohnShamMatrix = Mock()
 XTBDriver = Mock()
 
+available_functionals = Mock()
 mpi_master = Mock()
 mpi_size_limit = Mock()
 mpi_initialized = Mock()
@@ -39,8 +40,7 @@ boltzmann_in_evperkelvin = Mock()
 
 dipole_in_debye = Mock()
 rotatory_strength_in_cgs = Mock()
-molar_ellipticity_from_beta = Mock()
-extinction_coefficient_from_molar_ellipticity = Mock()
+extinction_coefficient_from_beta = Mock()
 fine_structure_constant = Mock()
 
 denmat = Mock()

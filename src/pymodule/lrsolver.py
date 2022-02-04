@@ -36,7 +36,6 @@ from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
 from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
 
 
@@ -77,12 +76,20 @@ class LinearResponseSolver(LinearSolver):
         self.b_components = 'xyz'
         self.frequencies = (0,)
 
+        self.input_keywords['response'].update({
+            'a_operator': ('str_lower', 'A operator'),
+            'a_components': ('str_lower', 'Cartesian components of A operator'),
+            'b_operator': ('str_lower', 'B operator'),
+            'b_components': ('str_lower', 'Cartesian components of B operator'),
+            'frequencies': ('seq_range', 'frequencies'),
+        })
+
     def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in linear response solver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -91,16 +98,6 @@ class LinearResponseSolver(LinearSolver):
             method_dict = {}
 
         super().update_settings(rsp_dict, method_dict)
-
-        rsp_keywords = {
-            'a_operator': 'str_lower',
-            'a_components': 'str_lower',
-            'b_operator': 'str_lower',
-            'b_components': 'str_lower',
-            'frequencies': 'seq_range',
-        }
-
-        parse_input(self, rsp_keywords, rsp_dict)
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -161,8 +158,6 @@ class LinearResponseSolver(LinearSolver):
         # PE information
         pe_dict = self.init_pe(molecule, basis)
 
-        timing_dict = {}
-
         # right-hand side (gradient)
         b_rhs = self.get_prop_grad(self.b_operator, self.b_components, molecule,
                                    basis, scf_tensors)
@@ -211,14 +206,14 @@ class LinearResponseSolver(LinearSolver):
 
         # read initial guess from restart file
         if self.restart:
-            self.read_vectors(rsp_vector_labels)
+            self.read_checkpoint(rsp_vector_labels)
 
         # generate initial guess from scratch
         else:
             bger, bung = self.setup_trials(dist_v1, precond)
 
             self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                               eri_dict, dft_dict, pe_dict, timing_dict)
+                               eri_dict, dft_dict, pe_dict)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -231,14 +226,16 @@ class LinearResponseSolver(LinearSolver):
                                             dft_dict, pe_dict,
                                             rsp_vector_labels)
 
-        iter_per_trail_in_hours = None
+        iter_per_trial_in_hours = None
 
         # start iterations
         for iteration in range(self.max_iter):
 
             iter_start_time = tm.time()
 
-            profiler.start_timer(iteration, 'ReducedSpace')
+            profiler.set_timing_key(f'Iteration {iteration+1}')
+
+            profiler.start_timer('ReducedSpace')
 
             n_ger = self.dist_bger.shape(1)
             n_ung = self.dist_bung.shape(1)
@@ -355,7 +352,7 @@ class LinearResponseSolver(LinearSolver):
 
                 self.print_iteration(relative_residual_norm, xvs)
 
-            profiler.stop_timer(iteration, 'ReducedSpace')
+            profiler.stop_timer('ReducedSpace')
 
             # check convergence
             self.check_convergence(relative_residual_norm)
@@ -363,7 +360,7 @@ class LinearResponseSolver(LinearSolver):
             if self.is_converged:
                 break
 
-            profiler.start_timer(iteration, 'Orthonorm.')
+            profiler.start_timer('Orthonorm.')
 
             # update trial vectors
             new_trials_ger, new_trials_ung = self.setup_trials(
@@ -371,7 +368,7 @@ class LinearResponseSolver(LinearSolver):
 
             residuals.clear()
 
-            profiler.stop_timer(iteration, 'Orthonorm.')
+            profiler.stop_timer('Orthonorm.')
 
             if self.rank == mpi_master():
                 n_new_trials = new_trials_ger.shape(1) + new_trials_ung.shape(1)
@@ -379,24 +376,22 @@ class LinearResponseSolver(LinearSolver):
                 n_new_trials = None
             n_new_trials = self.comm.bcast(n_new_trials, root=mpi_master())
 
-            if iter_per_trail_in_hours is not None:
-                next_iter_in_hours = iter_per_trail_in_hours * n_new_trials
+            if iter_per_trial_in_hours is not None:
+                next_iter_in_hours = iter_per_trial_in_hours * n_new_trials
                 if self.need_graceful_exit(next_iter_in_hours):
                     self.graceful_exit(molecule, basis, dft_dict, pe_dict,
                                        rsp_vector_labels)
 
-            profiler.start_timer(iteration, 'FockBuild')
+            profiler.start_timer('FockBuild')
 
             self.e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
                                scf_tensors, eri_dict, dft_dict, pe_dict,
-                               timing_dict)
+                               profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
-            iter_per_trail_in_hours = iter_in_hours / n_new_trials
+            iter_per_trial_in_hours = iter_in_hours / n_new_trials
 
-            profiler.stop_timer(iteration, 'FockBuild')
-            if self.dft or self.pe:
-                profiler.update_timer(iteration, timing_dict)
+            profiler.stop_timer('FockBuild')
 
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
@@ -426,12 +421,10 @@ class LinearResponseSolver(LinearSolver):
                 rsp_funcs = {}
                 full_solutions = {}
 
+                # create h5 file for response solutions
                 if self.checkpoint_file is not None:
                     final_h5_fname = str(
                         Path(self.checkpoint_file).with_suffix('.solutions.h5'))
-                else:
-                    final_h5_fname = 'rsp.solutions.h5'
-                if self.rank == mpi_master():
                     create_hdf5(final_h5_fname, molecule, basis,
                                 dft_dict['dft_func_label'],
                                 pe_dict['potfile_text'])
@@ -444,15 +437,19 @@ class LinearResponseSolver(LinearSolver):
                         rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
                         full_solutions[(bop, w)] = x
 
-                        write_rsp_solution(
-                            final_h5_fname,
-                            '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
+                        # write to h5 file for response solutions
+                        if self.checkpoint_file is not None:
+                            write_rsp_solution(
+                                final_h5_fname,
+                                '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
 
             if self.rank == mpi_master():
-                checkpoint_text = 'Response solution vectors written to file: '
-                checkpoint_text += final_h5_fname
-                self.ostream.print_info(checkpoint_text)
-                self.ostream.print_blank()
+                # print information about h5 file for response solutions
+                if self.checkpoint_file is not None:
+                    checkpoint_text = 'Response solution vectors written to file: '
+                    checkpoint_text += final_h5_fname
+                    self.ostream.print_info(checkpoint_text)
+                    self.ostream.print_blank()
 
                 return {
                     'response_functions': rsp_funcs,
@@ -557,7 +554,7 @@ class LinearResponseSolver(LinearSolver):
             The input trial vectors.
 
         :return:
-            A tuple of distributed trail vectors after preconditioning.
+            A tuple of distributed trial vectors after preconditioning.
         """
 
         pa = precond.data[:, 0]

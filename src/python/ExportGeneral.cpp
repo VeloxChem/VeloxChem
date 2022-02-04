@@ -212,6 +212,16 @@ export_general(py::module& m)
         "Checks if a MPI process is the master process.",
         "py_comm"_a = py::none());
     m.def(
+        "mpi_barrier",
+        [](py::object py_comm) {
+            if (py_comm.is_none())
+                MPI_Barrier(MPI_COMM_WORLD);
+            else
+                MPI_Barrier(*get_mpi_comm(py_comm));
+        },
+        "Synchronize all MPI processes using barrier.",
+        "py_comm"_a = py::none());
+    m.def(
         "is_single_node",
         [](py::object py_comm) -> bool {
             if (py_comm.is_none())
@@ -233,12 +243,9 @@ export_general(py::module& m)
 
     m.def("dipole_in_debye", &units::getDipoleInDebye, "Gets convertion factor for dipole moment (a.u. -> Debye).");
     m.def("rotatory_strength_in_cgs", &units::getRotatoryStrengthInCGS, "Gets convertion factor for rotatory strength (a.u. -> 10^-40 cgs).");
-    m.def("molar_ellipticity_from_beta",
-          &units::getMolarEllipticityFromBeta,
-          "Gets factor needed for the calculation of the molar ellipticity from the electric-dipole magnetic-dipole polarizability beta.");
-    m.def("extinction_coefficient_from_molar_ellipticity",
-          &units::getExtinctionCoefficientFromMolarEllipticity,
-          "Gets factor needed for the calculation of extinction coefficient from molar ellipticity.");
+    m.def("extinction_coefficient_from_beta",
+          &units::getExtinctionCoefficientFromBeta,
+          "Gets factor needed for the calculation of the extinction coefficent from the electric-dipole magnetic-dipole polarizability beta.");
     m.def("fine_structure_constant", &units::getFineStructureConstant, "Gets fine-structure constant.");
 
     m.def(

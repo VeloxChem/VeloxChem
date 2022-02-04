@@ -104,9 +104,9 @@ class Mp2Driver:
         Updates settings in MP2 driver.
 
         :param mp2_dict:
-            The dictionary of MP2 settings.
+            The dictionary of MP2 input.
         :param method_dict:
-            The dictionary of method.
+            The dictionary of method settings.
         """
 
         if method_dict is None:
