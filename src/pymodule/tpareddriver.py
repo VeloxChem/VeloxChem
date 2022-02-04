@@ -34,12 +34,10 @@ from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
-from .nonlinearsolver import NonLinearSolver
 from .tpadriver import TPADriver
 from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
-
 
 
 class TPAReducedDriver(TPADriver):
@@ -198,8 +196,8 @@ class TPAReducedDriver(TPADriver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis,
-                                        'real',{},None,density_list,'tpa')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real', {},
+                                        None, density_list, 'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -495,7 +493,6 @@ class TPAReducedDriver(TPADriver):
             density_list.append(Dz.real)
             density_list.append(Dz.imag)
 
-
         return density_list
 
     def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis):
@@ -539,8 +536,8 @@ class TPAReducedDriver(TPADriver):
                                           self.ostream)
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis,
-                                        'real_and_imag',{},None,density_list,'tpa')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                        {}, None, density_list, 'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock

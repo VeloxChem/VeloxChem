@@ -45,7 +45,6 @@ from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import XCIntegrator
-from veloxchem.veloxchemlib import is_mpi_master
 
 
 class NonLinearSolver:
@@ -357,9 +356,17 @@ class NonLinearSolver:
 
         return None
 
-    def comp_nlr_fock(self, mo, molecule, ao_basis, fock_flag, dft_dict = None, first_order_dens = None, second_order_dens = None, mode=None):
-        """-
-        Computes and returns a list of Fock matrices 
+    def comp_nlr_fock(self,
+                      mo,
+                      molecule,
+                      ao_basis,
+                      fock_flag,
+                      dft_dict=None,
+                      first_order_dens=None,
+                      second_order_dens=None,
+                      mode=None):
+        """
+        Computes and returns a list of Fock matrices.
 
         :param mo:
             The MO coefficients
@@ -375,22 +382,31 @@ class NonLinearSolver:
         :return:
             A list of Fock matrices
         """
-        
-        f_total = self.comp_two_el_int(mo, molecule, ao_basis,dft_dict,first_order_dens,second_order_dens,mode)
+
+        f_total = self.comp_two_el_int(mo, molecule, ao_basis, dft_dict,
+                                       first_order_dens, second_order_dens,
+                                       mode)
         nrows = f_total.data.shape[0]
         half_ncols = f_total.data.shape[1] // 2
         ff_data = np.zeros((nrows, half_ncols), dtype=np.complex128)
         if fock_flag == 'real_and_imag':
             for i in range(half_ncols):
                 ff_data[:, i] = (f_total.data[:, 2 * i] +
-                                1j * f_total.data[:, 2 * i + 1])
+                                 1j * f_total.data[:, 2 * i + 1])
             return DistributedArray(ff_data, self.comm, distribute=False)
         elif fock_flag == 'real':
             return f_total
         else:
             return None
 
-    def comp_two_el_int(self, mo, molecule, ao_basis , dft_dict = None, first_order_dens = None, second_order_dens = None, mode=None):
+    def comp_two_el_int(self,
+                        mo,
+                        molecule,
+                        ao_basis,
+                        dft_dict=None,
+                        first_order_dens=None,
+                        second_order_dens=None,
+                        mode=None):
         """
         Returns the two-electron part of the Fock matix in MO basis
 
@@ -421,7 +437,7 @@ class NonLinearSolver:
         else:
             n_total = None
             n_ao = None
-        
+
         batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
@@ -449,26 +465,26 @@ class NonLinearSolver:
 
                 if self.dft:
                     dts1 = [
-                    np.ascontiguousarray(dab)
-                    for dab in first_order_dens ]
+                        np.ascontiguousarray(dab) for dab in first_order_dens
+                    ]
 
                     dts2 = [
-                        np.ascontiguousarray(dab)
-                        for dab in second_order_dens ]
-                        
-                    dens1 = AODensityMatrix(dts1, denmat.rest) 
+                        np.ascontiguousarray(dab) for dab in second_order_dens
+                    ]
+
+                    dens1 = AODensityMatrix(dts1, denmat.rest)
 
                     dens2 = AODensityMatrix(dts2, denmat.rest)
                 else:
                     dts2 = [
-                        np.ascontiguousarray(dab)
-                        for dab in second_order_dens ]
+                        np.ascontiguousarray(dab) for dab in second_order_dens
+                    ]
 
                     dens2 = AODensityMatrix(dts2, denmat.rest)
             else:
                 dens1 = AODensityMatrix()
                 dens2 = AODensityMatrix()
-            
+
             if self.dft:
                 dens1.broadcast(self.rank, self.comm)
                 dens2.broadcast(self.rank, self.comm)
@@ -477,7 +493,7 @@ class NonLinearSolver:
 
             fock = AOFockMatrix(dens2)
             fock_flag = fockmat.rgenjk
-            
+
             if self.dft:
                 if self.xcfun.is_hybrid():
                     fock_flag = fockmat.rgenjkx
@@ -494,14 +510,15 @@ class NonLinearSolver:
             if self.dft and not self.xcfun.is_hybrid():
                 for ifock in range(fock.number_of_fock_matrices()):
                     fock.scale(2.0, ifock)
-            if self.dft: 
+            if self.dft:
                 xc_drv = XCIntegrator(self.comm)
                 molgrid = dft_dict['molgrid']
                 gs_density = dft_dict['gs_density']
 
                 molgrid.distribute(self.rank, self.nodes, self.comm)
-                xc_drv.integrate(fock, dens1, dens2, gs_density, molecule, ao_basis,
-                                 molgrid, self.xcfun.get_func_label(),mode)
+                xc_drv.integrate(fock, dens1, dens2, gs_density,
+                                 molecule, ao_basis, molgrid,
+                                 self.xcfun.get_func_label(), mode)
 
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 

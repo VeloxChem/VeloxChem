@@ -40,9 +40,7 @@ from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
-from .veloxchemlib import XCFunctional
-from .veloxchemlib import XCIntegrator
-from .veloxchemlib import parse_xc_func
+
 
 class QuadraticResponseDriver(NonLinearSolver):
     """
@@ -119,7 +117,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def compute(self, molecule, ao_basis, scf_tensors,method_settings):
+    def compute(self, molecule, ao_basis, scf_tensors, method_settings):
         """
         Computes a quadratic response function.
 
@@ -233,7 +231,7 @@ class QuadraticResponseDriver(NonLinearSolver):
             'program_end_time'
         }
 
-        N_drv.update_settings({},method_settings)
+        N_drv.update_settings({}, method_settings)
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
@@ -307,12 +305,13 @@ class QuadraticResponseDriver(NonLinearSolver):
         norb = self.comm.bcast(norb, root=mpi_master())
 
         nocc = molecule.number_of_alpha_electrons()
-        
+
         dft_dict = self.init_dft(molecule, scf_tensors)
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            firstorderdens,secorderdens = self.get_densities(freqpairs, kX, S, D0, mo)
+            firstorderdens, secorderdens = self.get_densities(
+                freqpairs, kX, S, D0, mo)
         else:
             firstorderdens = None
             secorderdens = None
@@ -320,8 +319,8 @@ class QuadraticResponseDriver(NonLinearSolver):
         profiler.check_memory_usage('Densities')
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(freqpairs, firstorderdens, secorderdens, F0, mo,
-                                       molecule, ao_basis,dft_dict)
+        fock_dict = self.get_fock_dict(freqpairs, firstorderdens, secorderdens,
+                                       F0, mo, molecule, ao_basis, dft_dict)
 
         profiler.check_memory_usage('Focks')
 
@@ -381,7 +380,7 @@ class QuadraticResponseDriver(NonLinearSolver):
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-                result[(wb,wc)] = beta
+                result[(wb, wc)] = beta
 
         profiler.check_memory_usage('End of QRF')
 
@@ -430,12 +429,20 @@ class QuadraticResponseDriver(NonLinearSolver):
             firstorderdens.append(Db.imag)
             firstorderdens.append(Dc.real)
             firstorderdens.append(Dc.imag)
-            secorderdens.append((Dbc+Dcb).real)
-            secorderdens.append((Dbc+Dcb).imag)
+            secorderdens.append((Dbc + Dcb).real)
+            secorderdens.append((Dbc + Dcb).imag)
 
-        return firstorderdens,secorderdens
+        return firstorderdens, secorderdens
 
-    def get_fock_dict(self, wi, firstorderdens,secorderdens, F0, mo, molecule, ao_basis,dft_dict = None):
+    def get_fock_dict(self,
+                      wi,
+                      firstorderdens,
+                      secorderdens,
+                      F0,
+                      mo,
+                      molecule,
+                      ao_basis,
+                      dft_dict=None):
         """
         Computes the Fock matrices for a quadratic response function
 
@@ -482,8 +489,9 @@ class QuadraticResponseDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis,
-                                        'real_and_imag',dft_dict,firstorderdens,secorderdens,'qrf')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                        dft_dict, firstorderdens, secorderdens,
+                                        'qrf')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock

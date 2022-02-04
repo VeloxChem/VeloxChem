@@ -40,7 +40,6 @@ from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
-                         
 
 
 class CubicResponseDriver(NonLinearSolver):
@@ -782,7 +781,6 @@ class CubicResponseDriver(NonLinearSolver):
             density_list.append(Dbc_d.real)
             density_list.append(Dbc_d.imag)
 
-
         return density_list
 
     def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis):
@@ -845,8 +843,8 @@ class CubicResponseDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis,
-                                        'real_and_imag',{},None,density_list,'tpa')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                        {}, None, density_list, 'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -921,8 +919,8 @@ class CubicResponseDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis,
-                                        'real_and_imag',{},None,density_list,'tpa')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                        {}, None, density_list, 'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
