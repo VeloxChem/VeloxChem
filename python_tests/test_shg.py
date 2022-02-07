@@ -34,7 +34,7 @@ class TestSHG:
             'frequencies': task.input_dict['response']['frequencies'],
             'conv_thresh': '1.0e-8',
         })
-        
+
         shg_prop.init_driver(task.mpi_comm, task.ostream)
         shg_prop.compute(task.molecule, task.ao_basis, scf_tensors)
         shg_result = shg_prop.rsp_property
@@ -61,9 +61,9 @@ class TestSHG:
         w = 0.2
 
         ref_result = {
-            'x': 0 + 0j,
+            'x': 163.69097360 + 177.80276777j,
             'y': 0 + 0j,
-            'z': 155.93642496 + 99.03258296J,
+            'z': 0 + 0J,
         }
 
         here = Path(__file__).parent

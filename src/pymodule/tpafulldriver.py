@@ -34,7 +34,6 @@ from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
-from .nonlinearsolver import NonLinearSolver
 from .tpadriver import TPADriver
 from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
@@ -197,23 +196,36 @@ class TPAFullDriver(TPADriver):
                                 self.transform_dens(ky, D_lamtau_yz, S) +
                                 self.transform_dens(kz, D_lamtau_zz, S))
 
-            density_list.append(D_sig_xx)
-            density_list.append(D_sig_yy)
-            density_list.append(D_sig_zz)
-            density_list.append(D_sig_xy)
-            density_list.append(D_sig_xz)
-            density_list.append(D_sig_yz)
-
-            density_list.append(D_lamtau_xx)
-            density_list.append(D_lamtau_yy)
-            density_list.append(D_lamtau_zz)
-            density_list.append(D_lamtau_xy)
-            density_list.append(D_lamtau_xz)
-            density_list.append(D_lamtau_yz)
-
-            density_list.append(D_lam_sig_tau_x)
-            density_list.append(D_lam_sig_tau_y)
-            density_list.append(D_lam_sig_tau_z)
+            density_list.append(D_sig_xx.real)
+            density_list.append(D_sig_xx.imag)
+            density_list.append(D_sig_yy.real)
+            density_list.append(D_sig_yy.imag)
+            density_list.append(D_sig_zz.real)
+            density_list.append(D_sig_zz.imag)
+            density_list.append(D_sig_xy.real)
+            density_list.append(D_sig_xy.imag)
+            density_list.append(D_sig_xz.real)
+            density_list.append(D_sig_xz.imag)
+            density_list.append(D_sig_yz.real)
+            density_list.append(D_sig_yz.imag)
+            density_list.append(D_lamtau_xx.real)
+            density_list.append(D_lamtau_xx.imag)
+            density_list.append(D_lamtau_yy.real)
+            density_list.append(D_lamtau_yy.imag)
+            density_list.append(D_lamtau_zz.real)
+            density_list.append(D_lamtau_zz.imag)
+            density_list.append(D_lamtau_xy.real)
+            density_list.append(D_lamtau_xy.imag)
+            density_list.append(D_lamtau_xz.real)
+            density_list.append(D_lamtau_xz.imag)
+            density_list.append(D_lamtau_yz.real)
+            density_list.append(D_lamtau_yz.imag)
+            density_list.append(D_lam_sig_tau_x.real)
+            density_list.append(D_lam_sig_tau_x.imag)
+            density_list.append(D_lam_sig_tau_y.real)
+            density_list.append(D_lam_sig_tau_y.imag)
+            density_list.append(D_lam_sig_tau_z.real)
+            density_list.append(D_lam_sig_tau_z.imag)
 
         return density_list
 
@@ -278,8 +290,8 @@ class TPAFullDriver(TPADriver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock_cubic(mo, density_list, molecule, ao_basis,
-                                        'real_and_imag')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                        {}, None, density_list, 'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -870,9 +882,12 @@ class TPAFullDriver(TPADriver):
             Dz += self.transform_dens(kz, D_lamtau_zz, S)
             Dz += self.transform_dens(k_lamtau_zz, Dc_z, S)
 
-            density_list.append(Dx)
-            density_list.append(Dy)
-            density_list.append(Dz)
+            density_list.append(Dx.real)
+            density_list.append(Dx.imag)
+            density_list.append(Dy.real)
+            density_list.append(Dy.imag)
+            density_list.append(Dz.real)
+            density_list.append(Dz.imag)
 
         return density_list
 
@@ -917,8 +932,8 @@ class TPAFullDriver(TPADriver):
                                           self.ostream)
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock_cubic(mo, density_list, molecule, ao_basis,
-                                        'real_and_imag')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                        {}, None, density_list, 'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock

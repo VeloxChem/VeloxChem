@@ -162,7 +162,7 @@ public:
     dengrid getDensityGridType() const;
     
     /**
-     Gets constant pointer to alpha density values.
+     Gets constant pointer to one-time transformed density product values.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
@@ -170,7 +170,7 @@ public:
     const double* rhow1rhow2(const int32_t iDensityMatrix) const;
     
     /**
-     Gets pointer to alpha density values.
+     Gets constant pointer to one-time transformed density product values.
      
     @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
@@ -178,7 +178,7 @@ public:
     double* rhow1rhow2(const int32_t iDensityMatrix);
     
     /**
-     Gets constant pointer to alpha density gradient X values.
+     Gets constant pointer to one-time transformed density product with X gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient X values.
@@ -186,7 +186,7 @@ public:
     const double* rxw1rhow2(const int32_t iDensityMatrix) const;
     
     /**
-     Gets pointer to alpha density gradient X values.
+     Gets  pointer to one-time transformed density product with X gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient X values.
@@ -194,7 +194,7 @@ public:
     double* rxw1rhow2(const int32_t iDensityMatrix);
     
     /**
-     Gets constant pointer to alpha density gradient Y values.
+     Gets constant pointer to one-time transformed density product with Y gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient Y values.
@@ -202,7 +202,7 @@ public:
     const double* ryw1rhow2(const int32_t iDensityMatrix) const;
     
     /**
-     Gets pointer to alpha density gradient Y values.
+     Gets constant pointer to one-time transformed density product with Y gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient Y values.
@@ -210,7 +210,7 @@ public:
     double* ryw1rhow2(const int32_t iDensityMatrix);
     
     /**
-     Gets constant pointer to alpha density gradient Z values.
+     Gets constant pointer to one-time transformed density product with Z gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient Z values.
@@ -218,7 +218,7 @@ public:
     const double* rzw1rhow2(const int32_t iDensityMatrix) const;
     
     /**
-     Gets pointer to alpha density gradient Z values.
+     Gets pointer to one-time transformed density product with Z gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient Z values.
@@ -226,7 +226,7 @@ public:
     double* rzw1rhow2(const int32_t iDensityMatrix);
  
       /**
-     Gets constant pointer to beta density gradient Z values.
+     Gets constant pointer to X gradient one-time transformed density product with X gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -234,7 +234,7 @@ public:
     const double* rxw1rxw2(const int32_t iDensityMatrix) const;
 
       /**
-     Gets pointer to beta density gradient Z values.
+     Gets pointer to X gradient one-time transformed density product with X gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -242,7 +242,7 @@ public:
     double* rxw1rxw2(const int32_t iDensityMatrix);
 
       /**
-     Gets constant pointer to beta density gradient Z values.
+     Gets constant pointer to X gradient one-time transformed density product with Y gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -250,7 +250,7 @@ public:
     const double* rxw1ryw2(const int32_t iDensityMatrix) const;
 
       /**
-     Gets pointer to beta density gradient Z values.
+     Gets  pointer to X gradient one-time transformed density product with X gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -258,7 +258,7 @@ public:
     double* rxw1ryw2(const int32_t iDensityMatrix);
 
       /**
-     Gets constant pointer to beta density gradient Z values.
+     Gets constant pointer to X gradient one-time transformed density product with Z gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -266,7 +266,7 @@ public:
     const double* rxw1rzw2(const int32_t iDensityMatrix) const;
 
       /**
-     Gets pointer to beta density gradient Z values.
+     Gets pointer to X gradient one-time transformed density product with Z gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -274,7 +274,7 @@ public:
     double* rxw1rzw2(const int32_t iDensityMatrix);
 
       /**
-     Gets constant pointer to beta density gradient Z values.
+     Gets constant pointer to Y gradient one-time transformed density product with X gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -282,7 +282,7 @@ public:
     const double* ryw1rxw2(const int32_t iDensityMatrix) const;
 
       /**
-     Gets pointer to beta density gradient Z values.
+     Gets pointer to Y gradient one-time transformed density product with X gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -290,7 +290,7 @@ public:
     double* ryw1rxw2(const int32_t iDensityMatrix);
 
       /**
-     Gets constant pointer to beta density gradient Z values.
+     Gets constant pointer to Y gradient one-time transformed density product with Y gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -298,7 +298,7 @@ public:
     const double* ryw1ryw2(const int32_t iDensityMatrix) const;
 
       /**
-     Gets pointer to beta density gradient Z values.
+     Gets pointer to Y gradient one-time transformed density product with Y gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -306,7 +306,7 @@ public:
     double* ryw1ryw2(const int32_t iDensityMatrix);
 
       /**
-     Gets constant pointer to beta density gradient Z values.
+     Gets constant pointer to Y gradient one-time transformed density product with Z gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -314,7 +314,7 @@ public:
     const double* ryw1rzw2(const int32_t iDensityMatrix) const;
 
       /**
-     Gets pointer to beta density gradient Z values.
+     Gets pointer to Y gradient one-time transformed density product with Z gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -322,7 +322,7 @@ public:
     double* ryw1rzw2(const int32_t iDensityMatrix);
 
       /**
-     Gets constant pointer to beta density gradient Z values.
+     Gets constant pointer to Z gradient one-time transformed density product with X gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -330,7 +330,7 @@ public:
     const double* rzw1rxw2(const int32_t iDensityMatrix) const;
 
       /**
-     Gets pointer to beta density gradient Z values.
+     Gets  pointer to Z gradient one-time transformed density product with X gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -338,7 +338,7 @@ public:
     double* rzw1rxw2(const int32_t iDensityMatrix);
 
       /**
-     Gets constant pointer to beta density gradient Z values.
+     Gets constant pointer to Z gradient one-time transformed density product with Y gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -346,7 +346,7 @@ public:
     const double* rzw1ryw2(const int32_t iDensityMatrix) const;
 
       /**
-     Gets pointer to beta density gradient Z values.
+     Gets pointer to Z gradient one-time transformed density product with Y gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -354,7 +354,7 @@ public:
     double* rzw1ryw2(const int32_t iDensityMatrix);
 
       /**
-     Gets constant pointer to beta density gradient Z values.
+     Gets constant pointer to Z gradient one-time transformed density product with Z gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -362,7 +362,7 @@ public:
     const double* rzw1rzw2(const int32_t iDensityMatrix) const;
 
       /**
-     Gets pointer to beta density gradient Z values.
+     Gets pointer Z X gradient one-time transformed density product with Z gradient of  one-time transformed density.
      
      @param iDensityMatrix the index of density matrix.
      @return the pointer to beta density gradient Z values.
@@ -370,16 +370,16 @@ public:
     double* rzw1rzw2(const int32_t iDensityMatrix);
 
     /**
-     Generates pair of screened molecular and density grids by removing grid points with specific density/density
-     gradient values bellow given threshold. NOTE: This method is exclusive to dengrid::ab type.
+     Generates products of one-time transformed densities to be used for quadratic response.
      
      @param densityGridab the screened density grid.
      @param molecularGridab the screened molecular grid.
-     @param iDensityMatrix the index of density matrix.
+     @param rwDensityGrid  one-time transformed densities evaluated on the grid
      @param densityThreshold the screening threshold for density values.
-     @param xcFuncType the type of exchange-correlation functional.
+     @param numdens the number of densities.
+     @param quadMode a string that specifies which densities should be combined. 
      */
-     void makenewdens(                CDensityGridQuad&   densityGridAB,
+     void DensityProd(                CDensityGridQuad&   densityGridAB,
                                       CMolecularGrid& molecularGridab,
                                 const CDensityGrid&   rwDensityGrid,
                                 const xcfun           xcFuncType,

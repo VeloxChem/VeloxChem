@@ -227,14 +227,15 @@ class SHGDriver(NonLinearSolver):
 
         # Computing the first-order response vectors (3 per frequency)
 
-
         N_drv = ComplexResponse(self.comm, self.ostream)
 
         if self.dft:
-            print(dft_dict)
-            method_settings = {'xcfun': dft_dict['dft_func_label'], 'grid_level': self.grid_level}
-            N_drv.update_settings({},method_settings)
-       
+            method_settings = {
+                'xcfun': dft_dict['dft_func_label'],
+                'grid_level': self.grid_level
+            }
+            N_drv.update_settings({}, method_settings)
+
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
@@ -368,19 +369,22 @@ class SHGDriver(NonLinearSolver):
 
         nocc = molecule.number_of_alpha_electrons()
 
+        dft_dict = self.init_dft(molecule, scf_tensors)
+
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            d_dft1,d_dft2 = self.get_densities(freqpairs, kX, S, D0, mo)
-            dft_dict = self.init_dft(molecule, scf_tensors)
+            first_order_dens, second_order_dens = self.get_densities(
+                freqpairs, kX, S, D0, mo)
         else:
-            d_dft1 = None
-            d_dft2 = None
+            first_order_dens = None
+            second_order_dens = None
 
         profiler.check_memory_usage('Densities')
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(freqpairs, d_dft1,d_dft2, F0, mo,
-                                       molecule, ao_basis,dft_dict)
+        fock_dict = self.get_fock_dict(freqpairs, first_order_dens,
+                                       second_order_dens, F0, mo, molecule,
+                                       ao_basis, dft_dict)
 
         profiler.check_memory_usage('Focks')
 
@@ -469,11 +473,14 @@ class SHGDriver(NonLinearSolver):
             A matrix containing the MO coefficents
 
         :return:
-            A list of tranformed compounded densities
+            first_order_dens:
+             A list of first-order one-time tranformed compounded densities
+            second_order_dens:
+             A list of first-order two-time tranformed compounded densities
         """
 
-        d_dft1 = []
-        d_dft2 = []  
+        first_order_dens = []
+        second_order_dens = []
 
         for (wb, wc) in freqpairs:
 
@@ -513,29 +520,37 @@ class SHGDriver(NonLinearSolver):
             D_lam_yz = (self.transform_dens(k_y, D_z, S) +
                         self.transform_dens(k_z, D_y, S))
 
-            d_dft1.append(D_x.real)
-            d_dft1.append(D_x.imag)
-            d_dft1.append(D_y.real)
-            d_dft1.append(D_y.imag)
-            d_dft1.append(D_z.real)
-            d_dft1.append(D_z.imag)
+            first_order_dens.append(D_x.real)
+            first_order_dens.append(D_x.imag)
+            first_order_dens.append(D_y.real)
+            first_order_dens.append(D_y.imag)
+            first_order_dens.append(D_z.real)
+            first_order_dens.append(D_z.imag)
 
-            d_dft2.append(D_sig_x.real)
-            d_dft2.append(D_sig_x.imag)
-            d_dft2.append(D_sig_y.real)
-            d_dft2.append(D_sig_y.imag)
-            d_dft2.append(D_sig_z.real)
-            d_dft2.append(D_sig_z.imag)
-            d_dft2.append(D_lam_xy.real)
-            d_dft2.append(D_lam_xy.imag)
-            d_dft2.append(D_lam_xz.real)
-            d_dft2.append(D_lam_xz.imag)
-            d_dft2.append(D_lam_yz.real)
-            d_dft2.append(D_lam_yz.imag)
+            second_order_dens.append(D_sig_x.real)
+            second_order_dens.append(D_sig_x.imag)
+            second_order_dens.append(D_sig_y.real)
+            second_order_dens.append(D_sig_y.imag)
+            second_order_dens.append(D_sig_z.real)
+            second_order_dens.append(D_sig_z.imag)
+            second_order_dens.append(D_lam_xy.real)
+            second_order_dens.append(D_lam_xy.imag)
+            second_order_dens.append(D_lam_xz.real)
+            second_order_dens.append(D_lam_xz.imag)
+            second_order_dens.append(D_lam_yz.real)
+            second_order_dens.append(D_lam_yz.imag)
 
-        return d_dft1,d_dft2
+        return first_order_dens, second_order_dens
 
-    def get_fock_dict(self, wi, d_dft1, d_dft2, F0, mo, molecule, ao_basis,dft_dict = None):
+    def get_fock_dict(self,
+                      wi,
+                      first_order_dens,
+                      second_order_dens,
+                      F0,
+                      mo,
+                      molecule,
+                      ao_basis,
+                      dft_dict=None):
         """
         Computes the compounded Fock matrices used for the
         isotropic quadratic response function used for SHG
@@ -554,7 +569,8 @@ class SHGDriver(NonLinearSolver):
             The AO basis set
 
         :return:
-            A dictonary of compounded first-order Fock-matrices
+            A dictonary of compounded first-order two-time Fock-matrices. For
+            SHG there are 6 real and 6 imaginary Fock matrices.
         """
 
         if self.rank == mpi_master():
@@ -589,8 +605,9 @@ class SHGDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis,
-                                        'real_and_imag',dft_dict,d_dft1, d_dft2,'shg')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                        dft_dict, first_order_dens,
+                                        second_order_dens, 'shg')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
