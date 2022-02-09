@@ -168,6 +168,7 @@ class CXCIntegrator
      @param rwDensityGrid the products of perturbed one-time transformed densities evaluated on the grid.
      @param rw2DensityGrid the two-time transformed densities evaluated on the grid.
      @param molecularGrid the molecular grid.
+     @param quadMode a string that specifies which densities should be combined.
      */
     void _compRestrictedContributionForLda(      CAOKohnShamMatrix&   aoKohnShamMatrix,
                                            const CGtoContainer*       gtoContainer,
@@ -331,6 +332,7 @@ class CXCIntegrator
      @param gridWeights the pointer to grid weights.
      @param gridOffset the grid offset.
      @param nGridPoints the number of grid points.
+     @param quadMode a string that specifies which densities should be combined.
      */
     void _compRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamMatrix,
                                     const CGtoContainer*       gtoContainer,
@@ -1369,6 +1371,7 @@ public:
      @param basis the molecular basis.
      @param molecularGrid the molecular grid.
      @param xcFuncLabel the label of exchange-correlation functional.
+     @param quadMode a string that specifies which densities should be combined.
      */
     void integrate(      CAOFockMatrix&    aoFockMatrix,
                    const CAODensityMatrix& rwDensityMatrix,

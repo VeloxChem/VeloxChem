@@ -28,6 +28,8 @@
 #include <cmath>
 #include <iostream>
 
+#include "StringFormat.hpp"
+
 CDensityGridQuad::CDensityGridQuad()
 
     : _gridType(dengrid::undefined)
@@ -392,7 +394,7 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
 
     if (xcFuncType == xcfun::lda)
     {
-        if (quadMode == "shg")
+        if (fstr::upcase(quadMode) == "SHG")
         {
             for (int32_t j = 0; j < numdens / 12; j++)
             {
@@ -513,7 +515,7 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
     }
     if (xcFuncType == xcfun::gga)
     {
-        if (quadMode == "shg")
+        if (fstr::upcase(quadMode) == "SHG")
         {
             for (int32_t j = 0; j < numdens / 12; j++)
 

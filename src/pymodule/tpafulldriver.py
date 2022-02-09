@@ -291,7 +291,7 @@ class TPAFullDriver(TPADriver):
 
         time_start_fock = time.time()
         dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                        {}, None, density_list, 'tpa')
+                                        None, None, density_list, 'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -933,7 +933,7 @@ class TPAFullDriver(TPADriver):
 
         time_start_fock = time.time()
         dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                        {}, None, density_list, 'tpa')
+                                        None, None, density_list, 'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
