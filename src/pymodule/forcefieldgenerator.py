@@ -263,6 +263,7 @@ class ForceFieldGenerator:
                 if con[k, i]:
                     inds = (k, i, j) if k < j else (j, i, k)
                     angle_indices.add(inds)
+        angle_indices = sorted(list(angle_indices))
 
         dihedral_indices = set()
         for i, j, k in angle_indices:
@@ -275,6 +276,7 @@ class ForceFieldGenerator:
                 if con[l, i]:
                     inds = (l, i, j, k) if l < k else (k, j, i, l)
                     dihedral_indices.add(inds)
+        dihedral_indices = sorted(list(dihedral_indices))
 
         exclusion_indices = []
         if self.nrexcl >= 2:
@@ -292,6 +294,10 @@ class ForceFieldGenerator:
 
         with open(self.force_field_data, 'r') as ff_data:
             ff_data_lines = ff_data.readlines()
+
+        if Path(self.data_extension).is_file():
+            with open(self.force_field_data, 'r') as ff_extension:
+                ff_data_lines += ff_extension.readlines()
 
         with open(filename, 'w') as itp_file:
 
@@ -359,7 +365,6 @@ class ForceFieldGenerator:
 
                 at_1 = atom_types[i]
                 at_2 = atom_types[j]
-
                 str_1 = r'\A' + f'{at_1}-{at_2}  '
                 str_2 = r'\A' + f'{at_2}-{at_1}  '
                 pattern_1 = re.compile(str_1)
@@ -381,11 +386,10 @@ class ForceFieldGenerator:
                 assert_msg_critical(bond_found, errmsg)
 
                 if abs(r - r_eq) > self.r_thresh:
-                    msg = 'Warning: Length of bond {}-{}'.format(at_1, at_2)
-                    msg += ' in data does not match length in XYZ file'
-                    msg += ' (atoms no. {} and {}):'.format(i + 1, j + 1)
-                    msg += ' {:.3f} vs. {:.3f}!'.format(r[-1], r_eq[-1])
-                    msg += ' Check atom types!'
+                    msg = f'Warning: bond length {at_1}-{at_2}'
+                    msg += ' does not match length in XYZ file'
+                    msg += f' (atoms no. {i+1} and {j+1}):'
+                    msg += f' {r:.3f} vs. {r_eq:.3f}'
                     print(msg)
 
                 if self.eq_param:
@@ -400,10 +404,8 @@ class ForceFieldGenerator:
             if self.gen_pairs:
                 itp_file.write('\n[ pairs ]\n')
                 itp_file.write(';    i      j    funct\n')
-
-                for pair in pairs_14:
-                    itp_file.write('{:6}{:7}{:7}\n'.format(
-                        pair[0] + 1, pair[1] + 1, 1))
+                for i, j in pairs_14:
+                    itp_file.write('{:6}{:7}{:7}\n'.format(i + 1, j + 1, 1))
 
             # angles
 
@@ -412,81 +414,50 @@ class ForceFieldGenerator:
             cur_str += '     theta       k_theta\n'
             itp_file.write(cur_str)
 
-            theta = []
-            theta_eq = []
-            k_theta = []
-            for i, at1 in enumerate(atom_types):
-                for j, at2 in enumerate(atom_types):
-                    if con[i, j]:
-                        for k, at3 in enumerate(atom_types[i + 1:],
-                                                start=i + 1):
-                            if con[j, k]:
-                                a = coords[i] - coords[j]
-                                b = coords[k] - coords[j]
-                                theta_eq.append(
-                                    np.arccos(
-                                        np.dot(a, b) / np.linalg.norm(a) /
-                                        np.linalg.norm(b)) * 180 / np.pi)
-                                str1 = r'\A' + f'{at1}-{at2}-{at3} '
-                                str2 = r'\A' + f'{at3}-{at2}-{at1} '
-                                pattern1 = re.compile(str1)
-                                pattern2 = re.compile(str2)
+            for i, j, k in angle_indices:
+                a = coords[i] - coords[j]
+                b = coords[k] - coords[j]
+                theta_eq = np.arccos(
+                    np.dot(a, b) / np.linalg.norm(a) /
+                    np.linalg.norm(b)) * 180 / np.pi
 
-                                theta_available = False
-                                ff_data = open(self.force_field_data, 'rt')
+                at_1 = atom_types[i]
+                at_2 = atom_types[j]
+                at_3 = atom_types[k]
+                str_1 = r'\A' + f'{at_1}-{at_2}-{at_3} '
+                str_2 = r'\A' + f'{at_3}-{at_2}-{at_1} '
+                pattern_1 = re.compile(str_1)
+                pattern_2 = re.compile(str_2)
 
-                                for line in ff_data:
-                                    if re.search(pattern1, line):
-                                        n_spaces = at1.count(' ') + at2.count(
-                                            ' ')
-                                        theta.append(
-                                            float(line.split()[2 + n_spaces]))
-                                        k_theta.append(
-                                            float(line.split()[1 + n_spaces]) *
-                                            4.184 * 2)
-                                        theta_available = True
-                                    elif re.search(pattern2, line):
-                                        n_spaces = at3.count(' ') + at2.count(
-                                            ' ')
-                                        theta.append(
-                                            float(line.split()[2 + n_spaces]))
-                                        k_theta.append(
-                                            float(line.split()[1 + n_spaces]) *
-                                            4.184 * 2)
-                                        theta_available = True
+                angle_found = False
 
-                                errmsg = 'ForceFieldGenerator: Angle {}-{}-{}'.format(
-                                    at1, at2, at3)
-                                errmsg += ' is not available in data! Check atom types!'
-                                assert_msg_critical(theta_available, errmsg)
+                for line in ff_data_lines:
+                    if (re.search(pattern_1, line) or
+                            re.search(pattern_2, line)):
+                        angle_ff = line[8:].strip().split()
+                        theta = float(angle_ff[1])
+                        k_theta = float(angle_ff[0]) * 4.184 * 2
+                        angle_found = True
 
-                                if abs(theta[-1] -
-                                       theta_eq[-1]) > self.theta_thresh:
-                                    msg = 'Warning: Angle {}-{}-{}'.format(
-                                        at1, at2, at3)
-                                    msg += ' in data does not match angle in XYZ file'
-                                    msg += ' (atoms no. {}, {} and {}):'.format(
-                                        i + 1, j + 1, k + 1)
-                                    msg += ' {:.1f} vs. {:.1f}!'.format(
-                                        theta[-1], theta_eq[-1])
-                                    msg += ' Check atom types!'
-                                    print(msg)
+                errmsg = f'ForceFieldGenerator: angle {at_1}-{at_2}-{at_3}'
+                errmsg += ' is not available.'
+                assert_msg_critical(angle_found, errmsg)
 
-            if self.eq_param:
-                theta = theta_eq
+                if abs(theta - theta_eq) > self.theta_thresh:
+                    msg = f'Warning: angle {at_1}-{at_2}-{at_3}'
+                    msg += ' does not match angle in XYZ file'
+                    msg += f' (atoms no. {i+1}, {j+1} and {k+1}):'
+                    msg += f' {theta:.1f} vs. {theta_eq:.1f}!'
+                    print(msg)
 
-            n = 0
-            for i in range(n_atoms):
-                for j in range(n_atoms):
-                    if con[i, j]:
-                        for k in range(i + 1, n_atoms):
-                            if con[j, k]:
-                                itp_file.write(
-                                    '{:6}{:7}{:7}{:7}{:14.4e}{:14.4e} ;{:>7} -{:>3} -{:>3}\n'
-                                    .format(i + 1, j + 1, k + 1, 1, theta[n],
-                                            k_theta[n], atom_names[i],
-                                            atom_names[j], atom_names[k]))
-                                n += 1
+                if self.eq_param:
+                    theta = theta_eq
+
+                cur_str = '{:6}{:7}{:7}{:7}{:14.4e}{:14.4e}'.format(
+                    i + 1, j + 1, k + 1, 1, theta, k_theta)
+                cur_str += ' ;{:>7} -{:>3} -{:>3}\n'.format(
+                    atom_names[i], atom_names[j], atom_names[k])
+                itp_file.write(cur_str)
 
             # proper dihedrals
 
@@ -498,124 +469,59 @@ class ForceFieldGenerator:
             cur_str += 'C0         C1         C2         C3         C4         C5\n'
             itp_file.write(cur_str)
 
-            dihedrals = []
-            ats = []
-            for i, at1 in enumerate(atom_types):
-                for j, at2 in enumerate(atom_types):
-                    if con[i, j]:
-                        for k, at3 in enumerate(atom_types):
-                            if con[j, k] and i != k:
-                                for l, at4 in enumerate(atom_types[i + 1:],
-                                                        start=i + 1):
-                                    if con[k, l] and j != l:
-                                        dihedrals.append([i, j, k, l])
-                                        ats.append([at1, at2, at3, at4])
+            for i, j, k, l in dihedral_indices:
+                at_1 = atom_types[i]
+                at_2 = atom_types[j]
+                at_3 = atom_types[k]
+                at_4 = atom_types[l]
+                str_1 = '{}-{}-{}-{}'.format(at_1, at_2, at_3, at_4)
+                str_2 = '{}-{}-{}-{}'.format(at_4, at_3, at_2, at_1)
+                pattern_1 = re.compile(str_1)
+                pattern_2 = re.compile(str_2)
 
-            for ([i, j, k, l], [at1, at2, at3, at4]) in zip(dihedrals, ats):
-                dihedral_available = False
+                dihedral_found = False
 
-                str1 = '{}-{}-{}-{}'.format(at1, at2, at3, at4)
-                str2 = '{}-{}-{}-{}'.format(at4, at3, at2, at1)
-                pattern1 = re.compile(str1)
-                pattern2 = re.compile(str2)
-                ff_data = open(self.force_field_data, 'rt')
+                dihedral_ff_lines = []
+                for line in ff_data_lines:
+                    if (re.search(pattern_1, line) or
+                            re.search(pattern_2, line)):
+                        if '.' not in line[11:].strip().split()[0]:
+                            dihedral_ff_lines.append(line)
+                            dihedral_found = True
 
-                for line in ff_data:
-                    if re.search(pattern1, line):
-                        n_spaces = (at1 + at2 + at3).count(' ')
-                        cur_str = '{:6}{:7}{:7}{:7}'.format(
-                            i + 1, j + 1, k + 1, l + 1)
-                        cur_str += '{:7}{:11.2f}{:11.5f}{:4}'.format(
-                            1, float(line.split()[3 + n_spaces]),
-                            float(line.split()[2 + n_spaces]) /
-                            float(line.split()[1 + n_spaces]) * 4.184,
-                            abs(int(float(line.split()[4 + n_spaces]))))
-                        cur_str += ' ;{:>7} -{:>3} -{:>3}-{:>3}\n'.format(
-                            atom_names[i], atom_names[j], atom_names[k],
-                            atom_names[l])
-                        itp_file.write(cur_str)
-                        dihedral_available = True
-                    elif re.search(pattern2, line):
-                        n_spaces = (at2 + at3 + at4).count(' ')
-                        cur_str = '{:6}{:7}{:7}{:7}'.format(
-                            i + 1, j + 1, k + 1, l + 1)
-                        cur_str += '{:7}{:11.2f}{:11.5f}{:4}'.format(
-                            1, float(line.split()[3 + n_spaces]),
-                            float(line.split()[2 + n_spaces]) /
-                            float(line.split()[1 + n_spaces]) * 4.184,
-                            abs(int(float(line.split()[4 + n_spaces]))))
-                        cur_str += ' ;{:>7} -{:>3} -{:>3}-{:>3}\n'.format(
-                            atom_names[i], atom_names[j], atom_names[k],
-                            atom_names[l])
-                        itp_file.write(cur_str)
-                        dihedral_available = True
+                if not dihedral_found:
+                    str_1 = 'X -{}-{}-X '.format(at_2, at_3)
+                    str_2 = 'X -{}-{}-X '.format(at_3, at_2)
+                    pattern_1 = re.compile(str_1)
+                    pattern_2 = re.compile(str_2)
 
-                if not dihedral_available:
-                    str1 = 'X -{}-{}-X'.format(at2, at3)
-                    str2 = 'X -{}-{}-X'.format(at3, at2)
-                    pattern1 = re.compile(str1)
-                    pattern2 = re.compile(str2)
-                    n_spaces = 1 + (at2 + at3).count(' ')
+                    dihedral_ff_lines = []
+                    for line in ff_data_lines:
+                        if (re.search(pattern_1, line) or
+                                re.search(pattern_2, line)):
+                            if '.' not in line[11:].strip().split()[0]:
+                                dihedral_ff_lines.append(line)
+                                dihedral_found = True
 
-                    ff_data = open(self.force_field_data, 'rt')
-                    for line in ff_data:
-                        if re.search(pattern1, line) or re.search(
-                                pattern2, line):
-                            cur_str = '{:6}{:7}{:7}{:7}'.format(
-                                i + 1, j + 1, k + 1, l + 1)
-                            cur_str += '{:7}{:11.2f}{:11.5f}{:4}'.format(
-                                1, float(line.split()[3 + n_spaces]),
-                                float(line.split()[2 + n_spaces]) /
-                                float(line.split()[1 + n_spaces]) * 4.184,
-                                int(float(line.split()[4 + n_spaces])))
-                            cur_str += ' ;{:>7} -{:>3} -{:>3}-{:>3}\n'.format(
-                                atom_names[i], atom_names[j], atom_names[k],
-                                atom_names[l])
-                            itp_file.write(cur_str)
-                            dihedral_available = True
+                errmsg = 'ForceFieldGenerator: dihedral'
+                errmsg += f' {at_1}-{at_2}-{at_3}-{at_4} is not available.'
+                assert_msg_critical(dihedral_found, errmsg)
 
-                if not dihedral_available:
-                    if Path(self.data_extension).is_file():
-                        ff_data = open(self.data_extension, 'rt')
-                        for line in ff_data:
-                            if re.search(pattern1, line) or re.search(
-                                    pattern2, line):
-                                cur_str = '{:6}{:7}{:7}{:7}'.format(
-                                    i + 1, j + 1, k + 1, l + 1)
-                                cur_str += '{:7}{:11.2f}{:11.5f}{:4}'.format(
-                                    1, float(line.split()[3 + n_spaces]),
-                                    float(line.split()[2 + n_spaces]) /
-                                    float(line.split()[1 + n_spaces]) * 4.184,
-                                    int(float(line.split()[4 + n_spaces])))
-                                cur_str += ' ;{:>7} -{:>3} -{:>3}-{:>3}\n'.format(
-                                    atom_names[i], atom_names[j], atom_names[k],
-                                    atom_names[l])
-                                itp_file.write(cur_str)
-                                dihedral_available = True
+                for line in dihedral_ff_lines:
+                    dihedral_ff = line[11:].strip().split()
+                    multiplicity = int(dihedral_ff[0])
+                    barrier = float(dihedral_ff[1]) * 4.184 / multiplicity
+                    phase = float(dihedral_ff[2])
+                    periodicity = abs(int(dihedral_ff[3]))
 
-                if not dihedral_available:
-                    cur_str = 'Dihedral {} is not available in data!'.format(
-                        str1)
-                    cur_str += 'Add parameters to extension file:'
-                    print(cur_str)
-                    ff_data = open(self.data_extension, 'a')
-                    multiplicity = int(input('Multiplicity: '))
-                    barrier = float(input('Rotational barrier in kcal/mol: '))
-                    phase = float(input('Phase angle: '))
-                    periodicity = int(input('Periodicity: '))
-
-                    ff_data.write('{}{:5}{:9.3f}{:14.3f}{:16.3f}\n'.format(
-                        str1, multiplicity, barrier, phase, periodicity))
                     cur_str = '{:6}{:7}{:7}{:7}'.format(i + 1, j + 1, k + 1,
                                                         l + 1)
                     cur_str += '{:7}{:11.2f}{:11.5f}{:4}'.format(
-                        1, phase, barrier / multiplicity * 4.184,
-                        int(periodicity))
+                        1, phase, barrier, periodicity)
                     cur_str += ' ;{:>7} -{:>3} -{:>3}-{:>3}\n'.format(
                         atom_names[i], atom_names[j], atom_names[k],
                         atom_names[l])
                     itp_file.write(cur_str)
-                    ff_data.close()
 
             # improper dihedrals
 
@@ -624,79 +530,90 @@ class ForceFieldGenerator:
             cur_str += '    phase     k_d      n\n'
             itp_file.write(cur_str)
 
-            # impropers for sp2 atom types in GAFF
+            for i, j, k in angle_indices:
+                at_1 = atom_types[i]
+                at_2 = atom_types[j]
+                at_3 = atom_types[k]
 
-            sp2_atom_types = [
-                'c2', 'n ', 'na', 'nh', 'no', 'p2', 'ce', 'cf', 'cp', 'cq',
-                'cu', 'cv', 'px'
-            ]
-            impropers = []
-            for i, at1 in enumerate(atom_types):
-                for j, at2 in enumerate(atom_types):
-                    if con[i, j]:
-                        for k, at3 in enumerate(atom_types[i + 1:],
-                                                start=i + 1):
-                            if con[j, k]:
-                                for l, at4 in enumerate(atom_types[k + 1:],
-                                                        start=k + 1):
-                                    k_d = 0.
-                                    sp2 = True
-                                    if con[j, l] and at2 in sp2_atom_types:
-                                        k_d = 1.1
-                                    elif con[j, l] and at2 == 'c ':
-                                        a = [at1, at3, at4]
-                                        if a.count('o ') == 1:
-                                            k_d = 10.5
-                                        else:
-                                            k_d = 1.1
-                                    elif con[j,
-                                             l] and at2 in ['ca', 'cc', 'cd']:
-                                        a = [at1, at3, at4]
-                                        if a.count('n2') == 2:
-                                            k_d = 10.5
-                                        else:
-                                            k_d = 1.1
-                                    elif con[j, l]:
-                                        impropers.append([i, j, l, k])
-                                        sp2 = False
-                                    else:
-                                        sp2 = False
-                                    if sp2:
-                                        cur_str = '{:6}{:7}{:7}{:7}'.format(
-                                            i + 1, j + 1, k + 1, l + 1)
-                                        cur_str += '{:7}{:11.2f}{:11.5f}{:4}'.format(
-                                            1, 180.0, k_d * 4.184, 2)
-                                        cur_str += ' ;{:>7} -{:>3} -{:>3}-{:>3}\n'.format(
-                                            atom_names[i], atom_names[j],
-                                            atom_names[k], atom_names[l])
-                                        itp_file.write(cur_str)
+                for l in range(n_atoms):
+                    if l in [i, j, k]:
+                        continue
+                    at_4 = atom_types[l]
 
-            # possible impropers that are left
+                    str_1 = '{}-{}-{}-{}'.format(at_4, at_1, at_2, at_3)
+                    str_2 = '{}-{}-{}-{}'.format(at_3, at_4, at_2, at_1)
+                    str_3 = '{}-{}-{}-{}'.format(at_1, at_3, at_2, at_4)
+                    pattern_1 = re.compile(str_1)
+                    pattern_2 = re.compile(str_2)
+                    pattern_3 = re.compile(str_3)
 
-            if self.add_impropers and len(impropers) > 0:
-                print('Add impropers to topology to avoid inversions:')
-                print('No.   i   j   k   l')
-                for m, imp in enumerate(impropers):
-                    [i, j, k, l] = imp
-                    print('{:3}{:4}{:4}{:4}{:4}'.format(m + 1, i + 1, j + 1,
-                                                        k + 1, l + 1))
-                n = int(input('How many impropers do you want to add? '))
+                    dihedral_found = False
 
-                for m in range(n):
-                    [i, j, k, l] = impropers[int(input('No.: ')) - 1]
-                    barrier = float(input('Rotational barrier in kcal/mol: '))
-                    phase = float(input('Phase angle: '))
-                    periodicity = int(input('Periodicity: '))
-                    cur_str = '{:6}{:7}{:7}{:7}'.format(i + 1, j + 1, k + 1,
-                                                        l + 1)
-                    cur_str += '{:7}{:11.2f}{:11.5f}{:4}'.format(
-                        1, phase, barrier * 4.184, periodicity)
-                    cur_str += ' ;{:>7} -{:>3} -{:>3}-{:>3}\n'.format(
-                        atom_names[i], atom_names[j], atom_names[k],
-                        atom_names[l])
-                    itp_file.write(cur_str)
+                    for line in ff_data_lines:
+                        if (re.search(pattern_1, line) or
+                                re.search(pattern_2, line) or
+                                re.search(pattern_3, line)):
+                            if '.' in line[11:].strip().split()[0]:
+                                dihedral_ff = line[11:].strip().split()
+                                dihedral_found = True
+                                break
 
-            itp_file.close()
+                    if not dihedral_found:
+                        str_1 = 'X -{}-{}-{}'.format(at_1, at_2, at_3)
+                        str_2 = 'X -{}-{}-{}'.format(at_4, at_2, at_1)
+                        str_3 = 'X -{}-{}-{}'.format(at_3, at_2, at_4)
+                        pattern_1 = re.compile(str_1)
+                        pattern_2 = re.compile(str_2)
+                        pattern_3 = re.compile(str_3)
+
+                        for line in ff_data_lines:
+                            if (re.search(pattern_1, line) or
+                                    re.search(pattern_2, line) or
+                                    re.search(pattern_3, line)):
+                                if '.' in line[11:].strip().split()[0]:
+                                    dihedral_ff = line[11:].strip().split()
+                                    dihedral_found = True
+                                    break
+
+                    if not dihedral_found:
+                        str_1 = 'X -X -{}-{}'.format(at_2, at_3)
+                        str_2 = 'X -X -{}-{}'.format(at_2, at_1)
+                        str_3 = 'X -X -{}-{}'.format(at_2, at_4)
+                        pattern_1 = re.compile(str_1)
+                        pattern_2 = re.compile(str_2)
+                        pattern_3 = re.compile(str_3)
+
+                        for line in ff_data_lines:
+                            if (re.search(pattern_1, line) or
+                                    re.search(pattern_2, line) or
+                                    re.search(pattern_3, line)):
+                                if '.' in line[11:].strip().split()[0]:
+                                    dihedral_ff = line[11:].strip().split()
+                                    dihedral_found = True
+                                    break
+
+                    if dihedral_found:
+                        barrier = float(dihedral_ff[0]) * 4.184
+                        phase = float(dihedral_ff[2])
+                        periodicity = abs(int(dihedral_ff[3]))
+
+                        assert_msg_critical(
+                            phase == 180.0,
+                            'ForceFieldGenerator: invalid improper dihedral phase'
+                        )
+                        assert_msg_critical(
+                            periodicity == 2,
+                            'ForceFieldGenerator: invalid improper dihedral periodicity'
+                        )
+
+                        cur_str = '{:6}{:7}{:7}{:7}'.format(
+                            l + 1, i + 1, j + 1, k + 1)
+                        cur_str += '{:7}{:11.2f}{:11.5f}{:4}'.format(
+                            1, phase, barrier, periodicity)
+                        cur_str += ' ;{:>7} -{:>3} -{:>3}-{:>3}\n'.format(
+                            atom_names[l], atom_names[i], atom_names[j],
+                            atom_names[k])
+                        itp_file.write(cur_str)
 
     def dihedral_correction(self, top_file, dihedrals=None):
         """
