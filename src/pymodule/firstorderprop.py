@@ -64,6 +64,24 @@ class FirstOrderProperties:
 
         self.properties = {}
 
+    def compute_scf_prop(self, molecule, basis, scf_tensors):
+        """
+        Computes first-order properties for SCF.
+
+        :param molecule:
+            The molecule
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The SCF tensors.
+        """
+        if self.rank == mpi_master():
+            total_density = scf_tensors['D_alpha'] + scf_tensors['D_beta']
+        else:
+            total_density = None
+
+        self.compute(molecule, basis, total_density)
+
     def compute(self, molecule, basis, total_density):
         """
         Computes first-order properties.
@@ -120,7 +138,7 @@ class FirstOrderProperties:
 
         return self.properties[key]
 
-    def print_properties(self, molecule, title=None):
+    def print_properties(self, molecule, title):
         """
         Prints first-order properties.
 
@@ -133,8 +151,6 @@ class FirstOrderProperties:
 
         self.ostream.print_blank()
 
-        if title is None:
-            title = 'SCF Ground-State Dipole Moment'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * (len(title) + 2))
 

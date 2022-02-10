@@ -208,8 +208,7 @@ class ScfGradientDriver(GradientDriver):
                         xc_plus = self.scf_drv.scf_tensors['xc_energy']
 
                     if self.dipole_deriv:
-                        density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                        prop.compute(new_mol, ao_basis, density)
+                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
                         mu_plus = prop.get_property('dipole moment')
 
                     coords[i, d] -= 2.0 * self.delta_h
@@ -222,8 +221,7 @@ class ScfGradientDriver(GradientDriver):
                         xc_minus = self.scf_drv.scf_tensors['xc_energy']
 
                     if self.dipole_deriv:
-                        density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                        prop.compute(new_mol, ao_basis, density)
+                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
                         mu_minus = prop.get_property('dipole moment')
 
                         for c in range(3):
@@ -247,8 +245,7 @@ class ScfGradientDriver(GradientDriver):
                     e_plus1 = self.scf_drv.get_scf_energy()
 
                     if self.dipole_deriv:
-                        density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                        prop.compute(new_mol, ao_basis, density)
+                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
                         mu_plus1 = prop.get_property('dipole moment')
 
                     coords[i, d] += self.delta_h
@@ -257,8 +254,7 @@ class ScfGradientDriver(GradientDriver):
                     e_plus2 = self.scf_drv.get_scf_energy()
 
                     if self.dipole_deriv:
-                        density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                        prop.compute(new_mol, ao_basis, density)
+                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
                         mu_plus2 = prop.get_property('dipole moment')
 
                     coords[i, d] -= 3.0 * self.delta_h
@@ -267,8 +263,7 @@ class ScfGradientDriver(GradientDriver):
                     e_minus1 = self.scf_drv.get_scf_energy()
 
                     if self.dipole_deriv:
-                        density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                        prop.compute(new_mol, ao_basis, density)
+                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
                         mu_minus1 = prop.get_property('dipole moment')
 
                     coords[i, d] -= self.delta_h
@@ -277,8 +272,7 @@ class ScfGradientDriver(GradientDriver):
                     e_minus2 = self.scf_drv.get_scf_energy()
 
                     if self.dipole_deriv:
-                        density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                        prop.compute(new_mol, ao_basis, density)
+                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
                         mu_minus2 = prop.get_property('dipole moment')
 
                         for c in range(3):
@@ -291,7 +285,7 @@ class ScfGradientDriver(GradientDriver):
                     self.gradient[i, d] = (e_minus2 - 8.0 * e_minus1
                                            + 8.0 * e_plus1 - e_plus2) / (12.0 * self.delta_h)
 
-        self.ostream.print_blank()
+        self.ostream.print_blank() # TODO: figure out if this is needed here.
 
         self.scf_drv.compute(molecule, ao_basis, min_basis)
         self.scf_drv.ostream.state = scf_ostream_state
