@@ -82,6 +82,7 @@ class ForceFieldGenerator:
         self.fudgeQQ = 0.8333
         self.comb_rule = 2
         self.nbfunc = 1
+        self.nrexcl = 3
         self.force_field_data = None
         self.data_extension = None
 
@@ -232,37 +233,60 @@ class ForceFieldGenerator:
 
         # preparing atom types and atom names
 
-        for i in range(n_atoms):
-            if len(atom_types[i]) == 1:
-                atom_types[i] += ' '
+        assert_msg_critical(
+            len(atom_types) == n_atoms,
+            'ForceFieldGenerator: inconsistent atom_types')
 
-        unique_atom_types = []
-        for at in atom_types:
-            if at not in unique_atom_types:
-                unique_atom_types.append(at)
+        for i in range(n_atoms):
+            atom_types[i] = f'{atom_types[i].strip():<2s}'
+        unique_atom_types = list(set(atom_types))
 
         atom_names = self.get_atom_names()
 
         # preparing 1-4 pairs
 
-        pair12 = []
-        pair13 = []
-        pair14 = []
+        bond_indices = set()
         for i in range(n_atoms):
-            for j in range(n_atoms):
+            for j in range(i + 1, n_atoms):
                 if con[i, j]:
-                    pair12.append([i, j])
-                    for k in range(n_atoms):
-                        if con[j, k] and i != k:
-                            pair13.append([i, k])
-                            for l in range(i + 1, n_atoms):
-                                if con[k, l] and i != k:
-                                    pair14.append([i, l])
+                    bond_indices.add((i, j))
 
-        pairs = []
-        for pair in pair14:
-            if pair not in pair12 and pair not in pair13:
-                pairs.append(pair)
+        angle_indices = set()
+        for i, j in bond_indices:
+            for k in range(n_atoms):
+                if k in [i, j]:
+                    continue
+                if con[j, k]:
+                    inds = (i, j, k) if i < k else (k, j, i)
+                    angle_indices.add(inds)
+                if con[k, i]:
+                    inds = (k, i, j) if k < j else (j, i, k)
+                    angle_indices.add(inds)
+
+        dihedral_indices = set()
+        for i, j, k in angle_indices:
+            for l in range(n_atoms):
+                if l in [i, j, k]:
+                    continue
+                if con[k, l]:
+                    inds = (i, j, k, l) if i < l else (l, k, j, i)
+                    dihedral_indices.add(inds)
+                if con[l, i]:
+                    inds = (l, i, j, k) if l < k else (k, j, i, l)
+                    dihedral_indices.add(inds)
+
+        exclusion_indices = []
+        if self.nrexcl >= 2:
+            for i, j in bond_indices:
+                exclusion_indices.append((i, j))
+        if self.nrexcl >= 3:
+            for i, j, k in angle_indices:
+                exclusion_indices.append((i, k))
+
+        pairs_14 = []
+        for i, j, k, l in dihedral_indices:
+            if (i, l) not in exclusion_indices:
+                pairs_14.append((i, l))
 
         with open(filename, 'w') as itp_file:
 
@@ -277,29 +301,31 @@ class ForceFieldGenerator:
             cur_str += '   ptype   sigma         epsilon\n'
             itp_file.write(cur_str)
 
-            for at in unique_atom_types:
-                pattern = re.compile(r'\A' + f'  {at} ')
-                ff_data = open(self.force_field_data, 'rt')
-                at_available = False
+            found_atom_types = []
 
+            with open(self.force_field_data, 'r') as ff_data:
                 for line in ff_data:
-                    if re.search(pattern, line):
-                        cur_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
-                            at, at, 0., 0., 'A')
-                        cur_str += '{:16.5e}{:14.5e}\n'.format(
-                            float(line.split()[1]) * 2**(-1 / 6) * 2 / 10,
-                            float(line.split()[2]) * 4.184)
-                        itp_file.write(cur_str)
-                        at_available = True
+                    for at in unique_atom_types:
+                        if line.startswith(f'  {at}  '):
+                            cur_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
+                                at, at, 0., 0., 'A')
+                            cur_str += '{:16.5e}{:14.5e}\n'.format(
+                                float(line.split()[1]) * 2**(-1 / 6) * 2 / 10,
+                                float(line.split()[2]) * 4.184)
+                            itp_file.write(cur_str)
+                            found_atom_types.append(at)
 
-                errmsg = 'ForceFieldGenerator: Unknown atom type {}!'.format(at)
-                assert_msg_critical(at_available, errmsg)
+            for at in unique_atom_types:
+                if at not in found_atom_types:
+                    errmsg = f'ForceFieldGenerator: Unknown atom type {at}'
+                    assert_msg_critical(at_available, errmsg)
 
             # molecule type
 
             itp_file.write('\n[ moleculetype ]\n')
             itp_file.write(';name            nrexcl\n')
-            itp_file.write('{:>10}{:10}\n'.format(self.molecule_name, 3))
+            itp_file.write('{:>10}{:10}\n'.format(self.molecule_name,
+                                                  self.nrexcl))
 
             # atoms
 
@@ -308,17 +334,16 @@ class ForceFieldGenerator:
             cur_str += '     charge      mass\n'
             itp_file.write(cur_str)
 
-            for i, at in enumerate(atom_types):
-                pattern = re.compile(r'\A' + f'{at} ')
-                ff_data = open(self.force_field_data, 'rt')
-
+            with open(self.force_field_data, 'r') as ff_data:
                 for line in ff_data:
-                    if re.search(pattern, line):
-                        cur_str = '{:6}{:>5}{:6}{:>6}{:>6}'.format(
-                            i + 1, atom_types[i], 1, 'RES', atom_names[i])
-                        cur_str += '{:5}{:13.6f}{:13.5f}\n'.format(
-                            i + 1, charges[i], float(line.split()[1]))
-                        itp_file.write(cur_str)
+                    for i, at in enumerate(atom_types):
+                        if line.startswith(f'{at} '):
+                            mass_i = float(line.split()[1])
+                            cur_str = '{:6}{:>5}{:6}{:>6}{:>6}'.format(
+                                i + 1, atom_types[i], 1, 'RES', atom_names[i])
+                            cur_str += '{:5}{:13.6f}{:13.5f}\n'.format(
+                                i + 1, charges[i], mass_i)
+                            itp_file.write(cur_str)
 
             # bonds
 
@@ -393,7 +418,7 @@ class ForceFieldGenerator:
                 itp_file.write('\n[ pairs ]\n')
                 itp_file.write(';    i      j    funct\n')
 
-                for pair in pairs:
+                for pair in pairs_14:
                     itp_file.write('{:6}{:7}{:7}\n'.format(
                         pair[0] + 1, pair[1] + 1, 1))
 
