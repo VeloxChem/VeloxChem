@@ -23,8 +23,7 @@ class TestFiniteDifference:
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
-        total_density = scf_drv.scf_tensors['D_alpha'] + scf_drv.scf_tensors['D_beta']
-        scf_prop.compute(task.molecule, task.ao_basis, total_density)
+        scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_drv.scf_tensors)
 
         cart = 2  # z-component
         delta_ef = 1.0e-4

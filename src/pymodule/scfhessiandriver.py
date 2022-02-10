@@ -881,12 +881,6 @@ class ScfHessianDriver(HessianDriver):
         # Hessian
         hessian = np.zeros((natm, 3, natm, 3))
 
-        # Gradient of the MO energies/coefficients and (energy-weighted) density matrix
-        self.orben_grad = np.zeros((natm, 3, nao))
-        self.mo_grad = np.zeros((natm, 3, nao, nao))
-        self.density_grad = np.zeros((natm, 3, nao, nao))
-        self.omega_grad = np.zeros((natm, 3, nao, nao))
-
         # First-order properties for gradient of dipole moment
         prop = FirstOrderProperties(self.comm, self.ostream)
         # numerical gradient (3 dipole components, no. atoms x 3 atom coords)
@@ -916,22 +910,13 @@ class ScfHessianDriver(HessianDriver):
                     grad_drv.compute(new_mol, ao_basis)
                     grad_plus = grad_drv.get_gradient()
 
-                    #density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                    orben_plus = self.scf_drv.scf_tensors['E']
-                    mo_plus = self.scf_drv.scf_tensors['C_alpha']
-                    # *2 for alpha+beta density
-					# TODO: remove omega gradient
-					# (it was needed for debugging the analytical Hessian)
-                    density_plus = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                    #omega_plus = grad_drv.omega_ao
-                    #prop.compute(new_mol, ao_basis, density)
-                    prop.compute(new_mol, ao_basis, density_plus)
+                    prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
                     mu_plus = prop.get_property('dipole moment')
 
                     if self.do_raman:
                         lr_drv.is_converged = False
                         lr_results_p = lr_drv.compute(new_mol, ao_basis,
-                                                           self.scf_drv.scf_tensors)
+                                                      self.scf_drv.scf_tensors)
 
 
                     coords[i, d] -= 2.0 * self.delta_h
@@ -940,14 +925,7 @@ class ScfHessianDriver(HessianDriver):
                     grad_drv.compute(new_mol, ao_basis)
                     grad_minus = grad_drv.get_gradient()
 
-                    #density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                    orben_minus = self.scf_drv.scf_tensors['E']
-                    mo_minus = self.scf_drv.scf_tensors['C_alpha']
-                    # *2 for alpha+beta density
-                    density_minus = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                    #omega_minus = grad_drv.omega_ao
-                    #prop.compute(new_mol, ao_basis, density)
-                    prop.compute(new_mol, ao_basis, density_minus)
+                    prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
                     mu_minus = prop.get_property('dipole moment')
 
                     if self.do_raman:
@@ -968,12 +946,6 @@ class ScfHessianDriver(HessianDriver):
                         self.dipole_gradient[c, 3*i + d] = (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
                     coords[i, d] += self.delta_h
                     hessian[i, d, :, :] = (grad_plus - grad_minus) / (2.0 * self.delta_h)
-                    self.orben_grad[i, d, :] = (orben_plus - orben_minus) / (2.0 * self.delta_h)
-                    self.mo_grad[i, d, :, :] = (mo_plus - mo_minus) / (2.0 * self.delta_h)
-                    #self.density_grad[i, d, :, :] = (density_plus - density_minus) / (2.0 * self.delta_h)
-                    #self.omega_grad[i, d, :, :] = (omega_plus - omega_minus) / (2.0 * self.delta_h)
-
-
         else:
             # Four-point numerical derivative approximation
             # for debugging of analytical Hessian:
@@ -986,8 +958,7 @@ class ScfHessianDriver(HessianDriver):
                     grad_drv.compute(new_mol, ao_basis)
                     grad_plus1 = grad_drv.get_gradient()
 
-                    density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                    prop.compute(new_mol, ao_basis, density)
+                    prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
                     mu_plus1 = prop.get_property('dipole moment')
 
                     if self.do_raman:
@@ -1001,8 +972,7 @@ class ScfHessianDriver(HessianDriver):
                     grad_drv.compute(new_mol, ao_basis)
                     grad_plus2 = grad_drv.get_gradient()
 
-                    density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                    prop.compute(new_mol, ao_basis, density)
+                    prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
                     mu_plus2 = prop.get_property('dipole moment')
 
                     if self.do_raman:
@@ -1016,8 +986,7 @@ class ScfHessianDriver(HessianDriver):
                     grad_drv.compute(new_mol, ao_basis)
                     grad_minus1 = grad_drv.get_gradient()
 
-                    density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                    prop.compute(new_mol, ao_basis, density)
+                    prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
                     mu_minus1 = prop.get_property('dipole moment')
 
                     if self.do_raman:
@@ -1031,8 +1000,7 @@ class ScfHessianDriver(HessianDriver):
                     grad_drv.compute(new_mol, ao_basis)
                     grad_minus2 = grad_drv.get_gradient()
 
-                    density = 2.0 * self.scf_drv.scf_tensors['D_alpha']
-                    prop.compute(new_mol, ao_basis, density)
+                    prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
                     mu_minus2 = prop.get_property('dipole moment')
 
                     if self.do_raman:

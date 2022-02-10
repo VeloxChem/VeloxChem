@@ -263,8 +263,8 @@ class SHGDriver(NonLinearSolver):
                                             ao_basis, profiler)
 
         # Compute dipole vector
-        scf_prop = ScfFirstOrderProperties(self.comm, self.ostream)
-        scf_prop.compute(molecule, ao_basis, scf_tensors)
+        scf_prop = FirstOrderProperties(self.comm, self.ostream)
+        scf_prop.compute_scf_prop(molecule, ao_basis, scf_tensors)
 
         if self.rank == mpi_master():
 

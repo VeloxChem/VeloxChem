@@ -321,13 +321,9 @@ def main():
 
             # SCF first-order properties
             scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
+            scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_tensors)
             if task.mpi_rank == mpi_master():
-                total_density = scf_tensors['D_alpha'] + scf_tensors['D_beta']
-            else:
-                total_density = None
-            scf_prop.compute(task.molecule, task.ao_basis, total_density)
-            if task.mpi_rank == mpi_master():
-                scf_prop.print_properties(task.molecule)
+                scf_prop.print_properties(task.molecule, 'SCF Ground-State Dipole Moment')
 
             if (scf_drv.electric_field is not None and
                     task.molecule.get_charge() != 0):
