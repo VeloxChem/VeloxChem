@@ -250,6 +250,7 @@ class ForceFieldGenerator:
             for j in range(i + 1, n_atoms):
                 if con[i, j]:
                     bond_indices.add((i, j))
+        bond_indices = sorted(list(bond_indices))
 
         angle_indices = set()
         for i, j in bond_indices:
@@ -287,6 +288,10 @@ class ForceFieldGenerator:
         for i, j, k, l in dihedral_indices:
             if (i, l) not in exclusion_indices:
                 pairs_14.append((i, l))
+        pairs_14.sort()
+
+        with open(self.force_field_data, 'r') as ff_data:
+            ff_data_lines = ff_data.readlines()
 
         with open(filename, 'w') as itp_file:
 
@@ -301,24 +306,23 @@ class ForceFieldGenerator:
             cur_str += '   ptype   sigma         epsilon\n'
             itp_file.write(cur_str)
 
-            found_atom_types = []
-
-            with open(self.force_field_data, 'r') as ff_data:
-                for line in ff_data:
-                    for at in unique_atom_types:
-                        if line.startswith(f'  {at}  '):
-                            cur_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
-                                at, at, 0., 0., 'A')
-                            cur_str += '{:16.5e}{:14.5e}\n'.format(
-                                float(line.split()[1]) * 2**(-1 / 6) * 2 / 10,
-                                float(line.split()[2]) * 4.184)
-                            itp_file.write(cur_str)
-                            found_atom_types.append(at)
-
             for at in unique_atom_types:
-                if at not in found_atom_types:
-                    errmsg = f'ForceFieldGenerator: Unknown atom type {at}'
-                    assert_msg_critical(at_available, errmsg)
+                atom_type_found = False
+
+                for line in ff_data_lines:
+                    if line.startswith(f'  {at}  '):
+                        cur_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
+                            at, at, 0., 0., 'A')
+                        cur_str += '{:16.5e}{:14.5e}\n'.format(
+                            float(line.split()[1]) * 2**(-1 / 6) * 2 / 10,
+                            float(line.split()[2]) * 4.184)
+                        itp_file.write(cur_str)
+                        atom_type_found = True
+                        break
+
+                assert_msg_critical(
+                    atom_type_found,
+                    f'ForceFieldGenerator: Unknown atom type {at}')
 
             # molecule type
 
@@ -334,83 +338,62 @@ class ForceFieldGenerator:
             cur_str += '     charge      mass\n'
             itp_file.write(cur_str)
 
-            with open(self.force_field_data, 'r') as ff_data:
-                for line in ff_data:
-                    for i, at in enumerate(atom_types):
-                        if line.startswith(f'{at} '):
-                            mass_i = float(line.split()[1])
-                            cur_str = '{:6}{:>5}{:6}{:>6}{:>6}'.format(
-                                i + 1, atom_types[i], 1, 'RES', atom_names[i])
-                            cur_str += '{:5}{:13.6f}{:13.5f}\n'.format(
-                                i + 1, charges[i], mass_i)
-                            itp_file.write(cur_str)
+            for i, at in enumerate(atom_types):
+                for line in ff_data_lines:
+                    if line.startswith(f'{at} '):
+                        mass_i = float(line.split()[1])
+                        cur_str = '{:6}{:>5}{:6}{:>6}{:>6}'.format(
+                            i + 1, atom_types[i], 1, 'RES', atom_names[i])
+                        cur_str += '{:5}{:13.6f}{:13.5f}\n'.format(
+                            i + 1, charges[i], mass_i)
+                        itp_file.write(cur_str)
 
             # bonds
 
             itp_file.write('\n[ bonds ]\n')
             itp_file.write(';    i      j    funct       r           k_r\n')
 
-            r = []
-            r_eq = []
-            k_r = []
-            for i, at1 in enumerate(atom_types):
-                for j, at2 in enumerate(atom_types[i + 1:], start=i + 1):
-                    if con[i, j]:
-                        r_eq.append(
-                            np.linalg.norm(coords[i] - coords[j]) *
-                            bohr_in_angstroms() / 10)
+            for i, j in bond_indices:
+                r_eq = np.linalg.norm(coords[i] - coords[j])
+                r_eq *= bohr_in_angstroms() * 0.1
 
-                        str1 = r'\A' + f'{at1}-{at2} '
-                        str2 = r'\A' + f'{at2}-{at1} '
-                        pattern1 = re.compile(str1)
-                        pattern2 = re.compile(str2)
+                at_1 = atom_types[i]
+                at_2 = atom_types[j]
 
-                        r_available = False
-                        ff_data = open(self.force_field_data, 'rt')
+                str_1 = r'\A' + f'{at_1}-{at_2}  '
+                str_2 = r'\A' + f'{at_2}-{at_1}  '
+                pattern_1 = re.compile(str_1)
+                pattern_2 = re.compile(str_2)
 
-                        for line in ff_data:
-                            if re.search(pattern1, line):
-                                n_spaces = at1.count(' ')
-                                r.append(float(line.split()[2 + n_spaces]) / 10)
-                                k_r.append(
-                                    float(line.split()[1 + n_spaces]) * 4.184 *
-                                    2 * 100)
-                                r_available = True
-                            elif re.search(pattern2, line):
-                                n_spaces = at2.count(' ')
-                                r.append(float(line.split()[2 + n_spaces]) / 10)
-                                k_r.append(
-                                    float(line.split()[1 + n_spaces]) * 4.184 *
-                                    2 * 100)
-                                r_available = True
+                bond_found = False
 
-                        errmsg = 'ForceFieldGenerator: Bond {}-{}'.format(
-                            at1, at2)
-                        errmsg += ' is not available in gaff.dat! Check atom types!'
-                        assert_msg_critical(r_available, errmsg)
+                for line in ff_data_lines:
+                    if (re.search(pattern_1, line) or
+                            re.search(pattern_2, line)):
+                        bond_ff = line[5:].strip().split()
+                        r = float(bond_ff[1]) * 0.1
+                        k_r = float(bond_ff[0]) * 4.184 * 2 * 100
+                        bond_found = True
+                        break
 
-                        if abs(r[-1] - r_eq[-1]) > self.r_thresh:
-                            msg = 'Warning: Length of bond {}-{}'.format(
-                                at1, at2)
-                            msg += ' in data does not match length in XYZ file'
-                            msg += ' (atoms no. {} and {}):'.format(
-                                i + 1, j + 1)
-                            msg += ' {:.3f} vs. {:.3f}!'.format(r[-1], r_eq[-1])
-                            msg += ' Check atom types!'
-                            print(msg)
+                errmsg = f'ForceFieldGenerator: bond {at_1}-{at_2}'
+                errmsg += ' is not available'
+                assert_msg_critical(bond_found, errmsg)
 
-            if self.eq_param:
-                r = r_eq
+                if abs(r - r_eq) > self.r_thresh:
+                    msg = 'Warning: Length of bond {}-{}'.format(at_1, at_2)
+                    msg += ' in data does not match length in XYZ file'
+                    msg += ' (atoms no. {} and {}):'.format(i + 1, j + 1)
+                    msg += ' {:.3f} vs. {:.3f}!'.format(r[-1], r_eq[-1])
+                    msg += ' Check atom types!'
+                    print(msg)
 
-            n = 0
-            for i in range(n_atoms):
-                for j in range(i + 1, n_atoms):
-                    if con[i, j]:
-                        cur_str = '{:6}{:7}{:7}{:14.4e}{:14.4e} ;{:>7} -{:>3}\n'.format(
-                            i + 1, j + 1, 1, r[n], k_r[n], atom_names[i],
-                            atom_names[j])
-                        itp_file.write(cur_str)
-                        n += 1
+                if self.eq_param:
+                    r = r_eq
+
+                cur_str = '{:6}{:7}{:7}{:14.4e}{:14.4e} ;{:>7} -{:>3}\n'.format(
+                    i + 1, j + 1, 1, r, k_r, atom_names[i], atom_names[j])
+                itp_file.write(cur_str)
 
             # pairs
 
