@@ -176,8 +176,8 @@ class RespChargesDriver:
 
         if 'equal_charges' in resp_dict:
             self.equal_charges = []
-            for i in list(resp_dict['equal_charges'].split(', ')):
-                self.equal_charges.append(list(map(int, list(i.split(' = ')))))
+            for q in resp_dict['equal_charges'].split(','):
+                self.equal_charges.append(list(map(int, q.split('='))))
 
         if method_dict is not None:
             self.method_dict = dict(method_dict)
