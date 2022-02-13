@@ -44,7 +44,6 @@ class ForceFieldGenerator:
         - molecule_name: The name of the molecule.
         - eq_param: If equilibrium bond lengths and angles should be used.
         - r_thresh: The threshold for warning if bond lenghts deviate (nm).
-        - add_impropers: If impropers avoiding inversion should be added.
         - gen_pairs: If 1-4 parameters should be generated.
         - fudgeLJ: The factor by which to multiply Lennard-Jones 1-4 interactions.
         - fudgeQQ: The factor by which to multiply electrostatic 1-4 interactions.
@@ -74,7 +73,6 @@ class ForceFieldGenerator:
         self.eq_param = True
         self.r_thresh = 0.005
         self.theta_thresh = 10.
-        self.add_impropers = False
         self.gen_pairs = True
         self.fudgeLJ = 0.5
         self.fudgeQQ = 0.8333
@@ -142,7 +140,6 @@ class ForceFieldGenerator:
             'eq_param': 'bool',
             'r_thresh': 'float',
             'theta_thresh': 'float',
-            'add_impropers': 'bool',
             'gen_pairs': 'bool',
             'fudgeLJ': 'float',
             'fudgeQQ': 'float',
@@ -357,16 +354,16 @@ class ForceFieldGenerator:
 
                 at_1 = atom_types[i]
                 at_2 = atom_types[j]
-                str_1 = r'\A' + f'{at_1}-{at_2}  '
-                str_2 = r'\A' + f'{at_2}-{at_1}  '
-                pattern_1 = re.compile(str_1)
-                pattern_2 = re.compile(str_2)
+                patterns = [
+                    re.compile(r'\A' + f'{at_1}-{at_2}  '),
+                    re.compile(r'\A' + f'{at_2}-{at_1}  '),
+                ]
 
                 bond_found = False
 
                 for line in ff_data_lines:
-                    if (re.search(pattern_1, line) or
-                            re.search(pattern_2, line)):
+                    matches = [re.search(p, line) for p in patterns]
+                    if any(matches):
                         bond_ff = line[5:].strip().split()
                         r = float(bond_ff[1]) * 0.1
                         k_r = float(bond_ff[0]) * 4.184 * 2 * 100
@@ -393,11 +390,10 @@ class ForceFieldGenerator:
 
             # pairs
 
-            if self.gen_pairs:
-                itp_file.write('\n[ pairs ]\n')
-                itp_file.write(';    i      j    funct\n')
-                for i, j in pairs_14:
-                    itp_file.write('{:6}{:7}{:7}\n'.format(i + 1, j + 1, 1))
+            itp_file.write('\n[ pairs ]\n')
+            itp_file.write(';    i      j    funct\n')
+            for i, j in pairs_14:
+                itp_file.write('{:6}{:7}{:7}\n'.format(i + 1, j + 1, 1))
 
             # angles
 
@@ -416,16 +412,16 @@ class ForceFieldGenerator:
                 at_1 = atom_types[i]
                 at_2 = atom_types[j]
                 at_3 = atom_types[k]
-                str_1 = r'\A' + f'{at_1}-{at_2}-{at_3} '
-                str_2 = r'\A' + f'{at_3}-{at_2}-{at_1} '
-                pattern_1 = re.compile(str_1)
-                pattern_2 = re.compile(str_2)
+                patterns = [
+                    re.compile(r'\A' + f'{at_1}-{at_2}-{at_3} '),
+                    re.compile(r'\A' + f'{at_3}-{at_2}-{at_1} '),
+                ]
 
                 angle_found = False
 
                 for line in ff_data_lines:
-                    if (re.search(pattern_1, line) or
-                            re.search(pattern_2, line)):
+                    matches = [re.search(p, line) for p in patterns]
+                    if any(matches):
                         angle_ff = line[8:].strip().split()
                         theta = float(angle_ff[1])
                         k_theta = float(angle_ff[0]) * 4.184 * 2
@@ -466,36 +462,36 @@ class ForceFieldGenerator:
                 at_2 = atom_types[j]
                 at_3 = atom_types[k]
                 at_4 = atom_types[l]
-                str_1 = '{}-{}-{}-{}'.format(at_1, at_2, at_3, at_4)
-                str_2 = '{}-{}-{}-{}'.format(at_4, at_3, at_2, at_1)
-                pattern_1 = re.compile(str_1)
-                pattern_2 = re.compile(str_2)
+                patterns = [
+                    re.compile(r'\A' + f'{at_1}-{at_2}-{at_3}-{at_4} '),
+                    re.compile(r'\A' + f'{at_4}-{at_3}-{at_2}-{at_1} '),
+                ]
 
                 dihedral_found = False
 
                 dihedral_ff_lines = []
                 for line in ff_data_lines:
-                    if (re.search(pattern_1, line) or
-                            re.search(pattern_2, line)):
+                    matches = [re.search(p, line) for p in patterns]
+                    if any(matches):
                         if '.' not in line[11:].strip().split()[0]:
                             dihedral_ff_lines.append(line)
                             dihedral_found = True
 
                 if not dihedral_found:
-                    str_1 = 'X -{}-{}-X '.format(at_2, at_3)
-                    str_2 = 'X -{}-{}-X '.format(at_3, at_2)
-                    pattern_1 = re.compile(str_1)
-                    pattern_2 = re.compile(str_2)
+                    patterns = [
+                        re.compile(r'\A' + f'X -{at_2}-{at_3}-X  '),
+                        re.compile(r'\A' + f'X -{at_3}-{at_2}-X  '),
+                    ]
 
                     dihedral_ff_lines = []
                     for line in ff_data_lines:
-                        if (re.search(pattern_1, line) or
-                                re.search(pattern_2, line)):
+                        matches = [re.search(p, line) for p in patterns]
+                        if any(matches):
                             if '.' not in line[11:].strip().split()[0]:
                                 dihedral_ff_lines.append(line)
                                 dihedral_found = True
 
-                errmsg = 'ForceFieldGenerator: dihedral'
+                errmsg = 'ForceFieldGenerator: proper dihedral'
                 errmsg += f' {at_1}-{at_2}-{at_3}-{at_4} is not available.'
                 assert_msg_critical(dihedral_found, errmsg)
 
@@ -520,6 +516,12 @@ class ForceFieldGenerator:
 
             # improper dihedrals
 
+            sp2_atom_types = [
+                'c ', 'cs', 'c2', 'ca', 'cp', 'cq', 'cc', 'cd', 'ce', 'cf',
+                'cu', 'cv', 'cz', 'n ', 'n2', 'na', 'nb', 'nc', 'nd', 'ne',
+                'nf', 'pb', 'pc', 'pd', 'pe', 'pf'
+            ]
+
             itp_file.write('\n[ dihedrals ] ; impropers\n')
             cur_str = ';    i      j      k      l    funct'
             cur_str += '    phase     k_d      n\n'
@@ -530,85 +532,90 @@ class ForceFieldGenerator:
                 at_2 = atom_types[j]
                 at_3 = atom_types[k]
 
+                if at_2 not in sp2_atom_types:
+                    continue
+
                 for l in range(n_atoms):
                     if (l in [i, j, k]) or (not con[l, j]):
                         continue
                     at_4 = atom_types[l]
 
-                    str_1 = '{}-{}-{}-{}'.format(at_4, at_1, at_2, at_3)
-                    str_2 = '{}-{}-{}-{}'.format(at_3, at_4, at_2, at_1)
-                    str_3 = '{}-{}-{}-{}'.format(at_1, at_3, at_2, at_4)
-                    pattern_1 = re.compile(str_1)
-                    pattern_2 = re.compile(str_2)
-                    pattern_3 = re.compile(str_3)
+                    patterns = [
+                        re.compile(r'\A' + f'{at_4}-{at_1}-{at_2}-{at_3} '),
+                        re.compile(r'\A' + f'{at_1}-{at_4}-{at_2}-{at_3} '),
+                        re.compile(r'\A' + f'{at_3}-{at_4}-{at_2}-{at_1} '),
+                        re.compile(r'\A' + f'{at_4}-{at_3}-{at_2}-{at_1} '),
+                        re.compile(r'\A' + f'{at_1}-{at_3}-{at_2}-{at_4} '),
+                        re.compile(r'\A' + f'{at_3}-{at_1}-{at_2}-{at_4} '),
+                    ]
 
                     dihedral_found = False
 
                     for line in ff_data_lines:
-                        if (re.search(pattern_1, line) or
-                                re.search(pattern_2, line) or
-                                re.search(pattern_3, line)):
+                        matches = [re.search(p, line) for p in patterns]
+                        if any(matches):
                             if '.' in line[11:].strip().split()[0]:
                                 dihedral_ff = line[11:].strip().split()
                                 dihedral_found = True
                                 break
 
                     if not dihedral_found:
-                        str_1 = 'X -{}-{}-{}'.format(at_1, at_2, at_3)
-                        str_2 = 'X -{}-{}-{}'.format(at_4, at_2, at_1)
-                        str_3 = 'X -{}-{}-{}'.format(at_3, at_2, at_4)
-                        pattern_1 = re.compile(str_1)
-                        pattern_2 = re.compile(str_2)
-                        pattern_3 = re.compile(str_3)
+                        patterns = [
+                            re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_3} '),
+                            re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_3} '),
+                            re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_1} '),
+                            re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_1} '),
+                            re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_4} '),
+                            re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_4} '),
+                        ]
 
                         for line in ff_data_lines:
-                            if (re.search(pattern_1, line) or
-                                    re.search(pattern_2, line) or
-                                    re.search(pattern_3, line)):
+                            matches = [re.search(p, line) for p in patterns]
+                            if any(matches):
                                 if '.' in line[11:].strip().split()[0]:
                                     dihedral_ff = line[11:].strip().split()
                                     dihedral_found = True
                                     break
 
                     if not dihedral_found:
-                        str_1 = 'X -X -{}-{}'.format(at_2, at_3)
-                        str_2 = 'X -X -{}-{}'.format(at_2, at_1)
-                        str_3 = 'X -X -{}-{}'.format(at_2, at_4)
-                        pattern_1 = re.compile(str_1)
-                        pattern_2 = re.compile(str_2)
-                        pattern_3 = re.compile(str_3)
+                        patterns = [
+                            re.compile(r'\A' + f'X -X -{at_2}-{at_3} '),
+                            re.compile(r'\A' + f'X -X -{at_2}-{at_1} '),
+                            re.compile(r'\A' + f'X -X -{at_2}-{at_4} '),
+                        ]
 
                         for line in ff_data_lines:
-                            if (re.search(pattern_1, line) or
-                                    re.search(pattern_2, line) or
-                                    re.search(pattern_3, line)):
+                            matches = [re.search(p, line) for p in patterns]
+                            if any(matches):
                                 if '.' in line[11:].strip().split()[0]:
                                     dihedral_ff = line[11:].strip().split()
                                     dihedral_found = True
                                     break
 
-                    if dihedral_found:
-                        barrier = float(dihedral_ff[0]) * 4.184
-                        phase = float(dihedral_ff[2])
-                        periodicity = abs(int(dihedral_ff[3]))
+                    errmsg = 'ForceFieldGenerator: improper dihedral'
+                    errmsg += f' {at_4}-{at_3}-{at_2}-{at_1} is not available.'
+                    assert_msg_critical(dihedral_found, errmsg)
 
-                        assert_msg_critical(
-                            phase == 180.0,
-                            'ForceFieldGenerator: invalid improper dihedral phase'
-                        )
-                        assert_msg_critical(
-                            periodicity == 2,
-                            'ForceFieldGenerator: invalid improper dihedral periodicity'
-                        )
+                    barrier = float(dihedral_ff[0]) * 4.184
+                    phase = float(dihedral_ff[2])
+                    periodicity = abs(int(dihedral_ff[3]))
 
-                        cur_str = '{:6}{:7}{:7}{:7}'.format(
-                            l + 1, i + 1, j + 1, k + 1)
-                        cur_str += '{:7}{:11.2f}{:11.5f}{:4}'.format(
-                            1, phase, barrier, periodicity)
-                        cur_str += ' ; {}-{}-{}-{}\n'.format(
-                            atom_names[l], atom_names[i], atom_names[j],
-                            atom_names[k])
-                        itp_file.write(cur_str)
+                    assert_msg_critical(
+                        phase == 180.0,
+                        'ForceFieldGenerator: invalid improper dihedral phase')
+                    assert_msg_critical(
+                        periodicity == 2,
+                        'ForceFieldGenerator: invalid improper dihedral periodicity'
+                    )
+
+                    cur_str = '{:6}{:7}{:7}{:7}'.format(l + 1, i + 1, j + 1,
+                                                        k + 1)
+                    cur_str += '{:7}{:11.2f}{:11.5f}{:4}'.format(
+                        1, phase, barrier, periodicity)
+                    cur_str += ' ; {}-{}-{}-{}\n'.format(
+                        atom_names[l], atom_names[i], atom_names[j],
+                        atom_names[k])
+                    itp_file.write(cur_str)
 
     @staticmethod
     def copy_file(src, dest):
