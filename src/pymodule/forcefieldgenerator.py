@@ -23,120 +23,119 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from pathlib import Path, PurePath
+from mpi4py import MPI
+from pathlib import Path
 from scipy.optimize import curve_fit
 import numpy as np
+import sys
 import re
 
+from .veloxchemlib import mpi_master, bohr_in_angstroms, hartree_in_kcalpermol
 from .molecule import Molecule
-from .veloxchemlib import bohr_in_angstroms
-from .veloxchemlib import hartree_in_kcalpermol
-from .inputparser import parse_input
+from .outputstream import OutputStream
+from .respchargesdriver import RespChargesDriver
+from .inputparser import parse_input, get_datetime_string
 from .errorhandler import assert_msg_critical
 
 
 class ForceFieldGenerator:
     """
-    Parameterizes Amber force fields and creates GROMACS topologies.
+    Parameterizes general Amber force field and creates Gromacs topologies.
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
 
     Instance variables:
-        - molecule: The molecule.
         - molecule_name: The name of the molecule.
         - eq_param: If equilibrium bond lengths and angles should be used.
         - r_thresh: The threshold for warning if bond lenghts deviate (nm).
+        - theta_thresh: The threshold for warning if bond angle deviate (deg).
         - gen_pairs: If 1-4 parameters should be generated.
         - fudgeLJ: The factor by which to multiply Lennard-Jones 1-4 interactions.
         - fudgeQQ: The factor by which to multiply electrostatic 1-4 interactions.
-        - comb_rule: The number of the combination rule.
+        - comb_rule: The number of the combination rule in Gromacs.
         - nbfunc: The non-bonded function type (1: Lennard-Jones, 2: Buckingham).
+        - nrexcl: Number of neighboring bonds to be excluded for non-bonded interaction.
         - force_field_data: The filename of the data file with force field parameters.
         - force_field_data_extension: The filename of the data file with user-specified
           parameters.
-        - box_length: The box length for energy minimizations with OpenMM (Angstroms).
-        - temperature: The temperature (Kelvin).
-        - gromacs_include_path: The path to share/gromacs/top of the GROMACS directory.
-        - kfac: The dihedral force constant to restrain dihedrals.
-        - scan_angles: The angles for MM dihedral scans.
-        - dft_energies: The energies of relaxed dihedral DFT scans.
-        - scan_geometries: The DFT optimized geometries for the angles.
-        - dihedrals: The dihedrals.
+        - box_length: The box length for energy minimization.
+        - temperature: The temperature.
+        - gromacs_include_path: The path to topology folder of Gromacs.
+        - kfac: The force constant to restrain dihedrals.
+        - scan_dih_angles: The dihedral angles for MM scans (list of list).
+        - scan_energies: The energies from QM scans (list of list).
+        - scan_geometries: The optimized geometries from QM scan (list of list).
+        - target_dihedrals: The target dihedral angles for parameterization.
     """
 
-    def __init__(self, molecule, dft_scans=None):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes force field generator.
         """
 
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
+
+        self.molecule_name = f'veloxchem_ff_{get_datetime_string()}'
+        self.scan_xyz_files = None
+        self.atom_types = None
+
         # topology settings
-        self.molecule = molecule
-        self.molecule_name = 'molecule'
         self.eq_param = True
         self.r_thresh = 0.005
         self.theta_thresh = 10.
         self.gen_pairs = True
         self.fudgeLJ = 0.5
-        self.fudgeQQ = 0.8333
+        self.fudgeQQ = (1.0 / 1.2)
         self.comb_rule = 2
         self.nbfunc = 1
         self.nrexcl = 3
         self.force_field_data = 'gaff2.dat'
         self.force_field_data_extension = None
 
-        # mm settings
-        self.box_length = 100.0
-        self.temperature = 293.15
+        # MM settings
+        self.box_length = 100.0  # Angstrom
+        self.temperature = 293.15  # Kelvin
         self.gromacs_include_path = None
-        self.kfac = 10000.0
+        self.kfac = 10000.0  # force constant in kJ/mol/rad^2
 
         # scan settings
-        self.scan_angles = []
-        self.dft_energies = []
-        self.scan_geometries = []
-        self.dihedrals = []
+        self.scan_dih_angles = None
+        self.scan_energies = None
+        self.scan_geometries = None
+        self.target_dihedrals = None
 
-        # reading DFT data
+        # resp settings
+        self.resp_dict = None
 
-        if dft_scans is not None:
-            try:
-                import MDAnalysis as mda
-            except ImportError:
-                raise ImportError(
-                    'Unable to import MDAnalysis. Please install ' +
-                    'MDAnalysis via \'conda install MDAnalysis\'')
+        # mpi information
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
 
-            for xyz_file in dft_scans:
-                geometries = []
-                u = mda.Universe(xyz_file)
-                for ts in u.trajectory:
-                    geometries.append(
-                        Molecule(u.atoms.names, u.atoms.positions, 'angstrom'))
-                self.scan_geometries.append(geometries)
-                with open(xyz_file, 'r') as xyz:
-                    e = []
-                    phi = []
-                    pattern = re.compile(r'\AScan')
-                    for line in xyz:
-                        if re.search(pattern, line):
-                            e.append(float(line.split('Energy')[1].split()[0]))
-                            phi.append(float(line.split('=')[1].split()[0]))
-                            dih = [
-                                int(i) for i in line.split('Dihedral')
-                                [1].split()[0].split('-')
-                            ]
-                    self.dft_energies.append(e)
-                    self.scan_angles.append(phi)
-                    self.dihedrals.append(dih)
+        # output stream
+        self.ostream = ostream
 
-    def update_settings(self, ffg_dict):
+    def update_settings(self, ffg_dict, resp_dict=None):
         """
         Updates settings in force field generator.
 
         :param ffg_dict:
             The input dictionary of force field group.
+        :param resp_dict:
+            The input dictionary of resp charges group.
         """
 
         ffg_keywords = {
             'molecule_name': 'str',
+            'scan_xyz_files': 'seq_fixed_str',
+            'atom_types': 'seq_fixed_str',
             'eq_param': 'bool',
             'r_thresh': 'float',
             'theta_thresh': 'float',
@@ -145,6 +144,7 @@ class ForceFieldGenerator:
             'fudgeQQ': 'float',
             'comb_rule': 'int',
             'nbfunc': 'int',
+            'nrexcl': 'int',
             'box_length': 'float',
             'temperature': 'float',
             'gromacs_include_path': 'str',
@@ -156,21 +156,144 @@ class ForceFieldGenerator:
         parse_input(self, ffg_keywords, ffg_dict)
 
         if self.force_field_data_extension is None:
-            ff_file = PurePath(self.force_field_data)
+            ff_file = Path(self.force_field_data)
             self.force_field_data_extension = str(
                 ff_file.parent / (ff_file.stem + '_extension.dat'))
 
-    def write_top(self, filename, itp_file):
+        if 'filename' in ffg_dict and 'molecule_name' not in ffg_dict:
+            self.molecule_name = ffg_dict['filename']
+
+        if resp_dict is None:
+            resp_dict = {}
+        self.resp_dict = dict(resp_dict)
+
+    def compute(self, molecule, basis):
+        """
+        Runs force field optimization.
+        Note: Only runs on the master MPI process.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        """
+
+        # sanity check
+
+        assert_msg_critical(
+            self.scan_xyz_files is not None,
+            'ForceFieldGenerator.compute: scan_xyz_files not defined ')
+
+        assert_msg_critical(
+            self.atom_types is not None,
+            'ForceFieldGenerator.compute: atom_types not defined ')
+
+        assert_msg_critical(
+            len(self.atom_types) == molecule.number_of_atoms(),
+            'ForceFieldGenerator.compute: inconsistent number of atom_types')
+
+        self.molecule = molecule
+
+        # RESP charges
+
+        resp_drv = RespChargesDriver(self.comm, self.ostream)
+        resp_drv.update_settings(self.resp_dict)
+        resp_chg = resp_drv.compute(self.molecule, basis, 'resp')
+
+        # read QM scan
+
+        title = 'Force Field Generator'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
+        self.ostream.print_info('Reading QM scan from file...')
+        for xyz_fname in self.scan_xyz_files:
+            self.ostream.print_info(f'  {xyz_fname}')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        self.scan_dih_angles = []
+        self.scan_energies = []
+        self.scan_geometries = []
+        self.target_dihedrals = []
+
+        if self.rank == mpi_master():
+            self.read_qm_scan_xyz_files(self.scan_xyz_files)
+
+            inp_dir = Path(self.molecule_name).parent
+            mol_name = Path(self.molecule_name).stem
+
+            original_itp_file = inp_dir / (mol_name + '_original.itp')
+            original_top_file = original_itp_file.with_suffix('.top')
+
+            self.write_original_itp(str(original_itp_file),
+                                    list(self.atom_types), resp_chg)
+            self.write_top(str(original_top_file), str(original_itp_file))
+
+            self.validate_force_field(str(original_top_file))
+
+            self.dihedral_correction(str(original_top_file))
+
+            new_top_file = inp_dir / (mol_name + '_new.top')
+            self.validate_force_field(str(new_top_file))
+
+    def read_qm_scan_xyz_files(self, scan_xyz_files):
+        """
+        Reads QM scan xyz files.
+
+        :param scan_xyz_files:
+            The list of xyz files from QM scan.
+        """
+
+        # reading QM data
+
+        try:
+            import MDAnalysis as mda
+        except ImportError:
+            raise ImportError('Unable to import MDAnalysis. Please install ' +
+                              'MDAnalysis via \'conda install MDAnalysis\'')
+
+        for xyz_fname in scan_xyz_files:
+            geometries = []
+            energies = []
+            dih_angles = []
+
+            u = mda.Universe(xyz_fname)
+            for ts in u.trajectory:
+                geometries.append(
+                    Molecule(u.atoms.names, u.atoms.positions, 'angstrom'))
+            self.scan_geometries.append(geometries)
+
+            pattern = re.compile(r'\AScan')
+            with open(xyz_fname, 'r') as f_xyz:
+                for line in f_xyz:
+                    if re.search(pattern, line):
+                        energies.append(
+                            float(line.split('Energy')[1].split()[0]))
+                        dih_angles.append(float(line.split('=')[1].split()[0]))
+                        dih_inds = [
+                            int(i) for i in line.split('Dihedral')[1].split()
+                            [0].split('-')
+                        ]
+                self.scan_energies.append(energies)
+                self.scan_dih_angles.append(dih_angles)
+                self.target_dihedrals.append(dih_inds)
+
+    def write_top(self, top_filename, itp_filename):
         """
         Writes a topology file.
 
-        :param filename:
-            The filename of the topology file.
-        :param itp_file:
-            The filename of the included itp file.
+        :param top_filename:
+            The name of the topology file.
+        :param itp_filename:
+            The name of the included itp file.
         """
 
-        with open(filename, 'w') as top_file:
+        mol_name = Path(self.molecule_name).stem
+        itp_name = Path(itp_filename).name
+
+        with open(top_filename, 'w') as top_file:
 
             # header
 
@@ -189,36 +312,38 @@ class ForceFieldGenerator:
 
             # include itp
 
-            top_file.write('\n#include "' + itp_file + '"\n')
+            top_file.write('\n#include "' + itp_name + '"\n')
 
             # system
 
             top_file.write('\n[ system ]\n')
-            top_file.write(' {}\n'.format(self.molecule_name))
+            top_file.write(' {}\n'.format(mol_name))
 
             # molecules
 
             top_file.write('\n[ molecules ]\n')
             top_file.write('; Compound        nmols\n')
-            top_file.write('{:>10}{:9}\n'.format(self.molecule_name, 1))
+            top_file.write('{:>10}{:9}\n'.format(mol_name, 1))
 
-    def write_original_itp(self, filename, atom_types, charges):
+    def write_original_itp(self, itp_fname, atom_types, charges):
         """
         Writes an itp file with the original parameters.
 
-        :param filename:
-            The filename.
+        :param itp_fname:
+            The name of itp file.
         :param atom_types:
             The atom types.
         :param charges:
             The charges.
         """
 
+        mol_name = Path(self.molecule_name).stem
+
         # molecular information
 
         coords = self.molecule.get_coordinates()
         n_atoms = self.molecule.number_of_atoms()
-        con = self.get_connectivity()
+        connected = self.get_connectivity()
 
         # preparing atom types and atom names
 
@@ -237,7 +362,7 @@ class ForceFieldGenerator:
         bond_indices = set()
         for i in range(n_atoms):
             for j in range(i + 1, n_atoms):
-                if con[i, j]:
+                if connected[i, j]:
                     bond_indices.add((i, j))
         bond_indices = sorted(list(bond_indices))
 
@@ -246,10 +371,10 @@ class ForceFieldGenerator:
             for k in range(n_atoms):
                 if k in [i, j]:
                     continue
-                if con[j, k]:
+                if connected[j, k]:
                     inds = (i, j, k) if i < k else (k, j, i)
                     angle_indices.add(inds)
-                if con[k, i]:
+                if connected[k, i]:
                     inds = (k, i, j) if k < j else (j, i, k)
                     angle_indices.add(inds)
         angle_indices = sorted(list(angle_indices))
@@ -259,10 +384,10 @@ class ForceFieldGenerator:
             for l in range(n_atoms):
                 if l in [i, j, k]:
                     continue
-                if con[k, l]:
+                if connected[k, l]:
                     inds = (i, j, k, l) if i < l else (l, k, j, i)
                     dihedral_indices.add(inds)
-                if con[l, i]:
+                if connected[l, i]:
                     inds = (l, i, j, k) if l < k else (k, j, i, l)
                     dihedral_indices.add(inds)
         dihedral_indices = sorted(list(dihedral_indices))
@@ -288,18 +413,18 @@ class ForceFieldGenerator:
             with open(self.force_field_data, 'r') as ff_extension:
                 ff_data_lines += ff_extension.readlines()
 
-        with open(filename, 'w') as itp_file:
+        with open(itp_fname, 'w') as f_itp:
 
             # header
 
-            itp_file.write('; Generated by VeloxChem\n')
+            f_itp.write('; Generated by VeloxChem\n')
 
             # atom types
 
-            itp_file.write('\n[ atomtypes ]\n')
+            f_itp.write('\n[ atomtypes ]\n')
             cur_str = ';name   bond_type     mass     charge'
             cur_str += '   ptype   sigma         epsilon\n'
-            itp_file.write(cur_str)
+            f_itp.write(cur_str)
 
             for at in unique_atom_types:
                 atom_type_found = False
@@ -311,7 +436,7 @@ class ForceFieldGenerator:
                         cur_str += '{:16.5e}{:14.5e}\n'.format(
                             float(line.split()[1]) * 2**(-1 / 6) * 2 / 10,
                             float(line.split()[2]) * 4.184)
-                        itp_file.write(cur_str)
+                        f_itp.write(cur_str)
                         atom_type_found = True
                         break
 
@@ -321,17 +446,16 @@ class ForceFieldGenerator:
 
             # molecule type
 
-            itp_file.write('\n[ moleculetype ]\n')
-            itp_file.write(';name            nrexcl\n')
-            itp_file.write('{:>10}{:10}\n'.format(self.molecule_name,
-                                                  self.nrexcl))
+            f_itp.write('\n[ moleculetype ]\n')
+            f_itp.write(';name            nrexcl\n')
+            f_itp.write('{:>10}{:10}\n'.format(mol_name, self.nrexcl))
 
             # atoms
 
-            itp_file.write('\n[ atoms ]\n')
+            f_itp.write('\n[ atoms ]\n')
             cur_str = ';   nr  type  resi  res  atom  cgnr'
             cur_str += '     charge      mass\n'
-            itp_file.write(cur_str)
+            f_itp.write(cur_str)
 
             for i, at in enumerate(atom_types):
                 for line in ff_data_lines:
@@ -341,12 +465,12 @@ class ForceFieldGenerator:
                             i + 1, atom_types[i], 1, 'RES', atom_names[i])
                         cur_str += '{:5}{:13.6f}{:13.5f}\n'.format(
                             i + 1, charges[i], mass_i)
-                        itp_file.write(cur_str)
+                        f_itp.write(cur_str)
 
             # bonds
 
-            itp_file.write('\n[ bonds ]\n')
-            itp_file.write(';    i      j    funct       r           k_r\n')
+            f_itp.write('\n[ bonds ]\n')
+            f_itp.write(';    i      j    funct       r           k_r\n')
 
             for i, j in bond_indices:
                 r_eq = np.linalg.norm(coords[i] - coords[j])
@@ -386,21 +510,21 @@ class ForceFieldGenerator:
 
                 cur_str = '{:6}{:7}{:7}{:14.4e}{:14.4e} ; {}-{}\n'.format(
                     i + 1, j + 1, 1, r, k_r, atom_names[i], atom_names[j])
-                itp_file.write(cur_str)
+                f_itp.write(cur_str)
 
             # pairs
 
-            itp_file.write('\n[ pairs ]\n')
-            itp_file.write(';    i      j    funct\n')
+            f_itp.write('\n[ pairs ]\n')
+            f_itp.write(';    i      j    funct\n')
             for i, j in pairs_14:
-                itp_file.write('{:6}{:7}{:7}\n'.format(i + 1, j + 1, 1))
+                f_itp.write('{:6}{:7}{:7}\n'.format(i + 1, j + 1, 1))
 
             # angles
 
-            itp_file.write('\n[ angles ]\n')
+            f_itp.write('\n[ angles ]\n')
             cur_str = ';    i      j      k    funct'
             cur_str += '     theta       k_theta\n'
-            itp_file.write(cur_str)
+            f_itp.write(cur_str)
 
             for i, j, k in angle_indices:
                 a = coords[i] - coords[j]
@@ -445,17 +569,17 @@ class ForceFieldGenerator:
                     i + 1, j + 1, k + 1, 1, theta, k_theta)
                 cur_str += ' ; {}-{}-{}\n'.format(atom_names[i], atom_names[j],
                                                   atom_names[k])
-                itp_file.write(cur_str)
+                f_itp.write(cur_str)
 
             # proper dihedrals
 
-            itp_file.write('\n[ dihedrals ] ; propers\n')
+            f_itp.write('\n[ dihedrals ] ; propers\n')
             cur_str = ';    i      j      k      l    funct'
             cur_str += '    phase     k_d      n\n'
-            itp_file.write(cur_str)
+            f_itp.write(cur_str)
             cur_str = ';                                        '
             cur_str += 'C0         C1         C2         C3         C4         C5\n'
-            itp_file.write(cur_str)
+            f_itp.write(cur_str)
 
             for i, j, k, l in dihedral_indices:
                 at_1 = atom_types[i]
@@ -512,7 +636,7 @@ class ForceFieldGenerator:
                     cur_str += ' ; {}-{}-{}-{}\n'.format(
                         atom_names[i], atom_names[j], atom_names[k],
                         atom_names[l])
-                    itp_file.write(cur_str)
+                    f_itp.write(cur_str)
 
             # improper dihedrals
 
@@ -522,10 +646,10 @@ class ForceFieldGenerator:
                 'nf', 'pb', 'pc', 'pd', 'pe', 'pf'
             ]
 
-            itp_file.write('\n[ dihedrals ] ; impropers\n')
+            f_itp.write('\n[ dihedrals ] ; impropers\n')
             cur_str = ';    i      j      k      l    funct'
             cur_str += '    phase     k_d      n\n'
-            itp_file.write(cur_str)
+            f_itp.write(cur_str)
 
             for i, j, k in angle_indices:
                 at_1 = atom_types[i]
@@ -536,7 +660,7 @@ class ForceFieldGenerator:
                     continue
 
                 for l in range(n_atoms):
-                    if (l in [i, j, k]) or (not con[l, j]):
+                    if (l in [i, j, k]) or (not connected[l, j]):
                         continue
                     at_4 = atom_types[l]
 
@@ -615,7 +739,7 @@ class ForceFieldGenerator:
                     cur_str += ' ; {}-{}-{}-{}\n'.format(
                         atom_names[l], atom_names[i], atom_names[j],
                         atom_names[k])
-                    itp_file.write(cur_str)
+                    f_itp.write(cur_str)
 
     @staticmethod
     def copy_file(src, dest):
@@ -638,6 +762,9 @@ class ForceFieldGenerator:
             The name of topology file.
         """
 
+        inp_dir = Path(self.molecule_name).parent
+        mol_name = Path(self.molecule_name).stem
+
         # Ryckaert-Bellemans function
 
         def rbpot(phi, c0, c1, c2, c3, c4, c5):
@@ -650,25 +777,25 @@ class ForceFieldGenerator:
 
         itp_fname = self.get_included_file(top_filename)
 
-        new_itp_fname = f'{self.molecule_name}_new.itp'
-        new_top_fname = f'{self.molecule_name}_new.top'
+        new_itp_fname = str(inp_dir / f'{mol_name}_new.itp')
+        new_top_fname = str(inp_dir / f'{mol_name}_new.top')
 
         if itp_fname != new_itp_fname:
             self.copy_file(Path(itp_fname), Path(new_itp_fname))
             self.write_top(new_top_fname, new_itp_fname)
 
         for i, (dih, geom, dft_scan, angles) in enumerate(
-                zip(self.dihedrals, self.scan_geometries, self.dft_energies,
-                    self.scan_angles)):
+                zip(self.target_dihedrals, self.scan_geometries,
+                    self.scan_energies, self.scan_dih_angles)):
 
-            output_dir = Path(f'{self.molecule_name}_dih_corr', f'{i+1}')
+            output_dir = inp_dir / f'{mol_name}_dih_corr' / f'{i+1}'
             output_dir.mkdir(parents=True, exist_ok=True)
 
-            zero_itp_file = output_dir / f'{self.molecule_name}_zero.itp'
-            zero_top_file = output_dir / f'{self.molecule_name}_zero.top'
+            zero_itp_file = output_dir / f'{mol_name}_zero.itp'
+            zero_top_file = output_dir / f'{mol_name}_zero.top'
 
             self.copy_file(Path(new_itp_fname), zero_itp_file)
-            self.write_top(str(zero_top_file), zero_itp_file.name)
+            self.write_top(str(zero_top_file), str(zero_itp_file))
 
             # MM scan with dihedral parameters set to zero
 
@@ -676,8 +803,8 @@ class ForceFieldGenerator:
             mm_zero_scan = self.perform_mm_scan(str(zero_top_file), dih, geom,
                                                 angles)
 
-            # fitting Ryckaert-Bellemans function to difference between MM zero
-            # scan and DFT
+            # fitting Ryckaert-Bellemans function to difference
+            # between MM zero scan and QM scan
 
             rel_e_dft = np.array(dft_scan) - min(dft_scan)
             rel_e_dft *= hartree_in_kcalpermol() * 4.184
@@ -689,8 +816,7 @@ class ForceFieldGenerator:
 
             # updating parameters
 
-            self.set_dihedral_parameters(
-                '{}_new.itp'.format(self.molecule_name), dih, coef.tolist())
+            self.set_dihedral_parameters(new_itp_fname, dih, coef.tolist())
 
     def validate_force_field(self, top_file):
         """
@@ -702,13 +828,13 @@ class ForceFieldGenerator:
             The dihedrals.
         """
 
-        for i, dih in enumerate(self.dihedrals):
+        for i, dih in enumerate(self.target_dihedrals):
             geom = self.scan_geometries[i]
-            angles = self.scan_angles[i]
+            angles = self.scan_dih_angles[i]
             mm_scan = self.perform_mm_scan(top_file, dih, geom, angles)
 
-            dft_scan = np.array(self.dft_energies[i]) - min(
-                self.dft_energies[i])
+            dft_scan = np.array(self.scan_energies[i]) - min(
+                self.scan_energies[i])
             dft_scan *= hartree_in_kcalpermol() * 4.184
             dft_scan += min(mm_scan)
 
@@ -729,7 +855,7 @@ class ForceFieldGenerator:
             The dihedral.
         """
 
-        # select scan angles and geometries from DFT data
+        # select scan angles and geometries from QM data
 
         itp_fname = self.get_included_file(top_filename)
 
@@ -751,7 +877,7 @@ class ForceFieldGenerator:
             local_pdb_fname = str(output_dir / f'{i+1}.pdb')
 
             self.copy_file(Path(itp_fname), Path(local_itp_fname))
-            self.write_top(local_top_fname, Path(local_itp_fname).name)
+            self.write_top(local_top_fname, local_itp_fname)
             self.write_pdb_file(local_pdb_fname, geom)
 
             # fix dihedral with harmonic restraint function and calculate
@@ -792,7 +918,7 @@ class ForceFieldGenerator:
         # setup of the system and simulation parameters
 
         pdb = openmm.app.PDBFile(pdb_file)
-        box_length_in_nm = self.box_length / 10
+        box_length_in_nm = self.box_length * 0.1
         box_vectors = (
             openmm.Vec3(box_length_in_nm, 0., 0.),
             openmm.Vec3(0., box_length_in_nm, 0.),
@@ -951,7 +1077,7 @@ class ForceFieldGenerator:
                          min(dft_scan)) * hartree_in_kcalpermol()
         mm_scan_kcal = (np.array(mm_scan) - min(mm_scan)) / 4.184
 
-        plt.plot(angles, dft_scan_kcal, '-o', label="DFT")
+        plt.plot(angles, dft_scan_kcal, '-o', label="QM")
         plt.plot(angles, mm_scan_kcal, '-o', label="MM")
 
         plt.grid()
@@ -964,6 +1090,9 @@ class ForceFieldGenerator:
     def get_connectivity(self):
         """
         Gets connectivity.
+
+        :return:
+            A 2d array containing the connectivity information of the molecule.
         """
 
         coords = self.molecule.get_coordinates()
@@ -990,25 +1119,36 @@ class ForceFieldGenerator:
             The topology file.
         """
 
+        itp_file = None
+
         with open(top_file, 'r') as top:
-            pattern = re.compile('include')
+            pattern = re.compile(r'\A#include')
             for line in top:
                 if re.search(pattern, line):
-                    return '{}/{}'.format(str(Path(top_file).parent),
-                                          line.split('\"')[1])
+                    itp_file = Path(top_file).parent / line.split('"')[1]
+
+        assert_msg_critical(
+            itp_file is not None,
+            'ForceFieldGenerator.get_included_file: could not find ' +
+            'included file')
+
+        return str(itp_file)
 
     def get_atom_names(self):
         """
         Gets the atom names.
+
+        :return:
+            A list of atom names.
         """
 
         atom_names = []
         counter = {}
+
         for label in self.molecule.get_labels():
             if label not in counter:
-                counter[label] = 1
-            else:
-                counter[label] += 1
+                counter[label] = 0
+            counter[label] += 1
             atom_names.append(label + str(counter[label]))
 
         for i, label in enumerate(self.molecule.get_labels()):
