@@ -310,17 +310,18 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            firstorderdens, secorderdens = self.get_densities(
+            first_order_dens, second_order_dens = self.get_densities(
                 freqpairs, kX, S, D0, mo)
         else:
-            firstorderdens = None
-            secorderdens = None
+            first_order_dens = None
+            second_order_dens = None
 
         profiler.check_memory_usage('Densities')
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(freqpairs, firstorderdens, secorderdens,
-                                       F0, mo, molecule, ao_basis, dft_dict)
+        fock_dict = self.get_fock_dict(freqpairs, first_order_dens,
+                                       second_order_dens, F0, mo, molecule,
+                                       ao_basis, dft_dict)
 
         profiler.check_memory_usage('Focks')
 
@@ -405,8 +406,8 @@ class QuadraticResponseDriver(NonLinearSolver):
             A list of tranformed densities
         """
 
-        firstorderdens = []
-        secorderdens = []
+        first_order_dens = []
+        second_order_dens = []
 
         for (wb, wc) in freqpairs:
 
@@ -425,19 +426,19 @@ class QuadraticResponseDriver(NonLinearSolver):
             Dbc = self.transform_dens(kb, Dc, S)
             Dcb = self.transform_dens(kc, Db, S)
 
-            firstorderdens.append(Db.real)
-            firstorderdens.append(Db.imag)
-            firstorderdens.append(Dc.real)
-            firstorderdens.append(Dc.imag)
-            secorderdens.append((Dbc + Dcb).real)
-            secorderdens.append((Dbc + Dcb).imag)
+            first_order_dens.append(Db.real)
+            first_order_dens.append(Db.imag)
+            first_order_dens.append(Dc.real)
+            first_order_dens.append(Dc.imag)
+            second_order_dens.append((Dbc + Dcb).real)
+            second_order_dens.append((Dbc + Dcb).imag)
 
-        return firstorderdens, secorderdens
+        return first_order_dens, second_order_dens
 
     def get_fock_dict(self,
                       wi,
-                      firstorderdens,
-                      secorderdens,
+                      first_order_dens,
+                      second_order_dens,
                       F0,
                       mo,
                       molecule,
@@ -490,8 +491,8 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         time_start_fock = time.time()
         dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                        dft_dict, firstorderdens, secorderdens,
-                                        'qrf')
+                                        dft_dict, first_order_dens,
+                                        second_order_dens, 'qrf')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock

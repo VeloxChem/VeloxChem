@@ -446,12 +446,18 @@ class NonLinearSolver:
                 n_first_order = len(first_order_dens)
                 n_second_order = len(second_order_dens)
                 if mode.lower() == 'shg':
+                    # 6 first-order densities
+                    # 12 second-order densities
+                    # see get_densities in shgdriver
                     condition = ((n_first_order % 6 == 0) and
                                  (n_second_order % 12 == 0) and
                                  (n_first_order // 6 == n_second_order // 12))
                     batch_size = max((batch_size // 12) * 12, 12)
                     batch_size_first_order = batch_size // 2
                 else:
+                    # 4 first-order densities
+                    # 2 second-order densities
+                    # see get_densities in quadraticresponsedriver
                     condition = ((n_first_order % 4 == 0) and
                                  (n_second_order % 2 == 0) and
                                  (n_first_order // 4 == n_second_order // 2))

@@ -353,19 +353,19 @@ class CubicResponseDriver(NonLinearSolver):
         profiler.check_memory_usage('2nd CPP')
 
         if self.rank == mpi_master():
-            density_list_ii = self.get_densities_ii(freqpairs, kX, k_xy, S, D0,
-                                                    mo)
+            density_list_two = self.get_densities_II(freqpairs, kX, k_xy, S, D0,
+                                                     mo)
         else:
-            density_list_ii = None
+            density_list_two = None
 
         profiler.check_memory_usage('2nd densities')
 
-        fock_dict_ii = self.get_fock_dict_ii(freqpairs, density_list_ii, F0, mo,
-                                             molecule, ao_basis)
+        fock_dict_two = self.get_fock_dict_II(freqpairs, density_list_two, F0,
+                                              mo, molecule, ao_basis)
 
         profiler.check_memory_usage('2nd Focks')
 
-        e3_dict = self.get_e3(freqpairs, kX, k_xy, Focks, fock_dict_ii, f_xy,
+        e3_dict = self.get_e3(freqpairs, kX, k_xy, Focks, fock_dict_two, f_xy,
                               nocc, norb)
 
         profiler.check_memory_usage('E[3]')
@@ -712,7 +712,7 @@ class CubicResponseDriver(NonLinearSolver):
 
         return density_list
 
-    def get_densities_ii(self, freqpairs, kX, k_xy, S, D0, mo):
+    def get_densities_II(self, freqpairs, kX, k_xy, S, D0, mo):
         """
         Computes the  densities needed for the Fock matrices.
 
@@ -868,7 +868,7 @@ class CubicResponseDriver(NonLinearSolver):
 
         return focks
 
-    def get_fock_dict_ii(self, wi, density_list, F0, mo, molecule, ao_basis):
+    def get_fock_dict_II(self, wi, density_list, F0, mo, molecule, ao_basis):
         """
         Computes the Fock matrices for a cubic response function
 
