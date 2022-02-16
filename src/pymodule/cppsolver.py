@@ -327,9 +327,12 @@ class ComplexResponse(LinearSolver):
             w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs
         }
 
-        # distribute the right-hand side
-        # dist_v1 will also serve as initial guess
+        # distribute the gradient and right-hand side:
+        # dist_v1 will be used for calculating the subspace matrix 
+        # equation and residuals, dist_rhs for the initial guess
+
         dist_v1 = {}
+        dist_rhs = {}
         for key in op_freq_keys:
             if self.rank == mpi_master():
                 gradger, gradung = self.decomp_grad(v1[key])
@@ -339,9 +342,17 @@ class ComplexResponse(LinearSolver):
                     gradung.imag.reshape(-1, 1),
                     gradger.imag.reshape(-1, 1),
                 ))
+                rhs = np.hstack((
+                    gradger.real.reshape(-1, 1),
+                    gradung.real.reshape(-1, 1),
+                    -gradung.imag.reshape(-1, 1),
+                    -gradger.imag.reshape(-1, 1),
+                ))
             else:
                 grad_mat = None
+                rhs = None
             dist_v1[key] = DistributedArray(grad_mat, self.comm)
+            dist_rhs[key] = DistributedArray(rhs, self.comm)
 
         if self.nonlinear:
             rsp_vector_labels = [
@@ -369,7 +380,7 @@ class ComplexResponse(LinearSolver):
 
         # generate initial guess from scratch
         else:
-            bger, bung = self.setup_trials(dist_v1, precond)
+            bger, bung = self.setup_trials(dist_rhs, precond)
 
             self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
                                eri_dict, dft_dict, pe_dict)
