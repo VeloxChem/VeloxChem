@@ -119,12 +119,12 @@ class RpaOrbitalResponse(OrbitalResponse):
                 # 3) Construct density matrices for E[3] term:
                 # XCIntegrator expects a DM with real and imaginary part,
                 # so we set the imaginary part to zero.
-                perturbed_dm_ao = AODensityMatrix([xpy_ao, 0*xpy_ao, xmy_ao, 0*xmy_ao],
+                perturbed_dm_ao = AODensityMatrix([xmy_ao, 0*xpy_ao, xmy_ao, 0*xmy_ao],
                                                    denmat.rest)
                 # TODO: check if this should actually be zero.
                 # This term would correspond to the derivative of the
                 #  perturbed dm with respect to the MO coefficients.
-                zero_dm_ao = AODensityMatrix([0*xpy_ao, 0*xpy_ao, 0*xmy_ao, 0*xmy_ao],
+                zero_dm_ao = AODensityMatrix([0*xpy_ao, 0*xpy_ao],	#, 0*xmy_ao, 0*xmy_ao
                                               denmat.rest)
         else:
             dm_ao_rhs = AODensityMatrix()
@@ -146,7 +146,7 @@ class RpaOrbitalResponse(OrbitalResponse):
             perturbed_dm_ao.broadcast(self.rank, self.comm)
             zero_dm_ao.broadcast(self.rank, self.comm)
             # Fock matrix for computing gxc
-            fock_gxc_ao = AOFockMatrix(perturbed_dm_ao)
+            fock_gxc_ao = AOFockMatrix(zero_dm_ao)
             if self.xcfun.is_hybrid():
                 fact_xc = self.xcfun.get_frac_exact_exchange()
                 for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
@@ -219,13 +219,13 @@ class RpaOrbitalResponse(OrbitalResponse):
                 [mo_occ.T, sdp_pds, mo_vir])
 
             # TODO: Check if the DFT E[3] term is correct.
+			# probably needs to be added differently for RPA than for TDA
             # Add DFT E[3] contribution to the RHS:
             if self.dft:
                 print("\nRHS:before gxc:\n")
                 print(rhs_mo)
                 gxc_ao = fock_gxc_ao.alpha_to_numpy(0)
-                gxc_ao += fock_gxc_ao.alpha_to_numpy(2)
-                gxc_mo =  np.linalg.multi_dot([mo_occ.T, gxc_ao, mo_vir])
+                gxc_mo = np.linalg.multi_dot([mo_occ.T, gxc_ao, mo_vir])
                 rhs_mo += 0.25*gxc_mo
                 print("\nDFT, added gxc:\n")
                 print(rhs_mo)
