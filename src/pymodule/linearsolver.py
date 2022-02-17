@@ -519,7 +519,7 @@ class LinearSolver:
         else:
             self.dist_fock_ung.append(fock_ung, axis=1)
 
-    def compute(self, molecule, basis, scf_tensors, v1=None):
+    def compute(self, molecule, basis, scf_tensors, v_grad=None):
         """
         Solves for the linear equations.
 
@@ -529,9 +529,9 @@ class LinearSolver:
             The AO basis.
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
-        :param v1:
-            The gradients on the right-hand side. If not provided, v1 will be
-            computed for the B operator.
+        :param v_grad:
+            The gradients on the right-hand side. If not provided, v_grad will
+            be computed for the B operator.
 
         :return:
             A dictionary containing response functions, solutions, etc.
