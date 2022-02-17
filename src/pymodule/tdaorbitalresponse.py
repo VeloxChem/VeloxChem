@@ -110,11 +110,11 @@ class TdaOrbitalResponse(OrbitalResponse):
                 # 3) Construct density matrices for E[3] term:
                 # XCIntegrator expects a DM with real and imaginary part,
                 # so we set the imaginary part to zero.
-                perturbed_dm_ao = AODensityMatrix([exc_vec_ao, 0*exc_vec_ao, exc_vec_ao, 0*exc_vec_ao],#
+                perturbed_dm_ao = AODensityMatrix([exc_vec_ao, 0*exc_vec_ao, exc_vec_ao, 0*exc_vec_ao],
                                                    denmat.rest)
-                # TODO: check if this should actually be zero.
-                # This term would correspond to the derivative of the
-                #  perturbed dm with respect to the MO coefficients.
+
+                # corresponds to rho^{omega_b,omega_c} in quadratic response,
+                # which is zero for TDDFT orbital response
                 zero_dm_ao = AODensityMatrix([0*exc_vec_ao, 0*exc_vec_ao],
                                               denmat.rest)
         else:
@@ -161,24 +161,22 @@ class TdaOrbitalResponse(OrbitalResponse):
 
         eri_drv.compute(fock_ao_rhs, dm_ao_rhs, molecule, basis, screening)
         if self.dft:
-            #t0 = tm.time()
             if not self.xcfun.is_hybrid():
                 fock_ao_rhs.scale(2.0, 0)
                 fock_ao_rhs.scale(2.0, 1)
                 fock_gxc_ao.scale(2.0, 0)
             xc_drv = XCIntegrator(self.comm)
             molgrid.distribute(self.rank, self.nodes, self.comm)
+            # Linear response routine for f^xc
             xc_drv.integrate(fock_ao_rhs, dm_ao_rhs, gs_density,
                              molecule, basis, molgrid,
                              self.xcfun.get_func_label())
-            # TODO: E[3] contribution correct for LDA, but not for GGA
+            # Quadratic response routine for TDDFT E[3] term g^xc
             xc_drv.integrate(fock_gxc_ao, perturbed_dm_ao, zero_dm_ao,
                              gs_density, molecule, basis, molgrid,
                              self.xcfun.get_func_label(), "quadratic")
 
             fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
-            #if timing_dict is not None:
-            #    timing_dict['DFT'] = tm.time() - t0
 
         fock_ao_rhs.reduce_sum(self.rank, self.nodes, self.comm)
 
@@ -197,16 +195,11 @@ class TdaOrbitalResponse(OrbitalResponse):
             rhs_mo = fmo_rhs_0 + np.linalg.multi_dot(
                 [mo_occ.T, sdp_pds, mo_vir])
 
-            # TODO: Check if the DFT E[3] term is correct.
             # Add DFT E[3] contribution to the RHS:
             if self.dft:
-                print("\nRHS:before gxc:\n")
-                print(rhs_mo)
                 gxc_ao = fock_gxc_ao.alpha_to_numpy(0)
-                gxc_mo =  np.linalg.multi_dot([mo_occ.T, gxc_ao, mo_vir])
-                rhs_mo += 0.25*gxc_mo
-                print("\nDFT, added gxc:\n")
-                print(rhs_mo)
+                gxc_mo = np.linalg.multi_dot([mo_occ.T, gxc_ao, mo_vir])
+                rhs_mo += 0.25 * gxc_mo
 
 
         profiler.stop_timer('RHS')
