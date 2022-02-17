@@ -169,30 +169,33 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         operator = 'dipole'
         linear_solver = LinearSolver(self.comm, self.ostream)
-        a_rhs = linear_solver.get_complex_prop_grad(operator, self.a_components,
-                                                    molecule, ao_basis,
-                                                    scf_tensors)
-        b_rhs = linear_solver.get_complex_prop_grad(operator, self.b_components,
-                                                    molecule, ao_basis,
-                                                    scf_tensors)
-        c_rhs = linear_solver.get_complex_prop_grad(operator, self.c_components,
-                                                    molecule, ao_basis,
-                                                    scf_tensors)
+        a_grad = linear_solver.get_complex_prop_grad(operator,
+                                                     self.a_components,
+                                                     molecule, ao_basis,
+                                                     scf_tensors)
+        b_grad = linear_solver.get_complex_prop_grad(operator,
+                                                     self.b_components,
+                                                     molecule, ao_basis,
+                                                     scf_tensors)
+        c_grad = linear_solver.get_complex_prop_grad(operator,
+                                                     self.c_components,
+                                                     molecule, ao_basis,
+                                                     scf_tensors)
 
         if self.rank == mpi_master():
             inv_sqrt_2 = 1.0 / np.sqrt(2.0)
 
-            a_rhs = list(a_rhs)
-            for ind in range(len(a_rhs)):
-                a_rhs[ind] *= inv_sqrt_2
+            a_grad = list(a_grad)
+            for ind in range(len(a_grad)):
+                a_grad[ind] *= inv_sqrt_2
 
-            b_rhs = list(b_rhs)
-            for ind in range(len(b_rhs)):
-                b_rhs[ind] *= inv_sqrt_2
+            b_grad = list(b_grad)
+            for ind in range(len(b_grad)):
+                b_grad[ind] *= inv_sqrt_2
 
-            c_rhs = list(c_rhs)
-            for ind in range(len(c_rhs)):
-                c_rhs[ind] *= inv_sqrt_2
+            c_grad = list(c_grad)
+            for ind in range(len(c_grad)):
+                c_grad[ind] *= inv_sqrt_2
 
         # Storing the dipole integral matrices used for the X[2] and
         # A[2] contractions in MO basis
@@ -203,10 +206,10 @@ class QuadraticResponseDriver(NonLinearSolver):
         ABC = {}
 
         if self.rank == mpi_master():
-            A = {(op, w): v for op, v in zip('A', a_rhs) for w in wa}
-            B = {(op, w): v for op, v in zip('B', b_rhs)
+            A = {(op, w): v for op, v in zip('A', a_grad) for w in wa}
+            B = {(op, w): v for op, v in zip('B', b_grad)
                  for w in self.b_frequencies}
-            C = {(op, w): v for op, v in zip('C', c_rhs)
+            C = {(op, w): v for op, v in zip('C', c_grad)
                  for w in self.c_frequencies}
 
             ABC.update(A)

@@ -424,12 +424,12 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # calculate properties
         if self.is_converged:
-            edip_rhs = self.get_prop_grad('electric dipole', 'xyz', molecule,
-                                          basis, scf_tensors)
-            lmom_rhs = self.get_prop_grad('linear momentum', 'xyz', molecule,
-                                          basis, scf_tensors)
-            mdip_rhs = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
-                                          basis, scf_tensors)
+            edip_grad = self.get_prop_grad('electric dipole', 'xyz', molecule,
+                                           basis, scf_tensors)
+            lmom_grad = self.get_prop_grad('linear momentum', 'xyz', molecule,
+                                           basis, scf_tensors)
+            mdip_grad = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
+                                           basis, scf_tensors)
 
             eigvals = np.array([excitations[s][0] for s in range(self.nstates)])
 
@@ -518,11 +518,11 @@ class LinearResponseEigenSolver(LinearSolver):
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
                         elec_trans_dipoles[s, ind] = np.vdot(
-                            edip_rhs[ind], eigvec)
+                            edip_grad[ind], eigvec)
                         velo_trans_dipoles[s, ind] = np.vdot(
-                            lmom_rhs[ind], eigvec) / (-eigvals[s])
+                            lmom_grad[ind], eigvec) / (-eigvals[s])
                         magn_trans_dipoles[s, ind] = np.vdot(
-                            mdip_rhs[ind], eigvec)
+                            mdip_grad[ind], eigvec)
 
                     eigvecs[:, s] = eigvec[:]
 

@@ -176,23 +176,25 @@ class SHGDriver(NonLinearSolver):
         dipole_mats = dipole_drv.compute(molecule, ao_basis)
 
         linear_solver = LinearSolver(self.comm, self.ostream)
-        a_rhs = linear_solver.get_complex_prop_grad(self.a_operator,
-                                                    self.a_components, molecule,
-                                                    ao_basis, scf_tensors)
-        b_rhs = linear_solver.get_complex_prop_grad(self.b_operator,
-                                                    self.b_components, molecule,
-                                                    ao_basis, scf_tensors)
+        a_grad = linear_solver.get_complex_prop_grad(self.a_operator,
+                                                     self.a_components,
+                                                     molecule, ao_basis,
+                                                     scf_tensors)
+        b_grad = linear_solver.get_complex_prop_grad(self.b_operator,
+                                                     self.b_components,
+                                                     molecule, ao_basis,
+                                                     scf_tensors)
 
         if self.rank == mpi_master():
             inv_sqrt_2 = 1.0 / np.sqrt(2.0)
 
-            a_rhs = list(a_rhs)
-            for ind in range(len(a_rhs)):
-                a_rhs[ind] *= inv_sqrt_2
+            a_grad = list(a_grad)
+            for ind in range(len(a_grad)):
+                a_grad[ind] *= inv_sqrt_2
 
-            b_rhs = list(b_rhs)
-            for ind in range(len(b_rhs)):
-                b_rhs[ind] *= inv_sqrt_2
+            b_grad = list(b_grad)
+            for ind in range(len(b_grad)):
+                b_grad[ind] *= inv_sqrt_2
 
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
@@ -203,8 +205,8 @@ class SHGDriver(NonLinearSolver):
         AB = {}
 
         if self.rank == mpi_master():
-            A = {(op, w): v for op, v in zip('xyz', a_rhs) for w in wa}
-            B = {(op, w): v for op, v in zip('xyz', b_rhs)
+            A = {(op, w): v for op, v in zip('xyz', a_grad) for w in wa}
+            B = {(op, w): v for op, v in zip('xyz', b_grad)
                  for w in self.frequencies}
 
             AB.update(A)
