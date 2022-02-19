@@ -285,24 +285,43 @@ class SHGDriver(NonLinearSolver):
             self.print_component('|mu|', 0, dip_norm, width)
             self.ostream.print_blank()
 
-            w_str = 'Averaged first-order hyperpolarizability'
-            self.ostream.print_header(w_str)
             self.ostream.print_header('=' * (len(w_str) + 2))
-
+            self.ostream.print_blank()
+            w_str = 'Computes the parallel component of the SHG hyperpolarizability tensor β'
+            self.ostream.print_header(w_str)
+            self.ostream.print_blank()
+            w_str = 'where'
+            self.ostream.print_header(w_str)
+            self.ostream.print_blank()
+            w_str = 'β_ijk = - << μ_i;μ_j,μ_k>>'
+            self.ostream.print_header(w_str)
+            self.ostream.print_blank()
+            w_str = 'β_i = 1/5 * (β_ijj + β_jij + β_jji)'
+            self.ostream.print_header(w_str)
+            self.ostream.print_blank()
+            w_str = 'β =  β_i*μ_i/|μ| '
+            self.ostream.print_header(w_str)
+            self.ostream.print_blank()
+            w_str = 'for'
+            self.ostream.print_header(w_str)
+            self.ostream.print_blank()
+            w_str = '{i,j}∈{x,y,z}'
+            self.ostream.print_header(w_str)
+            
             # beta_bar = {}
 
             for key in beta.keys():
                 betaa = 0
                 for a in range(len(beta[key])):
-                    betaa += 1 / dip_norm * dip[a] * beta[key][a]
+                    betaa = 1 / dip_norm * dip[a] * beta[key][a]
 
                 self.ostream.print_blank()
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
-                self.print_component('beta_x', key, beta[key][0], width)
-                self.print_component('beta_y', key, beta[key][1], width)
+                self.print_component('beta_x', key,  beta[key][0], width)
+                self.print_component('beta_y', key,  beta[key][1], width)
                 self.print_component('beta_z', key, beta[key][2], width)
-                self.print_component('beta ||', key, 1 / 5 * betaa, width)
+                self.print_component('beta ', key,  betaa, width)
 
                 # beta_bar = {key: betaa}
 
@@ -312,6 +331,13 @@ class SHGDriver(NonLinearSolver):
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
+
+            title = 'Reference: '
+            title += 'K. Ahmadzadeh, X. Li, Z. Rinkevicius, P. Norman'
+            self.ostream.print_header(title.ljust(width))
+            title = 'XXXXXXXX (2022)'
+            self.ostream.print_header(title.ljust(width))
+            self.ostream.print_blank()
 
         profiler.end(self.ostream)
 
@@ -441,11 +467,13 @@ class SHGDriver(NonLinearSolver):
                         X2[cart] -= 2 * np.dot(Na[eta].T, x2_kX_X[eta + cart])
                         X2[cart] -= 2 * np.dot(Na[cart].T, x2_kX_X[eta + eta])
                         X2[cart] -= 2 * np.dot(Na[eta].T, x2_kX_X[cart + eta])
-
+            
+                # β_i(ω) = -1/5 * (<< i;j,j >> + << j;i,j >> + << j;j,i >>), for {i,j}ε{x,y,z}
+                
                 beta[wb] = (
-                    NaE3NbNc['x'] + A2['x'] + X2['x'],
-                    NaE3NbNc['y'] + A2['y'] + X2['y'],
-                    NaE3NbNc['z'] + A2['z'] + X2['z'],
+                    - 1 / 5 *  (NaE3NbNc['x'] + A2['x'] + X2['x']),
+                    - 1 / 5 *  (NaE3NbNc['y'] + A2['y'] + X2['y']),
+                    - 1 / 5 *  (NaE3NbNc['z'] + A2['z'] + X2['z']),
                 )
 
         profiler.check_memory_usage('End of SHG')

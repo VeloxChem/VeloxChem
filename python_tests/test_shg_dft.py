@@ -13,12 +13,15 @@ class TestSHG:
     def run_scf(self):
 
         molecule_string = """
-        O   0.0   0.0   0.0
-        H   0.0   1.4   1.1
-        H   0.0  -1.4   1.1
+        H      1.2001      0.0363      0.8431
+        C      0.7031      0.0083     -0.1305
+        H      0.9877      0.8943     -0.7114
+        H      1.0155     -0.8918     -0.6742
+        O     -0.6582     -0.0067      0.1730
+        H     -1.1326     -0.0311     -0.6482
         """
 
-        basis_set_label = 'cc-pVDZ'
+        basis_set_label = '6-31G'
 
         scf_settings = {'conv_thresh': 1.0e-6}
 
@@ -56,25 +59,25 @@ class TestSHG:
 
             # x-component
 
-            assert abs(shg_result[0.1][0].real - ref_result['x'].real) < 1.0e-6
-            assert abs(shg_result[0.1][0].imag - ref_result['x'].imag) < 1.0e-6
+            assert abs(shg_result[0.1][0].real - ref_result['x'].real) < 1.0e-5
+            assert abs(shg_result[0.1][0].imag - ref_result['x'].imag) < 1.0e-5
 
             # y-component
 
-            assert abs(shg_result[0.1][1].real - ref_result['y'].real) < 1.0e-6
-            assert abs(shg_result[0.1][1].imag - ref_result['y'].imag) < 1.0e-6
+            assert abs(shg_result[0.1][1].real - ref_result['y'].real) < 1.0e-5
+            assert abs(shg_result[0.1][1].imag - ref_result['y'].imag) < 1.0e-5
 
             # z-component
 
-            assert abs(shg_result[0.1][2].real - ref_result['z'].real) < 1.0e-6
-            assert abs(shg_result[0.1][2].imag - ref_result['z'].imag) < 1.0e-6
+            assert abs(shg_result[0.1][2].real - ref_result['z'].real) < 1.0e-5
+            assert abs(shg_result[0.1][2].imag - ref_result['z'].imag) < 1.0e-5
 
     def test_shg(self):
 
         ref_result = {
-            'x': 0 + 0j,
-            'y': 0 + 0j,
-            'z': 100.98592528 + 56.88987624j,
+            'x': -45.07384219269649-39.17912107231103j,
+            'y': -0.10548318636851473-0.022340142881491942j,
+            'z': 28.863052804345973+28.176366259870544j,
         }
 
         self.run_shg(ref_result)

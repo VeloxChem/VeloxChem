@@ -43,31 +43,31 @@ class TestSHG:
 
             # x-component
 
-            assert abs(shg_result[0.2][0].real - ref_result['x'].real) < 1.0e-6
-            assert abs(shg_result[0.2][0].imag - ref_result['x'].imag) < 1.0e-6
+            assert abs(shg_result[0.1][0].real - ref_result['x'].real) < 1.0e-5
+            assert abs(shg_result[0.1][0].imag - ref_result['x'].imag) < 1.0e-5
 
             # y-component
 
-            assert abs(shg_result[0.2][1].real - ref_result['y'].real) < 1.0e-6
-            assert abs(shg_result[0.2][1].imag - ref_result['y'].imag) < 1.0e-6
+            assert abs(shg_result[0.1][1].real - ref_result['y'].real) < 1.0e-5
+            assert abs(shg_result[0.1][1].imag - ref_result['y'].imag) < 1.0e-5
 
             # z-component
 
-            assert abs(shg_result[0.2][2].real - ref_result['z'].real) < 1.0e-6
-            assert abs(shg_result[0.2][2].imag - ref_result['z'].imag) < 1.0e-6
+            assert abs(shg_result[0.1][2].real - ref_result['z'].real) < 1.0e-5
+            assert abs(shg_result[0.1][2].imag - ref_result['z'].imag) < 1.0e-5
 
     def test_shg(self):
 
-        w = 0.2
+        w = 0.1
 
         ref_result = {
-            'x': 163.69097360 + 177.80276777j,
-            'y': 0 + 0j,
-            'z': 0 + 0J,
+            'x': -35.83087082066745-19.023385411711395j,
+            'y': -0.1324804367386819-0.0445882565520379j,
+            'z': 20.54249934914053+12.047889262521506j,
         }
 
         here = Path(__file__).parent
 
-        inpfile = str(here / 'inputs' / 'water_shg.inp')
+        inpfile = str(here / 'inputs' / 'methanol_shg.inp')
 
         self.run_shg(inpfile, w, ref_result)
