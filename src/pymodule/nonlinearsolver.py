@@ -336,7 +336,7 @@ class NonLinearSolver:
             'potfile_text': potfile_text,
         }
 
-    def compute(self, molecule, basis, scf_tensors, v1=None):
+    def compute(self, molecule, basis, scf_tensors):
         """
         Solves for the nonlinear response functions.
 
@@ -346,9 +346,6 @@ class NonLinearSolver:
             The AO basis.
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
-        :param v1:
-            The gradients on the right-hand side. If not provided, v1 will be
-            computed for the B operator.
 
         :return:
             A dictionary containing response functions, solutions, etc.
