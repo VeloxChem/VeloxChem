@@ -38,7 +38,7 @@ from .veloxchemlib import mpi_master
 from .import_from_pyscf import overlap_deriv
 from .import_from_pyscf import fock_deriv
 from .import_from_pyscf import eri_deriv
-
+from .import_from_pyscf import hcore_deriv
 
 class ScfGradientDriver(GradientDriver):
     """
@@ -149,13 +149,27 @@ class ScfGradientDriver(GradientDriver):
 
             for i in range(natm):
                 d_ovlp = overlap_deriv(molecule, ao_basis, i)
-                d_fock = fock_deriv(molecule, ao_basis, one_pdm_ao, i)
+                #d_fock = fock_deriv(molecule, ao_basis, one_pdm_ao, i) #TODO: remove
+                d_hcore = hcore_deriv(molecule, ao_basis, i)
                 d_eri = eri_deriv(molecule, ao_basis, i)
 
-                self.gradient[i] += ( 2.0*np.einsum('mn,xmn->x', one_pdm_ao, d_fock)
-                                +2.0*np.einsum('mn,xmn->x', epsilon_dm_ao, d_ovlp)
-                                -2.0*np.einsum('mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
-                                +1.0*np.einsum('mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
+                self.gradient[i] += ( 2.0 * np.einsum('mn,xmn->x', one_pdm_ao, d_hcore)
+                                + 2.0 * np.einsum('mn,xmn->x', epsilon_dm_ao, d_ovlp)
+                                )
+                if self.dft:
+                    if self.xcfun.is_hybrid():
+                        fact_xc = self.xcfun.get_frac_exact_exchange()
+                    else:
+                        fact_xc = 0
+                    print("\nExact exchange fraction:", fact_xc, "\n\n")
+                    self.gradient[i] += (
+                                + 2.0 * np.einsum('mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
+                                - fact_xc * np.einsum('mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
+                                )
+                else:
+                    self.gradient[i] += (
+                                + 2.0 * np.einsum('mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
+                                - 1.0 * np.einsum('mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
                                 )
 
             self.gradient += self.grad_nuc_contrib(molecule)

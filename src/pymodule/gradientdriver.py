@@ -125,14 +125,14 @@ class GradientDriver:
                                 'Gradient driver: Undefined XC functional')
 
         # TODO: Analytical DFT gradient is not implemented yet
-        if self.dft and not self.numerical:
-            self.numerical = True
-            warn_msg = '*** Warning: Analytical DFT gradient is not yet implemented.'
-            self.ostream.print_blank()
-            self.ostream.print_header(warn_msg.ljust(56))
-            warn_msg = '              Gradient will be calculated numerically instead.'
-            self.ostream.print_header(warn_msg.ljust(56))
-            self.ostream.flush()
+        #if self.dft and not self.numerical:
+        #    self.numerical = True
+        #    warn_msg = '*** Warning: Analytical DFT gradient is not yet implemented.'
+        #    self.ostream.print_blank()
+        #    self.ostream.print_header(warn_msg.ljust(56))
+        #    warn_msg = '              Gradient will be calculated numerically instead.'
+        #    self.ostream.print_header(warn_msg.ljust(56))
+        #    self.ostream.flush()
 
         # step size for finite differences
         if 'delta_h' in grad_dict:
