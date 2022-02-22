@@ -76,7 +76,7 @@ class SHG(ResponseProperty):
         Gets response functions or solutions.
 
         :param key:
-            The keyword 'response_functions' or 'solutions'.
+            The keyword.
 
         :return:
             The response functions or solutions.
