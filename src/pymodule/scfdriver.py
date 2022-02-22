@@ -499,6 +499,59 @@ class ScfDriver:
                                          self.ostream)
             self.ostream.flush()
 
+    def write_checkpoint_from_numpy(self, molecule, basis, array):
+        """
+        Writes checkpoint file from numpy array containing MO coefficients.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param array:
+            The numpy array (or list/tuple of numpy arrays).
+        """
+
+        # create MolecularOrbitals object from numpy array
+
+        if self.rank == mpi_master():
+            if isinstance(array, np.ndarray):
+                C_alpha = array
+                C_beta = None
+            elif isinstance(array, (tuple, list)):
+                C_alpha = array[0]
+                C_beta = array[1] if len(array) > 1 else None
+            else:
+                assert_msg_critical(
+                    False,
+                    'ScfDriver.create_checkpoint_from_numpy: invalid array')
+
+            if C_beta is None:
+                E_alpha = np.zeros(C_alpha.shape[1])
+                self.mol_orbs = MolecularOrbitals([C_alpha], [E_alpha],
+                                                  molorb.rest)
+            else:
+                E_alpha = np.zeros(C_alpha.shape[1])
+                E_beta = np.zeros(C_beta.shape[1])
+                self.mol_orbs = MolecularOrbitals([C_alpha, C_beta],
+                                                  [E_alpha, E_beta],
+                                                  molorb.unrest)
+        else:
+            self.mol_orbs = MolecularOrbitals()
+
+        # check that self.checkpoint_file is defined
+
+        checkpoint_defined = (self.checkpoint_file and
+                              isinstance(self.checkpoint_file, str))
+        assert_msg_critical(
+            checkpoint_defined,
+            'ScfDriver.create_checkpoint_from_numpy: checkpoint_file ' +
+            'not defined or invalid')
+
+        # write checkpoint file and sychronize MPI processes
+
+        self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
+        self.comm.barrier()
+
     def write_checkpoint(self, nuclear_charges, basis_set):
         """
         Writes molecular orbitals to checkpoint file.
