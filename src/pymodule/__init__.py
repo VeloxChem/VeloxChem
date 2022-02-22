@@ -39,6 +39,7 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import TwoIndexes
 from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import ExcitationVector
+from .veloxchemlib import LinearMomentumIntegralsDriver
 
 # C++ functions
 from .veloxchemlib import available_functionals
