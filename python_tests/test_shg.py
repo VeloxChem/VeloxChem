@@ -49,19 +49,19 @@ class TestSHG:
                            ref_result[comp].imag) < 1.0e-5
 
             assert abs(shg_result['beta_bar'][freq].real -
-                       ref_result['beta_bar'].real) < 1.0e-5
+                       ref_result['beta_bar'].real) < 1.0e-4
             assert abs(shg_result['beta_bar'][freq].imag -
-                       ref_result['beta_bar'].imag) < 1.0e-5
+                       ref_result['beta_bar'].imag) < 1.0e-4
 
     def test_shg(self):
 
         w = 0.1
 
         ref_result = {
-            'x': -35.83087082066745 - 19.023385411711395j,
-            'y': -0.1324804367386819 - 0.0445882565520379j,
-            'z': 20.54249934914053 + 12.047889262521506j,
-            'beta_bar': -12.94956568702526 - 7.993844914851742j,
+            'x': -35.83087082 - 19.02338541j,
+            'y': -0.13248044 - 0.04458826j,
+            'z': 20.54249935 + 12.04788926j,
+            'beta_bar': -12.94957848 - 7.99384834j,
         }
 
         here = Path(__file__).parent
