@@ -285,28 +285,26 @@ class SHGDriver(NonLinearSolver):
             self.print_component('|mu|', 0, dip_norm, width)
             self.ostream.print_blank()
 
+            w_str = 'SHG hyperpolarizability'
+            self.ostream.print_header(w_str)
             self.ostream.print_header('=' * (len(w_str) + 2))
             self.ostream.print_blank()
-            w_str = 'Computes the parallel component of the SHG hyperpolarizability tensor β'
+            w_str = 'Computes the observable quantity corresponding to EFISHG experiments with parallel external fields.'
             self.ostream.print_header(w_str)
+            w_str=  'Betavec_i is the i th component of the projection of the first hyperpolarizability tensor along the dipole moment'
+            self.ostream.print_header(w_str)
+
             self.ostream.print_blank()
             w_str = 'where'
             self.ostream.print_header(w_str)
             self.ostream.print_blank()
-            w_str = 'β_ijk = - << μ_i;μ_j,μ_k>>'
+
+            w_str = 'betavec_i = 1/5 * (beta_ijj + beta_jij + beta_jji), for j = {x,y,z}'
             self.ostream.print_header(w_str)
             self.ostream.print_blank()
-            w_str = 'β_i = 1/5 * (β_ijj + β_jij + β_jji)'
+            w_str = 'beta =  betavec_i*mu_i/|mu|, for i = {x,y,z}'
             self.ostream.print_header(w_str)
             self.ostream.print_blank()
-            w_str = 'β =  β_i*μ_i/|μ| '
-            self.ostream.print_header(w_str)
-            self.ostream.print_blank()
-            w_str = 'for'
-            self.ostream.print_header(w_str)
-            self.ostream.print_blank()
-            w_str = '{i,j}∈{x,y,z}'
-            self.ostream.print_header(w_str)
             
             # beta_bar = {}
 
@@ -318,9 +316,9 @@ class SHGDriver(NonLinearSolver):
                 self.ostream.print_blank()
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
-                self.print_component('beta_x', key,  beta[key][0], width)
-                self.print_component('beta_y', key,  beta[key][1], width)
-                self.print_component('beta_z', key, beta[key][2], width)
+                self.print_component('betavec_x', key,  beta[key][0], width)
+                self.print_component('betvaec_y', key,  beta[key][1], width)
+                self.print_component('betavec_z', key, beta[key][2], width)
                 self.print_component('beta ', key,  betaa, width)
 
                 # beta_bar = {key: betaa}
