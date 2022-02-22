@@ -94,8 +94,8 @@ class TestScfUnrestricted:
         xcfun_label = 'slda'
         electric_field = None
 
-        ref_e_scf = -75.756138
-        ref_dip = np.array([0.000000, 0.000000, -0.226886])
+        ref_e_scf = -75.7561378
+        ref_dip = np.array([0.000000, 0.000000, -0.226850])
 
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)

@@ -43,6 +43,8 @@ from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
+from .veloxchemlib import parse_xc_func
+from .veloxchemlib import XCIntegrator
 
 
 class NonLinearSolver:
@@ -193,10 +195,12 @@ class NonLinearSolver:
                 self.checkpoint_file = f'{self.filename}.rsp.h5'
 
         if 'xcfun' in method_dict:
-            errmsg = 'NonLinearSolver: The \'xcfun\' keyword is not supported '
-            errmsg += 'in nonlinear response calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
+            if 'dft' not in method_dict:
+                self.dft = True
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'Nonlinear solver: Undefined XC functional')
 
         if 'potfile' in method_dict:
             errmsg = 'NonLinearSolver: The \'potfile\' keyword is not supported '
@@ -257,7 +261,6 @@ class NonLinearSolver:
         :return:
             The dictionary of DFT information.
         """
-
         # generate integration grid
         if self.dft:
             grid_drv = GridDriver(self.comm)
@@ -350,8 +353,9 @@ class NonLinearSolver:
 
         return None
 
-    def comp_nlr_fock(self, mo, D, molecule, ao_basis, fock_flag):
-        """-
+    def comp_nlr_fock(self, mo, molecule, ao_basis, fock_flag, dft_dict,
+                      first_order_dens, second_order_dens, mode):
+        """
         Computes and returns a list of Fock matrices.
 
         :param mo:
@@ -364,39 +368,39 @@ class NonLinearSolver:
             The AO basis set
         :param fock_flag:
             The type of Fock matrices
+        :param dft_dict:
+            The dictionary containing DFT information
+        :param first_order_dens:
+            A list of first order densitiy matrices
+        :param second_order_dens:
+            A list of second order densitiy matrices
+        :param mode:
+            A list of second order densitiy matrices
 
         :return:
             A list of Fock matrices
         """
 
+        f_total = self.comp_two_el_int(mo, molecule, ao_basis, dft_dict,
+                                       first_order_dens, second_order_dens,
+                                       mode)
+        nrows = f_total.data.shape[0]
+        half_ncols = f_total.data.shape[1] // 2
+        ff_data = np.zeros((nrows, half_ncols), dtype=np.complex128)
         if fock_flag == 'real_and_imag':
-            if self.rank == mpi_master():
-                D_total = []
-                for da in D:
-                    D_total.append(da.real)
-                    D_total.append(da.imag)
-            else:
-                D_total = None
-
-            f_total = self.comp_two_el_int(mo, molecule, ao_basis, D_total)
-
-            nrows = f_total.data.shape[0]
-            half_ncols = f_total.data.shape[1] // 2
-            ff_data = np.zeros((nrows, half_ncols), dtype=np.complex128)
             for i in range(half_ncols):
                 ff_data[:, i] = (f_total.data[:, 2 * i] +
                                  1j * f_total.data[:, 2 * i + 1])
             return DistributedArray(ff_data, self.comm, distribute=False)
-
         elif fock_flag == 'real':
-            return self.comp_two_el_int(mo, molecule, ao_basis, D)
-
+            return f_total
         else:
             return None
 
-    def comp_two_el_int(self, mo, molecule, ao_basis, dabs):
+    def comp_two_el_int(self, mo, molecule, ao_basis, dft_dict,
+                        first_order_dens, second_order_dens, mode):
         """
-        Returns the two-electron part of the Fock matix in MO basis
+        Computes the two-electron part of the Fock matix in MO basis.
 
         :param mo:
             The MO coefficients
@@ -404,8 +408,14 @@ class NonLinearSolver:
             The molecule
         :param ao_basis:
             The AO basis set
-        :param dabs:
-            A list of densitiy matrices
+        :param dft_dict:
+            The dictionary containing DFT information
+        :param first_order_dens:
+            A list of first order densitiy matrices
+        :param second_order_dens:
+            A list of second order densitiy matrices
+        :param mode:
+            A list of second order densitiy matrices
 
         :return:
             A tuple containing the two-electron part of the Fock matix (in MO
@@ -419,8 +429,8 @@ class NonLinearSolver:
         # determine number of batches
 
         if self.rank == mpi_master():
-            n_total = len(dabs)
-            n_ao = dabs[0].shape[0]
+            n_total = len(second_order_dens)
+            n_ao = second_order_dens[0].shape[0]
             norb = mo.shape[1]
         else:
             n_total = None
@@ -428,6 +438,35 @@ class NonLinearSolver:
 
         batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
+
+        # double-check batch size for DFT
+
+        if self.dft:
+            if self.rank == mpi_master():
+                n_first_order = len(first_order_dens)
+                n_second_order = len(second_order_dens)
+                if mode.lower() == 'shg':
+                    condition = ((n_first_order % 6 == 0) and
+                                 (n_second_order % 12 == 0) and
+                                 (n_first_order // 6 == n_second_order // 12))
+                    batch_size = max((batch_size // 12) * 12, 12)
+                    batch_size_first_order = batch_size // 2
+                else:
+                    condition = ((n_first_order % 4 == 0) and
+                                 (n_second_order % 2 == 0) and
+                                 (n_first_order // 4 == n_second_order // 2))
+                    batch_size = max((batch_size // 2) * 2, 2)
+                    batch_size_first_order = batch_size * 2
+                errmsg = 'NonLinearSolver.comp_nlr_fock: '
+                errmsg += f'inconsistent number of density matrices (mode={mode})'
+                assert_msg_critical(condition, errmsg)
+            else:
+                batch_size = None
+                batch_size_first_order = None
+            batch_size = self.comm.bcast(batch_size, root=mpi_master())
+            batch_size_first_order = self.comm.bcast(batch_size_first_order,
+                                                     root=mpi_master())
+            num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         # go through batches
 
@@ -448,23 +487,66 @@ class NonLinearSolver:
             # form density matrices
 
             if self.rank == mpi_master():
+                if self.dft:
+                    batch_start_first_order = batch_size_first_order * batch_ind
+                    batch_end_first_order = min(
+                        batch_start_first_order + batch_size_first_order,
+                        n_first_order)
+
+                    dts1 = [
+                        np.ascontiguousarray(dab) for dab in first_order_dens[
+                            batch_start_first_order:batch_end_first_order]
+                    ]
+
+                    dens1 = AODensityMatrix(dts1, denmat.rest)
+
                 batch_start = batch_size * batch_ind
                 batch_end = min(batch_start + batch_size, n_total)
-                dts = [
+
+                dts2 = [
                     np.ascontiguousarray(dab)
-                    for dab in dabs[batch_start:batch_end]
+                    for dab in second_order_dens[batch_start:batch_end]
                 ]
-                dens = AODensityMatrix(dts, denmat.rest)
+
+                dens2 = AODensityMatrix(dts2, denmat.rest)
             else:
-                dens = AODensityMatrix()
+                if self.dft:
+                    dens1 = AODensityMatrix()
+                dens2 = AODensityMatrix()
 
-            dens.broadcast(self.rank, self.comm)
+            if self.dft:
+                dens1.broadcast(self.rank, self.comm)
+            dens2.broadcast(self.rank, self.comm)
 
-            fock = AOFockMatrix(dens)
+            fock = AOFockMatrix(dens2)
+            fock_flag = fockmat.rgenjk
+
+            if self.dft:
+                if self.xcfun.is_hybrid():
+                    fock_flag = fockmat.rgenjkx
+                    fact_xc = self.xcfun.get_frac_exact_exchange()
+                    for i in range(fock.number_of_fock_matrices()):
+                        fock.set_scale_factor(fact_xc, i)
+                else:
+                    fock_flag = fockmat.rgenj
+
             for i in range(fock.number_of_fock_matrices()):
-                fock.set_fock_type(fockmat.rgenjk, i)
+                fock.set_fock_type(fock_flag, i)
 
-            eri_driver.compute(fock, dens, molecule, ao_basis, screening)
+            eri_driver.compute(fock, dens2, molecule, ao_basis, screening)
+            if self.dft and not self.xcfun.is_hybrid():
+                for ifock in range(fock.number_of_fock_matrices()):
+                    fock.scale(2.0, ifock)
+            if self.dft:
+                xc_drv = XCIntegrator(self.comm)
+                molgrid = dft_dict['molgrid']
+                gs_density = dft_dict['gs_density']
+
+                molgrid.distribute(self.rank, self.nodes, self.comm)
+                xc_drv.integrate(fock, dens1, dens2, gs_density,
+                                 molecule, ao_basis, molgrid,
+                                 self.xcfun.get_func_label(), mode)
+
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
             if self.rank == mpi_master():

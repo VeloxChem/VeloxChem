@@ -117,7 +117,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def compute(self, molecule, ao_basis, scf_tensors):
+    def compute(self, molecule, ao_basis, scf_tensors, method_settings):
         """
         Computes a quadratic response function.
 
@@ -231,6 +231,8 @@ class QuadraticResponseDriver(NonLinearSolver):
             'program_end_time'
         }
 
+        N_drv.update_settings({}, method_settings)
+
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
 
@@ -304,17 +306,21 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         nocc = molecule.number_of_alpha_electrons()
 
+        dft_dict = self.init_dft(molecule, scf_tensors)
+
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            density_list = self.get_densities(freqpairs, kX, S, D0, mo)
+            firstorderdens, secorderdens = self.get_densities(
+                freqpairs, kX, S, D0, mo)
         else:
-            density_list = None
+            firstorderdens = None
+            secorderdens = None
 
         profiler.check_memory_usage('Densities')
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(freqpairs, density_list, F0, mo,
-                                       molecule, ao_basis)
+        fock_dict = self.get_fock_dict(freqpairs, firstorderdens, secorderdens,
+                                       F0, mo, molecule, ao_basis, dft_dict)
 
         profiler.check_memory_usage('Focks')
 
@@ -374,7 +380,7 @@ class QuadraticResponseDriver(NonLinearSolver):
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-                result[wb] = beta
+                result[(wb, wc)] = beta
 
         profiler.check_memory_usage('End of QRF')
 
@@ -399,7 +405,8 @@ class QuadraticResponseDriver(NonLinearSolver):
             A list of tranformed densities
         """
 
-        density_list = []
+        firstorderdens = []
+        secorderdens = []
 
         for (wb, wc) in freqpairs:
 
@@ -418,12 +425,24 @@ class QuadraticResponseDriver(NonLinearSolver):
             Dbc = self.transform_dens(kb, Dc, S)
             Dcb = self.transform_dens(kc, Db, S)
 
-            density_list.append(Dbc)
-            density_list.append(Dcb)
+            firstorderdens.append(Db.real)
+            firstorderdens.append(Db.imag)
+            firstorderdens.append(Dc.real)
+            firstorderdens.append(Dc.imag)
+            secorderdens.append((Dbc + Dcb).real)
+            secorderdens.append((Dbc + Dcb).imag)
 
-        return density_list
+        return firstorderdens, secorderdens
 
-    def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis):
+    def get_fock_dict(self,
+                      wi,
+                      firstorderdens,
+                      secorderdens,
+                      F0,
+                      mo,
+                      molecule,
+                      ao_basis,
+                      dft_dict=None):
         """
         Computes the Fock matrices for a quadratic response function
 
@@ -447,7 +466,7 @@ class QuadraticResponseDriver(NonLinearSolver):
         if self.rank == mpi_master():
             self.print_fock_header()
 
-        keys = ['Fbc', 'Fcb']
+        keys = ['FbcFcb']
 
         if self.checkpoint_file is not None:
             fock_file = str(
@@ -470,8 +489,9 @@ class QuadraticResponseDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                        'real_and_imag')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                        dft_dict, firstorderdens, secorderdens,
+                                        'qrf')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -522,8 +542,7 @@ class QuadraticResponseDriver(NonLinearSolver):
         for (wb, wc) in wi:
 
             vec_pack = np.array([
-                fo['Fbc'][wb].data,
-                fo['Fcb'][wb].data,
+                fo['FbcFcb'][wb].data,
                 fo2[('B', wb)].data,
                 fo2[('C', wc)].data,
             ]).T.copy()
@@ -535,7 +554,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
             vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
 
-            (fbc, fcb, fb, fc) = vec_pack
+            (fbcfcb, fb, fc) = vec_pack
 
             fb = np.conjugate(fb).T
             fc = np.conjugate(fc).T
@@ -549,7 +568,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
             xi = self.xi(kb, kc, fb, fc, F0_a)
 
-            e3fock = xi.T + (0.5 * fbc + 0.5 * fcb).T
+            e3fock = xi.T + 0.5 * fbcfcb.T
 
             e3vec[wb] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))

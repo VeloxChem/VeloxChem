@@ -196,8 +196,8 @@ class TPAReducedDriver(TPADriver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                        'real')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real', None,
+                                        None, density_list, 'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -458,7 +458,6 @@ class TPAReducedDriver(TPADriver):
             D_sig_yz = self.transform_dens(k_sig_yz, D0, S)
 
             # x #
-
             Dx = self.transform_dens(kx_, D_sig_xx, S)
             Dx += self.transform_dens(k_sig_xx, Dc_x_, S)
             Dx += self.transform_dens(ky_, D_sig_xy, S)
@@ -487,9 +486,12 @@ class TPAReducedDriver(TPADriver):
             Dz += self.transform_dens(kz_, D_sig_zz, S)
             Dz += self.transform_dens(k_sig_zz, Dc_z_, S)
 
-            density_list.append(Dx)
-            density_list.append(Dy)
-            density_list.append(Dz)
+            density_list.append(Dx.real)
+            density_list.append(Dx.imag)
+            density_list.append(Dy.real)
+            density_list.append(Dy.imag)
+            density_list.append(Dz.real)
+            density_list.append(Dz.imag)
 
         return density_list
 
@@ -534,8 +536,8 @@ class TPAReducedDriver(TPADriver):
                                           self.ostream)
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                        'real_and_imag')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                        None, None, density_list, 'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock

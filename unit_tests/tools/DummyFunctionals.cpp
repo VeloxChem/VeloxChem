@@ -48,8 +48,7 @@ namespace vlxtest {
         xcGradientGrid.zero();
     }
     
-    void
-    dummy_fvxc2_ab(      CXCHessianGrid& xcHessianGrid,
+    void dummy_fvxc2_ab(      CXCHessianGrid& xcHessianGrid,
                    const double          factor,
                    const CDensityGrid&   densityGrid)
     {
@@ -68,6 +67,27 @@ namespace vlxtest {
                        const CDensityGrid&    densityGrid)
     {
         xcHessianGrid.zero(); 
+    }
+
+    void dummy_fvxc3_ab(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                   const double          factor,
+                   const CDensityGrid&   densityGrid)
+    {
+        xcCubicHessianGrid.zero();
+    }
+    
+    void dummy_fvxc3_a(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                       const double          factor,
+                       const CDensityGrid&   densityGrid)
+    {
+        xcCubicHessianGrid.zero();
+    }
+    
+    void dummy_fvxc3_b(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                       const double           factor,
+                       const CDensityGrid&    densityGrid)
+    {
+        xcCubicHessianGrid.zero(); 
     }
     
 }  // namespace vlxtest

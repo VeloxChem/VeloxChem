@@ -26,6 +26,7 @@
 #include "DensityGrid.hpp"
 
 #include <cmath>
+#include <iostream>
 
 CDensityGrid::CDensityGrid()
 
@@ -563,7 +564,7 @@ CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGridAB,
     auto drhob = densityGridAB.betaDensity(0);
     
     // density screening for LDA
-    
+
     if (xcFuncType == xcfun::lda)
     {
         for (int32_t i = 0; i < npoints; i++)
@@ -644,7 +645,7 @@ CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGridAB,
 }
 
 void
-CDensityGrid::getScreenedGridPairUnrestricted(       CDensityGrid&   densityGridAB,
+CDensityGrid::getScreenedGridPairUnrestricted(        CDensityGrid&   densityGridAB,
                                                       CDensityGrid&   densityGridA,
                                                       CDensityGrid&   densityGridB,
                                                       CMolecularGrid& molecularGridab,
@@ -656,7 +657,7 @@ CDensityGrid::getScreenedGridPairUnrestricted(       CDensityGrid&   densityGrid
 {
     // create density grid
 
-    densityGridAB      = CDensityGrid(getNumberOfGridPoints(), 1, xcFuncType, dengrid::ab);
+    densityGridAB = CDensityGrid(getNumberOfGridPoints(), 1, xcFuncType, dengrid::ab);
 
     densityGridA = CDensityGrid(getNumberOfGridPoints(), 1, xcFuncType, dengrid::lima);
 

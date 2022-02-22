@@ -40,10 +40,10 @@ TEST_F(CXCFunctionalTest, DefaultConstructor)
 TEST_F(CXCFunctionalTest, CopyConstructor)
 {
     CPrimitiveFunctional pfa({"Slater"}, xcfun::lda,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
@@ -55,10 +55,10 @@ TEST_F(CXCFunctionalTest, CopyConstructor)
 TEST_F(CXCFunctionalTest, MoveConstructor)
 {
     CPrimitiveFunctional pfa({"Slater"}, xcfun::lda,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
@@ -70,10 +70,10 @@ TEST_F(CXCFunctionalTest, MoveConstructor)
 TEST_F(CXCFunctionalTest, CopyAssignment)
 {
     CPrimitiveFunctional pfa({"Slater"}, xcfun::lda,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
@@ -85,10 +85,10 @@ TEST_F(CXCFunctionalTest, CopyAssignment)
 TEST_F(CXCFunctionalTest, MoveAssignment)
 {
     CPrimitiveFunctional pfa({"Slater"}, xcfun::lda,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
@@ -100,10 +100,10 @@ TEST_F(CXCFunctionalTest, MoveAssignment)
 TEST_F(CXCFunctionalTest, GetLabel)
 {
     CPrimitiveFunctional pfa({"Slater"}, xcfun::lda,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
@@ -113,10 +113,10 @@ TEST_F(CXCFunctionalTest, GetLabel)
 TEST_F(CXCFunctionalTest, IsHybrid)
 {
     CPrimitiveFunctional pfa({"Slater"}, xcfun::lda,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
@@ -130,10 +130,10 @@ TEST_F(CXCFunctionalTest, IsHybrid)
 TEST_F(CXCFunctionalTest, IsUndefined)
 {
     CPrimitiveFunctional pfa({"Slater"}, xcfun::lda,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
@@ -147,10 +147,10 @@ TEST_F(CXCFunctionalTest, IsUndefined)
 TEST_F(CXCFunctionalTest, GetFunctionalType)
 {
     CPrimitiveFunctional pfa({"Slater"}, xcfun::lda,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
@@ -160,10 +160,10 @@ TEST_F(CXCFunctionalTest, GetFunctionalType)
 TEST_F(CXCFunctionalTest, GetFractionOfExactExchange)
 {
     CPrimitiveFunctional pfa({"Slater"}, xcfun::lda,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
@@ -177,10 +177,10 @@ TEST_F(CXCFunctionalTest, ComputeWithGradient)
     CXCGradientGrid xcgrid(CMemBlock2D<double>({1.0, 2.0, 3.0, 4.0, 5.0, 6.0}, 2, 3), dengrid::ab, xcfun::lda);
     
     CPrimitiveFunctional pfa({"Slater"}, xcfun::lda,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                              &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
@@ -196,10 +196,10 @@ TEST_F(CXCFunctionalTest, ComputeWithHessian)
     CXCHessianGrid xcgrid(CMemBlock2D<double>({1.0, 2.0, 3.0, 4.0, 5.0, 6.0}, 2, 3), dengrid::ab, xcfun::lda);
     
     CPrimitiveFunctional pfa({"Slater"}, xcfun::lda,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CPrimitiveFunctional pfb({"Dirac"}, xcfun::gga,  &vlxtest::dummy_fvxc_ab, &vlxtest::dummy_fvxc_a, &vlxtest::dummy_fvxc_b,
-                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b);
+                             &vlxtest::dummy_fvxc2_ab, &vlxtest::dummy_fvxc2_a, &vlxtest::dummy_fvxc2_b,&vlxtest::dummy_fvxc3_ab, &vlxtest::dummy_fvxc3_a, &vlxtest::dummy_fvxc3_b);
     
     CXCFunctional rfa({"LDA"}, xcfun::lda, 1.0, {pfa, pfb}, {1.0, 2.0});
     
