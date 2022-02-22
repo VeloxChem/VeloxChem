@@ -256,15 +256,19 @@ class SHGDriver(NonLinearSolver):
                                             self.comp, scf_tensors, molecule,
                                             ao_basis, profiler)
 
+        profiler.end(self.ostream)
+
+        self.is_converged = True
+
         # Compute dipole vector
         scf_prop = ScfFirstOrderProperties(self.comm, self.ostream)
         scf_prop.compute(molecule, ao_basis, scf_tensors)
 
         if self.rank == mpi_master():
 
-            dip = list(scf_prop.get_property('dipole moment'))
+            dip = scf_prop.get_property('dipole moment')
             # Norm of dipole
-            dip_norm = np.linalg.norm(scf_prop.get_property('dipole moment'))
+            dip_norm = np.linalg.norm(dip)
 
             # Compute isotropic beta along molecular dipole
 
@@ -274,7 +278,7 @@ class SHGDriver(NonLinearSolver):
             self.ostream.print_header('=' * (len(w_str) + 2))
 
             self.ostream.print_blank()
-            title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
+            title = '{:<12s}{:>12s}{:>19s}{:>20s}'.format(
                 'Component', 'Frequency', 'Real', 'Imaginary')
             width = len(title)
             self.ostream.print_header(title.ljust(width))
@@ -284,51 +288,44 @@ class SHGDriver(NonLinearSolver):
             self.print_component('mu_z', 0, dip[2], width)
             self.print_component('|mu|', 0, dip_norm, width)
             self.ostream.print_blank()
+            self.ostream.print_blank()
 
             w_str = 'SHG hyperpolarizability'
             self.ostream.print_header(w_str)
             self.ostream.print_header('=' * (len(w_str) + 2))
             self.ostream.print_blank()
-            w_str = 'Computes the observable quantity corresponding to EFISHG experiments with parallel external fields.'
-            self.ostream.print_header(w_str)
-            w_str=  'Betavec_i is the i th component of the projection of the first hyperpolarizability tensor along the dipole moment'
-            self.ostream.print_header(w_str)
-
-            self.ostream.print_blank()
-            w_str = 'where'
-            self.ostream.print_header(w_str)
+            w_str = 'Observable quantity corresponding to EFISHG experiments with '
+            self.ostream.print_header(w_str.ljust(width))
+            w_str = 'parallel external fields:'
+            self.ostream.print_header(w_str.ljust(width))
             self.ostream.print_blank()
 
-            w_str = 'betavec_i = 1/5 * (beta_ijj + beta_jij + beta_jji), for j = {x,y,z}'
-            self.ostream.print_header(w_str)
+            w_str = 'beta(vec)_i = 1/5*sum_{j=x,y,z}(beta_ijj + beta_jij + beta_jji)'
+            self.ostream.print_header(w_str.ljust(width))
             self.ostream.print_blank()
-            w_str = 'beta =  betavec_i*mu_i/|mu|, for i = {x,y,z}'
-            self.ostream.print_header(w_str)
+            w_str = 'beta = sum_{i=x,y,z}(beta(vec)_i * mu_i / |mu|)'
+            self.ostream.print_header(w_str.ljust(width))
             self.ostream.print_blank()
-            
-            # beta_bar = {}
 
-            for key in beta.keys():
-                betaa = 0
-                for a in range(len(beta[key])):
-                    betaa = 1 / dip_norm * dip[a] * beta[key][a]
+            w_str = 'Note: beta(vec)_i is the i-component of the projection of the '
+            self.ostream.print_header(w_str.ljust(width))
+            w_str = 'first hyperpolarizability tensor along the dipole moment.'
+            self.ostream.print_header(w_str.ljust(width))
+            self.ostream.print_blank()
 
-                self.ostream.print_blank()
+            beta_bar = {}
+            for freq in beta:
+                beta_bar[freq] = 0.0
+                for a in range(len(beta[freq])):
+                    beta_bar[freq] += 1.0 / dip_norm * dip[a] * beta[freq][a]
+
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
-                self.print_component('betavec_x', key,  beta[key][0], width)
-                self.print_component('betvaec_y', key,  beta[key][1], width)
-                self.print_component('betavec_z', key, beta[key][2], width)
-                self.print_component('beta ', key,  betaa, width)
-
-                # beta_bar = {key: betaa}
-
-            self.ostream.print_blank()
-            valstr = '*** Time spent in SHG calculation: '
-            valstr += '{:.2f} sec ***'.format(time.time() - start_time)
-            self.ostream.print_header(valstr)
-            self.ostream.print_blank()
-            self.ostream.flush()
+                self.print_component('beta(vec)_x', freq, beta[freq][0], width)
+                self.print_component('beta(vec)_y', freq, beta[freq][1], width)
+                self.print_component('beta(vec)_z', freq, beta[freq][2], width)
+                self.print_component('beta', freq, beta_bar[freq], width)
+                self.ostream.print_blank()
 
             title = 'Reference: '
             title += 'K. Ahmadzadeh, X. Li, Z. Rinkevicius, P. Norman'
@@ -337,11 +334,21 @@ class SHGDriver(NonLinearSolver):
             self.ostream.print_header(title.ljust(width))
             self.ostream.print_blank()
 
-        profiler.end(self.ostream)
+            self.ostream.print_blank()
+            valstr = '*** Time spent in SHG calculation: '
+            valstr += '{:.2f} sec ***'.format(time.time() - start_time)
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
 
-        self.is_converged = True
+            return {
+                'dipole': dip,
+                'beta': beta,
+                'beta_bar': beta_bar,
+            }
 
-        return beta
+        else:
+            return None
 
     def compute_quad_components(self, Focks, freqpairs, X, d_a_mo, kX, track,
                                 scf_tensors, molecule, ao_basis, profiler):
@@ -465,13 +472,14 @@ class SHGDriver(NonLinearSolver):
                         X2[cart] -= 2 * np.dot(Na[eta].T, x2_kX_X[eta + cart])
                         X2[cart] -= 2 * np.dot(Na[cart].T, x2_kX_X[eta + eta])
                         X2[cart] -= 2 * np.dot(Na[eta].T, x2_kX_X[cart + eta])
-            
-                # β_i(ω) = -1/5 * (<< i;j,j >> + << j;i,j >> + << j;j,i >>), for {i,j}ε{x,y,z}
-                
+
+                # β_i(ω) = -1/5 * (<< i;j,j >> + << j;i,j >> + << j;j,i >>),
+                # for j in {x,y,z}
+
                 beta[wb] = (
-                    - 1 / 5 *  (NaE3NbNc['x'] + A2['x'] + X2['x']),
-                    - 1 / 5 *  (NaE3NbNc['y'] + A2['y'] + X2['y']),
-                    - 1 / 5 *  (NaE3NbNc['z'] + A2['z'] + X2['z']),
+                    -1 / 5 * (NaE3NbNc['x'] + A2['x'] + X2['x']),
+                    -1 / 5 * (NaE3NbNc['y'] + A2['y'] + X2['y']),
+                    -1 / 5 * (NaE3NbNc['z'] + A2['z'] + X2['z']),
                 )
 
         profiler.check_memory_usage('End of SHG')
@@ -801,6 +809,6 @@ class SHGDriver(NonLinearSolver):
             The width for the output
         """
 
-        w_str = '{:<9s} {:12.4f} {:20.8f} {:20.8f}j'.format(
+        w_str = '{:<12s}{:12.4f}{:19.8f}{:19.8f}j'.format(
             label, freq, value.real, value.imag)
         self.ostream.print_header(w_str.ljust(width))

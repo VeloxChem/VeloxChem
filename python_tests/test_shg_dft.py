@@ -47,7 +47,7 @@ class TestSHG:
         rsp_settings = {
             'conv_thresh': 1.0e-6,
             'frequencies': [0.1],
-            'damping': 0.1
+            'damping': 0.1,
         }
 
         shg_prop = SHGDriver()
@@ -56,28 +56,26 @@ class TestSHG:
         shg_result = shg_prop.compute(molecule, ao_basis, scf_tensors)
 
         if is_mpi_master():
+            freq = list(shg_result['beta'].keys())[0]
 
-            # x-component
+            for ind, comp in enumerate('xyz'):
+                assert abs(shg_result['beta'][freq][ind].real -
+                           ref_result[comp].real) < 1.0e-5
+                assert abs(shg_result['beta'][freq][ind].imag -
+                           ref_result[comp].imag) < 1.0e-5
 
-            assert abs(shg_result[0.1][0].real - ref_result['x'].real) < 1.0e-5
-            assert abs(shg_result[0.1][0].imag - ref_result['x'].imag) < 1.0e-5
-
-            # y-component
-
-            assert abs(shg_result[0.1][1].real - ref_result['y'].real) < 1.0e-5
-            assert abs(shg_result[0.1][1].imag - ref_result['y'].imag) < 1.0e-5
-
-            # z-component
-
-            assert abs(shg_result[0.1][2].real - ref_result['z'].real) < 1.0e-5
-            assert abs(shg_result[0.1][2].imag - ref_result['z'].imag) < 1.0e-5
+            assert abs(shg_result['beta_bar'][freq].real -
+                       ref_result['beta_bar'].real) < 1.0e-5
+            assert abs(shg_result['beta_bar'][freq].imag -
+                       ref_result['beta_bar'].imag) < 1.0e-5
 
     def test_shg(self):
 
         ref_result = {
-            'x': -45.07384219269649-39.17912107231103j,
-            'y': -0.10548318636851473-0.022340142881491942j,
-            'z': 28.863052804345973+28.176366259870544j,
+            'x': -45.07384219269649 - 39.17912107231103j,
+            'y': -0.10548318636851473 - 0.022340142881491942j,
+            'z': 28.863052804345973 + 28.176366259870544j,
+            'beta_bar': -12.602886181591845 - 13.87514718454642j,
         }
 
         self.run_shg(ref_result)
