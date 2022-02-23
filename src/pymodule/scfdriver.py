@@ -767,8 +767,10 @@ class ScfDriver:
             # the numerical gradient.
             if self.dft:
                 xc_energy = vxc_mat.get_energy()
+                #vxc_mat_np = vxc_mat #.alpha_to_numpy(0)
             else:
                 xc_energy = 0
+                vxc_mat = None
 
             self.scf_tensors = {
                 'C': C_alpha,
@@ -785,6 +787,7 @@ class ScfDriver:
                 'F_alpha': F_alpha,
                 'F_beta': F_beta,
                 'xc_energy': xc_energy, # TODO: remove after analytical xc derivative works.
+                'vxc_mat': vxc_mat, # TODO: remove after analytical xc derivatives work.
             }
 
             if self.is_converged:
