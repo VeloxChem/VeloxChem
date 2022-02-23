@@ -499,9 +499,9 @@ class ScfDriver:
                                          self.ostream)
             self.ostream.flush()
 
-    def write_checkpoint_from_numpy(self, molecule, basis, array):
+    def set_start_orbitals(self, molecule, basis, array):
         """
-        Writes checkpoint file from numpy array containing MO coefficients.
+        Creates checkpoint file from numpy array containing starting orbitals.
 
         :param molecule:
             The molecule.
@@ -521,15 +521,26 @@ class ScfDriver:
                 C_alpha = array[0]
                 C_beta = array[1] if len(array) > 1 else None
             else:
-                assert_msg_critical(
-                    False,
-                    'ScfDriver.create_checkpoint_from_numpy: invalid array')
+                C_alpha = None
+                C_beta = None
+
+            n_ao = basis.get_dimensions_of_basis(molecule)
+            err_ao = 'ScfDriver.set_start_orbitals: inconsistent number of AOs'
+            err_array = 'ScfDriver.set_start_orbitals: invalid array'
 
             if C_beta is None:
+                assert_msg_critical(isinstance(C_alpha, np.ndarray), err_array)
+                assert_msg_critical(n_ao == C_alpha.shape[0], err_ao)
                 E_alpha = np.zeros(C_alpha.shape[1])
                 self.mol_orbs = MolecularOrbitals([C_alpha], [E_alpha],
                                                   molorb.rest)
             else:
+                assert_msg_critical(
+                    isinstance(C_alpha, np.ndarray) and
+                    isinstance(C_beta, np.ndarray), err_array)
+                assert_msg_critical(
+                    n_ao == C_alpha.shape[0] and n_ao == C_beta.shape[0],
+                    err_ao)
                 E_alpha = np.zeros(C_alpha.shape[1])
                 E_beta = np.zeros(C_beta.shape[1])
                 self.mol_orbs = MolecularOrbitals([C_alpha, C_beta],
@@ -538,17 +549,11 @@ class ScfDriver:
         else:
             self.mol_orbs = MolecularOrbitals()
 
-        # check that self.checkpoint_file is defined
-
-        checkpoint_defined = (self.checkpoint_file and
-                              isinstance(self.checkpoint_file, str))
-        assert_msg_critical(
-            checkpoint_defined,
-            'ScfDriver.create_checkpoint_from_numpy: checkpoint_file ' +
-            'not defined or invalid')
-
         # write checkpoint file and sychronize MPI processes
 
+        self.restart = True
+        if self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}.scf.h5'
         self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
         self.comm.barrier()
 
