@@ -489,7 +489,6 @@ public:
                               const double          densityThreshold,
                               const xcfun           xcFuncType) const;
 
-
     /**
      Generates pair of screened molecular and density grids by removing grid points with specific density/density
      gradient values bellow given threshold. Extends to other types of densities than dengrid::ab

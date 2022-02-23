@@ -461,4 +461,5 @@ def get_datetime_string():
         The datetime string (ISO format with ':' replaced by '.').
     """
 
-    return datetime.now().isoformat().replace(':', '.')
+    return datetime.now().isoformat(sep='T',
+                                    timespec='seconds').replace(':', '.')

@@ -34,7 +34,7 @@ class TestQrf:
 
         return scf_drv.scf_tensors, molecule, basis
 
-    def run_qrf(self, w, ref_result):
+    def run_qrf(self, ref_result):
 
         scf_tensors, molecule, ao_basis = self.run_scf()
 
@@ -49,8 +49,13 @@ class TestQrf:
         }
 
         qrf_prop = QuadraticResponseDriver()
+
+        method_settings = {}
+
         qrf_prop.update_settings(rsp_settings)
-        qrf_result_xxx = qrf_prop.compute(molecule, ao_basis, scf_tensors)
+
+        qrf_result_xxx = qrf_prop.compute(molecule, ao_basis, scf_tensors,
+                                          method_settings)
 
         rsp_settings = {
             'conv_thresh': 1.0e-4,
@@ -61,9 +66,9 @@ class TestQrf:
             'b_components': 'z',
             'c_components': 'x'
         }
-
         qrf_prop.update_settings(rsp_settings)
-        qrf_result_zzx = qrf_prop.compute(molecule, ao_basis, scf_tensors)
+        qrf_result_zzx = qrf_prop.compute(molecule, ao_basis, scf_tensors,
+                                          method_settings)
 
         rsp_settings = {
             'conv_thresh': 1.0e-4,
@@ -74,36 +79,45 @@ class TestQrf:
             'b_components': 'y',
             'c_components': 'x'
         }
-
         qrf_prop.update_settings(rsp_settings)
-        qrf_result_yyx = qrf_prop.compute(molecule, ao_basis, scf_tensors)
+        qrf_result_yyx = qrf_prop.compute(molecule, ao_basis, scf_tensors,
+                                          method_settings)
 
         if is_mpi_master():
 
             # x-component
 
-            assert abs(qrf_result_xxx[0.2].real -
+            assert abs(qrf_result_xxx[(0.2, 0.2)].real -
                        ref_result['xxx'].real) < 1.0e-4
-            assert abs(qrf_result_xxx[0.2].imag -
+
+            assert abs(qrf_result_xxx[(0.2, 0.2)].imag -
                        ref_result['xxx'].imag) < 1.0e-4
 
             # y-component
 
-            assert abs(qrf_result_yyx[0.2].real -
+            assert abs(qrf_result_yyx[(0.2, 0.2)].real -
                        ref_result['yyx'].real) < 1.0e-4
-            assert abs(qrf_result_yyx[0.2].imag -
+
+            assert abs(qrf_result_yyx[(0.2, 0.2)].imag -
                        ref_result['yyx'].imag) < 1.0e-4
 
             # z-component
 
-            assert abs(qrf_result_zzx[0.2].real -
+            assert abs(qrf_result_zzx[(0.2, 0.2)].real -
                        ref_result['zzx'].real) < 1.0e-4
-            assert abs(qrf_result_zzx[0.2].imag -
+
+            assert abs(qrf_result_zzx[(0.2, 0.2)].imag -
+                       ref_result['zzx'].imag) < 1.0e-4
+
+            # z-component
+
+            assert abs(qrf_result_zzx[(0.2, 0.2)].real -
+                       ref_result['zzx'].real) < 1.0e-4
+
+            assert abs(qrf_result_zzx[(0.2, 0.2)].imag -
                        ref_result['zzx'].imag) < 1.0e-4
 
     def test_qrf(self):
-
-        w = 0.2
 
         ref_result = {
             'xxx': 29.16175897 + 28.05788008j,
@@ -111,4 +125,4 @@ class TestQrf:
             'yyx': -5.260931 + 2.081018j,
         }
 
-        self.run_qrf(w, ref_result)
+        self.run_qrf(ref_result)

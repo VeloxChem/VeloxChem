@@ -535,7 +535,7 @@ class ExcitonModelDriver:
                             if svec['index'] == cvec['index']:
                                 continue
 
-                            coupling = np.sum(svec['vec'] * cvec['vec'])
+                            coupling = np.vdot(svec['vec'], cvec['vec'])
 
                             self.H[svec['index'], cvec['index']] = coupling
                             self.H[cvec['index'], svec['index']] = coupling

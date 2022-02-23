@@ -499,6 +499,64 @@ class ScfDriver:
                                          self.ostream)
             self.ostream.flush()
 
+    def set_start_orbitals(self, molecule, basis, array):
+        """
+        Creates checkpoint file from numpy array containing starting orbitals.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param array:
+            The numpy array (or list/tuple of numpy arrays).
+        """
+
+        # create MolecularOrbitals object from numpy array
+
+        if self.rank == mpi_master():
+            if isinstance(array, np.ndarray):
+                C_alpha = array
+                C_beta = None
+            elif isinstance(array, (tuple, list)):
+                C_alpha = array[0]
+                C_beta = array[1] if len(array) > 1 else None
+            else:
+                C_alpha = None
+                C_beta = None
+
+            n_ao = basis.get_dimensions_of_basis(molecule)
+            err_ao = 'ScfDriver.set_start_orbitals: inconsistent number of AOs'
+            err_array = 'ScfDriver.set_start_orbitals: invalid array'
+
+            if C_beta is None:
+                assert_msg_critical(isinstance(C_alpha, np.ndarray), err_array)
+                assert_msg_critical(n_ao == C_alpha.shape[0], err_ao)
+                E_alpha = np.zeros(C_alpha.shape[1])
+                self.mol_orbs = MolecularOrbitals([C_alpha], [E_alpha],
+                                                  molorb.rest)
+            else:
+                assert_msg_critical(
+                    isinstance(C_alpha, np.ndarray) and
+                    isinstance(C_beta, np.ndarray), err_array)
+                assert_msg_critical(
+                    n_ao == C_alpha.shape[0] and n_ao == C_beta.shape[0],
+                    err_ao)
+                E_alpha = np.zeros(C_alpha.shape[1])
+                E_beta = np.zeros(C_beta.shape[1])
+                self.mol_orbs = MolecularOrbitals([C_alpha, C_beta],
+                                                  [E_alpha, E_beta],
+                                                  molorb.unrest)
+        else:
+            self.mol_orbs = MolecularOrbitals()
+
+        # write checkpoint file and sychronize MPI processes
+
+        self.restart = True
+        if self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}.scf.h5'
+        self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
+        self.comm.barrier()
+
     def write_checkpoint(self, nuclear_charges, basis_set):
         """
         Writes molecular orbitals to checkpoint file.

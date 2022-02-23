@@ -27,6 +27,8 @@
 
 #include <cmath>
 
+#include <iostream> 
+
 CXCFunctional::CXCFunctional()
 
     : _label(std::string())
@@ -186,6 +188,18 @@ CXCFunctional::compute(      CXCHessianGrid& xcHessianGrid,
     for (size_t i = 0; i < _primitiveFunctionals.size(); i++)
     {
         _primitiveFunctionals[i].compute(xcHessianGrid, _weightsOfPrimitiveFunctionals[i], densityGrid);
+    }
+}
+
+void
+CXCFunctional::compute(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                       const CDensityGrid&        densityGrid) const
+{
+    xcCubicHessianGrid.zero();
+
+    for (size_t i = 0; i < _primitiveFunctionals.size(); i++)
+    {
+        _primitiveFunctionals[i].compute(xcCubicHessianGrid, _weightsOfPrimitiveFunctionals[i], densityGrid);
     }
 }
 

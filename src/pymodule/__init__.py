@@ -30,6 +30,8 @@ from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .veloxchemlib import LinearMomentumIntegralsDriver
+from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import GridDriver
 from .veloxchemlib import DensityGridDriver
@@ -50,6 +52,11 @@ from .veloxchemlib import get_basis_function_indices_for_atom
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import hartree_in_kcalpermol
+from .veloxchemlib import hartree_in_wavenumbers
+from .veloxchemlib import dipole_in_debye
+from .veloxchemlib import rotatory_strength_in_cgs
+from .veloxchemlib import extinction_coefficient_from_beta
+from .veloxchemlib import fine_structure_constant
 from .veloxchemlib import mathconst_pi
 
 # C++ enums

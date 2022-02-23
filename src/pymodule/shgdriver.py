@@ -150,6 +150,8 @@ class SHGDriver(NonLinearSolver):
 
         start_time = time.time()
 
+        dft_dict = self.init_dft(molecule, scf_tensors)
+
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
@@ -218,7 +220,15 @@ class SHGDriver(NonLinearSolver):
             self.comp = None
 
         # Computing the first-order response vectors (3 per frequency)
+
         N_drv = ComplexResponse(self.comm, self.ostream)
+
+        if self.dft:
+            method_settings = {
+                'xcfun': dft_dict['dft_func_label'],
+                'grid_level': self.grid_level
+            }
+            N_drv.update_settings({}, method_settings)
 
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
@@ -246,15 +256,19 @@ class SHGDriver(NonLinearSolver):
                                             self.comp, scf_tensors, molecule,
                                             ao_basis, profiler)
 
+        profiler.end(self.ostream)
+
+        self.is_converged = True
+
         # Compute dipole vector
         scf_prop = ScfFirstOrderProperties(self.comm, self.ostream)
         scf_prop.compute(molecule, ao_basis, scf_tensors)
 
         if self.rank == mpi_master():
 
-            dip = list(scf_prop.get_property('dipole moment'))
+            dip = scf_prop.get_property('dipole moment')
             # Norm of dipole
-            dip_norm = np.linalg.norm(scf_prop.get_property('dipole moment'))
+            dip_norm = np.linalg.norm(dip)
 
             # Compute isotropic beta along molecular dipole
 
@@ -264,7 +278,7 @@ class SHGDriver(NonLinearSolver):
             self.ostream.print_header('=' * (len(w_str) + 2))
 
             self.ostream.print_blank()
-            title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
+            title = '{:<12s}{:>12s}{:>19s}{:>20s}'.format(
                 'Component', 'Frequency', 'Real', 'Imaginary')
             width = len(title)
             self.ostream.print_header(title.ljust(width))
@@ -274,27 +288,51 @@ class SHGDriver(NonLinearSolver):
             self.print_component('mu_z', 0, dip[2], width)
             self.print_component('|mu|', 0, dip_norm, width)
             self.ostream.print_blank()
+            self.ostream.print_blank()
 
-            w_str = 'Averaged first-order hyperpolarizability'
+            w_str = 'SHG hyperpolarizability'
             self.ostream.print_header(w_str)
             self.ostream.print_header('=' * (len(w_str) + 2))
+            self.ostream.print_blank()
+            w_str = 'Observable quantity corresponding to EFISHG experiments with '
+            self.ostream.print_header(w_str.ljust(width))
+            w_str = 'parallel external fields:'
+            self.ostream.print_header(w_str.ljust(width))
+            self.ostream.print_blank()
 
-            # beta_bar = {}
+            w_str = 'beta(vec)_i = 1/5*sum_{j=x,y,z}(beta_ijj + beta_jij + beta_jji)'
+            self.ostream.print_header(w_str.ljust(width))
+            self.ostream.print_blank()
+            w_str = 'beta = sum_{i=x,y,z}(beta(vec)_i * mu_i / |mu|)'
+            self.ostream.print_header(w_str.ljust(width))
+            self.ostream.print_blank()
 
-            for key in beta.keys():
-                betaa = 0
-                for a in range(len(beta[key])):
-                    betaa += 1 / dip_norm * dip[a] * beta[key][a]
+            w_str = 'Note: beta(vec)_i is the i-component of the projection of the '
+            self.ostream.print_header(w_str.ljust(width))
+            w_str = 'first hyperpolarizability tensor along the dipole moment.'
+            self.ostream.print_header(w_str.ljust(width))
+            self.ostream.print_blank()
 
-                self.ostream.print_blank()
+            beta_bar = {}
+            for freq in beta:
+                beta_bar[freq] = 0.0
+                for a in range(len(beta[freq])):
+                    beta_bar[freq] += 1.0 / dip_norm * dip[a] * beta[freq][a]
+
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
-                self.print_component('beta_x', key, beta[key][0], width)
-                self.print_component('beta_y', key, beta[key][1], width)
-                self.print_component('beta_z', key, beta[key][2], width)
-                self.print_component('beta ||', key, 1 / 5 * betaa, width)
+                self.print_component('beta(vec)_x', freq, beta[freq][0], width)
+                self.print_component('beta(vec)_y', freq, beta[freq][1], width)
+                self.print_component('beta(vec)_z', freq, beta[freq][2], width)
+                self.print_component('beta', freq, beta_bar[freq], width)
+                self.ostream.print_blank()
 
-                # beta_bar = {key: betaa}
+            title = 'Reference: '
+            title += 'K. Ahmadzadeh, X. Li, Z. Rinkevicius, P. Norman'
+            self.ostream.print_header(title.ljust(width))
+            title = 'XXXXXXXX (2022)'
+            self.ostream.print_header(title.ljust(width))
+            self.ostream.print_blank()
 
             self.ostream.print_blank()
             valstr = '*** Time spent in SHG calculation: '
@@ -303,11 +341,14 @@ class SHGDriver(NonLinearSolver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-        profiler.end(self.ostream)
+            return {
+                'dipole': dip,
+                'beta': beta,
+                'beta_bar': beta_bar,
+            }
 
-        self.is_converged = True
-
-        return beta
+        else:
+            return None
 
     def compute_quad_components(self, Focks, freqpairs, X, d_a_mo, kX, track,
                                 scf_tensors, molecule, ao_basis, profiler):
@@ -353,17 +394,22 @@ class SHGDriver(NonLinearSolver):
 
         nocc = molecule.number_of_alpha_electrons()
 
+        dft_dict = self.init_dft(molecule, scf_tensors)
+
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            density_list = self.get_densities(freqpairs, kX, S, D0, mo)
+            first_order_dens, second_order_dens = self.get_densities(
+                freqpairs, kX, S, D0, mo)
         else:
-            density_list = None
+            first_order_dens = None
+            second_order_dens = None
 
         profiler.check_memory_usage('Densities')
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(freqpairs, density_list, F0, mo,
-                                       molecule, ao_basis)
+        fock_dict = self.get_fock_dict(freqpairs, first_order_dens,
+                                       second_order_dens, F0, mo, molecule,
+                                       ao_basis, dft_dict)
 
         profiler.check_memory_usage('Focks')
 
@@ -427,10 +473,13 @@ class SHGDriver(NonLinearSolver):
                         X2[cart] -= 2 * np.dot(Na[cart].T, x2_kX_X[eta + eta])
                         X2[cart] -= 2 * np.dot(Na[eta].T, x2_kX_X[cart + eta])
 
+                # β_i(ω) = -1/5 * (<< i;j,j >> + << j;i,j >> + << j;j,i >>),
+                # for j in {x,y,z}
+
                 beta[wb] = (
-                    NaE3NbNc['x'] + A2['x'] + X2['x'],
-                    NaE3NbNc['y'] + A2['y'] + X2['y'],
-                    NaE3NbNc['z'] + A2['z'] + X2['z'],
+                    -1 / 5 * (NaE3NbNc['x'] + A2['x'] + X2['x']),
+                    -1 / 5 * (NaE3NbNc['y'] + A2['y'] + X2['y']),
+                    -1 / 5 * (NaE3NbNc['z'] + A2['z'] + X2['z']),
                 )
 
         profiler.check_memory_usage('End of SHG')
@@ -452,10 +501,14 @@ class SHGDriver(NonLinearSolver):
             A matrix containing the MO coefficents
 
         :return:
-            A list of tranformed compounded densities
+            first_order_dens:
+             A list of first-order one-time tranformed compounded densities
+            second_order_dens:
+             A list of first-order two-time tranformed compounded densities
         """
 
-        density_list = []
+        first_order_dens = []
+        second_order_dens = []
 
         for (wb, wc) in freqpairs:
 
@@ -495,16 +548,37 @@ class SHGDriver(NonLinearSolver):
             D_lam_yz = (self.transform_dens(k_y, D_z, S) +
                         self.transform_dens(k_z, D_y, S))
 
-            density_list.append(D_sig_x)
-            density_list.append(D_sig_y)
-            density_list.append(D_sig_z)
-            density_list.append(D_lam_xy)
-            density_list.append(D_lam_xz)
-            density_list.append(D_lam_yz)
+            first_order_dens.append(D_x.real)
+            first_order_dens.append(D_x.imag)
+            first_order_dens.append(D_y.real)
+            first_order_dens.append(D_y.imag)
+            first_order_dens.append(D_z.real)
+            first_order_dens.append(D_z.imag)
 
-        return density_list
+            second_order_dens.append(D_sig_x.real)
+            second_order_dens.append(D_sig_x.imag)
+            second_order_dens.append(D_sig_y.real)
+            second_order_dens.append(D_sig_y.imag)
+            second_order_dens.append(D_sig_z.real)
+            second_order_dens.append(D_sig_z.imag)
+            second_order_dens.append(D_lam_xy.real)
+            second_order_dens.append(D_lam_xy.imag)
+            second_order_dens.append(D_lam_xz.real)
+            second_order_dens.append(D_lam_xz.imag)
+            second_order_dens.append(D_lam_yz.real)
+            second_order_dens.append(D_lam_yz.imag)
 
-    def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis):
+        return first_order_dens, second_order_dens
+
+    def get_fock_dict(self,
+                      wi,
+                      first_order_dens,
+                      second_order_dens,
+                      F0,
+                      mo,
+                      molecule,
+                      ao_basis,
+                      dft_dict=None):
         """
         Computes the compounded Fock matrices used for the
         isotropic quadratic response function used for SHG
@@ -523,7 +597,8 @@ class SHGDriver(NonLinearSolver):
             The AO basis set
 
         :return:
-            A dictonary of compounded first-order Fock-matrices
+            A dictonary of compounded first-order two-time Fock-matrices. For
+            SHG there are 6 real and 6 imaginary Fock matrices.
         """
 
         if self.rank == mpi_master():
@@ -558,8 +633,9 @@ class SHGDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, density_list, molecule, ao_basis,
-                                        'real_and_imag')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                        dft_dict, first_order_dens,
+                                        second_order_dens, 'shg')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -733,6 +809,6 @@ class SHGDriver(NonLinearSolver):
             The width for the output
         """
 
-        w_str = '{:<9s} {:12.4f} {:20.8f} {:20.8f}j'.format(
+        w_str = '{:<12s}{:12.4f}{:19.8f}{:19.8f}j'.format(
             label, freq, value.real, value.imag)
         self.ostream.print_header(w_str.ljust(width))
