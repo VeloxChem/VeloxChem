@@ -9,14 +9,13 @@ basis: 6-31G
 @response
 property: shg
 frequencies: 0.1
-conv_thresh: 1.0e-08
+conv_thresh: 1.0e-06
 damping: 0.1
 @end
 
 @molecule
 charge: 0
 multiplicity: 1
-units: au
 xyz:  
 H      1.2001      0.0363      0.8431
 C      0.7031      0.0083     -0.1305
