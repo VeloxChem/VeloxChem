@@ -201,12 +201,16 @@ class ScfGradientDriver(GradientDriver):
         coords = molecule.get_coordinates()
         # the number of atoms
         natm = molecule.number_of_atoms()
+        # the number of atomic orbitals
+        # nao = self.scf_drv.scf_tensors["D_alpha"].shape[0]
 
         self.gradient = np.zeros((natm, 3))
 
         # Gradient of the exchange and correlation energy
+        # TODO: remove vxc numerical gradient
         if self.dft:
             self.xc_gradient = np.zeros((natm, 3))
+            # self.vxc_gradient = np.zeros((natm, 3, nao, nao))
 
         # First-order properties for gradient of dipole moment
         if self.dipole_deriv:
@@ -225,6 +229,7 @@ class ScfGradientDriver(GradientDriver):
                     # remove when analytical derivative is working.
                     if self.dft:
                         xc_plus = self.scf_drv.scf_tensors['xc_energy']
+                        # vxc_plus = self.scf_drv.scf_tensors['vxc_mat'].get_matrix().to_numpy()
 
                     if self.dipole_deriv:
                         prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
@@ -238,6 +243,7 @@ class ScfGradientDriver(GradientDriver):
                     # remove when analytical derivative is working.
                     if self.dft:
                         xc_minus = self.scf_drv.scf_tensors['xc_energy']
+                        # vxc_minus = self.scf_drv.scf_tensors['vxc_mat'].get_matrix().to_numpy()
 
                     if self.dipole_deriv:
                         prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
@@ -252,6 +258,7 @@ class ScfGradientDriver(GradientDriver):
                     # remove when analytical derivative is working.
                     if self.dft:
                         self.xc_gradient[i, d] = (xc_plus - xc_minus) / (2.0 * self.delta_h)
+                        # self.vxc_gradient[i, d] = (vxc_plus - vxc_minus) / (2.0 * self.delta_h)
         else:
             # Four-point numerical derivative approximation
             # for debugging of analytical gradient:

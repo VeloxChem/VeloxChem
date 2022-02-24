@@ -46,7 +46,7 @@ def get_molecule_string(molecule):
 
     return mol_string
 
-def write_2d_array_hdf5(fname, arrays, labels='xyz', atom_index=0):
+def write_2d_array_hdf5(fname, arrays, labels=[], atom_index=None):
     """
     Writes the one-electron integral derivatives to the checkpoint file. 
 
@@ -77,10 +77,52 @@ def write_2d_array_hdf5(fname, arrays, labels='xyz', atom_index=0):
         return False
 
     for label, array in zip(labels, arrays):
-        full_label= str(atom_index) + label
+        if atom_index is not None:
+            full_label= str(atom_index) + label
+        else:
+            full_label = label
         hf.create_dataset(full_label, data=array, compression='gzip')
     hf.close()
     return True
+
+def overlap(molecule, basis, unit="au", chk_file=None):
+    """
+    Imports the derivatives of the overlap matrix
+    from pyscf and converts it to veloxchem format
+
+    :param molecule:
+        the vlx molecule object
+    :param basis:
+        the vlx basis object
+    :param unit:
+        the units to be used for the molecular geometry;
+        possible values: "au" (default), "Angstrom"
+    :param chk_file:
+        the hdf5 checkpoint file name.
+
+    :return:
+        a numpy array of shape nao x nao
+        (nao = number of atomic orbitals)
+        corresponding to the overlap matrix.
+    """
+
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+
+    pyscf_ovlp = pyscf_molecule.intor('int1e_ovlp', aosym='s1')
+
+    # Transform each component (x,y,z) to veloxchem format
+    vlx_ovlp = ao_matrix_to_veloxchem(
+                                 DenseMatrix(pyscf_ovlp),
+                                 basis, molecule).to_numpy()
+    
+    if chk_file is not None:
+        write_2d_array_hdf5(chk_file, vlx_ovlp, labels=['overlap'])
+
+    return vlx_ovlp
 
 
 def overlap_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
@@ -162,7 +204,8 @@ def overlap_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
                                 )
 
     if chk_file is not None:
-        write_2d_array_hdf5(chk_file, vlx_ovlp_deriv_atom_i, labels='xyz',
+        write_2d_array_hdf5(chk_file, vlx_ovlp_deriv_atom_i,
+                            labels=['overlap_x', 'overlap_y', 'overlap_z'],
                             atom_index=i)
 
     return vlx_ovlp_deriv_atom_i
