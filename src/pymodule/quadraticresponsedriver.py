@@ -117,7 +117,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def compute(self, molecule, ao_basis, scf_tensors, method_settings):
+    def compute(self, molecule, ao_basis, scf_tensors):
         """
         Computes a quadratic response function.
 
@@ -169,30 +169,33 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         operator = 'dipole'
         linear_solver = LinearSolver(self.comm, self.ostream)
-        a_rhs = linear_solver.get_complex_prop_grad(operator, self.a_components,
-                                                    molecule, ao_basis,
-                                                    scf_tensors)
-        b_rhs = linear_solver.get_complex_prop_grad(operator, self.b_components,
-                                                    molecule, ao_basis,
-                                                    scf_tensors)
-        c_rhs = linear_solver.get_complex_prop_grad(operator, self.c_components,
-                                                    molecule, ao_basis,
-                                                    scf_tensors)
+        a_grad = linear_solver.get_complex_prop_grad(operator,
+                                                     self.a_components,
+                                                     molecule, ao_basis,
+                                                     scf_tensors)
+        b_grad = linear_solver.get_complex_prop_grad(operator,
+                                                     self.b_components,
+                                                     molecule, ao_basis,
+                                                     scf_tensors)
+        c_grad = linear_solver.get_complex_prop_grad(operator,
+                                                     self.c_components,
+                                                     molecule, ao_basis,
+                                                     scf_tensors)
 
         if self.rank == mpi_master():
             inv_sqrt_2 = 1.0 / np.sqrt(2.0)
 
-            a_rhs = list(a_rhs)
-            for ind in range(len(a_rhs)):
-                a_rhs[ind] *= inv_sqrt_2
+            a_grad = list(a_grad)
+            for ind in range(len(a_grad)):
+                a_grad[ind] *= inv_sqrt_2
 
-            b_rhs = list(b_rhs)
-            for ind in range(len(b_rhs)):
-                b_rhs[ind] *= inv_sqrt_2
+            b_grad = list(b_grad)
+            for ind in range(len(b_grad)):
+                b_grad[ind] *= inv_sqrt_2
 
-            c_rhs = list(c_rhs)
-            for ind in range(len(c_rhs)):
-                c_rhs[ind] *= inv_sqrt_2
+            c_grad = list(c_grad)
+            for ind in range(len(c_grad)):
+                c_grad[ind] *= inv_sqrt_2
 
         # Storing the dipole integral matrices used for the X[2] and
         # A[2] contractions in MO basis
@@ -203,10 +206,10 @@ class QuadraticResponseDriver(NonLinearSolver):
         ABC = {}
 
         if self.rank == mpi_master():
-            A = {(op, w): v for op, v in zip('A', a_rhs) for w in wa}
-            B = {(op, w): v for op, v in zip('B', b_rhs)
+            A = {(op, w): v for op, v in zip('A', a_grad) for w in wa}
+            B = {(op, w): v for op, v in zip('B', b_grad)
                  for w in self.b_frequencies}
-            C = {(op, w): v for op, v in zip('C', c_rhs)
+            C = {(op, w): v for op, v in zip('C', c_grad)
                  for w in self.c_frequencies}
 
             ABC.update(A)
@@ -231,7 +234,7 @@ class QuadraticResponseDriver(NonLinearSolver):
             'program_end_time'
         }
 
-        N_drv.update_settings({}, method_settings)
+        N_drv.update_settings({}, self.method_dict)
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
@@ -310,17 +313,18 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            firstorderdens, secorderdens = self.get_densities(
+            first_order_dens, second_order_dens = self.get_densities(
                 freqpairs, kX, S, D0, mo)
         else:
-            firstorderdens = None
-            secorderdens = None
+            first_order_dens = None
+            second_order_dens = None
 
         profiler.check_memory_usage('Densities')
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(freqpairs, firstorderdens, secorderdens,
-                                       F0, mo, molecule, ao_basis, dft_dict)
+        fock_dict = self.get_fock_dict(freqpairs, first_order_dens,
+                                       second_order_dens, F0, mo, molecule,
+                                       ao_basis, dft_dict)
 
         profiler.check_memory_usage('Focks')
 
@@ -405,8 +409,8 @@ class QuadraticResponseDriver(NonLinearSolver):
             A list of tranformed densities
         """
 
-        firstorderdens = []
-        secorderdens = []
+        first_order_dens = []
+        second_order_dens = []
 
         for (wb, wc) in freqpairs:
 
@@ -425,19 +429,19 @@ class QuadraticResponseDriver(NonLinearSolver):
             Dbc = self.transform_dens(kb, Dc, S)
             Dcb = self.transform_dens(kc, Db, S)
 
-            firstorderdens.append(Db.real)
-            firstorderdens.append(Db.imag)
-            firstorderdens.append(Dc.real)
-            firstorderdens.append(Dc.imag)
-            secorderdens.append((Dbc + Dcb).real)
-            secorderdens.append((Dbc + Dcb).imag)
+            first_order_dens.append(Db.real)
+            first_order_dens.append(Db.imag)
+            first_order_dens.append(Dc.real)
+            first_order_dens.append(Dc.imag)
+            second_order_dens.append((Dbc + Dcb).real)
+            second_order_dens.append((Dbc + Dcb).imag)
 
-        return firstorderdens, secorderdens
+        return first_order_dens, second_order_dens
 
     def get_fock_dict(self,
                       wi,
-                      firstorderdens,
-                      secorderdens,
+                      first_order_dens,
+                      second_order_dens,
                       F0,
                       mo,
                       molecule,
@@ -490,8 +494,8 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         time_start_fock = time.time()
         dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                        dft_dict, firstorderdens, secorderdens,
-                                        'qrf')
+                                        dft_dict, first_order_dens,
+                                        second_order_dens, 'qrf')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock

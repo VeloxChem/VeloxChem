@@ -17,26 +17,21 @@ class TestQrf:
             H   .7586020000  0.0  -.5042840000
             H   .7586020000  0.0   .5042840000
         """
-
         basis_set_label = '6-31G'
 
-        scf_settings = {'conv_thresh': 1.0e-6}
-
         molecule = Molecule.read_str(molecule_string, units='ang')
-        molecule.set_charge(0)
-        molecule.set_multiplicity(1)
-
         basis = MolecularBasis.read(molecule, basis_set_label)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.update_settings(scf_settings)
         scf_drv.compute(molecule, basis)
 
-        return scf_drv.scf_tensors, molecule, basis
+        return molecule, basis, scf_drv.scf_tensors
 
     def run_qrf(self, ref_result):
 
-        scf_tensors, molecule, ao_basis = self.run_scf()
+        molecule, basis, scf_tensors = self.run_scf()
+
+        qrf_drv = QuadraticResponseDriver()
 
         rsp_settings = {
             'conv_thresh': 1.0e-4,
@@ -47,15 +42,8 @@ class TestQrf:
             'b_components': 'x',
             'c_components': 'x'
         }
-
-        qrf_prop = QuadraticResponseDriver()
-
-        method_settings = {}
-
-        qrf_prop.update_settings(rsp_settings)
-
-        qrf_result_xxx = qrf_prop.compute(molecule, ao_basis, scf_tensors,
-                                          method_settings)
+        qrf_drv.update_settings(rsp_settings)
+        qrf_result_xxx = qrf_drv.compute(molecule, basis, scf_tensors)
 
         rsp_settings = {
             'conv_thresh': 1.0e-4,
@@ -66,9 +54,8 @@ class TestQrf:
             'b_components': 'z',
             'c_components': 'x'
         }
-        qrf_prop.update_settings(rsp_settings)
-        qrf_result_zzx = qrf_prop.compute(molecule, ao_basis, scf_tensors,
-                                          method_settings)
+        qrf_drv.update_settings(rsp_settings)
+        qrf_result_zzx = qrf_drv.compute(molecule, basis, scf_tensors)
 
         rsp_settings = {
             'conv_thresh': 1.0e-4,
@@ -79,50 +66,36 @@ class TestQrf:
             'b_components': 'y',
             'c_components': 'x'
         }
-        qrf_prop.update_settings(rsp_settings)
-        qrf_result_yyx = qrf_prop.compute(molecule, ao_basis, scf_tensors,
-                                          method_settings)
+        qrf_drv.update_settings(rsp_settings)
+        qrf_result_yyx = qrf_drv.compute(molecule, basis, scf_tensors)
 
         if is_mpi_master():
+            thresh = 1.0e-4
 
             # x-component
-
             assert abs(qrf_result_xxx[(0.2, 0.2)].real -
-                       ref_result['xxx'].real) < 1.0e-4
-
+                       ref_result['xxx'].real) < thresh
             assert abs(qrf_result_xxx[(0.2, 0.2)].imag -
-                       ref_result['xxx'].imag) < 1.0e-4
+                       ref_result['xxx'].imag) < thresh
 
             # y-component
-
             assert abs(qrf_result_yyx[(0.2, 0.2)].real -
-                       ref_result['yyx'].real) < 1.0e-4
-
+                       ref_result['yyx'].real) < thresh
             assert abs(qrf_result_yyx[(0.2, 0.2)].imag -
-                       ref_result['yyx'].imag) < 1.0e-4
+                       ref_result['yyx'].imag) < thresh
 
             # z-component
-
             assert abs(qrf_result_zzx[(0.2, 0.2)].real -
-                       ref_result['zzx'].real) < 1.0e-4
-
+                       ref_result['zzx'].real) < thresh
             assert abs(qrf_result_zzx[(0.2, 0.2)].imag -
-                       ref_result['zzx'].imag) < 1.0e-4
-
-            # z-component
-
-            assert abs(qrf_result_zzx[(0.2, 0.2)].real -
-                       ref_result['zzx'].real) < 1.0e-4
-
-            assert abs(qrf_result_zzx[(0.2, 0.2)].imag -
-                       ref_result['zzx'].imag) < 1.0e-4
+                       ref_result['zzx'].imag) < thresh
 
     def test_qrf(self):
 
         ref_result = {
             'xxx': 29.16175897 + 28.05788008j,
             'zzx': 27.37219617 + 32.23620966j,
-            'yyx': -5.260931 + 2.081018j,
+            'yyx': -5.26093100 + 2.08101800j,
         }
 
         self.run_qrf(ref_result)
