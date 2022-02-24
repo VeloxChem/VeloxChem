@@ -117,7 +117,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def compute(self, molecule, ao_basis, scf_tensors, method_settings):
+    def compute(self, molecule, ao_basis, scf_tensors):
         """
         Computes a quadratic response function.
 
@@ -234,7 +234,7 @@ class QuadraticResponseDriver(NonLinearSolver):
             'program_end_time'
         }
 
-        N_drv.update_settings({}, method_settings)
+        N_drv.update_settings({}, self.method_dict)
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))

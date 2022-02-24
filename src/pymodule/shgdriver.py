@@ -150,8 +150,6 @@ class SHGDriver(NonLinearSolver):
 
         start_time = time.time()
 
-        dft_dict = self.init_dft(molecule, scf_tensors)
-
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
@@ -226,11 +224,7 @@ class SHGDriver(NonLinearSolver):
         N_drv = ComplexResponse(self.comm, self.ostream)
 
         if self.dft:
-            method_settings = {
-                'xcfun': dft_dict['dft_func_label'],
-                'grid_level': self.grid_level
-            }
-            N_drv.update_settings({}, method_settings)
+            N_drv.update_settings({}, self.method_dict)
 
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',

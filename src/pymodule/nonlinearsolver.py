@@ -181,6 +181,8 @@ class NonLinearSolver:
         if method_dict is None:
             method_dict = {}
 
+        self.method_dict = dict(method_dict)
+
         rsp_keywords = {
             key: val[0] for key, val in self.input_keywords['response'].items()
         }
@@ -443,26 +445,25 @@ class NonLinearSolver:
 
         if self.dft:
             if self.rank == mpi_master():
-                n_first_order = len(first_order_dens)
-                n_second_order = len(second_order_dens)
+                num_1 = len(first_order_dens)
+                num_2 = len(second_order_dens)
+
                 if mode.lower() == 'shg':
                     # 6 first-order densities
                     # 12 second-order densities
                     # see get_densities in shgdriver
-                    condition = ((n_first_order % 6 == 0) and
-                                 (n_second_order % 12 == 0) and
-                                 (n_first_order // 6 == n_second_order // 12))
-                    batch_size = max((batch_size // 12) * 12, 12)
-                    batch_size_first_order = batch_size // 2
+                    size_1, size_2 = 6, 12
                 else:
                     # 4 first-order densities
                     # 2 second-order densities
                     # see get_densities in quadraticresponsedriver
-                    condition = ((n_first_order % 4 == 0) and
-                                 (n_second_order % 2 == 0) and
-                                 (n_first_order // 4 == n_second_order // 2))
-                    batch_size = max((batch_size // 2) * 2, 2)
-                    batch_size_first_order = batch_size * 2
+                    size_1, size_2 = 4, 2
+
+                condition = ((num_1 % size_1 == 0) and (num_2 % size_2 == 0) and
+                             (num_1 // size_1 == num_2 // size_2))
+                batch_size = max((batch_size // size_2) * size_2, size_2)
+                batch_size_first_order = (batch_size // size_2) * size_1
+
                 errmsg = 'NonLinearSolver.comp_nlr_fock: '
                 errmsg += f'inconsistent number of density matrices (mode={mode})'
                 assert_msg_critical(condition, errmsg)
@@ -497,7 +498,7 @@ class NonLinearSolver:
                     batch_start_first_order = batch_size_first_order * batch_ind
                     batch_end_first_order = min(
                         batch_start_first_order + batch_size_first_order,
-                        n_first_order)
+                        len(first_order_dens))
 
                     dts1 = [
                         np.ascontiguousarray(dab) for dab in first_order_dens[
