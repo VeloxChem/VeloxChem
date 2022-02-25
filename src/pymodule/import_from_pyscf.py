@@ -35,6 +35,27 @@ def translate_to_pyscf(label):
     else:
         return label
 
+def get_pyscf_integral_type(int_type):
+    """
+    Translates the integral type to pyscf moleintor format.
+    """
+    int_dict = {
+            "overlap"            : "int1e_ovlp",
+            "ovlp"               : "int1e_ovlp",
+            "kinetic_energy"     : "int1e_kin",
+            "kinetic"            : "int1e_kin",
+            "nuclear_attraction" : "int1e_nuc",
+            "nuclear"            : "int1e_nuc",
+            "nuc_att"            : "int1e_nuc",
+            "nuclear_att"        : "int1e_nuc",  
+        }
+    if int_type not in int_dict.keys():
+        error_text = "Unrecognized 1e integral type: " + int_type +". "
+        error_text += "Please use one of the following:"
+        raise ValueError(error_text, int_dict.keys())
+    else:
+        return int_dict[int_type]
+
 def get_molecule_string(molecule):
     mol_string = ""
     for i in range(molecule.number_of_atoms()):
@@ -85,25 +106,40 @@ def write_2d_array_hdf5(fname, arrays, labels=[], atom_index=None):
     hf.close()
     return True
 
-def overlap(molecule, basis, unit="au", chk_file=None):
+def import_1e_integral(molecule, basis, int_type, atom1=1, shell1=None,
+                       atom2=1, shell2=None, chk_file=None,
+                       unit="au", return_block=True):
     """
-    Imports the derivatives of the overlap matrix
-    from pyscf and converts it to veloxchem format
+    Imports one electron integrals from pyscf and converts to veloxchem format.
+    Specific atoms and shells can be selected.
 
     :param molecule:
         the vlx molecule object
     :param basis:
         the vlx basis object
+    :param int_type:
+        the type of one-electron integral: overlap, kinetic_energy,
+                                           nuclear_attraction 
+    :param atom1:
+        index of the first atom of interest
+    :param shell1:
+        list of atomic shells of interest for atom 1
+    :param atom2:
+        index of the second atom of interest
+    :param shell2:
+        list of atomic shells of interest for atom 2
+    :param chk_file:
+        the hdf5 checkpoint file name
     :param unit:
         the units to be used for the molecular geometry;
         possible values: "au" (default), "Angstrom"
-    :param chk_file:
-        the hdf5 checkpoint file name.
+    :param return_block:
+        return the matrix block, or the full matrix.
+
 
     :return:
-        a numpy array of shape nao x nao
-        (nao = number of atomic orbitals)
-        corresponding to the overlap matrix.
+        a numpy array corresponding to a specified block of 
+        the selected 1e integral matrix.
     """
 
     molecule_string = get_molecule_string(molecule)
@@ -112,17 +148,67 @@ def overlap(molecule, basis, unit="au", chk_file=None):
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
                                  basis=pyscf_basis, unit=unit)
 
-    pyscf_ovlp = pyscf_molecule.intor('int1e_ovlp', aosym='s1')
+    pyscf_int_type = get_pyscf_integral_type(int_type)
 
-    # Transform each component (x,y,z) to veloxchem format
-    vlx_ovlp = ao_matrix_to_veloxchem(
-                                 DenseMatrix(pyscf_ovlp),
+    pyscf_int = pyscf_molecule.intor(pyscf_int_type, aosym='s1')
+
+    # Transform integral to veloxchem format
+    vlx_int = ao_matrix_to_veloxchem(
+                                 DenseMatrix(pyscf_int),
                                  basis, molecule).to_numpy()
-    
-    if chk_file is not None:
-        write_2d_array_hdf5(chk_file, vlx_ovlp, labels=['overlap'])
 
-    return vlx_ovlp
+    ao_basis_map = basis.get_ao_basis_map(molecule)
+    rows = []
+    columns = []
+    k = 0
+    for ao in ao_basis_map:
+        parts = ao.split()
+        atom = int(parts[0])
+        shell = parts[2]
+        if atom1 == atom:
+            if shell1 is not None:
+                for s in shell1:
+                    if s in shell:
+                        rows.append(k)
+            else:
+                rows.append(k)
+        if atom2 == atom:
+            if shell2 is not None:
+                for s in shell2:
+                    if s in shell:
+                        columns.append(k)
+            else:
+                columns.append(k)
+        k += 1
+    if rows == []:
+        raise ValueError("Atom or shell(s) not found.", atom1, shell1)
+    if columns == []:
+        raise ValueError("Atom or shell(s) not found.", atom2, shell2)
+    
+
+    vlx_int_block = np.zeros((len(rows), len(columns)))
+    
+    for i in range(len(rows)):
+        for j in range(len(columns)):
+            vlx_int_block[i,j] = vlx_int[rows[i], columns[j]]
+   
+    label = int_type+'_atom%d' % (atom1)
+    if shell1 is not None:
+        for s1 in shell1:
+            label += "_%s" % (s1)
+    label += "_atom%d" % (atom2)
+    if shell2 is not None:
+        for s2 in shell2:
+            label += "_%s" % (s2)
+
+    print(label) 
+    if chk_file is not None:
+        write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
+
+    if return_block:
+        return vlx_int_block
+    else:
+        return vlx_int
 
 
 def overlap_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
