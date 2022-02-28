@@ -47,7 +47,10 @@ def get_pyscf_integral_type(int_type):
             "nuclear_attraction" : "int1e_nuc",
             "nuclear"            : "int1e_nuc",
             "nuc_att"            : "int1e_nuc",
-            "nuclear_att"        : "int1e_nuc",  
+            "nuclear_att"        : "int1e_nuc", 
+            "electron_repulsion" : "int2e",
+            "eri"                : "int2e",
+            "electron_rep"       : "int2e", 
         }
     if int_type not in int_dict.keys():
         error_text = "Unrecognized 1e integral type: " + int_type +". "
@@ -200,6 +203,165 @@ def import_1e_integral(molecule, basis, int_type, atom1=1, shell1=None,
     if shell2 is not None:
         for s2 in shell2:
             label += "_%s" % (s2)
+
+    print(label) 
+    if chk_file is not None:
+        write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
+
+    if return_block:
+        return vlx_int_block
+    else:
+        return vlx_int
+
+
+def import_2e_integral(molecule, basis, int_type, atom1=1, shell1=None,
+                       atom2=1, shell2=None, atom3=1, shell3=None,
+                       atom4=1, shell4=None, chk_file=None,
+                       unit="au", return_block=True):
+    """
+    Imports two electron integrals from pyscf and converts to veloxchem format.
+    Specific atoms and shells can be selected.
+
+    :param molecule:
+        the vlx molecule object
+    :param basis:
+        the vlx basis object
+    :param int_type:
+        the type of one-electron integral: overlap, kinetic_energy,
+                                           nuclear_attraction 
+    :param atom1:
+        index of the first atom of interest
+    :param shell1:
+        list of atomic shells of interest for atom 1
+    :param atom2:
+        index of the second atom of interest
+    :param shell2:
+        list of atomic shells of interest for atom 2
+    :param atom3:
+        index of the third atom of interest
+    :param shell3:
+        list of atomic shells of interest for atom 3
+    :param atom4:
+        index of the fourth atom of interest
+    :param shell2:
+        list of atomic shells of interest for atom 4
+    :param chk_file:
+        the hdf5 checkpoint file name
+    :param unit:
+        the units to be used for the molecular geometry;
+        possible values: "au" (default), "Angstrom"
+    :param return_block:
+        return the matrix block, or the full matrix.
+
+
+    :return:
+        a numpy array corresponding to a specified block of 
+        the selected 1e integral matrix.
+    """
+
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+
+    pyscf_int_type = get_pyscf_integral_type(int_type)
+
+    pyscf_int = pyscf_molecule.intor(pyscf_int_type, aosym='s1')
+
+    nao = pyscf_molecule.nao
+
+    # Transform integral to veloxchem format
+    vlx_int = np.zeros_like(pyscf_int)
+
+    basis_set_map = basis.get_index_map(molecule)
+    for m in range(nao):
+        for n in range(nao):
+            for t in range(nao):
+                for p in range(nao):
+                    vm = basis_set_map[m]
+                    vn = basis_set_map[n]
+                    vt = basis_set_map[t]
+                    vp = basis_set_map[p]
+                    vlx_int[vm,vn,vt,vp] = pyscf_int[m,n,t,p]
+
+    ao_basis_map = basis.get_ao_basis_map(molecule)
+    index1 = []
+    index2 = []
+    index3 = []
+    index4 = []
+    k = 0
+    for ao in ao_basis_map:
+        parts = ao.split()
+        atom = int(parts[0])
+        shell = parts[2]
+        if atom1 == atom:
+            if shell1 is not None:
+                for s in shell1:
+                    if s in shell:
+                        index1.append(k)
+            else:
+                index1.append(k)
+        if atom2 == atom:
+            if shell2 is not None:
+                for s in shell2:
+                    if s in shell:
+                        index2.append(k)
+            else:
+                index2.append(k)
+        if atom3 == atom:
+            if shell3 is not None:
+                for s in shell3:
+                    if s in shell:
+                        index3.append(k)
+            else:
+                index3.append(k)
+        if atom4 == atom:
+            if shell4 is not None:
+                for s in shell4:
+                    if s in shell:
+                        index4.append(k)
+            else:
+                index4.append(k)
+        k += 1
+    if index1 == []:
+        raise ValueError("Atom or shell(s) not found.", atom1, shell1)
+    if index2 == []:
+        raise ValueError("Atom or shell(s) not found.", atom2, shell2)
+    if index3 == []:
+        raise ValueError("Atom or shell(s) not found.", atom3, shell3)
+    if index4 == []:
+        raise ValueError("Atom or shell(s) not found.", atom4, shell4)
+    
+    vlx_int_block = np.zeros((len(index1), len(index2),
+                              len(index3), len(index4)))
+    
+    for i in range(len(index1)):
+        for j in range(len(index2)):
+            for k in range(len(index3)):
+                for l in range(len(index4)):
+                    vlx_int_block[i,j,k,l] = vlx_int[index1[i], index2[j],
+                                                     index3[k], index4[l]]
+   
+    label = int_type+'_atom%d' % (atom1)
+    if shell1 is not None:
+        for s1 in shell1:
+            label += "_%s" % (s1)
+
+    label += "_atom%d" % (atom2)
+    if shell2 is not None:
+        for s2 in shell2:
+            label += "_%s" % (s2)
+
+    label += "_atom%d" % (atom3)
+    if shell3 is not None:
+        for s3 in shell3:
+            label += "_%s" % (s3)
+
+    label += "_atom%d" % (atom4)
+    if shell4 is not None:
+        for s4 in shell4:
+            label += "_%s" % (s4)
 
     print(label) 
     if chk_file is not None:
