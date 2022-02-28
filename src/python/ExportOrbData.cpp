@@ -101,6 +101,7 @@ CAODensityMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
 static std::shared_ptr<CMolecularOrbitals>
 CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_orbs,
                                    const std::vector<py::array_t<double>>& eig_vals,
+                                   const std::vector<py::array_t<double>>& occupations,
                                    const molorb                            orbs_type)
 {
     std::vector<CDenseMatrix> cmos;
@@ -132,7 +133,22 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
         ceigs.push_back(CMemBlock<double>(vec));
     }
 
-    return std::make_shared<CMolecularOrbitals>(cmos, ceigs, orbs_type);
+    std::vector<CMemBlock<double>> coccs;
+
+    for (size_t i = 0; i < occupations.size(); i++)
+    {
+        const py::array_t<double>& arr = occupations[i];
+
+        std::string errdim("MolecularOrbitals: Expecting 1D numpy arrays for occupations");
+
+        errors::assertMsgCritical(arr.ndim() == 1, errdim);
+
+        std::vector<double> vec(arr.data(), arr.data() + arr.size());
+
+        coccs.push_back(CMemBlock<double>(vec));
+    }
+
+    return std::make_shared<CMolecularOrbitals>(cmos, ceigs, coccs, orbs_type);
 }
 
 // Exports classes/functions in src/orbdata to python
@@ -308,6 +324,18 @@ export_orbdata(py::module& m)
             "eb_to_numpy",
             [](const CMolecularOrbitals& self) -> py::array_t<double> {
                 return vlx_general::pointer_to_numpy(self.betaEnergies(), self.getNumberOfColumns());
+            },
+            "Converts beta orbital energies in MolecularOrbitals to numpy array.")
+        .def(
+            "occa_to_numpy",
+            [](const CMolecularOrbitals& self) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.alphaOccupations(), self.getNumberOfColumns());
+            },
+            "Converts alpha orbital energies in MolecularOrbitals to numpy array.")
+        .def(
+            "occb_to_numpy",
+            [](const CMolecularOrbitals& self) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.betaOccupations(), self.getNumberOfColumns());
             },
             "Converts beta orbital energies in MolecularOrbitals to numpy array.")
         .def("get_orbitals_type", &CMolecularOrbitals::getOrbitalsType, "Gets type of molecular orbital matrix.")

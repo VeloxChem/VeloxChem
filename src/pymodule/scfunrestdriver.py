@@ -233,12 +233,14 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         return effmat_a, effmat_b
 
-    def gen_molecular_orbitals(self, fock_mat, oao_mat):
+    def gen_molecular_orbitals(self, molecule, fock_mat, oao_mat):
         """
         Generates spin unrestricted molecular orbital by diagonalizing
         spin unrestricted open shell Fock/Kohn-Sham matrix. Overloaded base
         class method.
 
+        :param molecule:
+            The molecule.
         :param fock_mat:
             The Fock/Kohn-Sham matrix.
         :param oao_mat:
@@ -264,8 +266,10 @@ class ScfUnrestrictedDriver(ScfDriver):
             orb_coefs_a, eigs_a = self.delete_mos(orb_coefs_a, eigs_a)
             orb_coefs_b, eigs_b = self.delete_mos(orb_coefs_b, eigs_b)
 
+            occa, occb = molecule.get_aufbau_occupation(eigs_a.size, True)
+
             return MolecularOrbitals([orb_coefs_a, orb_coefs_b],
-                                     [eigs_a, eigs_b], molorb.unrest)
+                                     [eigs_a, eigs_b], [occa, occb], molorb.unrest)
 
         return MolecularOrbitals()
 
@@ -346,16 +350,9 @@ class ScfUnrestrictedDriver(ScfDriver):
         idx = occupations.argsort()[::-1] #Sort by occupation numbers
         Orbital_energies = Orbital_energies[idx]
         occupations = occupations[idx]
-        eigenvectors = eigenvectors[:,idx]
+        #eigenvectors = eigenvectors[:,idx]
+        C_natural = C_natural[:,idx]
 
-        # Print the natural orbitals occupation numbers
-        #float_formatter = "{:.5f}".format
-        #np.set_printoptions(formatter={'float_kind':float_formatter})
-        #print("The UHF natural orbitals occupation numbers are")
-        #print(occupations)
-        #print("The expectation energies of Fock matrix")
-        #print(Orbital_energies)
-
-        # Until the occupation numbers are stored in the MO object, we have to do without...
-        Natural_orbitals=MolecularOrbitals([C_natural],[Orbital_energies],molorb.rest)
+        # Create the MolecularOrbitals object and return
+        Natural_orbitals=MolecularOrbitals([C_natural],[Orbital_energies],[occupations], molorb.rest)
         return Natural_orbitals
