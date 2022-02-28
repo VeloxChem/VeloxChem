@@ -322,6 +322,7 @@ def _MolecularOrbitals_read_hdf5(fname):
 
     orbs = []
     enes = []
+    occs = []
 
     orbs.append(np.array(hf.get('alpha_orbitals')))
     enes.append(np.array(hf.get('alpha_energies')))
