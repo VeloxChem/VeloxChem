@@ -59,6 +59,16 @@ def get_pyscf_integral_type(int_type):
     else:
         return int_dict[int_type]
 
+def get_sign(pyscf_int_type):
+    """
+    Returns the sign of the pyscf integrals which corresponds
+    to the veloxchem standard. 
+    """
+    if pyscf_int_type in ["int1e_nuc"]:
+        return -1
+    else:
+        return 1
+
 def get_molecule_string(molecule):
     mol_string = ""
     for i in range(molecule.number_of_atoms()):
@@ -152,8 +162,9 @@ def import_1e_integral(molecule, basis, int_type, atom1=1, shell1=None,
                                  basis=pyscf_basis, unit=unit)
 
     pyscf_int_type = get_pyscf_integral_type(int_type)
+    sign = get_sign(pyscf_int_type)
 
-    pyscf_int = pyscf_molecule.intor(pyscf_int_type, aosym='s1')
+    pyscf_int = sign * pyscf_molecule.intor(pyscf_int_type, aosym='s1')
 
     # Transform integral to veloxchem format
     vlx_int = ao_matrix_to_veloxchem(
