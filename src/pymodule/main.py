@@ -34,6 +34,7 @@ from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scffirstorderprop import ScfFirstOrderProperties
 from .respchargesdriver import RespChargesDriver
 from .excitondriver import ExcitonModelDriver
+from .numerovdriver import NumerovDriver
 from .mp2driver import Mp2Driver
 from .loprop import LoPropDriver
 from .trajectorydriver import TrajectoryDriver
@@ -267,6 +268,18 @@ def main():
         traj_drv = TrajectoryDriver(task.mpi_comm, task.ostream)
         traj_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
         traj_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+    # Diatomic vibronic spectrum using Numerov
+
+    if task_type == 'numerov':
+        numerov_dict = (dict(task.input_dict['numerov'])
+                        if 'numerov' in task.input_dict else {})
+        scf_dict = (dict(task.input_dict['scf'])
+                    if 'scf' in task.input_dict else {})
+
+        numerov_drv = NumerovDriver(task.mpi_comm, task.ostream)
+        numerov_drv.update_settings(numerov_dict, scf_dict, method_dict)
+        numerov_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Self-consistent field
 
