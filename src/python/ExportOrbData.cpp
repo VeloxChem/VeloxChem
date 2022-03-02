@@ -236,6 +236,8 @@ export_orbdata(py::module& m)
              &CMolecularBasis::getDimensionsOfPrimitiveBasis,
              "Determines size of primitive AO basis for selected molecule.",
              "molecule"_a)
+        .def("get_index_map", &CMolecularBasis::getIndexMap, 
+			 "Maps the atomic orbital indices of veloxchem to pyscf and Dalton indices."_a)
         .def("n_basis_functions",
              vlx_general::overload_cast_<const CMolecule&, int32_t>()(&CMolecularBasis::getNumberOfBasisFunctions, py::const_),
              "Determines number of basis functions with specific angular momentum in molecular basis of selected molecule.",
