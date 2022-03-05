@@ -238,5 +238,29 @@ namespace vxcfuncs {  // vxcfuncs namespace
     {
         
     }
+
+    void
+    PkzbFuncCubicHessianAB(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                      const double          factor,
+                      const CDensityGrid&   densityGrid)
+    {
+
+    }
+    
+    void
+    PkzbFuncCubicHessianA(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                     const double          factor,
+                     const CDensityGrid&   densityGrid)
+    {
+
+    }
+    
+    void
+    PkzbFuncCubicHessianB(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                      const double          factor,
+                      const CDensityGrid&   densityGrid)
+    {
+        
+    }
     
 }  // namespace vxcfuncs
