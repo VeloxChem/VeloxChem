@@ -207,6 +207,38 @@ CDensityGrid::updateBetaDensities()
             }
         }
     }
+
+    if ((13 * _nDensityMatrices) == _densityValues.blocks())
+    {
+        for (int32_t i = 0; i < _nDensityMatrices; i++)
+        {
+            auto rhoa = alphaDensity(i); auto rhob = betaDensity(i);
+            
+            auto grada_x = alphaDensityGradientX(i);
+            
+            auto gradb_x = betaDensityGradientX(i);
+            
+            auto grada_y = alphaDensityGradientY(i);
+            
+            auto gradb_y = betaDensityGradientY(i);
+            
+            auto grada_z = alphaDensityGradientZ(i);
+            
+            auto gradb_z = betaDensityGradientZ(i);
+
+            auto lapa = alphaDensityLaplacian(i);
+
+            auto lapb = betaDensityLaplacian(i);
+            
+            #pragma omp simd aligned(rhoa, rhob, grada_x, gradb_x, grada_y, gradb_y, grada_z, gradb_z: VLX_ALIGN)
+            for (int32_t j = 0; j < ngpoints; j++)
+            {
+                rhob[j] = rhoa[j];
+                
+                gradb_x[j] = grada_x[j]; gradb_y[j] = grada_y[j]; gradb_z[j] = grada_z[j], lapb[j] = lapa[j];
+            }
+        }
+    }
 }
 
 void
@@ -528,6 +560,48 @@ CDensityGrid::betaDensityGradientZ(const int32_t iDensityMatrix)
     return nullptr;
 }
 
+const double*
+CDensityGrid::alphaDensityLaplacian(const int32_t iDensityMatrix) const 
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(11 * _nDensityMatrices + iDensityMatrix);
+    
+    if (_gridType == dengrid::limb) return _densityValues.data(5 * _nDensityMatrices + iDensityMatrix);
+    
+    return nullptr;
+}
+
+double*
+CDensityGrid::alphaDensityLaplacian(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(11 * _nDensityMatrices + iDensityMatrix);
+    
+    if (_gridType == dengrid::limb) return _densityValues.data(5 * _nDensityMatrices + iDensityMatrix);
+    
+    return nullptr;
+}
+
+const double*
+CDensityGrid::betaDensityLaplacian(const int32_t iDensityMatrix) const 
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(12 * _nDensityMatrices + iDensityMatrix);
+    
+    if (_gridType == dengrid::lima) return _densityValues.data(5 * _nDensityMatrices + iDensityMatrix);
+    
+    return nullptr;
+}
+
+double*
+CDensityGrid::betaDensityLaplacian(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(12 * _nDensityMatrices + iDensityMatrix);
+    
+    if (_gridType == dengrid::lima) return _densityValues.data(5 * _nDensityMatrices + iDensityMatrix);
+    
+    return nullptr;
+}
+
+
+
 void
 CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGridAB,
                                          CMolecularGrid& molecularGridab,
@@ -633,6 +707,42 @@ CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGridAB,
                 dgrada_x[ipoints] = sgrada_x[i]; dgrada_y[ipoints] = sgrada_y[i]; dgrada_z[ipoints] = sgrada_z[i];
                 
                 dgradb_x[ipoints] = sgradb_x[i]; dgradb_y[ipoints] = sgradb_y[i]; dgradb_z[ipoints] = sgradb_z[i];
+                
+                ipoints++;
+            }
+        }
+    }
+
+    // density screening for m-GGA
+    
+    // set up pointers to source  Laplacian
+
+    auto slapa = densityGridAB.alphaDensityLaplacian(iDensityMatrix);
+    
+    auto slapb = densityGridAB.betaDensityLaplacian(iDensityMatrix);
+
+    // set up pointers to destination  Laplacian 
+
+    auto dlapa = densityGridAB.alphaDensityLaplacian(0);
+    
+    auto dlapb = densityGridAB.betaDensityLaplacian(0);
+
+
+    if (xcFuncType == xcfun::mgga)
+    {
+        for (int32_t i = 0; i < npoints; i++)
+        {
+            if (_isValidGridPointForGga(srhoa[i], srhob[i], sgrada[i], sgradb[i], densityThreshold))
+            {
+                drhoa[ipoints] = srhoa[i]; drhob[ipoints] = srhob[i];
+                
+                dgrada[ipoints] = sgrada[i]; dgradb[ipoints] = sgradb[i]; dgradab[ipoints] = sgradab[i];
+                
+                dgrada_x[ipoints] = sgrada_x[i]; dgrada_y[ipoints] = sgrada_y[i]; dgrada_z[ipoints] = sgrada_z[i];
+                
+                dgradb_x[ipoints] = sgradb_x[i]; dgradb_y[ipoints] = sgradb_y[i]; dgradb_z[ipoints] = sgradb_z[i];
+
+                dlapa[ipoints] = slapa[i]; dlapb[ipoints] = slapb[i];
                 
                 ipoints++;
             }

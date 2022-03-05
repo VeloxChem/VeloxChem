@@ -141,6 +141,21 @@ class CDensityGridDriver
                                      const CMolecule&        molecule,
                                      const CMolecularBasis&  basis,
                                      const CMolecularGrid&   molecularGrid) const;
+
+      /**
+     Creates density grid for spin-restricted GGA case.
+     
+     @param densityGrid the density grid object.
+     @param aoDensityMatrix the AO density matrices.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the distributed molecular grid.
+     */
+    void _genRestrictedDensityForMgga(      CDensityGrid&     densityGrid,
+                                     const CAODensityMatrix& aoDensityMatrix,
+                                     const CMolecule&        molecule,
+                                     const CMolecularBasis&  basis,
+                                     const CMolecularGrid&   molecularGrid) const;
     
   /**
      Creates density grid for spin-restricted GGA case.
@@ -232,6 +247,31 @@ class CDensityGridDriver
                                                       const int32_t           nGridPoints) const;
 
 
+    /**
+     Generates batch of spin restricted density grid points for MGGA case.
+     
+     @param densityGrid the pointer to density grid object.
+     @param aoDensityMatrix the AO density matrix.
+     @param gtoContainer the GTOs container.
+     @param gridCoordinatesX the vector of Cartesian X coordinates of grid
+     points.
+     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid
+     points.
+     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid
+     points.
+     @param gridOffset the batch offset in vector grid points.
+     @param nGridPoints the number of grid points in batch.
+     */
+    void _genBatchOfRestrictedDensityGridPointsForMgga(      CDensityGrid*     densityGrid,
+                                                      const CAODensityMatrix* aoDensityMatrix,
+                                                      const CGtoContainer*    gtoContainer,
+                                                      const double*           gridCoordinatesX,
+                                                      const double*           gridCoordinatesY,
+                                                      const double*           gridCoordinatesZ,
+                                                      const int32_t           gridOffset,
+                                                      const int32_t           nGridPoints) const;
+
+
    /**
      Generates batch of spin restricted density grid points for GGA case.
      
@@ -314,6 +354,30 @@ class CDensityGridDriver
                                             const int32_t              gridBlockPosition,
                                             const int32_t              nGridPoints) const;
 
+
+
+    /**
+     Distributes spin-restriced density values into density grid.
+     
+     @param densityGrid the pointer to density grid object.
+     @param aoDensityMatrix the AO density matrix.
+     @param gtoValues the GTOs values buffer.
+     @param gtoValuesX the GTOs gradient along X axis values buffer.
+     @param gtoValuesY the GTOs gradient along Y axis values buffer.
+     @param gtoValuesZ the GTOs gradient along Z axis values buffer.
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param gridBlockPosition the position of grid block in GTOs values grid.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
+    void _distRestrictedDensityValuesForMgga(      CDensityGrid*        densityGrid,
+                                            const CAODensityMatrix*    aoDensityMatrix,
+                                            const CMemBlock2D<double>& gtoValues,
+                                            const CMemBlock2D<double>& gtoValuesX,
+                                            const CMemBlock2D<double>& gtoValuesY,
+                                            const CMemBlock2D<double>& gtoValuesZ,
+                                            const int32_t              gridOffset,
+                                            const int32_t              gridBlockPosition,
+                                            const int32_t              nGridPoints) const;
 
 
     /**

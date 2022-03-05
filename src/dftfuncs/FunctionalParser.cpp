@@ -32,6 +32,7 @@
 #include "SlaterFunctional.hpp"
 #include "StringFormat.hpp"
 #include "VWN3Functional.hpp"
+#include "PkzbFunctional.hpp"
 
 namespace vxcfuncs {  // vxcfuncs namespace
 
@@ -118,6 +119,10 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
                                  {setPrimitiveSlaterFunctional(), setPrimitiveBecke88Functional(), setPrimitiveLYPFunctional()},
                                  {0.5, 0.5, 1.0});
         }
+
+        // PKZB exchange functional
+
+        if (fstr::upcase(xcLabel) == "PKZB") return vxcfuncs::setPkzbFunctional();
 
         // FIX ME: add other functionals here...
     }

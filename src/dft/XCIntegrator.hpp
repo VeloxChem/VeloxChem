@@ -210,6 +210,23 @@ class CXCIntegrator
                                            const CDensityGrid&      densityGrid,
                                            const CMolecularGrid&    molecularGrid) const;
     
+
+
+      /**
+     Computes exchange-correlation contribution to Kohn-Sham matrix for spin-restricted MGGA case.
+     
+     @param aoKohnShamMatrix the Kohn-Sham matrix.
+     @param gtoContainer the container of GTOs blocks.
+     @param xcGradientGrid the exchange-correlation functional gradient grid.
+     @param densityGrid the density grid.
+     @param molecularGrid the molecular grid.
+     */
+    void _compRestrictedContributionForMgga(     CAOKohnShamMatrix& aoKohnShamMatrix,
+                                           const CGtoContainer*     gtoContainer,
+                                           const CXCGradientGrid&   xcGradientGrid,
+                                           const CDensityGrid&      densityGrid,
+                                           const CMolecularGrid&    molecularGrid) const;
+
     /**
      Computes exchange-correlation contribution to Kohn-Sham matrix for spin-unrestricted GGA case.
      
@@ -398,6 +415,7 @@ class CXCIntegrator
                                     const int32_t            gridOffset,
                                     const int32_t            nGridPoints) const;
     
+
     /**
      Computes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
      for spin-restricted GGA case.
@@ -425,6 +443,36 @@ class CXCIntegrator
                                     const double*            gridWeights,
                                     const int32_t            gridOffset,
                                     const int32_t            nGridPoints) const;
+
+
+    /**
+     Computes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
+     for spin-restricted MGGA case.
+     
+     @param aoKohnShamMatrix the pointer to Kohn-Sham matrix.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param xcGradientGrid the exchange-correlation functional gradient grid.
+     @param densityGrid the pointer to density grid.
+     @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
+     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
+     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
+     @param gridWeights the pointer to grid weights.
+     @param gridOffset the grid offset.
+     @param nGridPoints the number of grid points.
+     */
+    void _compRestrictedBatchForMGGA(     CAOKohnShamMatrix* aoKohnShamMatrix,
+                                    const CGtoBlock&         braGtoBlock,
+                                    const CGtoBlock&         ketGtoBlock,
+                                    const CXCGradientGrid*   xcGradientGrid,
+                                    const CDensityGrid*      densityGrid,
+                                    const double*            gridCoordinatesX,
+                                    const double*            gridCoordinatesY,
+                                    const double*            gridCoordinatesZ,
+                                    const double*            gridWeights,
+                                    const int32_t            gridOffset,
+                                    const int32_t            nGridPoints) const;
+
 
     /**
      Computes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
@@ -699,6 +747,37 @@ class CXCIntegrator
                                     const int32_t              gridBlockPosition,
                                     const int32_t              nGridPoints) const;
     
+
+    /**
+     Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
+     for spin-restricted MGGA case.
+
+     @param aoKohnShamMatrix the pointer to Kohn-Sham matrix.
+     @param xcBuffer the exchange-correlation buffer.
+     @param xcGradientGrid theexchange-correlation gradient grid.
+     @param densityGrid the density grid.
+     @param gtoValues the pointer to GTOS values on grid.
+     @param gtoValuesX the GTOs gradient along X axis values buffer.
+     @param gtoValuesY the GTOs gradient along Y axis values buffer.
+     @param gtoValuesZ the GTOs gradient along Z axis values buffer.
+     @param gridWeights the pointer to grid weights.
+     @param gridOffset the offset of grids batch in density grid.
+     @param gridBlockPosition the block position in grids batch.
+     @param nGridPoints the number of grid points in grid block.
+     */
+    void _distRestrictedBatchForMgga(     CAOKohnShamMatrix*   aoKohnShamMatrix,
+                                          CMemBlock<double>&   xcBuffer,
+                                    const CXCGradientGrid&     xcGradientGrid,
+                                    const CDensityGrid&        densityGrid,
+                                    const CMemBlock2D<double>& gtoValues,
+                                    const CMemBlock2D<double>& gtoValuesX,
+                                    const CMemBlock2D<double>& gtoValuesY,
+                                    const CMemBlock2D<double>& gtoValuesZ,
+                                    const double*              gridWeights,
+                                    const int32_t              gridOffset,
+                                    const int32_t              gridBlockPosition,
+                                    const int32_t              nGridPoints) const;
+
     /**
      Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
      for spin-restricted GGA case.
@@ -717,6 +796,37 @@ class CXCIntegrator
      @param nGridPoints the number of grid points in grid block.
      */
     void _distRestrictedBatchForGga(      CDenseMatrix&        subMatrix,
+                                    const CXCGradientGrid*     xcGradientGrid,
+                                    const CDensityGrid*        densityGrid,
+                                    const CMemBlock2D<double>& gtoValues,
+                                    const CMemBlock2D<double>& gtoValuesX,
+                                    const CMemBlock2D<double>& gtoValuesY,
+                                    const CMemBlock2D<double>& gtoValuesZ,
+                                    const CGtoBlock&           gtoBlock,
+                                    const double*              gridWeights,
+                                    const int32_t              gridOffset,
+                                    const int32_t              gridBlockPosition,
+                                    const int32_t              nGridPoints) const;
+
+
+      /**
+     Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
+     for spin-restricted GGA case.
+     
+     @param subMatrix the partial Kohn-Sham matrix.
+     @param xcGradientGrid the pointer to exchange-correlation gradient grid.
+     @param densityGrid the pointer to density grid.
+     @param gtoValues the pointer to GTOS values on grid.
+     @param gtoValuesX the GTOs gradient along X axis values buffer.
+     @param gtoValuesY the GTOs gradient along Y axis values buffer.
+     @param gtoValuesZ the GTOs gradient along Z axis values buffer.
+     @param gtoBlock the GTOs block.
+     @param gridWeights the pointer to grid weights.
+     @param gridOffset the offset of grids batch in density grid.
+     @param gridBlockPosition the block position in grids batch.
+     @param nGridPoints the number of grid points in grid block.
+     */
+    void _distRestrictedBatchForMgga(     CDenseMatrix&        subMatrix,
                                     const CXCGradientGrid*     xcGradientGrid,
                                     const CDensityGrid*        densityGrid,
                                     const CMemBlock2D<double>& gtoValues,
@@ -848,6 +958,47 @@ class CXCIntegrator
      @param nGridPoints the number of grid points in grid block.
      */
     void _distRestrictedBatchForGga(      CDenseMatrix&        subMatrix,
+                                    const CXCGradientGrid*     xcGradientGrid,
+                                    const CDensityGrid*        densityGrid,
+                                    const CMemBlock2D<double>& braGtoValues,
+                                    const CMemBlock2D<double>& braGtoValuesX,
+                                    const CMemBlock2D<double>& braGtoValuesY,
+                                    const CMemBlock2D<double>& braGtoValuesZ,
+                                    const CGtoBlock&           braGtoBlock,
+                                    const CMemBlock2D<double>& ketGtoValues,
+                                    const CMemBlock2D<double>& ketGtoValuesX,
+                                    const CMemBlock2D<double>& ketGtoValuesY,
+                                    const CMemBlock2D<double>& ketGtoValuesZ,
+                                    const CGtoBlock&           ketGtoBlock,
+                                    const double*              gridWeights,
+                                    const int32_t              gridOffset,
+                                    const int32_t              gridBlockPosition,
+                                    const int32_t              nGridPoints) const;
+
+
+      /**
+     Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
+     for spin-restricted MGGA case.
+     
+     @param subMatrix the partial Kohn-Sham matrix.
+     @param xcGradientGrid the pointer to exchange-correlation gradient grid.
+     @param densityGrid the pointer to density grid.
+     @param braGtoValues the pointer to GTOS values on grid on bra side.
+     @param braGtoValuesX the GTOs gradient along X axis values buffer on bra side.
+     @param braGtoValuesY the GTOs gradient along Y axis values buffer on bra side.
+     @param braGtoValuesZ the GTOs gradient along Z axis values buffer on bra side.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoValues the pointer to GTOS values on grid on ket side.
+     @param ketGtoValuesX the GTOs gradient along X axis values buffer on ket side.
+     @param ketGtoValuesY the GTOs gradient along Y axis values buffer on ket side.
+     @param ketGtoValuesZ the GTOs gradient along Z axis values buffer on ket side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param gridWeights the pointer to grid weights.
+     @param gridOffset the offset of grids batch in density grid.
+     @param gridBlockPosition the block position in grids batch.
+     @param nGridPoints the number of grid points in grid block.
+     */
+    void _distRestrictedBatchForMgga(     CDenseMatrix&        subMatrix,
                                     const CXCGradientGrid*     xcGradientGrid,
                                     const CDensityGrid*        densityGrid,
                                     const CMemBlock2D<double>& braGtoValues,

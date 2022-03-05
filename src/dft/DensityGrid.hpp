@@ -472,6 +472,41 @@ public:
      @return the pointer to beta density gradient Z values.
      */
     double* betaDensityGradientZ(const int32_t iDensityMatrix);
+
+
+    /**
+     Gets constant pointer to alpha density Laplacian norm values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient norm values.
+     */
+    const double* alphaDensityLaplacian(const int32_t iDensityMatrix) const;
+
+    /**
+     Gets pointer to alpha density Laplacian norm values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient norm values.
+     */
+    double* alphaDensityLaplacian(const int32_t iDensityMatrix);
+
+     /**
+     Gets constant pointer to beta density Laplacian norm values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient norm values.
+     */
+    const double* betaDensityLaplacian(const int32_t iDensityMatrix) const;
+
+    /**
+     Gets pointer to beta density Laplacian norm values.
+     
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta density gradient norm values.
+     */
+    double* betaDensityLaplacian(const int32_t iDensityMatrix);
+
+
     
     /**
      Generates pair of screened molecular and density grids by removing grid points with specific density/density
