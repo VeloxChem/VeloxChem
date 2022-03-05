@@ -84,66 +84,66 @@ namespace vxcfuncs {  // vxcfuncs namespace
 
             const double D = 0.133;
 
-            const double c1 = 10 / 81;
+            const double c1 = 10.0 / 81.0;
 
-            const double c2 = 146 / 2025;
+            const double c2 = 146.0 / 2025.0;
 
-            const double c3 = -73 / 405;
+            const double c3 = -73.0 / 405.0;
 
-            const double c4 = D + 1 / kappa * std::pow(10/81,2);
+            const double c4 = D + 1.0 / kappa * std::pow(10.0/81.0,2);
 
-            double epsslatera = -3 / (4*mathconst::getPiValue()) *pow(3* std::pow(mathconst::getPiValue(),2),1/3) * pow(2,4/3) * std::pow(rhoa[i], 4/3);
+            double epsslatera = -3.0 / (4*mathconst::getPiValue()) *pow(3.0* std::pow(mathconst::getPiValue(),2.0), 1.0/3.0) * std::pow(2.0,4.0/3.0) * std::pow(rhoa[i], 4.0/3.0);
 
-            double epsslaterb = -3 / (4*mathconst::getPiValue()) *pow(3* std::pow(mathconst::getPiValue(),2),1/3) * pow(2,4/3) * std::pow(rhob[i], 4/3);
+            double epsslaterb = -3.0 / (4*mathconst::getPiValue()) *pow(3.0 * std::pow(mathconst::getPiValue(),2), 1.0/3.0) * std::pow(2,4/3) * std::pow(rhob[i], 4.0/3.0);
 
-            double gammaa = 4 * std::pow(grhoa[i],2) / (4*std::pow(3*std::pow(mathconst::getPiValue(),2),2/3))*std::pow(2,8/3) * std::pow(rhoa[i],8/3);
+            double gammaa = 4.0 * std::pow(grhoa[i],2.0) / (4.0*  std::pow(3.0 * std::pow(mathconst::getPiValue(), 2.0), 2.0/3.0))*std::pow(2,8/3) * std::pow(rhoa[i],8.0/3.0);
 
-            double gammab = 4 * std::pow(grhob[i],2) / (4*std::pow(3*std::pow(mathconst::getPiValue(),2),2/3))*std::pow(2,8/3) * std::pow(rhob[i],8/3);
+            double gammab = 4.0 * std::pow(grhob[i],2.0) / (4.0 * std::pow(3.0 * std::pow(mathconst::getPiValue(), 2.0), 2.0/3.0))*std::pow(2,8/3) * std::pow(rhob[i],8.0/3.0);
 
-            double upsilona = 3*2 * taua[i] / (2 * std::pow(3 * std::pow(mathconst::getPiValue(),2),2/3) * std::pow(2,5 / 3) * 
+            double upsilona = 3.0 * 2.0 * taua[i] / (2.0 * std::pow(3.0 * std::pow(mathconst::getPiValue(),2),2/3) * std::pow(2.0 ,5.0 / 3.0) * 
                             
-                            std::pow(rhoa[i],5 / 3))- 9 / 20 - gammaa / 12;
+                            std::pow(rhoa[i], 5.0 / 3.0))- 9.0 / 20.0 - gammaa / 12.0;
 
-            double upsilonb = 3*2 * taub[i] / (2 * std::pow(3 * std::pow(mathconst::getPiValue(),2),2/3) * std::pow(2,5 / 3) * 
+            double upsilonb = 3.0 * 2.0 * taub[i] / (2.0 * std::pow( 3.0 * std::pow(mathconst::getPiValue(), 2.0 ), 2.0 / 3.0) * std::pow(2.0 , 5.0 / 3.0) * 
                             
-                            std::pow(rhob[i],5 / 3))- 9 / 20 - gammab / 12;
+                            std::pow(rhob[i], 5.0 / 3.0))- 9.0 / 20.0 - gammab / 12.0;
 
-            double omegaa = c1 * gammaa + c2 * std::pow(upsilona,2) + c3 * upsilona * gammaa + c4 * std::pow(gammaa,2);
+            double omegaa = c1 * gammaa + c2 * std::pow(upsilona,2.0) + c3 * upsilona * gammaa + c4 * std::pow(gammaa,2.0);
 
-            double omegab = c1 * gammab + c2 * std::pow(upsilonb,2) + c3 * upsilonb * gammab + c4 * std::pow(gammab,2);
+            double omegab = c1 * gammab + c2 * std::pow(upsilonb,2.0) + c3 * upsilonb * gammab + c4 * std::pow(gammab,2.0);
 
-            double fa = 1 + kappa - kappa / (1+ omegaa/kappa);
+            double fa = 1.0 + kappa - kappa / (1.0 + omegaa/kappa);
 
-            double fb = 1 + kappa - kappa / (1+ omegab/kappa);
+            double fb = 1.0 + kappa - kappa / (1.0 + omegab/kappa);
 
             // derivatives
 
-            double diffepsa = -std::pow(3*std::pow(mathconst::getPiValue(),2),1/3) / mathconst::getPiValue() * std::pow(2,4/3) * std::pow(rhoa[i],1/3);
+            double diffepsa = -std::pow(3.0*std::pow(mathconst::getPiValue(),2.0),1.0/3.0) / mathconst::getPiValue() * std::pow(2,4/3) * std::pow(rhoa[i],1.0/3.0);
 
-            double diffprhoa = -8 / 3 * 4 * std::pow(grada[i],2) / (4*std::pow(3*std::pow(mathconst::getPiValue(),2),2/3))*std::pow(2,8/3) * std::pow(rhoa[i],11/3);
+            double diffprhoa = -8.0 / 3.0 * 4.0 * std::pow(grada[i],2) / (4*std::pow(3*std::pow(mathconst::getPiValue(),2),2/3))*std::pow(2,8/3) * std::pow(rhoa[i],11/3);
 
-            double diffqrhoa = -5 / 3 * 6 * taua[i] / (2*std::pow(3*std::pow(mathconst::getPiValue(),2),2/3)) * std::pow(2, 5 / 3) * std::pow(rhob[i], 8 / 3) 
+            double diffqrhoa = -5.0 / 3.0 * 6.0 * taua[i] / (2*std::pow(3*std::pow(mathconst::getPiValue(),2.0),2.0/3.0)) * std::pow(2.0, 5.0 / 3.0) * std::pow(rhob[i], 8.0 / 3.0) 
                             
-                             - 1 / 12 * diffprhoa; 
+                             - 1.0 / 12.0 * diffprhoa; 
 
 
-            double diffpgrada = 8 * grada[i] / (4*std::pow(3*std::pow(mathconst::getPiValue(),2),2/3))*std::pow(2,8/3) * std::pow(rhob[i],8/3);
+            double diffpgrada = 8.0 * grada[i] / (4*std::pow(3*std::pow(mathconst::getPiValue(),2),2/3))*std::pow(2,8/3) * std::pow(rhob[i],8/3);
 
-            double diffqgrada = - 1 / 12 * diffpgrada;     
+            double diffqgrada = - 1.0 / 12.0 * diffpgrada;     
 
-            double diffqtaua = 3 * 2 / (2*std::pow(3*std::pow(mathconst::getPiValue(),2),2/3))*std::pow(2,5/3) * std::pow(rhob[i],5/3);            
+            double diffqtaua = 3.0 * 2.0 / (2*std::pow(3*std::pow(mathconst::getPiValue(), 2.0 ), 2.0/3.0))*std::pow(2.0,5.0/3.0) * std::pow(rhob[i],5.0/3.0);            
 
-            double diffomegarhoa = c1 * diffprhoa + 2 * c2 * upsilona * diffqrhoa   
+            double diffomegarhoa = c1 * diffprhoa + 2.0 * c2 * upsilona * diffqrhoa   
                                 
-                                 + c3 * (diffqrhoa * gammaa + upsilona * diffprhoa) + 2 * c4 * gammaa * diffprhoa;
+                                 + c3 * (diffqrhoa * gammaa + upsilona * diffprhoa) + 2.0 * c4 * gammaa * diffprhoa;
 
-            double diffomegagrada = c1 * diffpgrada + 2 * c2 * upsilona * diffqgrada 
+            double diffomegagrada = c1 * diffpgrada + 2.0 * c2 * upsilona * diffqgrada 
                             
-                                    +  c3 * (diffqgrada * gammaa + upsilona * diffpgrada) + 2 * c4 * gammaa * diffpgrada;
+                                    +  c3 * (diffqgrada * gammaa + upsilona * diffpgrada) + 2.0 * c4 * gammaa * diffpgrada;
                      
-            double diffomegataua = 2 * c2 * upsilona * diffqtaua + c3 * diffqtaua * gammaa;
+            double diffomegataua = 2.0 * c2 * upsilona * diffqtaua + c3 * diffqtaua * gammaa;
 
-            double difffomegaa = std::pow(1 + omegaa / kappa,-2);
+            double difffomegaa = std::pow(1 + omegaa / kappa,-2.0);
 
             double difffrhoa = difffomegaa * diffomegarhoa;
 
