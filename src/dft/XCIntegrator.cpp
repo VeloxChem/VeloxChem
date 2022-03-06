@@ -1168,8 +1168,6 @@ CXCIntegrator::_compRestrictedContributionForMgga(     CAOKohnShamMatrix& aoKohn
     // compute exchange-correlation energy and number of electrons
     
     auto xcdat = _compEnergyAndDensity(xcGradientGrid, densityGrid, molecularGrid);
-
-    std::cout << "xc energy " << std::get<0>(xcdat) << std::endl;
     
     aoKohnShamMatrix.setExchangeCorrelationEnergy(std::get<0>(xcdat));
     

@@ -145,46 +145,75 @@ namespace vxcfuncs {  // vxcfuncs namespace
 
             double diff_eps_a = C2 * std::pow(rhoa[i], 1.0 /3.0); 
 
+            double diff_eps_b = C2 * std::pow(rhob[i], 1.0 /3.0); 
+
             double denom3 = 4.0*std::pow(3.0*pi_sqr , 2.0/3.0)* std::pow(2.0, 8.0/3.0);
 
             double diff_p_rho_a = -8.0/3.0 * 4.0*grada2 /(denom3 *std::pow(rhoa[i], 11.0/3.0) ); 
+
+            double diff_p_rho_b = -8.0/3.0 * 4.0*gradb2 /(denom3 *std::pow(rhob[i], 11.0/3.0) ); 
 
             double denom4 = 2.0*std::pow(3.0*pi_sqr, 2.0/3.0)*std::pow(2.0, 5.0/3.0);    
 
             double diff_q_rho_a = -5.0/3.0 *6.0 *taua[i] /(denom4* std::pow(rhoa[i], 8.0/3.0) )-1/12.0*diff_p_rho_a; 
 
+            double diff_q_rho_b = -5.0/3.0 *6.0 *taub[i] /(denom4* std::pow(rhob[i], 8.0/3.0) )-1/12.0*diff_p_rho_b; 
+
             double diff_p_nabla_a = 8.0* grada[i] / (denom3 * std::pow(rhoa[i], 8.0/3.0) );
+
+            double diff_p_nabla_b = 8.0* gradb[i] / (denom3 * std::pow(rhob[i], 8.0/3.0) );
 
             double diff_q_nabla_a = - 1/12.0 * diff_p_nabla_a;
 
+            double diff_q_nabla_b = - 1/12.0 * diff_p_nabla_b;
+
             double diff_q_tau_a = 3.0 *2.0/ (denom4 * std::pow(rhoa[i], 5.0/3.0) );
 
+            double diff_q_tau_b = 3.0 *2.0/ (denom4 * std::pow(rhob[i], 5.0/3.0) );
 
             double diff_x_rho_a =  c1 * diff_p_rho_a + 2.0 *c2 * Upsilon_a *diff_q_rho_a +  c3*(diff_q_rho_a*Gamma_a + Upsilon_a*diff_p_rho_a) + 2.0 *c4*Gamma_a*diff_p_rho_a;
 
+            double diff_x_rho_b =  c1 * diff_p_rho_b + 2.0 *c2 * Upsilon_b *diff_q_rho_b +  c3*(diff_q_rho_a*Gamma_b + Upsilon_b*diff_p_rho_b) + 2.0 *c4*Gamma_b*diff_p_rho_b;
+
             double diff_x_nabla_a = c1 * diff_p_nabla_a + 2.0 *c2 * Upsilon_a *diff_q_nabla_a +  c3*(diff_q_nabla_a*Gamma_a + Upsilon_a*diff_p_nabla_a) + 2.0 *c4*Gamma_a*diff_p_nabla_a;
+            
+            double diff_x_nabla_b = c1 * diff_p_nabla_b + 2.0 *c2 * Upsilon_b *diff_q_nabla_b +  c3*(diff_q_nabla_b*Gamma_b + Upsilon_b*diff_p_nabla_b) + 2.0 *c4*Gamma_b*diff_p_nabla_b;
 
             double diff_x_tau_a = 2.0 *c2*Upsilon_a*diff_q_tau_a + c3*diff_q_tau_a*Gamma_a;
 
+            double diff_x_tau_b = 2.0 *c2*Upsilon_b*diff_q_tau_b + c3*diff_q_tau_a*Gamma_b;
 
             double diff_F_x_a = std::pow( 1+ Omega_a/kappa, -2);
 
+            double diff_F_x_b = std::pow( 1+ Omega_b/kappa, -2);
+
             double diff_F_rho_a = diff_F_x_a * diff_x_rho_a;
+
+            double diff_F_rho_b = diff_F_x_b * diff_x_rho_b;
 
             double diff_F_nabla_a = diff_F_x_a * diff_x_nabla_a;
 
+            double diff_F_nabla_b = diff_F_x_b * diff_x_nabla_b;
+
             double diff_F_tau_a = diff_F_x_a * diff_x_tau_a;
 
-            fexc[i] += 0.5 * (F_a * eps_slater_a + F_b * eps_slater_b);
+            double diff_F_tau_b = diff_F_x_b * diff_x_tau_b;
+
+            fexc[i] += 0.5 * (eps_Pkzb_a + eps_Pkzb_b);
 
             grhoa[i] += 0.5 *(diff_eps_a * F_a + eps_slater_a*diff_F_rho_a);
 
+            grhob[i] += 0.5 *(diff_eps_b * F_b + eps_slater_b *diff_F_rho_b);
+
             ggrada[i] += 0.5 * eps_slater_a * diff_F_nabla_a;
 
+            ggradb[i] += 0.5 * eps_slater_b * diff_F_nabla_b;
+
             gtaua[i] += 0.5 * eps_slater_a * diff_F_tau_a;
+
+            gtaub[i] += 0.5 * eps_slater_b * diff_F_tau_b;
  
         }
-
         
     }
     
