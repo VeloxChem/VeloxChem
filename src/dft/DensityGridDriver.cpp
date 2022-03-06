@@ -1082,7 +1082,7 @@ CDensityGridDriver::_distRestrictedDensityValuesForMgga(      CDensityGrid*     
                         
                         gradaz[gridOffset + gridBlockPosition + l] += dval * (bgaoz[l] * kgaos[l] + bgaos[l] * kgaoz[l]);
 
-                        lapa[gridOffset + gridBlockPosition + l] += dval * (bgaox[l] * kgaox[l] + bgaoy[l] * kgaoy[l] + bgaoz[l] * kgaoz[l]);
+                        lapa[gridOffset + gridBlockPosition + l] += 0.5 *dval * (bgaox[l] * kgaox[l] + bgaoy[l] * kgaoy[l] + bgaoz[l] * kgaoz[l]);
 
                     }
                 }
