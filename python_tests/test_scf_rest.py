@@ -98,6 +98,22 @@ class TestScfRestricted:
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)
 
+    
+    def test_scf_pkzb(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water.inp')
+        potfile = None
+
+        xcfun_label = 'pkzb'
+        electric_field = None
+
+        ref_e_scf = -75.961205966185
+        ref_dip = np.array([0.000000, 0.000000, 0.691948])
+
+        self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
+                     ref_dip)
+
     def test_scf_dft_slda(self):
 
         here = Path(__file__).parent
