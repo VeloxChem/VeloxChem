@@ -1079,7 +1079,7 @@ CXCIntegrator::_compRestrictedContributionForGga(      CAOKohnShamMatrix& aoKohn
 
 
 void
-CXCIntegrator::_compRestrictedContributionForMgga(      CAOKohnShamMatrix& aoKohnShamMatrix,
+CXCIntegrator::_compRestrictedContributionForMgga(     CAOKohnShamMatrix& aoKohnShamMatrix,
                                                  const CGtoContainer*     gtoContainer,
                                                  const CXCGradientGrid&   xcGradientGrid,
                                                  const CDensityGrid&      densityGrid,
@@ -1126,6 +1126,7 @@ CXCIntegrator::_compRestrictedContributionForMgga(      CAOKohnShamMatrix& aoKoh
     // set up number of GTOs blocks
     
     auto nblocks = gtoContainer->getNumberOfGtoBlocks();
+
     
     // loop over pairs of GTOs blocks
     
@@ -1167,6 +1168,8 @@ CXCIntegrator::_compRestrictedContributionForMgga(      CAOKohnShamMatrix& aoKoh
     // compute exchange-correlation energy and number of electrons
     
     auto xcdat = _compEnergyAndDensity(xcGradientGrid, densityGrid, molecularGrid);
+
+    std::cout << "xc energy " << std::get<0>(xcdat) << std::endl;
     
     aoKohnShamMatrix.setExchangeCorrelationEnergy(std::get<0>(xcdat));
     
@@ -2024,7 +2027,6 @@ CXCIntegrator::_compRestrictedBatchForMGGA(     CAOKohnShamMatrix* aoKohnShamMat
     auto symbk = (braGtoBlock == ketGtoBlock);
     
     // set up angular momentum data
-    
     auto bang = braGtoBlock.getAngularMomentum();
     
     auto kang = ketGtoBlock.getAngularMomentum();
@@ -2052,7 +2054,7 @@ CXCIntegrator::_compRestrictedBatchForMGGA(     CAOKohnShamMatrix* aoKohnShamMat
     auto blockdim = _getSizeOfBlock();
     
     auto nblocks = nGridPoints / blockdim;
-    
+        
     // set up current grid point
     
     int32_t igpnt = 0;
@@ -2083,7 +2085,7 @@ CXCIntegrator::_compRestrictedBatchForMGGA(     CAOKohnShamMatrix* aoKohnShamMat
         
         for (int32_t i = 0; i < nblocks; i++)
         {
-            gtorec::computeGtosValuesForGGA(baos, baox, baoy, baoz, braGtoBlock, gridCoordinatesX, gridCoordinatesY,
+            gtorec::computeGtosValuesForMGGA(baos, baox, baoy, baoz, braGtoBlock, gridCoordinatesX, gridCoordinatesY,
                                             gridCoordinatesZ, gridOffset, igpnt, blockdim);
             
             if (symbk)
@@ -2093,7 +2095,7 @@ CXCIntegrator::_compRestrictedBatchForMGGA(     CAOKohnShamMatrix* aoKohnShamMat
             }
             else
             {
-                gtorec::computeGtosValuesForGGA(kaos, kaox, kaoy, kaoz, ketGtoBlock, gridCoordinatesX, gridCoordinatesY,
+                gtorec::computeGtosValuesForMGGA(kaos, kaox, kaoy, kaoz, ketGtoBlock, gridCoordinatesX, gridCoordinatesY,
                                                 gridCoordinatesZ, gridOffset, igpnt, blockdim);
                 
                 _distRestrictedBatchForMgga(submat, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
@@ -2131,7 +2133,7 @@ CXCIntegrator::_compRestrictedBatchForMGGA(     CAOKohnShamMatrix* aoKohnShamMat
         
         auto kaoz = (symbk) ? CMemBlock2D<double>() : CMemBlock2D<double>(blockdim, kdim);
         
-        gtorec::computeGtosValuesForGGA(baos, baox, baoy, baoz, braGtoBlock, gridCoordinatesX, gridCoordinatesY,
+        gtorec::computeGtosValuesForMGGA(baos, baox, baoy, baoz, braGtoBlock, gridCoordinatesX, gridCoordinatesY,
                                         gridCoordinatesZ, gridOffset, igpnt, blockdim);
         
         if (symbk)
@@ -2141,7 +2143,7 @@ CXCIntegrator::_compRestrictedBatchForMGGA(     CAOKohnShamMatrix* aoKohnShamMat
         }
         else
         {
-            gtorec::computeGtosValuesForGGA(kaos, kaox, kaoy, kaoz, ketGtoBlock, gridCoordinatesX, gridCoordinatesY,
+            gtorec::computeGtosValuesForMGGA(kaos, kaox, kaoy, kaoz, ketGtoBlock, gridCoordinatesX, gridCoordinatesY,
                                             gridCoordinatesZ, gridOffset, igpnt, blockdim);
             
             _distRestrictedBatchForMgga(submat, xcGradientGrid, densityGrid, baos, baox, baoy, baoz, braGtoBlock,
@@ -3374,7 +3376,7 @@ CXCIntegrator::_distRestrictedBatchForMgga(      CDenseMatrix&        subMatrix,
     
     auto ggradab = xcGradientGrid->xcGradientValues(xcvars::gradab);
     
-    auto gtaua = xcGradientGrid->xcGradientValues(xcvars::lapa);
+    auto gtaua = xcGradientGrid->xcGradientValues(xcvars::taua);
 
     // set up pointers to density gradient norms
     
@@ -3431,14 +3433,14 @@ CXCIntegrator::_distRestrictedBatchForMgga(      CDenseMatrix&        subMatrix,
                 double gz = gradaz[koff + k];
                     
                 fvxc += w * bgaos[k] * kgaos[k] * grhoa[koff + k];
-                    
+                
                 double fgrd = w * (ggrada[koff + k] / ngrada[koff + k] + ggradab[koff + k]);
-                    
+                
                 fvxc += fgrd * bgaos[k] * (gx * kgaox[k] + gy * kgaoy[k] + gz * kgaoz[k]);
-                    
+                
                 fvxc += fgrd * kgaos[k] * (gx * bgaox[k] + gy * bgaoy[k] + gz * bgaoz[k]);
 
-                fvxc +=  w * gtaua[koff + k] * (bgaox[k] * kgaox[k] + bgaoy[k] * kgaoy[k] + bgaoz[k] * kgaoz[k]);
+                fvxc +=  w * 0.5 * gtaua[koff + k] * (bgaox[k] * kgaox[k] + bgaoy[k] * kgaoy[k] + bgaoz[k] * kgaoz[k]);
             }
             
             if (i == j) fvxc *= 0.5;
@@ -4247,7 +4249,7 @@ CXCIntegrator::_distRestrictedBatchForMgga(     CDenseMatrix&        subMatrix,
     
     auto ggradab = xcGradientGrid->xcGradientValues(xcvars::gradab);
 
-    auto gtaua = xcGradientGrid->xcGradientValues(xcvars::lapa);
+    auto gtaua = xcGradientGrid->xcGradientValues(xcvars::taua);
     
     // set up pointers to density gradient norms
     
@@ -4313,7 +4315,7 @@ CXCIntegrator::_distRestrictedBatchForMgga(     CDenseMatrix&        subMatrix,
                 
                 fvxc += fgrd * kgaos[k] * (gx * bgaox[k] + gy * bgaoy[k] + gz * bgaoz[k]);
 
-                fvxc +=  w * gtaua[koff + k] * (bgaox[k] * kgaox[k] + bgaoy[k] * kgaoy[k] + bgaoz[k] * kgaoz[k]);
+                fvxc +=  w * 0.5 * gtaua[koff + k] * (bgaox[k] * kgaox[k] + bgaoy[k] * kgaoy[k] + bgaoz[k] * kgaoz[k]);
 
             }
             
@@ -4888,7 +4890,7 @@ CXCIntegrator::_distRestrictedBatchForMgga(     CAOKohnShamMatrix*   aoKohnShamM
     
     auto ggradab = xcGradientGrid.xcGradientValues(xcvars::gradab);
 
-    auto gtaua = xcGradientGrid.xcGradientValues(xcvars::lapa);
+    auto gtaua = xcGradientGrid.xcGradientValues(xcvars::taua);
 
     // set up pointers to density gradient norms
     
@@ -4960,7 +4962,7 @@ CXCIntegrator::_distRestrictedBatchForMgga(     CAOKohnShamMatrix*   aoKohnShamM
                     
                     fvxc += fgrd * kgaos[l] * (gx * bgaox[l] + gy * bgaoy[l] + gz * bgaoz[l]);
 
-                    fvxc +=  w * gtaua[loff + l] * (bgaox[l] * kgaox[l] + bgaoy[l] * kgaoy[l] + bgaoz[l] * kgaoz[l]);
+                    fvxc +=  w * 0.5 * gtaua[loff + l] * (bgaox[l] * kgaox[l] + bgaoy[l] * kgaoy[l] + bgaoz[l] * kgaoz[l]);
 
                 }
                 
@@ -5044,7 +5046,7 @@ CXCIntegrator::_distRestrictedBatchForMgga(     CAOKohnShamMatrix*   aoKohnShamM
                     
                     fvxc += fgrd * kgaos[k] * (gx * bgaox[k] + gy * bgaoy[k] + gz * bgaoz[k]);
 
-                    fvxc +=  w * gtaua[koff + k] * (bgaox[k] * kgaox[k] + bgaoy[k] * kgaoy[k] + bgaoz[k] * kgaoz[k]);
+                    fvxc +=  w * 0.5 * gtaua[koff + k] * (bgaox[k] * kgaox[k] + bgaoy[k] * kgaoy[k] + bgaoz[k] * kgaoz[k]);
 
                 }
                 

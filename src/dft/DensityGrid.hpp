@@ -109,7 +109,6 @@ class CDensityGrid
                                  const double betaDensity,
                                  const double densityThreshold) const;
 
-
     /**
      Checks if density grid point is within range of allowe density values for GGA case.
      
@@ -126,6 +125,24 @@ class CDensityGrid
                                  const double betaDensityGradient,
                                  const double densityThreshold) const;
 
+
+    /**
+     Checks if density grid point is within range of allowe density values for GGA case.
+     
+     @param alphaDensity the value of alpha density at grid point.
+     @param betaDensity the value of beta density at grid point.
+     @param alphaDensityGradient the value of alpha density gradient at grid point.
+     @param betaDensityGradient the value of beta density gradient at grid point.
+     @param densityThreshold the threshold for density variable.
+     @return true if valid density grid point, false otherwise.
+     */
+    bool _isValidGridPointForMgga(const double alphaDensity,
+                                 const double betaDensity,
+                                 const double alphaDensityGradient,
+                                 const double betaDensityGradient,
+                                 const double alphatau,
+                                 const double betatau,
+                                 const double densityThreshold) const;
 
     /**
      Checks if density grid point is within range of allowe density values for GGA case.

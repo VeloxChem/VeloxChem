@@ -786,7 +786,7 @@ CDensityGridDriver::_genBatchOfRestrictedDensityGridPointsForMgga(      CDensity
         
         for (int32_t i = 0; i < nblocks; i++)
         {
-            gtorec::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz,  gtoContainer, gridCoordinatesX, gridCoordinatesY,
+            gtorec::computeGtosValuesForMGGA(gaos, gaox, gaoy, gaoz,  gtoContainer, gridCoordinatesX, gridCoordinatesY,
                                             gridCoordinatesZ, gridOffset, igpnt, blockdim);
             
             _distRestrictedDensityValuesForMgga(densityGrid, aoDensityMatrix, gaos, gaox, gaoy, gaoz,
@@ -810,7 +810,7 @@ CDensityGridDriver::_genBatchOfRestrictedDensityGridPointsForMgga(      CDensity
         
         CMemBlock2D<double> gaoz(blockdim, naos);
         
-        gtorec::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY,
+        gtorec::computeGtosValuesForMGGA(gaos, gaox, gaoy, gaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY,
                                         gridCoordinatesZ, gridOffset, igpnt, blockdim);
         
         _distRestrictedDensityValuesForMgga(densityGrid, aoDensityMatrix, gaos, gaox, gaoy, gaoz,

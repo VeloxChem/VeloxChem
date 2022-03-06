@@ -184,7 +184,178 @@ namespace gtorec {  // gtorec namespace
             }
         }
     }
+
+
+    void
+    computeGtosValuesForMGGA(      CMemBlock2D<double>& gtoValues,
+                                  CMemBlock2D<double>& gtoValuesX,
+                                  CMemBlock2D<double>& gtoValuesY,
+                                  CMemBlock2D<double>& gtoValuesZ,
+                            const CGtoContainer*       gtoContainer,
+                            const double*              gridCoordinatesX,
+                            const double*              gridCoordinatesY,
+                            const double*              gridCoordinatesZ,
+                            const int32_t              gridOffset,
+                            const int32_t              gridBlockPosition,
+                            const int32_t              nGridPoints)
+    {
+        // local copy of GTOs containers
+        
+        auto gtovec = CGtoContainer(*gtoContainer);
     
+        // loop over GTOs container data
+        
+        for (int32_t i = 0; i < gtovec.getNumberOfGtoBlocks(); i++)
+        {
+            auto bgtos = gtovec.getGtoBlock(i);
+            
+            // angular momentum data for bra and ket
+            
+            auto bang = bgtos.getAngularMomentum();
+            
+            // set up Cartesian GTOs buffer
+            
+            auto nvcomp = xcfun_components(xcfun::mgga);
+            
+            auto bncart = angmom::to_CartesianComponents(bang);
+            
+            auto bcartbuff = (bang > 0) ? CMemBlock2D<double>(nGridPoints, nvcomp * bncart) : CMemBlock2D<double>();
+            
+            // set up spherical GTOs buffer
+            
+            auto bnspher = angmom::to_SphericalComponents(bang);
+            
+            CMemBlock2D<double> bspherbuff(nGridPoints, nvcomp * bnspher);
+            
+            // loop over contracted GTOs
+            
+            for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++)
+            {
+                // compute j-th GTO values on batch of grid points
+                
+                gtorec::computeGtoValuesOnGrid(bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
+                                               gridBlockPosition + gridOffset, bgtos, j, xcfun::mgga);
+                
+                // distribute j-th GTO values into grid values matrix
+                
+                for (int32_t k = 0; k < bnspher; k++)
+                {
+                    auto bgaos = bspherbuff.data(4 * k);
+                    
+                    auto bgaox = bspherbuff.data(4 * k + 1);
+                    
+                    auto bgaoy = bspherbuff.data(4 * k + 2);
+                    
+                    auto bgaoz = bspherbuff.data(4 * k + 3);
+                    
+                    auto idx = (bgtos.getIdentifiers(k))[j];
+                    
+                    auto gvals = gtoValues.data(idx);
+                    
+                    auto gvalx = gtoValuesX.data(idx);
+                    
+                    auto gvaly = gtoValuesY.data(idx);
+                    
+                    auto gvalz = gtoValuesZ.data(idx);
+                    
+                    #pragma omp simd aligned(bgaos, bgaox, bgaoy, bgaoz, gvals, gvalx, gvaly, gvalz: VLX_ALIGN)
+                    for (int32_t l = 0; l < nGridPoints; l++)
+                    {
+                        gvals[l] = bgaos[l];
+                        
+                        gvalx[l] = bgaox[l];
+                        
+                        gvaly[l] = bgaoy[l];
+                        
+                        gvalz[l] = bgaoz[l];
+                    }
+                }
+            }
+        }
+    }
+
+
+    void
+    computeGtosValuesForMGGA(     CMemBlock2D<double>& gtoValues,
+                                  CMemBlock2D<double>& gtoValuesX,
+                                  CMemBlock2D<double>& gtoValuesY,
+                                  CMemBlock2D<double>& gtoValuesZ,
+                            const CGtoBlock&           gtoBlock,
+                            const double*              gridCoordinatesX,
+                            const double*              gridCoordinatesY,
+                            const double*              gridCoordinatesZ,
+                            const int32_t              gridOffset,
+                            const int32_t              gridBlockPosition,
+                            const int32_t              nGridPoints)
+    {
+        // angular momentum data for bra and ket
+        
+        auto bang = gtoBlock.getAngularMomentum();
+        
+        // set up Cartesian GTOs buffer
+        
+        auto nvcomp = xcfun_components(xcfun::mgga);
+        
+        auto bncart = angmom::to_CartesianComponents(bang);
+        
+        auto bcartbuff = (bang > 0) ? CMemBlock2D<double>(nGridPoints, nvcomp * bncart) : CMemBlock2D<double>();
+        
+        // set up spherical GTOs buffer
+        
+        auto bnspher = angmom::to_SphericalComponents(bang);
+        
+        CMemBlock2D<double> bspherbuff(nGridPoints, nvcomp * bnspher);
+        
+        // set up offset of GTOs buffer
+        
+        auto boff = (gtoBlock.getIdentifiers(0))[0];
+        
+        // loop over contracted GTOs
+        
+        for (int32_t i = 0; i < gtoBlock.getNumberOfContrGtos(); i++)
+        {
+            // compute i-th GTO values on batch of grid points
+            
+            gtorec::computeGtoValuesOnGrid(bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
+                                           gridBlockPosition + gridOffset, gtoBlock, i, xcfun::mgga);
+            
+            // distribute i-th GTO values on batch of grid points
+            
+            for (int32_t j = 0; j < bnspher; j++)
+            {
+                auto bgaos = bspherbuff.data(4 * j);
+                
+                auto bgaox = bspherbuff.data(4 * j + 1);
+                
+                auto bgaoy = bspherbuff.data(4 * j + 2);
+                
+                auto bgaoz = bspherbuff.data(4 * j + 3);
+                
+                auto idx = (gtoBlock.getIdentifiers(j))[i] - boff;
+                
+                auto gvals = gtoValues.data(idx);
+                
+                auto gvalx = gtoValuesX.data(idx);
+                
+                auto gvaly = gtoValuesY.data(idx);
+                
+                auto gvalz = gtoValuesZ.data(idx);
+                
+                #pragma omp simd aligned(bgaos, bgaox, bgaoy, bgaoz, gvals, gvalx, gvaly, gvalz: VLX_ALIGN)
+                for (int32_t k = 0; k < nGridPoints; k++)
+                {
+                    gvals[k] = bgaos[k];
+                    
+                    gvalx[k] = bgaox[k];
+                    
+                    gvaly[k] = bgaoy[k];
+                    
+                    gvalz[k] = bgaoz[k];
+                }
+            }
+        }
+    }
+
     void
     computeGtosValuesForGGA(      CMemBlock2D<double>& gtoValues,
                                   CMemBlock2D<double>& gtoValuesX,
@@ -544,6 +715,91 @@ namespace gtorec {  // gtorec namespace
         }
     }
     
+    void
+    computeGtosValuesForMGGA(     double*        gtoMatrix,
+                                  double*        gtoMatrixX,
+                                  double*        gtoMatrixY,
+                                  double*        gtoMatrixZ,
+                            const CGtoContainer* gtoContainer,
+                            const double*        gridCoordinatesX,
+                            const double*        gridCoordinatesY,
+                            const double*        gridCoordinatesZ,
+                            const int32_t        gridOffset,
+                            const int32_t        gridBlockPosition,
+                            const int32_t        nGridPoints)
+    {
+        // local copy of GTOs containers
+        
+        auto gtovec = CGtoContainer(*gtoContainer);
+        
+        // set up number of AOs
+        
+        auto naos = gtovec.getNumberOfAtomicOrbitals();
+        
+        // loop over GTOs container data
+        
+        for (int32_t i = 0; i < gtovec.getNumberOfGtoBlocks(); i++)
+        {
+            auto bgtos = gtovec.getGtoBlock(i);
+            
+            // angular momentum data for bra and ket
+            
+            auto bang = bgtos.getAngularMomentum();
+            
+            // set up Cartesian GTOs buffer
+            
+            auto nvcomp = xcfun_components(xcfun::mgga);
+            
+            auto bncart = angmom::to_CartesianComponents(bang);
+            
+            auto bcartbuff = (bang > 0) ? CMemBlock2D<double>(nGridPoints, nvcomp * bncart) : CMemBlock2D<double>();
+            
+            // set up spherical GTOs buffer
+            
+            auto bnspher = angmom::to_SphericalComponents(bang);
+            
+            CMemBlock2D<double> bspherbuff(nGridPoints, nvcomp * bnspher);
+            
+            // loop over contracted GTOs
+            
+            for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++)
+            {
+                // compute j-th GTO values on batch of grid points
+                
+                gtorec::computeGtoValuesOnGrid(bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
+                                               gridBlockPosition + gridOffset, bgtos, j, xcfun::mgga);
+                
+                // distribute j-th GTO values into grid values matrix
+                
+                for (int32_t k = 0; k < bnspher; k++)
+                {
+                    auto idx = (bgtos.getIdentifiers(k))[j];
+                    
+                    auto bgaos = bspherbuff.data(4 * k);
+                    
+                    auto bgaox = bspherbuff.data(4 * k + 1);
+                    
+                    auto bgaoy = bspherbuff.data(4 * k + 2);
+                    
+                    auto bgaoz = bspherbuff.data(4 * k + 3);
+                    
+                    auto loff = gridBlockPosition * naos;
+                    
+                    for (int32_t l = 0; l < nGridPoints; l++)
+                    {
+                        gtoMatrix[loff + l * naos + idx] = bgaos[l];
+                        
+                        gtoMatrixX[loff + l * naos + idx] = bgaox[l];
+                        
+                        gtoMatrixY[loff + l * naos + idx] = bgaoy[l];
+                        
+                        gtoMatrixZ[loff + l * naos + idx] = bgaoz[l]; 
+                    }
+                }
+            }
+        }
+    }
+
     void
     computeGtoValuesOnGrid(      CMemBlock2D<double>& spherGtoGridBuffer,
                                  CMemBlock2D<double>& cartGtoGridBuffer,

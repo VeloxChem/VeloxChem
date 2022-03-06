@@ -193,6 +193,15 @@ CXCGradientGrid::xcGradientValues(const xcvars gradientType) const
         return _xcValues.data(5);
     }
     
+    if (gradientType == xcvars::taua)
+    {
+       return _xcValues.data(6);
+    }
+    
+    if (gradientType == xcvars::taub)
+    {
+        return _xcValues.data(7);
+    }
     return nullptr;
 }
 
@@ -225,6 +234,16 @@ CXCGradientGrid::xcGradientValues(const xcvars gradientType)
 
     }
     
+    if (gradientType == xcvars::taua)
+    {
+       return _xcValues.data(6);
+    }
+    
+    if (gradientType == xcvars::taub)
+    {
+        return _xcValues.data(7);
+    }
+
     return nullptr;
 }
 

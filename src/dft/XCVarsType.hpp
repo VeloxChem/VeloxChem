@@ -38,8 +38,8 @@
  xcvars::grada     - the modulus of alpha density gradient
  xcvars::gradb     - the modulues of beta density gradient
  xcvars::gradab    - the product of alpha density gradient with beta density gradient
- xcvars::lapa      - the alpha density laplacian
- xcvars::lapb      - the beta density laplacian
+ xcvars::taua      - the alpha density laplacian
+ xcvars::taub      - the beta density laplacian
  xcvars::undefined - the undefined gradient variable type
  */
 enum class xcvars
@@ -49,8 +49,8 @@ enum class xcvars
     grada,
     gradb,
     gradab,
-    lapa,
-    lapb, 
+    taua,
+    taub, 
     undefined
 };
 
@@ -73,9 +73,9 @@ to_string(const xcvars xcvariable)
     
     if (xcvariable == xcvars::gradab) return std::string("GRAD_AB");
     
-    if (xcvariable == xcvars::lapa) return std::string("LAP_A");
+    if (xcvariable == xcvars::taua) return std::string("TAU_A");
     
-    if (xcvariable == xcvars::lapb) return std::string("LAP_B");
+    if (xcvariable == xcvars::taub) return std::string("TAU_B");
     
     return std::string("UNKNOWN");
 }
@@ -99,9 +99,9 @@ to_xcvars(const std::string label)
     
     if (fstr::upcase(label) == std::string("GRADAB"))  return xcvars::gradab;
     
-    if (fstr::upcase(label) == std::string("LAPA"))  return xcvars::lapa;
+    if (fstr::upcase(label) == std::string("TAUA"))  return xcvars::taua;
     
-    if (fstr::upcase(label) == std::string("LAPB"))  return xcvars::lapb;
+    if (fstr::upcase(label) == std::string("TAUB"))  return xcvars::taub;
     
     return xcvars::undefined;
 }

@@ -281,6 +281,40 @@ CDensityGrid::computeDensityNorms()
                 }
             }
         }
+
+        if ((13 * _nDensityMatrices) == _densityValues.blocks())
+        {   
+            for (int32_t i = 0; i < _nDensityMatrices; i++)
+            {
+                auto grada_x = alphaDensityGradientX(i);
+                
+                auto gradb_x = betaDensityGradientX(i);
+                
+                auto grada_y = alphaDensityGradientY(i);
+                
+                auto gradb_y = betaDensityGradientY(i);
+                
+                auto grada_z = alphaDensityGradientZ(i);
+                
+                auto gradb_z = betaDensityGradientZ(i);
+                
+                auto grada = alphaDensityGradient(i);
+                
+                auto gradb = betaDensityGradient(i);
+                
+                auto gradab = mixedDensityGradient(i);
+                
+                #pragma omp simd aligned(grada_x, gradb_x, grada_y, gradb_y, grada_z, gradb_z: VLX_ALIGN)
+                for (int32_t j = 0; j < ngpoints; j++)
+                {
+                    grada[j] = std::sqrt(grada_x[j] * grada_x[j] + grada_y[j] * grada_y[j] + grada_z[j] * grada_z[j]);
+                    
+                    gradb[j] = std::sqrt(gradb_x[j] * gradb_x[j] + gradb_y[j] * gradb_y[j] + gradb_z[j] * gradb_z[j]);
+            
+                    gradab[j] = grada_x[j] * gradb_x[j] + grada_y[j] * gradb_y[j] + grada_z[j] * gradb_z[j];
+                }
+            }
+        }
     }
 
     if (_gridType == dengrid::lima)
@@ -564,9 +598,7 @@ const double*
 CDensityGrid::alphaDensityLaplacian(const int32_t iDensityMatrix) const 
 {
     if (_gridType == dengrid::ab) return _densityValues.data(11 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::limb) return _densityValues.data(5 * _nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
@@ -574,9 +606,7 @@ double*
 CDensityGrid::alphaDensityLaplacian(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(11 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::limb) return _densityValues.data(5 * _nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
@@ -584,9 +614,7 @@ const double*
 CDensityGrid::betaDensityLaplacian(const int32_t iDensityMatrix) const 
 {
     if (_gridType == dengrid::ab) return _densityValues.data(12 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::lima) return _densityValues.data(5 * _nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
@@ -594,9 +622,7 @@ double*
 CDensityGrid::betaDensityLaplacian(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(12 * _nDensityMatrices + iDensityMatrix);
-    
-    if (_gridType == dengrid::lima) return _densityValues.data(5 * _nDensityMatrices + iDensityMatrix);
-    
+        
     return nullptr;
 }
 
@@ -717,9 +743,9 @@ CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGridAB,
     
     // set up pointers to source  Laplacian
 
-    auto slapa = densityGridAB.alphaDensityLaplacian(iDensityMatrix);
+    auto slapa = alphaDensityLaplacian(iDensityMatrix);
     
-    auto slapb = densityGridAB.betaDensityLaplacian(iDensityMatrix);
+    auto slapb = betaDensityLaplacian(iDensityMatrix);
 
     // set up pointers to destination  Laplacian 
 
@@ -732,8 +758,9 @@ CDensityGrid::getScreenedGridsPair(      CDensityGrid&   densityGridAB,
     {
         for (int32_t i = 0; i < npoints; i++)
         {
-            if (_isValidGridPointForGga(srhoa[i], srhob[i], sgrada[i], sgradb[i], densityThreshold))
+            if (_isValidGridPointForMgga(srhoa[i], srhob[i], sgrada[i], sgradb[i],slapa[i],slapb[i], densityThreshold))
             {
+                
                 drhoa[ipoints] = srhoa[i]; drhob[ipoints] = srhob[i];
                 
                 dgrada[ipoints] = sgrada[i]; dgradb[ipoints] = sgradb[i]; dgradab[ipoints] = sgradab[i];
@@ -1212,7 +1239,24 @@ CDensityGrid::getScreenedGrid(      CMolecularGrid& molecularGridsAB,
             }
         }
     }
+
+    auto taua = alphaDensityLaplacian(iDensityMatrix);
     
+    auto taub = betaDensityLaplacian(iDensityMatrix);
+
+    if (xcFuncType == xcfun::mgga)
+    {
+        for (int32_t i = 0; i < npoints; i++)
+        {
+            if (_isValidGridPointForMgga(rhoa[i], rhob[i], grada[i], gradb[i],taua[i],taub[i], densityThreshold))
+            {
+                gx[ipoints] = gx[i]; gy[ipoints] = gy[i]; gz[ipoints] = gz[i]; gw[ipoints] = gw[i];
+                
+                ipoints++;
+            }
+        }
+    }  
+
     // compress molecular grid size
     
     mgrid.slice(ipoints);
@@ -1267,8 +1311,6 @@ CDensityGrid::_isValidGridPointForLdaB(const double alphaDensity,
     return false;
 }
 
-
-
 bool
 CDensityGrid::_isValidGridPointForGga(const double alphaDensity,
                                       const double betaDensity,
@@ -1287,6 +1329,30 @@ CDensityGrid::_isValidGridPointForGga(const double alphaDensity,
     return true;
 }
 
+bool
+CDensityGrid::_isValidGridPointForMgga(const double alphaDensity,
+                                      const double betaDensity,
+                                      const double alphaDensityGradient,
+                                      const double betaDensityGradient,
+                                      const double alphatau,
+                                      const double betatau,
+                                      const double densityThreshold) const
+{
+
+    if (std::fabs(alphaDensity) < densityThreshold) return false;
+    
+    if (std::fabs(betaDensity) < densityThreshold) return false;
+    
+    if (std::fabs(alphaDensityGradient) < densityThreshold) return false;
+    
+    if (std::fabs(betaDensityGradient) < densityThreshold) return false;
+
+    if (std::fabs(alphatau) < densityThreshold) return false;
+    
+    if (std::fabs(betatau) < densityThreshold) return false;
+    
+    return true;
+}
 
 bool
 CDensityGrid::_isValidGridPointForGgaUnrestrictedAB(const double alphaDensity,

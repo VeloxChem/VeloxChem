@@ -12,6 +12,9 @@
 
 #include "MathConst.hpp"
 
+#include <iostream>
+
+
 namespace vxcfuncs {  // vxcfuncs namespace
    
     CXCFunctional
@@ -71,15 +74,15 @@ namespace vxcfuncs {  // vxcfuncs namespace
         
         auto ggradb = xcGradientGrid.xcGradientValues(xcvars::gradb);
 
-        auto gtaua = xcGradientGrid.xcGradientValues(xcvars::lapa);
+        auto gtaua = xcGradientGrid.xcGradientValues(xcvars::taua);
         
-        auto gtaub = xcGradientGrid.xcGradientValues(xcvars::lapb);
+        auto gtaub = xcGradientGrid.xcGradientValues(xcvars::taub);
 
-        #pragma omp simd aligned(rhoa, rhob,grada,gradb,taua,taub, fexc, grhoa, grhob,ggrada,ggradb,gtaua,gtaub: VLX_ALIGN)
+        #pragma omp simd aligned(rhoa, rhob,grada,gradb,taua,taub, fexc, grhoa, grhob, ggrada, ggradb, gtaua, gtaub: VLX_ALIGN)
         for (int32_t i = 0; i < ngpoints; i++)
         {
             // Constants 
-
+            
             const double kappa = 0.804;
 
             const double D = 0.133;
@@ -92,21 +95,25 @@ namespace vxcfuncs {  // vxcfuncs namespace
 
             const double c4 = D + 1.0 / kappa * std::pow(10.0/81.0,2);
 
-            double epsslatera = -3.0 / (4*mathconst::getPiValue()) *pow(3.0* std::pow(mathconst::getPiValue(),2.0), 1.0/3.0) * std::pow(2.0,4.0/3.0) * std::pow(rhoa[i], 4.0/3.0);
+            double pi_sqr = std::pow(mathconst::getPiValue(), 2.0);
 
-            double epsslaterb = -3.0 / (4*mathconst::getPiValue()) *pow(3.0 * std::pow(mathconst::getPiValue(),2), 1.0/3.0) * std::pow(2,4/3) * std::pow(rhob[i], 4.0/3.0);
+            double C = -3.0 / (4.0 * mathconst::getPiValue()) *pow(3.0* pi_sqr, 1.0/3.0) * std::pow(2.0,4.0/3.0);
 
-            double gammaa = 4.0 * std::pow(grhoa[i],2.0) / (4.0*  std::pow(3.0 * std::pow(mathconst::getPiValue(), 2.0), 2.0/3.0))*std::pow(2,8/3) * std::pow(rhoa[i],8.0/3.0);
+            double epsslatera = C *  std::pow(rhoa[i], 4.0/3.0);
 
-            double gammab = 4.0 * std::pow(grhob[i],2.0) / (4.0 * std::pow(3.0 * std::pow(mathconst::getPiValue(), 2.0), 2.0/3.0))*std::pow(2,8/3) * std::pow(rhob[i],8.0/3.0);
+            double epsslaterb = C * std::pow(rhob[i], 4.0/3.0);
 
-            double upsilona = 3.0 * 2.0 * taua[i] / (2.0 * std::pow(3.0 * std::pow(mathconst::getPiValue(),2),2/3) * std::pow(2.0 ,5.0 / 3.0) * 
-                            
-                            std::pow(rhoa[i], 5.0 / 3.0))- 9.0 / 20.0 - gammaa / 12.0;
+            double den = (4.0*  std::pow(3.0 * pi_sqr, 2.0/3.0)) * std::pow(2,8/3);
 
-            double upsilonb = 3.0 * 2.0 * taub[i] / (2.0 * std::pow( 3.0 * std::pow(mathconst::getPiValue(), 2.0 ), 2.0 / 3.0) * std::pow(2.0 , 5.0 / 3.0) * 
-                            
-                            std::pow(rhob[i], 5.0 / 3.0))- 9.0 / 20.0 - gammab / 12.0;
+            double gammaa = 4.0 * std::pow(grhoa[i],2.0) /den * std::pow(rhoa[i], 8.0/3.0);
+
+            double gammab = 4.0 * std::pow(grhob[i],2.0) /den * std::pow(rhob[i],8.0/3.0);
+
+            double den2 = (2.0 * std::pow(3.0 * pi_sqr, 2.0 /3.0 ) ) * std::pow(2.0 ,5.0 / 3.0);
+
+            double upsilona = 3.0 * 2.0 * taua[i] / (den2 * std::pow(rhoa[i], 5.0 / 3.0))- 9.0 / 20.0 - gammaa / 12.0;
+
+            double upsilonb = 3.0 * 2.0 * taub[i] / (den2 * std::pow(rhob[i], 5.0 / 3.0))- 9.0 / 20.0 - gammab / 12.0;
 
             double omegaa = c1 * gammaa + c2 * std::pow(upsilona,2.0) + c3 * upsilona * gammaa + c4 * std::pow(gammaa,2.0);
 
@@ -118,20 +125,25 @@ namespace vxcfuncs {  // vxcfuncs namespace
 
             // derivatives
 
-            double diffepsa = -std::pow(3.0*std::pow(mathconst::getPiValue(),2.0),1.0/3.0) / mathconst::getPiValue() * std::pow(2,4/3) * std::pow(rhoa[i],1.0/3.0);
+            double f1 = -std::pow(3.0 * pi_sqr, 1.0/3.0) / mathconst::getPiValue() * std::pow(2,4/3);
 
-            double diffprhoa = -8.0 / 3.0 * 4.0 * std::pow(grada[i],2) / (4*std::pow(3*std::pow(mathconst::getPiValue(),2),2/3))*std::pow(2,8/3) * std::pow(rhoa[i],11/3);
+            double diffepsa =  f1 * std::pow(rhoa[i],1.0/3.0);
 
-            double diffqrhoa = -5.0 / 3.0 * 6.0 * taua[i] / (2*std::pow(3*std::pow(mathconst::getPiValue(),2.0),2.0/3.0)) * std::pow(2.0, 5.0 / 3.0) * std::pow(rhob[i], 8.0 / 3.0) 
-                            
-                             - 1.0 / 12.0 * diffprhoa; 
+            double den3 =  (4*std::pow(3.0 * pi_sqr, 2.0/3.0))*std::pow(2.0,8.0/3.0);
 
+            double diffprhoa = -8.0 / 3.0 * 4.0 * std::pow(grada[i],2.0) /( den3 * std::pow(rhoa[i],11/3) );
 
-            double diffpgrada = 8.0 * grada[i] / (4*std::pow(3*std::pow(mathconst::getPiValue(),2),2/3))*std::pow(2,8/3) * std::pow(rhob[i],8/3);
+            double den4 =  (2.0 *std::pow(3.0 * pi_sqr, 2.0/3.0)) * std::pow(2.0, 5.0 / 3.0);
+
+            double diffqrhoa = -5.0 / 3.0 * 6.0 * taua[i] / den4 * std::pow(rhob[i], 8.0 / 3.0) - 1.0 / 12.0 * diffprhoa;
+
+            double diffpgrada = 8.0 * grada[i] / ( den3 * std::pow(rhob[i],8/3) ) ;
 
             double diffqgrada = - 1.0 / 12.0 * diffpgrada;     
 
-            double diffqtaua = 3.0 * 2.0 / (2*std::pow(3*std::pow(mathconst::getPiValue(), 2.0 ), 2.0/3.0))*std::pow(2.0,5.0/3.0) * std::pow(rhob[i],5.0/3.0);            
+            double den5 = (2*std::pow(3*std::pow(mathconst::getPiValue(), 2.0 ), 2.0/3.0))*std::pow(2.0,5.0/3.0);
+
+            double diffqtaua = 3.0 * 2.0 /(den5  * std::pow(rhob[i],5.0/3.0) );            
 
             double diffomegarhoa = c1 * diffprhoa + 2.0 * c2 * upsilona * diffqrhoa   
                                 
@@ -143,7 +155,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
                      
             double diffomegataua = 2.0 * c2 * upsilona * diffqtaua + c3 * diffqtaua * gammaa;
 
-            double difffomegaa = std::pow(1 + omegaa / kappa,-2.0);
+            double difffomegaa = std::pow(1.0 + omegaa / kappa,-2.0);
 
             double difffrhoa = difffomegaa * diffomegarhoa;
 
@@ -151,7 +163,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
 
             double diffftaua = difffomegaa * diffomegataua;
 
-            fexc[i] += fa * epsslatera + fb * epsslaterb ;
+            fexc[i] += fa * epsslatera + fb * epsslaterb;
             
             grhoa[i] += 0.5 * (diffepsa * fa + epsslatera * difffrhoa);
             
@@ -162,8 +174,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
             ggradb[i] += 0.5 * epsslatera * diffgrada;
 
             gtaua[i] += 0.5 * epsslatera * diffftaua;
-
-            gtaub[i] += 0.5 * epsslatera * diffftaua;    
+ 
         }
 
         

@@ -90,6 +90,33 @@ namespace gtorec {  // gtorec namespace
      @param gtoValuesX the GTOs gradient along X axis values buffer.
      @param gtoValuesY the GTOs gradient along Y axis values buffer.
      @param gtoValuesZ the GTOs gradient along Z axis values buffer.
+     @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
+     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
+     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param gridBlockPosition the position of grid block in GTOs values grid.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
+    void computeGtosValuesForMGGA(     CMemBlock2D<double>& gtoValues,
+                                       CMemBlock2D<double>& gtoValuesX,
+                                       CMemBlock2D<double>& gtoValuesY,
+                                       CMemBlock2D<double>& gtoValuesZ,
+                                 const CGtoContainer*       gtoContainer,
+                                 const double*              gridCoordinatesX,
+                                 const double*              gridCoordinatesY,
+                                 const double*              gridCoordinatesZ,
+                                 const int32_t              gridOffset,
+                                 const int32_t              gridBlockPosition,
+                                 const int32_t              nGridPoints);
+
+
+    /**
+     Computes GTOs values for batch of grid points.
+     
+     @param gtoValues the GTOs values buffer.
+     @param gtoValuesX the GTOs gradient along X axis values buffer.
+     @param gtoValuesY the GTOs gradient along Y axis values buffer.
+     @param gtoValuesZ the GTOs gradient along Z axis values buffer.
      @param gtoBlock the GTOs block. 
      @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
      @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
@@ -110,6 +137,36 @@ namespace gtorec {  // gtorec namespace
                                  const int32_t              gridBlockPosition,
                                  const int32_t              nGridPoints);
     
+
+
+    /**
+     Computes GTOs values for batch of grid points.
+     
+     @param gtoValues the GTOs values buffer.
+     @param gtoValuesX the GTOs gradient along X axis values buffer.
+     @param gtoValuesY the GTOs gradient along Y axis values buffer.
+     @param gtoValuesZ the GTOs gradient along Z axis values buffer.
+     @param gtoBlock the GTOs block. 
+     @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
+     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
+     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param gridBlockPosition the position of grid block in GTOs values grid.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
+    void computeGtosValuesForMGGA(      CMemBlock2D<double>& gtoValues,
+                                       CMemBlock2D<double>& gtoValuesX,
+                                       CMemBlock2D<double>& gtoValuesY,
+                                       CMemBlock2D<double>& gtoValuesZ,
+                                 const CGtoBlock&           gtoBlock,
+                                 const double*              gridCoordinatesX,
+                                 const double*              gridCoordinatesY,
+                                 const double*              gridCoordinatesZ,
+                                 const int32_t              gridOffset,
+                                 const int32_t              gridBlockPosition,
+                                 const int32_t              nGridPoints);
+
+
     /**
      Computes GTOs values matrix for given block of grid points.
      
@@ -191,7 +248,36 @@ namespace gtorec {  // gtorec namespace
                                  const int32_t        gridOffset,
                                  const int32_t        gridBlockPosition,
                                  const int32_t        nGridPoints);
-    
+
+
+
+
+    /**
+     Computes GTOs values for batch of grid points.
+     
+     @param gtoMatrix the pointer to GTOs values matrix.
+     @param gtoMatrixX the pointer to GTOs gradient along X coordinate values matrix.
+     @param gtoMatrixY the pointer to GTOs gradient along Y coordinate values matrix.
+     @param gtoMatrixZ the pointer to GTOs gradient along Z coordinate values matrix.
+     @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
+     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
+     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param gridBlockPosition the position of grid block in GTOs values grid.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
+    void computeGtosValuesForMGGA(     double*        gtoMatrix,
+                                       double*        gtoMatrixX,
+                                       double*        gtoMatrixY,
+                                       double*        gtoMatrixZ,
+                                 const CGtoContainer* gtoContainer,
+                                 const double*        gridCoordinatesX,
+                                 const double*        gridCoordinatesY,
+                                 const double*        gridCoordinatesZ,
+                                 const int32_t        gridOffset,
+                                 const int32_t        gridBlockPosition,
+                                 const int32_t        nGridPoints);
+
     /**
      Computes contracted GTOs values at grid points for specific type of functional.
      
