@@ -41,14 +41,23 @@ def get_pyscf_integral_type(int_type):
     """
     # TODO: routine which returns all the available integral types.
     int_dict = {
-            "overlap"                               : "int1e_ovlp",
-            "kinetic_energy"                        : "int1e_kin",
-            "nuclear_attraction"                    : "int1e_nuc",
-            "electron_repulsion"                    : "int2e",
-            "overlap_derivative"                    : "int1e_ipovlp",
-            "kinetic_energy_derivative"             : "int1e_ipkin",
-            "nuclear_attraction_derivative_operator": "int1e_iprinv",
-            "nuclear_attraction_derivative_orbitals": "int1e_ipnuc",
+            "overlap"                                       : "int1e_ovlp",
+            "kinetic_energy"                                : "int1e_kin",
+            "nuclear_attraction"                            : "int1e_nuc",
+            "electron_repulsion"                            : "int2e",
+            "overlap_derivative"                            : "int1e_ipovlp",
+            "kinetic_energy_derivative"                     : "int1e_ipkin",
+            "nuclear_attraction_derivative_operator"        : "int1e_iprinv",
+            "nuclear_attraction_derivative_orbitals"        : "int1e_ipnuc",
+            "electron_repulsion_derivative"                 : "int2e_ip1",
+            "overlap_second_derivative_2_0"                 : "int1e_ipipovlp",
+            "overlap_second_derivative_1_1"                 : "int1e_ipovlpip",
+            "kinetic_energy_second_derivative_2_0"          : "int1e_ipipkin",
+            "kinetic_energy_second_derivative_1_1"          : "int1e_ipkinip",
+            "nuclear_attraction_second_derivative_orbs_2_0" : "int1e_ipipnuc",
+            "nuclear_attraction_second_derivative_orbs_1_1" : "int1e_ipnucip",
+            "nuclear_attraction_second_derivative_op_2_0"   : "int1e_ipiprinv",
+            "nuclear_attraction_second_derivative_op_1_1"   : "int1e_iprinvip",
         }
     if int_type not in int_dict.keys():
         error_text = "Unrecognized 1e integral type: " + int_type +". "
@@ -63,7 +72,7 @@ def get_sign(pyscf_int_type):
     to the veloxchem standard. 
     """
     if pyscf_int_type in ["int1e_nuc", "int1e_ipovlp", "int1e_ipkin",
-                          "int1e_ipnuc", "int1e_iprinv"]:
+                          "int1e_ipnuc", "int1e_iprinv", "int2e_ip1"]:
         return -1
     else:
         return 1
@@ -266,7 +275,7 @@ def import_2e_integral(molecule, basis, int_type, atom1=1, shell1=None,
 
     :return:
         a numpy array corresponding to a specified block of 
-        the selected 1e integral matrix.
+        the selected two electron integral
     """
 
     molecule_string = get_molecule_string(molecule)
@@ -276,8 +285,8 @@ def import_2e_integral(molecule, basis, int_type, atom1=1, shell1=None,
                                  basis=pyscf_basis, unit=unit)
 
     pyscf_int_type = get_pyscf_integral_type(int_type)
-
-    pyscf_int = pyscf_molecule.intor(pyscf_int_type, aosym='s1')
+    sign = get_sign(pyscf_int_type)
+    pyscf_int = sign * pyscf_molecule.intor(pyscf_int_type, aosym='s1')
 
     nao = pyscf_molecule.nao
 
@@ -436,7 +445,7 @@ def import_1e_integral_derivative(molecule, basis, int_type, atomi=1, atom1=1,
 
     pyscf_int_type = get_pyscf_integral_type(int_type)
     sign = get_sign(pyscf_int_type)
-    if pyscf_int_type == "int1e_iprinv":
+    if pyscf_int_type in ["int1e_iprinv", "int1e_ipiprinv"]:
         # TODO: check if Zilvinas wants it this way
         sign *= molecule.elem_ids_to_numpy()[i] # Z-number
         # (m | nabla_i operator | n)
@@ -449,7 +458,6 @@ def import_1e_integral_derivative(molecule, basis, int_type, atomi=1, atom1=1,
 
 
     #print("Integral type and sign", sign, pyscf_int_type)
-
     
     ao_slices = pyscf_molecule.aoslice_by_atom()
 
@@ -457,7 +465,7 @@ def import_1e_integral_derivative(molecule, basis, int_type, atomi=1, atom1=1,
 
     pyscf_int_deriv_atom_i = np.zeros(pyscf_int_deriv.shape)
 
-    if pyscf_int_type in ["int1e_iprinv"]:
+    if pyscf_int_type in ["int1e_iprinv", "int1e_ipiprinv"]:
         # (m | nabla_i operator | n)
         pyscf_int_deriv_atom_i = pyscf_int_deriv
     else:
@@ -522,6 +530,346 @@ def import_1e_integral_derivative(molecule, basis, int_type, atomi=1, atom1=1,
     if shell2 is not None:
         for s2 in shell2:
             label += "_%s" % (s2)
+
+    if chk_file is not None:
+        write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
+
+    if return_block:
+        return vlx_int_block
+    else:
+        return vlx_int_deriv
+
+def import_1e_second_order_integral_derivative(molecule, basis, int_type,
+                                  atomi=1, atomj=1, 
+                                  atom1=1, shell1=None, atom2=1, shell2=None,
+                                  chk_file=None, unit="au", return_block=True,
+                                  full_deriv=False):
+    """
+    Imports one electron integral derivatives from pyscf and converts
+    to veloxchem format. Specific atoms and shells can be selected.
+
+    :param molecule:
+        the vlx molecule object
+    :param basis:
+        the vlx basis object
+    :param int_type:
+        the type of one-electron integral: overlap, kinetic_energy,
+                                           nuclear_attraction 
+    :param atomi:
+        the index of the atom with respect to which the derivatives
+        are taken (indexing starts at 1)
+    :param atomj:
+        the index of the second atom with respect to which the derivatives
+        are taken (indexing starts at 1)
+    :param atom1:
+        index of the first atom of interest
+    :param shell1:
+        list of atomic shells of interest for atom 1
+    :param atom2:
+        index of the second atom of interest
+    :param shell2:
+        list of atomic shells of interest for atom 2
+    :param chk_file:
+        the hdf5 checkpoint file name
+    :param unit:
+        the units to be used for the molecular geometry;
+        possible values: "au" (default), "Angstrom"
+    :param return_block:
+        return the matrix block, or the full matrix
+    :param full_deriv:
+        if to calculate the full derivative
+        (nabla m | operator | n) + (m | operator | nabla n) (for debugging).
+
+
+    :return:
+        a numpy array corresponding to a specified block of 
+        the selected 1e integral derivative matrix.
+    """
+
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+
+    # Get the AO indeces corresponding to atom i
+    i = atomi - 1 # to use pyscf indexing
+    j = atomj - 1
+
+    pyscf_int_type = get_pyscf_integral_type(int_type)
+    sign = get_sign(pyscf_int_type)
+
+    # TODO: modify to include all rinv-related integral derivatives
+    if pyscf_int_type == "int1e_iprinvip":
+        # TODO: check if Zilvinas wants it this way
+        sign *= molecule.elem_ids_to_numpy()[j] # Z-number
+        # (nabla_i m | nabla_j operator | n)
+        with pyscf_molecule.with_rinv_at_nucleus(j): 
+            pyscf_int_deriv = sign * pyscf_molecule.intor(pyscf_int_type,
+                                                          aosym='s1')
+    else:
+        pyscf_int_deriv = sign * pyscf_molecule.intor(pyscf_int_type,
+                                                      aosym='s1')
+
+
+    #print("Integral type and sign", sign, pyscf_int_type)
+    
+    ao_slices = pyscf_molecule.aoslice_by_atom()
+
+    ki, kf = ao_slices[i, 2:]
+    kj, kg = ao_slices[j, 2:]
+
+    pyscf_int_deriv_atoms_ij = np.zeros(pyscf_int_deriv.shape)
+
+    if pyscf_int_type in ["int1e_iprinvip"]:
+        # (nabla_i m | nabla_j operator | n)
+        pyscf_int_deriv_atoms_ij[:,ki:kf,:] = pyscf_int_deriv[:,ki:kf,:]
+    else:
+        pyscf_int_deriv_atoms_ij[:,ki:kf,kj:kg] = pyscf_int_deriv[:,ki:kf,kj:kg]
+
+
+    # (nabla**2 m | operator | n) + (m | operator | nabla**2 n)
+    # or (nabla m | operator | nabla n) + (nabla n | operator | nabla m)
+    # TODO: remove
+    if full_deriv:
+        pyscf_int_deriv_atoms_ij += pyscf_int_deriv_atoms_ij.transpose(0,2,1)
+
+    # Transform integral to veloxchem format
+    vlx_int_deriv = np.zeros_like(pyscf_int_deriv_atoms_ij)
+
+    # number of derivatives (3)
+    n_deriv = pyscf_int_deriv_atoms_ij.shape[0]
+    for x in range(n_deriv):
+        vlx_int_deriv[x] = ao_matrix_to_veloxchem(
+                                 DenseMatrix(pyscf_int_deriv_atoms_ij[x]),
+                                 basis, molecule).to_numpy()
+
+    ao_basis_map = basis.get_ao_basis_map(molecule)
+    rows = []
+    columns = []
+    k = 0
+    for ao in ao_basis_map:
+        parts = ao.split()
+        atom = int(parts[0])
+        shell = parts[2]
+        if atom1 == atom:
+            if shell1 is not None:
+                for s in shell1:
+                    if s in shell:
+                        rows.append(k)
+            else:
+                rows.append(k)
+        if atom2 == atom:
+            if shell2 is not None:
+                for s in shell2:
+                    if s in shell:
+                        columns.append(k)
+            else:
+                columns.append(k)
+        k += 1
+    if rows == []:
+        raise ValueError("Atom or shell(s) not found.", atom1, shell1)
+    if columns == []:
+        raise ValueError("Atom or shell(s) not found.", atom2, shell2)
+    
+
+    vlx_int_block = np.zeros((n_deriv, len(rows), len(columns)))
+
+    for k in range(len(rows)):
+        for l in range(len(columns)):
+            vlx_int_block[:, k, l] = vlx_int_deriv[:, rows[k], columns[l]]
+   
+    label = int_type+'_wrt_atom%d_atom%d_shells_atom%d' % (atomi, atomj, atom1)
+    if shell1 is not None:
+        for s1 in shell1:
+            label += "_%s" % (s1)
+    label += "_atom%d" % (atom2)
+    if shell2 is not None:
+        for s2 in shell2:
+            label += "_%s" % (s2)
+
+    if chk_file is not None:
+        write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
+
+    if return_block:
+        return vlx_int_block
+    else:
+        return vlx_int_deriv
+
+def import_2e_integral_derivative(molecule, basis, int_type, atomi, atom1=1,
+                        shell1=None, atom2=1, shell2=None, atom3=1, shell3=None,
+                        atom4=1, shell4=None, chk_file=None,
+                        unit="au", return_block=True, full_deriv=False):
+    """
+    Imports two electron integral derivatives from pyscf and converts 
+    them to veloxchem format.
+    Specific atoms and shells can be selected.
+
+    :param molecule:
+        the vlx molecule object
+    :param basis:
+        the vlx basis object
+    :param int_type:
+        the type of one-electron integral: overlap, kinetic_energy,
+                                           nuclear_attraction
+    :param atomi:
+        the index of the atom with respect to which the derivatives
+        are taken (indexing starts at 1) 
+    :param atom1:
+        index of the first atom of interest
+    :param shell1:
+        list of atomic shells of interest for atom 1
+    :param atom2:
+        index of the second atom of interest
+    :param shell2:
+        list of atomic shells of interest for atom 2
+    :param atom3:
+        index of the third atom of interest
+    :param shell3:
+        list of atomic shells of interest for atom 3
+    :param atom4:
+        index of the fourth atom of interest
+    :param shell2:
+        list of atomic shells of interest for atom 4
+    :param chk_file:
+        the hdf5 checkpoint file name
+    :param unit:
+        the units to be used for the molecular geometry;
+        possible values: "au" (default), "Angstrom"
+    :param return_block:
+        return the matrix block, or the full matrix.
+
+
+    :return:
+        a numpy array corresponding to a specified block of 
+        the selected two electron integral derivative matrix.
+    """
+
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+
+    # Get the AO indeces corresponding to atom i
+    i = atomi - 1 # to use pyscf indexing
+
+    pyscf_int_type = get_pyscf_integral_type(int_type)
+    sign = get_sign(pyscf_int_type)
+    pyscf_int_deriv = sign * pyscf_molecule.intor(pyscf_int_type, aosym='s1')
+
+    nao = pyscf_molecule.nao
+
+    ao_slices = pyscf_molecule.aoslice_by_atom()
+
+    # Get the AO indeces corresponding to atom i
+    ki, kf = ao_slices[i, 2:]
+
+    pyscf_int_deriv_atom_i = np.zeros(pyscf_int_deriv.shape)
+
+    pyscf_int_deriv_atom_i[:, ki:kf] = pyscf_int_deriv[:, ki:kf]
+
+    if full_deriv:
+        #   (nabla m n | t p) + ( m nabla n | t p)
+        # + (m n | nabla t p) + (m n | t nabla p)
+        pyscf_int_deriv_atom_i += ( pyscf_int_deriv_atom_i.transpose(0,2,1,4,3)
+                             + pyscf_int_deriv_atom_i.transpose(0,3,4,1,2)
+                             + pyscf_int_deriv_atom_i.transpose(0,4,3,2,1) )
+
+    # Transform integral to veloxchem format
+    vlx_int_deriv = np.zeros_like(pyscf_int_deriv_atom_i)
+
+    basis_set_map = basis.get_index_map(molecule)
+    for m in range(nao):
+        for n in range(nao):
+            for t in range(nao):
+                for p in range(nao):
+                    vm = basis_set_map[m]
+                    vn = basis_set_map[n]
+                    vt = basis_set_map[t]
+                    vp = basis_set_map[p]
+                    vlx_int_deriv[:,vm,vn,vt,vp] = (
+                                    pyscf_int_deriv_atom_i[:,m,n,t,p] )
+
+    ao_basis_map = basis.get_ao_basis_map(molecule)
+    index1 = []
+    index2 = []
+    index3 = []
+    index4 = []
+    k = 0
+    for ao in ao_basis_map:
+        parts = ao.split()
+        atom = int(parts[0])
+        shell = parts[2]
+        if atom1 == atom:
+            if shell1 is not None:
+                for s in shell1:
+                    if s in shell:
+                        index1.append(k)
+            else:
+                index1.append(k)
+        if atom2 == atom:
+            if shell2 is not None:
+                for s in shell2:
+                    if s in shell:
+                        index2.append(k)
+            else:
+                index2.append(k)
+        if atom3 == atom:
+            if shell3 is not None:
+                for s in shell3:
+                    if s in shell:
+                        index3.append(k)
+            else:
+                index3.append(k)
+        if atom4 == atom:
+            if shell4 is not None:
+                for s in shell4:
+                    if s in shell:
+                        index4.append(k)
+            else:
+                index4.append(k)
+        k += 1
+    if index1 == []:
+        raise ValueError("Atom or shell(s) not found.", atom1, shell1)
+    if index2 == []:
+        raise ValueError("Atom or shell(s) not found.", atom2, shell2)
+    if index3 == []:
+        raise ValueError("Atom or shell(s) not found.", atom3, shell3)
+    if index4 == []:
+        raise ValueError("Atom or shell(s) not found.", atom4, shell4)
+   
+    n_deriv = pyscf_int_deriv_atom_i.shape[0]
+    vlx_int_block = np.zeros((n_deriv, len(index1), len(index2),
+                              len(index3), len(index4)))
+    
+    for k in range(len(index1)):
+        for l in range(len(index2)):
+            for m in range(len(index3)):
+                for n in range(len(index4)):
+                    vlx_int_block[:,k,l,m,n] = vlx_int_deriv[:,index1[k],
+                                                       index2[l], index3[m],
+                                                       index4[n]]
+   
+    label = int_type+'_atom%d_shells_atom%d' % (atomi, atom1)
+    if shell1 is not None:
+        for s1 in shell1:
+            label += "_%s" % (s1)
+
+    label += "_atom%d" % (atom2)
+    if shell2 is not None:
+        for s2 in shell2:
+            label += "_%s" % (s2)
+
+    label += "_atom%d" % (atom3)
+    if shell3 is not None:
+        for s3 in shell3:
+            label += "_%s" % (s3)
+
+    label += "_atom%d" % (atom4)
+    if shell4 is not None:
+        for s4 in shell4:
+            label += "_%s" % (s4)
 
     if chk_file is not None:
         write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
