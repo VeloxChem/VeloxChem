@@ -66,23 +66,23 @@ get_mpi_comm(py::object py_comm)
 
 // Helper functions for getting shape and strides from int32_t dimension
 
-static std::vector<ssize_t>
+static std::vector<py::ssize_t>
 dimension_to_shape(const std::vector<int32_t>& dimension)
 {
-    std::vector<ssize_t> shape;
+    std::vector<py::ssize_t> shape;
 
     for (size_t i = 0; i < dimension.size(); i++)
     {
-        shape.push_back(static_cast<ssize_t>(dimension[i]));
+        shape.push_back(static_cast<py::ssize_t>(dimension[i]));
     }
 
     return shape;
 }
 
-static std::vector<ssize_t>
+static std::vector<py::ssize_t>
 dimension_to_strides(const std::vector<int32_t>& dimension, size_t sizeoftype)
 {
-    std::vector<ssize_t> strides;
+    std::vector<py::ssize_t> strides;
 
     for (size_t i = 0; i < dimension.size(); i++)
     {
@@ -93,7 +93,7 @@ dimension_to_strides(const std::vector<int32_t>& dimension, size_t sizeoftype)
             strd *= static_cast<size_t>(dimension[j]);
         }
 
-        strides.push_back(static_cast<ssize_t>(strd * sizeoftype));
+        strides.push_back(static_cast<py::ssize_t>(strd * sizeoftype));
     }
 
     return strides;
