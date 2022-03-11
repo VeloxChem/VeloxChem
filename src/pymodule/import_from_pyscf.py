@@ -448,7 +448,7 @@ def import_1e_integral_derivative(molecule, basis, int_type, atomi=1, atom1=1,
 
     pyscf_int_type = get_pyscf_integral_type(int_type)
     sign = get_sign(pyscf_int_type)
-    if pyscf_int_type in ["int1e_iprinv", "int1e_ipiprinv"]:
+    if pyscf_int_type in ["int1e_iprinv", "int1e_ipiprinv", "int1e_iprinvip"]:
         # TODO: check if Zilvinas wants it this way
         sign *= molecule.elem_ids_to_numpy()[i] # Z-number
         # (m | nabla_i operator | n)
@@ -468,9 +468,17 @@ def import_1e_integral_derivative(molecule, basis, int_type, atomi=1, atom1=1,
 
     pyscf_int_deriv_atom_i = np.zeros(pyscf_int_deriv.shape)
 
-    if pyscf_int_type in ["int1e_iprinv", "int1e_ipiprinv"]:
+    if pyscf_int_type in ["int1e_iprinv"]:
         # (m | nabla_i operator | n)
         pyscf_int_deriv_atom_i = pyscf_int_deriv
+    elif pyscf_int_type in ["int1e_iprinvip"]:
+        pyscf_int_deriv_atom_i = -pyscf_int_deriv
+        pyscf_int_deriv_atom_i[:,ki:kf] += pyscf_int_deriv[:,ki:kf]
+        pyscf_int_deriv_atom_i[:,:,ki:kf] += pyscf_int_deriv[:,:,ki:kf]
+    elif pyscf_int_type in ["int1e_ipiprinv"]:
+        pyscf_int_deriv_atom_i = -pyscf_int_deriv
+        pyscf_int_deriv_atom_i[:,ki:kf] += pyscf_int_deriv[:,ki:kf]
+        pyscf_int_deriv_atom_i[:,:,ki:kf] += pyscf_int_deriv[:,ki:kf].transpose(0,2,1)
     else:
         pyscf_int_deriv_atom_i[:,ki:kf] = pyscf_int_deriv[:,ki:kf]
 
@@ -603,7 +611,7 @@ def import_1e_second_order_integral_derivative(molecule, basis, int_type,
     sign = get_sign(pyscf_int_type)
 
     # TODO: modify to include all rinv-related integral derivatives
-    if pyscf_int_type == "int1e_iprinvip":
+    if pyscf_int_type in ["int1e_iprinvip", "int1e_ipiprinv"]:
         # TODO: check if Zilvinas wants it this way
         sign *= molecule.elem_ids_to_numpy()[j] # Z-number
         # (nabla_i m | nabla_j operator | n)
@@ -624,7 +632,7 @@ def import_1e_second_order_integral_derivative(molecule, basis, int_type,
 
     pyscf_int_deriv_atoms_ij = np.zeros(pyscf_int_deriv.shape)
 
-    if pyscf_int_type in ["int1e_iprinvip"]:
+    if pyscf_int_type in ["int1e_iprinvip", "int1e_ipiprinv"]:
         # (nabla_i m | nabla_j operator | n)
         pyscf_int_deriv_atoms_ij[:,ki:kf,:] = pyscf_int_deriv[:,ki:kf,:]
     else:
@@ -634,6 +642,7 @@ def import_1e_second_order_integral_derivative(molecule, basis, int_type,
     # (nabla**2 m | operator | n) + (m | operator | nabla**2 n)
     # or (nabla m | operator | nabla n) + (nabla n | operator | nabla m)
     # TODO: remove
+    nao = pyscf_molecule.nao
     if full_deriv:
         pyscf_int_deriv_atoms_ij += pyscf_int_deriv_atoms_ij.transpose(0,2,1)
         if pyscf_int_type in ["int1e_iprinvip"]:
@@ -641,9 +650,21 @@ def import_1e_second_order_integral_derivative(molecule, basis, int_type,
             # (nabla_j m | nabla_i operator | n)
             with pyscf_molecule.with_rinv_at_nucleus(i): 
                 new_pyscf_int_deriv = sign * pyscf_molecule.intor(pyscf_int_type,
-                                                aosym='s1')#.reshape((3,3,nao,nao))
+                                                aosym='s1').reshape((3,3,nao,nao))
+            transposed_new_pyscf_int_deriv = new_pyscf_int_deriv.transpose(1,0,2,3)
+            reshaped_new_pyscf_int_deriv = transposed_new_pyscf_int_deriv.reshape((3*3,nao,nao))
             new_pyscf_int_deriv_atoms_ij = np.zeros(pyscf_int_deriv.shape)
-            new_pyscf_int_deriv_atoms_ij[:,kj:kg] += new_pyscf_int_deriv[:,kj:kg,:]#.transpose(1,0,2,3)
+            new_pyscf_int_deriv_atoms_ij[:,kj:kg] += reshaped_new_pyscf_int_deriv[:,kj:kg]
+            new_pyscf_int_deriv_atoms_ij += new_pyscf_int_deriv_atoms_ij.transpose(0,2,1)
+            pyscf_int_deriv_atoms_ij += new_pyscf_int_deriv_atoms_ij
+        elif pyscf_int_type in ["int1e_ipiprinv"]:
+            sign = get_sign(pyscf_int_type) * molecule.elem_ids_to_numpy()[i]
+            # (nabla_j m | nabla_i operator | n)
+            with pyscf_molecule.with_rinv_at_nucleus(i): 
+                new_pyscf_int_deriv = sign * pyscf_molecule.intor(pyscf_int_type,
+                                                aosym='s1')
+            new_pyscf_int_deriv_atoms_ij = np.zeros(pyscf_int_deriv.shape)
+            new_pyscf_int_deriv_atoms_ij[:,kj:kg] += new_pyscf_int_deriv[:,kj:kg]
             new_pyscf_int_deriv_atoms_ij += new_pyscf_int_deriv_atoms_ij.transpose(0,2,1)
             pyscf_int_deriv_atoms_ij += new_pyscf_int_deriv_atoms_ij
 
