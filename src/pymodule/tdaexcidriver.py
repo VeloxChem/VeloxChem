@@ -182,8 +182,10 @@ class TDAExciDriver(LinearSolver):
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
+            n_ao=scf_tensors['C_alpha'].shape[0]
+            occ_alpha = molecule.get_aufbau_occupation(n_ao) #Occupation is not stored currently in scf_tensors, so just recreate an aufbau
             mol_orbs = MolecularOrbitals([scf_tensors['C_alpha']],
-                                         [scf_tensors['E_alpha']], molorb.rest)
+                                         [scf_tensors['E_alpha']], [occ_alpha], molorb.rest)
         else:
             mol_orbs = MolecularOrbitals()
 
