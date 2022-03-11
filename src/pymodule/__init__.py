@@ -112,6 +112,8 @@ from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
 from .cphfsolver import CphfSolver
 from .tdhfhessiandriver import TdhfHessianDriver
+from .impes import ImpesCoordinates
+from .impes import ImpesDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical
