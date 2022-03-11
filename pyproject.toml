@@ -1,7 +1,7 @@
 [build-system]
 requires = [
   "mpi4py>=3.0",
-  "numpy>=1.19.0",
+  "numpy>=1.15.0",
   "pybind11>=2.6",
   "setuptools>=42", 
   "wheel",
