@@ -532,9 +532,9 @@ class ScfDriver:
                 assert_msg_critical(isinstance(C_alpha, np.ndarray), err_array)
                 assert_msg_critical(n_ao == C_alpha.shape[0], err_ao)
                 E_alpha = np.zeros(C_alpha.shape[1])
-                occ_alpha = molecule.get_aufbau_occupation(n_ao)
-                self.mol_orbs = MolecularOrbitals([C_alpha], [E_alpha], [occ_alpha],
-                                                  molorb.rest)
+                occ_alpha = molecule.get_aufbau_occupation(n_ao, 'restricted')
+                self.mol_orbs = MolecularOrbitals([C_alpha], [E_alpha],
+                                                  [occ_alpha], molorb.rest)
             else:
                 assert_msg_critical(
                     isinstance(C_alpha, np.ndarray) and
@@ -545,7 +545,8 @@ class ScfDriver:
                 E_alpha = np.zeros(C_alpha.shape[1])
                 E_beta = np.zeros(C_beta.shape[1])
 
-                occ_alpha, occ_beta = molecule.get_aufbau_occupation(n_ao,True)
+                occ_alpha, occ_beta = molecule.get_aufbau_occupation(
+                    n_ao, 'unrestricted')
 
                 self.mol_orbs = MolecularOrbitals([C_alpha, C_beta],
                                                   [E_alpha, E_beta],
@@ -787,7 +788,8 @@ class ScfDriver:
 
             eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
-            self.mol_orbs = self.gen_molecular_orbitals(molecule, eff_fock_mat, oao_mat)
+            self.mol_orbs = self.gen_molecular_orbitals(molecule, eff_fock_mat,
+                                                        oao_mat)
 
             self.update_mol_orbs_phase()
 
@@ -1509,7 +1511,8 @@ class ScfDriver:
                     mo[:, col] *= -1.0
 
             if self.mol_orbs.get_orbitals_type() == molorb.rest:
-                self.mol_orbs = MolecularOrbitals([mo], [ea], [occa], molorb.rest)
+                self.mol_orbs = MolecularOrbitals([mo], [ea], [occa],
+                                                  molorb.rest)
 
             elif self.mol_orbs.get_orbitals_type() == molorb.unrest:
                 ref_mo_b = self.ref_mol_orbs.beta_to_numpy()
@@ -1521,8 +1524,8 @@ class ScfDriver:
                     if np.dot(mo_b[:, col], ref_mo_b[:, col]) < 0.0:
                         mo_b[:, col] *= -1.0
 
-                self.mol_orbs = MolecularOrbitals([mo, mo_b], [ea, eb], [occa, occb],
-                                                  molorb.unrest)
+                self.mol_orbs = MolecularOrbitals([mo, mo_b], [ea, eb],
+                                                  [occa, occb], molorb.unrest)
 
     def gen_new_density(self, molecule, scf_type):
         """

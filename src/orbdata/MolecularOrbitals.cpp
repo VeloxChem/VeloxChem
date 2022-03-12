@@ -580,7 +580,7 @@ CMolecularOrbitals::broadcast(int32_t rank, MPI_Comm comm)
             if (rank != mpi::master()) _energies.push_back(vec);
         }
 
-        // broadcast orbital energies
+        // broadcast occupation numbers
 
         int32_t noccvecs = static_cast<int32_t>(_occupations.size());
 

@@ -84,8 +84,8 @@ class TestOrbData:
 
         orb_rest = MolecularOrbitals([data_a], [ener_a], [occ_a], molorb.rest)
 
-        orb_unrest = MolecularOrbitals([data_a, data_b], [ener_a, ener_b], [occ_a, occ_b],
-                                       molorb.unrest)
+        orb_unrest = MolecularOrbitals([data_a, data_b], [ener_a, ener_b],
+                                       [occ_a, occ_b], molorb.unrest)
 
         orb_a1 = orb_rest.alpha_to_numpy()
         orb_a2 = orb_unrest.alpha_to_numpy()
@@ -147,7 +147,7 @@ class TestOrbData:
 
         arr = np.array([[.9, .2, .3], [.3, .8, .6], [.1, .5, .7]])
         ene = np.array([.7, .8, .9])
-        occ = np.array([2,0,0])
+        occ = np.array([2, 0, 0])
 
         orb_rest = MolecularOrbitals([arr], [ene], [occ], molorb.rest)
         den_rest = orb_rest.get_density(mol, 'restricted')
@@ -166,13 +166,13 @@ class TestOrbData:
 
         arr_a = np.array([[.9, .2, .3], [.3, .8, .6], [.1, .5, .7]])
         ene_a = np.array([.7, .8, .9])
-        occ = np.array([1,0,0])
+        occ = np.array([1, 0, 0])
 
         arr_b = arr_a * 0.9
         ene_b = ene_a * 0.8
 
-        orb_unrest = MolecularOrbitals([arr_a, arr_b], [ene_a, ene_b], [occ, occ], 
-                                       molorb.unrest)
+        orb_unrest = MolecularOrbitals([arr_a, arr_b], [ene_a, ene_b],
+                                       [occ, occ], molorb.unrest)
         den_unrest = orb_unrest.get_density(mol, 'unrestricted')
         den_a = den_unrest.alpha_to_numpy(0)
         den_b = den_unrest.beta_to_numpy(0)

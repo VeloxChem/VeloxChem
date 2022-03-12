@@ -211,7 +211,7 @@ def _MolecularOrbitals_get_density(self, molecule, scf_type):
         The AO density matrix.
     """
 
-    #MGD: need to implement one based on the occupations
+    # MGD: TODO: need to implement one based on the occupations
     nalpha = molecule.number_of_alpha_electrons()
     nbeta = molecule.number_of_beta_electrons()
 
@@ -310,15 +310,19 @@ def _MolecularOrbitals_read_hdf5(fname):
     orbs_type = molorb.rest
 
     assert_msg_critical(
-        'alpha_orbitals' in hf and 'alpha_energies' in hf and 'alpha_occupations' in hf,
-        'MolecularOrbitals.read_hdf5: alpha orbitals/energies/occupations not found')
+        'alpha_orbitals' in hf and 'alpha_energies' in hf and
+        'alpha_occupations' in hf,
+        'MolecularOrbitals.read_hdf5: alpha orbitals/energies/occupations not found'
+    )
 
     if 'beta_orbitals' in hf or 'beta_energies' in hf:
         orbs_type = molorb.unrest
 
         assert_msg_critical(
-            'beta_orbitals' in hf and 'beta_energies' in hf and 'beta_occupations' in hf,
-            'MolecularOrbitals.read_hdf5: beta orbitals/energies/occupations not found')
+            'beta_orbitals' in hf and 'beta_energies' in hf and
+            'beta_occupations' in hf,
+            'MolecularOrbitals.read_hdf5: beta orbitals/energies/occupations not found'
+        )
 
     orbs = []
     enes = []

@@ -266,7 +266,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
             orb_coefs = np.linalg.multi_dot([tmat, evecs])
             orb_coefs, eigs = self.delete_mos(orb_coefs, eigs)
 
-            occ = molecule.get_aufbau_occupation(eigs.size)
+            occ = molecule.get_aufbau_occupation(eigs.size, 'restricted')
 
             return MolecularOrbitals([orb_coefs], [eigs], [occ], molorb.rest)
 

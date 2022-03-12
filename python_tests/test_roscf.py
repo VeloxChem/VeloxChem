@@ -177,7 +177,7 @@ class ROSCF_Helper:
     def new_orbitals(self):
         fock_eff = self.fock_eff()
         oao = self.oao_mat()
-        mol_orbs = self.scf_drv.gen_molecular_orbitals(self.mol,fock_eff, oao)
+        mol_orbs = self.scf_drv.gen_molecular_orbitals(self.mol, fock_eff, oao)
         self.scf_drv.mol_orbs = mol_orbs
         return mol_orbs.alpha_to_numpy()
 

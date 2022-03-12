@@ -266,10 +266,12 @@ class ScfUnrestrictedDriver(ScfDriver):
             orb_coefs_a, eigs_a = self.delete_mos(orb_coefs_a, eigs_a)
             orb_coefs_b, eigs_b = self.delete_mos(orb_coefs_b, eigs_b)
 
-            occa, occb = molecule.get_aufbau_occupation(eigs_a.size, True)
+            occa, occb = molecule.get_aufbau_occupation(eigs_a.size,
+                                                        'unrestricted')
 
             return MolecularOrbitals([orb_coefs_a, orb_coefs_b],
-                                     [eigs_a, eigs_b], [occa, occb], molorb.unrest)
+                                     [eigs_a, eigs_b], [occa, occb],
+                                     molorb.unrest)
 
         return MolecularOrbitals()
 
@@ -320,39 +322,43 @@ class ScfUnrestrictedDriver(ScfDriver):
         """
 
         # Get the AO densities and add them
-        D_alpha=self.scf_tensors["D_alpha"]
-        D_beta=self.scf_tensors["D_beta"]
-        D_total=D_alpha + D_beta
+        D_alpha = self.scf_tensors["D_alpha"]
+        D_beta = self.scf_tensors["D_beta"]
+        D_total = D_alpha + D_beta
 
         # Get some MO coefficients and create C^-1
-        C=self.scf_tensors["C_alpha"]
-        S=self.scf_tensors["S"]
+        C = self.scf_tensors["C_alpha"]
+        S = self.scf_tensors["S"]
         C_inv = np.einsum("mn, ni->mi ", S, C)
 
         # Transform the density to MO basis
-        D_MO=np.einsum("pq,qu, pt->tu", D_total   , C_inv, C_inv)
+        D_MO = np.einsum("pq,qu, pt->tu", D_total, C_inv, C_inv)
 
         # Diagonalize
         occupations, eigenvectors = np.linalg.eigh(D_MO)
 
         # Create the final orbitals
-        C_natural = np.matmul(C,eigenvectors)
+        C_natural = np.matmul(C, eigenvectors)
 
-        # Compute the orbital energy as expectation value of the averaged Fock matrix (they are not eigenvalues!)
-        F_alpha=self.scf_tensors["F_alpha"]
-        F_beta=self.scf_tensors["F_beta"]
-        F_avg = 0.5*(F_alpha+F_beta)
+        # Compute the orbital energy as expectation value of the averaged Fock
+        # matrix (they are not eigenvalues!)
+        F_alpha = self.scf_tensors["F_alpha"]
+        F_beta = self.scf_tensors["F_beta"]
+        F_avg = 0.5 * (F_alpha + F_beta)
 
-        Orbital_energies=np.einsum('mi, mn, ni -> i',C_natural,F_avg,C_natural)
+        orbital_energies = np.einsum('mi, mn, ni -> i', C_natural, F_avg,
+                                     C_natural)
 
         # Sort by orbital energies or by occupation numbers?
-        #idx = Orbital_energies.argsort() #Sort by orbital energies
-        idx = occupations.argsort()[::-1] #Sort by occupation numbers
-        Orbital_energies = Orbital_energies[idx]
+        # idx = Orbital_energies.argsort() # Sort by orbital energies
+        idx = occupations.argsort()[::-1]  # Sort by occupation numbers
+        orbital_energies = orbital_energies[idx]
         occupations = occupations[idx]
-        #eigenvectors = eigenvectors[:,idx]
-        C_natural = C_natural[:,idx]
+        # eigenvectors = eigenvectors[:,idx]
+        C_natural = C_natural[:, idx]
 
         # Create the MolecularOrbitals object and return
-        Natural_orbitals=MolecularOrbitals([C_natural],[Orbital_energies],[occupations], molorb.rest)
-        return Natural_orbitals
+        natural_orbitals = MolecularOrbitals([C_natural], [orbital_energies],
+                                             [occupations], molorb.rest)
+
+        return natural_orbitals

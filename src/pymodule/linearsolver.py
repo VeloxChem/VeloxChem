@@ -1731,9 +1731,10 @@ class LinearSolver:
         # NTOs including holes and particles
         nto_orbs = np.concatenate((nto_occ, nto_vir), axis=1)
 
-        nto_lam = np.concatenate((np.flip(lam_diag),lam_diag))
+        nto_lam = np.zeros(nto_orbs.shape[1])
         nto_ener = np.zeros(nto_orbs.shape[1])
-        nto_mo = MolecularOrbitals([nto_orbs], [nto_ener], [nto_lam], molorb.rest)
+        nto_mo = MolecularOrbitals([nto_orbs], [nto_ener], [nto_lam],
+                                   molorb.rest)
 
         return lam_diag, nto_mo
 
