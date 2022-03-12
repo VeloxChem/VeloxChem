@@ -104,10 +104,22 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
                                    const std::vector<py::array_t<double>>& occupations,
                                    const molorb                            orbs_type)
 {
+    py::ssize_t nmo = -1;
+
+    std::string errnmo("MolecularOrbitals: Inconsistent number of MOs");
+
+    std::string erreig("MolecularOrbitals: Expecting 1D numpy arrays for eigenvalues");
+
+    std::string errocc("MolecularOrbitals: Expecting 1D numpy arrays for occupations");
+
     std::vector<CDenseMatrix> cmos;
 
     for (size_t i = 0; i < mol_orbs.size(); i++)
     {
+        if (nmo == -1) nmo = mol_orbs[i].shape(1);
+
+        errors::assertMsgCritical(nmo == mol_orbs[i].shape(1), errnmo);
+
         auto mp = vlx_math::CDenseMatrix_from_numpy(mol_orbs[i]);
 
         cmos.push_back(*mp);
@@ -117,11 +129,13 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
 
     for (size_t i = 0; i < eig_vals.size(); i++)
     {
+        if (nmo == -1) nmo = eig_vals[i].size();
+
+        errors::assertMsgCritical(nmo == eig_vals[i].size(), errnmo);
+
         const py::array_t<double>& arr = eig_vals[i];
 
-        std::string errdim("MolecularOrbitals: Expecting 1D numpy arrays for eigenvalues");
-
-        errors::assertMsgCritical(arr.ndim() == 1, errdim);
+        errors::assertMsgCritical(arr.ndim() == 1, erreig);
 
         if (arr.data() == nullptr || arr.size() == 0)
         {
@@ -137,11 +151,13 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
 
     for (size_t i = 0; i < occupations.size(); i++)
     {
+        if (nmo == -1) nmo = occupations[i].size();
+
+        errors::assertMsgCritical(nmo == occupations[i].size(), errnmo);
+
         const py::array_t<double>& arr = occupations[i];
 
-        std::string errdim("MolecularOrbitals: Expecting 1D numpy arrays for occupations");
-
-        errors::assertMsgCritical(arr.ndim() == 1, errdim);
+        errors::assertMsgCritical(arr.ndim() == 1, errocc);
 
         std::vector<double> vec(arr.data(), arr.data() + arr.size());
 
@@ -236,8 +252,8 @@ export_orbdata(py::module& m)
              &CMolecularBasis::getDimensionsOfPrimitiveBasis,
              "Determines size of primitive AO basis for selected molecule.",
              "molecule"_a)
-        .def("get_index_map", &CMolecularBasis::getIndexMap, 
-			 "Maps the atomic orbital indices of veloxchem to pyscf and Dalton indices."_a)
+        .def(
+            "get_index_map", &CMolecularBasis::getIndexMap, "Maps the atomic orbital indices of veloxchem to pyscf and Dalton indices.", "molecule"_a)
         .def("n_basis_functions",
              vlx_general::overload_cast_<const CMolecule&, int32_t>()(&CMolecularBasis::getNumberOfBasisFunctions, py::const_),
              "Determines number of basis functions with specific angular momentum in molecular basis of selected molecule.",
@@ -399,13 +415,7 @@ export_orbdata(py::module& m)
 
     PyClass<CSADGuessDriver>(m, "SADGuessDriver")
         .def(py::init(&vlx_general::create<CSADGuessDriver>), "comm"_a = py::none())
-        .def("compute",
-             &CSADGuessDriver::compute,
-             "Computes SAD initial guess.",
-             "molecule"_a,
-             "basis_1"_a,
-             "basis_2"_a,
-             "densityType"_a);
+        .def("compute", &CSADGuessDriver::compute, "Computes SAD initial guess.", "molecule"_a, "basis_1"_a, "basis_2"_a, "densityType"_a);
 
     // exposing functions
 
