@@ -1716,7 +1716,7 @@ class LinearSolver:
             The MO coefficients of virtual orbitals.
 
         :return:
-            The lambda values (1D array) and the NTO coefficients (2D array).
+            The NTOs as a MolecularOrbitals object.
         """
 
         # SVD
@@ -1732,18 +1732,22 @@ class LinearSolver:
         nto_orbs = np.concatenate((nto_occ, nto_vir), axis=1)
 
         nto_lam = np.zeros(nto_orbs.shape[1])
+        nocc = nto_occ.shape[1]
+        for i_nto in range(lam_diag.size):
+            nto_lam[nocc - 1 - i_nto] = -lam_diag[i_nto]
+            nto_lam[nocc + i_nto] = lam_diag[i_nto]
+
         nto_ener = np.zeros(nto_orbs.shape[1])
         nto_mo = MolecularOrbitals([nto_orbs], [nto_ener], [nto_lam],
                                    molorb.rest)
 
-        return lam_diag, nto_mo
+        return nto_mo
 
     def write_nto_cubes(self,
                         cubic_grid,
                         molecule,
                         basis,
                         root,
-                        lam_diag,
                         nto_mo,
                         nto_pairs=None,
                         nto_thresh=0.1):
@@ -1758,8 +1762,6 @@ class LinearSolver:
             The AO basis set.
         :param root:
             The index of the root (0-based).
-        :param lam_diag:
-            The lambda values (1D array).
         :param nto_mo:
             The NTO coefficients (2D array).
         :param nto_pairs:
@@ -1768,7 +1770,7 @@ class LinearSolver:
             The threshold for writing NTO to cube file.
 
         :return:
-            The list containing the names of the cube files.
+            Values of lambda and names of cube files.
         """
 
         filenames = []
@@ -1776,6 +1778,8 @@ class LinearSolver:
         vis_drv = VisualizationDriver(self.comm)
 
         nocc = molecule.number_of_alpha_electrons()
+        nvir = nto_mo.number_mos() - nocc
+        lam_diag = nto_mo.occa_to_numpy()[nocc:nocc + min(nocc, nvir)]
 
         for i_nto in range(lam_diag.size):
             if lam_diag[i_nto] < nto_thresh:
@@ -1820,7 +1824,7 @@ class LinearSolver:
 
         self.ostream.print_blank()
 
-        return filenames
+        return lam_diag, filenames
 
     def get_detach_attach_densities(self, z_mat, y_mat, mo_occ, mo_vir):
         """
