@@ -272,9 +272,7 @@ CVisualizationDriver::mapAtomToAtomicOrbitals(const CMolecule& molecule, const C
 }
 
 void
-CVisualizationDriver::computeAtomicOrbitalForGrid(CCubicGrid&                 grid,
-                                                  const CMolecularBasis&      basis,
-                                                  const std::vector<int32_t>& aoinfo) const
+CVisualizationDriver::computeAtomicOrbitalForGrid(CCubicGrid& grid, const CMolecularBasis& basis, const std::vector<int32_t>& aoinfo) const
 {
     // atomic orbital information
 
@@ -317,7 +315,7 @@ CVisualizationDriver::computeAtomicOrbitalForGrid(CCubicGrid&                 gr
 
     auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
 
-#pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(dynamic)
     for (int32_t ix = 0; ix < nx; ix++)
     {
         double rx = x0 + dx * ix;
@@ -561,7 +559,7 @@ CVisualizationDriver::compute_omp(CCubicGrid&               grid,
 
     // calculate psi on grid points
 
-#pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(dynamic)
     for (int32_t ix = 0; ix < nx; ix++)
     {
         double xp = x0 + dx * ix;
@@ -673,7 +671,7 @@ CVisualizationDriver::compute_omp(CCubicGrid&             grid,
 
     // calculate densities on grid points
 
-#pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(dynamic)
     for (int32_t ix = 0; ix < nx; ix++)
     {
         double xp = x0 + dx * ix;
