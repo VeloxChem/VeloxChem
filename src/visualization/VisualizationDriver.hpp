@@ -26,9 +26,10 @@
 #ifndef VisualizationDriver_hpp
 #define VisualizationDriver_hpp
 
-#include <vector>
-
 #include <mpi.h>
+
+#include <array>
+#include <vector>
 
 #include "AODensityMatrix.hpp"
 #include "CubicGrid.hpp"
@@ -95,6 +96,37 @@ class CVisualizationDriver
      Destroys a visualization driver object.
      */
     ~CVisualizationDriver();
+
+    /**
+     Gets atomic orbital information.
+
+     @param molecule the molecule.
+     @param basis the molecular basis set.
+     @return a vector of vector containing atomic number (nuclear charge),
+             angular momentum, spherical harmonic index and basis function
+             index for each atomic orbital.
+     */
+    std::vector<std::vector<int32_t>> getAtomicOrbitalInformation(const CMolecule& molecule, const CMolecularBasis& basis) const;
+
+    /**
+     Maps atom to atomic orbitals.
+
+     @param molecule the molecule.
+     @param basis the molecular basis set.
+     @return a vector of vector that maps atom index to atomic orbital indices.
+     */
+    std::vector<std::vector<int32_t>> mapAtomToAtomicOrbitals(const CMolecule& molecule, const CMolecularBasis& basis) const;
+
+    /**
+     Computes atomic orbital (centered at origin) at cubic grid points (OpenMP).
+
+     @param grid the cubic grid.
+     @param basis the molecular basis set.
+     @param aoinfo the atomic orbital information.
+     */
+    void computeAtomicOrbitalForGrid(CCubicGrid&                 grid,
+                                     const CMolecularBasis&      basis,
+                                     const std::vector<int32_t>& aoinfo) const;
 
     /**
      Gets rank of the MPI process.
