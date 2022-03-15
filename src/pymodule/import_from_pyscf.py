@@ -44,6 +44,7 @@ def get_pyscf_integral_type(int_type):
             "overlap"                                       : "int1e_ovlp",
             "kinetic_energy"                                : "int1e_kin",
             "nuclear_attraction"                            : "int1e_nuc",
+            "electric_dipole"                               : "int1e_r",
             "electron_repulsion"                            : "int2e",
             "overlap_derivative"                            : "int1e_ipovlp",
             "kinetic_energy_derivative"                     : "int1e_ipkin",
@@ -178,7 +179,14 @@ def import_1e_integral(molecule, basis, int_type, atom1=1, shell1=None,
     pyscf_int = sign * pyscf_molecule.intor(pyscf_int_type, aosym='s1')
 
     # Transform integral to veloxchem format
-    vlx_int = ao_matrix_to_veloxchem(
+    if pyscf_int_type in ["int1e_r"]:
+        vlx_int = np.zeros_like(pyscf_int) 
+        for x in range(3):
+            vlx_int[x] = ao_matrix_to_veloxchem(
+                                 DenseMatrix(pyscf_int[x]),
+                                 basis, molecule).to_numpy()
+    else:
+        vlx_int = ao_matrix_to_veloxchem(
                                  DenseMatrix(pyscf_int),
                                  basis, molecule).to_numpy()
 
@@ -211,11 +219,17 @@ def import_1e_integral(molecule, basis, int_type, atom1=1, shell1=None,
         raise ValueError("Atom or shell(s) not found.", atom2, shell2)
     
 
-    vlx_int_block = np.zeros((len(rows), len(columns)))
+    if pyscf_int_type in ["int1e_r"]:
+        vlx_int_block = np.zeros((3, len(rows), len(columns)))
+    else:
+        vlx_int_block = np.zeros((len(rows), len(columns)))
     
     for i in range(len(rows)):
         for j in range(len(columns)):
-            vlx_int_block[i,j] = vlx_int[rows[i], columns[j]]
+            if pyscf_int_type in ["int1e_r"]:
+                vlx_int_block[:,i,j] = vlx_int[:, rows[i], columns[j]] 
+            else:
+                vlx_int_block[i,j] = vlx_int[rows[i], columns[j]]
    
     label = int_type+'_atom%d' % (atom1)
     if shell1 is not None:
