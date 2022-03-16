@@ -204,8 +204,8 @@ class TdhfGradientDriver(GradientDriver):
             rel_dm_ao = orbrsp_results['relaxed_density_ao']
 
             # analytical gradient
-            # self.gradient = np.zeros((natm, 3))
-            self.gradient = self.grad_nuc_contrib(molecule)
+            self.gradient = np.zeros((natm, 3))
+            # self.gradient = self.grad_nuc_contrib(molecule)
 
             # loop over atoms and contract integral derivatives with density matrices
             # add the corresponding contribution to the gradient
@@ -215,14 +215,14 @@ class TdhfGradientDriver(GradientDriver):
                 d_fock = fock_deriv(molecule, basis, gs_dm, i)
                 d_eri = eri_deriv(molecule, basis, i)
 
-                self.gradient[i] += ( np.einsum('mn,xmn->x', 2.0 * gs_dm + rel_dm_ao, d_fock)
+                self.gradient[i] += ( #np.einsum('mn,xmn->x', 2.0 * gs_dm + rel_dm_ao, d_fock)
                                  +1.0 * np.einsum('mn,xmn->x', 2.0 * omega_ao, d_ovlp)
-                                 -2.0 * np.einsum('mt,np,xmtnp->x', gs_dm, gs_dm, d_eri)
-                                 +1.0 * np.einsum('mt,np,xmnpt->x', gs_dm, gs_dm, d_eri)
-                                 +1.0 * np.einsum('mn,pt,xtpmn->x', xpy, xpy - xpy.T, d_eri)
-                                 -0.5 * np.einsum('mn,pt,xtnmp->x', xpy, xpy - xpy.T, d_eri)
-                                 +1.0 * np.einsum('mn,pt,xtpmn->x', xmy, xmy + xmy.T, d_eri)
-                                 -0.5 * np.einsum('mn,pt,xtnmp->x', xmy, xmy + xmy.T, d_eri)
+                                 #-2.0 * np.einsum('mt,np,xmtnp->x', gs_dm, gs_dm, d_eri)
+                                 #+1.0 * np.einsum('mt,np,xmnpt->x', gs_dm, gs_dm, d_eri)
+                                 #+1.0 * np.einsum('mn,pt,xtpmn->x', xpy, xpy - xpy.T, d_eri)
+                                 #-0.5 * np.einsum('mn,pt,xtnmp->x', xpy, xpy - xpy.T, d_eri)
+                                 #+1.0 * np.einsum('mn,pt,xtpmn->x', xmy, xmy + xmy.T, d_eri)
+                                 #-0.5 * np.einsum('mn,pt,xtnmp->x', xmy, xmy + xmy.T, d_eri)
                                 )
 
 

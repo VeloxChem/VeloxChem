@@ -287,6 +287,7 @@ class OrbitalResponse:
             dm_vv = rhs_results['dm_vv']
             unrel_dm_ao = rhs_results['unrel_dm_ao']
             fock_ao_rhs = rhs_results['fock_ao_rhs']
+            fock_gxc_ao = rhs_results['fock_gxc_ao']
         else:
             rhs_mo = None
 
@@ -378,7 +379,7 @@ class OrbitalResponse:
             else:
                 # This is the routine for excited states
                 omega_ao = self.compute_omega(ovlp, mo_occ, mo_vir, epsilon_dm_ao,
-                                              rsp_results, fock_ao_rhs, fock_lambda)
+                                              rsp_results, fock_ao_rhs, fock_lambda, fock_gxc_ao)
 
         self.ostream.print_blank()
         self.ostream.flush()

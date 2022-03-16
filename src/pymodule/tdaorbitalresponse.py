@@ -152,6 +152,8 @@ class TdaOrbitalResponse(OrbitalResponse):
                 fock_ao_rhs.set_fock_type(fockmat.rgenj, 1)
                 fock_gxc_ao.set_fock_type(fockmat.rgenj, 0)
                 fock_gxc_ao.set_fock_type(fockmat.rgenj, 1)
+        else:
+            fock_gxc_ao = None
 
 
 
@@ -213,12 +215,13 @@ class TdaOrbitalResponse(OrbitalResponse):
                 'xmy_ao': exc_vec_ao,
                 'unrel_dm_ao': unrel_dm_ao,
                 'fock_ao_rhs': fock_ao_rhs,
+                'fock_gxc_ao': fock_gxc_ao, # None if not DFT
             }
         else:
             return {}
 
     def compute_omega(self, ovlp, mo_occ, mo_vir, epsilon_dm_ao, tda_results,
-                      fock_ao_rhs, fock_lambda):
+                      fock_ao_rhs, fock_lambda, fock_gxc_ao):
         """
         Calculates the TDA Lagrange multipliers for the overlap matrix.
 
@@ -236,6 +239,8 @@ class TdaOrbitalResponse(OrbitalResponse):
             The AOFockMatrix from the right-hand side of the orbital response eq.
         :param fock_lambda:
             The Fock matrix from Lagrange multipliers.
+        :param fock_gxc_ao:
+            The AOFockMatrix from the E[3] xc contribution (None if not DFT).
 
         :return:
             a numpy array containing the Lagrange multipliers in AO basis.
@@ -262,7 +267,7 @@ class TdaOrbitalResponse(OrbitalResponse):
         Ft = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, exc_vec_ao, ovlp])
         F = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, exc_vec_ao.T, ovlp.T])
 
-        # Compute the contributions from the 2PDM and the relaxed 1PDM
+        # Compute the contributions from the relaxed 1PDM
         # to the omega Lagrange multipliers:
         fmat = (fock_lambda.alpha_to_numpy(0) +
                 fock_lambda.alpha_to_numpy(0).T +
@@ -275,5 +280,9 @@ class TdaOrbitalResponse(OrbitalResponse):
                                     np.linalg.multi_dot([D_occ, fmat, D_occ]))
 
         omega = -epsilon_dm_ao - omega_1pdm_2pdm_contribs
+
+        if fock_gxc_ao is not None:
+            factor = -0.25
+            omega += factor * np.linalg.multi_dot([D_occ, fock_gxc_ao.alpha_to_numpy(0), D_occ])
 
         return omega

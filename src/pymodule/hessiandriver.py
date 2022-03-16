@@ -326,6 +326,7 @@ class HessianDriver:
 
             alpha_bar_sq = alpha_bar**2
 
+            # Calculate depolarization ratio from polarized (parallel) and depolarized (perpendicular) intensities
             if self.print_depolarization_ratio:
                 int_pol = 45 * alpha_bar_sq + 4 * gamma_bar_sq
                 int_depol = 3 * gamma_bar_sq
