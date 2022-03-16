@@ -131,6 +131,112 @@ def write_2d_array_hdf5(fname, arrays, labels=[], atom_index=None):
     hf.close()
     return True
 
+def import_integral(molecule, basis, int_type, atom1=None, shell1=None,
+                    atom2=None, shell2=None, atom3=None, shell3=None,
+                    atom4=None, shell4=None, xi1=None, xi2=None,
+                    chk_file=None, return_block=True, full_deriv=False):
+    """
+    Imports integrals and integral derivatives from pyscf and converts 
+    them to veloxchem format.
+    Specific atoms and shells can be selected.
+
+    :param molecule:
+        the vlx molecule object
+    :param basis:
+        the vlx basis object
+    :param int_type:
+        the type of integral, or integral derivative 
+    :param atom1:
+        index of the first atom of interest
+    :param shell1:
+        list of atomic shells of interest for atom 1
+    :param atom2:
+        index of the second atom of interest
+    :param shell2:
+        list of atomic shells of interest for atom 2
+    :param atom3:
+        index of the third atom of interest (for 2e integrals)
+    :param shell3:
+        list of atomic shells of interest for atom 3 (for 2e integrals)
+    :param atom4:
+        index of the fourth atom of interest (for 2e integrals)
+    :param shell4:
+        list of atomic shells of interest for atom 4 (for 2e integrals)
+    :param xi1:
+        index of the atom with respect to which derivatives are taken
+        (for first and second order derivatives)
+    :param xi2:
+        index of the second atom with respect to which derivatives are taken
+        (for second order derivatives)
+    :param chk_file:
+        the hdf5 checkpoint file name
+    :param return_block:
+        return the matrix block, or the full matrix
+    :full_deriv:
+        return the full integral derivative (for first and second order
+        derivatives).
+
+
+    :return:
+        a numpy array corresponding to a specified block of 
+        the selected integral or integral derivative matrix.
+    """
+
+    pyscf_int_type = get_pyscf_integral_type(int_type)
+
+    if 'derivative' in int_type:
+        if 'second' in int_type:
+            if '2_0' in int_type:
+                if 'int2e' in pyscf_int_type:
+                    return import_2e_integral_derivative(molecule, basis,
+                        int_type, atomi=xi1, atom1=atom1, shell1=shell1,
+                        atom2=atom2, shell2=shell2, atom3=atom3, shell3=shell3,
+                        atom4=atom4, shell4=shell4, chk_file=chk_file,
+                        return_block=return_block, full_deriv=full_deriv)
+                else:
+                    return import_1e_integral_derivative(molecule, basis,
+                        int_type, atomi=xi1, atom1=atom1, shell1=shell1,
+                        atom2=atom2, shell2=shell2, chk_file=chk_file,
+                        return_block=return_block, full_deriv=full_deriv)
+            else:
+                if 'int2e' in pyscf_int_type:
+                    return import_2e_second_order_integral_derivative(molecule,
+                        basis, int_type, atomi=xi1, atomj=xi2, atom1=atom1,
+                        shell1=shell1, atom2=atom2, shell2=shell2, atom3=atom3,
+                        shell3=shell3, atom4=atom4, shell4=shell4,
+                        chk_file=chk_file, return_block=return_block,
+                        full_deriv=full_deriv)
+                else:
+                    return import_1e_second_order_integral_derivative(molecule,
+                        basis, int_type, atomi=xi1, atomj=xi2, atom1=atom1,
+                        shell1=shell1, atom2=atom2, shell2=shell2,
+                        chk_file=chk_file, return_block=return_block,
+                        full_deriv=full_deriv)
+                
+        else:
+            if 'int2e' in pyscf_int_type:
+                return import_2e_integral_derivative(molecule, basis, int_type,
+                        atomi=xi1, atom1=atom1, shell1=shell1, atom2=atom2,
+                        shell2=shell2, atom3=atom3, shell3=shell3, atom4=atom4,
+                        shell4=shell4, chk_file=chk_file,
+                        return_block=return_block, full_deriv=full_deriv)
+            else:
+                return import_1e_integral_derivative(molecule, basis, int_type, 
+                        atomi=xi1, atom1=atom1, shell1=shell1,
+                        atom2=atom2, shell2=shell2, chk_file=chk_file,
+                        return_block=return_block, full_deriv=full_deriv)
+    else:
+        if 'int2e' in pyscf_int_type:
+            return import_2e_integral(molecule, basis, int_type, atom1=atom1,
+                       shell1=shell1, atom2=atom2, shell2=shell2, atom3=atom3,
+                       shell3=shell3, atom4=atom4, shell4=shell4,
+                       chk_file=chk_file, return_block=return_block)
+        else:
+            return import_1e_integral(molecule, basis, int_type, atom1=atom1,
+                       shell1=shell1, atom2=atom2, shell2=shell2,
+                       chk_file=chk_file, return_block=return_block)
+
+
 def import_1e_integral(molecule, basis, int_type, atom1=1, shell1=None,
                        atom2=1, shell2=None, chk_file=None,
                        unit="au", return_block=True):
