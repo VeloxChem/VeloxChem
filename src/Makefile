@@ -53,7 +53,8 @@ vpath %.hpp $(VLX_INCLUDES)
 CXXFLAGS += $(MATH_INC)
 
 # Add list of internal libraries
-VLX_LIBS_DIR := ${shell find * -not -path pymodule -type d -print}
+# exclude `pymodule` and any folders that DO NOT contain any .cpp files
+VLX_LIBS_DIR := $(shell find * -not -path pymodule -type d -exec sh -c 'ls -1 "{}" | egrep -i -q "*\.cpp$$"' ';' -print)
 
 # Generate all internal libraries related files
 VLX_LIBS = $(foreach d,$(VLX_LIBS_DIR),$(addsuffix .a,$(addprefix $d/,$d)))
