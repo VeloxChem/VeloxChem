@@ -347,7 +347,7 @@ export_twoints(py::module& m)
     PyClass<CElectronRepulsionIntegralsDriver>(m, "ElectronRepulsionIntegralsDriver")
         .def(py::init(&vlx_general::create<CElectronRepulsionIntegralsDriver>), "comm"_a = py::none())
         .def("compute",
-             vlx_general::overload_cast_<const ericut, const double, const CMolecule&, const CMolecularBasis&>()(
+             py::overload_cast<const ericut, const double, const CMolecule&, const CMolecularBasis&>()(
                  &CElectronRepulsionIntegralsDriver::compute, py::const_),
              // the wonky format of the raw string literal is to get help(...) in Python to look nice
              R"pbdoc(

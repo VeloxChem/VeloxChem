@@ -145,19 +145,6 @@ numpy_fstyle_to_memblock2d(const py::array_t<T, py::array::f_style>& arr)
     return CMemBlock2D<T>(arr.data(), arr.shape(0), arr.shape(1));
 }
 
-/**
- Bind overloaded functions in a less verbose fashion
-
- Use as:
-
-    vlx_general::overload_cast_<argument-list>()(name-of-function)
-
- NOTE This is a workaround for C++11 usage of pybind11::overload_cast.
- See: https://pybind11.readthedocs.io/en/stable/classes.html#overloaded-methods
- */
-template <typename... Args>
-using overload_cast_ = py::detail::overload_cast_impl<Args...>;
-
 /** Wrapper for object constructors accepting an MPI communicator.
  *
  * @tparam T type of the object to wrap in a shared pointer.

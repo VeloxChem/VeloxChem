@@ -220,7 +220,7 @@ export_dft(py::module& m)
              "molecularGrid"_a,
              "xcFuncLabel"_a)
         .def("integrate",
-             vlx_general::overload_cast_<CAOFockMatrix&,
+             py::overload_cast<CAOFockMatrix&,
                                          const CAODensityMatrix&,
                                          const CAODensityMatrix&,
                                          const CMolecule&,
@@ -236,7 +236,7 @@ export_dft(py::module& m)
              "molecularGrid"_a,
              "xcFuncLabel"_a)
         .def("integrate",
-             vlx_general::overload_cast_<CAOFockMatrix&,
+             py::overload_cast<CAOFockMatrix&,
                                          const CAODensityMatrix&,
                                          const CAODensityMatrix&,
                                          const CAODensityMatrix&,

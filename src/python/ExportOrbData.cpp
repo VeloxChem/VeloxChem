@@ -222,12 +222,12 @@ export_orbdata(py::module& m)
         .def(py::init<>())
         .def("__repr__", &CMolecularBasis::repr)
         .def("get_string",
-             vlx_general::overload_cast_<const std::string&, const CMolecule&>()(&CMolecularBasis::printBasis, py::const_),
+             py::overload_cast<const std::string&, const CMolecule&>()(&CMolecularBasis::printBasis, py::const_),
              "Prints AO basis information to output stream for selected molecule.",
              "title"_a,
              "molecule"_a)
         .def("get_string",
-             vlx_general::overload_cast_<const CMolecule&>()(&CMolecularBasis::printBasis, py::const_),
+             py::overload_cast<const CMolecule&>()(&CMolecularBasis::printBasis, py::const_),
              "Prints AO basis information to output stream for selected molecule.",
              "molecule"_a)
         .def("set_label", &CMolecularBasis::setLabel, "Sets name of molecular basis.", "label"_a)
@@ -255,12 +255,12 @@ export_orbdata(py::module& m)
         .def(
             "get_index_map", &CMolecularBasis::getIndexMap, "Maps the atomic orbital indices of veloxchem to pyscf and Dalton indices.", "molecule"_a)
         .def("n_basis_functions",
-             vlx_general::overload_cast_<const CMolecule&, int32_t>()(&CMolecularBasis::getNumberOfBasisFunctions, py::const_),
+             py::overload_cast<const CMolecule&, int32_t>()(&CMolecularBasis::getNumberOfBasisFunctions, py::const_),
              "Determines number of basis functions with specific angular momentum in molecular basis of selected molecule.",
              "molecule"_a,
              "angularMomentum"_a)
         .def("n_primitive_basis_functions",
-             vlx_general::overload_cast_<const CMolecule&, int32_t>()(&CMolecularBasis::getNumberOfPrimitiveBasisFunctions, py::const_),
+             py::overload_cast<const CMolecule&, int32_t>()(&CMolecularBasis::getNumberOfPrimitiveBasisFunctions, py::const_),
              "Determines number of primitive Gaussian functions with specific angular momentum in molecular basis of selected molecule.",
              "molecule"_a,
              "angularMomentum"_a)
@@ -358,22 +358,22 @@ export_orbdata(py::module& m)
             "Converts beta orbital energies in MolecularOrbitals to numpy array.")
         .def("get_orbitals_type", &CMolecularOrbitals::getOrbitalsType, "Gets type of molecular orbital matrix.")
         .def("get_ao_density",
-             vlx_general::overload_cast_<const int32_t>()(&CMolecularOrbitals::getAODensity, py::const_),
+             py::overload_cast<const int32_t>()(&CMolecularOrbitals::getAODensity, py::const_),
              "Computes spin restricted electron density matrix in AO basis for specific number of electrons.",
              "nElectrons"_a)
         .def("get_ao_density",
-             vlx_general::overload_cast_<const int32_t, const int32_t>()(&CMolecularOrbitals::getAODensity, py::const_),
+             py::overload_cast<const int32_t, const int32_t>()(&CMolecularOrbitals::getAODensity, py::const_),
              "Computes spin unrestricted electron density matrix in AO basis for specific number of alpha and beta electrons.",
              "nAlphaElectrons"_a,
              "nBetaElectrons"_a)
         .def("get_pair_density",
-             vlx_general::overload_cast_<const std::vector<int32_t>&, const std::vector<int32_t>&>()(&CMolecularOrbitals::getRestrictedPairDensity,
+             py::overload_cast<const std::vector<int32_t>&, const std::vector<int32_t>&>()(&CMolecularOrbitals::getRestrictedPairDensity,
                                                                                                      py::const_),
              "Computes set of restricted pair C_i C_j^T density matrices in AO basis.",
              "iMolecularOrbitals"_a,
              "ecularOrbitals"_a)
         .def("get_pair_density",
-             vlx_general::overload_cast_<const int32_t, const int32_t>()(&CMolecularOrbitals::getRestrictedPairDensity, py::const_),
+             py::overload_cast<const int32_t, const int32_t>()(&CMolecularOrbitals::getRestrictedPairDensity, py::const_),
              "Computes restricted pair C_i C_j^T density matrix in AO basis.",
              "iMolecularOrbital"_a,
              "jMolecularOrbital"_a)
@@ -386,12 +386,12 @@ export_orbdata(py::module& m)
         .def("number_aos", &CMolecularOrbitals::getNumberOfRows, "Gets number of rows in specific molecular orbital matrix.")
         .def("number_mos", &CMolecularOrbitals::getNumberOfColumns, "Gets number of columns in specific molecular orbital matrix.")
         .def("alpha_orbitals",
-             vlx_general::overload_cast_<const int32_t, const int32_t>()(&CMolecularOrbitals::alphaOrbitals, py::const_),
+             py::overload_cast<const int32_t, const int32_t>()(&CMolecularOrbitals::alphaOrbitals, py::const_),
              "Gets alpha orbitals within specific range.",
              "iMolecularOrbital"_a,
              "nMolecularOrbitals"_a)
         .def("beta_orbitals",
-             vlx_general::overload_cast_<const int32_t, const int32_t>()(&CMolecularOrbitals::betaOrbitals, py::const_),
+             py::overload_cast<const int32_t, const int32_t>()(&CMolecularOrbitals::betaOrbitals, py::const_),
              "Gets beta orbitals within specific range.",
              "iMolecularOrbital"_a,
              "nMolecularOrbitals"_a)
