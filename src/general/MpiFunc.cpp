@@ -25,12 +25,10 @@
 
 #include "MpiFunc.hpp"
 
-#include <iostream>
-#include <sstream>
-
 #include <mpi.h>
 
-#include "MathFunc.hpp"
+#include <iostream>
+#include <sstream>
 
 namespace mpi {  // mpi namespace
 
@@ -165,127 +163,19 @@ compare(MPI_Comm comm1, MPI_Comm comm2)
 }
 
 void
-bcast(int32_t& value, MPI_Comm comm)
-{
-    if (ENABLE_MPI)
-    {
-        auto merror = MPI_Bcast(&value, 1, MPI_INT32_T, mpi::master(), comm);
-
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::bcast(int32_t)");
-    }
-}
-
-void
-bcast(double& value, MPI_Comm comm)
-{
-    if (ENABLE_MPI)
-    {
-        auto merror = MPI_Bcast(&value, 1, MPI_DOUBLE, mpi::master(), comm);
-
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::bcast(double)");
-    }
-}
-
-void
-bcast(bool& value, int32_t rank, MPI_Comm comm)
-{
-    if (ENABLE_MPI)
-    {
-        int32_t mvalue = 0;
-
-        if (rank == mpi::master()) mvalue = (value) ? 1 : 0;
-
-        mpi::bcast(mvalue, comm);
-
-        value = (mvalue == 1) ? true : false;
-    }
-}
-
-void
-bcast(char& value, MPI_Comm comm)
-{
-    if (ENABLE_MPI)
-    {
-        auto merror = MPI_Bcast(&value, 1, MPI_CHAR, mpi::master(), comm);
-
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::bcast(char)");
-    }
-}
-
-void
-bcast(std::vector<int32_t>& vector, int32_t rank, MPI_Comm comm)
-{
-    if (ENABLE_MPI)
-    {
-        int32_t veclen = 0;
-
-        if (rank == mpi::master()) veclen = static_cast<int32_t>(vector.size());
-
-        mpi::bcast(veclen, comm);
-
-        if (rank != mpi::master()) vector.clear();
-
-        for (int32_t i = 0; i < veclen; i++)
-        {
-            int32_t mvalue = 0;
-
-            if (rank == mpi::master()) mvalue = vector[i];
-
-            mpi::bcast(mvalue, comm);
-
-            if (rank != mpi::master()) vector.push_back(mvalue);
-
-            MPI_Barrier(comm);
-        }
-    }
-}
-
-void
-bcast(std::vector<double>& vector, int32_t rank, MPI_Comm comm)
-{
-    if (ENABLE_MPI)
-    {
-        int32_t veclen = 0;
-
-        if (rank == mpi::master()) veclen = static_cast<int32_t>(vector.size());
-
-        mpi::bcast(veclen, comm);
-
-        if (rank != mpi::master()) vector.clear();
-
-        for (int32_t i = 0; i < veclen; i++)
-        {
-            double mvalue = 0;
-
-            if (rank == mpi::master()) mvalue = vector[i];
-
-            mpi::bcast(mvalue, comm);
-
-            if (rank != mpi::master()) vector.push_back(mvalue);
-
-            MPI_Barrier(comm);
-        }
-    }
-}
-
-void
 bcast(std::string& str, int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
-        int32_t strwidth = 0;
-
-        if (rank == mpi::master()) strwidth = static_cast<int32_t>(str.size());
+        auto strwidth = (rank == mpi::master()) ? str.size() : 0;
 
         mpi::bcast(strwidth, comm);
 
         if (rank != mpi::master()) str.clear();
 
-        for (int32_t i = 0; i < strwidth; i++)
+        for (const auto c : str)
         {
-            char symbol;
-
-            if (rank == mpi::master()) symbol = str[i];
+            auto symbol = (rank == mpi::master()) ? c : char{};
 
             mpi::bcast(symbol, comm);
 
@@ -293,58 +183,6 @@ bcast(std::string& str, int32_t rank, MPI_Comm comm)
 
             MPI_Barrier(comm);
         }
-    }
-}
-
-void
-bcast(std::vector<std::string>& vector, int32_t rank, MPI_Comm comm)
-{
-    if (ENABLE_MPI)
-    {
-        int32_t veclen = 0;
-
-        if (rank == mpi::master()) veclen = static_cast<int32_t>(vector.size());
-
-        mpi::bcast(veclen, comm);
-
-        if (rank != mpi::master()) vector.clear();
-
-        for (int32_t i = 0; i < veclen; i++)
-        {
-            std::string mstr;
-
-            if (rank == mpi::master()) mstr = vector[i];
-
-            mpi::bcast(mstr, rank, comm);
-
-            if (rank != mpi::master()) vector.push_back(mstr);
-
-            MPI_Barrier(comm);
-        }
-    }
-}
-
-void
-send(double& value, const int32_t rank, MPI_Comm comm)
-{
-    if (ENABLE_MPI)
-    {
-        auto merror = MPI_Send(&value, 1, MPI_DOUBLE, rank, 0, comm);
-
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::send(double)");
-    }
-}
-
-void
-receive(double& value, const int32_t rank, MPI_Comm comm)
-{
-    if (ENABLE_MPI)
-    {
-        MPI_Status mstat;
-
-        auto merror = MPI_Recv(&value, 1, MPI_DOUBLE, rank, 0, comm, &mstat);
-
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::receive(double)");
     }
 }
 
@@ -382,68 +220,6 @@ batches_pattern(int32_t* pattern, const int32_t nElements, const int32_t nodes)
     }
 }
 
-void
-gather(int32_t* vector, int32_t value, int32_t rank, MPI_Comm comm)
-{
-    if (ENABLE_MPI)
-    {
-        auto merror = MPI_Gather(&value, 1, MPI_INT32_T, vector, 1, MPI_INT32_T, mpi::master(), comm);
-
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::gather(integer)");
-    }
-    else
-    {
-        vector[0] = value;
-    }
-}
-
-void
-gather(double* vector, double value, int32_t rank, MPI_Comm comm)
-{
-    if (ENABLE_MPI)
-    {
-        auto merror = MPI_Gather(&value, 1, MPI_DOUBLE, vector, 1, MPI_DOUBLE, mpi::master(), comm);
-
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::gather(double)");
-    }
-    else
-    {
-        vector[0] = value;
-    }
-}
-
-void
-reduce_sum(const double* source, double* destination, const int32_t nElements, MPI_Comm comm)
-{
-    if (ENABLE_MPI)
-    {
-        auto merror = MPI_Reduce(source, destination, nElements, MPI_DOUBLE, MPI_SUM, mpi::master(), comm);
-
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::reduce_sum(double)");
-    }
-    else
-    {
-        mathfunc::copy(destination, 0, source, 0, nElements);
-    }
-}
-    
-double
-reduce_sum(const double value, MPI_Comm comm)
-{
-    if (ENABLE_MPI)
-    {
-        double dval = 0.0;
-        
-        mpi::reduce_sum(&value, &dval, 1, comm);
-        
-        MPI_Barrier(comm);
-        
-        return dval;
-    }
-    
-    return value;
-}
-
 // TODO: Add other MPI functions for generic types
 
 void
@@ -473,4 +249,9 @@ abort(const int errorcode, const char* label)
     }
 }
 
+void
+abort(const int errorcode, const std::string& label)
+{
+    mpi::abort(errorcode, label.c_str());
+}
 }  // namespace mpi
