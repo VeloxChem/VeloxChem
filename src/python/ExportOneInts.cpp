@@ -117,19 +117,19 @@ export_oneints(py::module& m)
     PyClass<CNuclearPotentialIntegralsDriver>(m, "NuclearPotentialIntegralsDriver")
         .def(py::init(&vlx_general::create<CNuclearPotentialIntegralsDriver>), "comm"_a = py::none())
         .def("compute",
-             py::overload_cast<const CMolecule&, const CMolecularBasis&>()(&CNuclearPotentialIntegralsDriver::compute, py::const_),
+             py::overload_cast<const CMolecule&, const CMolecularBasis&>(&CNuclearPotentialIntegralsDriver::compute, py::const_),
              "Computes AO-basis nuclear potential integrals for given molecule and basis",
              "molecule"_a,
              "basis"_a)
         .def("compute",
-             py::overload_cast<const CMolecule&, const CMolecularBasis&, const CMolecule&>()(&CNuclearPotentialIntegralsDriver::compute,
+             py::overload_cast<const CMolecule&, const CMolecularBasis&, const CMolecule&>(&CNuclearPotentialIntegralsDriver::compute,
                                                                                                        py::const_),
              "Computes AO-basis nuclear potential integrals for given molecule and basis set, using charges from the second molecule.",
              "molecule"_a,
              "basis"_a,
              "charges"_a)
         .def("compute",
-             py::overload_cast<const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const CMolecule&>()(
+             py::overload_cast<const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const CMolecule&>(
                  &CNuclearPotentialIntegralsDriver::compute, py::const_),
              "Computes AO-basis nuclear potential integrals for given molecule and two basis sets, using charges from the second molecule.",
              "molecule"_a,
@@ -137,7 +137,7 @@ export_oneints(py::module& m)
              "ket_basis"_a,
              "charges"_a)
         .def("compute",
-             py::overload_cast<const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecule&>()(
+             py::overload_cast<const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecule&>(
                  &CNuclearPotentialIntegralsDriver::compute, py::const_),
              "Computes AO-basis nuclear potential integrals for two molecules in given basis set, using charges from the third molecule.",
              "bra_molecule"_a,
@@ -145,7 +145,7 @@ export_oneints(py::module& m)
              "basis"_a,
              "charges"_a)
         .def("compute",
-             py::overload_cast<const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const CMolecule&>()(
+             py::overload_cast<const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const CMolecule&>(
                  &CNuclearPotentialIntegralsDriver::compute, py::const_),
              "Computes AO-basis nuclear potential integrals for two molecules, each with its own basis set. Use the charges from the third molecule.",
              "bra_molecule"_a,
@@ -304,7 +304,7 @@ export_oneints(py::module& m)
     PyClass<CElectricFieldIntegralsDriver>(m, "ElectricFieldIntegralsDriver")
         .def(py::init(&vlx_general::create<CElectricFieldIntegralsDriver>), "comm"_a = py::none())
         .def("compute",
-             py::overload_cast<const CMolecule&, const CMolecularBasis&, const double, const double, const double>()(
+             py::overload_cast<const CMolecule&, const CMolecularBasis&, const double, const double, const double>(
                  &CElectricFieldIntegralsDriver::compute, py::const_),
              "Compute AO-basis electric field integrals for given molecule and basis set, at given point.",
              "molecule"_a,
@@ -314,7 +314,7 @@ export_oneints(py::module& m)
              "Z"_a)
         .def(
             "compute",
-            py::overload_cast<const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const double, const double, const double>()(
+            py::overload_cast<const CMolecule&, const CMolecularBasis&, const CMolecularBasis&, const double, const double, const double>(
                 &CElectricFieldIntegralsDriver::compute, py::const_),
             "Compute AO-basis electric field integrals for given molecule and two basis sets, at given point.",
             "molecule"_a,
@@ -324,7 +324,7 @@ export_oneints(py::module& m)
             "Y"_a,
             "Z"_a)
         .def("compute",
-             py::overload_cast<const CMolecule&, const CMolecule&, const CMolecularBasis&, const double, const double, const double>()(
+             py::overload_cast<const CMolecule&, const CMolecule&, const CMolecularBasis&, const double, const double, const double>(
                  &CElectricFieldIntegralsDriver::compute, py::const_),
              "Compute AO-basis electric field integrals for two molecules in given basis set, at given point.",
              "bra_molecule"_a,
@@ -340,7 +340,7 @@ export_oneints(py::module& m)
                                          const CMolecularBasis&,
                                          const double,
                                          const double,
-                                         const double>()(&CElectricFieldIntegralsDriver::compute, py::const_),
+                                         const double>(&CElectricFieldIntegralsDriver::compute, py::const_),
              "Compute AO-basis electric field integrals for two molecules, each with its own basis set, at given point.",
              "bra_molecule"_a,
              "ket_molecule"_a,

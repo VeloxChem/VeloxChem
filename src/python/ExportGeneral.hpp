@@ -109,7 +109,7 @@ pointer_to_numpy(const T* ptr, const std::vector<int32_t>& dimension) -> py::arr
     else
     {
         auto [shape, strides] = array_t_params<T>(dimension);
-        py::array_t<T>(shape, strides, ptr);
+        return py::array_t<T>(shape, strides, ptr);
     }
 }
 

@@ -347,8 +347,8 @@ export_twoints(py::module& m)
     PyClass<CElectronRepulsionIntegralsDriver>(m, "ElectronRepulsionIntegralsDriver")
         .def(py::init(&vlx_general::create<CElectronRepulsionIntegralsDriver>), "comm"_a = py::none())
         .def("compute",
-             py::overload_cast<const ericut, const double, const CMolecule&, const CMolecularBasis&>()(
-                 &CElectronRepulsionIntegralsDriver::compute, py::const_),
+             py::overload_cast<const ericut, const double, const CMolecule&, const CMolecularBasis&>(&CElectronRepulsionIntegralsDriver::compute,
+                                                                                                       py::const_),
              // the wonky format of the raw string literal is to get help(...) in Python to look nice
              R"pbdoc(
 Computes Q values for electron repulsion integrals for molecule with specific AO
@@ -371,9 +371,8 @@ basis set and stores results in screening container object.
              "molecule"_a,
              "ao_basis"_a)
         .def("compute",
-             vlx_general::
-                 overload_cast_<CAOFockMatrix&, const CAODensityMatrix&, const CMolecule&, const CMolecularBasis&, const CScreeningContainer&>()(
-                     &CElectronRepulsionIntegralsDriver::compute, py::const_),
+             py::overload_cast<CAOFockMatrix&, const CAODensityMatrix&, const CMolecule&, const CMolecularBasis&, const CScreeningContainer&>(
+                 &CElectronRepulsionIntegralsDriver::compute, py::const_),
              // the wonky format of the raw string literal is to get help(...) in Python to look nice
              R"pbdoc(
 Computes electron repulsion integrals and stores them in AO Fock matrix for
