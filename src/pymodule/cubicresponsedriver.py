@@ -170,37 +170,41 @@ class CubicResponseDriver(NonLinearSolver):
 
         operator = 'dipole'
         linear_solver = LinearSolver(self.comm, self.ostream)
-        a_rhs = linear_solver.get_complex_prop_grad(operator, self.a_components,
-                                                    molecule, ao_basis,
-                                                    scf_tensors)
-        b_rhs = linear_solver.get_complex_prop_grad(operator, self.b_components,
-                                                    molecule, ao_basis,
-                                                    scf_tensors)
-        c_rhs = linear_solver.get_complex_prop_grad(operator, self.c_components,
-                                                    molecule, ao_basis,
-                                                    scf_tensors)
-        d_rhs = linear_solver.get_complex_prop_grad(operator, self.d_components,
-                                                    molecule, ao_basis,
-                                                    scf_tensors)
+        a_grad = linear_solver.get_complex_prop_grad(operator,
+                                                     self.a_components,
+                                                     molecule, ao_basis,
+                                                     scf_tensors)
+        b_grad = linear_solver.get_complex_prop_grad(operator,
+                                                     self.b_components,
+                                                     molecule, ao_basis,
+                                                     scf_tensors)
+        c_grad = linear_solver.get_complex_prop_grad(operator,
+                                                     self.c_components,
+                                                     molecule, ao_basis,
+                                                     scf_tensors)
+        d_grad = linear_solver.get_complex_prop_grad(operator,
+                                                     self.d_components,
+                                                     molecule, ao_basis,
+                                                     scf_tensors)
 
         if self.rank == mpi_master():
             inv_sqrt_2 = 1.0 / np.sqrt(2.0)
 
-            a_rhs = list(a_rhs)
-            for ind in range(len(a_rhs)):
-                a_rhs[ind] *= inv_sqrt_2
+            a_grad = list(a_grad)
+            for ind in range(len(a_grad)):
+                a_grad[ind] *= inv_sqrt_2
 
-            b_rhs = list(b_rhs)
-            for ind in range(len(b_rhs)):
-                b_rhs[ind] *= inv_sqrt_2
+            b_grad = list(b_grad)
+            for ind in range(len(b_grad)):
+                b_grad[ind] *= inv_sqrt_2
 
-            c_rhs = list(c_rhs)
-            for ind in range(len(c_rhs)):
-                c_rhs[ind] *= inv_sqrt_2
+            c_grad = list(c_grad)
+            for ind in range(len(c_grad)):
+                c_grad[ind] *= inv_sqrt_2
 
-            d_rhs = list(d_rhs)
-            for ind in range(len(d_rhs)):
-                d_rhs[ind] *= inv_sqrt_2
+            d_grad = list(d_grad)
+            for ind in range(len(d_grad)):
+                d_grad[ind] *= inv_sqrt_2
 
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
@@ -223,12 +227,12 @@ class CubicResponseDriver(NonLinearSolver):
         ABCD = {}
 
         if self.rank == mpi_master():
-            A = {(op, w): v for op, v in zip('A', a_rhs) for w in wa}
-            B = {(op, w): v for op, v in zip('B', b_rhs)
+            A = {(op, w): v for op, v in zip('A', a_grad) for w in wa}
+            B = {(op, w): v for op, v in zip('B', b_grad)
                  for w in self.b_frequencies}
-            C = {(op, w): v for op, v in zip('C', c_rhs)
+            C = {(op, w): v for op, v in zip('C', c_grad)
                  for w in self.c_frequencies}
-            D = {(op, w): v for op, v in zip('D', d_rhs)
+            D = {(op, w): v for op, v in zip('D', d_grad)
                  for w in self.d_frequencies}
 
             ABCD.update(A)
@@ -353,19 +357,19 @@ class CubicResponseDriver(NonLinearSolver):
         profiler.check_memory_usage('2nd CPP')
 
         if self.rank == mpi_master():
-            density_list_ii = self.get_densities_ii(freqpairs, kX, k_xy, S, D0,
-                                                    mo)
+            density_list_two = self.get_densities_II(freqpairs, kX, k_xy, S, D0,
+                                                     mo)
         else:
-            density_list_ii = None
+            density_list_two = None
 
         profiler.check_memory_usage('2nd densities')
 
-        fock_dict_ii = self.get_fock_dict_ii(freqpairs, density_list_ii, F0, mo,
-                                             molecule, ao_basis)
+        fock_dict_two = self.get_fock_dict_II(freqpairs, density_list_two, F0,
+                                              mo, molecule, ao_basis)
 
         profiler.check_memory_usage('2nd Focks')
 
-        e3_dict = self.get_e3(freqpairs, kX, k_xy, Focks, fock_dict_ii, f_xy,
+        e3_dict = self.get_e3(freqpairs, kX, k_xy, Focks, fock_dict_two, f_xy,
                               nocc, norb)
 
         profiler.check_memory_usage('E[3]')
@@ -712,7 +716,7 @@ class CubicResponseDriver(NonLinearSolver):
 
         return density_list
 
-    def get_densities_ii(self, freqpairs, kX, k_xy, S, D0, mo):
+    def get_densities_II(self, freqpairs, kX, k_xy, S, D0, mo):
         """
         Computes the  densities needed for the Fock matrices.
 
@@ -868,7 +872,7 @@ class CubicResponseDriver(NonLinearSolver):
 
         return focks
 
-    def get_fock_dict_ii(self, wi, density_list, F0, mo, molecule, ao_basis):
+    def get_fock_dict_II(self, wi, density_list, F0, mo, molecule, ao_basis):
         """
         Computes the Fock matrices for a cubic response function
 

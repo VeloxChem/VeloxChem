@@ -63,6 +63,18 @@ export_visualization(py::module& m)
     PyClass<CVisualizationDriver>(m, "VisualizationDriver")
         .def(py::init(&vlx_general::create<CVisualizationDriver>), "comm"_a = py::none())
         .def("get_rank", &CVisualizationDriver::getRank, "Gets rank of the MPI process.")
+        .def("get_atomic_orbital_info",
+             &CVisualizationDriver::getAtomicOrbitalInformation,
+             "Gets atomic orbital information.",
+             "molecule"_a,
+             "basis"_a)
+        .def("map_atom_to_atomic_orbitals", &CVisualizationDriver::mapAtomToAtomicOrbitals, "Maps atom to atomic orbitals.", "molecule"_a, "basis"_a)
+        .def("compute_atomic_orbital_for_grid",
+             &CVisualizationDriver::computeAtomicOrbitalForGrid,
+             "Computes atomic orbital (centered at origin) at cubic grid points.",
+             "grid"_a,
+             "basis"_a,
+             "aoinfo"_a)
         .def(
             "compute",
             vlx_general::

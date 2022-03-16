@@ -34,7 +34,7 @@ TEST_F(CMolecularOrbitalsTest, DefaultConstructor)
 {
     CMolecularOrbitals moa;
 
-    CMolecularOrbitals mob({}, {}, molorb::rest);
+    CMolecularOrbitals mob({}, {}, {}, molorb::rest);
 
     ASSERT_EQ(moa, mob);
 }
@@ -49,7 +49,11 @@ TEST_F(CMolecularOrbitalsTest, CopyConstructor)
 
     std::vector<double> eb({3.0, 5.0});
 
-    CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
+
+    std::vector<double> occb({0.6, 0.1});
+
+    CMolecularOrbitals moa({ma, mb}, {ea, eb}, {occa, occb}, molorb::unrest);
 
     CMolecularOrbitals mob(moa);
 
@@ -66,9 +70,13 @@ TEST_F(CMolecularOrbitalsTest, MoveConstructor)
 
     std::vector<double> eb({3.0, 5.0});
 
-    CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
 
-    CMolecularOrbitals mob(CMolecularOrbitals({ma, mb}, {ea, eb}, molorb::unrest));
+    std::vector<double> occb({0.6, 0.1});
+
+    CMolecularOrbitals moa({ma, mb}, {ea, eb}, {occa, occb}, molorb::unrest);
+
+    CMolecularOrbitals mob(CMolecularOrbitals({ma, mb}, {ea, eb}, {occa, occb}, molorb::unrest));
 
     ASSERT_EQ(moa, mob);
 }
@@ -79,7 +87,9 @@ TEST_F(CMolecularOrbitalsTest, CopyAssignment)
 
     std::vector<double> ea({1.0, 2.0, 4.0});
 
-    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
+
+    CMolecularOrbitals moa({ma}, {ea}, {occa}, molorb::rest);
 
     CMolecularOrbitals mob = moa;
 
@@ -92,9 +102,11 @@ TEST_F(CMolecularOrbitalsTest, MoveAssignment)
 
     std::vector<double> ea({1.0, 2.0, 4.0});
 
-    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
 
-    CMolecularOrbitals mob = CMolecularOrbitals({ma}, {ea}, molorb::rest);
+    CMolecularOrbitals moa({ma}, {ea}, {occa}, molorb::rest);
+
+    CMolecularOrbitals mob = CMolecularOrbitals({ma}, {ea}, {occa}, molorb::rest);
 
     ASSERT_EQ(moa, mob);
 }
@@ -111,7 +123,9 @@ TEST_F(CMolecularOrbitalsTest, Insert)
 
     std::vector<double> ea({1.0, 2.0, 4.0});
 
-    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
+
+    CMolecularOrbitals moa({ma}, {ea}, {occa}, molorb::rest);
 
     auto xbas = vlxbas::getMolecularBasisForLiHX();
 
@@ -122,7 +136,7 @@ TEST_F(CMolecularOrbitalsTest, Insert)
                     15,
                     3);
 
-    CMolecularOrbitals moc({mc}, {ea}, molorb::rest);
+    CMolecularOrbitals moc({mc}, {ea}, {occa}, molorb::rest);
 
     ASSERT_EQ(moc, mob);
 }
@@ -133,7 +147,9 @@ TEST_F(CMolecularOrbitalsTest, GetNumberOfRows)
 
     std::vector<double> ea({1.0, 2.0});
 
-    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({0.2, 0.5});
+
+    CMolecularOrbitals moa({ma}, {ea}, {occa}, molorb::rest);
 
     ASSERT_EQ(3, moa.getNumberOfRows());
 }
@@ -144,7 +160,9 @@ TEST_F(CMolecularOrbitalsTest, GetNumberOfColumns)
 
     std::vector<double> ea({1.0, 2.0});
 
-    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({0.2, 0.5});
+
+    CMolecularOrbitals moa({ma}, {ea}, {occa}, molorb::rest);
 
     ASSERT_EQ(2, moa.getNumberOfColumns());
 }
@@ -159,9 +177,13 @@ TEST_F(CMolecularOrbitalsTest, AlphaOrbitals)
 
     std::vector<double> eb({3.0, 5.0});
 
-    const CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
 
-    const CMolecularOrbitals mob({ma, mb}, {ea, eb}, molorb::unrest);
+    std::vector<double> occb({0.6, 0.1});
+
+    const CMolecularOrbitals moa({ma}, {ea}, {occa}, molorb::rest);
+
+    const CMolecularOrbitals mob({ma, mb}, {ea, eb}, {occa, occb}, molorb::unrest);
 
     vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, moa.alphaOrbitals());
 
@@ -178,9 +200,13 @@ TEST_F(CMolecularOrbitalsTest, BetaOrbitals)
 
     std::vector<double> eb({3.0, 5.0});
 
-    const CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
 
-    const CMolecularOrbitals mob({ma, mb}, {ea, eb}, molorb::unrest);
+    std::vector<double> occb({0.6, 0.1});
+
+    const CMolecularOrbitals moa({ma}, {ea}, {occa}, molorb::rest);
+
+    const CMolecularOrbitals mob({ma, mb}, {ea, eb}, {occa, occb}, molorb::unrest);
 
     vlxtest::compare({1.0, -1.0, -3.0, -2.0, 5.0, 4.0, 6.0, 4.0, -4.0}, moa.betaOrbitals());
 
@@ -197,9 +223,13 @@ TEST_F(CMolecularOrbitalsTest, AlphaEnergies)
 
     std::vector<double> eb({3.0, 5.0});
 
-    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
 
-    const CMolecularOrbitals mob({mb}, {eb}, molorb::rest);
+    std::vector<double> occb({0.6, 0.1});
+
+    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, {occa, occb}, molorb::unrest);
+
+    const CMolecularOrbitals mob({mb}, {eb}, {occb}, molorb::rest);
 
     vlxtest::compare(ea, moa.alphaEnergies());
 
@@ -216,9 +246,13 @@ TEST_F(CMolecularOrbitalsTest, BetaEnergies)
 
     std::vector<double> eb({3.0, 5.0});
 
-    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
 
-    const CMolecularOrbitals mob({mb}, {eb}, molorb::rest);
+    std::vector<double> occb({0.6, 0.1});
+
+    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, {occa, occb}, molorb::unrest);
+
+    const CMolecularOrbitals mob({mb}, {eb}, {occb}, molorb::rest);
 
     vlxtest::compare(eb, moa.betaEnergies());
 
@@ -235,9 +269,13 @@ TEST_F(CMolecularOrbitalsTest, AlphaOrbitalsWithRange)
 
     std::vector<double> eb({3.0, 5.0});
 
-    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
 
-    const CMolecularOrbitals mob({ma}, {ea}, molorb::rest);
+    std::vector<double> occb({0.6, 0.1});
+
+    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, {occa, occb}, molorb::unrest);
+
+    const CMolecularOrbitals mob({ma}, {ea}, {occa}, molorb::rest);
 
     ASSERT_EQ(CDenseMatrix({1.0, -2.0, 6.0}, 3, 1), moa.alphaOrbitals(0, 1));
 
@@ -262,9 +300,13 @@ TEST_F(CMolecularOrbitalsTest, BetaOrbitalsWithRange)
 
     std::vector<double> eb({3.0, 5.0});
 
-    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
 
-    const CMolecularOrbitals mob({mb}, {eb}, molorb::rest);
+    std::vector<double> occb({0.6, 0.1});
+
+    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, {occa, occb}, molorb::unrest);
+
+    const CMolecularOrbitals mob({mb}, {eb}, {occb}, molorb::rest);
 
     ASSERT_EQ(CDenseMatrix({-1.0, -2.0, 4.0}, 3, 1), moa.betaOrbitals(1, 1));
 
@@ -289,9 +331,13 @@ TEST_F(CMolecularOrbitalsTest, AlphaOrbitalsWithList)
 
     std::vector<double> eb({3.0, 5.0});
 
-    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
 
-    const CMolecularOrbitals mob({ma}, {ea}, molorb::rest);
+    std::vector<double> occb({0.6, 0.1});
+
+    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, {occa, occb}, molorb::unrest);
+
+    const CMolecularOrbitals mob({ma}, {ea}, {occa}, molorb::rest);
 
     ASSERT_EQ(CDenseMatrix({1.0, -2.0, 6.0}, 3, 1), moa.alphaOrbitals(0, 1));
 
@@ -316,9 +362,13 @@ TEST_F(CMolecularOrbitalsTest, BetaOrbitalsWithList)
 
     std::vector<double> eb({3.0, 5.0});
 
-    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
 
-    const CMolecularOrbitals mob({mb}, {eb}, molorb::rest);
+    std::vector<double> occb({0.6, 0.1});
+
+    const CMolecularOrbitals moa({ma, mb}, {ea, eb}, {occa, occb}, molorb::unrest);
+
+    const CMolecularOrbitals mob({mb}, {eb}, {occb}, molorb::rest);
 
     ASSERT_EQ(CDenseMatrix({-1.0, -2.0, 4.0}, 3, 1), moa.betaOrbitals({1}));
 
@@ -339,7 +389,9 @@ TEST_F(CMolecularOrbitalsTest, GetAODensityForRestrictedCase)
 
     std::vector<double> ea({1.0, 2.0, 4.0});
 
-    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
+
+    CMolecularOrbitals moa({ma}, {ea}, {occa}, molorb::rest);
 
     CDenseMatrix ref01mat({1.0, -2.0, 6.0, -2.0, 4.0, -12.0, 6.0, -12.0, 36.0}, 3, 3);
 
@@ -364,7 +416,11 @@ TEST_F(CMolecularOrbitalsTest, GetAODensityForUnrestrictedCase)
 
     std::vector<double> eb({3.0, 5.0});
 
-    CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
+
+    std::vector<double> occb({0.6, 0.1});
+
+    CMolecularOrbitals moa({ma, mb}, {ea, eb}, {occa, occb}, molorb::unrest);
 
     CDenseMatrix ref01mata({1.0, -2.0, 6.0, -2.0, 4.0, -12.0, 6.0, -12.0, 36.0}, 3, 3);
 
@@ -391,7 +447,9 @@ TEST_F(CMolecularOrbitalsTest, getRestrictedPairDensitySinglePair)
 
     std::vector<double> ea({1.0, 2.0, 4.0});
 
-    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
+
+    CMolecularOrbitals moa({ma}, {ea}, {occa}, molorb::rest);
 
     CDenseMatrix ref00mat({1.0, -2.0, 6.0, -2.0, 4.0, -12.0, 6.0, -12.0, 36.0}, 3, 3);
 
@@ -416,7 +474,9 @@ TEST_F(CMolecularOrbitalsTest, getRestrictedPairDensityVectorOfPairs)
 
     std::vector<double> ea({1.0, 2.0, 4.0});
 
-    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({0.2, 0.5, 0.3});
+
+    CMolecularOrbitals moa({ma}, {ea}, {occa}, molorb::rest);
 
     CDenseMatrix ref00mat({1.0, -2.0, 6.0, -2.0, 4.0, -12.0, 6.0, -12.0, 36.0}, 3, 3);
 
@@ -435,11 +495,15 @@ TEST_F(CMolecularOrbitalsTest, Transform)
 
     std::vector<double> ea({1.0, 2.0});
 
+    std::vector<double> occa({0.2, 0.5});
+
     CDenseMatrix mb({2.0, 4.0, -1.0, 2.0, 3.0, 5.0}, 3, 2);
 
     std::vector<double> eb({1.0, 1.0});
 
-    CMolecularOrbitals moa({ma, mb}, {ea, eb}, molorb::unrest);
+    std::vector<double> occb({0.6, 0.1});
+
+    CMolecularOrbitals moa({ma, mb}, {ea, eb}, {occa, occb}, molorb::unrest);
 
     CDenseMatrix aomat({2.0, 3.0, -1.0, 4.0, 1.0, 2.0, 5.0, -2.0, 4.0}, 3, 3);
 

@@ -137,8 +137,8 @@ class CMolecule
     /**
      Creates a sub-molecule object by slicing the molecule object.
 
-     @param start_index the starting index of the sub-molecule (0-based).
-     @param num_atoms the number of atoms in the sub-molecule.
+     @param startIndex the starting index of the sub-molecule (0-based).
+     @param numAtoms the number of atoms in the sub-molecule.
      */
     CMolecule getSubMolecule(int32_t startIndex, int32_t numAtoms);
 

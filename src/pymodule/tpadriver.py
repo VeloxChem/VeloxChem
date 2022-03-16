@@ -154,22 +154,22 @@ class TPADriver(NonLinearSolver):
         component = 'xyz'
 
         linear_solver = LinearSolver(self.comm, self.ostream)
-        b_rhs = linear_solver.get_complex_prop_grad(operator, component,
-                                                    molecule, ao_basis,
-                                                    scf_tensors)
+        b_grad = linear_solver.get_complex_prop_grad(operator, component,
+                                                     molecule, ao_basis,
+                                                     scf_tensors)
 
         # This is a workaround for the sqrt(2) factor in the property gradient
         if self.rank == mpi_master():
             inv_sqrt_2 = 1.0 / np.sqrt(2.0)
-            b_rhs = list(b_rhs)
-            for ind in range(len(b_rhs)):
-                b_rhs[ind] *= inv_sqrt_2
+            b_grad = list(b_grad)
+            for ind in range(len(b_grad)):
+                b_grad[ind] *= inv_sqrt_2
 
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
         if self.rank == mpi_master():
-            v1 = {(op, w): v for op, v in zip(component, b_rhs)
-                  for w in self.frequencies}
+            v_grad = {(op, w): v for op, v in zip(component, b_grad)
+                      for w in self.frequencies}
             X = {
                 'x': 2 * self.ao2mo(mo, dipole_mats.x_to_numpy()),
                 'y': 2 * self.ao2mo(mo, dipole_mats.y_to_numpy()),
@@ -177,7 +177,7 @@ class TPADriver(NonLinearSolver):
             }
             self.comp = self.get_comp(self.frequencies)
         else:
-            v1 = None
+            v_grad = None
             X = None
             self.comp = None
         X = self.comm.bcast(X, root=mpi_master())
@@ -199,7 +199,7 @@ class TPADriver(NonLinearSolver):
             Nb_drv.checkpoint_file = str(
                 Path(self.checkpoint_file).with_suffix('.tpa_1.h5'))
 
-        Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v1)
+        Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v_grad)
 
         kX = {}
         Focks = {}

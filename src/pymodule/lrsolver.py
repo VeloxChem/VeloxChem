@@ -159,15 +159,15 @@ class LinearResponseSolver(LinearSolver):
         pe_dict = self.init_pe(molecule, basis)
 
         # right-hand side (gradient)
-        b_rhs = self.get_prop_grad(self.b_operator, self.b_components, molecule,
-                                   basis, scf_tensors)
+        b_grad = self.get_prop_grad(self.b_operator, self.b_components,
+                                    molecule, basis, scf_tensors)
         if self.rank == mpi_master():
-            v1 = {(op, w): v for op, v in zip(self.b_components, b_rhs)
-                  for w in self.frequencies}
+            v_grad = {(op, w): v for op, v in zip(self.b_components, b_grad)
+                      for w in self.frequencies}
 
         # operators, frequencies and preconditioners
         if self.rank == mpi_master():
-            op_freq_keys = list(v1.keys())
+            op_freq_keys = list(v_grad.keys())
         else:
             op_freq_keys = None
         op_freq_keys = self.comm.bcast(op_freq_keys, root=mpi_master())
@@ -176,18 +176,19 @@ class LinearResponseSolver(LinearSolver):
         precond = {w: self.get_precond(orb_ene, nocc, norb, w) for w in freqs}
 
         # distribute the right-hand side
-        # dist_v1 will also serve as initial guess
-        dist_v1 = {}
+        # dist_grad will also serve as initial guess
+
+        dist_grad = {}
         for key in op_freq_keys:
             if self.rank == mpi_master():
-                gradger, gradung = self.decomp_grad(v1[key])
+                gradger, gradung = self.decomp_grad(v_grad[key])
                 grad_mat = np.hstack((
                     gradger.reshape(-1, 1),
                     gradung.reshape(-1, 1),
                 ))
             else:
                 grad_mat = None
-            dist_v1[key] = DistributedArray(grad_mat, self.comm)
+            dist_grad[key] = DistributedArray(grad_mat, self.comm)
 
         rsp_vector_labels = [
             'LR_bger_half_size',
@@ -210,7 +211,7 @@ class LinearResponseSolver(LinearSolver):
 
         # generate initial guess from scratch
         else:
-            bger, bung = self.setup_trials(dist_v1, precond)
+            bger, bung = self.setup_trials(dist_grad, precond)
 
             self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
                                eri_dict, dft_dict, pe_dict)
@@ -252,8 +253,8 @@ class LinearResponseSolver(LinearSolver):
                         relative_residual_norm[(op, freq)] < self.conv_thresh):
                     continue
 
-                gradger = dist_v1[(op, freq)].get_column(0)
-                gradung = dist_v1[(op, freq)].get_column(1)
+                gradger = dist_grad[(op, freq)].get_column(0)
+                gradung = dist_grad[(op, freq)].get_column(1)
 
                 g_ger = self.dist_bger.matmul_AtB(gradger, 2.0)
                 g_ung = self.dist_bung.matmul_AtB(gradung, 2.0)
@@ -306,7 +307,7 @@ class LinearResponseSolver(LinearSolver):
                 x_full = self.get_full_solution_vector(x)
 
                 if self.rank == mpi_master():
-                    xv = np.dot(x_full, v1[(op, freq)])
+                    xv = np.dot(x_full, v_grad[(op, freq)])
                     xvs.append((op, freq, xv))
 
                 r_norms_2 = 2.0 * r.squared_norm(axis=0)
@@ -412,12 +413,12 @@ class LinearResponseSolver(LinearSolver):
         profiler.print_memory_usage(self.ostream)
 
         # calculate response functions
-        a_rhs = self.get_prop_grad(self.a_operator, self.a_components, molecule,
-                                   basis, scf_tensors)
+        a_grad = self.get_prop_grad(self.a_operator, self.a_components,
+                                    molecule, basis, scf_tensors)
 
         if self.is_converged:
             if self.rank == mpi_master():
-                va = {op: v for op, v in zip(self.a_components, a_rhs)}
+                va = {op: v for op, v in zip(self.a_components, a_grad)}
                 rsp_funcs = {}
                 full_solutions = {}
 

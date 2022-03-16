@@ -424,12 +424,12 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # calculate properties
         if self.is_converged:
-            edip_rhs = self.get_prop_grad('electric dipole', 'xyz', molecule,
-                                          basis, scf_tensors)
-            lmom_rhs = self.get_prop_grad('linear momentum', 'xyz', molecule,
-                                          basis, scf_tensors)
-            mdip_rhs = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
-                                          basis, scf_tensors)
+            edip_grad = self.get_prop_grad('electric dipole', 'xyz', molecule,
+                                           basis, scf_tensors)
+            lmom_grad = self.get_prop_grad('linear momentum', 'xyz', molecule,
+                                           basis, scf_tensors)
+            mdip_grad = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
+                                           basis, scf_tensors)
 
             eigvals = np.array([excitations[s][0] for s in range(self.nstates)])
 
@@ -480,16 +480,13 @@ class LinearResponseEigenSolver(LinearSolver):
                     self.ostream.flush()
 
                     if self.rank == mpi_master():
-                        lam_diag, nto_mo = self.get_nto(z_mat, mo_occ, mo_vir)
+                        nto_mo = self.get_nto(z_mat, mo_occ, mo_vir)
                     else:
-                        lam_diag = None
                         nto_mo = MolecularOrbitals()
-                    lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
                     nto_mo.broadcast(self.rank, self.comm)
 
-                    nto_cube_fnames = self.write_nto_cubes(
-                        cubic_grid, molecule, basis, s, lam_diag, nto_mo,
-                        self.nto_pairs)
+                    lam_diag, nto_cube_fnames = self.write_nto_cubes(
+                        cubic_grid, molecule, basis, s, nto_mo, self.nto_pairs)
 
                     if self.rank == mpi_master():
                         nto_lambdas.append(lam_diag)
@@ -518,11 +515,11 @@ class LinearResponseEigenSolver(LinearSolver):
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
                         elec_trans_dipoles[s, ind] = np.vdot(
-                            edip_rhs[ind], eigvec)
+                            edip_grad[ind], eigvec)
                         velo_trans_dipoles[s, ind] = np.vdot(
-                            lmom_rhs[ind], eigvec) / (-eigvals[s])
+                            lmom_grad[ind], eigvec) / (-eigvals[s])
                         magn_trans_dipoles[s, ind] = np.vdot(
-                            mdip_rhs[ind], eigvec)
+                            mdip_grad[ind], eigvec)
 
                     eigvecs[:, s] = eigvec[:]
 

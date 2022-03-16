@@ -379,6 +379,35 @@ def _Molecule_is_linear(self):
 
 
 
+def _Molecule_get_aufbau_occupation(self, norb, flag='restricted'):
+    """
+    Creates an occupation vector based on the aufbau principle.
+
+    :param norb:
+        The number of molecular orbitals
+    :param flag:
+        The flag (restricted or unrestricted).
+
+    :return:
+        flag=='restricted': single vector assuming doubly occupied orbitals.
+        flag=='unrestricted': two vectors assuming singly occupied spin-orbitals.
+    """
+
+    nalpha = self.number_of_alpha_electrons()
+    nbeta = self.number_of_beta_electrons()
+
+    if flag == 'restricted':
+        occ = [
+            2.0 if x < nbeta else 1.0 if x < nalpha else 0.0
+            for x in range(norb)
+        ]
+        return occ
+    else:
+        occa = [1.0 if x < nalpha else 0.0 for x in range(norb)]
+        occb = [1.0 if x < nalpha else 0.0 for x in range(norb)]
+        return occa, occb
+
+
 Molecule.read_str = _Molecule_read_str
 Molecule.read_xyz = _Molecule_read_xyz
 Molecule.from_xyz_string = _Molecule_from_xyz_string
@@ -391,3 +420,4 @@ Molecule.get_ic_rmsd = _Molecule_get_ic_rmsd
 Molecule.write_xyz = _Molecule_write_xyz
 Molecule.moments_of_inertia = _Molecule_moments_of_inertia
 Molecule.is_linear = _Molecule_is_linear
+Molecule.get_aufbau_occupation = _Molecule_get_aufbau_occupation

@@ -234,7 +234,7 @@ class ComplexResponse(LinearSolver):
 
         return dist_new_ger, dist_new_ung
 
-    def compute(self, molecule, basis, scf_tensors, v1=None):
+    def compute(self, molecule, basis, scf_tensors, v_grad=None):
         """
         Solves for the response vector iteratively while checking the residuals
         for convergence.
@@ -245,9 +245,9 @@ class ComplexResponse(LinearSolver):
             The AO basis.
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
-        :param v1:
-            The gradients on the right-hand side. If not provided, v1 will be
-            computed for the B operator.
+        :param v_grad:
+            The gradients on the right-hand side. If not provided, v_grad will
+            be computed for the B operator.
 
         :return:
             A dictionary containing response functions, solutions and a
@@ -303,20 +303,20 @@ class ComplexResponse(LinearSolver):
 
         # right-hand side (gradient)
         if self.rank == mpi_master():
-            self.nonlinear = (v1 is not None)
+            self.nonlinear = (v_grad is not None)
         self.nonlinear = self.comm.bcast(self.nonlinear, root=mpi_master())
 
         if not self.nonlinear:
-            b_rhs = self.get_complex_prop_grad(self.b_operator,
-                                               self.b_components, molecule,
-                                               basis, scf_tensors)
+            b_grad = self.get_complex_prop_grad(self.b_operator,
+                                                self.b_components, molecule,
+                                                basis, scf_tensors)
             if self.rank == mpi_master():
-                v1 = {(op, w): v for op, v in zip(self.b_components, b_rhs)
-                      for w in self.frequencies}
+                v_grad = {(op, w): v for op, v in zip(self.b_components, b_grad)
+                          for w in self.frequencies}
 
         # operators, frequencies and preconditioners
         if self.rank == mpi_master():
-            op_freq_keys = list(v1.keys())
+            op_freq_keys = list(v_grad.keys())
         else:
             op_freq_keys = None
         op_freq_keys = self.comm.bcast(op_freq_keys, root=mpi_master())
@@ -327,21 +327,32 @@ class ComplexResponse(LinearSolver):
             w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs
         }
 
-        # distribute the right-hand side
-        # dist_v1 will also serve as initial guess
-        dist_v1 = {}
+        # distribute the gradient and right-hand side:
+        # dist_grad will be used for calculating the subspace matrix
+        # equation and residuals, dist_rhs for the initial guess
+
+        dist_grad = {}
+        dist_rhs = {}
         for key in op_freq_keys:
             if self.rank == mpi_master():
-                gradger, gradung = self.decomp_grad(v1[key])
+                gradger, gradung = self.decomp_grad(v_grad[key])
                 grad_mat = np.hstack((
                     gradger.real.reshape(-1, 1),
                     gradung.real.reshape(-1, 1),
                     gradung.imag.reshape(-1, 1),
                     gradger.imag.reshape(-1, 1),
                 ))
+                rhs_mat = np.hstack((
+                    gradger.real.reshape(-1, 1),
+                    gradung.real.reshape(-1, 1),
+                    -gradung.imag.reshape(-1, 1),
+                    -gradger.imag.reshape(-1, 1),
+                ))
             else:
                 grad_mat = None
-            dist_v1[key] = DistributedArray(grad_mat, self.comm)
+                rhs_mat = None
+            dist_grad[key] = DistributedArray(grad_mat, self.comm)
+            dist_rhs[key] = DistributedArray(rhs_mat, self.comm)
 
         if self.nonlinear:
             rsp_vector_labels = [
@@ -369,7 +380,7 @@ class ComplexResponse(LinearSolver):
 
         # generate initial guess from scratch
         else:
-            bger, bung = self.setup_trials(dist_v1, precond)
+            bger, bung = self.setup_trials(dist_rhs, precond)
 
             self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
                                eri_dict, dft_dict, pe_dict)
@@ -411,10 +422,10 @@ class ComplexResponse(LinearSolver):
                 if (iteration == 0 or
                         relative_residual_norm[(op, w)] > self.conv_thresh):
 
-                    grad_rg = dist_v1[(op, w)].get_column(0)
-                    grad_ru = dist_v1[(op, w)].get_column(1)
-                    grad_iu = dist_v1[(op, w)].get_column(2)
-                    grad_ig = dist_v1[(op, w)].get_column(3)
+                    grad_rg = dist_grad[(op, w)].get_column(0)
+                    grad_ru = dist_grad[(op, w)].get_column(1)
+                    grad_iu = dist_grad[(op, w)].get_column(2)
+                    grad_ig = dist_grad[(op, w)].get_column(3)
 
                     # projections onto gerade and ungerade subspaces:
 
@@ -564,7 +575,7 @@ class ComplexResponse(LinearSolver):
 
                     x_full = self.get_full_solution_vector(x)
                     if self.rank == mpi_master():
-                        xv = np.dot(x_full, v1[(op, w)])
+                        xv = np.dot(x_full, v_grad[(op, w)])
                         xvs.append((op, w, xv))
 
                     r_norms_2 = 2.0 * r.squared_norm(axis=0)
@@ -676,13 +687,13 @@ class ComplexResponse(LinearSolver):
 
         # calculate response functions
         if not self.nonlinear:
-            a_rhs = self.get_complex_prop_grad(self.a_operator,
-                                               self.a_components, molecule,
-                                               basis, scf_tensors)
+            a_grad = self.get_complex_prop_grad(self.a_operator,
+                                                self.a_components, molecule,
+                                                basis, scf_tensors)
 
             if self.is_converged:
                 if self.rank == mpi_master():
-                    va = {op: v for op, v in zip(self.a_components, a_rhs)}
+                    va = {op: v for op, v in zip(self.a_components, a_grad)}
                     rsp_funcs = {}
                     full_solutions = {}
 
