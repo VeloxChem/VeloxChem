@@ -28,18 +28,29 @@ stages:
   - test
 
 .monkey:setup:
-  image: ghcr.io/enccs/meta-vlx/vlx-ci_ubuntu-20.04:sha-0128a87
+  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-d54d2a6
   variables:
     OMP_NUM_THREADS: "6"
     GTESTROOT: "/usr"
-    GTESTLIB: "/usr/lib/x86_64-linux-gnu"
+    GTESTLIB: "/usr/lib/x86_64-linux-gnu/libgtest.a"
   before_script:
-    - source /opt/docker/etc/intel-env.sh
+    - uname -a
+    - free -m
+    - df -h
+    - ulimit -a
+    - ulimit -s unlimited
+    - lscpu | egrep 'Thread|Core|Socket|^CPU\('
+    - python -V
+    - mpiicc --version
+    - mpiicpc --version
 
 monkey:build:
   extends: .monkey:setup
   stage: build
   script:
+    - python -m venv --clear venv
+    - source venv/bin/activate
+    - python -m pip install numpy pybind11 mpi4py --no-binary=mpi4py
     - python config/generate_setup.py
     - make -j 6 -C src release
     - make -j 6 -C unit_tests release
@@ -60,8 +71,6 @@ monkey:python_tests:
   stage: test
   variables:
     VLX_NUM_BUILD_JOBS: "6"
-    CC: icc
-    MPICC: mpiicc
   script:
     - python -m venv --clear venv
     - source venv/bin/activate
