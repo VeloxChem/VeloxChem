@@ -64,7 +64,7 @@ def get_pyscf_integral_type(int_type):
             "electron_repulsion_second_derivative_1_0_1_0"  : "int2e_ip1ip2",
         }
     if int_type not in int_dict.keys():
-        error_text = "Unrecognized 1e integral type: " + int_type +". "
+        error_text = "Unrecognized integral type: " + int_type +". "
         error_text += "Please use one of the following:"
         raise ValueError(error_text, int_dict.keys())
     else:
@@ -131,8 +131,8 @@ def write_2d_array_hdf5(fname, arrays, labels=[], atom_index=None):
     hf.close()
     return True
 
-def import_integral(molecule, basis, int_type, atom1=None, shell1=None,
-                    atom2=None, shell2=None, atom3=None, shell3=None,
+def import_integral(molecule, basis, int_type, atom1, shell1,
+                    atom2, shell2, atom3=None, shell3=None,
                     atom4=None, shell4=None, xi1=None, xi2=None,
                     chk_file=None, return_block=True, full_deriv=False):
     """
@@ -183,6 +183,23 @@ def import_integral(molecule, basis, int_type, atom1=None, shell1=None,
     """
 
     pyscf_int_type = get_pyscf_integral_type(int_type)
+
+    if 'int2e' in pyscf_int_type:
+        if (atom3 is None) or (shell3 is None) or (atom4 is None) or (shell4 is None):
+            errtxt = "Not enough shells defined for a two-electron integral. "
+            errtxt += "Please define atom3, shell3, atom4, shell4."
+            raise ValueError(errtxt, atom3, shell3, atom4, shell4)
+
+    if 'derivative' in int_type and xi1 is None:
+        errtxt = "Please set the index of the atom (xi1) with respect to which"
+        errtxt += " the derivative should be taken. "
+        raise ValueError(errtxt, xi1)
+
+    if 'second' in int_type:
+        if '2_0' not in int_type and xi2 is None:
+            errtxt = "Please set the index of the second atom (xi2)"
+            errtxt += " with respect to which the derivative should be taken."
+            raise ValueError(errtxt, xi2)
 
     if 'derivative' in int_type:
         if 'second' in int_type:
