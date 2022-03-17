@@ -124,9 +124,7 @@ class CVisualizationDriver
      @param basis the molecular basis set.
      @param aoinfo the atomic orbital information.
      */
-    void computeAtomicOrbitalForGrid(CCubicGrid&                 grid,
-                                     const CMolecularBasis&      basis,
-                                     const std::vector<int32_t>& aoinfo) const;
+    void computeAtomicOrbitalForGrid(CCubicGrid& grid, const CMolecularBasis& basis, const std::vector<int32_t>& aoinfo) const;
 
     /**
      Gets rank of the MPI process.
