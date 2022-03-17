@@ -163,6 +163,8 @@ class RpaOrbitalResponse(OrbitalResponse):
                 fock_ao_rhs.set_fock_type(fockmat.rgenj, 2)
                 fock_gxc_ao.set_fock_type(fockmat.rgenj, 0)
                 fock_gxc_ao.set_fock_type(fockmat.rgenj, 1)
+        else:
+            fock_gxc_ao = None # None if not DFT
 
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
@@ -229,12 +231,13 @@ class RpaOrbitalResponse(OrbitalResponse):
                 'xmy_ao': xmy_ao,
                 'unrel_dm_ao': unrel_dm_ao,
                 'fock_ao_rhs': fock_ao_rhs,
+                'fock_gxc_ao': fock_gxc_ao, # None if not DFT
             }
         else:
             return {}
 
     def compute_omega(self, ovlp, mo_occ, mo_vir, epsilon_dm_ao, rpa_results,
-                      fock_ao_rhs, fock_lambda):
+                      fock_ao_rhs, fock_lambda, fock_gxc_ao):
         """
         Calculates the RPA Lagrange multipliers for the overlap matrix.
 
@@ -252,6 +255,8 @@ class RpaOrbitalResponse(OrbitalResponse):
             The AOFockMatrix from the right-hand side of the orbital response eq.
         :param fock_lambda:
             The Fock matrix from Lagrange multipliers.
+        :param fock_gxc_ao:
+            The AOFockMatrix from the E[3] xc contribution (None if not DFT).
 
         :return:
             a numpy array containing the Lagrange multipliers in AO basis.

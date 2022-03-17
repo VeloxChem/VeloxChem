@@ -50,6 +50,8 @@ def get_pyscf_integral_type(int_type):
             "kinetic_energy_derivative"                     : "int1e_ipkin",
             "nuclear_attraction_derivative_operator"        : "int1e_iprinv",
             "nuclear_attraction_derivative_orbitals"        : "int1e_ipnuc",
+            # electric dipole deriv. not imported from pyscf, calculated numerically
+            "electric_dipole_derivative"                    : "int1e", 
             "electron_repulsion_derivative"                 : "int2e_ip1",
             "overlap_second_derivative_2_0"                 : "int1e_ipipovlp",
             "overlap_second_derivative_1_1"                 : "int1e_ipovlpip",
@@ -134,7 +136,8 @@ def write_2d_array_hdf5(fname, arrays, labels=[], atom_index=None):
 def import_integral(molecule, basis, int_type, atom1, shell1,
                     atom2, shell2, atom3=None, shell3=None,
                     atom4=None, shell4=None, xi1=None, xi2=None,
-                    chk_file=None, return_block=True, full_deriv=False):
+                    chk_file=None, return_block=True, full_deriv=False,
+                    delta_h=1e-5):
     """
     Imports integrals and integral derivatives from pyscf and converts 
     them to veloxchem format.
@@ -172,8 +175,11 @@ def import_integral(molecule, basis, int_type, atom1, shell1,
         the hdf5 checkpoint file name
     :param return_block:
         return the matrix block, or the full matrix
-    :full_deriv:
+    :param full_deriv:
         return the full integral derivative (for first and second order
+        derivatives)
+    :param delta_h:
+        step for numerical derivative (required by the electric dipole
         derivatives).
 
 
@@ -238,7 +244,14 @@ def import_integral(molecule, basis, int_type, atom1, shell1,
                         shell4=shell4, chk_file=chk_file,
                         return_block=return_block, full_deriv=full_deriv)
             else:
-                return import_1e_integral_derivative(molecule, basis, int_type, 
+                if int_type == "electric_dipole_derivative":
+                    return numerical_electric_dipole_derivatives(molecule,
+                        basis, int_type, atomi=xi1, atom1=atom1, shell1=shell1,
+                        atom2=atom2, shell2=shell2, delta_h=delta_h,
+                        chk_file=chk_file, return_block=return_block) 
+                else:
+                    return import_1e_integral_derivative(molecule, basis,
+                        int_type, 
                         atomi=xi1, atom1=atom1, shell1=shell1,
                         atom2=atom2, shell2=shell2, chk_file=chk_file,
                         return_block=return_block, full_deriv=full_deriv)
@@ -686,6 +699,146 @@ def import_1e_integral_derivative(molecule, basis, int_type, atomi=1, atom1=1,
         return vlx_int_block
     else:
         return vlx_int_deriv
+
+def numerical_electric_dipole_derivatives(molecule, ao_basis, int_type,
+                                          atomi=1, atom1=1, shell1=None,
+                                          atom2=1, shell2=None, delta_h=1e-5,
+                                          chk_file=None, return_block=True,
+                                          unit="au"):
+    """
+    Computes numerical derivatives of the electric dipole integrals.
+
+    :param molecule:
+        The molecule.
+    :param ao_basis:
+        The AO basis set.
+    :param int_type:
+        The integral type (electric_dipole_derivative)
+    :param atomi:
+        The atom with respect to which the derivatives are taken
+    :param atom1:
+        index of the first atom of interest
+    :param shell1:
+        list of atomic shells of interest for atom 1
+    :param atom2:
+        index of the second atom of interest
+    :param shell2:
+        list of atomic shells of interest for atom 2
+    :param delta_h:
+        The step for the numerical derivative.
+    :param chk_file:
+        the hdf5 checkpoint file name
+    :param return_block:
+        return the matrix block, or the full matrix
+     :param unit:
+        the units to be used for the molecular geometry;
+        possible values: "au" (default), "Angstrom"
+
+    :return:
+        The selected block of the electric dipole integral derivatives.
+    """
+
+    i = atomi - 1
+    # atom labels
+    labels = molecule.get_labels()
+
+    # number of atoms
+    natm = molecule.number_of_atoms()
+
+    # atom coordinates (nx3)
+    coords = molecule.get_coordinates()
+
+    # number of atomic orbitals
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = ao_basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+    nao = pyscf_molecule.nao
+
+    # Dipole integrals driver
+    dipole_drv = ElectricDipoleIntegralsDriver()
+
+    # 3 dipole components x 3 atomic coordinates
+    # x No. basis x No. basis
+    dipole_integrals_gradient = np.zeros((3, 3, nao, nao))
+
+    for d in range(3):
+        coords[i, d] += delta_h
+        new_mol = Molecule(labels, coords, units='au')
+
+        dipole_mats_p = dipole_drv.compute(new_mol, ao_basis)
+        dipole_ints_p = (dipole_mats_p.x_to_numpy(), 
+                         dipole_mats_p.y_to_numpy(),
+                         dipole_mats_p.z_to_numpy())
+
+        coords[i, d] -= 2.0 * delta_h
+        new_mol = Molecule(labels, coords, units='au')
+
+        dipole_mats_m = dipole_drv.compute(new_mol, ao_basis)
+        dipole_ints_m = (dipole_mats_m.x_to_numpy(),
+                         dipole_mats_m.y_to_numpy(),
+                         dipole_mats_m.z_to_numpy())
+
+        for c in range(3):
+            dipole_integrals_gradient[c, d] = (
+                ( dipole_ints_p[c] - dipole_ints_m[c] ) / (2.0 * delta_h)
+            )
+
+    vlx_int_deriv = dipole_integrals_gradient.reshape(3*3,nao,nao)
+
+    ao_basis_map = ao_basis.get_ao_basis_map(molecule)
+    rows = []
+    columns = []
+    k = 0
+    for ao in ao_basis_map:
+        parts = ao.split()
+        atom = int(parts[0])
+        shell = parts[2]
+        if atom1 == atom:
+            if shell1 is not None:
+                for s in shell1:
+                    if s in shell:
+                        rows.append(k)
+            else:
+                rows.append(k)
+        if atom2 == atom:
+            if shell2 is not None:
+                for s in shell2:
+                    if s in shell:
+                        columns.append(k)
+            else:
+                columns.append(k)
+        k += 1
+    if rows == []:
+        raise ValueError("Atom or shell(s) not found.", atom1, shell1)
+    if columns == []:
+        raise ValueError("Atom or shell(s) not found.", atom2, shell2)
+    
+
+    vlx_int_block = np.zeros((vlx_int_deriv.shape[0], len(rows), len(columns)))
+
+    for k in range(len(rows)):
+        for l in range(len(columns)):
+            vlx_int_block[:, k, l] = vlx_int_deriv[:, rows[k], columns[l]]
+   
+    label = int_type+'_wrt_atom%d_shells_atom%d' % (atomi, atom1)
+    if shell1 is not None:
+        for s1 in shell1:
+            label += "_%s" % (s1)
+    label += "_atom%d" % (atom2)
+    if shell2 is not None:
+        for s2 in shell2:
+            label += "_%s" % (s2)
+
+    if chk_file is not None:
+        write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
+
+    if return_block:
+        return vlx_int_block
+    else:
+        return vlx_int_deriv
+
 
 def import_1e_second_order_integral_derivative(molecule, basis, int_type,
                                   atomi, atomj, atom1=1, shell1=None,
