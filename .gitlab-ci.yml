@@ -28,22 +28,19 @@ stages:
   - test
 
 .monkey:setup:
-  tags:
-    - vlx-test
+  image: ghcr.io/enccs/meta-vlx/vlx-ci_ubuntu-20.04:sha-0128a87
   variables:
     OMP_NUM_THREADS: "6"
-    GTESTROOT: "/home/xinli/software/googletest/googletest"
-    MPICC: "$I_MPI_ROOT/intel64/mpi/mpiicc"
+    GTESTROOT: "/usr"
+    GTESTLIB: "/usr/lib/x86_64-linux-gnu"
   before_script:
-    - set +e && source /opt/intel/bin/compilervars.sh intel64 && set -e
-    - export PATH=/opt/intel/intelpython3/bin:$PATH
-    - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/intelpython3/lib
+    - source /opt/docker/etc/intel-env.sh
 
 monkey:build:
   extends: .monkey:setup
   stage: build
   script:
-    - python3 config/generate_setup.py
+    - python config/generate_setup.py
     - make -j 6 -C src release
     - make -j 6 -C unit_tests release
   artifacts:
@@ -63,12 +60,12 @@ monkey:python_tests:
   stage: test
   variables:
     VLX_NUM_BUILD_JOBS: "6"
+    CC: icc
+    MPICC: mpiicc
   script:
-    - python3 -m venv --without-pip --clear venv
-    - source ./venv/bin/activate
-    - curl https://bootstrap.pypa.io/pip/3.6/get-pip.py -o get-pip.py
-    - python3 get-pip.py
-    - python3 -m pip install pytest pytest-cov
-    - python3 -m pip install .[qmmm]
-    - python3 -m pytest -v --cov=veloxchem --pyargs veloxchem
-    - mpiexec -n 2 python3 -m pytest -v --pyargs veloxchem -m "solvers"
+    - python -m venv --clear venv
+    - source venv/bin/activate
+    - python -m pip install pytest pytest-cov
+    - python -m pip install .[qmmm]
+    - python -m pytest -v --cov=veloxchem --pyargs veloxchem
+    - mpiexec -n 2 python -m pytest -v --pyargs veloxchem -m "solvers"

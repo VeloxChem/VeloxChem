@@ -152,3 +152,4 @@ cython_debug/
 # generated C++ sources
 ConfigMKL.hpp
 /.direnv/
+/compile_commands.json
