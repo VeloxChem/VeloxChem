@@ -178,7 +178,7 @@ class nb_orbviewer:
             The molecule.
         """
 
-        iorb=self.molecule.number_of_beta_electrons()-1
+        self.iorb=self.molecule.number_of_beta_electrons()-1
         MOs=MO_object.alpha_to_numpy()
         self.MOs=MOs
         self.thisplot = k3d.plot(grid_visible=False)
@@ -186,7 +186,7 @@ class nb_orbviewer:
         self.thisplot += self.plt_atoms
         for bonds in self.plt_bonds:
             self.thisplot += bonds
-        orbital, grid=self.vv.compute(MOs, iorb)
+        orbital, grid=self.vv.compute(MOs, self.iorb)
         self.plt_iso, self.plt_iso2 = self.draworb(grid,orbital)
         self.thisplot += self.plt_iso
         self.thisplot += self.plt_iso2
@@ -202,7 +202,7 @@ class nb_orbviewer:
         #Add widget
         int_range = widgets.Dropdown(
             options=orblist,
-            value=iorb,description='Orbital:')
+            value=self.iorb,description='Orbital:')
         display(int_range)
         int_range.observe(self.on_orb_index_change, names='value')
     def on_orb_index_change(self,change):
@@ -215,7 +215,8 @@ class nb_orbviewer:
         self.thisplot.camera_auto_fit=False #To avoid disturbing the current view
         self.thisplot-=self.plt_iso
         self.thisplot-=self.plt_iso2
-        orbital, grid=self.vv.compute(self.MOs, change['new'])
+        self.iorb=change['new']
+        orbital, grid=self.vv.compute(self.MOs, self.iorb)
         self.plt_iso, self.plt_iso2 = self.draworb(grid,orbital)
         self.thisplot += self.plt_iso
         self.thisplot += self.plt_iso2
@@ -263,7 +264,7 @@ class nb_orbviewer:
             colori=colors[i]
             for j in range(i+1,natoms):
                 bond=(radii[i]+radii[j])/0.529
-                if np.linalg.norm(coords[i,:]-coords[j,:])<1.2*bond:
+                if np.linalg.norm(coords[i,:]-coords[j,:])<1.25*bond:
                     colorj=colors[j]
                     plt_bonds.append(k3d.line([coords[i,:],0.5*(coords[i,:]+coords[j,:])], width=0.35,colors=[colori,colori],shader='mesh',radial_segments=16))
                     plt_bonds.append(k3d.line([0.5*(coords[i,:]+coords[j,:]),coords[j,:]], width=0.35,colors=[colorj,colorj],shader='mesh',radial_segments=16))
