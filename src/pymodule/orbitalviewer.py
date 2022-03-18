@@ -1,10 +1,17 @@
 import numpy as np
 import math
-import sys
 
 from .veloxchemlib import VisualizationDriver, CubicGrid
 from .veloxchemlib import bohr_in_angstroms
 
+try:
+    import k3d
+    import ipywidgets as widgets
+    from IPython.display import display
+except ImportError:
+        k3d=None
+        widgets=None
+        display=None
 
 class OrbitalViewer:
     """
@@ -13,11 +20,6 @@ class OrbitalViewer:
     atomic grid. These AOs are then translated as needed to the nearest grid
     point of the actual atomic center to compute on-the-fly the molecular
     orbital on the full grid.
-
-    :param molecule:
-        The molecule.
-    :param basis:
-        The AO basis set.
 
     Instance variables
         - grid_density: The density of grid points per a.u.
@@ -28,10 +30,19 @@ class OrbitalViewer:
           coefficient is below this value
     """
 
-    def __init__(self, molecule, basis):
+    def __init__(self):
         """
         Initializes the orbital viewer.
         """
+
+        #Check if k3d is imported
+        #ipywidgets and IPython come automatically with k3d
+        if k3d==None:
+            raise ImportError(
+            'Unable to import k3d. Please install k3d via\n' +
+            '  conda install -c conda-forge k3d\n' +
+            '  jupyter nbextension install --py --sys-prefix k3d\n' +
+            '  jupyter nbextension enable --py --sys-prefix k3d\n')
 
         # number of grid points per a.u.
         self.grid_density = 4
@@ -47,7 +58,6 @@ class OrbitalViewer:
         self.plt_iso_one = None
         self.plt_iso_two = None
 
-        self.initialize(molecule, basis)
 
     def initialize(self, molecule, basis):
         """
@@ -160,29 +170,23 @@ class OrbitalViewer:
 
         return np_orb
 
-    def plot(self, mo_object):
+    def plot(self, molecule, basis, mo_object):
         """
         Plots the orbitals, with a widget to choose which.
 
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
         :param mo_object:
             The MolecularOrbitals object.
         """
 
-        try:
-            import k3d
-        except ImportError:
-            raise ImportError(
-                'Unable to import k3d. Please install k3d via\n' +
-                '  conda install -c conda-forge k3d\n' +
-                '  jupyter nbextension install --py --sys-prefix k3d\n' +
-                '  jupyter nbextension enable --py --sys-prefix k3d\n')
+        self.molecule=molecule
+        self.initialize(molecule, basis)
 
-        try:
-            import ipywidgets as widgets
-        except ImportError:
-            raise ImportError('Unable to import ipywidgets.')
 
-        i_orb = self.molecule.number_of_beta_electrons() - 1
+        self.i_orb = self.molecule.number_of_beta_electrons() - 1  # i_orb is an instance object accessed by MultiPsi
         self.mo_coefs = mo_object.alpha_to_numpy()
 
         self.this_plot = k3d.plot(grid_visible=False)
@@ -191,7 +195,7 @@ class OrbitalViewer:
         for bonds in plt_bonds:
             self.this_plot += bonds
 
-        orbital = self.compute_orbital(self.mo_coefs, i_orb)
+        orbital = self.compute_orbital(self.mo_coefs, self.i_orb)
         self.plt_iso_one, self.plt_iso_two = self.draw_orbital(orbital)
         self.this_plot += self.plt_iso_one
         self.this_plot += self.plt_iso_two
@@ -207,7 +211,7 @@ class OrbitalViewer:
 
         # Add widget
         int_range = widgets.Dropdown(options=orblist,
-                                     value=i_orb,
+                                     value=self.i_orb,
                                      description='Orbital:')
         display(int_range)
         int_range.observe(self.on_orbital_index_change, names='value')
@@ -225,8 +229,8 @@ class OrbitalViewer:
         self.this_plot -= self.plt_iso_one
         self.this_plot -= self.plt_iso_two
 
-        i_orb = change['new']
-        orbital = self.compute_orbital(self.mo_coefs, i_orb)
+        self.i_orb = change['new']
+        orbital = self.compute_orbital(self.mo_coefs, self.i_orb)
 
         self.plt_iso_one, self.plt_iso_two = self.draw_orbital(orbital)
         self.this_plot += self.plt_iso_one
@@ -245,9 +249,6 @@ class OrbitalViewer:
                 - a k3d points objects for all atoms
                 - a list of k3d line objects, 2 per bonds
         """
-
-        if 'k3d' not in sys.modules:
-            import k3d
 
         atomcolor = np.array(
             [
@@ -344,9 +345,6 @@ class OrbitalViewer:
         :return:
             A tuple with the k3d positive and negative isosurfaces.
         """
-
-        if 'k3d' not in sys.modules:
-            import k3d
 
         # There is a mismatch between the x,y,z order of vlx and k3d
         orbital_k3d = orbital.swapaxes(0, 2).astype('float32')
