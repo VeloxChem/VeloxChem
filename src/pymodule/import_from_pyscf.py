@@ -50,8 +50,9 @@ def get_pyscf_integral_type(int_type):
             "kinetic_energy_derivative"                     : "int1e_ipkin",
             "nuclear_attraction_derivative_operator"        : "int1e_iprinv",
             "nuclear_attraction_derivative_orbitals"        : "int1e_ipnuc",
-            # electric dipole deriv. not imported from pyscf, calculated numerically
-            "electric_dipole_derivative"                    : "int1e", 
+            # electric dipole deriv. calculated numerically
+            "numerical_electric_dipole_derivative"          : "int1e",
+            "electric_dipole_derivative"                    : "int1e_irp",
             "electron_repulsion_derivative"                 : "int2e_ip1",
             "overlap_second_derivative_2_0"                 : "int1e_ipipovlp",
             "overlap_second_derivative_1_1"                 : "int1e_ipovlpip",
@@ -78,7 +79,8 @@ def get_sign(pyscf_int_type):
     to the veloxchem standard. 
     """
     if pyscf_int_type in ["int1e_nuc", "int1e_ipovlp", "int1e_ipkin",
-                          "int1e_ipnuc", "int1e_iprinv", "int2e_ip1"]:
+                          "int1e_ipnuc", "int1e_iprinv", "int2e_ip1",
+                          "int1e_irp"]:
         return -1
     else:
         return 1
@@ -244,7 +246,7 @@ def import_integral(molecule, basis, int_type, atom1, shell1,
                         shell4=shell4, chk_file=chk_file,
                         return_block=return_block, full_deriv=full_deriv)
             else:
-                if int_type == "electric_dipole_derivative":
+                if int_type == "numerical_electric_dipole_derivative":
                     return numerical_electric_dipole_derivatives(molecule,
                         basis, int_type, atomi=xi1, atom1=atom1, shell1=shell1,
                         atom2=atom2, shell2=shell2, delta_h=delta_h,
@@ -629,6 +631,8 @@ def import_1e_integral_derivative(molecule, basis, int_type, atomi=1, atom1=1,
         pyscf_int_deriv_atom_i = -pyscf_int_deriv
         pyscf_int_deriv_atom_i[:,ki:kf] += pyscf_int_deriv[:,ki:kf]
         pyscf_int_deriv_atom_i[:,:,ki:kf] += pyscf_int_deriv[:,ki:kf].transpose(0,2,1)
+    elif pyscf_int_type in ["int1e_irp"]:
+        pyscf_int_deriv_atom_i[:,:,ki:kf] = pyscf_int_deriv[:,:,ki:kf]
     else:
         pyscf_int_deriv_atom_i[:,ki:kf] = pyscf_int_deriv[:,ki:kf]
 
@@ -2117,65 +2121,66 @@ def eri_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
     return vlx_eri_deriv_atom_i
 
 ## Not working correctly
-##def dipole_deriv(molecule, basis, i=0, unit="au"):
-##    """
-##    Imports the derivatives of the dipole moment integrals
-##    from pyscf and converts it to veloxchem format
-##
-##    :param molecule:
-##        the vlx molecule object
-##    :param basis:
-##        the vlx basis object
-##    :param i:
-##        the index of the atom for which the derivatives
-##        are computed.
-##    :param unit:
-##        the units to be used for the molecular geometry;
-##        possible values: "au" (default), "Angstrom"
-##
-##    :return:
-##        a numpy array of shape 3 x 3 x nao x nao
-##        (nao = number of atomic orbitals)
-##        corresponding to the derivative of the x, y, and z
-##        coordinates of the dipole moment integrals
-##        with respect to the x, y and z coords. of atom i.
-##    """
-##
-##    molecule_string = get_molecule_string(molecule)
-##    basis_set_label = basis.get_label()
-##    pyscf_basis = translate_to_pyscf(basis_set_label)
-##    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-##                                 basis=pyscf_basis, unit=unit)
-##    nao = pyscf_molecule.nao
-##
-##
-##    pyscf_dipole_deriv = pyscf_molecule.intor('int1e_irp', aosym='s1').reshape(3, 3, nao, nao)
-##    ao_slices = pyscf_molecule.aoslice_by_atom()
-##
-##    # Get the AO indeces corresponding to atom i
-##    #ki, kf = ao_slices[i, 2:]
-##
-##    dipole_deriv_atom_i = np.zeros(pyscf_dipole_deriv.shape)
-##
-##    #dipole_deriv_atom_i[:,:,ki:kf] = pyscf_dipole_deriv[:,:,ki:kf]
-##    dipole_deriv_atom_i = pyscf_dipole_deriv
-##
-##    # (nabla m | n) + (m | nabla n)
-##    dipole_deriv_atom_i += dipole_deriv_atom_i.transpose(1,0,3,2)
-##
-##    #vlx_dipole_deriv_atom_i = np.zeros_like(dipole_deriv_atom_i.reshape(3,3,nao,nao))
-##    vlx_dipole_deriv_atom_i = np.zeros(dipole_deriv_atom_i.shape)
-##
-##
-##    # Transform each component to veloxchem format
-##    for c in range(3):
-##        for x in range(3):
-##            vlx_dipole_deriv_atom_i[c,x] = ( ao_matrix_to_veloxchem(
-##                                         DenseMatrix(dipole_deriv_atom_i[c,x]),
-##                                         basis, molecule).to_numpy()
-##                                         )
-##
-##    return vlx_dipole_deriv_atom_i
+def dipole_deriv(molecule, basis, i=0, unit="au"):
+    """
+    Imports the derivatives of the dipole moment integrals
+    from pyscf and converts it to veloxchem format
+
+    :param molecule:
+        the vlx molecule object
+    :param basis:
+        the vlx basis object
+    :param i:
+        the index of the atom for which the derivatives
+        are computed.
+    :param unit:
+        the units to be used for the molecular geometry;
+        possible values: "au" (default), "Angstrom"
+
+    :return:
+        a numpy array of shape 3 x 3 x nao x nao
+        (nao = number of atomic orbitals)
+        corresponding to the derivative of the x, y, and z
+        coordinates of the dipole moment integrals
+        with respect to the x, y and z coords. of atom i.
+    """
+
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+    nao = pyscf_molecule.nao
+
+
+    pyscf_dipole_deriv = -pyscf_molecule.intor('int1e_irp', aosym='s1').reshape(3, 3, nao, nao)
+    ao_slices = pyscf_molecule.aoslice_by_atom()
+
+    # Get the AO indeces corresponding to atom i
+    ki, kf = ao_slices[i, 2:]
+
+    dipole_deriv_atom_i = np.zeros(pyscf_dipole_deriv.shape)
+
+    #dipole_deriv_atom_i[:,:,ki:kf] = pyscf_dipole_deriv[:,:,ki:kf]
+    dipole_deriv_atom_i[:,:,:,ki:kf] = pyscf_dipole_deriv[:,:,:,ki:kf]
+    #dipole_deriv_atom_i = pyscf_dipole_deriv
+
+    # (nabla m | n) + (m | nabla n)
+    dipole_deriv_atom_i += dipole_deriv_atom_i.transpose(0,1,3,2)
+
+    #vlx_dipole_deriv_atom_i = np.zeros_like(dipole_deriv_atom_i.reshape(3,3,nao,nao))
+    vlx_dipole_deriv_atom_i = np.zeros(dipole_deriv_atom_i.shape)
+
+
+    # Transform each component to veloxchem format
+    for c in range(3):
+        for x in range(3):
+            vlx_dipole_deriv_atom_i[c,x] = ( ao_matrix_to_veloxchem(
+                                         DenseMatrix(dipole_deriv_atom_i[c,x]),
+                                         basis, molecule).to_numpy()
+                                         )
+
+    return vlx_dipole_deriv_atom_i
 
 
 ### Second derivatives
