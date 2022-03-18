@@ -9,9 +9,10 @@ try:
     import ipywidgets as widgets
     from IPython.display import display
 except ImportError:
-        k3d=None
-        widgets=None
-        display=None
+    k3d = None
+    widgets = None
+    display = None
+
 
 class OrbitalViewer:
     """
@@ -35,29 +36,57 @@ class OrbitalViewer:
         Initializes the orbital viewer.
         """
 
-        #Check if k3d is imported
-        #ipywidgets and IPython come automatically with k3d
-        if k3d==None:
+        # Check if k3d is imported
+        if k3d is None:
             raise ImportError(
-            'Unable to import k3d. Please install k3d via\n' +
-            '  conda install -c conda-forge k3d\n' +
-            '  jupyter nbextension install --py --sys-prefix k3d\n' +
-            '  jupyter nbextension enable --py --sys-prefix k3d\n')
+                'Unable to import k3d. Please install k3d via\n' +
+                '  conda install -c conda-forge k3d\n' +
+                '  jupyter nbextension install --py --sys-prefix k3d\n' +
+                '  jupyter nbextension enable --py --sys-prefix k3d\n')
+
+        # Check ipywidgets and IPython.display.display()
+        if widgets is None:
+            raise ImportError('\'import ipywidgets as widgets\' failed.\n')
+        if display is None:
+            raise ImportError(
+                '\'from IPython.display import display\' failed.\n')
 
         # number of grid points per a.u.
         self.grid_density = 4
+
         # a.u. added around the molecule to create the box
         self.grid_margins = 3.0
+
         # Radius in a.u. for each atomic box
         self.atombox_radius = 6.0
+
         # Do not compute AO if MO coefficient is below this value
         self.mo_threshold = 0.01
 
+        # molecule
+        self.molecule = None
+        self.basis = None
+        self.atomnr = None
+        self.coords = None
+
+        # grid
+        self.grid = None
+        self.origin = None
+        self.stepsize = None
+        self.npoints = None
+        self.atom_origin = None
+        self.atom_npoints = None
+
+        # orbital
+        self.ao_to_atom = None
+        self.ao_dict = None
+        self.i_orb = None
         self.mo_coefs = None
+
+        # plot
         self.this_plot = None
         self.plt_iso_one = None
         self.plt_iso_two = None
-
 
     def initialize(self, molecule, basis):
         """
@@ -182,11 +211,10 @@ class OrbitalViewer:
             The MolecularOrbitals object.
         """
 
-        self.molecule=molecule
         self.initialize(molecule, basis)
 
-
-        self.i_orb = self.molecule.number_of_beta_electrons() - 1  # i_orb is an instance object accessed by MultiPsi
+        # i_orb is an instance variable accessed by MultiPsi
+        self.i_orb = self.molecule.number_of_beta_electrons() - 1
         self.mo_coefs = mo_object.alpha_to_numpy()
 
         self.this_plot = k3d.plot(grid_visible=False)
