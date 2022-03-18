@@ -6,10 +6,13 @@ from .veloxchemlib import bohr_in_angstroms
 
 try:
     import k3d
+except ImportError:
+    k3d = None
+
+try:
     import ipywidgets as widgets
     from IPython.display import display
 except ImportError:
-    k3d = None
     widgets = None
     display = None
 
@@ -40,16 +43,16 @@ class OrbitalViewer:
         if k3d is None:
             raise ImportError(
                 'Unable to import k3d. Please install k3d via\n' +
-                '  conda install -c conda-forge k3d\n' +
+                '  python3 -m pip install k3d\n' +
                 '  jupyter nbextension install --py --sys-prefix k3d\n' +
                 '  jupyter nbextension enable --py --sys-prefix k3d\n')
 
-        # Check ipywidgets and IPython.display.display()
-        if widgets is None:
-            raise ImportError('\'import ipywidgets as widgets\' failed.\n')
-        if display is None:
+        # Check ipywidgets and IPython.display
+        if widgets is None or display is None:
             raise ImportError(
-                '\'from IPython.display import display\' failed.\n')
+                'Unable to import ipywidgets or IPython.display.\n' +
+                'Please install jupyter notebook via\n' +
+                '  python3 -m pip install jupyter')
 
         # number of grid points per a.u.
         self.grid_density = 4
