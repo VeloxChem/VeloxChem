@@ -326,6 +326,35 @@ def _Molecule_write_xyz(self, xyz_filename):
                 f'{elem.get_name():<6s} {x:22.12f} {y:22.12f} {z:22.12f}\n')
 
 
+def _Molecule_get_aufbau_occupation(self, norb, flag='restricted'):
+    """
+    Creates an occupation vector based on the aufbau principle.
+
+    :param norb:
+        The number of molecular orbitals
+    :param flag:
+        The flag (restricted or unrestricted).
+
+    :return:
+        flag=='restricted': single vector assuming doubly occupied orbitals.
+        flag=='unrestricted': two vectors assuming singly occupied spin-orbitals.
+    """
+
+    nalpha = self.number_of_alpha_electrons()
+    nbeta = self.number_of_beta_electrons()
+
+    if flag == 'restricted':
+        occ = [
+            2.0 if x < nbeta else 1.0 if x < nalpha else 0.0
+            for x in range(norb)
+        ]
+        return occ
+    else:
+        occa = [1.0 if x < nalpha else 0.0 for x in range(norb)]
+        occb = [1.0 if x < nalpha else 0.0 for x in range(norb)]
+        return occa, occb
+
+
 Molecule.read_str = _Molecule_read_str
 Molecule.read_xyz = _Molecule_read_xyz
 Molecule.from_xyz_string = _Molecule_from_xyz_string
@@ -336,3 +365,4 @@ Molecule.get_labels = _Molecule_get_labels
 Molecule.get_coordinates = _Molecule_get_coordinates
 Molecule.get_ic_rmsd = _Molecule_get_ic_rmsd
 Molecule.write_xyz = _Molecule_write_xyz
+Molecule.get_aufbau_occupation = _Molecule_get_aufbau_occupation

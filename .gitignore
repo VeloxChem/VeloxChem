@@ -1,6 +1,6 @@
 VeloxChem.xcodeproj
 bin
-build
+build*
 *.d
 *.o
 *.a

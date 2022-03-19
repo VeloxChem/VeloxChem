@@ -136,7 +136,7 @@ CMolecule_from_array(const std::vector<std::string>&                labels,
 
     std::string errmol("Molecule: Inconsistent size");
 
-    errors::assertMsgCritical(py_coords.shape(0) == static_cast<ssize_t>(labels.size()), errmol);
+    errors::assertMsgCritical(py_coords.shape(0) == static_cast<py::ssize_t>(labels.size()), errmol);
 
     errors::assertMsgCritical(py_coords.shape(1) == 3, errmol);
 

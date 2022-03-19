@@ -114,6 +114,7 @@ from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .scffirstorderprop import ScfFirstOrderProperties
 from .forcefieldgenerator import ForceFieldGenerator
+from .orbitalviewer import OrbitalViewer
 
 # Python functions
 from .errorhandler import assert_msg_critical
