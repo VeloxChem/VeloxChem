@@ -81,7 +81,7 @@ def get_command_output(command):
 
 
 def check_cray():
-    if "CRAYPE_VERSION" in os.environ and "CXX" in os.environ:
+    if "CRAYPE_VERSION" in os.environ and "CRAYPE_DIR" in os.environ:
         return True
     return False
 
@@ -125,32 +125,30 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
     print("*** Checking c++ compiler... ", end="")
 
     if check_cray():
-        cxx, cxx_path = find_exe([os.environ["CXX"]])
-    elif "MPICXX" in os.environ:
+        if "CXX" in os.environ and "MPICXX" not in os.environ:
+            os.environ["MPICXX"] = os.environ["CXX"]
+
+    if "MPICXX" in os.environ:
         cxx, cxx_path = find_exe([os.environ["MPICXX"]])
     else:
         cxx, cxx_path = find_exe(["mpiicpc", "mpicxx", "mpiCXX"])
 
-    print(cxx)
+    print(str(Path(cxx_path) / cxx))
 
     if cxx is None:
         print("*** Error: Unable to find c++ compiler!")
-        if check_cray():
-            print("***        Please make sure that CXX is correctly set.")
-        else:
-            print("***        Please make sure that MPICXX is correctly set.")
+        print("***        Please make sure that MPICXX is correctly set.")
         sys.exit(1)
 
     if cxx in ["icpc", "g++", "clang++"]:
         print(f"*** Error: {cxx} is not a MPI compiler!")
         sys.exit(1)
 
-    if cxx in ["mpiicpc", "mpicxx", "mpiCXX"]:
-        cxxname = get_command_output([cxx, "-show"])
-    else:
+    if check_cray():
         cxxname = get_command_output([cxx, "--version"])
-    if "Cray clang" in cxxname:
         cxxname = cxxname.replace("Cray clang", "Crayclang")
+    else:
+        cxxname = get_command_output([cxx, "-show"])
     cxxname = cxxname.split()[0]
 
     if cxxname in ["icc", "gcc", "clang"]:
