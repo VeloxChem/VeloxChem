@@ -156,13 +156,21 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
         sys.exit(1)
 
     use_intel = (cxxname == "icpc")
-    use_gnu = re.match(r"(.*(c|g|gnu-c)\+\+)", cxxname)
-    use_clang = cxxname in ["clang++", "Crayclang"] or re.match(
-        r".*-clang\+\+", cxxname)
+    use_gnu = (cxxname == "g++" or
+               re.match(r".*-(g|gnu-c)\+\+", cxxname) is not None)
+    use_clang = (cxxname in ["clang++", "Crayclang"] or
+                 re.match(r".*-clang\+\+", cxxname) is not None)
 
     if not (use_intel or use_gnu or use_clang):
         print("*** Error: Unrecognized c++ compiler!")
         print("***        Only Intel, GNU, and Clang compilers are supported.")
+        sys.exit(1)
+
+    elif [use_intel, use_gnu, use_clang].count(True) != 1:
+        print(f"*** Error: Unexpected c++ compiler: {cxxname}")
+        print(f"***        use_intel = {use_intel}")
+        print(f"***        use_gnu   = {use_gnu}")
+        print(f"***        use_clang = {use_clang}")
         sys.exit(1)
 
     # ==> openmp flags <==
