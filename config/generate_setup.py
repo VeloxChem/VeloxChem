@@ -55,11 +55,17 @@ class SearchReplace(dict):
         return self._make_regex().sub(self, text)
 
 
+def is_executable(exe):
+    return os.path.isfile(exe) and os.access(exe, os.X_OK)
+
+
 def find_exe(executables):
     for exe in executables:
+        if Path(exe).is_absolute() and is_executable(exe):
+            return Path(exe).name, str(Path(exe).parent)
         for path in os.environ["PATH"].split(os.pathsep):
             fname = os.path.join(path, exe)
-            if os.path.isfile(fname) and os.access(fname, os.X_OK):
+            if is_executable(fname):
                 return exe, path
     return None, None
 
@@ -173,7 +179,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
         cxx_flags = "-fopenmp"
         omp_flag = "-lgomp"
     elif use_clang:
-        cxx_flags = "-Xpreprocessor -fopenmp"
+        cxx_flags = "-Xclang -fopenmp"
         omp_flag = "-lomp"
 
     # ==> math library <==
