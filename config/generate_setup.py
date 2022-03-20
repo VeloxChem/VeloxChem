@@ -62,12 +62,12 @@ def is_executable(exe):
 def find_exe(executables):
     for exe in executables:
         if Path(exe).is_absolute() and is_executable(exe):
-            return Path(exe).name, str(Path(exe).parent)
-        for path in os.environ["PATH"].split(os.pathsep):
-            fname = os.path.join(path, exe)
+            return exe
+        for p in os.environ["PATH"].split(os.pathsep):
+            fname = str(Path(p) / exe)
             if is_executable(fname):
-                return exe, path
-    return None, None
+                return exe
+    return None
 
 
 def get_command_output(command):
@@ -129,18 +129,18 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
             os.environ["MPICXX"] = os.environ["CXX"]
 
     if "MPICXX" in os.environ:
-        cxx, cxx_path = find_exe([os.environ["MPICXX"]])
+        cxx = find_exe([os.environ["MPICXX"]])
     else:
-        cxx, cxx_path = find_exe(["mpiicpc", "mpicxx", "mpiCXX"])
+        cxx = find_exe(["mpiicpc", "mpicxx", "mpiCXX"])
 
-    print(str(Path(cxx_path) / cxx))
+    print(cxx)
 
     if cxx is None:
         print("*** Error: Unable to find c++ compiler!")
         print("***        Please make sure that MPICXX is correctly set.")
         sys.exit(1)
 
-    if cxx in ["icpc", "g++", "clang++"]:
+    if Path(cxx).name in ["icpc", "g++", "clang++"]:
         print(f"*** Error: {cxx} is not a MPI compiler!")
         sys.exit(1)
 
