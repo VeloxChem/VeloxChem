@@ -36,7 +36,10 @@ from .errorhandler import assert_msg_critical
 from .outputstream import OutputStream
 
 from .veloxchemlib import Molecule
-from .veloxchemlib import bohr_in_angstroms, hartree_in_wavenumbers
+from .veloxchemlib import (bohr_in_angstroms,
+                           hartree_in_wavenumbers,
+                           hartree_in_ev)
+from .veloxchemlib import boltzmann_in_evperkelvin
 
 class NumerovDriver:
     """
@@ -70,6 +73,10 @@ class NumerovDriver:
         self.electronic_excitation = False
         self.initial_state = 0
         self.final_state = 1
+
+        self.rotation = True
+        self.temp = 298.15
+        self.n_rot_states = 15
 
         # solver setup
         self.conv_thresh = 1.0e-12
@@ -106,6 +113,10 @@ class NumerovDriver:
                     ('int', 'initial state of the electronic transition'),
                 'final_state':
                     ('int', 'final state of the electronic transition'),
+                'rotation':
+                    ('bool', 'enable/disable rotational resolution'),
+                'temp':
+                    ('float', 'temperature in Kelvin'),
                 'conv_thresh':
                     ('float', 'convergence threshold for vibrational energies'),
                 'max_iter':
@@ -204,7 +215,6 @@ class NumerovDriver:
                 # save energies and dipole moments
                 pec_energies['i'].append(scf_drv.iter_data[-1]['energy'])
                 dipmoms.append(scf_prop.get_property('dipole moment')[0])
-                
 
             # if an electronic excitation is included
             if self.electronic_excitation:
@@ -229,6 +239,8 @@ class NumerovDriver:
     
                             total_energy = (rsp_drv.rsp_property['eigenvalues'][-1]
                                             + scf_drv.iter_data[-1]['energy'])
+                            #print('exc_energies:', rsp_drv.rsp_property['eigenvalues'])
+                            #print('elec_trans_dipoles:',rsp_drv.rsp_property['electric_transition_dipoles'])
    
                             # detect PEC minimum
                             if prev_energy and minima_found[state] == False:
@@ -243,6 +255,7 @@ class NumerovDriver:
                             correct_state_found = True
 
                         pec_energies[state].append(total_energy)
+                        transmoms.append(rsp_drv.rsp_property['electric_transition_dipoles'])
 
         if self.initial_state != 0:
             assert_msg_critical(minima_found['i'],
@@ -298,16 +311,28 @@ class NumerovDriver:
                 i_dip_coefs = np.polyfit(displacements, dipmoms, 6)
                 dmc = np.polyval(i_dip_coefs, i_grid)
 
-                IR_energies, IR_intensities = self.get_IR_spectrum(i_vib_energies, i_psi, dmc)
+                spectrum = self.get_spectrum(i_vib_energies, i_vib_energies, i_psi, i_psi, dmc, eq_bond_len)
 
-
-            return {
-                'grid': i_grid,
-                'psi': i_psi,
-                'vib_levels': i_vib_energies,
-                'IR_energies': IR_energies,
-                'IR_intensities': IR_intensities,
-            }
+            if self.rotation:
+                return {
+                    'grid': i_grid,
+                    'psi': i_psi,
+                    'vib_levels': i_vib_energies,
+                    'IR_energies': spectrum[0],
+                    'IR_intensities': spectrum[1],
+                    'r_energies': spectrum[2],
+                    'r_intensities': spectrum[3],
+                    'p_energies': spectrum[4],
+                    'p_intensities': spectrum[5],
+                }
+            else:
+                return {
+                    'grid': i_grid,
+                    'psi': i_psi,
+                    'vib_levels': i_vib_energies,
+                    'IR_energies': spectrum[0],
+                    'IR_intensities': spectrum[1],
+                }
 
         # UV/Vis for two states
         else:
@@ -437,15 +462,64 @@ class NumerovDriver:
         return (q * (np.exp(-2*m*(x-u))-2*np.exp(-m*(x-u))) + v)
 
 
-    def get_IR_spectrum(self, vib_energies, psi, dmc):
+    def get_spectrum(self, i_vib_energies, f_rel_vib_energies, i_psi, f_psi, dmc, eq_bond_len):
 
-        exc_energies = []
-        IR_intensities = []
-        for state in range(1,psi.shape[0]):
-            trans_mom = np.dot(psi[state], dmc * gs_psi[0])
-            exc_energies.append((vib_energies[state] - vib_energies[0]) * hartree_in_wavenumbers())
-            IR_intensities.append(2.0 / 3.0 * (gs_vib_energies[state] - gs_vib_energies[0]) * trans_mom**2)
 
-        return exc_energies, IR_intensities
+        excitation_energies = {}
+        oscillator_strengths = {}
+
+        if self.rotation:
+            r_energies = {}
+            r_intensities = {}
+            p_energies = {}
+            p_intensities = {}
+
+        for state in range(1,f_psi.shape[0]):
+
+            transition = '0->{}'.format(state)
+
+            trans_mom = np.dot(f_psi[state], dmc * i_psi[0])
+            exc_energy = f_rel_vib_energies[state] - i_vib_energies[0]
+            osc_str = 2.0 / 3.0 * exc_energy * trans_mom**2
+
+            excitation_energies[transition] = exc_energy * hartree_in_wavenumbers()
+            oscillator_strengths[transition] = osc_str
+
+            if self.rotation:
+                # rotational resolution
+                inertia = self.reduced_mass * eq_bond_len**2
+                B = 1.0 / (2.0 * inertia)
+
+                # R branch
+                r_energies[transition] = []
+                r_intensities[transition] = []
+
+                for j in range(0,self.n_rot_states):
+                    r_energies[transition].append((exc_energy + 2.0 * B * (j+1)) * hartree_in_wavenumbers())
+
+                    r_j = (2*j + 1) * np.exp((-B * j*(j+1)) / (boltzmann_in_evperkelvin() / hartree_in_ev() * self.temp))
+                    r_intensities[transition].append(r_j)
+
+                Z_r = np.sum(r_intensities[transition])
+                r_intensities[transition] /= Z_r * 0.5 * osc_str
+
+                # P branch
+                p_energies[transition] = []
+                p_intensities[transition] = []
+
+                for j in range(1,self.n_rot_states):
+                    p_energies[transition].append((exc_energy - 2.0 * B * j) * hartree_in_wavenumbers())
+
+                    p_j = (2*j + 1) * np.exp((-B * j*(j+1)) / (boltzmann_in_evperkelvin() / hartree_in_ev() * self.temp))
+                    p_intensities[transition].append(p_j)    
+
+                Z_p = np.sum(p_intensities[transition])
+                p_intensities[transition] /= Z_p * 0.5 * osc_str
+
+        if self.rotation:
+            return (excitation_energies, oscillator_strengths, r_energies,
+                r_intensities, p_energies, p_intensities)
+
+        return (excitation_energies, oscillator_strengths)
 
 
