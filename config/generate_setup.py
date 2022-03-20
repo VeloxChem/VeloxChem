@@ -122,7 +122,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
 
     # ==> compiler information <==
 
-    print("*** Checking c++ compiler... ", end="")
+    print("*** Checking C++ compiler... ", end="")
 
     if check_cray():
         if "CXX" in os.environ and "MPICXX" not in os.environ:
@@ -136,7 +136,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
     print(cxx)
 
     if cxx is None:
-        print("*** Error: Unable to find c++ compiler!")
+        print("*** Error: Unable to find C++ compiler!")
         print("***        Please make sure that MPICXX is correctly set.")
         sys.exit(1)
 
@@ -146,28 +146,31 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
 
     if check_cray():
         cxxname = get_command_output([cxx, "--version"])
-        cxxname = cxxname.replace("Cray clang", "Crayclang")
+        if (cxxname.startswith("Cray clang") or
+                cxxname.startswith("AMD clang")):
+            cxxname = "clang++" if Path(cxx).name == "CC" else (
+                "clang" if Path(cxx).name == "cc" else "Unknown")
     else:
         cxxname = get_command_output([cxx, "-show"])
     cxxname = cxxname.split()[0]
 
     if cxxname in ["icc", "gcc", "clang"]:
-        print(f"*** Error: {cxx} is not a c++ compiler!")
+        print(f"*** Error: {cxx} is not a C++ compiler!")
         sys.exit(1)
 
     use_intel = (cxxname == "icpc")
     use_gnu = (cxxname == "g++" or
                re.match(r".*-(g|gnu-c)\+\+", cxxname) is not None)
-    use_clang = (cxxname in ["clang++", "Crayclang"] or
+    use_clang = (cxxname == "clang++" or
                  re.match(r".*-clang\+\+", cxxname) is not None)
 
     if not (use_intel or use_gnu or use_clang):
-        print("*** Error: Unrecognized c++ compiler!")
+        print("*** Error: Unrecognized C++ compiler!")
         print("***        Only Intel, GNU, and Clang compilers are supported.")
         sys.exit(1)
 
     elif [use_intel, use_gnu, use_clang].count(True) != 1:
-        print(f"*** Error: Unexpected c++ compiler: {cxxname}")
+        print(f"*** Error: Unexpected C++ compiler: {cxxname}")
         print(f"***        use_intel = {use_intel}")
         print(f"***        use_gnu   = {use_gnu}")
         print(f"***        use_clang = {use_clang}")
@@ -216,7 +219,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
     use_openblas = (("OPENBLASROOT" in os.environ) or
                     ("OPENBLAS_INCLUDE_DIR" in os.environ and
                      "OPENBLAS_LIBRARY" in os.environ))
-    use_craylibsci = ("CRAY_LIBSCI_VERSION" in os.environ)
+    use_craylibsci = check_cray() and ("CRAY_LIBSCI_VERSION" in os.environ)
 
     if not (use_mkl or use_openblas or use_craylibsci):
         print()
