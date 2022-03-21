@@ -54,6 +54,7 @@ from .import_from_pyscf import eri_deriv
 from .import_from_pyscf import overlap_second_deriv
 from .import_from_pyscf import hcore_second_deriv
 from .import_from_pyscf import eri_second_deriv
+from .import_from_pyscf import dipole_deriv
 
 
 class ScfHessianDriver(HessianDriver):
@@ -1090,45 +1091,19 @@ class ScfHessianDriver(HessianDriver):
             The dipole integral derivatives.
         """
 
-        # atom labels
-        labels = molecule.get_labels()
-
         # number of atoms
         natm = molecule.number_of_atoms()
-
-        # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
 
         # number of atomic orbitals
         nao = self.scf_drv.scf_tensors['D_alpha'].shape[0]
 
-        # Dipole integrals driver
-        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-
         # 3 dipole components x No. atoms x 3 atomic coordinates x No. basis x No. basis
         dipole_integrals_gradient = np.zeros((3, natm, 3, nao, nao))
 
-        # smaller delta_h values can be used here
-        local_delta_h = 0.01 * self.delta_h
-
         for i in range(natm):
-            for d in range(3):
-                coords[i, d] += local_delta_h
-                new_mol = Molecule(labels, coords, units='au')
-
-                dipole_mats_p = dipole_drv.compute(new_mol, ao_basis)
-                dipole_ints_p = (dipole_mats_p.x_to_numpy(), dipole_mats_p.y_to_numpy(),
-                               dipole_mats_p.z_to_numpy())
-
-                coords[i, d] -= 2.0 * local_delta_h
-                new_mol = Molecule(labels, coords, units='au')
-
-                dipole_mats_m = dipole_drv.compute(new_mol, ao_basis)
-                dipole_ints_m = (dipole_mats_m.x_to_numpy(), dipole_mats_m.y_to_numpy(),
-                               dipole_mats_m.z_to_numpy())
-
-                for c in range(3):
-                    dipole_integrals_gradient[c, i, d] = ( dipole_ints_p[c] - dipole_ints_m[c] ) / (2.0 * local_delta_h)
+            dipole_integrals_gradient[:,i,:,:,:] = (
+                                dipole_deriv(molecule, ao_basis, i)
+                                )
 
         return dipole_integrals_gradient
 

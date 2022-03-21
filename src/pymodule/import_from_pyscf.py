@@ -2120,7 +2120,6 @@ def eri_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
 
     return vlx_eri_deriv_atom_i
 
-## Not working correctly
 def dipole_deriv(molecule, basis, i=0, unit="au"):
     """
     Imports the derivatives of the dipole moment integrals
@@ -2161,14 +2160,11 @@ def dipole_deriv(molecule, basis, i=0, unit="au"):
 
     dipole_deriv_atom_i = np.zeros(pyscf_dipole_deriv.shape)
 
-    #dipole_deriv_atom_i[:,:,ki:kf] = pyscf_dipole_deriv[:,:,ki:kf]
     dipole_deriv_atom_i[:,:,:,ki:kf] = pyscf_dipole_deriv[:,:,:,ki:kf]
-    #dipole_deriv_atom_i = pyscf_dipole_deriv
 
     # (nabla m | n) + (m | nabla n)
     dipole_deriv_atom_i += dipole_deriv_atom_i.transpose(0,1,3,2)
 
-    #vlx_dipole_deriv_atom_i = np.zeros_like(dipole_deriv_atom_i.reshape(3,3,nao,nao))
     vlx_dipole_deriv_atom_i = np.zeros(dipole_deriv_atom_i.shape)
 
 
