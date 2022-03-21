@@ -56,7 +56,9 @@ vpath %.hpp $(VLX_INCLUDES)
 CXXFLAGS += $(MATH_INC)
 
 # Add Google Test includes
-CXXFLAGS += -I $(GST_ROOT)/include
+ifdef GST_INC
+CXXFLAGS += -I $(GST_INC)
+endif
 
 # Default rule for linking library
 debug: $(LOCAL_OBJ)

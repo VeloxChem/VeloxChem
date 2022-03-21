@@ -58,7 +58,9 @@ CXXFLAGS += -I../src/general
 CXXFLAGS += $(MATH_INC)
 
 # Add Google Test includes
-CXXFLAGS += -isystem $(GST_ROOT)/include
+ifdef GST_INC
+CXXFLAGS += -I $(GST_INC)
+endif
 
 # Add list of internal libraries
 VST_LIBS_DIR := ${shell find * -type d -print}
