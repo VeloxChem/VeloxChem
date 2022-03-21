@@ -23,15 +23,17 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
 import numpy as np
 import os
+import sys
 
 from scipy.optimize import curve_fit
 
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scffirstorderprop import ScfFirstOrderProperties
 from .rspabsorption import Absorption
-from .inputparser import parse_input, print_keywords
+from .inputparser import parse_input, print_keywords, parse_seq_range
 from .errorhandler import assert_msg_critical
 from .outputstream import OutputStream
 
@@ -63,22 +65,28 @@ class NumerovDriver:
         """
 
         # Potential energy curve (PEC) scan parameters
-        self.pec_start = 0.7
-        self.pec_end = 2.0
-        self.pec_step = 0.1
+        #self.pec_start = 0.7
+        #self.pec_end = 2.0
+        #self.pec_step = 0.1
+        self.pec_displacements = parse_seq_range('-0.7 - 2.0 (0.1)')
+        self.pec_energies = None
+        self.pec_properties = None
 
         # spectroscopy parameters
+        self.reduced_mass = None
+        self.eq_bond_len = None
+        # electronic
+        self.el_transition = False
+        #self.initial_state = 0
+        self.final_el_state = 1
+        # vibrationial
         self.n_vib_states = 5
-
-        self.electronic_excitation = False
-        self.initial_state = 0
-        self.final_state = 1
-
+        # rotational
         self.rotation = True
         self.temp = 298.15
         self.n_rot_states = 15
 
-        # solver setup
+        # numerov solver setup
         self.conv_thresh = 1.0e-12
         self.max_iter = 1000
         self.cur_iter = 0
@@ -88,30 +96,38 @@ class NumerovDriver:
         self.is_converged = False
 
         # mpi information
+        if comm is None:
+            comm = MPI.COMM_WORLD
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
         # output streams
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
         self.ostream = ostream
         self.silent = OutputStream(os.devnull)
 
         # input keywords
         self.input_keywords = {
             'numerov': {
-                'pec_start':
-                    ('float', 'start distance for PEC screening [bohr]'),
-                'pec_end':
-                   ('float', 'end distance for PEC screening [bohr]'),
-                'pec_step':
-                    ('float', 'step size for PEC screening [bohr]'),
+                #'pec_start':
+                #    ('float', 'start distance for PEC screening [bohr]'),
+                #'pec_end':
+                #   ('float', 'end distance for PEC screening [bohr]'),
+                #'pec_step':
+                #    ('float', 'step size for PEC screening [bohr]'),
+                'pec_displacements':
+                    ('seq_range', 'PEC screening range [bohr]'),
                 'n_vib_states':
                     ('int', 'number of vibrational states to be resolved'),
-                'electronic_excitation':
-                    ('bool', 'include an electronic excitation'),
-                'intial_state':
-                    ('int', 'initial state of the electronic transition'),
-                'final_state':
+                'reduced_mass':
+                    ('float', 'reduced mass of the molecule'),
+                'el_transition':
+                    ('bool', 'include an electronic transition'),
+                #'intial_state':
+                #    ('int', 'initial state of the electronic transition'),
+                'final_el_state':
                     ('int', 'final state of the electronic transition'),
                 'rotation':
                     ('bool', 'enable/disable rotational resolution'),
@@ -153,10 +169,6 @@ class NumerovDriver:
 
         parse_input(self, numerov_keywords, numerov_dict)
 
-        if 'electronic_exciation' in numerov_keywords:
-            if self.electronic_exciation == 'yes':
-                self.electronic_excitation = True
-
         if method_dict is not None:
             self.method_dict = dict(method_dict)
 
@@ -168,31 +180,112 @@ class NumerovDriver:
         To be defined...
         """
 
+        # what else is needed if the energy profiles are provided?
+
+
+        if not self.pec_energies and not self.pec_properties:
+            self.pec_energies, self.properties = self.generate_pec(molecule, ao_basis, min_basis)
+
+        #print('ground state energies:', self.pec_energies['i'])
+        #print('ground state dipole moments:', dipmoms)
+
+        #print('excited state energies:', self.pec_energies['f'])
+        #print('bond lengths:',bond_lengths)
+        #print('displacements:',self.pec_displacements)
+
+
+        # calculate vibronic wave functions using the Numerov method for PEC(s)
+
+        i_pec = np.array(self.pec_energies['i']) - min(self.pec_energies['i'])
+
+        # use morse potential: figure out a nicer way
+        tstart = [1.e+3, 1, 3, 0]
+
+        i_pec_morse_params, pcov = curve_fit(self.morse, self.pec_displacements, i_pec, p0 = tstart, maxfev=40000000)
+
+        i_grid, i_psi, i_vib_energies = self.solve_numerov(i_pec_morse_params)
+
+        # check for convergence
+        assert_msg_critical(self.is_converged,
+           'Vibronic wave functions for initial electronic state not converged')
+
+        #print('energies:', i_vib_energies)
+
+        if self.el_transition:
+            f_pec = np.array(pec_energies['f']) - min(pec_energies['f'])
+
+            f_pec_morse_params, pcov = curve_fit(self.morse, self.pec_displacements, f_pec, p0 = tstart, maxfev=40000000)
+
+            f_grid, f_psi, f_vib_energies = self.solve_numerov(f_pec_morse_params)
+
+            # check for convergence
+            assert_msg_critical(self.is_converged,
+             'Vibronic wave functions for final electronic state not converged')
+
+            #print('final state energies:', f_vib_energies)
+
+        # calculate spectra
+
+        # discretize property curves
+        x_prop_coefs = np.polyfit(self.pec_displacements, np.array(self.properties)[:,0], 6)
+        y_prop_coefs = np.polyfit(self.pec_displacements, np.array(self.properties)[:,1], 6)
+        z_prop_coefs = np.polyfit(self.pec_displacements, np.array(self.properties)[:,2], 6)
+
+        dipmom_curves = {}
+        dipmom_curves['x'] = np.polyval(x_prop_coefs, i_grid)
+        dipmom_curves['y'] = np.polyval(y_prop_coefs, i_grid)
+        dipmom_curves['z'] = np.polyval(z_prop_coefs, i_grid)
+
+
+        # IR for a single state
+        if not self.el_transition:
+            spectrum = self.get_IR_spectrum(i_vib_energies, i_psi, dipmom_curves)
+
+            return {
+                'grid': i_grid,
+                'psi': i_psi,
+                'vib_levels': i_vib_energies,
+                'excitation_energies': spectrum[0],
+                'oscillator_strenths': spectrum[1],
+            }
+
+        # UV/Vis for two states
+        else:
+            UV_energies, UV_intensities = None, None
+
+            return {
+                'grid': i_grid,
+                'f_grid': f_grid,
+                'i_psi': i_psi,
+                'i_vib_levels': i_vib_energies,
+                'f_spi': f_psi,
+                'f_vib_levels': f_vib_energies,
+                'UV_energies': UV_energies,
+                'UV_intensities': UV_intensities,
+            }
+
+    def generate_pec(self, molecule, ao_basis, min_basis=None):
+
         # sanity check
         assert_msg_critical(molecule.number_of_atoms() == 2,
                             'Only applicable to diatomic molecules')
 
         # get data for PEC screening
         mol_coords = molecule.get_coordinates()
-        eq_bond_len = np.linalg.norm(mol_coords[0] - mol_coords[1])
-
-        bond_lengths = np.arange(eq_bond_len - self.pec_start,
-                                 eq_bond_len + self.pec_end + self.pec_step,
-                                 self.pec_step)
-        displacements = bond_lengths - eq_bond_len
+        self.eq_bond_len = np.linalg.norm(mol_coords[0] - mol_coords[1])
+        bond_lengths = self.pec_displacements + self.eq_bond_len
 
         atom1, atom2 = molecule.get_labels()
 
-        # extract reduced mass here with the help of the atom labels
-        self.reduced_mass = 0.9796 * 1822.888479031408
+        #### extract reduced mass here with the help of the atom labels
+        if not self.reduced_mass:
+            self.reduced_mass = 0.9796 * 1822.888479031408
 
         # calculate PEC(s) for initial (i) and final (f) state
         pec_energies = {'i': [], 'f': []}
+        dipoles = []
 
-        dipmoms = []
-        transmoms = []
-
-        minima_found = {'i': False, 'f': False}
+        f_minimum_found = False
 
         # initiate unrestricted SCF driver
         scf_drv = ScfUnrestrictedDriver(self.comm, self.silent)
@@ -210,153 +303,52 @@ class NumerovDriver:
             scf_drv.compute(geometry, ao_basis, min_basis)
             scf_prop.compute(geometry, ao_basis, scf_drv.scf_tensors)
 
-            # if initial (or only) state is the electronic ground state
-            if self.initial_state == 0:
-                # save energies and dipole moments
-                pec_energies['i'].append(scf_drv.iter_data[-1]['energy'])
-                dipmoms.append(scf_prop.get_property('dipole moment')[0])
+            # save energies and dipole moments
+            pec_energies['i'].append(scf_drv.iter_data[-1]['energy'])
+            dipoles.append(scf_prop.get_property('dipole moment'))
 
-            # if an electronic excitation is included
-            if self.electronic_excitation:
-                # calculate the PEC for initial (if not GS) and final state 
-                for state, n in {'i': self.initial_state, 'f': self.final_state}.items():
-                    if n > 0:
-                        excited_state = n
-                        correct_state_found = False
-                        prev_energy = None
-                        if pec_energies[state]:
-                            prev_energy = pec_energies[state][-1]
+            # if an electronic transition is included
+            if self.el_transition:
+                # calculate the PEC for final state 
+                excited_state = self.final_el_state
+                correct_state_found = False
+                prev_energy = None
+                if pec_energies['f']:
+                    prev_energy = pec_energies['f'][-1]
 
-                        # try to find a smooth PEC by jumping up in states
-                        # after an ISC
-                        while correct_state_found == False:
-                            # twice the number of excited states to consider
-                            # for unrestricted case
-                            rsp_drv = Absorption({'nstates': 2*excited_state - 1}, self.method_dict)
+                # try to find a smooth PEC by jumping up in states
+                # after an avoided crossing
+                while correct_state_found == False:
+                    # twice the number of excited states to consider
+                    # for unrestricted case
+                    rsp_drv = Absorption({'nstates': 2*excited_state - 1}, self.method_dict)
     
-                            rsp_drv.init_driver(self.comm, self.silent)
-                            rsp_drv.compute(geometry, ao_basis, scf_drv.scf_tensors)
+                    rsp_drv.init_driver(self.comm, self.silent)
+                    rsp_drv.compute(geometry, ao_basis, scf_drv.scf_tensors)
     
-                            total_energy = (rsp_drv.rsp_property['eigenvalues'][-1]
-                                            + scf_drv.iter_data[-1]['energy'])
-                            #print('exc_energies:', rsp_drv.rsp_property['eigenvalues'])
-                            #print('elec_trans_dipoles:',rsp_drv.rsp_property['electric_transition_dipoles'])
+                    total_energy = (rsp_drv.rsp_property['eigenvalues'][-1]
+                                    + scf_drv.iter_data[-1]['energy'])
    
-                            # detect PEC minimum
-                            if prev_energy and minima_found[state] == False:
-                                if prev_energy < total_energy:
-                                    minima_found[state] = True
-                            # total energy expected to rise right of the minimum
-                            if minima_found[state]:
-                                if prev_energy > total_energy:
-                                    # jumping up one state if not
-                                    excited_state += 1
-                                    continue
-                            correct_state_found = True
+                    # detect PEC minimum
+                    if prev_energy and f_minimum_found == False:
+                        if prev_energy < total_energy:
+                            minima_found[state] = True
+                    # total energy expected to rise after the minimum
+                    if f_minimum_found:
+                        if prev_energy > total_energy:
+                            # jumping up one state if not
+                            excited_state += 1
+                            continue
+                    correct_state_found = True
 
-                        pec_energies[state].append(total_energy)
-                        transmoms.append(rsp_drv.rsp_property['electric_transition_dipoles'])
+                pec_energies['f'].append(total_energy)
+                dipoles.append(rsp_drv.rsp_property['electric_transition_dipoles'][-1])
 
-        if self.initial_state != 0:
-            assert_msg_critical(minima_found['i'],
-                'No minimum was found for the initial state PEC')
-        if self.electronic_excitation:
-            assert_msg_critical(minima_found['f'],
+        if self.el_transition:
+            assert_msg_critical(f_minimum_found,
                 'No minimum was found for the final state PEC')
 
-        #print('ground state energies:', i_pec_energies)
-        #print('ground state dipole moments:', dipmoms)
-
-        #print('excited state energies:', f_pec_energies)
-        #print('bond lengths:',bond_lengths)
-        #print('displacements:',displacements)
-
-
-        # calculate vibronic wave functions using the Numerov method for PEC(s)
-
-        i_pec = np.array(pec_energies['i']) - min(pec_energies['i'])
-
-        # use morse potential: figure out a nicer way
-        tstart = [1.e+3, 1, 3, 0]
-
-        i_pec_morse_params, pcov = curve_fit(self.morse, displacements, i_pec, p0 = tstart, maxfev=40000000)
-
-        i_grid, i_psi, i_vib_energies = self.solve_numerov(i_pec_morse_params)
-
-        # check for convergence
-        assert_msg_critical(self.is_converged,
-            'Vibronic wave functions for initial electronic state not converged')
-
-        print('energies:', i_vib_energies)
-
-        if self.electronic_excitation:
-            f_pec = np.array(pec_energies['f']) - min(pec_energies['f'])
-
-            f_pec_morse_params, pcov = curve_fit(self.morse, displacements, f_pec, p0 = tstart, maxfev=40000000)
-
-            f_grid, f_psi, f_vib_energies = self.solve_numerov(f_pec_morse_params)
-
-            # check for convergence
-            assert_msg_critical(self.is_converged,
-                'Vibronic wave functions for final electronic state not converged')
-
-            print('final state energies:', f_vib_energies)
-
-        # calculate spectra
-
-        # IR for a single state
-        if self.electronic_excitation == False:
-            # (so far) only implemented for the electronic ground state
-            if self.initial_state == 0:
-                i_dip_coefs = np.polyfit(displacements, dipmoms, 6)
-                dmc = np.polyval(i_dip_coefs, i_grid)
-
-                spectrum = self.get_spectrum(i_vib_energies, i_vib_energies, i_psi, i_psi, dmc, eq_bond_len)
-
-            if self.rotation:
-                return {
-                    'grid': i_grid,
-                    'psi': i_psi,
-                    'vib_levels': i_vib_energies,
-                    'IR_energies': spectrum[0],
-                    'IR_intensities': spectrum[1],
-                    'r_energies': spectrum[2],
-                    'r_intensities': spectrum[3],
-                    'p_energies': spectrum[4],
-                    'p_intensities': spectrum[5],
-                }
-            else:
-                return {
-                    'grid': i_grid,
-                    'psi': i_psi,
-                    'vib_levels': i_vib_energies,
-                    'IR_energies': spectrum[0],
-                    'IR_intensities': spectrum[1],
-                }
-
-        # UV/Vis for two states
-        else:
-            UV_energies, UV_intensities = None, None
-
-            return {
-                'grid': i_grid,
-                'f_grid': f_grid,
-                'i_psi': i_psi,
-                'i_vib_levels': i_vib_energies,
-                'f_spi': f_psi,
-                'f_vib_levels': f_vib_energies,
-                'UV_energies': UV_energies,
-                'UV_intensities': UV_intensities,
-            }
-
-
-        # To-Do:
-        # Implement rotational resolution
-
-        print('running through')
-
-
-
+        return pec_energies, dipoles
 
     def solve_numerov(self, morse_params):
 
@@ -364,7 +356,7 @@ class NumerovDriver:
         self.is_converged = False
 
         # define grid
-        interval = self.n_margin + self.pec_start + self.pec_end + self.p_margin
+        interval = self.n_margin + -self.pec_displacements[0] + self.pec_displacements[-1] + self.p_margin
         n_steps = self.steps_per_au * interval
 
         n_grid = int(n_steps + 1)
@@ -376,7 +368,7 @@ class NumerovDriver:
         grid = np.zeros(n_grid)
         pec = np.zeros(n_grid)
         for i in range(n_grid):
-            grid[i] = -(self.pec_start + self.n_margin) + i * dx
+            grid[i] = (self.pec_displacements[0] - self.n_margin) + i * dx
             pec[i] = self.morse(grid[i], morse_params[0], morse_params[1], morse_params[2], morse_params[3])
 
         # initialize arrays
@@ -426,8 +418,7 @@ class NumerovDriver:
 
             if (abs(e_step) < self.conv_thresh) and (n_nodes > n_nodes_previous):
                 # convergence of a vibrational state is reached
-                # write "print_iteration" function
-                print('state {} converged'.format(n_nodes))
+                self.print_iteration(n_nodes-1)
 
                 # normalize the wave function
                 psi_v /= np.sqrt(np.dot(psi_v,psi_v))
@@ -457,69 +448,85 @@ class NumerovDriver:
 
         return grid, psi, energies
 
+    def print_iteration(self, v):
+
+        width = 92
+
+        output_header = '*** Vibronic state {} converged '.format(v)
+        output_header += 'in {} iterations'.format(self.cur_iter)
+        self.ostream.print_header(output_header.ljust(width))
+        self.ostream.flush()
+
 
     def morse(self, x, q, m, u, v):
         return (q * (np.exp(-2*m*(x-u))-2*np.exp(-m*(x-u))) + v)
 
 
-    def get_spectrum(self, i_vib_energies, f_rel_vib_energies, i_psi, f_psi, dmc, eq_bond_len):
+    def get_IR_spectrum(self, vib_energies, psi, dmc):
 
+        exc_energies = {}
+        osc_str = {}
 
-        excitation_energies = {}
-        oscillator_strengths = {}
+        # only transition 0->1 significant
+        trans_moms = [np.dot(psi[1], dmc[i] * psi[0]) for i in 'xyz']
+        vib_exc_energy = vib_energies[1] - vib_energies[0]
+        vib_osc_str = 2.0 / 3.0 * vib_exc_energy * np.sum([tm**2 for tm in trans_moms])
 
-        if self.rotation:
-            r_energies = {}
-            r_intensities = {}
-            p_energies = {}
-            p_intensities = {}
+        # (forbidden) Q branch
+        exc_energies['Q'] = vib_exc_energy * hartree_in_wavenumbers()
+        osc_str['Q'] = vib_osc_str
 
-        for state in range(1,f_psi.shape[0]):
+        # rotational resolution
+        inertia = self.reduced_mass * self.eq_bond_len**2
+        B = 1.0 / (2.0 * inertia)
 
-            transition = '0->{}'.format(state)
+        # R branch
+        exc_energies['R'] = np.array([])
+        osc_str['R'] = np.array([])
 
-            trans_mom = np.dot(f_psi[state], dmc * i_psi[0])
-            exc_energy = f_rel_vib_energies[state] - i_vib_energies[0]
-            osc_str = 2.0 / 3.0 * exc_energy * trans_mom**2
+        for j in range(0,self.n_rot_states):
+            exc_energies['R'] = np.append(exc_energies['R'], (vib_exc_energy + 2.0 * B * (j+1)) * hartree_in_wavenumbers())
 
-            excitation_energies[transition] = exc_energy * hartree_in_wavenumbers()
-            oscillator_strengths[transition] = osc_str
+            R_j = (2*j + 1) * np.exp((-B * j*(j+1)) / (boltzmann_in_evperkelvin() / hartree_in_ev() * self.temp))
+            osc_str['R'] = np.append(osc_str['R'], R_j)
 
-            if self.rotation:
-                # rotational resolution
-                inertia = self.reduced_mass * eq_bond_len**2
-                B = 1.0 / (2.0 * inertia)
+        Z_r = np.sum(osc_str['R'])
+        osc_str['R'] *= 0.5 * vib_osc_str / Z_r
 
-                # R branch
-                r_energies[transition] = []
-                r_intensities[transition] = []
+        # P branch
+        exc_energies['P'] = np.array([])
+        osc_str['P'] = np.array([])
 
-                for j in range(0,self.n_rot_states):
-                    r_energies[transition].append((exc_energy + 2.0 * B * (j+1)) * hartree_in_wavenumbers())
+        for j in range(1,self.n_rot_states):
+            exc_energies['P'] = np.append(exc_energies['P'], (vib_exc_energy - 2.0 * B * j) * hartree_in_wavenumbers())
 
-                    r_j = (2*j + 1) * np.exp((-B * j*(j+1)) / (boltzmann_in_evperkelvin() / hartree_in_ev() * self.temp))
-                    r_intensities[transition].append(r_j)
+            P_j = (2*j + 1) * np.exp((-B * j*(j+1)) / (boltzmann_in_evperkelvin() / hartree_in_ev() * self.temp))
+            osc_str['P'] = np.append(osc_str['P'], P_j)
 
-                Z_r = np.sum(r_intensities[transition])
-                r_intensities[transition] /= Z_r * 0.5 * osc_str
+        Z_p = np.sum(osc_str['P'])
+        osc_str['P'] *= 0.5 * vib_osc_str / Z_p
 
-                # P branch
-                p_energies[transition] = []
-                p_intensities[transition] = []
+        return (exc_energies, osc_str)
 
-                for j in range(1,self.n_rot_states):
-                    p_energies[transition].append((exc_energy - 2.0 * B * j) * hartree_in_wavenumbers())
+    def read_pec_data(self, bond_lengths, properties, *pec_energies):
 
-                    p_j = (2*j + 1) * np.exp((-B * j*(j+1)) / (boltzmann_in_evperkelvin() / hartree_in_ev() * self.temp))
-                    p_intensities[transition].append(p_j)    
+        # sanity checks
+        for i in [bond_lengths, properties, *pec_energies]:
+            assert_msg_critical(isinstance(i, (list, np.ndarray)),
+                'at least one input argument is not a list or array')
 
-                Z_p = np.sum(p_intensities[transition])
-                p_intensities[transition] /= Z_p * 0.5 * osc_str
+        assert_msg_critical(all([len(i) == len(displacements) for i in
+                                [properties, *pec_energies]]),
+            'input arrays are not of the same length')
 
-        if self.rotation:
-            return (excitation_energies, oscillator_strengths, r_energies,
-                r_intensities, p_energies, p_intensities)
+        self.properties = properties
+        self.pec_energies = {key: value for key, value in zip(['i', 'f'], [*pec_energies])}
+        self.eq_bond_len = bond_lengths[np.argmin(self.pec_energies['i'])]
+        self.pec_displacements = bond_lengths - self.eq_bond_len
 
-        return (excitation_energies, oscillator_strengths)
+    def set_reduced_mass(self, reduced_mass):
+
+        self.reduced_mass = reduced_mass
+
 
 
