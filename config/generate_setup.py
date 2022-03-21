@@ -56,7 +56,7 @@ class SearchReplace(dict):
 
 
 def is_executable(exe):
-    return os.path.isfile(exe) and os.access(exe, os.X_OK)
+    return Path(exe).is_file() and os.access(exe, os.X_OK)
 
 
 def find_exe(executables):
@@ -196,7 +196,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
     print("*** Checking math library... ", end="")
 
     # check conda environment
-    is_conda = os.path.exists(os.path.join(sys.prefix, "conda-meta"))
+    is_conda = Path(sys.prefix, "conda-meta").is_dir()
 
     # check whether MKL is in conda environment
     if is_conda and ("MKLROOT" not in os.environ):
@@ -219,7 +219,8 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
     use_openblas = (("OPENBLASROOT" in os.environ) or
                     ("OPENBLAS_INCLUDE_DIR" in os.environ and
                      "OPENBLAS_LIBRARY" in os.environ))
-    use_craylibsci = check_cray() and ("CRAY_LIBSCI_VERSION" in os.environ)
+    use_craylibsci = check_cray() and ("CRAY_LIBSCI_VERSION" in os.environ and
+                                       "CRAY_LIBSCI_DIR" in os.environ)
 
     if not (use_mkl or use_openblas or use_craylibsci):
         print()
