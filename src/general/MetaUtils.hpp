@@ -39,60 +39,62 @@
 namespace metautils {
 /* \@{ From type to MPI_Datatype enum variant and string representation */
 template <typename T>
-struct type_to_mpi_t;
-
-template <>
-struct type_to_mpi_t<bool>
-{
-    inline const static MPI_Datatype variant{MPI_C_BOOL};
+struct type_to_mpi_datatype {
+    inline constexpr static MPI_Datatype value{MPI_DATATYPE_NULL};
 };
 
 template <>
-struct type_to_mpi_t<char>
+struct type_to_mpi_datatype<bool>
 {
-    inline const static MPI_Datatype variant{MPI_CHAR};
+    inline constexpr static MPI_Datatype value{MPI_C_BOOL};
 };
 
 template <>
-struct type_to_mpi_t<int16_t>
+struct type_to_mpi_datatype<char>
 {
-    inline const static MPI_Datatype variant{MPI_INT16_T};
+    inline constexpr static MPI_Datatype value{MPI_CHAR};
 };
 
 template <>
-struct type_to_mpi_t<int32_t>
+struct type_to_mpi_datatype<int16_t>
 {
-    inline const static MPI_Datatype variant{MPI_INT32_T};
+    inline constexpr static MPI_Datatype value{MPI_INT16_T};
 };
 
 template <>
-struct type_to_mpi_t<int64_t>
+struct type_to_mpi_datatype<int32_t>
 {
-    inline const static MPI_Datatype variant{MPI_INT64_T};
+    inline constexpr static MPI_Datatype value{MPI_INT32_T};
 };
 
 template <>
-struct type_to_mpi_t<std::size_t>
+struct type_to_mpi_datatype<int64_t>
+{
+    inline constexpr static MPI_Datatype value{MPI_INT64_T};
+};
+
+template <>
+struct type_to_mpi_datatype<std::size_t>
 {
 #if SIZE_MAX == UCHAR_MAX
-    inline const static MPI_Datatype variant{MPI_UNSIGNED_CHAR};
+    inline constexpr static MPI_Datatype value{MPI_UNSIGNED_CHAR};
 #elif SIZE_MAX == USHRT_MAX
-    inline const static MPI_Datatype variant{MPI_UNSIGNED_SHORT};
+    inline constexpr static MPI_Datatype value{MPI_UNSIGNED_SHORT};
 #elif SIZE_MAX == UINT_MAX
-    inline const static MPI_Datatype variant{MPI_UNSIGNED};
+    inline constexpr static MPI_Datatype value{MPI_UNSIGNED};
 #elif SIZE_MAX == ULONG_MAX
-    inline const static MPI_Datatype variant{MPI_UNSIGNED_LONG};
+    inline constexpr static MPI_Datatype value{MPI_UNSIGNED_LONG};
 #elif SIZE_MAX == ULLONG_MAX
-    inline const static MPI_Datatype variant{MPI_UNSIGNED_LONG_LONG};
+    inline constexpr static MPI_Datatype value{MPI_UNSIGNED_LONG_LONG};
 #else
 #error "Your compiler does not know what SIZE_MAX is?"
 #endif
 };
 
 template <>
-struct type_to_mpi_t<double>
+struct type_to_mpi_datatype<double>
 {
-    inline const static MPI_Datatype variant{MPI_DOUBLE};
+    inline constexpr static MPI_Datatype value{MPI_DOUBLE};
 };
 /* \@} */
 

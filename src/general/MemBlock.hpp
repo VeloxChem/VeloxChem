@@ -110,7 +110,7 @@ class CMemBlock
 
      @param dataVector - the vector with data elements.
      */
-    CMemBlock(const std::vector<T>& dataVector);
+    explicit CMemBlock(const std::vector<T>& dataVector);
 
     /**
      Create a memory block object.
@@ -642,9 +642,27 @@ CMemBlock<int32_t>::broadcast(int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
+        // broadcast numa policy
+
+        int32_t nmpol = 0;
+
+        if (rank == mpi::master()) nmpol = to_int(_numaPolicy);
+
+        mpi::bcast(nmpol, comm);
+
+        if (rank != mpi::master())
+        {
+            _numaPolicy = to_numa(nmpol);
+        }
+
         mpi::bcast(_nElements, comm);
 
-        if (rank != mpi::master()) _allocate();
+        if (rank != mpi::master())
+        {
+            _allocate();
+        }
+
+        MPI_Barrier(comm);
 
         auto merror = MPI_Bcast(_data, _nElements, MPI_INT32_T, mpi::master(), comm);
 
@@ -983,7 +1001,8 @@ CMemBlock<T>::repr() const
 
     os << "[CMemBlock (Object):" << this << "]" << std::endl;
 
-    os << "_numaPolicy: " << to_string(_numaPolicy);
+    os << "_numaPolicy: " << to_string(_numaPolicy) << std::endl;
+    ;
 
     os << "_nElements: " << _nElements << std::endl;
 

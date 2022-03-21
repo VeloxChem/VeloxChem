@@ -28,11 +28,11 @@ stages:
   - test
 
 .monkey:setup:
-  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-d54d2a6
+  tags:
+    - vlx-docker
+  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-3e15b69
   variables:
     OMP_NUM_THREADS: "6"
-    GTESTROOT: "/usr"
-    GTESTLIB: "/usr/lib/x86_64-linux-gnu/libgtest.a"
   before_script:
     - uname -a
     - free -m
@@ -74,7 +74,7 @@ monkey:python_tests:
   script:
     - python -m venv --clear venv
     - source venv/bin/activate
-    - python -m pip install pytest pytest-cov
-    - python -m pip install .[qmmm]
+    - python -m pip install .[test,qmmm]
+    - python -c "import veloxchem; print(veloxchem.__version__)"
+    - mpiexec -n 2 python -m pytest -v -s --pyargs veloxchem -m "solvers"
     - python -m pytest -v --cov=veloxchem --pyargs veloxchem
-    - mpiexec -n 2 python -m pytest -v --pyargs veloxchem -m "solvers"

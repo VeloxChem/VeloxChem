@@ -28,7 +28,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
+#include <random>
 #include <type_traits>
 
 namespace mathfunc {  // mathfunc namespace
@@ -250,6 +252,39 @@ copy(T* aVector, const int32_t aPosition, const T* bVector, const int32_t bPosit
  */
 int32_t maxTensorComponents(const int32_t order);
 
+/** Fill raw array with random numbers in interval.
+ *
+ * @tparam scalar type of raw array.
+ * @param[in,out] dst raw array.
+ * @param[in] lower lower bound of interval.
+ * @param[in] upper upper bound of interval.
+ * @param[in] sz number of elements in array.
+ *
+ * This function uses the C++ default random engine with random seeding.
+ */
+template <typename T>
+auto
+fill_random(T* dst, T lower, T upper, size_t sz) -> void
+{
+    static_assert(std::is_arithmetic_v<T>, "Scalar type must be arithmetic.");
+
+    // random number generator
+    auto gen = std::default_random_engine(std::random_device()());
+
+    // distribution (use IIFE idiom to get the right distribution at compile-time)
+    auto dist = [lower, upper] {
+        if constexpr (std::is_floating_point_v<T>)
+        {
+            return std::uniform_real_distribution<T>(lower, upper);
+        }
+        else
+        {
+            return std::uniform_int_distribution<T>(lower, upper);
+        }
+    }();
+
+    std::generate(dst, dst + sz, [&dist, &gen]() { return dist(gen); });
+}
 }  // namespace mathfunc
 
 #endif /* MathFunc_hpp */

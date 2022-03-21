@@ -38,11 +38,7 @@
 
 namespace mpi {
 template <typename T>
-inline constexpr MPI_Datatype
-mpi_t()
-{
-    return metautils::type_to_mpi_t<T>::variant;
-}
+inline constexpr MPI_Datatype type_v = metautils::type_to_mpi_datatype<T>::value;
 
 template <typename T>
 inline std::string
@@ -149,12 +145,12 @@ bool compare(MPI_Comm comm1, MPI_Comm comm2);
  * @param comm the MPI communicator.
  */
 template <typename T>
-void
-bcast(T& value, MPI_Comm comm)
+auto
+bcast(T& value, MPI_Comm comm) -> decltype((void)(std::is_arithmetic_v<T>), void())
 {
     if (ENABLE_MPI)
     {
-        auto merror = MPI_Bcast(&value, 1, mpi_t<T>(), mpi::master(), comm);
+        auto merror = MPI_Bcast(&value, 1, mpi::type_v<T>, mpi::master(), comm);
 
         if (merror != MPI_SUCCESS) mpi::abort(merror, error_message<T>("mpi::bcast"));
     }
@@ -182,15 +178,15 @@ bcast(std::vector<T>& vector, int32_t rank, MPI_Comm comm)
 {
     if (ENABLE_MPI)
     {
-        auto veclen = (rank == mpi::master()) ? vector.size() : 0;
+        auto veclen = (rank == mpi::master()) ? vector.size() : static_cast<size_t>(0);
 
         mpi::bcast(veclen, comm);
 
         if (rank != mpi::master()) vector.clear();
 
-        for (const auto x : vector)
+        for (const auto& x : vector)
         {
-            auto mvalue = (rank == mpi::master()) ? x : 0;
+            auto mvalue = (rank == mpi::master()) ? x : static_cast<T>(0);
 
             if constexpr (std::is_same_v<T, std::string>)
             {
@@ -222,7 +218,7 @@ send(T& value, const int32_t rank, MPI_Comm comm) -> decltype((void)(std::is_ari
 {
     if (ENABLE_MPI)
     {
-        auto merror = MPI_Send(&value, 1, mpi_t<T>(), rank, 0, comm);
+        auto merror = MPI_Send(&value, 1, mpi::type_v<T>, rank, 0, comm);
 
         if (merror != MPI_SUCCESS) mpi::abort(merror, error_message<T>("mpi::send"));
     }
@@ -244,7 +240,7 @@ receive(T& value, const int32_t rank, MPI_Comm comm) -> decltype((void)(std::is_
     {
         MPI_Status mstat;
 
-        auto merror = MPI_Recv(&value, 1, mpi_t<T>(), rank, 0, comm, &mstat);
+        auto merror = MPI_Recv(&value, 1, mpi::type_v<T>, rank, 0, comm, &mstat);
 
         if (merror != MPI_SUCCESS) mpi::abort(merror, error_message<T>("mpi::receive"));
     }
@@ -297,7 +293,7 @@ gather(T* vector, T value, int32_t rank, MPI_Comm comm) -> decltype((void)(std::
 {
     if (ENABLE_MPI)
     {
-        auto merror = MPI_Gather(&value, 1, mpi_t<T>(), vector, 1, mpi_t<T>(), mpi::master(), comm);
+        auto merror = MPI_Gather(&value, 1, mpi::type_v<T>, vector, 1, mpi::type_v<T>, mpi::master(), comm);
 
         if (merror != MPI_SUCCESS) mpi::abort(merror, error_message<T>("mpi::gather"));
     }
@@ -322,7 +318,7 @@ reduce_sum(const T* source, T* destination, const int32_t nElements, MPI_Comm co
 {
     if (ENABLE_MPI)
     {
-        auto merror = MPI_Reduce(source, destination, nElements, mpi_t<T>(), MPI_SUM, mpi::master(), comm);
+        auto merror = MPI_Reduce(source, destination, nElements, mpi::type_v<T>, MPI_SUM, mpi::master(), comm);
 
         if (merror != MPI_SUCCESS) mpi::abort(merror, error_message<T>("mpi::reduce_sum"));
     }

@@ -88,6 +88,9 @@ debug: $(VLX_LIBS) basis pymodule pytests
 	@echo ====== Linking debug version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
+	@echo ====== Building bcastdebug program...
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) bcastdebug.cpp -o bcastdebug.x \
+	$(VLX_LIBS) $(MATH_LIB) general/general.a
 
 # Release
 release: $(VLX_LIBS) basis pymodule pytests

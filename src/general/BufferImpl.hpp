@@ -26,16 +26,15 @@
 #ifndef BufferImpl_hpp
 #define BufferImpl_hpp
 
-#include <algorithm>
 #include <array>
 #include <cstddef>
-#include <random>
 #include <tuple>
 #include <type_traits>
 #include <vector>
 
 #include "Device.hpp"
 #include "ErrorHandler.hpp"
+#include "MathFunc.hpp"
 #include "MemAlloc.hpp"
 #include "MetaUtils.hpp"
 #include "mdspan.hpp"
@@ -69,9 +68,13 @@ class CBuffer
     static_assert(NCols != 1, "CBuffer does not allow for storing column vectors.");
 
    public:
-    using size_type    = std::decay_t<decltype(Dynamic)>;
-    using value_type   = T;
-    using backend_type = B;
+    using size_type       = std::decay_t<decltype(Dynamic)>;
+    using value_type      = T;
+    using backend_type    = B;
+    using reference       = value_type &;
+    using const_reference = const value_type &;
+    using pointer         = value_type *;
+    using const_pointer   = const value_type *;
 
     static constexpr size_type Alignment = [] {
         if constexpr (mem::is_on_host_v<B>)
@@ -143,7 +146,7 @@ class CBuffer
     size_type _nElements{0};
 
     /** The contiguous and aligned memory buffer. */
-    value_type *_data{nullptr};
+    pointer _data{nullptr};
 
     /** Copy aligned data from `src` to `_data`.
      *
@@ -153,7 +156,7 @@ class CBuffer
      */
     template <typename B_ = backend_type, typename = std::enable_if_t<mem::is_on_host_v<B_>>>
     auto
-    _copy_aligned(const T *src) -> void
+    _copy_aligned(const_pointer src) -> void
     {
         auto pdata = _data;
 
@@ -178,7 +181,7 @@ class CBuffer
      */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
     auto
-    _copy_unaligned(const value_type *src) -> void
+    _copy_unaligned(const_pointer src) -> void
     {
         if constexpr (mem::is_on_host_v<backend_type>)
         {
@@ -200,7 +203,7 @@ class CBuffer
      */
     template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
     auto
-    _copy_unaligned(const value_type *src) -> void
+    _copy_unaligned(const_pointer src) -> void
     {
         if constexpr (mem::is_on_host_v<backend_type>)
         {
@@ -227,8 +230,43 @@ class CBuffer
         }
     }
 
+    auto
+    _allocate() -> void
+    {
+        if (_data)
+        {
+            errors::msgCritical(std::string(__func__) + ": buffer already allocated!");
+        }
+
+        if constexpr (Layout1D)
+        {
+            _nPaddedColumns = mem::get_pitch<value_type>(Alignment, _nColumns);
+            _nElements      = _nRows * _nPaddedColumns;
+            _data           = mem::malloc<value_type, backend_type>(_nElements);
+        }
+        else
+        {
+            std::tie(_nPaddedColumns, _data) = mem::malloc<value_type, backend_type>(_nRows, _nColumns);
+            _nElements                       = _nRows * _nPaddedColumns;
+        }
+    }
+
    public:
+    /** Default CTOR when some dimensions are not known at compile-time.
+     *
+     * @warning This CTOR **does not** allocate memory.  You will have to call
+     * one of `allocate`/`setConstant`/`setZero`/`setRandom` to do so.
+     */
+    template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::N) || !(K_ == Kind::MN), bool> = true>
+    explicit CBuffer()
+    {
+    }
+
     /** @{ CTORs 1D buffer with run-time number of elements. */
+    /** CTOR
+     *
+     * @param[in] nCols number of elements in 1D buffer
+     */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
     explicit CBuffer(size_type nCols)
         : _nColumns{nCols}
@@ -238,37 +276,81 @@ class CBuffer
     {
     }
 
+    /** CTOR
+     *
+     * @param[in] v vector of data to copy into 1D buffer
+     */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
     explicit CBuffer(const std::vector<value_type> &v) : CBuffer<value_type, backend_type, 1, Dynamic>{v.size()}
     {
         _copy_unaligned(v.data());
     }
 
+    /** CTOR
+     *
+     * @param[in] nCols number of elements in 1D buffer.
+     * @param[in] v vector of data to copy into 1D buffer.
+     * @warning the input vector **must** have at least `nCols` elements!
+     */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
     explicit CBuffer(size_type nCols, const std::vector<value_type> &v) : CBuffer<value_type, backend_type, 1, Dynamic>{nCols}
     {
+        errors::assertMsgCritical(v.size() <= _nColumns,
+                                  std::string(__func__) + ": input vector must have at least " + std::to_string(_nColumns) + " elements");
         _copy_unaligned(v.data());
+    }
+
+    /** Resize existing buffer.
+     *
+     * @param[in] nCols number of elements in 1D buffer.
+     *
+     * @warning The resize is **always** non-conservative, _i.e._ the current
+     * contents of the buffer  will be discarded.
+     */
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
+    auto
+    resize(size_type nCols) -> void
+    {
+        // deallocate existing _data
+        if (_data)
+        {
+            mem::free<value_type, backend_type>(_data);
+        }
+
+        // reset number of columns
+        _nColumns = nCols;
+        // reallocate
+        _allocate();
     }
     /** @} */
 
     /** @{ CTORs for 1D buffer with compile-time number of elements. */
-    /**
-     *
-     * @note the two default CTORs are only part of overload resolution when all extents are fixed at compile-time.
-     */
+    /** Default CTOR. */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::N), bool> = true>
     CBuffer() : _nElements{_nRows * _nPaddedColumns}, _data{mem::malloc<value_type, backend_type>(_nElements)}
     {
     }
 
+    /** CTOR
+     *
+     * @param[in] v vector of data to copy into 1D buffer
+     * @warning the input vector **must** have at least `NCols` elements!
+     */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::N), bool> = true>
     explicit CBuffer(const std::vector<value_type> &v) : CBuffer<value_type, backend_type, 1, NCols>{}
     {
+        errors::assertMsgCritical(v.size() <= _nColumns,
+                                  std::string(__func__) + ": input vector must have at least " + std::to_string(_nColumns) + " elements");
         _copy_unaligned(v.data());
     }
     /** @} */
 
     /** @{ CTORs for 2D buffer with run-time number of rows and columns. */
+    /** CTOR
+     *
+     * @param[in] nRows number of rows (height).
+     * @param[in] nCols number of columns (width).
+     */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
     explicit CBuffer(size_type nRows, size_type nCols) : _nRows{nRows}, _nColumns{nCols}
     {
@@ -276,14 +358,50 @@ class CBuffer
         _nElements                       = _nRows * _nPaddedColumns;
     }
 
+    /** CTOR
+     *
+     * @param[in] nRows number of rows (height).
+     * @param[in] nCols number of columns (width).
+     * @param[in] v vector of data to copy into buffer.
+     * @warning the input vector **must** have at least `nRows*nCols` elements!
+     */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
     CBuffer(size_type nRows, size_type nCols, const std::vector<value_type> &v) : CBuffer<value_type, backend_type, Dynamic, Dynamic>{nRows, nCols}
     {
+        errors::assertMsgCritical(v.size() <= _nRows * _nColumns,
+                                  std::string(__func__) + ": input vector must have at least " + std::to_string(_nRows * _nColumns) + " elements");
         _copy_unaligned(v.data());
+    }
+
+    /** Allocate buffer.
+     *
+     * @param[in] nRows number of rows (height).
+     * @param[in] nCols number of columns (width).
+     * @warning it is invalid to call this method on an already allocated buffer!
+     */
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
+    auto
+    allocate(size_type nRows, size_type nCols) -> void
+    {
+        if (!_data)
+        {
+            _nRows                           = nRows;
+            _nColumns                        = nCols;
+            std::tie(_nPaddedColumns, _data) = mem::malloc<value_type, backend_type>(_nRows, _nColumns);
+            _nElements                       = _nRows * _nPaddedColumns;
+        }
+        else
+        {
+            errors::msgCritical(std::string(__func__) + ": 2D buffer already allocated!");
+        }
     }
     /** @} */
 
     /** @{ CTORs for 2D buffer with compile-time number of rows. */
+    /** CTOR
+     *
+     * @param[in] nCols number of columns (width).
+     */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
     explicit CBuffer(size_type nCols) : _nColumns{nCols}
     {
@@ -291,14 +409,47 @@ class CBuffer
         _nElements                       = _nRows * _nPaddedColumns;
     }
 
+    /** CTOR
+     *
+     * @param[in] nCols number of columns (width).
+     * @param[in] v vector of data to copy into buffer.
+     * @warning the input vector **must** have at least `nRows*nCols` elements!
+     */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
     CBuffer(size_type nCols, const std::vector<value_type> &v) : CBuffer<value_type, backend_type, NRows, Dynamic>{nCols}
     {
+        errors::assertMsgCritical(v.size() <= _nRows * _nColumns,
+                                  std::string(__func__) + ": input vector must have at least " + std::to_string(_nRows * _nColumns) + " elements");
         _copy_unaligned(v.data());
+    }
+
+    /** Allocate buffer.
+     *
+     * @param[in] nCols number of columns (width).
+     * @warning it is invalid to call this method on an already allocated buffer!
+     */
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
+    auto
+    allocate(size_type nCols) -> void
+    {
+        if (!_data)
+        {
+            _nColumns                        = nCols;
+            std::tie(_nPaddedColumns, _data) = mem::malloc<value_type, backend_type>(_nRows, _nColumns);
+            _nElements                       = _nRows * _nPaddedColumns;
+        }
+        else
+        {
+            errors::msgCritical(std::string(__func__) + ": 2D buffer already allocated!");
+        }
     }
     /** @} */
 
     /** @{ CTORs for 2D buffer with compile-time number of columns. */
+    /** CTOR
+     *
+     * @param[in] nRows number of rows (height).
+     */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
     explicit CBuffer(size_type nRows) : _nRows{nRows}
     {
@@ -306,14 +457,44 @@ class CBuffer
         _nElements                       = _nRows * _nPaddedColumns;
     }
 
+    /** CTOR
+     *
+     * @param[in] nRows number of rows (height).
+     * @param[in] v vector of data to copy into buffer.
+     * @warning the input vector **must** have at least `nRows*nCols` elements!
+     */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
     CBuffer(size_type nRows, const std::vector<T> &v) : CBuffer<value_type, backend_type, Dynamic, NCols>{nRows}
     {
+        errors::assertMsgCritical(v.size() <= _nRows * _nColumns,
+                                  std::string(__func__) + ": input vector must have at least " + std::to_string(_nRows * _nColumns) + " elements");
         _copy_unaligned(v.data());
+    }
+
+    /** Allocate buffer.
+     *
+     * @param[in] nRows number of rows (height).
+     * @warning it is invalid to call this method on an already allocated buffer!
+     */
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
+    auto
+    allocate(size_type nRows) -> void
+    {
+        if (!_data)
+        {
+            _nRows                           = nRows;
+            std::tie(_nPaddedColumns, _data) = mem::malloc<value_type, backend_type>(_nRows, _nColumns);
+            _nElements                       = _nRows * _nPaddedColumns;
+        }
+        else
+        {
+            errors::msgCritical(std::string(__func__) + ": 2D buffer already allocated!");
+        }
     }
     /** @} */
 
     /** @{ CTORs for 2D buffer with compile-time number of rows and columns*/
+    /** Default CTOR. */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MN), bool> = true>
     CBuffer()
     {
@@ -321,9 +502,16 @@ class CBuffer
         _nElements                       = _nRows * _nPaddedColumns;
     }
 
+    /** CTOR
+     *
+     * @param[in] v vector of data to copy into buffer.
+     * @warning the input vector **must** have at least `_nRows*_nColumns` elements!
+     */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MN), bool> = true>
     explicit CBuffer(const std::vector<T> &v) : CBuffer<value_type, backend_type, NRows, NCols>{}
     {
+        errors::assertMsgCritical(v.size() <= _nRows * _nColumns,
+                                  std::string(__func__) + ": input vector must have at least " + std::to_string(_nRows * _nColumns) + " elements");
         _copy_unaligned(v.data());
     }
     /**@}*/
@@ -659,30 +847,49 @@ class CBuffer
     }
 
     /** @{ Accessors */
+    /** Return number of rows (height) of the buffer. */
     __host__ __device__ auto
     nRows() const -> size_type
     {
         return _nRows;
     }
+
+    /** Return number of columns (width) of the buffer. */
     __host__ __device__ auto
     nColumns() const -> size_type
     {
         return _nColumns;
     }
+
+    /** Return number of padded columns (pitch) of the buffer. */
     __host__ __device__ auto
     nPaddedColumns() const -> size_type
     {
         return _nPaddedColumns;
     }
 
+    /** Return unpadded number of elements in buffer. */
+    __host__ __device__ auto
+    size() const -> size_type
+    {
+        return _nRows * _nColumns;
+    }
+
+    /** Return padded number of elements in buffer. */
+    __host__ __device__ auto
+    paddedSize() const -> size_type
+    {
+        return _nElements;
+    }
+
     /** Get element in 1D buffer
      *
      * @param[in] i index.
-     * @note Access is not bounds-checked at runtime!
+     * @note Access is not bounds-checked at run-time!
      */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
     __host__ __device__ auto
-    operator()(size_type i) -> T &
+    operator()(size_type i) -> reference
     {
         return _data[i];
     }
@@ -690,11 +897,11 @@ class CBuffer
     /** Get element in 1D buffer
      *
      * @param[in] i index.
-     * @note Access is not bounds-checked at runtime!
+     * @note Access is not bounds-checked at run-time!
      */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
     __host__ __device__ auto
-    operator()(size_type i) const -> const T &
+    operator()(size_type i) const -> const_reference
     {
         return _data[i];
     }
@@ -703,11 +910,11 @@ class CBuffer
      *
      * @param[in] i row index.
      * @param[in] j column index.
-     * @note Access is not bounds-checked at runtime!
+     * @note Access is not bounds-checked at run-time!
      */
     template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
     __host__ __device__ auto
-    operator()(size_type i, size_type j) -> T &
+    operator()(size_type i, size_type j) -> reference
     {
         return _data[i * _nPaddedColumns + j];
     }
@@ -716,11 +923,11 @@ class CBuffer
      *
      * @param[in] i row index.
      * @param[in] j column index.
-     * @note Access is not bounds-checked at runtime!
+     * @note Access is not bounds-checked at run-time!
      */
     template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
     __host__ __device__ auto
-    operator()(size_type i, size_type j) const -> const T &
+    operator()(size_type i, size_type j) const -> const_reference
     {
         return _data[i * _nPaddedColumns + j];
     }
@@ -728,11 +935,11 @@ class CBuffer
     /** Get element in 1D buffer
      *
      * @param[in] i index.
-     * @note Access is bounds-checked at runtime!
+     * @note Access is bounds-checked at run-time!
      */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
     __host__ __device__ auto
-    at(size_type i) -> T &
+    at(size_type i) -> reference
     {
         errors::assertMsgCritical(i < _nColumns, std::string(__func__) + ": you cannot access an element beyond " + std::to_string(_nColumns));
         return _data[i];
@@ -741,11 +948,11 @@ class CBuffer
     /** Get element in 1D buffer
      *
      * @param[in] i index.
-     * @note Access is bounds-checked at runtime!
+     * @note Access is bounds-checked at run-time!
      */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
     __host__ __device__ auto
-    at(size_type i) const -> const T &
+    at(size_type i) const -> const_reference
     {
         errors::assertMsgCritical(i < _nColumns, std::string(__func__) + ": you cannot access an element beyond " + std::to_string(_nColumns));
         return _data[i];
@@ -755,11 +962,11 @@ class CBuffer
      *
      * @param[in] i row index.
      * @param[in] j column index.
-     * @note Access is bounds-checked at runtime!
+     * @note Access is bounds-checked at run-time!
      */
     template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
     __host__ __device__ auto
-    at(size_type i, size_type j) -> T &
+    at(size_type i, size_type j) -> reference
     {
         errors::assertMsgCritical(i < _nRows, std::string(__func__) + ": you cannot access an element beyond row " + std::to_string(_nRows));
         errors::assertMsgCritical(i < _nColumns, std::string(__func__) + ": you cannot access an element beyond column " + std::to_string(_nColumns));
@@ -770,11 +977,11 @@ class CBuffer
      *
      * @param[in] i row index.
      * @param[in] j column index.
-     * @note Access is bounds-checked at runtime!
+     * @note Access is bounds-checked at run-time!
      */
     template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
     __host__ __device__ auto
-    at(size_type i, size_type j) const -> const T &
+    at(size_type i, size_type j) const -> const_reference
     {
         errors::assertMsgCritical(i < _nRows, std::string(__func__) + ": you cannot access an element beyond row " + std::to_string(_nRows));
         errors::assertMsgCritical(i < _nColumns, std::string(__func__) + ": you cannot access an element beyond column " + std::to_string(_nColumns));
@@ -783,14 +990,16 @@ class CBuffer
     /**@}*/
 
     /** @{ Pointer accesssors. */
+    /** Return pointer to buffer data. */
     __host__ __device__ auto
-    data() -> T *
+    data() -> pointer
     {
         return _data;
     }
 
+    /** Return pointer to buffer data. */
     __host__ __device__ auto
-    data() const -> const T *
+    data() const -> const_pointer
     {
         return _data;
     }
@@ -859,7 +1068,7 @@ class CBuffer
     //     }
     //     else
     //     {
-    //         stdex::layout_stride::mapping layout{stdex::extents{_nRows, _nColumns}, std::array<std::size_t, 2>{_nPaddedColumns, 1}};
+    //         stdex::layout_stride::mapping layout{stdex::extents{_nRows, _nColumns}, std::array<size_t, 2>{_nPaddedColumns, 1}};
     //         return mdspan_type(_data, layout);
     //     }
     // }
@@ -873,20 +1082,20 @@ class CBuffer
     //     }
     //     else
     //     {
-    //         stdex::layout_stride::mapping layout{stdex::extents{_nRows, _nColumns}, std::array<std::size_t, 2>{_nPaddedColumns, 1}};
+    //         stdex::layout_stride::mapping layout{stdex::extents{_nRows, _nColumns}, std::array<size_t, 2>{_nPaddedColumns, 1}};
     //         return const_mdspan_type(_data, layout);
     //     }
     // }
     /**@}*/
 
-    mdspan_type
-    getMDSpan()
+    auto
+    getMDSpan() -> mdspan_type
     {
         return this->operator mdspan_type();
     }
 
-    const_mdspan_type
-    getMDSpan() const
+    auto
+    getMDSpan() const -> const_mdspan_type
     {
         return this->operator const_mdspan_type();
     }
@@ -997,26 +1206,37 @@ class CBuffer
     /** @{ Fillers/generators */
     /** Sets all elements in 1D buffer to given value.
      *
-     * @param fill_value
+     * @param v value of fill element.
+     * @param nCols number of columns. Defaults to the NCols template parameter.
      * @note The padding elements are left uninitialized!
      */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
     auto
-    setConstant(value_type fill_value) -> void
+    setConstant(value_type v, size_type nCols = NCols) -> void
     {
+        // allocate
+        if constexpr (kind == Kind::X)
+        {
+            allocate(nCols);
+        }
+        else
+        { /* nothing to do if the buffer is of MN kind! */
+        }
+
+        // set all of _data, except padding elements, to the specified constant
         if constexpr (mem::is_on_host_v<backend_type>)
         {
             auto pdata = _data;
 #pragma omp simd aligned(pdata : Alignment)
             for (size_type i = 0; i < _nColumns; ++i)
-                pdata[i] = fill_value;
+                pdata[i] = v;
         }
         else
         {
 #ifdef VLX_USE_DEVICE
             const auto block = dim3(256);
             const auto grid  = dim3((_nColumns + block.x - 1) / block.x);
-            deviceLaunch((device::full1D<value_type>), grid, block, 0, 0, _data, fill_value, _nColumns);
+            deviceLaunch((device::full1D<value_type>), grid, block, 0, 0, _data, v, _nColumns);
             DEVICE_CHECK(deviceStreamSynchronize(0));
 #endif
         }
@@ -1024,13 +1244,32 @@ class CBuffer
 
     /** Sets all elements in 2D buffer to given value.
      *
-     * @param fill_value
+     * @param v value of fill element.
+     * @param nRows number of rows. Defaults to the NRows template parameter.
+     * @param nCols number of columns. Defaults to the NCols template parameter.
      * @note The padding elements are left uninitialized!
      */
     template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
     auto
-    setConstant(value_type fill_value) -> void
+    setConstant(value_type fill_value, size_type nRows = NRows, size_type nCols = NCols) -> void
     {
+        // allocate
+        if constexpr (kind == Kind::MY)
+        {
+            allocate(nCols);
+        }
+        else if constexpr (kind == Kind::XN)
+        {
+            allocate(nRows);
+        }
+        else if constexpr (kind == Kind::XY)
+        {
+            allocate(nRows, nCols);
+        }
+        else
+        { /* nothing to do if the buffer is of MN kind! */
+        }
+
         if constexpr (mem::is_on_host_v<backend_type>)
         {
             for (size_type i = 0; i < _nRows; ++i)
@@ -1054,51 +1293,109 @@ class CBuffer
         }
     }
 
-    /** Zero out buffer.
+    /** Zero out 1D buffer.
      *
+     * @param nCols number of columns. Defaults to the NCols template parameter.
      * @note The padding elements are left uninitialized!
      */
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
     auto
-    setZero() -> void
+    setZero(size_type nCols = NCols) -> void
     {
-        setConstant(T{0});
+        setConstant(T{0}, nCols);
     }
 
-    /** Sets buffer elements to uniform random values in given inteval.
+    /** Zero out 2D buffer.
      *
-     * @param[in] lower
-     * @param[in] upper
+     * @param nRows number of rows. Defaults to the NRows template parameter.
+     * @param nCols number of columns. Defaults to the NCols template parameter.
+     * @note The padding elements are left uninitialized!
+     */
+    template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    auto
+    setZero(size_type nRows = NRows, size_type nCols = NCols) -> void
+    {
+        setConstant(T{0}, nRows, nCols);
+    }
+
+    /** Sets 1D buffer elements to uniform random values in given inteval.
+     *
+     * @param[in] lower lower bound of interval.
+     * @param[in] upper upper bound of interval.
+     * @param nCols number of columns. Defaults to the NCols template parameter.
+     * @note The padding elements are left uninitialized!
      *
      * The random numbers are generated on the CPU, then copied into the buffer.
-     * This method uses the C++ default random engine with random seeding. If
-     * you need more control, generate the random sequence and then use any of
-     * the available constructors.
+     * This method uses the C++ default random engine with random seeding.
+     * If you need more control, generate the random sequence (as std::vector or
+     * raw array) and then use any of the available constructors.
      */
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
     auto
-    setRandom(T lower, T upper) -> void
+    setRandom(T lower, T upper, size_type nCols = NCols) -> void
     {
-        // random number generator
-        auto gen = std::default_random_engine(std::random_device()());
-
-        // distribution (use IIFE idiom to get the right distribution at compile-time)
-        auto dist = [lower, upper] {
-            if constexpr (std::is_floating_point_v<T>)
-            {
-                return std::uniform_real_distribution<T>(lower, upper);
-            }
-            else
-            {
-                return std::uniform_int_distribution<T>(lower, upper);
-            }
-        }();
+        // allocate
+        if constexpr (kind == Kind::X)
+        {
+            allocate(nCols);
+        }
+        else
+        { /* nothing to do if the buffer is of MN kind! */
+        }
 
         // generate
         auto tmp = new T[_nElements];
-        std::generate(tmp, tmp + _nElements, [&dist, &gen]() { return dist(gen); });
+        mathfunc::fill_random(tmp, lower, upper, _nElements);
 
         // copy into buffer
         _copy_unaligned(tmp);
 
+        // delete temporary
+        delete[] tmp;
+    }
+
+    /** Sets 2D buffer elements to uniform random values in given inteval.
+     *
+     * @param[in] lower lower bound of interval.
+     * @param[in] upper upper bound of interval.
+     * @param nRows number of rows. Defaults to the NRows template parameter.
+     * @param nCols number of columns. Defaults to the NCols template parameter.
+     * @note The padding elements are left uninitialized!
+     *
+     * The random numbers are generated on the CPU, then copied into the buffer.
+     * This method uses the C++ default random engine with random seeding.
+     * If you need more control, generate the random sequence (as std::vector or
+     * raw array) and then use any of the available constructors.
+     */
+    template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    auto
+    setRandom(T lower, T upper, size_type nRows = NRows, size_type nCols = NCols) -> void
+    {
+        // allocate
+        if constexpr (kind == Kind::MY)
+        {
+            allocate(nCols);
+        }
+        else if constexpr (kind == Kind::XN)
+        {
+            allocate(nRows);
+        }
+        else if constexpr (kind == Kind::XY)
+        {
+            allocate(nRows, nCols);
+        }
+        else
+        { /* nothing to do if the buffer is of MN kind! */
+        }
+
+        // generate
+        auto tmp = new T[_nElements];
+        mathfunc::fill_random(tmp, lower, upper, _nElements);
+
+        // copy into buffer
+        _copy_unaligned(tmp);
+
+        // delete temporary
         delete[] tmp;
     }
     /**@}*/
