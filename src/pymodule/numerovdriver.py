@@ -40,8 +40,9 @@ from .outputstream import OutputStream
 from .veloxchemlib import Molecule
 from .veloxchemlib import (bohr_in_angstroms,
                            hartree_in_wavenumbers,
-                           hartree_in_ev)
-from .veloxchemlib import boltzmann_in_evperkelvin
+                           hartree_in_ev,
+                           amu_in_electron_masses,
+                           boltzmann_in_hartreeperkelvin)
 
 class NumerovDriver:
     """
@@ -55,8 +56,29 @@ class NumerovDriver:
         The output stream.
 
     Instance variables:
-        - work in progress...
-
+        - pec_displacements: The potential energy (PEC) screening range.
+        - pec_energies: The PEC energies.
+        - pec_properties: The corresponding PEC properties.
+        - reduced_mass: The reduced mass.
+        - eq_bond_len: The ground state equilibrium bond length.
+        - el_transition: The electronic transition flag.
+        - final_el_state: The final state of the electronic transition.
+        - exc_conv_thresh: The convergence threshold for the excited state calculation.
+        - n_vib_states: The number of vibrational states per electronic state.
+        - temp: The temperature.
+        - n_rot_states: The number of rotational states.
+        - conv_thresh: The Numerov convergence threshold.
+        - max_iter: The maximum number of iterations per vibronic state.
+        - cur_iter: The current Numerov iteration per vibronic state.
+        - p_margin: The margin of the numerical grid right of the scanned PEC.
+        - n_margin: The margin of the numerical grid left of the scanned PEC.
+        - steps_per_au: The number of grid points per Bohr radius.
+        - is_converged: The convergence flag for the Numerov solver.
+        - comm: The MPI communicator.
+        - rank: The rank of MPI process.
+        - nodes: The number of MPI processes.
+        - ostream: The output stream.
+        - silent: The silent output stream.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -188,8 +210,6 @@ class NumerovDriver:
             # carry out PEC scan
             self.pec_energies, self.properties = self.generate_pec(
                 molecule, ao_basis, min_basis)
-
-        print(self.reduced_mass)
 
         assert_msg_critical(self.reduced_mass, 'Reduced mass is not defined')
 
@@ -546,8 +566,7 @@ class NumerovDriver:
         # rotational resolution
         inertia = self.reduced_mass * self.eq_bond_len**2
         B = 1.0 / (2.0 * inertia)
-        # implement boltzmann_in_hartreeperkelvin
-        kB = boltzmann_in_evperkelvin() / hartree_in_ev()
+        kB = boltzmann_in_hartreeperkelvin()
 
         # R branch
         exc_energies['R'] = np.array([])
@@ -616,13 +635,10 @@ class NumerovDriver:
             The molecule.
         """
 
-        amu_in_m_e = 1822.888479031408
-
         m1, m2 = molecule.masses_to_numpy()
-        mu_amu = (m1 * m2) / (m1 + m2)
-        mu = mu_amu * amu_in_m_e
+        mu = (m1 * m2) / (m1 + m2)
 
-        self.set_reduced_mass(mu)
+        self.set_reduced_mass(mu * amu_in_electron_masses())
         
 
     def set_reduced_mass(self, reduced_mass):
@@ -753,7 +769,7 @@ class NumerovDriver:
 
         cur_str = 'Number of Vibrational States : ' + str(self.n_vib_states)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'SCF Convergece Threshold     : {:.1e}'.format(
+        cur_str = 'Energy Convergence Threshold : {:.1e}'.format(
             self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = 'Max. Number of Iterations    : ' + str(self.max_iter)
