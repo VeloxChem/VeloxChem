@@ -57,6 +57,8 @@ class NumerovDriver:
 
     Instance variables:
         - pec_displacements: The potential energy (PEC) screening range.
+        - pec_potential: The type of potential to fit the scan.
+        - pec_data: The external PEC data flag.
         - pec_energies: The PEC energies.
         - pec_properties: The corresponding PEC properties.
         - reduced_mass: The reduced mass.
@@ -88,6 +90,8 @@ class NumerovDriver:
 
         # Potential energy curve (PEC) scan parameters
         self.pec_displacements = parse_seq_range('-0.7 - 2.0 (0.1)')
+        self.pec_potential = 'morse'
+        self.pec_data = False
         self.pec_energies = None
         self.pec_properties = None
 
@@ -131,6 +135,8 @@ class NumerovDriver:
             'numerov': {
                 'pec_displacements':
                     ('seq_range', 'PEC screening range [bohr]'),
+                'pec_potential':
+                    ('str_lower', 'potential type for fitting'),
                 'reduced_mass':
                     ('float', 'reduced mass of the molecule'),
                 'el_transition':
@@ -146,15 +152,15 @@ class NumerovDriver:
                 'n_rot_states':
                     ('int', 'number of rotational states to be resolved'),
                 'conv_thresh':
-                    ('float', 'convergence threshold for vibrational energies'),
+                    ('float', 'convergence threshold for vibronic energies'),
                 'max_iter':
-                    ('int', 'maximum number of iterations per vibronic state'),
+                    ('int', 'max. iteration number per vibronic state'),
                 'n_margin':
-                    ('float', 'negative margin of the numerical grid [bohr]'),
+                    ('float', 'negative margin of the grid [bohr]'),
                 'p_margin':
-                    ('float', 'positive margin of the numerical grid [bohr]'),
+                    ('float', 'positive margin of the grid [bohr]'),
                 'steps_per_au':
-                    ('int', 'number of grid points per bohr radius'),
+                    ('int', 'number of grid points per Bohr radius'),
             }
         }
 
@@ -165,7 +171,7 @@ class NumerovDriver:
 
         print_keywords(self.input_keywords, self.ostream)
 
-    def update_settings(self, numerov_dict, scf_dict, method_dict=None):
+    def update_settings(self, numerov_dict, scf_dict=None, method_dict=None):
         """
         Updates settings in Numerov driver.
 
@@ -206,7 +212,7 @@ class NumerovDriver:
             energies and oscillator strengths.
         """
 
-        if not self.pec_energies:
+        if not self.pec_data:
             # carry out PEC scan
             self.pec_energies, self.properties = self.generate_pec(
                 molecule, ao_basis, min_basis)
@@ -218,13 +224,17 @@ class NumerovDriver:
         # shift data points
         i_pec = np.array(self.pec_energies['i']) - min(self.pec_energies['i'])
 
-        # fit Morse potential
-        i_pec_morse_params, _ = curve_fit(self.morse, self.pec_displacements,
-                                          i_pec)
+        # fit potential
+        if self.pec_potential == 'morse':
+            i_pec_pot_params, _ = curve_fit(self.morse,
+                                            self.pec_displacements, i_pec)
+        elif self.pec_potential == 'harmonic':
+            i_pec_pot_params = np.polyfit(self.pec_displacements, i_pec, 2)
 
         # start numerov procedure
         self.print_numerov_header()
-        i_grid, i_psi, i_vib_energies = self.solve_numerov(i_pec_morse_params)
+        i_grid, i_pot, i_psi, i_vib_levels = self.solve_numerov(
+            i_pec_pot_params)
 
         # check for convergence
         assert_msg_critical(self.is_converged,
@@ -235,16 +245,19 @@ class NumerovDriver:
             # calculate vibronic wave functions for excited state PEC
 
             # shift data points
-            f_pec = np.array(self.pec_energies['f']
+            f_pec = (np.array(self.pec_energies['f'])
                              - min(self.pec_energies['f']))
 
-            # fit Morse potential
-            f_pec_morse_params, _ = curve_fit(self.morse,
-                                              self.pec_displacements, f_pec)
+            # fit potential
+            if self.pec_potential == 'morse':
+                f_pec_pot_params, _ = curve_fit(self.morse,
+                                                self.pec_displacements, f_pec)
+            elif self.pec_potential == 'harmonic':
+                f_pec_pot_params = np.polyfit(self.pec_displacements, f_pec, 2)
 
             # start numerov procedure
-            f_grid, f_psi, f_vib_energies = self.solve_numerov(
-                f_pec_morse_params)
+            f_grid, f_pot, f_psi, f_vib_levels = self.solve_numerov(
+                f_pec_pot_params)
 
             # check for convergence
             assert_msg_critical(self.is_converged,
@@ -252,15 +265,27 @@ class NumerovDriver:
             self.print_numerov_convergence('final')
 
 
+        # correct equilibrium bond length
+        self.eq_bond_len += i_grid[np.argmin(i_pot)]
+
         # calculate spectra
 
         # discretize property curves
-        x_prop_coefs = np.polyfit(self.pec_displacements,
-                                  np.array(self.properties)[:,0], 6)
-        y_prop_coefs = np.polyfit(self.pec_displacements,
-                                  np.array(self.properties)[:,1], 6)
-        z_prop_coefs = np.polyfit(self.pec_displacements,
-                                  np.array(self.properties)[:,2], 6)
+        if not self.el_transition:
+            x_prop_coefs = np.polyfit(self.pec_displacements,
+                                      np.array(self.properties)[:,0], 6)
+            y_prop_coefs = np.polyfit(self.pec_displacements,
+                                      np.array(self.properties)[:,1], 6)
+            z_prop_coefs = np.polyfit(self.pec_displacements,
+                                      np.array(self.properties)[:,2], 6)
+
+        else:
+            x_prop_coefs = np.polyfit(self.pec_displacements,
+                                      np.array(self.properties)[:,0], 0)
+            y_prop_coefs = np.polyfit(self.pec_displacements,
+                                      np.array(self.properties)[:,1], 0)
+            z_prop_coefs = np.polyfit(self.pec_displacements,
+                                      np.array(self.properties)[:,2], 0)
 
         prop_curves = {}
         prop_curves['x'] = np.polyval(x_prop_coefs, i_grid)
@@ -270,30 +295,36 @@ class NumerovDriver:
 
         # IR for a single electronic state
         if not self.el_transition:
-            spectrum = self.get_IR_spectrum(i_vib_energies, i_psi, prop_curves)
+            spectrum = self.get_IR_spectrum(i_psi, i_vib_levels, prop_curves)
 
-            self.print_spectrum(spectrum)
+            self.print_IR_spectrum(spectrum)
 
             return {
                 'grid': i_grid,
+                'potential': i_pot,
                 'psi': i_psi,
-                'vib_levels': i_vib_energies,
+                'vib_levels': i_vib_levels,
                 'excitation_energies': spectrum[0],
-                'oscillator_strenths': spectrum[1],
+                'oscillator_strengths': spectrum[1],
             }
 
         # UV/Vis for two electronic states
         else:
-            UV_energies, UV_intensities = None, None
+            spectrum = self.get_UV_spectrum(i_pot, i_psi, i_vib_levels, f_pot,
+                                            f_psi, f_vib_levels, prop_curves)
+
+            self.print_UV_spectrum(spectrum)
 
             return {
                 'grid': i_grid,
+                'i_potential': i_pot,
                 'i_psi': i_psi,
-                'i_vib_levels': i_vib_energies,
+                'i_vib_levels': i_vib_levels,
+                'f_potential': f_pot,
                 'f_psi': f_psi,
-                'f_vib_levels': f_vib_energies,
-                'UV_energies': UV_energies,
-                'UV_intensities': UV_intensities,
+                'f_vib_levels': f_vib_levels,
+                'excitation_energies': spectrum[0],
+                'oscillator_strengths': spectrum[1],
             }
 
     def generate_pec(self, molecule, ao_basis, min_basis=None):
@@ -320,13 +351,13 @@ class NumerovDriver:
 
         # get data for PEC screening
         mol_coords = molecule.get_coordinates()
+        #input_bond_len = np.linalg.norm(mol_coords[0] - mol_coords[1])
         self.eq_bond_len = np.linalg.norm(mol_coords[0] - mol_coords[1])
         bond_lengths = self.pec_displacements + self.eq_bond_len
 
         atom1, atom2 = molecule.get_labels()
 
-        if not self.reduced_mass:
-            self.calculate_reduced_mass(molecule)
+        self.calculate_reduced_mass(molecule)
 
         # calculate PEC(s) for initial (i) and final (f) state
         pec_energies = {'i': [], 'f': []}
@@ -409,13 +440,13 @@ class NumerovDriver:
 
         return pec_energies, props
 
-    def solve_numerov(self, morse_params):
+    def solve_numerov(self, pot_params):
         """
         Calculates the vibronic wave functions and energy levels for a given
         Morse potential using the numerical Numerov procedure.
 
-        :param morse_params:
-            The Morse potential parameters.
+        :param pot_params:
+            The potential parameters.
 
         :return:
             The grid points, wave functions and energies.
@@ -436,11 +467,14 @@ class NumerovDriver:
 
         # discretize potential
         grid = np.zeros(n_grid)
-        pec = np.zeros(n_grid)
+        pot = np.zeros(n_grid)
         for i in range(n_grid):
             grid[i] = (self.pec_displacements[0] - self.n_margin) + i * dx
-            pec[i] = self.morse(grid[i], morse_params[0], morse_params[1],
-                                morse_params[2], morse_params[3])
+            if self.pec_potential == 'morse':
+                pot[i] = self.morse(grid[i], pot_params[0], pot_params[1],
+                                    pot_params[2], pot_params[3])
+            elif self.pec_potential == 'harmonic':
+                pot[i] = np.polyval(pot_params, grid[i])
 
         # initialize arrays
         g = np.zeros(n_grid)
@@ -461,7 +495,7 @@ class NumerovDriver:
             i_last = n_grid
 
             # define function g for the Numerov procedure
-            g = self.reduced_mass * 2.0 * (pec - e_guess)
+            g = self.reduced_mass * 2.0 * (pot - e_guess)
 
             # manually set the first two data points (boundary condition)
             psi_v[0] = 0.0
@@ -515,7 +549,7 @@ class NumerovDriver:
             # update the energy guess
             e_guess += e_step
 
-        return grid, psi, energies
+        return grid, pot, psi, energies
 
     def morse(self, r, De, a, re, v):
         """
@@ -532,17 +566,18 @@ class NumerovDriver:
         :param v:
             The off-set parameter.
         """
+
         return (De * (np.exp(-2.0*a*(r-re)) - 2.0 * np.exp(-a*(r-re))) + v)
 
-    def get_IR_spectrum(self, vib_energies, psi, dmc):
+    def get_IR_spectrum(self, psi, vib_levels, dmc):
         """
         Calculates the rotationally resolved IR spectrum for the transition from
         the vibronic ground state to the first vibronically excited state.
 
-        :param vib_energies:
-            The energy levels of the vibronic states.
         :param psi:
             The wave functions of the vibronic states.
+        :param vib_levels:
+            The energy levels of the vibronic states.
         :param dmc:
             The discretized dipole moment curve.
 
@@ -555,7 +590,7 @@ class NumerovDriver:
 
         # only transition 0->1 significant
         trans_moms = [np.dot(psi[1], dmc[i] * psi[0]) for i in 'xyz']
-        vib_exc_energy = vib_energies[1] - vib_energies[0]
+        vib_exc_energy = vib_levels[1] - vib_levels[0]
         vib_osc_str = (2.0 / 3.0 * vib_exc_energy
                        * np.sum([tm**2 for tm in trans_moms]))
 
@@ -598,12 +633,80 @@ class NumerovDriver:
 
         return (exc_energies, osc_str)
 
+
+    def get_UV_spectrum(self, i_pot, i_psi, i_vib_levels, f_pot, f_psi,
+                        f_vib_levels, tmc):
+        """
+        Calculates the UV/vis absorption and emission spectra for all calculated
+        vibrational levels.
+
+        :param i_pot:
+            The Morse potential of the initial electronic state.
+        :param i_psi:
+            The vibronic wave functions of the initial electronic state.
+        :param i_vib_levels:
+            The vibronic energy levels of the initial electronic state.
+        :param f_pot:
+            The Morse potential of the final electronic state.
+        :param f_psi:
+            The vibronic wave functions of the final electronic state.
+        :param f_vib_levels:
+            The vibronic energy levels of the final electronic state.
+        :param tmc:
+            The discretized transition dipole moment curve.
+
+        :return:
+            The excitation energies and oscillator strengths.
+        """
+
+        exc_energies = {}
+        osc_str = {}
+
+        # potential minima difference
+        f_pot_min = np.min(f_pot + np.min(self.pec_energies['f']))
+        i_pot_min = np.min(i_pot + np.min(self.pec_energies['i']))
+        pure_el_exc = f_pot_min - i_pot_min
+
+        a = 'absorption'
+        e = 'emission'
+
+        exc_energies[a] = np.array([])
+        osc_str[a] = np.array([])
+
+        exc_energies[e] = np.array([])
+        osc_str[e] = np.array([])
+
+        for i in range(len(i_vib_levels)):
+            # absorption spectrum
+            abs_vib_trans_moms = [np.dot(i_psi[0], tmc[j] * f_psi[i])
+                                  for j in 'xyz']
+            abs_energy = (f_vib_levels[i] + pure_el_exc) - i_vib_levels[0]
+            abs_f = 2.0 / 3.0 * abs_energy * np.sum(
+                [tm**2 for tm in abs_vib_trans_moms])
+
+            exc_energies[a] = np.append(exc_energies[a],
+                                        abs_energy * hartree_in_wavenumbers())
+            osc_str[a] = np.append(osc_str[a], abs_f)
+
+            # emission spectrum
+            em_vib_trans_moms = [np.dot(f_psi[0], tmc[j] * i_psi[i])
+                                 for j in 'xyz']
+            em_energy = (f_vib_levels[0] + pure_el_exc) - i_vib_levels[i]
+            em_f = 2.0 / 3.0 * em_energy * np.sum(
+                [tm**2 for tm in em_vib_trans_moms])
+
+            exc_energies[e] = np.append(exc_energies[e],
+                                        em_energy * hartree_in_wavenumbers())
+            osc_str[e] = np.append(osc_str[e], em_f)
+
+        return (exc_energies, osc_str)
+
     def read_pec_data(self, bond_lengths, properties, *pec_energies):
         """
         Reads potential energy curve data manually.
 
         :param bond_lengths:
-            The bond lengths of the PEC scan.
+            The bond lengths of the PEC scan in bohr radii.
         :param properties:
             The dipoles or transition dipole moments.
         :param pec_energies:
@@ -616,7 +719,7 @@ class NumerovDriver:
             assert_msg_critical(isinstance(i, (list, np.ndarray)),
                 'at least one input argument is not a list or array')
 
-        assert_msg_critical(all([len(i) == len(displacements) for i in
+        assert_msg_critical(all([len(i) == len(bond_lengths) for i in
                                 [properties, *pec_energies]]),
             'input arrays are not of the same length')
 
@@ -624,12 +727,15 @@ class NumerovDriver:
         self.pec_energies = {
             key: value for key, value in zip(['i', 'f'], [*pec_energies])
         }
-        self.eq_bond_len = bond_lengths[np.argmin(self.pec_energies['i'])]
-        self.pec_displacements = bond_lengths - self.eq_bond_len
+        self.eq_bond_len = (bond_lengths[np.argmin(self.pec_energies['i'])]
+                            / bohr_in_angstroms())
+        self.pec_displacements = (np.array(bond_lengths) / bohr_in_angstroms()
+                                   - self.eq_bond_len)
+        self.pec_data = True
 
     def calculate_reduced_mass(self, molecule):
         """
-        Calculates the reduced mass in a.u.
+        Calculates the reduced mass in amu.
 
         :param molecule:
             The molecule.
@@ -638,18 +744,17 @@ class NumerovDriver:
         m1, m2 = molecule.masses_to_numpy()
         mu = (m1 * m2) / (m1 + m2)
 
-        self.set_reduced_mass(mu * amu_in_electron_masses())
-        
+        self.set_reduced_mass(mu)
 
     def set_reduced_mass(self, reduced_mass):
         """
-        Sets the reduced mass.
+        Sets the reduced mass in a.u.
 
         :param reduced_mass:
-            The reduced mass.
+            The reduced mass in amu.
         """
 
-        self.reduced_mass = reduced_mass
+        self.reduced_mass = reduced_mass * amu_in_electron_masses()
 
     def print_PEC_header(self, scf_drv):
         """
@@ -821,9 +926,9 @@ class NumerovDriver:
         self.ostream.flush()
 
 
-    def print_spectrum(self, spectrum):
+    def print_IR_spectrum(self, spectrum):
         """
-        Prints the spectrum to output stream.
+        Prints the IR spectrum to output stream.
 
         :param spectrum:
             The spectrum results dictionary.
@@ -861,6 +966,49 @@ class NumerovDriver:
         self.ostream.print_header(cur_str.ljust(width))
         for exc, osc in zip(spectrum[0]['R'], spectrum[1]['R']):
             cur_str = ' ' * 8
+            cur_str += '{:16.2f} cm-1'.format(exc)
+            cur_str += ' ' * 12
+            cur_str += '{:.5e}'.format(osc)
+            self.ostream.print_header(cur_str.ljust(width))
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def print_UV_spectrum(self, spectrum):
+        """
+        Prints the UV/vis spectrum to output stream.
+
+        :param spectrum:
+            The spectrum results dictionary.
+        """
+
+        width = 92
+
+        a = 'absorption'
+        e = 'emission'
+
+        title = 'UV/vis Absorption/Emission Spectrum'
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_header(('-' * len(title)).ljust(width))
+
+        cur_str = ' ' * 10
+        cur_str += '{:>21s}'.format('Excitation energy')
+        cur_str += '{:>23s}'.format('Oscillator strength')
+        self.ostream.print_header(cur_str.ljust(width))
+
+        cur_str = '{:>10s}'.format('Absorption')
+        self.ostream.print_header(cur_str.ljust(width))
+        for exc, osc in zip(spectrum[0][a], spectrum[1][a]):
+            cur_str = ' ' * 10
+            cur_str += '{:16.2f} cm-1'.format(exc)
+            cur_str += ' ' * 12
+            cur_str += '{:.5e}'.format(osc)
+            self.ostream.print_header(cur_str.ljust(width))
+
+        cur_str = '{:>8s}'.format('Emission')
+        self.ostream.print_header(cur_str.ljust(width))
+        for exc, osc in zip(spectrum[0][e], spectrum[1][e]):
+            cur_str = ' ' * 10
             cur_str += '{:16.2f} cm-1'.format(exc)
             cur_str += ' ' * 12
             cur_str += '{:.5e}'.format(osc)
