@@ -96,7 +96,9 @@ class ForceFieldGenerator:
         self.comb_rule = 2
         self.nbfunc = 1
         self.nrexcl = 3
-        self.force_field_data = 'gaff2.dat'
+        # https://github.com/openmm/openmmforcefields/blob/master/amber/gaff/dat/gaff-2.11.dat
+        # https://raw.githubusercontent.com/openmm/openmmforcefields/master/amber/gaff/dat/gaff-2.11.dat
+        self.force_field_data = 'gaff-2.11.dat'
         self.force_field_data_extension = None
 
         # MM settings
