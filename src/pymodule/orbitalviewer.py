@@ -4,18 +4,6 @@ import math
 from .veloxchemlib import VisualizationDriver, CubicGrid
 from .veloxchemlib import bohr_in_angstroms
 
-try:
-    import k3d
-except ImportError:
-    k3d = None
-
-try:
-    import ipywidgets as widgets
-    from IPython.display import display
-except ImportError:
-    widgets = None
-    display = None
-
 
 class OrbitalViewer:
     """
@@ -38,21 +26,6 @@ class OrbitalViewer:
         """
         Initializes the orbital viewer.
         """
-
-        # Check if k3d is imported
-        if k3d is None:
-            raise ImportError(
-                'Unable to import k3d. Please install k3d via\n' +
-                '  python3 -m pip install k3d\n' +
-                '  jupyter nbextension install --py --sys-prefix k3d\n' +
-                '  jupyter nbextension enable --py --sys-prefix k3d\n')
-
-        # Check ipywidgets and IPython.display
-        if widgets is None or display is None:
-            raise ImportError(
-                'Unable to import ipywidgets or IPython.display.\n' +
-                'Please install jupyter notebook via\n' +
-                '  python3 -m pip install jupyter')
 
         # number of grid points per a.u.
         self.grid_density = 4
@@ -90,6 +63,19 @@ class OrbitalViewer:
         self.this_plot = None
         self.plt_iso_one = None
         self.plt_iso_two = None
+
+    def help_string_k3d(self):
+
+        return ('Unable to import k3d. Please install k3d via\n' +
+                '  python3 -m pip install k3d\n' +
+                '  jupyter nbextension install --py --sys-prefix k3d\n' +
+                '  jupyter nbextension enable --py --sys-prefix k3d\n')
+
+    def help_string_widgets_and_display(self):
+
+        return ('Unable to import ipywidgets or IPython.display.\n' +
+                'Please install jupyter notebook via\n' +
+                '  python3 -m pip install jupyter')
 
     def initialize(self, molecule, basis):
         """
@@ -214,6 +200,17 @@ class OrbitalViewer:
             The MolecularOrbitals object.
         """
 
+        try:
+            import k3d
+        except ImportError:
+            raise ImportError(self.help_string_k3d())
+
+        try:
+            import ipywidgets as widgets
+            from IPython.display import display
+        except ImportError:
+            raise ImportError(self.help_string_widgets_and_display())
+
         self.initialize(molecule, basis)
 
         # i_orb is an instance variable accessed by MultiPsi
@@ -280,6 +277,11 @@ class OrbitalViewer:
                 - a k3d points objects for all atoms
                 - a list of k3d line objects, 2 per bonds
         """
+
+        try:
+            import k3d
+        except ImportError:
+            raise ImportError(self.help_string_k3d())
 
         atomcolor = np.array(
             [
@@ -376,6 +378,11 @@ class OrbitalViewer:
         :return:
             A tuple with the k3d positive and negative isosurfaces.
         """
+
+        try:
+            import k3d
+        except ImportError:
+            raise ImportError(self.help_string_k3d())
 
         # There is a mismatch between the x,y,z order of vlx and k3d
         orbital_k3d = orbital.swapaxes(0, 2).astype('float32')

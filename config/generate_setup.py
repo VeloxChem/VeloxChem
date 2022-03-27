@@ -55,13 +55,19 @@ class SearchReplace(dict):
         return self._make_regex().sub(self, text)
 
 
+def is_executable(exe):
+    return Path(exe).is_file() and os.access(exe, os.X_OK)
+
+
 def find_exe(executables):
     for exe in executables:
-        for path in os.environ["PATH"].split(os.pathsep):
-            fname = os.path.join(path, exe)
-            if os.path.isfile(fname) and os.access(fname, os.X_OK):
-                return exe, path
-    return None, None
+        if Path(exe).is_absolute() and is_executable(exe):
+            return exe
+        for p in os.environ["PATH"].split(os.pathsep):
+            fname = str(Path(p) / exe)
+            if is_executable(fname):
+                return exe
+    return None
 
 
 def get_command_output(command):
@@ -75,7 +81,7 @@ def get_command_output(command):
 
 
 def check_cray():
-    if "CRAYPE_VERSION" in os.environ and "CXX" in os.environ:
+    if "CRAYPE_VERSION" in os.environ and "CRAYPE_DIR" in os.environ:
         return True
     return False
 
@@ -116,49 +122,58 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
 
     # ==> compiler information <==
 
-    print("*** Checking c++ compiler... ", end="")
+    print("*** Checking C++ compiler... ", end="")
 
     if check_cray():
-        cxx, cxx_path = find_exe([os.environ["CXX"]])
-    elif "MPICXX" in os.environ:
-        cxx, cxx_path = find_exe([os.environ["MPICXX"]])
+        if "CXX" in os.environ and "MPICXX" not in os.environ:
+            os.environ["MPICXX"] = os.environ["CXX"]
+
+    if "MPICXX" in os.environ:
+        cxx = find_exe([os.environ["MPICXX"]])
     else:
-        cxx, cxx_path = find_exe(["mpiicpc", "mpicxx", "mpiCXX"])
+        cxx = find_exe(["mpiicpc", "mpicxx", "mpiCXX"])
 
     print(cxx)
 
     if cxx is None:
-        print("*** Error: Unable to find c++ compiler!")
-        if check_cray():
-            print("***        Please make sure that CXX is correctly set.")
-        else:
-            print("***        Please make sure that MPICXX is correctly set.")
+        print("*** Error: Unable to find C++ compiler!")
+        print("***        Please make sure that MPICXX is correctly set.")
         sys.exit(1)
 
-    if cxx in ["icpc", "g++", "clang++"]:
+    if Path(cxx).name in ["icpc", "g++", "clang++"]:
         print(f"*** Error: {cxx} is not a MPI compiler!")
         sys.exit(1)
 
-    if cxx in ["mpiicpc", "mpicxx", "mpiCXX"]:
-        cxxname = get_command_output([cxx, "-show"])
-    else:
+    if check_cray():
         cxxname = get_command_output([cxx, "--version"])
-    if "Cray clang" in cxxname:
-        cxxname = cxxname.replace("Cray clang", "Crayclang")
+        if (cxxname.startswith("Cray clang") or
+                cxxname.startswith("AMD clang")):
+            cxxname = "clang++" if Path(cxx).name == "CC" else (
+                "clang" if Path(cxx).name == "cc" else "Unknown")
+    else:
+        cxxname = get_command_output([cxx, "-show"])
     cxxname = cxxname.split()[0]
 
     if cxxname in ["icc", "gcc", "clang"]:
-        print(f"*** Error: {cxx} is not a c++ compiler!")
+        print(f"*** Error: {cxx} is not a C++ compiler!")
         sys.exit(1)
 
     use_intel = (cxxname == "icpc")
-    use_gnu = re.match(r"(.*(c|g|gnu-c)\+\+)", cxxname)
-    use_clang = cxxname in ["clang++", "Crayclang"] or re.match(
-        r".*-clang\+\+", cxxname)
+    use_gnu = (cxxname == "g++" or
+               re.match(r".*-(g|gnu-c)\+\+", cxxname) is not None)
+    use_clang = (cxxname == "clang++" or
+                 re.match(r".*-clang\+\+", cxxname) is not None)
 
     if not (use_intel or use_gnu or use_clang):
-        print("*** Error: Unrecognized c++ compiler!")
+        print("*** Error: Unrecognized C++ compiler!")
         print("***        Only Intel, GNU, and Clang compilers are supported.")
+        sys.exit(1)
+
+    elif [use_intel, use_gnu, use_clang].count(True) != 1:
+        print(f"*** Error: Unexpected C++ compiler: {cxxname}")
+        print(f"***        use_intel = {use_intel}")
+        print(f"***        use_gnu   = {use_gnu}")
+        print(f"***        use_clang = {use_clang}")
         sys.exit(1)
 
     # ==> openmp flags <==
@@ -173,7 +188,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
         cxx_flags = "-fopenmp"
         omp_flag = "-lgomp"
     elif use_clang:
-        cxx_flags = "-Xpreprocessor -fopenmp"
+        cxx_flags = "-Xclang -fopenmp"
         omp_flag = "-lomp"
 
     # ==> math library <==
@@ -181,7 +196,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
     print("*** Checking math library... ", end="")
 
     # check conda environment
-    is_conda = os.path.exists(os.path.join(sys.prefix, "conda-meta"))
+    is_conda = Path(sys.prefix, "conda-meta").is_dir()
 
     # check whether MKL is in conda environment
     if is_conda and ("MKLROOT" not in os.environ):
@@ -204,7 +219,8 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
     use_openblas = (("OPENBLASROOT" in os.environ) or
                     ("OPENBLAS_INCLUDE_DIR" in os.environ and
                      "OPENBLAS_LIBRARY" in os.environ))
-    use_craylibsci = ("CRAY_LIBSCI_VERSION" in os.environ)
+    use_craylibsci = check_cray() and ("CRAY_LIBSCI_VERSION" in os.environ and
+                                       "CRAY_LIBSCI_DIR" in os.environ)
 
     if not (use_mkl or use_openblas or use_craylibsci):
         print()
