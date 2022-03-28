@@ -110,7 +110,7 @@ class CMemBlock
 
      @param dataVector - the vector with data elements.
      */
-    explicit CMemBlock(const std::vector<T>& dataVector);
+    CMemBlock(const std::vector<T>& dataVector);
 
     /**
      Create a memory block object.
