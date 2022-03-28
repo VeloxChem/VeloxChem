@@ -114,6 +114,8 @@ from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .scffirstorderprop import ScfFirstOrderProperties
 from .orbitalviewer import OrbitalViewer
+from .impes import ImpesCoordinates
+from .impes import ImpesDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical
