@@ -69,6 +69,8 @@ class ForceFieldGenerator:
         - scan_energies: The energies from QM scans (list of list).
         - scan_geometries: The optimized geometries from QM scan (list of list).
         - target_dihedrals: The target dihedral angles for parameterization.
+        - ffversion: The version of the force field.
+        - workdir: The working directory.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -112,6 +114,8 @@ class ForceFieldGenerator:
         self.scan_energies = None
         self.scan_geometries = None
         self.target_dihedrals = None
+        self.ffversion = 0
+        self.workdir = Path('.')
 
         # resp settings
         self.resp_dict = None
@@ -217,11 +221,16 @@ class ForceFieldGenerator:
 
         if self.rank == mpi_master():
             inp_dir = Path(self.molecule_name).parent
-            mol_name = Path(self.molecule_name).stem
 
             self.read_qm_scan_xyz_files(self.scan_xyz_files, inp_dir)
 
-            original_itp_file = inp_dir / (mol_name + '_original.itp')
+            self.workdir = Path(self.molecule_name + '_files')
+            self.workdir.mkdir(parents=True, exist_ok=True)
+            mol_name = Path(self.molecule_name).stem
+
+            self.ffversion = 0
+            original_itp_file = self.workdir / (mol_name +
+                                                f'_{self.ffversion:02d}.itp')
             original_top_file = original_itp_file.with_suffix('.top')
 
             self.write_original_itp(original_itp_file, list(self.atom_types),
@@ -793,14 +802,16 @@ class ForceFieldGenerator:
 
         self.ostream.print_info('Correcting dihedral angle...')
 
-        inp_dir = Path(self.molecule_name).parent
-        mol_name = Path(self.molecule_name).stem
-
         top_fname = top_file if isinstance(top_file, str) else str(top_file)
         itp_fname = self.get_included_file(top_fname)
 
-        new_itp_fname = str(inp_dir / f'{mol_name}_new.itp')
-        new_top_fname = str(inp_dir / f'{mol_name}_new.top')
+        mol_name = Path(self.molecule_name).stem
+
+        self.ffversion += 1
+        new_itp_fname = str(self.workdir /
+                            f'{mol_name}_{self.ffversion:02d}.itp')
+        new_top_fname = str(self.workdir /
+                            f'{mol_name}_{self.ffversion:02d}.top')
 
         if itp_fname != new_itp_fname:
             self.copy_file(Path(itp_fname), Path(new_itp_fname))
@@ -813,7 +824,7 @@ class ForceFieldGenerator:
             self.ostream.print_info('  {}-{}-{}-{}'.format(*dih))
             self.ostream.flush()
 
-            output_dir = inp_dir / f'{mol_name}_dih_corr' / f'{i+1}'
+            output_dir = self.workdir / f'{mol_name}_dih_corr' / f'{i+1}'
             output_dir.mkdir(parents=True, exist_ok=True)
 
             zero_itp_file = output_dir / f'{mol_name}_zero.itp'
