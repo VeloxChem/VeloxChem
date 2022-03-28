@@ -31,11 +31,10 @@
 #include <sstream>
 
 namespace mpi {  // mpi namespace
-
 bool
 init(int argc, char** argv)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         if (initialized())
         {
@@ -60,7 +59,7 @@ init(int argc, char** argv)
 bool
 initialized()
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         int32_t minit = 0;
 
@@ -75,7 +74,7 @@ initialized()
 bool
 finalize()
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         auto merror = MPI_Finalize();
 
@@ -90,12 +89,45 @@ finalize()
     return true;
 }
 
+void
+abort(const int errorcode, const char* label)
+{
+    if constexpr (ENABLE_MPI)
+    {
+        int32_t errclass = 0;
+
+        MPI_Error_class(errorcode, &errclass);
+
+        int32_t errlen = 0;
+
+        char errstr[MPI_MAX_ERROR_STRING];
+
+        MPI_Error_string(errorcode, errstr, &errlen);
+
+        std::stringstream sst;
+
+        sst << "**** Critical Error in " << label << " ****" << std::endl;
+
+        sst << "MPI ERROR " << errclass << ": " << errstr << std::endl;
+
+        std::cerr << sst.str();
+
+        MPI_Abort(MPI_COMM_WORLD, errorcode);
+    }
+}
+
+void
+abort(const int errorcode, const std::string& label)
+{
+    mpi::abort(errorcode, label.c_str());
+}
+
 int32_t
 rank(MPI_Comm comm)
 {
     int32_t mrank = 0;
 
-    if (ENABLE_MPI) MPI_Comm_rank(comm, &mrank);
+    if constexpr (ENABLE_MPI) MPI_Comm_rank(comm, &mrank);
 
     return mrank;
 }
@@ -105,7 +137,7 @@ nodes(MPI_Comm comm)
 {
     int32_t mnodes = 1;
 
-    if (ENABLE_MPI) MPI_Comm_size(comm, &mnodes);
+    if constexpr (ENABLE_MPI) MPI_Comm_size(comm, &mnodes);
 
     return mnodes;
 }
@@ -113,7 +145,7 @@ nodes(MPI_Comm comm)
 void
 duplicate(MPI_Comm comm1, MPI_Comm* comm2)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         auto merror = MPI_Comm_dup(comm1, comm2);
 
@@ -127,7 +159,7 @@ duplicate(MPI_Comm comm1, MPI_Comm* comm2)
 void
 destroy(MPI_Comm* comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         auto merror = MPI_Comm_free(comm);
 
@@ -141,7 +173,7 @@ destroy(MPI_Comm* comm)
 bool
 compare(MPI_Comm comm1, MPI_Comm comm2)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         int32_t mcvalue = 0;
 
@@ -165,17 +197,18 @@ compare(MPI_Comm comm1, MPI_Comm comm2)
 void
 bcast(std::string& str, int32_t rank, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
-        auto strwidth = (rank == mpi::master()) ? str.size() : 0;
+        auto strwidth = (rank == mpi::master()) ? static_cast<int32_t>(str.size()) : int32_t{0};
 
         mpi::bcast(strwidth, comm);
 
         if (rank != mpi::master()) str.clear();
 
-        for (const auto c : str)
+        // a range-based for loop makes this broadcast hang!
+        for (int32_t i = 0; i < strwidth; ++i)
         {
-            auto symbol = (rank == mpi::master()) ? c : char{};
+            auto symbol = (rank == mpi::master()) ? str[i] : char{};
 
             mpi::bcast(symbol, comm);
 
@@ -221,37 +254,4 @@ batches_pattern(int32_t* pattern, const int32_t nElements, const int32_t nodes)
 }
 
 // TODO: Add other MPI functions for generic types
-
-void
-abort(const int errorcode, const char* label)
-{
-    if (ENABLE_MPI)
-    {
-        int32_t errclass = 0;
-
-        MPI_Error_class(errorcode, &errclass);
-
-        int32_t errlen = 0;
-
-        char errstr[MPI_MAX_ERROR_STRING];
-
-        MPI_Error_string(errorcode, errstr, &errlen);
-
-        std::stringstream sst;
-
-        sst << "**** Critical Error in " << label << " ****" << std::endl;
-
-        sst << "MPI ERROR " << errclass << ": " << errstr << std::endl;
-
-        std::cerr << sst.str();
-
-        MPI_Abort(MPI_COMM_WORLD, errorcode);
-    }
-}
-
-void
-abort(const int errorcode, const std::string& label)
-{
-    mpi::abort(errorcode, label.c_str());
-}
 }  // namespace mpi

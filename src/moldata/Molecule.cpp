@@ -640,7 +640,7 @@ CMolecule::checkProximity(const double minDistance) const
 void
 CMolecule::broadcast(int32_t rank, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         mpi::bcast(_charge, comm);
 

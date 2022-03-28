@@ -62,6 +62,8 @@ VLX_LIBS_OBJS = $(foreach d,$(VLX_LIBS_DIR),$(addprefix $d/,*.o))
 VLX_LIBS_DEPS = $(foreach d,$(VLX_LIBS_DIR),$(addprefix $d/,*.d))
 VLX_LIBS_OPTS = $(foreach d,$(VLX_LIBS_DIR),$(addprefix $d/,*.optrpt))
 VLX_LIBS_LIST = $(foreach d,$(VLX_LIBS_DIR),$(addprefix -L$d -l,$d))
+VLX_LIBS_TMPS := $(foreach d,$(VLX_LIBS_DIR),$(addprefix $d/,*.ii))
+VLX_LIBS_TMPS += $(foreach d,$(VLX_LIBS_DIR),$(addprefix $d/,*.s))
 
 # Create build folder (if it doesn't exist already)
 build_folder:
@@ -88,9 +90,6 @@ debug: $(VLX_LIBS) basis pymodule pytests
 	@echo ====== Linking debug version of $(VLX_TARGET)...
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $(VLX_TARGET) \
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
-	@echo ====== Building bcastdebug program...
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) bcastdebug.cpp -o bcastdebug.x \
-	$(VLX_LIBS) $(MATH_LIB) general/general.a
 
 # Release
 release: $(VLX_LIBS) basis pymodule pytests
@@ -105,6 +104,7 @@ clean:
 	$(RM) $(VLX_LIBS_OBJS)
 	$(RM) $(VLX_LIBS_DEPS)
 	$(RM) $(VLX_LIBS_OPTS)
+	$(RM) $(VLX_LIBS_TMPS)
 
 # Set internal libraries generation rule
 .PHONY: $(VLX_LIBS) $(VLX_LIBS_DIR)

@@ -148,7 +148,7 @@ template <typename T>
 auto
 bcast(T& value, MPI_Comm comm) -> decltype((void)(std::is_arithmetic_v<T>), void())
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         auto merror = MPI_Bcast(&value, 1, mpi::type_v<T>, mpi::master(), comm);
 
@@ -176,17 +176,18 @@ template <typename T>
 void
 bcast(std::vector<T>& vector, int32_t rank, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
-        auto veclen = (rank == mpi::master()) ? vector.size() : static_cast<size_t>(0);
+        auto veclen = (rank == mpi::master()) ? static_cast<int32_t>(vector.size()) : int32_t{0};
 
         mpi::bcast(veclen, comm);
 
         if (rank != mpi::master()) vector.clear();
 
-        for (const auto& x : vector)
+        // a range-based for loop makes this broadcast hang!
+        for (int32_t i = 0; i < veclen; ++i)
         {
-            auto mvalue = (rank == mpi::master()) ? x : static_cast<T>(0);
+            auto mvalue = (rank == mpi::master()) ? vector[i] : T{0};
 
             if constexpr (std::is_same_v<T, std::string>)
             {
@@ -216,7 +217,7 @@ template <typename T>
 auto
 send(T& value, const int32_t rank, MPI_Comm comm) -> decltype((void)(std::is_arithmetic_v<T>), void())
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         auto merror = MPI_Send(&value, 1, mpi::type_v<T>, rank, 0, comm);
 
@@ -236,7 +237,7 @@ template <typename T>
 auto
 receive(T& value, const int32_t rank, MPI_Comm comm) -> decltype((void)(std::is_arithmetic_v<T>), void())
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         MPI_Status mstat;
 
@@ -291,7 +292,7 @@ template <typename T>
 auto
 gather(T* vector, T value, int32_t rank, MPI_Comm comm) -> decltype((void)(std::is_arithmetic_v<T>), void())
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         auto merror = MPI_Gather(&value, 1, mpi::type_v<T>, vector, 1, mpi::type_v<T>, mpi::master(), comm);
 
@@ -316,7 +317,7 @@ template <typename T>
 auto
 reduce_sum(const T* source, T* destination, const int32_t nElements, MPI_Comm comm) -> decltype((void)(std::is_arithmetic_v<T>), void())
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         auto merror = MPI_Reduce(source, destination, nElements, mpi::type_v<T>, MPI_SUM, mpi::master(), comm);
 
@@ -339,7 +340,7 @@ template <typename T>
 auto
 reduce_sum(const T value, MPI_Comm comm) -> decltype((void)(std::is_arithmetic_v<T>), T())
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         auto dval = T{0.0};
 

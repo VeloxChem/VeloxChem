@@ -640,41 +640,7 @@ template <>
 inline void
 CMemBlock<int32_t>::broadcast(int32_t rank, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
-    {
-        // broadcast numa policy
-
-        int32_t nmpol = 0;
-
-        if (rank == mpi::master()) nmpol = to_int(_numaPolicy);
-
-        mpi::bcast(nmpol, comm);
-
-        if (rank != mpi::master())
-        {
-            _numaPolicy = to_numa(nmpol);
-        }
-
-        mpi::bcast(_nElements, comm);
-
-        if (rank != mpi::master())
-        {
-            _allocate();
-        }
-
-        MPI_Barrier(comm);
-
-        auto merror = MPI_Bcast(_data, _nElements, MPI_INT32_T, mpi::master(), comm);
-
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "broadcast(CMemBlock)");
-    }
-}
-
-template <>
-inline void
-CMemBlock<double>::broadcast(int32_t rank, MPI_Comm comm)
-{
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         // broadcast numa policy
 
@@ -692,6 +658,38 @@ CMemBlock<double>::broadcast(int32_t rank, MPI_Comm comm)
 
         if (rank != mpi::master()) _allocate();
 
+        MPI_Barrier(comm);
+
+        auto merror = MPI_Bcast(_data, _nElements, MPI_INT32_T, mpi::master(), comm);
+
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "broadcast(CMemBlock)");
+    }
+}
+
+template <>
+inline void
+CMemBlock<double>::broadcast(int32_t rank, MPI_Comm comm)
+{
+    if constexpr (ENABLE_MPI)
+    {
+        // broadcast numa policy
+
+        int32_t nmpol = 0;
+
+        if (rank == mpi::master()) nmpol = to_int(_numaPolicy);
+
+        mpi::bcast(nmpol, comm);
+
+        if (rank != mpi::master()) _numaPolicy = to_numa(nmpol);
+
+        // broadcast memory block data
+
+        mpi::bcast(_nElements, comm);
+
+        if (rank != mpi::master()) _allocate();
+
+        MPI_Barrier(comm);
+
         auto merror = MPI_Bcast(_data, _nElements, MPI_DOUBLE, mpi::master(), comm);
 
         if (merror != MPI_SUCCESS) mpi::abort(merror, "broadcast(CMemBlock)");
@@ -702,7 +700,7 @@ template <>
 inline CMemBlock<int32_t>
 CMemBlock<int32_t>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         if (nodes == 1) return CMemBlock<int32_t>(*this);
 
@@ -751,7 +749,7 @@ template <>
 inline CMemBlock<double>
 CMemBlock<double>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         if (nodes == 1) return CMemBlock<double>(*this);
 
@@ -800,7 +798,7 @@ template <>
 inline void
 CMemBlock<int32_t>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         if (nodes == 1) return;
 
@@ -859,7 +857,7 @@ template <>
 inline void
 CMemBlock<double>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         if (nodes == 1) return;
 
@@ -918,7 +916,7 @@ template <>
 inline void
 CMemBlock<double>::reduce_sum(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         if (nodes == 1) return;
 
@@ -1002,7 +1000,6 @@ CMemBlock<T>::repr() const
     os << "[CMemBlock (Object):" << this << "]" << std::endl;
 
     os << "_numaPolicy: " << to_string(_numaPolicy) << std::endl;
-    ;
 
     os << "_nElements: " << _nElements << std::endl;
 

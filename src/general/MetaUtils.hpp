@@ -39,9 +39,7 @@
 namespace metautils {
 /* \@{ From type to MPI_Datatype enum variant and string representation */
 template <typename T>
-struct type_to_mpi_datatype {
-    inline constexpr static MPI_Datatype value{MPI_DATATYPE_NULL};
-};
+struct type_to_mpi_datatype;
 
 template <>
 struct type_to_mpi_datatype<bool>
