@@ -114,6 +114,8 @@ from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .scffirstorderprop import ScfFirstOrderProperties
 from .forcefieldgenerator import ForceFieldGenerator
+from .openmmdriver import OpenMMDriver
+from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
 
 # Python functions

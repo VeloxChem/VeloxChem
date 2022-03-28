@@ -23,13 +23,12 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from pathlib import PurePath
+from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
-from os import devnull
+from io import StringIO
 import time as tm
-import sys
 import tempfile
-import contextlib
+
 import geometric
 
 from .veloxchemlib import mpi_master
@@ -47,7 +46,7 @@ class OptimizationDriver:
     :param grad_drv:
         The gradient driver.
     :param flag:
-        The flag ("SCF" or "XTB").
+        The flag ("SCF", "XTB" or "OPENMM").
 
     Instance variables
         - rank: The rank of MPI process.
@@ -117,7 +116,7 @@ class OptimizationDriver:
         if 'filename' in opt_dict:
             self.filename = opt_dict['filename']
 
-    def compute(self, molecule, ao_basis, min_basis=None):
+    def compute(self, molecule, ao_basis=None, min_basis=None):
         """
         Performs geometry optimization.
 
@@ -149,8 +148,8 @@ class OptimizationDriver:
                 self.clean_up_file(filename + '.tmp', 'hessian', 'hessian.txt')
                 self.clean_up_file(filename + '.tmp', 'hessian', 'coords.xyz')
             else:
-                filename = PurePath(self.filename).name
-                filename = str(PurePath(temp_dir, f'{filename}_{self.rank}'))
+                filename = Path(self.filename).name
+                filename = str(Path(temp_dir, f'{filename}_{self.rank}'))
 
             if self.constraints:
                 constr_filename = Path(filename).with_suffix('.constr.txt')
@@ -163,26 +162,18 @@ class OptimizationDriver:
             log_ini = Path(temp_dir, f'log.ini_{self.rank}')
             self.write_log_ini(log_ini)
 
-            # geomeTRIC prints information to stdout and stderr. On master node
-            # this is redirected to the output stream. On other nodes this is
-            # redirected to devnull.
+            # redirect geomeTRIC stdout/stderr
 
-            with open(devnull, 'w') as f_devnull:
-
-                if self.rank == mpi_master():
-                    f_out = sys.stdout
-                else:
-                    f_out = f_devnull
-
-                with contextlib.redirect_stdout(f_out):
-                    m = geometric.optimize.run_optimizer(
-                        customengine=opt_engine,
-                        coordsys=self.coordsys,
-                        check=self.check_interval,
-                        maxiter=self.max_iter,
-                        constraints=constr_filename,
-                        input=filename + '.optinp',
-                        logIni=str(log_ini))
+            with redirect_stdout(StringIO()) as fg_out, redirect_stderr(
+                    StringIO()) as fg_err:
+                m = geometric.optimize.run_optimizer(
+                    customengine=opt_engine,
+                    coordsys=self.coordsys,
+                    check=self.check_interval,
+                    maxiter=self.max_iter,
+                    constraints=constr_filename,
+                    input=filename + '.optinp',
+                    logIni=str(log_ini))
 
         coords = m.xyzs[-1] / geometric.nifty.bohr2ang
         labels = molecule.get_labels()
