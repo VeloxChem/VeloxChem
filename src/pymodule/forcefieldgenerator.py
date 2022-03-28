@@ -34,6 +34,9 @@ from .veloxchemlib import mpi_master, bohr_in_angstroms, hartree_in_kcalpermol
 from .molecule import Molecule
 from .outputstream import OutputStream
 from .respchargesdriver import RespChargesDriver
+from .openmmdriver import OpenMMDriver
+from .openmmgradientdriver import OpenMMGradientDriver
+from .optimizationdriver import OptimizationDriver
 from .inputparser import parse_input, get_datetime_string
 from .errorhandler import assert_msg_critical
 
@@ -61,10 +64,7 @@ class ForceFieldGenerator:
         - force_field_data: The filename of the data file with force field parameters.
         - force_field_data_extension: The filename of the data file with user-specified
           parameters.
-        - box_length: The box length for energy minimization.
-        - temperature: The temperature.
         - gromacs_include_path: The path to topology folder of Gromacs.
-        - kfac: The force constant to restrain dihedrals.
         - scan_dih_angles: The dihedral angles for MM scans (list of list).
         - scan_energies: The energies from QM scans (list of list).
         - scan_geometries: The optimized geometries from QM scan (list of list).
@@ -104,10 +104,7 @@ class ForceFieldGenerator:
         self.force_field_data_extension = None
 
         # MM settings
-        self.box_length = 100.0  # Angstrom
-        self.temperature = 293.15  # Kelvin
         self.gromacs_include_path = None
-        self.kfac = 10000.0  # force constant in kJ/mol/rad^2
 
         # scan settings
         self.scan_dih_angles = None
@@ -151,23 +148,30 @@ class ForceFieldGenerator:
             'comb_rule': 'int',
             'nbfunc': 'int',
             'nrexcl': 'int',
-            'box_length': 'float',
-            'temperature': 'float',
             'gromacs_include_path': 'str',
-            'kfac': 'float',
             'force_field_data': 'str',
             'force_field_data_extension': 'str',
         }
 
         parse_input(self, ffg_keywords, ffg_dict)
 
+        if 'filename' in ffg_dict and 'molecule_name' not in ffg_dict:
+            self.molecule_name = ffg_dict['filename']
+
+        force_field_file = Path(
+            self.molecule_name).parent / self.force_field_data
+        if force_field_file.is_file():
+            self.force_field_data = str(force_field_file)
+
+        assert_msg_critical(
+            'gaff' in Path(self.force_field_data).name,
+            'ForceFieldGenerator: unrecognized force field. Only GAFF is supported.'
+        )
+
         if self.force_field_data_extension is None:
             ff_file = Path(self.force_field_data)
             self.force_field_data_extension = str(
                 ff_file.parent / (ff_file.stem + '_extension.dat'))
-
-        if 'filename' in ffg_dict and 'molecule_name' not in ffg_dict:
-            self.molecule_name = ffg_dict['filename']
 
         if resp_dict is None:
             resp_dict = {}
@@ -944,18 +948,13 @@ class ForceFieldGenerator:
             self.write_top(local_top_fname, local_itp_fname)
             self.write_pdb_file(local_pdb_fname, geom)
 
-            # fix dihedral with harmonic restraint function and calculate
-            # potential energy
-            self.fix_dihedral(local_itp_fname, dihedral, angle)
-            state = self.minimize_mm_energy(local_pdb_fname, local_top_fname)
-
-            pot_energy_str = str(state.getPotentialEnergy())
-            pot_energy_unit = pot_energy_str.split()[1]
-            assert_msg_critical(
-                pot_energy_unit == 'kJ/mol',
-                'ForceFieldGenerator.perform_mm_scan: ' +
-                'unexpected unit for potential energy')
-            pot_energy = float(pot_energy_str.split()[0])
+            # energy minimization with dihedral constraint
+            constraints = ['$set']
+            constraints += ['dihedral {} {} {} {} {}'.format(*dihedral, angle)]
+            pot_energy = self.minimize_mm_energy(geom, local_top_fname,
+                                                 constraints)
+            # convert to kJ/mol
+            pot_energy *= 4.184 * hartree_in_kcalpermol()
             energies.append(pot_energy)
 
             if flag == 'verbose':
@@ -965,50 +964,32 @@ class ForceFieldGenerator:
 
         return energies
 
-    def minimize_mm_energy(self, pdb_file, top_file):
+    def minimize_mm_energy(self, molecule, top_file, constraints):
         """
         Minimizes MM energy of a topology using OpenMM.
 
-        :param pdb_file:
-            The pdb file containing the initial geometry.
+        :param molecule:
+            The molecule.
         :param top_file:
             The topology.
+        :param constraints:
+            The constraints.
         """
 
-        try:
-            import openmm
-        except ImportError:
-            raise ImportError(
-                'Unable to import OpenMM. Please install ' +
-                'OpenMM via \'conda install -c conda-forge openmm\'')
+        openmm_drv = OpenMMDriver(self.comm)
+        openmm_drv.add_topology(top_file, self.gromacs_include_path)
 
-        # setup of the system and simulation parameters
+        grad_drv = OpenMMGradientDriver(openmm_drv, self.comm)
+        grad_drv.ostream.state = False
 
-        pdb = openmm.app.PDBFile(pdb_file)
-        box_length_in_nm = self.box_length * 0.1
-        box_vectors = (
-            openmm.Vec3(box_length_in_nm, 0., 0.),
-            openmm.Vec3(0., box_length_in_nm, 0.),
-            openmm.Vec3(0., 0., box_length_in_nm),
-        )
+        opt_drv = OptimizationDriver(grad_drv, 'OpenMM')
+        opt_drv.update_settings({
+            'constraints': constraints,
+            'filename': str(Path(top_file).parent / Path(top_file).stem),
+        })
+        opt_drv.compute(molecule)
 
-        top = openmm.app.GromacsTopFile(top_file,
-                                        periodicBoxVectors=box_vectors,
-                                        includeDir=self.gromacs_include_path)
-        system = top.createSystem(nonbondedMethod=openmm.app.PME,
-                                  nonbondedCutoff=1 * openmm.unit.nanometer,
-                                  constraints=openmm.app.HBonds)
-        integrator = openmm.LangevinIntegrator(
-            self.temperature * openmm.unit.kelvin, 1 / openmm.unit.picosecond,
-            0.004 * openmm.unit.picoseconds)
-
-        # minimize energy for given simulation parameters
-
-        simulation = openmm.app.Simulation(top.topology, system, integrator)
-        simulation.context.setPositions(pdb.positions)
-        simulation.minimizeEnergy(maxIterations=50000)
-
-        return simulation.context.getState(getPositions=True, getEnergy=True)
+        return opt_drv.grad_drv.openmm_drv.get_energy()
 
     def set_dihedral_parameters(self, itp_file, dihedral, coefficients):
         """
@@ -1073,32 +1054,6 @@ class ForceFieldGenerator:
             cur_str = '{:6}{:7}{:7}{:7}{:7}'.format(*dihedral, 3)
             for coef in coefficients:
                 cur_str += '{:11.5f}'.format(coef)
-            cur_str += ' ; {}-{}-{}-{}\n'.format(atom_names[dihedral[0] - 1],
-                                                 atom_names[dihedral[1] - 1],
-                                                 atom_names[dihedral[2] - 1],
-                                                 atom_names[dihedral[3] - 1])
-            f_itp.write(cur_str)
-
-    def fix_dihedral(self, itp_filename, dihedral, angle):
-        """
-        Fixing dihedral with harmonic restraint function.
-
-        :param itp_file:
-            The internal topology.
-        :param dihedral:
-            The dihedral.
-        :param angle:
-            The angle.
-        """
-
-        atom_names = self.get_atom_names()
-
-        with open(itp_filename, 'a') as f_itp:
-            f_itp.write('\n[ dihedrals ] ; restrained\n')
-            f_itp.write(
-                ';    i      j      k      l    type      phi      kfac \n')
-            cur_str = '{:6}{:7}{:7}{:7}{:7}{:11.2f}{:11.2f}'.format(
-                *dihedral, 2, angle, self.kfac)
             cur_str += ' ; {}-{}-{}-{}\n'.format(atom_names[dihedral[0] - 1],
                                                  atom_names[dihedral[1] - 1],
                                                  atom_names[dihedral[2] - 1],
