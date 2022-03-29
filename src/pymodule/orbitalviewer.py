@@ -2,6 +2,7 @@ import numpy as np
 import math
 
 from .veloxchemlib import VisualizationDriver, CubicGrid
+from .veloxchemlib import molorb
 from .veloxchemlib import bohr_in_angstroms
 
 
@@ -213,9 +214,15 @@ class OrbitalViewer:
 
         self.initialize(molecule, basis)
 
+        self.isUHF=mo_object.get_orbitals_type() == molorb.unrest
+
         # i_orb is an instance variable accessed by MultiPsi
-        self.i_orb = self.molecule.number_of_beta_electrons() - 1
+        self.i_orb = self.molecule.number_of_alpha_electrons() - 1
         self.mo_coefs = mo_object.alpha_to_numpy()
+        if self.isUHF:
+            self.mo_coefs_b=mo_object.beta_to_numpy()
+        else:
+            self.mo_coefs_b=self.mo_coefs
 
         self.this_plot = k3d.plot(grid_visible=False)
         plt_atoms, plt_bonds = self.draw_molecule(self.molecule)
@@ -237,28 +244,64 @@ class OrbitalViewer:
             orblist.append(
                 (f'{i+1:3d} occ={orb_occ[i]:.3f} ene={orb_ene[i]:.3f}', i))
 
-        # Add widget
-        int_range = widgets.Dropdown(options=orblist,
+
+        # Also do for beta if UHF
+        if self.isUHF:
+            orb_ene_b = mo_object.eb_to_numpy()
+            orb_occ_b = mo_object.occb_to_numpy()
+            orblist_b = [ ("",-1) ]
+            for i in range(len(orb_ene_b)):
+                orblist_b.append(
+                (f'{i+1:3d} occ={orb_occ_b[i]:.3f} ene={orb_ene_b[i]:.3f}', i))
+
+            orblist.insert(0, ("",-1)) #Add empty space
+            # Add widget
+            self.orbital_selector = widgets.Dropdown(options=orblist,
+                                     value=self.i_orb,
+                                     description='Alpha orbital:')
+            self.orbital_selector_b = widgets.Dropdown(options=orblist_b,
+                                     value=-1,
+                                     description='Beta orbital:')
+            hbox=widgets.HBox([self.orbital_selector, self.orbital_selector_b])
+            display(hbox)
+            self.orbital_selector_b.observe(self.on_orbital_index_change_b, names='value')
+        else:
+            # Add widget
+            self.orbital_selector = widgets.Dropdown(options=orblist,
                                      value=self.i_orb,
                                      description='Orbital:')
-        display(int_range)
-        int_range.observe(self.on_orbital_index_change, names='value')
+            display(self.orbital_selector)
+        self.orbital_selector.observe(self.on_orbital_index_change, names='value')
 
-    def on_orbital_index_change(self, change):
+    def on_orbital_index_change_b(self, change):
+        self.on_orbital_index_change(change, False)
+    def on_orbital_index_change(self, change, alpha=True):
         """
         Registers a widget event to plot a different orbital.
 
         :param change:
             A dictionary created by the widget observe.
         """
+        i_orb = change['new']
+
+        #Do not do anything if "blank index" is chosen
+        if i_orb<0:
+            return
+
+        self.i_orb=i_orb
 
         # To avoid disturbing the current view
         self.this_plot.camera_auto_fit = False
         self.this_plot -= self.plt_iso_one
         self.this_plot -= self.plt_iso_two
 
-        self.i_orb = change['new']
-        orbital = self.compute_orbital(self.mo_coefs, self.i_orb)
+        if alpha:
+            if self.isUHF:
+                self.orbital_selector_b.value=-1 #Reset the beta index to blank if exists
+            orbital = self.compute_orbital(self.mo_coefs, self.i_orb)
+        else:
+            self.orbital_selector.value=-1 #Reset the alpha index to blank
+            orbital = self.compute_orbital(self.mo_coefs_b, self.i_orb)
 
         self.plt_iso_one, self.plt_iso_two = self.draw_orbital(orbital)
         self.this_plot += self.plt_iso_one
@@ -337,7 +380,7 @@ class OrbitalViewer:
                 radii.append(2.0)
 
         # Balls
-        plt_atoms = k3d.points(positions=coords, point_size=0.7, colors=colors)
+        plt_atoms = k3d.points(positions=coords, point_size=0.7, colors=colors, shader='mesh')
 
         # Sticks
         plt_bonds = []
