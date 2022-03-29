@@ -25,10 +25,6 @@
 
 from mpi4py import MPI
 
-from openmm.app import GromacsTopFile, NoCutoff, Simulation
-from openmm.unit import nanometer, picosecond, picoseconds, kelvin, md_unit_system
-from openmm import LangevinIntegrator
-
 from .veloxchemlib import mpi_master, bohr_in_angstroms, hartree_in_kcalpermol
 
 
@@ -43,12 +39,16 @@ class OpenMMDriver:
         - integrator_temperature: The temperature.
         - integrator_friction_coeff: The friction coefficient.
         - integrator_step_size: The step size.
+        - energy: The potential energy.
+        - gradient: The gradient.
     """
 
     def __init__(self, comm=None):
         """
         Initializes OpenMM driver.
         """
+
+        from openmm.unit import picosecond, picoseconds, kelvin
 
         if comm is None:
             comm = MPI.COMM_WORLD
@@ -65,6 +65,17 @@ class OpenMMDriver:
         self.gradient = None
 
     def add_topology(self, top_file, include_dir=None):
+        """
+        Adds topology file.
+
+        :param top_file:
+            The name of the topology file.
+        :param include_dir:
+            The include directory for Gromacs topology files.
+        """
+
+        from openmm.app import GromacsTopFile, NoCutoff, Simulation
+        from openmm import LangevinIntegrator
 
         if self.rank == mpi_master():
             top = GromacsTopFile(top_file, includeDir=include_dir)
@@ -79,6 +90,14 @@ class OpenMMDriver:
             self.simulation = Simulation(top.topology, system, integrator)
 
     def compute(self, molecule):
+        """
+        Computes MM potential energy and gradient.
+
+        :param molecule:
+            The molecule.
+        """
+
+        from openmm.unit import nanometer, md_unit_system
 
         if self.rank == mpi_master():
             coords_nm = molecule.get_coordinates() * bohr_in_angstroms() * 0.1
@@ -106,9 +125,21 @@ class OpenMMDriver:
         self.gradient = self.comm.bcast(self.gradient, root=mpi_master())
 
     def get_energy(self):
+        """
+        Gets MM potential energy.
+
+        :return:
+            The potential energy.
+        """
 
         return self.energy
 
     def get_gradient(self):
+        """
+        Gets MM gradient.
+
+        :return:
+            The gradient.
+        """
 
         return self.gradient
