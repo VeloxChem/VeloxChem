@@ -257,7 +257,7 @@ class CBuffer
      * @warning This CTOR **does not** allocate memory.  You will have to call
      * one of `allocate`/`setConstant`/`setZero`/`setRandom` to do so.
      */
-    template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::N) || !(K_ == Kind::MN), bool> = true>
+    template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::N || K_ == Kind::MN), bool> = true>
     explicit CBuffer()
     {
     }
@@ -1124,7 +1124,7 @@ class CBuffer
             return false;
         }
 
-        for (auto i = 0; i < lhs._nColumns; ++i)
+        for (size_type i = 0; i < lhs._nColumns; ++i)
         {
             if (std::abs(lhs(i) - rhs(i)) > 1.0e-13)
             {
@@ -1175,9 +1175,9 @@ class CBuffer
             return false;
         }
 
-        for (auto i = 0; i < lhs._nRows; ++i)
+        for (size_type i = 0; i < lhs._nRows; ++i)
         {
-            for (auto j = 0; j < lhs._nColumns; ++j)
+            for (size_type j = 0; j < lhs._nColumns; ++j)
             {
                 if (std::abs(lhs(i, j) - rhs(i, j)) > 1.0e-13)
                 {
