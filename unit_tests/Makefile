@@ -58,7 +58,9 @@ CXXFLAGS += -I../src/general
 CXXFLAGS += $(MATH_INC)
 
 # Add Google Test includes
-CXXFLAGS += -isystem $(GST_ROOT)/include
+ifdef GST_INC
+CXXFLAGS += -I $(GST_INC)
+endif
 
 # Add list of internal libraries
 VST_LIBS_DIR := ${shell find * -type d -print}
@@ -71,10 +73,11 @@ VST_LIBS_OPTS = $(foreach d,$(VST_LIBS_DIR),$(addprefix $d/,*.optrpt))
 VST_LIBS_LIST = $(foreach d,$(VST_LIBS_DIR),$(addprefix -L$d -l,$d))
 
 # Add list of internal libraries
-VLX_LIBS_DIR := ${shell find ../src/*        \
+# exclude `pymodule` and any folders that DO NOT contain any .cpp files
+VLX_LIBS_DIR := $(shell find ../src/* \
                   -not -path ../src/pymodule \
-                  -not -path ../src/python   \
-                  -type d -print}
+                  -not -path ../src/python \
+                  -type d -exec sh -c 'ls -1 "{}" | egrep -i -q "*\.cpp$$"' ';' -print)
 
 # Generate all internal libraries related files
 VLX_LIBS = $(foreach d,$(VLX_LIBS_DIR),$(addsuffix .a,$(addprefix $d/,$d)))
@@ -111,7 +114,7 @@ clean:
 	$(RM) $(VST_LIBS_DEPS)
 	$(RM) $(VLX_LIBS_OPTS)
 	$(RM) $(VST_LIBS_OPTS)
-	
+
 # Request dependencies generation
 ifneq "$(MAKECMDGOALS)" "clean"
   -include $(VLX_MAIN_DEP)

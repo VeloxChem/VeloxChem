@@ -274,7 +274,7 @@ CAtomBasis::reduceToValenceBasis() const
 void
 CAtomBasis::broadcast(int32_t rank, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         mpi::bcast(_idElemental, comm);
 

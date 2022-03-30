@@ -534,7 +534,7 @@ CMolecularOrbitals::transform(const CDenseMatrix& aoMatrix, const szblock spinPa
 void
 CMolecularOrbitals::broadcast(int32_t rank, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         // broadcast molecular orbital type
 

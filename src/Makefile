@@ -53,7 +53,8 @@ vpath %.hpp $(VLX_INCLUDES)
 CXXFLAGS += $(MATH_INC)
 
 # Add list of internal libraries
-VLX_LIBS_DIR := ${shell find * -not -path pymodule -type d -print}
+# exclude `pymodule` and any folders that DO NOT contain any .cpp files
+VLX_LIBS_DIR := $(shell find * -not -path pymodule -type d -exec sh -c 'ls -1 "{}" | egrep -i -q "*\.cpp$$"' ';' -print)
 
 # Generate all internal libraries related files
 VLX_LIBS = $(foreach d,$(VLX_LIBS_DIR),$(addsuffix .a,$(addprefix $d/,$d)))
@@ -61,6 +62,8 @@ VLX_LIBS_OBJS = $(foreach d,$(VLX_LIBS_DIR),$(addprefix $d/,*.o))
 VLX_LIBS_DEPS = $(foreach d,$(VLX_LIBS_DIR),$(addprefix $d/,*.d))
 VLX_LIBS_OPTS = $(foreach d,$(VLX_LIBS_DIR),$(addprefix $d/,*.optrpt))
 VLX_LIBS_LIST = $(foreach d,$(VLX_LIBS_DIR),$(addprefix -L$d -l,$d))
+VLX_LIBS_TMPS := $(foreach d,$(VLX_LIBS_DIR),$(addprefix $d/,*.ii))
+VLX_LIBS_TMPS += $(foreach d,$(VLX_LIBS_DIR),$(addprefix $d/,*.s))
 
 # Create build folder (if it doesn't exist already)
 build_folder:
@@ -101,6 +104,7 @@ clean:
 	$(RM) $(VLX_LIBS_OBJS)
 	$(RM) $(VLX_LIBS_DEPS)
 	$(RM) $(VLX_LIBS_OPTS)
+	$(RM) $(VLX_LIBS_TMPS)
 
 # Set internal libraries generation rule
 .PHONY: $(VLX_LIBS) $(VLX_LIBS_DIR)

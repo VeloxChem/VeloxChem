@@ -23,16 +23,16 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-# Makefile for internal library in unit tests suite
+# Makefile for internal VeloxChem library
 
-LOCAL_LIB := response.a
+LOCAL_LIB := device.a
 LOCAL_SCR := $(wildcard *.cpp)
 LOCAL_OBJ := $(subst .cpp,.o,$(LOCAL_SCR))
 LOCAL_DEP := $(subst .cpp,.d,$(LOCAL_SCR))
 LOCAL_OPT := $(subst .cpp,.optrpt,$(LOCAL_SCR))
 
 # Read in compilers & shell commands info
-include ../../src/Makefile.setup
+include ../Makefile.setup
 
 # Select compiler flags
 ifneq "$(MAKECMDGOALS)" "release"
@@ -44,21 +44,14 @@ CPPFLAGS := $(CPP_REL_FLG)
 endif
 
 # Add includes directories
-VLX_INCLUDES := ${shell find ../../src/* -type d -print}
-VST_INCLUDES := ${shell find ../* -type d -print}
+VLX_INCLUDES := ${shell find ../* -type d -print}
 
 # Update CXX flags & includes path
-CXXFLAGS     += $(addprefix -I $(CURDIR)/,$(VLX_INCLUDES))
-CXXFLAGS     += $(addprefix -I $(CURDIR)/,$(VST_INCLUDES))
+CXXFLAGS += $(addprefix -I $(CURDIR)/,$(VLX_INCLUDES))
 vpath %.hpp $(VLX_INCLUDES)
 
 # Add MKL includes
 CXXFLAGS += $(MATH_INC)
-
-# Add Google Test includes
-ifdef GST_INC
-CXXFLAGS += -I $(GST_INC)
-endif
 
 # Default rule for linking library
 debug: $(LOCAL_OBJ)
