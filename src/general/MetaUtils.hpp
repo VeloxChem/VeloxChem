@@ -54,12 +54,6 @@ struct type_to_mpi_datatype<char>
 };
 
 template <>
-struct type_to_mpi_datatype<int16_t>
-{
-    inline constexpr static MPI_Datatype value{MPI_INT16_T};
-};
-
-template <>
 struct type_to_mpi_datatype<int32_t>
 {
     inline constexpr static MPI_Datatype value{MPI_INT32_T};
@@ -110,12 +104,6 @@ template <>
 struct type_to_string<char>
 {
     inline const static std::string name{"char"};
-};
-
-template <>
-struct type_to_string<int16_t>
-{
-    inline const static std::string name{"int16_t"};
 };
 
 template <>
