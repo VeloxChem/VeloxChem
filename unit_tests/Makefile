@@ -46,7 +46,7 @@ else
 endif
 
 # Add includes directories
-VLX_INCLUDES := ${shell find * -type d -print}
+VLX_INCLUDES := $(shell find * -type d -print)
 
 # Update CXX flags & includes path
 CXXFLAGS += $(addprefix -I $(CURDIR)/,$(VLX_INCLUDES))
@@ -63,7 +63,7 @@ CXXFLAGS += -I $(GST_INC)
 endif
 
 # Add list of internal libraries
-VST_LIBS_DIR := ${shell find * -type d -print}
+VST_LIBS_DIR := $(shell find * -type d -print)
 
 # Generate all internal libraries related files
 VST_LIBS = $(foreach d,$(VST_LIBS_DIR),$(addsuffix .a,$(addprefix $d/,$d)))
@@ -77,7 +77,8 @@ VST_LIBS_LIST = $(foreach d,$(VST_LIBS_DIR),$(addprefix -L$d -l,$d))
 VLX_LIBS_DIR := $(shell find ../src/* \
                   -not -path ../src/pymodule \
                   -not -path ../src/python \
-                  -type d -exec sh -c 'ls -1 "{}" | egrep -i -q "*\.cpp$$"' ';' -print)
+                  -not -path ../src/device \
+                  -type d -print)
 
 # Generate all internal libraries related files
 VLX_LIBS = $(foreach d,$(VLX_LIBS_DIR),$(addsuffix .a,$(addprefix $d/,$d)))

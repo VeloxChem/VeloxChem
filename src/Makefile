@@ -43,7 +43,7 @@ else
 endif 
 
 # Add includes directories
-VLX_INCLUDES := ${shell find * -not -path pymodule -type d -print}
+VLX_INCLUDES := $(shell find * -not -path pymodule -type d -print)
 
 # Update CXX flags & includes path
 CXXFLAGS += $(addprefix -I $(CURDIR)/,$(VLX_INCLUDES))
@@ -54,7 +54,7 @@ CXXFLAGS += $(MATH_INC)
 
 # Add list of internal libraries
 # exclude `pymodule` and any folders that DO NOT contain any .cpp files
-VLX_LIBS_DIR := $(shell find * -not -path pymodule -type d -exec sh -c 'ls -1 "{}" | egrep -i -q "*\.cpp$$"' ';' -print)
+VLX_LIBS_DIR := $(shell find * -not -path pymodule -not -path device -type d -print)
 
 # Generate all internal libraries related files
 VLX_LIBS = $(foreach d,$(VLX_LIBS_DIR),$(addsuffix .a,$(addprefix $d/,$d)))
