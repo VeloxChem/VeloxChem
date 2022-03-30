@@ -9,23 +9,6 @@
     template <typename B>                                           \
     using ConstMDSpan##SizeTag##TypeTag = ConstMDSpan##SizeTag<Type, B>;
 
-#define _X_XY_GENERATORS_WITH_TYPE(SizeTag, Type, TypeTag)                                   \
-    template <typename B>                                                                    \
-    auto constantBuffer(size_t nElements, Type fill_value)->Buffer##SizeTag##TypeTag<B>      \
-    {                                                                                        \
-        return Buffer##SizeTag##TypeTag<B>(nElements).setConstant(fill_value);               \
-    }                                                                                        \
-    template <typename B>                                                                    \
-    auto zeroBuffer(size_t nElements)->Buffer##SizeTag##TypeTag<B>                           \
-    {                                                                                        \
-        return Buffer##SizeTag##TypeTag<B>(nElements).setConstant(Type{0});                  \
-    }                                                                                        \
-    template <typename B>                                                                    \
-    auto randomBuffer(size_t nElements, Type lower, Type upper)->Buffer##SizeTag##TypeTag<B> \
-    {                                                                                        \
-        return Buffer##SizeTag##TypeTag<B>(nElements).setRandom(lower, upper);               \
-    }
-
 #define _X_XY_BUFFERS_AND_MDSPANS_WITH_BACKEND(SizeTag, Backend, BackendTag) \
     template <typename T>                                                    \
     using Buffer##BackendTag##SizeTag = Buffer##SizeTag<T, Backend>;         \
@@ -34,41 +17,10 @@
     template <typename T>                                                    \
     using ConstMDSpan##BackendTag##SizeTag = ConstMDSpan##SizeTag<T, Backend>;
 
-#define _X_XY_GENERATORS_WITH_BACKEND(SizeTag, Backend, BackendTag)                       \
-    template <typename T>                                                                 \
-    auto constantBuffer(size_t nElements, T fill_value)->Buffer##BackendTag##SizeTag<T>   \
-    {                                                                                     \
-        return Buffer##BackendTag##SizeTag<T>(nElements).setConstant(fill_value);         \
-    }                                                                                     \
-    template <typename T>                                                                 \
-    auto zeroBuffer(size_t nElements)->Buffer##BackendTag##SizeTag<T>                     \
-    {                                                                                     \
-        return Buffer##BackendTag##SizeTag<T>(nElements).setConstant(T{0});               \
-    }                                                                                     \
-    template <typename T>                                                                 \
-    auto randomBuffer(size_t nElements, T lower, T upper)->Buffer##BackendTag##SizeTag<T> \
-    {                                                                                     \
-        return Buffer##BackendTag##SizeTag<T>(nElements).setRandom(lower, upper);         \
-    }
-
 #define _X_XY_BUFFERS_AND_MDSPANS_WITH_BACKEND_AND_TYPE(SizeTag, Type, TypeTag, Backend, BackendTag) \
     using Buffer##BackendTag##SizeTag##TypeTag      = Buffer##SizeTag<Type, Backend>;                \
     using MDSpan##BackendTag##SizeTag##TypeTag      = MDSpan##SizeTag<Type, Backend>;                \
     using ConstMDSpan##BackendTag##SizeTag##TypeTag = ConstMDSpan##SizeTag<Type, Backend>;
-
-#define _X_XY_GENERATORS_WITH_BACKEND_AND_TYPE(SizeTag, Type, TypeTag, Backend, BackendTag)           \
-    auto constantBuffer(size_t nElements, Type fill_value)->Buffer##BackendTag##SizeTag##TypeTag      \
-    {                                                                                                 \
-        return Buffer##BackendTag##SizeTag##TypeTag(nElements).setConstant(fill_value);               \
-    }                                                                                                 \
-    auto zeroBuffer(size_t nElements)->Buffer##BackendTag##SizeTag##TypeTag                           \
-    {                                                                                                 \
-        return Buffer##BackendTag##SizeTag##TypeTag(nElements).setConstant(Type{0});                  \
-    }                                                                                                 \
-    auto randomBuffer(size_t nElements, Type lower, Type upper)->Buffer##BackendTag##SizeTag##TypeTag \
-    {                                                                                                 \
-        return Buffer##BackendTag##SizeTag##TypeTag(nElements).setRandom(lower, upper);               \
-    }
 
 #define VLX_X_XY_DEFINE_BUFFERS_MDSPANS(SizeTag)                                         \
     template <typename T, typename B>                                                    \
