@@ -299,7 +299,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
         math_lib = f"MATH_INC := -I{openblas_inc}"
         math_lib += f"\nMATH_LIB := -L{openblas_dir}"
         math_lib += f"\nMATH_LIB += -Wl,-rpath,{openblas_dir}"
-        openblas_flag = "-llapacke -lopenblas"
+        openblas_flag = "-lopenblas"
         if use_intel:
             openblas_flag += " -lifcore"
         math_lib += f"\nMATH_LIB += {openblas_flag} {omp_flag} -lpthread -lm -ldl"
