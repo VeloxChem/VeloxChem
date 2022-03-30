@@ -126,3 +126,107 @@ TYPED_TEST(CBufferTest, DefaultContructorAndResize)
         // do nothing for Kind::N and Kind::MN
     }
 }
+
+/* Test default construction and `setZero`
+ */
+TYPED_TEST(CBufferTest, DefaultContructorSetZero)
+{
+    using Scalar         = typename TypeParam::value_type;
+    using Backend        = typename TypeParam::backend_type;
+    constexpr auto NRows = TypeParam::NRows;
+    constexpr auto NCols = TypeParam::NCols;
+
+    buffer::CBuffer<Scalar, Backend, NRows, NCols> buf;
+
+    constexpr auto kind = decltype(buf)::kind;
+
+    if constexpr (kind == buffer::Kind::X)
+    {
+        buf.setZero(10);
+
+        ASSERT_EQ(buf.nColumns(), 10);
+    }
+    else if constexpr (kind == buffer::Kind::MY)
+    {
+        buf.setZero(10);
+
+        ASSERT_EQ(buf.nColumns(), 10);
+    }
+    else if constexpr (kind == buffer::Kind::XN)
+    {
+        buf.setZero(10);
+
+        ASSERT_EQ(buf.nRows(), 10);
+    }
+    else if constexpr (kind == buffer::Kind::XY)
+    {
+        buf.setZero(10, 5);
+
+        ASSERT_EQ(buf.nRows(), 10);
+        ASSERT_EQ(buf.nColumns(), 5);
+    }
+    else if constexpr (kind == buffer::Kind::MN)
+    {
+        buf.setZero();
+
+        ASSERT_EQ(buf.nRows(), 10);
+        ASSERT_EQ(buf.nColumns(), 5);
+    }
+    else
+    {
+        buf.setZero();
+
+        ASSERT_EQ(buf.nColumns(), 10);
+    }
+}
+
+/* Test static generators: `Zero`
+ */
+TYPED_TEST(CBufferTest, Zero)
+{
+    using Scalar         = typename TypeParam::value_type;
+    using Backend        = typename TypeParam::backend_type;
+    constexpr auto NRows = TypeParam::NRows;
+    constexpr auto NCols = TypeParam::NCols;
+
+    constexpr auto kind = buffer::CBuffer<Scalar, Backend, NRows, NCols>::kind;
+
+    if constexpr (kind == buffer::Kind::X)
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Zero(10);
+
+        ASSERT_EQ(buf.nColumns(), 10);
+    }
+    else if constexpr (kind == buffer::Kind::MY)
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Zero(10);
+
+        ASSERT_EQ(buf.nColumns(), 10);
+    }
+    else if constexpr (kind == buffer::Kind::XN)
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Zero(10);
+
+        ASSERT_EQ(buf.nRows(), 10);
+    }
+    else if constexpr (kind == buffer::Kind::XY)
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Zero(10, 5);
+
+        ASSERT_EQ(buf.nRows(), 10);
+        ASSERT_EQ(buf.nColumns(), 5);
+    }
+    else if constexpr (kind == buffer::Kind::MN)
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Zero();
+
+        ASSERT_EQ(buf.nRows(), 10);
+        ASSERT_EQ(buf.nColumns(), 5);
+    }
+    else
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Zero();
+
+        ASSERT_EQ(buf.nColumns(), 10);
+    }
+}

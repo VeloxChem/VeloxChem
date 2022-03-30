@@ -179,7 +179,7 @@ class CBuffer
      *
      * However, we only need to copy the first `_nColumns` elements!
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    template <auto L_ = Layout1D, std::enable_if_t<L_, bool> = true>
     auto
     _copy_unaligned(const_pointer src) -> void
     {
@@ -199,7 +199,7 @@ class CBuffer
 
     /** TODO Write Doxygen string
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    template <auto L_ = Layout1D, std::enable_if_t<L_, bool> = true>
     auto
     _fill(value_type fill_value) -> void
     {
@@ -225,7 +225,7 @@ class CBuffer
      *
      * @param[in] src source memory.
      */
-    template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    template <auto L_ = Layout1D, std::enable_if_t<!L_, bool> = true>
     auto
     _copy_unaligned(const_pointer src) -> void
     {
@@ -256,7 +256,7 @@ class CBuffer
 
     /** TODO Write Doxygen string
      */
-    template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    template <auto L_ = Layout1D, std::enable_if_t<!L_, bool> = true>
     auto
     _fill(value_type fill_value) -> void
     {
@@ -322,8 +322,7 @@ class CBuffer
         }
     }
 
-    /** TODO Write Doxygen string
-     */
+    /** TODO Write Doxygen string */
     auto
     _resize(size_type nRows, size_type nCols) -> void
     {
@@ -344,27 +343,21 @@ class CBuffer
     }
 
    public:
-    /** @{ Default CTORs
+    /** @{ Default CTORs. */
+    /** Default CTOR when some dimensions are not known at compile-time.
      *
-     * @warning This CTOR **does not** allocate memory. You will have to call
+     * @warning These CTORs **do not** allocate memory. You will have to call
      * `resize` to do so or, alternatively one of
      * `setConstant`/`setZero`/`setRandom` to allocate *and* initialize.
      */
-    /** Default CTOR when some dimensions are not known at compile-time. */
     template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::N || K_ == Kind::MN), bool> = true>
     CBuffer()
     {
     }
 
-    /** Default CTOR for 1D buffer with compile-time number of elements. */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::N), bool> = true>
+    /** Default CTOR for 1D and 2D buffers with compile-time number of elements in each dimension. */
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::N || K_ == Kind::MN), bool> = true>
     CBuffer() : _nElements{_nRows * _nPaddedColumns}, _data{mem::malloc<value_type, backend_type>(_nElements)}
-    {
-    }
-
-    /** Default CTOR for 2D buffer with compile-time number of rows and columns. */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MN), bool> = true>
-    CBuffer()
     {
     }
     /** @} */
@@ -602,10 +595,7 @@ class CBuffer
     auto
     resize(size_type nCols) -> void
     {
-        if (nCols != _nColumns)
-        {
-            _resize(1, nCols);
-        }
+        _resize(1, nCols);
     }
 
     /** Resize existing 2-dimensional buffer.
@@ -617,10 +607,7 @@ class CBuffer
     auto
     resize(size_type nRows, size_type nCols) -> void
     {
-        if ((nRows != _nRows) && (nCols != _nColumns))
-        {
-            _resize(nRows, nCols);
-        }
+        _resize(nRows, nCols);
     }
 
     /** Resize existing 2-dimensional buffer with compile-time number of rows.
@@ -631,10 +618,7 @@ class CBuffer
     auto
     resize(size_type nCols) -> void
     {
-        if (nCols != _nColumns)
-        {
-            _resize(_nRows, nCols);
-        }
+        _resize(_nRows, nCols);
     }
 
     /** Resize existing 2-dimensional buffer with compile-time number of columns.
@@ -645,10 +629,7 @@ class CBuffer
     auto
     resize(size_type nRows) -> void
     {
-        if (nRows != _nRows)
-        {
-            _resize(nRows, _nColumns);
-        }
+        _resize(nRows, _nColumns);
     }
     /** @} */
 
@@ -662,7 +643,7 @@ class CBuffer
      * @note This overload takes care of host-to-host and device-to-device
      * copy-constructions.
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    template <auto L_ = Layout1D, std::enable_if_t<L_, bool> = true>
     CBuffer(const CBuffer<T, B, NRows, NCols> &source)
         : _nRows{source._nRows}
         , _nColumns{source._nColumns}
@@ -687,10 +668,10 @@ class CBuffer
      * @note This overload takes care of host-to-device and device-to-host
      * copy-constructions.
      */
-    template <auto K_ = kind,
+    template <auto L_ = Layout1D,
               typename BSource,
-              std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true,
-              typename                                                 = std::enable_if_t<!std::is_same_v<backend_type, BSource>>>
+              std::enable_if_t<L_, bool> = true,
+              typename                   = std::enable_if_t<!std::is_same_v<backend_type, BSource>>>
     CBuffer(const CBuffer<T, BSource, NRows, NCols> &source)
         : _nRows{source._nRows}
         , _nColumns{source._nColumns}
@@ -714,7 +695,7 @@ class CBuffer
      * @note This overload takes care of host-to-host and device-to-device
      * copy-constructions.
      */
-    template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    template <auto L_ = Layout1D, std::enable_if_t<!L_, bool> = true>
     CBuffer(const CBuffer<T, B, NRows, NCols> &source)
         : _nRows{source._nRows}
         , _nColumns{source._nColumns}
@@ -745,10 +726,10 @@ class CBuffer
      * @note This overload takes care of host-to-device and device-to-host
      * copy-constructions.
      */
-    template <auto K_ = kind,
+    template <auto L_ = Layout1D,
               typename BSource,
-              std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true,
-              typename                                                  = std::enable_if_t<!std::is_same_v<backend_type, BSource>>>
+              std::enable_if_t<!L_, bool> = true,
+              typename                    = std::enable_if_t<!std::is_same_v<backend_type, BSource>>>
     CBuffer(const CBuffer<T, BSource, NRows, NCols> &source) : _nRows{source._nRows}, _nColumns{source._nColumns}
     {
         // pitched allocation
@@ -785,7 +766,7 @@ class CBuffer
      * @note Move-CTOR only applicable to host-side buffers.
      */
     template <typename BSource = B, typename = std::enable_if_t<!mem::is_on_device_v<BSource>>>
-    CBuffer(const CBuffer<T, B, NRows, NCols> &&source) noexcept
+    CBuffer(CBuffer<T, B, NRows, NCols> &&source) noexcept
         : _nRows{source._nRows}
         , _nColumns{source._nColumns}
         , _nPaddedColumns{source._nPaddedColumns}
@@ -803,9 +784,9 @@ class CBuffer
      * @note This overload takes care of host-to-host and device-to-device
      * copy-assignments.
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
-    CBuffer<T, B, NRows, NCols> &
-    operator=(const CBuffer<T, B, NRows, NCols> &source)
+    template <auto L_ = Layout1D, std::enable_if_t<L_, bool> = true>
+    auto
+    operator=(const CBuffer<T, B, NRows, NCols> &source) -> CBuffer<T, B, NRows, NCols> &
     {
         if (this == &source) return *this;
 
@@ -835,12 +816,12 @@ class CBuffer
      * @note This overload takes care of host-to-device and device-to-host
      * copy-assignments.
      */
-    template <auto K_ = kind,
+    template <auto L_ = Layout1D,
               typename BSource,
-              std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true,
-              typename                                                 = std::enable_if_t<!std::is_same_v<backend_type, BSource>>>
-    CBuffer<T, B, NRows, NCols> &
-    operator=(const CBuffer<T, BSource, NRows, NCols> &source)
+              std::enable_if_t<L_, bool> = true,
+              typename                   = std::enable_if_t<!std::is_same_v<backend_type, BSource>>>
+    auto
+    operator=(const CBuffer<T, BSource, NRows, NCols> &source) -> CBuffer<T, B, NRows, NCols> &
     {
         if (this == &source) return *this;
 
@@ -869,9 +850,9 @@ class CBuffer
      * @note This overload takes care of host-to-host and device-to-device
      * copy-assignments.
      */
-    template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
-    CBuffer<T, B, NRows, NCols> &
-    operator=(const CBuffer<T, B, NRows, NCols> &source)
+    template <auto L_ = Layout1D, std::enable_if_t<!L_, bool> = true>
+    auto
+    operator=(const CBuffer<T, B, NRows, NCols> &source) -> CBuffer<T, B, NRows, NCols> &
     {
         if (this == &source) return *this;
 
@@ -907,12 +888,12 @@ class CBuffer
      * @note This overload takes care of host-to-device and device-to-host
      * copy-assignments.
      */
-    template <auto K_ = kind,
+    template <auto L_ = Layout1D,
               typename BSource,
-              std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true,
-              typename                                                  = std::enable_if_t<!std::is_same_v<backend_type, BSource>>>
-    CBuffer<T, B, NRows, NCols> &
-    operator=(const CBuffer<T, BSource, NRows, NCols> &source)
+              std::enable_if_t<!L_, bool> = true,
+              typename                    = std::enable_if_t<!std::is_same_v<backend_type, BSource>>>
+    auto
+    operator=(const CBuffer<T, BSource, NRows, NCols> &source) -> CBuffer<T, B, NRows, NCols> &
     {
         if (this == &source) return *this;
 
@@ -955,8 +936,8 @@ class CBuffer
      * @note Move-assignment only applicable to host-side buffers.
      */
     template <typename BSource = B, typename = std::enable_if_t<!mem::is_on_device_v<BSource>>>
-    CBuffer<T, B, NRows, NCols> &
-    operator=(const CBuffer<T, B, NRows, NCols> &&source) noexcept
+    auto
+    operator=(CBuffer<T, B, NRows, NCols> &&source) noexcept -> CBuffer<T, B, NRows, NCols> &
     {
         if (this == &source) return *this;
 
@@ -1023,7 +1004,7 @@ class CBuffer
      * @param[in] i index.
      * @note Access is not bounds-checked at run-time!
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    template <auto L_ = Layout1D, std::enable_if_t<L_, bool> = true>
     __host__ __device__ auto
     operator()(size_type i) -> reference
     {
@@ -1035,7 +1016,7 @@ class CBuffer
      * @param[in] i index.
      * @note Access is not bounds-checked at run-time!
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    template <auto L_ = Layout1D, std::enable_if_t<L_, bool> = true>
     __host__ __device__ auto
     operator()(size_type i) const -> const_reference
     {
@@ -1048,7 +1029,7 @@ class CBuffer
      * @param[in] j column index.
      * @note Access is not bounds-checked at run-time!
      */
-    template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    template <auto L_ = Layout1D, std::enable_if_t<!L_, bool> = true>
     __host__ __device__ auto
     operator()(size_type i, size_type j) -> reference
     {
@@ -1061,7 +1042,7 @@ class CBuffer
      * @param[in] j column index.
      * @note Access is not bounds-checked at run-time!
      */
-    template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    template <auto L_ = Layout1D, std::enable_if_t<!L_, bool> = true>
     __host__ __device__ auto
     operator()(size_type i, size_type j) const -> const_reference
     {
@@ -1073,7 +1054,7 @@ class CBuffer
      * @param[in] i index.
      * @note Access is bounds-checked at run-time!
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    template <auto L_ = Layout1D, std::enable_if_t<L_, bool> = true>
     __host__ __device__ auto
     at(size_type i) -> reference
     {
@@ -1086,7 +1067,7 @@ class CBuffer
      * @param[in] i index.
      * @note Access is bounds-checked at run-time!
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    template <auto L_ = Layout1D, std::enable_if_t<L_, bool> = true>
     __host__ __device__ auto
     at(size_type i) const -> const_reference
     {
@@ -1100,7 +1081,7 @@ class CBuffer
      * @param[in] j column index.
      * @note Access is bounds-checked at run-time!
      */
-    template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    template <auto L_ = Layout1D, std::enable_if_t<!L_, bool> = true>
     __host__ __device__ auto
     at(size_type i, size_type j) -> reference
     {
@@ -1115,7 +1096,7 @@ class CBuffer
      * @param[in] j column index.
      * @note Access is bounds-checked at run-time!
      */
-    template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    template <auto L_ = Layout1D, std::enable_if_t<!L_, bool> = true>
     __host__ __device__ auto
     at(size_type i, size_type j) const -> const_reference
     {
@@ -1142,10 +1123,28 @@ class CBuffer
     /**@}*/
 
     /** @{ Iterators */
-    // FIXME
+    // TODO
     /**@}*/
 
     /** @{ mdspan interface */
+    template <typename W>
+    struct restrict_accessor
+    {
+        using element_type = W;
+        using pointer      = W *__restrict;
+        using reference    = W &;
+        reference
+        access(pointer p, ptrdiff_t i) const noexcept
+        {
+            return p[i];
+        }
+        pointer
+        offset(pointer p, ptrdiff_t i) const noexcept
+        {
+            return p + i;
+        }
+    };
+
     using extents_type = metautils::select_t<
         // 1D buffer with run-time number of elements.
         metautils::condition<(kind == Kind::X), stdex::extents<Dynamic>>,
@@ -1164,64 +1163,108 @@ class CBuffer
 
     using mdspan_type = metautils::select_t<
         // 1D buffer with run-time number of elements.
-        metautils::condition<(kind == Kind::X), stdex::mdspan<value_type, extents_type>>,
+        metautils::condition<(kind == Kind::X), stdex::mdspan<value_type, extents_type, stdex::layout_right, restrict_accessor<value_type>>>,
         // 1D buffer with compile-time number of elements.
-        metautils::condition<(kind == Kind::N), stdex::mdspan<value_type, extents_type>>,
+        metautils::condition<(kind == Kind::N), stdex::mdspan<value_type, extents_type, stdex::layout_right, restrict_accessor<value_type>>>,
         // 2D buffer with run-time number of rows and columns.
-        metautils::condition<(kind == Kind::XY), stdex::mdspan<value_type, extents_type, stdex::layout_stride>>,
+        metautils::condition<(kind == Kind::XY), stdex::mdspan<value_type, extents_type, stdex::layout_stride, restrict_accessor<value_type>>>,
         // 2D buffer with compile-time number of rows.
-        metautils::condition<(kind == Kind::MY), stdex::mdspan<value_type, extents_type, stdex::layout_stride>>,
+        metautils::condition<(kind == Kind::MY), stdex::mdspan<value_type, extents_type, stdex::layout_stride, restrict_accessor<value_type>>>,
         // 2D buffer with compile-time number of columns.
-        metautils::condition<(kind == Kind::XN), stdex::mdspan<value_type, extents_type, stdex::layout_stride>>,
+        metautils::condition<(kind == Kind::XN), stdex::mdspan<value_type, extents_type, stdex::layout_stride, restrict_accessor<value_type>>>,
         // 2D buffer with compile-time number of rows and columns.
-        metautils::condition<(kind == Kind::MN), stdex::mdspan<value_type, extents_type, stdex::layout_stride>>,
+        metautils::condition<(kind == Kind::MN), stdex::mdspan<value_type, extents_type, stdex::layout_stride, restrict_accessor<value_type>>>,
         // fallback type
-        stdex::mdspan<value_type, extents_type, stdex::layout_stride>>;
+        stdex::mdspan<value_type, extents_type, stdex::layout_stride, restrict_accessor<value_type>>>;
 
     using const_mdspan_type = metautils::select_t<
         // 1D buffer with run-time number of elements.
-        metautils::condition<(kind == Kind::X), stdex::mdspan<const value_type, extents_type>>,
+        metautils::condition<(kind == Kind::X),
+                             stdex::mdspan<const value_type, extents_type, stdex::layout_right, restrict_accessor<const value_type>>>,
         // 1D buffer with compile-time number of elements.
-        metautils::condition<(kind == Kind::N), stdex::mdspan<const value_type, extents_type>>,
+        metautils::condition<(kind == Kind::N),
+                             stdex::mdspan<const value_type, extents_type, stdex::layout_right, restrict_accessor<const value_type>>>,
         // 2D buffer with run-time number of rows and columns.
-        metautils::condition<(kind == Kind::XY), stdex::mdspan<const value_type, extents_type, stdex::layout_stride>>,
+        metautils::condition<(kind == Kind::XY),
+                             stdex::mdspan<const value_type, extents_type, stdex::layout_stride, restrict_accessor<const value_type>>>,
         // 2D buffer with compile-time number of rows.
-        metautils::condition<(kind == Kind::MY), stdex::mdspan<const value_type, extents_type, stdex::layout_stride>>,
+        metautils::condition<(kind == Kind::MY),
+                             stdex::mdspan<const value_type, extents_type, stdex::layout_stride, restrict_accessor<const value_type>>>,
         // 2D buffer with compile-time number of columns.
-        metautils::condition<(kind == Kind::XN), stdex::mdspan<const value_type, extents_type, stdex::layout_stride>>,
+        metautils::condition<(kind == Kind::XN),
+                             stdex::mdspan<const value_type, extents_type, stdex::layout_stride, restrict_accessor<const value_type>>>,
         // 2D buffer with compile-time number of rows and columns.
-        metautils::condition<(kind == Kind::MN), stdex::mdspan<const value_type, extents_type, stdex::layout_stride>>,
+        metautils::condition<(kind == Kind::MN),
+                             stdex::mdspan<const value_type, extents_type, stdex::layout_stride, restrict_accessor<const value_type>>>,
         // fallback type
-        stdex::mdspan<const value_type, extents_type, stdex::layout_stride>>;
+        stdex::mdspan<const value_type, extents_type, stdex::layout_stride, restrict_accessor<const value_type>>>;
 
     /** @{ Implicit conversions */
     /** Conversion to mdspan. */
-    // operator mdspan_type()
-    //{
-    //     if constexpr (kind == Kind::X || kind == Kind::N)
-    //     {
-    //         return mdspan_type(_data, _nColumns);
-    //     }
-    //     else
-    //     {
-    //         stdex::layout_stride::mapping layout{stdex::extents{_nRows, _nColumns}, std::array<size_t, 2>{_nPaddedColumns, 1}};
-    //         return mdspan_type(_data, layout);
-    //     }
-    // }
+    operator mdspan_type()
+    {
+        if constexpr (kind == buffer::Kind::X)
+        {
+            return mdspan_type(_data, _nColumns);
+        }
+        else if constexpr (kind == buffer::Kind::MY)
+        {
+            stdex::layout_stride::mapping layout{extents_type{_nColumns}, std::array<size_type, 2>{_nPaddedColumns, 1}};
+            return mdspan_type(_data, layout);
+        }
+        else if constexpr (kind == buffer::Kind::XN)
+        {
+            stdex::layout_stride::mapping layout{extents_type{_nRows}, std::array<size_type, 2>{_nPaddedColumns, 1}};
+            return mdspan_type(_data, layout);
+        }
+        else if constexpr (kind == buffer::Kind::XY)
+        {
+            stdex::layout_stride::mapping layout{extents_type{_nRows, _nColumns}, std::array<size_type, 2>{_nPaddedColumns, 1}};
+            return mdspan_type(_data, layout);
+        }
+        else if constexpr (kind == buffer::Kind::MN)
+        {
+            stdex::layout_stride::mapping layout{extents_type{}, std::array<size_type, 2>{_nPaddedColumns, 1}};
+            return mdspan_type(_data, layout);
+        }
+        else
+        {
+            return mdspan_type(_data);
+        }
+    }
 
-    ///** Conversion to const mdspan. */
-    // operator const_mdspan_type() const
-    //{
-    //     if constexpr (kind == Kind::X || kind == Kind::N)
-    //     {
-    //         return const_mdspan_type(_data, _nColumns);
-    //     }
-    //     else
-    //     {
-    //         stdex::layout_stride::mapping layout{stdex::extents{_nRows, _nColumns}, std::array<size_t, 2>{_nPaddedColumns, 1}};
-    //         return const_mdspan_type(_data, layout);
-    //     }
-    // }
+    /** Conversion to const mdspan. */
+    operator const_mdspan_type() const
+    {
+        if constexpr (kind == buffer::Kind::X)
+        {
+            return const_mdspan_type(_data, _nColumns);
+        }
+        else if constexpr (kind == buffer::Kind::MY)
+        {
+            stdex::layout_stride::mapping layout{extents_type{_nColumns}, std::array<size_type, 2>{_nPaddedColumns, 1}};
+            return const_mdspan_type(_data, layout);
+        }
+        else if constexpr (kind == buffer::Kind::XN)
+        {
+            stdex::layout_stride::mapping layout{extents_type{_nRows}, std::array<size_type, 2>{_nPaddedColumns, 1}};
+            return const_mdspan_type(_data, layout);
+        }
+        else if constexpr (kind == buffer::Kind::XY)
+        {
+            stdex::layout_stride::mapping layout{extents_type{_nRows, _nColumns}, std::array<size_type, 2>{_nPaddedColumns, 1}};
+            return const_mdspan_type(_data, layout);
+        }
+        else if constexpr (kind == buffer::Kind::MN)
+        {
+            stdex::layout_stride::mapping layout{extents_type{}, std::array<size_type, 2>{_nPaddedColumns, 1}};
+            return const_mdspan_type(_data, layout);
+        }
+        else
+        {
+            return const_mdspan_type(_data);
+        }
+    }
     /**@}*/
 
     auto
@@ -1300,64 +1343,116 @@ class CBuffer
      *
      * @note The padding elements are left uninitialized!
      */
-    /** 1D buffer.
+    /** 1D/2D buffer.
      *
      * @param v value of fill element.
-     * @param nCols number of columns. Defaults to the NCols template parameter.
+     * @note This is always valid when all dimensions are fixed at compile-time.
+     * When one or more dimensions are known at run-time, this method is only
+     * valid after allocation of the buffer, _e.g._ after calling `resize` or by
+     * creating the object with any of the allocating CTORs first.
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
     auto
-    setConstant(value_type fill_value, size_type nCols = NCols) -> void
+    setConstant(value_type fill_value) -> void
     {
-        // resize, if buffer has run-time dimension
-        if constexpr (kind == Kind::X) resize(nCols);
-
-        // set all of _data, except padding elements, to the specified constant
         _fill(fill_value);
     }
 
-    /** 2D buffer of XY or MN kinds.
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::N || K_ == Kind::MN), bool> = true>
+    inline static auto
+    Constant(value_type fill_value) -> CBuffer<T, B, NRows, NCols>
+    {
+        auto buf = CBuffer<T, B, NRows, NCols>{};
+        buf.setConstant(fill_value);
+        return buf;
+    }
+
+    /** 1D buffer.
      *
      * @param v value of fill element.
-     * @param nRows number of rows. Defaults to the NRows template parameter.
-     * @param nCols number of columns. Defaults to the NCols template parameter.
+     * @param nCols number of columns.
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY || K_ == Kind::MN), bool> = true>
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
     auto
-    setConstant(value_type fill_value, size_type nRows = NRows, size_type nCols = NCols) -> void
+    setConstant(value_type fill_value, size_type nCols) -> void
     {
-        // resize, if both dimensions of buffer are known at run-time
-        if constexpr (kind != Kind::MN) resize(nRows, nCols);
-
+        resize(nCols);
         _fill(fill_value);
+    }
+
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
+    inline static auto
+    Constant(value_type fill_value, size_type nCols) -> CBuffer<T, B, 1, NCols>
+    {
+        auto buf = CBuffer<T, B, 1, NCols>{nCols};
+        buf.setConstant(fill_value);
+        return buf;
+    }
+
+    /** 2D buffer of XY kind.
+     *
+     * @param v value of fill element.
+     * @param nRows number of rows.
+     * @param nCols number of columns.
+     */
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
+    auto
+    setConstant(value_type fill_value, size_type nRows, size_type nCols) -> void
+    {
+        resize(nRows, nCols);
+        _fill(fill_value);
+    }
+
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
+    inline static auto
+    Constant(value_type fill_value, size_type nRows, size_type nCols) -> CBuffer<T, B, Dynamic, Dynamic>
+    {
+        auto buf = CBuffer<T, B, Dynamic, Dynamic>{nRows, nCols};
+        buf.setConstant(fill_value);
+        return buf;
     }
 
     /** 2D buffer of MY kind.
      *
      * @param v value of fill element.
-     * @param nCols number of columns. Defaults to the NCols template parameter.
+     * @param nCols number of columns.
      */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
     auto
-    setConstant(value_type fill_value, size_type nCols = NCols) -> void
+    setConstant(value_type fill_value, size_type nCols) -> void
     {
         resize(nCols);
-
         _fill(fill_value);
+    }
+
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
+    inline static auto
+    Constant(value_type fill_value, size_type nCols) -> CBuffer<T, B, NRows, Dynamic>
+    {
+        auto buf = CBuffer<T, B, NRows, Dynamic>{nCols};
+        buf.setConstant(fill_value);
+        return buf;
     }
 
     /** 2D buffer of XN kind.
      *
      * @param v value of fill element.
-     * @param nRows number of rows. Defaults to the NRows template parameter.
+     * @param nRows number of rows.
      */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
     auto
-    setConstant(value_type fill_value, size_type nRows = NRows) -> void
+    setConstant(value_type fill_value, size_type nRows) -> void
     {
         resize(nRows);
-
         _fill(fill_value);
+    }
+
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
+    inline static auto
+    Constant(value_type fill_value, size_type nRows) -> CBuffer<T, B, Dynamic, NCols>
+    {
+        auto buf = CBuffer<T, B, Dynamic, NCols>{nRows};
+        buf.setConstant(fill_value);
+        return buf;
     }
     /**@}*/
 
@@ -1365,50 +1460,109 @@ class CBuffer
      *
      * @note The padding elements are left uninitialized!
      */
-    /** 1D buffer.
+    /** 1D/2D buffer.
      *
-     * @param nCols number of columns. Defaults to the NCols template parameter.
+     * @param v value of fill element.
+     * @note This is always valid when all dimensions are fixed at compile-time.
+     * When one or more dimensions are known at run-time, this method is only
+     * valid after allocation of the buffer, _e.g._ after calling `resize` or by
+     * creating the object with any of the allocating CTORs first.
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
     auto
-    setZero(size_type nCols = NCols) -> void
+    setZero() -> void
     {
-        setConstant(T{0}, nCols);
+        setConstant(value_type{0});
     }
 
-    /** 2D buffer of XY or MN kinds.
-     *
-     * @param nRows number of rows. Defaults to the NRows template parameter.
-     * @param nCols number of columns. Defaults to the NCols template parameter.
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY || K_ == Kind::MN), bool> = true>
-    auto
-    setZero(size_type nRows = NRows, size_type nCols = NCols) -> void
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::N || K_ == Kind::MN), bool> = true>
+    inline static auto
+    Zero() -> CBuffer<T, B, NRows, NCols>
     {
-        setConstant(T{0}, nRows, nCols);
+        auto buf = CBuffer<T, B, NRows, NCols>{};
+        buf.setZero();
+        return buf;
+    }
+
+    /** 1D buffer.
+     *
+     * @param nCols number of columns.
+     */
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
+    auto
+    setZero(size_type nCols) -> void
+    {
+        setConstant(value_type{0}, nCols);
+    }
+
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
+    inline static auto
+    Zero(size_type nCols) -> CBuffer<T, B, 1, NCols>
+    {
+        auto buf = CBuffer<T, B, 1, NCols>{nCols};
+        buf.setZero();
+        return buf;
+    }
+
+    /** 2D buffer of XY kind.
+     *
+     * @param nRows number of rows.
+     * @param nCols number of columns.
+     */
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
+    auto
+    setZero(size_type nRows, size_type nCols) -> void
+    {
+        setConstant(value_type{0}, nRows, nCols);
+    }
+
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
+    inline static auto
+    Zero(size_type nRows, size_type nCols) -> CBuffer<T, B, Dynamic, Dynamic>
+    {
+        auto buf = CBuffer<T, B, Dynamic, Dynamic>{nRows, nCols};
+        buf.setZero();
+        return buf;
     }
 
     /** 2D buffer of MY kind.
      *
-     * @param nCols number of columns. Defaults to the NCols template parameter.
+     * @param nCols number of columns.
      */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
     auto
-    setZero(size_type nCols = NCols) -> void
+    setZero(size_type nCols) -> void
     {
-        setConstant(T{0}, nCols);
+        setConstant(value_type{0}, nCols);
+    }
+
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
+    inline static auto
+    Zero(size_type nCols) -> CBuffer<T, B, NRows, Dynamic>
+    {
+        auto buf = CBuffer<T, B, NRows, Dynamic>{nCols};
+        buf.setZero();
+        return buf;
     }
 
     /** 2D buffer of XN kind.
      *
      * @param v value of fill element.
-     * @param nRows number of rows. Defaults to the NRows template parameter.
+     * @param nRows number of rows.
      */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
     auto
-    setZero(size_type nRows = NRows) -> void
+    setZero(size_type nRows) -> void
     {
-        setConstant(T{0}, nRows);
+        setConstant(value_type{0}, nRows);
+    }
+
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
+    inline static auto
+    Zero(size_type nRows) -> CBuffer<T, B, Dynamic, NCols>
+    {
+        auto buf = CBuffer<T, B, Dynamic, NCols>{nRows};
+        buf.setZero();
+        return buf;
     }
     /**@}*/
 
@@ -1421,68 +1575,125 @@ class CBuffer
      * If you need more control, generate the random sequence (as std::vector or
      * raw array) and then use any of the available constructors.
      */
+    /** 1D/2D buffer.
+     *
+     * @param[in] lower lower bound of interval.
+     * @param[in] upper upper bound of interval.
+     * @note This is always valid when all dimensions are fixed at compile-time.
+     * When one or more dimensions are known at run-time, this method is only
+     * valid after allocation of the buffer, _e.g._ after calling `resize` or by
+     * creating the object with any of the allocating CTORs first.
+     */
+    auto
+    setRandom(value_type lower, value_type upper) -> void
+    {
+        _random_fill(lower, upper);
+    }
+
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::N || K_ == Kind::MN), bool> = true>
+    inline static auto
+    Random(value_type upper, value_type lower) -> CBuffer<T, B, NRows, NCols>
+    {
+        auto buf = CBuffer<T, B, NRows, NCols>{};
+        buf.setRandom(lower, upper);
+        return buf;
+    }
+
     /** 1D buffer
      *
      * @param[in] lower lower bound of interval.
      * @param[in] upper upper bound of interval.
-     * @param nCols number of columns. Defaults to the NCols template parameter.
+     * @param nCols number of columns.
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X || K_ == Kind::N), bool> = true>
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
     auto
-    setRandom(T lower, T upper, size_type nCols = NCols) -> void
+    setRandom(value_type lower, value_type upper, size_type nCols) -> void
     {
-        // resize, if buffer has run-time dimension
-        if constexpr (kind == Kind::X) resize(nCols);
+        resize(nCols);
 
         _random_fill(lower, upper);
     }
 
-    /** 2D buffer of XY and MN kind.
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
+    inline static auto
+    Random(value_type upper, value_type lower, size_type nCols) -> CBuffer<T, B, 1, NCols>
+    {
+        auto buf = CBuffer<T, B, 1, NCols>{nCols};
+        buf.setRandom(lower, upper);
+        return buf;
+    }
+
+    /** 2D buffer of XY kind.
      *
      * @param[in] lower lower bound of interval.
      * @param[in] upper upper bound of interval.
-     * @param nRows number of rows. Defaults to the NRows template parameter.
-     * @param nCols number of columns. Defaults to the NCols template parameter.
+     * @param nRows number of rows.
+     * @param nCols number of columns.
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY || K_ == Kind::MN), bool> = true>
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
     auto
-    setRandom(T lower, T upper, size_type nRows = NRows, size_type nCols = NCols) -> void
+    setRandom(value_type lower, value_type upper, size_type nRows, size_type nCols) -> void
     {
-        // resize, if both dimensions of buffer are known at run-time
-        if constexpr (kind != Kind::MN) resize(nRows, nCols);
+        resize(nRows, nCols);
 
         _random_fill(lower, upper);
+    }
+
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
+    inline static auto
+    Random(value_type upper, value_type lower, size_type nRows, size_type nCols) -> CBuffer<T, B, Dynamic, Dynamic>
+    {
+        auto buf = CBuffer<T, B, Dynamic, Dynamic>{nRows, nCols};
+        buf.setRandom(lower, upper);
+        return buf;
     }
 
     /** 2D buffer of MY kind.
      *
      * @param[in] lower lower bound of interval.
      * @param[in] upper upper bound of interval.
-     * @param nCols number of columns. Defaults to the NCols template parameter.
+     * @param nCols number of columns.
      */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
     auto
-    setRandom(T lower, T upper, size_type nCols = NCols) -> void
+    setRandom(value_type lower, value_type upper, size_type nCols) -> void
     {
-        // resize, if both dimensions of buffer are known at run-time
         resize(nCols);
 
         _random_fill(lower, upper);
+    }
+
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
+    inline static auto
+    Random(value_type upper, value_type lower, size_type nCols) -> CBuffer<T, B, NRows, Dynamic>
+    {
+        auto buf = CBuffer<T, B, NRows, Dynamic>{nCols};
+        buf.setRandom(lower, upper);
+        return buf;
     }
 
     /** 2D buffer of XN kind.
      *
      * @param[in] lower lower bound of interval.
      * @param[in] upper upper bound of interval.
-     * @param nRows number of rows. Defaults to the NRows template parameter.
+     * @param nRows number of rows.
      */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
     auto
-    setRandom(T lower, T upper, size_type nRows = NRows) -> void
+    setRandom(value_type lower, value_type upper, size_type nRows) -> void
     {
         resize(nRows);
 
         _random_fill(lower, upper);
+    }
+
+    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
+    inline static auto
+    Random(value_type upper, value_type lower, size_type nRows) -> CBuffer<T, B, Dynamic, NCols>
+    {
+        auto buf = CBuffer<T, B, Dynamic, NCols>{nRows};
+        buf.setRandom(lower, upper);
+        return buf;
     }
     /** @} */
 };
