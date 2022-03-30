@@ -59,6 +59,7 @@ class OrbitalViewer:
         self.ao_dict = None
         self.i_orb = None
         self.mo_coefs = None
+        self.is_uhf = False
 
         # plot
         self.this_plot = None
@@ -214,15 +215,15 @@ class OrbitalViewer:
 
         self.initialize(molecule, basis)
 
-        self.isUHF=mo_object.get_orbitals_type() == molorb.unrest
+        self.is_uhf = (mo_object.get_orbitals_type() == molorb.unrest)
 
         # i_orb is an instance variable accessed by MultiPsi
         self.i_orb = self.molecule.number_of_alpha_electrons() - 1
         self.mo_coefs = mo_object.alpha_to_numpy()
-        if self.isUHF:
-            self.mo_coefs_b=mo_object.beta_to_numpy()
+        if self.is_uhf:
+            self.mo_coefs_beta = mo_object.beta_to_numpy()
         else:
-            self.mo_coefs_b=self.mo_coefs
+            self.mo_coefs_beta = self.mo_coefs
 
         self.this_plot = k3d.plot(grid_visible=False)
         plt_atoms, plt_bonds = self.draw_molecule(self.molecule)
@@ -241,72 +242,88 @@ class OrbitalViewer:
         orb_occ = mo_object.occa_to_numpy()
         orblist = []
         for i in range(len(orb_ene)):
-            orblist.append(
-                (f'{i+1:3d} occ={orb_occ[i]:.3f} ene={orb_ene[i]:.3f}', i))
-
+            orb_label = f'{i+1:3d} occ={orb_occ[i]:.3f} '
+            orb_label += f'ene={orb_ene[i]:.3f}'
+            orblist.append((orb_label, i))
 
         # Also do for beta if UHF
-        if self.isUHF:
-            orb_ene_b = mo_object.eb_to_numpy()
-            orb_occ_b = mo_object.occb_to_numpy()
-            orblist_b = [ ("",-1) ]
-            for i in range(len(orb_ene_b)):
-                orblist_b.append(
-                (f'{i+1:3d} occ={orb_occ_b[i]:.3f} ene={orb_ene_b[i]:.3f}', i))
+        if self.is_uhf:
+            orb_ene_beta = mo_object.eb_to_numpy()
+            orb_occ_beta = mo_object.occb_to_numpy()
+            orblist_beta = [('', -1)]
+            for i in range(len(orb_ene_beta)):
+                orb_label = f'{i+1:3d} occ={orb_occ_beta[i]:.3f} '
+                orb_label += f'ene={orb_ene_beta[i]:.3f}'
+                orblist_beta.append((orb_label, i))
 
-            orblist.insert(0, ("",-1)) #Add empty space
+            # Add empty space
+            orblist.insert(0, ('', -1))
             # Add widget
-            self.orbital_selector = widgets.Dropdown(options=orblist,
-                                     value=self.i_orb,
-                                     description='Alpha orbital:')
-            self.orbital_selector_b = widgets.Dropdown(options=orblist_b,
-                                     value=-1,
-                                     description='Beta orbital:')
-            hbox=widgets.HBox([self.orbital_selector, self.orbital_selector_b])
+            self.orbital_selector = widgets.Dropdown(
+                options=orblist, value=self.i_orb, description='Alpha orbital:')
+            self.orbital_selector_beta = widgets.Dropdown(
+                options=orblist_beta, value=-1, description='Beta orbital:')
+            hbox = widgets.HBox(
+                [self.orbital_selector, self.orbital_selector_beta])
             display(hbox)
-            self.orbital_selector_b.observe(self.on_orbital_index_change_b, names='value')
+            self.orbital_selector_beta.observe(
+                self.on_orbital_index_change_beta, names='value')
         else:
             # Add widget
             self.orbital_selector = widgets.Dropdown(options=orblist,
-                                     value=self.i_orb,
-                                     description='Orbital:')
+                                                     value=self.i_orb,
+                                                     description='Orbital:')
             display(self.orbital_selector)
-        self.orbital_selector.observe(self.on_orbital_index_change, names='value')
+        self.orbital_selector.observe(self.on_orbital_index_change,
+                                      names='value')
 
-    def on_orbital_index_change_b(self, change):
-        self.on_orbital_index_change(change, False)
-    def on_orbital_index_change(self, change, alpha=True):
+    def on_orbital_index_change(self, change, spin='alpha'):
         """
         Registers a widget event to plot a different orbital.
 
         :param change:
             A dictionary created by the widget observe.
+        :param spin:
+            The spin of the orbital.
         """
+
         i_orb = change['new']
 
-        #Do not do anything if "blank index" is chosen
-        if i_orb<0:
+        # Do not do anything if "blank index" is chosen
+        if i_orb < 0:
             return
 
-        self.i_orb=i_orb
+        self.i_orb = i_orb
 
         # To avoid disturbing the current view
         self.this_plot.camera_auto_fit = False
         self.this_plot -= self.plt_iso_one
         self.this_plot -= self.plt_iso_two
 
-        if alpha:
-            if self.isUHF:
-                self.orbital_selector_b.value=-1 #Reset the beta index to blank if exists
+        if spin == 'alpha':
+            if self.is_uhf:
+                # Reset the beta index to blank if exists
+                self.orbital_selector_beta.value = -1
             orbital = self.compute_orbital(self.mo_coefs, self.i_orb)
         else:
-            self.orbital_selector.value=-1 #Reset the alpha index to blank
-            orbital = self.compute_orbital(self.mo_coefs_b, self.i_orb)
+            # Reset the alpha index to blank
+            self.orbital_selector.value = -1
+            orbital = self.compute_orbital(self.mo_coefs_beta, self.i_orb)
 
         self.plt_iso_one, self.plt_iso_two = self.draw_orbital(orbital)
         self.this_plot += self.plt_iso_one
         self.this_plot += self.plt_iso_two
         self.this_plot.render()
+
+    def on_orbital_index_change_beta(self, change):
+        """
+        Registers a widget event to plot a different orbital of beta-spin.
+
+        :param change:
+            A dictionary created by the widget observe.
+        """
+
+        self.on_orbital_index_change(change, 'beta')
 
     def draw_molecule(self, molecule):
         """
@@ -380,7 +397,10 @@ class OrbitalViewer:
                 radii.append(2.0)
 
         # Balls
-        plt_atoms = k3d.points(positions=coords, point_size=0.7, colors=colors, shader='mesh')
+        plt_atoms = k3d.points(positions=coords,
+                               point_size=0.7,
+                               colors=colors,
+                               shader='mesh')
 
         # Sticks
         plt_bonds = []
