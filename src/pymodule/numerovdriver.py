@@ -29,6 +29,7 @@ import os
 import sys
 
 from scipy.optimize import curve_fit
+from scipy import interpolate
 
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scffirstorderprop import ScfFirstOrderProperties
@@ -56,7 +57,7 @@ class NumerovDriver:
         The output stream.
 
     Instance variables:
-        - pec_displacements: The potential energy (PEC) screening range.
+        - pec_displacements: The potential energy (PEC) scanning range.
         - pec_potential: The type of potential to fit the scan.
         - pec_data: The external PEC data flag.
         - pec_energies: The PEC energies.
@@ -134,7 +135,7 @@ class NumerovDriver:
         self.input_keywords = {
             'numerov': {
                 'pec_displacements':
-                    ('seq_range', 'PEC screening range [bohr]'),
+                    ('seq_range', 'PEC scanning range [bohr]'),
                 'pec_potential':
                     ('str_lower', 'potential type for fitting'),
                 'reduced_mass':
@@ -254,6 +255,9 @@ class NumerovDriver:
                                                 self.pec_displacements, f_pec)
             elif self.pec_potential == 'harmonic':
                 f_pec_pot_params = np.polyfit(self.pec_displacements, f_pec, 2)
+            else:
+                assert_msg_critical(self.pec_potential in ['morse', 'harmonic'],
+                    'Unvalid potential shape {}'.format(self.pec_potential))
 
             # start numerov procedure
             f_grid, f_pot, f_psi, f_vib_levels = self.solve_numerov(
@@ -271,7 +275,9 @@ class NumerovDriver:
         # calculate spectra
 
         # discretize property curves
+        prop_curves = {}
         if not self.el_transition:
+            # use 6th degree polynomial for one elctronic state
             x_prop_coefs = np.polyfit(self.pec_displacements,
                                       np.array(self.properties)[:,0], 6)
             y_prop_coefs = np.polyfit(self.pec_displacements,
@@ -279,19 +285,31 @@ class NumerovDriver:
             z_prop_coefs = np.polyfit(self.pec_displacements,
                                       np.array(self.properties)[:,2], 6)
 
+            prop_curves['x'] = np.polyval(x_prop_coefs, i_grid)
+            prop_curves['y'] = np.polyval(y_prop_coefs, i_grid)
+            prop_curves['z'] = np.polyval(z_prop_coefs, i_grid)
         else:
-            x_prop_coefs = np.polyfit(self.pec_displacements,
-                                      np.array(self.properties)[:,0], 0)
-            y_prop_coefs = np.polyfit(self.pec_displacements,
-                                      np.array(self.properties)[:,1], 0)
-            z_prop_coefs = np.polyfit(self.pec_displacements,
-                                      np.array(self.properties)[:,2], 0)
+            # use isotropic average to identify outliers
+            iso = np.array([np.sum(np.array(i)**2) for i in self.properties])
 
-        prop_curves = {}
-        prop_curves['x'] = np.polyval(x_prop_coefs, i_grid)
-        prop_curves['y'] = np.polyval(y_prop_coefs, i_grid)
-        prop_curves['z'] = np.polyval(z_prop_coefs, i_grid)
+            # filter outliers potentially caused by conical intersections
+            mask = self.mask_outliers(iso)
 
+            displacements = np.ma.masked_array(self.pec_displacements,
+                                               mask).compressed()
+            x_prop = np.ma.masked_array(np.array(self.properties)[:,0],
+                                                 mask).compressed()
+            y_prop = np.ma.masked_array(np.array(self.properties)[:,1],
+                                                 mask).compressed()
+            z_prop = np.ma.masked_array(np.array(self.properties)[:,2],
+                                                 mask).compressed()
+
+            x_prop_coefs = interpolate.splrep(displacements, x_prop, s=0)
+            prop_curves['x'] = interpolate.splev(i_grid, x_prop_coefs, der=0)
+            y_prop_coefs = interpolate.splrep(displacements, y_prop, s=0)
+            prop_curves['y'] = interpolate.splev(i_grid, y_prop_coefs, der=0)
+            z_prop_coefs = interpolate.splrep(displacements, z_prop, s=0)
+            prop_curves['z'] = interpolate.splev(i_grid, z_prop_coefs, der=0)
 
         # IR for a single electronic state
         if not self.el_transition:
@@ -349,9 +367,8 @@ class NumerovDriver:
         assert_msg_critical(molecule.number_of_atoms() == 2,
                             'Only applicable to diatomic molecules')
 
-        # get data for PEC screening
+        # get data for PEC scan
         mol_coords = molecule.get_coordinates()
-        #input_bond_len = np.linalg.norm(mol_coords[0] - mol_coords[1])
         self.eq_bond_len = np.linalg.norm(mol_coords[0] - mol_coords[1])
         bond_lengths = self.pec_displacements + self.eq_bond_len
 
@@ -427,8 +444,13 @@ class NumerovDriver:
 
                 # save energies and transition moments
                 pec_energies['f'].append(total_energy)
-                props.append(
-                    rsp_drv.rsp_property['electric_transition_dipoles'][-1])
+
+                # assume degeneracy
+                iso = 2.0 * np.sum(
+                    rsp_drv.rsp_property['electric_transition_dipoles'][-1]**2)
+                print(iso)
+                average = np.sqrt(iso / 3.0)
+                props.append(np.array([average] * 3))
 
             self.print_PEC_iteration(n)
 
@@ -568,6 +590,25 @@ class NumerovDriver:
         """
 
         return (De * (np.exp(-2.0*a*(r-re)) - 2.0 * np.exp(-a*(r-re))) + v)
+
+    def mask_outliers(self, y, m=15.0):
+        """
+        Masks the outliers from an array.
+
+        :param y:
+            The data values.
+        :param m:
+            The cutoff value.
+
+        :return:
+            The inverted mask.
+        """
+
+        dev = np.abs(y - np.median(y))
+        dev_med = np.median(dev)
+        s = dev / dev_med if dev_med else 0.0
+
+        return [s > m]
 
     def get_IR_spectrum(self, psi, vib_levels, dmc):
         """
@@ -773,29 +814,29 @@ class NumerovDriver:
         str_width = 62
 
         # print SCF info
-        cur_str = 'Number of Screening Geometries  : '
+        cur_str = 'Number of Geometries          : '
         cur_str += str(len(self.pec_displacements))
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Wave Function Model             : ' + scf_drv.get_scf_type()
+        cur_str = 'Wave Function Model           : ' + scf_drv.get_scf_type()
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'SCF Convergece Threshold        : {:.1e}'.format(
+        cur_str = 'SCF Convergece Threshold      : {:.1e}'.format(
             scf_drv.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
         if scf_drv.dft:
-            cur_str = 'Exchange-Correlation Functional : '
+            cur_str = 'DFT Functional                : '
             cur_str += scf_drv.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'Molecular Grid Level            : ' + str(
+            cur_str = 'Molecular Grid Level          : ' + str(
                 scf_drv.grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         # print excited state info
         if self.el_transition:
-            cur_str = 'Targeted Exicted State          : ' + str(
+            cur_str = 'Targeted Exicted State        : ' + str(
                 self.final_el_state)
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'Excited State Threshold         : {:.1e}'.format(
+            cur_str = 'Excited State Threshold       : {:.1e}'.format(
                 self.exc_conv_thresh)
             self.ostream.print_header(cur_str.ljust(str_width))
 
