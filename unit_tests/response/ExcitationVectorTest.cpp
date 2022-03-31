@@ -25,8 +25,11 @@
 
 #include "ExcitationVectorTest.hpp"
 
+#include <vector>
+
 #include "CheckFunctions.hpp"
 #include "ExcitationVector.hpp"
+#include "MemBlock.hpp"
 
 TEST_F(CExcitationVectorTest, DefaultConstructor)
 {
@@ -269,7 +272,9 @@ TEST_F(CExcitationVectorTest, GetDensityZ)
 
     std::vector<double> ea({1.0, 2.0, 4.0, 2.0});
 
-    const CMolecularOrbitals mos({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({2.0, 2.0, 0.0, 0.0});
+
+    const CMolecularOrbitals mos({ma}, {ea}, {occa}, molorb::rest);
 
     CDenseMatrix mden({-7.0,  14.0, 8.0,   7.0,  13.0, 19.0, -38.0, -41.0, 8.0,   -97.0, 10.0, -20.0, -5.0,
                        -19.0, 2.0,  -14.0, 28.0, 16.0, 14.0, 26.0,  13.0,  -26.0, -32.0, 11.0, -79.0},
@@ -289,7 +294,9 @@ TEST_F(CExcitationVectorTest, GetDensityY)
 
     std::vector<double> ea({1.0, 2.0, 4.0, 2.0});
 
-    const CMolecularOrbitals mos({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({2.0, 2.0, 0.0, 0.0});
+
+    const CMolecularOrbitals mos({ma}, {ea}, {occa}, molorb::rest);
 
     CDenseMatrix mden({-16.0, -44.0, 52.0, -32.0, -48.0, 32.0, 88.0, -104.0, 64.0, 96.0,  19.0, 41.0, -58.0,
                        38.0,  47.0,  15.0, 57.0,  -54.0, 30.0, 59.0, 32.0,   52.0, -92.0, 64.0, 64.0},
@@ -339,7 +346,9 @@ TEST_F(CExcitationVectorTest, GetBraEnergies)
 
     std::vector<double> ea({1.0, 2.0, 4.0, 2.0});
 
-    const CMolecularOrbitals mos({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({2.0, 2.0, 0.0, 0.0});
+
+    const CMolecularOrbitals mos({ma}, {ea}, {occa}, molorb::rest);
 
     vlxtest::compare(ea, mvec.getBraEnergies(mos));
 }
@@ -352,7 +361,9 @@ TEST_F(CExcitationVectorTest, GetKetEnergies)
 
     std::vector<double> ea({1.0, 2.0, 4.0, 2.0});
 
-    const CMolecularOrbitals mos({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({2.0, 2.0, 0.0, 0.0});
+
+    const CMolecularOrbitals mos({ma}, {ea}, {occa}, molorb::rest);
 
     vlxtest::compare(ea, mvec.getKetEnergies(mos));
 }
@@ -365,7 +376,9 @@ TEST_F(CExcitationVectorTest, GetSmallEnergyIdentifiers)
 
     std::vector<double> ea({1.0, 2.0, 4.0, 2.0});
 
-    const CMolecularOrbitals mos({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({2.0, 2.0, 0.0, 0.0});
+
+    const CMolecularOrbitals mos({ma}, {ea}, {occa}, molorb::rest);
 
     std::vector<int32_t> refidx4({0, 1, 2, 3});
 
@@ -384,7 +397,9 @@ TEST_F(CExcitationVectorTest, GetApproximateDiagonal)
 
     std::vector<double> ea({1.0, 2.0, 4.0, 2.0});
 
-    const CMolecularOrbitals mos({ma}, {ea}, molorb::rest);
+    std::vector<double> occa({2.0, 2.0, 0.0, 0.0});
+
+    const CMolecularOrbitals mos({ma}, {ea}, {occa}, molorb::rest);
 
     CMemBlock<double> diagmat({3.0, 1.0, 2.0, 0.0});
 

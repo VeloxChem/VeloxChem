@@ -562,7 +562,7 @@ class LoPropDriver:
             self.ostream.print_header(output_iter)
         self.ostream.print_blank()
 
-        title = 'LoProp Polarizabilities (a.u)'
+        title = 'LoProp Polarizabilities (a.u.)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * len(title))
 

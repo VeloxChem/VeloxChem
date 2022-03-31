@@ -34,6 +34,7 @@
 #include <cstring>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "MathFunc.hpp"
 #include "MemAlloc.hpp"
@@ -598,7 +599,7 @@ CMemBlock<T>::shrink(const int32_t nElements)
 {
     if (nElements < _nElements)
     {
-        auto tvals = static_cast<T*>(mem::malloc(nElements * sizeof(T)));
+        auto tvals = mem::malloc<T>(nElements);
 
         auto pdata = _data;
 
@@ -639,23 +640,7 @@ template <>
 inline void
 CMemBlock<int32_t>::broadcast(int32_t rank, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
-    {
-        mpi::bcast(_nElements, comm);
-
-        if (rank != mpi::master()) _allocate();
-
-        auto merror = MPI_Bcast(_data, _nElements, MPI_INT32_T, mpi::master(), comm);
-
-        if (merror != MPI_SUCCESS) mpi::abort(merror, "broadcast(CMemBlock)");
-    }
-}
-
-template <>
-inline void
-CMemBlock<double>::broadcast(int32_t rank, MPI_Comm comm)
-{
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         // broadcast numa policy
 
@@ -673,6 +658,38 @@ CMemBlock<double>::broadcast(int32_t rank, MPI_Comm comm)
 
         if (rank != mpi::master()) _allocate();
 
+        MPI_Barrier(comm);
+
+        auto merror = MPI_Bcast(_data, _nElements, MPI_INT32_T, mpi::master(), comm);
+
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "broadcast(CMemBlock)");
+    }
+}
+
+template <>
+inline void
+CMemBlock<double>::broadcast(int32_t rank, MPI_Comm comm)
+{
+    if constexpr (ENABLE_MPI)
+    {
+        // broadcast numa policy
+
+        int32_t nmpol = 0;
+
+        if (rank == mpi::master()) nmpol = to_int(_numaPolicy);
+
+        mpi::bcast(nmpol, comm);
+
+        if (rank != mpi::master()) _numaPolicy = to_numa(nmpol);
+
+        // broadcast memory block data
+
+        mpi::bcast(_nElements, comm);
+
+        if (rank != mpi::master()) _allocate();
+
+        MPI_Barrier(comm);
+
         auto merror = MPI_Bcast(_data, _nElements, MPI_DOUBLE, mpi::master(), comm);
 
         if (merror != MPI_SUCCESS) mpi::abort(merror, "broadcast(CMemBlock)");
@@ -683,7 +700,7 @@ template <>
 inline CMemBlock<int32_t>
 CMemBlock<int32_t>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         if (nodes == 1) return CMemBlock<int32_t>(*this);
 
@@ -691,11 +708,9 @@ CMemBlock<int32_t>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         // setup gathering pattern
 
-        size_t nsizes = static_cast<size_t>(nodes) * sizeof(int32_t);
-
         int32_t* bsizes = nullptr;
 
-        if (rank == mpi::master()) bsizes = static_cast<int32_t*>(mem::malloc(nsizes));
+        if (rank == mpi::master()) bsizes = mem::malloc<int32_t>(nodes);
 
         mpi::gather(bsizes, _nElements, rank, comm);
 
@@ -705,7 +720,7 @@ CMemBlock<int32_t>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         if (rank == mpi::master())
         {
-            bindexes = static_cast<int32_t*>(mem::malloc(nsizes));
+            bindexes = mem::malloc<int32_t>(nodes);
 
             mathfunc::indexes(bindexes, bsizes, nodes);
 
@@ -734,7 +749,7 @@ template <>
 inline CMemBlock<double>
 CMemBlock<double>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         if (nodes == 1) return CMemBlock<double>(*this);
 
@@ -742,11 +757,9 @@ CMemBlock<double>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         // setup for gathering pattern
 
-        size_t nsizes = static_cast<size_t>(nodes) * sizeof(int32_t);
-
         int32_t* bsizes = nullptr;
 
-        if (rank == mpi::master()) bsizes = static_cast<int32_t*>(mem::malloc(nsizes));
+        if (rank == mpi::master()) bsizes = mem::malloc<int32_t>(nodes);
 
         mpi::gather(bsizes, _nElements, rank, comm);
 
@@ -756,7 +769,7 @@ CMemBlock<double>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         if (rank == mpi::master())
         {
-            bindexes = static_cast<int32_t*>(mem::malloc(nsizes));
+            bindexes = mem::malloc<int32_t>(nodes);
 
             mathfunc::indexes(bindexes, bsizes, nodes);
 
@@ -785,7 +798,7 @@ template <>
 inline void
 CMemBlock<int32_t>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         if (nodes == 1) return;
 
@@ -801,9 +814,7 @@ CMemBlock<int32_t>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         // allocate local data chunk
 
-        auto nsizes = static_cast<size_t>(_nElements) * sizeof(int32_t);
-
-        int32_t* bdata = static_cast<int32_t*>(mem::malloc(nsizes));
+        auto bdata = mem::malloc<int32_t>(_nElements);
 
         // setup for scaterring pattern
 
@@ -813,13 +824,11 @@ CMemBlock<int32_t>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         if (rank == mpi::master())
         {
-            nsizes = static_cast<size_t>(nodes) * sizeof(int32_t);
-
-            bsizes = static_cast<int32_t*>(mem::malloc(nsizes));
+            bsizes = mem::malloc<int32_t>(nodes);
 
             mpi::batches_pattern(bsizes, totelem, nodes);
 
-            bindexes = static_cast<int32_t*>(mem::malloc(nsizes));
+            bindexes = mem::malloc<int32_t>(nodes);
 
             mathfunc::indexes(bindexes, bsizes, nodes);
         }
@@ -848,7 +857,7 @@ template <>
 inline void
 CMemBlock<double>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         if (nodes == 1) return;
 
@@ -864,9 +873,7 @@ CMemBlock<double>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         // allocate local data chunk
 
-        auto nsizes = static_cast<size_t>(_nElements) * sizeof(double);
-
-        auto bdata = static_cast<double*>(mem::malloc(nsizes));
+        auto bdata = mem::malloc<double>(_nElements);
 
         // setup for scaterring pattern
 
@@ -876,13 +883,11 @@ CMemBlock<double>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         if (rank == mpi::master())
         {
-            nsizes = static_cast<size_t>(nodes) * sizeof(int32_t);
-
-            bsizes = static_cast<int32_t*>(mem::malloc(nsizes));
+            bsizes = mem::malloc<int32_t>(nodes);
 
             mpi::batches_pattern(bsizes, totelem, nodes);
 
-            bindexes = static_cast<int32_t*>(mem::malloc(nsizes));
+            bindexes = mem::malloc<int32_t>(nodes);
 
             mathfunc::indexes(bindexes, bsizes, nodes);
         }
@@ -911,15 +916,13 @@ template <>
 inline void
 CMemBlock<double>::reduce_sum(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         if (nodes == 1) return;
 
         double* bdata = nullptr;
 
-        auto nsize = static_cast<size_t>(_nElements) * sizeof(double);
-
-        if (rank == mpi::master()) bdata = static_cast<double*>(mem::malloc(nsize));
+        if (rank == mpi::master()) bdata = mem::malloc<double>(_nElements);
 
         mpi::reduce_sum(_data, bdata, _nElements, comm);
 
@@ -942,7 +945,7 @@ CMemBlock<T>::_allocate()
 
         auto numelem = static_cast<size_t>(_nElements);
 
-        _data = static_cast<T*>(mem::malloc(numelem * sizeof(T)));
+        _data = mem::malloc<T>(numelem);
     }
 }
 
@@ -996,7 +999,7 @@ CMemBlock<T>::repr() const
 
     os << "[CMemBlock (Object):" << this << "]" << std::endl;
 
-    os << "_numaPolicy: " << to_string(_numaPolicy);
+    os << "_numaPolicy: " << to_string(_numaPolicy) << std::endl;
 
     os << "_nElements: " << _nElements << std::endl;
 

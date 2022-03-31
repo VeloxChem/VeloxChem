@@ -182,8 +182,12 @@ class TDAExciDriver(LinearSolver):
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
+            n_ao = scf_tensors['C_alpha'].shape[0]
+            # recreate an aufbau since occupation is not stored in scf_tensors
+            occ_alpha = molecule.get_aufbau_occupation(n_ao, 'restricted')
             mol_orbs = MolecularOrbitals([scf_tensors['C_alpha']],
-                                         [scf_tensors['E_alpha']], molorb.rest)
+                                         [scf_tensors['E_alpha']], [occ_alpha],
+                                         molorb.rest)
         else:
             mol_orbs = MolecularOrbitals()
 
@@ -315,7 +319,6 @@ class TDAExciDriver(LinearSolver):
         # print converged excited states
 
         if self.rank == mpi_master() and self.is_converged:
-            nocc = molecule.number_of_alpha_electrons()
             mo_occ = scf_tensors['C_alpha'][:, :nocc].copy()
             mo_vir = scf_tensors['C_alpha'][:, nocc:].copy()
 
@@ -357,16 +360,13 @@ class TDAExciDriver(LinearSolver):
                 self.ostream.flush()
 
                 if self.rank == mpi_master():
-                    lam_diag, nto_mo = self.get_nto(t_mat, mo_occ, mo_vir)
+                    nto_mo = self.get_nto(t_mat, mo_occ, mo_vir)
                 else:
-                    lam_diag = None
                     nto_mo = MolecularOrbitals()
-                lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
                 nto_mo.broadcast(self.rank, self.comm)
 
-                nto_cube_fnames = self.write_nto_cubes(cubic_grid, molecule,
-                                                       basis, s, lam_diag,
-                                                       nto_mo, self.nto_pairs)
+                lam_diag, nto_cube_fnames = self.write_nto_cubes(
+                    cubic_grid, molecule, basis, s, nto_mo, self.nto_pairs)
 
                 if self.rank == mpi_master():
                     nto_lambdas.append(lam_diag)

@@ -1716,7 +1716,7 @@ class CChemicalElement
      @param atomicLabel the name of chemical element as string.
      @param atomicCharge the charge.
      @param atomicMass the mass.
-     @paeam atomicNumber the chemical element number.
+     @param atomicNumber the chemical element number.
      */
     CChemicalElement(const std::string& atomicLabel, const double atomicCharge, const double atomicMass, const int32_t atomicNumber);
 

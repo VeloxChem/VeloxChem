@@ -480,16 +480,13 @@ class LinearResponseEigenSolver(LinearSolver):
                     self.ostream.flush()
 
                     if self.rank == mpi_master():
-                        lam_diag, nto_mo = self.get_nto(z_mat, mo_occ, mo_vir)
+                        nto_mo = self.get_nto(z_mat, mo_occ, mo_vir)
                     else:
-                        lam_diag = None
                         nto_mo = MolecularOrbitals()
-                    lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
                     nto_mo.broadcast(self.rank, self.comm)
 
-                    nto_cube_fnames = self.write_nto_cubes(
-                        cubic_grid, molecule, basis, s, lam_diag, nto_mo,
-                        self.nto_pairs)
+                    lam_diag, nto_cube_fnames = self.write_nto_cubes(
+                        cubic_grid, molecule, basis, s, nto_mo, self.nto_pairs)
 
                     if self.rank == mpi_master():
                         nto_lambdas.append(lam_diag)
