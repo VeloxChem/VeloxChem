@@ -448,7 +448,6 @@ class NumerovDriver:
                 # assume degeneracy
                 iso = 2.0 * np.sum(
                     rsp_drv.rsp_property['electric_transition_dipoles'][-1]**2)
-                print(iso)
                 average = np.sqrt(iso / 3.0)
                 props.append(np.array([average] * 3))
 
