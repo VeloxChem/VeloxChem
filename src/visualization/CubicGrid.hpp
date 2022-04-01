@@ -26,6 +26,7 @@
 #ifndef CubicGrid_hpp
 #define CubicGrid_hpp
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -41,17 +42,17 @@ class CCubicGrid
     /**
      Origin of the cubic grid points.
      */
-    std::vector<double> _origin;
+    std::array<double, 3> _origin;
 
     /**
      Step size in three dimensions.
      */
-    std::vector<double> _stepSize;
+    std::array<double, 3> _stepSize;
 
     /**
      Number of points in three dimensions.
      */
-    std::vector<int32_t> _numPoints;
+    std::array<int32_t, 3> _numPoints;
 
     /**
      Values at the grid points.
@@ -68,7 +69,7 @@ class CCubicGrid
      Creates a cubic grid object from origin, step size, and
      number of points.
      */
-    CCubicGrid(const std::vector<double>& origin, const std::vector<double>& stepSize, const std::vector<int32_t>& numPoints);
+    CCubicGrid(const std::array<double, 3>& origin, const std::array<double, 3>& stepSize, const std::array<int32_t, 3>& numPoints);
 
     /**
      Creates a cubic grid object by copying other cubic grid object.
@@ -124,21 +125,21 @@ class CCubicGrid
 
      @return coordinate of the origin.
      */
-    std::vector<double> getOrigin() const;
+    std::array<double, 3> getOrigin() const;
 
     /**
      Gets step size in X, Y and Z direction.
 
      @return step size in X, Y and Z direction.
      */
-    std::vector<double> getStepSize() const;
+    std::array<double, 3> getStepSize() const;
 
     /**
      Gets number of points in X, Y and Z direction.
 
      @return number of points in X, Y and Z direction.
      */
-    std::vector<int32_t> getNumPoints() const;
+    std::array<int32_t, 3> getNumPoints() const;
 
     /**
      Gets constant pointer to first element of cubic grid values.

@@ -64,12 +64,13 @@ MPI_Comm* get_mpi_comm(py::object py_comm);
 /** Gets shape and strides parameters for array_t CTOR.
  *
  * @tparam T scalar type of array.
+ * @tparam Container the object collecting dimensions, _e.g._ `std::vector` or `std::array`.
  * @param dimension the shape of numpy array.
  * @return shape and strides of numpy array.
  */
-template <typename T>
+template <typename T, typename Container>
 auto
-array_t_params(const std::vector<int32_t>& dimension) -> std::tuple<std::vector<py::ssize_t>, std::vector<py::ssize_t>>
+array_t_params(const Container& dimension) -> std::tuple<std::vector<py::ssize_t>, std::vector<py::ssize_t>>
 {
     std::vector<py::ssize_t> shape, strides;
 
@@ -93,13 +94,18 @@ array_t_params(const std::vector<int32_t>& dimension) -> std::tuple<std::vector<
 /** Gets numpy array from pointer and shape.
  *
  * @tparam T scalar type of array.
+ * @tparam Container the object collecting dimensions, _e.g._ `std::vector` or `std::array`.
  * @param ptr pointer to data.
  * @param dimension the shape of numpy array.
  * @return numpy array.
+ *
+ * @note The return type is rather convoluted, but it boils down to "return an
+ * object of `py::array<T>` only if the `dimension` argument implmentes a `size`
+ * method and the type `T` is arithmetic".
  */
-template <typename T>
+template <typename T, typename Container>
 auto
-pointer_to_numpy(const T* ptr, const std::vector<int32_t>& dimension) -> py::array_t<T>
+pointer_to_numpy(const T* ptr, const Container& dimension) -> decltype((void)(dimension.size()), (void)(std::is_arithmetic_v<T>), py::array_t<T>())
 {
     static_assert(std::is_arithmetic_v<T>, "NumPy array can only be instantiated with arithmetic types.");
     if (ptr == nullptr || dimension.size() == 0)
@@ -108,7 +114,7 @@ pointer_to_numpy(const T* ptr, const std::vector<int32_t>& dimension) -> py::arr
     }
     else
     {
-        auto [shape, strides] = array_t_params<T>(dimension);
+        const auto [shape, strides] = array_t_params<T>(dimension);
         return py::array_t<T>(shape, strides, ptr);
     }
 }

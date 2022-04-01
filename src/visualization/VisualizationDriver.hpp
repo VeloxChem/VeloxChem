@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "AODensityMatrix.hpp"
+#include "Buffer.hpp"
 #include "CubicGrid.hpp"
 #include "MemBlock.hpp"
 #include "MolecularBasis.hpp"
@@ -84,6 +85,55 @@ class CVisualizationDriver
                                                const double           yp,
                                                const double           zp) const;
 
+    /**
+     Computes molecular orbital values at rank-local cubic grid points (OpenMP).
+
+     @param grid the cubic grid.
+     @param molecule the molecule.
+     @param basis the basis set for the molecule.
+     @param molorb the molecular orbitals of the molecule.
+     @param moidx the index of the molecular orbital (0-based).
+     @param mospin the spin of the molecular orbital ('alpha' or 'beta').
+     */
+    void _compute(CCubicGrid&               grid,
+                  const CMolecule&          molecule,
+                  const CMolecularBasis&    basis,
+                  const CMolecularOrbitals& molorb,
+                  const int32_t             moidx,
+                  const std::string&        mospin) const;
+
+    /**
+     Computes electronic densities at rank-local cubic grid points (OpenMP).
+
+     @param grid the cubic grid.
+     @param molecule the molecule.
+     @param basis the basis set for the molecule.
+     @param density the density matrix of the molecule.
+     @param densityIndex the index of the density matrix (0-based).
+     @param densitySpin the spin of the density matrix ('alpha' or 'beta').
+     */
+    void _compute(CCubicGrid&             grid,
+                  const CMolecule&        molecule,
+                  const CMolecularBasis&  basis,
+                  const CAODensityMatrix& density,
+                  const int32_t           densityIndex,
+                  const std::string&      densitySpin) const;
+
+    /** Computes values of orbital-like quantities at rank-local cubic grid points (OpenMP).
+     *
+     * @param grid the cubic grid.
+     * @param molecule the molecule.
+     * @param basis the basis set for the molecule.
+     * @param coeffs AO-basis expansion coefficients of the orbital-like
+     * quantities to plot. This is of N_AO x N_orb dimensions.
+     * @param idxs indices of the orbital-like quantities to plot (0-based).
+     */
+    void _compute(CCubicGrid&                 grid,
+                  const CMolecule&            molecule,
+                  const CMolecularBasis&      basis,
+                  const BufferHostXYd&        coeffs,
+                  const std::vector<int32_t>& idxs) const;
+
    public:
     /**
      Creates a visualization driver object.
@@ -91,11 +141,6 @@ class CVisualizationDriver
      @param comm the MPI communicator.
      */
     CVisualizationDriver(MPI_Comm comm);
-
-    /**
-     Destroys a visualization driver object.
-     */
-    ~CVisualizationDriver();
 
     /**
      Gets atomic orbital information.
@@ -175,39 +220,20 @@ class CVisualizationDriver
                  const int32_t           denidx,
                  const std::string&      denspin) const;
 
-    /**
-     Computes molecular orbital values at cubic grid points (OpenMP).
-
-     @param grid the cubic grid.
-     @param molecule the molecule.
-     @param basis the basis set for the molecule.
-     @param molorb the molecular orbitals of the molecule.
-     @param moidx the index of the molecular orbital (0-based).
-     @param mospin the spin of the molecular orbital ('alpha' or 'beta').
+    /** Computes values of orbital-like quantities at cubic grid points (MPI).
+     *
+     * @param grid the cubic grid.
+     * @param molecule the molecule.
+     * @param basis the basis set for the molecule.
+     * @param coeffs AO-basis expansion coefficients of the orbital-like
+     * quantities to plot. This is of N_AO x N_orb dimensions.
+     * @param idxs indices of the orbital-like quantities to plot (0-based).
      */
-    void compute_omp(CCubicGrid&               grid,
-                     const CMolecule&          molecule,
-                     const CMolecularBasis&    basis,
-                     const CMolecularOrbitals& molorb,
-                     const int32_t             moidx,
-                     const std::string&        mospin) const;
-
-    /**
-     Computes electronic densities at cubic grid points (OpenMP).
-
-     @param grid the cubic grid.
-     @param molecule the molecule.
-     @param basis the basis set for the molecule.
-     @param density the density matrix of the molecule.
-     @param densityIndex the index of the density matrix (0-based).
-     @param densitySpin the spin of the density matrix ('alpha' or 'beta').
-     */
-    void compute_omp(CCubicGrid&             grid,
-                     const CMolecule&        molecule,
-                     const CMolecularBasis&  basis,
-                     const CAODensityMatrix& density,
-                     const int32_t           densityIndex,
-                     const std::string&      densitySpin) const;
+    void compute(CCubicGrid&                 grid,
+                 const CMolecule&            molecule,
+                 const CMolecularBasis&      basis,
+                 const BufferHostXYd&        coeffs,
+                 const std::vector<int32_t>& idxs) const;
 
     /**
      Computes molecular orbital at given coordinates.
