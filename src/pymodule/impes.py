@@ -385,6 +385,53 @@ class ImpesCoordinates:
 
         return np.array(self.z_matrix)
 
+    # TODO: return new variable instead of shifting the
+    # cartesian coordinates themselves?
+    def translate_to_zero(self):
+        """Translates the molecule (Cartesian coordinates)
+           to (0, 0, 0)
+         """
+
+        if self.cartesian_coordinates is None:
+            raise ValueError("No Cartesian coordinates found.")
+        else:
+            natoms = self.cartesian_coordinates.shape[1]
+            sum_x = 0.0
+            sum_y = 0.0
+            sum_z = 0.0
+
+            for i in range(natoms):
+                sum_x += self.cartesian_coordinates[i,0]
+                sum_y += self.cartesian_coordinates[i,1]
+                sum_z += self.cartesian_coordinates[i,2]
+            sum_x /= natoms
+            sum_y /= natoms
+            sum_z /= natoms
+
+            for i in range(natoms):
+                self.cartesian_coordinates[i,0] -= sum_x
+                self.cartesian_coordinates[i,1] -= sum_y
+                self.cartesian_coordinates[i,2] -= sum_z
+
+    # TODO: change to Eckart routine 
+    # is it possible to make use of geometric here?
+    # save in self or return?
+    def rotate_to(self, reference):
+        """Rotates the coordinates to align to a reference.
+
+            :param reference: numpy array of Cartesian coordinates
+                              to be used as a reference.
+        """
+        S = np.einsum("ix,iy->xy", reference, self.cartesian_coordinates)
+        # TODO inverse and square root of S S.T 
+        # (diagonal?, otherwise diagonalize) 
+        sqS = np.sqrt(np.linalg.inv(np.matmul(S, S.T)))
+        rotation_matrix = np.matmul(sqS, S)
+
+        rotated_coords = np.matmul(rotation_matrix, self.cartesian_coordinates)
+
+        return rotated_coords 
+
     def write_hdf5(self, fname, label, write_zmat=False):
         """
         Writes the energy, internal coordinates, internal gradient, and
@@ -725,10 +772,10 @@ class ImpesDriver():
             self.energy += weights[i] * potentials[i]
 
     def compute_potential(self, data_point):
-        """Calculated the potential energy surface at self.impes_coordinate
+        """Calculates the potential energy surface at self.impes_coordinate
            based on the energy, gradient and Hessian of data_point.
 
-            :param data_point:
+           :param data_point:
                 ImpesCoordinates object.
         """
 
@@ -743,3 +790,28 @@ class ImpesDriver():
                 )
 
         return pes
+
+    def cartesian_distance(self, data_point):
+        """Calculates and returns the cartesian distance between 
+           self.coordinates and data_point coordinates.
+
+           :param data_point:
+                ImpesCoordinates object
+        """
+
+        # First, translate the data point to zero
+        # self should also be shifted
+        data_point.translate_to_zero()
+        self.impes_coordinate.translate_to_zero()
+
+        # Then, determine the rotation matrix which
+        # aligns data_point and self.impes_coordinate
+        # TODO: change to Eckart routine
+        reference_coordinates = self.impes_coordinate.cartesian_coordinates
+        data_point.rotate_to(reference_coordinates)
+
+        distance = np.linalg.norm(  reference_coordinates
+                                  - data_point.cartesian_coordinates)
+
+        return distance
+
