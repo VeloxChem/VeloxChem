@@ -23,6 +23,9 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+import time as tm
+import numpy as np
+from .molecule import Molecule
 
 class GradientDriver:
     """
@@ -62,6 +65,68 @@ class GradientDriver:
         """
 
         return
+    def compute_numerical(self, molecule, arguments):
+        """
+        Performs calculation of numerical gradient.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param min_basis:
+            The minimal AO basis set.
+        """
+
+        ostream_state = self.init_drivers()
+
+        # atom labels
+        labels = molecule.get_labels()
+
+        # atom coordinates (nx3)
+        coords = molecule.get_coordinates()
+
+        # numerical gradient
+        self.gradient = np.zeros((molecule.number_of_atoms(), 3))
+
+        for i in range(molecule.number_of_atoms()):
+            for d in range(3):
+                coords[i, d] += self.delta_h
+                new_mol = Molecule(labels, coords, units='au')
+                e_plus = self.compute_energy(new_mol, arguments)
+
+                coords[i, d] -= 2.0 * self.delta_h
+                new_mol = Molecule(labels, coords, units='au')
+                e_minus = self.compute_energy(new_mol, arguments)
+
+                coords[i, d] += self.delta_h
+                self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
+
+        self.ostream.print_blank()
+
+        self.restore_drivers(molecule, arguments, ostream_state)
+
+
+    def init_drivers(self):
+        """
+        Silence the energy drivers and save the current ostream state.
+
+        :return:
+            The ostream state(s).
+        """
+
+    def compute_energy(self, molecule, arguments):
+        """
+        Compute the energy at current position
+
+        :return:
+            The energy.
+        """
+
+    def restore_drivers(self, molecule, arguments, ostream_state):
+        """
+        Restore the energy drivers to their initial states.
+
+        """
 
     def get_gradient(self):
         """

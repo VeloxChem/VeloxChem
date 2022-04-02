@@ -28,7 +28,6 @@ import numpy as np
 import time as tm
 import sys
 
-from .molecule import Molecule
 from .gradientdriver import GradientDriver
 from .outputstream import OutputStream
 
@@ -78,40 +77,15 @@ class ScfGradientDriver(GradientDriver):
             The minimal AO basis set.
         """
 
-        self.print_header()
         start_time = tm.time()
-
-        scf_ostream_state = self.scf_drv.ostream.state
-        self.scf_drv.ostream.state = False
+        self.print_header()
 
         # atom labels
         labels = molecule.get_labels()
 
-        # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
-
-        # numerical gradient
-        self.gradient = np.zeros((molecule.number_of_atoms(), 3))
-
-        for i in range(molecule.number_of_atoms()):
-            for d in range(3):
-                coords[i, d] += self.delta_h
-                new_mol = Molecule(labels, coords, units='au')
-                self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                e_plus = self.scf_drv.get_scf_energy()
-
-                coords[i, d] -= 2.0 * self.delta_h
-                new_mol = Molecule(labels, coords, units='au')
-                self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                e_minus = self.scf_drv.get_scf_energy()
-
-                coords[i, d] += self.delta_h
-                self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
-
-        self.ostream.print_blank()
-
-        self.scf_drv.compute(molecule, ao_basis, min_basis)
-        self.scf_drv.ostream.state = scf_ostream_state
+        arguments=(ao_basis, min_basis)
+        #Currently, only numerical gradients activated
+        self.compute_numerical(molecule, arguments)
 
         # print gradient
         self.print_geometry(molecule)
@@ -122,3 +96,38 @@ class ScfGradientDriver(GradientDriver):
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def init_drivers(self):
+        """
+        Silence the energy drivers and save the current ostream state.
+
+        :return:
+            The ostream state(s).
+        """
+
+        scf_ostream_state = self.scf_drv.ostream.state
+        self.scf_drv.ostream.state = False
+        return scf_ostream_state
+
+    def compute_energy(self, molecule, arguments):
+        """
+        Compute the energy at current position
+
+        :return:
+            The energy.
+        """
+        ao_basis, min_basis= arguments
+        self.scf_drv.compute(molecule, ao_basis, min_basis)
+
+        return self.scf_drv.get_scf_energy()
+
+    def restore_drivers(self, molecule, arguments, ostream_state):
+        """
+        Restore the energy drivers to their initial states.
+
+        """
+
+        ao_basis, min_basis= arguments
+        self.scf_drv.compute(molecule, ao_basis, min_basis)
+        self.scf_drv.ostream.state = ostream_state
+
