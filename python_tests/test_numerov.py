@@ -1,4 +1,11 @@
 import numpy as np
+import pytest
+import sys
+
+try:
+    import scipy
+except ImportError:
+    pass
 
 from veloxchem.numerovdriver import NumerovDriver
 from veloxchem.veloxchemlib import bohr_in_angstroms
@@ -179,6 +186,8 @@ class TestNumerov:
                 assert np.max(np.abs(exc[b] - ref_exc[b])) < 1.0e-2
                 assert np.max(np.abs(osc[b] - ref_osc[b])) < 1.0e-4
 
+    @pytest.mark.skipif('scipy' not in sys.modules,
+                        reason='scipy not available')
     def test_IR_spectrum(self):
 
         #    ----------------------
@@ -241,6 +250,8 @@ class TestNumerov:
 
         self.run_numerov(numerov_dict, data_lines)
 
+    @pytest.mark.skipif('scipy' not in sys.modules,
+                        reason='scipy not available')
     def test_UV_spectrum(self):
 
         #       ----------------------------------
