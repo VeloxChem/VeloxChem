@@ -25,8 +25,11 @@
 
 #include "ExcitationVectorTest.hpp"
 
+#include <vector>
+
 #include "CheckFunctions.hpp"
 #include "ExcitationVector.hpp"
+#include "MemBlock.hpp"
 
 TEST_F(CExcitationVectorTest, DefaultConstructor)
 {

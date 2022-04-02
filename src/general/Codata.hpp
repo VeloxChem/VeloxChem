@@ -64,6 +64,13 @@ double getHartreeValueInInverseNanometer();
 double getHartreeValueInWavenumbers();
 
 /**
+ Gets amu value in electron masses.
+
+ @return the conversion factor.
+ */
+double getAtomicMassUnitInElectronMasses();
+
+/**
  Gets convertion factor for dipole moment (a.u. -> Debye).
 
  @return the conversion factor.
@@ -83,6 +90,13 @@ double getRotatoryStrengthInCGS();
  @return the conversion factor.
  */
 double getBoltzmannConstantInElectronVoltsPerKelvin();
+
+/**
+ Gets Boltzmann constant in hartree/K.
+
+ @return the conversion factor.
+ */
+double getBoltzmannConstantInHartreePerKelvin();
 
 /**
  Gets factor needed for the calculation of extinction coefficient from the

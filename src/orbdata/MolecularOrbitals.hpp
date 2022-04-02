@@ -77,7 +77,10 @@ class CMolecularOrbitals
      @param energies the vector of orbital energies vectors.
      @param orbitalsType the type of molecular orbitals.
      */
-    CMolecularOrbitals(const std::vector<CDenseMatrix>& orbitals, const std::vector<CMemBlock<double>>& energies, const std::vector<CMemBlock<double>>& occupations, const molorb orbitalsType);
+    CMolecularOrbitals(const std::vector<CDenseMatrix>&      orbitals,
+                       const std::vector<CMemBlock<double>>& energies,
+                       const std::vector<CMemBlock<double>>& occupations,
+                       const molorb                          orbitalsType);
 
     /**
      Creates a molecular orbitals object by copying other molecular orbitals object.

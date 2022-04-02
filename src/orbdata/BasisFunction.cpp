@@ -345,7 +345,7 @@ CBasisFunction::_overlap(const size_t iComponent, const size_t jComponent) const
 void
 CBasisFunction::broadcast(int32_t rank, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         mpi::bcast(_angularMomentum, comm);
 

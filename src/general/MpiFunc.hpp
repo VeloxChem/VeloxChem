@@ -26,20 +26,33 @@
 #ifndef MpiFunc_hpp
 #define MpiFunc_hpp
 
+#include <mpi.h>
+
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-#include <mpi.h>
+#include "MetaUtils.hpp"
 
-namespace mpi {  // mpi namespace
+namespace mpi {
+template <typename T>
+inline constexpr MPI_Datatype type_v = metautils::type_to_mpi_datatype<T>::value;
+
+template <typename T>
+inline std::string
+error_message(std::string op)
+{
+    return op + "(" + metautils::type_to_string<T>::name + ")";
+}
 
 /**
  Gets default rank of master MPI process.
 
  @return the rank of master MPI process.
 */
-inline int32_t
+inline constexpr int32_t
 master()
 {
     return 0;
@@ -67,6 +80,22 @@ bool initialized();
  @return true if success, false otherwise.
  */
 bool finalize();
+
+/**
+ Terminates all MPI processes and prints error message to standard error stream.
+
+ @param errorcode the MPI error code.
+ @param label the label of function in which MPI error occured.
+ */
+void abort(const int errorcode, const char* label);
+
+/**
+ Terminates all MPI processes and prints error message to standard error stream.
+
+ @param errorcode the MPI error code.
+ @param label the label of function in which MPI error occured.
+ */
+void abort(const int errorcode, const std::string& label);
 
 /**
  Determines a rank of MPI process within MPI communicator.
@@ -109,55 +138,23 @@ void destroy(MPI_Comm* comm);
 bool compare(MPI_Comm comm1, MPI_Comm comm2);
 
 /**
- Broadcasts an integer number within MPI communicator.
-
- @param value the integer number.
- @param comm the MPI communicator.
+ * Broadcasts a scalar value within MPI communicator.
+ *
+ * @taparam T type of value.
+ * @param value the value.
+ * @param comm the MPI communicator.
  */
-void bcast(int32_t& value, MPI_Comm comm);
+template <typename T>
+auto
+bcast(T& value, MPI_Comm comm) -> decltype((void)(std::is_arithmetic_v<T>), void())
+{
+    if constexpr (ENABLE_MPI)
+    {
+        auto merror = MPI_Bcast(&value, 1, mpi::type_v<T>, mpi::master(), comm);
 
-/**
- Broadcasts a real number within MPI communicator.
-
- @param value the real number.
- @param comm the MPI communicator.
- */
-void bcast(double& value, MPI_Comm comm);
-
-/**
- Broadcasts a boolean within MPI communicator.
-
- @param value the boolean value.
- @param rank the rank of MPI process.
- @param comm the MPI communicator.
- */
-void bcast(bool& value, int32_t rank, MPI_Comm comm);
-
-/**
- Broadcasts a symbol within domain of MPI communicator.
-
- @param value the symbol.
- @param comm the MPI communicator.
- */
-void bcast(char& value, MPI_Comm comm);
-
-/**
- Broadcasts vector of integer numbers within domain of MPI communicator.
-
- @param vector the vector of integer numbers.
- @param rank the rank of MPI process.
- @param comm the MPI communicator.
- */
-void bcast(std::vector<int32_t>& vector, int32_t rank, MPI_Comm comm);
-
-/**
- Broadcasts vector of real numbers within domain of MPI communicator.
-
- @param vector the vector of real numbers.
- @param rank the rank of MPI process.
- @param comm the MPI communicator.
- */
-void bcast(std::vector<double>& vector, int32_t rank, MPI_Comm comm);
+        if (merror != MPI_SUCCESS) mpi::abort(merror, error_message<T>("mpi::bcast"));
+    }
+}
 
 /**
  Broadcasts a string within domain of MPI communicator.
@@ -169,31 +166,86 @@ void bcast(std::vector<double>& vector, int32_t rank, MPI_Comm comm);
 void bcast(std::string& str, int32_t rank, MPI_Comm comm);
 
 /**
- Broadcasts vector of stringd within domain of MPI communicator.
-
- @param vector the vector of strings.
- @param rank the rank of MPI process.
- @param comm the MPI communicator.
+ * Broadcasts vector within domain of MPI communicator.
+ *
+ * @taparam T type of underlying scalar.
+ * @param vector the vector.
+ * @param comm the MPI communicator.
  */
-void bcast(std::vector<std::string>& vector, int32_t rank, MPI_Comm comm);
+template <typename T>
+void
+bcast(std::vector<T>& vector, int32_t rank, MPI_Comm comm)
+{
+    if constexpr (ENABLE_MPI)
+    {
+        auto veclen = (rank == mpi::master()) ? static_cast<int32_t>(vector.size()) : int32_t{0};
+
+        mpi::bcast(veclen, comm);
+
+        if (rank != mpi::master()) vector.clear();
+
+        // a range-based for loop makes this broadcast hang!
+        for (int32_t i = 0; i < veclen; ++i)
+        {
+            auto mvalue = (rank == mpi::master()) ? vector[i] : T{0};
+
+            if constexpr (std::is_same_v<T, std::string>)
+            {
+                mpi::bcast(mvalue, rank, comm);
+            }
+            else
+            {
+                mpi::bcast(mvalue, comm);
+            }
+
+            if (rank != mpi::master()) vector.push_back(mvalue);
+
+            MPI_Barrier(comm);
+        }
+    }
+}
 
 /**
- Sends a real number to destination MPI process.
+ * Sends a scalar value to destination MPI process.
+ *
+ * @tparam T type of scalar value.
+ * @param value the scalar.
+ * @param rank the rank of destination MPI process.
+ * @param comm the MPI communicator.
+ */
+template <typename T>
+auto
+send(T& value, const int32_t rank, MPI_Comm comm) -> decltype((void)(std::is_arithmetic_v<T>), void())
+{
+    if constexpr (ENABLE_MPI)
+    {
+        auto merror = MPI_Send(&value, 1, mpi::type_v<T>, rank, 0, comm);
 
- @param value the real number.
- @param rank the rank of destination MPI process.
- @param comm the MPI communicator.
-*/
-void send(double& value, const int32_t rank, MPI_Comm comm);
+        if (merror != MPI_SUCCESS) mpi::abort(merror, error_message<T>("mpi::send"));
+    }
+}
 
 /**
- Receives a real number to source MPI process.
+ * Receives a scalar value from source MPI process.
+ *
+ * @tparam T type of scalar value.
+ * @param value the real number.
+ * @param rank the rank of source MPI process.
+ * @param comm the MPI communicator.
+ */
+template <typename T>
+auto
+receive(T& value, const int32_t rank, MPI_Comm comm) -> decltype((void)(std::is_arithmetic_v<T>), void())
+{
+    if constexpr (ENABLE_MPI)
+    {
+        MPI_Status mstat;
 
- @param value the real number.
- @param rank the rank of source MPI process.
- @param comm the MPI communicator.
-*/
-void receive(double& value, const int32_t rank, MPI_Comm comm);
+        auto merror = MPI_Recv(&value, 1, mpi::type_v<T>, rank, 0, comm, &mstat);
+
+        if (merror != MPI_SUCCESS) mpi::abort(merror, error_message<T>("mpi::receive"));
+    }
+}
 
 /**
  Determines batch size associated with MPI process for data vector within domain
@@ -226,27 +278,31 @@ int32_t batch_offset(const int32_t nElements, const int32_t rank, const int32_t 
  @param nodes the number of nodes in MPI communicator domain.
  */
 void batches_pattern(int32_t* pattern, const int32_t nElements, const int32_t nodes);
-/**
- Gathers vector of integers on master MPI process by taking single integer from
- all MPI processes within domain of MPI communicator.
-
- @param vector the vector of integers.
- @param value the integer value.
- @param rank the rank of MPI process.
- @param comm the MPI communicator.
- */
-void gather(int32_t* vector, int32_t value, int32_t rank, MPI_Comm comm);
 
 /**
- Gathers vector of real numbers on master MPI process by taking single real
- number from all MPI processes within domain of MPI communicator.
-
- @param vector the vector of real numbers.
- @param value the real number.
- @param rank the rank of MPI process.
- @param comm the MPI communicator.
+ * Gathers vector of integers on master MPI process by taking single integer from
+ * all MPI processes within domain of MPI communicator.
+ *
+ * @param vector the vector of integers.
+ * @param value the integer value.
+ * @param rank the rank of MPI process.
+ * @param comm the MPI communicator.
  */
-void gather(double* vector, double value, int32_t rank, MPI_Comm comm);
+template <typename T>
+auto
+gather(T* vector, T value, int32_t rank, MPI_Comm comm) -> decltype((void)(std::is_arithmetic_v<T>), void())
+{
+    if constexpr (ENABLE_MPI)
+    {
+        auto merror = MPI_Gather(&value, 1, mpi::type_v<T>, vector, 1, mpi::type_v<T>, mpi::master(), comm);
+
+        if (merror != MPI_SUCCESS) mpi::abort(merror, error_message<T>("mpi::gather"));
+    }
+    else
+    {
+        vector[0] = value;
+    }
+}
 
 /**
  Sums vector of real numbers on master MPI process from vectors of real numbers
@@ -257,8 +313,22 @@ void gather(double* vector, double value, int32_t rank, MPI_Comm comm);
  @param nElements the number of elements in vector.
  @param comm the MPI communicator.
  */
-void reduce_sum(const double* source, double* destination, const int32_t nElements, MPI_Comm comm);
-    
+template <typename T>
+auto
+reduce_sum(const T* source, T* destination, const int32_t nElements, MPI_Comm comm) -> decltype((void)(std::is_arithmetic_v<T>), void())
+{
+    if constexpr (ENABLE_MPI)
+    {
+        auto merror = MPI_Reduce(source, destination, nElements, mpi::type_v<T>, MPI_SUM, mpi::master(), comm);
+
+        if (merror != MPI_SUCCESS) mpi::abort(merror, error_message<T>("mpi::reduce_sum"));
+    }
+    else
+    {
+        std::copy_n(source, nElements, destination);
+    }
+}
+
 /**
  Performs reduction operation over given real numbers accross MPI processes.
 
@@ -266,16 +336,23 @@ void reduce_sum(const double* source, double* destination, const int32_t nElemen
  @param comm the MPI communicator
  @return the sum of partial real numbes on master node, 0.0 on other nodes.
  */
-double reduce_sum(const double value, MPI_Comm comm);
+template <typename T>
+auto
+reduce_sum(const T value, MPI_Comm comm) -> decltype((void)(std::is_arithmetic_v<T>), T())
+{
+    if constexpr (ENABLE_MPI)
+    {
+        auto dval = T{0.0};
 
-/**
- Terminates all MPI processes and prints error message to standard error stream.
+        mpi::reduce_sum(&value, &dval, 1, comm);
 
- @param errorcode the MPI error code.
- @param label the label of function in which MPI error occured.
- */
-void abort(const int errorcode, const char* label);
+        MPI_Barrier(comm);
 
+        return dval;
+    }
+
+    return value;
+}
 }  // namespace mpi
 
 #endif /* MpiFunc_hpp */

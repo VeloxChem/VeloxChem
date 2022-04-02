@@ -117,6 +117,7 @@ from .forcefieldgenerator import ForceFieldGenerator
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
+from .numerovdriver import NumerovDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical

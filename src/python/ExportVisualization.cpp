@@ -75,22 +75,19 @@ export_visualization(py::module& m)
              "grid"_a,
              "basis"_a,
              "aoinfo"_a)
-        .def(
-            "compute",
-            vlx_general::
-                overload_cast_<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CMolecularOrbitals&, const int32_t, const std::string&>()(
-                    &CVisualizationDriver::compute, py::const_),
-            "Computes molecular orbital values at cubic grid points.",
-            "grid"_a,
-            "molecule"_a,
-            "basis"_a,
-            "molorb"_a,
-            "moidx"_a,
-            "mospin"_a)
         .def("compute",
-             vlx_general::
-                 overload_cast_<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CAODensityMatrix&, const int32_t, const std::string&>()(
-                     &CVisualizationDriver::compute, py::const_),
+             py::overload_cast<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CMolecularOrbitals&, const int32_t, const std::string&>(
+                 &CVisualizationDriver::compute, py::const_),
+             "Computes molecular orbital values at cubic grid points.",
+             "grid"_a,
+             "molecule"_a,
+             "basis"_a,
+             "molorb"_a,
+             "moidx"_a,
+             "mospin"_a)
+        .def("compute",
+             py::overload_cast<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CAODensityMatrix&, const int32_t, const std::string&>(
+                 &CVisualizationDriver::compute, py::const_),
              "Computes density values at cubic grid points.",
              "grid"_a,
              "molecule"_a,
