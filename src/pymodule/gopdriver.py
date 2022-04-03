@@ -146,10 +146,10 @@ class GlobalOptimizationDriver:
         """
         Performs global optimization with given molecular seed.
         
-        :param filename:
-            The name of input file.
         :param seed:
             The molecular seed.
+        :param filename:                                                                                                                                                                                                                      
+            The name of input file.
         """
         
         self.print_header()
@@ -157,17 +157,19 @@ class GlobalOptimizationDriver:
         # generate conformer candidates
         molgeoms = []
         for _ in range(self.max_conformers):
-            mol = self.generate_conformer(seed)
+            mol = self.generate_conformer(seed, filename)
             if mol is not None:
                 molgeoms.append(mol)
         
         # select unique conformer candidates
-        confgeoms = self.remove_duplicates(molgeoms)
-        
+        #confgeoms = self.remove_duplicates(molgeoms)
+        confgeoms = molgeoms
+                 
         # optimize conformers
         opt_dict = {'max_iter': '900', 'conv_energy': 1.0e-5, 
                     'conv_grms': 1.0e-3, 'conv_gmax': 3.0e-3, 
-                    'conv_drms': 1.0e-3, 'conv_dmax': 3.0e-3}
+                    'conv_drms': 1.0e-3, 'conv_dmax': 3.0e-3, 
+                    'coordsys': 'cart'}
         for i, confgeom in enumerate(confgeoms):
         
             self.ostream.print_blank()
@@ -179,7 +181,7 @@ class GlobalOptimizationDriver:
             xtb_drv = XTBDriver(self.comm)
             xtb_drv.set_method('gfn2')
             grad_drv = XTBGradientDriver(xtb_drv, self.comm, self.ostream)
-            fname = 'conformer.{:d}'.format(i)
+            fname = filename + '.conformer.{:d}'.format(i)
             opt_drv = OptimizationDriver(fname, grad_drv, 'XTB')
             opt_drv.update_settings(opt_dict)
             mol, ene = opt_drv.compute(confgeom, None, None)
@@ -198,12 +200,14 @@ class GlobalOptimizationDriver:
         self.print_conformers(filename) 
         
 
-    def generate_conformer(self, seed):
+    def generate_conformer(self, seed, filename):
         """
         Generates conformer for given molecular seed.
         
         :param seed:
             The molecular seed.
+        :param filename:                                                                                                                                                                                                                      
+            The name of input file.
         :return:
             The generated molecular conformer.
         """
@@ -227,14 +231,17 @@ class GlobalOptimizationDriver:
                             if not self.add_build_block(mol):
                                 return None
                         fstr = 'xyz 1-{:d}'.format(natoms)
-                        opt_dict = {'max_iter': '900', 'constraints': ['$freeze', fstr]}
+                        opt_dict = {'max_iter': '900',  'conv_energy': 1.0e-1,
+                                    'conv_grms': 4.0e-1, 'conv_gmax': 8.0e-1,
+                                    'conv_drms': 4.0e-1, 'conv_dmax': 8.0e-1,
+                                    'coordsys': 'cart'}
                         xtb_drv = XTBDriver(self.comm)
                         xtb_drv.set_method('gfn2')
                         grad_drv = XTBGradientDriver(xtb_drv, self.comm, self.ostream)
-                        filename = 'partial.optimization.{:d}'.format(i)
-                        opt_drv = OptimizationDriver(filename, grad_drv, 'XTB')
+                        fname = filename + '.partial.optimization.{:d}'.format(i)
+                        opt_drv = OptimizationDriver(fname, grad_drv, 'XTB')
                         opt_drv.update_settings(opt_dict)
-                        mol = opt_drv.compute(mol, None, None)
+                        mol, ene = opt_drv.compute(mol, None, None)
                 
                 # add remaining growth units
                 nsteps = self.growth_steps % self.popt_steps
