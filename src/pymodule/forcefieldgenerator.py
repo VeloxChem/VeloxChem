@@ -25,7 +25,6 @@
 
 from mpi4py import MPI
 from pathlib import Path
-from scipy.optimize import curve_fit
 import numpy as np
 import sys
 import re
@@ -256,12 +255,6 @@ class ForceFieldGenerator:
 
         # reading QM data
 
-        try:
-            import MDAnalysis as mda
-        except ImportError:
-            raise ImportError('Unable to import MDAnalysis. Please install ' +
-                              'MDAnalysis via \'conda install MDAnalysis\'')
-
         if inp_dir is None:
             inp_dir = Path('.')
         elif isinstance(inp_dir, str):
@@ -279,13 +272,29 @@ class ForceFieldGenerator:
             energies = []
             dih_angles = []
 
-            u = mda.Universe(xyz_fname)
-            for ts in u.trajectory:
-                geometries.append(
-                    Molecule(u.atoms.names, u.atoms.positions, 'angstrom'))
+            # TODO: only read on master node
+            with open(xyz_fname, 'r') as f_xyz:
+                xyz_lines = f_xyz.readlines()
+
+            n_atoms = int(xyz_lines[0].split()[0])
+            n_geoms = len(xyz_lines) // (n_atoms + 2)
+
+            for i_geom in range(n_geoms):
+                i_start = i_geom * (n_atoms + 2)
+                i_end = i_start + (n_atoms + 2)
+
+                assert_msg_critical(
+                    int(xyz_lines[i_start].split()[0]) == n_atoms,
+                    'ForceFieldGenerator.read_qm_scan_xyz_files: ' +
+                    'inconsistent number of atoms')
+
+                xyz_str = ''.join(xyz_lines[i_start + 2:i_end])
+                geometries.append(Molecule.read_str(xyz_str, units='angstrom'))
+
             self.scan_geometries.append(geometries)
 
             pattern = re.compile(r'\AScan')
+            # TODO: reuse xyz_lines
             with open(xyz_fname, 'r') as f_xyz:
                 for line in f_xyz:
                     if re.search(pattern, line):
@@ -656,6 +665,7 @@ class ForceFieldGenerator:
                     multiplicity = int(dihedral_ff[0])
                     barrier = float(dihedral_ff[1]) * 4.184 / multiplicity
                     phase = float(dihedral_ff[2])
+                    # TODO: check the sign of periodicity (negative for multitermed dihedral)
                     try:
                         periodicity = abs(int(dihedral_ff[3]))
                     except ValueError:
@@ -793,6 +803,12 @@ class ForceFieldGenerator:
         :param top_filename:
             The topology file.
         """
+
+        try:
+            from scipy.optimize import curve_fit
+        except ImportError:
+            raise ImportError('Unable to import scipy. Please install scipy ' +
+                              'via \'python3 -m pip install scipy\'')
 
         # Ryckaert-Bellemans function
 
