@@ -21,7 +21,7 @@ class TestOptimizeXTB:
         xtb_drv.compute(task.molecule, task.ostream)
 
         grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
-        opt_drv = OptimizationDriver(grad_drv, 'XTB')
+        opt_drv = OptimizationDriver(grad_drv)
         opt_drv.update_settings({
             'coordsys': 'tric',
             'filename': task.input_dict['filename'],
