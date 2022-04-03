@@ -135,6 +135,15 @@ class CnaAnalysisDriver:
         """
     
         self.ostream.print_blank()
+        self.ostream.print_header(31 * '-')
+        self.ostream.print_header('!  Coordination Numbers Data  !')
+        self.ostream.print_header(31 * '-')
+        self.ostream.print_header('! (i) ! Min. ! Max. ! Average !')
+        self.ostream.print_header(31 * '-')
+    
+        self.comp_cnums_data(self.xyz_files)
+    
+        self.ostream.print_blank()
         self.ostream.print_header(29 * '-')
         self.ostream.print_header('! Self Correlation Function !')
         self.ostream.print_header(29 * '-')
@@ -186,6 +195,33 @@ class CnaAnalysisDriver:
             cnas.append(mcna)
             
         return cnas
+        
+    def get_coord_numbers(self, molecule):
+        """
+        Computes coordination numbers for the given molecule.
+
+        :param molecule:
+            The molecule.
+        :return:
+            The coordination numbers (max, min, average).
+        """
+        
+        cnums = np.array([molecule.coordination_number(i, self.cna_bond) for i in molecule.atom_indexes('TI')])
+        print(cnums)
+        return (np.amax(cnums),np.amin(cnums),np.mean(cnums))
+        
+    def comp_cnums_data(self, mol_files):
+        """
+        Computes coordination number for given list of files.
+
+        :param mol_files:
+            The list of molecule files.
+        """
+        
+        molecules = [Molecule.read_xyz(finp) for finp in mol_files]
+        for mol in molecules:
+            cdata = self.get_coord_numbers(mol)
+            print('@Coordination Data: ', cdata[0], ' ', cdata[1], ' ', cdata[2])
         
     def print_header(self):
         """

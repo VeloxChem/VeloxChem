@@ -72,6 +72,8 @@ CXCMolecularGradient::integrate(const std::vector<int32_t>& idsAtomic,
     
     CDenseMatrix molgrad(3, natoms);
     
+    
+    
     auto mgradx = molgrad.row(0);
     
     auto mgrady = molgrad.row(1);
