@@ -395,7 +395,7 @@ class ImpesCoordinates:
         if self.cartesian_coordinates is None:
             raise ValueError("No Cartesian coordinates found.")
         else:
-            natoms = self.cartesian_coordinates.shape[1]
+            natoms = self.cartesian_coordinates.shape[0]
             sum_x = 0.0
             sum_y = 0.0
             sum_z = 0.0
@@ -419,18 +419,16 @@ class ImpesCoordinates:
     def rotate_to(self, reference):
         """Rotates the coordinates to align to a reference.
 
-            :param reference: numpy array of Cartesian coordinates
+            :param reference: numpy array of target Cartesian coordinates
                               to be used as a reference.
         """
-        S = np.einsum("ix,iy->xy", reference, self.cartesian_coordinates)
-        # TODO inverse and square root of S S.T 
-        # (diagonal?, otherwise diagonalize) 
-        sqS = np.sqrt(np.linalg.inv(np.matmul(S, S.T)))
-        rotation_matrix = np.matmul(sqS, S)
+        N = reference.shape[0]
+        rotation_matrix = geometric.rotate.get_rot(self.cartesian_coordinates,
+                                                   reference)
 
-        rotated_coords = np.matmul(rotation_matrix, self.cartesian_coordinates)
-
-        return rotated_coords 
+        rotated_coords = np.dot(rotation_matrix, self.cartesian_coordinates.T).T
+        rmsd = np.sqrt(np.sum((rotated_coords-reference)**2)/N)
+        return rotation_matrix, rotated_coords, rmsd 
 
     def write_hdf5(self, fname, label, write_zmat=False):
         """
@@ -489,6 +487,14 @@ class ImpesCoordinates:
             h5f.create_dataset(full_label, data=self.internal_coordinates_array,
                                compression='gzip')
 
+        if self.cartesian_coordinates is None:
+            return False
+        else:
+            # internal coordinates
+            full_label = label + "_cartesian_coordinates"
+            h5f.create_dataset(full_label, data=self.cartesian_coordinates,
+                               compression='gzip')
+
         if write_zmat:
             if self.z_matrix is None:
                 return False
@@ -530,10 +536,13 @@ class ImpesCoordinates:
         gradient_label = label + "_gradient"
         hessian_label = label + "_hessian"
         coords_label = label + "_internal_coordinates"
+        cart_coords_label = label + "_cartesian_coordinates"
+        # TODO
         self.energy = np.array(h5f.get(energy_label))
         self.internal_gradient = np.array(h5f.get(gradient_label))
         self.internal_hessian = np.array(h5f.get(hessian_label))
         self.internal_coordinates_array = np.array(h5f.get(coords_label))
+        self.cartesian_coordinates = np.array(h5f.get(cart_coords_label))
 
         h5f.close()
 
@@ -802,11 +811,12 @@ class ImpesDriver():
         # First, translate the data point to zero
         # self should also be shifted
         data_point.translate_to_zero()
+        # TODO: perhaps translate only once!
         self.impes_coordinate.translate_to_zero()
 
         # Then, determine the rotation matrix which
         # aligns data_point and self.impes_coordinate
-        # TODO: change to Eckart routine
+        # TODO: perhaps save the rotation matrix?
         reference_coordinates = self.impes_coordinate.cartesian_coordinates
         data_point.rotate_to(reference_coordinates)
 
