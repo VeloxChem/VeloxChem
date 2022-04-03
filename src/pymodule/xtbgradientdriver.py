@@ -57,6 +57,8 @@ class XTBGradientDriver(GradientDriver):
         if ostream is None:
             ostream = OutputStream(sys.stdout)
 
+        self.ostream=ostream
+
         super().__init__(comm, ostream)
 
         self.flag = 'XTB Gradient Driver'
@@ -80,3 +82,14 @@ class XTBGradientDriver(GradientDriver):
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def compute_energy(self, molecule):
+        """
+        Performs calculation of XTB energy.
+
+        :param molecule:
+            The molecule.
+        """
+
+        self.xtb_drv = compute(molecule, self.ostream)
+        return self.xtb_drv.get_energy()

@@ -83,9 +83,8 @@ class ScfGradientDriver(GradientDriver):
         # atom labels
         labels = molecule.get_labels()
 
-        arguments=(ao_basis, min_basis)
         #Currently, only numerical gradients activated
-        self.compute_numerical(molecule, arguments)
+        self.compute_numerical(molecule, ao_basis, min_basis)
 
         # print gradient
         self.print_geometry(molecule)
@@ -109,25 +108,23 @@ class ScfGradientDriver(GradientDriver):
         self.scf_drv.ostream.state = False
         return scf_ostream_state
 
-    def compute_energy(self, molecule, arguments):
+    def compute_energy(self, molecule, ao_basis, min_basis=None):
         """
         Compute the energy at current position
 
         :return:
             The energy.
         """
-        ao_basis, min_basis= arguments
         self.scf_drv.compute(molecule, ao_basis, min_basis)
 
         return self.scf_drv.get_scf_energy()
 
-    def restore_drivers(self, molecule, arguments, ostream_state):
+    def restore_drivers(self, molecule, ostream_state, ao_basis, min_basis=None):
         """
         Restore the energy drivers to their initial states.
 
         """
 
-        ao_basis, min_basis= arguments
         self.scf_drv.compute(molecule, ao_basis, min_basis)
         self.scf_drv.ostream.state = ostream_state
 

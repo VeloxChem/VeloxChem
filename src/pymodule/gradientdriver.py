@@ -65,16 +65,14 @@ class GradientDriver:
         """
 
         return
-    def compute_numerical(self, molecule, arguments):
+    def compute_numerical(self, molecule, *args):
         """
         Performs calculation of numerical gradient.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
+        :param args:
+            The same arguments as the "compute" function.
         """
 
         ostream_state = self.init_drivers()
@@ -92,18 +90,18 @@ class GradientDriver:
             for d in range(3):
                 coords[i, d] += self.delta_h
                 new_mol = Molecule(labels, coords, units='au')
-                e_plus = self.compute_energy(new_mol, arguments)
+                e_plus = self.compute_energy(new_mol, *args)
 
                 coords[i, d] -= 2.0 * self.delta_h
                 new_mol = Molecule(labels, coords, units='au')
-                e_minus = self.compute_energy(new_mol, arguments)
+                e_minus = self.compute_energy(new_mol, *args)
 
                 coords[i, d] += self.delta_h
                 self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
 
         self.ostream.print_blank()
 
-        self.restore_drivers(molecule, arguments, ostream_state)
+        self.restore_drivers(molecule, ostream_state, *args)
 
 
     def init_drivers(self):
@@ -114,17 +112,29 @@ class GradientDriver:
             The ostream state(s).
         """
 
-    def compute_energy(self, molecule, arguments):
+    def compute_energy(self, molecule, *args):
         """
         Compute the energy at current position
+
+        :param molecule:
+            The molecule.
+        :param args:
+            The same arguments as the "compute" function.
 
         :return:
             The energy.
         """
 
-    def restore_drivers(self, molecule, arguments, ostream_state):
+    def restore_drivers(self, molecule, ostream_state, *args):
         """
         Restore the energy drivers to their initial states.
+
+        :param molecule:
+            The molecule.
+        :param ostream_state:
+            The previous ostream_state of the driver.
+        :param args:
+            The same arguments as the "compute" function.
 
         """
 
