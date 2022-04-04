@@ -81,9 +81,12 @@ def get_command_output(command):
 
 
 def check_cray():
-    if "CRAYPE_VERSION" in os.environ and "CRAYPE_DIR" in os.environ:
-        return True
-    return False
+    return "CRAYPE_VERSION" in os.environ and "CRAYPE_DIR" in os.environ
+
+
+def check_apple_clang(cxx):
+    cxxversion = get_command_output([cxx, "--version"])
+    return cxxversion.startswith("Apple clang")
 
 
 def check_dir(dir_path, label):
@@ -188,7 +191,10 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
         cxx_flags = "-fopenmp"
         omp_flag = "-lgomp"
     elif use_clang:
-        cxx_flags = "-Xclang -fopenmp"
+        if check_apple_clang(cxx):
+            cxx_flags = "-Xclang -fopenmp"
+        else:
+            cxx_flags = "-fopenmp"
         omp_flag = "-lomp"
 
     # ==> math library <==
@@ -378,7 +384,6 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
             gtest_libdir = gtest_lib
 
     print(f"*** Checking GoogleTest... {gtest_incdir} {gtest_libdir}")
-
 
     # ==> write Makefile.setup <==
 
