@@ -25,7 +25,7 @@
 
 #include "CheckFunctions.hpp"
 
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 namespace vlxtest {  // namespace
 

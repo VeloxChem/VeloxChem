@@ -370,7 +370,7 @@ CDenseMatrix::getString() const
 void
 CDenseMatrix::broadcast(int32_t rank, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         mpi::bcast(_nRows, comm);
 
@@ -383,7 +383,7 @@ CDenseMatrix::broadcast(int32_t rank, MPI_Comm comm)
 void
 CDenseMatrix::reduce_sum(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         _values.reduce_sum(rank, nodes, comm);
     }

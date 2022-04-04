@@ -341,7 +341,7 @@ CAODensityMatrix::getString() const
 void
 CAODensityMatrix::broadcast(int32_t rank, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         // broadcast density matrix type
 

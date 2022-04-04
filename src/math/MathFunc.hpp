@@ -26,62 +26,68 @@
 #ifndef MathFunc_hpp
 #define MathFunc_hpp
 
+#include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
+#include <random>
+#include <type_traits>
 
 namespace mathfunc {  // mathfunc namespace
 
 /**
- Sets all elements of real numbers vector to zero.
-
- @param vector the vector of real numbers.
- @param nElements the number of elements in vector.
+ * Sets all elements of vector to zero.
+ *
+ * @tparam T scalar type
+ * @param vector the vector.
+ * @param nElements the number of elements in vector.
  */
-void zero(double* vector, const int32_t nElements);
+template <typename T>
+inline auto
+zero(T* vector, const int32_t nElements) -> decltype((void)(std::is_arithmetic_v<T>), void())
+{
+#pragma omp simd aligned(vector : VLX_ALIGN)
+    for (int32_t i = 0; i < nElements; i++)
+        vector[i] = T{0};
+}
 
 /**
- Sets all elements of integer numbers vector to zero.
-
- @param vector the vector of integer numbers.
- @param nElements the number of elements in vector.
+ * Sets all elements of vector to specific value.
+ *
+ * @tparam T scalar type
+ * @param vector the vector.
+ * @param value the value of element.
+ * @param nElements the number of elements in vector.
  */
-void zero(int32_t* vector, const int32_t nElements);
+template <typename T>
+inline auto
+set_to(T* vector, const T value, const int32_t nElements) -> decltype((void)(std::is_arithmetic_v<T>), void())
+{
+#pragma omp simd aligned(vector : VLX_ALIGN)
+    for (int32_t i = 0; i < nElements; i++)
+        vector[i] = value;
+}
 
 /**
- Sets all elements of real numbers vector to specific value.
-
- @param vector the vector of real numbers.
- @param value the value of element.
- @param nElements the number of elements in vector.
+ * Computes sum of all elements vector.
+ *
+ * @tparam T scalar type
+ * @param vector the vector.
+ * @param nElements the number of elements in vector.
+ * @return sum of all elements in vector.
  */
-void set_to(double* vector, const double value, const int32_t nElements);
+template <typename T>
+inline auto
+sum(const T* vector, const int32_t nElements) -> decltype((void)(std::is_arithmetic_v<T>), T())
+{
+    auto fsum = T{0};
 
-/**
- Sets all elements of integer numbers vector to specific value.
+#pragma omp simd aligned(vector : VLX_ALIGN)
+    for (int32_t i = 0; i < nElements; i++)
+        fsum += vector[i];
 
- @param vector the vector of integer numbers.
- @param value the value of element.
- @param nElements the number of elements in vector.
- */
-void set_to(int32_t* vector, const int32_t value, const int32_t nElements);
-
-/**
- Computes sum of all elements in real numbers vector.
-
- @param vector the vector of real numbers.
- @param nElements the number of elements in vector.
- @return sum of all elements in vector.
- */
-double sum(const double* vector, const int32_t nElements);
-
-/**
- Computes sum of all elements in integer numbers vector.
-
- @param vector the vector of integer numbers.
- @param nElements the number of elements in vector.
- @return sum of all elements in vector.
- */
-int32_t sum(const int32_t* vector, const int32_t nElements);
+    return fsum;
+}
 
 /**
  Scales all elements of real numbers vector by specific factor.
@@ -103,22 +109,28 @@ void scale(double* vector, const double factor, const int32_t nElements);
 void add_scaled(double* aVector, const double* bVector, const double factor, const int32_t nElements);
 
 /**
- Determines largest element in real numbers vector.
-
- @param vector the vector of real numbers.
- @param nElements the number of elements in vector.
- @return the largest element in real numbers vector.
+ * Determines largest element in vector.
+ *
+ * @tparam T scalar type
+ * @param vector the vector.
+ * @param nElements the number of elements in vector.
+ * @return the largest element in real numbers vector.
  */
-double max(const double* vector, const int32_t nElements);
+template <typename T>
+inline auto
+max(const T* vector, const int32_t nElements) -> decltype((void)(std::is_arithmetic_v<T>), T())
+{
+    auto fmax = vector[0];
 
-/**
- Determines largest element in integer numbers vector.
+    for (int32_t i = 1; i < nElements; i++)
+    {
+        auto cmax = vector[i];
 
- @param vector the vector of integer numbers.
- @param nElements the number of elements in vector.
- @return the largest element in integer numbers vector.
- */
-int32_t max(const int32_t* vector, const int32_t nElements);
+        if (cmax > fmax) fmax = cmax;
+    }
+
+    return fmax;
+}
 
 /**
  Normalizes vector of real numbers.
@@ -215,26 +227,22 @@ void distances(double*       abDistancesX,
 void quadChebyshevOfKindTwo(double* coordinates, double* weights, const int32_t nPoints);
 
 /**
- Copies integer numbers from one vector to another vector.
-
- @param aVector the destination vector.
- @param aPosition the position of first copied element in destination vector.
- @param bVector the source vector.
- @param bPosition the position of first copied element in source vector.
- @param nElements the number of elements.
+ * Copies scalars from one vector to another vector.
+ *
+ * @tparam T scalar type.
+ * @param aVector the destination vector.
+ * @param aPosition the position of first copied element in destination vector.
+ * @param bVector the source vector.
+ * @param bPosition the position of first copied element in source vector.
+ * @param nElements the number of elements.
  */
-void copy(int32_t* aVector, const int32_t aPosition, const int32_t* bVector, const int32_t bPosition, const int32_t nElements);
-
-/**
- Copies real numbers from one vector to another vector.
-
- @param aVector the destination vector.
- @param aPosition the position of first copied element in destination vector.
- @param bVector the source vector.
- @param bPosition the position of first copied element in source vector.
- @param nElements the number of elements.
- */
-void copy(double* aVector, const int32_t aPosition, const double* bVector, const int32_t bPosition, const int32_t nElements);
+template <typename T>
+inline auto
+copy(T* aVector, const int32_t aPosition, const T* bVector, const int32_t bPosition, const int32_t nElements)
+    -> decltype((void)(std::is_arithmetic_v<T>), void())
+{
+    std::copy_n(bVector + bPosition, nElements, aVector + aPosition);
+}
 
 /**
  Determines maximum number of components for tensor of given order.
@@ -244,6 +252,39 @@ void copy(double* aVector, const int32_t aPosition, const double* bVector, const
  */
 int32_t maxTensorComponents(const int32_t order);
 
+/** Fill raw array with random numbers in interval.
+ *
+ * @tparam scalar type of raw array.
+ * @param[in,out] dst raw array.
+ * @param[in] lower lower bound of interval.
+ * @param[in] upper upper bound of interval.
+ * @param[in] sz number of elements in array.
+ *
+ * This function uses the C++ default random engine with random seeding.
+ */
+template <typename T>
+auto
+fill_random(T* dst, T lower, T upper, size_t sz) -> void
+{
+    static_assert(std::is_arithmetic_v<T>, "Scalar type must be arithmetic.");
+
+    // random number generator
+    auto gen = std::default_random_engine(std::random_device()());
+
+    // distribution (use IIFE idiom to get the right distribution at compile-time)
+    auto dist = [lower, upper] {
+        if constexpr (std::is_floating_point_v<T>)
+        {
+            return std::uniform_real_distribution<T>(lower, upper);
+        }
+        else
+        {
+            return std::uniform_int_distribution<T>(lower, upper);
+        }
+    }();
+
+    std::generate(dst, dst + sz, [&dist, &gen]() { return dist(gen); });
+}
 }  // namespace mathfunc
 
 #endif /* MathFunc_hpp */

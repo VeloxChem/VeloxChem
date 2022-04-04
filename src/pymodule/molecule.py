@@ -404,7 +404,7 @@ def _Molecule_get_aufbau_occupation(self, norb, flag='restricted'):
         return occ
     else:
         occa = [1.0 if x < nalpha else 0.0 for x in range(norb)]
-        occb = [1.0 if x < nalpha else 0.0 for x in range(norb)]
+        occb = [1.0 if x < nbeta else 0.0 for x in range(norb)]
         return occa, occb
 
 

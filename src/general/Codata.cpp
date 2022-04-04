@@ -77,6 +77,15 @@ getHartreeValueInWavenumbers()
 }
 
 double
+getAtomicMassUnitInElectronMasses()
+{
+    // electron mass in u: 5.485 799 090 65 e-4
+    // u in electron masses: 1.0 / 5.485 799 090 65 e-4
+
+    return 1822.888486209;
+}
+
+double
 getDipoleInDebye()
 {
     // atomic unit of electric dipole mom.: 8.478 353 6255 e-30 [C m]
@@ -110,6 +119,17 @@ getBoltzmannConstantInElectronVoltsPerKelvin()
     // Boltzmann constant: 8.617 333 262... e-5 eV K^-1
 
     return 8.617333262e-5;
+}
+
+double
+getBoltzmannConstantInHartreePerKelvin()
+{
+    // Boltzmann constant: 8.617 333 262... e-5 eV K^-1
+    // hartree-electron volt relationship: 27.211 386 245 988
+
+    // Boltzmann constant in hartree K^-1: 3.166 811 563 e-6
+
+    return 3.166811563e-6;
 }
 
 double
