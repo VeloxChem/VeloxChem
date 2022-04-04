@@ -26,13 +26,13 @@
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
 from io import StringIO
+import numpy as np
 import time as tm
 import tempfile
 
 import geometric
 
-from .veloxchemlib import mpi_master
-from .veloxchemlib import hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, hartree_in_kcalpermol
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 from .errorhandler import assert_msg_critical
@@ -250,6 +250,102 @@ class OptimizationDriver:
             for line in lines:
                 print(line, file=f_ini)
 
+    @staticmethod
+    def get_ic_rmsd(opt_mol, ref_mol):
+        """
+        Gets statistical deviation of bonds, angles and dihedral angles between
+        optimized and reference geometry.
+
+        :param opt_mol:
+            The optimized molecule.
+        :param ref_mol:
+            The reference molecule (or xyz filename).
+
+        :return:
+            The statistical deviation of bonds, angles and dihedral angles.
+        """
+
+        if isinstance(ref_mol, str):
+            errmsg = '*** Note: invalid reference xyz file!'
+        else:
+            errmsg = '*** Note: invalid reference molecule!'
+
+        if isinstance(ref_mol, str):
+            if Path(ref_mol).is_file():
+                ref_mol = Molecule.read_xyz(ref_mol)
+            else:
+                return errmsg
+
+        if ref_mol.get_labels() != opt_mol.get_labels():
+            return errmsg
+
+        g_mol = geometric.molecule.Molecule()
+        g_mol.elem = opt_mol.get_labels()
+        g_mol.xyzs = [opt_mol.get_coordinates() * geometric.nifty.bohr2ang]
+
+        ic = geometric.internal.DelocalizedInternalCoordinates(g_mol,
+                                                               build=True)
+
+        ref_geom = ref_mol.get_coordinates() * geometric.nifty.bohr2ang
+        opt_geom = opt_mol.get_coordinates() * geometric.nifty.bohr2ang
+
+        bonds = []
+        angles = []
+        dihedrals = []
+
+        for internal in ic.Prims.Internals:
+            if isinstance(internal, geometric.internal.Distance):
+                v1 = internal.value(ref_geom)
+                v2 = internal.value(opt_geom)
+                bonds.append(abs(v1 - v2))
+            elif isinstance(internal, geometric.internal.Angle):
+                v1 = internal.value(ref_geom)
+                v2 = internal.value(opt_geom)
+                angles.append(abs(v1 - v2) * 180.0 / np.pi)
+            elif isinstance(internal, geometric.internal.Dihedral):
+                v1 = internal.value(ref_geom)
+                v2 = internal.value(opt_geom)
+                diff_in_deg = (v1 - v2) * 180.0 / np.pi
+                if diff_in_deg > 180.0:
+                    diff_in_deg -= 360.0
+                elif diff_in_deg < -180.0:
+                    diff_in_deg += 360.0
+                dihedrals.append(abs(diff_in_deg))
+
+        ic_rmsd = {'bonds': None, 'angles': None, 'dihedrals': None}
+
+        if bonds:
+            np_bonds = np.array(bonds)
+            rms_bonds = np.sqrt(np.mean(np_bonds**2))
+            max_bonds = np.max(np_bonds)
+            ic_rmsd['bonds'] = {
+                'rms': rms_bonds,
+                'max': max_bonds,
+                'unit': 'Angstrom'
+            }
+
+        if angles:
+            np_angles = np.array(angles)
+            rms_angles = np.sqrt(np.mean(np_angles**2))
+            max_angles = np.max(np_angles)
+            ic_rmsd['angles'] = {
+                'rms': rms_angles,
+                'max': max_angles,
+                'unit': 'degree'
+            }
+
+        if dihedrals:
+            np_dihedrals = np.array(dihedrals)
+            rms_dihedrals = np.sqrt(np.mean(np_dihedrals**2))
+            max_dihedrals = np.max(np_dihedrals)
+            ic_rmsd['dihedrals'] = {
+                'rms': rms_dihedrals,
+                'max': max_dihedrals,
+                'unit': 'degree'
+            }
+
+        return ic_rmsd
+
     def print_opt_result(self, progress):
         """
         Prints summary of geometry optimization.
@@ -383,7 +479,7 @@ class OptimizationDriver:
 
         xyz_filename = ref_mol if isinstance(ref_mol, str) else None
 
-        ic_rmsd = opt_mol.get_ic_rmsd(ref_mol)
+        ic_rmsd = self.get_ic_rmsd(opt_mol, ref_mol)
 
         if isinstance(ic_rmsd, str):
             self.ostream.print_header(ic_rmsd)
