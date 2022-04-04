@@ -272,9 +272,13 @@ class ForceFieldGenerator:
             energies = []
             dih_angles = []
 
-            # TODO: only read on master node
-            with open(xyz_fname, 'r') as f_xyz:
-                xyz_lines = f_xyz.readlines()
+            # read geometries
+
+            xyz_lines = None
+            if self.rank == mpi_master():
+                with open(xyz_fname, 'r') as f_xyz:
+                    xyz_lines = f_xyz.readlines()
+            xyz_lines = self.comm.bcast(xyz_lines, root=mpi_master())
 
             n_atoms = int(xyz_lines[0].split()[0])
             n_geoms = len(xyz_lines) // (n_atoms + 2)
@@ -293,21 +297,21 @@ class ForceFieldGenerator:
 
             self.scan_geometries.append(geometries)
 
+            # read energies and dihedral angles
+
             pattern = re.compile(r'\AScan')
-            # TODO: reuse xyz_lines
-            with open(xyz_fname, 'r') as f_xyz:
-                for line in f_xyz:
-                    if re.search(pattern, line):
-                        energies.append(
-                            float(line.split('Energy')[1].split()[0]))
-                        dih_angles.append(float(line.split('=')[1].split()[0]))
-                        dih_inds = [
-                            int(i) for i in line.split('Dihedral')[1].split()
-                            [0].split('-')
-                        ]
-                self.scan_energies.append(energies)
-                self.scan_dih_angles.append(dih_angles)
-                self.target_dihedrals.append(dih_inds)
+
+            for line in xyz_lines:
+                if re.search(pattern, line):
+                    energies.append(float(line.split('Energy')[1].split()[0]))
+                    dih_angles.append(float(line.split('=')[1].split()[0]))
+                    dih_inds = [
+                        int(i)
+                        for i in line.split('Dihedral')[1].split()[0].split('-')
+                    ]
+            self.scan_energies.append(energies)
+            self.scan_dih_angles.append(dih_angles)
+            self.target_dihedrals.append(dih_inds)
 
         self.ostream.print_blank()
 
@@ -665,20 +669,24 @@ class ForceFieldGenerator:
                     multiplicity = int(dihedral_ff[0])
                     barrier = float(dihedral_ff[1]) * 4.184 / multiplicity
                     phase = float(dihedral_ff[2])
-                    # TODO: check the sign of periodicity (negative for multitermed dihedral)
+                    # Note: negative periodicity implies multitermed dihedral
+                    # See https://ambermd.org/FileFormats.php
                     try:
-                        periodicity = abs(int(dihedral_ff[3]))
+                        periodicity = int(dihedral_ff[3])
                     except ValueError:
-                        periodicity = abs(int(float(dihedral_ff[3])))
+                        periodicity = int(float(dihedral_ff[3]))
 
                     cur_str = '{:6}{:7}{:7}{:7}'.format(i + 1, j + 1, k + 1,
                                                         l + 1)
                     cur_str += '{:7}{:11.2f}{:11.5f}{:4}'.format(
-                        1, phase, barrier, periodicity)
+                        1, phase, barrier, abs(periodicity))
                     cur_str += ' ; {}-{}-{}-{}\n'.format(
                         atom_names[i], atom_names[j], atom_names[k],
                         atom_names[l])
                     f_itp.write(cur_str)
+
+                    if periodicity > 0:
+                        break
 
             # improper dihedrals
 
