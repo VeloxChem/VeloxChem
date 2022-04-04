@@ -79,3 +79,15 @@ class TestForceField:
 
             if gaff_file.is_file():
                 gaff_file.unlink()
+
+            pdb_file = Path(inpfile).with_suffix('.pdb')
+            if pdb_file.is_file():
+                pdb_file.unlink()
+
+            scf_h5_file = Path(inpfile).with_suffix('.scf.h5')
+            if scf_h5_file.is_file():
+                scf_h5_file.unlink()
+
+            scf_final_h5_file = Path(inpfile).with_suffix('.scf.tensors.h5')
+            if scf_final_h5_file.is_file():
+                scf_final_h5_file.unlink()

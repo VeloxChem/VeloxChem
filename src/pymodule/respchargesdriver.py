@@ -212,18 +212,28 @@ class RespChargesDriver:
             errmsg += 'specified.'
             assert_msg_critical(self.xyz_file is not None, errmsg)
 
-            try:
-                import MDAnalysis as mda
-            except ImportError:
-                raise ImportError(
-                    'Unable to import MDAnalysis. Please install ' +
-                    'MDAnalysis via \'python3 -m pip install MDAnalysis\'')
+            xyz_lines = None
+            if self.rank == mpi_master():
+                with open(self.xyz_file, 'r') as f_xyz:
+                    xyz_lines = f_xyz.readlines()
+            xyz_lines = self.comm.bcast(xyz_lines, root=mpi_master())
 
-            u = mda.Universe(str(self.xyz_file))
-            for ts in u.trajectory:
+            n_atoms = int(xyz_lines[0].split()[0])
+            n_geoms = len(xyz_lines) // (n_atoms + 2)
+
+            for i_geom in range(n_geoms):
+                i_start = i_geom * (n_atoms + 2)
+                i_end = i_start + (n_atoms + 2)
+
+                assert_msg_critical(
+                    int(xyz_lines[i_start].split()[0]) == n_atoms,
+                    'RespChargesDriver.compute: inconsistent number of atoms')
+
+                xyz_str = ''.join(xyz_lines[i_start + 2:i_end])
+
                 if self.rank == mpi_master():
                     # create molecule
-                    mol = Molecule(u.atoms.names, u.atoms.positions, 'angstrom')
+                    mol = Molecule.read_str(xyz_str, units='angstrom')
                     mol.set_charge(self.net_charge)
                     mol.set_multiplicity(self.multiplicity)
                     # create basis set
