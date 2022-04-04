@@ -34,7 +34,7 @@ from .veloxchemlib import (mpi_master, bohr_in_angstroms,
                            boltzmann_in_hartreeperkelvin)
 from .outputstream import OutputStream
 from .scfunrestdriver import ScfUnrestrictedDriver
-from .scffirstorderprop import ScfFirstOrderProperties
+from .firstorderprop import FirstOrderProperties
 from .rspabsorption import Absorption
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords
@@ -388,7 +388,7 @@ class NumerovDriver:
         scf_drv.ostream.state = False
         scf_drv.update_settings(self.scf_dict, self.method_dict)
 
-        scf_prop = ScfFirstOrderProperties(self.comm)
+        scf_prop = FirstOrderProperties(self.comm)
         scf_prop.ostream.state = False
 
         # PEC scan
