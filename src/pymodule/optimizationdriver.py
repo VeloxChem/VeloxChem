@@ -46,8 +46,6 @@ class OptimizationDriver:
 
     :param grad_drv:
         The gradient driver.
-    :param flag:
-        The flag ("SCF" or "XTB").
 
     Instance variables
         - rank: The rank of MPI process.
@@ -58,10 +56,9 @@ class OptimizationDriver:
         - max_iter: The maximum number of optimization steps
         - filename: The filename that will be used by geomeTRIC.
         - grad_drv: The gradient driver.
-        - flag: The type of the optimization driver.
     """
 
-    def __init__(self, grad_drv, flag):
+    def __init__(self, grad_drv):
         """
         Initializes optimization driver.
         """
@@ -79,7 +76,6 @@ class OptimizationDriver:
 
         self.filename = f'veloxchem_opt_{get_datetime_string()}'
         self.grad_drv = grad_drv
-        self.flag = flag
 
         # input keywords
         self.input_keywords = {
@@ -117,16 +113,14 @@ class OptimizationDriver:
         if 'filename' in opt_dict:
             self.filename = opt_dict['filename']
 
-    def compute(self, molecule, ao_basis, min_basis=None):
+    def compute(self, molecule, *args):
         """
         Performs geometry optimization.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
+        :param args:
+            The same arguments as the "compute" function of the gradient driver.
 
         :return:
             The molecule with final geometry.
@@ -135,8 +129,7 @@ class OptimizationDriver:
         self.print_header()
         start_time = tm.time()
 
-        opt_engine = OptimizationEngine(molecule, ao_basis, min_basis,
-                                        self.grad_drv, self.flag)
+        opt_engine = OptimizationEngine(self.grad_drv, molecule, *args)
 
         # filename is used by geomeTRIC to create .log and other files. On
         # master node filename is determined based on the input/output file.

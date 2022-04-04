@@ -24,6 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import time as tm
 import sys
 from mpi4py import MPI
 
@@ -37,6 +38,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
+from .molecule import Molecule
 
 class GradientDriver:
     """
@@ -165,6 +167,86 @@ class GradientDriver:
         """
 
         return
+    def compute_numerical(self, molecule, *args):
+        """
+        Performs calculation of numerical gradient.
+
+        :param molecule:
+            The molecule.
+        :param args:
+            The same arguments as the "compute" function.
+        """
+
+        ostream_state = self.init_drivers()
+
+        # atom labels
+        labels = molecule.get_labels()
+
+        # atom coordinates (nx3)
+        coords = molecule.get_coordinates()
+
+        # numerical gradient
+        self.gradient = np.zeros((molecule.number_of_atoms(), 3))
+
+        for i in range(molecule.number_of_atoms()):
+            for d in range(3):
+                coords[i, d] += self.delta_h
+                new_mol = Molecule(labels, coords, units='au')
+                e_plus = self.compute_energy(new_mol, *args)
+
+                coords[i, d] -= 2.0 * self.delta_h
+                new_mol = Molecule(labels, coords, units='au')
+                e_minus = self.compute_energy(new_mol, *args)
+
+                if self.do_four_point:
+                    coords[i, d] -= self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    e_minus2 = self.compute_energy(new_mol, *args)
+                    coords[i, d] += 4.0 * self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    e_plus2 = self.compute_energy(new_mol, *args)
+                    coords[i, d] -= 2.0 * self.delta_h
+                    self.gradient[i, d] = (e_minus2 - 8 * e_minus + 8 * e_plus - e_plus2) / (12.0 * self.delta_h)
+                else:
+                    coords[i, d] += self.delta_h
+                    self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
+                    
+        self.restore_drivers(molecule, ostream_state, *args)
+        self.ostream.print_blank()
+
+    def init_drivers(self):
+        """
+        Silence the energy drivers and save the current ostream state.
+
+        :return:
+            The ostream state(s).
+        """
+
+    def compute_energy(self, molecule, *args):
+        """
+        Compute the energy at current position
+
+        :param molecule:
+            The molecule.
+        :param args:
+            The same arguments as the "compute" function.
+
+        :return:
+            The energy.
+        """
+
+    def restore_drivers(self, molecule, ostream_state, *args):
+        """
+        Restore the energy drivers to their initial states.
+
+        :param molecule:
+            The molecule.
+        :param ostream_state:
+            The previous ostream_state of the driver.
+        :param args:
+            The same arguments as the "compute" function.
+
+        """
 
     def init_dft(self, molecule, scf_tensors):
         """
@@ -430,7 +512,7 @@ class GradientDriver:
         self.ostream.print_header((len(self.flag) + 2) * '=')
         self.ostream.flush()
 
-       	cur_str = 'Gradient Type               : '
+        cur_str = 'Gradient Type               : '
 
         if self.numerical:
             cur_str += 'Numerical'

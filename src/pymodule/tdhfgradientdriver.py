@@ -122,7 +122,8 @@ class TdhfGradientDriver(GradientDriver):
         self.method_dict = dict(method_dict)
         self.orbrsp_dict = dict(orbrsp_dict)
 
-    def compute(self, molecule, basis, rsp_drv, rsp_results):
+    # TODO: add min_basis here??
+    def compute(self, molecule, basis, rsp_drv, rsp_results, min_basis=None):
         """
         Performs calculation of analytical or numerical gradient.
 
@@ -147,7 +148,7 @@ class TdhfGradientDriver(GradientDriver):
         start_time = tm.time()
 
         if self.numerical:
-            self.compute_numerical(molecule, basis, rsp_drv)
+            self.compute_numerical(molecule, basis, rsp_drv, min_basis)
         else:
             self.compute_analytical(molecule, basis, rsp_results)
 
@@ -263,126 +264,176 @@ class TdhfGradientDriver(GradientDriver):
 
             self.ostream.print_blank()
 
-    def compute_numerical(self, molecule, ao_basis, rsp_drv, min_basis=None):
+    def init_drivers(self):
         """
-        Performs calculation of numerical gradient at RPA or TDA level.
+        Silence the energy drivers and save the current ostream state.
 
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param rsp_drv:
-            The RPA or TDA driver.
-        :param min_basis:
-            The minimal AO basis set.
+        :return:
+            The ostream state(s).
         """
 
-        # self.scf_drv = scf_drv
         scf_ostream_state = self.scf_drv.ostream.state
         self.scf_drv.ostream.state = False
+        return scf_ostream_state
 
-        # atom labels
-        labels = molecule.get_labels()
-
-        # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
-
-        # number of atoms
-        natm = molecule.number_of_atoms()
-
+    def compute_energy(self, molecule, basis, rsp_drv, min_basis=None):
+        """
+        Computes the energy at the current position.
+        
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param rsp_drv:
+            The linear response driver.
+        """
+        self.scf_drv.compute(molecule, basis, min_basis)
+        scf_tensors = dict(self.scf_drv.scf_tensors)
+        rsp_drv.is_converged = False  # only needed for RPA
+        rsp_results = rsp_drv.compute(molecule, basis,
+                                      scf_tensors)
         if self.rank == mpi_master():
-            # numerical gradient
-            self.gradient = np.zeros((natm, 3))
+            exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
         else:
-            self.gradient = None
+            exc_en = None
+        exc_en = self.comm.bcast(exc_en, root=mpi_master())
+    
+        #print("Compute energy: \n", scf_tensors)
 
-        if not self.do_four_point:
-            for i in range(natm):
-                for d in range(3):
-                    coords[i, d] += self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    scf_tensors = self.scf_drv.scf_tensors
-                    rsp_drv.is_converged = False  # only needed for RPA
-                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
-                                                       scf_tensors)
-                    if self.rank == mpi_master():
-                        exc_en_plus = rsp_results['eigenvalues'][self.state_deriv_index]
-                        e_plus = self.scf_drv.get_scf_energy() + exc_en_plus
+        return self.scf_drv.get_scf_energy() + exc_en
 
-                    coords[i, d] -= 2.0 * self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    rsp_drv.is_converged = False
-                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
-                                                       self.scf_drv.scf_tensors)
-                    if self.rank == mpi_master():
-                        exc_en_minus = rsp_results['eigenvalues'][self.state_deriv_index]
-                        e_minus = self.scf_drv.get_scf_energy() + exc_en_minus
+    def restore_drivers(self, molecule, ostream_state, basis, rsp_drv,
+                        min_basis=None):
+        """
+        Restore the energy drivers to their initial states.
 
-                        self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
+        """
 
-                    coords[i, d] += self.delta_h
+        self.scf_drv.compute(molecule, basis, min_basis)
+        self.scf_drv.ostream.state = ostream_state
 
-        else:
-            # Four-point numerical derivative approximation
-            # for debugging of analytical gradient:
-            # [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
-            for i in range(natm):
-                for d in range(3):
-                    coords[i, d] += self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    scf_tensors = self.scf_drv.scf_tensors
-                    rsp_drv.is_converged = False  # only needed for RPA
-                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
-                                                       scf_tensors)
-                    if self.rank == mpi_master():
-                        exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
-                        e_plus1 = self.scf_drv.get_scf_energy() + exc_en
-
-                    coords[i, d] += self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    scf_tensors = self.scf_drv.scf_tensors
-                    rsp_drv.is_converged = False  # only needed for RPA
-                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
-                                                       scf_tensors)
-                    if self.rank == mpi_master():
-                        exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
-                        e_plus2 = self.scf_drv.get_scf_energy() + exc_en
-
-                    coords[i, d] -= 3.0 * self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    rsp_drv.is_converged = False
-                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
-                                                       self.scf_drv.scf_tensors)
-                    if self.rank == mpi_master():
-                        exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
-                        e_minus1 = self.scf_drv.get_scf_energy() + exc_en
-
-                    coords[i, d] -= self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    rsp_drv.is_converged = False
-                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
-                                                       self.scf_drv.scf_tensors)
-                    if self.rank == mpi_master():
-                        exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
-                        e_minus2 = self.scf_drv.get_scf_energy() + exc_en
-
-                        # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
-                        self.gradient[i, d] = (e_minus2 - 8.0 * e_minus1
-                                               + 8.0 * e_plus1 - e_plus2) / (12.0 * self.delta_h)
-
-                    coords[i, d] += 2.0 * self.delta_h
-
-
-        self.ostream.print_blank()
-
-        self.scf_drv.compute(molecule, ao_basis, min_basis)
-        self.scf_drv.ostream.state = scf_ostream_state
+# TODO: delete the commented out code; numerical gradient is now included
+# in gradientdriver
+#    def compute_numerical(self, molecule, ao_basis, rsp_drv, min_basis=None):
+#        """
+#        Performs calculation of numerical gradient at RPA or TDA level.
+#
+#        :param molecule:
+#            The molecule.
+#        :param ao_basis:
+#            The AO basis set.
+#        :param rsp_drv:
+#            The RPA or TDA driver.
+#        :param min_basis:
+#            The minimal AO basis set.
+#        """
+#
+#        # self.scf_drv = scf_drv
+#        scf_ostream_state = self.scf_drv.ostream.state
+#        self.scf_drv.ostream.state = False
+#
+#        # atom labels
+#        labels = molecule.get_labels()
+#
+#        # atom coordinates (nx3)
+#        coords = molecule.get_coordinates()
+#
+#        # number of atoms
+#        natm = molecule.number_of_atoms()
+#
+#        if self.rank == mpi_master():
+#            # numerical gradient
+#            self.gradient = np.zeros((natm, 3))
+#        else:
+#            self.gradient = None
+#
+#        if not self.do_four_point:
+#            for i in range(natm):
+#                for d in range(3):
+#                    coords[i, d] += self.delta_h
+#                    new_mol = Molecule(labels, coords, units='au')
+#                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+#                    scf_tensors = self.scf_drv.scf_tensors
+#                    rsp_drv.is_converged = False  # only needed for RPA
+#                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
+#                                                       scf_tensors)
+#                    if self.rank == mpi_master():
+#                        exc_en_plus = rsp_results['eigenvalues'][self.state_deriv_index]
+#                        e_plus = self.scf_drv.get_scf_energy() + exc_en_plus
+#
+#                    coords[i, d] -= 2.0 * self.delta_h
+#                    new_mol = Molecule(labels, coords, units='au')
+#                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+#                    rsp_drv.is_converged = False
+#                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
+#                                                       self.scf_drv.scf_tensors)
+#                    if self.rank == mpi_master():
+#                        exc_en_minus = rsp_results['eigenvalues'][self.state_deriv_index]
+#                        e_minus = self.scf_drv.get_scf_energy() + exc_en_minus
+#
+#                        self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
+#
+#                    coords[i, d] += self.delta_h
+#
+#        else:
+#            # Four-point numerical derivative approximation
+#            # for debugging of analytical gradient:
+#            # [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
+#            for i in range(natm):
+#                for d in range(3):
+#                    coords[i, d] += self.delta_h
+#                    new_mol = Molecule(labels, coords, units='au')
+#                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+#                    scf_tensors = self.scf_drv.scf_tensors
+#                    rsp_drv.is_converged = False  # only needed for RPA
+#                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
+#                                                       scf_tensors)
+#                    if self.rank == mpi_master():
+#                        exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
+#                        e_plus1 = self.scf_drv.get_scf_energy() + exc_en
+#
+#                    coords[i, d] += self.delta_h
+#                    new_mol = Molecule(labels, coords, units='au')
+#                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+#                    scf_tensors = self.scf_drv.scf_tensors
+#                    rsp_drv.is_converged = False  # only needed for RPA
+#                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
+#                                                       scf_tensors)
+#                    if self.rank == mpi_master():
+#                        exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
+#                        e_plus2 = self.scf_drv.get_scf_energy() + exc_en
+#
+#                    coords[i, d] -= 3.0 * self.delta_h
+#                    new_mol = Molecule(labels, coords, units='au')
+#                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+#                    rsp_drv.is_converged = False
+#                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
+#                                                       self.scf_drv.scf_tensors)
+#                    if self.rank == mpi_master():
+#                        exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
+#                        e_minus1 = self.scf_drv.get_scf_energy() + exc_en
+#
+#                    coords[i, d] -= self.delta_h
+#                    new_mol = Molecule(labels, coords, units='au')
+#                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+#                    rsp_drv.is_converged = False
+#                    rsp_results = rsp_drv.compute(new_mol, ao_basis,
+#                                                       self.scf_drv.scf_tensors)
+#                    if self.rank == mpi_master():
+#                        exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
+#                        e_minus2 = self.scf_drv.get_scf_energy() + exc_en
+#
+#                        # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
+#                        self.gradient[i, d] = (e_minus2 - 8.0 * e_minus1
+#                                               + 8.0 * e_plus1 - e_plus2) / (12.0 * self.delta_h)
+#
+#                    coords[i, d] += 2.0 * self.delta_h
+#
+#
+#        self.ostream.print_blank()
+#
+#        self.scf_drv.compute(molecule, ao_basis, min_basis)
+#        self.scf_drv.ostream.state = scf_ostream_state
 
     def compute_numerical_dipole(self, molecule, ao_basis, rsp_drv,
                                  field_strength=1e-5, min_basis=None):

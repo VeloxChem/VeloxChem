@@ -75,8 +75,8 @@ class ScfGradientDriver(GradientDriver):
         self.delta_h = 0.001
 
         # Flag for numerical derivative of dipole moment
-        self.dipole_deriv = False
-        self.dipole_gradient = None
+        # self.dipole_deriv = False
+        # self.dipole_gradient = None
 
     def update_settings(self, grad_dict, method_dict):
         """
@@ -179,140 +179,175 @@ class ScfGradientDriver(GradientDriver):
             self.gradient += self.grad_nuc_contrib(molecule)
             self.omega_ao = epsilon_dm_ao #TODO remove again
 
-    def compute_numerical(self, molecule, ao_basis, min_basis=None):
-        """
-        Performs calculation of numerical gradient.
+# TODO: delete commented out code; numerical gradient is now included
+# in gradientdriver.
+#    def compute_numerical(self, molecule, ao_basis, min_basis=None):
+#        """
+#        Performs calculation of numerical gradient.
+#
+#        :param molecule:
+#            The molecule.
+#        :param ao_basis:
+#            The AO basis set.
+#        :param min_basis:
+#            The minimal AO basis set.
+#        """
+#
+#        scf_ostream_state = self.scf_drv.ostream.state
+#        self.scf_drv.ostream.state = False
+#
+#        # atom labels
+#        labels = molecule.get_labels()
+#
+#        # atom coordinates (nx3)
+#        coords = molecule.get_coordinates()
+#        # the number of atoms
+#        natm = molecule.number_of_atoms()
+#        # the number of atomic orbitals
+#        # nao = self.scf_drv.scf_tensors["D_alpha"].shape[0]
+#
+#        self.gradient = np.zeros((natm, 3))
+#
+#        # Gradient of the exchange and correlation energy
+#        # TODO: remove vxc numerical gradient
+#        if self.dft:
+#            self.xc_gradient = np.zeros((natm, 3))
+#            # self.vxc_gradient = np.zeros((natm, 3, nao, nao))
+#
+#        # First-order properties for gradient of dipole moment
+#        if self.dipole_deriv:
+#            prop = FirstOrderProperties(self.comm, self.ostream)
+#            # numerical gradient (3 dipole components x no. atoms x 3 atom coords)
+#            self.dipole_gradient = np.zeros((3, natm, 3))
+#
+#        if not self.do_four_point:
+#            for i in range(natm):
+#                for d in range(3):
+#                    coords[i, d] += self.delta_h
+#                    new_mol = Molecule(labels, coords, units='au')
+#                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+#                    e_plus = self.scf_drv.get_scf_energy()
+#                    # TODO: numerical derivative of the xc energy;
+#                    # remove when analytical derivative is working.
+#                    if self.dft:
+#                        xc_plus = self.scf_drv.scf_tensors['xc_energy']
+#                        # vxc_plus = self.scf_drv.scf_tensors['vxc_mat'].get_matrix().to_numpy()
+#
+#                    if self.dipole_deriv:
+#                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
+#                        mu_plus = prop.get_property('dipole moment')
+#
+#                    coords[i, d] -= 2.0 * self.delta_h
+#                    new_mol = Molecule(labels, coords, units='au')
+#                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+#                    e_minus = self.scf_drv.get_scf_energy()
+#                    # TODO: numerical derivative of the xc energy;
+#                    # remove when analytical derivative is working.
+#                    if self.dft:
+#                        xc_minus = self.scf_drv.scf_tensors['xc_energy']
+#                        # vxc_minus = self.scf_drv.scf_tensors['vxc_mat'].get_matrix().to_numpy()
+#
+#                    if self.dipole_deriv:
+#                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
+#                        mu_minus = prop.get_property('dipole moment')
+#
+#                        for c in range(3):
+#                            self.dipole_gradient[c, i, d] = (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
+#
+#                    coords[i, d] += self.delta_h
+#                    self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
+#                    # TODO: numerical derivative of the xc energy;
+#                    # remove when analytical derivative is working.
+#                    if self.dft:
+#                        self.xc_gradient[i, d] = (xc_plus - xc_minus) / (2.0 * self.delta_h)
+#                        # self.vxc_gradient[i, d] = (vxc_plus - vxc_minus) / (2.0 * self.delta_h)
+#        else:
+#            # Four-point numerical derivative approximation
+#            # for debugging of analytical gradient:
+#            # [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
+#            for i in range(natm):
+#                for d in range(3):
+#                    coords[i, d] += self.delta_h
+#                    new_mol = Molecule(labels, coords, units='au')
+#                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+#                    e_plus1 = self.scf_drv.get_scf_energy()
+#
+#                    if self.dipole_deriv:
+#                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
+#                        mu_plus1 = prop.get_property('dipole moment')
+#
+#                    coords[i, d] += self.delta_h
+#                    new_mol = Molecule(labels, coords, units='au')
+#                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+#                    e_plus2 = self.scf_drv.get_scf_energy()
+#
+#                    if self.dipole_deriv:
+#                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
+#                        mu_plus2 = prop.get_property('dipole moment')
+#
+#                    coords[i, d] -= 3.0 * self.delta_h
+#                    new_mol = Molecule(labels, coords, units='au')
+#                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+#                    e_minus1 = self.scf_drv.get_scf_energy()
+#
+#                    if self.dipole_deriv:
+#                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
+#                        mu_minus1 = prop.get_property('dipole moment')
+#
+#                    coords[i, d] -= self.delta_h
+#                    new_mol = Molecule(labels, coords, units='au')
+#                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
+#                    e_minus2 = self.scf_drv.get_scf_energy()
+#
+#                    if self.dipole_deriv:
+#                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
+#                        mu_minus2 = prop.get_property('dipole moment')
+#
+#                        for c in range(3):
+#                            self.dipole_gradient[c, i, d] = (mu_minus2[c] - 8.0 * mu_minus1[c]
+#                                                             + 8.0 * mu_plus1[c] - mu_plus2[c]) / (12.0 * self.delta_h)
+#
+#
+#                    coords[i, d] += 2.0 * self.delta_h
+#                    # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
+#                    self.gradient[i, d] = (e_minus2 - 8.0 * e_minus1
+#                                           + 8.0 * e_plus1 - e_plus2) / (12.0 * self.delta_h)
+#
+#        self.ostream.print_blank() # TODO: figure out if this is needed here.
+#
+#        self.scf_drv.compute(molecule, ao_basis, min_basis)
+#        self.scf_drv.ostream.state = scf_ostream_state
 
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
+
+    def init_drivers(self):
+        """
+        Silence the energy drivers and save the current ostream state.
+
+        :return:
+            The ostream state(s).
         """
 
         scf_ostream_state = self.scf_drv.ostream.state
         self.scf_drv.ostream.state = False
+        return scf_ostream_state
 
-        # atom labels
-        labels = molecule.get_labels()
+    def compute_energy(self, molecule, ao_basis, min_basis=None):
+        """
+        Compute the energy at current position
 
-        # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
-        # the number of atoms
-        natm = molecule.number_of_atoms()
-        # the number of atomic orbitals
-        # nao = self.scf_drv.scf_tensors["D_alpha"].shape[0]
+        :return:
+            The energy.
+        """
+        self.scf_drv.compute(molecule, ao_basis, min_basis)
 
-        self.gradient = np.zeros((natm, 3))
+        return self.scf_drv.get_scf_energy()
 
-        # Gradient of the exchange and correlation energy
-        # TODO: remove vxc numerical gradient
-        if self.dft:
-            self.xc_gradient = np.zeros((natm, 3))
-            # self.vxc_gradient = np.zeros((natm, 3, nao, nao))
+    def restore_drivers(self, molecule, ostream_state, ao_basis, min_basis=None):
+        """
+        Restore the energy drivers to their initial states.
 
-        # First-order properties for gradient of dipole moment
-        if self.dipole_deriv:
-            prop = FirstOrderProperties(self.comm, self.ostream)
-            # numerical gradient (3 dipole components x no. atoms x 3 atom coords)
-            self.dipole_gradient = np.zeros((3, natm, 3))
-
-        if not self.do_four_point:
-            for i in range(natm):
-                for d in range(3):
-                    coords[i, d] += self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    e_plus = self.scf_drv.get_scf_energy()
-                    # TODO: numerical derivative of the xc energy;
-                    # remove when analytical derivative is working.
-                    if self.dft:
-                        xc_plus = self.scf_drv.scf_tensors['xc_energy']
-                        # vxc_plus = self.scf_drv.scf_tensors['vxc_mat'].get_matrix().to_numpy()
-
-                    if self.dipole_deriv:
-                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
-                        mu_plus = prop.get_property('dipole moment')
-
-                    coords[i, d] -= 2.0 * self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    e_minus = self.scf_drv.get_scf_energy()
-                    # TODO: numerical derivative of the xc energy;
-                    # remove when analytical derivative is working.
-                    if self.dft:
-                        xc_minus = self.scf_drv.scf_tensors['xc_energy']
-                        # vxc_minus = self.scf_drv.scf_tensors['vxc_mat'].get_matrix().to_numpy()
-
-                    if self.dipole_deriv:
-                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
-                        mu_minus = prop.get_property('dipole moment')
-
-                        for c in range(3):
-                            self.dipole_gradient[c, i, d] = (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
-
-                    coords[i, d] += self.delta_h
-                    self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
-                    # TODO: numerical derivative of the xc energy;
-                    # remove when analytical derivative is working.
-                    if self.dft:
-                        self.xc_gradient[i, d] = (xc_plus - xc_minus) / (2.0 * self.delta_h)
-                        # self.vxc_gradient[i, d] = (vxc_plus - vxc_minus) / (2.0 * self.delta_h)
-        else:
-            # Four-point numerical derivative approximation
-            # for debugging of analytical gradient:
-            # [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
-            for i in range(natm):
-                for d in range(3):
-                    coords[i, d] += self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    e_plus1 = self.scf_drv.get_scf_energy()
-
-                    if self.dipole_deriv:
-                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
-                        mu_plus1 = prop.get_property('dipole moment')
-
-                    coords[i, d] += self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    e_plus2 = self.scf_drv.get_scf_energy()
-
-                    if self.dipole_deriv:
-                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
-                        mu_plus2 = prop.get_property('dipole moment')
-
-                    coords[i, d] -= 3.0 * self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    e_minus1 = self.scf_drv.get_scf_energy()
-
-                    if self.dipole_deriv:
-                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
-                        mu_minus1 = prop.get_property('dipole moment')
-
-                    coords[i, d] -= self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    e_minus2 = self.scf_drv.get_scf_energy()
-
-                    if self.dipole_deriv:
-                        prop.compute_scf_prop(new_mol, ao_basis, self.scf_drv.scf_tensors)
-                        mu_minus2 = prop.get_property('dipole moment')
-
-                        for c in range(3):
-                            self.dipole_gradient[c, i, d] = (mu_minus2[c] - 8.0 * mu_minus1[c]
-                                                             + 8.0 * mu_plus1[c] - mu_plus2[c]) / (12.0 * self.delta_h)
-
-
-                    coords[i, d] += 2.0 * self.delta_h
-                    # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
-                    self.gradient[i, d] = (e_minus2 - 8.0 * e_minus1
-                                           + 8.0 * e_plus1 - e_plus2) / (12.0 * self.delta_h)
-
-        self.ostream.print_blank() # TODO: figure out if this is needed here.
+        """
 
         self.scf_drv.compute(molecule, ao_basis, min_basis)
-        self.scf_drv.ostream.state = scf_ostream_state
+        self.scf_drv.ostream.state = ostream_state
 
