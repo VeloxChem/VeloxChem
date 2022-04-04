@@ -148,7 +148,7 @@ class TdhfGradientDriver(GradientDriver):
         start_time = tm.time()
 
         if self.numerical:
-            self.compute_numerical(molecule, basis, rsp_drv, min_basis)
+            self.compute_numerical(molecule, basis, rsp_drv, rsp_results, min_basis)
         else:
             self.compute_analytical(molecule, basis, rsp_results)
 
@@ -276,7 +276,7 @@ class TdhfGradientDriver(GradientDriver):
         self.scf_drv.ostream.state = False
         return scf_ostream_state
 
-    def compute_energy(self, molecule, basis, rsp_drv, min_basis=None):
+    def compute_energy(self, molecule, basis, rsp_drv, rsp_results=None, min_basis=None):
         """
         Computes the energy at the current position.
         
@@ -303,7 +303,7 @@ class TdhfGradientDriver(GradientDriver):
         return self.scf_drv.get_scf_energy() + exc_en
 
     def restore_drivers(self, molecule, ostream_state, basis, rsp_drv,
-                        min_basis=None):
+                        rsp_results=None, min_basis=None):
         """
         Restore the energy drivers to their initial states.
 
