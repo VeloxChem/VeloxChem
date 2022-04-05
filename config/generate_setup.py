@@ -389,6 +389,12 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
         gtest_lib += f"\nGST_LIB := -L{gtest_dir}"
         gtest_lib += f"\nGST_LIB += -Wl,-rpath,{gtest_dir} -lgtest"
         print(f"*** Checking GoogleTest... {gtest_root}")
+    else:
+        gtest_dir = os.getenv("GTESTLIB", "")
+        if gtest_dir:
+            use_gtest = True
+            gtest_lib = f"GST_LIB := -L{gtest_dir} -lgtest"
+            print(f"*** Checking GoogleTest... {gtest_dir}")
 
     # ==> write Makefile.setup <==
 

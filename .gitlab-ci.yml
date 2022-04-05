@@ -47,6 +47,8 @@ stages:
 monkey:build:
   extends: .monkey:setup
   stage: build
+  variables:
+    GTESTLIB: "/usr/lib/x86_64-linux-gnu"
   script:
     - python -m venv --clear venv
     - source venv/bin/activate
