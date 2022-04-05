@@ -334,12 +334,15 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
 
     # ==> xtb package <==
 
+    if is_conda and ("XTBHOME" not in os.environ):
+        os.environ["XTBHOME"] = sys.prefix
+
     xtb_root = os.getenv("XTBHOME", sys.prefix)
 
     # xtb include
-    xtb_inc = Path(xtb_root, "include")
+    xtb_inc = Path(xtb_root, "include", "xtb")
     if not xtb_inc.is_dir():
-        xtb_inc = Path(xtb_root, "include", "xtb")
+        xtb_inc = Path(xtb_root, "include")
     has_xtb_header = (xtb_inc / "xtb.h").is_file()
 
     # xtb library
@@ -366,24 +369,26 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
 
     # ==> google test <==
 
-    # use GTESTROOT for local from-source installations
-    # this env-var takes priority!
+    if is_conda and ("GTESTROOT" not in os.environ):
+        os.environ["GTESTROOT"] = sys.prefix
+
     gtest_root = os.getenv("GTESTROOT", None)
-    # use GTESTLIB for system-package (APT) installations
-    gtest_lib = os.getenv("GTESTLIB", None)
 
-    gtest_incdir = ""
-    gtest_libdir = ""
-    if gtest_root is not None:
-        if Path(gtest_root, "include").is_dir():
-            gtest_incdir = Path(gtest_root, "include")
-        if Path(gtest_root, "lib").is_dir():
-            gtest_libdir = Path(gtest_root, "lib")
-    else:
-        if gtest_lib is not None:
-            gtest_libdir = gtest_lib
+    # gtest include
+    gtest_inc = Path(gtest_root, "include")
+    has_gtest_header = (gtest_inc / "gtest" / "gtest.h").is_file()
 
-    print(f"*** Checking GoogleTest... {gtest_incdir} {gtest_libdir}")
+    # gtest library
+    gtest_dir = Path(gtest_root, "lib")
+    has_gtest_lib = ((gtest_dir / "libgtest.so").is_file() or
+                     (gtest_dir / "libgtest.dylib").is_file())
+
+    use_gtest = (has_gtest_header and has_gtest_lib)
+    if use_gtest:
+        gtest_lib = f"GST_INC := {gtest_inc}"
+        gtest_lib += f"\nGST_LIB := -L{gtest_dir}"
+        gtest_lib += f"\nGST_LIB += -Wl,-rpath,{gtest_dir} -lgtest"
+        print(f"*** Checking GoogleTest... {gtest_root}")
 
     # ==> write Makefile.setup <==
 
@@ -442,10 +447,8 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
                 if use_xtb:
                     print(xtb_lib, file=f_mkfile)
                     print("", file=f_mkfile)
-                if gtest_incdir:
-                    print(f"GST_INC := {gtest_incdir}", file=f_mkfile)
-                if gtest_libdir:
-                    print(f"GST_LIB := -L{gtest_libdir} -lgtest", file=f_mkfile)
+                if use_gtest:
+                    print(gtest_lib, file=f_mkfile)
                     print("", file=f_mkfile)
 
                 print("# Generic settings", file=f_mkfile)
