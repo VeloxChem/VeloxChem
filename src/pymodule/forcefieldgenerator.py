@@ -166,9 +166,14 @@ class ForceFieldGenerator:
             self.force_field_data = str(force_field_file)
 
         assert_msg_critical(
-            'gaff' in Path(self.force_field_data).name,
-            'ForceFieldGenerator: unrecognized force field. Only GAFF is supported.'
-        )
+            Path(self.force_field_data).is_file(),
+            f'ForceFieldGenerator: force field file {self.force_field_data} ' +
+            'does not exist')
+
+        assert_msg_critical(
+            'gaff' in Path(self.force_field_data).name.lower(),
+            'ForceFieldGenerator: unrecognized force field ' +
+            f'{self.force_field_data}. Only GAFF is supported.')
 
         if self.force_field_data_extension is None:
             ff_file = Path(self.force_field_data)
