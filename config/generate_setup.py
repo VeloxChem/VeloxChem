@@ -372,7 +372,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
     if is_conda and ("GTESTROOT" not in os.environ):
         os.environ["GTESTROOT"] = sys.prefix
 
-    gtest_root = os.getenv("GTESTROOT", None)
+    gtest_root = os.getenv("GTESTROOT", sys.prefix)
 
     # gtest include
     gtest_inc = Path(gtest_root, "include")
