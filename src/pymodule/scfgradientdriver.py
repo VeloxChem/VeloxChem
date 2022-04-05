@@ -24,7 +24,6 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-import numpy as np
 import time as tm
 import sys
 
@@ -67,7 +66,7 @@ class ScfGradientDriver(GradientDriver):
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
-        Performs calculation of numerical gradient.
+        Performs calculation of gradient.
 
         :param molecule:
             The molecule.
@@ -83,7 +82,7 @@ class ScfGradientDriver(GradientDriver):
         # atom labels
         labels = molecule.get_labels()
 
-        #Currently, only numerical gradients activated
+        # Currently, only numerical gradients activated
         self.compute_numerical(molecule, ao_basis, min_basis)
 
         # print gradient
@@ -96,12 +95,12 @@ class ScfGradientDriver(GradientDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def init_drivers(self):
+    def pre_numerical_gradient(self):
         """
-        Silence the energy drivers and save the current ostream state.
+        Silences the energy driver and save the current ostream state.
 
         :return:
-            The ostream state(s).
+            The ostream state.
         """
 
         scf_ostream_state = self.scf_drv.ostream.state
@@ -110,21 +109,39 @@ class ScfGradientDriver(GradientDriver):
 
     def compute_energy(self, molecule, ao_basis, min_basis=None):
         """
-        Compute the energy at current position
+        Computes the energy at current geometry.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param min_basis:
+            The minimal AO basis set.
 
         :return:
             The energy.
         """
-        self.scf_drv.compute(molecule, ao_basis, min_basis)
 
+        self.scf_drv.compute(molecule, ao_basis, min_basis)
         return self.scf_drv.get_scf_energy()
 
-    def restore_drivers(self, molecule, ostream_state, ao_basis, min_basis=None):
+    def post_numerical_gradient(self,
+                                ostream_state,
+                                molecule,
+                                ao_basis,
+                                min_basis=None):
         """
-        Restore the energy drivers to their initial states.
+        Restores the energy driver to initial state.
 
+        :param ostream_state:
+            The state of the energy driver's ostream.
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param min_basis:
+            The minimal AO basis set.
         """
 
         self.scf_drv.compute(molecule, ao_basis, min_basis)
         self.scf_drv.ostream.state = ostream_state
-

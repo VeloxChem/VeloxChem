@@ -23,9 +23,10 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-import time as tm
 import numpy as np
+
 from .molecule import Molecule
+
 
 class GradientDriver:
     """
@@ -65,6 +66,7 @@ class GradientDriver:
         """
 
         return
+
     def compute_numerical(self, molecule, *args):
         """
         Performs calculation of numerical gradient.
@@ -75,7 +77,7 @@ class GradientDriver:
             The same arguments as the "compute" function.
         """
 
-        ostream_state = self.init_drivers()
+        ostream_state = self.pre_numerical_gradient()
 
         # atom labels
         labels = molecule.get_labels()
@@ -101,20 +103,21 @@ class GradientDriver:
 
         self.ostream.print_blank()
 
-        self.restore_drivers(molecule, ostream_state, *args)
+        self.post_numerical_gradient(ostream_state, molecule, *args)
 
-
-    def init_drivers(self):
+    def pre_numerical_gradient(self):
         """
-        Silence the energy drivers and save the current ostream state.
+        Silences the energy drivers and save the current ostream state.
 
         :return:
-            The ostream state(s).
+            The ostream state.
         """
+
+        return
 
     def compute_energy(self, molecule, *args):
         """
-        Compute the energy at current position
+        Computes the energy at current geometry.
 
         :param molecule:
             The molecule.
@@ -125,18 +128,21 @@ class GradientDriver:
             The energy.
         """
 
-    def restore_drivers(self, molecule, ostream_state, *args):
+        return
+
+    def post_numerical_gradient(self, molecule, ostream_state, *args):
         """
-        Restore the energy drivers to their initial states.
+        Restores the energy driver to initial state.
 
         :param molecule:
             The molecule.
         :param ostream_state:
-            The previous ostream_state of the driver.
+            The previous state of the driver's ostream.
         :param args:
             The same arguments as the "compute" function.
-
         """
+
+        return
 
     def get_gradient(self):
         """

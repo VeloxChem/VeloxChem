@@ -100,17 +100,9 @@ class OptimizationEngine(geometric.engine.Engine):
         ostream_state = self.grad_drv.ostream.state
         self.grad_drv.ostream.state = False
 
-        energy = self.grad_drv.compute_energy(new_mol,*self.args)
+        energy = self.grad_drv.compute_energy(new_mol, *self.args)
         self.grad_drv.compute(new_mol, *self.args)
         gradient = self.grad_drv.get_gradient()
-
-        elif self.flag.upper() == 'OPENMM':
-            openmm_drv = self.grad_drv.openmm_drv
-            openmm_drv.compute(new_mol)
-            energy = openmm_drv.get_energy()
-
-            self.grad_drv.compute(new_mol)
-            gradient = self.grad_drv.get_gradient()
 
         self.grad_drv.ostream.state = ostream_state
 
