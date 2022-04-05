@@ -382,12 +382,14 @@ def main():
         if use_xtb:
             grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
             opt_drv = OptimizationDriver(grad_drv)
+            opt_drv.update_settings(opt_dict)
+            opt_drv.compute(task.molecule)
+
         elif scf_drv.scf_type == 'restricted':
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
             opt_drv = OptimizationDriver(grad_drv)
-
-        opt_drv.update_settings(opt_dict)
-        opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+            opt_drv.update_settings(opt_dict)
+            opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Response
 
