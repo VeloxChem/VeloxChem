@@ -77,7 +77,8 @@ class GradientDriver:
             The same arguments as the "compute" function.
         """
 
-        ostream_state = self.pre_numerical_gradient()
+        ostream_state = self.ostream.state
+        self.ostream.state = False
 
         # atom labels
         labels = molecule.get_labels()
@@ -103,17 +104,8 @@ class GradientDriver:
 
         self.ostream.print_blank()
 
-        self.post_numerical_gradient(ostream_state, molecule, *args)
-
-    def pre_numerical_gradient(self):
-        """
-        Silences the energy drivers and save the current ostream state.
-
-        :return:
-            The ostream state.
-        """
-
-        return
+        self.compute_energy(molecule, *args)
+        self.ostream.state = ostream_state
 
     def compute_energy(self, molecule, *args):
         """
@@ -126,20 +118,6 @@ class GradientDriver:
 
         :return:
             The energy.
-        """
-
-        return
-
-    def post_numerical_gradient(self, molecule, ostream_state, *args):
-        """
-        Restores the energy driver to initial state.
-
-        :param molecule:
-            The molecule.
-        :param ostream_state:
-            The previous state of the driver's ostream.
-        :param args:
-            The same arguments as the "compute" function.
         """
 
         return

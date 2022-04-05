@@ -95,18 +95,6 @@ class ScfGradientDriver(GradientDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def pre_numerical_gradient(self):
-        """
-        Silences the energy driver and save the current ostream state.
-
-        :return:
-            The ostream state.
-        """
-
-        scf_ostream_state = self.scf_drv.ostream.state
-        self.scf_drv.ostream.state = False
-        return scf_ostream_state
-
     def compute_energy(self, molecule, ao_basis, min_basis=None):
         """
         Computes the energy at current geometry.
@@ -124,24 +112,3 @@ class ScfGradientDriver(GradientDriver):
 
         self.scf_drv.compute(molecule, ao_basis, min_basis)
         return self.scf_drv.get_scf_energy()
-
-    def post_numerical_gradient(self,
-                                ostream_state,
-                                molecule,
-                                ao_basis,
-                                min_basis=None):
-        """
-        Restores the energy driver to initial state.
-
-        :param ostream_state:
-            The state of the energy driver's ostream.
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
-        """
-
-        self.scf_drv.compute(molecule, ao_basis, min_basis)
-        self.scf_drv.ostream.state = ostream_state
