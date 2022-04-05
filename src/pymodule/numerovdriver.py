@@ -83,6 +83,15 @@ class NumerovDriver:
         Initializes the Numerov driver.
         """
 
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
+
         # Potential energy curve (PEC) scan parameters
         self.pec_displacements = list(np.arange(-0.7, 2.01, 0.1))
         self.pec_potential = 'morse'
@@ -113,15 +122,11 @@ class NumerovDriver:
         self.is_converged = False
 
         # mpi information
-        if comm is None:
-            comm = MPI.COMM_WORLD
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-        # output streams
-        if ostream is None:
-            ostream = OutputStream(sys.stdout)
+        # output stream
         self.ostream = ostream
 
         # input keywords
