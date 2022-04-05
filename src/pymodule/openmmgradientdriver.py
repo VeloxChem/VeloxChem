@@ -83,3 +83,14 @@ class OpenMMGradientDriver(GradientDriver):
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def compute_energy(self, molecule):
+        """
+        Performs calculation of XTB energy.
+
+        :param molecule:
+            The molecule.
+        """
+
+        self.openmm_drv.compute(molecule)
+        return self.openmm_drv.get_energy()

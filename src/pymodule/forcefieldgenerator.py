@@ -1013,7 +1013,7 @@ class ForceFieldGenerator:
         grad_drv = OpenMMGradientDriver(openmm_drv, self.comm)
         grad_drv.ostream.state = False
 
-        opt_drv = OptimizationDriver(grad_drv, 'OpenMM')
+        opt_drv = OptimizationDriver(grad_drv)
         opt_drv.update_settings({
             'constraints': constraints,
             'filename': str(Path(top_file).parent / Path(top_file).stem),
