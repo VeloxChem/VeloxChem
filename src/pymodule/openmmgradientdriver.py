@@ -33,17 +33,21 @@ class OpenMMGradientDriver(GradientDriver):
 
     :param openmm_drv:
         The OpenMM driver.
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
 
     Instance variables
         - openmm_drv: The OpenMM driver.
     """
 
-    def __init__(self, openmm_drv):
+    def __init__(self, openmm_drv, comm=None, ostream=None):
         """
         Initializes OpenMM gradient driver.
         """
 
-        super().__init__(openmm_drv)
+        super().__init__(openmm_drv, comm, ostream)
 
         self.flag = 'OpenMM Gradient Driver'
         self.openmm_drv = openmm_drv

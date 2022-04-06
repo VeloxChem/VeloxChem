@@ -38,43 +38,50 @@ class GradientDriver:
 
     :param energy_drv:
         The energy driver.
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
 
     Instance variables
         - gradient: The gradient.
         - flag: The type of gradient driver.
     """
 
-    def __init__(self, energy_drv):
+    def __init__(self, energy_drv, comm=None, ostream=None):
         """
         Initializes gradient driver.
         """
 
-        if hasattr(energy_drv, "comm"):
-            self.comm = energy_drv.comm
-        else:
-            self.comm = MPI.COMM_WORLD
-
-        if hasattr(energy_drv, "ostream"):
-            self.ostream = energy_drv.ostream
-        else:
-            if self.comm.Get_rank() == mpi_master():
-                self.ostream = OutputStream(sys.stdout)
+        if comm is None:
+            if hasattr(energy_drv, 'comm'):
+                comm = energy_drv.comm
             else:
-                self.ostream = OutputStream(None)
+                comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            if hasattr(energy_drv, 'ostream'):
+                ostream = energy_drv.ostream
+            else:
+                if comm.Get_rank() == mpi_master():
+                    ostream = OutputStream(sys.stdout)
+                else:
+                    ostream = OutputStream(None)
+
+        self.comm = comm
+        self.ostream = ostream
 
         self.gradient = None
         self.flag = None
 
-    def compute(self, molecule, ao_basis=None, min_basis=None):
+    def compute(self, molecule, *args):
         """
         Performs calculation of numerical gradient.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
+        :param args:
+            The arguments.
         """
 
         return
@@ -88,9 +95,6 @@ class GradientDriver:
         :param args:
             The same arguments as the "compute" function.
         """
-
-        ostream_state = self.ostream.state
-        self.ostream.state = False
 
         # atom labels
         labels = molecule.get_labels()
@@ -114,10 +118,8 @@ class GradientDriver:
                 coords[i, d] += self.delta_h
                 self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
 
-        self.ostream.print_blank()
-
+        # restore energy driver
         self.compute_energy(molecule, *args)
-        self.ostream.state = ostream_state
 
     def compute_energy(self, molecule, *args):
         """

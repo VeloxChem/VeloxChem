@@ -34,18 +34,22 @@ class ScfGradientDriver(GradientDriver):
 
     :param scf_drv:
         The SCF driver.
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
 
     Instance variables
         - scf_drv: The SCF driver.
         - delta_h: The displacement for finite difference.
     """
 
-    def __init__(self, scf_drv):
+    def __init__(self, scf_drv, comm=None, ostream=None):
         """
         Initializes gradient driver.
         """
 
-        super().__init__(scf_drv)
+        super().__init__(scf_drv, comm, ostream)
 
         self.flag = 'SCF Gradient Driver'
         self.scf_drv = scf_drv
@@ -69,8 +73,13 @@ class ScfGradientDriver(GradientDriver):
         # atom labels
         labels = molecule.get_labels()
 
+        scf_ostream_state = self.scf_drv.ostream.state
+        self.scf_drv.ostream.state = False
+
         # Currently, only numerical gradients activated
         self.compute_numerical(molecule, ao_basis, min_basis)
+
+        self.scf_drv.ostream.state = scf_ostream_state
 
         # print gradient
         self.print_geometry(molecule)

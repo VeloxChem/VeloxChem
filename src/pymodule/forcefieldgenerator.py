@@ -1015,7 +1015,7 @@ class ForceFieldGenerator:
         openmm_drv = OpenMMDriver(self.comm)
         openmm_drv.add_topology(top_file, self.gromacs_include_path)
 
-        grad_drv = OpenMMGradientDriver(openmm_drv)
+        grad_drv = OpenMMGradientDriver(openmm_drv, self.comm)
         grad_drv.ostream.state = False
 
         opt_drv = OptimizationDriver(grad_drv)
