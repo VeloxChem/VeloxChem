@@ -23,32 +23,44 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
 import numpy as np
+import sys
 
+from .veloxchemlib import mpi_master
 from .molecule import Molecule
+from .outputstream import OutputStream
 
 
 class GradientDriver:
     """
     Implements gradient driver.
 
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
+    :param energy_drv:
+        The energy driver.
 
     Instance variables
         - gradient: The gradient.
         - flag: The type of gradient driver.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, energy_drv):
         """
         Initializes gradient driver.
         """
 
-        self.comm = comm
-        self.ostream = ostream
+        if hasattr(energy_drv, "comm"):
+            self.comm = energy_drv.comm
+        else:
+            self.comm = MPI.COMM_WORLD
+
+        if hasattr(energy_drv, "ostream"):
+            self.ostream = energy_drv.ostream
+        else:
+            if self.comm.Get_rank() == mpi_master():
+                self.ostream = OutputStream(sys.stdout)
+            else:
+                self.ostream = OutputStream(None)
 
         self.gradient = None
         self.flag = None

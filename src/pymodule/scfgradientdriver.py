@@ -23,12 +23,9 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from mpi4py import MPI
 import time as tm
-import sys
 
 from .gradientdriver import GradientDriver
-from .outputstream import OutputStream
 
 
 class ScfGradientDriver(GradientDriver):
@@ -37,28 +34,18 @@ class ScfGradientDriver(GradientDriver):
 
     :param scf_drv:
         The SCF driver.
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
 
     Instance variables
         - scf_drv: The SCF driver.
         - delta_h: The displacement for finite difference.
     """
 
-    def __init__(self, scf_drv, comm=None, ostream=None):
+    def __init__(self, scf_drv):
         """
         Initializes gradient driver.
         """
 
-        if comm is None:
-            comm = MPI.COMM_WORLD
-
-        if ostream is None:
-            ostream = OutputStream(sys.stdout)
-
-        super().__init__(comm, ostream)
+        super().__init__(scf_drv)
 
         self.flag = 'SCF Gradient Driver'
         self.scf_drv = scf_drv

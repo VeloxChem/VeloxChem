@@ -33,7 +33,7 @@ class TestOptimizeSCF:
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
+        grad_drv = ScfGradientDriver(scf_drv)
         opt_drv = OptimizationDriver(grad_drv)
         opt_drv.update_settings({
             'coordsys': 'tric',

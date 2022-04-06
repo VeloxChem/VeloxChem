@@ -23,12 +23,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from mpi4py import MPI
-import sys
-
 from .veloxchemlib import mpi_master
 from .gradientdriver import GradientDriver
-from .outputstream import OutputStream
 
 
 class OpenMMGradientDriver(GradientDriver):
@@ -37,30 +33,17 @@ class OpenMMGradientDriver(GradientDriver):
 
     :param openmm_drv:
         The OpenMM driver.
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
 
     Instance variables
         - openmm_drv: The OpenMM driver.
     """
 
-    def __init__(self, openmm_drv, comm=None, ostream=None):
+    def __init__(self, openmm_drv):
         """
         Initializes OpenMM gradient driver.
         """
 
-        if comm is None:
-            comm = MPI.COMM_WORLD
-
-        if ostream is None:
-            if comm.Get_rank() == mpi_master():
-                ostream = OutputStream(sys.stdout)
-            else:
-                ostream = OutputStream(None)
-
-        super().__init__(comm, ostream)
+        super().__init__(openmm_drv)
 
         self.flag = 'OpenMM Gradient Driver'
         self.openmm_drv = openmm_drv

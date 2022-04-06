@@ -359,10 +359,10 @@ def main():
 
     if task_type == 'gradient':
         if use_xtb:
-            grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
+            grad_drv = XTBGradientDriver(xtb_drv)
             grad_drv.compute(task.molecule)
         elif scf_drv.scf_type == 'restricted':
-            grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
+            grad_drv = ScfGradientDriver(scf_drv)
             grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Geometry optimization
@@ -380,13 +380,13 @@ def main():
         opt_dict['filename'] = task.input_dict['filename']
 
         if use_xtb:
-            grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
+            grad_drv = XTBGradientDriver(xtb_drv)
             opt_drv = OptimizationDriver(grad_drv)
             opt_drv.update_settings(opt_dict)
             opt_drv.compute(task.molecule)
 
         elif scf_drv.scf_type == 'restricted':
-            grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
+            grad_drv = ScfGradientDriver(scf_drv)
             opt_drv = OptimizationDriver(grad_drv)
             opt_drv.update_settings(opt_dict)
             opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)

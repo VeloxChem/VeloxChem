@@ -22,7 +22,7 @@ class TestOptimizeXTB:
         xtb_drv.set_method(xtb_method.lower())
         xtb_drv.compute(task.molecule, task.ostream)
 
-        grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
+        grad_drv = XTBGradientDriver(xtb_drv)
         opt_drv = OptimizationDriver(grad_drv)
         opt_drv.update_settings({
             'coordsys': 'tric',
