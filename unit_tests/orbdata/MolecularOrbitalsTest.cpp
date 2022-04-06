@@ -25,6 +25,8 @@
 
 #include "MolecularOrbitalsTest.hpp"
 
+#include <vector>
+
 #include "CheckFunctions.hpp"
 #include "MolecularBasisSetter.hpp"
 #include "MolecularOrbitals.hpp"

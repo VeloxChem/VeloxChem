@@ -229,7 +229,7 @@ CAOKohnShamMatrix::reduce_sum(int32_t  rank,
 void
 CAOKohnShamMatrix::collect(int32_t rank, int32_t nodes, MPI_Comm comm, int32_t source)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         std::string errsource("AOKohnShamMatrix.collect: Invalid rank for the source");
 

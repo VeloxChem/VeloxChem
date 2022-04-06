@@ -116,6 +116,7 @@ from .scffirstorderprop import ScfFirstOrderProperties
 from .orbitalviewer import OrbitalViewer
 from .impes import ImpesCoordinates
 from .impes import ImpesDriver
+from .numerovdriver import NumerovDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical

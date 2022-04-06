@@ -41,28 +41,34 @@ assertMsgCritical(const bool condition, const std::string& label)
 {
     if (!condition)
     {
-        std::stringstream sst;
-
-        sst << "**** Critical Error";
-
-        if (mpi::initialized() && mpi::nodes(MPI_COMM_WORLD) > 1)
-        {
-            sst << " (process " << mpi::rank(MPI_COMM_WORLD) << ")";
-        }
-
-        sst << " ****" << std::endl;
-
-        sst << "     " <<  label << std::endl << std::endl;
-
-        std::cerr << sst.str();
-
-        if (mpi::initialized() && mpi::nodes(MPI_COMM_WORLD) > 1)
-        {
-            MPI_Abort(MPI_COMM_WORLD, MPI_ERR_OTHER);
-        }
-
-        std::abort();
+	    msgCritical(label);
     }
+}
+
+void
+msgCritical(const std::string& label)
+{
+    std::stringstream sst;
+
+    sst << "**** Critical Error";
+
+    if (mpi::initialized() && mpi::nodes(MPI_COMM_WORLD) > 1)
+    {
+        sst << " (process " << mpi::rank(MPI_COMM_WORLD) << ")";
+    }
+
+    sst << " ****" << std::endl;
+
+    sst << "     " <<  label << std::endl << std::endl;
+
+    std::cerr << sst.str();
+
+    if (mpi::initialized() && mpi::nodes(MPI_COMM_WORLD) > 1)
+    {
+        MPI_Abort(MPI_COMM_WORLD, MPI_ERR_OTHER);
+    }
+
+    std::abort();
 }
 
 }  // namespace errors
