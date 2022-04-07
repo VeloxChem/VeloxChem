@@ -61,7 +61,7 @@ class TestForceField:
             ref_atom_inds = [1, 5, 8, 11]
             ref_funct_type = 3
             ref_parameters = np.array(
-                [4.83016, 10.77805, 0.02500, -15.02995, 1.99979, -2.70952])
+                [4.82579, 10.74424, 0.17548, -15.10881, 1.85225, -2.59463])
 
             new_itp_file = here / 'inputs' / 'butane_files' / 'butane_01.itp'
             with new_itp_file.open('r') as f_itp:

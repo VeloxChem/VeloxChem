@@ -687,7 +687,7 @@ class ForceFieldGenerator:
                     cur_str = '{:6}{:7}{:7}{:7}'.format(i + 1, j + 1, k + 1,
                                                         l + 1)
                     cur_str += '{:7}{:11.2f}{:11.5f}{:4}'.format(
-                        1, phase, barrier, abs(periodicity))
+                        9, phase, barrier, abs(periodicity))
                     cur_str += ' ; {}-{}-{}-{}\n'.format(
                         atom_names[i], atom_names[j], atom_names[k],
                         atom_names[l])
@@ -850,7 +850,7 @@ class ForceFieldGenerator:
                             f'{mol_name}_{self.ffversion:02d}.top')
 
         if itp_fname != new_itp_fname:
-            if self.comm == mpi_master():
+            if self.rank == mpi_master():
                 self.copy_file(Path(itp_fname), Path(new_itp_fname))
                 self.write_top(new_top_fname, new_itp_fname)
             self.comm.barrier()
@@ -868,7 +868,7 @@ class ForceFieldGenerator:
             zero_itp_file = output_dir / f'{mol_name}_zero.itp'
             zero_top_file = output_dir / f'{mol_name}_zero.top'
 
-            if self.comm == mpi_master():
+            if self.rank == mpi_master():
                 output_dir.mkdir(parents=True, exist_ok=True)
                 self.copy_file(Path(new_itp_fname), zero_itp_file)
                 self.write_top(zero_top_file, zero_itp_file)
@@ -880,7 +880,7 @@ class ForceFieldGenerator:
 
             # fitting Ryckaert-Bellemans function
 
-            if self.comm == mpi_master():
+            if self.rank == mpi_master():
                 rel_e_qm = np.array(qm_scan) - min(qm_scan)
                 rel_e_qm *= hartree_in_kcalpermol() * 4.184
                 rel_e_mm = np.array(mm_zero_scan) - min(mm_zero_scan)
@@ -978,7 +978,7 @@ class ForceFieldGenerator:
             local_itp_fname = str(output_dir / f'{i+1}.itp')
             local_top_fname = str(output_dir / f'{i+1}.top')
 
-            if self.comm == mpi_master():
+            if self.rank == mpi_master():
                 output_dir.mkdir(parents=True, exist_ok=True)
                 self.copy_file(Path(itp_fname), Path(local_itp_fname))
                 self.write_top(local_top_fname, local_itp_fname)
@@ -1055,17 +1055,18 @@ class ForceFieldGenerator:
             for line in f_itp:
                 title = line.split(';')[0].strip()
 
-                if re.search(dihedral_pattern, title):
-                    dihedral_flag = True
-                elif title.startswith('['):
-                    dihedral_flag = False
+                if title.startswith('['):
+                    if re.search(dihedral_pattern, title):
+                        dihedral_flag = True
+                    else:
+                        dihedral_flag = False
 
                 if dihedral_flag:
                     content = line.split()
                     try:
                         i, j, k, l, funct = tuple(
                             [int(content[n]) for n in range(5)])
-                        condition_1 = (funct in [1, 3])
+                        condition_1 = (funct in [1, 3, 9])
                         condition_2 = ([i, j, k, l] == dihedral or
                                        [l, k, j, i] == dihedral or
                                        [j, k] == dihedral[1:3] or
