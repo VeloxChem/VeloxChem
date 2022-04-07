@@ -389,12 +389,10 @@ class NumerovDriver:
         f_minimum_found = False
 
         # initiate unrestricted SCF driver
-        scf_drv = ScfUnrestrictedDriver(self.comm)
-        scf_drv.ostream.state = False
+        scf_drv = ScfUnrestrictedDriver(self.comm, OutputStream(None))
         scf_drv.update_settings(self.scf_dict, self.method_dict)
 
-        scf_prop = ScfFirstOrderProperties(self.comm)
-        scf_prop.ostream.state = False
+        scf_prop = ScfFirstOrderProperties(self.comm, OutputStream(None))
 
         # PEC scan
         self.print_PEC_header(scf_drv)
@@ -431,17 +429,16 @@ class NumerovDriver:
                 while not correct_state_found:
                     # twice the number of excited states to consider
                     # for unrestricted case
-                    rsp_drv = Absorption(
+                    rsp_prop = Absorption(
                         {
                             'nstates': 2 * excited_state - 1,
                             'conv_thresh': self.exc_conv_thresh
                         }, self.method_dict)
 
-                    rsp_drv.init_driver(self.comm)
-                    rsp_drv.ostream.state = False
-                    rsp_drv.compute(geometry, ao_basis, scf_drv.scf_tensors)
+                    rsp_prop.init_driver(self.comm, OutputStream(None))
+                    rsp_prop.compute(geometry, ao_basis, scf_drv.scf_tensors)
 
-                    total_energy = (rsp_drv.rsp_property['eigenvalues'][-1] +
+                    total_energy = (rsp_prop.rsp_property['eigenvalues'][-1] +
                                     scf_drv.iter_data[-1]['energy'])
 
                     # detect PEC minimum
@@ -461,7 +458,7 @@ class NumerovDriver:
 
                 # assume degeneracy
                 iso = 2.0 * np.sum(
-                    rsp_drv.rsp_property['electric_transition_dipoles'][-1]**2)
+                    rsp_prop.rsp_property['electric_transition_dipoles'][-1]**2)
                 average = np.sqrt(iso / 3.0)
                 props.append(np.array([average] * 3))
 
