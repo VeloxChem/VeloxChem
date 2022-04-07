@@ -72,6 +72,8 @@ class ScfHessianDriver(HessianDriver):
         - scf_drv: The SCF driver.
         - do_raman: Additionally calculate Raman intensities
                 (at significantly higher computational cost).
+        - pople_hessian: Evaluate the Hessian the Pople or
+                the Ahlrichs/Furche way.
     """
 
     def __init__(self, scf_drv, comm=None, ostream=None):
@@ -84,7 +86,7 @@ class ScfHessianDriver(HessianDriver):
         self.flag = 'SCF Hessian Driver'
         self.scf_drv = scf_drv
         self.do_raman = False
-        self.pople = False
+        self.pople_hessian = False
 
         # Solver setup
         self.conv_thresh = 1.0e-4
@@ -119,7 +121,11 @@ class ScfHessianDriver(HessianDriver):
             self.conv_thresh = float(cphf_dict['conv_thresh'])
 
         if 'max_iter' in cphf_dict:
-            self.max_iter = int(cphf_dict['max_iter']) 
+            self.max_iter = int(cphf_dict['max_iter'])
+
+        if 'pople_hessian' in freq_dict:
+            key = freq_dict['pople_hessian'].lower()
+            self.pople_hessian = True if key in ['yes', 'y'] else False
 
         # check if Raman intensities are to be calculated (numerically)
         if 'do_raman' in freq_dict:
@@ -193,6 +199,7 @@ class ScfHessianDriver(HessianDriver):
         nocc = molecule.number_of_alpha_electrons()
         mo_occ = mo[:, :nocc]
         mo_vir = mo[:, nocc:]
+        nvir = mo_vir.shape[1]
         mo_energies = scf_tensors['E']
         eocc = mo_energies[:nocc]
         eoo = eocc.reshape(-1, 1) + eocc #ei+ej
@@ -205,7 +212,7 @@ class ScfHessianDriver(HessianDriver):
 
         # Solve the CPHF equations
         cphf_solution_dict = cphf_solver.compute(molecule, ao_basis, scf_tensors)
-        cphf_ov = cphf_solution_dict['cphf_ov']
+        cphf_ov = cphf_solution_dict['cphf_ov'].reshape(natm, 3, nocc, nvir)
         ovlp_deriv_oo = cphf_solution_dict['ovlp_deriv_oo']
 
         # Calculate the perturbed density matrix
@@ -219,7 +226,7 @@ class ScfHessianDriver(HessianDriver):
                             )
 
         # Parts related to first-order integral derivatives
-        if self.pople:
+        if self.pople_hessian:
             fock_uij = cphf_solution_dict['fock_uij']
             fock_deriv_ao = cphf_solution_dict['fock_deriv_ao']
             fock_deriv_oo = np.einsum('mi,xymn,nj->xyij', mo_occ, fock_deriv_ao, mo_occ)
@@ -230,7 +237,7 @@ class ScfHessianDriver(HessianDriver):
                                               fock_deriv_oo, orben_ovlp_deriv_oo, perturbed_density,
                                               profiler)
         else:
-            cphf_rhs = cphf_solution_dict['cphf_rhs']
+            cphf_rhs = cphf_solution_dict['cphf_rhs'].reshape(natm, 3, nocc, nvir)
             hessian_first_order_derivatives = self.compute_furche(molecule, ao_basis,
                                                          cphf_rhs, -0.5 * ovlp_deriv_oo, cphf_ov,
                                                          profiler)

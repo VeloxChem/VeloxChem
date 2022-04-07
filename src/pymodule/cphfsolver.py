@@ -63,7 +63,7 @@ class CphfSolver(LinearSolver):
         The output stream.
 
     Instance variables
-        - use_subspace_solver: flag to use subspace solver 
+        - use_subspace_solver: flag to use subspace solver
           instead of conjugate gradient.
     ##    - a_operator: The A operator.
     ##    - frequencies: The frequencies.
@@ -210,12 +210,18 @@ class CphfSolver(LinearSolver):
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors)
 
         if self.rank == mpi_master():
-            cphf_rhs = cphf_rhs_dict['cphf_rhs'].reshape(3*natm, nocc*nvir)
-            ovlp_deriv_oo = cphf_rhs_dict['ovlp_deriv_oo']
-            fock_deriv_ao = cphf_rhs_dict['fock_deriv_ao']
-            fock_uij_numpy = cphf_rhs_dict['fock_uij']
+            # get rhs, find out how many degrees of freedom, and reshape
+            cphf_rhs = cphf_rhs_dict['cphf_rhs'] #.reshape(3*natm, nocc*nvir)
+            dof = cphf_rhs.shape[0]
+            cphf_rhs = cphf_rhs.reshape(dof, nocc * nvir)
+            #ovlp_deriv_oo = cphf_rhs_dict['ovlp_deriv_oo']
+            #fock_deriv_ao = cphf_rhs_dict['fock_deriv_ao']
+            #fock_uij_numpy = cphf_rhs_dict['fock_uij']
         else:
-            cphf_rhs = None 
+            cphf_rhs = None
+            dof = None
+
+        dof = self.comm.bcast(dof, root=mpi_master())
 
         self.profiler.stop_timer('CPHF RHS')
 
@@ -229,8 +235,8 @@ class CphfSolver(LinearSolver):
 
         # create list of distributed arrays for RHS
         dist_rhs = []
-        # TODO: are these loops over 3*natm (all coordinates) really efficient?
-        for k in range(3 * natm):
+        # TODO: are these loops over all degrees of freedom really efficient?
+        for k in range(dof):
             if self.rank == mpi_master():
                 cphf_rhs_k = cphf_rhs[k]
             else:
@@ -244,9 +250,9 @@ class CphfSolver(LinearSolver):
         self.build_sigmas(molecule, basis, scf_tensors, dist_trials)
 
         # lists that will hold the solutions and residuals
-        solutions = list(np.zeros((3*natm)))
-        residuals = list(np.zeros((3*natm)))
-        relative_residual_norm = np.ones((3*natm))
+        solutions = list(np.zeros((dof)))
+        residuals = list(np.zeros((dof)))
+        relative_residual_norm = np.ones((dof))
 
         # start iterations
         for iteration in range(self.max_iter):
@@ -261,7 +267,7 @@ class CphfSolver(LinearSolver):
             self.cur_iter = iteration
             num_vecs = self.dist_trials.shape(1)
 
-            for x in range(3 * natm):
+            for x in range(dof):
                 if (iteration > 0 and
                         relative_residual_norm[x] < self.conv_thresh):
                     continue
@@ -365,22 +371,22 @@ class CphfSolver(LinearSolver):
         # transform Distributed arrays into numpy arrays
         # TODO: decide whether using Distributed arrays in
         # ScfHessianDriver is more convenient/efficient etc.
-        
-            cphf_ov = np.zeros((natm, 3, nocc, nvir))
-    
-        for i in range(natm):
-            for x in range(3):
-                sol = solutions[3*i+x].get_full_vector(0)
-                if self.rank == mpi_master():
-                    cphf_ov[i,x] = sol.reshape(nocc,nvir)
-    
+
+            cphf_ov = np.zeros((dof, nocc, nvir))
+
+        for i in range(dof):
+            sol = solutions[i].get_full_vector(0)
+            if self.rank == mpi_master():
+                cphf_ov[i] = sol.reshape(nocc, nvir)
+
+        # merge the rhs dict with the solution
         if self.rank == mpi_master():
-            return {
+            return {**cphf_rhs_dict,
                 'cphf_ov': cphf_ov,
-                'cphf_rhs': cphf_rhs.reshape(natm,3,nocc,nvir),
-                'ovlp_deriv_oo': ovlp_deriv_oo,
-                'fock_deriv_ao': fock_deriv_ao,
-                'fock_uij': fock_uij_numpy,
+                #'cphf_rhs': cphf_rhs.reshape(natm,3,nocc,nvir),
+                #'ovlp_deriv_oo': ovlp_deriv_oo,
+                #'fock_deriv_ao': fock_deriv_ao,
+                #'fock_uij': fock_uij_numpy,
             }
         return None
 
@@ -508,7 +514,7 @@ class CphfSolver(LinearSolver):
             self.dist_trials.append(dist_trials, axis=1)
 
 
-    def setup_trials(self, molecule, dist_precond, dist_rhs, old_trials=None, 
+    def setup_trials(self, molecule, dist_precond, dist_rhs, old_trials=None,
                      renormalize=True):
         """
         Set up trial vectors and apply preconditioner to them.
@@ -535,16 +541,16 @@ class CphfSolver(LinearSolver):
         trials = []
 
         n = len(dist_rhs)
-        
+
         for k in range(n):
             v = DistributedArray(dist_precond.data * dist_rhs[k].data,
                                  self.comm, distribute=False)
             norm = np.sqrt(v.squared_norm())
-            
+
             if norm > 1e-10: # small_thresh of lrsolver
                 trials.append(v.data[:])
-            
-        dist_trials = DistributedArray(np.array(trials).T, 
+
+        dist_trials = DistributedArray(np.array(trials).T,
                                        self.comm, distribute=False)
 
         if dist_trials.data.size == 0:
@@ -555,14 +561,14 @@ class CphfSolver(LinearSolver):
             #bT_new_trials = old_trials.matmul_AtB_allreduce(dist_trials)
             #dist_trials_proj = dist_trials.matmul_AB_no_gather(bT_new_trials)
             #dist_trials.data -= dist_trials_proj.data
-            
+
             # b b.T
             bT_new_trials = np.matmul(old_trials.data, old_trials.data.T)
             # (b b.T) t
             dist_trials_proj = np.matmul(bT_new_trials, dist_trials.data)
             # t = t - (b b.T) t
             dist_trials.data -= dist_trials_proj
- 
+
 
         # remove linear dependencies and orthonormalize trial vectors
         if renormalize:
@@ -659,23 +665,24 @@ class CphfSolver(LinearSolver):
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors)
 
         if self.rank == mpi_master():
-            cphf_rhs = cphf_rhs_dict['cphf_rhs'].reshape(3*natm, nocc*nvir)
-            ovlp_deriv_oo = cphf_rhs_dict['ovlp_deriv_oo']
-            fock_deriv_ao = cphf_rhs_dict['fock_deriv_ao']
-            fock_uij_numpy = cphf_rhs_dict['fock_uij']
+            cphf_rhs = cphf_rhs_dict['cphf_rhs'] #.reshape(3*natm, nocc*nvir)
+            dof = cphf_rhs.shape[0]
+            #ovlp_deriv_oo = cphf_rhs_dict['ovlp_deriv_oo']
+            #fock_deriv_ao = cphf_rhs_dict['fock_deriv_ao']
+            #fock_uij_numpy = cphf_rhs_dict['fock_uij']
         else:
-            cphf_rhs = None 
+            cphf_rhs = None
 
         self.profiler.stop_timer('CPHF RHS')
 
         cphf_rhs = self.comm.bcast(cphf_rhs, root=mpi_master())
 
-        cphf_ov = np.zeros((natm, 3, nocc, nvir))
+        #cphf_ov = np.zeros((dof, nocc, nvir))
 
         # Solve the CPHF equations using conjugate gradient (cg)
         cphf_ov = self.solve_cphf_cg(molecule, basis, scf_tensors,
-                                  cphf_rhs.reshape(3*natm, nocc, nvir), # TODO: possibly change the shape
-                                  dft_dict)
+                                  cphf_rhs #.reshape(3*natm, nocc, nvir), # TODO: possibly change the shape
+                                  )
 
         self.profiler.stop_timer('Total CG')
         self.profiler.print_timing(self.ostream)
@@ -688,18 +695,20 @@ class CphfSolver(LinearSolver):
             self.ostream.print_blank()
             self.print_convergence('Coupled-Perturbed Hartree-Fock')
 
-            return {
-                'cphf_ov': cphf_ov,
-                'cphf_rhs': cphf_rhs.reshape(natm,3,nocc,nvir),
-                'ovlp_deriv_oo': ovlp_deriv_oo,
-                'fock_deriv_ao': fock_deriv_ao,
-                'fock_uij': fock_uij_numpy,
-            }
-        
+            # merge the rhs dict with the solution
+            cphf_ov_dict = {**cphf_rhs_dict, 'cphf_ov': cphf_ov}
+
+            return cphf_ov_dict
+                #'cphf_ov': cphf_ov,
+                #'cphf_rhs': cphf_rhs.reshape(natm,3,nocc,nvir),
+                #'ovlp_deriv_oo': ovlp_deriv_oo,
+                #'fock_deriv_ao': fock_deriv_ao,
+                #'fock_uij': fock_uij_numpy,
+
         return None
 
 
-    def solve_cphf_cg(self, molecule, basis, scf_tensors, cphf_rhs, dft_dict):
+    def solve_cphf_cg(self, molecule, basis, scf_tensors, cphf_rhs):
         """
         Solves the CPHF equations using conjugate gradient
         for all atomic coordinates to obtain the ov block
@@ -862,7 +871,7 @@ class CphfSolver(LinearSolver):
 
         self.is_converged = (cg_conv == 0)
 
-        return cphf_coefficients_ov.reshape(int(dof/3), 3, nocc, nvir)
+        return cphf_coefficients_ov #.reshape(int(dof/3), 3, nocc, nvir)
 
 
 
@@ -914,7 +923,7 @@ class CphfSolver(LinearSolver):
             self.profiler.stop_timer('derivs')
 
             # transform integral derivatives to MO basis
-            ovlp_deriv_ov = np.einsum('mi,xymn,na->xyia', mo_occ, 
+            ovlp_deriv_ov = np.einsum('mi,xymn,na->xyia', mo_occ,
                                       ovlp_deriv_ao, mo_vir)
             ovlp_deriv_oo = np.einsum('mi,xymn,nj->xyij', mo_occ,
                                       ovlp_deriv_ao, mo_occ)
@@ -923,9 +932,9 @@ class CphfSolver(LinearSolver):
             orben_ovlp_deriv_ov = np.einsum('i,xyia->xyia', eocc, ovlp_deriv_ov)
 
             # the oo part of the CPHF coefficients in AO basis,
-            # transforming the oo overlap derivative back to AO basis 
+            # transforming the oo overlap derivative back to AO basis
             # (not equal to the initial one)
-            uij_ao = np.einsum('mi,axij,nj->axmn', mo_occ, 
+            uij_ao = np.einsum('mi,axij,nj->axmn', mo_occ,
                        -0.5 * ovlp_deriv_oo, mo_occ).reshape((3*natm, nao, nao))
             uij_ao_list = list([uij_ao[x] for x in range(natm * 3)])
 
@@ -976,7 +985,7 @@ class CphfSolver(LinearSolver):
             cphf_rhs = (fock_deriv_ov - orben_ovlp_deriv_ov
                         + 2 * fock_uij_mo)
             return {
-                'cphf_rhs': cphf_rhs,
+                'cphf_rhs': cphf_rhs.reshape(3*natm, nocc, nvir),
                 'ovlp_deriv_oo': ovlp_deriv_oo,
                 'fock_deriv_ao': fock_deriv_ao,
                 'fock_uij': fock_uij_numpy,
@@ -1027,8 +1036,8 @@ class CphfSolver(LinearSolver):
             power = int(str(self.conv_thresh).split("-")[1]) + 1
         else:
             power = 5
-        residual_norm_string = 'Residual Norm: {:.%df}' % (power)    
-    
+        residual_norm_string = 'Residual Norm: {:.%df}' % (power)
+
         for i in range(natm):
             for x in range(3):
                 coord_label = '{:16s}'.format('   '+str(i+1)+' '
