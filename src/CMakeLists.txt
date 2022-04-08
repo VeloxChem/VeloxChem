@@ -39,6 +39,7 @@ set_target_properties(vlxobjs
     POSITION_INDEPENDENT_CODE 1
   )
 
+add_subdirectory(device)
 add_subdirectory(dft)
 add_subdirectory(dftfuncs)
 add_subdirectory(general)

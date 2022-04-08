@@ -3,7 +3,6 @@ target_sources(vlxobjs
     Codata.cpp
     ErrorHandler.cpp
     FourIndexes.cpp
-    MemAlloc.cpp
     MpiFunc.cpp
     OMPTasks.cpp
     StringFormat.cpp

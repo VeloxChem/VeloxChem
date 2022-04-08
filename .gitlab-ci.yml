@@ -93,11 +93,10 @@ monkey:deploy:
       when: never
     - if: '$CI_COMMIT_TITLE =~ /\[conda-build\]/i'
   script:
-    - export PATH=/home/roberto/Software/cmake-3.19.6/bin:$PATH
-    - cmake -S. -Bbuild_deploy -DPython_EXECUTABLE=$(type -P python3)
+    - python -m pip install numpy pybind11 mpi4py requests --no-binary=mpi4py
+    - cmake -S. -Bbuild_deploy -DPython_EXECUTABLE=$(type -P python)
     - cmake --build build_deploy --target package_source
-    - python3 -m pip install requests  # though it appears to be already installed
-    - python3 .gitlab/trigger.py
+    - python .gitlab/trigger.py
         --tarball "$TARBALL"
         --url "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/$TARBALL"
   artifacts:

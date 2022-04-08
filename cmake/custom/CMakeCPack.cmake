@@ -29,6 +29,7 @@ list(APPEND _to_ignore
   "todo.org"
   "\.envrc"
   "/\.ccls-cache/"
+  "/venv/"
   )
 set(CPACK_SOURCE_IGNORE_FILES
   ${_to_ignore}

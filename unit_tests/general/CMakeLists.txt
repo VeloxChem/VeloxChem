@@ -1,5 +1,6 @@
 target_sources(utests
   PRIVATE
+    CBufferTest.cpp
     CodataTest.cpp
     ErrorHandlerTest.cpp
     FourIndexesTest.cpp
