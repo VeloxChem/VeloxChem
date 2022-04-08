@@ -86,7 +86,7 @@ class TdhfGradientDriver(GradientDriver):
 
         :param grad_dict:
             The input dictionary of gradient settings group.
-        :param orbrsp_dict: 
+        :param orbrsp_dict:
             The input dictionary of orbital response settings group.
         :param rsp_dict:
             The input dictionary of response settings  group.
@@ -156,7 +156,7 @@ class TdhfGradientDriver(GradientDriver):
             # print gradient
             self.print_geometry(molecule)
             self.print_gradient(molecule)
-    
+
             valstr = '*** Time spent in gradient calculation: '
             valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
             self.ostream.print_header(valstr)
@@ -246,7 +246,7 @@ class TdhfGradientDriver(GradientDriver):
             if 'relaxed_density_ao' in orbrsp_results:
                 rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
                                orbrsp_results['relaxed_density_ao'])
-                # TODO: consider computing the relaxed dipole moment in parallel? 
+                # TODO: consider computing the relaxed dipole moment in parallel?
                 firstorderprop.compute(molecule, basis, rel_density)
                 self.relaxed_dipole_moment = firstorderprop.get_property('dipole moment')
 

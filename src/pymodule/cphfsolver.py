@@ -128,7 +128,7 @@ class CphfSolver(LinearSolver):
 ##        parse_input(self, rsp_keywords, rsp_dict)
 
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, scf_tensors, *args):
         """
         Performs CPHF calculation for a molecule and a basis set.
 
@@ -138,6 +138,8 @@ class CphfSolver(LinearSolver):
             The AO basis set.
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
+		:param *args:
+			Additional arguments, same as in compute_rhs.
 
         :return:
             A dictionary containing the RHS and solution (ov block)
@@ -158,12 +160,12 @@ class CphfSolver(LinearSolver):
             self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
 
         if self.use_subspace_solver:
-            return self.compute_subspace_solver(molecule, basis, scf_tensors)
+            return self.compute_subspace_solver(molecule, basis, scf_tensors, *args)
         else:
-            return self.compute_conjugate_gradient(molecule, basis, scf_tensors)
+            return self.compute_conjugate_gradient(molecule, basis, scf_tensors, *args)
 
 
-    def compute_subspace_solver(self, molecule, basis, scf_tensors):
+    def compute_subspace_solver(self, molecule, basis, scf_tensors, *args):
         """
         Performs CPHF calculation for a molecule and a basis set.
 
@@ -207,7 +209,7 @@ class CphfSolver(LinearSolver):
         natm =  molecule.number_of_atoms()
         nvir = nmo - nocc
 
-        cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors)
+        cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, *args)
 
         if self.rank == mpi_master():
             # get rhs, find out how many degrees of freedom, and reshape
@@ -605,7 +607,7 @@ class CphfSolver(LinearSolver):
                                             root=mpi_master())
 
 
-    def compute_conjugate_gradient(self, molecule, basis, scf_tensors):
+    def compute_conjugate_gradient(self, molecule, basis, scf_tensors, *args):
         """
         Computes the coupled-perturbed Hartree-Fock (CPHF) coefficients.
 
@@ -662,7 +664,7 @@ class CphfSolver(LinearSolver):
         natm =  molecule.number_of_atoms()
         nvir = nmo - nocc
 
-        cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors)
+        cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, *args)
 
         if self.rank == mpi_master():
             cphf_rhs = cphf_rhs_dict['cphf_rhs'] #.reshape(3*natm, nocc*nvir)
@@ -722,8 +724,6 @@ class CphfSolver(LinearSolver):
             The tensors from the converged SCF calculation.
         :param cphf_rhs:
             The right-hand side of the CPHF equations for all atomic coordinates.
-        :param dft_dict:
-            The dictionary of DFT settings.
 
         :returns:
             The ov block of the CPHF coefficients.
@@ -871,7 +871,7 @@ class CphfSolver(LinearSolver):
 
         self.is_converged = (cg_conv == 0)
 
-        return cphf_coefficients_ov #.reshape(int(dof/3), 3, nocc, nvir)
+        return cphf_coefficients_ov.reshape(dof, nocc, nvir)
 
 
 
