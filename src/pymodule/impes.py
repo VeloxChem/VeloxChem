@@ -314,7 +314,7 @@ class ImpesCoordinates:
                 j += 1
             i += 1
 
-    def transform_gradient_to_r(self):
+    def transform_to_r(self):
         """
         Returns the internal gradient transformed from 
         using the inverse bond length 1/R to using R.
@@ -331,13 +331,30 @@ class ImpesCoordinates:
         n_atoms = self.cartesian_coordinates.shape[0]
         coords = self.cartesian_coordinates.reshape((3*n_atoms))
         gradient_in_r = self.internal_gradient.copy()
+        hessian_in_r = self.internal_hessian.copy()
         i = 0
         for z in self.z_matrix:
+            j = 0
             if len(z) == 2:
                 r = self.internal_coordinates[i].value(coords)
                 gradient_in_r[i] /= -r**2
+            for t in self.z_matrix:
+                # TODO: *** TEST FOR BIG MOLECULES ***
+                if i == j and len(z) == 2:
+                    r = self.internal_coordinates[j].value(coords)
+                    hessian_in_r[i, j] -= (
+                                        - 2.0 * r * self.internal_gradient[i]
+                                        )
+                if len(z) == 2:
+                    r = self.internal_coordinates[i].value(coords)
+                    hessian_in_r[i, j] /= -r**2
+                if len(t) == 2:
+                    r = self.internal_coordinates[j].value(coords)
+                    hessian_in_r[i, j] /= -r**2
+
+                j += 1
             i += 1
-        return gradient_in_r
+        return gradient_in_r, hessian_in_r
 
     def transform_gradient_and_hessian(self, z_matrix=None):
         """
@@ -860,15 +877,15 @@ class ImpesDriver():
         dist = (   self.impes_coordinate.internal_coordinates_array 
                  - data_point.internal_coordinates_array )
 
-        dist_hessian = np.matmul(dist.T, hessian)
         b_matrix = self.impes_coordinate.b_matrix
 
         if self.r_inverse:
-            # retrun the gradient transformed to r.
+            # trnasform gradient and hessian back to r.
             # this is required to be able to then transform
             # to the Cartesian gradient.
-            grad = data_point.transform_gradient_to_r()
+            grad, hessian = data_point.transform_to_r()
 
+        dist_hessian = np.matmul(dist.T, hessian)
         gradient = ( np.matmul(b_matrix.T, grad + dist_hessian)
                         ).reshape(natm, 3)
 
