@@ -108,6 +108,9 @@ class ForceFieldGenerator:
         # number of rounds for fitting dihedral potentials
         self.n_rounds = 3
 
+        self.partial_charges = None
+        self.original_top_file = None
+
         # MM settings
         self.gromacs_include_path = None
 
@@ -157,6 +160,8 @@ class ForceFieldGenerator:
             'force_field_data': 'str',
             'force_field_data_extension': 'str',
             'n_rounds': 'int',
+            'partial_charges': 'seq_fixed',
+            'original_top_file': 'str',
         }
 
         parse_input(self, ffg_keywords, ffg_dict)
@@ -217,9 +222,11 @@ class ForceFieldGenerator:
 
         # RESP charges
 
-        resp_drv = RespChargesDriver(self.comm, self.ostream)
-        resp_drv.update_settings(self.resp_dict)
-        resp_chg = resp_drv.compute(self.molecule, basis, 'resp')
+        if self.partial_charges is None and self.original_top_file is None:
+            resp_drv = RespChargesDriver(self.comm, self.ostream)
+            resp_drv.update_settings(self.resp_dict)
+            self.partial_charges = resp_drv.compute(self.molecule, basis,
+                                                    'resp')
 
         # read QM scan
 
@@ -241,16 +248,28 @@ class ForceFieldGenerator:
         mol_name = Path(self.molecule_name).stem
 
         self.ffversion = 0
-        original_itp_file = self.workdir / (mol_name +
-                                            f'_{self.ffversion:02d}.itp')
-        original_top_file = original_itp_file.with_suffix('.top')
 
-        if self.rank == mpi_master():
-            self.workdir.mkdir(parents=True, exist_ok=True)
-            self.write_original_itp(original_itp_file, list(self.atom_types),
-                                    resp_chg)
-            self.write_top(original_top_file, original_itp_file)
-        self.comm.barrier()
+        if self.original_top_file is None:
+            original_itp_file = self.workdir / (mol_name +
+                                                f'_{self.ffversion:02d}.itp')
+            original_top_file = original_itp_file.with_suffix('.top')
+
+            if self.rank == mpi_master():
+                self.workdir.mkdir(parents=True, exist_ok=True)
+                self.write_original_itp(original_itp_file,
+                                        list(self.atom_types),
+                                        self.partial_charges)
+                self.write_top(original_top_file, original_itp_file)
+            self.comm.barrier()
+
+        else:
+            original_top_file = Path(self.original_top_file)
+
+        self.ostream.print_blank()
+        self.ostream.print_info(
+            f'Original topology file: {str(original_top_file)}')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
         # validate original force field
 
@@ -562,17 +581,12 @@ class ForceFieldGenerator:
                 errmsg += ' is not available'
                 assert_msg_critical(bond_found, errmsg)
 
-                if abs(r - r_eq) > self.r_thresh:
-                    msg_1 = f'*** Warning: bond length {at_1}-{at_2}'
-                    msg_1 += ' does not match length in XYZ file'
-                    msg_2 = f'             (atoms {i+1},{j+1}:'
-                    msg_2 += f' {r:.3f} vs. {r_eq:.3f})'
-                    self.ostream.print_header(msg_1.ljust(80))
-                    self.ostream.print_header(msg_2.ljust(80))
-                    self.ostream.print_blank()
-                    self.ostream.flush()
-
                 if self.eq_param:
+                    if abs(r - r_eq) > self.r_thresh:
+                        msg = f'Updated bond length {i+1}-{j+1} '
+                        msg += f'({at_1}-{at_2}) to {r_eq:.3f} nm'
+                        self.ostream.print_info(msg)
+                        self.ostream.flush()
                     r = r_eq
 
                 cur_str = '{:6}{:7}{:7}{:14.4e}{:14.4e} ; {}-{}\n'.format(
@@ -622,17 +636,12 @@ class ForceFieldGenerator:
                 errmsg += ' is not available.'
                 assert_msg_critical(angle_found, errmsg)
 
-                if abs(theta - theta_eq) > self.theta_thresh:
-                    msg_1 = f'*** Warning: angle {at_1}-{at_2}-{at_3}'
-                    msg_1 += ' does not match angle in XYZ file'
-                    msg_2 = f'             (atoms no. {i+1},{j+1},{k+1}:'
-                    msg_2 += f' {theta:.1f} vs. {theta_eq:.1f})'
-                    self.ostream.print_header(msg_1.ljust(80))
-                    self.ostream.print_header(msg_2.ljust(80))
-                    self.ostream.print_blank()
-                    self.ostream.flush()
-
                 if self.eq_param:
+                    if abs(theta - theta_eq) > self.theta_thresh:
+                        msg = f'Updated bond angle {i+1}-{j+1}-{k+1} '
+                        msg += f'({at_1}-{at_2}-{at_3}) to {theta_eq:.1f} deg'
+                        self.ostream.print_info(msg)
+                        self.ostream.flush()
                     theta = theta_eq
 
                 cur_str = '{:6}{:7}{:7}{:7}{:14.4e}{:14.4e}'.format(
@@ -827,7 +836,8 @@ class ForceFieldGenerator:
             The destination of copy.
         """
 
-        dest.write_text(src.read_text())
+        if (not dest.is_file()) or (not src.samefile(dest)):
+            dest.write_text(src.read_text())
 
     def dihedral_correction(self, top_file, i):
         """
@@ -911,6 +921,7 @@ class ForceFieldGenerator:
         self.comm.barrier()
 
         self.ostream.print_info('...done.')
+        self.ostream.print_blank()
         self.ostream.print_info(f'Generated new topology file: {new_top_fname}')
         self.ostream.print_blank()
         self.ostream.flush()
@@ -930,8 +941,7 @@ class ForceFieldGenerator:
             A dictionary containing the results of validation.
         """
 
-        self.ostream.print_info(f'Validating force field...')
-        self.ostream.print_info(f'  {str(top_file)}')
+        self.ostream.print_info(f'Validating {str(top_file)} ...')
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -949,10 +959,15 @@ class ForceFieldGenerator:
         qm_scan = np.array(self.scan_energies[i]) - min(self.scan_energies[i])
         qm_scan *= hartree_in_kcalpermol() * 4.184
 
-        rmsd = np.sqrt(np.linalg.norm(qm_scan - mm_scan)**2 / qm_scan.size)
-
-        self.ostream.print_info('  --------------------------------')
-        self.ostream.print_info(f'  RMSD from QM {rmsd:12.3f} kJ/mol')
+        self.ostream.print_blank()
+        self.ostream.print_info(
+            '      Dihedral      MM energy(rel)      QM energy(rel)       diff')
+        self.ostream.print_info(
+            '  ---------------------------------------------------------------')
+        for angle, e_mm, e_qm in zip(angles, mm_scan, qm_scan):
+            self.ostream.print_info(
+                f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol ' +
+                f'{(e_mm - e_qm):10.3f}')
         self.ostream.print_blank()
         self.ostream.flush()
 
