@@ -26,6 +26,7 @@
 from mpi4py import MPI
 import sys
 
+from .veloxchemlib import mpi_master
 from .rspdriver import ResponseDriver
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
@@ -71,7 +72,10 @@ class ResponseProperty:
             comm = MPI.COMM_WORLD
 
         if ostream is None:
-            ostream = OutputStream(sys.stdout)
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
 
         self.rsp_driver = ResponseDriver(comm, ostream)
         self.rsp_driver.update_settings(self.rsp_dict, self.method_dict)

@@ -27,34 +27,34 @@ from .veloxchemlib import mpi_master
 from .gradientdriver import GradientDriver
 
 
-class XTBGradientDriver(GradientDriver):
+class OpenMMGradientDriver(GradientDriver):
     """
-    Implements XTB gradient driver.
+    Implements OpenMM gradient driver.
 
-    :param xtb_drv:
-        The XTB driver.
+    :param openmm_drv:
+        The OpenMM driver.
     :param comm:
         The MPI communicator.
     :param ostream:
         The output stream.
 
     Instance variables
-        - xtb_drv: The XTB driver.
+        - openmm_drv: The OpenMM driver.
     """
 
-    def __init__(self, xtb_drv, comm=None, ostream=None):
+    def __init__(self, openmm_drv, comm=None, ostream=None):
         """
-        Initializes XTB gradient driver.
+        Initializes OpenMM gradient driver.
         """
 
-        super().__init__(xtb_drv, comm, ostream)
+        super().__init__(openmm_drv, comm, ostream)
 
-        self.flag = 'XTB Gradient Driver'
-        self.xtb_drv = xtb_drv
+        self.flag = 'OpenMM Gradient Driver'
+        self.openmm_drv = openmm_drv
 
     def compute(self, molecule):
         """
-        Performs calculation of XTB analytical gradient.
+        Performs calculation of OpenMM analytical gradient.
 
         :param molecule:
             The molecule.
@@ -62,7 +62,7 @@ class XTBGradientDriver(GradientDriver):
 
         self.print_header()
 
-        self.gradient = self.xtb_drv.get_gradient()
+        self.gradient = self.openmm_drv.get_gradient()
         self.gradient = self.comm.bcast(self.gradient, root=mpi_master())
 
         self.print_geometry(molecule)
@@ -79,5 +79,5 @@ class XTBGradientDriver(GradientDriver):
             The molecule.
         """
 
-        self.xtb_drv.compute(molecule, self.ostream)
-        return self.xtb_drv.get_energy()
+        self.openmm_drv.compute(molecule)
+        return self.openmm_drv.get_energy()

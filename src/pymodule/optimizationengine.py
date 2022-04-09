@@ -35,28 +35,21 @@ class OptimizationEngine(geometric.engine.Engine):
     """
     Implements optimization engine for geomeTRIC.
 
-    :param molecule:
-        The molecule.
-    :param ao_basis:
-        The AO basis set.
-    :param min_basis:
-        The minimal AO basis set.
-    :param scf_drv:
-        The SCF driver.
     :param grad_drv:
         The gradient driver.
+    :param molecule:
+        The molecule.
+    :params **:
+        The input parameters of the main energy driver
 
     Instance variables
         - molecule: The molecule.
-        - ao_basis: The AO basis set.
-        - min_basis: The minimal AO basis set.
         - grad_drv: The gradient driver.
-        - flag: The type of the optimization engine.
         - comm: The MPI communicator.
         - rank: The rank of MPI process.
     """
 
-    def __init__(self, molecule, ao_basis, min_basis, grad_drv, flag):
+    def __init__(self, grad_drv, molecule, *args):
         """
         Initializes optimization engine for geomeTRIC.
         """
@@ -70,11 +63,8 @@ class OptimizationEngine(geometric.engine.Engine):
         super().__init__(g_molecule)
 
         self.molecule = molecule
-        self.ao_basis = ao_basis
-        self.min_basis = min_basis
-
+        self.args = args
         self.grad_drv = grad_drv
-        self.flag = flag
 
         self.comm = grad_drv.comm
         self.rank = grad_drv.comm.Get_rank()
@@ -107,26 +97,14 @@ class OptimizationEngine(geometric.engine.Engine):
         self.grad_drv.ostream.print_info('Computing energy and gradient...')
         self.grad_drv.ostream.flush()
 
-        ostream_state = self.grad_drv.ostream.state
+        grad_ostream_state = self.grad_drv.ostream.state
         self.grad_drv.ostream.state = False
 
-        if self.flag.upper() == 'XTB':
-            xtb_drv = self.grad_drv.xtb_drv
-            xtb_drv.compute(new_mol, self.grad_drv.ostream)
-            energy = xtb_drv.get_energy()
+        energy = self.grad_drv.compute_energy(new_mol, *self.args)
+        self.grad_drv.compute(new_mol, *self.args)
+        gradient = self.grad_drv.get_gradient()
 
-            self.grad_drv.compute(new_mol)
-            gradient = self.grad_drv.get_gradient()
-
-        elif self.flag.upper() == 'SCF':
-            scf_drv = self.grad_drv.scf_drv
-            scf_drv.compute(new_mol, self.ao_basis, self.min_basis)
-            energy = scf_drv.get_scf_energy()
-
-            self.grad_drv.compute(new_mol, self.ao_basis, self.min_basis)
-            gradient = self.grad_drv.get_gradient()
-
-        self.grad_drv.ostream.state = ostream_state
+        self.grad_drv.ostream.state = grad_ostream_state
 
         energy = self.comm.bcast(energy, root=mpi_master())
         gradient = self.comm.bcast(gradient, root=mpi_master())

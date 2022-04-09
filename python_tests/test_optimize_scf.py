@@ -1,5 +1,6 @@
 from pathlib import Path
 import numpy as np
+import pytest
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.veloxchemlib import bohr_in_angstroms
@@ -10,6 +11,8 @@ from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.optimizationdriver import OptimizationDriver
 
 
+@pytest.mark.filterwarnings(
+    'ignore:.*tostring.*tobytes:DeprecationWarning:geometric')
 class TestOptimizeSCF:
 
     def run_opt(self, inpfile, basis_label, ref_coords):
@@ -31,7 +34,7 @@ class TestOptimizeSCF:
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
-        opt_drv = OptimizationDriver(grad_drv, 'SCF')
+        opt_drv = OptimizationDriver(grad_drv)
         opt_drv.update_settings({
             'coordsys': 'tric',
             'filename': task.input_dict['filename'],

@@ -12,5 +12,12 @@ dependencies:
   - pip
   - pybind11>=2.6
   - python>=3.6
-  - mdanalysis
+  - geometric
+  - psutil
   - pytest
+  - mdanalysis
+  - openmm
+  - scipy
+  - gtest
+  - cppe=0.2.1
+  - xtb
