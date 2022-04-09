@@ -457,7 +457,7 @@ class ForceFieldGenerator:
             ff_data_lines = ff_data.readlines()
 
         if Path(self.force_field_data_extension).is_file():
-            with open(self.force_field_data, 'r') as ff_extension:
+            with open(self.force_field_data_extension, 'r') as ff_extension:
                 ff_data_lines += ff_extension.readlines()
 
         with open(itp_fname, 'w') as f_itp:
@@ -630,9 +630,6 @@ class ForceFieldGenerator:
             cur_str = ';    i      j      k      l    funct'
             cur_str += '    phase     k_d      n\n'
             f_itp.write(cur_str)
-            cur_str = ';                                        '
-            cur_str += 'C0         C1         C2         C3         C4         C5\n'
-            f_itp.write(cur_str)
 
             for i, j, k, l in dihedral_indices:
                 at_1 = atom_types[i]
@@ -650,7 +647,8 @@ class ForceFieldGenerator:
                 for line in ff_data_lines:
                     matches = [re.search(p, line) for p in patterns]
                     if any(matches):
-                        if '.' not in line[11:].strip().split()[0]:
+                        dihedral_ff = line[11:60].strip().split()
+                        if len(dihedral_ff) == 4:
                             dihedral_ff_lines.append(line)
                             dihedral_found = True
 
@@ -664,7 +662,8 @@ class ForceFieldGenerator:
                     for line in ff_data_lines:
                         matches = [re.search(p, line) for p in patterns]
                         if any(matches):
-                            if '.' not in line[11:].strip().split()[0]:
+                            dihedral_ff = line[11:60].strip().split()
+                            if len(dihedral_ff) == 4:
                                 dihedral_ff_lines.append(line)
                                 dihedral_found = True
 
@@ -673,7 +672,8 @@ class ForceFieldGenerator:
                 assert_msg_critical(dihedral_found, errmsg)
 
                 for line in dihedral_ff_lines:
-                    dihedral_ff = line[11:].strip().split()
+                    dihedral_ff = line[11:60].strip().split()
+
                     multiplicity = int(dihedral_ff[0])
                     barrier = float(dihedral_ff[1]) * 4.184 / multiplicity
                     phase = float(dihedral_ff[2])
@@ -736,8 +736,8 @@ class ForceFieldGenerator:
                     for line in ff_data_lines:
                         matches = [re.search(p, line) for p in patterns]
                         if any(matches):
-                            if '.' in line[11:].strip().split()[0]:
-                                dihedral_ff = line[11:].strip().split()
+                            dihedral_ff = line[11:60].strip().split()
+                            if len(dihedral_ff) == 3:
                                 dihedral_found = True
                                 break
 
@@ -754,8 +754,8 @@ class ForceFieldGenerator:
                         for line in ff_data_lines:
                             matches = [re.search(p, line) for p in patterns]
                             if any(matches):
-                                if '.' in line[11:].strip().split()[0]:
-                                    dihedral_ff = line[11:].strip().split()
+                                dihedral_ff = line[11:60].strip().split()
+                                if len(dihedral_ff) == 3:
                                     dihedral_found = True
                                     break
 
@@ -769,8 +769,8 @@ class ForceFieldGenerator:
                         for line in ff_data_lines:
                             matches = [re.search(p, line) for p in patterns]
                             if any(matches):
-                                if '.' in line[11:].strip().split()[0]:
-                                    dihedral_ff = line[11:].strip().split()
+                                dihedral_ff = line[11:60].strip().split()
+                                if len(dihedral_ff) == 3:
                                     dihedral_found = True
                                     break
 
@@ -779,8 +779,8 @@ class ForceFieldGenerator:
                     assert_msg_critical(dihedral_found, errmsg)
 
                     barrier = float(dihedral_ff[0]) * 4.184
-                    phase = float(dihedral_ff[2])
-                    periodicity = abs(int(dihedral_ff[3]))
+                    phase = float(dihedral_ff[1])
+                    periodicity = abs(int(float(dihedral_ff[2])))
 
                     assert_msg_critical(
                         phase == 180.0,
@@ -793,7 +793,7 @@ class ForceFieldGenerator:
                     cur_str = '{:6}{:7}{:7}{:7}'.format(l + 1, i + 1, j + 1,
                                                         k + 1)
                     cur_str += '{:7}{:11.2f}{:11.5f}{:4}'.format(
-                        1, phase, barrier, periodicity)
+                        4, phase, barrier, periodicity)
                     cur_str += ' ; {}-{}-{}-{}\n'.format(
                         atom_names[l], atom_names[i], atom_names[j],
                         atom_names[k])
@@ -906,12 +906,17 @@ class ForceFieldGenerator:
             The topology file.
         :param flag:
             The flag for the force field.
+
+        :return:
+            A dictionary containing the results of validation.
         """
 
         self.ostream.print_info(f'Validating {flag} force field...')
         self.ostream.print_info(f'  {str(top_file)}')
         self.ostream.print_blank()
         self.ostream.flush()
+
+        validation_result = {}
 
         for i, dih in enumerate(self.target_dihedrals):
 
@@ -935,6 +940,13 @@ class ForceFieldGenerator:
             self.ostream.print_info(f'  RMSD from QM {rmsd:12.3f} kJ/mol')
             self.ostream.print_blank()
             self.ostream.flush()
+
+            validation_result['dihedral_indices'] = list(dih)
+            validation_result['dihedral_angles'] = list(angles)
+            validation_result['mm_scan_kJpermol'] = mm_scan.copy()
+            validation_result['qm_scan_kJpermol'] = qm_scan.copy()
+
+        return validation_result
 
     def perform_mm_scan(self,
                         top_file,
@@ -1099,14 +1111,12 @@ class ForceFieldGenerator:
                                                  atom_names[dihedral[3] - 1])
             f_itp.write(cur_str)
 
-    def visualize(self, dft_scan, mm_scan, dihedral, angles):
+    def visualize(self, validation_result):
         """
         Visualizes dihedral potential.
 
-        :param mm_scan:
-            The MM scan energies.
-        :param dihedral:
-            The dihedral.
+        :param validation_result:
+            The dictionary containing the result of validation.
         """
 
         try:
@@ -1115,17 +1125,18 @@ class ForceFieldGenerator:
             raise ImportError('Unable to import Matplotlib. Please install ' +
                               'Matplotlib via \'conda install matplotlib\'')
 
-        dft_scan_kcal = (np.array(dft_scan) -
-                         min(dft_scan)) * hartree_in_kcalpermol()
-        mm_scan_kcal = (np.array(mm_scan) - min(mm_scan)) / 4.184
+        qm_scan_kJpermol = validation_result['qm_scan_kJpermol']
+        mm_scan_kJpermol = validation_result['mm_scan_kJpermol']
+        dihedral_angles = validation_result['dihedral_angles']
+        dihedral_indices = validation_result['dihedral_indices']
 
-        plt.plot(angles, dft_scan_kcal, '-o', label="QM")
-        plt.plot(angles, mm_scan_kcal, '-o', label="MM")
+        plt.plot(dihedral_angles, qm_scan_kJpermol, '-o', label="QM")
+        plt.plot(dihedral_angles, mm_scan_kJpermol, '-o', label="MM")
 
         plt.grid()
         plt.legend(loc='upper right')
-        plt.xlabel('dihedral angle {}-{}-{}-{}'.format(*dihedral))
-        plt.ylabel('E in kcal/mol')
+        plt.xlabel('dihedral angle {}-{}-{}-{}'.format(*dihedral_indices))
+        plt.ylabel('E in kJ/mol')
         plt.title('dihedral potential of {}'.format(self.molecule_name))
         plt.show()
 
