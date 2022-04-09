@@ -314,6 +314,31 @@ class ImpesCoordinates:
                 j += 1
             i += 1
 
+    def transform_gradient_to_r(self):
+        """
+        Returns the internal gradient transformed from 
+        using the inverse bond length 1/R to using R.
+        (required to transform back to the Cartesian gradient).
+
+        """
+        if self.internal_coordinates is None:
+            self.define_internal_coordinates()
+        if self.cartesian_coordinates is None:
+            raise ValueError("No cartesian coordinates are defined.")
+        if not self.r_inverse:
+            raise ValueError("Internal Gradient is already in R.")
+
+        n_atoms = self.cartesian_coordinates.shape[0]
+        coords = self.cartesian_coordinates.reshape((3*n_atoms))
+        gradient_in_r = self.internal_gradient.copy()
+        i = 0
+        for z in self.z_matrix:
+            if len(z) == 2:
+                r = self.internal_coordinates[i].value(coords)
+                gradient_in_r[i] /= -r**2
+            i += 1
+        return gradient_in_r
+
     def transform_gradient_and_hessian(self, z_matrix=None):
         """
         Performs all steps required to transform from Cartesian coordinates
@@ -385,11 +410,9 @@ class ImpesCoordinates:
 
         return np.array(self.z_matrix)
 
-    # TODO: return new variable instead of shifting the
-    # cartesian coordinates themselves?
     def translate_to_zero(self):
-        """Translates the molecule (Cartesian coordinates)
-           to (0, 0, 0)
+        """Retruns an array with the Cartesian coordinates
+           translated to (0, 0, 0)
          """
 
         if self.cartesian_coordinates is None:
@@ -408,10 +431,12 @@ class ImpesCoordinates:
             sum_y /= natoms
             sum_z /= natoms
 
+            translated_coordinates = self.cartesian_coordinates.copy()
             for i in range(natoms):
-                self.cartesian_coordinates[i,0] -= sum_x
-                self.cartesian_coordinates[i,1] -= sum_y
-                self.cartesian_coordinates[i,2] -= sum_z
+                translated_coordinates[i,0] -= sum_x
+                translated_coordinates[i,1] -= sum_y
+                translated_coordinates[i,2] -= sum_z
+            return translated_coordinates
 
     # TODO: change to Eckart routine 
     # is it possible to make use of geometric here?
@@ -427,8 +452,9 @@ class ImpesCoordinates:
                                                    reference)
 
         rotated_coords = np.dot(rotation_matrix, self.cartesian_coordinates.T).T
+        self.cartesian_coordinates = rotated_coords
         rmsd = np.sqrt(np.sum((rotated_coords-reference)**2)/N)
-        return rotation_matrix, rotated_coords, rmsd 
+        return rotation_matrix, rotated_coords, rmsd
 
     def write_hdf5(self, fname, label, write_zmat=False):
         """
@@ -686,6 +712,7 @@ class ImpesDriver():
         self.impes_coordinate.update_settings(self.impes_dict)
         self.impes_coordinate.cartesian_coordinates = coordinates
         self.impes_coordinate.define_internal_coordinates()
+        self.impes_coordinate.calculate_b_matrix() # required for gradient
         self.impes_coordinate.compute_internal_coordinates()
 
     def compute(self, coordinates, fname, labels):
@@ -725,24 +752,33 @@ class ImpesDriver():
         data_point.update_settings(self.impes_dict)
         sum_weights = 0.0
         potentials = []
+        gradients = []
         weights = []
         # Determine weights and energy values for interpolation
+        # TODO: save gradients and potentials, so 
+        # that they do not have to be recalculated for each new point?
         for label in labels:
             data_point.read_hdf5(fname, label)
-            distance = np.linalg.norm( 
-                            self.impes_coordinate.internal_coordinates_array
-                          - data_point.internal_coordinates_array )
+            distance = self.cartesian_distance(data_point) 
+            #dist =     np.linalg.norm( 
+            #                self.impes_coordinate.internal_coordinates_array
+            #              - data_point.internal_coordinates_array )
             weight = 1.0 / (distance**self.exponent_p)
             sum_weights += weight
             potential = self.compute_potential(data_point)
+            gradient = self.compute_gradient(data_point)
+            gradients.append(gradient)
             potentials.append(potential)
             weights.append(weight)
 
         # Perform the interpolation and save the result in self.energy
+        natm = self.impes_coordinate.cartesian_coordinates.shape[0]
         self.energy = 0
+        self.gradient = np.zeros((natm, 3))
         weights /= sum_weights
         for i in range(n_points):
             self.energy += weights[i] * potentials[i]
+            self.gradient += weights[i] * gradients[i]
 
     def shepard_interpolation(self, fname, labels):
         """Performs a simple interpolation.
@@ -758,27 +794,33 @@ class ImpesDriver():
         data_point.update_settings(self.impes_dict)
         sum_weights = 0.0
         potentials = []
+        gradients = []
         weights = []
         # Determine weights and potential energy surface values for interpolation
         for label in labels:
             data_point.read_hdf5(fname, label)
-            distance = np.linalg.norm(
-                            self.impes_coordinate.internal_coordinates_array 
-                          - data_point.internal_coordinates_array )
+            distance = self.cartesian_distance(data_point) #np.linalg.norm(
+                       #     self.impes_coordinate.internal_coordinates_array 
+                       #   - data_point.internal_coordinates_array )
             denominator = ( 
                     ( distance / self.confidence_radius )**self.exponent_p
                   + ( distance / self.confidence_radius )**self.exponent_q )
             weight = 1.0 / denominator
             sum_weights += weight
             potential = self.compute_potential(data_point)
+            gradient = self.compute_gradient(data_point)
+            gradients.append(gradient)
             potentials.append(potential)
             weights.append(weight)
 
-        # Perform the interpolation and save the result in self.energy
+        # Perform the interpolation and save the result in self.energy, self.gradient
+        natm = self.impes_coordinate.cartesian_coordinates.shape[0]
         self.energy = 0
+        self.gradient = np.zeros((natm, 3))
         weights /= sum_weights
         for i in range(n_points):
             self.energy += weights[i] * potentials[i]
+            self.gradient += weights[i] * gradients[i]
 
     def compute_potential(self, data_point):
         """Calculates the potential energy surface at self.impes_coordinate
@@ -800,6 +842,41 @@ class ImpesDriver():
 
         return pes
 
+    def compute_gradient(self, data_point):
+        """Calculates part of the cartesian gradient 
+           for self.impes_coordinate based on the gradient
+           and Hessian of data_point.
+           J ( g_a + delta_a H_a )
+           eq. (4) JCTC 12, 5235-5246
+
+           :param data_point:
+                ImpesCoordinates object.
+        """
+
+        natm = data_point.cartesian_coordinates.shape[0]
+        energy = data_point.energy
+        grad = data_point.internal_gradient
+        hessian = data_point.internal_hessian
+        dist = (   self.impes_coordinate.internal_coordinates_array 
+                 - data_point.internal_coordinates_array )
+
+        dist_hessian = np.matmul(dist.T, hessian)
+        b_matrix = self.impes_coordinate.b_matrix
+
+        if self.r_inverse:
+            # retrun the gradient transformed to r.
+            # this is required to be able to then transform
+            # to the Cartesian gradient.
+            grad = data_point.transform_gradient_to_r()
+
+        gradient = ( np.matmul(b_matrix.T, grad + dist_hessian)
+                        ).reshape(natm, 3)
+
+        return gradient
+
+    def weight_gradient(self):
+        pass
+
     def cartesian_distance(self, data_point):
         """Calculates and returns the cartesian distance between 
            self.coordinates and data_point coordinates.
@@ -808,20 +885,24 @@ class ImpesDriver():
                 ImpesCoordinates object
         """
 
-        # First, translate the data point to zero
-        # self should also be shifted
-        data_point.translate_to_zero()
-        # TODO: perhaps translate only once!
-        self.impes_coordinate.translate_to_zero()
+        # First, translate the cartesian coordinates to zero
+        target_coordinates = data_point.translate_to_zero()
+        reference_coordinates = self.impes_coordinate.translate_to_zero()
 
         # Then, determine the rotation matrix which
-        # aligns data_point and self.impes_coordinate
-        # TODO: perhaps save the rotation matrix?
-        reference_coordinates = self.impes_coordinate.cartesian_coordinates
-        data_point.rotate_to(reference_coordinates)
+        # aligns data_point (target_coordinates)
+        # to self.impes_coordinate (reference_coordinates)
 
-        distance = np.linalg.norm(  reference_coordinates
-                                  - data_point.cartesian_coordinates)
+        rotation_matrix = geometric.rotate.get_rot(target_coordinates,
+                                                   reference_coordinates)
+
+        # Rotate the data point
+        rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
+
+        # Calculate the Cartesian distance
+        N = reference_coordinates.shape[0] # number of atoms
+        distance = np.sqrt(N) * np.linalg.norm(  reference_coordinates
+                                  - rotated_coordinates)
 
         return distance
 
