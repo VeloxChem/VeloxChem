@@ -105,6 +105,9 @@ class ForceFieldGenerator:
         self.force_field_data = 'gaff-2.11.dat'
         self.force_field_data_extension = None
 
+        # number of rounds for fitting dihedral potentials
+        self.n_rounds = 3
+
         # MM settings
         self.gromacs_include_path = None
 
@@ -153,6 +156,7 @@ class ForceFieldGenerator:
             'gromacs_include_path': 'str',
             'force_field_data': 'str',
             'force_field_data_extension': 'str',
+            'n_rounds': 'int',
         }
 
         parse_input(self, ffg_keywords, ffg_dict)
@@ -248,10 +252,23 @@ class ForceFieldGenerator:
             self.write_top(original_top_file, original_itp_file)
         self.comm.barrier()
 
-        self.validate_force_field(original_top_file, 'original')
+        # validate original force field
 
-        new_top_file = self.dihedral_correction(original_top_file)
-        self.validate_force_field(new_top_file, 'new')
+        for i, dih in enumerate(self.target_dihedrals):
+            self.validate_force_field(original_top_file, i)
+
+        # fit dihedral potentials
+
+        n_rounds = self.n_rounds if len(self.scan_dih_angles) > 1 else 1
+        target_top_file = original_top_file
+        for i_round in range(n_rounds):
+            for i, dih in enumerate(self.target_dihedrals):
+                target_top_file = self.dihedral_correction(target_top_file, i)
+
+        # validate final force field
+
+        for i, dih in enumerate(self.target_dihedrals):
+            self.validate_force_field(target_top_file, i)
 
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
         """
@@ -812,12 +829,14 @@ class ForceFieldGenerator:
 
         dest.write_text(src.read_text())
 
-    def dihedral_correction(self, top_file):
+    def dihedral_correction(self, top_file, i):
         """
         Corrects dihedral parameters.
 
         :param top_filename:
             The topology file.
+        :param i:
+            The index of the target dihedral.
         """
 
         try:
@@ -836,8 +855,6 @@ class ForceFieldGenerator:
             v += c5 * np.cos((180 - phi) * 2 * np.pi / 360)**5
             return v
 
-        self.ostream.print_info('Correcting dihedral angle...')
-
         top_fname = top_file if isinstance(top_file, str) else str(top_file)
         itp_fname = self.get_included_file(top_fname)
 
@@ -855,105 +872,98 @@ class ForceFieldGenerator:
                 self.write_top(new_top_fname, new_itp_fname)
             self.comm.barrier()
 
-        for i, (dih, geom, qm_scan, angles) in enumerate(
-                zip(self.target_dihedrals, self.scan_geometries,
-                    self.scan_energies, self.scan_dih_angles)):
+        dih = self.target_dihedrals[i]
+        geom = self.scan_geometries[i]
+        qm_scan = self.scan_energies[i]
+        angles = self.scan_dih_angles[i]
 
-            self.ostream.print_info('  {}-{}-{}-{}'.format(*dih))
-            self.ostream.flush()
+        self.ostream.print_info('Fitting dihedral angle ' +
+                                '{}-{}-{}-{}'.format(*dih) + '...')
+        self.ostream.flush()
 
-            # MM scan with dihedral parameters set to zero
+        # MM scan with dihedral parameters set to zero
 
-            output_dir = self.workdir / f'{mol_name}_dih_corr' / f'{i+1}'
-            zero_itp_file = output_dir / f'{mol_name}_zero.itp'
-            zero_top_file = output_dir / f'{mol_name}_zero.top'
+        output_dir = self.workdir / f'{mol_name}_dih_corr' / f'{i+1}'
+        zero_itp_file = output_dir / f'{mol_name}_zero.itp'
+        zero_top_file = output_dir / f'{mol_name}_zero.top'
 
-            if self.rank == mpi_master():
-                output_dir.mkdir(parents=True, exist_ok=True)
-                self.copy_file(Path(new_itp_fname), zero_itp_file)
-                self.write_top(zero_top_file, zero_itp_file)
-                self.set_dihedral_parameters(zero_itp_file, dih, [0.] * 6)
-            self.comm.barrier()
+        if self.rank == mpi_master():
+            output_dir.mkdir(parents=True, exist_ok=True)
+            self.copy_file(Path(new_itp_fname), zero_itp_file)
+            self.write_top(zero_top_file, zero_itp_file)
+            self.set_dihedral_parameters(zero_itp_file, dih, [0.] * 6)
+        self.comm.barrier()
 
-            mm_zero_scan = self.perform_mm_scan(zero_top_file, dih, geom,
-                                                angles)
+        mm_zero_scan = self.perform_mm_scan(zero_top_file, dih, geom, angles)
 
-            # fitting Ryckaert-Bellemans function
+        # fitting Ryckaert-Bellemans function
 
-            if self.rank == mpi_master():
-                rel_e_qm = np.array(qm_scan) - min(qm_scan)
-                rel_e_qm *= hartree_in_kcalpermol() * 4.184
-                rel_e_mm = np.array(mm_zero_scan) - min(mm_zero_scan)
+        if self.rank == mpi_master():
+            rel_e_qm = np.array(qm_scan) - min(qm_scan)
+            rel_e_qm *= hartree_in_kcalpermol() * 4.184
+            rel_e_mm = np.array(mm_zero_scan) - min(mm_zero_scan)
 
-                difference = rel_e_qm - rel_e_mm
-                initial_coef = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-                coef, cv = curve_fit(rbpot, angles, difference, initial_coef)
+            difference = rel_e_qm - rel_e_mm
+            initial_coef = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+            coef, cv = curve_fit(rbpot, angles, difference, initial_coef)
 
-                self.set_dihedral_parameters(new_itp_fname, dih, coef.tolist())
-            self.comm.barrier()
+            self.set_dihedral_parameters(new_itp_fname, dih, coef.tolist())
+        self.comm.barrier()
 
         self.ostream.print_info('...done.')
+        self.ostream.print_info(f'Generated new topology file: {new_top_fname}')
         self.ostream.print_blank()
         self.ostream.flush()
 
         return Path(new_top_fname)
 
-    def validate_force_field(self, top_file, flag):
+    def validate_force_field(self, top_file, i):
         """
         Validates force field by RMSD of dihedral potentials.
 
         :param top_file:
             The topology file.
-        :param flag:
-            The flag for the force field.
+        :param i:
+            The index of the target dihedral.
 
         :return:
             A dictionary containing the results of validation.
         """
 
-        self.ostream.print_info(f'Validating {flag} force field...')
+        self.ostream.print_info(f'Validating force field...')
         self.ostream.print_info(f'  {str(top_file)}')
         self.ostream.print_blank()
         self.ostream.flush()
 
-        validation_result = {}
+        dih = self.target_dihedrals[i]
 
-        for i, dih in enumerate(self.target_dihedrals):
+        self.ostream.print_info(
+            '  Target dihedral angle: {}-{}-{}-{}'.format(*dih))
+        self.ostream.print_blank()
 
-            self.ostream.print_info(
-                '  Target dihedral angle: {}-{}-{}-{}'.format(*dih))
-            self.ostream.print_blank()
+        geom = self.scan_geometries[i]
+        angles = self.scan_dih_angles[i]
+        mm_scan = self.perform_mm_scan(top_file, dih, geom, angles)
+        mm_scan = np.array(mm_scan) - min(mm_scan)
 
-            geom = self.scan_geometries[i]
-            angles = self.scan_dih_angles[i]
-            mm_scan = self.perform_mm_scan(top_file, dih, geom, angles,
-                                           'verbose')
-            mm_scan = np.array(mm_scan) - min(mm_scan)
+        qm_scan = np.array(self.scan_energies[i]) - min(self.scan_energies[i])
+        qm_scan *= hartree_in_kcalpermol() * 4.184
 
-            qm_scan = np.array(self.scan_energies[i]) - min(
-                self.scan_energies[i])
-            qm_scan *= hartree_in_kcalpermol() * 4.184
+        rmsd = np.sqrt(np.linalg.norm(qm_scan - mm_scan)**2 / qm_scan.size)
 
-            rmsd = np.sqrt(np.linalg.norm(qm_scan - mm_scan)**2 / qm_scan.size)
+        self.ostream.print_info('  --------------------------------')
+        self.ostream.print_info(f'  RMSD from QM {rmsd:12.3f} kJ/mol')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
-            self.ostream.print_info('  --------------------------------')
-            self.ostream.print_info(f'  RMSD from QM {rmsd:12.3f} kJ/mol')
-            self.ostream.print_blank()
-            self.ostream.flush()
+        return {
+            'dihedral_indices': list(dih),
+            'dihedral_angles': list(angles),
+            'mm_scan_kJpermol': mm_scan.copy(),
+            'qm_scan_kJpermol': qm_scan.copy(),
+        }
 
-            validation_result['dihedral_indices'] = list(dih)
-            validation_result['dihedral_angles'] = list(angles)
-            validation_result['mm_scan_kJpermol'] = mm_scan.copy()
-            validation_result['qm_scan_kJpermol'] = qm_scan.copy()
-
-        return validation_result
-
-    def perform_mm_scan(self,
-                        top_file,
-                        dihedral,
-                        geometries,
-                        angles,
-                        flag=None):
+    def perform_mm_scan(self, top_file, dihedral, geometries, angles):
         """
         Performs MM scan of a specific dihedral.
 
@@ -961,8 +971,10 @@ class ForceFieldGenerator:
             The topology file.
         :param dihedral:
             The dihedral.
-        :param flag:
-            The flag for output verbosity.
+        :param geometries:
+            The scanned geometris for this dihedral.
+        :param angles:
+            The scanned angles for this dihedral.
         """
 
         # select scan angles and geometries from QM data
@@ -978,10 +990,9 @@ class ForceFieldGenerator:
             scan_dir.mkdir(parents=True, exist_ok=True)
         self.comm.barrier()
 
-        if flag == 'verbose':
-            self.ostream.print_info('      Dihedral           MM energy')
-            self.ostream.print_info('  --------------------------------')
-            self.ostream.flush()
+        self.ostream.print_info('      Dihedral           MM energy')
+        self.ostream.print_info('  --------------------------------')
+        self.ostream.flush()
 
         energies = []
         for i, (geom, angle) in enumerate(zip(geometries, angles)):
@@ -1005,10 +1016,9 @@ class ForceFieldGenerator:
             pot_energy *= 4.184 * hartree_in_kcalpermol()
             energies.append(pot_energy)
 
-            if flag == 'verbose':
-                self.ostream.print_info(
-                    f'  {angle:8.1f} deg {pot_energy:12.3f} kJ/mol')
-                self.ostream.flush()
+            self.ostream.print_info(
+                f'  {angle:8.1f} deg {pot_energy:12.3f} kJ/mol')
+            self.ostream.flush()
 
         return energies
 
