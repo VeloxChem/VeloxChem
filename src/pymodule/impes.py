@@ -755,6 +755,9 @@ class ImpesDriver():
             errtxt += self.interpolation_type
             raise ValueError(errtxt)
 
+    # TODO: double check weight gradients!
+    # Rinv seems not to work properly...
+    # not sure even why it is so different...
     def simple_interpolation(self, fname, labels):
         """Performs a simple interpolation.
 
@@ -764,6 +767,8 @@ class ImpesDriver():
         :param labels:
             A list of data point labels.
         """
+
+        natms = self.impes_coordinate.cartesian_coordinates.shape[0]
         n_points = len(labels)
         data_point = ImpesCoordinates(self.comm, self.ostream)
         data_point.update_settings(self.impes_dict)
@@ -771,31 +776,37 @@ class ImpesDriver():
         potentials = []
         gradients = []
         weights = []
-        # Determine weights and energy values for interpolation
-        # TODO: save gradients and potentials, so 
-        # that they do not have to be recalculated for each new point?
+        weight_gradients = []
+        sum_weight_gradients = np.zeros((natms, 3))
+        # Determine weights, weight gradients,
+        # energy values, and energy gradients for interpolation
         for label in labels:
             data_point.read_hdf5(fname, label)
-            distance = self.cartesian_distance(data_point) 
+            distance, weight_gradient = self.cartesian_distance(data_point) 
             #dist =     np.linalg.norm( 
             #                self.impes_coordinate.internal_coordinates_array
             #              - data_point.internal_coordinates_array )
             weight = 1.0 / (distance**self.exponent_p)
             sum_weights += weight
+            sum_weight_gradients += weight_gradient
             potential = self.compute_potential(data_point)
             gradient = self.compute_gradient(data_point)
             gradients.append(gradient)
             potentials.append(potential)
             weights.append(weight)
+            weight_gradients.append(weight_gradient)
 
         # Perform the interpolation and save the result in self.energy
-        natm = self.impes_coordinate.cartesian_coordinates.shape[0]
+        # and self.gradient
         self.energy = 0
-        self.gradient = np.zeros((natm, 3))
+        self.gradient = np.zeros((natms, 3))
         weights /= sum_weights
         for i in range(n_points):
             self.energy += weights[i] * potentials[i]
-            self.gradient += weights[i] * gradients[i]
+            self.gradient += ( weights[i] * gradients[i]
+             + potentials[i] * weight_gradients[i] / sum_weights
+             - potentials[i] * weights[i] * sum_weight_gradients / sum_weights 
+                                )
 
     def shepard_interpolation(self, fname, labels):
         """Performs a simple interpolation.
@@ -807,16 +818,21 @@ class ImpesDriver():
             A list of data point labels.
         """
         n_points = len(labels)
+        natms = self.impes_coordinate.cartesian_coordinates.shape[0]
         data_point = ImpesCoordinates(self.comm, self.ostream)
         data_point.update_settings(self.impes_dict)
         sum_weights = 0.0
         potentials = []
         gradients = []
         weights = []
-        # Determine weights and potential energy surface values for interpolation
+        weight_gradients = []
+        sum_weight_gradients = np.zeros((natms, 3))
+        # Determine weights, weight gradients,
+        # energy values, and energy gradients for interpolation
         for label in labels:
             data_point.read_hdf5(fname, label)
-            distance = self.cartesian_distance(data_point) #np.linalg.norm(
+            distance, weight_gradient = self.cartesian_distance(data_point)
+                       # np.linalg.norm(
                        #     self.impes_coordinate.internal_coordinates_array 
                        #   - data_point.internal_coordinates_array )
             denominator = ( 
@@ -824,20 +840,25 @@ class ImpesDriver():
                   + ( distance / self.confidence_radius )**self.exponent_q )
             weight = 1.0 / denominator
             sum_weights += weight
+            sum_weight_gradients += weight_gradient
             potential = self.compute_potential(data_point)
             gradient = self.compute_gradient(data_point)
             gradients.append(gradient)
             potentials.append(potential)
             weights.append(weight)
+            weight_gradients.append(weight_gradient)
 
-        # Perform the interpolation and save the result in self.energy, self.gradient
-        natm = self.impes_coordinate.cartesian_coordinates.shape[0]
+        # Perform the interpolation and save the result
+        # in self.energy, self.gradient
         self.energy = 0
-        self.gradient = np.zeros((natm, 3))
+        self.gradient = np.zeros((natms, 3))
         weights /= sum_weights
         for i in range(n_points):
             self.energy += weights[i] * potentials[i]
-            self.gradient += weights[i] * gradients[i]
+            self.gradient += ( weights[i] * gradients[i]
+             + potentials[i] * weight_gradients[i] / sum_weights
+             - potentials[i] * weights[i] * sum_weight_gradients / sum_weights 
+                                )
 
     def compute_potential(self, data_point):
         """Calculates the potential energy surface at self.impes_coordinate
@@ -891,12 +912,57 @@ class ImpesDriver():
 
         return gradient
 
-    def weight_gradient(self):
-        pass
+    def simple_weight_gradient(self, distance_vector, distance):
+        """ Returns the derivative of an unormalized simple interpolation
+            weight with respect to the Cartesian coordinates in
+            self.impes_coordinate
+
+            :param distance_vector:
+                The Cartesian distance vector between
+                the current data_point and self.impes_coordinate.
+            :param distance:
+                The norm of the distance vector * sqrt(N), N number of atoms.
+        """
+        weight_gradient = ( - self.exponent_p * distance_vector /
+                            distance**( self.exponent_p + 1 ) )
+
+        return weight_gradient
+    
+    def shepard_weight_gradient(self, distance_vector, distance):
+        """ Returns the derivative of an unormalized Shepard interpolation
+            weight with respect to the Cartesian coordinates in
+            self.impes_coordinate
+
+            :param distance_vector:
+                The Cartesian distance vector between
+                the current data_point and self.impes_coordinate.
+            :param distance:
+                The norm of the distance vector * sqrt(N), N number of atoms.
+        """
+
+        denominator = ( 
+                    ( distance / self.confidence_radius )**self.exponent_p
+                  + ( distance / self.confidence_radius )**self.exponent_q )
+        derivative_p = ( self.exponent_p 
+                * ( distance / self.confidence_radius )**( self.exponent_p - 1 )
+                * distance_vector / self.confidence_radius
+                        )
+        derivative_q = ( self.exponent_q 
+                * ( distance / self.confidence_radius )**( self.exponent_q - 1 )
+                * distance_vector / self.confidence_radius
+                        )
+
+        weight_gradient = ( - 1.0 / denominator**2 * 
+                                ( derivative_p + derivative_q )
+                            )
+
+        return weight_gradient
 
     def cartesian_distance(self, data_point):
         """Calculates and returns the cartesian distance between 
            self.coordinates and data_point coordinates.
+           Besides the distance, it also returns the weight gradient,
+           which requires the distance vector to be computed.
 
            :param data_point:
                 ImpesCoordinates object
@@ -921,5 +987,18 @@ class ImpesDriver():
         distance = np.sqrt(N) * np.linalg.norm(  reference_coordinates
                                   - rotated_coordinates)
 
-        return distance
+        # Calculate the gradient of the interpolation weights
+        # (required for energy gradient interpolation)
+        distance_vector = reference_coordinates - rotated_coordinates
+
+        if self.interpolation_type == 'shepard':
+            weight_gradient = self.shepard_weight_gradient(distance_vector, distance)
+        elif self.interpolation_type == 'simple':
+            weight_gradient = self.simple_weight_gradient(distance_vector, distance)
+        else:
+            errtxt = "Unrecognized interpolation type: "
+            errtxt += self.interpolation_type
+            raise ValueError(errtxt)
+
+        return distance, weight_gradient
 
