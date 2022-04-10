@@ -359,6 +359,34 @@ class ForceFieldGenerator:
 
         self.ostream.print_blank()
 
+    def update_dihedral_range(self, dih_start_end, i):
+        """
+        Updates the range of dihedral angles for i-th dihedral (0-based index).
+
+        :param dih_start_end:
+            A tuple containing the starting and ending values of dihedral angle.
+        :param i:
+            The index of the target dihedral.
+        """
+
+        new_scan_dih_angles = []
+        new_scan_energies = []
+        new_scan_geometries = []
+
+        for angle, ene, geom in zip(
+                self.scan_dih_angles[i],
+                self.scan_energies[i],
+                self.scan_geometries[i],
+        ):
+            if angle >= dih_start_end[0] and angle <= dih_start_end[1]:
+                new_scan_dih_angles.append(angle)
+                new_scan_energies.append(ene)
+                new_scan_geometries.append(geom)
+
+        self.scan_dih_angles[i] = new_scan_dih_angles
+        self.scan_energies[i] = new_scan_energies
+        self.scan_geometries[i] = new_scan_geometries
+
     def write_top(self, top_file, itp_file):
         """
         Writes a topology file.
