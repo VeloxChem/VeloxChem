@@ -483,11 +483,11 @@ class ForceFieldGenerator:
             for i, j, k in angle_indices:
                 exclusion_indices.append((i, k))
 
-        pairs_14 = []
+        pairs_14 = set()
         for i, j, k, l in dihedral_indices:
             if (i, l) not in exclusion_indices:
-                pairs_14.append((i, l))
-        pairs_14.sort()
+                pairs_14.add((i, l))
+        pairs_14 = sorted(list(pairs_14))
 
         with open(self.force_field_data, 'r') as ff_data:
             ff_data_lines = ff_data.readlines()
@@ -735,12 +735,19 @@ class ForceFieldGenerator:
             cur_str += '    phase     k_d      n\n'
             f_itp.write(cur_str)
 
+            improper_atom_inds = []
+
             for i, j, k in angle_indices:
                 at_1 = atom_types[i]
                 at_2 = atom_types[j]
                 at_3 = atom_types[k]
 
                 if at_2 not in sp2_atom_types:
+                    continue
+
+                if j not in improper_atom_inds:
+                    improper_atom_inds.append(j)
+                else:
                     continue
 
                 for l in range(n_atoms):
@@ -750,11 +757,11 @@ class ForceFieldGenerator:
 
                     patterns = [
                         re.compile(r'\A' + f'{at_4}-{at_1}-{at_2}-{at_3} '),
-                        re.compile(r'\A' + f'{at_1}-{at_4}-{at_2}-{at_3} '),
-                        re.compile(r'\A' + f'{at_3}-{at_4}-{at_2}-{at_1} '),
                         re.compile(r'\A' + f'{at_4}-{at_3}-{at_2}-{at_1} '),
                         re.compile(r'\A' + f'{at_1}-{at_3}-{at_2}-{at_4} '),
+                        re.compile(r'\A' + f'{at_1}-{at_4}-{at_2}-{at_3} '),
                         re.compile(r'\A' + f'{at_3}-{at_1}-{at_2}-{at_4} '),
+                        re.compile(r'\A' + f'{at_3}-{at_4}-{at_2}-{at_1} '),
                     ]
 
                     dihedral_found = False
@@ -770,11 +777,11 @@ class ForceFieldGenerator:
                     if not dihedral_found:
                         patterns = [
                             re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_3} '),
-                            re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_3} '),
-                            re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_1} '),
                             re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_1} '),
                             re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_4} '),
+                            re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_3} '),
                             re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_4} '),
+                            re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_1} '),
                         ]
 
                         for line in ff_data_lines:
