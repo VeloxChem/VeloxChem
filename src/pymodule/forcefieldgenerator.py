@@ -874,7 +874,7 @@ class ForceFieldGenerator:
         if (not dest.is_file()) or (not src.samefile(dest)):
             dest.write_text(src.read_text())
 
-    def dihedral_correction(self, top_file, i):
+    def dihedral_correction(self, top_file, i, kT=None):
         """
         Corrects dihedral parameters.
 
@@ -882,6 +882,8 @@ class ForceFieldGenerator:
             The topology file.
         :param i:
             The index of the target dihedral.
+        :param kT:
+            kT for Boltzmann factor (used in weighted fitting).
         """
 
         try:
@@ -950,7 +952,17 @@ class ForceFieldGenerator:
 
             difference = rel_e_qm - rel_e_mm
             initial_coef = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-            coef, cv = curve_fit(rbpot, angles, difference, initial_coef)
+
+            if kT is not None:
+                sigma = 1.0 / np.exp(-rel_e_qm / kT)
+                coef, cv = curve_fit(rbpot,
+                                     angles,
+                                     difference,
+                                     initial_coef,
+                                     sigma,
+                                     absolute_sigma=False)
+            else:
+                coef, cv = curve_fit(rbpot, angles, difference, initial_coef)
 
             self.set_dihedral_parameters(new_itp_fname, dih, coef.tolist())
         self.comm.barrier()
