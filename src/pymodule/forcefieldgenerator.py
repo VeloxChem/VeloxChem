@@ -678,12 +678,22 @@ class ForceFieldGenerator:
                                                   atom_names[k])
                 f_itp.write(cur_str)
 
-            # proper dihedrals
+            # dihedrals
 
-            f_itp.write('\n[ dihedrals ] ; propers\n')
+            f_itp.write('\n[ dihedrals ]\n')
+
             cur_str = ';    i      j      k      l    funct'
             cur_str += '    phase     k_d      n\n'
             f_itp.write(cur_str)
+
+            cur_str = ';                                   '
+            cur_str += '     C0         C1         C2         C3'
+            cur_str += '         C4         C5\n'
+            f_itp.write(cur_str)
+
+            # proper dihedrals
+
+            f_itp.write('; propers\n')
 
             for i, j, k, l in dihedral_indices:
                 at_1 = atom_types[i]
@@ -758,10 +768,7 @@ class ForceFieldGenerator:
                 'nf', 'pb', 'pc', 'pd', 'pe', 'pf'
             ]
 
-            f_itp.write('\n[ dihedrals ] ; impropers\n')
-            cur_str = ';    i      j      k      l    funct'
-            cur_str += '    phase     k_d      n\n'
-            f_itp.write(cur_str)
+            f_itp.write('; impropers\n')
 
             improper_atom_inds = []
 
@@ -951,7 +958,7 @@ class ForceFieldGenerator:
             rel_e_mm = np.array(mm_zero_scan) - min(mm_zero_scan)
 
             difference = rel_e_qm - rel_e_mm
-            initial_coef = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+            initial_coef = tuple([0.] * 6)
 
             if kT is not None:
                 sigma = 1.0 / np.exp(-rel_e_qm / kT)
@@ -1135,6 +1142,15 @@ class ForceFieldGenerator:
         dihedral_pattern = re.compile(r'\[\s*dihedrals\s*\]')
         saved_itp_lines = []
 
+        added_dih_str = False
+        dih_str = '{:6}{:7}{:7}{:7}{:7}'.format(*dihedral, 3)
+        for coef in coefficients:
+            dih_str += '{:11.5f}'.format(coef)
+        dih_str += ' ; {}-{}-{}-{}\n'.format(atom_names[dihedral[0] - 1],
+                                             atom_names[dihedral[1] - 1],
+                                             atom_names[dihedral[2] - 1],
+                                             atom_names[dihedral[3] - 1])
+
         with open(itp_fname, 'r') as f_itp:
             for line in f_itp:
                 title = line.split(';')[0].strip()
@@ -1155,7 +1171,11 @@ class ForceFieldGenerator:
                                        [l, k, j, i] == dihedral or
                                        [j, k] == dihedral[1:3] or
                                        [k, j] == dihedral[1:3])
-                        if not (condition_1 and condition_2):
+                        if condition_1 and condition_2:
+                            if not added_dih_str:
+                                saved_itp_lines.append(dih_str)
+                                added_dih_str = True
+                        else:
                             saved_itp_lines.append(line)
                     except (ValueError, IndexError):
                         saved_itp_lines.append(line)
@@ -1167,21 +1187,6 @@ class ForceFieldGenerator:
         with open(itp_fname, 'w') as f_itp:
             for line in saved_itp_lines:
                 f_itp.write(line)
-
-            f_itp.write('\n[ dihedrals ] ; edited\n')
-            cur_str = ';    i      j      k      l    type'
-            cur_str += '      C0         C1         C2         C3'
-            cur_str += '         C4         C5\n'
-            f_itp.write(cur_str)
-
-            cur_str = '{:6}{:7}{:7}{:7}{:7}'.format(*dihedral, 3)
-            for coef in coefficients:
-                cur_str += '{:11.5f}'.format(coef)
-            cur_str += ' ; {}-{}-{}-{}\n'.format(atom_names[dihedral[0] - 1],
-                                                 atom_names[dihedral[1] - 1],
-                                                 atom_names[dihedral[2] - 1],
-                                                 atom_names[dihedral[3] - 1])
-            f_itp.write(cur_str)
 
     def visualize(self, validation_result):
         """
