@@ -301,7 +301,8 @@ class PolOrbitalResponse(CphfSolver):
                     gxc_ao[i] = fock_gxc_ao.alpha_to_numpy(2*i)
 
                 gxc_mo = np.einsum('mi,xmn,na->xia', mo_occ, gxc_ao, mo_vir)
-                rhs_mo += 0.25 * gxc_mo
+                # different factor compared to TDDFT orbital response because here vectors are scaled by 1/sqrt(2)
+                rhs_mo += 0.5 * gxc_mo
 
         self.profiler.stop_timer('RHS')
 
@@ -375,7 +376,7 @@ class PolOrbitalResponse(CphfSolver):
 ###        fock_ao_rhs_2 = fock_ao_rhs.alpha_to_numpy(2)  # xmy
 ###
 ###        Fp1_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, xpy_ao, ovlp.T])
-###        Fm1_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_2.T, xmy_ao, ovlp.T])
+###        Fm1_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_2.T, xmy_ao, of.dft is true, will add gxc contribution nowvlp.T])
 ###        Fp2_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, xpy_ao, ovlp.T])
 ###        Fm2_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_2, xmy_ao, ovlp.T])
 ###        # Fp1_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, xpy_ao, ovlp.T])
