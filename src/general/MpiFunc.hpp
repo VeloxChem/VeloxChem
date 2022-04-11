@@ -38,7 +38,7 @@
 
 namespace mpi {
 template <typename T>
-inline constexpr MPI_Datatype type_v = metautils::type_to_mpi_datatype<T>::value;
+inline MPI_Datatype type_v = metautils::type_to_mpi_datatype<T>::value;
 
 template <typename T>
 inline std::string

@@ -30,7 +30,7 @@ stages:
 .monkey:setup:
   tags:
     - vlx-docker
-  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-3e15b69
+  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-5e6dcd2
   variables:
     OMP_NUM_THREADS: "6"
   before_script:
@@ -43,6 +43,9 @@ stages:
     - python -V
     - mpiicc --version
     - mpiicpc --version
+    - python -m venv --clear venv
+    - source venv/bin/activate
+    - python -m pip install --upgrade pip setuptools wheel
 
 monkey:build:
   extends: .monkey:setup
@@ -50,9 +53,6 @@ monkey:build:
   variables:
     GTESTLIB: "/usr/lib/x86_64-linux-gnu"
   script:
-    - python -m venv --clear venv
-    - source venv/bin/activate
-    - python -m pip install --upgrade pip setuptools wheel
     - python -m pip install numpy pybind11 mpi4py --no-binary=mpi4py
     - python config/generate_setup.py
     - make -j 6 -C src release
@@ -75,9 +75,6 @@ monkey:python_tests:
   variables:
     VLX_NUM_BUILD_JOBS: "6"
   script:
-    - python -m venv --clear venv
-    - source venv/bin/activate
-    - python -m pip install --upgrade pip setuptools wheel
     - python -m pip install mpi4py --no-binary=mpi4py
     - CC=gcc CXX=g++ python -m pip install cppe==0.2.1 MDAnalysis
     - python -m pip install .[test,qmmm]
