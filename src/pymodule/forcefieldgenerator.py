@@ -105,6 +105,12 @@ class ForceFieldGenerator:
         self.force_field_data = 'gaff-2.11.dat'
         self.force_field_data_extension = None
 
+        # number of rounds for fitting dihedral potentials
+        self.n_rounds = 3
+
+        self.partial_charges = None
+        self.original_top_file = None
+
         # MM settings
         self.gromacs_include_path = None
 
@@ -153,6 +159,9 @@ class ForceFieldGenerator:
             'gromacs_include_path': 'str',
             'force_field_data': 'str',
             'force_field_data_extension': 'str',
+            'n_rounds': 'int',
+            'partial_charges': 'seq_fixed',
+            'original_top_file': 'str',
         }
 
         parse_input(self, ffg_keywords, ffg_dict)
@@ -213,9 +222,11 @@ class ForceFieldGenerator:
 
         # RESP charges
 
-        resp_drv = RespChargesDriver(self.comm, self.ostream)
-        resp_drv.update_settings(self.resp_dict)
-        resp_chg = resp_drv.compute(self.molecule, basis, 'resp')
+        if self.partial_charges is None and self.original_top_file is None:
+            resp_drv = RespChargesDriver(self.comm, self.ostream)
+            resp_drv.update_settings(self.resp_dict)
+            self.partial_charges = resp_drv.compute(self.molecule, basis,
+                                                    'resp')
 
         # read QM scan
 
@@ -237,21 +248,46 @@ class ForceFieldGenerator:
         mol_name = Path(self.molecule_name).stem
 
         self.ffversion = 0
-        original_itp_file = self.workdir / (mol_name +
-                                            f'_{self.ffversion:02d}.itp')
-        original_top_file = original_itp_file.with_suffix('.top')
 
-        if self.rank == mpi_master():
-            self.workdir.mkdir(parents=True, exist_ok=True)
-            self.write_original_itp(original_itp_file, list(self.atom_types),
-                                    resp_chg)
-            self.write_top(original_top_file, original_itp_file)
-        self.comm.barrier()
+        if self.original_top_file is None:
+            original_itp_file = self.workdir / (mol_name +
+                                                f'_{self.ffversion:02d}.itp')
+            original_top_file = original_itp_file.with_suffix('.top')
 
-        self.validate_force_field(original_top_file, 'original')
+            if self.rank == mpi_master():
+                self.workdir.mkdir(parents=True, exist_ok=True)
+                self.write_original_itp(original_itp_file,
+                                        list(self.atom_types),
+                                        self.partial_charges)
+                self.write_top(original_top_file, original_itp_file)
+            self.comm.barrier()
 
-        new_top_file = self.dihedral_correction(original_top_file)
-        self.validate_force_field(new_top_file, 'new')
+        else:
+            original_top_file = Path(self.original_top_file)
+
+        self.ostream.print_blank()
+        self.ostream.print_info(
+            f'Original topology file: {str(original_top_file)}')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        # validate original force field
+
+        for i, dih in enumerate(self.target_dihedrals):
+            self.validate_force_field(original_top_file, i)
+
+        # fit dihedral potentials
+
+        n_rounds = self.n_rounds if len(self.scan_dih_angles) > 1 else 1
+        target_top_file = original_top_file
+        for i_round in range(n_rounds):
+            for i, dih in enumerate(self.target_dihedrals):
+                target_top_file = self.dihedral_correction(target_top_file, i)
+
+        # validate final force field
+
+        for i, dih in enumerate(self.target_dihedrals):
+            self.validate_force_field(target_top_file, i)
 
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
         """
@@ -322,6 +358,34 @@ class ForceFieldGenerator:
             self.target_dihedrals.append(dih_inds)
 
         self.ostream.print_blank()
+
+    def update_dihedral_range(self, dih_start_end, i):
+        """
+        Updates the range of dihedral angles for i-th dihedral (0-based index).
+
+        :param dih_start_end:
+            A tuple containing the starting and ending values of dihedral angle.
+        :param i:
+            The index of the target dihedral.
+        """
+
+        new_scan_dih_angles = []
+        new_scan_energies = []
+        new_scan_geometries = []
+
+        for angle, ene, geom in zip(
+                self.scan_dih_angles[i],
+                self.scan_energies[i],
+                self.scan_geometries[i],
+        ):
+            if angle >= dih_start_end[0] and angle <= dih_start_end[1]:
+                new_scan_dih_angles.append(angle)
+                new_scan_energies.append(ene)
+                new_scan_geometries.append(geom)
+
+        self.scan_dih_angles[i] = new_scan_dih_angles
+        self.scan_energies[i] = new_scan_energies
+        self.scan_geometries[i] = new_scan_geometries
 
     def write_top(self, top_file, itp_file):
         """
@@ -447,17 +511,17 @@ class ForceFieldGenerator:
             for i, j, k in angle_indices:
                 exclusion_indices.append((i, k))
 
-        pairs_14 = []
+        pairs_14 = set()
         for i, j, k, l in dihedral_indices:
             if (i, l) not in exclusion_indices:
-                pairs_14.append((i, l))
-        pairs_14.sort()
+                pairs_14.add((i, l))
+        pairs_14 = sorted(list(pairs_14))
 
         with open(self.force_field_data, 'r') as ff_data:
             ff_data_lines = ff_data.readlines()
 
         if Path(self.force_field_data_extension).is_file():
-            with open(self.force_field_data, 'r') as ff_extension:
+            with open(self.force_field_data_extension, 'r') as ff_extension:
                 ff_data_lines += ff_extension.readlines()
 
         with open(itp_fname, 'w') as f_itp:
@@ -545,17 +609,12 @@ class ForceFieldGenerator:
                 errmsg += ' is not available'
                 assert_msg_critical(bond_found, errmsg)
 
-                if abs(r - r_eq) > self.r_thresh:
-                    msg_1 = f'*** Warning: bond length {at_1}-{at_2}'
-                    msg_1 += ' does not match length in XYZ file'
-                    msg_2 = f'             (atoms {i+1},{j+1}:'
-                    msg_2 += f' {r:.3f} vs. {r_eq:.3f})'
-                    self.ostream.print_header(msg_1.ljust(80))
-                    self.ostream.print_header(msg_2.ljust(80))
-                    self.ostream.print_blank()
-                    self.ostream.flush()
-
                 if self.eq_param:
+                    if abs(r - r_eq) > self.r_thresh:
+                        msg = f'Updated bond length {i+1}-{j+1} '
+                        msg += f'({at_1}-{at_2}) to {r_eq:.3f} nm'
+                        self.ostream.print_info(msg)
+                        self.ostream.flush()
                     r = r_eq
 
                 cur_str = '{:6}{:7}{:7}{:14.4e}{:14.4e} ; {}-{}\n'.format(
@@ -605,17 +664,12 @@ class ForceFieldGenerator:
                 errmsg += ' is not available.'
                 assert_msg_critical(angle_found, errmsg)
 
-                if abs(theta - theta_eq) > self.theta_thresh:
-                    msg_1 = f'*** Warning: angle {at_1}-{at_2}-{at_3}'
-                    msg_1 += ' does not match angle in XYZ file'
-                    msg_2 = f'             (atoms no. {i+1},{j+1},{k+1}:'
-                    msg_2 += f' {theta:.1f} vs. {theta_eq:.1f})'
-                    self.ostream.print_header(msg_1.ljust(80))
-                    self.ostream.print_header(msg_2.ljust(80))
-                    self.ostream.print_blank()
-                    self.ostream.flush()
-
                 if self.eq_param:
+                    if abs(theta - theta_eq) > self.theta_thresh:
+                        msg = f'Updated bond angle {i+1}-{j+1}-{k+1} '
+                        msg += f'({at_1}-{at_2}-{at_3}) to {theta_eq:.1f} deg'
+                        self.ostream.print_info(msg)
+                        self.ostream.flush()
                     theta = theta_eq
 
                 cur_str = '{:6}{:7}{:7}{:7}{:14.4e}{:14.4e}'.format(
@@ -624,15 +678,22 @@ class ForceFieldGenerator:
                                                   atom_names[k])
                 f_itp.write(cur_str)
 
-            # proper dihedrals
+            # dihedrals
 
-            f_itp.write('\n[ dihedrals ] ; propers\n')
+            f_itp.write('\n[ dihedrals ]\n')
+
             cur_str = ';    i      j      k      l    funct'
             cur_str += '    phase     k_d      n\n'
             f_itp.write(cur_str)
-            cur_str = ';                                        '
-            cur_str += 'C0         C1         C2         C3         C4         C5\n'
+
+            cur_str = ';                                   '
+            cur_str += '     C0         C1         C2         C3'
+            cur_str += '         C4         C5\n'
             f_itp.write(cur_str)
+
+            # proper dihedrals
+
+            f_itp.write('; propers\n')
 
             for i, j, k, l in dihedral_indices:
                 at_1 = atom_types[i]
@@ -650,7 +711,8 @@ class ForceFieldGenerator:
                 for line in ff_data_lines:
                     matches = [re.search(p, line) for p in patterns]
                     if any(matches):
-                        if '.' not in line[11:].strip().split()[0]:
+                        dihedral_ff = line[11:60].strip().split()
+                        if len(dihedral_ff) == 4:
                             dihedral_ff_lines.append(line)
                             dihedral_found = True
 
@@ -664,7 +726,8 @@ class ForceFieldGenerator:
                     for line in ff_data_lines:
                         matches = [re.search(p, line) for p in patterns]
                         if any(matches):
-                            if '.' not in line[11:].strip().split()[0]:
+                            dihedral_ff = line[11:60].strip().split()
+                            if len(dihedral_ff) == 4:
                                 dihedral_ff_lines.append(line)
                                 dihedral_found = True
 
@@ -673,7 +736,8 @@ class ForceFieldGenerator:
                 assert_msg_critical(dihedral_found, errmsg)
 
                 for line in dihedral_ff_lines:
-                    dihedral_ff = line[11:].strip().split()
+                    dihedral_ff = line[11:60].strip().split()
+
                     multiplicity = int(dihedral_ff[0])
                     barrier = float(dihedral_ff[1]) * 4.184 / multiplicity
                     phase = float(dihedral_ff[2])
@@ -704,10 +768,9 @@ class ForceFieldGenerator:
                 'nf', 'pb', 'pc', 'pd', 'pe', 'pf'
             ]
 
-            f_itp.write('\n[ dihedrals ] ; impropers\n')
-            cur_str = ';    i      j      k      l    funct'
-            cur_str += '    phase     k_d      n\n'
-            f_itp.write(cur_str)
+            f_itp.write('; impropers\n')
+
+            improper_atom_inds = []
 
             for i, j, k in angle_indices:
                 at_1 = atom_types[i]
@@ -717,6 +780,11 @@ class ForceFieldGenerator:
                 if at_2 not in sp2_atom_types:
                     continue
 
+                if j not in improper_atom_inds:
+                    improper_atom_inds.append(j)
+                else:
+                    continue
+
                 for l in range(n_atoms):
                     if (l in [i, j, k]) or (not connected[l, j]):
                         continue
@@ -724,11 +792,11 @@ class ForceFieldGenerator:
 
                     patterns = [
                         re.compile(r'\A' + f'{at_4}-{at_1}-{at_2}-{at_3} '),
-                        re.compile(r'\A' + f'{at_1}-{at_4}-{at_2}-{at_3} '),
-                        re.compile(r'\A' + f'{at_3}-{at_4}-{at_2}-{at_1} '),
                         re.compile(r'\A' + f'{at_4}-{at_3}-{at_2}-{at_1} '),
                         re.compile(r'\A' + f'{at_1}-{at_3}-{at_2}-{at_4} '),
+                        re.compile(r'\A' + f'{at_1}-{at_4}-{at_2}-{at_3} '),
                         re.compile(r'\A' + f'{at_3}-{at_1}-{at_2}-{at_4} '),
+                        re.compile(r'\A' + f'{at_3}-{at_4}-{at_2}-{at_1} '),
                     ]
 
                     dihedral_found = False
@@ -736,26 +804,26 @@ class ForceFieldGenerator:
                     for line in ff_data_lines:
                         matches = [re.search(p, line) for p in patterns]
                         if any(matches):
-                            if '.' in line[11:].strip().split()[0]:
-                                dihedral_ff = line[11:].strip().split()
+                            dihedral_ff = line[11:60].strip().split()
+                            if len(dihedral_ff) == 3:
                                 dihedral_found = True
                                 break
 
                     if not dihedral_found:
                         patterns = [
                             re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_3} '),
-                            re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_3} '),
-                            re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_1} '),
                             re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_1} '),
                             re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_4} '),
+                            re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_3} '),
                             re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_4} '),
+                            re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_1} '),
                         ]
 
                         for line in ff_data_lines:
                             matches = [re.search(p, line) for p in patterns]
                             if any(matches):
-                                if '.' in line[11:].strip().split()[0]:
-                                    dihedral_ff = line[11:].strip().split()
+                                dihedral_ff = line[11:60].strip().split()
+                                if len(dihedral_ff) == 3:
                                     dihedral_found = True
                                     break
 
@@ -769,8 +837,8 @@ class ForceFieldGenerator:
                         for line in ff_data_lines:
                             matches = [re.search(p, line) for p in patterns]
                             if any(matches):
-                                if '.' in line[11:].strip().split()[0]:
-                                    dihedral_ff = line[11:].strip().split()
+                                dihedral_ff = line[11:60].strip().split()
+                                if len(dihedral_ff) == 3:
                                     dihedral_found = True
                                     break
 
@@ -779,8 +847,8 @@ class ForceFieldGenerator:
                     assert_msg_critical(dihedral_found, errmsg)
 
                     barrier = float(dihedral_ff[0]) * 4.184
-                    phase = float(dihedral_ff[2])
-                    periodicity = abs(int(dihedral_ff[3]))
+                    phase = float(dihedral_ff[1])
+                    periodicity = abs(int(float(dihedral_ff[2])))
 
                     assert_msg_critical(
                         phase == 180.0,
@@ -793,7 +861,7 @@ class ForceFieldGenerator:
                     cur_str = '{:6}{:7}{:7}{:7}'.format(l + 1, i + 1, j + 1,
                                                         k + 1)
                     cur_str += '{:7}{:11.2f}{:11.5f}{:4}'.format(
-                        1, phase, barrier, periodicity)
+                        4, phase, barrier, periodicity)
                     cur_str += ' ; {}-{}-{}-{}\n'.format(
                         atom_names[l], atom_names[i], atom_names[j],
                         atom_names[k])
@@ -810,14 +878,19 @@ class ForceFieldGenerator:
             The destination of copy.
         """
 
-        dest.write_text(src.read_text())
+        if (not dest.is_file()) or (not src.samefile(dest)):
+            dest.write_text(src.read_text())
 
-    def dihedral_correction(self, top_file):
+    def dihedral_correction(self, top_file, i, kT=None):
         """
         Corrects dihedral parameters.
 
         :param top_filename:
             The topology file.
+        :param i:
+            The index of the target dihedral.
+        :param kT:
+            kT for Boltzmann factor (used in weighted fitting).
         """
 
         try:
@@ -836,8 +909,6 @@ class ForceFieldGenerator:
             v += c5 * np.cos((180 - phi) * 2 * np.pi / 360)**5
             return v
 
-        self.ostream.print_info('Correcting dihedral angle...')
-
         top_fname = top_file if isinstance(top_file, str) else str(top_file)
         itp_fname = self.get_included_file(top_fname)
 
@@ -855,93 +926,113 @@ class ForceFieldGenerator:
                 self.write_top(new_top_fname, new_itp_fname)
             self.comm.barrier()
 
-        for i, (dih, geom, qm_scan, angles) in enumerate(
-                zip(self.target_dihedrals, self.scan_geometries,
-                    self.scan_energies, self.scan_dih_angles)):
+        dih = self.target_dihedrals[i]
+        geom = self.scan_geometries[i]
+        qm_scan = self.scan_energies[i]
+        angles = self.scan_dih_angles[i]
 
-            self.ostream.print_info('  {}-{}-{}-{}'.format(*dih))
-            self.ostream.flush()
+        self.ostream.print_info('Fitting dihedral angle ' +
+                                '{}-{}-{}-{}'.format(*dih) + '...')
+        self.ostream.flush()
 
-            # MM scan with dihedral parameters set to zero
+        # MM scan with dihedral parameters set to zero
 
-            output_dir = self.workdir / f'{mol_name}_dih_corr' / f'{i+1}'
-            zero_itp_file = output_dir / f'{mol_name}_zero.itp'
-            zero_top_file = output_dir / f'{mol_name}_zero.top'
+        output_dir = self.workdir / f'{mol_name}_dih_corr' / f'{i+1}'
+        zero_itp_file = output_dir / f'{mol_name}_zero.itp'
+        zero_top_file = output_dir / f'{mol_name}_zero.top'
 
-            if self.rank == mpi_master():
-                output_dir.mkdir(parents=True, exist_ok=True)
-                self.copy_file(Path(new_itp_fname), zero_itp_file)
-                self.write_top(zero_top_file, zero_itp_file)
-                self.set_dihedral_parameters(zero_itp_file, dih, [0.] * 6)
-            self.comm.barrier()
+        if self.rank == mpi_master():
+            output_dir.mkdir(parents=True, exist_ok=True)
+            self.copy_file(Path(new_itp_fname), zero_itp_file)
+            self.write_top(zero_top_file, zero_itp_file)
+            self.set_dihedral_parameters(zero_itp_file, dih, [0.] * 6)
+        self.comm.barrier()
 
-            mm_zero_scan = self.perform_mm_scan(zero_top_file, dih, geom,
-                                                angles)
+        mm_zero_scan = self.perform_mm_scan(zero_top_file, dih, geom, angles)
 
-            # fitting Ryckaert-Bellemans function
+        # fitting Ryckaert-Bellemans function
 
-            if self.rank == mpi_master():
-                rel_e_qm = np.array(qm_scan) - min(qm_scan)
-                rel_e_qm *= hartree_in_kcalpermol() * 4.184
-                rel_e_mm = np.array(mm_zero_scan) - min(mm_zero_scan)
+        if self.rank == mpi_master():
+            rel_e_qm = np.array(qm_scan) - min(qm_scan)
+            rel_e_qm *= hartree_in_kcalpermol() * 4.184
+            rel_e_mm = np.array(mm_zero_scan) - min(mm_zero_scan)
 
-                difference = rel_e_qm - rel_e_mm
-                initial_coef = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+            difference = rel_e_qm - rel_e_mm
+            initial_coef = tuple([0.] * 6)
+
+            if kT is not None:
+                sigma = 1.0 / np.exp(-rel_e_qm / kT)
+                coef, cv = curve_fit(rbpot,
+                                     angles,
+                                     difference,
+                                     initial_coef,
+                                     sigma,
+                                     absolute_sigma=False)
+            else:
                 coef, cv = curve_fit(rbpot, angles, difference, initial_coef)
 
-                self.set_dihedral_parameters(new_itp_fname, dih, coef.tolist())
-            self.comm.barrier()
+            self.set_dihedral_parameters(new_itp_fname, dih, coef.tolist())
+        self.comm.barrier()
 
         self.ostream.print_info('...done.')
+        self.ostream.print_blank()
+        self.ostream.print_info(f'Generated new topology file: {new_top_fname}')
         self.ostream.print_blank()
         self.ostream.flush()
 
         return Path(new_top_fname)
 
-    def validate_force_field(self, top_file, flag):
+    def validate_force_field(self, top_file, i):
         """
         Validates force field by RMSD of dihedral potentials.
 
         :param top_file:
             The topology file.
-        :param flag:
-            The flag for the force field.
+        :param i:
+            The index of the target dihedral.
+
+        :return:
+            A dictionary containing the results of validation.
         """
 
-        self.ostream.print_info(f'Validating {flag} force field...')
-        self.ostream.print_info(f'  {str(top_file)}')
+        self.ostream.print_info(f'Validating {str(top_file)} ...')
         self.ostream.print_blank()
         self.ostream.flush()
 
-        for i, dih in enumerate(self.target_dihedrals):
+        dih = self.target_dihedrals[i]
 
+        self.ostream.print_info(
+            '  Target dihedral angle: {}-{}-{}-{}'.format(*dih))
+        self.ostream.print_blank()
+
+        geom = self.scan_geometries[i]
+        angles = self.scan_dih_angles[i]
+        mm_scan = self.perform_mm_scan(top_file, dih, geom, angles)
+        mm_scan = np.array(mm_scan) - min(mm_scan)
+
+        qm_scan = np.array(self.scan_energies[i]) - min(self.scan_energies[i])
+        qm_scan *= hartree_in_kcalpermol() * 4.184
+
+        self.ostream.print_blank()
+        self.ostream.print_info(
+            '      Dihedral      MM energy(rel)      QM energy(rel)       diff')
+        self.ostream.print_info(
+            '  ---------------------------------------------------------------')
+        for angle, e_mm, e_qm in zip(angles, mm_scan, qm_scan):
             self.ostream.print_info(
-                '  Target dihedral angle: {}-{}-{}-{}'.format(*dih))
-            self.ostream.print_blank()
+                f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol ' +
+                f'{(e_mm - e_qm):10.3f}')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
-            geom = self.scan_geometries[i]
-            angles = self.scan_dih_angles[i]
-            mm_scan = self.perform_mm_scan(top_file, dih, geom, angles,
-                                           'verbose')
-            mm_scan = np.array(mm_scan) - min(mm_scan)
+        return {
+            'dihedral_indices': list(dih),
+            'dihedral_angles': list(angles),
+            'mm_scan_kJpermol': mm_scan.copy(),
+            'qm_scan_kJpermol': qm_scan.copy(),
+        }
 
-            qm_scan = np.array(self.scan_energies[i]) - min(
-                self.scan_energies[i])
-            qm_scan *= hartree_in_kcalpermol() * 4.184
-
-            rmsd = np.sqrt(np.linalg.norm(qm_scan - mm_scan)**2 / qm_scan.size)
-
-            self.ostream.print_info('  --------------------------------')
-            self.ostream.print_info(f'  RMSD from QM {rmsd:12.3f} kJ/mol')
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-    def perform_mm_scan(self,
-                        top_file,
-                        dihedral,
-                        geometries,
-                        angles,
-                        flag=None):
+    def perform_mm_scan(self, top_file, dihedral, geometries, angles):
         """
         Performs MM scan of a specific dihedral.
 
@@ -949,8 +1040,10 @@ class ForceFieldGenerator:
             The topology file.
         :param dihedral:
             The dihedral.
-        :param flag:
-            The flag for output verbosity.
+        :param geometries:
+            The scanned geometris for this dihedral.
+        :param angles:
+            The scanned angles for this dihedral.
         """
 
         # select scan angles and geometries from QM data
@@ -966,10 +1059,9 @@ class ForceFieldGenerator:
             scan_dir.mkdir(parents=True, exist_ok=True)
         self.comm.barrier()
 
-        if flag == 'verbose':
-            self.ostream.print_info('      Dihedral           MM energy')
-            self.ostream.print_info('  --------------------------------')
-            self.ostream.flush()
+        self.ostream.print_info('      Dihedral           MM energy')
+        self.ostream.print_info('  --------------------------------')
+        self.ostream.flush()
 
         energies = []
         for i, (geom, angle) in enumerate(zip(geometries, angles)):
@@ -993,10 +1085,9 @@ class ForceFieldGenerator:
             pot_energy *= 4.184 * hartree_in_kcalpermol()
             energies.append(pot_energy)
 
-            if flag == 'verbose':
-                self.ostream.print_info(
-                    f'  {angle:8.1f} deg {pot_energy:12.3f} kJ/mol')
-                self.ostream.flush()
+            self.ostream.print_info(
+                f'  {angle:8.1f} deg {pot_energy:12.3f} kJ/mol')
+            self.ostream.flush()
 
         return energies
 
@@ -1051,6 +1142,15 @@ class ForceFieldGenerator:
         dihedral_pattern = re.compile(r'\[\s*dihedrals\s*\]')
         saved_itp_lines = []
 
+        added_dih_str = False
+        dih_str = '{:6}{:7}{:7}{:7}{:7}'.format(*dihedral, 3)
+        for coef in coefficients:
+            dih_str += '{:11.5f}'.format(coef)
+        dih_str += ' ; {}-{}-{}-{}\n'.format(atom_names[dihedral[0] - 1],
+                                             atom_names[dihedral[1] - 1],
+                                             atom_names[dihedral[2] - 1],
+                                             atom_names[dihedral[3] - 1])
+
         with open(itp_fname, 'r') as f_itp:
             for line in f_itp:
                 title = line.split(';')[0].strip()
@@ -1071,7 +1171,11 @@ class ForceFieldGenerator:
                                        [l, k, j, i] == dihedral or
                                        [j, k] == dihedral[1:3] or
                                        [k, j] == dihedral[1:3])
-                        if not (condition_1 and condition_2):
+                        if condition_1 and condition_2:
+                            if not added_dih_str:
+                                saved_itp_lines.append(dih_str)
+                                added_dih_str = True
+                        else:
                             saved_itp_lines.append(line)
                     except (ValueError, IndexError):
                         saved_itp_lines.append(line)
@@ -1084,29 +1188,12 @@ class ForceFieldGenerator:
             for line in saved_itp_lines:
                 f_itp.write(line)
 
-            f_itp.write('\n[ dihedrals ] ; edited\n')
-            cur_str = ';    i      j      k      l    type'
-            cur_str += '      C0         C1         C2         C3'
-            cur_str += '         C4         C5\n'
-            f_itp.write(cur_str)
-
-            cur_str = '{:6}{:7}{:7}{:7}{:7}'.format(*dihedral, 3)
-            for coef in coefficients:
-                cur_str += '{:11.5f}'.format(coef)
-            cur_str += ' ; {}-{}-{}-{}\n'.format(atom_names[dihedral[0] - 1],
-                                                 atom_names[dihedral[1] - 1],
-                                                 atom_names[dihedral[2] - 1],
-                                                 atom_names[dihedral[3] - 1])
-            f_itp.write(cur_str)
-
-    def visualize(self, dft_scan, mm_scan, dihedral, angles):
+    def visualize(self, validation_result):
         """
         Visualizes dihedral potential.
 
-        :param mm_scan:
-            The MM scan energies.
-        :param dihedral:
-            The dihedral.
+        :param validation_result:
+            The dictionary containing the result of validation.
         """
 
         try:
@@ -1115,17 +1202,18 @@ class ForceFieldGenerator:
             raise ImportError('Unable to import Matplotlib. Please install ' +
                               'Matplotlib via \'conda install matplotlib\'')
 
-        dft_scan_kcal = (np.array(dft_scan) -
-                         min(dft_scan)) * hartree_in_kcalpermol()
-        mm_scan_kcal = (np.array(mm_scan) - min(mm_scan)) / 4.184
+        qm_scan_kJpermol = validation_result['qm_scan_kJpermol']
+        mm_scan_kJpermol = validation_result['mm_scan_kJpermol']
+        dihedral_angles = validation_result['dihedral_angles']
+        dihedral_indices = validation_result['dihedral_indices']
 
-        plt.plot(angles, dft_scan_kcal, '-o', label="QM")
-        plt.plot(angles, mm_scan_kcal, '-o', label="MM")
+        plt.plot(dihedral_angles, qm_scan_kJpermol, '-o', label="QM")
+        plt.plot(dihedral_angles, mm_scan_kJpermol, '-o', label="MM")
 
         plt.grid()
         plt.legend(loc='upper right')
-        plt.xlabel('dihedral angle {}-{}-{}-{}'.format(*dihedral))
-        plt.ylabel('E in kcal/mol')
+        plt.xlabel('dihedral angle {}-{}-{}-{}'.format(*dihedral_indices))
+        plt.ylabel('E in kJ/mol')
         plt.title('dihedral potential of {}'.format(self.molecule_name))
         plt.show()
 
