@@ -63,18 +63,24 @@ class TestForceField:
             ref_parameters = np.array(
                 [4.82579, 10.74424, 0.17548, -15.10881, 1.85225, -2.59463])
 
+            dih_parameters = None
             new_itp_file = here / 'inputs' / 'butane_files' / 'butane_01.itp'
+
             with new_itp_file.open('r') as f_itp:
-                itp_lines = f_itp.readlines()
+                for line in f_itp:
+                    content = line.split()
 
-            last_line_content = itp_lines[-1].split()
-            dih_atom_inds = [int(x) for x in last_line_content[:4]]
-            dih_funct_type = int(last_line_content[4])
-            dih_parameters = np.array(
-                [float(x) for x in last_line_content[5:11]])
+                    try:
+                        dih_atom_inds = [int(x) for x in content[:4]]
+                        dih_funct_type = int(content[4])
+                        if (dih_atom_inds == ref_atom_inds and
+                                dih_funct_type == ref_funct_type):
+                            dih_parameters = np.array(
+                                [float(x) for x in content[5:11]])
+                    except (ValueError, IndexError):
+                        continue
 
-            assert dih_atom_inds == ref_atom_inds
-            assert dih_funct_type == ref_funct_type
+            assert dih_parameters is not None
             assert np.max(np.abs(dih_parameters - ref_parameters)) < 1.0e-3
 
             if gaff_file.is_file():
