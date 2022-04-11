@@ -318,7 +318,11 @@ class ImpesCoordinates:
         """
         Returns the internal gradient transformed from 
         using the inverse bond length 1/R to using R.
+        Also transforms distance * Hessian from 1/R to R.
         (required to transform back to the Cartesian gradient).
+
+        :param dist_hessian:
+            result of distance.T Hessian matrix-matrix multiplication 
 
         """
         if self.internal_coordinates is None:
@@ -418,6 +422,33 @@ class ImpesCoordinates:
 
         self.internal_coordinates_array = np.array(int_coords)
 
+    def return_internal_coordinates(self, r_inverse=True):
+        """
+        Returns a numpy array with the internal coordinates.
+
+        :param r_inverse:
+            flag to decide if R or 1/R is used, where R is the bond length.
+        """
+        if self.internal_coordinates is None:
+            self.define_internal_coordinates()
+        if self.cartesian_coordinates is None:
+            raise ValueError("No cartesian coordinates are defined.")
+
+        n_atoms = self.cartesian_coordinates.shape[0]
+        coords = self.cartesian_coordinates.reshape((3*n_atoms))
+
+        int_coords = []
+        for q in self.internal_coordinates:
+            if isinstance(q, geometric.internal.Distance) and self.r_inverse:
+                if r_inverse:
+                    int_coords.append(1.0/q.value(coords))
+                else:
+                    int_coords.append(q.value(coords))
+            else:
+                int_coords.append(q.value(coords))
+
+        return np.array(int_coords)
+
     def get_z_matrix_as_np_array(self):
         """
         Returns an array with the Z-matrix
@@ -455,9 +486,6 @@ class ImpesCoordinates:
                 translated_coordinates[i,2] -= sum_z
             return translated_coordinates
 
-    # TODO: change to Eckart routine 
-    # is it possible to make use of geometric here?
-    # save in self or return?
     def rotate_to(self, reference):
         """Rotates the coordinates to align to a reference.
 
@@ -551,7 +579,7 @@ class ImpesCoordinates:
         return True
 
 
-    # TODO: complpete
+    # TODO: read more variables in?
     def read_hdf5(self, fname, label):
         """
         Reads the energy, internal coordinates, gradient, and Hessian from
@@ -756,8 +784,6 @@ class ImpesDriver():
             raise ValueError(errtxt)
 
     # TODO: double check weight gradients!
-    # Rinv seems not to work properly...
-    # not sure even why it is so different...
     def simple_interpolation(self, fname, labels):
         """Performs a simple interpolation.
 
@@ -895,20 +921,28 @@ class ImpesDriver():
         energy = data_point.energy
         grad = data_point.internal_gradient
         hessian = data_point.internal_hessian
-        dist = (   self.impes_coordinate.internal_coordinates_array 
-                 - data_point.internal_coordinates_array )
+        dist = (
+            self.impes_coordinate.return_internal_coordinates(r_inverse=False) 
+          - data_point.return_internal_coordinates(r_inverse=False)
+                )
 
-        b_matrix = self.impes_coordinate.b_matrix
+        if data_point.b_matrix is None:
+            data_point.calculate_b_matrix()
+        b_matrix = data_point.b_matrix #self.impes_coordinate.b_matrix
 
         if self.r_inverse:
             # trnasform gradient and hessian back to r.
             # this is required to be able to then transform
             # to the Cartesian gradient.
+
             grad, hessian = data_point.transform_to_r()
 
         dist_hessian = np.matmul(dist.T, hessian)
-        gradient = ( np.matmul(b_matrix.T, grad + dist_hessian)
-                        ).reshape(natm, 3)
+
+        gradient = (  np.matmul(b_matrix.T, grad)
+                    + np.matmul(b_matrix.T, dist_hessian)
+                    ).reshape(natm, 3)
+
 
         return gradient
 
@@ -924,7 +958,7 @@ class ImpesDriver():
                 The norm of the distance vector * sqrt(N), N number of atoms.
         """
         weight_gradient = ( - self.exponent_p * distance_vector /
-                            distance**( self.exponent_p + 1 ) )
+                            distance**( self.exponent_p + 1 ) ) #TODO double check +1 / +2 
 
         return weight_gradient
     
