@@ -30,6 +30,10 @@ import sys
 import h5py
 import geometric
 
+au_in_fs = 2.418884326585747e-2
+fs_in_au = 1.0 / au_in_fs
+amu_in_au = 1822.888486217198 
+
 def parse_z_matrix(input_z_matrix):
     """
     Parses the input Z-matrix to create a list of indices which define
@@ -51,7 +55,26 @@ def parse_z_matrix(input_z_matrix):
 
     return z_matrix
 
-# TODO: add routines to read energy, gradient, Hessian in internal coordinates.
+def parse_labels(input_labels):
+    """
+    Parses the input for labels of interpolation data points
+    and returns them as a list.
+    
+    :param input_z_matrix:
+        The string containing the Z-matrix.
+
+    :return:
+        a list of data point labels.
+    """
+
+    labels = []
+    for label_str in input_labels.split('\n'):
+        labels.append(label_str)
+
+    return labels
+
+
+# TODO: MPI-parallelization!
 class ImpesCoordinates:
     """
     Implements routines for the coordinates required for potential
@@ -206,7 +229,8 @@ class ImpesCoordinates:
         coords = self.cartesian_coordinates.reshape((3*n_atoms))
 
         if self.b2_matrix is None:
-            self.b2_matrix = np.zeros((len(self.z_matrix), 3*n_atoms, 3*n_atoms))
+            self.b2_matrix = np.zeros(
+                    (len(self.z_matrix), 3*n_atoms, 3*n_atoms))
 
         for i in range(len(self.z_matrix)):
             z = self.z_matrix[i]
@@ -650,6 +674,7 @@ class ImpesCoordinates:
 
         h5f.close() 
 
+# TODO: MPI-parallelization!
 class ImpesDriver():
     """
     Implements the potential energy surface interpolation driver
@@ -660,13 +685,13 @@ class ImpesDriver():
         The output stream.
 
     Instance variables
-        - list_of_points: a list of impes coordinates?
         - z_matrix: the Z-matrix of indices defining the internal
           coordinates.
-        - r_inv: flag which determines if to use 1/R.
+        - r_inverse: flag which determines if to use 1/R.
         - impes_coordinate: the new molecular geometry at which the energy
           is to be calculated by interpolation.
         - energy: the energy determined by interpolation.
+        - gradient: the Cartesian gradient determined by interpolation.
         - exponent_p: exponent required in the interpolation procedure (both
           simple and Shepard interpolation).
         - exponent_q: exponent required in the Shepard interpolation procedure.
@@ -696,10 +721,11 @@ class ImpesDriver():
         # Z-matrix, energy and coordinate
         self.z_matrix = None
         self.energy = None
+        self.gradient = None
         self.impes_coordinate = None
 
         # r_inv: if to use 1/R instead of R
-        self.r_inv = True
+        self.r_inverse = True
         
         # simple or Shepard interpolation
         self.interpolation_type = 'shepard'
@@ -958,7 +984,8 @@ class ImpesDriver():
                 The norm of the distance vector * sqrt(N), N number of atoms.
         """
         weight_gradient = ( - self.exponent_p * distance_vector /
-                            distance**( self.exponent_p + 1 ) ) #TODO double check +1 / +2 
+                            distance**( self.exponent_p + 1 ) )
+        # TODO double check +1 / +2 
 
         return weight_gradient
     
@@ -1026,13 +1053,154 @@ class ImpesDriver():
         distance_vector = reference_coordinates - rotated_coordinates
 
         if self.interpolation_type == 'shepard':
-            weight_gradient = self.shepard_weight_gradient(distance_vector, distance)
+            weight_gradient = self.shepard_weight_gradient(distance_vector,
+                                                           distance)
         elif self.interpolation_type == 'simple':
-            weight_gradient = self.simple_weight_gradient(distance_vector, distance)
+            weight_gradient = self.simple_weight_gradient(distance_vector,
+                                                          distance)
         else:
             errtxt = "Unrecognized interpolation type: "
             errtxt += self.interpolation_type
             raise ValueError(errtxt)
 
         return distance, weight_gradient
+
+
+# TODO: store labels in the same checkpoint file, rather than pass them on
+# separately?
+class ImpesDynamicsDriver():
+    """
+    Simple interpolated dynamics driver based on Verlet integration.
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
+
+    Instance variables
+        - impes_driver: an ImpesDriver object that provides the gradient.
+        - coordinates: array of coordinates.
+        - velocities: array of velocities
+        - time_step: the time step to be used (in fs).
+        - duration: the total time to run the dynamics (in fs).
+        - current_step: time step at which dynamics has arrived-
+        - name: name of the checkpoint file where the data points for
+                interpolation are stored.
+        - labels: labels of the data points to be used for interpolation.
+    """
+
+    def __init__(self, comm=None, ostream=None):
+        """
+            Initializes the IMPES dynamics driver.
+        """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
+
+        # MPI information
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+        self.ostream = ostream
+
+        # TODO: add timing and profiling
+
+        # ImpesDriver, coordinates, velocities
+        self.impes_driver = ImpesDriver()
+        self.coordinates = None
+        self.velocities = None
+
+        # time step and total duration
+        self.time_step = 1 # fs = 41 a.u.  
+        self.duration = 10 # fs = 410 a.u.
+        self.current_step = 0 
+
+
+    def update_settings(self, impes_dict=None):
+        """
+        Updates settings in the ImpesDynamicsDriver.
+
+        :param impes_dict:
+            The input dictionary of settings for IMPES.
+        """ 
+        if impes_dict is None:
+            impes_dict = {}
+
+        self.impes_driver.update_settings(impes_dict)
+
+        if 'time_step' in impes_dict:
+            self.time_step = float(impes_dict['time_step'])
+        if 'duration' in impes_dict:
+            self.duration = float(impes_dict['duration'])
+        if 'name' in impes_dict:
+            self.name = impes_dict['name']
+        if 'labels' in impes_dict:
+            self.labels = parse_labels(impes_dict['labels'])
+
+    def run_dynamics_step(self, molecule, iteration=0):
+        """
+        Runs one step of the interpolated dynamics to update
+        the atomic coordinates and velocities based on 
+        Verlet integration.
+
+        :param molecule:
+            The molecule.
+        """
+
+        # atomic masses
+        masses = molecule.masses_to_numpy() * amu_in_au # transform to au
+
+        # Determine the atomic forces and accelerations
+        forces = - self.impes_driver.gradient
+        acc = np.einsum('ix,i->ix', forces, 1/masses) 
+
+        # Calculate velocities at t + 1/2 dt
+        dt = self.time_step * fs_in_au # transform fs to a.u. 
+        velocities = self.velocities[iteration] + 0.5 * acc * dt
+        coordinates = self.coordinates[iteration] + velocities * dt
+
+        # calculate energy and gradient for the new coordinates
+        # TODO: save potential and kinetic energies too? 
+        self.impes_driver.compute(coordinates, self.name, self.labels)
+
+        # recalculate the accelerations
+        forces = - self.impes_driver.gradient
+        acc_dt = np.einsum('ix,i->ix', forces, 1/masses)
+
+        # calculate the velocity at t + dt
+        velocities = self.velocities[iteration] + 0.5 * ( acc + acc_dt ) * dt
+
+        # save results
+        self.velocities.append(velocities)
+        self.coordinates.append(coordinates)
+
+        # update current step
+        self.current_step += self.time_step
+
+
+    def compute(self, molecule):
+        """
+        Runs the interpolation dynamics.
+
+        :param molecule:
+            The molecule.
+        """
+
+        # Initialize coordinates and velocities
+        starting_coordinates = molecule.get_coordinates()
+        self.coordinates = [ starting_coordinates ]
+        self.velocities = [np.zeros_like(starting_coordinates)]
+
+        # Calculate energy and gradient for starting coordinates
+        self.impes_driver.compute(starting_coordinates, self.name, self.labels)
+        
+        # Start dynamics
+        iteration = 0
+        while self.duration >= self.current_step:
+            self.run_dynamics_step(molecule, iteration)
+            iteration += 1
+
 
