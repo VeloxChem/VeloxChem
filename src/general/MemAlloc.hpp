@@ -90,7 +90,15 @@ constexpr inline auto __vlx_malloc =
 #ifdef _MSC_VER
     _aligned_alloc;
 #else  // _MSC_VER
-    [](size_t pitch_bytes, size_t alignment) -> void * { return std::aligned_alloc(alignment, pitch_bytes); };
+    [](size_t count_bytes, size_t alignment) -> void * {
+    void* ptr = nullptr;
+
+    auto ierr = ::posix_memalign(&ptr, alignment, count_bytes);
+
+    errors::assertMsgCritical(ierr == 0, "posix_memalign failed");
+
+    return ptr;
+};
 #endif
 #endif
 
@@ -108,7 +116,7 @@ constexpr inline auto __vlx_free =
 #ifdef _MSC_VER
     _aligned_free;
 #else  // _MSC_VER
-    std::free;
+    ::free;
 #endif
 #endif
 
@@ -116,34 +124,35 @@ constexpr inline auto __vlx_free =
  *
  * @tparam T scalar type of the allocation.
  * @param[in] alignment desired alignment of allocation.
- * @param[in] pitch number of element in allocation, including padding.
+ * @param[in] count number of element in allocation, including padding.
  * @return pointer to the allocation
  *
- * @note Alignemnt must be a power of 2.
+ * @note Alignment must be a power of 2.
  */
 template <typename T>
 auto
-host_allocate(size_t alignment, size_t pitch) -> T *
+host_allocate(size_t alignment, size_t count) -> T *
 {
-    if (pitch == 0)
+    if (count == 0)
     {
         return nullptr;
     }
 
     // check that alignment is a power of 2
-    if (alignment % 2 != 0) errors::msgCritical(std::string(__func__) + ": alignment must be a power of 2");
+    // http://www.graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
+    if (alignment && !(alignment & (alignment - 1))) errors::msgCritical(std::string(__func__) + ": alignment must be a power of 2");
 
     // check that we are not trying to allocate too big a chunk
-    if (pitch > std::numeric_limits<size_t>::max() / sizeof(T))
+    if (count > std::numeric_limits<size_t>::max() / sizeof(T))
     {
         // equivalent of: throw std::bad_array_new_length();
-        errors::msgCritical(std::string(__func__) + ": you cannot allocate a memory block with " + std::to_string(pitch) + " elements");
+        errors::msgCritical(std::string(__func__) + ": you cannot allocate a memory block with " + std::to_string(count) + " elements");
 
         // the useless return statement is to avoid warnings from the compiler
         return nullptr;
     }
 
-    if (auto p = static_cast<T *>(__vlx_malloc(pitch * sizeof(T), alignment)))
+    if (auto p = static_cast<T *>(__vlx_malloc(count * sizeof(T), alignment)))
     {
         return p;
     }
