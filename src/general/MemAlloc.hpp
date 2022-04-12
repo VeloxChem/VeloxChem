@@ -81,7 +81,7 @@ namespace detail {
  * - When linking against MKL, use `mkl_malloc`. Otherwise:
  *   * On Windows, use the intrinsic `_aligned_malloc`. See:
  * https://developercommunity.visualstudio.com/t/c17-stdaligned-alloc%E7%BC%BA%E5%A4%B1/468021
- *   * On Linux, use `std::aligned_alloc`
+ *   * On Linux, use `::posix_memalign`
  */
 constexpr inline auto __vlx_malloc =
 #ifdef ENABLE_MKL
@@ -107,7 +107,7 @@ constexpr inline auto __vlx_malloc =
  * - When linking against MKL, use `mkl_free`. Otherwise:
  *   * On Windows, use the intrinsic `_aligned_free`. See:
  * https://developercommunity.visualstudio.com/t/c17-stdaligned-alloc%E7%BC%BA%E5%A4%B1/468021
- *   * On Linux, use `std::free`
+ *   * On Linux, use `::free`
  */
 constexpr inline auto __vlx_free =
 #ifdef ENABLE_MKL
