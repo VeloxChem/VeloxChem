@@ -23,50 +23,25 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from multiprocessing import cpu_count
 from os import environ
-from pathlib import Path
 from sys import stdout
 
-from .mklconf import configure_mkl_rt
 
-
-def get_basis_path():
+def configure_mkl_rt():
     """
-    Returns location of basis files within module.
+    Run-time configuration of interface and threading layer for the MKL single dynamic library (libmkl_rt.so)
 
-    :return:
-        The location of basis files within module.
-    """
-
-    return Path(__file__).parent / "basis"
-
-
-def set_vlxbasispath():
-    """
-    Sets location of basis files.
+    See here:
+      - https://tinyurl.com/y4y695ay
+      - https://tinyurl.com/y254ggts
     """
 
-    if 'VLXBASISPATH' not in environ:
-        environ['VLXBASISPATH'] = str(get_basis_path())
+    if 'MKL_INTERFACE_LAYER' not in environ:
+        environ['MKL_INTERFACE_LAYER'] = '@_mkl_interface_layer_@'
+        print('* Warning * Setting MKL_INTERFACE_LAYER to "@_mkl_interface_layer_@".', file=stdout)
+        stdout.flush()
 
-
-def set_omp_num_threads(ncores=None):
-    """
-    Sets number of OpenMP threads.
-
-    :param ncores:
-        The number of cores available for OpenMP threads.
-    """
-
-    if ncores is not None:
-        environ['OMP_NUM_THREADS'] = ncores
-    else:
-        if 'OMP_NUM_THREADS' not in environ:
-            ncores = cpu_count()
-            environ['OMP_NUM_THREADS'] = str(ncores)
-            print('* Warning * Environment variable OMP_NUM_THREADS not set.',
-                  file=stdout)
-            print('* Warning * Setting OMP_NUM_THREADS to {:d}.'.format(ncores),
-                  file=stdout)
-            stdout.flush()
+    if 'MKL_THREADING_LAYER' not in environ:
+        environ['MKL_THREADING_LAYER'] = '@_mkl_threading_layer_@'
+        print('* Warning * Setting MKL_THREADING_LAYER to "@_mkl_threading_layer_@".', file=stdout)
+        stdout.flush()
