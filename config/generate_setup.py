@@ -264,26 +264,27 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
             math_lib += "\nMATH_LIB += -lmkl_rt -Wl,--no-as-needed"
         math_lib += " -lpthread -lm -ldl"
 
+        conf = {}
         if is_linux and not use_intel:
             conf = {
-                "@_mkl_interface_layer_@": "MKL_INTERFACE_LP64+MKL_INTERFACE_GNU",
-                "@_mkl_threading_layer_@": "MKL_THREADING_GNU",
+                "@_mkl_interface_layer_@": "GNU,LP64",
+                "@_mkl_threading_layer_@": "GNU",
             }
         elif use_intel:
             conf = {
-                "@_mkl_interface_layer_@": "MKL_INTERFACE_LP64",
-                "@_mkl_threading_layer_@": "MKL_THREADING_INTEL",
+                "@_mkl_interface_layer_@": "LP64",
+                "@_mkl_threading_layer_@": "INTEL",
             }
         elif use_clang:
             conf = {
-                "@_mkl_interface_layer_@": "MKL_INTERFACE_LP64",
-                "@_mkl_threading_layer_@": "MKL_THREADING_INTEL",
+                "@_mkl_interface_layer_@": "LP64",
+                "@_mkl_threading_layer_@": "INTEL",
             }
         replacer = SearchReplace(conf)
 
-        # read in src/general/ConfigMKL.hpp.in
-        conf_mkl_in = Path("src", "general", "ConfigMKL.hpp.in")
-        conf_mkl = Path("src", "general", "ConfigMKL.hpp")
+        # read in src/pymodule/mklconf.py.in
+        conf_mkl_in = Path("src", "pymodule", "mklconf.py.in")
+        conf_mkl = Path("src", "pymodule", "mklconf.py")
 
         with conf_mkl_in.open("r") as f:
             contents = "".join(f.readlines())
