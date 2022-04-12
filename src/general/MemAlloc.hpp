@@ -91,7 +91,7 @@ constexpr inline auto __vlx_malloc =
     _aligned_alloc;
 #else  // _MSC_VER
     [](size_t count_bytes, size_t alignment) -> void * {
-    auto ptr = nullptr;
+    void* ptr = nullptr;
 
     auto ierr = ::posix_memalign(&ptr, alignment, count_bytes);
 
@@ -139,7 +139,8 @@ host_allocate(size_t alignment, size_t count) -> T *
     }
 
     // check that alignment is a power of 2
-    if (alignment % 2 != 0) errors::msgCritical(std::string(__func__) + ": alignment must be a power of 2");
+    // http://www.graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
+    if (alignment && !(alignment & (alignment - 1))) errors::msgCritical(std::string(__func__) + ": alignment must be a power of 2");
 
     // check that we are not trying to allocate too big a chunk
     if (count > std::numeric_limits<size_t>::max() / sizeof(T))
