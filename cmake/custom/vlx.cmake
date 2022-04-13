@@ -2,8 +2,7 @@
 # This is useful for static analysis tools and linters
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(MPI_CXX_SKIP_MPICXX ON)
-find_package(MPI REQUIRED COMPONENTS CXX)
+find_package(MPI REQUIRED COMPONENTS C)
 
 find_package(OpenMP 4.5 REQUIRED COMPONENTS CXX)
 

@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.17...3.20)
 
 # project name
-project(VeloxChem LANGUAGES CXX)
+project(VeloxChem LANGUAGES CXX C)
 
 # do not rebuild if rules (compiler flags) change
 set(CMAKE_SKIP_RULE_DEPENDENCY TRUE)
@@ -55,7 +55,7 @@ include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_safeguards.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/alignment.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/math.cmake)
 
-find_package(Python 3.6 REQUIRED COMPONENTS Interpreter Development NumPy)
+find_package(Python 3.7 REQUIRED COMPONENTS Interpreter Development NumPy)
 # add your site-packages to the search path automatically
 execute_process(
   COMMAND

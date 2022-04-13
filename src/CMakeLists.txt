@@ -5,7 +5,7 @@ add_library(vlxobjs OBJECT)
 target_compile_definitions(vlxobjs
   PUBLIC
     # TODO should probably be namespaced, like VLX_HAS_MPI or similar
-    $<BUILD_INTERFACE:ENABLE_MPI=$<BOOL:$<TARGET_EXISTS:MPI::MPI_CXX>>>
+    $<BUILD_INTERFACE:ENABLE_MPI=$<BOOL:$<TARGET_EXISTS:MPI::MPI_C>>>
     $<BUILD_INTERFACE:VLX_ALIGN=${VLX_ALIGN}>
   )
   
@@ -30,7 +30,7 @@ target_include_directories(vlxobjs
 target_link_libraries(vlxobjs
   PUBLIC
     OpenMP::OpenMP_CXX
-    MPI::MPI_CXX
+    MPI::MPI_C
     Math::LA
   )
 
