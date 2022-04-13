@@ -94,7 +94,7 @@ monkey:deploy:
     - if: '$CI_COMMIT_TITLE =~ /\[conda-build\]/i'
   script:
     - python -m pip install numpy pybind11 mpi4py requests --no-binary=mpi4py
-    - cmake -S. -Bbuild_deploy -DPython_EXECUTABLE=$(type -P python)
+    - cmake -S. -Bbuild_deploy -DPython_EXECUTABLE=$(type -P python) -DVLX_LA_VENDOR=MKL
     - cmake --build build_deploy --target package_source
     - python .gitlab/trigger.py
         --tarball "$TARBALL"

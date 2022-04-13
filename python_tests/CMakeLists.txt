@@ -85,4 +85,5 @@ install(
   PATTERN "py_plot_comb.py" EXCLUDE
   PATTERN "CMakeLists.txt" EXCLUDE
   PATTERN "Makefile" EXCLUDE
+  PATTERN "__pycache__" EXCLUDE
   )
