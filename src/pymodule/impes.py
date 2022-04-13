@@ -69,7 +69,8 @@ def parse_labels(input_labels):
 
     labels = []
     for label_str in input_labels.split('\n'):
-        labels.append(label_str)
+        label = label_str.replace(" ","")
+        labels.append(label)
 
     return labels
 
@@ -786,7 +787,7 @@ class ImpesDriver():
         self.impes_coordinate.calculate_b_matrix() # required for gradient
         self.impes_coordinate.compute_internal_coordinates()
 
-    def compute(self, coordinates, fname, labels):
+    def compute(self, coordinates, fname, labels=None):
         """Computes the energy by interpolation between pre-defined points.
 
             :param coordinates:
@@ -795,7 +796,9 @@ class ImpesDriver():
                 the name of the checkpoint file  containing the pre-defined
                 data points.
             :param labels:
-                a list of data point labels.
+                a list of data point labels (optional).
+                if this parameter is None, all datapoints from fname will be
+                used.
         """
 
         self.define_impes_coordinate(coordinates)
@@ -817,11 +820,11 @@ class ImpesDriver():
             The name of the checkpoint file  containing the pre-defined
             data points.
         :param labels:
-            A list of data point labels.
+            A list of data point labels. If labels is None, it will be read
+            from fname.
         """
 
         natms = self.impes_coordinate.cartesian_coordinates.shape[0]
-        n_points = len(labels)
         data_point = ImpesCoordinates(self.comm, self.ostream)
         data_point.update_settings(self.impes_dict)
         sum_weights = 0.0
@@ -830,6 +833,11 @@ class ImpesDriver():
         weights = []
         weight_gradients = []
         sum_weight_gradients = np.zeros((natms, 3))
+
+        if labels is None:
+            labels = self.read_labels(fname)
+        n_points = len(labels)
+
         # Determine weights, weight gradients,
         # energy values, and energy gradients for interpolation
         for label in labels:
@@ -869,7 +877,6 @@ class ImpesDriver():
         :param labels:
             A list of data point labels.
         """
-        n_points = len(labels)
         natms = self.impes_coordinate.cartesian_coordinates.shape[0]
         data_point = ImpesCoordinates(self.comm, self.ostream)
         data_point.update_settings(self.impes_dict)
@@ -879,6 +886,10 @@ class ImpesDriver():
         weights = []
         weight_gradients = []
         sum_weight_gradients = np.zeros((natms, 3))
+        if labels is None:
+            labels = self.read_labels(fname)
+        n_points = len(labels)
+
         # Determine weights, weight gradients,
         # energy values, and energy gradients for interpolation
         for label in labels:
@@ -1065,9 +1076,24 @@ class ImpesDriver():
 
         return distance, weight_gradient
 
+    def read_labels(self, fname):
+        """
+        Read data point labels from checkpoint file.
 
-# TODO: store labels in the same checkpoint file, rather than pass them on
-# separately?
+        :param fname:
+            Name of the checkpoint file.
+        """
+
+        h5f = h5py.File(fname, 'r')
+        key = 'labels'
+        labels = []
+        for label_bytes in list(h5f.get(key)):
+            label = label_bytes.decode()
+            labels.append(label)
+        h5f.close()
+
+        return labels
+
 class ImpesDynamicsDriver():
     """
     Simple interpolated dynamics driver based on Verlet integration.
@@ -1116,7 +1142,11 @@ class ImpesDynamicsDriver():
         # time step and total duration
         self.time_step = 1 # fs = 41 a.u.  
         self.duration = 10 # fs = 410 a.u.
-        self.current_step = 0 
+        self.current_step = 0
+
+        # name of the checkpoint file with data points and labels
+        self.name = None
+        self.labels = None
 
 
     def update_settings(self, impes_dict=None):
@@ -1173,9 +1203,19 @@ class ImpesDynamicsDriver():
         # calculate the velocity at t + dt
         velocities = self.velocities[iteration] + 0.5 * ( acc + acc_dt ) * dt
 
+        # calculate kinetic energy:
+        velocities_squared = np.einsum('ix,ix->ix', velocities, velocities)
+        kinetic_energy = np.einsum('i,ix->', masses, 0.5 * velocities_squared)
+        total_energy = kinetic_energy + self.impes_driver.energy
+
         # save results
         self.velocities.append(velocities)
         self.coordinates.append(coordinates)
+        self.potential_energies.append(self.impes_driver.energy)
+        self.kinetic_energies.append(kinetic_energy)
+        self.total_energies.append(total_energy)
+
+        self.print_iteration(iteration)
 
         # update current step
         self.current_step += self.time_step
@@ -1196,11 +1236,55 @@ class ImpesDynamicsDriver():
 
         # Calculate energy and gradient for starting coordinates
         self.impes_driver.compute(starting_coordinates, self.name, self.labels)
-        
+        self.potential_energies = [self.impes_driver.energy]
+        self.kinetic_energies = [0.0]
+        self.total_energies = [self.impes_driver.energy]
+
+        self.print_header()
+
         # Start dynamics
         iteration = 0
         while self.duration >= self.current_step:
             self.run_dynamics_step(molecule, iteration)
             iteration += 1
 
+    def print_header(self):
+        """
+        Prints information about the ImpesDynamicsDriver.
+        """
+        self.ostream.print_blank()
 
+        title = 'Interpolated Dynamics Driver'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
+        width = 50
+
+        cur_str = 'Time Step                : {:.3f} fs'.format(
+            self.time_step)
+        self.ostream.print_header(cur_str.ljust(width))
+        cur_str = 'Total Duration           : {:.2f} fs'.format(
+            self.duration)
+        self.ostream.print_header(cur_str.ljust(width))
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def print_iteration(self, iteration=0):
+        """
+        Prints information about the current iteration.
+
+        :param iteration:
+            The current iteration.
+        """
+        width = 92
+        output_header = '*** Iteration:   {:2d} '.format(iteration)
+        output_header += '  Kinetic energy (H): '
+        output_header += '{:7.2f}'.format(self.kinetic_energies[iteration])
+        output_header += '  Potential energy (H): '
+        output_header += '{:7.2f}'.format(self.potential_energies[iteration])
+        output_header += '  Total energy (H): '
+        output_header += '{:7.2f}'.format(self.total_energies[iteration])
+        self.ostream.print_header(output_header.ljust(width))
+        self.ostream.flush()
