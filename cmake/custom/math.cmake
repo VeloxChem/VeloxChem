@@ -39,20 +39,18 @@ list(APPEND _la_compile_definitions
   )
 
 # compiler flags for the Math::LA target
-set(_la_compiler_flags)
+set(_la_compiler_flags "")
 
 # include directories for the Math::LA target
-set(_la_include_dirs)
+list(APPEND _la_include_dirs
+  ${PROJECT_SOURCE_DIR}/external/upstream/cblas
+  ${PROJECT_SOURCE_DIR}/external/upstream/lapacke
+  )
 
-# libraries for the Math::LA target
-set(_la_libraries)
-
-
-if(VLX_LA_VENDOR MATCHES "MKL")
+if(VLX_LA_VENDOR STREQUAL "MKL")
   # MKL is known under a different name to CMake
   set(BLA_VENDOR "Intel10_64_dyn")
   find_package(LAPACK REQUIRED)
-  list(APPEND _la_libraries ${LAPACK_LIBRARIES})
 
   # locate mkl.h
   # MKL uses a multitude of partially platform-specific subdirectories:
@@ -84,7 +82,7 @@ if(VLX_LA_VENDOR MATCHES "MKL")
     "include/intel64_${LAPACK_mkl_OS_NAME}"
     )
 
-  find_path(_la_include_dirs
+  find_path(_mkl_include_dirs
     NAMES
       mkl.h
     HINTS
@@ -94,11 +92,28 @@ if(VLX_LA_VENDOR MATCHES "MKL")
     PATH_SUFFIXES
       ${_mkl_path_suffixes}
     )
+  # clear generic _la_include_dirs and use MKL own
+  set(_la_include_dirs "${_mkl_include_dirs}")
 
   if(CMAKE_CXX_COMPILER_ID MATCHES GNU OR CMAKE_CXX_COMPILER_ID STREQUAL Clang)
     set(_la_compiler_flags "-m64")
   endif()
-elseif(VLX_LA_VENDOR MATCHES "FLAME")
+elseif(VLX_LA_VENDOR STREQUAL "Apple" OR VLX_LA_VENDOR STREQUAL "NAS")
+  set(CMAKE_THREAD_LIBS_INIT "-lpthread")
+  set(CMAKE_HAVE_THREADS_LIBRARY 1)
+  set(CMAKE_USE_WIN32_THREADS_INIT 0)
+  set(CMAKE_USE_PTHREADS_INIT 1)
+  set(THREADS_PREFER_PTHREAD_FLAG ON)
+  find_package(LAPACK REQUIRED)
+elseif(VLX_LA_VENDOR STREQUAL "Cray")
+  # compiling and linking with Cray libsci is taken care of automatically by the
+  # Cray compiler wrappers. Do nothing!
+  set(BLAS_FOUND TRUE)
+  set(LAPACK_FOUND TRUE)
+  # clear generic _la_include_dirs and let the Cray compiler figure it out
+  set(_la_include_dirs "")
+  set(LAPACK_LIBRARIES "")
+elseif(VLX_LA_VENDOR STREQUAL "FLAME")
   # detection of BLIS/FLAME in the standard CMake module cannot find the
   # multithreaded version, hence the code here.
   include(CheckFunctionExists)
@@ -141,30 +156,12 @@ elseif(VLX_LA_VENDOR MATCHES "FLAME")
       _la_flame_library_WORKS
     )
 
-  list(APPEND _la_libraries ${_la_flame_library} ${_la_blis_library})
-  list(APPEND _la_include_dirs
-    ${PROJECT_SOURCE_DIR}/external/upstream/cblas
-    ${PROJECT_SOURCE_DIR}/external/upstream/lapacke
-    )
+  list(APPEND LAPACK_LIBRARIES ${_la_flame_library} ${_la_blis_library})
 
   unset(_la_blis_library)
   unset(_la_flame_library)
-elseif(VLX_LA_VENDOR MATCHES "Cray")
-  # compiling and linking with Cray libsci is taken care of automatically by the
-  # Cray compiler wrappers. Do nothing!
-  set(BLAS_FOUND TRUE)
-  set(LAPACK_FOUND TRUE)
 else()
   find_package(LAPACK REQUIRED)
-  list(APPEND _la_libraries ${LAPACK_LIBRARIES})
-  list(APPEND _la_include_dirs
-    ${PROJECT_SOURCE_DIR}/external/upstream/cblas
-    ${PROJECT_SOURCE_DIR}/external/upstream/lapacke
-    )
-endif()
-
-if(NOT _la_include_dirs AND NOT VLX_LA_VENDOR MATCHES "Cray")
-  message(FATAL_ERROR "Could not find header files for ${VLX_LA_VENDOR} linear algebra backend")
 endif()
 
 # create target
@@ -178,20 +175,24 @@ if(BLAS_FOUND AND LAPACK_FOUND AND NOT TARGET Math::LA)
       "${_la_compile_definitions}"
     )
 
-  target_compile_options(Math::LA
-    INTERFACE
-      "${_la_compiler_flags}"
-    )
+  if(_la_compiler_flags)
+    target_compile_options(Math::LA
+      INTERFACE
+        "${_la_compiler_flags}"
+      )
+  endif()
 
-  target_include_directories(Math::LA
-    SYSTEM
-    INTERFACE
-      "${_la_include_dirs}"
-    )
+  if(_la_include_dirs)
+    target_include_directories(Math::LA
+      SYSTEM
+      INTERFACE
+        "${_la_include_dirs}"
+      )
+  endif()
 
   target_link_libraries(Math::LA
     INTERFACE
-      "${_la_libraries}"
+      "${LAPACK_LIBRARIES}"
   )
 
   unset(_la_compile_definitions)
