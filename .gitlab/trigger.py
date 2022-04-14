@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 import argparse
+import hashlib
 import json
 import os
 import re
 from datetime import datetime
 from pathlib import Path
-from subprocess import run, PIPE
+from subprocess import PIPE, run
 
 from requests import post
 
@@ -69,8 +70,16 @@ def main():
     recipe = tarball.name.split(".")[0]
 
     # get sha256 of tarball
-    with Path(f"{args.tarball}.sha256").resolve().open("r") as f:
-        sha256 = f.readline().strip().split()[0]
+    # we read the tarball in as binary in chunks of 8192 bytes
+    with tarball.open("rb") as fh:
+        algo = hashlib.sha256()
+        chunk = fh.read(8192)
+        while chunk:
+            algo.update(chunk)
+            chunk = fh.read(8192)
+
+    sha256 = algo.hexdigest()
+    print(f"Tarball {tarball} with sha256 checksum {sha256}")
 
     # parse commit message, the configuration is expected in dict-like format
     msg = re.search(
@@ -115,11 +124,17 @@ def main():
         with vfile.open("w") as f:
             f.write(re.sub(regex, f"\\g<pre>{conf['version']}\\g<post>", contents))
 
+    # build number as string
+    build_number = str(0)
+    if "build" in conf.keys():
+        build_number = conf["build"]
+
     # append dictionary with information on deployment
     deploy = {
         "timestamp": datetime.now().astimezone().strftime("%A %Y-%m-%d %H:%M:%S %Z"),
         "author": os.getenv("GITLAB_USER_NAME", ""),
         "commit": os.getenv("CI_COMMIT_SHA", ""),
+        "build": build_number,
     }
     with vfile.open("a") as f:
         f.write(

@@ -24,8 +24,6 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 stages:
-  - build
-  - test
   - deploy
 
 .monkey:setup:
@@ -48,54 +46,60 @@ stages:
     - source venv/bin/activate
     - python -m pip install --upgrade pip setuptools wheel
 
-monkey:build:
-  extends: .monkey:setup
-  stage: build
-  variables:
-    GTESTLIB: "/usr/lib/x86_64-linux-gnu"
-  script:
-    - python -m pip install numpy pybind11 mpi4py --no-binary=mpi4py
-    - python config/generate_setup.py
-    - make -j 6 -C src release
-    - make -j 6 -C unit_tests release
-  artifacts:
-    paths:
-      - build
-    expire_in: 2 hours
-
-monkey:unit_tests:
-  extends: .monkey:setup
-  stage: test
-  needs: ["monkey:build"]
-  script:
-    - ./build/bin/UnitTestVeloxChem.x
-
-monkey:python_tests:
-  extends: .monkey:setup
-  stage: test
-  variables:
-    VLX_NUM_BUILD_JOBS: "6"
-  script:
-    - python -m pip install mpi4py --no-binary=mpi4py
-    - CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
-    - python -m pip install .[test,qmmm]
-    - python -c "import veloxchem; print(veloxchem.__version__)"
-    - mpiexec -n 2 python -m pytest -v --pyargs veloxchem -m "solvers"
-    - python -m pytest -v --cov=veloxchem --pyargs veloxchem
+#monkey:build:
+#  extends: .monkey:setup
+#  stage: build
+#  variables:
+#    GTESTLIB: "/usr/lib/x86_64-linux-gnu"
+#  script:
+#    - python -m pip install numpy pybind11 mpi4py --no-binary=mpi4py
+#    - python config/generate_setup.py
+#    - make -j 6 -C src release
+#    - make -j 6 -C unit_tests release
+#  artifacts:
+#    paths:
+#      - build
+#    expire_in: 2 hours
+#
+#monkey:unit_tests:
+#  extends: .monkey:setup
+#  stage: test
+#  needs: ["monkey:build"]
+#  script:
+#    - ./build/bin/UnitTestVeloxChem.x
+#
+#monkey:python_tests:
+#  extends: .monkey:setup
+#  stage: test
+#  variables:
+#    VLX_NUM_BUILD_JOBS: "6"
+#  script:
+#    - python -m pip install mpi4py --no-binary=mpi4py
+#    - CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
+#    - python -m pip install .[test,qmmm]
+#    - python -c "import veloxchem; print(veloxchem.__version__)"
+#    - mpiexec -n 2 python -m pytest -v --pyargs veloxchem -m "solvers"
+#    - python -m pytest -v --cov=veloxchem --pyargs veloxchem
 
 monkey:deploy:
-  extends: .monkey:setup
+  tags:
+    - vlx-docker
+  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-5e6dcd2
   stage: deploy
   variables:
-    TARBALL: "build_deploy/veloxchem.tar.bz2"
+    TARBALL: "veloxchem.tar.bz2"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_TITLE =~ /\[conda-build\]/i'
   script:
-    - python -m pip install numpy pybind11 mpi4py requests --no-binary=mpi4py
-    - cmake -S. -Bbuild_deploy -DPython_EXECUTABLE=$(type -P python) -DVLX_LA_VENDOR=MKL
-    - cmake --build build_deploy --target package_source
+    # prepare tar.bz2 archive
+    - git archive
+        --format=tar
+        --prefix="veloxchem/"
+        "$CI_COMMIT_SHA" | bzip2 > "$TARBALL"
+    - tar tf "$TARBALL"
+    # trigger deployment
     - python .gitlab/trigger.py
         --tarball "$TARBALL"
         --url "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/$TARBALL"
@@ -104,5 +108,5 @@ monkey:deploy:
       - "$TARBALL"
     expire_in: 1 week
 
-include:
-  local: '.gitlab/windows-ci.yml'
+#include:
+#  local: '.gitlab/windows-ci.yml'

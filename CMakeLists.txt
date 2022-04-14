@@ -70,4 +70,3 @@ include(${PROJECT_SOURCE_DIR}/external/upstream/fetch_pybind11.cmake)
 # TODO code coverage
 include(${PROJECT_SOURCE_DIR}/cmake/custom/vlx.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_save_flags.cmake)
-include(${PROJECT_SOURCE_DIR}/cmake/custom/CMakeCPack.cmake)
