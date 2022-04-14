@@ -44,40 +44,40 @@ struct type_to_mpi_datatype;
 template <>
 struct type_to_mpi_datatype<bool>
 {
-    inline constexpr static MPI_Datatype value{MPI_C_BOOL};
+    inline const static MPI_Datatype value{MPI_C_BOOL};
 };
 
 template <>
 struct type_to_mpi_datatype<char>
 {
-    inline constexpr static MPI_Datatype value{MPI_CHAR};
+    inline const static MPI_Datatype value{MPI_CHAR};
 };
 
 template <>
 struct type_to_mpi_datatype<int32_t>
 {
-    inline constexpr static MPI_Datatype value{MPI_INT32_T};
+    inline const static MPI_Datatype value{MPI_INT32_T};
 };
 
 template <>
 struct type_to_mpi_datatype<int64_t>
 {
-    inline constexpr static MPI_Datatype value{MPI_INT64_T};
+    inline const static MPI_Datatype value{MPI_INT64_T};
 };
 
 template <>
 struct type_to_mpi_datatype<std::size_t>
 {
 #if SIZE_MAX == UCHAR_MAX
-    inline constexpr static MPI_Datatype value{MPI_UNSIGNED_CHAR};
+    inline const static MPI_Datatype value{MPI_UNSIGNED_CHAR};
 #elif SIZE_MAX == USHRT_MAX
-    inline constexpr static MPI_Datatype value{MPI_UNSIGNED_SHORT};
+    inline const static MPI_Datatype value{MPI_UNSIGNED_SHORT};
 #elif SIZE_MAX == UINT_MAX
-    inline constexpr static MPI_Datatype value{MPI_UNSIGNED};
+    inline const static MPI_Datatype value{MPI_UNSIGNED};
 #elif SIZE_MAX == ULONG_MAX
-    inline constexpr static MPI_Datatype value{MPI_UNSIGNED_LONG};
+    inline const static MPI_Datatype value{MPI_UNSIGNED_LONG};
 #elif SIZE_MAX == ULLONG_MAX
-    inline constexpr static MPI_Datatype value{MPI_UNSIGNED_LONG_LONG};
+    inline const static MPI_Datatype value{MPI_UNSIGNED_LONG_LONG};
 #else
 #error "Your compiler does not know what SIZE_MAX is?"
 #endif
@@ -86,7 +86,7 @@ struct type_to_mpi_datatype<std::size_t>
 template <>
 struct type_to_mpi_datatype<double>
 {
-    inline constexpr static MPI_Datatype value{MPI_DOUBLE};
+    inline const static MPI_Datatype value{MPI_DOUBLE};
 };
 /* \@} */
 

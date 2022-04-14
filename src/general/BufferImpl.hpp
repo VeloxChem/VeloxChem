@@ -161,7 +161,7 @@ class CBuffer
         auto pdata = _data;
 
 #pragma omp simd aligned(pdata, src : Alignment)
-        for (auto i = 0; i < _nElements; ++i)
+        for (size_type i = 0; i < _nElements; ++i)
             pdata[i] = src[i];
     }
 
@@ -462,8 +462,6 @@ class CBuffer
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::N), bool> = true>
     explicit CBuffer(const_pointer v) : CBuffer<value_type, backend_type, 1, NCols>{}
     {
-        errors::assertMsgCritical(v.size() <= _nColumns,
-                                  std::string(__func__) + ": input vector must have at least " + std::to_string(_nColumns) + " elements");
         _copy_unaligned(v);
     }
 
