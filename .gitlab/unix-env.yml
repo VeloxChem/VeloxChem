@@ -2,15 +2,12 @@ name: vlx
 channels:
   - conda-forge
 dependencies:
-  - cppe=0.2.1
-  - cmake
+  - cppe
+  - cmake>=3.18
   - cxx-compiler
   - geometric
   - gtest
   - h5py
-  - libblas=*=*mkl*
-  - loprop>=0.3.4
-  - mkl-devel=*2020.*
   - mpi4py
   - ninja
   - numpy
@@ -18,6 +15,6 @@ dependencies:
   - psutil
   - pybind11
   - pytest
-  - python>=3.6
+  - python>=3.7
   - requests
   - xtb

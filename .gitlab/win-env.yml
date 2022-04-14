@@ -8,7 +8,6 @@ dependencies:
   - gtest
   - h5py
   - libblas=*=*mkl
-  - loprop>=0.3.4
   - mkl-devel=*2020.*
   - mpi4py
   - ninja
@@ -16,5 +15,5 @@ dependencies:
   - psutil
   - pybind11
   - pytest
-  - python>=3.6
+  - python>=3.7
   - requests

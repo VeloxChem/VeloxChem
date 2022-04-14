@@ -77,7 +77,7 @@ monkey:python_tests:
     VLX_NUM_BUILD_JOBS: "6"
   script:
     - python -m pip install mpi4py --no-binary=mpi4py
-    - CC=gcc CXX=g++ python -m pip install cppe==0.2.1 MDAnalysis
+    - CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
     - python -m pip install .[test,qmmm]
     - python -c "import veloxchem; print(veloxchem.__version__)"
     - mpiexec -n 2 python -m pytest -v --pyargs veloxchem -m "solvers"

@@ -13,9 +13,12 @@
 
 option(ENABLE_ARCH_FLAGS "Enable architecture-specific compiler flags" ON)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+# code needs C++17 at least
+set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ version selection")
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# do not use compiler extensions to the C++ standard
 set(CMAKE_CXX_EXTENSIONS FALSE)
+# generate a JSON database of compiler commands (useful for LSP IDEs)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
 if(ENABLE_ARCH_FLAGS)

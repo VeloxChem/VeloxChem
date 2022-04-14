@@ -8,7 +8,7 @@ target_compile_definitions(vlxobjs
     $<BUILD_INTERFACE:ENABLE_MPI=$<BOOL:$<TARGET_EXISTS:MPI::MPI_C>>>
     $<BUILD_INTERFACE:VLX_ALIGN=${VLX_ALIGN}>
   )
-  
+
 if(WIN32)
   target_compile_definitions(vlxobjs
     PUBLIC
