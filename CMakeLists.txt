@@ -56,17 +56,8 @@ include(${PROJECT_SOURCE_DIR}/cmake/custom/alignment.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/math.cmake)
 
 find_package(Python 3.7 REQUIRED COMPONENTS Interpreter Development NumPy)
-# add your site-packages to the search path automatically
-execute_process(
-  COMMAND
-    "${Python_EXECUTABLE}" -c
-    "import pybind11; print(pybind11.get_cmake_dir())"
-  OUTPUT_VARIABLE _tmp_dir
-  OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ECHO STDOUT)
-list(APPEND CMAKE_PREFIX_PATH "${_tmp_dir}")
 
 # download pybind11 if not available on the system
 include(${PROJECT_SOURCE_DIR}/external/upstream/fetch_pybind11.cmake)
-# TODO code coverage
 include(${PROJECT_SOURCE_DIR}/cmake/custom/vlx.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_save_flags.cmake)

@@ -200,15 +200,3 @@ if(BLAS_FOUND AND LAPACK_FOUND AND NOT TARGET Math::LA)
   unset(_la_include_dirs)
   unset(_la_libraries)
 endif()
-
-# print out some info on the Math::LA target
-include(CMakePrintHelpers)
-cmake_print_properties(
-  TARGETS
-    Math::LA
-  PROPERTIES
-    INTERFACE_COMPILE_DEFINITIONS
-    INTERFACE_COMPILE_OPTIONS
-    INTERFACE_INCLUDE_DIRECTORIES
-    INTERFACE_LINK_LIBRARIES
-  )
