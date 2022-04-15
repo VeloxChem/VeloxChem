@@ -12,8 +12,11 @@
 #   The list of valid vendors in this module is the same as for the
 #   official ``FindBLAS.cmake`` module, plus ``Cray``.
 #   Note that this module reimplements the detection of ``FLAME`` to be able to
-#   discover its multithreaded version.
+#   also discover the multithreaded versions of both the BLIS and FLAME
+#   libraries.
 #   Defaults to ``Generic``.
+#   Note that ``Generic`` is essentially meant to be used for building the Conda
+#   package.
 #
 # Imported targets
 # ^^^^^^^^^^^^^^^^
@@ -25,6 +28,9 @@
 #
 
 option_with_default(VLX_LA_VENDOR "Linear algebra library vendor" "Generic")
+
+# check_function_exists invocations will not print any output
+set(CMAKE_REQUIRED_QUIET ON)
 
 # we use the standard CMake FindLapack module
 # it will search for BLAS too
@@ -42,15 +48,12 @@ list(APPEND _la_compile_definitions
 set(_la_compiler_flags "")
 
 # include directories for the Math::LA target
-list(APPEND _la_include_dirs
-  ${PROJECT_SOURCE_DIR}/external/upstream/cblas
-  ${PROJECT_SOURCE_DIR}/external/upstream/lapacke
-  )
+set(_la_include_dirs "")
 
 if(VLX_LA_VENDOR STREQUAL "MKL")
   # MKL is known under a different name to CMake
   set(BLA_VENDOR "Intel10_64_dyn")
-  find_package(LAPACK REQUIRED)
+  find_package(LAPACK REQUIRED QUIET)
 
   # locate mkl.h
   # MKL uses a multitude of partially platform-specific subdirectories:
@@ -116,8 +119,8 @@ elseif(VLX_LA_VENDOR STREQUAL "Cray")
 elseif(VLX_LA_VENDOR STREQUAL "FLAME")
   # detection of BLIS/FLAME in the standard CMake module cannot find the
   # multithreaded version, hence the code here.
-  include(CheckFunctionExists)
   include(FindPackageHandleStandardArgs)
+  include(CheckCXXSymbolExists)
 
   list(APPEND _extaddlibdir ENV LD_LIBRARY_PATH "${CMAKE_C_IMPLICIT_LINK_DIRECTORIES}")
   # we would prefer the multithreaded version, if available
@@ -130,13 +133,13 @@ elseif(VLX_LA_VENDOR STREQUAL "FLAME")
       ${_extaddlibdir}
     )
   set(CMAKE_REQUIRED_LIBRARIES ${_la_blis_library})
-  check_function_exists("sgemm_" _la_blis_library_WORKS)
+  check_cxx_symbol_exists("cblas_sgemm" "cblas.h" _la_blis_library_works)
   set(CMAKE_REQUIRED_LIBRARIES)
 
   find_package_handle_standard_args(BLAS
     REQUIRED_VARS
       _la_blis_library
-      _la_blis_library_WORKS
+      _la_blis_library_works
     )
 
   find_library(_la_flame_library
@@ -147,27 +150,91 @@ elseif(VLX_LA_VENDOR STREQUAL "FLAME")
       ${_extaddlibdir}
     )
   set(CMAKE_REQUIRED_LIBRARIES ${_la_flame_library})
-  check_function_exists("cheev_" _la_flame_library_WORKS)
+  check_cxx_symbol_exists("LAPACKE_cheev" "lapacke.h" _la_flame_library_works)
   set(CMAKE_REQUIRED_LIBRARIES)
 
   find_package_handle_standard_args(LAPACK
     REQUIRED_VARS
       _la_flame_library
-      _la_flame_library_WORKS
+      _la_flame_library_works
     )
 
   list(APPEND LAPACK_LIBRARIES ${_la_flame_library} ${_la_blis_library})
 
   unset(_la_blis_library)
+  unset(_la_blis_library_works)
   unset(_la_flame_library)
+  unset(_la_flame_library_works)
+elseif(VLX_LA_VENDOR STREQUAL "Generic")
+  find_package(LAPACK REQUIRED QUIET)
+
+  # get directory containing cblas.h
+  find_path(_include_dirs
+    NAMES
+      cblas.h
+    )
+
+  # look for CBLAS and LAPACKE
+  include(${CMAKE_CURRENT_LIST_DIR}/cblas-lapacke.cmake)
+  set(_la_cblas_library "")
+  check_cblas_lapacke(_la_cblas_library 
+    CBLAS 
+    cblas_sgemm
+    ${_include_dirs}
+    "cblas.h"
+    "" 
+    "cblas" 
+    "" 
+    "" 
+    ""
+    )
+  
+  if(_la_cblas_library)
+    list(PREPEND BLAS_LIBRARIES ${_la_cblas_library})
+    list(INSERT LAPACK_LIBRARIES 1 ${_la_cblas_library})
+    unset(_la_cblas_library)
+    unset(_include_dirs)
+  else()
+    message(FATAL_ERROR "Cannot find a working CBLAS library to link to!")
+  endif()
+
+  # get directory containing lapacke.h
+  find_path(_include_dirs
+    NAMES
+      lapacke.h
+    )
+
+  set(_la_lapacke_library "")
+  check_cblas_lapacke(_la_lapacke_library 
+    LAPACKE 
+    LAPACKE_cheev
+    ${_include_dirs}
+    "lapacke.h"
+    "" 
+    "lapacke" 
+    "" 
+    "" 
+    ""
+    )
+
+  if(_la_lapacke_library)
+    list(PREPEND LAPACK_LIBRARIES ${_la_lapacke_library})
+    unset(_la_lapacke_library)
+    unset(_include_dirs)
+  else()
+    message(FATAL_ERROR "Cannot find a working LAPACKE library to link to!")
+  endif()
 else()
-  find_package(LAPACK REQUIRED)
+  find_package(LAPACK REQUIRED QUIET)
 endif()
+
+set(CMAKE_REQUIRED_QUIET OFF)
 
 # create target
 # adapted from: https://github.com/Kitware/CMake/blob/master/Modules/FindLAPACK.cmake#L588-L603
 if(BLAS_FOUND AND LAPACK_FOUND AND NOT TARGET Math::LA)
   message(STATUS "Using ${VLX_LA_VENDOR} as linear algebra backend")
+  message(STATUS "BLAS/LAPACK libraries: ${LAPACK_LIBRARIES}")
   add_library(Math::LA INTERFACE IMPORTED)
 
   target_compile_definitions(Math::LA

@@ -55,4 +55,6 @@ gtest_discover_tests(utests
     LABELS "unit"
   DISCOVERY_TIMEOUT  # how long to wait (in seconds) before crashing
     240
+  DISCOVERY_MODE  # when to discover the tests
+    PRE_TEST
   )
