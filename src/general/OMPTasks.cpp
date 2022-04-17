@@ -25,11 +25,7 @@
 
 #include "OMPTasks.hpp"
 
-#ifdef MAC_OS_OMP
-#include "/opt/intel/compilers_and_libraries/mac/include/omp.h"
-#else
 #include "omp.h"
-#endif
 
 #include "MathFunc.hpp"
 #include "MpiFunc.hpp"

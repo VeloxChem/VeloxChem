@@ -40,7 +40,7 @@ CMolecule::CMolecule(const std::vector<double>&      atomCoordinates,
                      const std::vector<std::string>& atomLabels,
                      const std::vector<int32_t>&     idsElemental)
 
-    : _atomCoordinates(atomCoordinates, idsElemental.size(), 3)
+    : _atomCoordinates(atomCoordinates, static_cast<int32_t>(idsElemental.size()), 3)
 
     , _atomCharges{atomCharges}
 
