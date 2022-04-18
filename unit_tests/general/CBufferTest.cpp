@@ -180,6 +180,61 @@ TYPED_TEST(CBufferTest, DefaultContructorSetZero)
     }
 }
 
+TYPED_TEST(CBufferTest, CopyConstructor)
+{
+    using Scalar         = typename TypeParam::value_type;
+    using Backend        = typename TypeParam::backend_type;
+    constexpr auto NRows = TypeParam::NRows;
+    constexpr auto NCols = TypeParam::NCols;
+
+    constexpr auto kind = buffer::CBuffer<Scalar, Backend, NRows, NCols>::kind;
+
+    auto val = static_cast<Scalar>(3);
+
+    if constexpr (kind == buffer::Kind::X)
+    {
+        auto buf_src = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(val, 10);
+        auto buf_dst{buf_src};
+
+        ASSERT_EQ(buf_dst, buf_src);
+    }
+    else if constexpr (kind == buffer::Kind::MY)
+    {
+        auto buf_src = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(val, 10);
+        auto buf_dst{buf_src};
+
+        ASSERT_EQ(buf_dst, buf_src);
+    }
+    else if constexpr (kind == buffer::Kind::XN)
+    {
+        auto buf_src = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(val, 10);
+        auto buf_dst{buf_src};
+
+        ASSERT_EQ(buf_dst, buf_src);
+    }
+    else if constexpr (kind == buffer::Kind::XY)
+    {
+        auto buf_src = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(val, 10, 5);
+        auto buf_dst{buf_src};
+
+        ASSERT_EQ(buf_dst, buf_src);
+    }
+    else if constexpr (kind == buffer::Kind::MN)
+    {
+        auto buf_src = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(val);
+        auto buf_dst{buf_src};
+
+        ASSERT_EQ(buf_dst, buf_src);
+    }
+    else
+    {
+        auto buf_src = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(val);
+        auto buf_dst{buf_src};
+
+        ASSERT_EQ(buf_dst, buf_src);
+    }
+}
+
 /* Test static generators: `Zero`
  */
 TYPED_TEST(CBufferTest, Zero)

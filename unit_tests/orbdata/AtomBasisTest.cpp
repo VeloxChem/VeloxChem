@@ -100,8 +100,8 @@ TEST_F(CAtomBasisTest, AddBasisFunction)
 
     abas.setIdElemental(1);
 
-    abas.addBasisFunction(CBasisFunction(
-        {1.301070100000e+01, 1.962257200000e+00, 4.445379600000e-01}, {1.968215800000e-02, 1.379652400000e-01, 4.783193500000e-01}, 0));
+    abas.addBasisFunction(CBasisFunction({1.301070100000e+01, 1.962257200000e+00, 4.445379600000e-01},
+                                         {1.968215800000e-02, 1.379652400000e-01, 4.783193500000e-01}, 0));
 
     abas.addBasisFunction(CBasisFunction({1.219496200000e-01}, {1.000000000000e+00}, 0));
 
@@ -119,6 +119,29 @@ TEST_F(CAtomBasisTest, GetNumberOfBasisFunctions)
     ASSERT_EQ(3, abas.getNumberOfBasisFunctions(0));
 
     ASSERT_EQ(2, abas.getNumberOfBasisFunctions(1));
+}
+
+TEST_F(CAtomBasisTest, GetNumberOfBasisFunctionsWithPrimitives)
+{
+    const CAtomBasis abas = vlxbas::getAtomBasisForLi();
+    
+    ASSERT_EQ(1, abas.getNumberOfBasisFunctions(0, 5));
+    
+    ASSERT_EQ(0, abas.getNumberOfBasisFunctions(0, 2));
+    
+    ASSERT_EQ(2, abas.getNumberOfBasisFunctions(0, 1));
+    
+    ASSERT_EQ(0, abas.getNumberOfBasisFunctions(1, 3));
+    
+    ASSERT_EQ(1, abas.getNumberOfBasisFunctions(1, 2));
+    
+    ASSERT_EQ(1, abas.getNumberOfBasisFunctions(1, 1));
+    
+    ASSERT_EQ(0, abas.getNumberOfBasisFunctions(2, 3));
+    
+    ASSERT_EQ(0, abas.getNumberOfBasisFunctions(2, 2));
+    
+    ASSERT_EQ(0, abas.getNumberOfBasisFunctions(2, 1));
 }
 
 TEST_F(CAtomBasisTest, GetNumberOfPrimitiveFunctions)

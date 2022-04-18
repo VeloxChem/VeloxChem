@@ -180,7 +180,8 @@ class CMolecularBasis
      @param angularMomentum the angular momentum.
      @return number of basis functions.
      */
-    int32_t getNumberOfBasisFunctions(const int32_t idElemental, const int32_t angularMomentum) const;
+    int32_t getNumberOfBasisFunctions(const int32_t idElemental,
+                                      const int32_t angularMomentum) const;
 
     /**
      Determines number of basis functions with specific angular momentum
@@ -190,7 +191,8 @@ class CMolecularBasis
      @param angularMomentum the angular momentum.
      @return the number of basis functions.
      */
-    int32_t getNumberOfBasisFunctions(const CMolecule& molecule, const int32_t angularMomentum) const;
+    int32_t getNumberOfBasisFunctions(const CMolecule& molecule,
+                                      const int32_t    angularMomentum) const;
 
     /**
      Determines number of basis functions with specific angular momentum
@@ -202,7 +204,40 @@ class CMolecularBasis
      @param angularMomentum the angular momentum.
      @return the number of basis functions.
      */
-    int32_t getNumberOfBasisFunctions(const CMolecule& molecule, const int32_t iAtom, const int32_t nAtoms, const int32_t angularMomentum) const;
+    int32_t getNumberOfBasisFunctions(const CMolecule& molecule,
+                                      const int32_t    iAtom,
+                                      const int32_t    nAtoms,
+                                      const int32_t    angularMomentum) const;
+    
+    /**
+     Determines number of basis functions with specific angular momentum and number of
+     primitive GTOs in molecular basis of selected molecule.
+
+     @param molecule the molecule.
+     @param angularMomentum the angular momentum.
+     @param nPrimitiveGtos the number of primitive GTOs.
+     @return the number of basis functions.
+     */
+    int32_t getNumberOfBasisFunctions(const CMolecule& molecule,
+                                      const int32_t    angularMomentum,
+                                      const int32_t    nPrimitiveGtos) const;
+
+    /**
+     Determines number of basis functions with specific angular momentum and number of
+     primitive GTOs  in molecular basis of list of atoms in selected molecule.
+
+     @param molecule the molecule.
+     @param iAtom the index of first atom in list of atoms.
+     @param nAtoms the number of atoms in list of atoms.
+     @param angularMomentum the angular momentum.
+     @param nPrimitiveGtos the number of primitive GTOs.
+     @return the number of basis functions.
+     */
+    int32_t getNumberOfBasisFunctions(const CMolecule& molecule,
+                                      const int32_t    iAtom,
+                                      const int32_t    nAtoms,
+                                      const int32_t    angularMomentum,
+                                      const int32_t    nPrimitiveGtos) const;
 
     /**
      Determines number of primitive Gaussian functions with specific angular
@@ -212,7 +247,8 @@ class CMolecularBasis
      @param angularMomentum the angular momentum.
      @return the number of Gaussian functions.
      */
-    int32_t getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule, const int32_t angularMomentum) const;
+    int32_t getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule,
+                                               const int32_t    angularMomentum) const;
 
     /**
      Determines number of primitive Gaussian functions with specific angular
@@ -245,7 +281,8 @@ class CMolecularBasis
      @param angularMomentum the angular momentum.
      @return the partial size of contracted AO basis.
      */
-    int32_t getPartialDimensionsOfBasis(const CMolecule& molecule, const int32_t angularMomentum) const;
+    int32_t getPartialDimensionsOfBasis(const CMolecule& molecule,
+                                        const int32_t    angularMomentum) const;
 
     /**
      Determines size of primitive AO basis for selected molecule.
@@ -271,7 +308,8 @@ class CMolecularBasis
      @param angularMomentum the angular momentum.
      @return  the vector of basis function objects.
      */
-    std::vector<CBasisFunction> getBasisFunctions(const int32_t idElemental, const int32_t angularMomentum) const;
+    std::vector<CBasisFunction> getBasisFunctions(const int32_t idElemental,
+                                                  const int32_t angularMomentum) const;
 
     /**
      Creates string representation map of basis functions.
@@ -317,7 +355,8 @@ class CMolecularBasis
      @param title the header line of AO basis output.
      @param molecule the molecule.
      */
-    std::string printBasis(const std::string& title, const CMolecule& molecule) const;
+    std::string printBasis(const std::string& title,
+                           const CMolecule&   molecule) const;
 
     /**
      Prints AO basis information to output stream for selected molecule.
@@ -420,6 +459,7 @@ class CMolecularBasis
  @param output the output text stream.
  @param source the molecular basis object.
  */
-std::ostream& operator<<(std::ostream& output, const CMolecularBasis& source);
+std::ostream& operator<<(      std::ostream&    output,
+                         const CMolecularBasis& source);
 
 #endif /* MolecularBasis_hpp */

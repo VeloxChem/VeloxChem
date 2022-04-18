@@ -172,6 +172,26 @@ CAtomBasis::getNumberOfBasisFunctions(const int32_t angularMomentum) const
 }
 
 int32_t
+CAtomBasis::getNumberOfBasisFunctions(const int32_t angularMomentum,
+                                      const int32_t nPrimitiveGtos) const
+{
+    if (angularMomentum > _maxAngularMomentum) return 0;
+
+    int32_t nbfuncs = 0;
+
+    for (size_t i = 0; i < _basisFunctions.size(); i++)
+    {
+        if ((_basisFunctions[i].getAngularMomentum() == angularMomentum) &&
+            (_basisFunctions[i].getNumberOfPrimitiveFunctions() == nPrimitiveGtos))
+        {
+            nbfuncs++;
+        }
+    }
+
+    return nbfuncs;
+}
+
+int32_t
 CAtomBasis::getNumberOfPrimitiveFunctions(const int32_t angularMomentum) const
 {
     if (angularMomentum > _maxAngularMomentum) return 0;

@@ -155,6 +155,16 @@ class CAtomBasis
      @return the number of basis functions.
      */
     int32_t getNumberOfBasisFunctions(const int32_t angularMomentum) const;
+    
+    /**
+     Gets number of basis functions with specific angular momentum and number of primitve GTOs.
+
+     @param angularMomentum the angular momentum.
+     @param nPrimitiveGtos the number of primitive GTOs.
+     @return the number of basis functions.
+     */
+    int32_t getNumberOfBasisFunctions(const int32_t angularMomentum,
+                                      const int32_t nPrimitiveGtos) const;
 
     /**
      Gets number of primitive Gaussain functions with requested angular momentum.
