@@ -353,6 +353,17 @@ TEST_F(CMolecularBasisTest, GetDimensionsOfPrimitiveBasis)
     ASSERT_EQ(23, ambas.getDimensionsOfPrimitiveBasis(lih));
 }
 
+TEST_F(CMolecularBasisTest, GetContractionDepths)
+{
+    const CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();
+
+    ASSERT_EQ(ambas.getContractionDepths(0), std::set<int32_t>({1, 3, 5}));
+    
+    ASSERT_EQ(ambas.getContractionDepths(1), std::set<int32_t>({1, 2}));
+    
+    ASSERT_EQ(ambas.getContractionDepths(2), std::set<int32_t>({}));
+}
+
 TEST_F(CMolecularBasisTest, GetAtomBasis)
 {
     CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();

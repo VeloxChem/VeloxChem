@@ -30,6 +30,7 @@
 #include <ostream>
 #include <string>
 #include <vector>
+#include <set>
 
 #include <mpi.h>
 
@@ -173,6 +174,14 @@ class CAtomBasis
      @return the number of primitive Gaussian functions.
      */
     int32_t getNumberOfPrimitiveFunctions(const int32_t angularMomentum) const;
+    
+    /**
+     Get vector of unique contraction numbers of basis function with given angular momentum in atom basis.
+
+     @param angularMomentum the angular momentum.
+     @return the vector of unique contraction numbers.
+    */
+    std::set<int32_t> getContractionDepths(const int32_t angularMomentum) const;
 
     /**
      Gets contraction string for atom basis.

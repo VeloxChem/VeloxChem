@@ -71,6 +71,7 @@ class CBinnedGtoBlock
      Creates an empty binned GTOs block object.
      */
     CBinnedGtoBlock()
+    
         : _angularMomentum(0)
 
         , _nPrimitiveGtos(0)

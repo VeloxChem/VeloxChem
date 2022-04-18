@@ -369,6 +369,21 @@ CMolecularBasis::getDimensionsOfPrimitiveBasis(const CMolecule& molecule) const
     return ndim;
 }
 
+std::set<int32_t>
+CMolecularBasis::getContractionDepths(const int32_t angularMomentum) const
+{
+    std::set<int32_t> cnums;
+    
+    for (const auto& abasis : _atomicBasisSets)
+    {
+        const auto anums = abasis.getContractionDepths(angularMomentum);
+        
+        cnums.insert(anums.begin(), anums.end());
+    }
+    
+    return cnums;
+}
+
 CAtomBasis
 CMolecularBasis::getAtomBasis(const int32_t idElemental) const
 {

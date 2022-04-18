@@ -155,6 +155,17 @@ TEST_F(CAtomBasisTest, GetNumberOfPrimitiveFunctions)
     ASSERT_EQ(3, abas.getNumberOfPrimitiveFunctions(1));
 }
 
+TEST_F(CAtomBasisTest, GetContractionDepths)
+{
+    CAtomBasis abas = vlxbas::getAtomBasisForLi();
+    
+    ASSERT_EQ(abas.getContractionDepths(0), std::set<int32_t>({1, 5}));
+    
+    ASSERT_EQ(abas.getContractionDepths(1), std::set<int32_t>({1, 2}));
+    
+    ASSERT_EQ(abas.getContractionDepths(2), std::set<int32_t>({}));
+}
+
 TEST_F(CAtomBasisTest, GetContractionString)
 {
     CAtomBasis abas = vlxbas::getAtomBasisForLi();

@@ -29,6 +29,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <set>
 
 #include <mpi.h>
 
@@ -291,6 +292,14 @@ class CMolecularBasis
      @return the size of primitive AO basis.
      */
     int32_t getDimensionsOfPrimitiveBasis(const CMolecule& molecule) const;
+        
+    /**
+     Get vector of unique contraction numbers of basis function with given angular momentum in molecular basis.
+
+     @param angularMomentum the angular momentum.
+     @return the vector of unique contraction numbers.
+    */
+    std::set<int32_t> getContractionDepths(const int32_t angularMomentum) const;
 
     /**
      Gets atom basis object for specific chemical element from molecular basis.
