@@ -33,7 +33,7 @@ from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
 from .hessiandriver import HessianDriver
 from .outputstream import OutputStream
-from .firstorderprop import FirstOrderProperties
+from .scffirstorderprop import ScfFirstOrderProperties
 from .lrsolver import LinearResponseSolver
 from .profiler import Profiler
 from .qqscheme import get_qq_scheme
@@ -193,7 +193,7 @@ class ScfHessianDriver(HessianDriver):
         hessian = np.zeros((natm, 3, natm, 3))
 
         # First-order properties for gradient of dipole moment
-        prop = FirstOrderProperties(self.comm, self.ostream)
+        prop = ScfFirstOrderProperties(self.comm, self.ostream)
         # numerical gradient (3 dipole components, no. atoms x 3 atom coords)
         #self.dipole_gradient = np.zeros((3, natm, 3))
         self.dipole_gradient = np.zeros((3, 3 * natm))
@@ -223,8 +223,8 @@ class ScfHessianDriver(HessianDriver):
                 self.scf_drv.compute(new_mol, ao_basis, min_basis)
                 energy_ixp = self.scf_drv.get_scf_energy()
 
-                prop.compute_scf_prop(new_mol, ao_basis,
-                                      self.scf_drv.scf_tensors)
+                prop.compute(new_mol, ao_basis,
+                             self.scf_drv.scf_tensors)
                 mu_plus = prop.get_property('dipole moment')
 
                 if self.do_raman:
@@ -238,8 +238,8 @@ class ScfHessianDriver(HessianDriver):
                 self.scf_drv.compute(new_mol, ao_basis, min_basis)
                 energy_ixm = self.scf_drv.get_scf_energy()
 
-                prop.compute_scf_prop(new_mol, ao_basis,
-                                      self.scf_drv.scf_tensors)
+                prop.compute(new_mol, ao_basis,
+                             self.scf_drv.scf_tensors)
                 mu_minus = prop.get_property('dipole moment')
 
                 if self.do_raman:
