@@ -661,9 +661,9 @@ class CBuffer
             {
                 DEVICE_CHECK(deviceMemcpy2D(_data,
                                             _nPaddedColumns * sizeof(value_type), /* dpitch (bytes) */
-                                            source._data,
-                                            source._nPaddedColumns * sizeof(value_type), /* spitch (bytes) */
-                                            _nColumns * sizeof(value_type),              /* width (bytes) */
+                                            src._data,
+                                            src._nPaddedColumns * sizeof(value_type), /* spitch (bytes) */
+                                            _nColumns * sizeof(value_type),           /* width (bytes) */
                                             _nRows,
                                             D2D));
             }
@@ -671,7 +671,106 @@ class CBuffer
     }
     /**@}*/
 
-    /** @{ Host-to-device and device-to-host copies */
+    /** @{ Copy-assignment operator. */
+    /** Create a buffer object by copy-assignment of other buffer object.
+     *
+     * @param source the source buffer object.
+     * @note This overload takes care of host-to-host and device-to-device
+     * copy-assignments.
+     */
+    auto
+    operator=(const CBuffer &src) -> CBuffer &
+    {
+        if (&src != this)
+        {
+            _nRows          = src._nRows;
+            _nColumns       = src._nColumns;
+            _nPaddedColumns = src._nPaddedColumns;
+            _nElements      = src._nElements;
+
+            _data = mem::malloc<value_type, B>(_nElements);
+
+            if constexpr (mem::is_on_host_v<B>)
+            {
+                _copy_aligned(src._data);
+            }
+            else
+            {
+                if constexpr (Layout1D)
+                {
+                    DEVICE_CHECK(deviceMemcpy(_data, src._data, _nElements * sizeof(T), D2D));
+                }
+                else
+                {
+                    DEVICE_CHECK(deviceMemcpy2D(_data,
+                                                _nPaddedColumns * sizeof(value_type), /* dpitch (bytes) */
+                                                src._data,
+                                                src._nPaddedColumns * sizeof(value_type), /* spitch (bytes) */
+                                                _nColumns * sizeof(value_type),           /* width (bytes) */
+                                                _nRows,
+                                                D2D));
+                }
+            }
+        }
+
+        return *this;
+    }
+    /**@}*/
+
+    /** @{ Move CTORs. */
+    /** Create a buffer object by moving other 1D buffer object.
+     *
+     * @param source the source buffer object.
+     * @note Move-CTOR only applicable to host-side buffers.
+     */
+    template <typename B_ = B, typename = std::enable_if_t<!mem::is_on_device_v<B_>>>
+    CBuffer(CBuffer &&src) noexcept
+        : _nRows{src._nRows}, _nColumns{src._nColumns}, _nPaddedColumns{src._nPaddedColumns}, _nElements{src._nElements}, _data{src._data}
+    {
+        src._nRows          = NRows;
+        src._nColumns       = NCols;
+        src._nPaddedColumns = mem::get_pitch<value_type>(Alignment, NCols);
+        src._nElements      = 0;
+        src._data           = nullptr;
+    }
+    /**@}*/
+
+    /** @{ Move-assignment operator. */
+    /** Create a buffer object by move-assignment of other buffer object.
+     *
+     * @param source the source buffer object.
+     * @note Move-assignment only applicable to host-side buffers.
+     */
+    template <typename B_ = B, typename = std::enable_if_t<!mem::is_on_device_v<B_>>>
+    auto
+    operator=(CBuffer &&src) noexcept -> CBuffer &
+    {
+        if (&src != this)
+        {
+            _nRows          = src._nRows;
+            _nColumns       = src._nColumns;
+            _nPaddedColumns = src._nPaddedColumns;
+            _nElements      = src._nElements;
+
+            mem::free<value_type, backend_type>(_data);
+
+            _data = src._data;
+
+            src._data = nullptr;
+        }
+
+        return *this;
+    }
+    /**@}*/
+
+    /** Destroys a memory buffer object. */
+    ~CBuffer() noexcept
+    {
+        _nElements = 0;
+        mem::free<value_type, backend_type>(_data);
+    }
+
+    /** @{ Host-to-device and device-to-host converting CTORs */
     /** Converts a 1D buffer object between host and device backends, by creating a copy.
      *
      * @tparam BSource backend of source buffer object.
@@ -740,56 +839,7 @@ class CBuffer
     }
     /**@}*/
 
-    /** @{ Move CTORs. */
-    /** Create a buffer object by moving other 1D buffer object.
-     *
-     * @param source the source buffer object.
-     * @note Move-CTOR only applicable to host-side buffers.
-     */
-    template <typename BSource = B, typename = std::enable_if_t<!mem::is_on_device_v<BSource>>>
-    CBuffer(CBuffer<T, B, NRows, NCols> &&source) noexcept
-        : _nRows{source._nRows}
-        , _nColumns{source._nColumns}
-        , _nPaddedColumns{source._nPaddedColumns}
-        , _nElements{source._nElements}
-        , _data{source._data}
-    {
-        source._data = nullptr;
-    }
-    /**@}*/
-
-    /** @{ Copy-assignment operators. */
-    /** Create a 1D buffer object by copy-assignment of other 1D buffer object.
-     *
-     * @param source the source buffer object.
-     * @note This overload takes care of host-to-host and device-to-device
-     * copy-assignments.
-     */
-    template <auto L_ = Layout1D, std::enable_if_t<L_, bool> = true>
-    auto
-    operator=(const CBuffer<T, B, NRows, NCols> &source) -> CBuffer<T, B, NRows, NCols> &
-    {
-        if (this == &source) return *this;
-
-        _nRows          = source._nRows;
-        _nColumns       = source._nColumns;
-        _nPaddedColumns = source._nPaddedColumns;
-        _nElements      = source._nElements;
-
-        _data = mem::malloc<value_type, B>(_nElements);
-
-        if constexpr (mem::is_on_host_v<B>)
-        {
-            _copy_aligned(source._data);
-        }
-        else
-        {
-            DEVICE_CHECK(deviceMemcpy(_data, source._data, _nElements * sizeof(T), D2D));
-        }
-
-        return *this;
-    }
-
+    /** @{ Host-to-device and device-to-host converting assignment operators */
     /** Creates a 1D buffer object by copy-assignment of other 1D buffer object.
      *
      * @tparam BSource backend of source buffer object.
@@ -802,61 +852,25 @@ class CBuffer
               std::enable_if_t<L_, bool> = true,
               typename                   = std::enable_if_t<!std::is_same_v<backend_type, BSource>>>
     auto
-    operator=(const CBuffer<T, BSource, NRows, NCols> &source) -> CBuffer<T, B, NRows, NCols> &
+    operator=(const CBuffer<T, BSource, NRows, NCols> &src) -> CBuffer<T, B, NRows, NCols> &
     {
-        if (this == &source) return *this;
-
-        _nRows          = source._nRows;
-        _nColumns       = source._nColumns;
-        _nPaddedColumns = source._nPaddedColumns;
-        _nElements      = source._nElements;
-
-        _data = mem::malloc<value_type, B>(_nElements);
-
-        if constexpr (mem::is_on_host_v<BSource>)
+        if (&src != this)
         {
-            DEVICE_CHECK(deviceMemcpy(_data, source._data, _nElements * sizeof(T), H2D));
-        }
-        else
-        {
-            DEVICE_CHECK(deviceMemcpy(_data, source._data, _nElements * sizeof(T), D2H));
-        }
+            _nRows          = src._nRows;
+            _nColumns       = src._nColumns;
+            _nPaddedColumns = src._nPaddedColumns;
+            _nElements      = src._nElements;
 
-        return *this;
-    }
+            _data = mem::malloc<value_type, B>(_nElements);
 
-    /** Create a 2D buffer object by copy-assignment of other 2D buffer object.
-     *
-     * @param source the source buffer object.
-     * @note This overload takes care of host-to-host and device-to-device
-     * copy-assignments.
-     */
-    template <auto L_ = Layout1D, std::enable_if_t<!L_, bool> = true>
-    auto
-    operator=(const CBuffer<T, B, NRows, NCols> &source) -> CBuffer<T, B, NRows, NCols> &
-    {
-        if (this == &source) return *this;
-
-        _nRows          = source._nRows;
-        _nColumns       = source._nColumns;
-        _nPaddedColumns = source._nPaddedColumns;
-        _nElements      = source._nElements;
-
-        _data = mem::malloc<value_type, backend_type>(_nElements);
-
-        if constexpr (mem::is_on_host_v<B>)
-        {
-            _copy_aligned(source._data);
-        }
-        else
-        {
-            DEVICE_CHECK(deviceMemcpy2D(_data,
-                                        _nPaddedColumns * sizeof(value_type), /* dpitch (bytes) */
-                                        source._data,
-                                        source._nPaddedColumns * sizeof(value_type), /* spitch (bytes) */
-                                        _nColumns * sizeof(value_type),              /* width (bytes) */
-                                        _nRows,
-                                        D2D));
+            if constexpr (mem::is_on_host_v<BSource>)
+            {
+                DEVICE_CHECK(deviceMemcpy(_data, src._data, _nElements * sizeof(T), H2D));
+            }
+            else
+            {
+                DEVICE_CHECK(deviceMemcpy(_data, src._data, _nElements * sizeof(T), D2H));
+            }
         }
 
         return *this;
@@ -874,75 +888,42 @@ class CBuffer
               std::enable_if_t<!L_, bool> = true,
               typename                    = std::enable_if_t<!std::is_same_v<backend_type, BSource>>>
     auto
-    operator=(const CBuffer<T, BSource, NRows, NCols> &source) -> CBuffer<T, B, NRows, NCols> &
+    operator=(const CBuffer<T, BSource, NRows, NCols> &src) -> CBuffer<T, B, NRows, NCols> &
     {
-        if (this == &source) return *this;
-
-        _nRows    = source._nRows;
-        _nColumns = source._nColumns;
-
-        // pitched allocation
-        std::tie(_nPaddedColumns, _data) = mem::malloc<value_type, B>(_nRows, _nColumns);
-        _nElements                       = _nRows * _nPaddedColumns;
-
-        if constexpr (mem::is_on_host_v<BSource>)
+        if (&src != this)
         {
-            DEVICE_CHECK(deviceMemcpy2D(_data,
-                                        _nPaddedColumns * sizeof(value_type), /* dpitch (bytes) */
-                                        source._data,
-                                        source._nPaddedColumns * sizeof(value_type), /* spitch (bytes) */
-                                        _nColumns * sizeof(value_type),              /* width (bytes) */
-                                        _nRows,
-                                        H2D));
-        }
-        else
-        {
-            DEVICE_CHECK(deviceMemcpy2D(_data,
-                                        _nPaddedColumns * sizeof(value_type), /* dpitch (bytes) */
-                                        source._data,
-                                        source._nPaddedColumns * sizeof(value_type), /* spitch (bytes) */
-                                        _nColumns * sizeof(value_type),              /* width (bytes) */
-                                        _nRows,
-                                        D2H));
+            _nRows    = src._nRows;
+            _nColumns = src._nColumns;
+
+            // pitched allocation
+            std::tie(_nPaddedColumns, _data) = mem::malloc<value_type, B>(_nRows, _nColumns);
+            _nElements                       = _nRows * _nPaddedColumns;
+
+            if constexpr (mem::is_on_host_v<BSource>)
+            {
+                DEVICE_CHECK(deviceMemcpy2D(_data,
+                                            _nPaddedColumns * sizeof(value_type), /* dpitch (bytes) */
+                                            src._data,
+                                            src._nPaddedColumns * sizeof(value_type), /* spitch (bytes) */
+                                            _nColumns * sizeof(value_type),           /* width (bytes) */
+                                            _nRows,
+                                            H2D));
+            }
+            else
+            {
+                DEVICE_CHECK(deviceMemcpy2D(_data,
+                                            _nPaddedColumns * sizeof(value_type), /* dpitch (bytes) */
+                                            src._data,
+                                            src._nPaddedColumns * sizeof(value_type), /* spitch (bytes) */
+                                            _nColumns * sizeof(value_type),           /* width (bytes) */
+                                            _nRows,
+                                            D2H));
+            }
         }
 
         return *this;
     }
     /**@}*/
-
-    /** @{ Move-assignment operators. */
-    /** Create a buffer object by move-assignment of other buffer object.
-     *
-     * @param source the source buffer object.
-     * @note Move-assignment only applicable to host-side buffers.
-     */
-    template <typename BSource = B, typename = std::enable_if_t<!mem::is_on_device_v<BSource>>>
-    auto
-    operator=(CBuffer<T, B, NRows, NCols> &&source) noexcept -> CBuffer<T, B, NRows, NCols> &
-    {
-        if (this == &source) return *this;
-
-        _nRows          = source._nRows;
-        _nColumns       = source._nColumns;
-        _nPaddedColumns = source._nPaddedColumns;
-        _nElements      = source._nElements;
-
-        mem::free<value_type, backend_type>(_data);
-
-        _data = source._data;
-
-        source._data = nullptr;
-
-        return *this;
-    }
-    /**@}*/
-
-    /** Destroys a memory buffer object. */
-    ~CBuffer()
-    {
-        _nElements = 0;
-        mem::free<value_type, backend_type>(_data);
-    }
 
     /** @{ Accessors */
     /** Return number of rows (height) of the buffer. */
@@ -1094,7 +1075,7 @@ class CBuffer
     {
         return _data;
     }
-    
+
     /** @param irow the index of row. */
     /** Return pointer to buffer data. */
     __host__ __device__ auto
@@ -1109,7 +1090,7 @@ class CBuffer
     {
         return _data;
     }
-    
+
     /** @param irow the index of row. */
     /** Return pointer to buffer data. */
     __host__ __device__ auto
@@ -1117,7 +1098,7 @@ class CBuffer
     {
         return &_data[irow * _nPaddedColumns];
     }
-    
+
     /**@}*/
 
     /** @{ Iterators */
@@ -1300,12 +1281,12 @@ class CBuffer
         {
             return false;
         }
-        
+
         if (lhs._nElements == 0)
         {
             return true;
         }
-        
+
         if (lhs._nRows != rhs._nRows)
         {
             return false;
@@ -1704,7 +1685,7 @@ class CBuffer
         return buf;
     }
     /** @} */
-    
+
     /** Checks if buffer is empty.
      *
      * @return True if buffer is empty, false otherwise.
