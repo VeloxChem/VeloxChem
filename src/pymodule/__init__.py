@@ -113,7 +113,7 @@ from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
-from .scffirstorderprop import ScfFirstOrderProperties
+from .firstorderprop import FirstOrderProperties
 from .forcefieldgenerator import ForceFieldGenerator
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver

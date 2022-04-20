@@ -31,7 +31,7 @@ from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
-from .scffirstorderprop import ScfFirstOrderProperties
+from .firstorderprop import FirstOrderProperties
 from .forcefieldgenerator import ForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
 from .excitondriver import ExcitonModelDriver
@@ -345,8 +345,8 @@ def main():
                 return
 
             # SCF first-order properties
-            scf_prop = ScfFirstOrderProperties(task.mpi_comm, task.ostream)
-            scf_prop.compute(task.molecule, task.ao_basis, scf_tensors)
+            scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
+            scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_tensors)
             if task.mpi_rank == mpi_master():
                 scf_prop.print_properties(task.molecule)
 

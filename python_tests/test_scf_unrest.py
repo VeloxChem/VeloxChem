@@ -4,7 +4,7 @@ import numpy as np
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
-from veloxchem.scffirstorderprop import ScfFirstOrderProperties
+from veloxchem.firstorderprop import FirstOrderProperties
 
 
 class TestScfUnrestricted:
@@ -28,8 +28,8 @@ class TestScfUnrestricted:
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        scf_prop = ScfFirstOrderProperties(task.mpi_comm, task.ostream)
-        scf_prop.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors)
+        scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
+        scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_drv.scf_tensors)
 
         if is_mpi_master(task.mpi_comm):
             e_scf = scf_drv.get_scf_energy()

@@ -33,9 +33,9 @@ from .veloxchemlib import dipole_in_debye
 from .outputstream import OutputStream
 
 
-class ScfFirstOrderProperties:
+class FirstOrderProperties:
     """
-    Implements SCF first-order properties.
+    Implements first-order properties.
 
     :param comm:
         The MPI communicator.
@@ -55,10 +55,7 @@ class ScfFirstOrderProperties:
             comm = MPI.COMM_WORLD
 
         if ostream is None:
-            if comm.Get_rank() == mpi_master():
-                ostream = OutputStream(sys.stdout)
-            else:
-                ostream = OutputStream(None)
+            ostream = OutputStream(sys.stdout)
 
         self.comm = comm
         self.rank = comm.Get_rank()
@@ -67,16 +64,34 @@ class ScfFirstOrderProperties:
 
         self.properties = {}
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute_scf_prop(self, molecule, basis, scf_tensors):
         """
-        Computes SCF first-order properties.
+        Computes first-order properties for SCF.
 
         :param molecule:
             The molecule
         :param basis:
             The AO basis set.
         :param scf_tensors:
-            The tensors from the converged SCF calculation.
+            The SCF tensors.
+        """
+        if self.rank == mpi_master():
+            total_density = scf_tensors['D_alpha'] + scf_tensors['D_beta']
+        else:
+            total_density = None
+
+        self.compute(molecule, basis, total_density)
+
+    def compute(self, molecule, basis, total_density):
+        """
+        Computes first-order properties.
+
+        :param molecule:
+            The molecule
+        :param basis:
+            The AO basis set.
+        :param total_density:
+            The total electron density.
         """
 
         if molecule.get_charge() != 0:
@@ -97,7 +112,6 @@ class ScfFirstOrderProperties:
                            dipole_mats.z_to_numpy())
 
             # electronic contribution
-            total_density = scf_tensors['D_alpha'] + scf_tensors['D_beta']
             electronic_dipole = -1.0 * np.array(
                 [np.sum(dipole_ints[d] * total_density) for d in range(3)])
 
@@ -107,12 +121,13 @@ class ScfFirstOrderProperties:
             nuclear_dipole = np.sum((coords - origin).T * nuclear_charges,
                                     axis=1)
 
-            self.properties['dipole moment'] = (nuclear_dipole +
-                                                electronic_dipole)
+            self.properties['dipole moment'] = (nuclear_dipole
+                                                + electronic_dipole
+                                               )
 
     def get_property(self, key):
         """
-        Gets SCF first-order property.
+        Gets first-order property.
 
         :param key:
             The name of the property.
@@ -123,17 +138,19 @@ class ScfFirstOrderProperties:
 
         return self.properties[key]
 
-    def print_properties(self, molecule):
+    def print_properties(self, molecule, title):
         """
-        Prints SCF first-order properties.
+        Prints first-order properties.
 
         :param molecule:
             The molecule.
+        :param title:
+            The title of the printout, giving information about the method,
+            relaxed/unrelaxed density, which excited state.
         """
 
         self.ostream.print_blank()
 
-        title = 'Ground-State Dipole Moment'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * (len(title) + 2))
 
@@ -143,7 +160,7 @@ class ScfFirstOrderProperties:
             self.ostream.print_header(warn_msg.ljust(56))
             warn_msg = '    moment will be dependent on the choice of origin.'
             self.ostream.print_header(warn_msg.ljust(56))
-            warn_msg = '    Center of nulcear charge is chosen as the origin.'
+            warn_msg = '    Center of nuclear charge is chosen as the origin.'
             self.ostream.print_header(warn_msg.ljust(56))
 
         self.ostream.print_blank()

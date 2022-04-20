@@ -864,8 +864,8 @@ class ImpesDriver():
         for i in range(n_points):
             self.energy += weights[i] * potentials[i]
             self.gradient += ( weights[i] * gradients[i]
-             + potentials[i] * weight_gradients[i] / sum_weights
-             - potentials[i] * weights[i] * sum_weight_gradients / sum_weights 
+             #+ potentials[i] * weight_gradients[i] / sum_weights
+             #- potentials[i] * weights[i] * sum_weight_gradients / sum_weights 
                                 )
 
     def shepard_interpolation(self, fname, labels):
@@ -919,8 +919,8 @@ class ImpesDriver():
         for i in range(n_points):
             self.energy += weights[i] * potentials[i]
             self.gradient += ( weights[i] * gradients[i]
-             + potentials[i] * weight_gradients[i] / sum_weights
-             - potentials[i] * weights[i] * sum_weight_gradients / sum_weights 
+             #+ potentials[i] * weight_gradients[i] / sum_weights
+             #- potentials[i] * weights[i] * sum_weight_gradients / sum_weights 
                                 )
 
     def compute_potential(self, data_point):
@@ -968,10 +968,9 @@ class ImpesDriver():
         b_matrix = data_point.b_matrix #self.impes_coordinate.b_matrix
 
         if self.r_inverse:
-            # trnasform gradient and hessian back to r.
+            # transform gradient and hessian back to r.
             # this is required to be able to then transform
             # to the Cartesian gradient.
-
             grad, hessian = data_point.transform_to_r()
 
         dist_hessian = np.matmul(dist.T, hessian)
@@ -994,11 +993,14 @@ class ImpesDriver():
             :param distance:
                 The norm of the distance vector * sqrt(N), N number of atoms.
         """
-        weight_gradient = ( - self.exponent_p * distance_vector /
-                            distance**( self.exponent_p + 1 ) )
-        # TODO double check +1 / +2 
 
-        return weight_gradient
+        N = distance_vector.shape[0]
+        fact_sqrtN = 1.0 / ( np.sqrt(N)**self.exponent_p )
+        weight_gradient = ( - self.exponent_p * distance_vector /
+                            ( distance**( self.exponent_p + 2 ) ) )
+        # TODO double check +2! 
+
+        return fact_sqrtN * weight_gradient
     
     def shepard_weight_gradient(self, distance_vector, distance):
         """ Returns the derivative of an unormalized Shepard interpolation
@@ -1056,12 +1058,12 @@ class ImpesDriver():
 
         # Calculate the Cartesian distance
         N = reference_coordinates.shape[0] # number of atoms
-        distance = np.sqrt(N) * np.linalg.norm(  reference_coordinates
+        distance =  np.linalg.norm(  reference_coordinates
                                   - rotated_coordinates)
 
         # Calculate the gradient of the interpolation weights
         # (required for energy gradient interpolation)
-        distance_vector = reference_coordinates - rotated_coordinates
+        distance_vector = ( reference_coordinates - rotated_coordinates )
 
         if self.interpolation_type == 'shepard':
             weight_gradient = self.shepard_weight_gradient(distance_vector,
@@ -1074,7 +1076,7 @@ class ImpesDriver():
             errtxt += self.interpolation_type
             raise ValueError(errtxt)
 
-        return distance, weight_gradient
+        return np.sqrt(N) * distance, weight_gradient
 
     def read_labels(self, fname):
         """
