@@ -276,8 +276,8 @@ class CVisualizationDriver
      @param spin_1 the spin of x1 ('alpha' or 'beta').
      @param spin_2 the spin of x2 ('alpha' or 'beta').
      */
-    std::vector<double> getTwoParticleDensity(const std::vector<std::vector<double>>& coord_1,
-                                              const std::vector<std::vector<double>>& coord_2,
+    std::vector<double> getTwoParticleDensity(const std::vector<std::vector<double>>& coords_1,
+                                              const std::vector<std::vector<double>>& coords_2,
                                               const CMolecule&                        molecule,
                                               const CMolecularBasis&                  basis,
                                               const CAODensityMatrix&                 density,

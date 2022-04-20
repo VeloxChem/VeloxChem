@@ -239,7 +239,7 @@ public:
     /**
      Computes second derivative of exchange-correlation functional for given density grid.
      
-     @param xcHessianGrid the exchange-correlation hessian grid object.
+     @param xcCubicHessianGrid the exchange-correlation hessian grid object.
      @param factor the scaling factor of functional contribution.
      @param densityGrid the density grid object.
      */

@@ -712,7 +712,7 @@ CMemBlock<int32_t>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         if (rank == mpi::master()) bsizes = mem::malloc<int32_t>(nodes);
 
-        mpi::gather(bsizes, _nElements, rank, comm);
+        mpi::gather(bsizes, _nElements, comm);
 
         // set indexes of data blocks on master node
 
@@ -761,7 +761,7 @@ CMemBlock<double>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 
         if (rank == mpi::master()) bsizes = mem::malloc<int32_t>(nodes);
 
-        mpi::gather(bsizes, _nElements, rank, comm);
+        mpi::gather(bsizes, _nElements, comm);
 
         // set indexes of data blocks on master node
 

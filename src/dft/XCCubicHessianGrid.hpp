@@ -148,7 +148,7 @@ class CXCCubicHessianGrid
 
      @param iVariableType the type of first differentiation variable in hessian.
      @param jVariableType the type of second differentiation variable in hessian.
-     @param jVariableType the type of third differentiation variable in hessian.
+     @param kVariableType the type of third differentiation variable in hessian.
      @return the constant pointer to exchage-correlation functional hessian values.
      */
     const double* xcCubicHessianValues(const xcvars iVariableType, const xcvars jVariableType, const xcvars kVariableType) const;
@@ -158,7 +158,7 @@ class CXCCubicHessianGrid
 
      @param iVariableType the type of first differentiation variable in hessian.
      @param jVariableType the type of second differentiation variable in hessian.
-     @param jVariableType the type of third differentiation variable in hessian.
+     @param kVariableType the type of third differentiation variable in hessian.
      @return the pointer to exchage-correlation functional hessian values.
      */
     double* xcCubicHessianValues(const xcvars iVariableType, const xcvars jVariableType, const xcvars kVariableType);
