@@ -12,7 +12,6 @@ dependencies:
   - pip
   - pybind11>=2.6
   - python>=3.6
-  - geometric
   - psutil
   - pytest
   - mdanalysis
@@ -21,3 +20,4 @@ dependencies:
   - gtest
   - cppe=0.2.1
   - xtb
+  - veloxchem::geometric

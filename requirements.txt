@@ -1,4 +1,4 @@
-geometric>=0.9.7
+git+https://github.com/leeping/geomeTRIC.git@e982ad6#egg=geometric
 h5py>=2.8
 mpi4py>=3.0
 numpy>=1.15.0
