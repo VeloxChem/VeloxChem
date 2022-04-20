@@ -53,6 +53,8 @@ class OptimizationDriver:
         - check_interval: The interval (number of steps) for checking
           coordinate system.
         - max_iter: The maximum number of optimization steps
+        - transition: The flag for transition state searching.
+        - hessian: The flag for computing Hessian.
         - filename: The filename that will be used by geomeTRIC.
         - grad_drv: The gradient driver.
     """
@@ -71,6 +73,9 @@ class OptimizationDriver:
         self.check_interval = 0
         self.max_iter = 300
 
+        self.transition = False
+        self.hessian = 'never'
+
         self.ref_xyz = None
 
         self.filename = f'veloxchem_opt_{get_datetime_string()}'
@@ -84,6 +89,8 @@ class OptimizationDriver:
                 'check_interval':
                     ('int', 'interval for checking coordinate system'),
                 'max_iter': ('int', 'maximum number of optimization steps'),
+                'transition': ('bool', 'transition state search'),
+                'hessian': ('str_lower', 'hessian flag'),
                 'ref_xyz': ('str', 'reference geometry'),
             },
         }
@@ -112,6 +119,12 @@ class OptimizationDriver:
         if 'filename' in opt_dict:
             self.filename = opt_dict['filename']
 
+        if ('hessian' not in opt_dict) and self.transition:
+            self.hessian = 'first'
+
+        if self.hessian == 'only':
+            self.hessian = 'stop'
+
     def compute(self, molecule, *args):
         """
         Performs geometry optimization.
@@ -129,6 +142,7 @@ class OptimizationDriver:
         start_time = tm.time()
 
         opt_engine = OptimizationEngine(self.grad_drv, molecule, *args)
+        hessian_exit = False
 
         # filename is used by geomeTRIC to create .log and other files. On
         # master node filename is determined based on the input/output file.
@@ -152,21 +166,27 @@ class OptimizationDriver:
             else:
                 constr_filename = None
 
-            log_ini = Path(temp_dir, f'log.ini_{self.rank}')
-            self.write_log_ini(log_ini)
-
             # redirect geomeTRIC stdout/stderr
 
             with redirect_stdout(StringIO()) as fg_out, redirect_stderr(
                     StringIO()) as fg_err:
-                m = geometric.optimize.run_optimizer(
-                    customengine=opt_engine,
-                    coordsys=self.coordsys,
-                    check=self.check_interval,
-                    maxiter=self.max_iter,
-                    constraints=constr_filename,
-                    input=filename + '.optinp',
-                    logIni=str(log_ini))
+                try:
+                    m = geometric.optimize.run_optimizer(
+                        customengine=opt_engine,
+                        coordsys=self.coordsys,
+                        check=self.check_interval,
+                        maxiter=self.max_iter,
+                        constraints=constr_filename,
+                        transition=self.transition,
+                        hessian=self.hessian,
+                        input=filename + '.optinp')
+                except geometric.errors.HessianExit:
+                    hessian_exit = True
+
+        if hessian_exit:
+            if self.rank == mpi_master() and self.hessian == 'stop':
+                self.print_vib_analysis('vdata_first')
+            return molecule
 
         coords = m.xyzs[-1] / geometric.nifty.bohr2ang
         labels = molecule.get_labels()
@@ -192,6 +212,9 @@ class OptimizationDriver:
                 else:
                     self.print_ic_rmsd(final_mol, molecule)
 
+            if self.hessian in ['last', 'first+last', 'each']:
+                self.print_vib_analysis('vdata_last')
+
             valstr = '*** Time spent in Optimization Driver: '
             valstr += '{:.2f} sec'.format(tm.time() - start_time)
             self.ostream.print_header(valstr)
@@ -212,36 +235,6 @@ class OptimizationDriver:
 
         if extfile.is_file():
             extfile.unlink()
-
-    def write_log_ini(self, fname):
-
-        lines = [
-            '[loggers]',
-            'keys=root',
-            '[handlers]',
-            'keys=stream_handler, file_handler',
-            '[formatters]',
-            'keys=formatter',
-            '[logger_root]',
-            'level=INFO',
-            'handlers=stream_handler, file_handler',
-            '[handler_stream_handler]',
-            'class=geometric.nifty.RawStreamHandler',
-            'level=INFO',
-            'formatter=formatter',
-            'args=(sys.stderr,)',
-            '[handler_file_handler]',
-            'class=geometric.nifty.RawFileHandler',
-            'level=INFO',
-            'formatter=formatter',
-            'args=(r\'%(logfilename)s\',)',
-            '[formatter_formatter]',
-            'format=%(message)s',
-        ]
-
-        with fname.open('w') as f_ini:
-            for line in lines:
-                print(line, file=f_ini)
 
     @staticmethod
     def get_ic_rmsd(opt_mol, ref_mol):
@@ -543,6 +536,9 @@ class OptimizationDriver:
         lines.append('Constraints             :    ' +
                      ('Yes' if self.constraints else 'No'))
         lines.append('Max. Number of Steps    :    ' + str(self.max_iter))
+        lines.append('Transition State        :    ' +
+                     ('Yes' if self.transition else 'No'))
+        lines.append('Hessian                 :    ' + self.hessian)
 
         maxlen = max([len(line.split(':')[0]) * 2 for line in lines])
         for line in lines:
