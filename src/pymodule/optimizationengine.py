@@ -23,12 +23,16 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from contextlib import redirect_stderr
+from io import StringIO
 import numpy as np
 import time as tm
-import geometric
 
 from .veloxchemlib import mpi_master
 from .molecule import Molecule
+
+with redirect_stderr(StringIO()) as fg_err:
+    import geometric
 
 
 class OptimizationEngine(geometric.engine.Engine):
