@@ -121,9 +121,8 @@ class FirstOrderProperties:
             nuclear_dipole = np.sum((coords - origin).T * nuclear_charges,
                                     axis=1)
 
-            self.properties['dipole moment'] = (nuclear_dipole
-                                                + electronic_dipole
-                                               )
+            self.properties['dipole moment'] = (nuclear_dipole +
+                                                electronic_dipole)
 
     def get_property(self, key):
         """
@@ -138,7 +137,7 @@ class FirstOrderProperties:
 
         return self.properties[key]
 
-    def print_properties(self, molecule, title):
+    def print_properties(self, molecule, title=None):
         """
         Prints first-order properties.
 
@@ -149,6 +148,8 @@ class FirstOrderProperties:
             relaxed/unrelaxed density, which excited state.
         """
 
+        if title is None:
+            title = "Ground State Dipole Moment"
         self.ostream.print_blank()
 
         self.ostream.print_header(title)

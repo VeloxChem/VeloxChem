@@ -25,10 +25,12 @@
 
 from pathlib import Path
 import numpy as np
+import geometric
 
 from .veloxchemlib import Molecule
 from .veloxchemlib import ChemicalElement
 from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import mathconst_pi
 
 
 @staticmethod
@@ -323,6 +325,7 @@ def _Molecule_get_ic_rmsd(self, ref_mol):
 
     return ic_rmsd
 
+
 def _Molecule_moments_of_inertia(self):
     """
     Calculates the moment of inertia tensor and principle axes
@@ -340,15 +343,18 @@ def _Molecule_moments_of_inertia(self):
     coords_com = coordinates - center_of_mass[np.newaxis, :]
 
     # Moment of inertia tensor
-    I = np.sum([masses[i] * (np.eye(3)*(np.dot(coords_com[i], coords_com[i]))
-                - np.outer(coords_com[i], coords_com[i])) for i in range(natm)], axis=0)
+    Imom = np.sum([
+        masses[i] * (np.eye(3) * (np.dot(coords_com[i], coords_com[i])) -
+                     np.outer(coords_com[i], coords_com[i]))
+        for i in range(natm)], axis=0)
 
     # Principal moments
-    Ivals, Ivecs = np.linalg.eigh(I)
+    Ivals, Ivecs = np.linalg.eigh(Imom)
     # Eigenvectors are in the rows after transpose
-    #Ivecs = Ivecs.T
+    # Ivecs = Ivecs.T
 
     return Ivals
+
 
 def _Molecule_is_linear(self):
     """
@@ -374,6 +380,7 @@ def _Molecule_is_linear(self):
     # TODO: Raise an error if rotational DoFs are not 2 or 3
     else:
         pass
+
 
 def _Molecule_get_aufbau_occupation(self, norb, flag='restricted'):
     """
