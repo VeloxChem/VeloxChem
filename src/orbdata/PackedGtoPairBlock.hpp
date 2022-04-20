@@ -359,4 +359,7 @@ class CPackedGtoPairBlock
     }
 };
 
+template <typename T, typename B = mem::Host>
+using VPackedGtoPairBlocks = std::vector<CPackedGtoPairBlock<T, B>>;
+
 #endif /* PackedGtoPairBlock_hpp */
