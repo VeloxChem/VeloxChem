@@ -368,10 +368,9 @@ class CDensityGridQuad
     /**
      Generates products of one-time transformed densities to be used for quadratic response.
 
-     @param densityGridab the screened density grid.
+     @param densityGridAB the screened density grid.
      @param molecularGridab the screened molecular grid.
      @param rwDensityGrid  one-time transformed densities evaluated on the grid
-     @param densityThreshold the screening threshold for density values.
      @param numdens the number of densities.
      @param quadMode a string that specifies which densities should be combined.
      */

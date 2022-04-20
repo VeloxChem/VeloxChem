@@ -26,7 +26,7 @@
 #include "DenseLinearAlgebra.hpp"
 
 #ifdef ENABLE_MKL
-#include <mkl.h>
+#include <mkl_cblas.h>
 #else
 #include <cblas.h>
 #endif

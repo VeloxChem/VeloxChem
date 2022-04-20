@@ -33,7 +33,8 @@
 #include <vector>
 
 #ifdef ENABLE_MKL
-#include <mkl.h>
+#include <mkl_cblas.h>
+#include <mkl_lapacke.h>
 #else
 #include <cblas.h>
 #include <lapacke.h>

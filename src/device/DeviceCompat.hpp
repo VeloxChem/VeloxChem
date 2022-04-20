@@ -50,7 +50,7 @@ namespace detail {
  */
 template <typename T>
 auto
-device_allocate(size_t /* count */) -> T *
+device_allocate(size_t count) -> T *
 {
     return nullptr;
 }
@@ -77,7 +77,7 @@ device_allocate(size_t /* count */) -> T *
  */
 template <typename T>
 auto
-device_allocate(size_t /* height */, size_t /* width */) -> std::tuple<size_t, T *>
+device_allocate(size_t height, size_t width) -> std::tuple<size_t, T *>
 {
     return {0, nullptr};
 }
@@ -89,7 +89,7 @@ device_allocate(size_t /* height */, size_t /* width */) -> std::tuple<size_t, T
  */
 template <typename T>
 auto
-device_deallocate(T * /* p */) noexcept -> void
+device_deallocate(T *p) noexcept -> void
 {
     // do nothing
 }
