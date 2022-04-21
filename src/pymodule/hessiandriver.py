@@ -29,7 +29,9 @@ from io import StringIO
 import numpy as np
 import sys
 
-from .veloxchemlib import mpi_master, bohr_in_angstroms, fine_structure_constant
+from .veloxchemlib import (mpi_master, bohr_in_angstroms, avogadro_constant,
+                           fine_structure_constant, electron_mass_in_amu,
+                           amu_in_kg, speed_of_light_in_vacuum_in_SI)
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
@@ -283,27 +285,23 @@ class HessianDriver:
         self.reduced_masses = 1.0 / (np.einsum('ki->i', self.normal_modes.T**2))
 
         # Constants and conversion factors
-        # TODO: get these from the proper place.
-        c = 2.99792458e8  # speed of light in m/s
-        cm_to_m = 1e-2  # centimeters in meters
-        amu_to_kg = 1.6605390666e-27  # atomic mass unit in kg
-        N_to_mdyne = 1e8  # Newton in milli dyne
-        m_to_A = 1e10  # meters in Angstroms
-        me_in_amu = 5.4857990907e-4  # electron mass in u
-        n_avogadro = 6.02214076e23
+        c = speed_of_light_in_vacuum_in_SI()
         alpha = fine_structure_constant()
         bohr_in_km = bohr_in_angstroms() * 1e-13
+        cm_to_m = 1e-2  # centimeters in meters
+        N_to_mdyne = 1e+8  # Newton in milli dyne
+        m_to_A = 1e+10  # meters in Angstroms
         raman_conversion_factor = 0.078424
 
         # Conversion factor of IR intensity to km/mol
-        conv_ir_ea0amu2kmmol = (me_in_amu * n_avogadro * alpha**2 * bohr_in_km *
-                                np.pi / 3.0)
+        conv_ir_ea0amu2kmmol = (electron_mass_in_amu() * avogadro_constant() *
+                                alpha**2 * bohr_in_km * np.pi / 3.0)
 
         # Calculate force constants
         self.force_constants = (4.0 * np.pi**2 *
                                 (c * (self.frequencies / cm_to_m))**2 *
-                                self.reduced_masses * amu_to_kg) * (N_to_mdyne /
-                                                                    m_to_A)
+                                self.reduced_masses *
+                                amu_in_kg()) * (N_to_mdyne / m_to_A)
 
         natoms = molecule.number_of_atoms()
         atom_symbol = molecule.get_labels()

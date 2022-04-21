@@ -64,11 +64,39 @@ double getHartreeValueInInverseNanometer();
 double getHartreeValueInWavenumbers();
 
 /**
+ Gets electron mass in amu.
+
+ @return electron mass in amu.
+ */
+double getElectronMassInAtomicMassUnit();
+
+/**
  Gets amu value in electron masses.
 
  @return the conversion factor.
  */
 double getAtomicMassUnitInElectronMasses();
+
+/**
+ Gets amu value in kg.
+
+ @return the conversion factor.
+ */
+double getAtomicMassUnitInKg();
+
+/**
+ Gets speed of light in vacuum in SI.
+
+ @return the speed of light in vacuum.
+ */
+double getSpeedOfLightInVacuumInSI();
+
+/**
+ Gets Avogadro constant.
+
+ @return Avogadro constant.
+ */
+double getAvogadroConstant();
 
 /**
  Gets convertion factor for dipole moment (a.u. -> Debye).
