@@ -90,7 +90,6 @@ class CBinnedGtoPairBlock
         , _atomicIndexes(BufferMY<int32_t, B, 2>())
 
         , _pairFactors(BufferMY<T, B, 24>())
-
     {
         
     }
@@ -883,7 +882,9 @@ class CBinnedGtoPairBlock
         
         int32_t ncgtos = 0;
         
-        for (int32_t i = 0; i < indexes.size(); i++)
+        const auto ndims = (indexes.getMDSpan()).extent(0);
+        
+        for (size_t i = 0; i < ndims; i++)
         {
             if (indexes(i) == ivalue) ncgtos++;
         }
@@ -908,9 +909,9 @@ class CBinnedGtoPairBlock
             
             int32_t icgto = 0;
             
-            for (int32_t i = 0; i < indexes.size(); i++)
+            for (size_t i = 0; i < ndims; i++)
             {
-                if (indexes.at(i) == ivalue)
+                if (indexes(i) == ivalue)
                 {
                     // copy primitibe GTO pairs data
                     
@@ -983,7 +984,14 @@ class CBinnedGtoPairBlock
     auto
     getNumberOfContrPairs() const -> int32_t
     {
-        return  static_cast<int32_t>((_atomicIndexes.getMDSpan()).extent(1));
+        if (_atomicIndexes.empty())
+        {
+            return 0; 
+        }
+        else
+        {
+            return  static_cast<int32_t>((_atomicIndexes.getMDSpan()).extent(1));
+        }
     }
     
     /**

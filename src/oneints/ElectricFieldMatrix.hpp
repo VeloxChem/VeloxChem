@@ -80,7 +80,7 @@ class CElectricFieldMatrix
     /**
      Creates a electric field matrix object.
 
-     @param matrices array of dense matrices with components of electric field
+     @param matrix array of dense matrices with components of electric field
      integrals.
      */
     CElectricFieldMatrix(const std::array<CDenseMatrix, 3>& matrix);

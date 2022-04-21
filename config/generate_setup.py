@@ -193,13 +193,15 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
     elif use_clang:
         if check_apple_clang(cxx):
             cxx_flags = "-Xclang -fopenmp"
-            if "OMPROOT" in os.environ:
-                cxx_flags += " -I" + os.environ["OMPROOT"] + "/include" 
         else:
             cxx_flags = "-fopenmp"
         omp_flag = "-lomp"
+        # for custom OpenMP installation on mac
         if "OMPROOT" in os.environ:
-            omp_flag = " -L" + os.environ["OMPROOT"] + "/lib " + omp_flag
+            omp_inc = str(Path(os.environ["OMPROOT"], "include"))
+            omp_dir = str(Path(os.environ["OMPROOT"], "lib"))
+            cxx_flags += f" -I{omp_inc}"
+            omp_flag = f" -L{omp_dir} " + omp_flag
 
     # ==> math library <==
 

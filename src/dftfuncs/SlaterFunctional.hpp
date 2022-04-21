@@ -125,7 +125,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
     Implements second order derivatives of spin-polarized Slater functional 1/2 [Ex(2 rho_a) + Ex(2rho_b)] with Ex(rho) = -3/4 (3/pi) (rho)^4/3 for
     dengrid::ab case.
 
-    @param xcHessianGrid the exchange-correlation hessian grid.
+    @param xcCubicHessianGrid the exchange-correlation hessian grid.
     @param factor the scale factor of functional contribution.
     @param densityGrid the density grid.
     */
@@ -137,7 +137,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
     Implements second order derivatives of spin-polarized Slater functional 1/2 [Ex(2 rho_a) + Ex(2rho_b)] with Ex(rho) = -3/4 (3/pi) (rho)^4/3 for
     dengrid::ab case.
 
-    @param xcHessianGrid the exchange-correlation hessian grid.
+    @param xcCubicHessianGrid the exchange-correlation hessian grid.
     @param factor the scale factor of functional contribution.
     @param densityGrid the density grid.
     */
@@ -149,7 +149,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
     Implements second order derivatives of spin-polarized Slater functional 1/2 [Ex(2 rho_a) + Ex(2rho_b)] with Ex(rho) = -3/4 (3/pi) (rho)^4/3 for
     dengrid::ab case.
 
-    @param xcHessianGrid the exchange-correlation hessian grid.
+    @param xcCubicHessianGrid the exchange-correlation hessian grid.
     @param factor the scale factor of functional contribution.
     @param densityGrid the density grid.
     */

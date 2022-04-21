@@ -72,7 +72,7 @@ using implementations = ::testing::Types<
 
 TYPED_TEST_SUITE(CBufferTest, detail::implementations);
 
-TYPED_TEST(CBufferTest, DefaultContructor)
+TYPED_TEST(CBufferTest, DefaultConstructor)
 {
     using Scalar         = typename TypeParam::value_type;
     using Backend        = typename TypeParam::backend_type;
@@ -85,7 +85,7 @@ TYPED_TEST(CBufferTest, DefaultContructor)
     ASSERT_EQ(buf.nColumns(), NCols);
 }
 
-TYPED_TEST(CBufferTest, DefaultContructorAndResize)
+TYPED_TEST(CBufferTest, DefaultConstructorAndResize)
 {
     using Scalar         = typename TypeParam::value_type;
     using Backend        = typename TypeParam::backend_type;
@@ -127,9 +127,8 @@ TYPED_TEST(CBufferTest, DefaultContructorAndResize)
     }
 }
 
-/* Test default construction and `setZero`
- */
-TYPED_TEST(CBufferTest, DefaultContructorSetZero)
+/* Test default construction and `setZero` */
+TYPED_TEST(CBufferTest, DefaultConstructorSetZero)
 {
     using Scalar         = typename TypeParam::value_type;
     using Backend        = typename TypeParam::backend_type;
@@ -187,56 +186,80 @@ TYPED_TEST(CBufferTest, CopyConstructor)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    constexpr auto kind = buffer::CBuffer<Scalar, Backend, NRows, NCols>::kind;
+    buffer::CBuffer<Scalar, Backend, NRows, NCols> src{};
+    buffer::CBuffer<Scalar, Backend, NRows, NCols> dst{src};
 
-    auto val = static_cast<Scalar>(3);
-
-    if constexpr (kind == buffer::Kind::X)
-    {
-        auto buf_src = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(val, 10);
-        auto buf_dst{buf_src};
-
-        ASSERT_EQ(buf_dst, buf_src);
-    }
-    else if constexpr (kind == buffer::Kind::MY)
-    {
-        auto buf_src = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(val, 10);
-        auto buf_dst{buf_src};
-
-        ASSERT_EQ(buf_dst, buf_src);
-    }
-    else if constexpr (kind == buffer::Kind::XN)
-    {
-        auto buf_src = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(val, 10);
-        auto buf_dst{buf_src};
-
-        ASSERT_EQ(buf_dst, buf_src);
-    }
-    else if constexpr (kind == buffer::Kind::XY)
-    {
-        auto buf_src = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(val, 10, 5);
-        auto buf_dst{buf_src};
-
-        ASSERT_EQ(buf_dst, buf_src);
-    }
-    else if constexpr (kind == buffer::Kind::MN)
-    {
-        auto buf_src = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(val);
-        auto buf_dst{buf_src};
-
-        ASSERT_EQ(buf_dst, buf_src);
-    }
-    else
-    {
-        auto buf_src = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(val);
-        auto buf_dst{buf_src};
-
-        ASSERT_EQ(buf_dst, buf_src);
-    }
+    // the two objects are exactly equal, but independent from each other
+    ASSERT_EQ(dst, src);
 }
 
-/* Test static generators: `Zero`
- */
+TYPED_TEST(CBufferTest, CopyAssignment)
+{
+    using Scalar         = typename TypeParam::value_type;
+    using Backend        = typename TypeParam::backend_type;
+    constexpr auto NRows = TypeParam::NRows;
+    constexpr auto NCols = TypeParam::NCols;
+
+    buffer::CBuffer<Scalar, Backend, NRows, NCols> src{};
+    buffer::CBuffer<Scalar, Backend, NRows, NCols> dst{};
+
+    dst = src;
+
+    // the two objects are exactly equal, but independent from each other
+    ASSERT_EQ(dst, src);
+}
+
+TYPED_TEST(CBufferTest, MoveConstructor)
+{
+    using Scalar         = typename TypeParam::value_type;
+    using Backend        = typename TypeParam::backend_type;
+    constexpr auto NRows = TypeParam::NRows;
+    constexpr auto NCols = TypeParam::NCols;
+
+    buffer::CBuffer<Scalar, Backend, NRows, NCols> src{};
+
+    auto nrows = src.nRows();
+    auto ncols = src.nColumns();
+
+    buffer::CBuffer<Scalar, Backend, NRows, NCols> dst{std::move(src)};
+
+    // dst "steals" representation of src
+    ASSERT_EQ(dst.nRows(), nrows);
+    ASSERT_EQ(dst.nColumns(), ncols);
+
+    // src is still in a valid state
+    ASSERT_EQ(src.nRows(), NRows);
+    ASSERT_EQ(src.nColumns(), NCols);
+    ASSERT_EQ(src.data(), nullptr);
+}
+
+TYPED_TEST(CBufferTest, MoveAssignment)
+{
+    using Scalar         = typename TypeParam::value_type;
+    using Backend        = typename TypeParam::backend_type;
+    constexpr auto NRows = TypeParam::NRows;
+    constexpr auto NCols = TypeParam::NCols;
+
+    buffer::CBuffer<Scalar, Backend, NRows, NCols> src{};
+
+    auto nrows = src.nRows();
+    auto ncols = src.nColumns();
+
+    buffer::CBuffer<Scalar, Backend, NRows, NCols> dst{};
+
+    dst = std::move(src);
+
+    // dst "steals" representation of src
+    ASSERT_EQ(dst.nRows(), nrows);
+    ASSERT_EQ(dst.nColumns(), ncols);
+
+    // src is still in a valid state
+    ASSERT_EQ(src.nRows(), NRows);
+    ASSERT_EQ(src.nColumns(), NCols);
+    ASSERT_EQ(src.data(), nullptr);
+}
+
+/* Test static generators: `Zero` */
 TYPED_TEST(CBufferTest, Zero)
 {
     using Scalar         = typename TypeParam::value_type;

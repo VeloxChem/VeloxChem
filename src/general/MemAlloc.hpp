@@ -83,15 +83,15 @@ namespace detail {
  * https://developercommunity.visualstudio.com/t/c17-stdaligned-alloc%E7%BC%BA%E5%A4%B1/468021
  *   * On Linux, use `::posix_memalign`
  */
-constexpr inline auto __vlx_malloc =
+inline auto __vlx_malloc =
 #ifdef ENABLE_MKL
-    mkl_malloc;
+    [](size_t count_bytes, size_t alignment) -> void * { return mkl_malloc(count_bytes, static_cast<int>(alignment)); };
 #else  // ENABLE_MKL
 #ifdef _MSC_VER
-    _aligned_alloc;
+    _aligned_malloc;
 #else  // _MSC_VER
     [](size_t count_bytes, size_t alignment) -> void * {
-    void* ptr = nullptr;
+    void *ptr = nullptr;
 
     auto ierr = ::posix_memalign(&ptr, alignment, count_bytes);
 
@@ -109,7 +109,7 @@ constexpr inline auto __vlx_malloc =
  * https://developercommunity.visualstudio.com/t/c17-stdaligned-alloc%E7%BC%BA%E5%A4%B1/468021
  *   * On Linux, use `::free`
  */
-constexpr inline auto __vlx_free =
+inline auto __vlx_free =
 #ifdef ENABLE_MKL
     mkl_free;
 #else  // ENABLE_MKL
@@ -140,7 +140,7 @@ host_allocate(size_t alignment, size_t count) -> T *
 
     // check that alignment is a power of 2
     // http://www.graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
-    if ((alignment == 0) || ((alignment & (alignment - 1)) != 0)) errors::msgCritical(std::string(__func__) + ": alignment must be a power of 2");
+    errors::assertMsgCritical((alignment && !(alignment & (alignment - 1))), std::string(__func__) + ": alignment must be a power of 2");
 
     // check that we are not trying to allocate too big a chunk
     if (count > std::numeric_limits<size_t>::max() / sizeof(T))
@@ -193,11 +193,11 @@ malloc_1d(size_t alignment, size_t count) -> T *
     }
 }
 
-template <typename T, typename B = Host>
+template <typename T, typename B = Host, typename U = size_t>
 auto
-malloc(size_t count) -> T *
+malloc(U count) -> T *
 {
-    return malloc_1d<T, B>(VLX_ALIGN, count);
+    return malloc_1d<T, B>(VLX_ALIGN, static_cast<size_t>(count));
 }
 
 template <typename T, typename B = Host>
@@ -215,11 +215,11 @@ malloc_2d(size_t alignment, size_t height, size_t width) -> std::tuple<size_t, T
     }
 }
 
-template <typename T, typename B = Host>
+template <typename T, typename B = Host, typename U = size_t>
 auto
-malloc(size_t height, size_t width) -> std::tuple<size_t, T *>
+malloc(U height, U width) -> std::tuple<size_t, T *>
 {
-    return malloc_2d<T, B>(VLX_ALIGN, height, width);
+    return malloc_2d<T, B>(VLX_ALIGN, static_cast<size_t>(height), static_cast<size_t>(width));
 }
 
 /** Deallocate memory chunk pointed to by pointer.
