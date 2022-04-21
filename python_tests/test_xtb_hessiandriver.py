@@ -31,7 +31,6 @@ class TestXTBHessianDriver:
         if is_mpi_master(task.mpi_comm):
             xtb_hessian_drv = XTBHessianDriver(xtb_drv)
             xtb_hessian_drv.compute(task.molecule)
-            xtb_hessian_drv.vibrational_analysis(task.molecule)
 
             hf = h5py.File(h5file)
             ref_hessian = np.array(hf.get('hessian'))
@@ -40,6 +39,40 @@ class TestXTBHessianDriver:
             hf.close()
 
             assert np.max(np.abs(xtb_hessian_drv.hessian - ref_hessian)) < 1.0e-5
+
+        task.finish()
+
+    @pytest.mark.skipif(True,
+       reason='geometric verison not able to run vib. analysis')
+    def test_xtb_vibrational_analysis(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water_hessian.inp')
+        h5file = str(here / 'inputs' / 'xtbhessian.h5')
+
+        task = MpiTask([inpfile, None])
+
+        xtb_method = 'gfn2'
+
+        xtb_drv = XTBDriver(task.mpi_comm)
+        xtb_drv.set_method(xtb_method.lower())
+        xtb_drv.compute(task.molecule, task.ostream)
+
+        if is_mpi_master(task.mpi_comm):
+            xtb_hessian_drv = XTBHessianDriver(xtb_drv)
+            xtb_hessian_drv.compute(task.molecule)
+
+            hf = h5py.File(h5file)
+            ref_frequencies = np.array(hf.get('frequencies'))
+            ref_ir_intensities = np.array(hf.get('ir'))
+            hf.close()
+
+            # This works only with a new enough version of geometric
+            # which can do vibrational analysis and can
+            # return un-normalized normal modes (needed for IR intensities
+            # and Raman activities)
+            xtb_hessian_drv.vibrational_analysis(task.molecule)
+
             assert np.max(np.abs(xtb_hessian_drv.frequencies 
                                  - ref_frequencies)) < 1.0e-3
             assert np.max(np.abs(xtb_hessian_drv.ir_intensities
