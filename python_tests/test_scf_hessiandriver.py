@@ -13,7 +13,7 @@ class TestScfHessianDriver:
     def test_scfhessian_driver(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water_hessian.inp')
+        inpfile = str(here / 'inputs' / 'water_hessian_scf.inp')
         h5file = str(here / 'inputs' / 'water_hessian_scf.h5')
 
         task = MpiTask([inpfile, None])
@@ -41,15 +41,19 @@ class TestScfHessianDriver:
             ref_raman_intensities = np.array(hf.get('raman'))
             hf.close()
 
-            assert np.max(
-                np.abs(scf_hessian_drv.hessian - ref_hessian)) < 1.0e-5
-            assert np.max(
-                np.abs(scf_hessian_drv.frequencies - ref_frequencies)) < 1.0e-2
-            assert np.max(
-                np.abs(scf_hessian_drv.ir_intensities -
-                       ref_ir_intensities)) < 1.0e-4
-            assert np.max(
-                np.abs(scf_hessian_drv.raman_intensities -
-                       ref_raman_intensities)) < 1.0e-4
+            diff_hessian = np.max(np.abs(scf_hessian_drv.hessian - ref_hessian))
+            rel_diff_freq = np.max(
+                np.abs(scf_hessian_drv.frequencies / ref_frequencies - 1.0))
+            rel_diff_ir = np.max(
+                np.abs(scf_hessian_drv.ir_intensities / ref_ir_intensities -
+                       1.0))
+            rel_diff_raman = np.max(
+                np.abs(scf_hessian_drv.raman_intensities /
+                       ref_raman_intensities - 1.0))
+
+            assert diff_hessian < 1.0e-5
+            assert rel_diff_freq < 1.0e-3
+            assert rel_diff_ir < 1.0e-3
+            assert rel_diff_raman < 1.0e-3
 
         task.finish()

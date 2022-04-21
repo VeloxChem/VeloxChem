@@ -16,7 +16,7 @@ class TestXTBHessianDriver:
     def test_xtbhessian_driver(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water_hessian.inp')
+        inpfile = str(here / 'inputs' / 'water_hessian_xtb.inp')
         h5file = str(here / 'inputs' / 'water_hessian_xtb.h5')
 
         task = MpiTask([inpfile, None])
@@ -39,15 +39,19 @@ class TestXTBHessianDriver:
 
             hf = h5py.File(h5file)
             ref_hessian = np.array(hf.get('hessian'))
-            #ref_frequencies = np.array(hf.get('frequencies'))
-            #ref_ir_intensities = np.array(hf.get('ir'))
+            ref_frequencies = np.array(hf.get('frequencies'))
+            ref_ir_intensities = np.array(hf.get('ir'))
             hf.close()
 
-            assert np.max(
-                np.abs(xtb_hessian_drv.hessian - ref_hessian)) < 1.0e-5
-            #assert np.max(np.abs(xtb_hessian_drv.frequencies
-            #                     - ref_frequencies)) < 1.0e-3
-            #assert np.max(np.abs(xtb_hessian_drv.ir_intensities
-            #                     - ref_ir_intensities)) < 1.0e-4
+            diff_hessian = np.max(np.abs(xtb_hessian_drv.hessian - ref_hessian))
+            rel_diff_freq = np.max(
+                np.abs(xtb_hessian_drv.frequencies / ref_frequencies - 1.0))
+            rel_diff_ir = np.max(
+                np.abs(xtb_hessian_drv.ir_intensities / ref_ir_intensities -
+                       1.0))
+
+            assert diff_hessian < 1.0e-5
+            assert rel_diff_freq < 1.0e-3
+            assert rel_diff_ir < 1.0e-3
 
         task.finish()

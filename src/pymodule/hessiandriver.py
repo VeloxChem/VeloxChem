@@ -29,7 +29,7 @@ from io import StringIO
 import numpy as np
 import sys
 
-from .veloxchemlib import bohr_in_angstroms, fine_structure_constant
+from .veloxchemlib import mpi_master, bohr_in_angstroms, fine_structure_constant
 from .outputstream import OutputStream
 
 with redirect_stderr(StringIO()) as fg_err:
@@ -82,7 +82,10 @@ class HessianDriver:
             comm = MPI.COMM_WORLD
 
         if ostream is None:
-            ostream = OutputStream(sys.stdout)
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
 
         # MPI information
         self.comm = comm
