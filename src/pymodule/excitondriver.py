@@ -69,8 +69,8 @@ class ExcitonModelDriver:
 
     Instance variables
         - H: The exciton model Hamiltonian matrix.
-        - trans_dipoles: The diabatic electric transition dipole moments in
-          length form.
+        - elec_trans_dipoles: The diabatic electric transition dipole moments
+          in length form.
         - velo_trans_dipoles: The diabatic electric transition dipole moments
           in velocity form.
         - magn_trans_dipoles: The diabatic magnetic transition dipole moments.
@@ -117,7 +117,7 @@ class ExcitonModelDriver:
 
         # exciton Hamiltonian matrix and transition dipoles
         self.H = None
-        self.trans_dipoles = None
+        self.elec_trans_dipoles = None
         self.velo_trans_dipoles = None
         self.magn_trans_dipoles = None
 
@@ -292,7 +292,7 @@ class ExcitonModelDriver:
         total_num_states = total_LE_states + total_CT_states
 
         self.H = np.zeros((total_num_states, total_num_states))
-        self.trans_dipoles = np.zeros((total_num_states, 3))
+        self.elec_trans_dipoles = np.zeros((total_num_states, 3))
         self.velo_trans_dipoles = np.zeros((total_num_states, 3))
         self.magn_trans_dipoles = np.zeros((total_num_states, 3))
         self.center_of_mass = molecule.center_of_mass()
@@ -367,7 +367,7 @@ class ExcitonModelDriver:
                     self.H[h, h] = self.monomers[ind]['exc_energies'][s]
 
                     # LE transition dipole
-                    self.trans_dipoles[h, :] = trans_dipoles['electric'][s]
+                    self.elec_trans_dipoles[h, :] = trans_dipoles['electric'][s]
                     self.velo_trans_dipoles[h, :] = trans_dipoles['velocity'][s]
                     self.magn_trans_dipoles[h, :] = trans_dipoles['magnetic'][s]
 
@@ -386,7 +386,7 @@ class ExcitonModelDriver:
         # read checkpoint file
         if self.restart:
             if self.rank == mpi_master():
-                (dimer_indices, num_states, H, tdip, vdip, mdip,
+                (dimer_indices, num_states, H, edip, vdip, mdip,
                  state_info) = read_rsp_hdf5(self.checkpoint_file,
                                              rsp_vector_labels, molecule, basis,
                                              {'dft_func_label': dft_func_label},
@@ -394,7 +394,7 @@ class ExcitonModelDriver:
                                              self.ostream)
                 read_success = (dimer_indices is not None and
                                 num_states is not None and H is not None and
-                                tdip is not None and vdip is not None and
+                                edip is not None and vdip is not None and
                                 mdip is not None and state_info is not None)
                 if read_success:
                     shape_match = (
@@ -402,7 +402,7 @@ class ExcitonModelDriver:
                         num_states[0] == self.nstates and
                         num_states[1] == self.ct_nocc and
                         num_states[2] == self.ct_nvir and
-                        tdip.shape == self.trans_dipoles.shape and
+                        edip.shape == self.elec_trans_dipoles.shape and
                         vdip.shape == self.velo_trans_dipoles.shape and
                         mdip.shape == self.magn_trans_dipoles.shape and
                         len(state_info) == len(self.state_info))
@@ -416,7 +416,7 @@ class ExcitonModelDriver:
 
             if self.rank == mpi_master():
                 self.H = H.copy()
-                self.trans_dipoles = tdip.copy()
+                self.elec_trans_dipoles = edip.copy()
                 self.velo_trans_dipoles = vdip.copy()
                 self.magn_trans_dipoles = mdip.copy()
 
@@ -582,7 +582,7 @@ class ExcitonModelDriver:
                         valstr += '  {:20.12f}'.format(energy)
                         self.ostream.print_header(valstr.ljust(72))
 
-                        self.trans_dipoles[
+                        self.elec_trans_dipoles[
                             cvec['index'], :] = trans_dipoles['electric'][ivec]
                         self.velo_trans_dipoles[
                             cvec['index'], :] = trans_dipoles['velocity'][ivec]
@@ -666,10 +666,12 @@ class ExcitonModelDriver:
 
                 rsp_vector_list = [
                     np.array([ind_A, ind_B]),
-                    np.array([self.nstates, self.ct_nocc,
-                              self.ct_nvir]), self.H, self.trans_dipoles,
-                    self.velo_trans_dipoles, self.magn_trans_dipoles,
-                    np.string_(state_info_list)
+                    np.array([self.nstates, self.ct_nocc, self.ct_nvir]),
+                    self.H,
+                    self.elec_trans_dipoles,
+                    self.velo_trans_dipoles,
+                    self.magn_trans_dipoles,
+                    np.string_(state_info_list),
                 ]
 
                 if self.rank == mpi_master():
@@ -705,7 +707,8 @@ class ExcitonModelDriver:
                 self.ostream.print_blank()
 
             eigvals, eigvecs = np.linalg.eigh(self.H)
-            adia_trans_dipoles = np.matmul(eigvecs.T, self.trans_dipoles)
+            adia_elec_trans_dipoles = np.matmul(eigvecs.T,
+                                                self.elec_trans_dipoles)
             adia_velo_trans_dipoles = np.matmul(eigvecs.T,
                                                 self.velo_trans_dipoles)
             adia_magn_trans_dipoles = np.matmul(eigvecs.T,
@@ -723,7 +726,7 @@ class ExcitonModelDriver:
             rot_str = []
 
             for i, e in enumerate(eigvals):
-                dip_strength = np.sum(adia_trans_dipoles[i, :]**2)
+                dip_strength = np.sum(adia_elec_trans_dipoles[i, :]**2)
                 f = (2.0 / 3.0) * dip_strength * e
                 osc_str.append(f)
 
@@ -974,7 +977,7 @@ class ExcitonModelDriver:
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
 
-        trans_dipoles = []
+        elec_trans_dipoles = []
         velo_trans_dipoles = []
         magn_trans_dipoles = []
 
@@ -984,7 +987,7 @@ class ExcitonModelDriver:
             vec = tda_results['exc_vectors'][:, s].copy()
             tdens = sqrt_2 * np.matmul(
                 mo_occ, np.matmul(vec.reshape(nocc, nvir), mo_vir.T))
-            trans_dipoles.append(
+            elec_trans_dipoles.append(
                 np.array([np.sum(tdens * dipole_ints[d].T) for d in range(3)]))
             velo_trans_dipoles.append(
                 np.array([np.sum(tdens * linmom_ints[d].T) for d in range(3)]))
@@ -992,7 +995,7 @@ class ExcitonModelDriver:
                 np.array([np.sum(tdens * angmom_ints[d].T) for d in range(3)]))
 
         return {
-            'electric': trans_dipoles,
+            'electric': elec_trans_dipoles,
             'velocity': velo_trans_dipoles,
             'magnetic': magn_trans_dipoles,
         }
@@ -1484,7 +1487,7 @@ class ExcitonModelDriver:
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
 
-        trans_dipoles = []
+        elec_trans_dipoles = []
         velo_trans_dipoles = []
         magn_trans_dipoles = []
 
@@ -1492,7 +1495,7 @@ class ExcitonModelDriver:
 
         for cvec in ct_exc_vectors:
             tdens = sqrt_2 * np.matmul(mo_occ, np.matmul(cvec['vec'], mo_vir.T))
-            trans_dipoles.append(
+            elec_trans_dipoles.append(
                 np.array([np.sum(tdens * dipole_ints[d].T) for d in range(3)]))
             velo_trans_dipoles.append(
                 np.array([np.sum(tdens * linmom_ints[d].T) for d in range(3)]))
@@ -1500,7 +1503,7 @@ class ExcitonModelDriver:
                 np.array([np.sum(tdens * angmom_ints[d].T) for d in range(3)]))
 
         return {
-            'electric': trans_dipoles,
+            'electric': elec_trans_dipoles,
             'velocity': velo_trans_dipoles,
             'magnetic': magn_trans_dipoles,
         }
