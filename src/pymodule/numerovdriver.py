@@ -34,7 +34,7 @@ from .veloxchemlib import (mpi_master, bohr_in_angstroms,
                            boltzmann_in_hartreeperkelvin)
 from .outputstream import OutputStream
 from .scfunrestdriver import ScfUnrestrictedDriver
-from .scffirstorderprop import ScfFirstOrderProperties
+from .firstorderprop import FirstOrderProperties
 from .rspabsorption import Absorption
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords
@@ -392,7 +392,7 @@ class NumerovDriver:
         scf_drv = ScfUnrestrictedDriver(self.comm, OutputStream(None))
         scf_drv.update_settings(self.scf_dict, self.method_dict)
 
-        scf_prop = ScfFirstOrderProperties(self.comm, OutputStream(None))
+        scf_prop = FirstOrderProperties(self.comm, OutputStream(None))
 
         # PEC scan
         self.print_PEC_header(scf_drv)
@@ -402,7 +402,7 @@ class NumerovDriver:
                 atom1, atom2, x * bohr_in_angstroms()))
 
             scf_drv.compute(geometry, ao_basis, min_basis)
-            scf_prop.compute(geometry, ao_basis, scf_drv.scf_tensors)
+            scf_prop.compute_scf_prop(geometry, ao_basis, scf_drv.scf_tensors)
 
             # save energies and dipole moments
             pec_energies['i'].append(scf_drv.get_scf_energy())

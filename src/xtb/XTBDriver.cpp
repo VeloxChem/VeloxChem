@@ -238,6 +238,23 @@ CXTBDriver::getGradient() const
     return grad; 
 }
 
+std::vector<double> 
+CXTBDriver::getDipole() const
+{
+    std::vector<double> dipole;
+
+    if ((_natoms > 0) && isMasterNode())  
+    {
+#ifdef ENABLE_XTB
+        dipole = std::vector<double>(3, 0.0);
+
+        xtb_getDipole(_environment, _results, dipole.data());
+#endif
+    } 
+
+    return dipole; 
+}
+
 #ifdef ENABLE_XTB
 xtb_TMolecule
 CXTBDriver::_set_molecule(const CMolecule& molecule)

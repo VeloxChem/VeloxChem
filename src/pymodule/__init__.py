@@ -113,11 +113,17 @@ from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
-from .scffirstorderprop import ScfFirstOrderProperties
+from .firstorderprop import FirstOrderProperties
 from .forcefieldgenerator import ForceFieldGenerator
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
+from .impes import ImpesCoordinates
+from .impes import ImpesDriver
+from .impes import ImpesDynamicsDriver
+from .hessiandriver import HessianDriver
+from .scfhessiandriver import ScfHessianDriver
+from .xtbhessiandriver import XTBHessianDriver
 from .numerovdriver import NumerovDriver
 
 # Python functions
