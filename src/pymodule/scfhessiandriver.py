@@ -26,11 +26,11 @@
 import numpy as np
 import time as tm
 
+from .veloxchemlib import mpi_master
 from .molecule import Molecule
 from .hessiandriver import HessianDriver
 from .firstorderprop import FirstOrderProperties
 from .lrsolver import LinearResponseSolver
-from .profiler import Profiler
 
 
 class ScfHessianDriver(HessianDriver):
@@ -115,18 +115,11 @@ class ScfHessianDriver(HessianDriver):
         :param min_basis:
             The minimal AO basis set.
         """
-        self.print_header()
 
+        self.print_header()
         start_time = tm.time()
 
-        profiler = Profiler({
-            'timing': self.timing,
-            'profiling': self.profiling,
-            'memory_profiling': self.memory_profiling,
-            'memory_tracing': self.memory_tracing,
-        })
-
-        self.compute_numerical(molecule, ao_basis, min_basis, profiler)
+        self.compute_numerical(molecule, ao_basis, min_basis)
 
         # print Hessian
         if self.do_print_hessian is True:
@@ -141,7 +134,7 @@ class ScfHessianDriver(HessianDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def compute_numerical(self, molecule, ao_basis, min_basis, profiler):
+    def compute_numerical(self, molecule, ao_basis, min_basis):
         """
         Performs the calculation of a numerical Hessian based only
         on the energy.
@@ -152,8 +145,6 @@ class ScfHessianDriver(HessianDriver):
             The AO basis set.
         :param min_basis:
             The minimal AO basis set.
-        :param profiler:
-            The profiler.
         """
 
         scf_ostream_state = self.scf_drv.ostream.state
@@ -174,7 +165,8 @@ class ScfHessianDriver(HessianDriver):
         # First-order properties for gradient of dipole moment
         prop = FirstOrderProperties(self.comm, self.ostream)
         # numerical gradient (3 dipole components, no. atoms x 3 atom coords)
-        self.dipole_gradient = np.zeros((3, 3 * natm))
+        if self.rank == mpi_master():
+            self.dipole_gradient = np.zeros((3, 3 * natm))
 
         # If Raman intensities are calculated,
         # set up LR solver and member variable
@@ -186,9 +178,8 @@ class ScfHessianDriver(HessianDriver):
             # polarizability gradient: dictionary goes through
             # 3 coordinates x 3 coordinates
             # each entry having values for no. atoms x 3 coordinates
-            self.pol_gradient = np.zeros((3, 3, 3 * natm))
-            # dictionary to translate from numbers to operator components 'xyz'
-            component_dict = {0: 'x', 1: 'y', 2: 'z'}
+            if self.rank == mpi_master():
+                self.polarizability_gradient = np.zeros((3, 3, 3 * natm))
 
         self.scf_drv.compute(molecule, ao_basis, min_basis)
         energy_0 = self.scf_drv.get_scf_energy()
@@ -203,7 +194,8 @@ class ScfHessianDriver(HessianDriver):
 
                 prop.compute_scf_prop(new_mol, ao_basis,
                                       self.scf_drv.scf_tensors)
-                mu_plus = prop.get_property('dipole moment')
+                if self.rank == mpi_master():
+                    mu_plus = prop.get_property('dipole moment')
 
                 if self.do_raman:
                     lr_drv.is_converged = False
@@ -218,27 +210,33 @@ class ScfHessianDriver(HessianDriver):
 
                 prop.compute_scf_prop(new_mol, ao_basis,
                                       self.scf_drv.scf_tensors)
-                mu_minus = prop.get_property('dipole moment')
+                if self.rank == mpi_master():
+                    mu_minus = prop.get_property('dipole moment')
 
                 if self.do_raman:
                     lr_drv.is_converged = False
                     lr_results_m = lr_drv.compute(new_mol, ao_basis,
                                                   self.scf_drv.scf_tensors)
-                    for aop in range(3):
-                        for bop in range(3):
-                            # TODO: here the freq. is hard-coded to 0.0!
-                            comp_plus = (lr_results_p['response_functions'][
-                                component_dict[aop], component_dict[bop], 0.0])
-                            comp_minus = (lr_results_m['response_functions'][
-                                component_dict[aop], component_dict[bop], 0.0])
-                            self.pol_gradient[aop, bop, 3 * i +
-                                              x] = ((comp_plus - comp_minus) /
-                                                    (2.0 * self.delta_h))
+                    if self.rank == mpi_master():
+                        for ind_aop, aop in enumerate('xyz'):
+                            for ind_bop, bop in enumerate('xyz'):
+                                # TODO: here the freq. is hard-coded to 0.0!
+                                comp_plus = (
+                                    lr_results_p['response_functions'][aop, bop,
+                                                                       0.0])
+                                comp_minus = (
+                                    lr_results_m['response_functions'][aop, bop,
+                                                                       0.0])
+                                self.polarizability_gradient[
+                                    ind_aop, ind_bop,
+                                    3 * i + x] = ((comp_plus - comp_minus) /
+                                                  (2.0 * self.delta_h))
 
-                for c in range(3):
-                    self.dipole_gradient[c, 3 * i +
-                                         x] = ((mu_plus[c] - mu_minus[c]) /
-                                               (2.0 * self.delta_h))
+                if self.rank == mpi_master():
+                    for c in range(3):
+                        self.dipole_gradient[c, 3 * i +
+                                             x] = ((mu_plus[c] - mu_minus[c]) /
+                                                   (2.0 * self.delta_h))
 
                 hessian[i, x, i,
                         x] = ((energy_ixp - 2 * energy_0 + energy_ixm) /

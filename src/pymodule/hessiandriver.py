@@ -23,14 +23,17 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
+from contextlib import redirect_stderr
+from io import StringIO
 import numpy as np
 import sys
-from mpi4py import MPI
 
+from .veloxchemlib import bohr_in_angstroms, fine_structure_constant
 from .outputstream import OutputStream
 
-# geometric is needed for vibrational analysis
-import geometric
+with redirect_stderr(StringIO()) as fg_err:
+    import geometric
 
 
 class HessianDriver:
@@ -55,7 +58,7 @@ class HessianDriver:
                         (non-mass-weighted) Cartesian coordinates in 1/sqrt(amu).
         - dipole_gradient: The gradient of the dipole moment.
         - ir_intensities: The IR intensities in km/mol.
-        - pol_gradient: The gradient of the polarizability.
+        - polarizability_gradient: The gradient of the polarizability.
         - raman_intensities: The Raman intensities (in ??).
         - flag: The type of Hessian driver.
         - numerical: Perform numerical Hessian calculation.
@@ -96,7 +99,7 @@ class HessianDriver:
         self.cart_normal_modes = None  # neither normalized nor mass-weighted
         self.dipole_gradient = None
         self.ir_intensities = None
-        self.pol_gradient = None
+        self.polarizability_gradient = None
         self.raman_intensities = None
         self.flag = None
         self.numerical = False
@@ -235,10 +238,7 @@ class HessianDriver:
 
         return
 
-    def vibrational_analysis(self,
-                             molecule,
-                             filename=None,
-                             rsp_drv=None):
+    def vibrational_analysis(self, molecule, filename=None, rsp_drv=None):
         """
         Performs vibrational analysis (frequencies and normal modes)
         based on the molecular Hessian employing the geomeTRIC module:
@@ -279,14 +279,14 @@ class HessianDriver:
         N_to_mdyne = 1e8  # Newton in milli dyne
         m_to_A = 1e10  # meters in Angstroms
         me_in_amu = 5.4857990907e-4  # electron mass in u
-        n_avogadro = 6.02214076e23  # Avogadro's number
-        alpha = 0.00729735257  # fine structure constant
-        bohr_in_km = 5.291772109e-14  # bohr radius in kilometers
-        raman_conversion_factor = 0.078424  # taken from Q-Chem (units??)
+        n_avogadro = 6.02214076e23
+        alpha = fine_structure_constant()
+        bohr_in_km = bohr_in_angstroms() * 1e-13
+        raman_conversion_factor = 0.078424
 
         # Conversion factor of IR intensity to km/mol
-        conv_ir_ea0amu2kmmol = (
-            me_in_amu * n_avogadro * alpha**2 * bohr_in_km * np.pi / 3.0)
+        conv_ir_ea0amu2kmmol = (me_in_amu * n_avogadro * alpha**2 * bohr_in_km *
+                                np.pi / 3.0)
 
         # Calculate force constants
         self.force_constants = (4.0 * np.pi**2 *
@@ -309,10 +309,11 @@ class HessianDriver:
             self.ir_intensities = ir_intensity_au_amu * conv_ir_ea0amu2kmmol
 
         # Calculate Raman intensities, if applicable
-        if self.pol_gradient is not None:
-            raman_transmom = np.einsum(
-                'xyi,ik->xyk', self.pol_gradient,
-                self.normal_modes.T)
+        if self.polarizability_gradient is not None:
+            raman_transmom = np.einsum('xyi,ik->xyk',
+                                       self.polarizability_gradient,
+                                       self.normal_modes.T,
+                                       optimize=True)
             # Calculate rotational invariants
             alpha_bar = np.zeros((number_of_modes))
             gamma_bar_sq = np.zeros((number_of_modes))
@@ -350,7 +351,8 @@ class HessianDriver:
             if self.raman_intensities is not None:
                 valstr += ' Raman scattering activities (in A**4/amu),'
             self.ostream.print_header(valstr)
-            if (self.raman_intensities is not None and self.print_depolarization_ratio):
+            if (self.raman_intensities is not None and
+                    self.print_depolarization_ratio):
                 valstr = ' parallel and perpendicular Raman '
                 valstr += 'scattering activities,'
                 valstr += ' depolarization ratios,'
