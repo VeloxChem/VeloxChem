@@ -31,6 +31,7 @@ import sys
 
 from .veloxchemlib import mpi_master, bohr_in_angstroms, fine_structure_constant
 from .outputstream import OutputStream
+from .errorhandler import assert_msg_critical
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -254,6 +255,13 @@ class HessianDriver:
         :param rsp_drv:
             The response driver (for excited state vibrational analysis).
         """
+
+        geometric_repo = 'https://github.com/leeping/geomeTRIC.git'
+        err_msg = ('The installed geometric package does not support\n' +
+                   '  vibrational analysis. Please install the latest\n' +
+                   '  geometric via\n' +
+                   f'  python3 -m pip install git+{geometric_repo}\n')
+        assert_msg_critical(hasattr(geometric, 'normal_modes'), err_msg)
 
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
