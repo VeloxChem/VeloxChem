@@ -1,0 +1,17 @@
+@jobs
+task: scf
+@end
+
+@method settings
+basis: sto-3g 
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+unit: ang
+xyz:  
+O 0.000 0.000  0.000
+H 0.000 0.000  0.950
+H 0.896 0.000 -0.317
+@end 
