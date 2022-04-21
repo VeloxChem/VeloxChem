@@ -76,6 +76,29 @@ def parse_labels(input_labels):
 
     return labels
 
+def parse_coordinate(input_coordinate):
+    """
+    Parses the input coordinate to create a numpy array of
+    Cartesian coordinates.
+    
+    :param input_coordinate:
+        The string containing the Cartesian coordinates.
+
+    :return:
+        a numpy array of Cartesian coordinates.
+    """
+    coords_list = []
+
+    for xyz_str in input_coordinate.split('\n'):
+        xyz = []
+        for x_str in xyz_str.split():
+            x = float(x_str)
+            xyz.append(x)
+        coords_list.append(xyz)
+
+    coords = np.array(coords_list)
+    return coords
+
 
 # TODO: MPI-parallelization!
 class ImpesCoordinates:
@@ -367,7 +390,6 @@ class ImpesCoordinates:
                 r = self.internal_coordinates[i].value(coords)
                 gradient_in_r[i] /= -r**2
             for t in self.z_matrix:
-                # TODO: *** TEST FOR BIG MOLECULES ***
                 if i == j and len(z) == 2:
                     r = self.internal_coordinates[j].value(coords)
                     hessian_in_r[i, j] -= (-2.0 * r * self.internal_gradient[i])
@@ -410,7 +432,7 @@ class ImpesCoordinates:
         # Save the values of the internal coordinates as a numpy array
         self.compute_internal_coordinates()
 
-    # TODO: is it a good idea to do it this way??
+    # TODO: is it a good idea to reset? better create new object from scratch?
     def reset(self):
         """
         Resets some variables to be able to reuse the object.
@@ -604,7 +626,6 @@ class ImpesCoordinates:
         h5f.close()
         return True
 
-    # TODO: read more variables in?
     def read_hdf5(self, fname, label):
         """
         Reads the energy, internal coordinates, gradient, and Hessian from
@@ -633,7 +654,7 @@ class ImpesCoordinates:
         hessian_label = label + "_hessian"
         coords_label = label + "_internal_coordinates"
         cart_coords_label = label + "_cartesian_coordinates"
-        # TODO
+
         self.energy = np.array(h5f.get(energy_label))
         self.internal_gradient = np.array(h5f.get(gradient_label))
         self.internal_hessian = np.array(h5f.get(hessian_label))
@@ -673,6 +694,33 @@ class ImpesCoordinates:
         self.cartesian_coordinates = np.array(h5f.get(coords_label))
 
         h5f.close()
+
+    def cartesian_distance_vector(self, data_point):
+        """Calculates and returns the cartesian distance between 
+           self and data_point.
+
+           :param data_point:
+                ImpesCoordinates object
+        """
+
+        # First, translate the cartesian coordinates to zero
+        target_coordinates = data_point.translate_to_zero()
+        reference_coordinates = self.translate_to_zero()
+
+        # Then, determine the rotation matrix which
+        # aligns data_point (target_coordinates)
+        # to self.impes_coordinate (reference_coordinates)
+
+        rotation_matrix = geometric.rotate.get_rot(target_coordinates,
+                                                   reference_coordinates)
+
+        # Rotate the data point:
+        rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
+
+        # Calculate the distance:
+        distance_vector = (reference_coordinates - rotated_coordinates)
+
+        return distance_vector
 
 
 # TODO: MPI-parallelization!
@@ -1137,6 +1185,10 @@ class ImpesDynamicsDriver():
         self.coordinates = None
         self.velocities = None
 
+        # Force constant (to overrun gradient calculation)
+        self.force_constant = None
+        self.equilibrium_coordinate = None
+
         # time step and total duration
         self.time_step = 1  # fs = 41 a.u.
         self.duration = 10  # fs = 410 a.u.
@@ -1167,6 +1219,30 @@ class ImpesDynamicsDriver():
         if 'labels' in impes_dict:
             self.labels = parse_labels(impes_dict['labels'])
 
+        if 'force_constant' in impes_dict:
+            self.force_constant = float(impes_dict['force_constant'])
+
+            if 'equilibrium_coordinate' in impes_dict:
+                coords = parse_coordinate(impes_dict['equilibrium_coordinate'])
+                self.define_equilibrium_coordinate(coords)
+
+    def define_impes_coordinate(self, coordinates):
+        """Defines the current coordinate based on the molecule object.
+           The energy of this molecular geometry is to  be determined by
+           interpolation.
+
+            :param coordinates:
+                a numpy array of Cartesian coordinates.
+        """
+        self.equilibrium_coordinate = ImpesCoordinates(self.comm, self.ostream)
+        self.equilibrium_coordinate.update_settings(self.impes_dict)
+        self.equilibrium_coordinate.cartesian_coordinates = coordinates
+
+        # TODO: internal coordinates and B matrix probably not needed here.
+        self.equilibrium_coordinate.define_internal_coordinates()
+        self.equilibrium_coordinate.calculate_b_matrix()
+        self.equilibrium_coordinate.compute_internal_coordinates()
+
     def run_dynamics_step(self, molecule, iteration=0):
         """
         Runs one step of the interpolated dynamics to update
@@ -1181,7 +1257,14 @@ class ImpesDynamicsDriver():
         masses = molecule.masses_to_numpy() * amu_in_au  # transform to au
 
         # Determine the atomic forces and accelerations
-        forces = -self.impes_driver.gradient
+        if self.force_constant is None:
+            forces = -self.impes_driver.gradient
+        else:
+            dx = (
+                self.impes_driver.impes_coordinate.cartesian_distance_vector(
+                    self.equilibrium_coordinate)
+                    )
+            forces = -self.force_constant * dx
         acc = np.einsum('ix,i->ix', forces, 1 / masses)
 
         # Calculate velocities at t + 1/2 dt
@@ -1191,6 +1274,7 @@ class ImpesDynamicsDriver():
 
         # calculate energy and gradient for the new coordinates
         # TODO: save potential and kinetic energies too?
+        self.impes_driver.impes_coordinate.reset()
         self.impes_driver.compute(coordinates, self.name, self.labels)
 
         # recalculate the accelerations
