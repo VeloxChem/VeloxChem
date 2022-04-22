@@ -32,7 +32,7 @@ UPDATE = [
             ),
         ],
         # folders to exclude
-        "exclude": ["pymodule"],
+        "exclude": ["pymodule", "device"],
     },
     {
         # location of sources
@@ -59,8 +59,9 @@ def update_cmakelists():
     for up in UPDATE:
         where = (Path(__file__).parents[1] / up["folder"]).resolve()
         folders = sorted(
-            (_ for _ in where.iterdir() if _.name not in up["exclude"] and _.is_dir())
+            (_ for _ in where.rglob("*") if _.is_dir() and _.name not in up["exclude"])
         )
+        print(folders)
 
         for f in folders:
             cmakelists = f / "CMakeLists.txt"

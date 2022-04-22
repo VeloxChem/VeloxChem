@@ -5,6 +5,9 @@ target_sources(utests
     AtomBasisSetter.cpp
     AtomBasisTest.cpp
     BasisFunctionTest.cpp
+    BinnedGtoBlockTest.cpp
+    BinnedGtoContainerTest.cpp
+    BinnedGtoPairBlockTest.cpp
     GenFuncTest.cpp
     GtoBlockTest.cpp
     GtoContainerTest.cpp
@@ -14,6 +17,8 @@ target_sources(utests
     MolecularBasisSetter.cpp
     MolecularBasisTest.cpp
     MolecularOrbitalsTest.cpp
+    PackedGtoPairBlockTest.cpp
+    PackedGtoPairContainerTest.cpp
     SADGuessDriverTest.cpp
     SphericalMomentumTest.cpp
   )
