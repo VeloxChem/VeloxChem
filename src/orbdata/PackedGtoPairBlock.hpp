@@ -94,7 +94,7 @@ class CPackedGtoPairBlock
        
         auto idxints = BufferX<int32_t, B>::Zero(nints);
             
-        for (int32_t i = 0; i < nints; i++)
+        for (int32_t i = 0; i < static_cast<int32_t>(nints); i++)
         {
             if (const auto tval = std::sqrt(intsBuffer(i)); tval < 1.0)
             {
@@ -106,14 +106,14 @@ class CPackedGtoPairBlock
             
         std::set<int32_t> primidx;
             
-        for (int32_t i = 0; i < nints; i++)
+        for (int32_t i = 0; i < static_cast<int32_t>(nints); i++)
         {
             primidx.insert(idxints(i));
         }
             
         for (const auto& i : primidx)
         {
-            if (i < _gtoPairBlocks.size())
+            if (i < static_cast<int32_t>(_gtoPairBlocks.size()))
             {
                 _gtoPairBlocks[i] = gtoPairBlock.compress(idxints, i);
             }

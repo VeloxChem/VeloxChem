@@ -927,7 +927,7 @@ class CBinnedGtoPairBlock
                     
                     // copy angular indexes
                     
-                    for (int32_t j = 0; j < bkcomps; j++)
+                    for (int32_t j = 0; j < static_cast<int32_t>(bkcomps); j++)
                     {
                         pairids(j, icgto) = _pairIndexes(j, i);
                     }
