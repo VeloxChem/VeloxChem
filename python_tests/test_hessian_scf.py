@@ -10,7 +10,7 @@ from veloxchem.scfhessiandriver import ScfHessianDriver
 
 class TestScfHessianDriver:
 
-    def test_scfhessian_driver(self):
+    def test_scf_hessian_driver(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water_hessian_scf.inp')
@@ -28,10 +28,6 @@ class TestScfHessianDriver:
         scf_hessian_drv.compute(task.molecule, task.ao_basis)
 
         if is_mpi_master(task.mpi_comm):
-            # This works only with a new enough version of geometric
-            # which can do vibrational analysis and can
-            # return un-normalized normal modes (needed for IR intensities
-            # and Raman activities)
             scf_hessian_drv.vibrational_analysis(task.molecule)
 
             hf = h5py.File(h5file)

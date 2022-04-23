@@ -45,8 +45,6 @@ class XTBHessianDriver(HessianDriver):
 
     Instance variables
         - xtb_drv: The SCF driver.
-        - do_raman: Additionally calculate Raman intensities
-                (at significantly higher computational cost).
     """
 
     def __init__(self, xtb_drv, comm=None, ostream=None):
@@ -58,7 +56,6 @@ class XTBHessianDriver(HessianDriver):
 
         self.flag = 'XTB Hessian Driver'
         self.xtb_drv = xtb_drv
-        self.do_raman = False
 
     def update_settings(self, method_dict, freq_dict=None):
         """
@@ -74,11 +71,6 @@ class XTBHessianDriver(HessianDriver):
 
         if freq_dict is None:
             freq_dict = {}
-
-        # check if Raman intensities are to be calculated (numerically)
-        if 'do_raman' in freq_dict:
-            key = freq_dict['do_raman'].lower()
-            self.do_raman = True if key in ['yes', 'y'] else False
 
         # The electronic energy
         self.elec_energy = self.xtb_drv.get_energy()

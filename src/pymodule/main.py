@@ -40,6 +40,7 @@ from .mp2driver import Mp2Driver
 from .loprop import LoPropDriver
 from .trajectorydriver import TrajectoryDriver
 from .scfgradientdriver import ScfGradientDriver
+from .scfhessiandriver import ScfHessianDriver
 from .optimizationdriver import OptimizationDriver
 from .pulsedrsp import PulsedResponse
 from .rsppolarizability import Polarizability
@@ -53,6 +54,7 @@ from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
+from .xtbhessiandriver import XTBHessianDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_end_time
@@ -301,8 +303,8 @@ def main():
 
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
-        'wave function', 'mp2', 'gradient', 'optimize', 'response', 'pulses',
-        'visualization', 'loprop'
+        'wave function', 'mp2', 'gradient', 'hessian', 'optimize', 'response',
+        'pulses', 'visualization', 'loprop'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -364,6 +366,24 @@ def main():
         elif scf_drv.scf_type == 'restricted':
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
             grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+    # Hessian
+
+    if task_type == 'hessian':
+        hessian_dict = (task.input_dict['hessian']
+                        if 'hessian' in task.input_dict else {})
+        if use_xtb:
+            hessian_drv = XTBHessianDriver(xtb_drv, task.mpi_comm, task.ostream)
+            hessian_drv.update_settings(method_dict, hessian_dict)
+            hessian_drv.compute(task.molecule)
+
+        elif scf_drv.scf_type == 'restricted':
+            hessian_drv = ScfHessianDriver(scf_drv, task.mpi_comm, task.ostream)
+            hessian_drv.update_settings(method_dict, hessian_dict)
+            hessian_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        if task.mpi_rank == mpi_master():
+            hessian_drv.vibrational_analysis(task.molecule)
 
     # Geometry optimization
 

@@ -99,7 +99,7 @@ class ScfHessianDriver(HessianDriver):
         # check if Raman intensities are to be calculated (numerically)
         if 'do_raman' in freq_dict:
             key = freq_dict['do_raman'].lower()
-            self.do_raman = True if key in ['yes', 'y'] else False
+            self.do_raman = (key in ['yes', 'y'])
 
         # The electronic energy
         self.elec_energy = self.scf_drv.get_scf_energy()

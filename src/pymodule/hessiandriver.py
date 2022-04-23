@@ -65,11 +65,8 @@ class HessianDriver:
         - raman_intensities: The Raman intensities (in ??).
         - flag: The type of Hessian driver.
         - numerical: Perform numerical Hessian calculation.
-        - numerical_grad: Perform numerical gradient calculation.
         - delta_h: Nuclear displacement for finite differences.
         - do_four_point: Perform four-point numerical approximation.
-        - print_vib_analysis: Print vibrational analysis
-          (frequencies and normal modes)
         - do_print_hessian: Flag for printing the Hessian.
         - elec_energy: The (total) electronic energy.
         - temperature: The temperature (in K) used for thermodynamic analysis.
@@ -94,6 +91,7 @@ class HessianDriver:
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
+
         self.ostream = ostream
 
         self.hessian = None
@@ -108,29 +106,21 @@ class HessianDriver:
         self.polarizability_gradient = None
         self.raman_intensities = None
         self.flag = None
-        self.numerical = False
-        self.numerical_grad = False
+
+        self.numerical = True
         self.delta_h = 0.001
+
         # flag for two-point or four-point approximation
         self.do_four_point = False
-        self.print_vib_analysis = True
+
         # flag for printing the Hessian
         self.do_print_hessian = False
         self.print_depolarization_ratio = False
 
         # Thermodynamics
         self.elec_energy = 0.0
-        self.temperature = 300
+        self.temperature = 298.15
         self.pressure = 1.0
-
-        # Timing and profiling
-        self.timing = False
-        self.profiling = False
-        self.memory_profiling = False
-        self.memory_tracing = False
-
-        # DFT
-        self.dft = False
 
     def update_settings(self, method_dict, freq_dict=None):
         """
@@ -145,87 +135,33 @@ class HessianDriver:
         if freq_dict is None:
             freq_dict = {}
 
-        # if this is True, numerical must also be True
-        if 'do_four_point' in freq_dict:
-            key = freq_dict['do_four_point'].lower()
-            self.do_four_point = True if key in ['yes', 'y'] else False
-            # if four-point is desired, numerical is also set to True
-            if self.do_four_point:
-                self.numerical = True
-
         # check if Hessianis to be calculated numerically
         if 'numerical' in freq_dict:
             key = freq_dict['numerical'].lower()
-            self.numerical = True if key in ['yes', 'y'] else False
+            self.numerical = (key in ['yes', 'y'])
 
-        # check if gradient is to be calculated numerically
-        if 'numerical_grad' in freq_dict:
-            key = freq_dict['numerical_grad'].lower()
-            self.numerical_grad = True if key in ['yes', 'y'] else False
+        if 'do_four_point' in freq_dict:
+            key = freq_dict['do_four_point'].lower()
+            self.do_four_point = (key in ['yes', 'y'])
 
-        # if gradient is calculated numerically, so is the Hessian
-        if self.numerical_grad:
+        if self.do_four_point:
             self.numerical = True
-
-        # Analytical DFT gradient/Hessian is not implemented yet
-        if 'xcfun' in method_dict:
-            if method_dict['xcfun'] is not None:
-                self.numerical = True
-                self.numerical_grad = True
-                self.dft = True
-        if 'dft' in method_dict:
-            key = method_dict['dft'].lower()
-            self.dft = True if key in ['yes', 'y'] else False
-            if key in ['yes', 'y']:
-                self.numerical = True
-                self.numerical_grad = True
-
-        if self.dft:
-            self.ostream.print_blank()
-            warn_msg = '*** Warning: Analytical Hessian is not yet '
-            warn_msg += 'implemented for DFT methods.'
-            self.ostream.print_header(warn_msg.ljust(56))
-            warn_msg = '    Hessian will be calculated numerically instead.'
-            self.ostream.print_header(warn_msg.ljust(56))
-            self.ostream.flush()
-
-        # print vibrational analysis (frequencies and normal modes)
-        if 'print_vib_analysis' in freq_dict:
-            key = freq_dict['print_vib_analysis'].lower()
-            self.print_vib_analysis = True if key in ['yes', 'y'] else False
 
         # print the Hessian (not mass-weighted)
         if 'do_print_hessian' in freq_dict:
             key = freq_dict['do_print_hessian'].lower()
-            self.do_print_hessian = True if key in ['yes', 'y'] else False
+            self.do_print_hessian = (key in ['yes', 'y'])
 
         # print the depolarization ratio, parallel, and perpendicular
         # Raman activities
         if 'print_depolarization_ratio' in freq_dict:
             key = freq_dict['print_depolarization_ratio'].lower()
-            if key in ['yes', 'y']:
-                self.print_depolarization_ratio = True
-            else:
-                self.print_depolarization_ratio = False
+            self.print_depolarization_ratio = (key in ['yes', 'y'])
 
         if 'temperature' in freq_dict:
             self.temperature = float(freq_dict['temperature'])
         if 'pressure' in freq_dict:
             self.pressure = float(freq_dict['pressure'])
-
-        # Timing and profiling
-        if 'timing' in freq_dict:
-            key = freq_dict['timing'].lower()
-            self.timing = True if key in ['yes', 'y'] else False
-        if 'profiling' in freq_dict:
-            key = freq_dict['profiling'].lower()
-            self.profiling = True if key in ['yes', 'y'] else False
-        if 'memory_profiling' in freq_dict:
-            key = freq_dict['memory_profiling'].lower()
-            self.memory_profiling = True if key in ['yes', 'y'] else False
-        if 'memory_tracing' in freq_dict:
-            key = freq_dict['memory_tracing'].lower()
-            self.memory_tracing = True if key in ['yes', 'y'] else False
 
         self.method_dict = dict(method_dict)
         self.freq_dict = dict(freq_dict)

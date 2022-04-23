@@ -13,7 +13,7 @@ class TestXTBHessianDriver:
 
     @pytest.mark.skipif(not XTBDriver().is_available(),
                         reason='xtb not available')
-    def test_xtbhessian_driver(self):
+    def test_xtb_hessian_driver(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water_hessian_xtb.inp')
@@ -31,10 +31,6 @@ class TestXTBHessianDriver:
         xtb_hessian_drv.compute(task.molecule)
 
         if is_mpi_master(task.mpi_comm):
-            # This works only with a new enough version of geometric
-            # which can do vibrational analysis and can
-            # return un-normalized normal modes (needed for IR intensities
-            # and Raman activities)
             xtb_hessian_drv.vibrational_analysis(task.molecule)
 
             hf = h5py.File(h5file)

@@ -108,7 +108,7 @@ class RespChargesDriver:
         self.method_dict = None
         self.weights = None
         self.energies = None
-        self.temperature = 293.15
+        self.temperature = 298.15
 
         # grid information
         self.number_layers = 4
