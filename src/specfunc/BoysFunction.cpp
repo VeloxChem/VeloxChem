@@ -46,13 +46,18 @@ CBoysFunction::CBoysFunction(const int32_t order)
 }
 
 void
-CBoysFunction::compute(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t iOrder) const
+CBoysFunction::compute(      CMemBlock2D<double>& values,
+                       const CMemBlock<double>&   arguments,
+                       const int32_t              iOrder) const
 {
     compute(values, arguments, arguments.size(), iOrder);
 }
 
 void
-CBoysFunction::compute(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments, const int32_t iOrder) const
+CBoysFunction::compute(      CMemBlock2D<double>& values,
+                       const CMemBlock<double>&   arguments,
+                       const int32_t              nArguments,
+                       const int32_t              iOrder) const
 {
     if (iOrder < 0) return;
 
@@ -228,7 +233,7 @@ CBoysFunction::compute(CMemBlock2D<double>& values, const CMemBlock<double>& arg
 
     if (iOrder == 24)
     {
-        _computeBF23(values, arguments, nArguments);
+        _computeBF24(values, arguments, nArguments);
 
         return;
     }
@@ -389,7 +394,9 @@ CBoysFunction::_setTable()
 }
 
 void
-CBoysFunction::_computeBF00(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF00(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -436,7 +443,9 @@ CBoysFunction::_computeBF00(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF01(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF01(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -499,7 +508,9 @@ CBoysFunction::_computeBF01(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF02(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF02(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -582,7 +593,9 @@ CBoysFunction::_computeBF02(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF03(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF03(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -677,7 +690,9 @@ CBoysFunction::_computeBF03(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF04(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF04(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -784,7 +799,9 @@ CBoysFunction::_computeBF04(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF05(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF05(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -903,7 +920,9 @@ CBoysFunction::_computeBF05(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF06(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF06(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -1034,7 +1053,9 @@ CBoysFunction::_computeBF06(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF07(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF07(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -1177,7 +1198,9 @@ CBoysFunction::_computeBF07(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF08(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF08(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -1332,7 +1355,9 @@ CBoysFunction::_computeBF08(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF09(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF09(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -1499,7 +1524,9 @@ CBoysFunction::_computeBF09(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF10(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF10(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -1678,7 +1705,9 @@ CBoysFunction::_computeBF10(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF11(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF11(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -1870,7 +1899,9 @@ CBoysFunction::_computeBF11(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF12(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF12(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -2074,7 +2105,9 @@ CBoysFunction::_computeBF12(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF13(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF13(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -2301,7 +2334,9 @@ CBoysFunction::_computeBF13(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF14(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF14(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -2541,7 +2576,9 @@ CBoysFunction::_computeBF14(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF15(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF15(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -2794,7 +2831,9 @@ CBoysFunction::_computeBF15(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF16(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF16(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -3060,7 +3099,9 @@ CBoysFunction::_computeBF16(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF17(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF17(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -3339,7 +3380,9 @@ CBoysFunction::_computeBF17(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF18(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF18(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -3631,7 +3674,9 @@ CBoysFunction::_computeBF18(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF19(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF19(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -3936,7 +3981,9 @@ CBoysFunction::_computeBF19(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF20(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF20(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -4236,7 +4283,9 @@ CBoysFunction::_computeBF20(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF21(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF21(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -4549,7 +4598,9 @@ CBoysFunction::_computeBF21(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF22(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF22(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -4874,7 +4925,9 @@ CBoysFunction::_computeBF22(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF23(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF23(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -5211,7 +5264,9 @@ CBoysFunction::_computeBF23(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF24(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF24(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -5560,7 +5615,9 @@ CBoysFunction::_computeBF24(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF25(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF25(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -5921,7 +5978,9 @@ CBoysFunction::_computeBF25(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF26(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF26(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -6294,7 +6353,9 @@ CBoysFunction::_computeBF26(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF27(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF27(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -6679,7 +6740,9 @@ CBoysFunction::_computeBF27(CMemBlock2D<double>& values, const CMemBlock<double>
 }
 
 void
-CBoysFunction::_computeBF28(CMemBlock2D<double>& values, const CMemBlock<double>& arguments, const int32_t nArguments) const
+CBoysFunction::_computeBF28(      CMemBlock2D<double>& values,
+                            const CMemBlock<double>&   arguments,
+                            const int32_t              nArguments) const
 {
     auto fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
