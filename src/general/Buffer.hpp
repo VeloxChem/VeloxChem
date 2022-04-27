@@ -203,4 +203,13 @@ using BufferMN = buffer::CBuffer<T, B, MRows, NCols>;
 VLX_MN_DEFINE_BUFFERS_AND_MDSPANS();
 /**@}*/
 
+namespace buffer {
+template <typename T, typename B, size_t NRows, size_t NCols, typename... Args>
+[[nodiscard]] auto
+factory(Args&&... args) -> buffer::CBuffer<T, B, NRows, NCols>
+{
+    return CBuffer<T, B, NRows, NCols>(std::forward<Args>(args)...);
+}
+}  // namespace buffer
+
 #endif /* Buffer_hpp */
