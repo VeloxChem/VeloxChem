@@ -1326,7 +1326,7 @@ class CBuffer
     friend inline auto
     operator!=(const CBuffer<T, B, NRows, NCols> &lhs, const CBuffer<T, Bother, NRows, NCols> &rhs) -> bool
     {
-        return !(lhs == rhs);
+        return lhs != rhs;
     }
     /**@}*/
 
@@ -1690,7 +1690,7 @@ class CBuffer
      *
      * @return True if buffer is empty, false otherwise.
      */
-    inline auto
+    [[nodiscard]] inline auto
     empty() const -> bool
     {
         return (_nElements == 0);

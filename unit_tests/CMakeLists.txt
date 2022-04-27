@@ -26,6 +26,7 @@ target_link_libraries(utests
   )
 
 add_subdirectory(dft)
+add_subdirectory(eridrv)
 add_subdirectory(general)
 add_subdirectory(math)
 add_subdirectory(moldata)

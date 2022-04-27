@@ -29,11 +29,15 @@ from sys import stdout
 
 def configure_mkl_rt():
     """
-    Run-time configuration of interface and threading layer for the MKL single dynamic library (libmkl_rt.so)
+    Run-time configuration of interface and threading layer for the MKL single
+    dynamic library (libmkl_rt.so)
 
     See here:
       - https://tinyurl.com/y4y695ay
       - https://tinyurl.com/y254ggts
+
+    Invoking this function will set the ``MKL_INTERFACE_LAYER`` and
+    ``MKL_THREADING_LAYER``, regardless of whether MKL is in use or not.
     """
 
     if 'MKL_INTERFACE_LAYER' not in environ:

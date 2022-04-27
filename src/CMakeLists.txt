@@ -42,6 +42,7 @@ set_target_properties(vlxobjs
 add_subdirectory(device)
 add_subdirectory(dft)
 add_subdirectory(dftfuncs)
+add_subdirectory(eridrv)
 add_subdirectory(general)
 add_subdirectory(math)
 add_subdirectory(moldata)

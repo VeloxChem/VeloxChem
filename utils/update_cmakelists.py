@@ -31,7 +31,12 @@ UPDATE = [
                 re.DOTALL | re.MULTILINE,
             ),
         ],
-        # folders to exclude
+        # placeholder for new CMakeLists.txt
+        "placeholder": """target_sources(vlxobjs
+  PRIVATE
+    Foo.cpp
+  )""",
+        # subfolders to exclude
         "exclude": ["pymodule", "device"],
     },
     {
@@ -48,7 +53,12 @@ UPDATE = [
                 re.DOTALL | re.MULTILINE,
             ),
         ],
-        # folders to exclude
+        # placeholder for new CMakeLists.txt
+        "placeholder": """target_sources(utests
+  PRIVATE
+    Foo.cpp
+  )""",
+        # subfolders to exclude
         "exclude": [],
     },
 ]
@@ -61,14 +71,17 @@ def update_cmakelists():
         folders = sorted(
             (_ for _ in where.rglob("*") if _.is_dir() and _.name not in up["exclude"])
         )
-        print(folders)
 
         for f in folders:
             cmakelists = f / "CMakeLists.txt"
 
-            # get old contents
-            with cmakelists.open("r") as fh:
-                old = fh.read()
+            # initiliaze with placeholder text, so that new folders get their
+            # own CMakeLists.txt automatically
+            old = up["placeholder"]
+            if cmakelists.exists():
+                # get old contents
+                with cmakelists.open("r") as fh:
+                    old = fh.read()
 
             # get sorted list of all source files
             cpps = sorted(
