@@ -23,49 +23,20 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "MemAlloc.hpp"
-#include "ErrorHandler.hpp"
+#ifndef EriBlockDims_hpp
+#define EriBlockDims_hpp
 
-#ifdef ENABLE_MKL
-#include "mkl.h"
-#else
-#include <cstdlib>
-#endif
+#include <cstdint>
 
-namespace mem {  // mem namespace
+namespace eridims { // eridims namespace
 
-void*
-malloc(const size_t size)
-{
-#ifdef ENABLE_MKL
+    /**
+     Gets batch size of electron repulsion integrals.
 
-    return MKL_malloc(size, VLX_ALIGN);
+     @return the number of contracted integrals in batch.
+     */
+    int32_t getBatchSize();
 
-#else
+} // eridims namespace
 
-    void* ptr = nullptr;
-
-    int ierr = ::posix_memalign(&ptr, VLX_ALIGN, size);
-
-    errors::assertMsgCritical(ierr == 0, "malloc: posix_memalign failed");
-
-    return ptr;
-
-#endif
-}
-
-void
-free(void* pointer)
-{
-#ifdef ENABLE_MKL
-
-    if (pointer != nullptr) MKL_free(pointer);
-
-#else
-
-    if (pointer != nullptr) ::free(pointer);
-
-#endif
-}
-
-}  // namespace mem
+#endif /* EriBlockDims_hpp */

@@ -71,7 +71,7 @@ TEST_F(CMpiFuncTest, BcastBoolean)
 {
     bool mvalue = false;
 
-    mpi::bcast(mvalue, mpi::master(), MPI_COMM_WORLD);
+    mpi::bcast(mvalue, MPI_COMM_WORLD);
 
     ASSERT_FALSE(mvalue);
 }
@@ -142,7 +142,7 @@ TEST_F(CMpiFuncTest, GatherInteger)
 {
     int32_t mvalue = 0;
 
-    mpi::gather(&mvalue, 9, mpi::master(), MPI_COMM_WORLD);
+    mpi::gather(&mvalue, 9, MPI_COMM_WORLD);
 
     ASSERT_EQ(mvalue, 9);
 }

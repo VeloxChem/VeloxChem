@@ -23,11 +23,21 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
+import numpy as np
+import sys
+
+from .veloxchemlib import mpi_master
+from .molecule import Molecule
+from .outputstream import OutputStream
+
 
 class GradientDriver:
     """
     Implements gradient driver.
 
+    :param energy_drv:
+        The energy driver.
     :param comm:
         The MPI communicator.
     :param ostream:
@@ -38,10 +48,25 @@ class GradientDriver:
         - flag: The type of gradient driver.
     """
 
-    def __init__(self, comm, ostream):
+    def __init__(self, energy_drv, comm=None, ostream=None):
         """
         Initializes gradient driver.
         """
+
+        if comm is None:
+            if hasattr(energy_drv, 'comm'):
+                comm = energy_drv.comm
+            else:
+                comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            if hasattr(energy_drv, 'ostream'):
+                ostream = energy_drv.ostream
+            else:
+                if comm.Get_rank() == mpi_master():
+                    ostream = OutputStream(sys.stdout)
+                else:
+                    ostream = OutputStream(None)
 
         self.comm = comm
         self.ostream = ostream
@@ -49,16 +74,64 @@ class GradientDriver:
         self.gradient = None
         self.flag = None
 
-    def compute(self, molecule, ao_basis=None, min_basis=None):
+    def compute(self, molecule, *args):
         """
         Performs calculation of numerical gradient.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
+        :param args:
+            The arguments.
+        """
+
+        return
+
+    def compute_numerical(self, molecule, *args):
+        """
+        Performs calculation of numerical gradient.
+
+        :param molecule:
+            The molecule.
+        :param args:
+            The same arguments as the "compute" function.
+        """
+
+        # atom labels
+        labels = molecule.get_labels()
+
+        # atom coordinates (nx3)
+        coords = molecule.get_coordinates()
+
+        # numerical gradient
+        self.gradient = np.zeros((molecule.number_of_atoms(), 3))
+
+        for i in range(molecule.number_of_atoms()):
+            for d in range(3):
+                coords[i, d] += self.delta_h
+                new_mol = Molecule(labels, coords, units='au')
+                e_plus = self.compute_energy(new_mol, *args)
+
+                coords[i, d] -= 2.0 * self.delta_h
+                new_mol = Molecule(labels, coords, units='au')
+                e_minus = self.compute_energy(new_mol, *args)
+
+                coords[i, d] += self.delta_h
+                self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
+
+        # restore energy driver
+        self.compute_energy(molecule, *args)
+
+    def compute_energy(self, molecule, *args):
+        """
+        Computes the energy at current geometry.
+
+        :param molecule:
+            The molecule.
+        :param args:
+            The same arguments as the "compute" function.
+
+        :return:
+            The energy.
         """
 
         return

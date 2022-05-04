@@ -30,11 +30,7 @@
 
 #include <mpi.h>
 
-#ifdef MAC_OS_OMP
-#include "/opt/intel/compilers_and_libraries/mac/include/omp.h"
-#else
 #include "omp.h"
-#endif
 
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"

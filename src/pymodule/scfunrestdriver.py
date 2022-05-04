@@ -58,7 +58,10 @@ class ScfUnrestrictedDriver(ScfDriver):
             comm = MPI.COMM_WORLD
 
         if ostream is None:
-            ostream = OutputStream(sys.stdout)
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
 
         super().__init__(comm, ostream)
 
@@ -233,12 +236,14 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         return effmat_a, effmat_b
 
-    def gen_molecular_orbitals(self, fock_mat, oao_mat):
+    def gen_molecular_orbitals(self, molecule, fock_mat, oao_mat):
         """
         Generates spin unrestricted molecular orbital by diagonalizing
         spin unrestricted open shell Fock/Kohn-Sham matrix. Overloaded base
         class method.
 
+        :param molecule:
+            The molecule.
         :param fock_mat:
             The Fock/Kohn-Sham matrix.
         :param oao_mat:
@@ -264,8 +269,12 @@ class ScfUnrestrictedDriver(ScfDriver):
             orb_coefs_a, eigs_a = self.delete_mos(orb_coefs_a, eigs_a)
             orb_coefs_b, eigs_b = self.delete_mos(orb_coefs_b, eigs_b)
 
+            occa, occb = molecule.get_aufbau_occupation(eigs_a.size,
+                                                        'unrestricted')
+
             return MolecularOrbitals([orb_coefs_a, orb_coefs_b],
-                                     [eigs_a, eigs_b], molorb.unrest)
+                                     [eigs_a, eigs_b], [occa, occb],
+                                     molorb.unrest)
 
         return MolecularOrbitals()
 
@@ -306,3 +315,51 @@ class ScfUnrestrictedDriver(ScfDriver):
             fock_mat.set_fock_type(fockmat.unrestj, 0, 'beta')
 
         return
+
+    def natural_orbitals(self):
+        """
+        Compute the UHF natural orbitals
+
+        :return:
+            The natural orbitals.
+        """
+
+        # Get total density
+        D_total = self.scf_tensors['D_alpha'] + self.scf_tensors['D_beta']
+
+        # Get some MO coefficients and create C^-1
+        C = self.scf_tensors["C_alpha"]
+        S = self.scf_tensors["S"]
+        C_inv = np.matmul(S, C)
+
+        # Transform total density to MO basis
+        D_MO = np.linalg.multi_dot([C_inv.T, D_total, C_inv])
+
+        # Diagonalize
+        occupations, eigenvectors = np.linalg.eigh(D_MO)
+
+        # Create the final orbitals
+        C_natural = np.matmul(C, eigenvectors)
+
+        # Compute the orbital energy as expectation value of the averaged Fock
+        # matrix (they are not eigenvalues!)
+        F_alpha = self.scf_tensors['F_alpha']
+        F_beta = self.scf_tensors['F_beta']
+        F_avg = 0.5 * (F_alpha + F_beta)
+
+        orbital_energies = np.diag(
+            np.linalg.multi_dot([C_natural.T, F_avg, C_natural]))
+
+        # Sort by orbital energies or by occupation numbers?
+        # idx = orbital_energies.argsort() # Sort by orbital energies
+        idx = occupations.argsort()[::-1]  # Sort by occupation numbers
+        orbital_energies = orbital_energies[idx]
+        occupations = occupations[idx]
+        # eigenvectors = eigenvectors[:,idx]
+        C_natural = C_natural[:, idx]
+
+        # Create the MolecularOrbitals object and return
+        natural_orbitals = MolecularOrbitals([C_natural], [orbital_energies],
+                                             [occupations], molorb.rest)
+
+        return natural_orbitals

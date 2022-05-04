@@ -31,13 +31,16 @@ from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
-from .scffirstorderprop import ScfFirstOrderProperties
+from .firstorderprop import FirstOrderProperties
+from .forcefieldgenerator import ForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
 from .excitondriver import ExcitonModelDriver
+from .numerovdriver import NumerovDriver
 from .mp2driver import Mp2Driver
 from .loprop import LoPropDriver
 from .trajectorydriver import TrajectoryDriver
 from .scfgradientdriver import ScfGradientDriver
+from .scfhessiandriver import ScfHessianDriver
 from .optimizationdriver import OptimizationDriver
 from .pulsedrsp import PulsedResponse
 from .rsppolarizability import Polarizability
@@ -51,6 +54,7 @@ from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
+from .xtbhessiandriver import XTBHessianDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_end_time
@@ -250,6 +254,21 @@ def main():
         exciton_drv.update_settings(exciton_dict, method_dict)
         exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+    # Force field generator
+
+    if task_type == 'force field':
+        force_field_dict = (task.input_dict['force_field']
+                            if 'force_field' in task.input_dict else {})
+        resp_dict = (task.input_dict['resp_charges']
+                     if 'resp_charges' in task.input_dict else {})
+
+        force_field_dict['filename'] = task.input_dict['filename']
+        resp_dict['filename'] = task.input_dict['filename']
+
+        force_field_drv = ForceFieldGenerator(task.mpi_comm, task.ostream)
+        force_field_drv.update_settings(force_field_dict, resp_dict)
+        force_field_drv.compute(task.molecule, task.ao_basis)
+
     # Spectrum from trajectory
 
     if task_type == 'trajectory':
@@ -268,12 +287,24 @@ def main():
         traj_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
         traj_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+    # Diatomic vibronic spectrum using Numerov
+
+    if task_type == 'numerov':
+        numerov_dict = (dict(task.input_dict['numerov'])
+                        if 'numerov' in task.input_dict else {})
+        scf_dict = (dict(task.input_dict['scf'])
+                    if 'scf' in task.input_dict else {})
+
+        numerov_drv = NumerovDriver(task.mpi_comm, task.ostream)
+        numerov_drv.update_settings(numerov_dict, scf_dict, method_dict)
+        numerov_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
     # Self-consistent field
 
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
-        'wave function', 'mp2', 'gradient', 'optimize', 'response', 'pulses',
-        'visualization', 'loprop'
+        'wave function', 'mp2', 'gradient', 'hessian', 'optimize', 'response',
+        'pulses', 'visualization', 'loprop'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -316,8 +347,8 @@ def main():
                 return
 
             # SCF first-order properties
-            scf_prop = ScfFirstOrderProperties(task.mpi_comm, task.ostream)
-            scf_prop.compute(task.molecule, task.ao_basis, scf_tensors)
+            scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
+            scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_tensors)
             if task.mpi_rank == mpi_master():
                 scf_prop.print_properties(task.molecule)
 
@@ -336,6 +367,24 @@ def main():
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
             grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+    # Hessian
+
+    if task_type == 'hessian':
+        hessian_dict = (task.input_dict['hessian']
+                        if 'hessian' in task.input_dict else {})
+        if use_xtb:
+            hessian_drv = XTBHessianDriver(xtb_drv, task.mpi_comm, task.ostream)
+            hessian_drv.update_settings(method_dict, hessian_dict)
+            hessian_drv.compute(task.molecule)
+
+        elif scf_drv.scf_type == 'restricted':
+            hessian_drv = ScfHessianDriver(scf_drv, task.mpi_comm, task.ostream)
+            hessian_drv.update_settings(method_dict, hessian_dict)
+            hessian_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        if task.mpi_rank == mpi_master():
+            hessian_drv.vibrational_analysis(task.molecule)
+
     # Geometry optimization
 
     if task_type == 'optimize':
@@ -352,13 +401,15 @@ def main():
 
         if use_xtb:
             grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
-            opt_drv = OptimizationDriver(grad_drv, 'XTB')
+            opt_drv = OptimizationDriver(grad_drv)
+            opt_drv.update_settings(opt_dict)
+            opt_drv.compute(task.molecule)
+
         elif scf_drv.scf_type == 'restricted':
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
-            opt_drv = OptimizationDriver(grad_drv, 'SCF')
-
-        opt_drv.update_settings(opt_dict)
-        opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+            opt_drv = OptimizationDriver(grad_drv)
+            opt_drv.update_settings(opt_dict)
+            opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Response
 

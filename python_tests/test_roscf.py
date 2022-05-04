@@ -177,7 +177,7 @@ class ROSCF_Helper:
     def new_orbitals(self):
         fock_eff = self.fock_eff()
         oao = self.oao_mat()
-        mol_orbs = self.scf_drv.gen_molecular_orbitals(fock_eff, oao)
+        mol_orbs = self.scf_drv.gen_molecular_orbitals(self.mol, fock_eff, oao)
         self.scf_drv.mol_orbs = mol_orbs
         return mol_orbs.alpha_to_numpy()
 
@@ -192,8 +192,7 @@ class ROSCF_Helper:
         self.mats['ao_density'] = ao_density
 
 
-@pytest.mark.skipif(not is_single_node(),
-                    reason='This test only runs on single node')
+@pytest.mark.skipif(not is_single_node(), reason='single node only')
 class TestROSCF:
 
     @pytest.fixture
@@ -362,8 +361,7 @@ class TestROSCF:
         assert scf_drv.iter_data[-1]['energy'] == approx(-3.347480513475661)
 
 
-@pytest.mark.skipif(not is_single_node(),
-                    reason='This test only runs on single node')
+@pytest.mark.skipif(not is_single_node(), reason='single node only')
 class TestRODFT:
 
     @pytest.fixture

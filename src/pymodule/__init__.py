@@ -78,6 +78,7 @@ from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
+from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
@@ -112,7 +113,15 @@ from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
-from .scffirstorderprop import ScfFirstOrderProperties
+from .firstorderprop import FirstOrderProperties
+from .forcefieldgenerator import ForceFieldGenerator
+from .openmmdriver import OpenMMDriver
+from .openmmgradientdriver import OpenMMGradientDriver
+from .orbitalviewer import OrbitalViewer
+from .hessiandriver import HessianDriver
+from .scfhessiandriver import ScfHessianDriver
+from .xtbhessiandriver import XTBHessianDriver
+from .numerovdriver import NumerovDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical

@@ -64,6 +64,41 @@ double getHartreeValueInInverseNanometer();
 double getHartreeValueInWavenumbers();
 
 /**
+ Gets electron mass in amu.
+
+ @return electron mass in amu.
+ */
+double getElectronMassInAtomicMassUnit();
+
+/**
+ Gets amu value in electron masses.
+
+ @return the conversion factor.
+ */
+double getAtomicMassUnitInElectronMasses();
+
+/**
+ Gets amu value in kg.
+
+ @return the conversion factor.
+ */
+double getAtomicMassUnitInKg();
+
+/**
+ Gets speed of light in vacuum in SI.
+
+ @return the speed of light in vacuum.
+ */
+double getSpeedOfLightInVacuumInSI();
+
+/**
+ Gets Avogadro constant.
+
+ @return Avogadro constant.
+ */
+double getAvogadroConstant();
+
+/**
  Gets convertion factor for dipole moment (a.u. -> Debye).
 
  @return the conversion factor.
@@ -83,6 +118,13 @@ double getRotatoryStrengthInCGS();
  @return the conversion factor.
  */
 double getBoltzmannConstantInElectronVoltsPerKelvin();
+
+/**
+ Gets Boltzmann constant in hartree/K.
+
+ @return the conversion factor.
+ */
+double getBoltzmannConstantInHartreePerKelvin();
 
 /**
  Gets factor needed for the calculation of extinction coefficient from the

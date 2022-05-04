@@ -693,7 +693,7 @@ template <>
 inline void
 CMemBlock2D<int32_t>::broadcast(int32_t rank, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         mpi::bcast(_nElements, comm);
 
@@ -711,7 +711,7 @@ template <>
 inline void
 CMemBlock2D<double>::broadcast(int32_t rank, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         mpi::bcast(_nElements, comm);
 
@@ -729,7 +729,7 @@ template <>
 inline CMemBlock2D<int32_t>
 CMemBlock2D<int32_t>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         if (nodes == 1) return CMemBlock2D<int32_t>(*this);
 
@@ -787,7 +787,7 @@ template <>
 inline CMemBlock2D<double>
 CMemBlock2D<double>::gather(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         if (nodes == 1) return CMemBlock2D<double>(*this);
 
@@ -844,7 +844,7 @@ template <>
 inline void
 CMemBlock2D<int32_t>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         if (nodes == 1) return;
 
@@ -930,7 +930,7 @@ template <>
 inline void
 CMemBlock2D<double>::scatter(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         if (nodes == 1) return;
 

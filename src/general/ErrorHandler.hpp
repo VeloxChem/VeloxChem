@@ -31,6 +31,11 @@
 namespace errors {  // errors namespace
 
 /**
+ * Prints message and aborts.
+ */
+void msgCritical(const std::string& message);
+
+/**
  Prints message and aborts in case of a critical error.
  */
 void assertMsgCritical(const bool condition, const std::string& message);

@@ -568,7 +568,6 @@ class CDensityGrid
     @param densityThreshold the density/density gradient screening threshold.
     @param iDensityMatrix the index of density matrix.
     @param xcFuncType the type of exchange-correlation functional.
-    @return the screened molecular grid.
     */
     void getScreenedGridUnrestricted(CMolecularGrid& molecularGridsAB,
                                      CMolecularGrid& molecularGridsA,

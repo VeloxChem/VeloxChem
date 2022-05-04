@@ -33,10 +33,11 @@
 #include <vector>
 
 #ifdef ENABLE_MKL
-#include "mkl.h"
+#include <mkl_cblas.h>
+#include <mkl_lapacke.h>
 #else
-#include "cblas.h"
-#include "lapacke.h"
+#include <cblas.h>
+#include <lapacke.h>
 #endif
 
 #include "DenseMatrix.hpp"
@@ -88,9 +89,9 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr)
     }
     else if (f_style)
     {
-        for (ssize_t i = 0; i < arr.shape(0); i++)
+        for (py::ssize_t i = 0; i < arr.shape(0); i++)
         {
-            for (ssize_t j = 0; j < arr.shape(1); j++)
+            for (py::ssize_t j = 0; j < arr.shape(1); j++)
             {
                 vec.data()[i * arr.shape(1) + j] = arr.data()[j * arr.shape(0) + i];
             }

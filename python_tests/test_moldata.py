@@ -1,14 +1,18 @@
 from pathlib import Path
 import tempfile
+import pytest
 
 import numpy as np
 
-from veloxchem.molecule import Molecule
-from veloxchem.mpitask import MpiTask
 from veloxchem.veloxchemlib import ChemicalElement, DispersionModel
 from veloxchem.veloxchemlib import bohr_in_angstroms, is_mpi_master
+from veloxchem.molecule import Molecule
+from veloxchem.mpitask import MpiTask
+from veloxchem.optimizationdriver import OptimizationDriver
 
 
+@pytest.mark.filterwarnings(
+    'ignore:.*tostring.*tobytes:DeprecationWarning:geometric')
 class TestMolData:
 
     def nh3_labels(self):
@@ -290,7 +294,7 @@ class TestMolData:
         init_mol = Molecule.read_str(init_xyz_str, units='angstrom')
         final_mol = Molecule.read_str(final_xyz_str, units='angstrom')
 
-        ic_rmsd = final_mol.get_ic_rmsd(init_mol)
+        ic_rmsd = OptimizationDriver.get_ic_rmsd(final_mol, init_mol)
         ref_ic_rmsd = {
             'bonds': {
                 'rms': 0.017,
