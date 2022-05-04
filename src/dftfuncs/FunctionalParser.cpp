@@ -29,17 +29,17 @@
 
 #include "Becke88Functional.hpp"
 #include "LYPFunctional.hpp"
+#include "PkzbFunctional.hpp"
 #include "SlaterFunctional.hpp"
 #include "StringFormat.hpp"
 #include "VWN3Functional.hpp"
-#include "PkzbFunctional.hpp"
 
 namespace vxcfuncs {  // vxcfuncs namespace
 
 std::vector<std::string>
 getAvailableFunctionals()
 {
-    return std::vector<std::string>({"SLATER", "VWN3", "BECKE88", "LYP", "SLDA", "B88X", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP","PKZB"});
+    return std::vector<std::string>({"SLATER", "VWN3", "BECKE88", "LYP", "SLDA", "B88X", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP", "PKZB"});
 }
 
 CXCFunctional
