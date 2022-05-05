@@ -43,6 +43,7 @@
 #include "MOIntsBatch.hpp"
 #include "MOIntsType.hpp"
 #include "ScreeningContainer.hpp"
+#include "DiagEriDriver.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -457,6 +458,29 @@ molecule with specific AO basis set. Performs screening according to
              "cross_rank"_a,
              "cross_nodes"_a,
              "py_cross_comm"_a);
+    
+    // CDiagEriDriver class
+
+    PyClass<CDiagEriDriver<double, mem::Host>>(m, "DiagEriDriver")
+        .def(py::init<>())
+        .def("compute",
+             py::overload_cast<const CMolecule&, const CMolecularBasis&>(
+                &CDiagEriDriver<double, mem::Host>::compute, py::const_),
+             // the wonky format of the raw string literal is to get help(...) in Python to look nice
+             R"pbdoc(
+Computes Q values for electron repulsion integrals for molecule with specific AO
+basis set and stores results in screening container object.
+
+:param molecule:
+    The molecule.
+:param ao_basis:
+    The molecular AO basis.
+
+:return:
+    The packed GTOs pairs container.
+             )pbdoc",
+             "molecule"_a,
+             "ao_basis"_a);
 }
 
 }  // namespace vlx_twoints

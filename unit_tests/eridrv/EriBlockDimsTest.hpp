@@ -23,20 +23,17 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef EriBlockDims_hpp
-#define EriBlockDims_hpp
+#ifndef EriBlockDimsTest_hpp
+#define EriBlockDimsTest_hpp
 
-#include <cstdint>
+#include "gtest/gtest.h"
 
-namespace eridims { // eridims namespace
+class CEriBlockDimsTest : public ::testing::Test
+{
+   protected:
+    CEriBlockDimsTest() {};
 
-    /**
-     Gets diagonal batch size of electron repulsion integrals.
+    virtual ~CEriBlockDimsTest() {};
+};
 
-     @return the number of contracted integrals in batch.
-     */
-    int32_t getDiagBatchSize();
-
-} // eridims namespace
-
-#endif /* EriBlockDims_hpp */
+#endif /* EriBlockDimsTest_hpp */
