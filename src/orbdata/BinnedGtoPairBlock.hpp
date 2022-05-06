@@ -27,6 +27,7 @@
 #define BinnedGtoPairBlock_hpp
 
 #include <cstdint>
+#include <type_traits>
 
 #include "Buffer.hpp"
 #include "BinnedGtoBlock.hpp"
@@ -347,38 +348,82 @@ class CBinnedGtoPairBlock
             }
         }
             
+        // total number of primitive pairs
+        
+        const auto ntpairs = getNumberOfContrPairs() * _nPrimitivePairs;
+        
         // compute Obara-Saika factors
 
-        const auto fpi = mathconst::getPiValue();
-            
-        const auto ntpairs = getNumberOfContrPairs() * _nPrimitivePairs;
+        const auto fpi = static_cast<T>(mathconst::getPiValue());
+        
+        // double implementation 
+        
+        if constexpr (std::is_same<T, double>::value)
+        {
+            #pragma omp simd
+            for (int32_t i = 0; i < ntpairs; i++)
+            {
+                const auto fx = ppbexp[i] + ppkexp[i];
+        
+                const auto fi = 1.0 / fx;
+        
+                const auto fz = ppbexp[i] * ppkexp[i] * fi;
+        
+                // store Obara-Saika factors
+        
+                ppfx[i] = fx;
+        
+                ppfi[i] = fi;
+        
+                ppfz[i] = fz;
+        
+                ppss[i] *= std::pow(fpi * fi, 1.50)
+        
+                         * std::exp(-fz * (pprabx[i] * pprabx[i] +
+                                  
+                                           ppraby[i] * ppraby[i] +
+                                  
+                                           pprabz[i] * pprabz[i]));
+            }
+        }
+        
+        // float implementation
+        
+        if constexpr (std::is_same<T, float>::value)
+        {
+            #pragma omp simd
+            for (int32_t i = 0; i < ntpairs; i++)
+            {
+                const auto fx = ppbexp[i] + ppkexp[i];
+        
+                const auto fi = 1.0f / fx;
+        
+                const auto fz = ppbexp[i] * ppkexp[i] * fi;
+        
+                // store Obara-Saika factors
+        
+                ppfx[i] = fx;
+        
+                ppfi[i] = fi;
+        
+                ppfz[i] = fz;
+        
+                ppss[i] *= std::pow(fpi * fi, 1.50f)
+        
+                         * std::exp(-fz * (pprabx[i] * pprabx[i] +
+                                  
+                                           ppraby[i] * ppraby[i] +
+                                  
+                                           pprabz[i] * pprabz[i]));
+            }
+        }
             
         #pragma omp simd
         for (int32_t i = 0; i < ntpairs; i++)
         {
-            const auto fx = ppbexp[i] + ppkexp[i];
-                
-            const auto fi = 1.0 / fx;
-                
-            const auto fz = ppbexp[i] * ppkexp[i] * fi;
-                
-            // store Obara-Saika factors
-                
-            ppfx[i] = fx;
-                
-            ppfi[i] = fi;
-                
-            ppfz[i] = fz;
-                
-            ppss[i] *= std::pow(fpi * fi, 1.50)
-                
-                     * std::exp(-fz * (pprabx[i] * pprabx[i] +
-                                          
-                                       ppraby[i] * ppraby[i] +
-                                          
-                                       pprabz[i] * pprabz[i]));
-                
             // store P center coordinates
+            
+            const auto fi = ppfi[i];
                 
             pprpx[i] = fi * (ppbexp[i] * pprax[i] + ppkexp[i] * pprbx[i]);
                 
@@ -646,38 +691,82 @@ class CBinnedGtoPairBlock
             }
         }
         
-        // compute Obara-Saika factors
-
-        const auto fpi = mathconst::getPiValue();
+        // total number of primitive pairs
         
         const auto ntpairs = getNumberOfContrPairs() * _nPrimitivePairs;
+        
+        // compute Obara-Saika factors
+
+        const auto fpi = static_cast<T>(mathconst::getPiValue());
+        
+        // double type
+        
+        if constexpr (std::is_same<T, double>::value)
+        {
+            #pragma omp simd
+            for (int32_t i = 0; i < ntpairs; i++)
+            {
+                const auto fx = ppbexp[i] + ppkexp[i];
+    
+                const auto fi = 1.0 / fx;
+    
+                const auto fz = ppbexp[i] * ppkexp[i] * fi;
+    
+                // store Obara-Saika factors
+    
+                ppfx[i] = fx;
+    
+                ppfi[i] = fi;
+    
+                ppfz[i] = fz;
+    
+                ppss[i] *= std::pow(fpi * fi, 1.50)
+    
+                        * std::exp(-fz * (pprabx[i] * pprabx[i] +
+                              
+                                          ppraby[i] * ppraby[i] +
+                              
+                                          pprabz[i] * pprabz[i]));
+            }
+        }
+        
+        //  float type
+        
+        if constexpr (std::is_same<T, float>::value)
+        {
+            #pragma omp simd
+            for (int32_t i = 0; i < ntpairs; i++)
+            {
+                const auto fx = ppbexp[i] + ppkexp[i];
+    
+                const auto fi = 1.0f / fx;
+    
+                const auto fz = ppbexp[i] * ppkexp[i] * fi;
+    
+                // store Obara-Saika factors
+    
+                ppfx[i] = fx;
+    
+                ppfi[i] = fi;
+    
+                ppfz[i] = fz;
+    
+                ppss[i] *= std::pow(fpi * fi, 1.50f)
+    
+                        * std::exp(-fz * (pprabx[i] * pprabx[i] +
+                              
+                                          ppraby[i] * ppraby[i] +
+                              
+                                          pprabz[i] * pprabz[i]));
+            }
+        }
         
         #pragma omp simd
         for (int32_t i = 0; i < ntpairs; i++)
         {
-            const auto fx = ppbexp[i] + ppkexp[i];
-            
-            const auto fi = 1.0 / fx;
-            
-            const auto fz = ppbexp[i] * ppkexp[i] * fi;
-            
-            // store Obara-Saika factors
-            
-            ppfx[i] = fx;
-            
-            ppfi[i] = fi;
-            
-            ppfz[i] = fz;
-            
-            ppss[i] *= std::pow(fpi * fi, 1.50)
-            
-                     * std::exp(-fz * (pprabx[i] * pprabx[i] +
-                                      
-                                       ppraby[i] * ppraby[i] +
-                                      
-                                       pprabz[i] * pprabz[i]));
-            
             // store P center coordinates
+            
+            const auto fi = ppfi[i];
             
             pprpx[i] = fi * (ppbexp[i] * pprax[i] + ppkexp[i] * pprbx[i]);
             
@@ -934,10 +1023,9 @@ class CBinnedGtoPairBlock
                     
                     // copy atomic indexes
                     
-                    for (int32_t j = 0; j < 2; j++)
-                    {
-                        atomids(j, icgto) = _atomicIndexes(j, i);
-                    }
+                    atomids(0, icgto) = _atomicIndexes(0, i);
+                    
+                    atomids(1, icgto) = _atomicIndexes(1, i);
                     
                     // update GTO pairs counter
                     
@@ -1385,6 +1473,5 @@ class CBinnedGtoPairBlock
         return rab;
     }
 };
-
 
 #endif /* BinnedGtoPairBlock_hpp */

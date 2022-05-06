@@ -23,25 +23,17 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef BoysFuncTest_hpp
-#define BoysFuncTest_hpp
+#ifndef DiagEriRecFactsTest_hpp
+#define DiagEriRecFactsTest_hpp
 
 #include "gtest/gtest.h"
 
-#include "Buffer.hpp"
-
-class CBoysFuncTest : public ::testing::Test
+class CDiagEriRecFactsTest : public ::testing::Test
 {
    protected:
-    CBoysFuncTest() {};
+    CDiagEriRecFactsTest() {};
 
-    virtual ~CBoysFuncTest() {};
-
-    BufferHostXd getSmallArguments() const;
-
-    BufferHostXd getMediumArguments() const;
-
-    BufferHostXd getLargeArguments() const;
+    virtual ~CDiagEriRecFactsTest() {};
 };
 
-#endif /* BoysFuncTest_hpp */
+#endif /* DiagEriRecFactsTest_hpp */

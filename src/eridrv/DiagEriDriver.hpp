@@ -26,11 +26,14 @@
 #ifndef DiagEriDriver_hpp
 #define DiagEriDriver_hpp
 
+#include <type_traits>
+
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 #include "PackedGtoPairContainer.hpp"
 #include "BinnedGtoContainer.hpp"
 #include "EriBlockDims.hpp"
+#include "DiagEriRecForSSSS.hpp"
 
 #include <iostream>
 
@@ -76,7 +79,95 @@ public:
              const int32_t                    bPosition,
              const int32_t                    ePosition) const -> void
     {
+        // set up angular momentum data
         
+        const auto bang = gtoPairBlock->getBraAngularMomentum();
+        
+        const auto kang = gtoPairBlock->getKetAngularMomentum();
+        
+        // (SS|SS) integrals
+        
+        if ((bang == 0) && (kang  == 0))
+        {
+            if constexpr (std::is_same<B, mem::Host>::value)
+            {
+                derirec::compHostSSSS(intsBuffer, gtoPairBlock, bPosition, ePosition);
+            }
+            
+            return;
+        }
+        
+        // (SP|SP) integrals
+        
+        if ((bang == 0) && (kang  == 1))
+        {
+            
+            return;
+        }
+        
+        // (SD|SD) integrals
+        
+        if ((bang == 0) && (kang  == 2))
+        {
+            
+            return;
+        }
+        
+        // (SF|SF) integrals
+        
+        if ((bang == 0) && (kang  == 3))
+        {
+            
+            return;
+        }
+        
+        // (PP|PP) integrals
+        
+        if ((bang == 1) && (kang  == 1))
+        {
+            
+            return;
+        }
+        
+        // (PD|PD) integrals
+        
+        if ((bang == 1) && (kang  == 2))
+        {
+            
+            return;
+        }
+        
+        // (PF|PF) integrals
+        
+        if ((bang == 1) && (kang  == 3))
+        {
+            
+            return;
+        }
+        
+        // (DD|DD) integrals
+        
+        if ((bang == 2) && (kang  == 2))
+        {
+            
+            return;
+        }
+        
+        // (DF|DF) integrals
+        
+        if ((bang == 2) && (kang  == 3))
+        {
+            
+            return;
+        }
+        
+        // (FF|FF) integrals
+        
+        if ((bang == 3) && (kang  == 3))
+        {
+            
+            return;
+        }
     }
     
     /**
@@ -202,7 +293,6 @@ public:
         
         return gtodata;
     }
-    
 };
 
 
