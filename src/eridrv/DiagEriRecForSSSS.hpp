@@ -112,7 +112,7 @@ compHostSSSS(      T*                                 intsBuffer,
             
             if ((i + j) == 0)
             {
-                #pragma omp simd aligned(frho, fnorm, bvals: VLX_ALIGN)
+                #pragma omp simd aligned(frho, fnorm, bf0: VLX_ALIGN)
                 for (int32_t k = 0; k < ncpairs; k++)
                 {
                     intsBuffer[k] = std::sqrt(fpi * frho[k]) * bf0[k] * fnorm[k];
@@ -120,7 +120,7 @@ compHostSSSS(      T*                                 intsBuffer,
             }
             else
             {
-                #pragma omp simd aligned(frho, fnorm, bvals: VLX_ALIGN)
+                #pragma omp simd aligned(frho, fnorm, bf0: VLX_ALIGN)
                 for (int32_t k = 0; k < ncpairs; k++)
                 {
                     intsBuffer[k] += std::sqrt(fpi * frho[k]) * bf0[k] * fnorm[k];
