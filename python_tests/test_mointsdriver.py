@@ -74,19 +74,19 @@ class TestMOIntegralsDriver:
             assert abs(e_mp2 - master_e_mp2) < 1.0e-12
 
         # in-memory test
-        in_mem_oovv = moints_drv.compute_in_mem(task.molecule, task.ao_basis,
-                                                mol_orbs, "OOVV")
+        phys_oovv = moints_drv.compute_in_mem(task.molecule, task.ao_basis,
+                                              mol_orbs, "OOVV")
 
         if is_mpi_master(task.mpi_comm):
-            in_mem_e_mp2 = 0.0
-            for i in range(in_mem_oovv.shape[0]):
-                for j in range(in_mem_oovv.shape[1]):
-                    ij = in_mem_oovv[i, j, :, :]
+            conventional_e_mp2 = 0.0
+            for i in range(phys_oovv.shape[0]):
+                for j in range(phys_oovv.shape[1]):
+                    ij = phys_oovv[i, j, :, :]
                     ij_antisym = ij - ij.T
                     denom = eocc[i] + eocc[j] - eab
-                    in_mem_e_mp2 += np.sum(ij * (ij + ij_antisym) / denom)
+                    conventional_e_mp2 += np.sum(ij * (ij + ij_antisym) / denom)
 
-            assert abs(e_mp2 - in_mem_e_mp2) < 1.0e-12
+            assert abs(e_mp2 - conventional_e_mp2) < 1.0e-12
 
         task.finish()
 

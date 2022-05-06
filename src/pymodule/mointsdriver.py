@@ -93,10 +93,84 @@ class MOIntegralsDriver:
         # output stream
         self.ostream = ostream
 
-    def compute_in_mem(self, molecule, basis, mol_orbs, mints_type):
+    def compute_in_memory(self, molecule, basis, mol_orbs, moints_name):
         """
         Performs in-memory MO integrals calculation for a molecule and a basis
         set.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param mol_orbs:
+            The molecular orbitals.
+        :param moints_name:
+            The name of MO integrals to be calculated, such as 'chem_oovv'.
+
+        :return:
+            The computed MO integrals.
+        """
+
+        mo = mol_orbs.alpha_to_numpy()
+        nocc = molecule.number_of_alpha_electrons()
+        mo_occ = mo[:, :nocc]
+        mo_vir = mo[:, nocc:]
+
+        # get the type of MO integral, such as 'oovv'
+
+        chem_notation = moints_name.lower().startswith('chem_')
+        phys_notation = moints_name.lower().startswith('phys_')
+
+        err_msg = 'MOIntegralsDriver.compute_in_memory: invalid moints_name'
+        assert_msg_critical(chem_notation or phys_notation, err_msg)
+
+        if chem_notation:
+            moints_type = moints_name.lower().replace('chem_', '')
+        elif phys_notation:
+            moints_type = moints_name.lower().replace('phys_', '')
+
+        assert_msg_critical(len(moints_type) == 4, err_msg)
+        for x in moints_type:
+            assert_msg_critical(x == 'o' or x == 'v', err_msg)
+
+        # MO coefficients
+
+        mo_coef_dict = {'o': mo_occ, 'v': mo_vir}
+        if chem_notation:
+            mo_coefs = [mo_coef_dict[x] for x in moints_type]
+        elif phys_notation:
+            mo_coefs = [
+                mo_coef_dict[moints_type[0]],
+                mo_coef_dict[moints_type[2]],
+                mo_coef_dict[moints_type[1]],
+                mo_coef_dict[moints_type[3]],
+            ]
+
+        # AO integrals
+
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        pqrs = eri_drv.compute_in_memory(molecule, basis)
+
+        # AO-to-MO integral transformation
+
+        tqrs = np.einsum('pqrs,pt->tqrs', pqrs, mo_coefs[0], optimize=True)
+        del pqrs
+        turs = np.einsum('tqrs,qu->turs', tqrs, mo_coefs[1], optimize=True)
+        del tqrs
+        tuvs = np.einsum('turs,rv->tuvs', turs, mo_coefs[2], optimize=True)
+        del turs
+        tuvw = np.einsum('tuvs,sw->tuvw', tuvs, mo_coefs[3], optimize=True)
+        del tuvs
+
+        if chem_notation:
+            return tuvw
+        elif phys_notation:
+            return tuvw.swapaxes(1, 2)
+
+    def compute_in_mem(self, molecule, basis, mol_orbs, mints_type):
+        """
+        Performs in-memory MO integrals calculation for a molecule and a basis
+        set. (will be deprecated)
 
         :param molecule:
             The molecule.
@@ -111,33 +185,8 @@ class MOIntegralsDriver:
             The computed MO integrals.
         """
 
-        mo = mol_orbs.alpha_to_numpy()
-        nocc = molecule.number_of_alpha_electrons()
-        mo_occ = mo[:, :nocc]
-        mo_vir = mo[:, nocc:]
-
-        err_msg = 'MOIntegralsDriver.compute_in_mem: invalid mints_type'
-        assert_msg_critical(len(mints_type) == 4, err_msg)
-        for x in mints_type:
-            assert_msg_critical(x.lower() in ['o', 'v'], err_msg)
-
-        mo_coefs = [mo_occ if x.lower() == 'o' else mo_vir for x in mints_type]
-
-        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        pqrs = eri_drv.compute_in_mem(molecule, basis)
-
-        # Note that we calculate the integrals in physicists' notation
-
-        tqrs = np.einsum('pqrs,pt->tqrs', pqrs, mo_coefs[0], optimize=True)
-        del pqrs
-        turs = np.einsum('tqrs,qu->turs', tqrs, mo_coefs[2], optimize=True)
-        del tqrs
-        tuvs = np.einsum('turs,rv->tuvs', turs, mo_coefs[1], optimize=True)
-        del turs
-        tuvw = np.einsum('tuvs,sw->tuvw', tuvs, mo_coefs[3], optimize=True)
-        del tuvs
-
-        return tuvw.swapaxes(1, 2)
+        return self.compute_in_memory(molecule, basis, mol_orbs,
+                                      'phys_' + mints_type)
 
     def compute(self, molecule, ao_basis, mol_orbs, mints_type, grps):
         """
