@@ -3802,7 +3802,7 @@ CBoysFunc<T, N>::compute(      BufferHostXY<T>& values,
     
     if constexpr (std::is_same<T, float>::value)
     {
-        const float fpi = static_cast<float>(0.5 * std::sqrt(mathconst::getPiValue()));
+        const float fpi = 0.5f * std::sqrt(static_cast<float>(mathconst::getPiValue()));
 
         const std::array<float, 28> ft{1.0f,
                                        1.0f / 3.0f,  1.0f / 5.0f,  1.0f / 7.0f,

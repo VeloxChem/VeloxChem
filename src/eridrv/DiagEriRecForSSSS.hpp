@@ -31,6 +31,7 @@
 #include "Buffer.hpp"
 #include "BinnedGtoPairBlock.hpp"
 #include "DiagEriRecFacts.hpp"
+#include "BoysFunc.hpp"
 
 namespace derirec { // derirec  namespace
 
@@ -60,18 +61,71 @@ compHostSSSS(      T*                                 intsBuffer,
     
     BufferHostMY<T, 3> rpq(ncpairs);
     
-    BufferHostX<T> cbuf_ssss(ncpairs);
+    BufferHostMY<T, 2> osfacts(ncpairs);
     
+    // allocate Boys function data
+    
+    BufferHostX<T> bargs(ncpairs);
+    
+    BufferHostXY<T> bvals(1, ncpairs);
+    
+    CBoysFunc<T, 0> bftable;
+    
+    // set up scaling factor
+        
+    const auto fpi = static_cast<T>(4.0) / static_cast<T>(mathconst::getPiValue());
+        
+    // set up pointers to Obara-Saika factors
+        
+    auto frho = osfacts.data(0);
+        
+    auto fnorm = osfacts.data(1);
+        
     // loop over primitive integrals
     
     for (int32_t i = 0; i < nppairs; i++)
     {
         for (int j = i; j < nppairs; j++)
         {
+            // compute recursion data
+            
             derirec::compHostDistancesPQ(rpq, gtoPairBlock,
                                          bPosition, ePosition, i, j);
             
+            derirec::compHostFactorRho(frho, gtoPairBlock,
+                                       bPosition, ePosition, i, j);
             
+            derirec::compHostFactorNorm(fnorm, gtoPairBlock,
+                                        bPosition, ePosition, i, j);
+            
+            // compute Boys function values
+            
+            derirec::compHostBoysArguments(bargs, rpq, frho, ncpairs);
+            
+            bftable.compute(bvals, bargs);
+            
+            // set up pointers to Boys function values
+            
+            auto bf0 = bvals.data();
+            
+            // compute (ss|ss) integrals
+            
+            if ((i + j) == 0)
+            {
+                #pragma omp simd aligned(frho, fnorm, bvals: VLX_ALIGN)
+                for (int32_t k = 0; k < ncpairs; k++)
+                {
+                    intsBuffer[k] = std::sqrt(fpi * frho[k]) * bf0[k] * fnorm[k];
+                }
+            }
+            else
+            {
+                #pragma omp simd aligned(frho, fnorm, bvals: VLX_ALIGN)
+                for (int32_t k = 0; k < ncpairs; k++)
+                {
+                    intsBuffer[k] += std::sqrt(fpi * frho[k]) * bf0[k] * fnorm[k];
+                }
+            }
         }
     }
 }
