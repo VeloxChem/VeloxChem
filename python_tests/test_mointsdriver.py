@@ -47,13 +47,13 @@ class TestMOIntegralsDriver:
         mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
 
         if is_mpi_master(task.mpi_comm):
-            assert abs(e_mp2 - mp2_drv.e_mp2) < 1.0e-12
+            assert abs(e_ref - mp2_drv.e_mp2) < 1.0e-8
 
         # extra test: collect moints batches to master node
         moints_drv = MOIntegralsDriver(task.mpi_comm, task.ostream)
         grps = [p for p in range(task.mpi_size)]
         oovv = moints_drv.compute(task.molecule, task.ao_basis, mol_orbs,
-                                  "OOVV", grps)
+                                  'OOVV', grps)
         moints_drv.collect_moints_batches(oovv, grps)
 
         if is_mpi_master(task.mpi_comm):
@@ -61,32 +61,30 @@ class TestMOIntegralsDriver:
             nocc = task.molecule.number_of_alpha_electrons()
             eocc = orb_ene[:nocc]
             evir = orb_ene[nocc:]
-            eab = evir.reshape(-1, 1) + evir
+            e_vv = evir.reshape(-1, 1) + evir
 
             # loop over generator pairs for mp2 energy
             master_e_mp2 = 0.0
             for pair in oovv.get_gen_pairs():
-                ij = oovv.to_numpy(pair)
-                ij_antisym = ij - ij.T
-                denom = eocc[pair.first()] + eocc[pair.second()] - eab
-                master_e_mp2 += np.sum(ij * (ij + ij_antisym) / denom)
+                ab = oovv.to_numpy(pair)
+                denom = e_vv - eocc[pair.first()] - eocc[pair.second()]
+                master_e_mp2 -= np.sum(ab * (2.0 * ab - ab.T) / denom)
 
-            assert abs(e_mp2 - master_e_mp2) < 1.0e-12
+            assert abs(e_ref - master_e_mp2) < 1.0e-8
 
-        # in-memory test
+        # in-mem test (will be deprecated)
         phys_oovv = moints_drv.compute_in_mem(task.molecule, task.ao_basis,
-                                              mol_orbs, "OOVV")
+                                              mol_orbs, 'OOVV')
 
         if is_mpi_master(task.mpi_comm):
-            conventional_e_mp2 = 0.0
+            in_mem_e_mp2 = 0.0
             for i in range(phys_oovv.shape[0]):
                 for j in range(phys_oovv.shape[1]):
-                    ij = phys_oovv[i, j, :, :]
-                    ij_antisym = ij - ij.T
-                    denom = eocc[i] + eocc[j] - eab
-                    conventional_e_mp2 += np.sum(ij * (ij + ij_antisym) / denom)
+                    ab = phys_oovv[i, j, :, :]
+                    denom = e_vv - eocc[i] - eocc[j]
+                    in_mem_e_mp2 -= np.sum(ab * (2.0 * ab - ab.T) / denom)
 
-            assert abs(e_mp2 - conventional_e_mp2) < 1.0e-12
+            assert abs(e_ref - in_mem_e_mp2) < 1.0e-8
 
         task.finish()
 
