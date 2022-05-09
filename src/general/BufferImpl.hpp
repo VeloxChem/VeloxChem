@@ -1326,7 +1326,7 @@ class CBuffer
     friend inline auto
     operator!=(const CBuffer<T, B, NRows, NCols> &lhs, const CBuffer<T, Bother, NRows, NCols> &rhs) -> bool
     {
-        return lhs != rhs;
+        return !(lhs == rhs);
     }
     /**@}*/
 
