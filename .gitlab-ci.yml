@@ -30,7 +30,7 @@ stages:
 .monkey:setup:
   tags:
     - vlx-docker
-  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-5e6dcd2
+  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-4672d65
   variables:
     OMP_NUM_THREADS: "6"
   before_script:
