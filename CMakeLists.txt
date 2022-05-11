@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.18...3.20)
 
 # project name
-project(VeloxChem LANGUAGES CXX C)
+project(VeloxChem LANGUAGES CXX)
 
 # do not rebuild if rules (compiler flags) change
 set(CMAKE_SKIP_RULE_DEPENDENCY TRUE)

@@ -34,6 +34,8 @@ stages:
   image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-f51f706
   variables:
     OMP_NUM_THREADS: "6"
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
   before_script:
     - uname -a
     - free -m
