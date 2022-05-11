@@ -345,22 +345,20 @@ class CBuffer
     }
 
    public:
-    /** @{ Default CTORs. */
-    /** Default CTOR when some dimensions are not known at compile-time.
+    /** Default CTOR.
      *
-     * @warning These CTORs **do not** allocate memory. You will have to call
-     * `resize` to do so or, alternatively one of
+     * @warning These CTORs **only** allocate memory when the sizes of the
+     * buffer are known at compile-time.  In all other cases, you will have to
+     * call `resize` to allocate or, alternatively one of
      * `setConstant`/`setZero`/`setRandom` to allocate *and* initialize.
      */
-    template <auto K_ = kind, std::enable_if_t<!(K_ == Kind::N || K_ == Kind::MN), bool> = true>
     CBuffer()
     {
-    }
-
-    /** Default CTOR for 1D and 2D buffers with compile-time number of elements in each dimension. */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::N || K_ == Kind::MN), bool> = true>
-    CBuffer() : _nElements{_nRows * _nPaddedColumns}, _data{mem::malloc<value_type, backend_type>(_nElements)}
-    {
+        if constexpr (kind == Kind::N || kind == Kind::MN)
+        {
+            _nElements = _nRows * _nPaddedColumns;
+            _data      = mem::malloc<value_type, backend_type>(_nElements);
+        }
     }
     /** @} */
 
@@ -368,7 +366,7 @@ class CBuffer
      *
      * @note Only defined when some of the buffer dimensions are not known at
      * compile-time.
-     * @note These CTORs **allocate** memory, but leave uninitialized.
+     * @note These CTORs **allocate** memory, but leave it uninitialized.
      * You can call one of `setConstant`/`setZero`/`setRandom` to do so.
      */
     /** CTOR for 1D buffer with run-time number of elements.
