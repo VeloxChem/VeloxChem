@@ -1,0 +1,57 @@
+monkey:cron_deploy:
+  tags:
+    - vlx-docker
+  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-f51f706
+  variables:
+    OMP_NUM_THREADS: "6"
+    TARBALL: "veloxchem.tar.bz2"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  before_script:
+    - uname -a
+    - free -m
+    - df -h
+    - ulimit -a
+    - ulimit -s unlimited
+    - lscpu | egrep 'Thread|Core|Socket|^CPU\('
+    - python -V
+    - mpiicc --version
+    - mpiicpc --version
+    - python -m venv --clear venv
+    - source venv/bin/activate
+    - python -m pip install --upgrade
+        pip
+        setuptools
+        wheel
+        numpy
+        pybind11
+        pytest
+        mpi4py --no-binary=mpi4py
+    - CC=gcc CXX=g++ python -m pip install
+        cppe
+        MDAnalysis
+  script:
+    - cmake
+        -S.
+        -Bbuild
+        -GNinja
+        -DCMAKE_CXX_COMPILER=mpiicpc
+        -DCMAKE_C_COMPILER=mpiicc
+        -DVLX_LA_VENDOR=MKL
+    - cd build
+    - cmake --build . --parallel 6 -- -v -d stats
+    - ctest --output-on-failure
+    # prepare tar.bz2 archive
+    - git archive
+        --format=tar
+        --prefix="veloxchem/"
+        "$CI_COMMIT_SHA" | bzip2 > "$TARBALL"
+    - tar tf "$TARBALL"
+    # trigger deployment
+    - python .gitlab/trigger.py
+        --tarball "$TARBALL"
+        --url "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/$TARBALL"
+  artifacts:
+    paths:
+      - "$TARBALL"
+    expire_in: 1 day
