@@ -86,6 +86,6 @@ monkey:python_tests:
     - python -m pytest -v --cov=veloxchem --pyargs veloxchem
 
 include:
-  - '.gitlab/windows-ci.yml'
+  #- '.gitlab/windows-ci.yml'
   - '.gitlab/cron-deploy.yml'
   - '.gitlab/deploy.yml'
