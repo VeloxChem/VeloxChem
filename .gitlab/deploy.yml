@@ -10,6 +10,7 @@ monkey:deploy:
       when: never
     - if: '$CI_COMMIT_TITLE =~ /\[conda-build\]/i'
   script:
+    - python -m pip install requests
     # prepare tar.bz2 archive
     - git archive
         --format=tar

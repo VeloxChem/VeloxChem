@@ -5,6 +5,7 @@ monkey:cron_deploy:
   variables:
     OMP_NUM_THREADS: "6"
     TARBALL: "veloxchem.tar.bz2"
+  stage: deploy
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
   before_script:
@@ -16,12 +17,14 @@ monkey:cron_deploy:
     - lscpu | egrep 'Thread|Core|Socket|^CPU\('
     - python -V
     - mpiicpc --version
+    - cmake --version
     - python -m venv --clear venv
     - source venv/bin/activate
     - python -m pip install --upgrade
         pip
         setuptools
         wheel
+        requests
         numpy
         pybind11[global]
         pytest
@@ -39,9 +42,8 @@ monkey:cron_deploy:
         -GNinja
         -DCMAKE_CXX_COMPILER=mpiicpc
         -DVLX_LA_VENDOR=MKL
-    - cd build
-    - cmake --build . --parallel 6 -- -v -d stats
-    - ctest --output-on-failure
+    - cmake --build build --parallel 6 -- -v -d stats
+    - ctest --test-dir build --output-on-failure
     # prepare tar.bz2 archive
     - git archive
         --format=tar
@@ -50,11 +52,11 @@ monkey:cron_deploy:
     - tar tf "$TARBALL"
     # build number as last two digits of year + ISO week number (1..53)
     # trigger deployment
-    - |
-      python .gitlab/trigger.py
+    - | 
+      python .gitlab/trigger.py \
+        --tarball "$TARBALL" \
+        --url "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/$TARBALL" \
         --commit "package={'build': '$(("$(date +"%y")" + "$(date +"%V")"))', 'label': 'main'}"
-        --tarball "$TARBALL"
-        --url "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/$TARBALL"
   artifacts:
     paths:
       - "$TARBALL"
