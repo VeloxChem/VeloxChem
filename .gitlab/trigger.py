@@ -165,9 +165,9 @@ def main():
         "url": args.url,
         "sha256": sha256,
         "version": version,
-        "build": str(0),
+        "build": build_number,
         "channel": "veloxchem",
-        "label": "main",
+        "label": os.getenv("CI_COMMIT_BRANCH"),
         "patch": version_patch,
     }
     # update inputs with configuration from commit message

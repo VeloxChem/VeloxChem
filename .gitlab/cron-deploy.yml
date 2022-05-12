@@ -15,7 +15,6 @@ monkey:cron_deploy:
     - ulimit -s unlimited
     - lscpu | egrep 'Thread|Core|Socket|^CPU\('
     - python -V
-    - mpiicc --version
     - mpiicpc --version
     - python -m venv --clear venv
     - source venv/bin/activate
@@ -24,8 +23,11 @@ monkey:cron_deploy:
         setuptools
         wheel
         numpy
-        pybind11
+        pybind11[global]
         pytest
+        h5py
+        psutil
+        geometric@git+https://github.com/leeping/geomeTRIC.git@e982ad6#egg=geometric
         mpi4py --no-binary=mpi4py
     - CC=gcc CXX=g++ python -m pip install
         cppe
@@ -36,7 +38,6 @@ monkey:cron_deploy:
         -Bbuild
         -GNinja
         -DCMAKE_CXX_COMPILER=mpiicpc
-        -DCMAKE_C_COMPILER=mpiicc
         -DVLX_LA_VENDOR=MKL
     - cd build
     - cmake --build . --parallel 6 -- -v -d stats
@@ -47,8 +48,11 @@ monkey:cron_deploy:
         --prefix="veloxchem/"
         "$CI_COMMIT_SHA" | bzip2 > "$TARBALL"
     - tar tf "$TARBALL"
+    # build number as last two digits of year + ISO week number (1..53)
     # trigger deployment
-    - python .gitlab/trigger.py
+    - |
+      python .gitlab/trigger.py
+        --commit "package={'build': '$(("$(date +"%y")" + "$(date +"%V")"))', 'label': 'main'}"
         --tarball "$TARBALL"
         --url "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/$TARBALL"
   artifacts:
