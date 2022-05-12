@@ -24,7 +24,6 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from os import environ
-from sys import stdout
 
 
 def configure_mkl_rt():
@@ -42,10 +41,6 @@ def configure_mkl_rt():
 
     if 'MKL_INTERFACE_LAYER' not in environ:
         environ['MKL_INTERFACE_LAYER'] = '@_mkl_interface_layer_@'
-        print('* Warning * Setting MKL_INTERFACE_LAYER to "@_mkl_interface_layer_@".', file=stdout)
-        stdout.flush()
 
     if 'MKL_THREADING_LAYER' not in environ:
         environ['MKL_THREADING_LAYER'] = '@_mkl_threading_layer_@'
-        print('* Warning * Setting MKL_THREADING_LAYER to "@_mkl_threading_layer_@".', file=stdout)
-        stdout.flush()
