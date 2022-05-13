@@ -320,93 +320,97 @@ class PolOrbitalResponse(CphfSolver):
         else:
             return {}
 
-###    def compute_omega(self, ovlp, mo_occ, mo_vir, epsilon_dm_ao, rpa_results,
-###                      fock_ao_rhs, fock_lambda, fock_gxc_ao):
-###        """
-###        Calculates the RPA Lagrange multipliers for the overlap matrix.
-###
-###        :param ovlp:
-###            The overlap matrix.
-###        :param mo_occ:
-###            The occupied MO coefficients.
-###        :param mo_vir:
-###            The virtual MO coefficients.
-###        :param epsilon_dm_ao:
-###            The energy-weighted relaxed density matrix.
-###        :param rpa_results:
-###            The results from the RPA calculation.
-###        :param fock_ao_rhs:
-###            The AOFockMatrix from the right-hand side of the orbital response eq.
-###        :param fock_lambda:
-###            The Fock matrix from Lagrange multipliers.
-###        :param fock_gxc_ao:
-###            The AOFockMatrix from the E[3] xc contribution (None if not DFT).
-###
-###        :return:
-###            a numpy array containing the Lagrange multipliers in AO basis.
-###        """
-###
-###        # Get the excitation and deexcitation vector of interest,
-###        # construct plus/minus combinations and transform them to AO
-###        nocc = mo_occ.shape[1]
-###        nvir = mo_vir.shape[1]
-###        exc_vec = rpa_results['eigenvectors'][:nocc * nvir, self.state_deriv_index]
-###        deexc_vec = rpa_results['eigenvectors'][nocc * nvir:,
-###                                                self.state_deriv_index]
-###        exc_vec = exc_vec.reshape(nocc, nvir).copy()
-###        deexc_vec = deexc_vec.reshape(nocc, nvir).copy()
-###        xpy = exc_vec + deexc_vec
-###        xmy = exc_vec - deexc_vec
-###        xpy_ao = np.linalg.multi_dot([mo_occ, xpy, mo_vir.T])
-###        xmy_ao = np.linalg.multi_dot([mo_occ, xmy, mo_vir.T])
-###
-###        # Transform the vectors to the AO basis
-###        # The density matrix; only alpha block;
-###        # Only works for the restricted case
-###        # (since scf_tensors['C'] only gives alpha block...)
-###        D_occ = np.matmul(mo_occ, mo_occ.T)
-###        D_vir = np.matmul(mo_vir, mo_vir.T)
-###
-###        # Because the excitation vector is not symmetric,
-###        # we need both the matrix (OO block in omega, and probably VO)
-###        # and its transpose (VV, OV blocks)
-###        # this comes from the transformation of the 2PDM contribution
-###        # from MO to AO basis
-###        fock_ao_rhs_1 = fock_ao_rhs.alpha_to_numpy(1)  # xpy
-###        fock_ao_rhs_2 = fock_ao_rhs.alpha_to_numpy(2)  # xmy
-###
-###        Fp1_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, xpy_ao, ovlp.T])
-###        Fm1_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_2.T, xmy_ao, ovlp.T])
-###        Fp2_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, xpy_ao, ovlp.T])
-###        Fm2_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_2, xmy_ao, ovlp.T])
-###        # Fp1_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, xpy_ao, ovlp.T])
-###        # Fm1_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_2.T, xmy_ao, ovlp.T])
-###        # Fp2_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, xpy_ao, ovlp.T])
-###        # Fm2_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_2, xmy_ao, ovlp.T])
-###        Fp1_oo = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, xpy_ao.T, ovlp.T])
-###        Fm1_oo = np.linalg.multi_dot([0.5 * fock_ao_rhs_2, xmy_ao.T, ovlp.T])
-###        Fp2_oo = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, xpy_ao.T, ovlp.T])
-###        Fm2_oo = np.linalg.multi_dot([0.5 * fock_ao_rhs_2.T, xmy_ao.T, ovlp.T])
-###        # We see that:
-###        # Fp1_vv = Fp1_ov and Fm1_vv = Fm1_ov
-###        # Fp2_vv = Fp2_ov and Fm2_vv = Fm2_ov
-###
-###        # Compute the contributions from the 2PDM and the relaxed 1PDM
-###        # to the omega Lagrange multipliers:
-###        fmat = (fock_lambda.alpha_to_numpy(0) +
-###                fock_lambda.alpha_to_numpy(0).T +
-###                0.5 * fock_ao_rhs.alpha_to_numpy(0))
-###
-###        omega_1pdm_2pdm_contribs = 0.5 * (
-###            np.linalg.multi_dot([D_vir, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir])
-###          + np.linalg.multi_dot([D_occ, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir])
-###          + np.linalg.multi_dot([D_occ, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir]).T
-###          + np.linalg.multi_dot([D_occ, Fp1_oo + Fm1_oo - Fp2_oo + Fm2_oo, D_occ])
-###          + 2 * np.linalg.multi_dot([D_occ, fmat, D_occ]))
-###
-###        omega = -epsilon_dm_ao - omega_1pdm_2pdm_contribs
-###
-###        return omega
+# NOTES:
+#	- epsilon_dm_ao not returned from cphfsolver, to be calculated inside compute_omega
+#	- fock_ao_rhs and fock_gxc_ao come from cphfsolver dictionary
+#	- fock_lambda not returned yet, put in dictionary from cphfsolver (otherwise needs to be recalculated)
+    def compute_omega(self, ovlp, mo_occ, mo_vir, epsilon_dm_ao, lr_results,
+                      fock_ao_rhs, fock_lambda, fock_gxc_ao):
+        """
+        Calculates the polarizability Lagrange multipliers for the overlap matrix.
+
+        :param ovlp:
+            The overlap matrix.
+        :param mo_occ:
+            The occupied MO coefficients.
+        :param mo_vir:
+            The virtual MO coefficients.
+        :param epsilon_dm_ao:
+            The energy-weighted relaxed density matrix.
+        :param lr_results:
+            The results from the linear response calculation.
+        :param fock_ao_rhs:
+            The AOFockMatrix from the right-hand side of the orbital response eq.
+        :param fock_lambda:
+            The Fock matrix from Lagrange multipliers.
+        :param fock_gxc_ao:
+            The AOFockMatrix from the E[3] xc contribution (None if not DFT).
+
+        :return:
+            a numpy array containing the Lagrange multipliers in AO basis.
+        """
+
+        # Get the excitation and deexcitation vector of interest,
+        # construct plus/minus combinations and transform them to AO
+        nocc = mo_occ.shape[1]
+        nvir = mo_vir.shape[1]
+        exc_vec = rpa_results['eigenvectors'][:nocc * nvir, self.state_deriv_index]
+        deexc_vec = rpa_results['eigenvectors'][nocc * nvir:,
+                                                self.state_deriv_index]
+        exc_vec = exc_vec.reshape(nocc, nvir).copy()
+        deexc_vec = deexc_vec.reshape(nocc, nvir).copy()
+        xpy = exc_vec + deexc_vec
+        xmy = exc_vec - deexc_vec
+        xpy_ao = np.linalg.multi_dot([mo_occ, xpy, mo_vir.T])
+        xmy_ao = np.linalg.multi_dot([mo_occ, xmy, mo_vir.T])
+
+        # Transform the vectors to the AO basis
+        # The density matrix; only alpha block;
+        # Only works for the restricted case
+        # (since scf_tensors['C'] only gives alpha block...)
+        D_occ = np.matmul(mo_occ, mo_occ.T)
+        D_vir = np.matmul(mo_vir, mo_vir.T)
+
+        # Because the excitation vector is not symmetric,
+        # we need both the matrix (OO block in omega, and probably VO)
+        # and its transpose (VV, OV blocks)
+        # this comes from the transformation of the 2PDM contribution
+        # from MO to AO basis
+        fock_ao_rhs_1 = fock_ao_rhs.alpha_to_numpy(1)  # xpy
+        fock_ao_rhs_2 = fock_ao_rhs.alpha_to_numpy(2)  # xmy
+
+        Fp1_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, xpy_ao, ovlp.T])
+        Fm1_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_2.T, xmy_ao, ovlp.T])
+        Fp2_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, xpy_ao, ovlp.T])
+        Fm2_vv = np.linalg.multi_dot([0.5 * fock_ao_rhs_2, xmy_ao, ovlp.T])
+        # Fp1_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, xpy_ao, ovlp.T])
+        # Fm1_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_2.T, xmy_ao, ovlp.T])
+        # Fp2_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, xpy_ao, ovlp.T])
+        # Fm2_ov = np.linalg.multi_dot([0.5 * fock_ao_rhs_2, xmy_ao, ovlp.T])
+        Fp1_oo = np.linalg.multi_dot([0.5 * fock_ao_rhs_1, xpy_ao.T, ovlp.T])
+        Fm1_oo = np.linalg.multi_dot([0.5 * fock_ao_rhs_2, xmy_ao.T, ovlp.T])
+        Fp2_oo = np.linalg.multi_dot([0.5 * fock_ao_rhs_1.T, xpy_ao.T, ovlp.T])
+        Fm2_oo = np.linalg.multi_dot([0.5 * fock_ao_rhs_2.T, xmy_ao.T, ovlp.T])
+        # We see that:
+        # Fp1_vv = Fp1_ov and Fm1_vv = Fm1_ov
+        # Fp2_vv = Fp2_ov and Fm2_vv = Fm2_ov
+
+        # Compute the contributions from the 2PDM and the relaxed 1PDM
+        # to the omega Lagrange multipliers:
+        fmat = (fock_lambda.alpha_to_numpy(0) +
+                fock_lambda.alpha_to_numpy(0).T +
+                0.5 * fock_ao_rhs.alpha_to_numpy(0))
+
+        omega_1pdm_2pdm_contribs = 0.5 * (
+            np.linalg.multi_dot([D_vir, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir])
+          + np.linalg.multi_dot([D_occ, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir])
+          + np.linalg.multi_dot([D_occ, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir]).T
+          + np.linalg.multi_dot([D_occ, Fp1_oo + Fm1_oo - Fp2_oo + Fm2_oo, D_occ])
+          + 2 * np.linalg.multi_dot([D_occ, fmat, D_occ]))
+
+        omega = -epsilon_dm_ao - omega_1pdm_2pdm_contribs
+
+        return omega
 
     def print_cphf_header(self, title):
         self.ostream.print_blank()
