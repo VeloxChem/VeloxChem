@@ -2506,9 +2506,9 @@ using __repeated_with_idxs = _T;
 /**
  *  PSA = "partially static array"
  *
- * @tparam _T
- * @tparam _ValsSeq
- * @tparam __sentinal
+ * @tparam _T foo
+ * @tparam _ValsSeq foo
+ * @tparam __sentinal foo
  */
 template <class _Tag, class _T, class _ValsSeq, _T __sentinal = dynamic_extent, class _IdxsSeq = make_index_sequence<_ValsSeq::size()>>
 struct __standard_layout_psa;
