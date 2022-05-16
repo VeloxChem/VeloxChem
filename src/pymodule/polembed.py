@@ -30,7 +30,7 @@ try:
     import cppe
 except ImportError:
     raise ImportError('Unable to import cppe. Please install cppe via ' +
-                      '\'python3 -m pip install cppe==0.2.1\'')
+                      '\'python3 -m pip install cppe\'')
 
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricFieldIntegralsDriver
@@ -82,7 +82,6 @@ class PolEmbed:
         self.output = ''
         self.V_es = None
 
-        self.check_cppe_version()
         self.update_options(pe_dict)
 
         cppe_mol = cppe.Molecule()
@@ -105,19 +104,6 @@ class PolEmbed:
                 if site.is_polarizable
             ])
             self.polarizable_coords = coords
-
-    def check_cppe_version(self):
-        """
-        Checks the version of CPPE.
-        """
-
-        from pkg_resources import parse_version
-        cppe_version = '0.2.1'
-
-        if parse_version(cppe.__version__) != parse_version(cppe_version):
-            err_str = 'cppe version {} is required. '.format(cppe_version)
-            err_str += 'cppe version {} was found.'.format(cppe.__version__)
-            raise ModuleNotFoundError(err_str)
 
     def get_cppe_version(self):
         """

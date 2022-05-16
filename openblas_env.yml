@@ -10,13 +10,13 @@ dependencies:
   - h5py
   - pip
   - pybind11>=2.6
-  - python>=3.6
+  - python>=3.7
   - psutil
   - pytest
   - mdanalysis
   - openmm
   - scipy
   - gtest
-  - cppe=0.2.1
+  - cppe
   - xtb
   - veloxchem::geometric

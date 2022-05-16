@@ -1,0 +1,20 @@
+name: vlx
+channels:
+  - conda-forge
+dependencies:
+  - cppe
+  - cmake>=3.18
+  - cxx-compiler
+  - geometric
+  - gtest
+  - h5py
+  - mpi4py
+  - ninja
+  - numpy
+  - pkg-config
+  - psutil
+  - pybind11
+  - pytest
+  - python>=3.7
+  - requests
+  - xtb
