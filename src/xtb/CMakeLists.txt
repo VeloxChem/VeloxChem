@@ -8,9 +8,9 @@ if(PKG_CONFIG_FOUND)
   
   if(TARGET PkgConfig::xTB) 
     message(STATUS "Found xTB ${xTB_VERSION}: ${xTB_LINK_LIBRARIES}")
-    set_source_files_properties(XTBDriver.cpp
-      PROPERTIES
-        COMPILE_DEFINITIONS ENABLE_XTB
+    target_compile_definitions(vlxobjs
+      PUBLIC
+        ENABLE_XTB
       )
     target_link_libraries(vlxobjs
       PUBLIC
