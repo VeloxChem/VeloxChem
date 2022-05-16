@@ -138,8 +138,8 @@ class CphfSolver(LinearSolver):
             The AO basis set.
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
-		:param *args:
-			Additional arguments, same as in compute_rhs.
+        :param *args:
+            Additional arguments, same as in compute_rhs.
 
         :return:
             A dictionary containing the RHS and solution (ov block)
@@ -160,9 +160,9 @@ class CphfSolver(LinearSolver):
             self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
 
         if self.use_subspace_solver:
-            return self.compute_subspace_solver(molecule, basis, scf_tensors, *args)
+            self.cphf_results = self.compute_subspace_solver(molecule, basis, scf_tensors, *args)
         else:
-            return self.compute_conjugate_gradient(molecule, basis, scf_tensors, *args)
+            self.cphf_results = self.compute_conjugate_gradient(molecule, basis, scf_tensors, *args)
 
 
     def compute_subspace_solver(self, molecule, basis, scf_tensors, *args):
