@@ -33,15 +33,15 @@
 class CBoysFuncTest : public ::testing::Test
 {
    protected:
-    CBoysFuncTest(){};
+    CBoysFuncTest() {};
 
-    virtual ~CBoysFuncTest(){};
+    virtual ~CBoysFuncTest() {};
 
-    BufferHostX<double> getSmallArguments() const;
+    BufferHostXd getSmallArguments() const;
 
-    BufferHostX<double> getMediumArguments() const;
+    BufferHostXd getMediumArguments() const;
 
-    BufferHostX<double> getLargeArguments() const;
+    BufferHostXd getLargeArguments() const;
 };
 
 #endif /* BoysFuncTest_hpp */

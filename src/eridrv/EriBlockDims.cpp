@@ -28,9 +28,9 @@
 namespace eridims { // eridims namespace
 
     int32_t
-    getBatchSize()
+    getDiagBatchSize()
     {
-        return 16;
+        return 32;
     }
 
 } // eridims namespace

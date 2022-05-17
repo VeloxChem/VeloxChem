@@ -23,23 +23,17 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef ConfigMKL_hpp
-#define ConfigMKL_hpp
+#ifndef DiagEriRecFactsTest_hpp
+#define DiagEriRecFactsTest_hpp
 
-#include <mkl.h>
+#include "gtest/gtest.h"
 
-/* Set interface and threading layer for the MKL single dynamic library (libmkl_rt.so)
- * See here:
- *   - https://tinyurl.com/y4y695ay
- *   - https://tinyurl.com/y254ggts
- */
-inline void
-configure_mkl_rt() noexcept
+class CDiagEriRecFactsTest : public ::testing::Test
 {
-    /* clang-format off */
-    mkl_set_interface_layer(@_mkl_interface_layer_@);
-    mkl_set_threading_layer(@_mkl_threading_layer_@);
-    /* clang-format on */
-}
+   protected:
+    CDiagEriRecFactsTest() {};
 
-#endif /* ConfigMKL_hpp */
+    virtual ~CDiagEriRecFactsTest() {};
+};
+
+#endif /* DiagEriRecFactsTest_hpp */

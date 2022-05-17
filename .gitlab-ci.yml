@@ -26,13 +26,16 @@
 stages:
   - build
   - test
+  - deploy
 
 .monkey:setup:
   tags:
     - vlx-docker
-  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-5e6dcd2
+  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-f51f706
   variables:
     OMP_NUM_THREADS: "6"
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
   before_script:
     - uname -a
     - free -m
@@ -76,8 +79,13 @@ monkey:python_tests:
     VLX_NUM_BUILD_JOBS: "6"
   script:
     - python -m pip install mpi4py --no-binary=mpi4py
-    - CC=gcc CXX=g++ python -m pip install cppe==0.2.1 MDAnalysis
+    - CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
     - python -m pip install .[test,qmmm]
     - python -c "import veloxchem; print(veloxchem.__version__)"
     - mpiexec -n 2 python -m pytest -v --pyargs veloxchem -m "solvers"
     - python -m pytest -v --cov=veloxchem --pyargs veloxchem
+
+include:
+  #- '.gitlab/windows-ci.yml'
+  - '.gitlab/cron-deploy.yml'
+  - '.gitlab/deploy.yml'

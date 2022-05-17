@@ -36,9 +36,6 @@
 
 #include <string>
 
-#ifdef ENABLE_MKL
-#include "ConfigMKL.hpp"
-#endif
 #include "Codata.hpp"
 #include "ErrorHandler.hpp"
 #include "MpiFunc.hpp"
@@ -69,12 +66,6 @@ get_mpi_comm(py::object py_comm)
 void
 export_general(py::module& m)
 {
-    // configure MKL single dynamic library
-
-#ifdef ENABLE_MKL
-    configure_mkl_rt();
-#endif
-
     // initialize mpi4py's C-API
 
     if (import_mpi4py() < 0)

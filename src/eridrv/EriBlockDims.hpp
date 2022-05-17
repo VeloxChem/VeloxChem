@@ -31,11 +31,11 @@
 namespace eridims { // eridims namespace
 
     /**
-     Gets batch size of electron repulsion integrals.
+     Gets diagonal batch size of electron repulsion integrals.
 
      @return the number of contracted integrals in batch.
      */
-    int32_t getBatchSize();
+    int32_t getDiagBatchSize();
 
 } // eridims namespace
 

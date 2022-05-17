@@ -48,6 +48,7 @@
 #include "Molecule.hpp"
 #include "SADGuessDriver.hpp"
 #include "StringFormat.hpp"
+#include "PackedGtoPairContainer.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -416,6 +417,13 @@ export_orbdata(py::module& m)
     PyClass<CSADGuessDriver>(m, "SADGuessDriver")
         .def(py::init(&vlx_general::create<CSADGuessDriver>), "comm"_a = py::none())
         .def("compute", &CSADGuessDriver::compute, "Computes SAD initial guess.", "molecule"_a, "basis_1"_a, "basis_2"_a, "densityType"_a);
+    
+    // CPackedGtoPairContainer class
+
+    PyClass<CPackedGtoPairContainer<double, mem::Host>>(m, "PackedGtoPairContainer")
+        .def(py::init<>())
+        .def(py::init<const CPackedGtoPairContainer<double, mem::Host>&>())
+        .def("summary", &CPackedGtoPairContainer<double, mem::Host>::printSummary);
 
     // exposing functions
 

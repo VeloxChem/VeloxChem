@@ -85,6 +85,7 @@ class InputParser:
                 # remove comment and extra space
                 line = line.strip()
                 line = re.sub(r'!.*', '', line)
+                line = re.sub(r'#.*', '', line)
                 line = ' '.join(line.split())
 
                 # skip empty line

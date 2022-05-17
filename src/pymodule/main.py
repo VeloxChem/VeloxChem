@@ -25,6 +25,7 @@
 
 from mpi4py import MPI
 from datetime import datetime, timedelta
+import time as tm
 
 from .veloxchemlib import mpi_initialized, mpi_master
 from .mpitask import MpiTask
@@ -55,10 +56,10 @@ from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
 from .xtbhessiandriver import XTBHessianDriver
+from .veloxchemlib import DiagEriDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_end_time
-
 
 def select_scf_driver(task, scf_type):
     """
@@ -497,6 +498,15 @@ def main():
             chg_drv.compute(task.molecule, task.ao_basis, 'resp')
         elif task_type == 'esp charges':
             chg_drv.compute(task.molecule, task.ao_basis, 'esp')
+            
+    # Test of electron repulstion integrals
+    
+    if task_type == 'eritest':
+        print('*** Testing Two Electron Implementation ***')
+        tm0 = tm.time()
+        eri_driver = DiagEriDriver()
+        pgblock = eri_driver.compute(task.molecule, task.ao_basis)
+        print('Diagonal Eri Driver: ', tm.time() - tm0, ' sec.')
 
     # All done
 

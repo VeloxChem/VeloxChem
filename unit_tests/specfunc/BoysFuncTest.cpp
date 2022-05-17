@@ -28,10 +28,10 @@
 #include "BoysFunc.hpp"
 #include "CheckFunctions.hpp"
 
-BufferHostX<double>
+BufferHostXd
 CBoysFuncTest::getSmallArguments() const
 {
-    BufferHostX<double> mat(15);
+    BufferHostXd mat(15);
 
     double f = 0.0;
 
@@ -45,10 +45,10 @@ CBoysFuncTest::getSmallArguments() const
     return mat;
 }
 
-BufferHostX<double>
+BufferHostXd
 CBoysFuncTest::getMediumArguments() const
 {
-    BufferHostX<double> mat(15);
+    BufferHostXd mat(15);
 
     double f = 9.2;
 
@@ -62,10 +62,10 @@ CBoysFuncTest::getMediumArguments() const
     return mat;
 }
 
-BufferHostX<double>
+BufferHostXd
 CBoysFuncTest::getLargeArguments() const
 {
-    BufferHostX<double> mat(15);
+    BufferHostXd mat(15);
 
     double f = 5.27;
 
@@ -85,7 +85,7 @@ TEST_F(CBoysFuncTest, BoysFunctionSmallArgumentOrder4)
 
     auto argv = getSmallArguments();
 
-    BufferHostXY<double> vals(5, 15);
+    BufferHostXYd vals(5, 15);
 
     bf.compute(vals, argv);
 
@@ -186,7 +186,7 @@ TEST_F(CBoysFuncTest, BoysFunctionMediumArgumentOrder4)
 
     auto argv = getMediumArguments();
 
-    BufferHostXY<double> vals(5, 15);
+    BufferHostXYd vals(5, 15);
 
     bf.compute(vals, argv);
 
@@ -287,7 +287,7 @@ TEST_F(CBoysFuncTest, BoysFunctionLargeArgumentOrder4)
 
     auto argv = getLargeArguments();
 
-    BufferHostXY<double> vals(5, 15);
+    BufferHostXYd vals(5, 15);
 
     bf.compute(vals, argv);
 
@@ -388,7 +388,7 @@ TEST_F(CBoysFuncTest, BoysFunctionSmallArgumentOrder6)
 
     auto argv = getSmallArguments();
 
-    BufferHostXY<double> vals(7, 15);
+    BufferHostXYd vals(7, 15);
 
     bf.compute(vals, argv);
 
@@ -525,7 +525,7 @@ TEST_F(CBoysFuncTest, BoysFunctionMediumArgumentOrder6)
 
     auto argv = getMediumArguments();
 
-    BufferHostXY<double> vals(7, 15);
+    BufferHostXYd vals(7, 15);
 
     bf.compute(vals, argv);
 
@@ -662,7 +662,7 @@ TEST_F(CBoysFuncTest, BoysFunctionLargeArgumentOrder6)
 
     auto argv = getLargeArguments();
 
-    BufferHostXY<double> vals(7, 15);
+    BufferHostXYd vals(7, 15);
 
     bf.compute(vals, argv);
 
@@ -799,7 +799,7 @@ TEST_F(CBoysFuncTest, BoysFunctionSmallArgumentOrder10)
 
     auto argv = getSmallArguments();
 
-    BufferHostXY<double> vals(11, 15);
+    BufferHostXYd vals(11, 15);
 
     bf.compute(vals, argv);
 
@@ -1008,7 +1008,7 @@ TEST_F(CBoysFuncTest, BoysFunctionMediumArgumentOrder10)
 
     auto argv = getMediumArguments();
 
-    BufferHostXY<double> vals(11, 15);
+    BufferHostXYd vals(11, 15);
 
     bf.compute(vals, argv);
 
@@ -1217,7 +1217,7 @@ TEST_F(CBoysFuncTest, BoysFunctionLargeArgumentOrder10)
 
     auto argv = getLargeArguments();
 
-    BufferHostXY<double> vals(11, 15);
+    BufferHostXYd vals(11, 15);
 
     bf.compute(vals, argv);
 
@@ -1426,7 +1426,7 @@ TEST_F(CBoysFuncTest, BoysFunctionSmallArgumentOrder14)
 
     auto argv = getSmallArguments();
 
-    BufferHostXY<double> vals(15, 15);
+    BufferHostXYd vals(15, 15);
 
     bf.compute(vals, argv);
 
@@ -1707,7 +1707,7 @@ TEST_F(CBoysFuncTest, BoysFunctionMediumArgumentOrder14)
 
     auto argv = getMediumArguments();
 
-    BufferHostXY<double> vals(15, 15);
+    BufferHostXYd vals(15, 15);
 
     bf.compute(vals, argv);
 
@@ -1988,7 +1988,7 @@ TEST_F(CBoysFuncTest, BoysFunctionLargeArgumentOrder14)
 
     auto argv = getLargeArguments();
 
-    BufferHostXY<double> vals(15, 15);
+    BufferHostXYd vals(15, 15);
 
     bf.compute(vals, argv);
 
@@ -2269,7 +2269,7 @@ TEST_F(CBoysFuncTest, BoysFunctionSmallArgumentOrder18)
 
     auto argv = getSmallArguments();
 
-    BufferHostXY<double> vals(19, 15);
+    BufferHostXYd vals(19, 15);
 
     bf.compute(vals, argv);
 
@@ -2622,7 +2622,7 @@ TEST_F(CBoysFuncTest, BoysFunctionMediumArgumentOrder18)
 
     auto argv = getMediumArguments();
 
-    BufferHostXY<double> vals(19, 15);
+    BufferHostXYd vals(19, 15);
 
     bf.compute(vals, argv);
 
@@ -2975,7 +2975,7 @@ TEST_F(CBoysFuncTest, BoysFunctionLargeArgumentOrder18)
 
     auto argv = getLargeArguments();
 
-    BufferHostXY<double> vals(19, 15);
+    BufferHostXYd vals(19, 15);
 
     bf.compute(vals, argv);
 
@@ -3328,7 +3328,7 @@ TEST_F(CBoysFuncTest, BoysFunctionSmallArgumentOrder22)
 
     auto argv = getSmallArguments();
 
-    BufferHostXY<double> vals(23, 15);
+    BufferHostXYd vals(23, 15);
 
     bf.compute(vals, argv);
 
@@ -3753,7 +3753,7 @@ TEST_F(CBoysFuncTest, BoysFunctionMediumArgumentOrder22)
 
     auto argv = getMediumArguments();
 
-    BufferHostXY<double> vals(23, 15);
+    BufferHostXYd vals(23, 15);
 
     bf.compute(vals, argv);
 
@@ -4178,7 +4178,7 @@ TEST_F(CBoysFuncTest, BoysFunctionLargeArgumentOrder22)
 
     auto argv = getLargeArguments();
 
-    BufferHostXY<double> vals(23, 15);
+    BufferHostXYd vals(23, 15);
 
     bf.compute(vals, argv);
 
@@ -4603,7 +4603,7 @@ TEST_F(CBoysFuncTest, BoysFunctionSmallArgumentOrder26)
 
     auto argv = getSmallArguments();
 
-    BufferHostXY<double> vals(27, 15);
+    BufferHostXYd vals(27, 15);
 
     bf.compute(vals, argv);
 
@@ -5100,7 +5100,7 @@ TEST_F(CBoysFuncTest, BoysFunctionMediumArgumentOrder26)
 
     auto argv = getMediumArguments();
 
-    BufferHostXY<double> vals(27, 15);
+    BufferHostXYd vals(27, 15);
 
     bf.compute(vals, argv);
 
@@ -5597,7 +5597,7 @@ TEST_F(CBoysFuncTest, BoysFunctionLargeArgumentOrder26)
 
     auto argv = getLargeArguments();
 
-    BufferHostXY<double> vals(27, 15);
+    BufferHostXYd vals(27, 15);
 
     bf.compute(vals, argv);
 

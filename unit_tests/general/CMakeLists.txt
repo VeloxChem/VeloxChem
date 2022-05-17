@@ -1,0 +1,15 @@
+target_sources(utests
+  PRIVATE
+    CBufferTest.cpp
+    CodataTest.cpp
+    ErrorHandlerTest.cpp
+    FourIndexesTest.cpp
+    MemAllocTest.cpp
+    MemBlock2DTest.cpp
+    MemBlockTest.cpp
+    MpiFuncTest.cpp
+    OMPTasksTest.cpp
+    StringFormatTest.cpp
+    ThreeIndexesTest.cpp
+    TwoIndexesTest.cpp
+  )

@@ -28,6 +28,7 @@
 
 #include <array>
 #include <cstdint>
+#include <type_traits>
 
 #include "Buffer.hpp"
 #include "MathConst.hpp"
@@ -49,7 +50,7 @@ class CBoysFunc
      The vector of Boys function recursion parameters for arguments between
      0.0-12.0.
      */
-    std::array<std::array<T, 7>, 121> _table;
+    std::array<std::array<double, 7>, 121> _table;
 
    public:
     /**
@@ -3709,77 +3710,187 @@ void
 CBoysFunc<T, N>::compute(      BufferHostXY<T>& values,
                          const BufferHostX<T>&  arguments) const
 {
-    const auto fpi = static_cast<T>(0.5 * std::sqrt(mathconst::getPiValue()));
-
-    const std::array<T, 28> ft{1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0, 1.0 / 17.0, 1.0 / 19.0,
-                               1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0, 1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0,
-                               1.0 / 41.0, 1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0, 1.0 / 51.0, 1.0 / 53.0, 1.0 / 55.0};
+    // double implementation
     
-    const auto nargs = static_cast<int32_t>((arguments.getMDSpan()).extent(0));
-
-    for (int32_t i = 0; i < nargs; i++)
+    if constexpr (std::is_same<T, double>::value)
     {
-        int32_t pnt = (arguments(i) > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * arguments(i) + 0.5);
+        const double fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
-        if (pnt < 121)
+        const std::array<double, 28> ft{1.0,
+                                        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,
+                                        1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0,
+                                        1.0 / 15.0, 1.0 / 17.0, 1.0 / 19.0,
+                                        1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0,
+                                        1.0 / 27.0, 1.0 / 29.0, 1.0 / 31.0,
+                                        1.0 / 33.0, 1.0 / 35.0, 1.0 / 37.0,
+                                        1.0 / 39.0, 1.0 / 41.0, 1.0 / 43.0,
+                                        1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0,
+                                        1.0 / 51.0, 1.0 / 53.0, 1.0 / 55.0};
+    
+        const int32_t nargs = static_cast<int32_t>((arguments.getMDSpan()).extent(0));
+
+        for (int32_t i = 0; i < nargs; i++)
         {
-            const auto fa = arguments(i);
+            int32_t pnt = (arguments(i) > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * arguments(i) + 0.5);
 
-            const T w = fa - 0.1 * pnt;
-
-            const auto w2 = w * w;
-
-            const auto w4 = w2 * w2;
-
-            values(N, i) = _table[pnt][0] + _table[pnt][1] * w + _table[pnt][2] * w2 + _table[pnt][3] * w2 * w
-
-                         + _table[pnt][4] * w4 + _table[pnt][5] * w4 * w + _table[pnt][6] * w4 * w2;
-
-            const auto f2a = fa + fa;
-
-            const auto fx = std::exp(-fa);
-
-            for (int32_t j = 0; j < N; j++)
+            if (pnt < 121)
             {
-                values(N - j - 1, i) = ft[N - j - 1] * (f2a * values(N - j, i) + fx);
-            }
-        }
-        else
-        {
-            const auto fia = 1.0 / arguments(i);
+                const double fa = arguments(i);
 
-            auto pf = 0.5 * fia;
+                const double w = fa - 0.1 * pnt;
 
-            values(0, i) = fpi * std::sqrt(fia);
+                const double w2 = w * w;
 
-            if (pnt < 921)
-            {
-                const auto fia2 = fia * fia;
+                const double w4 = w2 * w2;
 
-                const auto f = 0.4999489092 * fia - 0.2473631686 * fia2
+                values(N, i) = _table[pnt][0] + _table[pnt][1] * w + _table[pnt][2] * w2 + _table[pnt][3] * w2 * w
 
-                             + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                             + _table[pnt][4] * w4 + _table[pnt][5] * w4 * w + _table[pnt][6] * w4 * w2;
 
-                const auto fx = std::exp(-arguments(i));
+                const double f2a = fa + fa;
 
-                values(0, i) -= f * fx;
+                const double fx = std::exp(-fa);
 
-                double rterm = pf * fx;
-
-                for (int32_t j = 1; j <= N; j++)
+                for (int32_t j = 0; j < N; j++)
                 {
-                    values(j, i) = pf * values(j -1, i) - rterm;
-
-                    pf += fia;
+                    values(N - j - 1, i) = ft[N - j - 1] * (f2a * values(N - j, i) + fx);
                 }
             }
             else
             {
-                for (int32_t j = 1; j <= N; j++)
-                {
-                    values(j, i) = pf * values(j -1, i);
+                const double fia = 1.0 / arguments(i);
 
-                    pf += fia;
+                double pf = 0.5 * fia;
+
+                values(0, i) = fpi * std::sqrt(fia);
+
+                if (pnt < 921)
+                {
+                    const double fia2 = fia * fia;
+
+                    const double f = 0.4999489092 * fia - 0.2473631686 * fia2
+
+                                   + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+
+                    const double fx = std::exp(-arguments(i));
+
+                    values(0, i) -= f * fx;
+
+                    double rterm = pf * fx;
+
+                    for (int32_t j = 1; j <= N; j++)
+                    {
+                        values(j, i) = pf * values(j -1, i) - rterm;
+
+                        pf += fia;
+                    }
+                }
+                else
+                {
+                    for (int32_t j = 1; j <= N; j++)
+                    {
+                        values(j, i) = pf * values(j -1, i);
+
+                        pf += fia;
+                    }
+                }
+            }
+        }
+    }
+    
+    // float implementation
+    
+    if constexpr (std::is_same<T, float>::value)
+    {
+        const float fpi = 0.5f * std::sqrt(static_cast<float>(mathconst::getPiValue()));
+
+        const std::array<float, 28> ft{1.0f,
+                                       1.0f / 3.0f,  1.0f / 5.0f,  1.0f / 7.0f,
+                                       1.0f / 9.0f,  1.0f / 11.0f, 1.0f / 13.0f,
+                                       1.0f / 15.0f, 1.0f / 17.0f, 1.0f / 19.0f,
+                                       1.0f / 21.0f, 1.0f / 23.0f, 1.0f / 25.0f,
+                                       1.0f / 27.0f, 1.0f / 29.0f, 1.0f / 31.0f,
+                                       1.0f / 33.0f, 1.0f / 35.0f, 1.0f / 37.0f,
+                                       1.0f / 39.0f, 1.0f / 41.0f, 1.0f / 43.0f,
+                                       1.0f / 45.0f, 1.0f / 47.0f, 1.0f / 49.0f,
+                                       1.0f / 51.0f, 1.0f / 53.0f, 1.0f / 55.0f};
+    
+        const int32_t nargs = static_cast<int32_t>((arguments.getMDSpan()).extent(0));
+
+        for (int32_t i = 0; i < nargs; i++)
+        {
+            int32_t pnt = (arguments(i) > 100000.0f) ? 1000000 : static_cast<int32_t>(10.0f * arguments(i) + 0.5f);
+
+            if (pnt < 121)
+            {
+                const float fa = arguments(i);
+
+                const float w = fa - 0.1f * pnt;
+
+                const float w2 = w * w;
+
+                const float w4 = w2 * w2;
+
+                values(N, i) = static_cast<float>(_table[pnt][0])
+                            
+                             + static_cast<float>(_table[pnt][1]) * w
+                
+                             + static_cast<float>(_table[pnt][2]) * w2
+                
+                             + static_cast<float>(_table[pnt][3]) * w2 * w
+
+                             + static_cast<float>(_table[pnt][4]) * w4
+                
+                             + static_cast<float>(_table[pnt][5]) * w4 * w
+                
+                             + static_cast<float>(_table[pnt][6]) * w4 * w2;
+
+                const float f2a = fa + fa;
+
+                const float fx = std::exp(-fa);
+
+                for (int32_t j = 0; j < N; j++)
+                {
+                    values(N - j - 1, i) = ft[N - j - 1] * (f2a * values(N - j, i) + fx);
+                }
+            }
+            else
+            {
+                const float fia = 1.0f / arguments(i);
+
+                float pf = 0.5f * fia;
+
+                values(0, i) = fpi * std::sqrt(fia);
+
+                if (pnt < 921)
+                {
+                    const float fia2 = fia * fia;
+
+                    const float f = 0.4999489092f * fia - 0.2473631686f * fia2
+
+                                   + 0.3211809090f * fia2 * fia - 0.3811559346f * fia2 * fia2;
+
+                    const float fx = std::exp(-arguments(i));
+
+                    values(0, i) -= f * fx;
+
+                    float rterm = pf * fx;
+
+                    for (int32_t j = 1; j <= N; j++)
+                    {
+                        values(j, i) = pf * values(j -1, i) - rterm;
+
+                        pf += fia;
+                    }
+                }
+                else
+                {
+                    for (int32_t j = 1; j <= N; j++)
+                    {
+                        values(j, i) = pf * values(j -1, i);
+
+                        pf += fia;
+                    }
                 }
             }
         }
