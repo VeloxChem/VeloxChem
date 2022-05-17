@@ -72,9 +72,9 @@ namespace vxcfuncs {  // vxcfuncs namespace
 
         auto gradb = densityGrid.betaDensityGradient(0);
 
-        auto taua = densityGrid.alphaDensityLaplacian(0);
+        auto taua = densityGrid.alphaDensitytau(0);
 
-        auto taub = densityGrid.betaDensityLaplacian(0);
+        auto taub = densityGrid.betaDensitytau(0);
 
         // set up pointers to functional data
 

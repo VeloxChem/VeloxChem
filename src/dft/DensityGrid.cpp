@@ -225,9 +225,9 @@ CDensityGrid::updateBetaDensities()
 
             auto gradb_z = betaDensityGradientZ(i);
 
-            auto lapa = alphaDensityLaplacian(i);
+            auto taua = alphaDensitytau(i);
 
-            auto lapb = betaDensityLaplacian(i);
+            auto taub = betaDensitytau(i);
 
             #pragma omp simd aligned(rhoa, rhob, grada_x, gradb_x, grada_y, gradb_y, grada_z, gradb_z : VLX_ALIGN)
             for (int32_t j = 0; j < ngpoints; j++)
@@ -236,7 +236,7 @@ CDensityGrid::updateBetaDensities()
 
                 gradb_x[j] = grada_x[j];
                 gradb_y[j] = grada_y[j];
-                gradb_z[j] = grada_z[j], lapb[j] = lapa[j];
+                gradb_z[j] = grada_z[j], taub[j] = taua[j];
             }
         }
     }
@@ -596,7 +596,7 @@ CDensityGrid::betaDensityGradientZ(const int32_t iDensityMatrix)
 }
 
 const double*
-CDensityGrid::alphaDensityLaplacian(const int32_t iDensityMatrix) const
+CDensityGrid::alphaDensitytau(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(11 * _nDensityMatrices + iDensityMatrix);
 
@@ -604,7 +604,7 @@ CDensityGrid::alphaDensityLaplacian(const int32_t iDensityMatrix) const
 }
 
 double*
-CDensityGrid::alphaDensityLaplacian(const int32_t iDensityMatrix)
+CDensityGrid::alphaDensitytau(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(11 * _nDensityMatrices + iDensityMatrix);
 
@@ -612,7 +612,7 @@ CDensityGrid::alphaDensityLaplacian(const int32_t iDensityMatrix)
 }
 
 const double*
-CDensityGrid::betaDensityLaplacian(const int32_t iDensityMatrix) const
+CDensityGrid::betaDensitytau(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(12 * _nDensityMatrices + iDensityMatrix);
 
@@ -620,7 +620,7 @@ CDensityGrid::betaDensityLaplacian(const int32_t iDensityMatrix) const
 }
 
 double*
-CDensityGrid::betaDensityLaplacian(const int32_t iDensityMatrix)
+CDensityGrid::betaDensitytau(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(12 * _nDensityMatrices + iDensityMatrix);
 
@@ -748,23 +748,23 @@ CDensityGrid::getScreenedGridsPair(CDensityGrid&   densityGridAB,
 
     // density screening for m-GGA
 
-    // set up pointers to source  Laplacian
+    // set up pointers to source  tau
 
-    auto slapa = alphaDensityLaplacian(iDensityMatrix);
+    auto staua = alphaDensitytau(iDensityMatrix);
 
-    auto slapb = betaDensityLaplacian(iDensityMatrix);
+    auto staub = betaDensitytau(iDensityMatrix);
 
-    // set up pointers to destination  Laplacian
+    // set up pointers to destination  tau
 
-    auto dlapa = densityGridAB.alphaDensityLaplacian(0);
+    auto dtaua = densityGridAB.alphaDensitytau(0);
 
-    auto dlapb = densityGridAB.betaDensityLaplacian(0);
+    auto dtaub = densityGridAB.betaDensitytau(0);
 
     if (xcFuncType == xcfun::mgga)
     {
         for (int32_t i = 0; i < npoints; i++)
         {
-            if (_isValidGridPointForMgga(srhoa[i], srhob[i], sgrada[i], sgradb[i], slapa[i], slapb[i], densityThreshold))
+            if (_isValidGridPointForMgga(srhoa[i], srhob[i], sgrada[i], sgradb[i], staua[i], staub[i], densityThreshold))
             {
                 drhoa[ipoints] = srhoa[i];
                 drhob[ipoints] = srhob[i];
@@ -781,8 +781,8 @@ CDensityGrid::getScreenedGridsPair(CDensityGrid&   densityGridAB,
                 dgradb_y[ipoints] = sgradb_y[i];
                 dgradb_z[ipoints] = sgradb_z[i];
 
-                dlapa[ipoints] = slapa[i];
-                dlapb[ipoints] = slapb[i];
+                dtaua[ipoints] = staua[i];
+                dtaub[ipoints] = staub[i];
 
                 ipoints++;
             }
@@ -1255,9 +1255,9 @@ CDensityGrid::getScreenedGrid(CMolecularGrid& molecularGridsAB,
         }
     }
 
-    auto taua = alphaDensityLaplacian(iDensityMatrix);
+    auto taua = alphaDensitytau(iDensityMatrix);
 
-    auto taub = betaDensityLaplacian(iDensityMatrix);
+    auto taub = betaDensitytau(iDensityMatrix);
 
     if (xcFuncType == xcfun::mgga)
     {

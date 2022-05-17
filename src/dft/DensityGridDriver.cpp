@@ -1019,7 +1019,7 @@ CDensityGridDriver::_distRestrictedDensityValuesForMgga(CDensityGrid*           
 
         auto gradaz = densityGrid->alphaDensityGradientZ(i);
 
-        auto lapa = densityGrid->alphaDensityLaplacian(i);
+        auto lapa = densityGrid->alphaDensitytau(i);
 
         // set up poiinter to density matrix data
 
