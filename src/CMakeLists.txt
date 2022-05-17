@@ -18,6 +18,21 @@ if(WIN32)
     )
 endif()
 
+# flags to prepend
+target_compile_options(vlxobjs
+  BEFORE
+  PRIVATE
+    "${VLX_CXX_FLAGS}"
+  PUBLIC
+    "${ARCH_FLAG}"
+  )
+
+# flags to append
+target_compile_options(vlxobjs
+  PRIVATE
+    "${EXTRA_CXXFLAGS}"
+  )
+
 # FIXME the includes should be relative to the source folder:
 # that is: #include "dft/AOKohnShamMatrix.hpp", rather than: #include "AOKohnShamMatrix.hpp"
 target_include_directories(vlxobjs

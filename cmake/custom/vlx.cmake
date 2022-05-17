@@ -6,6 +6,21 @@ find_package(MPI REQUIRED COMPONENTS CXX)
 
 find_package(OpenMP 4.5 REQUIRED COMPONENTS CXX)
 
+message(STATUS "Configuring a ${CMAKE_BUILD_TYPE} build")
+string(TOUPPER ${CMAKE_BUILD_TYPE} _cmake_build_type_upper)
+
+message(STATUS "C++ compiler flags")
+message(STATUS "   From environment       : ${CMAKE_CXX_FLAGS}")
+message(STATUS "   Build-type-specific    : ${CMAKE_CXX_FLAGS_${_cmake_build_type_upper}}")
+message(STATUS "   Vectorization flag     : ${ARCH_FLAG}")
+message(STATUS "   Project defaults       : ${VLX_CXX_FLAGS}")
+message(STATUS "   User-appended          : ${EXTRA_CXXFLAGS}")
+message(STATUS "   OpenMP parallelization : ${OpenMP_CXX_FLAGS}")
+
+# transform VLX_CXX_FLAGS and EXTRA_CXXFLAGS to ;-separated lists
+string(REPLACE " " ";" VLX_CXX_FLAGS ${VLX_CXX_FLAGS})
+string(REPLACE " " ";" EXTRA_CXXFLAGS ${EXTRA_CXXFLAGS})
+
 # figure out where to put the Python module
 if(NOT DEFINED PYMOD_INSTALL_FULLDIR)
   if(NOT WIN32)
