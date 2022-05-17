@@ -101,13 +101,15 @@ class SHGDriver(NonLinearSolver):
         self.a_components = 'xyz'
         self.b_components = 'xyz'
 
+        self.shg_mode = 'shg_red'
+
         # input keywords
         self.input_keywords['response'].update({
             'frequencies': ('seq_range', 'frequencies'),
             'damping': ('float', 'damping parameter'),
             'a_operator': ('str_lower', 'A operator'),
             'b_operator': ('str_lower', 'B operator'),
-            'c_operator': ('str_lower', 'C operator'),
+            'c_operator': ('str_lower', 'C operator')
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -554,18 +556,26 @@ class SHGDriver(NonLinearSolver):
             first_order_dens.append(D_z.real)
             first_order_dens.append(D_z.imag)
 
-            second_order_dens.append(D_sig_x.real)
-            second_order_dens.append(D_sig_x.imag)
-            second_order_dens.append(D_sig_y.real)
-            second_order_dens.append(D_sig_y.imag)
-            second_order_dens.append(D_sig_z.real)
-            second_order_dens.append(D_sig_z.imag)
-            second_order_dens.append(D_lam_xy.real)
-            second_order_dens.append(D_lam_xy.imag)
-            second_order_dens.append(D_lam_xz.real)
-            second_order_dens.append(D_lam_xz.imag)
-            second_order_dens.append(D_lam_yz.real)
-            second_order_dens.append(D_lam_yz.imag)
+            if self.shg_mode == 'shg_red':
+                second_order_dens.append(D_sig_x.real)
+                second_order_dens.append(D_sig_y.real)
+                second_order_dens.append(D_sig_z.real)
+                second_order_dens.append(D_lam_xy.real)
+                second_order_dens.append(D_lam_xz.real)
+                second_order_dens.append(D_lam_yz.real)
+            else:
+                second_order_dens.append(D_sig_x.real)
+                second_order_dens.append(D_sig_x.imag)
+                second_order_dens.append(D_sig_y.real)
+                second_order_dens.append(D_sig_y.imag)
+                second_order_dens.append(D_sig_z.real)
+                second_order_dens.append(D_sig_z.imag)
+                second_order_dens.append(D_lam_xy.real)
+                second_order_dens.append(D_lam_xy.imag)
+                second_order_dens.append(D_lam_xz.real)
+                second_order_dens.append(D_lam_xz.imag)
+                second_order_dens.append(D_lam_yz.real)
+                second_order_dens.append(D_lam_yz.imag)
 
         return first_order_dens, second_order_dens
 
@@ -632,9 +642,15 @@ class SHGDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                        dft_dict, first_order_dens,
-                                        second_order_dens, 'shg')
+        if self.shg_mode == 'shg_red':
+            dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real',
+                                            dft_dict, first_order_dens,
+                                        second_order_dens, self.shg_mode)
+        else:
+            dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                            dft_dict, first_order_dens,
+                                        second_order_dens, self.shg_mode)
+
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock

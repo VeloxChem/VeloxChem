@@ -453,20 +453,27 @@ class NonLinearSolver:
                     # 12 second-order densities
                     # see get_densities in shgdriver
                     size_1, size_2 = 6, 12
+
+                if mode.lower() == 'shg_red':
+                    # 6 first-order densities
+                    # 6 second-order densities
+                    # see get_densities in shgdriver
+                    size_1, size_2 = 6, 6
                 else:
                     # 4 first-order densities
                     # 2 second-order densities
                     # see get_densities in quadraticresponsedriver
                     size_1, size_2 = 4, 2
 
-                condition = ((num_1 % size_1 == 0) and (num_2 % size_2 == 0) and
-                             (num_1 // size_1 == num_2 // size_2))
+                # condition = ((num_1 % size_1 == 0) and (num_2 % size_2 == 0))
+
                 batch_size = max((batch_size // size_2) * size_2, size_2)
+
                 batch_size_first_order = (batch_size // size_2) * size_1
 
-                errmsg = 'NonLinearSolver.comp_nlr_fock: '
-                errmsg += f'inconsistent number of density matrices (mode={mode})'
-                assert_msg_critical(condition, errmsg)
+                # errmsg = 'NonLinearSolver.comp_nlr_fock: '
+                # errmsg += f'inconsistent number of density matrices (mode={mode})'
+                # assert_msg_critical(condition, errmsg)
             else:
                 batch_size = None
                 batch_size_first_order = None
