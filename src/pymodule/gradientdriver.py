@@ -167,6 +167,7 @@ class GradientDriver:
         """
 
         return
+
     def compute_numerical(self, molecule, *args):
         """
         Performs calculation of numerical gradient.

@@ -121,6 +121,7 @@ from .scfhessiandriver import ScfHessianDriver
 from .cphfsolver import CphfSolver
 from .tdhfhessiandriver import TdhfHessianDriver
 from .polarizabilitygradient import PolOrbitalResponse
+from .polarizabilitygradient import PolarizabilityGradient
 from .impes import ImpesCoordinates
 from .impes import ImpesDriver
 from .orbitalviewer import OrbitalViewer
