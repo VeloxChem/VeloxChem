@@ -101,7 +101,7 @@ class SHGDriver(NonLinearSolver):
         self.a_components = 'xyz'
         self.b_components = 'xyz'
 
-        self.shg_mode = 'shg_red'
+        self.shg_mode = ''
 
         # input keywords
         self.input_keywords['response'].update({
@@ -124,6 +124,10 @@ class SHGDriver(NonLinearSolver):
 
         if method_dict is None:
             method_dict = {}
+        
+        if rsp_dict['mode'] == 'reduced':
+            self.shg_mode = 'shg_red'
+
 
         super().update_settings(rsp_dict, method_dict)
 
