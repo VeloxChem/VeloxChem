@@ -46,7 +46,7 @@ def get_pyscf_integral_type(int_type):
             "nuclear_attraction"                            : "int1e_nuc",
             "electric_dipole"                               : "int1e_r",
             "electron_repulsion"                            : "int2e",
-            "electron_repulsion_erf"                        : "int2e_coulerf",
+            "electron_repulsion_erf"                        : "int2e", #_coulerf
             "overlap_derivative"                            : "int1e_ipovlp",
             "kinetic_energy_derivative"                     : "int1e_ipkin",
             "nuclear_attraction_derivative_operator"        : "int1e_iprinv",
@@ -140,7 +140,7 @@ def import_integral(molecule, basis, int_type, atom1, shell1,
                     atom2, shell2, atom3=None, shell3=None,
                     atom4=None, shell4=None, xi1=None, xi2=None,
                     chk_file=None, return_block=True, full_deriv=False,
-                    delta_h=1e-5):
+                    delta_h=1e-5, omega=None):
     """
     Imports integrals and integral derivatives from pyscf and converts 
     them to veloxchem format.
@@ -238,7 +238,7 @@ def import_integral(molecule, basis, int_type, atom1, shell1,
                         shell1=shell1, atom2=atom2, shell2=shell2,
                         chk_file=chk_file, return_block=return_block,
                         full_deriv=full_deriv)
-                
+
         else:
             if 'int2e' in pyscf_int_type:
                 return import_2e_integral_derivative(molecule, basis, int_type,
@@ -263,7 +263,7 @@ def import_integral(molecule, basis, int_type, atom1, shell1,
             return import_2e_integral(molecule, basis, int_type, atom1=atom1,
                        shell1=shell1, atom2=atom2, shell2=shell2, atom3=atom3,
                        shell3=shell3, atom4=atom4, shell4=shell4,
-                       chk_file=chk_file, return_block=return_block)
+                       chk_file=chk_file, return_block=return_block, omega=omega)
         else:
             return import_1e_integral(molecule, basis, int_type, atom1=atom1,
                        shell1=shell1, atom2=atom2, shell2=shell2,
@@ -392,7 +392,7 @@ def import_1e_integral(molecule, basis, int_type, atom1=1, shell1=None,
 def import_2e_integral(molecule, basis, int_type, atom1=1, shell1=None,
                        atom2=1, shell2=None, atom3=1, shell3=None,
                        atom4=1, shell4=None, chk_file=None,
-                       unit="au", return_block=True):
+                       unit="au", return_block=True, omega=None):
     """
     Imports two electron integrals from pyscf and converts to veloxchem format.
     Specific atoms and shells can be selected.
@@ -427,10 +427,12 @@ def import_2e_integral(molecule, basis, int_type, atom1=1, shell1=None,
         possible values: "au" (default), "Angstrom"
     :param return_block:
         return the matrix block, or the full matrix.
+    :param omega:
+        Error function parameter for range-separated Coulomb integrals.
 
 
     :return:
-        a numpy array corresponding to a specified block of 
+        a numpy array corresponding to a specified block of
         the selected two electron integral
     """
 
@@ -442,7 +444,11 @@ def import_2e_integral(molecule, basis, int_type, atom1=1, shell1=None,
 
     pyscf_int_type = get_pyscf_integral_type(int_type)
     sign = get_sign(pyscf_int_type)
-    pyscf_int = sign * pyscf_molecule.intor(pyscf_int_type, aosym='s1')
+    if 'erf' in int_type:
+        with pyscf_molecule.with_range_coulomb(omega):
+            pyscf_int = sign * pyscf_molecule.intor(pyscf_int_type, aosym='s1')
+    else:
+        pyscf_int = sign * pyscf_molecule.intor(pyscf_int_type, aosym='s1')
 
     nao = pyscf_molecule.nao
 
