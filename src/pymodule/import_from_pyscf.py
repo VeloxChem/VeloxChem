@@ -46,6 +46,7 @@ def get_pyscf_integral_type(int_type):
             "nuclear_attraction"                            : "int1e_nuc",
             "electric_dipole"                               : "int1e_r",
             "electron_repulsion"                            : "int2e",
+            "electron_repulsion_erf"                        : "int2e_coulerf",
             "overlap_derivative"                            : "int1e_ipovlp",
             "kinetic_energy_derivative"                     : "int1e_ipkin",
             "nuclear_attraction_derivative_operator"        : "int1e_iprinv",
