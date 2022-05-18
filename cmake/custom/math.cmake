@@ -29,9 +29,6 @@
 
 option_with_default(VLX_LA_VENDOR "Linear algebra library vendor" "Generic")
 
-# check_function_exists invocations will not print any output
-set(CMAKE_REQUIRED_QUIET ON)
-
 # we use the standard CMake FindLapack module
 # it will search for BLAS too
 # we set up the call by defining the BLA_VENDOR variable
@@ -132,6 +129,9 @@ elseif(VLX_LA_VENDOR STREQUAL "FLAME")
   include(FindPackageHandleStandardArgs)
   include(CheckCXXSymbolExists)
 
+  # check_* invocations will not print any output
+  set(CMAKE_REQUIRED_QUIET ON)
+
   list(APPEND _extaddlibdir ENV LD_LIBRARY_PATH "${CMAKE_C_IMPLICIT_LINK_DIRECTORIES}")
 
   # we would prefer the multithreaded version, if available
@@ -177,6 +177,8 @@ elseif(VLX_LA_VENDOR STREQUAL "FLAME")
   unset(_la_flame_library)
   unset(_la_flame_library_works)
 
+  set(CMAKE_REQUIRED_QUIET OFF)
+
   set(_check_cblas_and_lapacke FALSE)
 elseif(VLX_LA_VENDOR STREQUAL "Generic")
   find_package(LAPACK REQUIRED QUIET)
@@ -188,6 +190,9 @@ else()
   set(_check_cblas_and_lapacke TRUE)
 endif()
 
+# check_* invocations will not print any output
+set(CMAKE_REQUIRED_QUIET ON)
+
 # check that CBLAS works
 if(_check_cblas_and_lapacke)
   include(${CMAKE_CURRENT_LIST_DIR}/cblas-lapacke.cmake)
@@ -197,7 +202,13 @@ if(_check_cblas_and_lapacke)
   find_path(_include_dirs
     NAMES
       cblas.h
+    HINTS
+      ${CMAKE_PREFIX_PATH}/include
+    PATHS
+      ${BLAS_ROOT}/include
+      ${LAPACK_ROOT}/include
     )
+  list(APPEND _la_include_dirs ${_include_dirs})
 
   # is CBLAS bundled with the BLAS_LIBRARIES we found?
   set(_blas_libs)
@@ -215,8 +226,8 @@ if(_check_cblas_and_lapacke)
     ""
     "${_blas_libs}"
     ""
-    ""
-    ""
+    "${BLAS_ROOT};${LAPACK_ROOT}"
+    "lib"
     )
 
   if(NOT _la_cblas_bundled)
@@ -230,8 +241,8 @@ if(_check_cblas_and_lapacke)
       ""
       "cblas;${_blas_libs}"
       ""
-      ""
-      ""
+      "${BLAS_ROOT};${LAPACK_ROOT}"
+      "lib"
       )
 
     if(_la_cblas_library)
@@ -249,7 +260,13 @@ if(_check_cblas_and_lapacke)
   find_path(_include_dirs
     NAMES
       lapacke.h
+    HINTS
+      ${CMAKE_PREFIX_PATH}/include
+    PATHS
+      ${BLAS_ROOT}/include
+      ${LAPACK_ROOT}/include
     )
+  list(APPEND _la_include_dirs ${_include_dirs})
 
   # is LAPACKE bundled with the LAPACK_LIBRARIES we found?
   set(_lapack_libs)
@@ -267,8 +284,8 @@ if(_check_cblas_and_lapacke)
     ""
     "${_lapack_libs}"
     ""
-    ""
-    ""
+    "${BLAS_ROOT};${LAPACK_ROOT}"
+    "lib"
     )
 
   if(NOT _la_lapacke_bundled)
@@ -282,8 +299,8 @@ if(_check_cblas_and_lapacke)
       ""
       "lapacke;${_lapack_libs}"
       ""
-      ""
-      ""
+      "${BLAS_ROOT};${LAPACK_ROOT}"
+      "lib"
       )
 
     if(_la_lapacke_library)
@@ -318,6 +335,11 @@ if(BLAS_FOUND AND LAPACK_FOUND AND NOT TARGET Math::LA)
   endif()
 
   if(_la_include_dirs)
+    # not strictly necessary, but clean up duplicates
+    list(REMOVE_DUPLICATES _la_include_dirs)
+
+    message(STATUS "BLAS/LAPACK include directories: ${_la_include_dirs}")
+
     target_include_directories(Math::LA
       SYSTEM
       INTERFACE
