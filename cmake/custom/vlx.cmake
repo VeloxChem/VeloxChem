@@ -19,7 +19,9 @@ message(STATUS "   OpenMP parallelization : ${OpenMP_CXX_FLAGS}")
 
 # transform VLX_CXX_FLAGS and EXTRA_CXXFLAGS to ;-separated lists
 string(REPLACE " " ";" VLX_CXX_FLAGS ${VLX_CXX_FLAGS})
-string(REPLACE " " ";" EXTRA_CXXFLAGS ${EXTRA_CXXFLAGS})
+if(DEFINED EXTRA_CXXFLAGS)
+  string(REPLACE " " ";" EXTRA_CXXFLAGS ${EXTRA_CXXFLAGS})
+endif()
 
 # figure out where to put the Python module
 if(NOT DEFINED PYMOD_INSTALL_FULLDIR)
