@@ -101,7 +101,7 @@ class SHGDriver(NonLinearSolver):
         self.a_components = 'xyz'
         self.b_components = 'xyz'
 
-        self.shg_mode = ''
+        self.shg_type = 'full'
 
         # input keywords
         self.input_keywords['response'].update({
@@ -109,7 +109,8 @@ class SHGDriver(NonLinearSolver):
             'damping': ('float', 'damping parameter'),
             'a_operator': ('str_lower', 'A operator'),
             'b_operator': ('str_lower', 'B operator'),
-            'c_operator': ('str_lower', 'C operator')
+            'c_operator': ('str_lower', 'C operator'),
+            'shg_type': ('str_lower', 'full or reduced SHG calculation'),
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -124,10 +125,6 @@ class SHGDriver(NonLinearSolver):
 
         if method_dict is None:
             method_dict = {}
-        
-        if rsp_dict['mode'] == 'reduced':
-            self.shg_mode = 'shg_red'
-
 
         super().update_settings(rsp_dict, method_dict)
 
@@ -560,14 +557,14 @@ class SHGDriver(NonLinearSolver):
             first_order_dens.append(D_z.real)
             first_order_dens.append(D_z.imag)
 
-            if self.shg_mode == 'shg_red':
+            if self.shg_type == 'reduced':
                 second_order_dens.append(D_sig_x.real)
                 second_order_dens.append(D_sig_y.real)
                 second_order_dens.append(D_sig_z.real)
                 second_order_dens.append(D_lam_xy.real)
                 second_order_dens.append(D_lam_xz.real)
                 second_order_dens.append(D_lam_yz.real)
-            else:
+            elif self.shg_type == 'full':
                 second_order_dens.append(D_sig_x.real)
                 second_order_dens.append(D_sig_x.imag)
                 second_order_dens.append(D_sig_y.real)
@@ -646,14 +643,16 @@ class SHGDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        if self.shg_mode == 'shg_red':
+
+        if self.shg_type == 'reduced':
             dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real',
                                             dft_dict, first_order_dens,
-                                        second_order_dens, self.shg_mode)
-        else:
-            dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                            dft_dict, first_order_dens,
-                                        second_order_dens, self.shg_mode)
+                                            second_order_dens, 'shg_red')
+        elif self.shg_type == 'full':
+            dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis,
+                                            'real_and_imag', dft_dict,
+                                            first_order_dens, second_order_dens,
+                                            'shg')
 
         time_end_fock = time.time()
 
@@ -792,7 +791,10 @@ class SHGDriver(NonLinearSolver):
 
         self.ostream.print_blank()
 
-        title = 'SHG Driver Setup'
+        if self.shg_type == 'reduced':
+            title = 'SHG Driver (Reduced) Setup'
+        elif self.shg_type == 'full':
+            title = 'SHG Driver Setup'
         self.ostream.print_header(title)
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
