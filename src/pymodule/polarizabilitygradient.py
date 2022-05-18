@@ -142,8 +142,9 @@ class PolarizabilityGradient():
 
 
             # transform lambda multipliers to AO basis and calculate relaxed density matrix
-            lambda_ao = np.einsum('mi,xia,na->xmn', mo_occ, lambda_mo, mo_vir).reshape(dof, dof, nao, nao)
-            lambda_ao += lambda_ao.transpose(0,1,3,2)
+            lambda_ao = np.einsum('mi,xia,na->xmn', mo_occ, lambda_mo,
+                                  mo_vir).reshape(dof, dof, nao, nao) # occ-vir
+            lambda_ao += lambda_ao.transpose(0,1,3,2) # vir-occ
             rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
 
             # analytical polarizability gradient
@@ -160,18 +161,22 @@ class PolarizabilityGradient():
                 d_eri = eri_deriv(molecule, basis, i)
                 d_dipole = dipole_deriv(molecule, basis, i)
 
-                pol_gradient[:, :, i] += (   np.einsum('xymn,amn->xya', 2.0 * rel_dm_ao, d_fock)
+# NOTES:
+#  - Calculate omega in MO basis (do we get the same result?)
+#  - Do we have symmetrization, signs, and prefactors correct (compared to TDHF)?
+#  - Can we isolate the term with omega and overlap matrix a bit more? Is there a numerical way to get them?
+                pol_gradient[:, :, i] += ( np.einsum('xymn,amn->xya', 2.0 * rel_dm_ao, d_fock)
                                  +1.0 * np.einsum('xymn,amn->xya', 2.0 * omega_ao, d_ovlp)
-                                 +0.5 * np.einsum('xmn,ypt,atpmn->xya', xpy, xpy - xpy.transpose(0,2,1), d_eri)
-                                 -0.25 * np.einsum('xmn,ypt,atnmp->xya', xpy, xpy - xpy.transpose(0,2,1), d_eri)
-                                 +0.5 * np.einsum('xmn,ypt,atpmn->xya', xmy, xmy + xmy.transpose(0,2,1), d_eri)
-                                 -0.25 * np.einsum('xmn,ypt,atnmp->xya', xmy, xmy + xmy.transpose(0,2,1), d_eri)
-                                 +0.5 * np.einsum('xmn,ypt,atpmn->yxa', xpy, xpy - xpy.transpose(0,2,1), d_eri)
-                                 -0.25 * np.einsum('xmn,ypt,atnmp->yxa', xpy, xpy - xpy.transpose(0,2,1), d_eri)
-                                 +0.5 * np.einsum('xmn,ypt,atpmn->yxa', xmy, xmy + xmy.transpose(0,2,1), d_eri)
-                                 -0.25 * np.einsum('xmn,ypt,atnmp->yxa', xmy, xmy + xmy.transpose(0,2,1), d_eri)
-                                 +2.0 * np.einsum('xmn,yamn->xya', xmy, d_dipole)
-                                 +2.0 * np.einsum('xmn,yamn->yxa', xmy, d_dipole)
+                                 +1.0 * np.einsum('xmn,ypt,atpmn->xya', xpy, xpy - xpy.transpose(0,2,1), d_eri)
+                                 -0.5 * np.einsum('xmn,ypt,atnmp->xya', xpy, xpy - xpy.transpose(0,2,1), d_eri)
+                                 +1.0 * np.einsum('xmn,ypt,atpmn->xya', xmy, xmy + xmy.transpose(0,2,1), d_eri)
+                                 -0.5 * np.einsum('xmn,ypt,atnmp->xya', xmy, xmy + xmy.transpose(0,2,1), d_eri)
+                                 +1.0 * np.einsum('xmn,ypt,atpmn->yxa', xpy, xpy - xpy.transpose(0,2,1), d_eri)
+                                 -0.5 * np.einsum('xmn,ypt,atnmp->yxa', xpy, xpy - xpy.transpose(0,2,1), d_eri)
+                                 +1.0 * np.einsum('xmn,ypt,atpmn->yxa', xmy, xmy + xmy.transpose(0,2,1), d_eri)
+                                 -0.5 * np.einsum('xmn,ypt,atnmp->yxa', xmy, xmy + xmy.transpose(0,2,1), d_eri)
+                                 -2.0 * np.einsum('xmn,yamn->xya', xmy, d_dipole)
+                                 -2.0 * np.einsum('xmn,yamn->yxa', xmy, d_dipole)
                                 )
 
             self.pol_gradient = pol_gradient.reshape(dof, dof, 3 * natm)
@@ -533,37 +538,22 @@ class PolOrbitalResponse(CphfSolver):
         else:
             return {}
 
-# NOTES:
-#   - epsilon_dm_ao not returned from cphfsolver, to be calculated inside compute_omega
-#   - fock_ao_rhs and fock_gxc_ao come from cphfsolver dictionary
-#   - fock_lambda not returned yet, put in dictionary from cphfsolver (otherwise needs to be recalculated)
-# TODO: pass only lr_results and scf_tensors;
-# save dictionary with rhs and cphf_coefficients in self
+    # NOTES:
+    #   - epsilon_dm_ao not returned from cphfsolver, to be calculated inside compute_omega
+    #   - fock_ao_rhs and fock_gxc_ao come from cphfsolver dictionary
+    #   - fock_lambda not returned yet, put in dictionary from cphfsolver (otherwise needs to be recalculated)
     def compute_omega(self, molecule, basis, scf_tensors, lr_results):
-#    def compute_omega(self, ovlp, mo_occ, mo_vir, epsilon_dm_ao, lr_results,
-#                      fock_ao_rhs, fock_lambda, fock_gxc_ao):
         """
         Calculates the polarizability Lagrange multipliers for the overlap matrix.
 
-        :param ovlp:
-            The overlap matrix.
-        :param mo_occ:
-            The occupied MO coefficients.
-        :param mo_vir:
-            The virtual MO coefficients.
-        :param epsilon_dm_ao:
-            The energy-weighted relaxed density matrix.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
         :param lr_results:
             The results from the linear response calculation.
-        :param fock_ao_rhs:
-            The AOFockMatrix from the right-hand side of the orbital response eq.
-        :param fock_lambda:
-            The Fock matrix from Lagrange multipliers.
-        :param fock_gxc_ao:
-            The AOFockMatrix from the E[3] xc contribution (None if not DFT).
-
-        :return:
-            a numpy array containing the Lagrange multipliers in AO basis.
         """
 
         # ERI information
@@ -760,14 +750,14 @@ class PolOrbitalResponse(CphfSolver):
                         0.5 * fock_ao_rhs.alpha_to_numpy(m*dof+n))
                 # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2), (2,0), (2,1), (2,2) * dof gamma_{zx} =
 
-                omega_1pdm_2pdm_contribs = 0.5 * (
+                omega_1pdm_2pdm_contribs = 0.5 * ( 1 *(
                     np.linalg.multi_dot([D_vir, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir])
                   + np.linalg.multi_dot([D_occ, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir])
                   + np.linalg.multi_dot([D_occ, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir]).T
-                  + np.linalg.multi_dot([D_occ, Fp1_oo + Fm1_oo - Fp2_oo + Fm2_oo, D_occ])
+                  + np.linalg.multi_dot([D_occ, Fp1_oo + Fm1_oo - Fp2_oo + Fm2_oo, D_occ]))
                   + 2 * np.linalg.multi_dot([D_occ, fmat, D_occ]))
 
-                omega[m*dof+n] = -epsilon_dm_ao - omega_1pdm_2pdm_contribs + dipole_ints_contrib_ao[m,n]
+                omega[m*dof+n] = -1.0 * epsilon_dm_ao - omega_1pdm_2pdm_contribs + 1.0 *  dipole_ints_contrib_ao[m,n]
 
         # add omega multipliers in AO basis to cphf_results dictionary
         self.cphf_results['omega_ao'] = omega
