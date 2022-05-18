@@ -548,7 +548,7 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
                 }
             }
         }
-        else
+        if (fstr::upcase(quadMode) == "QRF")
         {
             for (int32_t j = 0; j < numdens / 2; j++)
             {
@@ -2117,7 +2117,7 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
                 }
             }
         }
-        else
+        if (fstr::upcase(quadMode) == "QRF")
         {
             for (int32_t j = 0; j < numdens / 2; j++)
             {

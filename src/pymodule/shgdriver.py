@@ -309,12 +309,6 @@ class SHGDriver(NonLinearSolver):
             self.ostream.print_header(w_str.ljust(width))
             self.ostream.print_blank()
 
-            w_str = 'Note: beta(vec)_i is the i-component of the projection of the '
-            self.ostream.print_header(w_str.ljust(width))
-            w_str = 'first hyperpolarizability tensor along the dipole moment.'
-            self.ostream.print_header(w_str.ljust(width))
-            self.ostream.print_blank()
-
             beta_bar = {}
             for freq in beta:
                 beta_bar[freq] = 0.0

@@ -460,7 +460,7 @@ class NonLinearSolver:
                     # see get_densities in shgdriver
                     size_1, size_2 = 6, 6
 
-                else:
+                elif mode.lower() == 'qrf':
                     # 4 first-order densities
                     # 2 second-order densities
                     # see get_densities in quadraticresponsedriver
