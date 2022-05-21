@@ -27,8 +27,8 @@
 
 # Compiler flags
 
-CXX_REL_FLG += -std=c++11 -O3 -Wall
-CXX_DEB_FLG += -std=c++11 -O3 -Wall -g
+CXX_REL_FLG += -std=c++17 -O3 -Wall
+CXX_DEB_FLG += -std=c++17 -O3 -Wall -g
 
 # Preprocessor flags
 

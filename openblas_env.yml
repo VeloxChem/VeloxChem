@@ -1,17 +1,22 @@
+name: vlxenv
 channels:
   - conda-forge
-  - defaults
 dependencies:
   - cxx-compiler
-  - geometric
-  - MDAnalysis
-  - h5py
-  - numpy
+  - mpich
   - openblas=*=*openmp*
+  - mpi4py
+  - numpy
+  - h5py
   - pip
-  - psutil
   - pybind11>=2.6
+  - python>=3.7
+  - psutil
   - pytest
-  - python>=3.6
-  - pip:
-    - loprop
+  - mdanalysis
+  - openmm
+  - scipy
+  - gtest
+  - cppe
+  - xtb
+  - veloxchem::geometric

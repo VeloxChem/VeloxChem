@@ -38,8 +38,10 @@
 #include "MolecularGrid.hpp"
 #include "XCGradientGrid.hpp"
 #include "XCHessianGrid.hpp"
+#include "XCCubicHessianGrid.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "DensityGrid.hpp"
+#include "DensityGridQuad.hpp"
 #include "GtoContainer.hpp"
 #include "AOFockMatrix.hpp"
 #include "MemBlock.hpp"
@@ -156,7 +158,27 @@ class CXCIntegrator
                                            const CXCHessianGrid&    xcHessianGrid,
                                            const CDensityGrid&      rwDensityGrid,
                                            const CMolecularGrid&    molecularGrid) const;
-    
+   /**
+     Computes exchange-correlation contribution to perturbed Kohn-Sham matrix for spin-restricted LDA case.
+
+     @param aoKohnShamMatrix the spin-restricted exchange-correlation contribution to perturbed Kohn-Sham matrix.
+     @param gtoContainer the container of GTOs blocks.
+     @param xcHessianGrid the exchange-correlation functional hessian grid.
+     @param xcCubicHessianGrid the exchange-correlation functional cubic hessian grid.
+     @param rwDensityGrid the products of perturbed one-time transformed densities evaluated on the grid.
+     @param rw2DensityGrid the two-time transformed densities evaluated on the grid.
+     @param molecularGrid the molecular grid.
+     @param quadMode a string that specifies which densities should be combined.
+     */
+    void _compRestrictedContributionForLda(      CAOKohnShamMatrix&   aoKohnShamMatrix,
+                                           const CGtoContainer*       gtoContainer,
+                                           const CXCHessianGrid&      xcHessianGrid,
+                                           const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                           const CDensityGridQuad&    rwDensityGrid,
+                                           const CDensityGrid&        rw2DensityGrid,
+                                           const CMolecularGrid&      molecularGrid,
+                                           const std::string&         quadMode) const;
+
     /**
      Computes exchange-correlation contribution to Kohn-Sham matrix for spin-unrestricted LDA case.
         
@@ -221,6 +243,29 @@ class CXCIntegrator
                                            const CDensityGrid&      rwDensityGrid,
                                            const CMolecularGrid&    molecularGrid) const;
     
+   /**
+     Computes exchange-correlation contribution to perturbed Kohn-Sham matrix for spin-restricted GGA case.
+     
+     @param aoKohnShamMatrix the spin-restricted exchange-correlation contribution to perturbed Kohn-Sham matrix.
+     @param gtoContainer the container of GTOs blocks.
+     @param xcGradientGrid the exchange-correlation functional gradient grid.
+     @param xcHessianGrid the exchange-correlation functional hessian grid.
+     @param xcCubicHessianGrid the exchange-correlation functional cubic hessian grid.
+     @param gsDensityGrid the ground state density grid.
+     @param rwDensityGrid the products of perturbed one-time transformed densities evaluated on the grid.
+     @param rw2DensityGrid the two-time transformed densities evaluated on the grid.
+     @param molecularGrid the molecular grid.
+     */
+    void _compRestrictedContributionForGga(      CAOKohnShamMatrix&   aoKohnShamMatrix,
+                                           const CGtoContainer*       gtoContainer,
+                                           const CXCGradientGrid&     xcGradientGrid,
+                                           const CXCHessianGrid&      xcHessianGrid,
+                                           const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                           const CDensityGrid&        gsDensityGrid,
+                                           const CDensityGridQuad&    rwDensityGrid,
+                                           const CDensityGrid&        rw2DensityGrid,
+                                           const CMolecularGrid&      molecularGrid) const;
+
     /**
      Computes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
      for spin-restricted LDA case.
@@ -271,6 +316,37 @@ class CXCIntegrator
                                     const int32_t            gridOffset,
                                     const int32_t            nGridPoints) const;
     
+    /**
+     Computes exchange-correlation contribution to perturbed Kohn-Sham matrix from batch of grid points
+     for spin-restricted LDA case.
+     
+     @param aoKohnShamMatrix the perturbed Kohn-Sham matrix.
+     @param gtoContainer the container of GTOs blocks.
+     @param xcHessianGrid the exchange-correlation functional hessian grid.
+     @param rwDensityGrid the products of perturbed one-time transformed densities evaluated on the grid.
+     @param rw2DensityGrid the two-time transformed densities evaluated on the grid.
+     @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
+     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
+     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
+     @param gridWeights the pointer to grid weights.
+     @param gridOffset the grid offset.
+     @param nGridPoints the number of grid points.
+     @param quadMode a string that specifies which densities should be combined.
+     */
+    void _compRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+                                    const CGtoContainer*       gtoContainer,
+                                    const CXCHessianGrid*      xcHessianGrid,
+                                    const CXCCubicHessianGrid* xcCubicHessianGrid,
+                                    const CDensityGridQuad*    rwDensityGrid,
+                                    const CDensityGrid*        rw2DensityGrid,
+                                    const double*              gridCoordinatesX,
+                                    const double*              gridCoordinatesY,
+                                    const double*              gridCoordinatesZ,
+                                    const double*              gridWeights,
+                                    const int32_t              gridOffset,
+                                    const int32_t              nGridPoints,
+                                    const std::string&         quadMode) const;
+
     /**
      Computes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
      for spin-unrestricted LDA case.
@@ -408,6 +484,39 @@ class CXCIntegrator
                                     const int32_t            nGridPoints) const;
 
     /**
+     Computes exchange-correlation contribution to perturbed Kohn-Sham matrix from batch of grid points
+     for spin-restricted GGA case.
+
+     @param aoKohnShamMatrix the pointer to Kohn-Sham matrix.
+     @param gtoContainer the container of GTOs blocks.
+     @param xcGradientGrid the exchange-correlation functional gradient grid.
+     @param xcHessianGrid the exchange-correlation functional hessian grid.
+     @param gsDensityGrid the pointer to ground state density grid.
+     @param rwDensityGrid the products of perturbed one-time transformed densities evaluated on the grid.
+     @param rw2DensityGrid the two-time transformed densities evaluated on the grid.
+     @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
+     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
+     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
+     @param gridWeights the pointer to grid weights.
+     @param gridOffset the grid offset.
+     @param nGridPoints the number of grid points.
+     */
+    void _compRestrictedBatchForGGA(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+                                    const CGtoContainer*       gtoContainer,
+                                    const CXCGradientGrid*     xcGradientGrid,
+                                    const CXCHessianGrid*      xcHessianGrid,
+                                    const CXCCubicHessianGrid* xcCubicHessianGrid,
+                                    const CDensityGrid*        gsDensityGrid,
+                                    const CDensityGridQuad*    rwDensityGrid,
+                                    const CDensityGrid*        rw2DensityGrid,
+                                    const double*              gridCoordinatesX,
+                                    const double*              gridCoordinatesY,
+                                    const double*              gridCoordinatesZ,
+                                    const double*              gridWeights,
+                                    const int32_t              gridOffset,
+                                    const int32_t              nGridPoints) const;
+
+    /**
      Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
      for spin-restricted LDA case.
 
@@ -532,6 +641,33 @@ class CXCIntegrator
                                     const int32_t              gridBlockPosition,
                                     const int32_t              nGridPoints) const;
     
+    /**
+     Distributes exchange-correlation contribution to perturbed Kohn-Sham matrix from batch of grid points
+     for spin-restricted LDA case.
+
+     @param aoKohnShamMatrix the pointer to Kohn-Sham matrix.
+     @param xcBuffer the exchange-correlation buffer.
+     @param xcHessianGrid the pointer to exchange-correlation hessian grid.
+     @param rwDensityGrid the products of perturbed one-time transformed densities evaluated on the grid.
+     @param rw2DensityGrid the two-time transformed densities evaluated on the grid..
+     @param gtoValues the pointer to GTOS values on grid.
+     @param gridWeights the pointer to grid weights.
+     @param gridOffset the offset of grids batch in density grid.
+     @param gridBlockPosition the block position in grids batch.
+     @param nGridPoints the number of grid points in grid block.
+     */
+    void _distRestrictedBatchForLda(   CAOKohnShamMatrix*   aoKohnShamMatrix,
+                                          CMemBlock<double>&   xcBuffer,
+                                    const CXCHessianGrid*      xcHessianGrid,
+                                    const CXCCubicHessianGrid* xcCubicHessianGrid,
+                                    const CDensityGridQuad*    rwDensityGrid,
+                                    const CDensityGrid*        rw2DensityGrid,
+                                    const CMemBlock2D<double>& gtoValues,
+                                    const double*              gridWeights,
+                                    const int32_t              gridOffset,
+                                    const int32_t              gridBlockPosition,
+                                    const int32_t              nGridPoints) const;
+
     /**
      Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
      for spin-restricted GGA case.
@@ -887,7 +1023,45 @@ class CXCIntegrator
                                     const int32_t              gridOffset,
                                     const int32_t              gridBlockPosition,
                                     const int32_t              nGridPoints) const;
-    
+   /**
+     Distributes exchange-correlation contribution to Kohn-Sham matrix from batch of grid points
+     for spin-restricted GGA case.
+
+     @param aoKohnShamMatrix the pointer to Kohn-Sham matrix.
+     @param xcBuffer the exchange-correlation buffer.
+     @param xcGradientGrid the pointer to exchange-correlation gradient grid.
+     @param xcHessianGrid the pointer to exchange-correlation hessian grid.
+     @param xcCubicHessianGrid the pointer to exchange-correlation cubic hessian grid.
+     @param gsDensityGrid the pointer to ground state density grid.
+     @param rwDensityGrid the products of perturbed one-time transformed densities evaluated on the grid.
+     @param rw2DensityGrid the two-time transformed densities evaluated on the grid.
+     @param gtoValues the pointer to GTOS values on grid.
+     @param gtoValuesX the GTOs gradient along X axis values buffer.
+     @param gtoValuesY the GTOs gradient along Y axis values buffer.
+     @param gtoValuesZ the GTOs gradient along Z axis values buffer.
+     @param gridWeights the pointer to grid weights.
+     @param gridOffset the offset of grids batch in density grid.
+     @param gridBlockPosition the block position in grids batch.
+     @param nGridPoints the number of grid points in grid block.
+     */
+    void _distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+                                          CMemBlock<double>&   xcBuffer,
+                                    const CXCGradientGrid*     xcGradientGrid,
+                                    const CXCHessianGrid*      xcHessianGrid,
+                                    const CXCCubicHessianGrid* xcCubicHessianGrid,
+                                    const CDensityGrid*        gsDensityGrid,
+                                    const CDensityGridQuad*    rwDensityGrid,
+                                    const CDensityGrid*        rw2DensityGrid,
+                                    const CMemBlock2D<double>& gtoValues,
+                                    const CMemBlock2D<double>& gtoValuesX,
+                                    const CMemBlock2D<double>& gtoValuesY,
+                                    const CMemBlock2D<double>& gtoValuesZ,
+                                    const double*              gridWeights,
+                                    const int32_t              gridOffset,
+                                    const int32_t              gridBlockPosition,
+                                    const int32_t              nGridPoints) const;
+
+
     /**
      Computes exchange-correlation contribution to perturbed Kohn-Sham matrix from restricted density.
      
@@ -1185,6 +1359,28 @@ public:
                    const CMolecularBasis&  basis,
                    const CMolecularGrid&   molecularGrid,
                    const std::string&      xcFuncLabel) const;
+      
+     /**
+     Integrates exchnage-correlation functional contribution to second-order Fock matrices and adds it to AO Fock matrix.
+     
+     @param aoFockMatrix the AO Fock matrix.
+     @param rwDensityMatrix the perturbed AO density matrix object.
+     @param gsDensityMatrix the ground state AO density matrix object.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @param quadMode a string that specifies which densities should be combined.
+     */
+    void integrate(      CAOFockMatrix&    aoFockMatrix,
+                   const CAODensityMatrix& rwDensityMatrix,
+                   const CAODensityMatrix& rw2DensityMatrix,
+                   const CAODensityMatrix& gsDensityMatrix,
+                   const CMolecule&        molecule,
+                   const CMolecularBasis&  basis,
+                   const CMolecularGrid&   molecularGrid,
+                   const std::string&      xcFuncLabel,
+                   const std::string&      quadMode) const;
 };
 
 #endif /* XCIntegrator_hpp */

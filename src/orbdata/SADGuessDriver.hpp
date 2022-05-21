@@ -27,6 +27,7 @@
 #define SADGuessDriver_hpp
 
 #include <cstdint>
+#include <string>
 
 #include <mpi.h>
 
@@ -124,6 +125,78 @@ class CSADGuessDriver
     std::vector<double> _getOcc4s4p(const double nocc) const;
 
     /**
+     Gets occupation numbers for 5s elements.
+
+     @param occ number of 5s orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc5s(double occ) const;
+
+    /**
+     Gets occupation numbers for 4d elements.
+
+     @param occ number of 4d orbitals.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc4d(double occ) const;
+
+    /**
+     Gets occupation numbers for 5p elements.
+
+     @param occ number of 5s5p orbitals.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc5s5p(double occ) const;
+
+    /**
+     Gets occupation numbers for 6s elements.
+
+     @param occ number of 6s orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc6s(double occ) const;
+
+    /**
+     Gets occupation numbers for 4f elements.
+
+     @param occ number of 4f orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc4f(double occ) const;
+
+    /**
+     Gets occupation numbers for 5d elements.
+
+     @param occ number of 5d orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc5d(double occ) const;
+
+    /**
+     Gets occupation numbers for 6p elements.
+
+     @param occ number of 6p orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc6s6p(double occ) const;
+
+    /**
+     Gets occupation numbers for 7s elements.
+
+     @param occ number of 7s orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc7s(double occ) const;
+
+    /**
+     Gets occupation numbers for 5f elements.
+
+     @param occ number of 5f orbital.
+     @return vector of occupation numbers.
+     */
+    std::vector<double> _getOcc5f(double occ) const;
+
+    /**
      Computes SAD initial guess.
 
      @param molecule the molecule.
@@ -131,7 +204,7 @@ class CSADGuessDriver
      @param basis_2 the molecular (larger) basis set.
      @param S12 the crossing overlap matrix between basis_1 and basis_2.
      @param S22 the overlap matrix computed from basis_2.
-     @param closedShell the flag for generating restricted initial guess
+     @param densityType the density type (restricted or unrestricted).
      @return the density matrix of SAD guess.
      */
     CAODensityMatrix _compSADGuess(const CMolecule&       molecule,
@@ -139,7 +212,7 @@ class CSADGuessDriver
                                    const CMolecularBasis& basis_2,
                                    const COverlapMatrix&  S12,
                                    const COverlapMatrix&  S22,
-                                   const bool             closedShell) const;
+                                   const std::string&     densityType) const;
 
    public:
     /**
@@ -160,17 +233,13 @@ class CSADGuessDriver
      @param molecule the molecule.
      @param basis_1 the minimal (smaller) basis set.
      @param basis_2 the molecular (larger) basis set.
-     @param S12 the crossing overlap matrix between basis_1 and basis_2.
-     @param S22 the overlap matrix computed from basis_2.
-     @param closedShell the flag for generating restricted initial guess
+     @param densityType the density type (restricted or unrestricted).
      @return the density matrix of SAD guess.
      */
     CAODensityMatrix compute(const CMolecule&       molecule,
                              const CMolecularBasis& basis_1,
                              const CMolecularBasis& basis_2,
-                             const COverlapMatrix&  S12,
-                             const COverlapMatrix&  S22,
-                             const bool             closedShell) const;
+                             const std::string&     densityType) const;
 
     /**
      Computes indicies of atomic orbitals that are located on each atom.

@@ -36,7 +36,6 @@ from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
 from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
 
 
@@ -67,7 +66,10 @@ class ComplexResponse(LinearSolver):
             comm = MPI.COMM_WORLD
 
         if ostream is None:
-            ostream = OutputStream(sys.stdout)
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
 
         super().__init__(comm, ostream)
 
@@ -79,12 +81,21 @@ class ComplexResponse(LinearSolver):
         self.frequencies = (0,)
         self.damping = 1000.0 / hartree_in_wavenumbers()
 
+        self.input_keywords['response'].update({
+            'a_operator': ('str_lower', 'A operator'),
+            'a_components': ('str_lower', 'Cartesian components of A operator'),
+            'b_operator': ('str_lower', 'B operator'),
+            'b_components': ('str_lower', 'Cartesian components of B operator'),
+            'frequencies': ('seq_range', 'frequencies'),
+            'damping': ('float', 'damping parameter'),
+        })
+
     def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in complex liner response solver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -93,17 +104,6 @@ class ComplexResponse(LinearSolver):
             method_dict = {}
 
         super().update_settings(rsp_dict, method_dict)
-
-        rsp_keywords = {
-            'a_operator': 'str_lower',
-            'a_components': 'str_lower',
-            'b_operator': 'str_lower',
-            'b_components': 'str_lower',
-            'frequencies': 'seq_range',
-            'damping': 'float',
-        }
-
-        parse_input(self, rsp_keywords, rsp_dict)
 
     def get_precond(self, orb_ene, nocc, norb, w, d):
         """
@@ -166,7 +166,7 @@ class ComplexResponse(LinearSolver):
             The input trial vectors.
 
         :return:
-            A tuple of distributed trail vectors after preconditioning.
+            A tuple of distributed trial vectors after preconditioning.
         """
 
         pa = precond.data[:, 0]
@@ -237,7 +237,7 @@ class ComplexResponse(LinearSolver):
 
         return dist_new_ger, dist_new_ung
 
-    def compute(self, molecule, basis, scf_tensors, v1=None):
+    def compute(self, molecule, basis, scf_tensors, v_grad=None):
         """
         Solves for the response vector iteratively while checking the residuals
         for convergence.
@@ -248,9 +248,9 @@ class ComplexResponse(LinearSolver):
             The AO basis.
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
-        :param v1:
-            The gradients on the right-hand side. If not provided, v1 will be
-            computed for the B operator.
+        :param v_grad:
+            The gradients on the right-hand side. If not provided, v_grad will
+            be computed for the B operator.
 
         :return:
             A dictionary containing response functions, solutions and a
@@ -304,24 +304,22 @@ class ComplexResponse(LinearSolver):
         # PE information
         pe_dict = self.init_pe(molecule, basis)
 
-        timing_dict = {}
-
         # right-hand side (gradient)
         if self.rank == mpi_master():
-            self.nonlinear = (v1 is not None)
+            self.nonlinear = (v_grad is not None)
         self.nonlinear = self.comm.bcast(self.nonlinear, root=mpi_master())
 
         if not self.nonlinear:
-            b_rhs = self.get_complex_prop_grad(self.b_operator,
-                                               self.b_components, molecule,
-                                               basis, scf_tensors)
+            b_grad = self.get_complex_prop_grad(self.b_operator,
+                                                self.b_components, molecule,
+                                                basis, scf_tensors)
             if self.rank == mpi_master():
-                v1 = {(op, w): v for op, v in zip(self.b_components, b_rhs)
-                      for w in self.frequencies}
+                v_grad = {(op, w): v for op, v in zip(self.b_components, b_grad)
+                          for w in self.frequencies}
 
         # operators, frequencies and preconditioners
         if self.rank == mpi_master():
-            op_freq_keys = list(v1.keys())
+            op_freq_keys = list(v_grad.keys())
         else:
             op_freq_keys = None
         op_freq_keys = self.comm.bcast(op_freq_keys, root=mpi_master())
@@ -332,21 +330,32 @@ class ComplexResponse(LinearSolver):
             w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs
         }
 
-        # distribute the right-hand side
-        # dist_v1 will also serve as initial guess
-        dist_v1 = {}
+        # distribute the gradient and right-hand side:
+        # dist_grad will be used for calculating the subspace matrix
+        # equation and residuals, dist_rhs for the initial guess
+
+        dist_grad = {}
+        dist_rhs = {}
         for key in op_freq_keys:
             if self.rank == mpi_master():
-                gradger, gradung = self.decomp_grad(v1[key])
+                gradger, gradung = self.decomp_grad(v_grad[key])
                 grad_mat = np.hstack((
                     gradger.real.reshape(-1, 1),
                     gradung.real.reshape(-1, 1),
                     gradung.imag.reshape(-1, 1),
                     gradger.imag.reshape(-1, 1),
                 ))
+                rhs_mat = np.hstack((
+                    gradger.real.reshape(-1, 1),
+                    gradung.real.reshape(-1, 1),
+                    -gradung.imag.reshape(-1, 1),
+                    -gradger.imag.reshape(-1, 1),
+                ))
             else:
                 grad_mat = None
-            dist_v1[key] = DistributedArray(grad_mat, self.comm)
+                rhs_mat = None
+            dist_grad[key] = DistributedArray(grad_mat, self.comm)
+            dist_rhs[key] = DistributedArray(rhs_mat, self.comm)
 
         if self.nonlinear:
             rsp_vector_labels = [
@@ -370,14 +379,14 @@ class ComplexResponse(LinearSolver):
 
         # read initial guess from restart file
         if self.restart:
-            self.read_vectors(rsp_vector_labels)
+            self.read_checkpoint(rsp_vector_labels)
 
         # generate initial guess from scratch
         else:
-            bger, bung = self.setup_trials(dist_v1, precond)
+            bger, bung = self.setup_trials(dist_rhs, precond)
 
             self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                               eri_dict, dft_dict, pe_dict, timing_dict)
+                               eri_dict, dft_dict, pe_dict)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -391,14 +400,16 @@ class ComplexResponse(LinearSolver):
                                             dft_dict, pe_dict,
                                             rsp_vector_labels)
 
-        iter_per_trail_in_hours = None
+        iter_per_trial_in_hours = None
 
         # start iterations
         for iteration in range(self.max_iter):
 
             iter_start_time = tm.time()
 
-            profiler.start_timer(iteration, 'ReducedSpace')
+            profiler.set_timing_key(f'Iteration {iteration+1}')
+
+            profiler.start_timer('ReducedSpace')
 
             xvs = []
             self.cur_iter = iteration
@@ -414,10 +425,10 @@ class ComplexResponse(LinearSolver):
                 if (iteration == 0 or
                         relative_residual_norm[(op, w)] > self.conv_thresh):
 
-                    grad_rg = dist_v1[(op, w)].get_column(0)
-                    grad_ru = dist_v1[(op, w)].get_column(1)
-                    grad_iu = dist_v1[(op, w)].get_column(2)
-                    grad_ig = dist_v1[(op, w)].get_column(3)
+                    grad_rg = dist_grad[(op, w)].get_column(0)
+                    grad_ru = dist_grad[(op, w)].get_column(1)
+                    grad_iu = dist_grad[(op, w)].get_column(2)
+                    grad_ig = dist_grad[(op, w)].get_column(3)
 
                     # projections onto gerade and ungerade subspaces:
 
@@ -567,7 +578,7 @@ class ComplexResponse(LinearSolver):
 
                     x_full = self.get_full_solution_vector(x)
                     if self.rank == mpi_master():
-                        xv = np.dot(x_full, v1[(op, w)])
+                        xv = np.dot(x_full, v_grad[(op, w)])
                         xvs.append((op, w, xv))
 
                     r_norms_2 = 2.0 * r.squared_norm(axis=0)
@@ -614,7 +625,7 @@ class ComplexResponse(LinearSolver):
 
                 self.print_iteration(relative_residual_norm, xvs)
 
-            profiler.stop_timer(iteration, 'ReducedSpace')
+            profiler.stop_timer('ReducedSpace')
 
             # check convergence
 
@@ -623,7 +634,7 @@ class ComplexResponse(LinearSolver):
             if self.is_converged:
                 break
 
-            profiler.start_timer(iteration, 'Orthonorm.')
+            profiler.start_timer('Orthonorm.')
 
             # spawning new trial vectors from residuals
 
@@ -632,7 +643,7 @@ class ComplexResponse(LinearSolver):
 
             residuals.clear()
 
-            profiler.stop_timer(iteration, 'Orthonorm.')
+            profiler.stop_timer('Orthonorm.')
 
             if self.rank == mpi_master():
                 n_new_trials = new_trials_ger.shape(1) + new_trials_ung.shape(1)
@@ -640,26 +651,24 @@ class ComplexResponse(LinearSolver):
                 n_new_trials = None
             n_new_trials = self.comm.bcast(n_new_trials, root=mpi_master())
 
-            if iter_per_trail_in_hours is not None:
-                next_iter_in_hours = iter_per_trail_in_hours * n_new_trials
+            if iter_per_trial_in_hours is not None:
+                next_iter_in_hours = iter_per_trial_in_hours * n_new_trials
                 if self.need_graceful_exit(next_iter_in_hours):
                     self.graceful_exit(molecule, basis, dft_dict, pe_dict,
                                        rsp_vector_labels)
 
-            profiler.start_timer(iteration, 'FockBuild')
+            profiler.start_timer('FockBuild')
 
             # creating new sigma and rho linear transformations
 
             self.e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
                                scf_tensors, eri_dict, dft_dict, pe_dict,
-                               timing_dict)
+                               profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
-            iter_per_trail_in_hours = iter_in_hours / n_new_trials
+            iter_per_trial_in_hours = iter_in_hours / n_new_trials
 
-            profiler.stop_timer(iteration, 'FockBuild')
-            if self.dft or self.pe:
-                profiler.update_timer(iteration, timing_dict)
+            profiler.stop_timer('FockBuild')
 
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
@@ -681,23 +690,21 @@ class ComplexResponse(LinearSolver):
 
         # calculate response functions
         if not self.nonlinear:
-            a_rhs = self.get_complex_prop_grad(self.a_operator,
-                                               self.a_components, molecule,
-                                               basis, scf_tensors)
+            a_grad = self.get_complex_prop_grad(self.a_operator,
+                                                self.a_components, molecule,
+                                                basis, scf_tensors)
 
             if self.is_converged:
                 if self.rank == mpi_master():
-                    va = {op: v for op, v in zip(self.a_components, a_rhs)}
+                    va = {op: v for op, v in zip(self.a_components, a_grad)}
                     rsp_funcs = {}
                     full_solutions = {}
 
+                    # create h5 file for response solutions
                     if self.checkpoint_file is not None:
                         final_h5_fname = str(
                             Path(self.checkpoint_file).with_suffix(
                                 '.solutions.h5'))
-                    else:
-                        final_h5_fname = 'rsp.solutions.h5'
-                    if self.rank == mpi_master():
                         create_hdf5(final_h5_fname, molecule, basis,
                                     dft_dict['dft_func_label'],
                                     pe_dict['potfile_text'])
@@ -710,15 +717,19 @@ class ComplexResponse(LinearSolver):
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
                             full_solutions[(bop, w)] = x
 
-                            write_rsp_solution(
-                                final_h5_fname,
-                                '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
+                            # write to h5 file for response solutions
+                            if self.checkpoint_file is not None:
+                                write_rsp_solution(
+                                    final_h5_fname,
+                                    '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
 
                 if self.rank == mpi_master():
-                    checkpoint_text = 'Response solution vectors written to file: '
-                    checkpoint_text += final_h5_fname
-                    self.ostream.print_info(checkpoint_text)
-                    self.ostream.print_blank()
+                    # print information about h5 file for response solutions
+                    if self.checkpoint_file is not None:
+                        checkpoint_text = 'Response solution vectors written to file: '
+                        checkpoint_text += final_h5_fname
+                        self.ostream.print_info(checkpoint_text)
+                        self.ostream.print_blank()
 
                     return {
                         'response_functions': rsp_funcs,

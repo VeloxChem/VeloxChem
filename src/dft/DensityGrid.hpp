@@ -518,7 +518,6 @@ public:
                               const double          densityThreshold,
                               const xcfun           xcFuncType) const;
 
-
     /**
      Generates pair of screened molecular and density grids by removing grid points with specific density/density
      gradient values bellow given threshold. Extends to other types of densities than dengrid::ab
@@ -566,7 +565,6 @@ public:
     @param densityThreshold the density/density gradient screening threshold.
     @param iDensityMatrix the index of density matrix.
     @param xcFuncType the type of exchange-correlation functional.
-    @return the screened molecular grid.
     */
     void getScreenedGridUnrestricted(      CMolecularGrid& molecularGridsAB,
                                            CMolecularGrid& molecularGridsA,

@@ -48,6 +48,7 @@
 #include "Molecule.hpp"
 #include "SADGuessDriver.hpp"
 #include "StringFormat.hpp"
+#include "PackedGtoPairContainer.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -101,12 +102,25 @@ CAODensityMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
 static std::shared_ptr<CMolecularOrbitals>
 CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_orbs,
                                    const std::vector<py::array_t<double>>& eig_vals,
+                                   const std::vector<py::array_t<double>>& occupations,
                                    const molorb                            orbs_type)
 {
+    py::ssize_t nmo = -1;
+
+    std::string errnmo("MolecularOrbitals: Inconsistent number of MOs");
+
+    std::string erreig("MolecularOrbitals: Expecting 1D numpy arrays for eigenvalues");
+
+    std::string errocc("MolecularOrbitals: Expecting 1D numpy arrays for occupations");
+
     std::vector<CDenseMatrix> cmos;
 
     for (size_t i = 0; i < mol_orbs.size(); i++)
     {
+        if (nmo == -1) nmo = mol_orbs[i].shape(1);
+
+        errors::assertMsgCritical(nmo == mol_orbs[i].shape(1), errnmo);
+
         auto mp = vlx_math::CDenseMatrix_from_numpy(mol_orbs[i]);
 
         cmos.push_back(*mp);
@@ -116,11 +130,13 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
 
     for (size_t i = 0; i < eig_vals.size(); i++)
     {
+        if (nmo == -1) nmo = eig_vals[i].size();
+
+        errors::assertMsgCritical(nmo == eig_vals[i].size(), errnmo);
+
         const py::array_t<double>& arr = eig_vals[i];
 
-        std::string errdim("MolecularOrbitals: Expecting 1D numpy arrays for eigenvalues");
-
-        errors::assertMsgCritical(arr.ndim() == 1, errdim);
+        errors::assertMsgCritical(arr.ndim() == 1, erreig);
 
         if (arr.data() == nullptr || arr.size() == 0)
         {
@@ -132,7 +148,24 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
         ceigs.push_back(CMemBlock<double>(vec));
     }
 
-    return std::make_shared<CMolecularOrbitals>(cmos, ceigs, orbs_type);
+    std::vector<CMemBlock<double>> coccs;
+
+    for (size_t i = 0; i < occupations.size(); i++)
+    {
+        if (nmo == -1) nmo = occupations[i].size();
+
+        errors::assertMsgCritical(nmo == occupations[i].size(), errnmo);
+
+        const py::array_t<double>& arr = occupations[i];
+
+        errors::assertMsgCritical(arr.ndim() == 1, errocc);
+
+        std::vector<double> vec(arr.data(), arr.data() + arr.size());
+
+        coccs.push_back(CMemBlock<double>(vec));
+    }
+
+    return std::make_shared<CMolecularOrbitals>(cmos, ceigs, coccs, orbs_type);
 }
 
 // Exports classes/functions in src/orbdata to python
@@ -146,7 +179,6 @@ export_orbdata(py::module& m)
     py::enum_<denmat>(m, "denmat")
         .value("rest", denmat::rest)
         .value("unrest", denmat::unrest)
-        .value("osrest", denmat::osrest)
         .value("rmoij", denmat::rmoij)
         .value("umoij", denmat::umoij)
         .value("rgen", denmat::rgen);
@@ -191,12 +223,12 @@ export_orbdata(py::module& m)
         .def(py::init<>())
         .def("__repr__", &CMolecularBasis::repr)
         .def("get_string",
-             vlx_general::overload_cast_<const std::string&, const CMolecule&>()(&CMolecularBasis::printBasis, py::const_),
+             py::overload_cast<const std::string&, const CMolecule&>(&CMolecularBasis::printBasis, py::const_),
              "Prints AO basis information to output stream for selected molecule.",
              "title"_a,
              "molecule"_a)
         .def("get_string",
-             vlx_general::overload_cast_<const CMolecule&>()(&CMolecularBasis::printBasis, py::const_),
+             py::overload_cast<const CMolecule&>(&CMolecularBasis::printBasis, py::const_),
              "Prints AO basis information to output stream for selected molecule.",
              "molecule"_a)
         .def("set_label", &CMolecularBasis::setLabel, "Sets name of molecular basis.", "label"_a)
@@ -221,13 +253,15 @@ export_orbdata(py::module& m)
              &CMolecularBasis::getDimensionsOfPrimitiveBasis,
              "Determines size of primitive AO basis for selected molecule.",
              "molecule"_a)
+        .def(
+            "get_index_map", &CMolecularBasis::getIndexMap, "Maps the atomic orbital indices of veloxchem to pyscf and Dalton indices.", "molecule"_a)
         .def("n_basis_functions",
-             vlx_general::overload_cast_<const CMolecule&, int32_t>()(&CMolecularBasis::getNumberOfBasisFunctions, py::const_),
+             py::overload_cast<const CMolecule&, int32_t>(&CMolecularBasis::getNumberOfBasisFunctions, py::const_),
              "Determines number of basis functions with specific angular momentum in molecular basis of selected molecule.",
              "molecule"_a,
              "angularMomentum"_a)
         .def("n_primitive_basis_functions",
-             vlx_general::overload_cast_<const CMolecule&, int32_t>()(&CMolecularBasis::getNumberOfPrimitiveBasisFunctions, py::const_),
+             py::overload_cast<const CMolecule&, int32_t>(&CMolecularBasis::getNumberOfPrimitiveBasisFunctions, py::const_),
              "Determines number of primitive Gaussian functions with specific angular momentum in molecular basis of selected molecule.",
              "molecule"_a,
              "angularMomentum"_a)
@@ -311,24 +345,36 @@ export_orbdata(py::module& m)
                 return vlx_general::pointer_to_numpy(self.betaEnergies(), self.getNumberOfColumns());
             },
             "Converts beta orbital energies in MolecularOrbitals to numpy array.")
+        .def(
+            "occa_to_numpy",
+            [](const CMolecularOrbitals& self) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.alphaOccupations(), self.getNumberOfColumns());
+            },
+            "Converts alpha orbital energies in MolecularOrbitals to numpy array.")
+        .def(
+            "occb_to_numpy",
+            [](const CMolecularOrbitals& self) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.betaOccupations(), self.getNumberOfColumns());
+            },
+            "Converts beta orbital energies in MolecularOrbitals to numpy array.")
         .def("get_orbitals_type", &CMolecularOrbitals::getOrbitalsType, "Gets type of molecular orbital matrix.")
         .def("get_ao_density",
-             vlx_general::overload_cast_<const int32_t>()(&CMolecularOrbitals::getAODensity, py::const_),
+             py::overload_cast<const int32_t>(&CMolecularOrbitals::getAODensity, py::const_),
              "Computes spin restricted electron density matrix in AO basis for specific number of electrons.",
              "nElectrons"_a)
         .def("get_ao_density",
-             vlx_general::overload_cast_<const int32_t, const int32_t>()(&CMolecularOrbitals::getAODensity, py::const_),
+             py::overload_cast<const int32_t, const int32_t>(&CMolecularOrbitals::getAODensity, py::const_),
              "Computes spin unrestricted electron density matrix in AO basis for specific number of alpha and beta electrons.",
              "nAlphaElectrons"_a,
              "nBetaElectrons"_a)
         .def("get_pair_density",
-             vlx_general::overload_cast_<const std::vector<int32_t>&, const std::vector<int32_t>&>()(&CMolecularOrbitals::getRestrictedPairDensity,
+             py::overload_cast<const std::vector<int32_t>&, const std::vector<int32_t>&>(&CMolecularOrbitals::getRestrictedPairDensity,
                                                                                                      py::const_),
              "Computes set of restricted pair C_i C_j^T density matrices in AO basis.",
              "iMolecularOrbitals"_a,
              "ecularOrbitals"_a)
         .def("get_pair_density",
-             vlx_general::overload_cast_<const int32_t, const int32_t>()(&CMolecularOrbitals::getRestrictedPairDensity, py::const_),
+             py::overload_cast<const int32_t, const int32_t>(&CMolecularOrbitals::getRestrictedPairDensity, py::const_),
              "Computes restricted pair C_i C_j^T density matrix in AO basis.",
              "iMolecularOrbital"_a,
              "jMolecularOrbital"_a)
@@ -341,12 +387,12 @@ export_orbdata(py::module& m)
         .def("number_aos", &CMolecularOrbitals::getNumberOfRows, "Gets number of rows in specific molecular orbital matrix.")
         .def("number_mos", &CMolecularOrbitals::getNumberOfColumns, "Gets number of columns in specific molecular orbital matrix.")
         .def("alpha_orbitals",
-             vlx_general::overload_cast_<const int32_t, const int32_t>()(&CMolecularOrbitals::alphaOrbitals, py::const_),
+             py::overload_cast<const int32_t, const int32_t>(&CMolecularOrbitals::alphaOrbitals, py::const_),
              "Gets alpha orbitals within specific range.",
              "iMolecularOrbital"_a,
              "nMolecularOrbitals"_a)
         .def("beta_orbitals",
-             vlx_general::overload_cast_<const int32_t, const int32_t>()(&CMolecularOrbitals::betaOrbitals, py::const_),
+             py::overload_cast<const int32_t, const int32_t>(&CMolecularOrbitals::betaOrbitals, py::const_),
              "Gets beta orbitals within specific range.",
              "iMolecularOrbital"_a,
              "nMolecularOrbitals"_a)
@@ -370,15 +416,14 @@ export_orbdata(py::module& m)
 
     PyClass<CSADGuessDriver>(m, "SADGuessDriver")
         .def(py::init(&vlx_general::create<CSADGuessDriver>), "comm"_a = py::none())
-        .def("compute",
-             &CSADGuessDriver::compute,
-             "Computes SAD initial guess.",
-             "molecule"_a,
-             "basis_1"_a,
-             "basis_2"_a,
-             "S12"_a,
-             "S22"_a,
-             "closedShell"_a);
+        .def("compute", &CSADGuessDriver::compute, "Computes SAD initial guess.", "molecule"_a, "basis_1"_a, "basis_2"_a, "densityType"_a);
+    
+    // CPackedGtoPairContainer class
+
+    PyClass<CPackedGtoPairContainer<double, mem::Host>>(m, "PackedGtoPairContainer")
+        .def(py::init<>())
+        .def(py::init<const CPackedGtoPairContainer<double, mem::Host>&>())
+        .def("summary", &CPackedGtoPairContainer<double, mem::Host>::printSummary);
 
     // exposing functions
 

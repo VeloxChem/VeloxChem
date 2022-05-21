@@ -121,24 +121,24 @@ bind_integrals_driver(py::module& m, const char* cls_name, const std::string& do
     return PyClass<T>(m, cls_name)
         .def(py::init(&vlx_general::create<T>), "comm"_a = py::none())
         .def("compute",
-             vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&>()(&T::compute, py::const_),
+             py::overload_cast<const CMolecule&, const CMolecularBasis&>(&T::compute, py::const_),
              (docpreamble + " integrals for given molecule and basis set.").c_str(),
              "molecule"_a,
              "basis"_a)
         .def("compute",
-             vlx_general::overload_cast_<const CMolecule&, const CMolecularBasis&, const CMolecularBasis&>()(&T::compute, py::const_),
+             py::overload_cast<const CMolecule&, const CMolecularBasis&, const CMolecularBasis&>(&T::compute, py::const_),
              (docpreamble + " integrals for given molecule in two basis sets.").c_str(),
              "molecule"_a,
              "bra_basis"_a,
              "ket_basis"_a)
         .def("compute",
-             vlx_general::overload_cast_<const CMolecule&, const CMolecule&, const CMolecularBasis&>()(&T::compute, py::const_),
+             py::overload_cast<const CMolecule&, const CMolecule&, const CMolecularBasis&>(&T::compute, py::const_),
              (docpreamble + " integrals for two molecules in given basis set.").c_str(),
              "bra_molecule"_a,
              "ket_molecule"_a,
              "basis"_a)
         .def("compute",
-             vlx_general::overload_cast_<const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&>()(&T::compute,
+             py::overload_cast<const CMolecule&, const CMolecule&, const CMolecularBasis&, const CMolecularBasis&>(&T::compute,
                                                                                                                                py::const_),
              (docpreamble + " integrals for two molecules, each in its own basis set.").c_str(),
              "bra_molecule"_a,

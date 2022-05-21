@@ -67,6 +67,13 @@ export_xtb(py::module& m)
                 return vlx_general::pointer_to_numpy(grad.data(), grad.size() / 3, 3);
             },
             "Gets molecular gradient as numpy array of shape (natoms, 3).")
+        .def(
+            "get_dipole",
+            [](const CXTBDriver& self) -> py::array_t<double> {
+                auto dipole = self.getDipole();
+                return vlx_general::pointer_to_numpy(dipole.data(), dipole.size());
+            },
+            "Gets molecular dipole moment as numpy array.")
         // prefixed by an underscore because it will be decorated in xtbdriver.py
         .def("_compute", &CXTBDriver::compute);
 }

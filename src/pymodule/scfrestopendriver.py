@@ -27,11 +27,9 @@ from mpi4py import MPI
 import numpy as np
 import sys
 
-from .aodensitymatrix import AODensityMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import MolecularOrbitals
 from .veloxchemlib import molorb
-from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
@@ -60,12 +58,14 @@ class ScfRestrictedOpenDriver(ScfDriver):
             comm = MPI.COMM_WORLD
 
         if ostream is None:
-            ostream = OutputStream(sys.stdout)
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
 
         super().__init__(comm, ostream)
 
-        self.closed_shell = False
-        self.restricted_open = True
+        self.scf_type = 'restricted_openshell'
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """
@@ -185,8 +185,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
                         den_mat.alpha_to_numpy(0),
                         den_mat.beta_to_numpy(0),
                         self.scf_tensors['S'],
-                    )
-                )
+                    ))
 
     def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
@@ -243,12 +242,14 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
         return effmat
 
-    def gen_molecular_orbitals(self, fock_mat, oao_mat):
+    def gen_molecular_orbitals(self, molecule, fock_mat, oao_mat):
         """
         Generates spin restricted molecular orbital by diagonalizing
         spin restricted projected open shell Fock/Kohn-Sham matrix. Overloaded base
         class method.
 
+        :param molecule:
+            The molecule.
         :param fock_mat:
             The Fock/Kohn-Sham matrix.
         :param oao_mat:
@@ -261,37 +262,56 @@ class ScfRestrictedOpenDriver(ScfDriver):
         if self.rank == mpi_master():
 
             tmat = oao_mat.to_numpy()
-            fock_mat = tmat.T @ fock_mat @ tmat
+            fock_mat = np.linalg.multi_dot([tmat.T, fock_mat, tmat])
 
             eigs, evecs = np.linalg.eigh(fock_mat)
 
-            orb_coefs = tmat @ evecs
+            orb_coefs = np.linalg.multi_dot([tmat, evecs])
             orb_coefs, eigs = self.delete_mos(orb_coefs, eigs)
 
-            return MolecularOrbitals([orb_coefs], [eigs], molorb.rest)
+            occ = molecule.get_aufbau_occupation(eigs.size, 'restricted')
+
+            return MolecularOrbitals([orb_coefs], [eigs], [occ], molorb.rest)
 
         return MolecularOrbitals()
 
     def get_projected_fock(self, fa, fb, da, db, s):
+        """
+        Generates projected Fock matrix.
 
-        naos = len(s)
+        :param fa:
+            The Fock matrix of alpha spin.
+        :param fb:
+            The Fock matrix of beta spin.
+        :param da:
+            The density matrix of alpha spin.
+        :param db:
+            The density matrix of beta spin.
+        :param s:
+            The overlap matrix.
+
+        :return:
+            The projected Fock matrix.
+        """
+
+        naos = s.shape[0]
 
         f0 = 0.5 * (fa + fb)
 
-        ga = s @ da @ fa - fa @ da @ s
-        gb = s @ db @ fb - fb @ db @ s
+        ga = np.linalg.multi_dot([s, da, fa]) - np.linalg.multi_dot([fa, da, s])
+        gb = np.linalg.multi_dot([s, db, fb]) - np.linalg.multi_dot([fb, db, s])
         g = ga + gb
 
-        inactive = s @ db
-        active = s @ (da - db)
-        virtual = np.eye(naos) - s @ da
+        inactive = np.matmul(s, db)
+        active = np.matmul(s, da - db)
+        virtual = np.eye(naos) - np.matmul(s, da)
 
-        fcorr = inactive @ (g - f0) @ active.T - active @ (g + f0) @ inactive.T \
-            + active @ (g - f0) @ virtual.T - virtual @ (g + f0) @ active.T
+        fcorr = np.linalg.multi_dot([inactive, g - f0, active.T])
+        fcorr -= np.linalg.multi_dot([active, g + f0, inactive.T])
+        fcorr += np.linalg.multi_dot([active, g - f0, virtual.T])
+        fcorr -= np.linalg.multi_dot([virtual, g + f0, active.T])
 
-        fproj = f0 + fcorr
-
-        return fproj
+        return f0 + fcorr
 
     def get_scf_type(self):
         """
@@ -330,12 +350,3 @@ class ScfRestrictedOpenDriver(ScfDriver):
             fock_mat.set_fock_type(fockmat.unrestj, 0, 'beta')
 
         return
-
-    def gen_new_density(self, molecule):
-        c = self.mol_orbs.alpha_to_numpy()
-        na = molecule.number_of_alpha_electrons()
-        nb = molecule.number_of_beta_electrons()
-        da = c[:, :na] @ c[:, :na].T
-        db = c[:, :nb] @ c[:, :nb].T
-        ao_density = AODensityMatrix([da, db], denmat.unrest)
-        return ao_density

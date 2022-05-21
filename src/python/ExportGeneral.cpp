@@ -36,9 +36,6 @@
 
 #include <string>
 
-#ifdef ENABLE_MKL
-#include "ConfigMKL.hpp"
-#endif
 #include "Codata.hpp"
 #include "ErrorHandler.hpp"
 #include "MpiFunc.hpp"
@@ -64,108 +61,11 @@ get_mpi_comm(py::object py_comm)
     return comm_ptr;
 }
 
-// Helper functions for getting shape and strides from int32_t dimension
-
-static std::vector<ssize_t>
-dimension_to_shape(const std::vector<int32_t>& dimension)
-{
-    std::vector<ssize_t> shape;
-
-    for (size_t i = 0; i < dimension.size(); i++)
-    {
-        shape.push_back(static_cast<ssize_t>(dimension[i]));
-    }
-
-    return shape;
-}
-
-static std::vector<ssize_t>
-dimension_to_strides(const std::vector<int32_t>& dimension, size_t sizeoftype)
-{
-    std::vector<ssize_t> strides;
-
-    for (size_t i = 0; i < dimension.size(); i++)
-    {
-        size_t strd = 1;
-
-        for (size_t j = i + 1; j < dimension.size(); j++)
-        {
-            strd *= static_cast<size_t>(dimension[j]);
-        }
-
-        strides.push_back(static_cast<ssize_t>(strd * sizeoftype));
-    }
-
-    return strides;
-}
-
-// Gets numpy array from double pointer and int32_t dimensions
-// Not static functions; used in other files
-
-py::array_t<double>
-pointer_to_numpy(const double* ptr, const std::vector<int32_t>& dimension)
-{
-    if (ptr == nullptr || dimension.size() == 0)
-    {
-        return py::array_t<double>();
-    }
-    else
-    {
-        return py::array_t<double>(dimension_to_shape(dimension), dimension_to_strides(dimension, sizeof(double)), ptr);
-    }
-}
-
-py::array_t<double>
-pointer_to_numpy(const double* ptr, int32_t nElements)
-{
-    return pointer_to_numpy(ptr, std::vector<int32_t>({nElements}));
-}
-
-py::array_t<double>
-pointer_to_numpy(const double* ptr, int32_t nRows, int32_t nColumns)
-{
-    return pointer_to_numpy(ptr, std::vector<int32_t>({nRows, nColumns}));
-}
-
-// Gets numpy array from int32_t pointer and dimensions
-// Not static functions; used in other files
-
-py::array_t<int32_t>
-pointer_to_numpy(const int32_t* ptr, const std::vector<int32_t>& dimension)
-{
-    if (ptr == nullptr || dimension.size() == 0)
-    {
-        return py::array_t<int32_t>();
-    }
-    else
-    {
-        return py::array_t<int32_t>(dimension_to_shape(dimension), dimension_to_strides(dimension, sizeof(int32_t)), ptr);
-    }
-}
-
-py::array_t<int32_t>
-pointer_to_numpy(const int32_t* ptr, int32_t nElements)
-{
-    return pointer_to_numpy(ptr, std::vector<int32_t>({nElements}));
-}
-
-py::array_t<int32_t>
-pointer_to_numpy(const int32_t* ptr, int32_t nRows, int32_t nColumns)
-{
-    return pointer_to_numpy(ptr, std::vector<int32_t>({nRows, nColumns}));
-}
-
 // Exports classes/functions in src/general to python
 
 void
 export_general(py::module& m)
 {
-    // configure MKL single dynamic library
-
-#ifdef ENABLE_MKL
-    configure_mkl_rt();
-#endif
-
     // initialize mpi4py's C-API
 
     if (import_mpi4py() < 0)
@@ -212,6 +112,16 @@ export_general(py::module& m)
         "Checks if a MPI process is the master process.",
         "py_comm"_a = py::none());
     m.def(
+        "mpi_barrier",
+        [](py::object py_comm) {
+            if (py_comm.is_none())
+                MPI_Barrier(MPI_COMM_WORLD);
+            else
+                MPI_Barrier(*get_mpi_comm(py_comm));
+        },
+        "Synchronize all MPI processes using barrier.",
+        "py_comm"_a = py::none());
+    m.def(
         "is_single_node",
         [](py::object py_comm) -> bool {
             if (py_comm.is_none())
@@ -229,16 +139,19 @@ export_general(py::module& m)
     m.def("hartree_in_kcalpermol", &units::getHartreeValueInKiloCaloriePerMole, "Gets Hartree value in kcal/mol.");
     m.def("hartree_in_inverse_nm", &units::getHartreeValueInInverseNanometer, "Gets Hartree value in inverse nanometer.");
     m.def("hartree_in_wavenumbers", &units::getHartreeValueInWavenumbers, "Gets Hartree value in reciprocal cm.");
+    m.def("electron_mass_in_amu", &units::getElectronMassInAtomicMassUnit, "Gets electron mass in amu.");
+    m.def("amu_in_electron_masses", &units::getAtomicMassUnitInElectronMasses, "Gets atomic mass unit in electron masses.");
+    m.def("amu_in_kg", &units::getAtomicMassUnitInKg, "Gets atomic mass unit in kg.");
+    m.def("speed_of_light_in_vacuum_in_SI", &units::getSpeedOfLightInVacuumInSI, "Gets speed of light in vacuum in SI.");
+    m.def("avogadro_constant", &units::getAvogadroConstant, "Gets Avogadro constant.");
     m.def("boltzmann_in_evperkelvin", &units::getBoltzmannConstantInElectronVoltsPerKelvin, "Gets Boltzmann constant in eV/K.");
+    m.def("boltzmann_in_hartreeperkelvin", &units::getBoltzmannConstantInHartreePerKelvin, "Gets Boltzmann constant in Hartree/K.");
 
     m.def("dipole_in_debye", &units::getDipoleInDebye, "Gets convertion factor for dipole moment (a.u. -> Debye).");
     m.def("rotatory_strength_in_cgs", &units::getRotatoryStrengthInCGS, "Gets convertion factor for rotatory strength (a.u. -> 10^-40 cgs).");
-    m.def("molar_ellipticity_from_beta",
-          &units::getMolarEllipticityFromBeta,
-          "Gets factor needed for the calculation of the molar ellipticity from the electric-dipole magnetic-dipole polarizability beta.");
-    m.def("extinction_coefficient_from_molar_ellipticity",
-          &units::getExtinctionCoefficientFromMolarEllipticity,
-          "Gets factor needed for the calculation of extinction coefficient from molar ellipticity.");
+    m.def("extinction_coefficient_from_beta",
+          &units::getExtinctionCoefficientFromBeta,
+          "Gets factor needed for the calculation of the extinction coefficent from the electric-dipole magnetic-dipole polarizability beta.");
     m.def("fine_structure_constant", &units::getFineStructureConstant, "Gets fine-structure constant.");
 
     m.def(

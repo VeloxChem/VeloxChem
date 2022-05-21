@@ -206,6 +206,13 @@ class CXTBDriver
      @return the molecular gradient.
     */
     std::vector<double> getGradient() const;
+
+    /**
+     Gets molecular dipole moment as vector (order: 3).
+
+     @return the molecular dipole moment.
+    */
+    std::vector<double> getDipole() const;
 };
 
 #endif /* XTBDriver_hpp */

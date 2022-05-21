@@ -23,33 +23,30 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from pathlib import PurePath
+from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
-from os import devnull
+from io import StringIO
+import numpy as np
 import time as tm
-import sys
 import tempfile
-import contextlib
-import geometric
 
-from .veloxchemlib import mpi_master
-from .veloxchemlib import hartree_in_kcalpermol
-from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import CommonNeighbors
+from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstroms
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
-from .veloxchemlib import CommonNeighbors
+from .inputparser import parse_input, print_keywords, get_datetime_string
+
+with redirect_stderr(StringIO()) as fg_err:
+    import geometric
 
 
 class OptimizationDriver:
     """
     Implements optimization driver.
 
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
+    :param grad_drv:
+        The gradient driver.
 
     Instance variables
         - rank: The rank of MPI process.
@@ -60,14 +57,15 @@ class OptimizationDriver:
         - max_iter: The maximum number of optimization steps.
         - filename: The filename that will be used by geomeTRIC.
         - grad_drv: The gradient driver.
-        - flag: The type of the optimization driver.
         - cna: The flag for computation of Jaccard similarity index.
         - cna_bond: The cut-off radius for chemical bond in CNA analysis.
         - cna_rcut: The cut-off radius for chemical bonds environment in
           CNA analysis.
+        - transition: The flag for transition state searching.
+        - hessian: The flag for computing Hessian.
     """
 
-    def __init__(self, filename, grad_drv, flag):
+    def __init__(self, grad_drv):
         """
         Initializes optimization driver.
         """
@@ -87,39 +85,58 @@ class OptimizationDriver:
         self.conv_drms = None 
         self.conv_dmax = None
 
+        self.transition = False
+        self.hessian = 'never'
+
         self.ref_xyz = None
 
-        self.filename = filename
+        self.filename = f'veloxchem_opt_{get_datetime_string()}'
         self.grad_drv = grad_drv
-        self.flag = flag
-        
+
         self.cna = False
         self.cna_bond = None
         self.cna_rcut = None
-        
+
+        # input keywords
+        self.input_keywords = {
+            'optimize': {
+                'coordsys': ('str_lower', 'coordinate system'),
+                'constraints': ('list', 'constraints'),
+                'check_interval':
+                    ('int', 'interval for checking coordinate system'),
+                'max_iter': ('int', 'maximum number of optimization steps'),
+                'transition': ('bool', 'transition state search'),
+                'hessian': ('str_lower', 'hessian flag'),
+                'ref_xyz': ('str', 'reference geometry'),
+                'conv_energy': ('float', ''),
+                'conv_grms': ('float',  ''),
+                'conv_gmax': ('float',  ''),
+                'conv_drms': ('float',  ''),
+                'conv_dmax': ('float', ''),
+                'ref_xyz': ('str', ''),
+                'cna': ('bool', ''),
+                'cna_bond': ('float', ''),
+                'cna_rcut': ('float', ''),
+            },
+        }
+
+    def print_keywords(self):
+        """
+        Prints input keywords in optimization driver.
+        """
+
+        print_keywords(self.input_keywords, self.ostream)
 
     def update_settings(self, opt_dict):
         """
         Updates settings in optimization driver.
 
         :param opt_dict:
-            The input dictionary of optimize group.
+            The dictionary of optimize input.
         """
 
         opt_keywords = {
-            'coordsys': 'str_lower',
-            'constraints': 'list',
-            'check_interval': 'int',
-            'max_iter': 'int',
-            'conv_energy': 'float', 
-            'conv_grms': 'float', 
-            'conv_gmax': 'float', 
-            'conv_drms': 'float', 
-            'conv_dmax': 'float',
-            'ref_xyz': 'str',
-            'cna': 'bool',
-            'cna_bond': 'float',
-            'cna_rcut': 'float',
+            key: val[0] for key, val in self.input_keywords['optimize'].items()
         }
 
         parse_input(self, opt_keywords, opt_dict)
@@ -136,26 +153,42 @@ class OptimizationDriver:
         else:
             self.cna_rcut /= bohr_in_angstroms() 
 
-    def compute(self, molecule, ao_basis, min_basis=None):
+        if 'filename' in opt_dict:
+            self.filename = opt_dict['filename']
+
+        if ('hessian' not in opt_dict) and self.transition:
+            self.hessian = 'first'
+
+        if self.hessian == 'only':
+            self.hessian = 'stop'
+
+    def compute(self, molecule, *args):
         """
         Performs geometry optimization.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
+        :param args:
+            The same arguments as the "compute" function of the gradient driver.
 
         :return:
             The tuple with final geometry, and energy of molecule.
         """
 
+        if self.hessian or self.transition:
+            geometric_repo = 'https://github.com/leeping/geomeTRIC.git'
+            err_msg = (
+                'The installed geometric package does not support\n' +
+                '  Hessian or transition state search. Please install\n' +
+                '  the latest geometric via\n' +
+                f'  python3 -m pip install git+{geometric_repo}\n')
+            assert_msg_critical(hasattr(geometric, 'normal_modes'), err_msg)
+
         self.print_header()
         start_time = tm.time()
 
-        opt_engine = OptimizationEngine(molecule, ao_basis, min_basis,
-                                        self.grad_drv, self.flag)
+        opt_engine = OptimizationEngine(self.grad_drv, molecule, *args)
+        hessian_exit = False
 
         # filename is used by geomeTRIC to create .log and other files. On
         # master node filename is determined based on the input/output file.
@@ -168,8 +201,8 @@ class OptimizationDriver:
                 self.clean_up_file(filename + '.tmp', 'hessian', 'hessian.txt')
                 self.clean_up_file(filename + '.tmp', 'hessian', 'coords.xyz')
             else:
-                filename = PurePath(self.filename).name
-                filename = str(PurePath(temp_dir, f'{filename}_{self.rank}'))
+                filename = Path(self.filename).name
+                filename = str(Path(temp_dir, f'{filename}_{self.rank}'))
 
             if self.constraints:
                 constr_filename = Path(filename).with_suffix('.constr.txt')
@@ -179,21 +212,11 @@ class OptimizationDriver:
             else:
                 constr_filename = None
 
-            log_ini = Path(temp_dir, f'log.ini_{self.rank}')
-            self.write_log_ini(log_ini)
+            # redirect geomeTRIC stdout/stderr
 
-            # geomeTRIC prints information to stdout and stderr. On master node
-            # this is redirected to the output stream. On other nodes this is
-            # redirected to devnull.
-
-            with open(devnull, 'w') as f_devnull:
-
-                if self.rank == mpi_master():
-                    f_out = sys.stdout
-                else:
-                    f_out = f_devnull
-
-                with contextlib.redirect_stdout(f_out):
+            with redirect_stdout(StringIO()) as fg_out, redirect_stderr(
+                    StringIO()) as fg_err:
+                try:
                     m = geometric.optimize.run_optimizer(
                         customengine=opt_engine,
                         coordsys=self.coordsys,
@@ -201,8 +224,16 @@ class OptimizationDriver:
                         maxiter=self.max_iter,
                         converge=self.conv_flags(), 
                         constraints=constr_filename,
-                        input=filename,
-                        logIni=str(log_ini))
+                        transition=self.transition,
+                        hessian=self.hessian,
+                        input=filename + '.optinp')
+                except geometric.errors.HessianExit:
+                    hessian_exit = True
+
+        if hessian_exit:
+            if self.rank == mpi_master() and self.hessian == 'stop':
+                self.print_vib_analysis('vdata_first')
+            return molecule
 
         coords = m.xyzs[-1] / geometric.nifty.bohr2ang
         labels = molecule.get_labels()
@@ -233,6 +264,9 @@ class OptimizationDriver:
             if self.cna:
                 self.cna_analysis(final_mol, molecule, self.ref_xyz)
     
+            if self.hessian in ['last', 'first+last', 'each']:
+                self.print_vib_analysis('vdata_last')
+
             valstr = '*** Time spent in Optimization Driver: '
             valstr += '{:.2f} sec'.format(tm.time() - start_time)
             self.ostream.print_header(valstr)
@@ -280,35 +314,101 @@ class OptimizationDriver:
         if extfile.is_file():
             extfile.unlink()
 
-    def write_log_ini(self, fname):
+    @staticmethod
+    def get_ic_rmsd(opt_mol, ref_mol):
+        """
+        Gets statistical deviation of bonds, angles and dihedral angles between
+        optimized and reference geometry.
 
-        lines = [
-            '[loggers]',
-            'keys=root',
-            '[handlers]',
-            'keys=stream_handler, file_handler',
-            '[formatters]',
-            'keys=formatter',
-            '[logger_root]',
-            'level=INFO',
-            'handlers=stream_handler, file_handler',
-            '[handler_stream_handler]',
-            'class=geometric.nifty.RawStreamHandler',
-            'level=INFO',
-            'formatter=formatter',
-            'args=(sys.stderr,)',
-            '[handler_file_handler]',
-            'class=geometric.nifty.RawFileHandler',
-            'level=INFO',
-            'formatter=formatter',
-            'args=(r\'%(logfilename)s\',)',
-            '[formatter_formatter]',
-            'format=%(message)s',
-        ]
+        :param opt_mol:
+            The optimized molecule.
+        :param ref_mol:
+            The reference molecule (or xyz filename).
 
-        with fname.open('w') as f_ini:
-            for line in lines:
-                print(line, file=f_ini)
+        :return:
+            The statistical deviation of bonds, angles and dihedral angles.
+        """
+
+        if isinstance(ref_mol, str):
+            errmsg = '*** Note: invalid reference xyz file!'
+        else:
+            errmsg = '*** Note: invalid reference molecule!'
+
+        if isinstance(ref_mol, str):
+            if Path(ref_mol).is_file():
+                ref_mol = Molecule.read_xyz(ref_mol)
+            else:
+                return errmsg
+
+        if ref_mol.get_labels() != opt_mol.get_labels():
+            return errmsg
+
+        g_mol = geometric.molecule.Molecule()
+        g_mol.elem = opt_mol.get_labels()
+        g_mol.xyzs = [opt_mol.get_coordinates() * geometric.nifty.bohr2ang]
+
+        ic = geometric.internal.DelocalizedInternalCoordinates(g_mol,
+                                                               build=True)
+
+        ref_geom = ref_mol.get_coordinates() * geometric.nifty.bohr2ang
+        opt_geom = opt_mol.get_coordinates() * geometric.nifty.bohr2ang
+
+        bonds = []
+        angles = []
+        dihedrals = []
+
+        for internal in ic.Prims.Internals:
+            if isinstance(internal, geometric.internal.Distance):
+                v1 = internal.value(ref_geom)
+                v2 = internal.value(opt_geom)
+                bonds.append(abs(v1 - v2))
+            elif isinstance(internal, geometric.internal.Angle):
+                v1 = internal.value(ref_geom)
+                v2 = internal.value(opt_geom)
+                angles.append(abs(v1 - v2) * 180.0 / np.pi)
+            elif isinstance(internal, geometric.internal.Dihedral):
+                v1 = internal.value(ref_geom)
+                v2 = internal.value(opt_geom)
+                diff_in_deg = (v1 - v2) * 180.0 / np.pi
+                if diff_in_deg > 180.0:
+                    diff_in_deg -= 360.0
+                elif diff_in_deg < -180.0:
+                    diff_in_deg += 360.0
+                dihedrals.append(abs(diff_in_deg))
+
+        ic_rmsd = {'bonds': None, 'angles': None, 'dihedrals': None}
+
+        if bonds:
+            np_bonds = np.array(bonds)
+            rms_bonds = np.sqrt(np.mean(np_bonds**2))
+            max_bonds = np.max(np_bonds)
+            ic_rmsd['bonds'] = {
+                'rms': rms_bonds,
+                'max': max_bonds,
+                'unit': 'Angstrom'
+            }
+
+        if angles:
+            np_angles = np.array(angles)
+            rms_angles = np.sqrt(np.mean(np_angles**2))
+            max_angles = np.max(np_angles)
+            ic_rmsd['angles'] = {
+                'rms': rms_angles,
+                'max': max_angles,
+                'unit': 'degree'
+            }
+
+        if dihedrals:
+            np_dihedrals = np.array(dihedrals)
+            rms_dihedrals = np.sqrt(np.mean(np_dihedrals**2))
+            max_dihedrals = np.max(np_dihedrals)
+            ic_rmsd['dihedrals'] = {
+                'rms': rms_dihedrals,
+                'max': max_dihedrals,
+                'unit': 'degree'
+            }
+
+        return ic_rmsd
 
     def print_opt_result(self, progress):
         """
@@ -443,7 +543,7 @@ class OptimizationDriver:
 
         xyz_filename = ref_mol if isinstance(ref_mol, str) else None
 
-        ic_rmsd = opt_mol.get_ic_rmsd(ref_mol)
+        ic_rmsd = self.get_ic_rmsd(opt_mol, ref_mol)
 
         if isinstance(ic_rmsd, str):
             self.ostream.print_header(ic_rmsd)
@@ -514,6 +614,9 @@ class OptimizationDriver:
         lines.append('Constraints             :    ' +
                      ('Yes' if self.constraints else 'No'))
         lines.append('Max. Number of Steps    :    ' + str(self.max_iter))
+        lines.append('Transition State        :    ' +
+                     ('Yes' if self.transition else 'No'))
+        lines.append('Hessian                 :    ' + self.hessian)
 
         maxlen = max([len(line.split(':')[0]) * 2 for line in lines])
         for line in lines:

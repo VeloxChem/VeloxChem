@@ -1,0 +1,15 @@
+target_sources(utests
+  PRIVATE
+    AOKohnShamMatrixTest.cpp
+    DensityGridDriverTest.cpp
+    DensityGridTest.cpp
+    GridDriverTest.cpp
+    LebedevLaikovQuadratureTest.cpp
+    Log3QuadratureTest.cpp
+    MolecularGridTest.cpp
+    PrimitiveFunctionalTest.cpp
+    XCFunctionalTest.cpp
+    XCGradientGridTest.cpp
+    XCHessianGridTest.cpp
+    XCIntegratorTest.cpp
+  )

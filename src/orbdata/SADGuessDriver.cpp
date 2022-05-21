@@ -35,6 +35,7 @@
 #include "DensityMatrixType.hpp"
 #include "ErrorHandler.hpp"
 #include "MpiFunc.hpp"
+#include "OverlapIntegralsDriver.hpp"
 #include "PartialCharges.hpp"
 #include "StringFormat.hpp"
 
@@ -124,8 +125,70 @@ CSADGuessDriver::_getOcc4s4p(const double nocc) const
 }
 
 std::vector<double>
-CSADGuessDriver::getOccupationNumbersForElement(const int32_t elem_id,
-                                                const double  nelec) const
+CSADGuessDriver::_getOcc5s(double occ) const
+{
+    //                           1s   2s   3s   4s   5s  2p-1 3p-1 4p-1 2p0  3p0  4p0  2p+1 3p+1 4p+1 3d-2 3d-1 3d0  3d+1 3d+2
+    return std::vector<double>({1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
+}
+
+std::vector<double>
+CSADGuessDriver::_getOcc4d(double occ) const
+{
+    //                           1s   2s   3s   4s   5s  2p-1 3p-1 4p-1 2p0  3p0  4p0  2p+1 3p+1 4p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1 3d+2 4d+2
+    return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ});
+}
+
+std::vector<double>
+CSADGuessDriver::_getOcc5s5p(double occ) const
+{
+    //                           1s   2s   3s   4s   5s  2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0  5p0  2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1 3d+2 4d+2
+    return std::vector<double>({1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
+}
+
+std::vector<double>
+CSADGuessDriver::_getOcc6s(double occ) const
+{
+    //                           1s   2s   3s   4s   5s  6s   2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0  5p0  2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1 3d+2 4d+2
+    return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
+}
+
+std::vector<double>
+CSADGuessDriver::_getOcc4f(double occ) const
+{
+    //                           1s   2s   3s   4s   5s  6s   2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0  5p0  2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1 3d+2 4d+2 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
+    return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, occ, occ, occ, occ, occ, occ});
+}
+
+std::vector<double>
+CSADGuessDriver::_getOcc5d(double occ) const
+{
+    //                           1s   2s   3s   4s   5s  6s   2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0  5p0  2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 5d-2 3d-1 4d-1 5d-1 3d0  4d0  5d0  3d+1 4d+1 5d+1 3d+2 4d+2 5d+2 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
+    return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
+}
+
+std::vector<double>
+CSADGuessDriver::_getOcc6s6p(double occ) const
+{
+    //                           1s   2s   3s   4s   5s  6s   2p-1 3p-1 4p-1 5p-1 6s-1 2p0  3p0  4p0  5p0  6s0  2p+1 3p+1 4p+1 5p+1 6s+1 3d-2 4d-2 5d-2 3d-1 4d-1 5d-1 3d0  4d0  5d0  3d+1 4d+1 5d+1 3d+2 4d+2 5d+2 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
+    return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
+}
+
+std::vector<double>
+CSADGuessDriver::_getOcc7s(double occ) const
+{
+    //                           1s   2s   3s   4s   5s  6s   7s   2p-1 3p-1 4p-1 5p-1 6s-1 2p0  3p0  4p0  5p0  6s0  2p+1 3p+1 4p+1 5p+1 6s+1 3d-2 4d-2 5d-2 3d-1 4d-1 5d-1 3d0  4d0  5d0  3d+1 4d+1 5d+1 3d+2 4d+2 5d+2 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
+    return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
+}
+
+std::vector<double>
+CSADGuessDriver::_getOcc5f(double occ) const
+{
+    //                           1s   2s   3s   4s   5s  6s   7s   2p-1 3p-1 4p-1 5p-1 6s-1 2p0  3p0  4p0  5p0  6s0  2p+1 3p+1 4p+1 5p+1 6s+1 3d-2 4d-2 5d-2 3d-1 4d-1 5d-1 3d0  4d0  5d0  3d+1 4d+1 5d+1 3d+2 4d+2 5d+2 4f-3 5f-3 4f-2 5f-2 4f-1 5f-1 4f0  5f0  4f+1 5f+1 4f+2 5f+2 4f+3 5f+3
+    return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ});
+}
+
+std::vector<double>
+CSADGuessDriver::getOccupationNumbersForElement(const int32_t elem_id, const double nelec) const
 {
     switch (elem_id)
     {
@@ -258,7 +321,205 @@ CSADGuessDriver::getOccupationNumbersForElement(const int32_t elem_id,
         case 36:
             return _getOcc4s4p(1.000 + nelec / 4.0);
 
-            // other elements: not implemented
+            // Rb,Sr
+
+        case 37:
+            return _getOcc5s(0.5 + nelec);
+
+        case 38:
+            return _getOcc5s(1.0 + nelec);
+
+            // Y,Zr,Nb,Mo,Tc,Ru,Rh,Pd,Ag,Cd (39-48)
+
+        case 39:
+            return _getOcc4d(0.1 + nelec / 5.0);
+
+        case 40:
+            return _getOcc4d(0.2 + nelec / 5.0);
+
+        case 41:
+            return _getOcc4d(0.3 + nelec / 5.0);
+
+        case 42:
+            return _getOcc4d(0.4 + nelec / 5.0);
+
+        case 43:
+            return _getOcc4d(0.5 + nelec / 5.0);
+
+        case 44:
+            return _getOcc4d(0.6 + nelec / 5.0);
+
+        case 45:
+            return _getOcc4d(0.7 + nelec / 5.0);
+
+        case 46:
+            return _getOcc4d(0.8 + nelec / 5.0);
+
+        case 47:
+            return _getOcc4d(0.9 + nelec / 5.0);
+
+        case 48:
+            return _getOcc4d(1.0 + nelec / 5.0);
+
+            // In,Sn,Sb,Te,I,Xe
+
+        case 49:
+            return _getOcc5s5p(0.375 + nelec / 4.0);
+
+        case 50:
+            return _getOcc5s5p(0.500 + nelec / 4.0);
+
+        case 51:
+            return _getOcc5s5p(0.625 + nelec / 4.0);
+
+        case 52:
+            return _getOcc5s5p(0.750 + nelec / 4.0);
+
+        case 53:
+            return _getOcc5s5p(0.875 + nelec / 4.0);
+
+        case 54:
+            return _getOcc5s5p(1.000 + nelec / 4.0);
+
+            // Cs,Ba (55-56)
+
+        case 55:
+            return _getOcc6s(0.5 + nelec);
+
+        case 56:
+            return _getOcc6s(1.0 + nelec);
+
+            // La,Ce,Pr,Nd,Pm,Sm,Eu,Gb,Tb,Dy,Ho,Er,Tm,Yb
+
+        case 57:
+            return _getOcc4f( 1.0 / 14.0 + nelec / 7.0);
+
+        case 58:
+            return _getOcc4f( 2.0 / 14.0 + nelec / 7.0);
+
+        case 59:
+            return _getOcc4f( 3.0 / 14.0 + nelec / 7.0);
+
+        case 60:
+            return _getOcc4f( 4.0 / 14.0 + nelec / 7.0);
+
+        case 61:
+            return _getOcc4f( 5.0 / 14.0 + nelec / 7.0);
+
+        case 62:
+            return _getOcc4f( 6.0 / 14.0 + nelec / 7.0);
+
+        case 63:
+            return _getOcc4f( 7.0 / 14.0 + nelec / 7.0);
+
+        case 64:
+            return _getOcc4f( 8.0 / 14.0 + nelec / 7.0);
+
+        case 65:
+            return _getOcc4f( 9.0 / 14.0 + nelec / 7.0);
+
+        case 66:
+            return _getOcc4f(10.0 / 14.0 + nelec / 7.0);
+
+        case 67:
+            return _getOcc4f(11.0 / 14.0 + nelec / 7.0);
+
+        case 68:
+            return _getOcc4f(12.0 / 14.0 + nelec / 7.0);
+
+        case 69:
+            return _getOcc4f(13.0 / 14.0 + nelec / 7.0);
+
+        case 70:
+            return _getOcc4f(14.0 / 14.0 + nelec / 7.0);
+
+            // Lu,Hf,Ta,W,Re,Os,Ir,Pt,Au,Hg
+
+        case 71:
+            return _getOcc5d(0.1 + nelec / 5.0);
+
+        case 72:
+            return _getOcc5d(0.2 + nelec / 5.0);
+
+        case 73:
+            return _getOcc5d(0.3 + nelec / 5.0);
+
+        case 74:
+            return _getOcc5d(0.4 + nelec / 5.0);
+
+        case 75:
+            return _getOcc5d(0.5 + nelec / 5.0);
+
+        case 76:
+            return _getOcc5d(0.6 + nelec / 5.0);
+
+        case 77:
+            return _getOcc5d(0.7 + nelec / 5.0);
+
+        case 78:
+            return _getOcc5d(0.8 + nelec / 5.0);
+
+        case 79:
+            return _getOcc5d(0.9 + nelec / 5.0);
+
+        case 80:
+            return _getOcc5d(1.0 + nelec / 5.0);
+
+            // Tl,Pb,Bi,Po,At,Rn (81-86)
+
+        case 81:
+            return _getOcc6s6p(0.375 + nelec / 4.0);
+
+        case 82:
+            return _getOcc6s6p(0.500 + nelec / 4.0);
+
+        case 83:
+            return _getOcc6s6p(0.625 + nelec / 4.0);
+
+        case 84:
+            return _getOcc6s6p(0.750 + nelec / 4.0);
+
+        case 85:
+            return _getOcc6s6p(0.875 + nelec / 4.0);
+
+        case 86:
+            return _getOcc6s6p(1.000 + nelec / 4.0);
+
+            // Fr,Ra (87-88)
+
+        case 87:
+            return _getOcc7s(0.5 + nelec);
+
+        case 88:
+            return _getOcc7s(1.0 + nelec);
+
+            // Ac,Th,Pa,U,Np,Pu,Am,Cm (89-96)
+
+        case 89:
+            return _getOcc5f( 1.0 / 14.0 + nelec / 7.0);
+
+        case 90:
+            return _getOcc5f( 2.0 / 14.0 + nelec / 7.0);
+
+        case 91:
+            return _getOcc5f( 3.0 / 14.0 + nelec / 7.0);
+
+        case 92:
+            return _getOcc5f( 4.0 / 14.0 + nelec / 7.0);
+
+        case 93:
+            return _getOcc5f( 5.0 / 14.0 + nelec / 7.0);
+
+        case 94:
+            return _getOcc5f( 6.0 / 14.0 + nelec / 7.0);
+
+        case 95:
+            return _getOcc5f( 7.0 / 14.0 + nelec / 7.0);
+
+        case 96:
+            return _getOcc5f( 8.0 / 14.0 + nelec / 7.0);
+
+            // 
 
         default:
             return std::vector<double>();
@@ -327,9 +588,7 @@ CAODensityMatrix
 CSADGuessDriver::compute(const CMolecule&       molecule,
                          const CMolecularBasis& basis_1,
                          const CMolecularBasis& basis_2,
-                         const COverlapMatrix&  S12,
-                         const COverlapMatrix&  S22,
-                         const bool             closedShell) const
+                         const std::string&     densityType) const
 {
     CAODensityMatrix dsad;
 
@@ -337,7 +596,13 @@ CSADGuessDriver::compute(const CMolecule&       molecule,
     {
         // generate SAD guess
 
-        dsad = _compSADGuess(molecule, basis_1, basis_2, S12, S22, closedShell);
+        COverlapIntegralsDriver ovldrv(_locComm);
+
+        auto S12 = ovldrv.compute(molecule, basis_1, basis_2);
+
+        auto S22 = ovldrv.compute(molecule, basis_2);
+
+        dsad = _compSADGuess(molecule, basis_1, basis_2, S12, S22, densityType);
     }
 
     return dsad;
@@ -349,7 +614,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
                                const CMolecularBasis& basis_2,
                                const COverlapMatrix&  S12,
                                const COverlapMatrix&  S22,
-                               const bool             closedShell) const
+                               const std::string&     densityType) const
 {
     auto natoms = molecule.getNumberOfAtoms();
 
@@ -528,7 +793,7 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
         // update csad_beta
 
-        if (!closedShell)
+        if (fstr::upcase(densityType) == std::string("UNRESTRICTED"))
         {
             for (int32_t j = 0; j < naodim_2; j++)
             {
@@ -546,18 +811,22 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     std::vector<CDenseMatrix> dsad;
 
-    if (closedShell)
+    if (fstr::upcase(densityType) == std::string("RESTRICTED"))
     {
         dsad.push_back(denblas::multABt(csad_alpha, csad_alpha));
 
         return CAODensityMatrix(dsad, denmat::rest);
     }
-    else
+    else if (fstr::upcase(densityType) == std::string("UNRESTRICTED"))
     {
         dsad.push_back(denblas::multABt(csad_alpha, csad_alpha));
 
         dsad.push_back(denblas::multABt(csad_beta, csad_beta));
 
         return CAODensityMatrix(dsad, denmat::unrest);
+    }
+    else
+    {
+        return CAODensityMatrix();
     }
 }

@@ -49,12 +49,12 @@ class CMolecule
     /**
      The charge of molecule.
      */
-    double _charge;
+    double _charge{0.0};
 
     /**
      The multiplicity of electronic ground state.
      */
-    int32_t _multiplicity;
+    int32_t _multiplicity{1};
 
     /**
      The vector of atomic coordinates (x, y, z).
@@ -90,7 +90,7 @@ class CMolecule
     /**
      Creates an empty molecule object.
      */
-    CMolecule();
+    CMolecule() = default;
 
     /**
      Creates a molecule object.
@@ -129,11 +129,6 @@ class CMolecule
      */
     CMolecule(const CMolecule& mol_1,
               const CMolecule& mol_2);
-
-    /**
-     Destroys a molecule object.
-     */
-    ~CMolecule();
 
     /**
      Creates a sub-molecule object by slicing the molecule object.

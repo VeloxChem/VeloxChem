@@ -90,8 +90,6 @@ class TestBasis:
 
             if not basis.is_file():
                 continue
-            if basis.name == 'MIN-CC-PVDZ':
-                continue
             if 'RI' in basis.name:
                 continue
 
@@ -110,20 +108,24 @@ class TestBasis:
     def test_avail_basis(self):
 
         h_basis = [
-            '6-311++G(2D,2P)', 'AUG-CC-PVTZ', 'DEF2-SVPD', 'MIN-CC-PVDZ',
+            '6-311++G(2D,2P)', 'AUG-CC-PVTZ', 'DEF2-SVPD', 'AO-START-GUESS',
             'STO-6G', 'DEF2-SV(P)', 'PCSEG-0'
         ]
         c_basis = [
             '6-31G', '6-31G(2DF,P)', 'AUG-CC-PVDZ', 'AUG-CC-PVQZ',
-            'SADLEJ-PVTZ', 'AUG-CC-PCVTZ', 'PCX-2'
+            'SADLEJ-PVTZ', 'AUG-CC-PCVTZ', 'PCX-2', 'ANO-S-MB'
         ]
+        zn_basis = ['CC-PVTZ', 'AO-START-GUESS', 'STO-3G', 'ANO-L-VQZP']
 
         if is_mpi_master():
 
             h_avail_basis = MolecularBasis.get_avail_basis('H')
             c_avail_basis = MolecularBasis.get_avail_basis('C')
+            zn_avail_basis = MolecularBasis.get_avail_basis('zn')
 
             for bas in h_basis:
                 assert bas in h_avail_basis
             for bas in c_basis:
                 assert bas in c_avail_basis
+            for bas in zn_basis:
+                assert bas in zn_avail_basis

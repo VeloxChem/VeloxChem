@@ -24,6 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from pathlib import PurePath
+from datetime import datetime
 import numpy as np
 import sys
 import re
@@ -84,6 +85,7 @@ class InputParser:
                 # remove comment and extra space
                 line = line.strip()
                 line = re.sub(r'!.*', '', line)
+                line = re.sub(r'#.*', '', line)
                 line = ' '.join(line.split())
 
                 # skip empty line
@@ -93,7 +95,7 @@ class InputParser:
                 # skip first line if reading basis set
                 if (not self.is_basis_set) and (line[:10] == '@BASIS_SET'):
                     self.is_basis_set = True
-                    self.basis_set_name = line.split()[1]
+                    self.basis_set_name = line[10:].strip()
                     continue
 
                 # begin of group
@@ -164,20 +166,9 @@ class InputParser:
             f_path = PurePath(self.inpname)
         self.input_dict['filename'] = str(f_path.with_name(f_path.stem))
 
-        # update checkpoint filename
-        abbrev = {
-            'scf': 'scf',
-            'response': 'rsp',
-            'exciton': 'exciton',
-        }
-
-        for job_type in abbrev:
-            if job_type not in self.input_dict:
-                self.input_dict[job_type] = {}
-            if 'checkpoint_file' not in self.input_dict[job_type]:
-                checkpoint_file = str(
-                    f_path.with_suffix(f'.{abbrev[job_type]}.h5'))
-                self.input_dict[job_type]['checkpoint_file'] = checkpoint_file
+        # initializes scf group if not defined in input file
+        if 'scf' not in self.input_dict:
+            self.input_dict['scf'] = {}
 
     def get_dict(self):
         """
@@ -213,6 +204,8 @@ def parse_seq_fixed(input_seq, flag='float'):
             return tuple([float(x) for x in seq_str.split()])
         elif flag == 'int':
             return tuple([int(x) for x in seq_str.split()])
+        elif flag == 'str':
+            return tuple(seq_str.split())
         else:
             assert_msg_critical(False,
                                 f'parse_seq_fixed: invalid flag \'{flag}\'')
@@ -284,9 +277,9 @@ def parse_bool(input_bool):
         return input_bool
 
     elif isinstance(input_bool, str):
-        if input_bool.lower() in ['yes', 'y']:
+        if input_bool.lower() in ['true', 'yes', 'y']:
             return True
-        elif input_bool.lower() in ['no', 'n']:
+        elif input_bool.lower() in ['false', 'no', 'n']:
             return False
         else:
             assert_msg_critical(
@@ -343,16 +336,19 @@ def parse_list(input_list):
 def parse_input(obj, keyword_types, input_dictionary):
     """
     Parses input keywords for object.
-    - 'str' for string input, such as 'checkpoint_file: mycheckpoint.h5'
-    - 'str_upper' for uppercase string input, such as 'qq_type: QQ_DEN'
-    - 'str_lower' for lowercase string input, such as 'coordsys: tric'
-    - 'int' for integer input, such as 'max_iter: 300'
-    - 'float' for floating-point input, such as 'eri_thresh: 1.0e-12'
-    - 'bool' for floating-point input, such as 'restart: no'
-    - 'list' for multi-line input, such as 'constraints'
-    - 'seq_fixed_int' for fixed-length integer sequence, such as 'cube_points: 80,80,80'
-    - 'seq_fixed' for fixed-length sequence, such as 'cube_origin: 0.0,0.0,0.0'
-    - 'seq_range' for sequence with range, such as 'frequencies: 0.0-0.1(0.02)'
+        - 'str' for string input, such as 'checkpoint_file: mycheckpoint.h5'
+        - 'str_upper' for uppercase string input, such as 'qq_type: QQ_DEN'
+        - 'str_lower' for lowercase string input, such as 'coordsys: tric'
+        - 'int' for integer input, such as 'max_iter: 300'
+        - 'float' for floating-point input, such as 'eri_thresh: 1.0e-12'
+        - 'bool' for floating-point input, such as 'restart: no'
+        - 'list' for multi-line input, such as 'constraints'
+        - 'seq_fixed_str' for fixed-length string sequence, such as
+          'atom_types: c3,c3,hc'
+        - 'seq_fixed_int' for fixed-length integer sequence, such as
+          'cube_points: 80,80,80'
+        - 'seq_fixed' for fixed-length sequence, such as 'cube_origin: 0.0,0.0,0.0'
+        - 'seq_range' for sequence with range, such as 'frequencies: 0.0-0.1(0.02)'
 
     :param obj:
         The object.
@@ -391,6 +387,9 @@ def parse_input(obj, keyword_types, input_dictionary):
         elif keyword_types[key] == 'list':
             setattr(obj, key, parse_list(val))
 
+        elif keyword_types[key] == 'seq_fixed_str':
+            setattr(obj, key, parse_seq_fixed(val, 'str'))
+
         elif keyword_types[key] == 'seq_fixed_int':
             setattr(obj, key, parse_seq_fixed(val, 'int'))
 
@@ -403,3 +402,65 @@ def parse_input(obj, keyword_types, input_dictionary):
         else:
             err_type = f'parse_input: invalid keyword type for \'{key}\''
             assert_msg_critical(False, err_type)
+
+
+def print_keywords(input_keywords, ostream):
+    """
+    Prints input keywords to output stream.
+    """
+
+    width = 80
+    for group in input_keywords:
+        group_print = group.replace('_', ' ')
+        ostream.print_header('=' * width)
+        ostream.print_header(f'  @{group_print}'.ljust(width))
+        ostream.print_header('-' * width)
+        for key, val in input_keywords[group].items():
+            text = f'  {key}'.ljust(20)
+            text += f'  {get_keyword_type(val[0])}'.ljust(15)
+            text += f'  {val[1]}'.ljust(width - 35)
+            ostream.print_header(text)
+    ostream.print_header('=' * width)
+    ostream.flush()
+
+
+def get_keyword_type(keyword_type):
+    """
+    Gets keyword type for printing.
+        - 'str', 'str_upper', 'str_lower' -> 'string'
+        - 'int' -> 'integer'
+        - 'float' -> 'float'
+        - 'bool' -> 'boolean'
+        - 'list' -> 'multi-line'
+        - 'seq_fixed_str', 'seq_fixed_int', 'seq_fixed' -> 'sequence'
+        - 'seq_range' -> 'sequence'
+
+    :return:
+        The keyword type for printing.
+    """
+
+    return {
+        'str': 'string',
+        'str_upper': 'string',
+        'str_lower': 'string',
+        'int': 'integer',
+        'float': 'float',
+        'bool': 'boolean',
+        'list': 'multi-line',
+        'seq_fixed_str': 'sequence',
+        'seq_fixed_int': 'sequence',
+        'seq_fixed': 'sequence',
+        'seq_range': 'sequence',
+    }[keyword_type]
+
+
+def get_datetime_string():
+    """
+    Gets datetime string.
+
+    :return:
+        The datetime string (ISO format with ':' replaced by '.').
+    """
+
+    return datetime.now().isoformat(sep='T',
+                                    timespec='seconds').replace(':', '.')

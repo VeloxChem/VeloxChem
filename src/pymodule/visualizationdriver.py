@@ -155,7 +155,7 @@ def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
     Computes and writes cube file.
 
     :param cube_dict:
-        The input dictionary of cube options.
+        The dictionary of cube input.
     :param molecule:
         The molecule.
     :param basis:

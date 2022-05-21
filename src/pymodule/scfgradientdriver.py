@@ -23,14 +23,9 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from mpi4py import MPI
-import numpy as np
 import time as tm
-import sys
 
-from .molecule import Molecule
 from .gradientdriver import GradientDriver
-from .outputstream import OutputStream
 
 
 class ScfGradientDriver(GradientDriver):
@@ -54,13 +49,7 @@ class ScfGradientDriver(GradientDriver):
         Initializes gradient driver.
         """
 
-        if comm is None:
-            comm = MPI.COMM_WORLD
-
-        if ostream is None:
-            ostream = OutputStream(sys.stdout)
-
-        super().__init__(comm, ostream)
+        super().__init__(scf_drv, comm, ostream)
 
         self.flag = 'SCF Gradient Driver'
         self.scf_drv = scf_drv
@@ -68,7 +57,7 @@ class ScfGradientDriver(GradientDriver):
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
-        Performs calculation of numerical gradient.
+        Performs calculation of gradient.
 
         :param molecule:
             The molecule.
@@ -78,39 +67,18 @@ class ScfGradientDriver(GradientDriver):
             The minimal AO basis set.
         """
 
-        self.print_header()
         start_time = tm.time()
-
-        scf_ostream_state = self.scf_drv.ostream.state
-        self.scf_drv.ostream.state = False
+        self.print_header()
 
         # atom labels
         labels = molecule.get_labels()
 
-        # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
+        scf_ostream_state = self.scf_drv.ostream.state
+        self.scf_drv.ostream.state = False
 
-        # numerical gradient
-        self.gradient = np.zeros((molecule.number_of_atoms(), 3))
+        # Currently, only numerical gradients activated
+        self.compute_numerical(molecule, ao_basis, min_basis)
 
-        for i in range(molecule.number_of_atoms()):
-            for d in range(3):
-                coords[i, d] += self.delta_h
-                new_mol = Molecule(labels, coords, units='au')
-                self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                e_plus = self.scf_drv.get_scf_energy()
-
-                coords[i, d] -= 2.0 * self.delta_h
-                new_mol = Molecule(labels, coords, units='au')
-                self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                e_minus = self.scf_drv.get_scf_energy()
-
-                coords[i, d] += self.delta_h
-                self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
-
-        self.ostream.print_blank()
-
-        self.scf_drv.compute(molecule, ao_basis, min_basis)
         self.scf_drv.ostream.state = scf_ostream_state
 
         # print gradient
@@ -122,3 +90,21 @@ class ScfGradientDriver(GradientDriver):
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def compute_energy(self, molecule, ao_basis, min_basis=None):
+        """
+        Computes the energy at current geometry.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param min_basis:
+            The minimal AO basis set.
+
+        :return:
+            The energy.
+        """
+
+        self.scf_drv.compute(molecule, ao_basis, min_basis)
+        return self.scf_drv.get_scf_energy()

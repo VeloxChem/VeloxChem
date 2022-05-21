@@ -1,5 +1,6 @@
 from pathlib import Path
 import numpy as np
+import pytest
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.veloxchemlib import bohr_in_angstroms
@@ -10,6 +11,8 @@ from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.optimizationdriver import OptimizationDriver
 
 
+@pytest.mark.filterwarnings(
+    'ignore:.*tostring.*tobytes:DeprecationWarning:geometric')
 class TestOptimizeSCF:
 
     def run_opt(self, inpfile, basis_label, ref_coords):
@@ -31,9 +34,11 @@ class TestOptimizeSCF:
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
-        opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
-                                     'SCF')
-        opt_drv.update_settings({'coordsys': 'tric'})
+        opt_drv = OptimizationDriver(grad_drv)
+        opt_drv.update_settings({
+            'coordsys': 'tric',
+            'filename': task.input_dict['filename'],
+        })
         opt_mol, opt_ene = opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         if is_mpi_master(task.mpi_comm):
@@ -42,8 +47,11 @@ class TestOptimizeSCF:
 
             inpfile = Path(inpfile)
             optfile = Path(str(inpfile.with_name(inpfile.stem)) + '_optim.xyz')
+            logfile = inpfile.with_suffix('.log')
             if optfile.is_file():
                 optfile.unlink()
+            if logfile.is_file():
+                logfile.unlink()
 
     def test_nh3(self):
 

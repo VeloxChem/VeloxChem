@@ -5,12 +5,23 @@ try:
     import MDAnalysis
 except ImportError:
     pass
+try:
+    import cppe
+except ImportError:
+    pass
 
-from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.trajectorydriver import TrajectoryDriver
+from veloxchem.veloxchemlib import is_mpi_master
 
 
+@pytest.mark.filterwarnings(
+    'ignore:.*distutils Version classes:DeprecationWarning')
+@pytest.mark.filterwarnings(
+    'ignore:Using the last letter of the segid:DeprecationWarning:MDAnalysis')
+@pytest.mark.filterwarnings(
+    'ignore:TPR files index residues from 0:DeprecationWarning:MDAnalysis')
+@pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
 class TestTrajectoryDriver:
 
     def run_trajectory(self, filename, ref_exc_energies, ref_osc_strengths):

@@ -58,11 +58,14 @@ class ScfRestrictedDriver(ScfDriver):
             comm = MPI.COMM_WORLD
 
         if ostream is None:
-            ostream = OutputStream(sys.stdout)
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
 
         super().__init__(comm, ostream)
 
-        self.closed_shell = True
+        self.scf_type = 'restricted'
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """
@@ -208,12 +211,14 @@ class ScfRestrictedDriver(ScfDriver):
 
         return effmat
 
-    def gen_molecular_orbitals(self, fock_mat, oao_mat):
+    def gen_molecular_orbitals(self, molecule, fock_mat, oao_mat):
         """
         Generates spin restricted molecular orbital by diagonalizing
         spin restricted closed shell Fock/Kohn-Sham matrix. Overloaded base
         class method.
 
+        :param molecule:
+            The molecule.
         :param fock_mat:
             The Fock/Kohn-Sham matrix.
         :param oao_mat:
@@ -231,7 +236,9 @@ class ScfRestrictedDriver(ScfDriver):
             orb_coefs = np.matmul(tmat, evecs)
             orb_coefs, eigs = self.delete_mos(orb_coefs, eigs)
 
-            return MolecularOrbitals([orb_coefs], [eigs], molorb.rest)
+            occa = molecule.get_aufbau_occupation(eigs.size, 'restricted')
+
+            return MolecularOrbitals([orb_coefs], [eigs], [occa], molorb.rest)
 
         return MolecularOrbitals()
 

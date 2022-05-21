@@ -31,12 +31,15 @@
 #ifdef MSMPI_VER
 #define PyMPI_HAVE_MPI_Message 1
 #endif
-#include <mpi4py/mpi4py.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include <memory>
+#include <tuple>
+#include <type_traits>
 #include <utility>
+#include <vector>
 
 #include "ErrorHandler.hpp"
 #include "MemBlock.hpp"
@@ -58,61 +61,86 @@ namespace vlx_general {  // vlx_general namespace
  */
 MPI_Comm* get_mpi_comm(py::object py_comm);
 
-/**
- Gets numpy array from double pointer and int32_t dimension.
-
- @param ptr the double pointer.
- @param dimension the shape of numpy array.
- @return numpy array.
+/** Gets shape and strides parameters for array_t CTOR.
+ *
+ * @tparam T scalar type of array.
+ * @param dimension the shape of numpy array.
+ * @return shape and strides of numpy array.
  */
-py::array_t<double> pointer_to_numpy(const double* ptr, const std::vector<int32_t>& dimension);
+template <typename T>
+auto
+array_t_params(const std::vector<int32_t>& dimension) -> std::tuple<std::vector<py::ssize_t>, std::vector<py::ssize_t>>
+{
+    std::vector<py::ssize_t> shape, strides;
 
-/**
- Gets 1d numpy array from double pointer and int32_t dimension.
+    for (size_t i = 0; i < dimension.size(); i++)
+    {
+        shape.push_back(static_cast<py::ssize_t>(dimension[i]));
 
- @param ptr the double pointer.
- @param nElements number of elements.
- @return numpy array.
+        size_t strd = 1;
+
+        for (size_t j = i + 1; j < dimension.size(); j++)
+        {
+            strd *= dimension[j];
+        }
+
+        strides.push_back(static_cast<py::ssize_t>(strd * sizeof(T)));
+    }
+
+    return {shape, strides};
+}
+
+/** Gets numpy array from pointer and shape.
+ *
+ * @tparam T scalar type of array.
+ * @param ptr pointer to data.
+ * @param dimension the shape of numpy array.
+ * @return numpy array.
  */
-py::array_t<double> pointer_to_numpy(const double* ptr, const int32_t nElements);
+template <typename T>
+auto
+pointer_to_numpy(const T* ptr, const std::vector<int32_t>& dimension) -> py::array_t<T>
+{
+    static_assert(std::is_arithmetic_v<T>, "NumPy array can only be instantiated with arithmetic types.");
+    if (ptr == nullptr || dimension.size() == 0)
+    {
+        return py::array_t<T>();
+    }
+    else
+    {
+        auto [shape, strides] = array_t_params<T>(dimension);
+        return py::array_t<T>(shape, strides, ptr);
+    }
+}
 
-/**
- Gets 2d numpy array from double pointer and int32_t dimension.
-
- @param ptr the double pointer.
- @param nRows number of rows.
- @param nColumns number of columns.
- @return numpy array.
+/** Gets 1d numpy array from double pointer and int32_t dimension.
+ *
+ * @tparam T scalar type of array.
+ * @param ptr pointer to data.
+ * @param nElements number of elements.
+ * @return numpy array.
  */
-py::array_t<double> pointer_to_numpy(const double* ptr, const int32_t nRows, const int32_t nColumns);
+template <typename T>
+auto
+pointer_to_numpy(const T* ptr, int32_t nElements) -> py::array_t<T>
+{
+    return pointer_to_numpy(ptr, std::vector<int32_t>{nElements});
+}
 
-/**
- Gets numpy array from int32_t pointer and dimension.
-
- @param ptr the int32_t pointer.
- @param dimension the shape of numpy array.
- @return numpy array.
+/** Gets 2d numpy array from double pointer and int32_t dimension.
+ *
+ * @tparam T scalar type of array.
+ * @param ptr pointer to data.
+ * @param nRows number of rows.
+ * @param nColumns number of columns.
+ * @return numpy array.
  */
-py::array_t<int32_t> pointer_to_numpy(const int32_t* ptr, const std::vector<int32_t>& dimension);
-
-/**
- Gets 1d numpy array from int32_t pointer and dimension.
-
- @param ptr the int32_t pointer.
- @param nElements number of elements.
- @return numpy array.
- */
-py::array_t<int32_t> pointer_to_numpy(const int32_t* ptr, const int32_t nElements);
-
-/**
- Gets 2d numpy array from int32_t pointer and dimension.
-
- @param ptr the int32_t pointer.
- @param nRows number of rows.
- @param nColumns number of columns.
- @return numpy array.
- */
-py::array_t<int32_t> pointer_to_numpy(const int32_t* ptr, const int32_t nRows, const int32_t nColumns);
+template <typename T>
+auto
+pointer_to_numpy(const T* ptr, int32_t nRows, int32_t nColumns) -> py::array_t<T>
+{
+    return pointer_to_numpy(ptr, std::vector<int32_t>{nRows, nColumns});
+}
 
 /**
  Convert NumPy array to 1-dimensional memory block, i.e. contiguous array.
@@ -126,7 +154,7 @@ CMemBlock<T>
 numpy_to_memblock(const py::array_t<T>& arr)
 {
     std::string errmsg("numpy_to_memblock: Expecting a C-style contiguous numpy array");
-    auto c_style = py::detail::check_flags(arr.ptr(), py::array::c_style);
+    auto        c_style = py::detail::check_flags(arr.ptr(), py::array::c_style);
     errors::assertMsgCritical(c_style, errmsg);
     return CMemBlock<T>(arr.data(), arr.size(), numa::serial);
 }
@@ -145,19 +173,6 @@ numpy_fstyle_to_memblock2d(const py::array_t<T, py::array::f_style>& arr)
 {
     return CMemBlock2D<T>(arr.data(), arr.shape(0), arr.shape(1));
 }
-
-/**
- Bind overloaded functions in a less verbose fashion
-
- Use as:
-
-    vlx_general::overload_cast_<argument-list>()(name-of-function)
-
- NOTE This is a workaround for C++11 usage of pybind11::overload_cast.
- See: https://pybind11.readthedocs.io/en/stable/classes.html#overloaded-methods
- */
-template <typename... Args>
-using overload_cast_ = py::detail::overload_cast_impl<Args...>;
 
 /** Wrapper for object constructors accepting an MPI communicator.
  *

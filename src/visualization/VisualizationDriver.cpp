@@ -25,10 +25,10 @@
 
 #include "VisualizationDriver.hpp"
 
+#include <mpi.h>
+
 #include <cmath>
 #include <cstring>
-
-#include <mpi.h>
 
 #include "BasisFunction.hpp"
 #include "CubicGrid.hpp"
@@ -187,6 +187,193 @@ CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
     return phi;
 }
 
+std::vector<std::vector<int32_t>>
+CVisualizationDriver::getAtomicOrbitalInformation(const CMolecule& molecule, const CMolecularBasis& basis) const
+{
+    std::vector<std::vector<int32_t>> aoinfo;
+
+    auto natoms = molecule.getNumberOfAtoms();
+
+    auto max_angl = basis.getMolecularMaxAngularMomentum(molecule);
+
+    // azimuthal quantum number: s,p,d,f,...
+
+    for (int32_t angl = 0; angl <= max_angl; angl++)
+    {
+        CSphericalMomentum sphmom(angl);
+
+        auto nsph = sphmom.getNumberOfComponents();
+
+        // magnetic quantum number: s,p-1,p0,p+1,d-2,d-1,d0,d+1,d+2,...
+
+        for (int32_t isph = 0; isph < nsph; isph++)
+        {
+            // atoms
+
+            for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
+            {
+                auto idelem = molecule.getIdsElemental()[atomidx];
+
+                auto nao = basis.getNumberOfBasisFunctions(idelem, angl);
+
+                // atomic orbitals
+
+                for (int32_t iao = 0; iao < nao; iao++)
+                {
+                    aoinfo.push_back(std::vector<int32_t>({idelem, angl, isph, iao}));
+                }
+            }
+        }
+    }
+
+    return aoinfo;
+}
+
+std::vector<std::vector<int32_t>>
+CVisualizationDriver::mapAtomToAtomicOrbitals(const CMolecule& molecule, const CMolecularBasis& basis) const
+{
+    auto natoms = molecule.getNumberOfAtoms();
+
+    std::vector<std::vector<int32_t>> atomToAO(natoms, std::vector<int32_t>());
+
+    auto max_angl = basis.getMolecularMaxAngularMomentum(molecule);
+
+    // azimuthal quantum number: s,p,d,f,...
+
+    for (int32_t aoidx = 0, angl = 0; angl <= max_angl; angl++)
+    {
+        CSphericalMomentum sphmom(angl);
+
+        auto nsph = sphmom.getNumberOfComponents();
+
+        // magnetic quantum number: s,p-1,p0,p+1,d-2,d-1,d0,d+1,d+2,...
+
+        for (int32_t isph = 0; isph < nsph; isph++)
+        {
+            // atoms
+
+            for (int32_t atomidx = 0; atomidx < natoms; atomidx++)
+            {
+                auto idelem = molecule.getIdsElemental()[atomidx];
+
+                auto nao = basis.getNumberOfBasisFunctions(idelem, angl);
+
+                // atomic orbitals
+
+                for (int32_t iao = 0; iao < nao; iao++, aoidx++)
+                {
+                    atomToAO[atomidx].push_back(aoidx);
+                }
+            }
+        }
+    }
+
+    return atomToAO;
+}
+
+void
+CVisualizationDriver::computeAtomicOrbitalForGrid(CCubicGrid& grid, const CMolecularBasis& basis, const std::vector<int32_t>& aoinfo) const
+{
+    // atomic orbital information
+
+    auto idelem = aoinfo[0];
+
+    auto angl = aoinfo[1];
+
+    auto isph = aoinfo[2];
+
+    auto iao = aoinfo[3];
+
+    // prepare Cartesian components
+
+    std::vector<double> fcarts, lx, ly, lz;
+
+    CSphericalMomentum sphmom(angl);
+
+    auto ncomp = sphmom.getNumberOfFactors(isph);
+
+    auto lmn = _buildCartesianAngularMomentum(angl);
+
+    for (int32_t icomp = 0; icomp < ncomp; icomp++)
+    {
+        fcarts.push_back(sphmom.getFactors(isph)[icomp]);
+
+        auto cartind = sphmom.getIndexes(isph)[icomp];
+
+        lx.push_back(lmn[cartind][0]);
+
+        ly.push_back(lmn[cartind][1]);
+
+        lz.push_back(lmn[cartind][2]);
+    }
+
+    // calculate atomic orbital on grid points
+
+    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
+
+    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
+
+    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
+
+    #pragma omp parallel for schedule(dynamic)
+    for (int32_t ix = 0; ix < nx; ix++)
+    {
+        double rx = x0 + dx * ix;
+
+        int32_t xstride = ix * ny * nz;
+
+        for (int32_t iy = 0; iy < ny; iy++)
+        {
+            double ry = y0 + dy * iy;
+
+            int32_t ystride = iy * nz;
+
+            for (int32_t iz = 0; iz < nz; iz++)
+            {
+                double rz = z0 + dz * iz;
+
+                int32_t zstride = iz;
+
+                // note that the AO is centered at origin
+
+                double r2 = rx * rx + ry * ry + rz * rz;
+
+                // process primitives in atomic orbital
+
+                double phiao = 0.0;
+
+                auto basisfuncs = basis.getBasisFunctions(idelem, angl);
+
+                auto nprims = basisfuncs[iao].getNumberOfPrimitiveFunctions();
+
+                auto exponents = basisfuncs[iao].getExponents();
+
+                auto normcoefs = basisfuncs[iao].getNormalizationFactors();
+
+                for (int32_t iprim = 0; iprim < nprims; iprim++)
+                {
+                    double expon = std::exp(-exponents[iprim] * r2);
+
+                    double coef1 = normcoefs[iprim];
+
+                    // transform from Cartesian to spherical harmonics
+
+                    for (int32_t icomp = 0; icomp < ncomp; icomp++)
+                    {
+                        double coef2 = coef1 * fcarts[icomp];
+
+                        double powxyz = std::pow(rx, lx[icomp]) * std::pow(ry, ly[icomp]) * std::pow(rz, lz[icomp]);
+
+                        phiao += coef2 * powxyz * expon;
+                    }
+                }
+
+                grid.values()[xstride + ystride + zstride] = phiao;
+            }
+        }
+    }
+}
+
 int32_t
 CVisualizationDriver::getRank() const
 {
@@ -271,9 +458,8 @@ CVisualizationDriver::compute(CCubicGrid&               grid,
         yzdispls.push_back(xdispls[i] * ny * nz);
     }
 
-    MPI_Gatherv(localgrid.values(), yzcounts[_locRank], MPI_DOUBLE,
-                grid.values(), yzcounts.data(), yzdispls.data(), MPI_DOUBLE,
-                mpi::master(), _locComm);
+    MPI_Gatherv(
+        localgrid.values(), yzcounts[_locRank], MPI_DOUBLE, grid.values(), yzcounts.data(), yzdispls.data(), MPI_DOUBLE, mpi::master(), _locComm);
 }
 
 void
@@ -321,9 +507,8 @@ CVisualizationDriver::compute(CCubicGrid&             grid,
         yzdispls.push_back(xdispls[i] * ny * nz);
     }
 
-    MPI_Gatherv(localgrid.values(), yzcounts[_locRank], MPI_DOUBLE,
-                grid.values(), yzcounts.data(), yzdispls.data(), MPI_DOUBLE,
-                mpi::master(), _locComm);
+    MPI_Gatherv(
+        localgrid.values(), yzcounts[_locRank], MPI_DOUBLE, grid.values(), yzcounts.data(), yzdispls.data(), MPI_DOUBLE, mpi::master(), _locComm);
 }
 
 void
@@ -719,11 +904,11 @@ CVisualizationDriver::getTwoParticleDensity(const std::vector<std::vector<double
         // compute density
 
         auto g_11 = getOneParticleDensity(coords_1, coords_1, molecule, basis, density, denidx, spin_1, spin_1);
-                                                                                                              
+
         auto g_22 = getOneParticleDensity(coords_2, coords_2, molecule, basis, density, denidx, spin_2, spin_2);
-                                                                                                              
+
         auto g_12 = getOneParticleDensity(coords_1, coords_2, molecule, basis, density, denidx, spin_1, spin_2);
-                                                                                                              
+
         auto g_21 = getOneParticleDensity(coords_2, coords_1, molecule, basis, density, denidx, spin_2, spin_1);
 
         auto npoints = static_cast<int32_t>(coords_1.size());

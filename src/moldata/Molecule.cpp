@@ -25,23 +25,15 @@
 
 #include "Molecule.hpp"
 
+#include <mpi.h>
+
 #include <cmath>
 #include <sstream>
-
-#include <mpi.h>
 
 #include "Codata.hpp"
 #include "MathFunc.hpp"
 #include "StringFormat.hpp"
 #include "ChemicalElement.hpp"
-
-CMolecule::CMolecule()
-
-    : _charge(0.0)
-
-    , _multiplicity(1)
-{
-}
 
 CMolecule::CMolecule(const std::vector<double>&      atomCoordinates,
                      const std::vector<double>&      atomCharges,
@@ -49,27 +41,16 @@ CMolecule::CMolecule(const std::vector<double>&      atomCoordinates,
                      const std::vector<std::string>& atomLabels,
                      const std::vector<int32_t>&     idsElemental)
 
-    : _charge(0.0)
+    : _atomCoordinates(atomCoordinates, static_cast<int32_t>(idsElemental.size()), 3)
 
-    , _multiplicity(1)
+    , _atomCharges{atomCharges}
+
+    , _atomMasses{atomMasses}
+
+    , _atomLabels{atomLabels}
+
+    , _idsElemental{idsElemental}
 {
-    auto natoms = static_cast<int32_t>(idsElemental.size());
-
-    // set up atom's properties
-
-    _atomCoordinates = CMemBlock2D<double>(atomCoordinates, natoms, 3);
-
-    _atomCharges = CMemBlock<double>(atomCharges);
-
-    _atomMasses = CMemBlock<double>(atomMasses);
-
-    _atomLabels = atomLabels;
-
-    _idsElemental = CMemBlock<int32_t>(idsElemental);
-
-    // set up default indexing of atoms in molecule
-
-    setAtomicIndexes(0);
 }
 
 CMolecule::CMolecule(const CMolecule& source)
@@ -190,15 +171,9 @@ CMolecule::CMolecule(const CMolecule& mol_1, const CMolecule& mol_2)
 
     _idsElemental = CMemBlock<int32_t>(idsElemental);
 
-    setAtomicIndexes(0);
-
     setCharge(mol_1._charge + mol_2._charge);
 
     setMultiplicity(mol_1._multiplicity + mol_2._multiplicity - 1);
-}
-
-CMolecule::~CMolecule()
-{
 }
 
 CMolecule
@@ -657,7 +632,7 @@ CMolecule::getMkRadii() const
 
     for (int32_t i = 0; i < getNumberOfAtoms(); i++)
     {
-        if (_idsElemental.data()[i] < mk_radii.size())
+        if (_idsElemental.data()[i] < static_cast<int32_t>(mk_radii.size()))
         {
             atomradii.push_back(mk_radii[_idsElemental.data()[i]]);
         }
@@ -943,7 +918,7 @@ CMolecule::checkProximity(const double minDistance) const
 void
 CMolecule::broadcast(int32_t rank, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         mpi::bcast(_charge, comm);
 

@@ -27,6 +27,8 @@
 
 #include <cmath>
 
+#include <iostream> 
+
 #include "MathConst.hpp"
 
 namespace vxcfuncs {  // vxcfuncs namespace
@@ -46,7 +48,10 @@ namespace vxcfuncs {  // vxcfuncs namespace
                                     &vxcfuncs::LYPFuncGradientB,
                                     &vxcfuncs::LYPFuncHessianAB,
                                     &vxcfuncs::LYPFuncHessianA,
-                                    &vxcfuncs::LYPFuncHessianB);
+                                    &vxcfuncs::LYPFuncHessianB,
+                                    &vxcfuncs::LYPFuncCubicHessianAB,
+                                    &vxcfuncs::LYPFuncCubicHessianA,
+                                    &vxcfuncs::LYPFuncCubicHessianB);
     }
     
     void
@@ -673,6 +678,427 @@ namespace vxcfuncs {  // vxcfuncs namespace
     LYPFuncHessianB(      CXCHessianGrid& xcHessianGrid,
                     const double          factor,
                     const CDensityGrid&   densityGrid)
+    {
+        
+    }
+
+
+    void
+    LYPFuncCubicHessianAB(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                     const double          factor,
+                     const CDensityGrid&   densityGrid)
+    {
+        double A = 0.04918, B = 0.132, C = 0.2533, D = 0.349;
+        
+        double cf = 0.3 * std::pow(3 * mathconst::getPiValue() * mathconst::getPiValue(), 2.0 / 3.0);
+        
+        double CF = 0.3 * std::pow(3.0 * mathconst::getPiValue() * mathconst::getPiValue(), 2.0 / 3.0);
+        
+        // determine number of grid points
+        
+        auto ngpoints = densityGrid.getNumberOfGridPoints();
+        
+        // set up pointers to density grid data
+        
+        auto rhoa = densityGrid.alphaDensity(0);
+        
+        auto rhob = densityGrid.betaDensity(0);
+        
+        auto grada = densityGrid.alphaDensityGradient(0);
+        
+        auto gradb = densityGrid.betaDensityGradient(0);
+        
+        auto gradab = densityGrid.mixedDensityGradient(0);
+
+         // set up pointers to functional data
+        
+        auto df3000 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::rhoa);
+
+        auto df2100 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::rhob);
+        
+        auto df1200 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhob, xcvars::rhob);
+
+        auto df2010 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::grada);
+
+        auto df2001 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::gradb);
+
+        auto df0210 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::rhob, xcvars::grada);
+
+        auto df1020 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::grada, xcvars::grada);
+
+        auto df1002 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::gradb, xcvars::gradb);
+
+        auto df0120 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::grada, xcvars::grada);
+
+        auto df1110 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhob, xcvars::grada);
+
+        auto df1101 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhob, xcvars::gradb);
+
+        auto df20001 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::gradab);
+
+        auto df02001 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::rhob, xcvars::gradab);
+
+        auto df11001 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhob, xcvars::gradab);
+
+        #pragma omp simd aligned(rhoa, rhob, grada, gradb, df3000,df2100,df1200,df2010,df2001,df0210,df1020,df1002,df0120,df1110,df1101,df20001,df02001,df11001: VLX_ALIGN)
+        for (int32_t i = 0; i < ngpoints; i++)
+        {  
+            double rho = rhoa[i] + rhob[i];
+            
+            double rho2 = rho * rho;
+            
+            double rhoa2 = rhoa[i] * rhoa[i];
+            
+            double rhob2 = rhob[i] * rhob[i];
+
+            double ngrada2 = grada[i] * grada[i];
+            
+            double ngradb2 = gradb[i] * gradb[i];
+            
+            double ngrad2 = ngrada2 + ngradb2 + 2.0 * gradab[i];
+
+            double grada2 = ngrada2;
+            
+            double gradb2 = ngradb2;
+            
+            double grad2 = ngrad2;
+                                    
+            double rho13 = std::pow(rho, 1.0 / 3.0);
+            
+            double drho13 = D + rho13;
+
+            double rhoab = rhoa[i] * rhob[i];
+
+            double drho3_2 = drho13 * drho13;
+
+            double drho3_3 = drho13 * drho3_2;
+
+            double grad = grada[i] + gradb[i];
+
+            /* s derivatives */
+
+            double sA = (rhoa[i] * grada2 + rhob[i] * gradb2) / rho;
+            
+            double sA10 = (grada[i] - gradb[i]) * grad * rhob[i] / rho2;
+            
+            double sA01 = (gradb[i] - grada[i]) * grad * rhoa[i] / rho2;
+                        
+            double sA1000 = (grada[i] - gradb[i]) * grad * rhob[i] / rho2;
+            
+            double sA0100 = (gradb[i] - grada[i]) * grad * rhoa[i] / rho2;
+            
+            double sA2000 =  -2.0 * sA1000 / rho;
+            
+            double sA0200 =  -2.0 * sA0100 / rho;
+            
+            double sA1100 = (rhoa[i] - rhob[i]) * (grada[i] - gradb[i]) * grad / (rho2 * rho);
+
+            double sA3000 = -3*sA2000/rho;
+
+            double sA1200 = -2*sA1100/rho+2*sA0100/rho2;
+
+            double sA2100 = -2*sA1100/rho+2*sA1000/rho2;
+
+            double de = C / ( 3.0 * rho * rho13);
+
+            double de1 = -4.0 * C / ( 9.0 * rho2 * rho13);
+
+            double de2 = -de1*7.0/(3*rho);
+
+            double dl = C / rho13 + D / (rho13 * (1 + D / rho13));
+
+            double dl_1 = (-C * drho3_2 - D * rho / rho13) / (3.0 * rho * rho13 * drho3_2);
+
+            double dl_2 = (4.0 * rho * (C + D) + 2.0 * D * (6.0 * rho13 * C * D + 2.0 * C * D * D + rho / rho13 * (6 * C + D))) / (9.0 * rho2 * rho13 * drho3_3);
+
+            double dl_3 = (-2.0*rho/rho13*D*D*(84.0 *C+ 5.0 *D)-4.0 *D*(rho*(28.0 *C+ 8.0*D)+ 7.0 *C*D*D*D)
+               
+                            -28.0*rho13*(4*C*D*D*D+rho*(C+D)))/(27*rho2*rho*rho13*drho3_2*drho3_2);
+
+            // F0 derivatives
+            double f0_3000 = 8.0*rhob[i]*(81.0*rhoa[i]*rhob[i]+81.0*rhob2+2*rho/rho13*(7.0*rhoa[i]+99.0*rhob[i])*D
+                            
+                            +2.0*rho13*(8.0*rhoa[i]+81.0*rhob[i])*D*D+(5.0*rhoa[i]+45.0*rhob[i])*D*D*D)/(27.0*std::pow(rho,11.0/3.0)*drho3_2*drho3_2);
+            
+            double f0_2100 = 8.0*(-54*rhoa2*rhob[i]-27*rhoa[i]*rhob2+27.0*rhob2*rhob[i]
+                            
+                            -2.0*rho/rho13*(3.0*rhoa2+65*rhoab-30.0*rhob2)*D
+                            
+                            -rho13*(9*rhoa2+110.0*rhoab-45.0*rhob2)*D*D
+                        
+                            +(12.0*rhob2-3*rhoa2-31.0*rhoab)*D*D*D)/
+                        
+                            (27.0*rho2*rho2/rho13*drho3_3*drho13);
+
+            double f0_1200 = 8.0*(-54.0*rhob2*rhoa[i]-27.0*rhob[i]*rhoa2+27.0*rhoa2*rhoa[i]
+
+                            -2.0*rho/rho13*(3.0*rhob2+65.0*rhoab-30.0*rhoa2)*D
+
+                            -rho13*(9.0*rhob2+110*rhoab-45.0*rhoa2)*D*D
+
+                            +(12.0*rhoa2-3*rhob2-31.0*rhoab)*D*D*D)/(27.0*rho2*rho2/rho13*drho3_3*drho13);
+
+            // F1 derivatives
+
+            double f1_00001 = (47.0 - 7.0 * dl) / 9.0;
+
+            double f1_01001 = -7.0 * dl_1 / 9.0;
+
+            double f1_10001 = -7.0 * dl_1 / 9.0;
+
+            double f1_11001 = -7.0*dl_2/9.0;
+
+            double f1 = std::pow(2.0, 11.0 / 3.0) * cf * (std::pow(rhoa[i], 8.0 / 3.0) + std::pow(rhob[i], 8.0 / 3.0))
+            
+                      + (47.0 - 7.0 * dl) *grad2 / 18.0 + (dl - 45.0) * (grada2 + gradb2) / 18.0 + (11.0 - dl) * sA / 9.0;
+            
+            double f1_1000 = std::pow(2.0, 11.0 / 3.0) * cf * 8.0 / 3.0 * std::pow(rhoa[i], 5.0 / 3.0)
+            
+                           + (grada2 + gradb2 - 7.0 * grad2 - 2.0 * sA) * dl_1 / 18.0 + (11.0 - dl) * sA10 / 9.0;
+            
+            double f1_0100 = std::pow(2.0, 11.0 / 3.0) * cf * 8.0 / 3.0 * std::pow(rhob[i], 5.0 / 3.0)
+            
+                           + (grada2 + gradb2 - 7.0 * grad2 - 2.0 * sA) * dl_1 / 18.0 + (11.0 - dl) * sA01 / 9.0;
+            
+            double f1_0010 = (47.0 - 7.0 * dl) * grada[i] / 9.0 + (dl - 45.0 + (22.0 - 2.0 * dl) * rhoa[i] / rho) * grada[i] / 9.0;
+            
+            double f1_0001 = (47.0 - 7.0 * dl) * gradb[i] / 9.0 + (dl - 45.0 + (22.0 - 2.0 * dl) * rhob[i] / rho) * gradb[i] / 9.0;
+                                                
+            double f1_2000 = std::pow(2.0, 11.0 / 3.0) * CF * 40.0 / 9.0 * std::pow(rhoa[i], 2.0 / 3.0) - 2.0 * sA1000 * dl_1 / 9.0
+            
+                           + (grada2 + gradb2 - 7.0 * grad2 - 2.0 * sA) * dl_2 / 18.0 + (11.0 - dl) * sA2000 / 9.0;
+            
+            double f1_0200 = std::pow(2.0, 11.0 / 3.0) * CF * 40.0 / 9.0 * std::pow(rhob[i], 2.0 / 3.0) - 2.0 * sA0100 * dl_1 / 9.0
+            
+                           + (grada2 + gradb2 - 7.0 * grad2 - 2.0 * sA) * dl_2 / 18.0 + (11.0 - dl) * sA0200 / 9.0;
+            
+            double f1_0020 = (47.0 - 7.0 * dl) / 9.0 + (dl - 45.0 + (22.0 - 2.0 * dl) * rhoa[i] / rho) / 9.0;
+            
+            double f1_0002 = (47.0 - 7.0 * dl) / 9.0 + (dl - 45.0 + (22.0 - 2.0 * dl) * rhob[i] / rho) / 9.0;
+            
+            double f1_1100 = -2.0 * sA0100 * dl_1 / 18.0 + (grada2 + gradb2 - 7.0 * grad2 - 2.0 * sA) * dl_2 / 18.0
+            
+                           - dl_1 * sA1000 / 9.0 + (11.0 - dl) * sA1100 / 9.0;
+            
+            double f1_1010 = (grada[i] * (1.0 - 2.0 * rhoa[i] / rho) - 7.0 * grada[i]) * dl_1 / 9.0 + (11.0 - dl) * rhob[i] / rho2 * grada[i] / 4.5;
+            
+            double f1_0101 = (gradb[i] * (1.0 - 2.0 * rhob[i] / rho) - 7.0 * gradb[i]) * dl_1 / 9.0 + (11.0 - dl) * rhoa[i] / rho2 * gradb[i] / 4.5;
+            
+            double f1_1001 = (gradb[i] * (1.0 - 2.0 * rhob[i] / rho) - 7.0 * gradb[i]) * dl_1 / 9.0 - (11.0 - dl) * rhob[i] / rho2 * gradb[i] / 4.5;
+            
+            double f1_0110 = (grada[i] * (1.0 - 2.0 * rhoa[i] / rho) - 7.0 * grada[i]) * dl_1 / 9.0 - (11.0 - dl) * rhoa[i] / rho2 * grada[i] / 4.5;
+            
+            double f1_20001 = -7.0*dl_2/9.0;
+
+            double f1_2010 = (grada[i]-7.0*grada[i])*dl_2/9.0
+                         +(-dl_1*rhob[i]/rho2-2*(11-dl)*rhob[i]/(rho2*rho)
+                            -dl_2*rhoa[i]/rho-dl_1*rhob[i]/rho2)*grada[i]/4.5;
+
+            double f1_2001 =  2*gradb[i]*rhob[i]/rho2*dl_1/4.5
+                            + (gradb[i]-7.0*gradb[i]-2.0*gradb[i]*rhob[i]/rho)*dl_2/9.0
+                            + (11-dl)*2.0*gradb[i]*rhob[i]/(4.5*rho2*rho);
+
+
+            double f1_1020 = ((1-2*rhoa[i]/rho)-7.0)*dl_1/9.0 + (11-dl)*rhob[i]/rho2/4.5;
+            
+            double f1_1002 = ((1-2*rhob[i]/rho)-7.0)*dl_1/9.0 -(11-dl)*rhob[i]/rho2/4.5; 
+
+            double f1_0120 = ((1-2*rhoa[i]/rho)-7.0)*dl_1/9.0 -(11-dl)*rhoa[i]/rho2/4.5;               
+
+            double f1_0210 =  2*grada[i]*rhoa[i]/rho2*dl_1/4.5 + (grada[i]-7.0*grada[i]-2.0*grada[i]*rhoa[i]/rho)*dl_2/9.0
+                
+                            + (11-dl)*2.0*grada[i]*rhoa[i]/(4.5*rho2*rho);
+
+            double f1_02001 = -7.0*dl_2/9.0;     
+
+            double f1_1110= (2*grada[i]*(rhoa[i]-rhob[i])*(11-dl+rho*dl_1)- rho2*(2*(4*rhoa[i]+3*rhob[i])*grada[i])*dl_2)/(9*rho2*rho);   
+
+            double f1_1101= (2*gradb[i]*(rhob[i]-rhoa[i])*(11-dl+rho*dl_1)-rho2*(2*(4*rhob[i]+3*rhoa[i])*gradb[i])*dl_2)/(9*rho2*rho);
+
+
+            double f1_2100 = - 2.0 *(sA1100*dl_1+sA1000*dl_2)/9.0
+                                + (grada2+gradb2-7.0*grad2-2*sA)*dl_3/18.0-sA0100*dl_2/9.0
+                                + (11.0-dl)*sA2100/9.0-dl_1*sA2000/9.0;
+
+            double f1_3000 = std::pow(2.0,11.0/3.0)*CF*80.0/27.0*std::pow(rhoa[i],-1.0/3.0)- 2.0*sA2000*dl_1/9.0 - 2.0*sA1000*dl_2/9.0
+                            
+                            + (grada2+gradb2-7*grad2-2*sA)*dl_3/18.0
+                        
+                            - sA1000*dl_2/9.0
+                        
+                            -dl_1*sA2000/9.0 + (11-dl)*sA3000/9.0 ;
+            
+            double f1_1200 = - 2*(sA1100*dl_1+sA0100*dl_2)/9.0 + (grada2+gradb2-7*grad2-2*sA)*dl_3/18.0-sA1000*dl_2/9.0
+                            
+                                + (11-dl)*sA1200/9.0-dl_1*sA0200/9.0;
+
+            // F2 derivatives 
+
+            double f2 = -2.0/3.0*rho2*grad2+(2.0/3.0*rho2-rhoa2)*gradb2+(2.0/3.0*rho2-rhob2)*grada2;
+            
+            double f2_1000 = -8.0 / 3.0 * rho * gradab[i] - 2.0 * rhoa[i] * gradb2;
+            
+            double f2_0100 = -8.0 / 3.0 * rho * gradab[i] - 2.0 * rhob[i] * grada2;
+            
+            double f2_0010 = -2.0 * rhob2 * grada[i];
+            
+            double f2_0001 = -2.0 * rhoa2 * gradb[i];
+            
+            double f2_00001 = -4.0 / 3.0 * rho2;
+            
+            double f2_2000 = -8.0 / 3.0 * gradab[i] - 2.0 * gradb2;
+            
+            double f2_0200 = -8.0 / 3.0 * gradab[i] - 2.0 * grada2;
+            
+            double f2_0020 = -2.0 * rhob2;
+            
+            double f2_0002 = -2.0 * rhoa2;
+            
+            double f2_1100  = -8.0 / 3.0 * gradab[i];
+            
+            double f2_1010 = 0.0;
+            
+            double f2_0101 = 0.0;
+            
+            double f2_1001 = -4.0 * rhoa[i] * gradb[i];
+            
+            double f2_0110 = -4.0 * rhob[i] * grada[i];
+            
+            double f2_10001 = -8.0 / 3.0 * rho;
+            
+            double f2_01001 = -8.0 / 3.0 * rho;
+                                                                        
+            double f2_11001 = -8.0/3.0;
+        
+            double f2_20001 = -8.0/3.0;
+
+            double f2_2001  = -4.0*gradb[i];
+
+            double f2_1002  = -4.0*rhoa[i];
+
+            double f2_0120  = -4.0*rhob[i];
+
+            double f2_0210  = -4.0*grada[i];
+
+            double f2_02001 = -8.0/3.0;
+
+            /* omega derivatives */
+            
+            double omx  = std::pow(rho, -11.0 / 3.0) / (1.0 + D / rho13);
+            
+            double omx1 = (-11.0 * rho13 - 10.0 * D) / (3.0 * rho2 * rho2 * rho13 * drho3_2);
+            
+            double omx2 = 2.0 * (77.0 * rho / rho13 + 141.0 * D * rho13 + 65.0 * D * D) / (9.0 * std::pow(rho, 16.0 / 3.0) * drho3_3);
+
+            double omx3 = -2.0*(1309.0*rho+3616.0*rho/rho13*D+3350.0*rho13*D*D+1040.0*D*D*D)/(27.0*std::pow(rho,19.0/3.0)*(drho3_2*drho3_2));
+            
+            double expcr = std::exp(-C / rho13);
+
+            double om = expcr * omx;
+            
+            double om_1 = expcr * (omx1 + omx * de);
+            
+            double om_2 = expcr * (omx2 + 2.0 * omx1 * de + omx * (de1 + de * de));
+            
+            double om_3 = expcr*(omx3+3*omx2*de+3*omx1*(de1+de*de)+omx*(de2 + 3*de1*de+ de*de*de));
+
+            /* derivatives sums */
+
+            double  rff  = rhoa[i]*rhob[i]*f1+f2;
+
+            double rff_1000 = rhob[i]*f1+rhoa[i]*rhob[i]*f1_1000+f2_1000;
+
+            double rff_1200 = 2.0*(f1_0100+rhoa[i]*f1_1100)+rhob[i]*f1_0200+rhoa[i]*rhob[i]*f1_1200;
+
+            double rff_3000 = 2.0*rhob[i]*f1_2000+rhob[i]*(f1_2000+rhoa[i]*f1_3000); 
+   
+            double rff_0100 = rhoa[i] * f1 + rhoa[i] * rhob[i] * f1_0100 + f2_0100;
+            
+            double rff_2000 = 2.0 * rhob[i] * f1_1000 + rhoa[i] * rhob[i] * f1_2000 + f2_2000;
+
+            double rff_2100 = 2.0 * (f1_1000+rhob[i]*f1_1100)+rhoa[i]*f1_2000+rhoa[i]*rhob[i]*f1_2100;
+
+            double rff_0200 = 2.0 * rhoa[i] * f1_0100 + rhoa[i] * rhob[i] * f1_0200 + f2_0200;
+            
+            double rff_1100 = f1 + rhob[i] * f1_0100 + rhoa[i] * f1_1000 + rhoa[i] * rhob[i] * f1_1100 + f2_1100;
+            
+            double rff_0010 = rhoa[i] * rhob[i] * f1_0010 + f2_0010;
+            
+            double rff_0001 = rhoa[i] * rhob[i] * f1_0001 + f2_0001;
+            
+            double rff_1010 = rhob[i] * f1_0010 + rhoa[i] * rhob[i] * f1_1010 + f2_1010;
+            
+            double rff_0101 = rhoa[i] * f1_0001 + rhoa[i] * rhob[i] * f1_0101 + f2_0101;
+
+            double rff_01001 = rhoa[i] * f1_00001 + rhoa[i] * rhob[i] * f1_01001 + f2_01001;
+
+            double rff_11001 = f1_00001+rhob[i]*f1_01001+rhoa[i]*f1_10001+rhoab*f1_11001+f2_11001;
+
+            double rff_00001 = rhoa[i] * rhob[i] * f1_00001 + f2_00001;
+
+            double rff_10001 = rhob[i] * f1_00001 + rhoa[i] * rhob[i] * f1_10001 + f2_10001;
+
+            double rff_20001 = 2.0 * rhob[i]*f1_10001+rhoab*f1_20001+f2_20001; 
+
+            double rff_2010 = 2.0*rhob[i]*f1_1010+rhoab*f1_2010;
+
+            double rff_1001 = rhob[i]*f1_0001+rhoab*f1_1001+f2_1001;
+
+            double rff_2001 = 2.0*rhob[i]*f1_1001+rhoab*f1_2001+f2_2001;
+
+            double rff_0110 = rhoa[i]*f1_0010+rhoab*f1_0110+f2_0110;
+
+            double rff_0210 = 2.0*rhoa[i]*f1_0110+rhoab*f1_0210+f2_0210;
+
+            double rff_1110 = f1_0010+rhob[i]*f1_0110+rhoa[i]*f1_1010+rhoab*f1_1110;
+    
+            double rff_1101 = f1_0001+rhob[i]*f1_0101+rhoa[i]*f1_1001+rhoab*f1_1101;
+
+            double rff_02001 = 2.0*rhoa[i]*f1_01001+rhoab*f1_02001+f2_02001;
+
+            df3000[i] += factor*(-A*f0_3000 -A*B*(om_3*rff+3*om_2*rff_1000 + 3.0 *om_1*rff_2000+om*rff_3000));
+
+            df2100[i] += factor*(-A*f0_2100 -A*B*(om_3*rff+om_2*(2.0 *rff_1000+rff_0100)+ om_1*(rff_2000+ 2.0*rff_1100)+om*rff_2100));
+
+            df1200[i] += factor*(-A*f0_1200-A*B*(om_3*rff+om_2*(2.0 *rff_0100+rff_1000)+ om_1*(rff_0200+ 2.0*rff_1100)+om*rff_1200));
+ 
+            df2010[i] += factor*(-A*B*(om_2*rff_0010+ 2.0*om_1*rff_1010+om*rff_2010)); 
+
+            df2001[i] += factor*(-A*B*(om_2*rff_0001+ 2.0*om_1*rff_1001+om*rff_2001));
+
+            df0210[i] += factor*(-A*B*(om_2*rff_0010+ 2.0*om_1*rff_0110+om*rff_0210));
+
+            df1020[i] += factor*(-A*B*(om_1*(rhoa[i]*rhob[i]*f1_0020+f2_0020)+ om*rhob[i]*(f1_0020+rhoa[i]*f1_1020)));
+
+            df1002[i] += factor*(-A*B*(om_1*(rhoab*f1_0002+f2_0002) + om*(rhob[i]*f1_0002+rhoab*f1_1002+f2_1002)));
+
+            df0120[i] += factor*(-A*B*(om_1*(rhoab*f1_0020+f2_0020)+ om*(rhoa[i]*f1_0020+rhoab*f1_0120+f2_0120)));
+
+            df1110[i] += factor*(-A*B*(om_2*rff_0010+om_1*rff_0110+om_1*rff_1010 + om*rff_1110));
+
+            df1101[i] += factor*(-A*B*(om_2*rff_0001+om_1*rff_0101+om_1*rff_1001 + om*rff_1101));     
+
+            df20001[i] += factor*(-A*B*(om_2*rff_00001+2*om_1*rff_10001+om*rff_20001));
+
+            df02001[i] += factor*(-A*B*(om_2*rff_00001+2*om_1*rff_01001+om*rff_02001)); 
+
+            df11001[i] += factor*(-A*B*(om_2*rff_00001+om_1*rff_01001+om_1*rff_10001 + om*rff_11001));                          
+        }
+        
+    }
+
+    void
+    LYPFuncCubicHessianA(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                     const double          factor,
+                     const CDensityGrid&   densityGrid)
+    {
+        
+    }
+
+    void
+    LYPFuncCubicHessianB(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                     const double          factor,
+                     const CDensityGrid&   densityGrid)
     {
         
     }

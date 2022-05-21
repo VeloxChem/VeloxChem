@@ -27,19 +27,28 @@
 #define FunctionalParser_hpp
 
 #include <string>
+#include <vector>
 
 #include "XCFunctional.hpp"
 
 namespace vxcfuncs {  // vxcfuncs namespace
-    
-    /**
-     Converts exchange-correlation functional label to exchange-correlation functional object.
-     
-     @param xcLabel the label of exchange-correlation functional.
-     @return the exchange-correlation functional object.
-     */
-    CXCFunctional getExchangeCorrelationFunctional(const std::string& xcLabel);
-    
+
+/**
+ Gets labels of available exchange-correlation functional.
+
+ @return a vector of labels of available exchange-correlation functionals.
+ */
+std::vector<std::string> getAvailableFunctionals();
+
+/**
+ Converts exchange-correlation functional label to exchange-correlation
+ functional object.
+
+ @param xcLabel the label of exchange-correlation functional.
+ @return the exchange-correlation functional object.
+ */
+CXCFunctional getExchangeCorrelationFunctional(const std::string &xcLabel);
+
 }  // namespace vxcfuncs
 
 #endif /* FunctionalParser_hpp */

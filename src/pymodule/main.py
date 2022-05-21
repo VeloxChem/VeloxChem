@@ -24,39 +24,46 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+from datetime import datetime, timedelta
 import time as tm
 
-from .veloxchemlib import mpi_initialized
-from .veloxchemlib import mpi_master
-from .cli import cli
-from .errorhandler import assert_msg_critical
+from .veloxchemlib import mpi_initialized, mpi_master
+from .mpitask import MpiTask
+from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
+from .scfrestopendriver import ScfRestrictedOpenDriver
+from .firstorderprop import FirstOrderProperties
+from .forcefieldgenerator import ForceFieldGenerator
+from .respchargesdriver import RespChargesDriver
 from .excitondriver import ExcitonModelDriver
-from .loprop import LoPropDriver
+from .numerovdriver import NumerovDriver
 from .mp2driver import Mp2Driver
 from .cnadriver import CnaAnalysisDriver
 from .gopdriver import GlobalOptimizationDriver
 from .mpitask import MpiTask
 from .optimizationdriver import OptimizationDriver
+from .loprop import LoPropDriver
 from .trajectorydriver import TrajectoryDriver
-from .pulsedrsp import PulsedResponse
-from .respchargesdriver import RespChargesDriver
-from .rspabsorption import Absorption
-from .rspc6 import C6
-from .rspcdspec import CircularDichroismSpectrum
-from .rspcustomproperty import CustomProperty
-from .rsplinabscross import LinearAbsorptionCrossSection
-from .rsppolarizability import Polarizability
-from .rsptpa import TPA
-from .scffirstorderprop import ScfFirstOrderProperties
 from .scfgradientdriver import ScfGradientDriver
-from .scfrestdriver import ScfRestrictedDriver
-from .scfrestopendriver import ScfRestrictedOpenDriver
-from .scfunrestdriver import ScfUnrestrictedDriver
-from .slurminfo import get_slurm_maximum_hours
+from .scfhessiandriver import ScfHessianDriver
+from .optimizationdriver import OptimizationDriver
+from .pulsedrsp import PulsedResponse
+from .rsppolarizability import Polarizability
+from .rspabsorption import Absorption
+from .rsplinabscross import LinearAbsorptionCrossSection
+from .rspcdspec import CircularDichroismSpectrum
+from .rspc6 import C6
+from .rspshg import SHG
+from .rsptpa import TPA
+from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
-
+from .xtbhessiandriver import XTBHessianDriver
+from .veloxchemlib import DiagEriDriver
+from .cli import cli
+from .errorhandler import assert_msg_critical
+from .slurminfo import get_slurm_end_time
 
 def select_scf_driver(task, scf_type):
     """
@@ -65,7 +72,8 @@ def select_scf_driver(task, scf_type):
     :param task:
         The MPI task.
     :param scf_type:
-        The type of SCF calculation (restricted or unrestricted).
+        The type of SCF calculation (restricted, unrestricted, or
+        restricted_openshell).
 
     :return:
         The SCF driver object.
@@ -80,13 +88,16 @@ def select_scf_driver(task, scf_type):
     nalpha = task.molecule.number_of_alpha_electrons()
     nbeta = task.molecule.number_of_beta_electrons()
 
-    if nalpha == nbeta and scf_type == 'restricted':
+    if scf_type == 'restricted' and nalpha == nbeta:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+    elif scf_type == 'restricted' and nalpha != nbeta:
+        scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
+    elif scf_type == 'unrestricted':
+        scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
+    elif scf_type == 'restricted_openshell':
+        scf_drv = ScfRestrictedOpenDriver(task.mpi_comm, task.ostream)
     else:
-        if scf_type == 'restricted_open':
-            scf_drv = ScfRestrictedOpenDriver(task.mpi_comm, task.ostream)
-        else:
-            scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
+        assert_msg_critical(False, f'SCF: invalide scf_type {scf_type}')
 
     return scf_drv
 
@@ -100,7 +111,7 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     :param mol_orbs:
         The molecular orbitals.
     :param rsp_dict:
-        The dictionary of response dict.
+        The dictionary of response input.
     :param method_dict:
         The dictionary of method settings.
 
@@ -115,6 +126,7 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
         assert_msg_critical(task.mpi_size == 1 or task.mpi_size <= n_ov,
                             'Response: too many MPI processes')
 
+    # check property type
     if 'property' in rsp_dict:
         prop_type = rsp_dict['property'].lower()
     else:
@@ -150,16 +162,45 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     elif prop_type == 'c6':
         rsp_prop = C6(rsp_dict, method_dict)
 
-    elif prop_type == 'custom':
-        rsp_prop = CustomProperty(rsp_dict, method_dict)
-
     elif prop_type == 'tpa':
         rsp_prop = TPA(rsp_dict, method_dict)
 
+    elif prop_type == 'shg':
+        rsp_prop = SHG(rsp_dict, method_dict)
+
+    elif prop_type == 'custom':
+        rsp_prop = CustomProperty(rsp_dict, method_dict)
+
     else:
-        assert_msg_critical(False, 'input file: invalid response property')
+        assert_msg_critical(
+            False, f'Response: invalide response property {prop_type}')
 
     return rsp_prop
+
+
+def updated_dict_with_eri_settings(settings_dict, scf_drv):
+    """
+    Returns an updated dictionary with ERI settings from SCF driver.
+
+    :param settings_dict:
+        The original dictionary of settings.
+    :param scf_drv:
+        The SCF driver.
+
+    :return:
+        An updated dictionary with updated ERI settings.
+    """
+
+    new_dict = dict(settings_dict)
+
+    if 'eri_thresh' not in new_dict:
+        new_dict['eri_thresh'] = scf_drv.eri_thresh
+    if 'qq_type' not in new_dict:
+        new_dict['qq_type'] = scf_drv.qq_type
+    if not scf_drv.restart:
+        new_dict['restart'] = 'no'
+
+    return new_dict
 
 
 def main():
@@ -167,7 +208,7 @@ def main():
     Runs VeloxChem with command line arguments.
     """
 
-    program_start_time = tm.time()
+    program_start_time = datetime.now()
 
     assert_msg_critical(mpi_initialized(), "MPI not initialized")
 
@@ -181,58 +222,67 @@ def main():
     task = MpiTask([args.input_file, args.output_file], MPI.COMM_WORLD)
     task_type = task.input_dict['jobs']['task'].lower()
 
-    # Timelimit in hours
+    # Timelimit
 
     if 'maximum_hours' in task.input_dict['jobs']:
         maximum_hours = float(task.input_dict['jobs']['maximum_hours'])
+        program_end_time = program_start_time + timedelta(hours=maximum_hours)
     else:
-        maximum_hours = get_slurm_maximum_hours()
+        if task.mpi_rank == mpi_master():
+            program_end_time = get_slurm_end_time()
+        else:
+            program_end_time = None
+        program_end_time = task.mpi_comm.bcast(program_end_time,
+                                               root=mpi_master())
 
     # Method settings
+    # Note: the @pe group is added to method_dict as pe_options
 
-    if 'method_settings' in task.input_dict:
-        method_dict = dict(task.input_dict['method_settings'])
-    else:
-        method_dict = {}
+    method_dict = (dict(task.input_dict['method_settings'])
+                   if 'method_settings' in task.input_dict else {})
 
-    if 'pe' in task.input_dict:
-        # add @pe group to method_dict as pe_options
-        method_dict['pe_options'] = dict(task.input_dict['pe'])
-    else:
-        method_dict['pe_options'] = {}
+    method_dict['pe_options'] = (dict(task.input_dict['pe'])
+                                 if 'pe' in task.input_dict else {})
 
     use_xtb = ('xtb' in method_dict)
 
     # Exciton model
 
     if task_type == 'exciton':
-        if 'exciton' in task.input_dict:
-            exciton_dict = task.input_dict['exciton']
-        else:
-            exciton_dict = {}
+        exciton_dict = (task.input_dict['exciton']
+                        if 'exciton' in task.input_dict else {})
 
-        exciton_dict['program_start_time'] = program_start_time
-        exciton_dict['maximum_hours'] = maximum_hours
+        exciton_dict['program_end_time'] = program_end_time
+        exciton_dict['filename'] = task.input_dict['filename']
 
         exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
         exciton_drv.update_settings(exciton_dict, method_dict)
         exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+    # Force field generator
+
+    if task_type == 'force field':
+        force_field_dict = (task.input_dict['force_field']
+                            if 'force_field' in task.input_dict else {})
+        resp_dict = (task.input_dict['resp_charges']
+                     if 'resp_charges' in task.input_dict else {})
+
+        force_field_dict['filename'] = task.input_dict['filename']
+        resp_dict['filename'] = task.input_dict['filename']
+
+        force_field_drv = ForceFieldGenerator(task.mpi_comm, task.ostream)
+        force_field_drv.update_settings(force_field_dict, resp_dict)
+        force_field_drv.compute(task.molecule, task.ao_basis)
+
     # Spectrum from trajectory
 
     if task_type == 'trajectory':
-        if 'trajectory' in task.input_dict:
-            traj_dict = dict(task.input_dict['trajectory'])
-        else:
-            traj_dict = {}
-        if 'spectrum_settings' in task.input_dict:
-            spect_dict = dict(task.input_dict['spectrum_settings'])
-        else:
-            spect_dict = {}
-        if 'response' in task.input_dict:
-            rsp_dict = dict(task.input_dict['response'])
-        else:
-            rsp_dict = {}
+        traj_dict = (dict(task.input_dict['trajectory'])
+                     if 'trajectory' in task.input_dict else {})
+        spect_dict = (dict(task.input_dict['spectrum_settings'])
+                      if 'spectrum_settings' in task.input_dict else {})
+        rsp_dict = (dict(task.input_dict['response'])
+                    if 'response' in task.input_dict else {})
 
         traj_dict['filename'] = task.input_dict['filename']
         traj_dict['charges'] = task.input_dict['charges']
@@ -242,37 +292,43 @@ def main():
         traj_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
         traj_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+    # Diatomic vibronic spectrum using Numerov
+
+    if task_type == 'numerov':
+        numerov_dict = (dict(task.input_dict['numerov'])
+                        if 'numerov' in task.input_dict else {})
+        scf_dict = (dict(task.input_dict['scf'])
+                    if 'scf' in task.input_dict else {})
+
+        numerov_drv = NumerovDriver(task.mpi_comm, task.ostream)
+        numerov_drv.update_settings(numerov_dict, scf_dict, method_dict)
+        numerov_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
     # Self-consistent field
 
     run_scf = task_type in [
-        'hf', 'rhf', 'rohf', 'uhf', 'scf', 'roscf', 'uscf', 'wavefunction', 'wave function',
-        'mp2', 'gradient', 'optimize', 'response', 'pulses', 'visualization',
-        'loprop'
+        'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
+        'wave function', 'mp2', 'gradient', 'hessian', 'optimize', 'response',
+        'pulses', 'visualization', 'loprop'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
         run_scf = 'read_dalton' not in task.input_dict['visualization']['cubes']
 
+    scf_type = 'restricted'
     if task_type in ['uhf', 'uscf']:
         scf_type = 'unrestricted'
     elif task_type in ['rohf', 'roscf']:
-        scf_type = 'restricted_open'
-    else:
-        scf_type = 'restricted'
+        scf_type = 'restricted_openshell'
 
     if run_scf:
         assert_msg_critical(task.molecule.number_of_atoms(),
                             'Molecule: no atoms found in molecule')
 
-        if 'scf' in task.input_dict:
-            scf_dict = task.input_dict['scf']
-        else:
-            scf_dict = {}
+        scf_dict = task.input_dict['scf'] if 'scf' in task.input_dict else {}
 
+        scf_dict['program_end_time'] = program_end_time
         scf_dict['filename'] = task.input_dict['filename']
-
-        scf_dict['program_start_time'] = program_start_time
-        scf_dict['maximum_hours'] = maximum_hours
 
         if use_xtb:
             if 'potfile' in method_dict:
@@ -296,8 +352,8 @@ def main():
                 return
 
             # SCF first-order properties
-            scf_prop = ScfFirstOrderProperties(task.mpi_comm, task.ostream)
-            scf_prop.compute(task.molecule, task.ao_basis, scf_tensors)
+            scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
+            scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_tensors)
             if task.mpi_rank == mpi_master():
                 scf_prop.print_properties(task.molecule)
 
@@ -312,9 +368,27 @@ def main():
         if use_xtb:
             grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
             grad_drv.compute(task.molecule)
-        elif scf_drv.closed_shell:
+        elif scf_drv.scf_type == 'restricted':
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
             grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+    # Hessian
+
+    if task_type == 'hessian':
+        hessian_dict = (task.input_dict['hessian']
+                        if 'hessian' in task.input_dict else {})
+        if use_xtb:
+            hessian_drv = XTBHessianDriver(xtb_drv, task.mpi_comm, task.ostream)
+            hessian_drv.update_settings(method_dict, hessian_dict)
+            hessian_drv.compute(task.molecule)
+
+        elif scf_drv.scf_type == 'restricted':
+            hessian_drv = ScfHessianDriver(scf_drv, task.mpi_comm, task.ostream)
+            hessian_drv.update_settings(method_dict, hessian_dict)
+            hessian_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        if task.mpi_rank == mpi_master():
+            hessian_drv.vibrational_analysis(task.molecule)
 
     # Geometry optimization
 
@@ -325,41 +399,33 @@ def main():
             if task.mpi_rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
-        if 'optimize' in task.input_dict:
-            opt_dict = task.input_dict['optimize']
-        else:
-            opt_dict = {}
+        opt_dict = (task.input_dict['optimize']
+                    if 'optimize' in task.input_dict else {})
+
+        opt_dict['filename'] = task.input_dict['filename']
 
         if use_xtb:
             grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
-            opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
-                                         'XTB')
-        elif scf_drv.closed_shell:
+            opt_drv = OptimizationDriver(grad_drv)
+            opt_drv.update_settings(opt_dict)
+            opt_drv.compute(task.molecule)
+
+        elif scf_drv.scf_type == 'restricted':
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
-            opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
-                                         'SCF')
-        opt_drv.update_settings(opt_dict)
-        opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+            opt_drv = OptimizationDriver(grad_drv)
+            opt_drv.update_settings(opt_dict)
+            opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Response
 
-    if task_type == 'response' and scf_drv.closed_shell:
-        if 'response' in task.input_dict:
-            rsp_dict = dict(task.input_dict['response'])
-        else:
-            rsp_dict = {}
+    if task_type == 'response' and scf_drv.scf_type == 'restricted':
+        rsp_dict = (dict(task.input_dict['response'])
+                    if 'response' in task.input_dict else {})
 
+        rsp_dict['program_end_time'] = program_end_time
         rsp_dict['filename'] = task.input_dict['filename']
 
-        rsp_dict['program_start_time'] = program_start_time
-        rsp_dict['maximum_hours'] = maximum_hours
-
-        if 'eri_thresh' not in rsp_dict:
-            rsp_dict['eri_thresh'] = scf_drv.eri_thresh
-        if 'qq_type' not in rsp_dict:
-            rsp_dict['qq_type'] = scf_drv.qq_type
-        if not scf_drv.restart:
-            rsp_dict['restart'] = 'no'
+        rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
         rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
         rsp_prop.init_driver(task.mpi_comm, task.ostream)
@@ -373,19 +439,11 @@ def main():
     # Pulsed Linear Response Theory
 
     if ((task_type == 'pulses' or 'pulses' in task.input_dict) and
-            scf_drv.closed_shell):
-        if 'pulses' in task.input_dict:
-            prt_dict = task.input_dict['pulses']
-        else:
-            prt_dict = {}
+            scf_drv.scf_type == 'restricted'):
+        prt_dict = (task.input_dict['pulses']
+                    if 'pulses' in task.input_dict else {})
 
-        cpp_dict = {}
-        if 'eri_thresh' not in cpp_dict:
-            cpp_dict['eri_thresh'] = scf_drv.eri_thresh
-        if 'qq_type' not in cpp_dict:
-            cpp_dict['qq_type'] = scf_drv.qq_type
-        if not scf_drv.restart:
-            cpp_dict['restart'] = 'no'
+        cpp_dict = updated_dict_with_eri_settings({}, scf_drv)
 
         pulsed_response = PulsedResponse(task.mpi_comm, task.ostream)
         pulsed_response.update_settings(prt_dict, cpp_dict, method_dict)
@@ -393,16 +451,10 @@ def main():
 
     # MP2 perturbation theory
 
-    if task_type == 'mp2' and scf_drv.closed_shell:
-        if 'mp2' in task.input_dict:
-            mp2_dict = task.input_dict['mp2']
-        else:
-            mp2_dict = {}
+    if task_type == 'mp2' and scf_drv.scf_type == 'restricted':
+        mp2_dict = task.input_dict['mp2'] if 'mp2' in task.input_dict else {}
 
-        if 'eri_thresh' not in mp2_dict:
-            mp2_dict['eri_thresh'] = scf_drv.eri_thresh
-        if 'qq_type' not in mp2_dict:
-            mp2_dict['qq_type'] = scf_drv.qq_type
+        mp2_dict = updated_dict_with_eri_settings(mp2_dict, scf_drv)
 
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
         mp2_drv.update_settings(mp2_dict, method_dict)
@@ -411,10 +463,8 @@ def main():
     # Cube file
 
     if task_type == 'visualization':
-        if 'visualization' in task.input_dict:
-            cube_dict = task.input_dict['visualization']
-        else:
-            cube_dict = {}
+        cube_dict = (task.input_dict['visualization']
+                     if 'visualization' in task.input_dict else {})
 
         if 'read_dalton' not in task.input_dict['visualization']['cubes']:
             mol_orbs.broadcast(task.mpi_rank, task.mpi_comm)
@@ -452,6 +502,15 @@ def main():
             chg_drv.compute(task.molecule, task.ao_basis, 'resp')
         elif task_type == 'esp charges':
             chg_drv.compute(task.molecule, task.ao_basis, 'esp')
+            
+    # Test of electron repulstion integrals
+    
+    if task_type == 'eritest':
+        print('*** Testing Two Electron Implementation ***')
+        tm0 = tm.time()
+        eri_driver = DiagEriDriver()
+        pgblock = eri_driver.compute(task.molecule, task.ao_basis)
+        print('Diagonal Eri Driver: ', tm.time() - tm0, ' sec.')
 
     # CNA correlation analysis
 

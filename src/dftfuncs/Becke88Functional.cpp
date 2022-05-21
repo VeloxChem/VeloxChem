@@ -26,6 +26,7 @@
 #include "Becke88Functional.hpp"
 
 #include <cmath>
+#include <iostream>
 
 #include "MathConst.hpp"
 
@@ -46,7 +47,10 @@ namespace vxcfuncs {  // vxcfuncs namespace
                                     &vxcfuncs::Becke88FuncGradientB,
                                     &vxcfuncs::Becke88FuncHessianAB,
                                     &vxcfuncs::Becke88FuncHessianA,
-                                    &vxcfuncs::Becke88FuncHessianB); 
+                                    &vxcfuncs::Becke88FuncHessianB,
+                                    &vxcfuncs::Becke88FuncCubicHessianAB,
+                                    &vxcfuncs::Becke88FuncCubicHessianA,
+                                    &vxcfuncs::Becke88FuncCubicHessianB); 
     }
     
     void
@@ -252,7 +256,6 @@ namespace vxcfuncs {  // vxcfuncs namespace
         }
     }
     
-    
     void Becke88FuncHessianAB(      CXCHessianGrid& xcHessianGrid,
                               const double          factor,
                               const CDensityGrid&   densityGrid)
@@ -336,6 +339,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
             
             // FIX ME: Add beta part
         }
+
     }
     
     void Becke88FuncHessianA(      CXCHessianGrid& xcHessianGrid,
@@ -352,4 +356,123 @@ namespace vxcfuncs {  // vxcfuncs namespace
         
     }
     
+    void Becke88FuncCubicHessianAB(     CXCCubicHessianGrid& xcCubicHessianGrid,
+                                  const double          factor,
+                                  const CDensityGrid&   densityGrid)
+    {
+     // functional prefactors
+        
+        // determine number of grid points
+        
+        auto ngpoints = densityGrid.getNumberOfGridPoints();
+        
+        // set up pointers to density grid data
+        
+        auto rhoa = densityGrid.alphaDensity(0);
+                
+        auto grada = densityGrid.alphaDensityGradient(0);
+                
+        // set up pointers to functional data
+
+        auto df2010 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::grada);
+
+        auto df1020 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::grada, xcvars::grada);
+        
+        auto df3000 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::rhoa);
+        
+        auto df0030 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::grada, xcvars::grada, xcvars::grada);        
+                
+        double BETA = 0.0042;
+
+        double BETA2 = BETA*BETA;
+
+        #pragma omp simd aligned(rhoa, grada, df2010, df1020,df3000,df0030: VLX_ALIGN)
+        for (int32_t i = 0; i < ngpoints; i++)
+        {
+
+            // Alpha 
+            
+            double alpha = grada[i]*std::pow(rhoa[i],-4.0/3.0);
+
+            double a2 = alpha*alpha;
+            
+            double a3 = alpha*a2;
+            
+            double a4 = alpha*a3;
+
+            double a5 = alpha*a4;
+
+            double asha = std::asinh(alpha);
+
+            double asha2= asha*asha;
+
+            double alpha10 = -4.0/3.0*alpha/rhoa[i];   
+
+            double alpha20 = -7.0/3.0*alpha10/rhoa[i];
+
+            double alpha30 = -10./3.0*alpha20/rhoa[i]; 
+
+            double alpha01 = std::pow(rhoa[i],-4.0/3.0);   
+
+            double alpha11 = -4.0/3.0*alpha01/rhoa[i]; 
+
+            double alpha21 = alpha20/grada[i];       
+
+            double alpha10_2 = alpha10*alpha10;
+
+            double sq1a2 = std::sqrt(1 + a2);
+
+            double denom= 1 + 6*alpha*BETA*asha;
+
+            double denom2 = denom*denom;
+
+            double denom3 = denom2*denom;
+
+            double denom4 = denom3*denom;
+                  
+            double ff1 = BETA*( 6.0 *a2*BETA - sq1a2)/(sq1a2*denom2);
+
+            double ff2 = (6.0 *BETA2*(4.0 *alpha + a3*(3.0 - 12.0 *sq1a2*BETA) + 
+                            2.0 *(std::pow(1.0 + a2 ,1.5) - 3.0 *a4*BETA)*asha))/ (std::pow(1.0 + a2,1.5)*denom3);
+            
+            double ff3 = (6.0 *BETA2*(6.0 + 5.0 *a2 + 2.0*a4 
+	                    - 12.0 *alpha*(6.0 + 16.0 *a2 + 7.0 *a4)*BETA*asha + 
+	                36.0*sq1a2*BETA*(-a2*(3.0 + 2.0*a2) + 6.0 *a5*BETA*asha - 
+	                std::pow(1.0 + a2 ,2.0) * asha2) + 36.0 *a4*BETA2*(6.0 *(1.0 + a2) + (-1.0 + 2.0 *a2 )*asha2)))/(std::pow(1.0 + a2, 2.5)*denom4);
+
+
+            df2010[i] += factor*(ff2*alpha10_2 + ff1 * alpha20 +
+                          grada[i]*(ff3*alpha10_2*alpha01 + 
+                                 2.0*ff2*alpha11*alpha10 +
+                                 ff2*alpha20*alpha01 + ff1*alpha21));
+
+            df1020[i] += factor*(2.0*ff2*alpha10*alpha01 + 2.0*ff1*alpha11 +
+                          grada[i]*(ff3*alpha01*alpha01*alpha10 + 
+                                 2.0*ff2*alpha11*alpha01));
+    
+            df3000[i] += factor*grada[i]*(ff3 * alpha10_2*alpha10 +
+                                3.0*ff2*alpha10*alpha20 +
+                                ff1*alpha30);
+
+            df0030[i] += factor*(3.0*ff2*alpha01*alpha01 +
+                          grada[i]*ff3*std::pow(alpha01,3.0));
+
+        }
+    }
+
+    void Becke88FuncCubicHessianA(     CXCCubicHessianGrid& xcCubicHessianGrid,
+                                  const double          factor,
+                                  const CDensityGrid&   densityGrid)
+    {
+
+
+    }
+
+    void Becke88FuncCubicHessianB(     CXCCubicHessianGrid& xcCubicHessianGrid,
+                                  const double          factor,
+                                  const CDensityGrid&   densityGrid)
+    {
+
+    }
+
 }  // namespace vxcfuncs

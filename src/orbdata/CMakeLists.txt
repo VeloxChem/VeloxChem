@@ -1,0 +1,23 @@
+target_sources(vlxobjs
+  PRIVATE
+    AODensityMatrix.cpp
+    AOIndices.cpp
+    AngularMomentum.cpp
+    AtomBasis.cpp
+    BasisFunction.cpp
+    GenFunc.cpp
+    GtoBlock.cpp
+    GtoContainer.cpp
+    GtoPairsBlock.cpp
+    GtoPairsContainer.cpp
+    GtoTransform.cpp
+    MolecularBasis.cpp
+    MolecularOrbitals.cpp
+    SADGuessDriver.cpp
+    SphericalMomentum.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )

@@ -1,0 +1,29 @@
+target_sources(utests
+  PRIVATE
+    AODensityMatrixTest.cpp
+    AngularMomentumTest.cpp
+    AtomBasisSetter.cpp
+    AtomBasisTest.cpp
+    BasisFunctionTest.cpp
+    BinnedGtoBlockTest.cpp
+    BinnedGtoContainerTest.cpp
+    BinnedGtoPairBlockTest.cpp
+    GenFuncTest.cpp
+    GtoBlockTest.cpp
+    GtoContainerTest.cpp
+    GtoPairsBlockTest.cpp
+    GtoPairsContainerTest.cpp
+    GtoTransformTest.cpp
+    MolecularBasisSetter.cpp
+    MolecularBasisTest.cpp
+    MolecularOrbitalsTest.cpp
+    PackedGtoPairBlockTest.cpp
+    PackedGtoPairContainerTest.cpp
+    SADGuessDriverTest.cpp
+    SphericalMomentumTest.cpp
+  )
+
+target_include_directories(utests
+  PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}
+  )

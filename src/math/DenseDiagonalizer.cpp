@@ -29,9 +29,9 @@
 #include <cmath>
 
 #ifdef ENABLE_MKL
-#include "mkl.h"
+#include <mkl_lapacke.h>
 #else
-#include "lapacke.h"
+#include <lapacke.h>
 #endif
 
 CDenseDiagonalizer::CDenseDiagonalizer()

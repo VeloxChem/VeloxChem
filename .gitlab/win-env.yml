@@ -1,0 +1,19 @@
+name: vlx
+channels:
+  - conda-forge
+dependencies:
+  - cmake
+  - cxx-compiler
+  - geometric
+  - gtest
+  - h5py
+  - libblas=*=*mkl
+  - mkl-devel=*2020.*
+  - mpi4py
+  - ninja
+  - numpy
+  - psutil
+  - pybind11
+  - pytest
+  - python>=3.7
+  - requests

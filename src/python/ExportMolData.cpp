@@ -34,6 +34,7 @@
 #include <string>
 #include <vector>
 
+#include "AtomicRadii.hpp"
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
 #include "CoordinationNumber.hpp"
@@ -137,7 +138,7 @@ CMolecule_from_array(const std::vector<std::string>&                labels,
 
     std::string errmol("Molecule: Inconsistent size");
 
-    errors::assertMsgCritical(py_coords.shape(0) == static_cast<ssize_t>(labels.size()), errmol);
+    errors::assertMsgCritical(py_coords.shape(0) == static_cast<py::ssize_t>(labels.size()), errmol);
 
     errors::assertMsgCritical(py_coords.shape(1) == 3, errmol);
 
@@ -231,13 +232,13 @@ export_moldata(py::module& m)
              "Creates a sub-molecule object by slicing the molecule object.",
              "startIndex"_a,
              "numAtoms"_a)
-        .def("number_of_atoms", vlx_general::overload_cast_<>()(&CMolecule::getNumberOfAtoms, py::const_), "Gets total number of atoms in molecule.")
+        .def("number_of_atoms", py::overload_cast<>(&CMolecule::getNumberOfAtoms, py::const_), "Gets total number of atoms in molecule.")
         .def("number_of_atoms",
-             vlx_general::overload_cast_<const int32_t>()(&CMolecule::getNumberOfAtoms, py::const_),
+             py::overload_cast<const int32_t>(&CMolecule::getNumberOfAtoms, py::const_),
              "Gets number of atoms belonging to specific chemical element in molecule.",
              "idElemental"_a)
         .def("number_of_atoms",
-             vlx_general::overload_cast_<const int32_t, const int32_t, const int32_t>()(&CMolecule::getNumberOfAtoms, py::const_),
+             py::overload_cast<const int32_t, const int32_t, const int32_t>(&CMolecule::getNumberOfAtoms, py::const_),
              "Gets number of atoms belonging to specific chemical element in list of atoms in molecule.",
              "iAtom"_a,
              "nAtoms"_a,
@@ -302,14 +303,14 @@ export_moldata(py::module& m)
             "Gets VDW radii for molecule.")
         .def(
             "mk_radii_to_numpy",
-            [](const CMolecule& self) ->py::array_t<double> {
+            [](const CMolecule& self) -> py::array_t<double> {
                 auto atomradii = self.getMkRadii();
                 return vlx_general::pointer_to_numpy(atomradii.data(), static_cast<int32_t>(atomradii.size()));
             },
             "Gets MK radii for molecule.")
         .def(
             "covalent_radii_to_numpy",
-            [](const CMolecule& self) ->py::array_t<double> {
+            [](const CMolecule& self) -> py::array_t<double> {
                 auto atomradii = self.getCovalentRadii();
                 return vlx_general::pointer_to_numpy(atomradii.data(), static_cast<int32_t>(atomradii.size()));
             },
@@ -343,11 +344,11 @@ export_moldata(py::module& m)
     PyClass<CChemicalElement>(m, "ChemicalElement")
         .def(py::init<>())
         .def("set_atom_type",
-             vlx_general::overload_cast_<const std::string&>()(&CChemicalElement::setAtomType),
+             py::overload_cast<const std::string&>(&CChemicalElement::setAtomType),
              "Sets chemical element properties using name of chemical element.",
              "atomLabel"_a)
         .def("set_atom_type",
-             vlx_general::overload_cast_<const int32_t>()(&CChemicalElement::setAtomType),
+             py::overload_cast<const int32_t>(&CChemicalElement::setAtomType),
              "Sets chemical element object properties using chemical element number.",
              "idElemental"_a)
         .def("get_name", &CChemicalElement::getName, "Gets name of chemical element.")

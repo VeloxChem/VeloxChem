@@ -52,7 +52,7 @@ from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .rspabsorption import Absorption
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
+from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
 from .checkpoint import read_rsp_hdf5
 from .checkpoint import write_rsp_hdf5
@@ -69,8 +69,8 @@ class ExcitonModelDriver:
 
     Instance variables
         - H: The exciton model Hamiltonian matrix.
-        - trans_dipoles: The diabatic electric transition dipole moments in
-          length form.
+        - elec_trans_dipoles: The diabatic electric transition dipole moments
+          in length form.
         - velo_trans_dipoles: The diabatic electric transition dipole moments
           in velocity form.
         - magn_trans_dipoles: The diabatic magnetic transition dipole moments.
@@ -110,11 +110,14 @@ class ExcitonModelDriver:
             comm = MPI.COMM_WORLD
 
         if ostream is None:
-            ostream = OutputStream(sys.stdout)
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
 
         # exciton Hamiltonian matrix and transition dipoles
         self.H = None
-        self.trans_dipoles = None
+        self.elec_trans_dipoles = None
         self.velo_trans_dipoles = None
         self.magn_trans_dipoles = None
 
@@ -157,6 +160,32 @@ class ExcitonModelDriver:
         self.restart = True
         self.checkpoint_file = None
 
+        # filename
+        self.filename = f'veloxchem_exciton_{get_datetime_string()}'
+
+        # input keywords
+        self.input_keywords = {
+            'exciton': {
+                'nstates': ('int', 'number of locally excited (LE) states'),
+                'ct_nocc': ('int', 'number of occupied MOs for CT states'),
+                'ct_nvir': ('int', 'number of unoccupied MOs for CT states'),
+                'restart': ('bool', 'restart from checkpoint file'),
+                'checkpoint_file': ('str', 'name of checkpoint file'),
+            },
+            'method_settings': {
+                'dft': ('bool', 'use DFT'),
+                'xcfun': ('str_upper', 'exchange-correlation functional'),
+                'grid_level': ('int', 'accuracy level of DFT grid'),
+            },
+        }
+
+    def print_keywords(self):
+        """
+        Prints input keywords in exciton model driver.
+        """
+
+        print_keywords(self.input_keywords, self.ostream)
+
     def update_settings(self, exciton_dict, method_dict=None):
         """
         Updates settings in exciton model driver.
@@ -194,18 +223,19 @@ class ExcitonModelDriver:
             self.charges += [float(q)] * int(n)
 
         exciton_keywords = {
-            'nstates': 'int',
-            'ct_nocc': 'int',
-            'ct_nvir': 'int',
-            'restart': 'bool',
-            'checkpoint_file': 'str',
+            key: val[0] for key, val in self.input_keywords['exciton'].items()
         }
 
         parse_input(self, exciton_keywords, exciton_dict)
 
+        if 'filename' in exciton_dict:
+            self.filename = exciton_dict['filename']
+            if 'checkpoint_file' not in exciton_dict:
+                self.checkpoint_file = f'{self.filename}.exciton.h5'
+
         method_keywords = {
-            'dft': 'bool',
-            'grid_level': 'int',
+            key: val[0]
+            for key, val in self.input_keywords['method_settings'].items()
         }
 
         parse_input(self, method_keywords, method_dict)
@@ -227,7 +257,7 @@ class ExcitonModelDriver:
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
-    def compute(self, molecule, basis, min_basis):
+    def compute(self, molecule, basis, min_basis=None):
         """
         Executes exciton model calculation and writes checkpoint file.
 
@@ -236,7 +266,7 @@ class ExcitonModelDriver:
         :param basis:
             The AO basis.
         :param min_basis:
-            The minimal AO basis for generating initial guess.
+            The minimal AO basis set.
         """
 
         # sanity check
@@ -262,7 +292,7 @@ class ExcitonModelDriver:
         total_num_states = total_LE_states + total_CT_states
 
         self.H = np.zeros((total_num_states, total_num_states))
-        self.trans_dipoles = np.zeros((total_num_states, 3))
+        self.elec_trans_dipoles = np.zeros((total_num_states, 3))
         self.velo_trans_dipoles = np.zeros((total_num_states, 3))
         self.magn_trans_dipoles = np.zeros((total_num_states, 3))
         self.center_of_mass = molecule.center_of_mass()
@@ -278,33 +308,19 @@ class ExcitonModelDriver:
         if self.rank == mpi_master():
             self.print_title(total_LE_states, total_CT_states)
 
-        # dimer indices
-        dimer_id = np.zeros((nfragments, nfragments), dtype=np.int32)
-        dimer_count = 0
-        for ind_A in range(nfragments):
-            dimer_id[ind_A, ind_A] = -1
-            for ind_B in range(ind_A + 1, nfragments):
-                dimer_id[ind_A, ind_B] = dimer_count
-                dimer_id[ind_B, ind_A] = dimer_count
-                dimer_count += 1
-
         # indices of diabatic excited states
-        excitation_id = np.zeros((nfragments, nfragments), dtype=np.int32)
-        for ind_A in range(nfragments):
-            # LE
-            excitation_id[ind_A, ind_A] = ind_A * self.nstates
-            for ind_B in range(ind_A + 1, nfragments):
-                ct_id = nfragments * self.nstates
-                ct_id += dimer_id[ind_A][ind_B] * ct_states * 2
-                # CT(A->B)
-                excitation_id[ind_A, ind_B] = ct_id
-                # CT(B->A)
-                excitation_id[ind_B, ind_A] = ct_id + ct_states
+        excitation_ids = self.get_excitation_ids()
 
         if self.dft:
             dft_func_label = self.xcfun_label
+            method_dict = {
+                'dft': 'yes',
+                'grid_level': self.grid_level,
+                'xcfun': dft_func_label,
+            }
         else:
             dft_func_label = 'HF'
+            method_dict = {'dft': 'no'}
 
         rsp_vector_labels = [
             'dimer_indices',
@@ -331,138 +347,29 @@ class ExcitonModelDriver:
             monomer.set_charge(self.charges[ind])
             monomer.check_multiplicity()
 
-            if self.rank == mpi_master():
-                self.ostream.print_block(monomer.get_string())
+            one_elec_ints = self.get_one_elec_integrals(monomer, basis)
 
-                valstr = 'Molecular charge            : {:.0f}'.format(
-                    monomer.get_charge())
-                self.ostream.print_header(valstr.ljust(70))
-                valstr = 'Spin multiplicity           : {:d}'.format(
-                    monomer.get_multiplicity())
-                self.ostream.print_header(valstr.ljust(70))
-                valstr = 'Number of alpha electrons   : {:d}'.format(
-                    monomer.number_of_alpha_electrons())
-                self.ostream.print_header(valstr.ljust(70))
-                valstr = 'Number of beta  electrons   : {:d}'.format(
-                    monomer.number_of_beta_electrons())
-                self.ostream.print_header(valstr.ljust(70))
-                self.ostream.print_blank()
-                self.ostream.print_blank()
-
-                self.ostream.print_block(
-                    basis.get_string('Atomic Basis', monomer))
-                self.ostream.flush()
-
-            # 1e integral
-            dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-            dipole_drv.origin = self.center_of_mass
-            dipole_mats = dipole_drv.compute(monomer, basis)
-
-            linmom_drv = LinearMomentumIntegralsDriver(self.comm)
-            linmom_mats = linmom_drv.compute(monomer, basis)
-
-            angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-            angmom_drv.origin = self.center_of_mass
-            angmom_mats = angmom_drv.compute(monomer, basis)
+            scf_tensors = self.monomer_scf(method_dict, ind, monomer, basis)
+            tda_results = self.monomer_tda(method_dict, ind, monomer, basis,
+                                           scf_tensors)
 
             if self.rank == mpi_master():
-                dipole_ints = (dipole_mats.x_to_numpy(),
-                               dipole_mats.y_to_numpy(),
-                               dipole_mats.z_to_numpy())
+                self.monomers[ind]['mo'] = scf_tensors['C_alpha'].copy()
+                self.monomers[ind]['exc_energies'] = tda_results['exc_energies']
+                self.monomers[ind]['exc_vectors'] = tda_results['exc_vectors']
 
-                linmom_ints = (linmom_mats.x_to_numpy(),
-                               linmom_mats.y_to_numpy(),
-                               linmom_mats.z_to_numpy())
-
-                angmom_ints = (angmom_mats.x_to_numpy(),
-                               angmom_mats.y_to_numpy(),
-                               angmom_mats.z_to_numpy())
-
-            if self.dft:
-                method_dict = {
-                    'dft': 'yes',
-                    'grid_level': self.grid_level,
-                    'xcfun': self.xcfun_label
-                }
-            else:
-                method_dict = {'dft': 'no'}
-
-            # SCF checkpoint file
-            monomer_scf_h5 = f'monomer_{ind + 1}.scf.h5'
-            if self.checkpoint_file is not None:
-                monomer_scf_h5 = Path(
-                    self.checkpoint_file).with_suffix(f'.{monomer_scf_h5}')
-
-            # SCF calculation
-            scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
-            scf_drv.update_settings(
-                {
-                    'qq_type': self.qq_type,
-                    'eri_thresh': self.eri_thresh,
-                    'conv_thresh': self.scf_conv_thresh,
-                    'max_iter': self.scf_max_iter,
-                    'restart': 'yes' if self.restart else 'no',
-                    'checkpoint_file': str(monomer_scf_h5),
-                }, method_dict)
-            scf_drv.compute(monomer, basis, min_basis)
-
-            if self.rank == mpi_master():
-                self.monomers[ind]['mo'] = scf_drv.scf_tensors['C_alpha'].copy()
-
-            # update ERI screening threshold
-            if self.eri_thresh > scf_drv.eri_thresh and scf_drv.eri_thresh > 0:
-                self.eri_thresh = scf_drv.eri_thresh
-
-            # TDA checkpoint file
-            monomer_rsp_h5 = f'monomer_{ind + 1}.rsp.h5'
-            if self.checkpoint_file is not None:
-                monomer_rsp_h5 = Path(
-                    self.checkpoint_file).with_suffix(f'.{monomer_rsp_h5}')
-
-            # TDA calculation
-            abs_spec = Absorption(
-                {
-                    'tamm_dancoff': 'yes',
-                    'nstates': self.nstates,
-                    'qq_type': self.qq_type,
-                    'eri_thresh': self.eri_thresh,
-                    'conv_thresh': self.tda_conv_thresh,
-                    'max_iter': self.tda_max_iter,
-                    'restart': 'yes' if self.restart else 'no',
-                    'checkpoint_file': str(monomer_rsp_h5),
-                }, method_dict)
-            abs_spec.init_driver(self.comm, self.ostream)
-            abs_spec.compute(monomer, basis, scf_drv.scf_tensors)
-
-            if self.rank == mpi_master():
-                abs_spec.print_property(self.ostream)
-                self.ostream.flush()
-
-                self.monomers[ind]['exc_energies'] = abs_spec.get_property(
-                    'eigenvalues').copy()
-                self.monomers[ind]['exc_vectors'] = abs_spec.get_property(
-                    'eigenvectors').copy()
-
-                nocc = monomer.number_of_alpha_electrons()
-                nvir = self.monomers[ind]['mo'].shape[1] - nocc
-                mo_occ = self.monomers[ind]['mo'][:, :nocc].copy()
-                mo_vir = self.monomers[ind]['mo'][:, nocc:].copy()
+                trans_dipoles = self.get_LE_trans_dipoles(
+                    monomer, basis, one_elec_ints, scf_tensors, tda_results)
 
                 for s in range(self.nstates):
                     # LE excitation energy
-                    h = excitation_id[ind, ind] + s
+                    h = excitation_ids[ind, ind] + s
                     self.H[h, h] = self.monomers[ind]['exc_energies'][s]
 
                     # LE transition dipole
-                    vec = self.monomers[ind]['exc_vectors'][:, s].copy()
-                    tdens = math.sqrt(2.0) * np.matmul(
-                        mo_occ, np.matmul(vec.reshape(nocc, nvir), mo_vir.T))
-                    self.trans_dipoles[h, :] = np.array(
-                        [np.sum(tdens * dipole_ints[d].T) for d in range(3)])
-                    self.velo_trans_dipoles[h, :] = np.array(
-                        [np.sum(tdens * linmom_ints[d].T) for d in range(3)])
-                    self.magn_trans_dipoles[h, :] = np.array(
-                        [np.sum(tdens * angmom_ints[d].T) for d in range(3)])
+                    self.elec_trans_dipoles[h, :] = trans_dipoles['electric'][s]
+                    self.velo_trans_dipoles[h, :] = trans_dipoles['velocity'][s]
+                    self.magn_trans_dipoles[h, :] = trans_dipoles['magnetic'][s]
 
             valstr = '*** Time used in monomer calculation:'
             valstr += ' {:.2f} sec'.format(tm.time() - monomer_start_time)
@@ -479,7 +386,7 @@ class ExcitonModelDriver:
         # read checkpoint file
         if self.restart:
             if self.rank == mpi_master():
-                (dimer_indices, num_states, H, tdip, vdip, mdip,
+                (dimer_indices, num_states, H, edip, vdip, mdip,
                  state_info) = read_rsp_hdf5(self.checkpoint_file,
                                              rsp_vector_labels, molecule, basis,
                                              {'dft_func_label': dft_func_label},
@@ -487,7 +394,7 @@ class ExcitonModelDriver:
                                              self.ostream)
                 read_success = (dimer_indices is not None and
                                 num_states is not None and H is not None and
-                                tdip is not None and vdip is not None and
+                                edip is not None and vdip is not None and
                                 mdip is not None and state_info is not None)
                 if read_success:
                     shape_match = (
@@ -495,7 +402,7 @@ class ExcitonModelDriver:
                         num_states[0] == self.nstates and
                         num_states[1] == self.ct_nocc and
                         num_states[2] == self.ct_nvir and
-                        tdip.shape == self.trans_dipoles.shape and
+                        edip.shape == self.elec_trans_dipoles.shape and
                         vdip.shape == self.velo_trans_dipoles.shape and
                         mdip.shape == self.magn_trans_dipoles.shape and
                         len(state_info) == len(self.state_info))
@@ -509,7 +416,7 @@ class ExcitonModelDriver:
 
             if self.rank == mpi_master():
                 self.H = H.copy()
-                self.trans_dipoles = tdip.copy()
+                self.elec_trans_dipoles = edip.copy()
                 self.velo_trans_dipoles = vdip.copy()
                 self.magn_trans_dipoles = mdip.copy()
 
@@ -547,190 +454,38 @@ class ExcitonModelDriver:
                 dimer = Molecule(monomer_a, monomer_b)
                 dimer.check_multiplicity()
 
-                if self.rank == mpi_master():
-                    self.ostream.print_block(dimer.get_string())
-
-                    valstr = 'Molecular charge            : {:.0f}'.format(
-                        dimer.get_charge())
-                    self.ostream.print_header(valstr.ljust(70))
-                    valstr = 'Spin multiplicity           : {:d}'.format(
-                        dimer.get_multiplicity())
-                    self.ostream.print_header(valstr.ljust(70))
-                    valstr = 'Number of alpha electrons   : {:d}'.format(
-                        dimer.number_of_alpha_electrons())
-                    self.ostream.print_header(valstr.ljust(70))
-                    valstr = 'Number of beta  electrons   : {:d}'.format(
-                        dimer.number_of_beta_electrons())
-                    self.ostream.print_header(valstr.ljust(70))
-                    self.ostream.print_blank()
-                    self.ostream.print_blank()
-
-                    self.ostream.print_block(
-                        basis.get_string('Atomic Basis', dimer))
-                    self.ostream.flush()
-
-                # 1e integrals
-                kin_drv = KineticEnergyIntegralsDriver(self.comm)
-                kin_mat = kin_drv.compute(dimer, basis)
-
-                npot_drv = NuclearPotentialIntegralsDriver(self.comm)
-                npot_mat = npot_drv.compute(dimer, basis)
-
-                dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-                dipole_drv.origin = self.center_of_mass
-                dipole_mats = dipole_drv.compute(dimer, basis)
-
-                linmom_drv = LinearMomentumIntegralsDriver(self.comm)
-                linmom_mats = linmom_drv.compute(dimer, basis)
-
-                angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-                angmom_drv.origin = self.center_of_mass
-                angmom_mats = angmom_drv.compute(dimer, basis)
-
-                # dft grid
-                if self.dft:
-                    grid_drv = GridDriver(self.comm)
-                    grid_drv.set_level(self.grid_level)
-
-                    grid_t0 = tm.time()
-                    dimer_molgrid = grid_drv.generate(dimer)
-                    n_grid_points = dimer_molgrid.number_of_points()
-                    dimer_molgrid.distribute(self.rank, self.nodes, self.comm)
-                    self.ostream.print_info(
-                        'Molecular grid with {} points generated in {:.2f} sec.'
-                        .format(n_grid_points,
-                                tm.time() - grid_t0))
-                    self.ostream.print_blank()
+                one_elec_ints = self.get_one_elec_integrals(dimer, basis)
 
                 if self.rank == mpi_master():
-                    dipole_ints = (dipole_mats.x_to_numpy(),
-                                   dipole_mats.y_to_numpy(),
-                                   dipole_mats.z_to_numpy())
-
-                    linmom_ints = (linmom_mats.x_to_numpy(),
-                                   linmom_mats.y_to_numpy(),
-                                   linmom_mats.z_to_numpy())
-
-                    angmom_ints = (angmom_mats.x_to_numpy(),
-                                   angmom_mats.y_to_numpy(),
-                                   angmom_mats.z_to_numpy())
-
-                    # get indices of monomer AOs in dimer
-                    ao_inds_A, ao_inds_B = get_dimer_ao_indices(
-                        monomer_a, monomer_b, basis, basis)
-
-                    # assemble MO coefficient matrix
-
-                    #         occ.A     occ.B     vir.A     vir.B
-                    #      +---------+---------+---------+---------+
-                    #      |         |         |         |         |
-                    # ao.A |  CoccA  |         |  CvirA  |         |
-                    #      |         |         |         |         |
-                    #      +---------+---------+---------+---------+
-                    #      |         |         |         |         |
-                    # ao.B |         |  CoccB  |         |  CvirB  |
-                    #      |         |         |         |         |
-                    #      +---------+---------+---------+---------+
-
                     CA = self.monomers[ind_A]['mo']
                     CB = self.monomers[ind_B]['mo']
 
-                    nao_A = CA.shape[0]
-                    nao_B = CB.shape[0]
-                    nmo_A = CA.shape[1]
-                    nmo_B = CB.shape[1]
-
                     nocc_A = monomer_a.number_of_alpha_electrons()
                     nocc_B = monomer_b.number_of_alpha_electrons()
-                    nvir_A = nmo_A - nocc_A
-                    nvir_B = nmo_B - nocc_B
+                    nvir_A = CA.shape[1] - nocc_A
+                    nvir_B = CB.shape[1] - nocc_B
 
                     nocc = nocc_A + nocc_B
                     nvir = nvir_A + nvir_B
 
-                    mo = np.zeros((nao_A + nao_B, nmo_A + nmo_B))
-
-                    for row in range(nao_A):
-                        mo[ao_inds_A[row], :nocc_A] = CA[row, :nocc_A]
-                        mo[ao_inds_A[row], nocc:nocc + nvir_A] = CA[row,
-                                                                    nocc_A:]
-
-                    for row in range(nao_B):
-                        mo[ao_inds_B[row], nocc_A:nocc] = CB[row, :nocc_B]
-                        mo[ao_inds_B[row], nocc + nvir_A:] = CB[row, nocc_B:]
-
-                    mo_occ = mo[:, :nocc].copy()
-                    mo_vir = mo[:, nocc:].copy()
-
-                    # compute density matrix
-                    dens = np.matmul(mo_occ, mo_occ.T)
-                    dens_mat = AODensityMatrix([dens], denmat.rest)
+                    mo = self.dimer_mo_coefficients(monomer_a, monomer_b, basis,
+                                                    CA, CB)
                 else:
-                    dens_mat = AODensityMatrix()
+                    mo = None
 
-                dens_mat.broadcast(self.rank, self.comm)
-
-                # compute Fock matrix
-                fock_mat = AOFockMatrix(dens_mat)
-
-                if self.dft:
-                    xcfun = parse_xc_func(self.xcfun_label.upper())
-                    if xcfun.is_hybrid():
-                        fock_mat.set_fock_type(fockmat.restjkx, 0)
-                        fock_mat.set_scale_factor(
-                            xcfun.get_frac_exact_exchange(), 0)
-                    else:
-                        fock_mat.set_fock_type(fockmat.restj, 0)
-                else:
-                    fock_mat.set_fock_type(fockmat.restjk, 0)
-
-                eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-                screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                            self.eri_thresh, dimer, basis)
-                eri_drv.compute(fock_mat, dens_mat, dimer, basis, screening)
-                fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
-
-                if self.dft:
-                    if not xcfun.is_hybrid():
-                        fock_mat.scale(2.0, 0)
-
-                    xc_drv = XCIntegrator(self.comm)
-                    vxc_mat = xc_drv.integrate(dens_mat, dimer, basis,
-                                               dimer_molgrid, self.xcfun_label)
-                    vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
+                dimer_prop = self.dimer_properties(dimer, basis, mo)
 
                 if self.rank == mpi_master():
-
-                    # compute dimer energy
-
-                    hcore = kin_mat.to_numpy() - npot_mat.to_numpy()
-                    fock = hcore + fock_mat.to_numpy(0)
-
-                    dimer_energy = dimer.nuclear_repulsion_energy()
-                    dimer_energy += np.sum(dens * (hcore + fock))
-                    if self.dft:
-                        dimer_energy += vxc_mat.get_energy()
-
-                    self.ostream.print_blank()
-
                     valstr = 'Excitonic Couplings'
                     self.ostream.print_header(valstr)
                     self.ostream.print_header('=' * (len(valstr) + 2))
                     self.ostream.print_blank()
 
+                    dimer_energy = dimer_prop['energy']
                     valstr = 'Dimer Energy:{:20.10f} a.u.'.format(dimer_energy)
                     self.ostream.print_header(valstr.ljust(72))
                     self.ostream.print_blank()
                     self.ostream.flush()
-
-                    # compute Fock in MO basis
-
-                    if self.dft:
-                        fock += vxc_mat.get_matrix().to_numpy()
-
-                    fock_mo = np.matmul(mo.T, np.matmul(fock, mo))
-                    fock_occ = fock_mo[:nocc, :nocc].copy()
-                    fock_vir = fock_mo[nocc:, nocc:].copy()
 
                     # assemble TDA CI vectors
 
@@ -739,71 +494,21 @@ class ExcitonModelDriver:
 
                     CI_vectors = []
 
-                    #          vir.A     vir.B                vir.A     vir.B
-                    #       +---------+---------+          +---------+---------+
-                    # occ.A |  LE(A)  |         |    occ.A |         |         |
-                    #       +---------+---------+          +---------+---------+
-                    # occ.B |         |         |    occ.B |         |  LE(B)  |
-                    #       +---------+---------+          +---------+---------+
+                    CI_vectors += self.dimer_excitation_vectors_LE_A(
+                        vectors_A, ind_A, nocc_A, nvir_A, nocc, nvir,
+                        excitation_ids)
 
-                    for sA in range(self.nstates):
-                        vec_A = vectors_A[:, sA].reshape(nocc_A, nvir_A)
-                        ci_vec = np.zeros((nocc, nvir))
-                        ci_vec[:nocc_A, :nvir_A] = vec_A[:, :]
-                        CI_vectors.append({
-                            'vec': ci_vec,
-                            'frag': 'A',
-                            'type': 'LE',
-                            'index': excitation_id[ind_A, ind_A] + sA,
-                            'name': '{}e({})'.format(ind_A + 1, sA + 1),
-                        })
+                    CI_vectors += self.dimer_excitation_vectors_LE_B(
+                        vectors_B, ind_B, nocc_A, nvir_A, nocc, nvir,
+                        excitation_ids)
 
-                    for sB in range(self.nstates):
-                        vec_B = vectors_B[:, sB].reshape(nocc_B, nvir_B)
-                        ci_vec = np.zeros((nocc, nvir))
-                        ci_vec[nocc_A:, nvir_A:] = vec_B[:, :]
-                        CI_vectors.append({
-                            'vec': ci_vec,
-                            'frag': 'B',
-                            'type': 'LE',
-                            'index': excitation_id[ind_B, ind_B] + sB,
-                            'name': '{}e({})'.format(ind_B + 1, sB + 1),
-                        })
+                    CI_vectors += self.dimer_excitation_vectors_CT_AB(
+                        ind_A, ind_B, nocc_A, nvir_A, nocc, nvir,
+                        excitation_ids)
 
-                    #          vir.A     vir.B                vir.A     vir.B
-                    #       +---------+---------+          +---------+---------+
-                    # occ.A |         |  CT(AB) |    occ.A |         |         |
-                    #       +---------+---------+          +---------+---------+
-                    # occ.B |         |         |    occ.B |  CT(BA) |         |
-                    #       +---------+---------+          +---------+---------+
-
-                    for oA in range(self.ct_nocc):
-                        for vB in range(self.ct_nvir):
-                            ctAB = oA * self.ct_nvir + vB
-                            ci_vec = np.zeros((nocc, nvir))
-                            ci_vec[nocc_A - 1 - oA][nvir_A + vB] = 1.0
-                            CI_vectors.append({
-                                'vec': ci_vec,
-                                'frag': 'AB',
-                                'type': 'CT',
-                                'index': excitation_id[ind_A, ind_B] + ctAB,
-                                'name': '{}+(H{}){}-(L{})'.format(
-                                    ind_A + 1, oA, ind_B + 1, vB),
-                            })
-
-                    for oB in range(self.ct_nocc):
-                        for vA in range(self.ct_nvir):
-                            ctBA = oB * self.ct_nvir + vA
-                            ci_vec = np.zeros((nocc, nvir))
-                            ci_vec[nocc - 1 - oB][vA] = 1.0
-                            CI_vectors.append({
-                                'vec': ci_vec,
-                                'frag': 'BA',
-                                'type': 'CT',
-                                'index': excitation_id[ind_B, ind_A] + ctBA,
-                                'name': '{}-(L{}){}+(H{})'.format(
-                                    ind_A + 1, vA, ind_B + 1, oB),
-                            })
+                    CI_vectors += self.dimer_excitation_vectors_CT_BA(
+                        ind_A, ind_B, nocc_A, nvir_A, nocc, nvir,
+                        excitation_ids)
 
                     # update excited state information in self.state_info
                     for vec in CI_vectors:
@@ -815,64 +520,14 @@ class ExcitonModelDriver:
                     # create masked CI_vectors containing LE(A), CT(AB), CT(BA)
                     mask_ci_vectors = CI_vectors[:self.nstates] + CI_vectors[
                         self.nstates * 2:]
-
-                # compute sigma vectors for LE(A), CT(AB), CT(BA)
-                if self.rank == mpi_master():
-                    tdens = []
-                    for vec in mask_ci_vectors:
-                        tdens.append(
-                            np.matmul(mo_occ, np.matmul(vec['vec'], mo_vir.T)))
-                    tdens_mat = AODensityMatrix(tdens, denmat.rest)
                 else:
-                    tdens_mat = AODensityMatrix()
+                    mask_ci_vectors = None
 
-                tdens_mat.broadcast(self.rank, self.comm)
-
-                tfock_mat = AOFockMatrix(tdens_mat)
-
-                if self.dft:
-                    if xcfun.is_hybrid():
-                        fock_flag = fockmat.rgenjkx
-                        fact_xc = xcfun.get_frac_exact_exchange()
-                        for s in range(tfock_mat.number_of_fock_matrices()):
-                            tfock_mat.set_scale_factor(fact_xc, s)
-                    else:
-                        fock_flag = fockmat.rgenj
-                else:
-                    fock_flag = fockmat.rgenjk
-
-                for s in range(tfock_mat.number_of_fock_matrices()):
-                    tfock_mat.set_fock_type(fock_flag, s)
-
-                eri_drv.compute(tfock_mat, tdens_mat, dimer, basis, screening)
-                if self.dft:
-                    if not xcfun.is_hybrid():
-                        for s in range(tfock_mat.number_of_fock_matrices()):
-                            tfock_mat.scale(2.0, s)
-                    xc_drv.integrate(tfock_mat, tdens_mat, dens_mat, dimer,
-                                     basis, dimer_molgrid, self.xcfun_label)
-                tfock_mat.reduce_sum(self.rank, self.nodes, self.comm)
+                # compute sigma vectors
+                sigma_vectors = self.dimer_sigma_vectors(
+                    dimer, basis, dimer_prop, mo, mask_ci_vectors)
 
                 if self.rank == mpi_master():
-                    sigma_vectors = []
-
-                    for s in range(tfock_mat.number_of_fock_matrices()):
-                        tfock = tfock_mat.to_numpy(s)
-                        sigma_vec = np.matmul(mo_occ.T,
-                                              np.matmul(tfock, mo_vir))
-
-                        sigma_vec -= np.matmul(fock_occ,
-                                               mask_ci_vectors[s]['vec'])
-                        sigma_vec += np.matmul(mask_ci_vectors[s]['vec'],
-                                               fock_vir)
-
-                        sigma_vectors.append({
-                            'vec': sigma_vec,
-                            'frag': mask_ci_vectors[s]['frag'],
-                            'type': mask_ci_vectors[s]['type'],
-                            'index': mask_ci_vectors[s]['index'],
-                            'name': mask_ci_vectors[s]['name'],
-                        })
 
                     # compute couplings
                     # sigma_vectors contains LE(A), CT(AB), CT(BA)
@@ -883,7 +538,7 @@ class ExcitonModelDriver:
                             if svec['index'] == cvec['index']:
                                 continue
 
-                            coupling = np.sum(svec['vec'] * cvec['vec'])
+                            coupling = np.vdot(svec['vec'], cvec['vec'])
 
                             self.H[svec['index'], cvec['index']] = coupling
                             self.H[cvec['index'], svec['index']] = coupling
@@ -909,40 +564,38 @@ class ExcitonModelDriver:
                         self.ostream.print_blank()
 
                     # compute CT excitation energies and transition dipoles
-                    # sigma_vectors[self.nstates:] contains CT(AB), CT(BA)
+                    # mask_ci_vectors[self.nstates:] contains CT(AB) and CT(BA)
+                    # sigma_vectors[self.nstates:] contains CT(AB) and CT(BA)
 
-                    for ivec, svec in enumerate(sigma_vectors[self.nstates:]):
+                    trans_dipoles = self.get_CT_trans_dipoles(
+                        dimer, basis, one_elec_ints, mo,
+                        mask_ci_vectors[self.nstates:])
 
-                        # the CI vector that corresponds to svec
-                        cvec = CI_vectors[ivec + self.nstates * 2]
-
-                        # CT excitation energy
-                        energy = np.sum(svec['vec'] * cvec['vec'])
-
+                    for ivec, (cvec, svec) in enumerate(
+                            zip(mask_ci_vectors[self.nstates:],
+                                sigma_vectors[self.nstates:])):
+                        energy = np.vdot(svec['vec'], cvec['vec'])
                         self.H[svec['index'], svec['index']] = energy
 
                         valstr = '{} excitation energy:'.format(svec['type'])
                         valstr += '  {:>26s}'.format(svec['name'])
-
                         valstr += '  {:20.12f}'.format(energy)
                         self.ostream.print_header(valstr.ljust(72))
 
-                        # CT transition dipole
-                        tdens = math.sqrt(2.0) * np.matmul(
-                            mo_occ, np.matmul(cvec['vec'], mo_vir.T))
-                        self.trans_dipoles[svec['index'], :] = np.array([
-                            np.sum(tdens * dipole_ints[d].T) for d in range(3)
-                        ])
-                        self.velo_trans_dipoles[svec['index'], :] = np.array([
-                            np.sum(tdens * linmom_ints[d].T) for d in range(3)
-                        ])
-                        self.magn_trans_dipoles[svec['index'], :] = np.array([
-                            np.sum(tdens * angmom_ints[d].T) for d in range(3)
-                        ])
+                        self.elec_trans_dipoles[
+                            cvec['index'], :] = trans_dipoles['electric'][ivec]
+                        self.velo_trans_dipoles[
+                            cvec['index'], :] = trans_dipoles['velocity'][ivec]
+                        self.magn_trans_dipoles[
+                            cvec['index'], :] = trans_dipoles['magnetic'][ivec]
 
                     self.ostream.print_blank()
 
                     # three-body CT-CT couplings
+
+                    fock_mo = dimer_prop['fock_mo']
+                    fock_occ = fock_mo[:nocc, :nocc]
+                    fock_vir = fock_mo[nocc:, nocc:]
 
                     for ind_C in range(nfragments):
                         if ind_C == ind_A or ind_C == ind_B:
@@ -954,8 +607,8 @@ class ExcitonModelDriver:
                                 for vB in range(self.ct_nvir):
                                     ctCA = oC * self.ct_nvir + vA
                                     ctCB = oC * self.ct_nvir + vB
-                                    ctCA += excitation_id[ind_C, ind_A]
-                                    ctCB += excitation_id[ind_C, ind_B]
+                                    ctCA += excitation_ids[ind_C, ind_A]
+                                    ctCB += excitation_ids[ind_C, ind_B]
 
                                     coupling = fock_vir[vA, nvir_A + vB]
 
@@ -978,8 +631,8 @@ class ExcitonModelDriver:
                                 for oB in range(self.ct_nocc):
                                     ctAC = oA * self.ct_nvir + vC
                                     ctBC = oB * self.ct_nvir + vC
-                                    ctAC += excitation_id[ind_A, ind_C]
-                                    ctBC += excitation_id[ind_B, ind_C]
+                                    ctAC += excitation_ids[ind_A, ind_C]
+                                    ctBC += excitation_ids[ind_B, ind_C]
 
                                     coupling = -fock_occ[nocc_A - 1 - oA,
                                                          nocc - 1 - oB]
@@ -1013,10 +666,12 @@ class ExcitonModelDriver:
 
                 rsp_vector_list = [
                     np.array([ind_A, ind_B]),
-                    np.array([self.nstates, self.ct_nocc,
-                              self.ct_nvir]), self.H, self.trans_dipoles,
-                    self.velo_trans_dipoles, self.magn_trans_dipoles,
-                    np.string_(state_info_list)
+                    np.array([self.nstates, self.ct_nocc, self.ct_nvir]),
+                    self.H,
+                    self.elec_trans_dipoles,
+                    self.velo_trans_dipoles,
+                    self.magn_trans_dipoles,
+                    np.string_(state_info_list),
                 ]
 
                 if self.rank == mpi_master():
@@ -1052,7 +707,8 @@ class ExcitonModelDriver:
                 self.ostream.print_blank()
 
             eigvals, eigvecs = np.linalg.eigh(self.H)
-            adia_trans_dipoles = np.matmul(eigvecs.T, self.trans_dipoles)
+            adia_elec_trans_dipoles = np.matmul(eigvecs.T,
+                                                self.elec_trans_dipoles)
             adia_velo_trans_dipoles = np.matmul(eigvecs.T,
                                                 self.velo_trans_dipoles)
             adia_magn_trans_dipoles = np.matmul(eigvecs.T,
@@ -1070,7 +726,7 @@ class ExcitonModelDriver:
             rot_str = []
 
             for i, e in enumerate(eigvals):
-                dip_strength = np.sum(adia_trans_dipoles[i, :]**2)
+                dip_strength = np.sum(adia_elec_trans_dipoles[i, :]**2)
                 f = (2.0 / 3.0) * dip_strength * e
                 osc_str.append(f)
 
@@ -1103,6 +759,754 @@ class ExcitonModelDriver:
                 self.ostream.print_blank()
 
             self.ostream.flush()
+
+    def get_excitation_ids(self):
+        """
+        Gets excitation indices.
+
+        :return:
+            A 2d numpy array containing indices of the LE and CT excitations.
+        """
+
+        nfragments = len(self.natoms)
+        ct_states = self.ct_nocc * self.ct_nvir
+
+        # dimer indices
+        dimer_ids = np.zeros((nfragments, nfragments), dtype=np.int32)
+        dimer_count = 0
+        for ind_A in range(nfragments):
+            dimer_ids[ind_A, ind_A] = -1
+            for ind_B in range(ind_A + 1, nfragments):
+                dimer_ids[ind_A, ind_B] = dimer_count
+                dimer_ids[ind_B, ind_A] = dimer_count
+                dimer_count += 1
+
+        # indices of diabatic excited states
+        excitation_ids = np.zeros((nfragments, nfragments), dtype=np.int32)
+        for ind_A in range(nfragments):
+            # LE
+            excitation_ids[ind_A, ind_A] = ind_A * self.nstates
+            for ind_B in range(ind_A + 1, nfragments):
+                ct_id = (nfragments * self.nstates +
+                         dimer_ids[ind_A, ind_B] * ct_states * 2)
+                # CT(A->B)
+                excitation_ids[ind_A, ind_B] = ct_id
+                # CT(B->A)
+                excitation_ids[ind_B, ind_A] = ct_id + ct_states
+
+        return excitation_ids
+
+    def get_one_elec_integrals(self, molecule, basis):
+        """
+        Gets one-electron integrals (center-of-mass as gauge-origin).
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis.
+
+        :return:
+            The electric, velocity and magnetic dipole integrals in AO basis.
+        """
+
+        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+        dipole_drv.origin = self.center_of_mass
+        dipole_mats = dipole_drv.compute(molecule, basis)
+
+        linmom_drv = LinearMomentumIntegralsDriver(self.comm)
+        linmom_mats = linmom_drv.compute(molecule, basis)
+
+        angmom_drv = AngularMomentumIntegralsDriver(self.comm)
+        angmom_drv.origin = self.center_of_mass
+        angmom_mats = angmom_drv.compute(molecule, basis)
+
+        if self.rank == mpi_master():
+            dipole_ints = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
+                           dipole_mats.z_to_numpy())
+            linmom_ints = (linmom_mats.x_to_numpy(), linmom_mats.y_to_numpy(),
+                           linmom_mats.z_to_numpy())
+            angmom_ints = (angmom_mats.x_to_numpy(), angmom_mats.y_to_numpy(),
+                           angmom_mats.z_to_numpy())
+        else:
+            dipole_ints = None
+            linmom_ints = None
+            angmom_ints = None
+
+        return {
+            'electric_dipole': dipole_ints,
+            'linear_momentum': linmom_ints,
+            'angular_momentum': angmom_ints,
+        }
+
+    def monomer_scf(self, method_dict, ind, monomer, basis, min_basis=None):
+        """
+        Runs monomer SCF calculation.
+
+        :param method_dict:
+            The dictionary of method settings.
+        :param ind:
+            The index of the monomer.
+        :param monomer:
+            The monomer molecule.
+        :param basis:
+            The AO basis.
+        :param min_basis:
+            The minimal AO basis set.
+
+        :return:
+            The SCF tensors.
+        """
+
+        # molecule and basis info
+        if self.rank == mpi_master():
+            self.ostream.print_block(monomer.get_string())
+            self.ostream.print_block(monomer.more_info())
+            self.ostream.print_blank()
+            self.ostream.print_blank()
+
+            self.ostream.print_block(basis.get_string('Atomic Basis', monomer))
+            self.ostream.flush()
+
+        # checkpoint file for SCF
+        monomer_scf_h5 = f'monomer_{ind + 1}.scf.h5'
+        if self.checkpoint_file is not None:
+            monomer_scf_h5 = Path(
+                self.checkpoint_file).with_suffix(f'.{monomer_scf_h5}')
+
+        # SCF calculation
+        scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
+        scf_drv.update_settings(
+            {
+                'qq_type': self.qq_type,
+                'eri_thresh': self.eri_thresh,
+                'conv_thresh': self.scf_conv_thresh,
+                'max_iter': self.scf_max_iter,
+                'restart': 'yes' if self.restart else 'no',
+                'checkpoint_file': str(monomer_scf_h5),
+            }, method_dict)
+        scf_drv.compute(monomer, basis, min_basis)
+
+        # update ERI screening threshold
+        if self.eri_thresh > scf_drv.eri_thresh and scf_drv.eri_thresh > 0:
+            self.eri_thresh = scf_drv.eri_thresh
+
+        return scf_drv.scf_tensors
+
+    def monomer_tda(self, method_dict, ind, monomer, basis, scf_tensors):
+        """
+        Runs monomer TDDFT-TDA calculation.
+
+        :param method_dict:
+            The dictionary of method settings.
+        :param ind:
+            The index of the monomer.
+        :param monomer:
+            The monomer molecule.
+        :param basis:
+            The AO basis.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+
+        :return:
+            The dictionary that contains TDA properties.
+        """
+
+        # checkpoint file for TDA
+        monomer_rsp_h5 = f'monomer_{ind + 1}.rsp.h5'
+        if self.checkpoint_file is not None:
+            monomer_rsp_h5 = Path(
+                self.checkpoint_file).with_suffix(f'.{monomer_rsp_h5}')
+
+        # TDA calculation
+        abs_spec = Absorption(
+            {
+                'tamm_dancoff': 'yes',
+                'nstates': self.nstates,
+                'qq_type': self.qq_type,
+                'eri_thresh': self.eri_thresh,
+                'conv_thresh': self.tda_conv_thresh,
+                'max_iter': self.tda_max_iter,
+                'restart': 'yes' if self.restart else 'no',
+                'checkpoint_file': str(monomer_rsp_h5),
+            }, method_dict)
+        abs_spec.init_driver(self.comm, self.ostream)
+        abs_spec.compute(monomer, basis, scf_tensors)
+
+        # TDA results
+        if self.rank == mpi_master():
+            abs_spec.print_property(self.ostream)
+            self.ostream.flush()
+
+            tda_results = {
+                'exc_energies': abs_spec.get_property('eigenvalues').copy(),
+                'exc_vectors': abs_spec.get_property('eigenvectors').copy(),
+            }
+        else:
+            tda_results = None
+
+        return tda_results
+
+    def get_LE_trans_dipoles(self, monomer, basis, one_elec_ints, scf_tensors,
+                             tda_results):
+        """
+        Gets transition dipole for LE states.
+
+        :param monomer:
+            The monomer molecule.
+        :param basis:
+            The AO basis.
+        :param one_elec_ints:
+            The dictionary of one-electron integrals.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param tda_results:
+            The dictionary of eigenvalues and eigenvectors from TDDFT-TDA.
+
+        :return:
+            The dictionary containing the electric, velocity and magnetic
+            transition dipoles for LE states.
+        """
+
+        dipole_ints = one_elec_ints['electric_dipole']
+        linmom_ints = one_elec_ints['linear_momentum']
+        angmom_ints = one_elec_ints['angular_momentum']
+
+        mo = scf_tensors['C_alpha']
+        nocc = monomer.number_of_alpha_electrons()
+        nvir = mo.shape[1] - nocc
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+
+        elec_trans_dipoles = []
+        velo_trans_dipoles = []
+        magn_trans_dipoles = []
+
+        sqrt_2 = math.sqrt(2.0)
+
+        for s in range(self.nstates):
+            vec = tda_results['exc_vectors'][:, s].copy()
+            tdens = sqrt_2 * np.matmul(
+                mo_occ, np.matmul(vec.reshape(nocc, nvir), mo_vir.T))
+            elec_trans_dipoles.append(
+                np.array([np.sum(tdens * dipole_ints[d].T) for d in range(3)]))
+            velo_trans_dipoles.append(
+                np.array([np.sum(tdens * linmom_ints[d].T) for d in range(3)]))
+            magn_trans_dipoles.append(
+                np.array([np.sum(tdens * angmom_ints[d].T) for d in range(3)]))
+
+        return {
+            'electric': elec_trans_dipoles,
+            'velocity': velo_trans_dipoles,
+            'magnetic': magn_trans_dipoles,
+        }
+
+    def dimer_mo_coefficients(self, monomer_a, monomer_b, basis, mo_a, mo_b):
+        """
+        Gets MO coefficients matrices of monomers A and B.
+
+        :param monomer_a:
+            The molecule of monomer A.
+        :param monomer_b:
+            The molecule of monomer B.
+        :param basis:
+            The AO basis.
+        :param mo_a:
+            The MO coefficients of monomer A.
+        :param mo_b:
+            The MO coefficients of monomer B.
+
+        :return:
+            The MO coefficients matrix for dimer AB.
+        """
+
+        # get indices of monomer AOs in dimer
+        ao_inds_A, ao_inds_B = get_dimer_ao_indices(monomer_a, monomer_b, basis,
+                                                    basis)
+
+        # assemble MO coefficient matrix
+
+        #         occ.A     occ.B     vir.A     vir.B
+        #      +---------+---------+---------+---------+
+        #      |         |         |         |         |
+        # ao.A |  CoccA  |         |  CvirA  |         |
+        #      |         |         |         |         |
+        #      +---------+---------+---------+---------+
+        #      |         |         |         |         |
+        # ao.B |         |  CoccB  |         |  CvirB  |
+        #      |         |         |         |         |
+        #      +---------+---------+---------+---------+
+
+        nao_A, nmo_A = mo_a.shape[0], mo_a.shape[1]
+        nao_B, nmo_B = mo_b.shape[0], mo_b.shape[1]
+
+        nocc_A = monomer_a.number_of_alpha_electrons()
+        nocc_B = monomer_b.number_of_alpha_electrons()
+        nvir_A = nmo_A - nocc_A
+
+        nocc = nocc_A + nocc_B
+
+        mo = np.zeros((nao_A + nao_B, nmo_A + nmo_B))
+
+        for row in range(nao_A):
+            mo[ao_inds_A[row], :nocc_A] = mo_a[row, :nocc_A]
+            mo[ao_inds_A[row], nocc:nocc + nvir_A] = mo_a[row, nocc_A:]
+
+        for row in range(nao_B):
+            mo[ao_inds_B[row], nocc_A:nocc] = mo_b[row, :nocc_B]
+            mo[ao_inds_B[row], nocc + nvir_A:] = mo_b[row, nocc_B:]
+
+        return mo
+
+    def dimer_properties(self, dimer, basis, mo):
+        """
+        Computes dimer properties.
+
+        :param dimer:
+            The dimer molecule.
+        :param basis:
+            The AO basis.
+        :param mo:
+            The MO coefficients of dimer.
+
+        :return:
+            A dictionary containing dimer properties.
+        """
+
+        if self.rank == mpi_master():
+            self.ostream.print_block(dimer.get_string())
+            self.ostream.print_block(dimer.more_info())
+            self.ostream.print_blank()
+            self.ostream.print_blank()
+
+            self.ostream.print_block(basis.get_string('Atomic Basis', dimer))
+            self.ostream.flush()
+
+        # 1e integrals
+        kin_drv = KineticEnergyIntegralsDriver(self.comm)
+        kin_mat = kin_drv.compute(dimer, basis)
+
+        npot_drv = NuclearPotentialIntegralsDriver(self.comm)
+        npot_mat = npot_drv.compute(dimer, basis)
+
+        # dft grid
+        if self.dft:
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(self.grid_level)
+
+            grid_t0 = tm.time()
+            dimer_molgrid = grid_drv.generate(dimer)
+            n_grid_points = dimer_molgrid.number_of_points()
+            dimer_molgrid.distribute(self.rank, self.nodes, self.comm)
+            self.ostream.print_info(
+                'Molecular grid with {} points generated in {:.2f} sec.'.format(
+                    n_grid_points,
+                    tm.time() - grid_t0))
+            self.ostream.print_blank()
+        else:
+            dimer_molgrid = None
+
+        if self.rank == mpi_master():
+            # compute density matrix
+            nocc = dimer.number_of_alpha_electrons()
+            mo_occ = mo[:, :nocc].copy()
+            dens = np.matmul(mo_occ, mo_occ.T)
+            dens_mat = AODensityMatrix([dens], denmat.rest)
+        else:
+            dens_mat = AODensityMatrix()
+
+        dens_mat.broadcast(self.rank, self.comm)
+
+        # compute Fock matrix
+        fock_mat = AOFockMatrix(dens_mat)
+
+        if self.dft:
+            xcfun = parse_xc_func(self.xcfun_label.upper())
+            if xcfun.is_hybrid():
+                fock_mat.set_fock_type(fockmat.restjkx, 0)
+                fock_mat.set_scale_factor(xcfun.get_frac_exact_exchange(), 0)
+            else:
+                fock_mat.set_fock_type(fockmat.restj, 0)
+        else:
+            xcfun = None
+            fock_mat.set_fock_type(fockmat.restjk, 0)
+
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                    self.eri_thresh, dimer, basis)
+        eri_drv.compute(fock_mat, dens_mat, dimer, basis, screening)
+        fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
+
+        if self.dft:
+            if not xcfun.is_hybrid():
+                fock_mat.scale(2.0, 0)
+
+            xc_drv = XCIntegrator(self.comm)
+            vxc_mat = xc_drv.integrate(dens_mat, dimer, basis, dimer_molgrid,
+                                       self.xcfun_label)
+            vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
+
+        if self.rank == mpi_master():
+            # compute dimer energy
+            hcore = kin_mat.to_numpy() - npot_mat.to_numpy()
+            fock = hcore + fock_mat.to_numpy(0)
+            dimer_energy = dimer.nuclear_repulsion_energy()
+            dimer_energy += np.sum(dens * (hcore + fock))
+            if self.dft:
+                dimer_energy += vxc_mat.get_energy()
+                fock += vxc_mat.get_matrix().to_numpy()
+            # compute Fock in MO basis
+            fock_mo = np.matmul(mo.T, np.matmul(fock, mo))
+        else:
+            dimer_energy = None
+            fock_mo = None
+
+        self.ostream.print_blank()
+
+        return {
+            'energy': dimer_energy,
+            'fock_mo': fock_mo,
+            'density': dens_mat,
+            'screening': screening,
+            'molgrid': dimer_molgrid,
+            'xcfun': xcfun,
+        }
+
+    def dimer_excitation_vectors_LE_A(self, vectors_A, ind_A, nocc_A, nvir_A,
+                                      nocc, nvir, excitation_ids):
+        """
+        Gets dimer excitation vectors for LE states on monomer A.
+
+        :param vectors_A:
+            The excitation vectors of monomer A.
+        :param ind_A:
+            The index of monomer A.
+        :param nocc_A:
+            The number of occupied MOs in monomer A.
+        :param nvir_A:
+            The number of unoccupied MOs in monomer A.
+        :param nocc:
+            The number of occupied MOs in dimer.
+        :param nvir:
+            The number of unoccupied MOs in dimer.
+        :param excitation_ids:
+            The indices of diabatic excited states.
+
+        :return:
+            A list containing the excitation vectors of LE(A) states.
+        """
+
+        #          vir.A     vir.B
+        #       +---------+---------+
+        # occ.A |  LE(A)  |         |
+        #       +---------+---------+
+        # occ.B |         |         |
+        #       +---------+---------+
+
+        CI_vectors = []
+
+        for sA in range(self.nstates):
+            vec_A = vectors_A[:, sA].reshape(nocc_A, nvir_A)
+            ci_vec = np.zeros((nocc, nvir))
+            ci_vec[:nocc_A, :nvir_A] = vec_A[:, :]
+            CI_vectors.append({
+                'vec': ci_vec,
+                'frag': 'A',
+                'type': 'LE',
+                'index': excitation_ids[ind_A, ind_A] + sA,
+                'name': '{}e({})'.format(ind_A + 1, sA + 1),
+            })
+
+        return CI_vectors
+
+    def dimer_excitation_vectors_LE_B(self, vectors_B, ind_B, nocc_A, nvir_A,
+                                      nocc, nvir, excitation_ids):
+        """
+        Gets dimer excitation vectors for LE states on monomer B.
+
+        :param vectors_B:
+            The excitation vectors of monomer B.
+        :param ind_B:
+            The index of monomer B.
+        :param nocc_A:
+            The number of occupied MOs in monomer A.
+        :param nvir_A:
+            The number of unoccupied MOs in monomer A.
+        :param nocc:
+            The number of occupied MOs in dimer.
+        :param nvir:
+            The number of unoccupied MOs in dimer.
+        :param excitation_ids:
+            The indices of diabatic excited states.
+
+        :return:
+            A list containing the excitation vectors of LE(B) states.
+        """
+
+        #          vir.A     vir.B
+        #       +---------+---------+
+        # occ.A |         |         |
+        #       +---------+---------+
+        # occ.B |         |  LE(B)  |
+        #       +---------+---------+
+
+        CI_vectors = []
+
+        nocc_B = nocc - nocc_A
+        nvir_B = nvir - nvir_A
+
+        for sB in range(self.nstates):
+            vec_B = vectors_B[:, sB].reshape(nocc_B, nvir_B)
+            ci_vec = np.zeros((nocc, nvir))
+            ci_vec[nocc_A:, nvir_A:] = vec_B[:, :]
+            CI_vectors.append({
+                'vec': ci_vec,
+                'frag': 'B',
+                'type': 'LE',
+                'index': excitation_ids[ind_B, ind_B] + sB,
+                'name': '{}e({})'.format(ind_B + 1, sB + 1),
+            })
+
+        return CI_vectors
+
+    def dimer_excitation_vectors_CT_AB(self, ind_A, ind_B, nocc_A, nvir_A, nocc,
+                                       nvir, excitation_ids):
+        """
+        Gets dimer excitation vectors for CT states (A->B).
+
+        :param ind_A:
+            The index of monomer A.
+        :param ind_B:
+            The index of monomer B.
+        :param nocc_A:
+            The number of occupied MOs in monomer A.
+        :param nvir_A:
+            The number of unoccupied MOs in monomer A.
+        :param nocc:
+            The number of occupied MOs in dimer.
+        :param nvir:
+            The number of unoccupied MOs in dimer.
+        :param excitation_ids:
+            The indices of diabatic excited states.
+
+        :return:
+            A list containing the excitation vectors of CT(A->B) states.
+        """
+
+        #          vir.A     vir.B
+        #       +---------+---------+
+        # occ.A |         |  CT(AB) |
+        #       +---------+---------+
+        # occ.B |         |         |
+        #       +---------+---------+
+
+        CI_vectors = []
+
+        for oA in range(self.ct_nocc):
+            for vB in range(self.ct_nvir):
+                ctAB = oA * self.ct_nvir + vB
+                ci_vec = np.zeros((nocc, nvir))
+                ci_vec[nocc_A - 1 - oA][nvir_A + vB] = 1.0
+                CI_vectors.append({
+                    'vec': ci_vec,
+                    'frag': 'AB',
+                    'type': 'CT',
+                    'index': excitation_ids[ind_A, ind_B] + ctAB,
+                    'name': '{}+(H{}){}-(L{})'.format(ind_A + 1, oA, ind_B + 1,
+                                                      vB),
+                })
+
+        return CI_vectors
+
+    def dimer_excitation_vectors_CT_BA(self, ind_A, ind_B, nocc_A, nvir_A, nocc,
+                                       nvir, excitation_ids):
+        """
+        Gets dimer excitation vectors for CT states (B->A).
+
+        :param ind_A:
+            The index of monomer A.
+        :param ind_B:
+            The index of monomer B.
+        :param nocc_A:
+            The number of occupied MOs in monomer A.
+        :param nvir_A:
+            The number of unoccupied MOs in monomer A.
+        :param nocc:
+            The number of occupied MOs in dimer.
+        :param nvir:
+            The number of unoccupied MOs in dimer.
+        :param excitation_ids:
+            The indices of diabatic excited states.
+
+        :return:
+            A list containing the excitation vectors of CT(B->A) states.
+        """
+
+        #          vir.A     vir.B
+        #       +---------+---------+
+        # occ.A |         |         |
+        #       +---------+---------+
+        # occ.B |  CT(BA) |         |
+        #       +---------+---------+
+
+        CI_vectors = []
+
+        for oB in range(self.ct_nocc):
+            for vA in range(self.ct_nvir):
+                ctBA = oB * self.ct_nvir + vA
+                ci_vec = np.zeros((nocc, nvir))
+                ci_vec[nocc - 1 - oB][vA] = 1.0
+                CI_vectors.append({
+                    'vec': ci_vec,
+                    'frag': 'BA',
+                    'type': 'CT',
+                    'index': excitation_ids[ind_B, ind_A] + ctBA,
+                    'name': '{}-(L{}){}+(H{})'.format(ind_A + 1, vA, ind_B + 1,
+                                                      oB),
+                })
+
+        return CI_vectors
+
+    def dimer_sigma_vectors(self, dimer, basis, dimer_prop, mo, ci_vectors):
+        """
+        Computes sigma vectors from dimer CI vectors.
+
+        :param dimer:
+            The dimer molecule.
+        :param basis:
+            The AO basis.
+        :param dimer_prop:
+            The dictionary containing dimer properties.
+        :param mo:
+            The MO coefficients of dimer.
+        :param ci_vectors:
+            The CI vectors.
+
+        :return:
+            A list containing the sigma vectors of dimer.
+        """
+
+        # compute sigma vectors for LE(A), CT(AB), CT(BA)
+        if self.rank == mpi_master():
+            nocc = dimer.number_of_alpha_electrons()
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+
+            tdens = []
+            for vec in ci_vectors:
+                tdens.append(np.matmul(mo_occ, np.matmul(vec['vec'], mo_vir.T)))
+            tdens_mat = AODensityMatrix(tdens, denmat.rest)
+        else:
+            tdens_mat = AODensityMatrix()
+
+        tdens_mat.broadcast(self.rank, self.comm)
+
+        tfock_mat = AOFockMatrix(tdens_mat)
+
+        if self.dft:
+            xcfun = dimer_prop['xcfun']
+            if xcfun.is_hybrid():
+                fock_flag = fockmat.rgenjkx
+                fact_xc = xcfun.get_frac_exact_exchange()
+                for s in range(tfock_mat.number_of_fock_matrices()):
+                    tfock_mat.set_scale_factor(fact_xc, s)
+            else:
+                fock_flag = fockmat.rgenj
+        else:
+            fock_flag = fockmat.rgenjk
+
+        for s in range(tfock_mat.number_of_fock_matrices()):
+            tfock_mat.set_fock_type(fock_flag, s)
+
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = dimer_prop['screening']
+        eri_drv.compute(tfock_mat, tdens_mat, dimer, basis, screening)
+
+        if self.dft:
+            if not xcfun.is_hybrid():
+                for s in range(tfock_mat.number_of_fock_matrices()):
+                    tfock_mat.scale(2.0, s)
+            xc_drv = XCIntegrator(self.comm)
+            dens_mat = dimer_prop['density']
+            dimer_molgrid = dimer_prop['molgrid']
+            xc_drv.integrate(tfock_mat, tdens_mat, dens_mat, dimer, basis,
+                             dimer_molgrid, self.xcfun_label)
+        tfock_mat.reduce_sum(self.rank, self.nodes, self.comm)
+
+        if self.rank == mpi_master():
+            sigma_vectors = []
+
+            fock_mo = dimer_prop['fock_mo']
+            fock_occ = fock_mo[:nocc, :nocc].copy()
+            fock_vir = fock_mo[nocc:, nocc:].copy()
+
+            for s in range(tfock_mat.number_of_fock_matrices()):
+                tfock = tfock_mat.to_numpy(s)
+                sigma_vec = np.matmul(mo_occ.T, np.matmul(tfock, mo_vir))
+
+                sigma_vec -= np.matmul(fock_occ, ci_vectors[s]['vec'])
+                sigma_vec += np.matmul(ci_vectors[s]['vec'], fock_vir)
+
+                sigma_vectors.append({
+                    'vec': sigma_vec,
+                    'frag': ci_vectors[s]['frag'],
+                    'type': ci_vectors[s]['type'],
+                    'index': ci_vectors[s]['index'],
+                    'name': ci_vectors[s]['name'],
+                })
+        else:
+            sigma_vectors = None
+
+        return sigma_vectors
+
+    def get_CT_trans_dipoles(self, dimer, basis, one_elec_ints, mo,
+                             ct_exc_vectors):
+        """
+        Gets transition dipole for CT states.
+
+        :param dimer:
+            The dimer molecule.
+        :param basis:
+            The AO basis.
+        :param one_elec_ints:
+            The dictionary of one-electron integrals.
+        :param mo:
+            The MO coefficients of dimer.
+        :param ct_exc_vectors:
+            The list of CT excitation vectors.
+
+        :return:
+            The dictionary containing the electric, velocity and magnetic
+            transition dipoles for CT states.
+        """
+
+        dipole_ints = one_elec_ints['electric_dipole']
+        linmom_ints = one_elec_ints['linear_momentum']
+        angmom_ints = one_elec_ints['angular_momentum']
+
+        nocc = dimer.number_of_alpha_electrons()
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+
+        elec_trans_dipoles = []
+        velo_trans_dipoles = []
+        magn_trans_dipoles = []
+
+        sqrt_2 = math.sqrt(2.0)
+
+        for cvec in ct_exc_vectors:
+            tdens = sqrt_2 * np.matmul(mo_occ, np.matmul(cvec['vec'], mo_vir.T))
+            elec_trans_dipoles.append(
+                np.array([np.sum(tdens * dipole_ints[d].T) for d in range(3)]))
+            velo_trans_dipoles.append(
+                np.array([np.sum(tdens * linmom_ints[d].T) for d in range(3)]))
+            magn_trans_dipoles.append(
+                np.array([np.sum(tdens * angmom_ints[d].T) for d in range(3)]))
+
+        return {
+            'electric': elec_trans_dipoles,
+            'velocity': velo_trans_dipoles,
+            'magnetic': magn_trans_dipoles,
+        }
 
     def print_banner(self, title):
         """
@@ -1187,7 +1591,8 @@ class ExcitonModelDriver:
         self.ostream.print_header(('-' * len(valstr)).ljust(80))
         for s, R in enumerate(rot_str):
             valstr = 'Excited State {:>5s}: '.format('S' + str(s + 1))
-            valstr += '    Rot.Str. {:11.4f}'.format(R)
-            valstr += '    [10**(-40) (esu**2)*(cm**2)]'
+            valstr += '    Rot.Str. '
+            valstr += f'{(R / rotatory_strength_in_cgs()):13.6f} a.u.'
+            valstr += f'{R:11.4f} [10**(-40) cgs]'
             self.ostream.print_header(valstr.ljust(80))
         self.ostream.print_blank()

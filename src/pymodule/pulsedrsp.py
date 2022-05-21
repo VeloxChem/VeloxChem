@@ -84,7 +84,10 @@ class PulsedResponse:
             comm = MPI.COMM_WORLD
 
         if ostream is None:
-            ostream = OutputStream(sys.stdout)
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
 
         # mpi information
         self.comm = comm

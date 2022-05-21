@@ -26,7 +26,6 @@
 #include <pybind11/pybind11.h>
 
 #include "ExportDFT.hpp"
-#include "ExportXTB.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "ExportMolData.hpp"
@@ -35,6 +34,7 @@
 #include "ExportResponse.hpp"
 #include "ExportTwoInts.hpp"
 #include "ExportVisualization.hpp"
+#include "ExportXTB.hpp"
 
 PYBIND11_MODULE(veloxchemlib, m)
 {

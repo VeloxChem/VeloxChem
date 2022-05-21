@@ -75,7 +75,10 @@ class Mp2Driver:
             comm = MPI.COMM_WORLD
 
         if ostream is None:
-            ostream = OutputStream(sys.stdout)
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
 
         # mp2 energy
         self.e_mp2 = None
@@ -104,9 +107,9 @@ class Mp2Driver:
         Updates settings in MP2 driver.
 
         :param mp2_dict:
-            The dictionary of MP2 settings.
+            The dictionary of MP2 input.
         :param method_dict:
-            The dictionary of method.
+            The dictionary of method settings.
         """
 
         if method_dict is None:
@@ -181,17 +184,16 @@ class Mp2Driver:
             nocc = molecule.number_of_alpha_electrons()
             eocc = orb_ene[:nocc]
             evir = orb_ene[nocc:]
-            eab = evir.reshape(-1, 1) + evir
+            e_vv = evir.reshape(-1, 1) + evir
 
             self.e_mp2 = 0.0
-            oovv = moints_drv.compute_in_mem(molecule, ao_basis, mol_orbs,
-                                             "OOVV")
-            for i in range(oovv.shape[0]):
-                for j in range(oovv.shape[1]):
-                    ij = oovv[i, j, :, :]
-                    ij_antisym = ij - ij.T
-                    denom = eocc[i] + eocc[j] - eab
-                    self.e_mp2 += np.sum(ij * (ij + ij_antisym) / denom)
+            phys_oovv = moints_drv.compute_in_memory(molecule, ao_basis,
+                                                     mol_orbs, 'phys_oovv')
+            for i in range(phys_oovv.shape[0]):
+                for j in range(phys_oovv.shape[1]):
+                    ab = phys_oovv[i, j, :, :]
+                    denom = e_vv - eocc[i] - eocc[j]
+                    self.e_mp2 -= np.sum(ab * (2.0 * ab - ab.T) / denom)
 
             mp2_str = '*** MP2 correlation energy: %20.12f a.u.' % self.e_mp2
             self.ostream.print_header(mp2_str.ljust(92))

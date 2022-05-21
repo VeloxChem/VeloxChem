@@ -79,10 +79,13 @@ class TestOrbData:
         ener_a = [0.5, 0.9]
         ener_b = [0.3, 0.6]
 
-        orb_rest = MolecularOrbitals([data_a], [ener_a], molorb.rest)
+        occ_a = [1.8, 0.2]
+        occ_b = [0.6, 0.4]
+
+        orb_rest = MolecularOrbitals([data_a], [ener_a], [occ_a], molorb.rest)
 
         orb_unrest = MolecularOrbitals([data_a, data_b], [ener_a, ener_b],
-                                       molorb.unrest)
+                                       [occ_a, occ_b], molorb.unrest)
 
         orb_a1 = orb_rest.alpha_to_numpy()
         orb_a2 = orb_unrest.alpha_to_numpy()
@@ -99,6 +102,14 @@ class TestOrbData:
         assert (ener_a == ene_a1).all()
         assert (ener_a == ene_a2).all()
         assert (ener_b == ene_b2).all()
+
+        occ_a1 = orb_rest.occa_to_numpy()
+        occ_a2 = orb_unrest.occa_to_numpy()
+        occ_b2 = orb_unrest.occb_to_numpy()
+
+        assert (occ_a == occ_a1).all()
+        assert (occ_a == occ_a2).all()
+        assert (occ_b == occ_b2).all()
 
         assert orb_rest.get_orbitals_type() == molorb.rest
         assert orb_unrest.get_orbitals_type() == molorb.unrest
@@ -120,14 +131,19 @@ class TestOrbData:
             orb_rest.write_hdf5(h5file, nuc_chg, 'sto-3g')
             dummy = MolecularOrbitals.read_hdf5(h5file)
             assert orb_rest == dummy
-            assert MolecularOrbitals.match_hdf5(h5file, nuc_chg, 'sto-3g', True)
+            assert MolecularOrbitals.match_hdf5(h5file, nuc_chg, 'sto-3g',
+                                                'restricted')
 
             nuc_chg = np.array([1, 1, 8], dtype=np.int32)
             orb_unrest.write_hdf5(h5file, nuc_chg, 'cc-pvdz')
             dummy = MolecularOrbitals.read_hdf5(h5file)
             assert orb_unrest == dummy
             assert MolecularOrbitals.match_hdf5(h5file, nuc_chg, 'cc-pvdz',
-                                                False)
+                                                'unrestricted')
+
+            h5file = Path(h5file)
+            if h5file.is_file():
+                h5file.unlink()
 
     def test_rest_density(self):
 
@@ -135,9 +151,10 @@ class TestOrbData:
 
         arr = np.array([[.9, .2, .3], [.3, .8, .6], [.1, .5, .7]])
         ene = np.array([.7, .8, .9])
+        occ = np.array([2, 0, 0])
 
-        orb_rest = MolecularOrbitals([arr], [ene], molorb.rest)
-        den_rest = orb_rest.get_density(mol)
+        orb_rest = MolecularOrbitals([arr], [ene], [occ], molorb.rest)
+        den_rest = orb_rest.get_density(mol, 'restricted')
         den_a = den_rest.alpha_to_numpy(0)
         den_b = den_rest.beta_to_numpy(0)
 
@@ -153,13 +170,14 @@ class TestOrbData:
 
         arr_a = np.array([[.9, .2, .3], [.3, .8, .6], [.1, .5, .7]])
         ene_a = np.array([.7, .8, .9])
+        occ = np.array([1, 0, 0])
 
         arr_b = arr_a * 0.9
         ene_b = ene_a * 0.8
 
         orb_unrest = MolecularOrbitals([arr_a, arr_b], [ene_a, ene_b],
-                                       molorb.unrest)
-        den_unrest = orb_unrest.get_density(mol)
+                                       [occ, occ], molorb.unrest)
+        den_unrest = orb_unrest.get_density(mol, 'unrestricted')
         den_a = den_unrest.alpha_to_numpy(0)
         den_b = den_unrest.beta_to_numpy(0)
 

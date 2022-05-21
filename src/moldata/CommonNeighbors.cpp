@@ -335,7 +335,7 @@ CCommonNeighbors::compJaccardIndex(const CCommonNeighbors& other)
         }
     }
     
-    for (int32_t i = 0; i < other._signatures.size(); i++)
+    for (int32_t i = 0; i < static_cast<int32_t>(other._signatures.size()); i++)
     {
         const auto idx = find(other._signatures[i]);
         

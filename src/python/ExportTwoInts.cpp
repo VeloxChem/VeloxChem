@@ -33,6 +33,7 @@
 
 #include "AOFockMatrix.hpp"
 #include "DenseMatrix.hpp"
+#include "DiagEriDriver.hpp"
 #include "ElectronRepulsionIntegralsDriver.hpp"
 #include "EriScreenerType.hpp"
 #include "ErrorHandler.hpp"
@@ -71,24 +72,24 @@ CAOFockMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
 // Helper function for exporting CElectronRepulsionIntegralsDriver.computeInMemory
 
 static void
-CElectronRepulsionIntegralsDriver_compute_in_mem(const CElectronRepulsionIntegralsDriver& self,
-                                                 const CMolecule&                         molecule,
-                                                 const CMolecularBasis&                   basis,
-                                                 py::array_t<double>&                     eri)
+CElectronRepulsionIntegralsDriver_compute_in_memory(const CElectronRepulsionIntegralsDriver& self,
+                                                    const CMolecule&                         molecule,
+                                                    const CMolecularBasis&                   basis,
+                                                    py::array_t<double>&                     eri)
 {
-    std::string errsrc("ElectronRepulsionIntegralsDriver.compute_in_mem: Expecting a C-style contiguous numpy array");
+    std::string errsrc("ElectronRepulsionIntegralsDriver.compute_in_memory: Expecting a C-style contiguous numpy array");
 
     auto c_style = py::detail::check_flags(eri.ptr(), py::array::c_style);
 
     errors::assertMsgCritical(c_style, errsrc);
 
-    std::string errshape("ElectronRepulsionIntegralsDriver.compute_in_mem: Invalid shape");
+    std::string errshape("ElectronRepulsionIntegralsDriver.compute_in_memory: Invalid shape");
 
     errors::assertMsgCritical(eri.ndim() == 4, errshape);
 
     auto nao = vlx_orbdata::get_number_of_atomic_orbitals(molecule, basis);
 
-    std::string errsize("ElectronRepulsionIntegralsDriver.compute_in_mem: Inconsistent size");
+    std::string errsize("ElectronRepulsionIntegralsDriver.compute_in_memory: Inconsistent size");
 
     errors::assertMsgCritical(eri.shape(0) == nao, errsize);
 
@@ -124,7 +125,7 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
 
             int32_t numbatches = 0;
 
-            auto merror = MPI_Recv(&numbatches, 1, MPI_INT, cross_id, tag_id++, *cross_comm, &mstat);
+            auto merror = MPI_Recv(&numbatches, 1, MPI_INT32_T, cross_id, tag_id++, *cross_comm, &mstat);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -134,11 +135,11 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
             {
                 int32_t first = -1, second = -1;
 
-                merror = MPI_Recv(&first, 1, MPI_INT, cross_id, tag_id++, *cross_comm, &mstat);
+                merror = MPI_Recv(&first, 1, MPI_INT32_T, cross_id, tag_id++, *cross_comm, &mstat);
 
                 if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
-                merror = MPI_Recv(&second, 1, MPI_INT, cross_id, tag_id++, *cross_comm, &mstat);
+                merror = MPI_Recv(&second, 1, MPI_INT32_T, cross_id, tag_id++, *cross_comm, &mstat);
 
                 if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -159,7 +160,7 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
 
         auto numbatches = self.getNumberOfBatches();
 
-        auto merror = MPI_Send(&numbatches, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm);
+        auto merror = MPI_Send(&numbatches, 1, MPI_INT32_T, mpi::master(), tag_id++, *cross_comm);
 
         if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -173,11 +174,11 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
 
             auto second = genpairs[ibatch].second();
 
-            merror = MPI_Send(&first, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm);
+            merror = MPI_Send(&first, 1, MPI_INT32_T, mpi::master(), tag_id++, *cross_comm);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
-            merror = MPI_Send(&second, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm);
+            merror = MPI_Send(&second, 1, MPI_INT32_T, mpi::master(), tag_id++, *cross_comm);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -347,8 +348,8 @@ export_twoints(py::module& m)
     PyClass<CElectronRepulsionIntegralsDriver>(m, "ElectronRepulsionIntegralsDriver")
         .def(py::init(&vlx_general::create<CElectronRepulsionIntegralsDriver>), "comm"_a = py::none())
         .def("compute",
-             vlx_general::overload_cast_<const ericut, const double, const CMolecule&, const CMolecularBasis&>()(
-                 &CElectronRepulsionIntegralsDriver::compute, py::const_),
+             py::overload_cast<const ericut, const double, const CMolecule&, const CMolecularBasis&>(&CElectronRepulsionIntegralsDriver::compute,
+                                                                                                     py::const_),
              // the wonky format of the raw string literal is to get help(...) in Python to look nice
              R"pbdoc(
 Computes Q values for electron repulsion integrals for molecule with specific AO
@@ -371,9 +372,8 @@ basis set and stores results in screening container object.
              "molecule"_a,
              "ao_basis"_a)
         .def("compute",
-             vlx_general::
-                 overload_cast_<CAOFockMatrix&, const CAODensityMatrix&, const CMolecule&, const CMolecularBasis&, const CScreeningContainer&>()(
-                     &CElectronRepulsionIntegralsDriver::compute, py::const_),
+             py::overload_cast<CAOFockMatrix&, const CAODensityMatrix&, const CMolecule&, const CMolecularBasis&, const CScreeningContainer&>(
+                 &CElectronRepulsionIntegralsDriver::compute, py::const_),
              // the wonky format of the raw string literal is to get help(...) in Python to look nice
              R"pbdoc(
 Computes electron repulsion integrals and stores them in AO Fock matrix for
@@ -396,14 +396,14 @@ molecule with specific AO basis set. Performs screening according to
              "molecule"_a,
              "ao_basis"_a,
              "screening"_a)
-        .def("compute_in_mem",
-             &CElectronRepulsionIntegralsDriver_compute_in_mem,
+        .def("compute_in_memory",
+             &CElectronRepulsionIntegralsDriver_compute_in_memory,
              "Computes electron repulsion integrals as a full 4D array and stores them in memory.",
              "molecule"_a,
              "basis"_a,
              "eri_tensor"_a)
         .def(
-            "compute_in_mem",
+            "compute_in_memory",
             [](const CElectronRepulsionIntegralsDriver& eridrv, const CMolecule& molecule, const CMolecularBasis& basis) {
                 auto nao = vlx_orbdata::get_number_of_atomic_orbitals(molecule, basis);
                 auto eri = py::array_t<double, py::array::c_style>({nao, nao, nao, nao});
@@ -458,6 +458,28 @@ molecule with specific AO basis set. Performs screening according to
              "cross_rank"_a,
              "cross_nodes"_a,
              "py_cross_comm"_a);
+
+    // CDiagEriDriver class
+
+    PyClass<CDiagEriDriver<double, mem::Host>>(m, "DiagEriDriver")
+        .def(py::init<>())
+        .def("compute",
+             py::overload_cast<const CMolecule&, const CMolecularBasis&>(&CDiagEriDriver<double, mem::Host>::compute, py::const_),
+             // the wonky format of the raw string literal is to get help(...) in Python to look nice
+             R"pbdoc(
+Computes Q values for electron repulsion integrals for molecule with specific AO
+basis set and stores results in screening container object.
+
+:param molecule:
+    The molecule.
+:param ao_basis:
+    The molecular AO basis.
+
+:return:
+    The packed GTOs pairs container.
+             )pbdoc",
+             "molecule"_a,
+             "ao_basis"_a);
 }
 
 }  // namespace vlx_twoints

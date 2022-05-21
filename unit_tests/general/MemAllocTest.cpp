@@ -29,7 +29,7 @@
 
 TEST_F(CMemAllocTest, Malloc)
 {
-    double* ptr = (double*)mem::malloc(53 * sizeof(double));
+    auto ptr = mem::malloc<double>(53);
 
     ASSERT_EQ(0u, ((size_t)ptr) % VLX_ALIGN);
 

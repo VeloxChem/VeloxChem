@@ -4,7 +4,7 @@ import numpy as np
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
-from veloxchem.scffirstorderprop import ScfFirstOrderProperties
+from veloxchem.firstorderprop import FirstOrderProperties
 
 
 class TestScfUnrestricted:
@@ -28,8 +28,8 @@ class TestScfUnrestricted:
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        scf_prop = ScfFirstOrderProperties(task.mpi_comm, task.ostream)
-        scf_prop.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors)
+        scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
+        scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_drv.scf_tensors)
 
         if is_mpi_master(task.mpi_comm):
             e_scf = scf_drv.get_scf_energy()
@@ -43,7 +43,7 @@ class TestScfUnrestricted:
     def test_scf_dft_blyp(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water_unrest.inp')
+        inpfile = str(here / 'inputs' / 'water_triplet.inp')
         potfile = None
 
         xcfun_label = 'blyp'
@@ -58,7 +58,7 @@ class TestScfUnrestricted:
     def test_scf_dft_blyp_efield(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water_unrest.inp')
+        inpfile = str(here / 'inputs' / 'water_triplet.inp')
         potfile = None
 
         xcfun_label = 'blyp'
@@ -73,7 +73,7 @@ class TestScfUnrestricted:
     def test_scf_dft_b3lyp(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water_unrest.inp')
+        inpfile = str(here / 'inputs' / 'water_triplet.inp')
         potfile = None
 
         xcfun_label = 'b3lyp'
@@ -88,14 +88,14 @@ class TestScfUnrestricted:
     def test_scf_dft_slda(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water_unrest.inp')
+        inpfile = str(here / 'inputs' / 'water_triplet.inp')
         potfile = None
 
         xcfun_label = 'slda'
         electric_field = None
 
-        ref_e_scf = -75.756138
-        ref_dip = np.array([0.000000, 0.000000, -0.226886])
+        ref_e_scf = -75.7561378
+        ref_dip = np.array([0.000000, 0.000000, -0.226850])
 
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)
@@ -103,7 +103,7 @@ class TestScfUnrestricted:
     def test_scf_dft_b88x(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water_unrest.inp')
+        inpfile = str(here / 'inputs' / 'water_triplet.inp')
         potfile = None
 
         xcfun_label = 'b88x'
