@@ -48,10 +48,9 @@ macro(option_with_default variable msge default)
 endmacro()
 
 # included cmake modules
-include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_cxx.cmake)
-include(${PROJECT_SOURCE_DIR}/cmake/compiler_flags/CXXFlags.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_default_build_paths.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_safeguards.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/compiler_flags/CXXFlags.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/alignment.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/math.cmake)
 

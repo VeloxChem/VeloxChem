@@ -8,8 +8,13 @@ else()
     QUIET
     URL https://github.com/google/googletest/archive/release-1.10.0.tar.gz
   )
-  # Prevent Google Test from using PThreads
+  # for windows: Prevent overriding the parent project's compiler/linker settings
+  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+  # prevent Google Test from using PThreads
   set(gtest_disable_pthreads ON CACHE BOOL "" FORCE)
+  # do not build Google Mock
+  set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+
   FetchContent_MakeAvailable(_gtest)
 
   # Provide an alias, so linking to GTest looks the same regardless if it was

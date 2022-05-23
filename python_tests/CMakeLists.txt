@@ -37,7 +37,7 @@ foreach(_f IN LISTS _vlx_pytests)
     NAME
       ${_name}
     COMMAND
-      ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 1 ${Python_EXECUTABLE} -m pytest -v -s --pyargs veloxchem -k test_${_name}
+      ${Python_EXECUTABLE} -m pytest -v -s --pyargs veloxchem -k test_${_name}
     WORKING_DIRECTORY
       ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/..
     )

@@ -29,9 +29,6 @@
 
 option_with_default(VLX_LA_VENDOR "Linear algebra library vendor" "Generic")
 
-# check_function_exists invocations will not print any output
-set(CMAKE_REQUIRED_QUIET ON)
-
 # we use the standard CMake FindLapack module
 # it will search for BLAS too
 # we set up the call by defining the BLA_VENDOR variable
@@ -49,6 +46,9 @@ set(_la_compiler_flags "")
 
 # include directories for the Math::LA target
 set(_la_include_dirs "")
+
+# whether to check that CBLAS and LAPACKE work
+set(_check_cblas_and_lapacke TRUE)
 
 if(VLX_LA_VENDOR STREQUAL "MKL")
   # MKL is known under a different name to CMake
@@ -101,13 +101,18 @@ if(VLX_LA_VENDOR STREQUAL "MKL")
   if(CMAKE_CXX_COMPILER_ID MATCHES GNU OR CMAKE_CXX_COMPILER_ID STREQUAL Clang)
     set(_la_compiler_flags "-m64")
   endif()
+
+  set(_check_cblas_and_lapacke FALSE)
 elseif(VLX_LA_VENDOR STREQUAL "Apple" OR VLX_LA_VENDOR STREQUAL "NAS")
   set(CMAKE_THREAD_LIBS_INIT "-lpthread")
   set(CMAKE_HAVE_THREADS_LIBRARY 1)
   set(CMAKE_USE_WIN32_THREADS_INIT 0)
   set(CMAKE_USE_PTHREADS_INIT 1)
   set(THREADS_PREFER_PTHREAD_FLAG ON)
-  find_package(LAPACK REQUIRED)
+
+  find_package(LAPACK REQUIRED QUIET)
+
+  set(_check_cblas_and_lapacke FALSE)
 elseif(VLX_LA_VENDOR STREQUAL "Cray")
   # compiling and linking with Cray libsci is taken care of automatically by the
   # Cray compiler wrappers. Do nothing!
@@ -116,13 +121,19 @@ elseif(VLX_LA_VENDOR STREQUAL "Cray")
   # clear generic _la_include_dirs and let the Cray compiler figure it out
   set(_la_include_dirs "")
   set(LAPACK_LIBRARIES "")
+
+  set(_check_cblas_and_lapacke FALSE)
 elseif(VLX_LA_VENDOR STREQUAL "FLAME")
   # detection of BLIS/FLAME in the standard CMake module cannot find the
   # multithreaded version, hence the code here.
   include(FindPackageHandleStandardArgs)
   include(CheckCXXSymbolExists)
 
+  # check_* invocations will not print any output
+  set(CMAKE_REQUIRED_QUIET ON)
+
   list(APPEND _extaddlibdir ENV LD_LIBRARY_PATH "${CMAKE_C_IMPLICIT_LINK_DIRECTORIES}")
+
   # we would prefer the multithreaded version, if available
   find_library(_la_blis_library
     NAMES
@@ -165,67 +176,141 @@ elseif(VLX_LA_VENDOR STREQUAL "FLAME")
   unset(_la_blis_library_works)
   unset(_la_flame_library)
   unset(_la_flame_library_works)
+
+  set(CMAKE_REQUIRED_QUIET OFF)
+
+  set(_check_cblas_and_lapacke FALSE)
 elseif(VLX_LA_VENDOR STREQUAL "Generic")
   find_package(LAPACK REQUIRED QUIET)
 
+  set(_check_cblas_and_lapacke TRUE)
+else()
+  find_package(LAPACK REQUIRED QUIET)
+
+  set(_check_cblas_and_lapacke TRUE)
+endif()
+
+# check_* invocations will not print any output
+set(CMAKE_REQUIRED_QUIET ON)
+
+# check that CBLAS works
+if(_check_cblas_and_lapacke)
+  include(${CMAKE_CURRENT_LIST_DIR}/cblas-lapacke.cmake)
+
   # get directory containing cblas.h
+  # we are assuming this is on an already-known system path
   find_path(_include_dirs
     NAMES
       cblas.h
+    HINTS
+      ${CMAKE_PREFIX_PATH}/include
+    PATHS
+      ${BLAS_ROOT}/include
+      ${LAPACK_ROOT}/include
     )
+  list(APPEND _la_include_dirs ${_include_dirs})
 
-  # look for CBLAS and LAPACKE
-  include(${CMAKE_CURRENT_LIST_DIR}/cblas-lapacke.cmake)
-  set(_la_cblas_library "")
-  check_cblas_lapacke(_la_cblas_library 
-    CBLAS 
+  # is CBLAS bundled with the BLAS_LIBRARIES we found?
+  set(_blas_libs)
+  foreach(_lib IN LISTS BLAS_LIBRARIES)
+    get_filename_component(__lib ${_lib} NAME_WE)
+    list(APPEND _blas_libs ${__lib})
+  endforeach()
+  list(TRANSFORM _blas_libs REPLACE "^lib" "")
+
+  check_cblas_lapacke(_la_cblas_bundled
+    CBLAS
     cblas_sgemm
     ${_include_dirs}
     "cblas.h"
-    "" 
-    "cblas" 
-    "" 
-    "" 
     ""
+    "${_blas_libs}"
+    ""
+    "${BLAS_ROOT};${LAPACK_ROOT}"
+    "lib"
     )
-  
-  if(_la_cblas_library)
-    list(PREPEND BLAS_LIBRARIES ${_la_cblas_library})
-    list(INSERT LAPACK_LIBRARIES 1 ${_la_cblas_library})
-    unset(_la_cblas_library)
-    unset(_include_dirs)
-  else()
-    message(FATAL_ERROR "Cannot find a working CBLAS library to link to!")
+
+  if(NOT _la_cblas_bundled)
+    # well, it's not bundled, let's give it another shot by also linking the
+    # generic libcblas.so
+    check_cblas_lapacke(_la_cblas_library
+      CBLAS
+      cblas_sgemm
+      ${_include_dirs}
+      "cblas.h"
+      ""
+      "cblas;${_blas_libs}"
+      ""
+      "${BLAS_ROOT};${LAPACK_ROOT}"
+      "lib"
+      )
+
+    if(_la_cblas_library)
+      list(PREPEND BLAS_LIBRARIES ${_la_cblas_library})
+      list(INSERT LAPACK_LIBRARIES 1 ${_la_cblas_library})
+      unset(_la_cblas_library)
+      unset(_include_dirs)
+    else()
+      message(FATAL_ERROR "Cannot find a working CBLAS library to link to!")
+    endif()
   endif()
 
   # get directory containing lapacke.h
+  # we are assuming this is on an already-known system path
   find_path(_include_dirs
     NAMES
       lapacke.h
+    HINTS
+      ${CMAKE_PREFIX_PATH}/include
+    PATHS
+      ${BLAS_ROOT}/include
+      ${LAPACK_ROOT}/include
     )
+  list(APPEND _la_include_dirs ${_include_dirs})
 
-  set(_la_lapacke_library "")
-  check_cblas_lapacke(_la_lapacke_library 
-    LAPACKE 
+  # is LAPACKE bundled with the LAPACK_LIBRARIES we found?
+  set(_lapack_libs)
+  foreach(_lib IN LISTS LAPACK_LIBRARIES)
+    get_filename_component(__lib ${_lib} NAME_WE)
+    list(APPEND _lapack_libs ${__lib})
+  endforeach()
+  list(TRANSFORM _lapack_libs REPLACE "^lib" "")
+
+  check_cblas_lapacke(_la_lapacke_bundled
+    LAPACKE
     LAPACKE_cheev
     ${_include_dirs}
     "lapacke.h"
-    "" 
-    "lapacke" 
-    "" 
-    "" 
     ""
+    "${_lapack_libs}"
+    ""
+    "${BLAS_ROOT};${LAPACK_ROOT}"
+    "lib"
     )
 
-  if(_la_lapacke_library)
-    list(PREPEND LAPACK_LIBRARIES ${_la_lapacke_library})
-    unset(_la_lapacke_library)
-    unset(_include_dirs)
-  else()
-    message(FATAL_ERROR "Cannot find a working LAPACKE library to link to!")
+  if(NOT _la_lapacke_bundled)
+    # well, it's not bundled, let's give it another shot by also linking the
+    # generic liblapacke.so
+    check_cblas_lapacke(_la_lapacke_library
+      LAPACKE
+      LAPACKE_cheev
+      ${_include_dirs}
+      "lapacke.h"
+      ""
+      "lapacke;${_lapack_libs}"
+      ""
+      "${BLAS_ROOT};${LAPACK_ROOT}"
+      "lib"
+      )
+
+    if(_la_lapacke_library)
+      list(PREPEND LAPACK_LIBRARIES ${_la_lapacke_library})
+      unset(_la_lapacke_library)
+      unset(_include_dirs)
+    else()
+      message(FATAL_ERROR "Cannot find a working LAPACKE library to link to!")
+    endif()
   endif()
-else()
-  find_package(LAPACK REQUIRED QUIET)
 endif()
 
 set(CMAKE_REQUIRED_QUIET OFF)
@@ -234,7 +319,7 @@ set(CMAKE_REQUIRED_QUIET OFF)
 # adapted from: https://github.com/Kitware/CMake/blob/master/Modules/FindLAPACK.cmake#L588-L603
 if(BLAS_FOUND AND LAPACK_FOUND AND NOT TARGET Math::LA)
   message(STATUS "Using ${VLX_LA_VENDOR} as linear algebra backend")
-  message(STATUS "BLAS/LAPACK libraries: ${LAPACK_LIBRARIES}")
+
   add_library(Math::LA INTERFACE IMPORTED)
 
   target_compile_definitions(Math::LA
@@ -250,12 +335,22 @@ if(BLAS_FOUND AND LAPACK_FOUND AND NOT TARGET Math::LA)
   endif()
 
   if(_la_include_dirs)
+    # not strictly necessary, but clean up duplicates
+    list(REMOVE_DUPLICATES _la_include_dirs)
+
+    message(STATUS "BLAS/LAPACK include directories: ${_la_include_dirs}")
+
     target_include_directories(Math::LA
       SYSTEM
       INTERFACE
         "${_la_include_dirs}"
       )
   endif()
+
+  # not strictly necessary, but clean up duplicates
+  list(REMOVE_DUPLICATES LAPACK_LIBRARIES)
+
+  message(STATUS "BLAS/LAPACK libraries: ${LAPACK_LIBRARIES}")
 
   target_link_libraries(Math::LA
     INTERFACE
