@@ -520,31 +520,23 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
 
                                   - 2.0 * (rhow_kx_i[i] * rhow_kx_i[i] + rhow_ky_i[i] * rhow_ky_i[i] + rhow_kz_i[i] * rhow_kz_i[i]);
 
-
                     rho_sig_x_r[i] = 4.0 * (rhow_kx_r[i] * rhow_kx_r[i] - rhow_kx_i[i] * rhow_kx_i[i]) + jj_r;
-
 
                     rho_sig_y_r[i] = 4.0 * (rhow_ky_r[i] * rhow_ky_r[i] - rhow_ky_i[i] * rhow_ky_i[i]) + jj_r;
 
-
                     rho_sig_z_r[i] = 4.0 * (rhow_kz_r[i] * rhow_kz_r[i] - rhow_kz_i[i] * rhow_kz_i[i]) + jj_r;
-
 
                     rho_lam_xy_r[i] = (rhow_kx_r[i] * rhow_ky_r[i] - rhow_kx_i[i] * rhow_ky_i[i]
 
                                        + rhow_ky_r[i] * rhow_kx_r[i] - rhow_ky_i[i] * rhow_kx_i[i]);
 
-
                     rho_lam_xz_r[i] = (rhow_kx_r[i] * rhow_kz_r[i] - rhow_kx_i[i] * rhow_kz_i[i]
 
                                        + rhow_kz_r[i] * rhow_kx_r[i] - rhow_kz_i[i] * rhow_kx_i[i]);
 
-
                     rho_lam_yz_r[i] = (rhow_ky_r[i] * rhow_kz_r[i] - rhow_ky_i[i] * rhow_kz_i[i]
 
                                        + rhow_kz_r[i] * rhow_ky_r[i] - rhow_kz_i[i] * rhow_ky_i[i]);
-
-
                 }
             }
         }
@@ -1571,7 +1563,6 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
 
                 auto rho_lam_yz_r = densityGridAB.rhow1rhow2(6 * j + 5);
 
-
                 // rxw1rhow part
 
                 auto rxw1rhow2_sig_x_r = densityGridAB.rxw1rhow2(6 * j);
@@ -1852,7 +1843,6 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
 
                     // rxw1rhow2 imag
 
-
                     // ryw1rhow2 real
 
                     jj_r = 4.0 * (gradyw_kx_r[i] * rhow_kx_r[i] + gradyw_ky_r[i] * rhow_ky_r[i] + gradyw_kz_r[i] * rhow_kz_r[i])
@@ -1931,7 +1921,6 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
 
                     // rxw1rxw2 imag
 
-
                     // rxw1ryw2
 
                     jj_r = 2.0 * (gradxw_kx_r[i] * gradyw_kx_r[i] + gradxw_ky_r[i] * gradyw_ky_r[i] + gradxw_kz_r[i] * gradyw_kz_r[i])
@@ -1958,7 +1947,6 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
 
                     // rxw1ryw2 imag
 
-
                     // rxw1rzw2
 
                     jj_r = 2.0 * (gradxw_kx_r[i] * gradzw_kx_r[i] + gradxw_ky_r[i] * gradzw_ky_r[i] + gradxw_kz_r[i] * gradzw_kz_r[i])
@@ -1984,7 +1972,6 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
                                            + gradxw_kz_r[i] * gradzw_ky_r[i] - gradxw_kz_i[i] * gradzw_ky_i[i];
 
                     // rxw1rzw2 imag
-
 
                     // ryw1rxw2
 
@@ -2054,7 +2041,6 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
 
                     // ryw1rzw2 imag
 
-
                     // rzw1rxw2
 
                     rzw1rxw2_sig_x_r[i] = rxw1rzw2_sig_x_r[i];
@@ -2070,7 +2056,6 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
                     rzw1rxw2_lam_yz_r[i] = rxw1rzw2_lam_yz_r[i];
 
                     // rzw1rxw2 imag
-
 
                     // rzw1ryw2
 
@@ -2113,7 +2098,6 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
                                            + gradzw_kz_r[i] * gradzw_ky_r[i] - gradzw_kz_i[i] * gradzw_ky_i[i];
 
                     // rzw1rzw2 imag
-
                 }
             }
         }
