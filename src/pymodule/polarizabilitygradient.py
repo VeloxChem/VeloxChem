@@ -167,7 +167,7 @@ class PolarizabilityGradient():
 #  - Can we isolate the term with omega and overlap matrix a bit more? Is there a numerical way to get them?
                 pol_gradient[:, :, i] += ( np.einsum('xymn,amn->xya', 2.0 * rel_dm_ao, d_fock)
                                  +1.0 * np.einsum('xymn,amn->xya', 2.0 * omega_ao, d_ovlp)
-                                 +0.5 * (
+                                 +1.0 * (
                                  +1.0 * np.einsum('xmn,ypt,atpmn->xya', xpy, xpy - xpy.transpose(0,2,1), d_eri)
                                  -0.5 * np.einsum('xmn,ypt,atnmp->xya', xpy, xpy - xpy.transpose(0,2,1), d_eri)
                                  +1.0 * np.einsum('xmn,ypt,atpmn->xya', xmy, xmy + xmy.transpose(0,2,1), d_eri)
@@ -764,7 +764,7 @@ class PolOrbitalResponse(CphfSolver):
                         0.5 * fock_ao_rhs.alpha_to_numpy(m*dof+n))
                 # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2), (2,0), (2,1), (2,2) * dof gamma_{zx} =
 
-                omega_1pdm_2pdm_contribs = 1.0 * ( 1 *(
+                omega_1pdm_2pdm_contribs = 1.0 * ( 0.5 *(
                     np.linalg.multi_dot([D_vir, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir])
                   + np.linalg.multi_dot([D_occ, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir])
                   + np.linalg.multi_dot([D_occ, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir]).T
@@ -773,7 +773,7 @@ class PolOrbitalResponse(CphfSolver):
 
                 omega_epsilon_dm[m,n] = -2.0 * epsilon_dm_ao
                 omega_pdms[m,n] = - 2.0 * omega_1pdm_2pdm_contribs
-                omega[m*dof+n] = -2.0 * epsilon_dm_ao - 10.0 * omega_1pdm_2pdm_contribs - 1.0 * dipole_ints_contrib_ao[m,n]
+                omega[m*dof+n] = - 1.0 * epsilon_dm_ao - 1.0 * omega_1pdm_2pdm_contribs + 1.0 * dipole_ints_contrib_ao[m,n]
 
         self.cphf_results['omega_epsilon_dm'] = omega_epsilon_dm
         self.cphf_results['omega_pdms'] = omega_pdms
