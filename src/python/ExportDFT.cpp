@@ -248,7 +248,7 @@ export_dft(py::module& m)
              "molecularGrid"_a,
              "xcFuncLabel"_a,
              "quadMode"_a);
-
+    
     // CXCMolecularGradient class
 
     PyClass<CXCMolecularGradient>(m, "XCMolecularGradient")

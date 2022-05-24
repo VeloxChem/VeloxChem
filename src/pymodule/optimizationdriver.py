@@ -34,8 +34,8 @@ from .veloxchemlib import CommonNeighbors
 from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstroms
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
-from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords, get_datetime_string
+from .errorhandler import assert_msg_critical
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
