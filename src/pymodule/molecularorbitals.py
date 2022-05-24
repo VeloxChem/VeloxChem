@@ -78,7 +78,7 @@ def _MolecularOrbitals_print_orbitals(self,
 
         rvecs = self.alpha_to_numpy()
         reigs = self.ea_to_numpy()
-        rnocc = [2.0 if x < nocc else 0.0 for x in range(norb)]
+        rnocc = self.occa_to_numpy()
 
         for i in range(nstart, nend):
             _MolecularOrbitals_print_coefficients(reigs[i], rnocc[i], i,
@@ -103,7 +103,7 @@ def _MolecularOrbitals_print_orbitals(self,
 
         uvecs = self.alpha_to_numpy()
         ueigs = self.ea_to_numpy()
-        unocc = [1.0 if x < nalpha else 0.0 for x in range(norb)]
+        unocc = self.occa_to_numpy()
 
         for i in range(nstart, nend):
             _MolecularOrbitals_print_coefficients(ueigs[i], unocc[i], i,
@@ -124,7 +124,7 @@ def _MolecularOrbitals_print_orbitals(self,
 
         uvecs = self.beta_to_numpy()
         ueigs = self.eb_to_numpy()
-        unocc = [1.0 if x < nbeta else 0.0 for x in range(norb)]
+        unocc = self.occb_to_numpy()
 
         for i in range(nstart, nend):
             _MolecularOrbitals_print_coefficients(ueigs[i], unocc[i], i,
@@ -168,7 +168,7 @@ def _MolecularOrbitals_print_coefficients(eigval, focc, iorb, coeffs, ao_map,
     valstr = 26 * "-"
     ostream.print_header(valstr.ljust(92))
 
-    valstr = "Occupation: {:.1f} Energy: {:10.5f} a.u.".format(focc, eigval)
+    valstr = "Occupation: {:.3f} Energy: {:10.5f} a.u.".format(focc, eigval)
     ostream.print_header(valstr.ljust(92))
 
     tuplist = []
@@ -197,35 +197,41 @@ def _MolecularOrbitals_print_coefficients(eigval, focc, iorb, coeffs, ao_map,
         ostream.print_header(valstr.ljust(92))
 
 
-def _MolecularOrbitals_get_density(self, molecule):
+def _MolecularOrbitals_get_density(self, molecule, scf_type):
     """
     Gets AO density matrix from molecular orbitals.
 
     :param molecule:
         The molecule.
+    :param scf_type:
+        The type of SCF calculation (restricted, unrestricted, or restricted
+        open-shell).
 
     :return:
         The AO density matrix.
     """
 
+    # MGD: TODO: need to implement one based on the occupations
     nalpha = molecule.number_of_alpha_electrons()
     nbeta = molecule.number_of_beta_electrons()
 
-    if self.get_orbitals_type() == molorb.rest:
-        if nalpha == nbeta:
-            return self.get_ao_density(nalpha + nbeta)
-        else:
-            # Here call twice with 2*na, 2*nb respectively and then average
-            alpha_density = self.get_ao_density(2 * nalpha).alpha_to_numpy(0)
-            beta_density = self.get_ao_density(2 * nbeta).beta_to_numpy(0)
-            return AODensityMatrix([alpha_density, beta_density], denmat.unrest)
+    if (self.get_orbitals_type() == molorb.rest and scf_type == 'restricted'):
+        return self.get_ao_density(nalpha + nbeta)
 
-    elif self.get_orbitals_type() == molorb.unrest:
-
+    elif (self.get_orbitals_type() == molorb.unrest and
+          scf_type == 'unrestricted'):
         return self.get_ao_density(nalpha, nbeta)
 
-    else:
+    elif (self.get_orbitals_type() == molorb.rest and
+          scf_type == 'restricted_openshell'):
+        mo_coef = self.alpha_to_numpy()
+        mo_occ_alpha = mo_coef[:, :nalpha]
+        mo_occ_beta = mo_coef[:, :nbeta]
+        dalpha = np.matmul(mo_occ_alpha, mo_occ_alpha.T)
+        dbeta = np.matmul(mo_occ_beta, mo_occ_beta.T)
+        return AODensityMatrix([dalpha, dbeta], denmat.unrest)
 
+    else:
         errmsg = "MolecularOrbitals.get_density:"
         errmsg += " Invalid molecular orbitals type"
         assert_msg_critical(False, errmsg)
@@ -256,6 +262,10 @@ def _MolecularOrbitals_write_hdf5(self,
                       data=self.ea_to_numpy(),
                       compression='gzip')
 
+    hf.create_dataset('alpha_occupations',
+                      data=self.occa_to_numpy(),
+                      compression='gzip')
+
     if self.get_orbitals_type() == molorb.unrest:
 
         hf.create_dataset('beta_orbitals',
@@ -264,6 +274,10 @@ def _MolecularOrbitals_write_hdf5(self,
 
         hf.create_dataset('beta_energies',
                           data=self.eb_to_numpy(),
+                          compression='gzip')
+
+        hf.create_dataset('beta_occupations',
+                          data=self.occb_to_numpy(),
                           compression='gzip')
 
     if nuclear_charges is not None:
@@ -296,34 +310,40 @@ def _MolecularOrbitals_read_hdf5(fname):
     orbs_type = molorb.rest
 
     assert_msg_critical(
-        'alpha_orbitals' in hf and 'alpha_energies' in hf,
-        'MolecularOrbitals.read_hdf5: alpha orbitals/energies not found')
+        'alpha_orbitals' in hf and 'alpha_energies' in hf and
+        'alpha_occupations' in hf,
+        'MolecularOrbitals.read_hdf5: alpha orbitals/energies/occupations not found'
+    )
 
     if 'beta_orbitals' in hf or 'beta_energies' in hf:
         orbs_type = molorb.unrest
 
         assert_msg_critical(
-            'beta_orbitals' in hf and 'beta_energies' in hf,
-            'MolecularOrbitals.read_hdf5: beta orbitals/energies not found')
+            'beta_orbitals' in hf and 'beta_energies' in hf and
+            'beta_occupations' in hf,
+            'MolecularOrbitals.read_hdf5: beta orbitals/energies/occupations not found'
+        )
 
     orbs = []
     enes = []
+    occs = []
 
     orbs.append(np.array(hf.get('alpha_orbitals')))
     enes.append(np.array(hf.get('alpha_energies')))
+    occs.append(np.array(hf.get('alpha_occupations')))
 
     if orbs_type == molorb.unrest:
         orbs.append(np.array(hf.get('beta_orbitals')))
         enes.append(np.array(hf.get('beta_energies')))
+        occs.append(np.array(hf.get('beta_occupations')))
 
     hf.close()
 
-    return MolecularOrbitals(orbs, enes, orbs_type)
+    return MolecularOrbitals(orbs, enes, occs, orbs_type)
 
 
 @staticmethod
-def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set,
-                                  restricted):
+def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set, scf_type):
     """
     Checks if the hdf5 file matches the given nuclear charges and basis set.
 
@@ -333,8 +353,9 @@ def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set,
         The nuclear charges.
     :param basis_set:
         Name of the basis set.
-    :param restricted:
-        The flag for restricted molecular orbitals.
+    :param scf_type:
+        The type of SCF calculation (restricted, unrestricted, or restricted
+        open-shell).
 
     :return:
         Whether the hdf5 file matches the given nuclear charges and basis set.
@@ -355,6 +376,7 @@ def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set,
         match_basis_set = (h5_basis_set.upper() == basis_set.upper())
 
     h5_restricted = ('beta_orbitals' not in hf and 'beta_energies' not in hf)
+    restricted = (scf_type in ['restricted', 'restricted_openshell'])
     match_restricted = (h5_restricted == restricted)
 
     hf.close()

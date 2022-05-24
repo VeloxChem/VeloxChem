@@ -26,7 +26,6 @@
 from os.path import isfile
 import time as tm
 
-from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import SADGuessDriver
 from .veloxchemlib import mpi_master
 from .molecularorbitals import MolecularOrbitals
@@ -84,7 +83,7 @@ class DensityGuess:
         self._guess_type = value
 
     def validate_checkpoint(self, rank, comm, nuclear_charges, basis_set,
-                            restricted):
+                            scf_type):
         """
         Validates the checkpoint file by checking nuclear charges and basis set.
 
@@ -96,8 +95,9 @@ class DensityGuess:
             Numpy array of the nuclear charges.
         :param basis_set:
             Name of the AO basis.
-        :param restricted:
-            The flag for restricted molecular orbitals.
+        :param scf_type:
+            The type of SCF calculation (restricted, unrestricted, or
+            restricted open-shell).
 
         :return:
             Validity of the checkpoint file.
@@ -107,7 +107,7 @@ class DensityGuess:
                 rank == mpi_master() and isfile(self._checkpoint_file)):
             valid = MolecularOrbitals.match_hdf5(self._checkpoint_file,
                                                  nuclear_charges, basis_set,
-                                                 restricted)
+                                                 scf_type)
         else:
             valid = False
 
@@ -115,7 +115,7 @@ class DensityGuess:
 
         return valid
 
-    def restart_density(self, molecule, rank, ostream):
+    def restart_density(self, molecule, rank, ostream, scf_type):
         """
         Reads initial molecular orbitals and AO density from checkpoint file.
 
@@ -125,6 +125,9 @@ class DensityGuess:
             The rank of the MPI process.
         :param ostream:
             The output stream.
+        :param scf_type:
+            The type of SCF calculation (restricted, unrestricted, or
+            restricted open-shell).
 
         :return:
             The AO density matrix to restart from.
@@ -132,7 +135,7 @@ class DensityGuess:
 
         if rank == mpi_master():
             mol_orbs = MolecularOrbitals.read_hdf5(self._checkpoint_file)
-            den_mat = mol_orbs.get_density(molecule)
+            den_mat = mol_orbs.get_density(molecule, scf_type)
 
             restart_text = 'Restarting from checkpoint file: '
             restart_text += self._checkpoint_file
@@ -144,8 +147,8 @@ class DensityGuess:
 
         return den_mat
 
-    def sad_density(self, molecule, ao_basis, min_basis, overlap_matrix,
-                    closed_shell, comm, ostream):
+    def sad_density(self, molecule, ao_basis, min_basis, scf_type, comm,
+                    ostream):
         """
         Computes initial AO density using superposition of atomic densities
         scheme.
@@ -156,10 +159,9 @@ class DensityGuess:
             The AO basis.
         :param min_basis:
             The minimal AO basis for generation of atomic densities.
-        :param overlap_matrix:
-            The AO overlap matrix.
-        :param closed_shell:
-            The flag for generating closed_shell initial guess.
+        :param scf_type:
+            The type of SCF calculation (restricted, unrestricted, or
+            restricted open-shell).
         :param comm:
             The local MPI communicator.
         :param ostream:
@@ -171,16 +173,14 @@ class DensityGuess:
 
         if self._guess_type == 'SAD':
 
-            ovl_drv = OverlapIntegralsDriver(comm)
-
-            ovl_mat_sb = ovl_drv.compute(molecule, min_basis, ao_basis)
-
             t0 = tm.time()
 
             sad_drv = SADGuessDriver(comm)
 
-            den_mat = sad_drv.compute(molecule, min_basis, ao_basis, ovl_mat_sb,
-                                      overlap_matrix, closed_shell)
+            density_type = 'restricted' if scf_type == 'restricted' else 'unrestricted'
+
+            den_mat = sad_drv.compute(molecule, min_basis, ao_basis,
+                                      density_type)
 
             if comm.Get_rank() == mpi_master():
 
@@ -195,7 +195,7 @@ class DensityGuess:
 
         return AODensityMatrix()
 
-    def prcmo_density(self, molecule, ao_basis, red_basis, red_orbs):
+    def prcmo_density(self, molecule, ao_basis, red_basis, red_orbs, scf_type):
         """
         Computes initial AO density from molecular orbitals obtained by
         inserting molecular orbitals from reduced basis into molecular
@@ -209,6 +209,9 @@ class DensityGuess:
             The reduced AO basis for generation of molecular orbitals.
         :param red_orbs:
             The molecular orbitals in reduced AO basis.
+        :param scf_type:
+            The type of SCF calculation (restricted, unrestricted, or
+            restricted open-shell).
 
         :return:
             The AO density matrix from PRCMO.
@@ -218,6 +221,6 @@ class DensityGuess:
 
             proj_orbs = red_orbs.insert(molecule, ao_basis, red_basis)
 
-            return proj_orbs.get_density(molecule)
+            return proj_orbs.get_density(molecule, scf_type)
 
         return AODensityMatrix()

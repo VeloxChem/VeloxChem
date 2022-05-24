@@ -192,6 +192,15 @@ public:
                  const CDensityGrid&   densityGrid) const;
     
     /**
+     Computes third derivative of exchange-correlation functional for given density grid.
+     
+     @param xcCubicHessianGrid the exchange-correlation hessian grid object.
+     @param densityGrid the density grid object.
+     */
+    void compute(      CXCCubicHessianGrid& xcCubicHessianGrid,
+                 const CDensityGrid&   densityGrid) const;
+    
+    /**
      Converts exchange-correlation functional object to text format and insert it into output text stream.
      
      @param output the output text stream.

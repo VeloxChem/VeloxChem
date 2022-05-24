@@ -44,7 +44,8 @@ class Profiler:
         - memory_tracing: The flag for tracing memory allocation using
         - start_time: The starting time.
         - start_avail_mem: The starting available memory.
-        - timing_list: The list containing information about timing.
+        - timing_dict: The dictionary containing information about timing.
+        - timing_key: The key for the timing dictionary.
         - memory_usage: The list containing information about memory usage.
         - pr: The Profile object.
     """
@@ -65,7 +66,9 @@ class Profiler:
         self.start_time = None
         self.start_avail_mem = None
 
-        self.timing_list = None
+        self.timing_dict = None
+        self.timing_key = None
+
         self.memory_usage = None
         self.pr = None
 
@@ -92,7 +95,7 @@ class Profiler:
         self.start_time = tm.time()
         self.start_avail_mem = psutil.virtual_memory().available
 
-        self.timing_list = []
+        self.timing_dict = {}
         self.memory_usage = []
 
         if self.profiling:
@@ -178,49 +181,58 @@ class Profiler:
                     text, self.memory_to_string(stat.size)))
             ostream.print_blank()
 
-    def start_timer(self, iteration, label):
+    def set_timing_key(self, key):
         """
-        Starts the timer for an iteration and a label.
+        Sets the timing key for the timing dictionary.
+        """
 
-        :param iteration:
-            The iteration.
+        if self.timing:
+            self.timing_key = key
+            self.timing_dict[key] = {}
+
+    def start_timer(self, label):
+        """
+        Starts the timer for a label.
+
         :param label:
             The label.
         """
 
-        if self.timing:
-            if iteration >= len(self.timing_list):
-                num = iteration - len(self.timing_list) + 1
-                self.timing_list += [{}] * num
-            self.timing_list[iteration][label] = tm.time()
+        key = self.timing_key
 
-    def stop_timer(self, iteration, label):
+        if self.timing and (key is not None) and (key in self.timing_dict):
+            self.timing_dict[key][label] = tm.time()
+
+    def stop_timer(self, label):
         """
-        Stops the timer for an iteration and a label.
+        Stops the timer for a label.
 
-        :param iteration:
-            The iteration.
         :param label:
             The label.
         """
 
-        if self.timing:
-            t0 = self.timing_list[iteration][label]
-            self.timing_list[iteration][label] = tm.time() - t0
+        key = self.timing_key
 
-    def update_timer(self, iteration, timing_dict):
+        if self.timing and (key is not None) and (key in self.timing_dict):
+            t0 = self.timing_dict[key][label]
+            self.timing_dict[key][label] = tm.time() - t0
+
+    def add_timing_info(self, label, dt):
         """
-        Updates the timer with a dictionary of timing information.
+        Adds timing info for a label.
 
-        :param iteration:
-            The iteration.
-        :param timing_dict:
-            The dictionary containing timing information.
+        :param label:
+            The label.
+        :param dt:
+            The timing info to be added.
         """
 
-        if self.timing:
-            for key, val in timing_dict.items():
-                self.timing_list[iteration][key] = val
+        key = self.timing_key
+
+        if self.timing and (key is not None) and (key in self.timing_dict):
+            if label not in self.timing_dict[key]:
+                self.timing_dict[key][label] = 0.0
+            self.timing_dict[key][label] += dt
 
     def print_timing(self, ostream, scf_flag=False):
         """
@@ -239,21 +251,21 @@ class Profiler:
             ostream.print_header(valstr.ljust(width))
             ostream.print_header(('-' * len(valstr)).ljust(width))
 
-            keys = list(self.timing_list[0].keys())
+            key_0 = list(self.timing_dict.keys())[0]
+            labels = list(self.timing_dict[key_0].keys())
 
             valstr = '{:<18s}'.format('')
-            for key in keys:
-                valstr += ' {:>12s}'.format(key)
+            for label in labels:
+                valstr += ' {:>12s}'.format(label)
             ostream.print_header(valstr.ljust(width))
 
-            for i, d in enumerate(self.timing_list):
-                if scf_flag and i == 0:
+            for key, val in self.timing_dict.items():
+                if scf_flag and key.lower() == 'iteration 0':
                     continue
-                index = i if scf_flag else i + 1
-                valstr = '{:<18s}'.format('Iteration {:d}'.format(index))
-                for key in keys:
-                    if key in d:
-                        valstr += ' {:12.2f}'.format(d[key])
+                valstr = f'{key:<18s}'
+                for label in labels:
+                    if label in val:
+                        valstr += f' {val[label]:12.2f}'
                     else:
                         valstr += ' {:12s}'.format('')
                 ostream.print_header(valstr.ljust(width))

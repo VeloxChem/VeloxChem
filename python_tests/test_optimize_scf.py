@@ -31,10 +31,19 @@ class TestOptimizeSCF:
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
+<<<<<<< HEAD
         opt_drv = OptimizationDriver(task.input_dict['filename'], grad_drv,
                                      'SCF')
         opt_drv.update_settings({'coordsys': 'tric'})
         opt_mol, opt_ene = opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+=======
+        opt_drv = OptimizationDriver(grad_drv, 'SCF')
+        opt_drv.update_settings({
+            'coordsys': 'tric',
+            'filename': task.input_dict['filename'],
+        })
+        opt_mol = opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+>>>>>>> b1869c9deb16f4b75433cf30baab84be41b6d8f5
 
         if is_mpi_master(task.mpi_comm):
             opt_coords = opt_mol.get_coordinates()

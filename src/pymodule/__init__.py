@@ -30,7 +30,11 @@ from .veloxchemlib import OverlapIntegralsDriver
 from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .veloxchemlib import LinearMomentumIntegralsDriver
+from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
+from .veloxchemlib import GridDriver
+from .veloxchemlib import DensityGridDriver
 from .veloxchemlib import SADGuessDriver
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import DenseMatrix
@@ -39,6 +43,7 @@ from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import ExcitationVector
 
 # C++ functions
+from .veloxchemlib import available_functionals
 from .veloxchemlib import mpi_master
 from .veloxchemlib import mpi_initialized
 from .veloxchemlib import ao_matrix_to_veloxchem
@@ -47,6 +52,11 @@ from .veloxchemlib import get_basis_function_indices_for_atom
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import hartree_in_kcalpermol
+from .veloxchemlib import hartree_in_wavenumbers
+from .veloxchemlib import dipole_in_debye
+from .veloxchemlib import rotatory_strength_in_cgs
+from .veloxchemlib import extinction_coefficient_from_beta
+from .veloxchemlib import fine_structure_constant
 from .veloxchemlib import mathconst_pi
 
 # C++ enums
@@ -67,6 +77,7 @@ from .molecularorbitals import MolecularOrbitals
 from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
+from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfgradientdriver import ScfGradientDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
@@ -83,17 +94,27 @@ from .lreigensolver import LinearResponseEigenSolver
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
 from .c6solver import C6Solver
+from .quadraticresponsedriver import QuadraticResponseDriver
+from .cubicresponsedriver import CubicResponseDriver
+from .shgdriver import SHGDriver
+from .tpafulldriver import TPAFullDriver
+from .tpareddriver import TPAReducedDriver
+from .respchargesdriver import RespChargesDriver
 from .rspproperty import ResponseProperty
 from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .rspc6 import C6
+from .rspshg import SHG
+from .rsptpa import TPA
 from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .scffirstorderprop import ScfFirstOrderProperties
+from .orbitalviewer import OrbitalViewer
+from .numerovdriver import NumerovDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical

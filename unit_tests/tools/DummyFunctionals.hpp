@@ -28,6 +28,7 @@
 
 #include "XCGradientGrid.hpp"
 #include "XCHessianGrid.hpp"
+#include "XCCubicHessianGrid.hpp"
 #include "DensityGrid.hpp"
 
 namespace vlxtest {
@@ -43,6 +44,12 @@ namespace vlxtest {
     void dummy_fvxc2_a(CXCHessianGrid& xcHessianGrid, const double factor, const CDensityGrid& densityGrid);
     
     void dummy_fvxc2_b(CXCHessianGrid& xcHessianGrid, const double factor, const CDensityGrid& densityGrid);
+
+    void dummy_fvxc3_ab(CXCCubicHessianGrid& xcCubicHessianGrid, const double factor, const CDensityGrid& densityGrid);
+    
+    void dummy_fvxc3_a(CXCCubicHessianGrid& xcCubicHessianGrid, const double factor, const CDensityGrid& densityGrid);
+    
+    void dummy_fvxc3_b(CXCCubicHessianGrid& xcCubicHessianGrid, const double factor, const CDensityGrid& densityGrid);
     
 }  // namespace vlxtest
 

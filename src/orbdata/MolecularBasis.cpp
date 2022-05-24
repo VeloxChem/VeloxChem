@@ -482,6 +482,10 @@ CMolecularBasis::getIndexMapForDalton(const CMolecule &molecule) const
     return idsmap;
 }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> b1869c9deb16f4b75433cf30baab84be41b6d8f5
 std::vector<int32_t>
 CMolecularBasis::getIndexMap(const CMolecule& molecule) const
 {
@@ -498,6 +502,10 @@ CMolecularBasis::getIndexMap(const CMolecule& molecule) const
     return indexes;
 }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> b1869c9deb16f4b75433cf30baab84be41b6d8f5
 int32_t
 CMolecularBasis::getPositionInAngularBlock(const CMolecule& molecule,
                                            const int32_t    iAtom,
@@ -592,7 +600,7 @@ CMolecularBasis::printBasis(const CMolecule& molecule) const
 void
 CMolecularBasis::broadcast(int32_t rank, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         mpi::bcast(_maxAngularMomentum, comm);
 

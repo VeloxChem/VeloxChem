@@ -34,13 +34,13 @@ from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
-from .tpadriver import TpaDriver
+from .tpadriver import TPADriver
 from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
 
 
-class TpaFullDriver(TpaDriver):
+class TPAFullDriver(TPADriver):
     """
     Implements the full isotropic cubic response driver for two-photon
     absorption (TPA)
@@ -70,7 +70,7 @@ class TpaFullDriver(TpaDriver):
         Updates response and method settings for TPA
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -83,7 +83,7 @@ class TpaFullDriver(TpaDriver):
     def get_densities(self, wi, kX, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded Fock
-        matrics F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
+        matrices F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
         function. Note: All densities are 1/3 of those in the paper, and all
         the Fock matrices are later scaled by 3.
 
@@ -108,9 +108,9 @@ class TpaFullDriver(TpaDriver):
 
             # convert response matrix to ao basis #
 
-            kx = self.mo2ao(mo, kX['Nb'][('x', w)]).T
-            ky = self.mo2ao(mo, kX['Nb'][('y', w)]).T
-            kz = self.mo2ao(mo, kX['Nb'][('z', w)]).T
+            kx = self.mo2ao(mo, kX['Nb'][('x', w)])
+            ky = self.mo2ao(mo, kX['Nb'][('y', w)])
+            kz = self.mo2ao(mo, kX['Nb'][('z', w)])
 
             kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
             ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
@@ -196,29 +196,42 @@ class TpaFullDriver(TpaDriver):
                                 self.transform_dens(ky, D_lamtau_yz, S) +
                                 self.transform_dens(kz, D_lamtau_zz, S))
 
-            density_list.append(D_sig_xx)
-            density_list.append(D_sig_yy)
-            density_list.append(D_sig_zz)
-            density_list.append(D_sig_xy)
-            density_list.append(D_sig_xz)
-            density_list.append(D_sig_yz)
-
-            density_list.append(D_lamtau_xx)
-            density_list.append(D_lamtau_yy)
-            density_list.append(D_lamtau_zz)
-            density_list.append(D_lamtau_xy)
-            density_list.append(D_lamtau_xz)
-            density_list.append(D_lamtau_yz)
-
-            density_list.append(D_lam_sig_tau_x)
-            density_list.append(D_lam_sig_tau_y)
-            density_list.append(D_lam_sig_tau_z)
+            density_list.append(D_sig_xx.real)
+            density_list.append(D_sig_xx.imag)
+            density_list.append(D_sig_yy.real)
+            density_list.append(D_sig_yy.imag)
+            density_list.append(D_sig_zz.real)
+            density_list.append(D_sig_zz.imag)
+            density_list.append(D_sig_xy.real)
+            density_list.append(D_sig_xy.imag)
+            density_list.append(D_sig_xz.real)
+            density_list.append(D_sig_xz.imag)
+            density_list.append(D_sig_yz.real)
+            density_list.append(D_sig_yz.imag)
+            density_list.append(D_lamtau_xx.real)
+            density_list.append(D_lamtau_xx.imag)
+            density_list.append(D_lamtau_yy.real)
+            density_list.append(D_lamtau_yy.imag)
+            density_list.append(D_lamtau_zz.real)
+            density_list.append(D_lamtau_zz.imag)
+            density_list.append(D_lamtau_xy.real)
+            density_list.append(D_lamtau_xy.imag)
+            density_list.append(D_lamtau_xz.real)
+            density_list.append(D_lamtau_xz.imag)
+            density_list.append(D_lamtau_yz.real)
+            density_list.append(D_lamtau_yz.imag)
+            density_list.append(D_lam_sig_tau_x.real)
+            density_list.append(D_lam_sig_tau_x.imag)
+            density_list.append(D_lam_sig_tau_y.real)
+            density_list.append(D_lam_sig_tau_y.imag)
+            density_list.append(D_lam_sig_tau_z.real)
+            density_list.append(D_lam_sig_tau_z.imag)
 
         return density_list
 
     def get_fock_dict(self, wi, density_list, F0_a, mo, molecule, ao_basis):
         """
-        Computes the compounded Fock matrics F^{σ},F^{λ+τ},F^{σλτ} used for the
+        Computes the compounded Fock matrices F^{σ},F^{λ+τ},F^{σλτ} used for the
         isotropic cubic response function
 
         :param wi:
@@ -277,8 +290,8 @@ class TpaFullDriver(TpaDriver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
-                                     'real_and_imag')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                        None, None, density_list, 'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -528,7 +541,7 @@ class TpaFullDriver(TpaDriver):
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
-            'program_start_time', 'maximum_hours'
+            'program_end_time'
         }
 
         for key in cpp_keywords:
@@ -740,7 +753,7 @@ class TpaFullDriver(TpaDriver):
     def get_densities_II(self, wi, kX, kXY, S, D0, mo):
         """
         Computes the compounded densities needed for the compounded
-        second-order Fock matrics used for the isotropic cubic response
+        second-order Fock matrices used for the isotropic cubic response
         function
 
         :param wi:
@@ -763,25 +776,25 @@ class TpaFullDriver(TpaDriver):
         density_list = []
 
         for w in wi:
-            k_sig_xx = self.mo2ao(mo, kXY[(('N_sig_xx', w), 2 * w)]).T
-            k_sig_yy = self.mo2ao(mo, kXY[(('N_sig_yy', w), 2 * w)]).T
-            k_sig_zz = self.mo2ao(mo, kXY[(('N_sig_zz', w), 2 * w)]).T
+            k_sig_xx = self.mo2ao(mo, kXY[(('N_sig_xx', w), 2 * w)])
+            k_sig_yy = self.mo2ao(mo, kXY[(('N_sig_yy', w), 2 * w)])
+            k_sig_zz = self.mo2ao(mo, kXY[(('N_sig_zz', w), 2 * w)])
 
-            k_sig_xy = self.mo2ao(mo, kXY[(('N_sig_xy', w), 2 * w)]).T
-            k_sig_xz = self.mo2ao(mo, kXY[(('N_sig_xz', w), 2 * w)]).T
-            k_sig_yz = self.mo2ao(mo, kXY[(('N_sig_yz', w), 2 * w)]).T
+            k_sig_xy = self.mo2ao(mo, kXY[(('N_sig_xy', w), 2 * w)])
+            k_sig_xz = self.mo2ao(mo, kXY[(('N_sig_xz', w), 2 * w)])
+            k_sig_yz = self.mo2ao(mo, kXY[(('N_sig_yz', w), 2 * w)])
 
-            k_lamtau_xx = self.mo2ao(mo, kXY[(('N_lamtau_xx', w), 0)]).T
-            k_lamtau_yy = self.mo2ao(mo, kXY[(('N_lamtau_yy', w), 0)]).T
-            k_lamtau_zz = self.mo2ao(mo, kXY[(('N_lamtau_zz', w), 0)]).T
+            k_lamtau_xx = self.mo2ao(mo, kXY[(('N_lamtau_xx', w), 0)])
+            k_lamtau_yy = self.mo2ao(mo, kXY[(('N_lamtau_yy', w), 0)])
+            k_lamtau_zz = self.mo2ao(mo, kXY[(('N_lamtau_zz', w), 0)])
 
-            k_lamtau_xy = self.mo2ao(mo, kXY[(('N_lamtau_xy', w), 0)]).T
-            k_lamtau_xz = self.mo2ao(mo, kXY[(('N_lamtau_xz', w), 0)]).T
-            k_lamtau_yz = self.mo2ao(mo, kXY[(('N_lamtau_yz', w), 0)]).T
+            k_lamtau_xy = self.mo2ao(mo, kXY[(('N_lamtau_xy', w), 0)])
+            k_lamtau_xz = self.mo2ao(mo, kXY[(('N_lamtau_xz', w), 0)])
+            k_lamtau_yz = self.mo2ao(mo, kXY[(('N_lamtau_yz', w), 0)])
 
-            kx = self.mo2ao(mo, kX['Nb'][('x', w)]).T
-            ky = self.mo2ao(mo, kX['Nb'][('y', w)]).T
-            kz = self.mo2ao(mo, kX['Nb'][('z', w)]).T
+            kx = self.mo2ao(mo, kX['Nb'][('x', w)])
+            ky = self.mo2ao(mo, kX['Nb'][('y', w)])
+            kz = self.mo2ao(mo, kX['Nb'][('z', w)])
 
             kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
             ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
@@ -869,15 +882,18 @@ class TpaFullDriver(TpaDriver):
             Dz += self.transform_dens(kz, D_lamtau_zz, S)
             Dz += self.transform_dens(k_lamtau_zz, Dc_z, S)
 
-            density_list.append(Dx)
-            density_list.append(Dy)
-            density_list.append(Dz)
+            density_list.append(Dx.real)
+            density_list.append(Dx.imag)
+            density_list.append(Dy.real)
+            density_list.append(Dy.imag)
+            density_list.append(Dz.real)
+            density_list.append(Dz.imag)
 
         return density_list
 
     def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis):
         """
-        Computes the compounded second-order Fock matrics used for the
+        Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
 
         :param wi:
@@ -916,8 +932,8 @@ class TpaFullDriver(TpaDriver):
                                           self.ostream)
 
         time_start_fock = time.time()
-        dist_focks = self.get_fock_r(mo, density_list, molecule, ao_basis,
-                                     'real_and_imag')
+        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                        None, None, density_list, 'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -1308,14 +1324,10 @@ class TpaFullDriver(TpaDriver):
         kb_nb_nc = inp_dict['Nc_Nb_kb']
         kd_nd = inp_dict['Nd_kd']
 
-        Na = (LinearSolver.lrmat2vec(ka_na.real, nocc, norb) +
-              1j * LinearSolver.lrmat2vec(ka_na.imag, nocc, norb))
-        Nb = (LinearSolver.lrmat2vec(kb_nb.real, nocc, norb) +
-              1j * LinearSolver.lrmat2vec(kb_nb.imag, nocc, norb))
-        Nc_Nb = (LinearSolver.lrmat2vec(kb_nb_nc.real, nocc, norb) +
-                 1j * LinearSolver.lrmat2vec(kb_nb_nc.imag, nocc, norb))
-        Nd = (LinearSolver.lrmat2vec(kd_nd.real, nocc, norb) +
-              1j * LinearSolver.lrmat2vec(kd_nd.imag, nocc, norb))
+        Na = self.complex_lrmat2vec(ka_na, nocc, norb)
+        Nb = self.complex_lrmat2vec(kb_nb, nocc, norb)
+        Nc_Nb = self.complex_lrmat2vec(kb_nb_nc, nocc, norb)
+        Nd = self.complex_lrmat2vec(kd_nd, nocc, norb)
 
         Nc = self.flip_yz(Nc_Nb)  # gets Nc from Nb
 
@@ -1393,12 +1405,9 @@ class TpaFullDriver(TpaDriver):
                 ka_y = kX['Na'][('y', w)]
                 ka_z = kX['Na'][('z', w)]
 
-                na_x = (LinearSolver.lrmat2vec(ka_x.real, nocc, norb) +
-                        1j * LinearSolver.lrmat2vec(ka_x.imag, nocc, norb))
-                na_y = (LinearSolver.lrmat2vec(ka_y.real, nocc, norb) +
-                        1j * LinearSolver.lrmat2vec(ka_y.imag, nocc, norb))
-                na_z = (LinearSolver.lrmat2vec(ka_z.real, nocc, norb) +
-                        1j * LinearSolver.lrmat2vec(ka_z.imag, nocc, norb))
+                na_x = self.complex_lrmat2vec(ka_x, nocc, norb)
+                na_y = self.complex_lrmat2vec(ka_y, nocc, norb)
+                na_z = self.complex_lrmat2vec(ka_z, nocc, norb)
 
                 t4term = (np.dot(na_x, e4_dict['f_iso_x'][ww] - S4[('x', ww)]) +
                           np.dot(na_y, e4_dict['f_iso_y'][ww] - S4[('y', ww)]) +
@@ -1567,12 +1576,9 @@ class TpaFullDriver(TpaDriver):
             kb_nb_nc = inp_dict['Nc_Nb_kb']
             kd_nd = inp_dict['Nd_kd']
 
-            Nb = (LinearSolver.lrmat2vec(kb_nb.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kb_nb.imag, nocc, norb))
-            Nc_Nb = (LinearSolver.lrmat2vec(kb_nb_nc.real, nocc, norb) +
-                     1j * LinearSolver.lrmat2vec(kb_nb_nc.imag, nocc, norb))
-            Nd = (LinearSolver.lrmat2vec(kd_nd.real, nocc, norb) +
-                  1j * LinearSolver.lrmat2vec(kd_nd.imag, nocc, norb))
+            Nb = self.complex_lrmat2vec(kb_nb, nocc, norb)
+            Nc_Nb = self.complex_lrmat2vec(kb_nb_nc, nocc, norb)
+            Nd = self.complex_lrmat2vec(kd_nd, nocc, norb)
 
             Nc = self.flip_yz(Nc_Nb)  # gets Nc from Nb
 
@@ -1599,82 +1605,6 @@ class TpaFullDriver(TpaDriver):
             's4': s4_term,
             'r4': r4_term,
         }
-
-    def s4(self, k1, k2, k3, D, nocc, norb):
-        """
-        Returns the contraction of S[4] for S[4] dict
-
-        :param k1:
-            A response matrix
-        :param k2:
-            A response matrix
-        :param k3:
-            A response matrix
-        :param D:
-            A density matrix
-        :param nocc:
-            The number of occupied orbtials
-        :param norb:
-            The number of total orbitals
-
-        :return:
-            The contraction of S[4] for S[4] dict
-        """
-
-        S4_123 = self.s4_contract(k1, k2, k3, D, nocc, norb)
-        S4_132 = self.s4_contract(k1, k3, k2, D, nocc, norb)
-
-        return S4_123 + S4_132
-
-    def s4_contract(self, k1, k2, k3, D, nocc, norb):
-        """
-        Returns the contraction of S[4] for S[4] dict
-
-        :param k1:
-            A response matrix
-        :param k2:
-            A response matrix
-        :param k3:
-            A response matrix
-        :param D:
-            A density matrix
-        :param nocc:
-            The number of occupied orbtials
-        :param norb:
-            The number of total orbitals
-
-        :return:
-            The contraction of S[4] for S[4] dict
-        """
-
-        S4N1N2N3 = self.commut(self.commut(k3, self.commut(k2, k1)), D.T)
-        S4N1N2N3_c = (LinearSolver.lrmat2vec(S4N1N2N3.real, nocc, norb) +
-                      1j * LinearSolver.lrmat2vec(S4N1N2N3.imag, nocc, norb))
-        return (2. / 6) * S4N1N2N3_c
-
-    def s4_for_r4(self, k1, k2, k3, D, nocc, norb):
-        """
-        Returns the contraction of S[4] for the contraction of R[4]
-
-        :param k1:
-            A response matrix
-        :param k2:
-            A response matrix
-        :param k3:
-            A response matrix
-        :param D:
-            A density matrix
-        :param nocc:
-            The number of occupied orbtials
-        :param norb:
-            The number of total orbitals
-
-        :return:
-            The contraction of S[4] for the contraction of R[4]
-        """
-
-        S4_123 = self.s4_contract(k1, k2, k3, D, nocc, norb)
-        return S4_123
 
     def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
         """

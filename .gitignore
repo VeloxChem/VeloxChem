@@ -1,9 +1,11 @@
 VeloxChem.xcodeproj
 bin
-build
+build*
 *.d
 *.o
 *.a
+*.ii
+*.s
 *.optrpt
 *.out
 *.log
@@ -12,12 +14,14 @@ build
 *.gcno
 *.gcda
 .*.swp
+*.inp
 *~
 dummy.*
 .vscode
 *.DS_Store
 Makefile.setup
 /.ccls-cache/
+.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -148,3 +152,5 @@ cython_debug/
 
 # generated C++ sources
 ConfigMKL.hpp
+/.direnv/
+/compile_commands.json

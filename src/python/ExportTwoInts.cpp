@@ -124,7 +124,7 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
 
             int32_t numbatches = 0;
 
-            auto merror = MPI_Recv(&numbatches, 1, MPI_INT, cross_id, tag_id++, *cross_comm, &mstat);
+            auto merror = MPI_Recv(&numbatches, 1, MPI_INT32_T, cross_id, tag_id++, *cross_comm, &mstat);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -134,11 +134,11 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
             {
                 int32_t first = -1, second = -1;
 
-                merror = MPI_Recv(&first, 1, MPI_INT, cross_id, tag_id++, *cross_comm, &mstat);
+                merror = MPI_Recv(&first, 1, MPI_INT32_T, cross_id, tag_id++, *cross_comm, &mstat);
 
                 if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
-                merror = MPI_Recv(&second, 1, MPI_INT, cross_id, tag_id++, *cross_comm, &mstat);
+                merror = MPI_Recv(&second, 1, MPI_INT32_T, cross_id, tag_id++, *cross_comm, &mstat);
 
                 if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -159,7 +159,7 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
 
         auto numbatches = self.getNumberOfBatches();
 
-        auto merror = MPI_Send(&numbatches, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm);
+        auto merror = MPI_Send(&numbatches, 1, MPI_INT32_T, mpi::master(), tag_id++, *cross_comm);
 
         if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -173,11 +173,11 @@ CMOIntsBatch_collectBatches(CMOIntsBatch& self, int32_t cross_rank, int32_t cros
 
             auto second = genpairs[ibatch].second();
 
-            merror = MPI_Send(&first, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm);
+            merror = MPI_Send(&first, 1, MPI_INT32_T, mpi::master(), tag_id++, *cross_comm);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
-            merror = MPI_Send(&second, 1, MPI_INT, mpi::master(), tag_id++, *cross_comm);
+            merror = MPI_Send(&second, 1, MPI_INT32_T, mpi::master(), tag_id++, *cross_comm);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "collectBatches");
 
@@ -347,8 +347,8 @@ export_twoints(py::module& m)
     PyClass<CElectronRepulsionIntegralsDriver>(m, "ElectronRepulsionIntegralsDriver")
         .def(py::init(&vlx_general::create<CElectronRepulsionIntegralsDriver>), "comm"_a = py::none())
         .def("compute",
-             vlx_general::overload_cast_<const ericut, const double, const CMolecule&, const CMolecularBasis&>()(
-                 &CElectronRepulsionIntegralsDriver::compute, py::const_),
+             py::overload_cast<const ericut, const double, const CMolecule&, const CMolecularBasis&>(&CElectronRepulsionIntegralsDriver::compute,
+                                                                                                       py::const_),
              // the wonky format of the raw string literal is to get help(...) in Python to look nice
              R"pbdoc(
 Computes Q values for electron repulsion integrals for molecule with specific AO
@@ -371,9 +371,8 @@ basis set and stores results in screening container object.
              "molecule"_a,
              "ao_basis"_a)
         .def("compute",
-             vlx_general::
-                 overload_cast_<CAOFockMatrix&, const CAODensityMatrix&, const CMolecule&, const CMolecularBasis&, const CScreeningContainer&>()(
-                     &CElectronRepulsionIntegralsDriver::compute, py::const_),
+             py::overload_cast<CAOFockMatrix&, const CAODensityMatrix&, const CMolecule&, const CMolecularBasis&, const CScreeningContainer&>(
+                 &CElectronRepulsionIntegralsDriver::compute, py::const_),
              // the wonky format of the raw string literal is to get help(...) in Python to look nice
              R"pbdoc(
 Computes electron repulsion integrals and stores them in AO Fock matrix for

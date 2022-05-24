@@ -90,19 +90,21 @@ class LoPropDriver:
             n_ao = C.shape[0]
             n_mo = C.shape[1]
 
-            # re-arrange AOs according to principal quantum number
+            # re-arrange AOs
             re_arranged_indices = []
             for i in range(molecule.number_of_atoms()):
                 indices, angmoms = get_basis_function_indices_for_atom(
                     molecule, basis, i)
-                re_arranged_indices.append(indices)
-            re_arranged_indices = np.concatenate(re_arranged_indices)
+                re_arranged_indices += indices
 
             # obtain occupied & virtual orbital lists
             ao_per_atom, ao_occ, ao_vir = self.get_ao_indices(molecule, basis)
 
-            # TO transforation: re-arrange S
-            S0 = S[re_arranged_indices, :][:, re_arranged_indices]
+            # T0 transforation: re-arrange S
+            T0 = np.zeros((n_ao, n_ao))
+            for ind, new_ind in enumerate(re_arranged_indices):
+                T0[new_ind, ind] = 1.0
+            S0 = np.linalg.multi_dot([T0.T, S, T0])
 
             # T1 transformation: Gram-Schmidt
             T1 = np.zeros((n_ao, n_ao))
@@ -153,11 +155,10 @@ class LoPropDriver:
                     T4[ao_v, ao_v_1] = T4_virtual[ao_v_ind, ao_v_1_ind]
 
             # total transformation T becomes:
-            T = np.linalg.multi_dot([T1, T2, T3, T4])
+            T = np.linalg.multi_dot([T0, T1, T2, T3, T4])
 
             # obtain density matrix D in loprop basis set
             T_inv = np.linalg.pinv(T)
-            D = D[re_arranged_indices, :][:, re_arranged_indices]
             D_loprop = np.linalg.multi_dot([T_inv, D, T_inv.T])
 
             # calculated localized charges
@@ -193,9 +194,9 @@ class LoPropDriver:
             # unpact response vectors to matrix form
             nocc = molecule.number_of_alpha_electrons()
             norb = n_mo
-            kappa_x = self.vec2mat(Nx, nocc, norb)
-            kappa_y = self.vec2mat(Ny, nocc, norb)
-            kappa_z = self.vec2mat(Nz, nocc, norb)
+            kappa_x = self.lr2mat(Nx, nocc, norb)
+            kappa_y = self.lr2mat(Ny, nocc, norb)
+            kappa_z = self.lr2mat(Nz, nocc, norb)
 
             # perturbed densities
             # factor of 2 from spin-adapted excitation vectors
@@ -204,9 +205,6 @@ class LoPropDriver:
             Dz = 2.0 * np.linalg.multi_dot([C, kappa_z, C.T])
 
             # convert purterbed density to loprop basis
-            Dx = Dx[re_arranged_indices, :][:, re_arranged_indices]
-            Dy = Dy[re_arranged_indices, :][:, re_arranged_indices]
-            Dz = Dz[re_arranged_indices, :][:, re_arranged_indices]
             Dx_loprop = np.linalg.multi_dot([T_inv, Dx, T_inv.T])
             Dy_loprop = np.linalg.multi_dot([T_inv, Dy, T_inv.T])
             Dz_loprop = np.linalg.multi_dot([T_inv, Dz, T_inv.T])
@@ -223,9 +221,6 @@ class LoPropDriver:
             z_ao = dipole_mats.z_to_numpy()
 
             # convert to loprop basis
-            x_ao = x_ao[re_arranged_indices, :][:, re_arranged_indices]
-            y_ao = y_ao[re_arranged_indices, :][:, re_arranged_indices]
-            z_ao = z_ao[re_arranged_indices, :][:, re_arranged_indices]
             x_ao_loprop = np.linalg.multi_dot([T.T, x_ao, T])
             y_ao_loprop = np.linalg.multi_dot([T.T, y_ao, T])
             z_ao_loprop = np.linalg.multi_dot([T.T, z_ao, T])
@@ -261,7 +256,7 @@ class LoPropDriver:
                 coord_matrix[i][i] = molecule_coord[i]
                 for j in range(i + 1, natoms):
                     # a!=b: rab = (ra-rb)/2
-                    rij = 0.5 * np.abs(molecule_coord[i] - molecule_coord[j])
+                    rij = 0.5 * np.abs(molecule_coord[i] + molecule_coord[j])
                     coord_matrix[i][j] = rij
                     coord_matrix[j][i] = rij
 
@@ -302,8 +297,8 @@ class LoPropDriver:
                     Rb = molecule_coord[b]
                     Fab[a, b] = self.penalty_fc(za, Ra, zb, Rb)
                     Fab[b, a] = Fab[a][b]
-                for a in range(natoms):
-                    Fab[a, a] += -sum(Fab[a, :])
+            for a in range(natoms):
+                Fab[a, a] += -sum(Fab[a, :])
 
             Lab = Fab + 2.0 * np.max(np.abs(Fab))
 
@@ -369,8 +364,6 @@ class LoPropDriver:
                                                      atom_pol_matrix[2, 1])
                 atom_polarizabilities[i, 5] = atom_pol_matrix[2, 2]
 
-            atom_polarizabilities = atom_polarizabilities * (
-                bohr_in_angstroms()**3)
             self.print_results(molecule, natoms, Qab, local_polarizabilities,
                                molecule_polarizabilities, atom_polarizabilities)
 
@@ -399,12 +392,12 @@ class LoPropDriver:
         """
 
         RBS = np.array([
-            0, 0.25, 0.25, 1.45, 1.05, 0.85, 0.7, 0.65, 0.5, 0.43, 1.8, 1.5,
-            1.25, 1.1, 1.0, 1.0, 1.0, 1.0
+            0, 0.25, 0.25, 1.45, 1.05, 0.85, 0.7, 0.65, 0.6, 0.5, 0.43, 1.8,
+            1.5, 1.25, 1.1, 1.0, 1.0, 1.0, 1.0
         ]) / bohr_in_angstroms()
 
-        assert_msg_critical(za <= 17 or zb <= 17,
-                            'LoPropDriver: we currently support up to Cl')
+        assert_msg_critical(za <= 18 and zb <= 18,
+                            'LoPropDriver: we currently support up to Ar')
 
         ra = RBS[za]
         rb = RBS[zb]
@@ -414,7 +407,7 @@ class LoPropDriver:
         f = 0.5 * np.exp(-2 * (rab2 / (ra + rb)**2))
         return f
 
-    def vec2mat(self, vec, nocc, norb):
+    def lr2mat(self, vec, nocc, norb):
         """
         Unpack response vector to matrix form.
 
@@ -463,7 +456,6 @@ class LoPropDriver:
         :return:
             ao_per_atom, ao_occ, and ao_vir
         """
-
         ao_count = dict(S=1, P=3, D=5, F=7, G=9, H=11, I=13)
 
         basis_info = {}
@@ -483,8 +475,8 @@ class LoPropDriver:
 
             # Note: This function supports up to Ar but is limited by the RBS
             # radius list in penalty_fc
-            assert_msg_critical(element_id <= 17,
-                                'LoPropDriver: we currently support up to Cl')
+            assert_msg_critical(element_id <= 18,
+                                'LoPropDriver: we currently support up to Ar')
 
             # H and He: 1s
             ao_occ.append(iterr)
@@ -560,7 +552,7 @@ class LoPropDriver:
         self.ostream.print_blank()
 
         # print localized chagres
-        title = 'LoProp localized charges'
+        title = 'LoProp Charges (a.u.)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * len(title))
 
@@ -570,7 +562,7 @@ class LoPropDriver:
             self.ostream.print_header(output_iter)
         self.ostream.print_blank()
 
-        title = 'LoProp Localised polarizabilities'
+        title = 'LoProp Polarizabilities (a.u.)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * len(title))
 

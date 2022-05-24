@@ -61,8 +61,6 @@ def _AOFockMatrix_write_hdf5(self, fname):
 
     matrix_count = 0
 
-    restricted = self.is_closed_shell()
-
     for fock_id in range(self.number_of_fock_matrices()):
 
         factors.append(self.get_scale_factor(fock_id, 'alpha'))
@@ -76,7 +74,7 @@ def _AOFockMatrix_write_hdf5(self, fname):
 
         matrix_count += 1
 
-        if not restricted:
+        if not self.is_closed_shell():
 
             factors.append(self.get_scale_factor(fock_id, 'beta'))
 

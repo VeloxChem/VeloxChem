@@ -64,6 +64,13 @@ double getHartreeValueInInverseNanometer();
 double getHartreeValueInWavenumbers();
 
 /**
+ Gets amu value in electron masses.
+
+ @return the conversion factor.
+ */
+double getAtomicMassUnitInElectronMasses();
+
+/**
  Gets convertion factor for dipole moment (a.u. -> Debye).
 
  @return the conversion factor.
@@ -85,20 +92,19 @@ double getRotatoryStrengthInCGS();
 double getBoltzmannConstantInElectronVoltsPerKelvin();
 
 /**
- Gets factor needed for the calculation of the molar ellipticity from the
- electric-dipole magnetic-dipole polarizability beta.
+ Gets Boltzmann constant in hartree/K.
 
- @return the factor.
+ @return the conversion factor.
  */
-double getMolarEllipticityFromBeta();
+double getBoltzmannConstantInHartreePerKelvin();
 
 /**
- Gets factor needed for the calculation of extinction coefficient from molar
- ellipticity.
+ Gets factor needed for the calculation of extinction coefficient from the
+ electric-dipole magnetic-dipole polarizability tensor beta.
 
  @return the factor.
  */
-double getExtinctionCoefficientFromMolarEllipticity();
+double getExtinctionCoefficientFromBeta();
 
 /**
  Gets fine-structure constant.

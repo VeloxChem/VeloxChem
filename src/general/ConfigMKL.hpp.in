@@ -28,14 +28,12 @@
 
 #include <mkl.h>
 
-#include <cstdlib>
-
 /* Set interface and threading layer for the MKL single dynamic library (libmkl_rt.so)
  * See here:
  *   - https://tinyurl.com/y4y695ay
  *   - https://tinyurl.com/y254ggts
  */
-void
+inline void
 configure_mkl_rt() noexcept
 {
     /* clang-format off */

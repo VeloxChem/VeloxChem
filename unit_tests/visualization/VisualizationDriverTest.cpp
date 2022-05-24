@@ -56,7 +56,9 @@ TEST_F(CVisualizationDriverTest, Helium)
 //
 //    std::vector<double> ea({0.1});
 //
-//    CMolecularOrbitals moa({ma}, {ea}, molorb::rest);
+//    std::vector<double> occa({2.0});
+//
+//    CMolecularOrbitals moa({ma}, {ea}, {occa}, molorb::rest);
 //
 //    // psi from manual calculation
 //

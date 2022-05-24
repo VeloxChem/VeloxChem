@@ -27,118 +27,130 @@
 
 namespace units {  // units namespace
 
-// CODATA 2010
-// https://physics.nist.gov/cuu/Constants/allascii_2010.txt
+// CODATA 2018
+// https://physics.nist.gov/cuu/Constants/Table/allascii.txt
 
 double
 getBohrValueInAngstroms()
 {
-    // Bohr radius: 0.529 177 210 92 e-10 [m]
+    // Bohr radius: 0.5291 772 109 03 e-10 [m]
 
-    return 0.52917721092;
+    return 0.529177210903;
 }
 
 double
 getHartreeValueInElectronVolts()
 {
-    // hartree-electron volt relationship: 27.211 385 05
+    // hartree-electron volt relationship: 27.211 386 245 988
 
-    return 27.21138505;
+    return 27.211386245988;
 }
 
 double
 getHartreeValueInKiloCaloriePerMole()
 {
-    // hartree-joule relationship: 4.359 744 34 e-18
-    // Avogadro constant: 6.022 141 29 e23 [mol^-1]
+    // hartree-joule relationship: 4.359 744 722 2071 e-18
+    // Avogadro constant: 6.022 140 76 e23 [mol^-1]
 
     // hartree-kcal/mol relationship:
-    // 4.35974434e-18 * 1e-3 * 6.02214129e23 / 4.184
+    // 4.3597447222071e-18 * 1e-3 * 6.02214076e23 / 4.184
 
-    return 627.50947428;
+    return 627.509474063;
 }
 
 double
 getHartreeValueInInverseNanometer()
 {
-    // hartree-inverse meter relationship: 2.194 746 313 708 e7 m^-1
-    //                                     2.194 746 313 708 e-2 nm^-1
+    // hartree-inverse meter relationship: 2.194 746 313 6320 e7 m^-1
+    //                                     2.194 746 313 6320 e-2 nm^-1
 
-    return 2.194746313708e-2;
+    return 2.1947463136320e-2;
 }
 
 double
 getHartreeValueInWavenumbers()
 {
-    // hartree-inverse meter relationship: 2.194 746 313 708 e7 m^-1
-    //                                     2.194 746 313 708 e5 cm^-1
+    // hartree-inverse meter relationship: 2.194 746 313 6320 e7 m^-1
+    //                                     2.194 746 313 6320 e5 cm^-1
 
-    return 2.194746313708e+5;
+    return 2.1947463136320e+5;
+}
+
+double
+getAtomicMassUnitInElectronMasses()
+{
+    // electron mass in u: 5.485 799 090 65 e-4
+    // u in electron masses: 1.0 / 5.485 799 090 65 e-4
+
+    return 1822.888486209;
 }
 
 double
 getDipoleInDebye()
 {
-    // atomic unit of electric dipole mom.: 8.478 353 26 e-30 [C m]
-    // ea0 = 8.47835326e-30 * 299792458*10 * 100 [statC cm]
+    // atomic unit of electric dipole mom.: 8.478 353 6255 e-30 [C m]
+    // speed of light in vacuum: 299 792 458 [m s^-1]
+    // ea0 = 8.4783536255e-30 * 299792458*10 * 100 [statC cm]
     // Debye = 1e-18 [statC cm]
 
-    // 1 [a.u.] = 2.54174636 Debye
+    // 1 [a.u.] = 2.541746473 Debye
 
-    return 2.54174636;
+    return 2.541746473;
 }
 
 double
 getRotatoryStrengthInCGS()
 {
-    // atomic unit of electric dipole mom.: 8.478 353 26 e-30 [C m]
+    // atomic unit of electric dipole mom.: 8.478 353 6255 e-30 [C m]
     // speed of light in vacuum: 299 792 458 [m s^-1]
-    // ea0 = 8.47835326e-30 * 299792458*10 * 100 [statC cm]
+    // ea0 = 8.4783536255e-30 * 299792458*10 * 100 [statC cm]
 
-    // Bohr magneton: 927.400 968 e-26 [J T^-1]
-    // mu_B = 927.400968e-23 [erg G^-1]
+    // Bohr magneton: 927.4 010 0783 e-26 [J T^-1]
+    // mu_B = 927.40100783e-23 [erg G^-1]
 
     // 1 [a.u.] = 2 ea0 mu_B = 471.44360760 [10**(-40) cgs unit]
 
-    return 471.44360760;
+    return 471.443648175;
 }
 
 double
 getBoltzmannConstantInElectronVoltsPerKelvin()
 {
-    // Boltzmann constant: 8.617 3324 e-5 eV K^-1
+    // Boltzmann constant: 8.617 333 262... e-5 eV K^-1
 
-    return 8.6173324e-5;
+    return 8.617333262e-5;
 }
 
 double
-getMolarEllipticityFromBeta()
+getBoltzmannConstantInHartreePerKelvin()
 {
-    // Avogadro constant: N_A = 6.022 141 29 e23 [mol^-1]
-    // Bohr radius: a0 = 0.529 177 210 92 [Angstrom]
-    // Molar ellipticity in [deg cm^2 dmol^-1]
-    // factor = 288e-30 * pi^2 * N_A * a0^4 / 100
+    // Boltzmann constant: 8.617 333 262... e-5 eV K^-1
+    // hartree-electron volt relationship: 27.211 386 245 988
 
-    return 1.342294175363e-06;
+    // Boltzmann constant in hartree K^-1: 3.166 811 563 e-6
+
+    return 3.166811563e-6;
 }
 
 double
-getExtinctionCoefficientFromMolarEllipticity()
+getExtinctionCoefficientFromBeta()
 {
-    // Molar ellipticity in [deg cm^2 dmol^-1]
+    // Avogadro constant: N_A = 6.022 140 76 e23 [mol^-1]
+    // inverse of fine-structure constant: c = 137.035 999 084
+    // Bohr radius: a0 = 0.5291 772 109 03 e-10 [m]
     // Extinction coefficient in [L mol^-1 cm^-1]
-    // J. A. Schellman, Chem Rev 1975, 75, 323-331.
-    // math.pi / (4.5 * math.log(10.0) * 1000.0)
 
-    return 3.031947452982e-04;
+    // factor = 16 * pi * N_A * 10 * a0^2 / (ln(10) * c^2)
+
+    return 19.603697575813566;
 }
 
 double
 getFineStructureConstant()
 {
-    // fine-structure constant: 7.297 352 5698 e-3
+    // fine-structure constant: 7.297 352 5693 e-3
 
-    return 7.2973525698e-3;
+    return 7.2973525693e-3;
 }
 
 }  // namespace units

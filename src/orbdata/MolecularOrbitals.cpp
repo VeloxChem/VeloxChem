@@ -36,11 +36,14 @@ CMolecularOrbitals::CMolecularOrbitals()
     , _orbitals(std::vector<CDenseMatrix>())
 
     , _energies(std::vector<CMemBlock<double>>())
+
+    , _occupations(std::vector<CMemBlock<double>>())
 {
 }
 
 CMolecularOrbitals::CMolecularOrbitals(const std::vector<CDenseMatrix>&      orbitals,
                                        const std::vector<CMemBlock<double>>& energies,
+                                       const std::vector<CMemBlock<double>>& occupations,
                                        const molorb                          orbitalsType)
 
     : _orbitalsType(orbitalsType)
@@ -48,6 +51,8 @@ CMolecularOrbitals::CMolecularOrbitals(const std::vector<CDenseMatrix>&      orb
     , _orbitals(orbitals)
 
     , _energies(energies)
+
+    , _occupations(occupations)
 {
 }
 
@@ -58,6 +63,8 @@ CMolecularOrbitals::CMolecularOrbitals(const CMolecularOrbitals& source)
     , _orbitals(source._orbitals)
 
     , _energies(source._energies)
+
+    , _occupations(source._occupations)
 {
 }
 
@@ -68,6 +75,8 @@ CMolecularOrbitals::CMolecularOrbitals(CMolecularOrbitals&& source) noexcept
     , _orbitals(std::move(source._orbitals))
 
     , _energies(std::move(source._energies))
+
+    , _occupations(std::move(source._occupations))
 {
 }
 
@@ -86,6 +95,8 @@ CMolecularOrbitals::operator=(const CMolecularOrbitals& source)
 
     _energies = source._energies;
 
+    _occupations = source._occupations;
+
     return *this;
 }
 
@@ -99,6 +110,8 @@ CMolecularOrbitals::operator=(CMolecularOrbitals&& source) noexcept
     _orbitals = std::move(source._orbitals);
 
     _energies = std::move(source._energies);
+
+    _occupations = std::move(source._occupations);
 
     return *this;
 }
@@ -120,6 +133,11 @@ CMolecularOrbitals::operator==(const CMolecularOrbitals& other) const
     for (size_t i = 0; i < _energies.size(); i++)
     {
         if (_energies[i] != other._energies[i]) return false;
+    }
+
+    for (size_t i = 0; i < _occupations.size(); i++)
+    {
+        if (_occupations[i] != other._occupations[i]) return false;
     }
 
     return true;
@@ -202,7 +220,7 @@ CMolecularOrbitals::insert(const CMolecule& molecule, const CMolecularBasis& aoB
         }
     }
 
-    return CMolecularOrbitals(orbvec, _energies, _orbitalsType);
+    return CMolecularOrbitals(orbvec, _energies, _occupations, _orbitalsType);
 }
 
 molorb
@@ -306,6 +324,28 @@ CMolecularOrbitals::betaEnergies() const
     if (_orbitalsType == molorb::unrest)
     {
         return _energies[1].data();
+    }
+
+    return nullptr;
+}
+
+const double*
+CMolecularOrbitals::alphaOccupations() const
+{
+    return _occupations[0].data();
+}
+
+const double*
+CMolecularOrbitals::betaOccupations() const
+{
+    if (_orbitalsType == molorb::rest)
+    {
+        return alphaOccupations();
+    }
+
+    if (_orbitalsType == molorb::unrest)
+    {
+        return _occupations[1].data();
     }
 
     return nullptr;
@@ -494,7 +534,7 @@ CMolecularOrbitals::transform(const CDenseMatrix& aoMatrix, const szblock spinPa
 void
 CMolecularOrbitals::broadcast(int32_t rank, MPI_Comm comm)
 {
-    if (ENABLE_MPI)
+    if constexpr (ENABLE_MPI)
     {
         // broadcast molecular orbital type
 
@@ -539,6 +579,23 @@ CMolecularOrbitals::broadcast(int32_t rank, MPI_Comm comm)
 
             if (rank != mpi::master()) _energies.push_back(vec);
         }
+
+        // broadcast occupation numbers
+
+        int32_t noccvecs = static_cast<int32_t>(_occupations.size());
+
+        mpi::bcast(noccvecs, comm);
+
+        for (int32_t i = 0; i < noccvecs; i++)
+        {
+            CMemBlock<double> vec;
+
+            if (rank == mpi::master()) vec = _occupations[i];
+
+            vec.broadcast(rank, comm);
+
+            if (rank != mpi::master()) _occupations.push_back(vec);
+        }
     }
 }
 
@@ -567,6 +624,15 @@ operator<<(std::ostream& output, const CMolecularOrbitals& source)
         output << "_energies[" << i << "]: " << std::endl;
 
         output << source._energies[i] << std::endl;
+    }
+
+    output << "_occupations: " << std::endl;
+
+    for (size_t i = 0; i < source._occupations.size(); i++)
+    {
+        output << "_occupations[" << i << "]: " << std::endl;
+
+        output << source._occupations[i] << std::endl;
     }
 
     return output;

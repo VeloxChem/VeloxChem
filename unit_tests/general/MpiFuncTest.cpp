@@ -71,7 +71,7 @@ TEST_F(CMpiFuncTest, BcastBoolean)
 {
     bool mvalue = false;
 
-    mpi::bcast(mvalue, mpi::master(), MPI_COMM_WORLD);
+    mpi::bcast(mvalue, MPI_COMM_WORLD);
 
     ASSERT_FALSE(mvalue);
 }

@@ -49,12 +49,12 @@ class CMolecule
     /**
      The charge of molecule.
      */
-    double _charge;
+    double _charge{0.0};
 
     /**
      The multiplicity of electronic ground state.
      */
-    int32_t _multiplicity;
+    int32_t _multiplicity{1};
 
     /**
      The vector of atomic coordinates (x, y, z).
@@ -77,11 +77,6 @@ class CMolecule
     std::vector<std::string> _atomLabels;
 
     /**
-     The vector of global indexes.
-     */
-    CMemBlock<int32_t> _idsAtomic;
-
-    /**
      The vector of chemical element identifiers.
      */
     CMemBlock<int32_t> _idsElemental;
@@ -90,7 +85,7 @@ class CMolecule
     /**
      Creates an empty molecule object.
      */
-    CMolecule();
+    CMolecule() = default;
 
     /**
      Creates a molecule object.
@@ -129,11 +124,6 @@ class CMolecule
      */
     CMolecule(const CMolecule& mol_1,
               const CMolecule& mol_2);
-
-    /**
-     Destroys a molecule object.
-     */
-    ~CMolecule();
 
     /**
      Creates a sub-molecule object by slicing the molecule object.
@@ -187,13 +177,6 @@ class CMolecule
      @return true if molecule objects are not equal, false otherwise.
      */
     bool operator!=(const CMolecule& other) const;
-
-    /**
-     Sets atomic indexes of all atoms in molecule object.
-
-     @param startIndex the starting index of atomic indexes.
-     */
-    void setAtomicIndexes(const int32_t startIndex);
 
     /**
      Sets charge of molecule object.

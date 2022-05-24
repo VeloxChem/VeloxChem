@@ -26,6 +26,7 @@
 #include "XCIntegrator.hpp"
 
 #include <cmath>
+#include <iostream> 
 
 #include "MpiFunc.hpp"
 #include "DensityGridDriver.hpp"
@@ -249,7 +250,7 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
     CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
     
     CXCHessianGrid vxc2grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
-    
+
     fvxc.compute(vxcgrid, gsdengrid);
     
     fvxc.compute(vxc2grid, gsdengrid);
@@ -285,12 +286,13 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
         // symmetrize Kohn-Sham matrix
         
         ksmat.symmetrize();
-        
+
         // add Kohn-Sham contribution to Fock matrix
         
         for (int32_t i = 0; i < ksmat.getNumberOfMatrices(); i++)
         {
             aoFockMatrix.addOneElectronMatrix(ksmat.getReferenceToMatrix(i), i); 
+
         }
     }
     else
@@ -299,6 +301,103 @@ CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
         
         // FIX ME: implement partitioning and screening for density grid
     }
+}
+
+void
+CXCIntegrator::integrate(      CAOFockMatrix&    aoFockMatrix,
+                         const CAODensityMatrix& rwDensityMatrix,
+                         const CAODensityMatrix& rw2DensityMatrix,
+                         const CAODensityMatrix& gsDensityMatrix,
+                         const CMolecule&        molecule,
+                         const CMolecularBasis&  basis,
+                         const CMolecularGrid&   molecularGrid,
+                         const std::string&      xcFuncLabel,
+                         const std::string&      quadMode) const
+{
+    // parse exchange-correlation functional data
+    
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    
+    // create GTOs container
+    
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+    
+    // generate reference density grid
+    
+    CDensityGridDriver dgdrv(_locComm);
+    
+    auto refdengrid = dgdrv.generate(gsDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
+    
+    // generate screened density and molecular grids
+    
+    CMolecularGrid mgrid(molecularGrid);
+    
+    CDensityGrid gsdengrid;
+    
+    refdengrid.getScreenedGridsPair(gsdengrid, mgrid, 0, _thresholdOfDensity, fvxc.getFunctionalType());
+    
+    // compute gradient and hessian of exchange-correlation functional
+
+    CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
+    
+    CXCHessianGrid vxc2grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
+    
+    CXCCubicHessianGrid vxc3grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());  
+    
+    fvxc.compute(vxcgrid, gsdengrid);
+
+    fvxc.compute(vxc2grid, gsdengrid);
+
+    fvxc.compute(vxc3grid, gsdengrid);
+
+    // compute perturbed density 
+    
+    auto rwdengrid = dgdrv.generate(rwDensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType());
+
+    auto rw2dengrid = dgdrv.generate(rw2DensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType());
+
+    auto rwdengridc = CDensityGridQuad(mgrid.getNumberOfGridPoints(), rw2DensityMatrix.getNumberOfDensityMatrices(), fvxc.getFunctionalType(), dengrid::ab);
+
+    // Compute all and store all products of first-order transformed denisites 
+
+    rwdengridc.DensityProd(rwdengridc,mgrid,rwdengrid,fvxc.getFunctionalType(),rw2DensityMatrix.getNumberOfDensityMatrices(),quadMode);
+            
+    // set up number of perturbed denstries and matrix dimensions
+    
+    auto ndmat = rw2DensityMatrix.getNumberOfDensityMatrices();
+    
+    auto nrow = gsDensityMatrix.getNumberOfRows(0);
+    
+    auto ncol = gsDensityMatrix.getNumberOfColumns(0);
+    
+    // allocate perturbed Kohn-Sham matrices
+        
+    CAOKohnShamMatrix ksmat(nrow, ncol, ndmat, true);
+
+    if (fvxc.getFunctionalType() == xcfun::lda)
+    {
+
+        _compRestrictedContributionForLda(ksmat, gtovec, vxc2grid, vxc3grid, rwdengridc, rw2dengrid, mgrid,quadMode);
+        
+    }
+        
+    if (fvxc.getFunctionalType() == xcfun::gga)
+    {
+        _compRestrictedContributionForGga(ksmat, gtovec, vxcgrid, vxc2grid, vxc3grid, gsdengrid, rwdengridc, rw2dengrid, mgrid);
+    }
+    
+    // symmetrize Kohn-Sham matrix
+    
+    ksmat.symmetrize(); 
+    
+    // add Kohn-Sham contribution to Fock matrix
+    
+    for (int32_t i = 0; i < ksmat.getNumberOfMatrices(); i++)
+    {
+        aoFockMatrix.addOneElectronMatrix(ksmat.getReferenceToMatrix(i), i); 
+
+    }
+
 }
 
 void
@@ -798,6 +897,86 @@ CXCIntegrator::_compRestrictedContributionForLda(      CAOKohnShamMatrix& aoKohn
 }
 
 void
+CXCIntegrator::_compRestrictedContributionForLda(      CAOKohnShamMatrix&   aoKohnShamMatrix,
+                                                 const CGtoContainer*       gtoContainer,
+                                                 const CXCHessianGrid&      xcHessianGrid,
+                                                 const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                                 const CDensityGridQuad&    rwDensityGrid,
+                                                 const CDensityGrid&        rw2DensityGrid,
+                                                 const CMolecularGrid&      molecularGrid,
+                                                 const std::string&         quadMode) const
+{
+    // initialize Kohn-Sham matrix to zero
+    
+    aoKohnShamMatrix.zero();
+    
+    // set up OMP tasks
+    
+    COMPTasks omptaks(5);
+    
+    omptaks.set(molecularGrid.getNumberOfGridPoints());
+    
+ 
+    auto ntasks = omptaks.getNumberOfTasks();
+    
+    auto tbsizes = omptaks.getTaskSizes();
+
+    
+    auto tbpositions = omptaks.getTaskPositions();
+    
+    // set up pointer to molecular grid weigths
+    
+    auto mgx = molecularGrid.getCoordinatesX();
+    
+    auto mgy = molecularGrid.getCoordinatesY();
+    
+    auto mgz = molecularGrid.getCoordinatesZ();
+    
+    auto mgw = molecularGrid.getWeights();
+    
+    // set up pointer to exchange-correlation derrivatives
+    
+    auto xchessptr = &xcHessianGrid;
+
+    auto xchess2ptr = &xcCubicHessianGrid;
+    
+    // set up pointer to perturbed density grid
+    
+    auto rwdenptr = &rwDensityGrid;
+
+    auto rw2denptr = &rw2DensityGrid;
+    
+    // set up pointer to Kohn-Sham matrix
+    
+    auto ksmatprt = &aoKohnShamMatrix;
+    
+    // compute contributions to Kohn-Sham matrix from blocks of grid points
+    
+    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, mgw, xchessptr, xchess2ptr, rwdenptr,rw2denptr, ksmatprt)
+    {
+        #pragma omp single nowait
+        {
+            for (int32_t i = 0; i < ntasks; i++)
+            {
+                // set up task parameters
+                
+                auto tbsize = tbsizes[i];
+                
+                auto tbposition = tbpositions[i];
+                
+                // generate task
+                
+                #pragma omp task firstprivate(tbsize, tbposition)
+                {
+                    _compRestrictedBatchForLda(ksmatprt, gtoContainer, xchessptr, xchess2ptr, rwdenptr, rw2denptr, mgx, mgy, mgz, mgw,
+                                               tbposition, tbsize,quadMode);
+                }
+            }
+        }
+    }
+}
+
+void
 CXCIntegrator::_compRestrictedContributionForGga(      CAOKohnShamMatrix& aoKohnShamMatrix,
                                                  const CGtoContainer*     gtoContainer,
                                                  const CXCGradientGrid&   xcGradientGrid,
@@ -1046,6 +1225,90 @@ CXCIntegrator::_compRestrictedContributionForGga(      CAOKohnShamMatrix& aoKohn
                 #pragma omp task firstprivate(tbsize, tbposition)
                 {
                     _compRestrictedBatchForGGA(ksmatprt, gtoContainer, xcgradptr, xchessptr, gsdenptr, rwdenptr,
+                                               mgx, mgy, mgz, mgw, tbposition, tbsize);
+                }
+            }
+        }
+    }
+}
+
+void
+CXCIntegrator::_compRestrictedContributionForGga(      CAOKohnShamMatrix&   aoKohnShamMatrix,
+                                                 const CGtoContainer*       gtoContainer,
+                                                 const CXCGradientGrid&     xcGradientGrid,
+                                                 const CXCHessianGrid&      xcHessianGrid,
+                                                 const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                                 const CDensityGrid&        gsDensityGrid,
+                                                 const CDensityGridQuad&    rwDensityGrid,
+                                                 const CDensityGrid&        rw2DensityGrid,
+                                                 const CMolecularGrid&      molecularGrid) const
+{
+    // initialize Kohn-Sham matrix to zero
+    
+    aoKohnShamMatrix.zero();
+    
+    // set up OMP tasks
+    
+    COMPTasks omptaks(5);
+    
+    omptaks.set(molecularGrid.getNumberOfGridPoints());
+    
+    auto ntasks = omptaks.getNumberOfTasks();
+    
+    auto tbsizes = omptaks.getTaskSizes();
+    
+    auto tbpositions = omptaks.getTaskPositions();
+    
+    // set up pointer to molecular grid weigths
+    
+    auto mgx = molecularGrid.getCoordinatesX();
+    
+    auto mgy = molecularGrid.getCoordinatesY();
+    
+    auto mgz = molecularGrid.getCoordinatesZ();
+    
+    auto mgw = molecularGrid.getWeights();
+    
+    // set up pointer to exchange-correlation derrivatives
+    
+    auto xcgradptr = &xcGradientGrid;
+    
+    auto xchessptr = &xcHessianGrid;
+
+    auto xchess2ptr = &xcCubicHessianGrid;
+    
+    // set up pointer to density grid
+    
+    auto gsdenptr = &gsDensityGrid;
+    
+    auto rwdenptr = &rwDensityGrid;
+
+    auto rw2denptr = &rw2DensityGrid;
+    
+    // set up pointer to Kohn-Sham matrix
+    
+    auto ksmatprt = &aoKohnShamMatrix;
+    
+    // compute contributions to Kohn-Sham matrix from blocks of grid points
+    
+    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, mgw, xcgradptr, xchessptr,xchess2ptr,\
+                                gsdenptr, rwdenptr, rw2DensityGrid,ksmatprt)
+    {
+        #pragma omp single nowait
+        {
+            for (int32_t i = 0; i < ntasks; i++)
+            {
+                // set up task parameters
+                
+                auto tbsize = tbsizes[i];
+                
+                auto tbposition = tbpositions[i];
+                
+                // generate task
+                
+                #pragma omp task firstprivate(tbsize, tbposition)
+                {
+                    _compRestrictedBatchForGGA(ksmatprt, gtoContainer, xcgradptr, xchessptr,xchess2ptr, gsdenptr, rwdenptr,rw2denptr,
                                                mgx, mgy, mgz, mgw, tbposition, tbsize);
                 }
             }
@@ -1331,6 +1594,79 @@ CXCIntegrator::_compRestrictedBatchForLda(      CAOKohnShamMatrix* aoKohnShamMat
                                    gridOffset, igpnt, blockdim);
     }
 }
+
+void
+CXCIntegrator::_compRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+                                          const CGtoContainer*       gtoContainer,
+                                          const CXCHessianGrid*      xcHessianGrid,
+                                          const CXCCubicHessianGrid* xcCubicHessianGrid,
+                                          const CDensityGridQuad*        rwDensityGrid,
+                                          const CDensityGrid*        rw2DensityGrid,
+                                          const double*              gridCoordinatesX,
+                                          const double*              gridCoordinatesY,
+                                          const double*              gridCoordinatesZ,
+                                          const double*              gridWeights,
+                                          const int32_t              gridOffset,
+                                          const int32_t              nGridPoints,
+                                          const std::string&         quadMode) const
+{
+    // set up number of AOs
+    
+    auto naos = gtoContainer->getNumberOfAtomicOrbitals();
+
+    // determine number of grid blocks
+    
+    auto blockdim = _getSizeOfBlock();
+    
+    auto nblocks = nGridPoints / blockdim;
+    // allocate XC contribution buffer
+    
+    auto bufdim = _getNumberOfAOsInBuffer();
+    
+    CMemBlock<double> vxcbuf(bufdim * naos);
+    
+    // set up current grid point
+    
+    int32_t igpnt = 0;
+    
+    // loop over grid points blocks
+    
+    if (nblocks > 0)
+    {
+        CMemBlock2D<double> gaos(blockdim, naos);
+        
+        for (int32_t i = 0; i < nblocks; i++)
+        {
+            gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
+                                            gridOffset, igpnt, blockdim);
+                                        
+
+            _distRestrictedBatchForLda(aoKohnShamMatrix, vxcbuf,xcHessianGrid, xcCubicHessianGrid, rwDensityGrid,rw2DensityGrid, gaos,
+                                    gridWeights, gridOffset, igpnt, blockdim);
+
+           
+            
+            igpnt += blockdim;
+        }
+    }
+    
+    // comopute remaining grid points block
+    
+    blockdim = nGridPoints % blockdim;
+    
+    if (blockdim > 0)
+    {
+        CMemBlock2D<double> gaos(blockdim, naos);
+        
+        gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
+                                        gridOffset, igpnt, blockdim);
+        
+        
+        _distRestrictedBatchForLda(aoKohnShamMatrix, vxcbuf,xcHessianGrid, xcCubicHessianGrid, rwDensityGrid,rw2DensityGrid, gaos,
+                            gridWeights, gridOffset, igpnt, blockdim);
+    }
+}
+
 
 void
 CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMatrix,
@@ -1991,6 +2327,88 @@ CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix* aoKohnShamMat
                                         gridOffset, igpnt, blockdim);
         
         _distRestrictedBatchForGga(aoKohnShamMatrix, vxcbuf, xcGradientGrid, xcHessianGrid, gsDensityGrid, rwDensityGrid,
+                                   gaos, gaox, gaoy, gaoz, gridWeights, gridOffset, igpnt, blockdim);
+    }
+}
+
+void
+CXCIntegrator::_compRestrictedBatchForGGA(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+                                          const CGtoContainer*       gtoContainer,
+                                          const CXCGradientGrid*     xcGradientGrid,
+                                          const CXCHessianGrid*      xcHessianGrid,
+                                          const CXCCubicHessianGrid* xcCubicHessianGrid,
+                                          const CDensityGrid*        gsDensityGrid,
+                                          const CDensityGridQuad*    rwDensityGrid,
+                                          const CDensityGrid*        rw2DensityGrid,
+                                          const double*              gridCoordinatesX,
+                                          const double*              gridCoordinatesY,
+                                          const double*              gridCoordinatesZ,
+                                          const double*              gridWeights,
+                                          const int32_t              gridOffset,
+                                          const int32_t              nGridPoints) const
+{
+    // set up number of AOs
+
+    auto naos = gtoContainer->getNumberOfAtomicOrbitals();
+    
+    // determine number of grid blocks
+    
+    auto blockdim = _getSizeOfBlock();
+    
+    auto nblocks = nGridPoints / blockdim;
+    
+    // allocate XC contribution buffer
+    
+    auto bufdim = _getNumberOfAOsInBuffer();
+    
+    CMemBlock<double> vxcbuf(bufdim * naos);
+    
+    // set up current grid point
+    
+    int32_t igpnt = 0;
+    
+    // loop over grid points blocks
+    
+    if (nblocks > 0)
+    {
+        CMemBlock2D<double> gaos(blockdim, naos);
+        
+        CMemBlock2D<double> gaox(blockdim, naos);
+        
+        CMemBlock2D<double> gaoy(blockdim, naos);
+        
+        CMemBlock2D<double> gaoz(blockdim, naos);
+        
+        for (int32_t i = 0; i < nblocks; i++)
+        {
+            gtorec::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY,
+                                            gridCoordinatesZ, gridOffset, igpnt, blockdim);
+            
+            _distRestrictedBatchForGga(aoKohnShamMatrix, vxcbuf, xcGradientGrid, xcHessianGrid, xcCubicHessianGrid, gsDensityGrid, rwDensityGrid,rw2DensityGrid,
+                                       gaos, gaox, gaoy, gaoz, gridWeights, gridOffset, igpnt, blockdim);
+            
+            igpnt += blockdim;
+        }
+    }
+    
+    // comopute remaining grid points block
+    
+    blockdim = nGridPoints % blockdim;
+    
+    if (blockdim > 0)
+    {
+        CMemBlock2D<double> gaos(blockdim, naos);
+        
+        CMemBlock2D<double> gaox(blockdim, naos);
+        
+        CMemBlock2D<double> gaoy(blockdim, naos);
+        
+        CMemBlock2D<double> gaoz(blockdim, naos);
+        
+        gtorec::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ,
+                                        gridOffset, igpnt, blockdim);
+        
+        _distRestrictedBatchForGga(aoKohnShamMatrix, vxcbuf, xcGradientGrid, xcHessianGrid, xcCubicHessianGrid, gsDensityGrid, rwDensityGrid,rw2DensityGrid,
                                    gaos, gaox, gaoy, gaoz, gridWeights, gridOffset, igpnt, blockdim);
     }
 }
@@ -3145,7 +3563,7 @@ CXCIntegrator::_distUnrestrictedBatchForGga(      CDenseMatrix&        subMatrix
 
 void
 CXCIntegrator::_distUnrestrictedBatchForGgaA(      CDenseMatrix&        subMatrixa,
-                                                  CDenseMatrix&        subMatrixb,
+                                                   CDenseMatrix&        subMatrixb,
                                              const CXCGradientGrid*     xcGradientGrid,
                                              const CDensityGrid*        densityGrid,
                                              const CMemBlock2D<double>& braGtoValues,
@@ -3577,6 +3995,186 @@ CXCIntegrator::_distRestrictedBatchForLda(      CAOKohnShamMatrix*   aoKohnShamM
                         fvxc += bgaos[l] * kgaos[l] * gridWeights[loff + l]
                         
                               * (grho_aa[loff + l] * rhowa[loff + l] + grho_ab[loff + l] * rhowb[loff + l]);
+                    }
+                    
+                    xcBuffer.at(idx) = fvxc;
+                    
+                    idx++;
+                }
+            }
+            
+            // distribute last block of Kohn-Sham matrix elements
+            
+            #pragma omp critical
+            {
+                idx = 0;
+                
+                for (int32_t j = curao; j < naos; j++)
+                {
+                    for (int32_t k = j; k < naos; k++)
+                    {
+                        auto fvxc = (j == k) ? 0.5 * xcBuffer.at(idx) : xcBuffer.at(idx);
+                        
+                        ksmat[j * naos + k] += fvxc;
+                        
+                        idx++;
+                    }
+                }
+            }
+        }
+    }
+}
+
+void
+CXCIntegrator::_distRestrictedBatchForLda(   CAOKohnShamMatrix*   aoKohnShamMatrix,
+                                                CMemBlock<double>&   xcBuffer,
+                                          const CXCHessianGrid*      xcHessianGrid,
+                                          const CXCCubicHessianGrid* xcCubicHessianGrid,
+                                          const CDensityGridQuad*    rwDensityGrid,
+                                          const CDensityGrid*        rw2DensityGrid,
+                                          const CMemBlock2D<double>& gtoValues,
+                                          const double*              gridWeights,
+                                          const int32_t              gridOffset,
+                                          const int32_t              gridBlockPosition,
+                                          const int32_t              nGridPoints) const
+{
+    // set up AOs blocks
+
+    auto naos = aoKohnShamMatrix->getNumberOfRows();
+    
+    auto bufdim = _getNumberOfAOsInBuffer();
+    
+    auto nblock = naos / bufdim;
+    
+    // set up pointers to exchange-correlation functional derrivatives
+
+    auto grho_aa = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::rhoa);
+
+    auto grho_ab = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::rhob);
+    
+    auto grho_aaa = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::rhoa);
+    
+    auto grho_aab = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::rhob);
+
+    auto grho_abb = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhob, xcvars::rhob);
+
+    // set up loop over number of matrices
+    
+    auto nmat = aoKohnShamMatrix->getNumberOfMatrices();
+    
+    for (int32_t i = 0; i < nmat; i++)
+    {
+        // set up pointer to Kohn-Sham matrix
+
+        auto ksmat = aoKohnShamMatrix->getMatrix(i);
+        
+        // set up pointer to perturbed density
+        
+        auto rhow1a = rwDensityGrid->rhow1rhow2(i);
+        
+        auto rhow12a = rw2DensityGrid->alphaDensity(i);
+        
+        auto rhow12b = rw2DensityGrid->betaDensity(i);
+
+        // loop over AOs blocks
+        
+        int32_t curao = 0;
+        
+        for (int32_t j = 0; j < nblock; j++)
+        {
+            // compute block of Kohn-Sham matrix elements
+            
+            int32_t idx = 0;
+            
+            for (int32_t k = curao; k < (curao + bufdim); k++)
+            {
+                auto bgaos = gtoValues.data(k);
+                for (int32_t l = k; l < naos; l++)
+                {
+                    auto kgaos = gtoValues.data(l);
+                    double fvxc = 0.0;
+                    
+                    auto moff = gridOffset + gridBlockPosition;
+                    for (int32_t m = 0; m < nGridPoints; m++)
+                    {
+                       fvxc += bgaos[m] * kgaos[m] * gridWeights[moff + m] * 
+                       
+                            ( ( grho_aaa[moff + m] 
+                             
+                             +  grho_aab[moff + m] 
+
+                             +  grho_aab[moff + m]
+                             
+                             +  grho_abb[moff + m] )* rhow1a[moff + m]
+                             
+                             +  grho_aa[moff + m] * rhow12a[moff + m] + grho_ab[moff + m] * rhow12b[moff + m] );                            
+                    } 
+                    
+                    xcBuffer.at(idx) = fvxc;
+                    
+                    idx++;
+                }
+            }
+            
+            // distribute block of Kohn-Sham matrix elements
+        
+            #pragma omp critical
+            {
+
+                idx = 0;
+            
+                for (int32_t k = curao; k < (curao + bufdim); k++)
+                {
+                    for (int32_t l = k; l < naos; l++)
+                    {
+                        auto fvxc = (k == l) ? 0.5 * xcBuffer.at(idx) : xcBuffer.at(idx);
+                
+                        ksmat[k * naos + l] += fvxc;
+                    
+                        idx++;
+                    }
+                }
+            }
+        
+            // update AOs counter
+        
+            curao += bufdim;
+        }
+        
+        // loop over last block
+        
+        if (naos % bufdim != 0)
+        {
+            // compute last block of Kohn-Sham matrix elements
+            
+            int32_t idx = 0;
+            
+            for (int32_t j = curao; j < naos; j++)
+            {
+                auto bgaos = gtoValues.data(j);
+                
+                for (int32_t k = j; k < naos; k++)
+                {
+                    auto kgaos = gtoValues.data(k);
+                    
+                    double fvxc = 0.0;
+                    
+                    auto loff = gridOffset + gridBlockPosition;
+                    
+                    for (int32_t l = 0; l < nGridPoints; l++)
+                    {
+                        fvxc += bgaos[l] * kgaos[l] * gridWeights[loff + l] * 
+                        
+                            (  (grho_aaa[loff + l] 
+                             
+                             +  grho_aab[loff + l] 
+
+                             +  grho_aab[loff + l] 
+                             
+                             +  grho_abb[loff + l]) * rhow1a[loff + l] 
+                             
+                             +  grho_aa[loff + l] * rhow12a[loff + l] + grho_ab[loff + l] * rhow12b[loff + l] ); 
+
                     }
                     
                     xcBuffer.at(idx) = fvxc;
@@ -4198,6 +4796,942 @@ CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamM
                         double abw = ax * rxwa + ay * rywa + az * rzwa;
                         
                         fvxc += w * ggrad_c[loff + l] * abw;
+                    }
+                    
+                    xcBuffer.at(idx) = fvxc;
+                    
+                    idx++;
+                }
+            }
+            
+            // distribute last block of Kohn-Sham matrix elements
+            
+            #pragma omp critical
+            {
+                idx = 0;
+                
+                for (int32_t j = curao; j < naos; j++)
+                {
+                    for (int32_t k = j ; k < naos; k++)
+                    {
+                        auto fvxc = (j == k ) ? 0.5 * xcBuffer.at(idx) : xcBuffer.at(idx);
+                        
+                        ksmat[j * naos + k] += fvxc;
+                        
+                        idx++;
+                    }
+                }
+            }
+        }
+    }
+}
+
+void
+CXCIntegrator::_distRestrictedBatchForGga(      CAOKohnShamMatrix*   aoKohnShamMatrix,
+                                                CMemBlock<double>&   xcBuffer,
+                                          const CXCGradientGrid*     xcGradientGrid,
+                                          const CXCHessianGrid*      xcHessianGrid,
+                                          const CXCCubicHessianGrid* xcCubicHessianGrid,
+                                          const CDensityGrid*        gsDensityGrid,
+                                          const CDensityGridQuad*    rwDensityGrid,
+                                          const CDensityGrid*        rw2DensityGrid,
+                                          const CMemBlock2D<double>& gtoValues,
+                                          const CMemBlock2D<double>& gtoValuesX,
+                                          const CMemBlock2D<double>& gtoValuesY,
+                                          const CMemBlock2D<double>& gtoValuesZ,
+                                          const double*              gridWeights,
+                                          const int32_t              gridOffset,
+                                          const int32_t              gridBlockPosition,
+                                          const int32_t              nGridPoints) const
+{
+
+    // set up pointers to exchange-correlation functional derrivatives
+
+    auto df2000 = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::rhoa);
+    
+    auto df1100 = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::rhob);
+    
+    auto df1010 = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::grada);
+    
+    auto df1001 = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::gradb);
+    
+    auto df10001 = xcHessianGrid->xcHessianValues(xcvars::rhoa, xcvars::gradab);
+        
+    auto df0020 = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::grada);
+    
+    auto df0011 = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::gradb);
+    
+    auto df00101 = xcHessianGrid->xcHessianValues(xcvars::grada, xcvars::gradab);
+    
+    auto df00002 = xcHessianGrid->xcHessianValues(xcvars::gradab, xcvars::gradab);
+    
+    auto df0010 = xcGradientGrid->xcGradientValues(xcvars::grada);
+    
+    auto df00001 = xcGradientGrid->xcGradientValues(xcvars::gradab);
+
+    auto df00011 = xcHessianGrid->xcHessianValues(xcvars::gradb ,xcvars::gradab);
+    
+    auto df01001 = xcHessianGrid->xcHessianValues(xcvars::rhob ,xcvars::gradab);
+
+    auto df0110  = xcHessianGrid->xcHessianValues(xcvars::rhob ,xcvars::grada);
+
+    auto df3000 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::rhoa );
+
+    auto df2100 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa,xcvars::rhob );
+
+    auto df1200 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhob,xcvars::rhob );
+
+    auto df2010 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa,xcvars::grada );
+
+    auto df0030 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::grada,xcvars::grada );
+
+    auto df0021 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::grada,xcvars::gradb );
+
+    auto df0012 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::gradb,xcvars::gradb );
+
+    auto df00201 =  xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::grada,xcvars::gradab );
+
+    auto df00111 =  xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::gradb,xcvars::gradab );
+
+    auto df00102 =  xcCubicHessianGrid->xcCubicHessianValues(xcvars::grada, xcvars::gradab,xcvars::gradab );
+
+    auto df00003 =  xcCubicHessianGrid->xcCubicHessianValues(xcvars::gradab, xcvars::gradab,xcvars::gradab );
+
+    auto df2001 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa,xcvars::gradb );
+
+    auto df1110 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhob,xcvars::grada );
+
+    auto df1101 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhob,xcvars::gradb );
+
+    auto df20001 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa,xcvars::gradab );
+
+    auto df11001 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::rhob,xcvars::gradab );
+
+    auto df1020 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::grada ,xcvars::grada );
+
+    auto df1011 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::grada ,xcvars::gradb );
+
+    auto df1002 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::gradb ,xcvars::gradb);
+
+    auto df10101 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::grada ,xcvars::gradab);
+
+    auto df10002 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::gradab ,xcvars::gradab);
+
+    auto df01002 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::gradab ,xcvars::gradab);
+
+    auto df0120 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::grada ,xcvars::grada);
+
+    auto df0111 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::grada ,xcvars::gradb);
+
+    auto df01101 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::grada ,xcvars::gradab);
+
+    auto df10011 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhoa, xcvars::gradb ,xcvars::gradab);
+    
+    auto df01011 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::gradb ,xcvars::gradab);
+
+    auto df0210 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::rhob ,xcvars::grada);
+
+    auto df02001 = xcCubicHessianGrid->xcCubicHessianValues(xcvars::rhob, xcvars::rhob ,xcvars::gradab);
+
+    auto df00021 =  xcCubicHessianGrid->xcCubicHessianValues(xcvars::gradb, xcvars::gradb ,xcvars::gradab);
+
+    // set up pointers to ground state density gradient norms
+    
+    auto ngrada = gsDensityGrid->alphaDensityGradient(0);
+        
+    auto grada_x = gsDensityGrid->alphaDensityGradientX(0);
+    
+    auto grada_y = gsDensityGrid->alphaDensityGradientY(0);
+    
+    auto grada_z = gsDensityGrid->alphaDensityGradientZ(0);
+    
+    auto naos = aoKohnShamMatrix->getNumberOfRows();
+    
+    auto bufdim = _getNumberOfAOsInBuffer();
+    
+    auto nblock = naos / bufdim;
+    
+    // set up pointers to exchange-correlation functional derrivatives
+    
+    
+    auto nmat = aoKohnShamMatrix->getNumberOfMatrices();
+    
+    for (int32_t i = 0; i < nmat; i++)
+    {
+        // set up pointer to Kohn-Sham matrix
+        
+        auto ksmat = aoKohnShamMatrix->getMatrix(i);
+        
+        // set up pointers to perturbed density gradient norms
+        
+        auto rhow1rhow2 = rwDensityGrid->rhow1rhow2(i);
+        
+        auto rxw1rhow2 = rwDensityGrid->rxw1rhow2(i);
+        
+        auto ryw1rhow2 = rwDensityGrid->ryw1rhow2(i);
+        
+        auto rzw1rhow2 = rwDensityGrid->rzw1rhow2(i);
+
+        auto rxw1rxw2 = rwDensityGrid->rxw1rxw2(i);
+
+        auto rxw1ryw2 = rwDensityGrid->rxw1ryw2(i); 
+
+        auto rxw1rzw2 = rwDensityGrid->rxw1rzw2(i);
+        
+        auto ryw1rxw2 = rwDensityGrid->ryw1rxw2(i);
+        
+        auto ryw1ryw2 = rwDensityGrid->ryw1ryw2(i);
+        
+        auto ryw1rzw2 = rwDensityGrid->ryw1rzw2(i);
+        
+        auto rzw1rxw2 = rwDensityGrid->rzw1rxw2(i);
+        
+        auto rzw1ryw2 = rwDensityGrid->rzw1ryw2(i);
+
+        auto rzw1rzw2 = rwDensityGrid->rzw1rzw2(i);
+
+        auto rhow12a = rw2DensityGrid->alphaDensity(i);
+        
+        auto gradw12a_x = rw2DensityGrid->alphaDensityGradientX(i);
+        
+        auto gradw12a_y = rw2DensityGrid->alphaDensityGradientY(i);
+        
+        auto gradw12a_z = rw2DensityGrid->alphaDensityGradientZ(i);
+        
+        // loop over AOs blocks
+        
+        int32_t curao = 0;
+        
+        for (int32_t j = 0; j < nblock; j++)
+        {
+            // compute block of Kohn-Sham matrix elements
+            
+            int32_t idx = 0;
+            
+            for (int32_t k = curao; k < (curao + bufdim); k++)
+            {
+                auto bgaos = gtoValues.data(k);
+                
+                auto bgaox = gtoValuesX.data(k);
+                
+                auto bgaoy = gtoValuesY.data(k);
+                
+                auto bgaoz = gtoValuesZ.data(k);
+                
+                for (int32_t l = k ; l < naos; l++)
+                {
+                    auto kgaos = gtoValues.data(l);
+                    
+                    auto kgaox = gtoValuesX.data(l);
+                    
+                    auto kgaoy = gtoValuesY.data(l);
+                    
+                    auto kgaoz = gtoValuesZ.data(l);
+                    
+                    double fvxc = 0.0;
+                    
+                    auto moff = gridOffset + gridBlockPosition;
+                    
+                    for (int32_t m = 0; m < nGridPoints; m++)
+                    {
+
+                        double w = gridWeights[moff + m];
+                        
+                        auto omega = bgaos[m] * kgaos[m];
+                        
+                        auto xomega = bgaox[m] * kgaos[m] + bgaos[m] * kgaox[m];
+                        
+                        auto yomega = bgaoy[m] * kgaos[m] + bgaos[m] * kgaoy[m];
+                        
+                        auto zomega = bgaoz[m] * kgaos[m] + bgaos[m] * kgaoz[m];
+
+                        double znva =  1.0 / ngrada[moff + m];
+
+                        double znva3 = 1.0 / std::pow(ngrada[moff + m],3.0);
+
+                        double znva5 = 1.0 / std::pow(ngrada[moff + m],5.0);
+
+                        double rxw12a = gradw12a_x[moff + m];
+                        
+                        double ryw12a = gradw12a_y[moff + m];
+                        
+                        double rzw12a = gradw12a_z[moff + m];
+
+                        double xigrad_x = znva * grada_x[moff + m];
+                        
+                        double xigrad_y = znva * grada_y[moff + m];
+                        
+                        double xigrad_z = znva * grada_z[moff + m];
+
+                        double xigrad_xx = (znva - grada_x[moff + m] * grada_x[moff + m] * znva3);
+
+                        double xigrad_yy = (znva - grada_y[moff + m] * grada_y[moff + m] * znva3);
+
+                        double xigrad_zz = (znva - grada_z[moff + m] * grada_z[moff + m] * znva3);
+
+                        double xigrad_xy =  - grada_x[moff + m] * grada_y[moff + m] * znva3;
+
+                        double xigrad_xz =  - grada_x[moff + m] * grada_z[moff + m] * znva3;
+
+                        double xigrad_yz =  - grada_y[moff + m] * grada_z[moff + m] * znva3;
+
+                        double xigrad_xxy =   3.0  * grada_x[moff + m] * grada_x[moff + m] * grada_y[moff + m] * znva5 - grada_y[moff + m] * znva3;
+
+                        double xigrad_xxz =   3.0  * grada_x[moff + m] * grada_x[moff + m] * grada_z[moff + m] * znva5 - grada_z[moff + m] * znva3;
+
+                        double xigrad_xyy =   3.0  * grada_x[moff + m] * grada_y[moff + m] * grada_y[moff + m] * znva5 - grada_x[moff + m] * znva3;
+
+                        double xigrad_xzz =   3.0  * grada_x[moff + m] * grada_z[moff + m] * grada_z[moff + m] * znva5 - grada_x[moff + m] * znva3;
+                        
+                        double xigrad_yzz =   3.0  * grada_y[moff + m] * grada_z[moff + m] * grada_z[moff + m] * znva5 - grada_y[moff + m] * znva3;
+
+                        double xigrad_yyz =   3.0  * grada_y[moff + m] * grada_y[moff + m] * grada_z[moff + m] * znva5 - grada_z[moff + m] * znva3;
+
+                        double xigrad_xyz =   3.0  * grada_x[moff + m] * grada_y[moff + m] * grada_z[moff + m] * znva5;
+
+                        double xigrad_xxx =  3.0 * grada_x[moff + m] * grada_x[moff + m] * grada_x[moff + m] * znva5 - 3.0  * grada_x[moff + m] * znva3;
+
+                        double xigrad_yyy =  3.0 * grada_y[moff + m] * grada_y[moff + m] * grada_y[moff + m] * znva5 - 3.0  * grada_y[moff + m] * znva3;
+
+                        double xigrad_zzz =  3.0 * grada_z[moff + m] * grada_z[moff + m] * grada_z[moff + m] * znva5 - 3.0  * grada_z[moff + m] * znva3;
+                        
+                        // Various required quantities
+
+                        double xigrad_dot_rw12a = (xigrad_x * rxw12a + xigrad_y * ryw12a + xigrad_z * rzw12a);
+
+                        double xigrad_dot_omega = (xigrad_x * xomega + xigrad_y * yomega + xigrad_z * zomega );
+
+                        double xigrad_dot_rw1rw2 = xigrad_x * rxw1rhow2[moff + m] + xigrad_y * ryw1rhow2[moff + m] + xigrad_z * rzw1rhow2[moff + m];
+                        
+                        double rw1_dot_rw2 = rxw1rxw2[moff + m] + ryw1ryw2[moff + m] + rzw1rzw2[moff + m]; 
+
+                        double xigrad_dot_rw1rhow2 = xigrad_x * rxw1rhow2[moff + m] + xigrad_y * ryw1rhow2[moff + m] + xigrad_z * rzw1rhow2[moff + m];
+
+                        double grad_dot_rw12 = grada_x[moff + m] * rxw12a + grada_y[moff + m] * ryw12a + grada_z[moff + m] * rzw12a;
+
+                        double grad_dot_omega = grada_x[moff + m] * xomega + grada_y[moff + m] * yomega + grada_z[moff + m] * zomega;
+
+                        double grad_dot_rw1rw2 = grada_x[moff + m] * rxw1rhow2[moff + m] + grada_y[moff + m] * ryw1rhow2[moff + m] + grada_z[moff + m] * rzw1rhow2[moff + m];
+
+                        double omega_dot_rw1rhow2 = xomega * rxw1rhow2[moff + m] + yomega * ryw1rhow2[moff + m] + zomega  * rzw1rhow2[moff + m];
+
+                        double grad_dot_rw1rhow2 = grada_x[moff + m] * rxw1rhow2[moff + m] + grada_y[moff + m] * ryw1rhow2[moff + m] + grada_z[moff + m] * rzw1rhow2[moff + m];
+
+                        double xigrad_dot_rw1_xigrad_dot_rw2  = xigrad_x * xigrad_x * rxw1rxw2[moff + m]
+                                                              + xigrad_x * xigrad_y * rxw1ryw2[moff + m]
+                                                              + xigrad_x * xigrad_z * rxw1rzw2[moff + m]
+                                                              + xigrad_y * xigrad_x * ryw1rxw2[moff + m]
+                                                              + xigrad_y * xigrad_y * ryw1ryw2[moff + m]
+                                                              + xigrad_y * xigrad_z * ryw1rzw2[moff + m]
+                                                              + xigrad_z * xigrad_x * rzw1rxw2[moff + m]
+                                                              + xigrad_z * xigrad_y * rzw1ryw2[moff + m]
+                                                              + xigrad_z * xigrad_z * rzw1rzw2[moff + m];
+
+                        double first = w * (df2000[moff + m] * rhow12a[moff + m] + df1100[moff + m] * rhow12a[moff + m]) * omega;
+
+                        double second = w * (df1010[moff + m] + df1001[moff + m])  * xigrad_dot_rw12a * omega;
+
+                        second += w * df10001[moff + m] * 2.0 * grad_dot_rw12 * omega;  
+                        
+                        double third = w * (df1010[moff + m] + df0110[moff + m] ) * xigrad_dot_omega * rhow12a[moff + m];
+
+                        third += w * (df10001[moff + m ] + df01001[moff + m]) * grad_dot_omega * rhow12a[moff + m];
+
+                        double fourth = w * df0010[moff + m] * ( (xigrad_xx  * xomega + xigrad_xy  * yomega +  xigrad_xz  * zomega )* rxw12a
+
+                                                     +  (xigrad_xy  * xomega + xigrad_yy  * yomega +  xigrad_yz  * zomega ) * ryw12a
+
+                                                     +  (xigrad_xz  * xomega + xigrad_yz  * yomega +  xigrad_zz  * zomega ) * rzw12a 
+                                                                                                                                
+                                                                                                                                );
+
+                        fourth += w * df00001[moff + m] * ( xomega * rxw12a + yomega * ryw12a + zomega * rzw12a );
+
+                        fourth += w * df00101[moff + m ] * xigrad_dot_omega * (2.0 * grad_dot_rw12 ) ;
+
+                        fourth += w * (df00101[moff + m ] * xigrad_dot_rw12a   + df00011[moff + m ] * xigrad_dot_rw12a) * grad_dot_omega; 
+
+                        fourth += w * df00002[moff + m ] * grad_dot_omega * (2.0 * grad_dot_rw12);
+
+                        fourth += w * (df0020[moff + m] + df0011[moff + m])* xigrad_dot_omega * xigrad_dot_rw12a;
+                        
+                        double fifth = w * (df3000[moff + m] + 2.0 * df2100[moff + m] + df1200[moff + m]) * rhow1rhow2[moff + m] * omega;
+
+                        double seventh = w * (df2010[moff + m] + df2001[moff + m] ) * xigrad_dot_rw1rw2 * omega; 
+
+                        seventh += w * (df1110[moff + m] + df1101[moff + m] ) * xigrad_dot_rw1rw2 * omega;     
+
+                        seventh += w * 2.0 * (df20001[moff + m] + df11001[moff + m] ) * grad_dot_rw1rw2 * omega;
+
+                        double eighth  = w * (df1020[moff + m] + 2.0 * df1011[moff + m] + df1002[moff + m] ) * xigrad_dot_rw1_xigrad_dot_rw2 * omega;
+
+                        eighth  += w * (df1010[moff + m] + df1001[moff + m]  ) * (xigrad_xx *  rxw1rxw2[moff + m] +   xigrad_xy *  rxw1ryw2[moff + m] + xigrad_xz *  rxw1rzw2[moff + m] 
+
+                                                   + xigrad_xy *  ryw1rxw2[moff + m] + xigrad_yy *  ryw1ryw2[moff + m] + xigrad_yz *  ryw1rzw2[moff + m]
+
+                                                  + xigrad_xz *  rzw1rxw2[moff + m] + xigrad_yz *  rzw1ryw2[moff + m]  + xigrad_zz *  rzw1rzw2[moff + m]) * omega;
+
+
+                        eighth += w * 2.0 * (df10101[moff + m] + df10101[moff + m]) * ngrada[moff + m] * xigrad_dot_rw1_xigrad_dot_rw2 *omega;
+                        
+
+                        eighth += w * 4.0 * df10002[moff + m]  * ngrada[moff + m] * ngrada[moff + m]*  xigrad_dot_rw1_xigrad_dot_rw2 *omega;
+                        
+                        eighth += w * 2.0 * df10001[moff + m] * rw1_dot_rw2 * omega;
+
+                        double ninth = w * (df2010[moff + m] + 2.0 * df1110[moff + m] + df0210[moff + m] ) * rhow1rhow2[moff + m] * xigrad_dot_omega;
+
+                        ninth += w * (df20001[moff + m] + 2.0 * df11001[moff + m] + df02001[moff + m]) *  grad_dot_omega * rhow1rhow2[moff + m];
+
+                        double tenth = w * (df1010[moff + m] + df0110[moff + m] ) * 
+                        
+                                                ( (xigrad_xx  * rxw1rhow2[moff + m] + xigrad_xy  * ryw1rhow2[moff + m] +  xigrad_xz  * rzw1rhow2[moff + m] )* xomega
+
+                                              +  (xigrad_xy  * rxw1rhow2[moff + m] + xigrad_yy  * ryw1rhow2[moff + m] +  xigrad_yz  * rzw1rhow2[moff + m] ) * yomega
+
+                                              +  (xigrad_xz  * rxw1rhow2[moff + m] + xigrad_yz  * ryw1rhow2[moff + m] +  xigrad_zz  * rzw1rhow2[moff + m] ) * zomega 
+                                                                                                                                
+                                                                                                                                );
+
+
+                        tenth += w * (df1020[moff + m ] + df1011[moff + m ] + df0120[moff + m ] + df0111[moff + m ] ) * xigrad_dot_rw1rhow2 * xigrad_dot_omega;
+
+                        tenth += w * (df10001[moff + m] + df01001[moff + m]) * omega_dot_rw1rhow2;
+
+                        tenth += w * (df10101[moff + m] + df10011[moff + m]+  df01101[moff + m] + df0111[moff + m] + df01011[moff + m] )* xigrad_dot_rw1rhow2 * grad_dot_omega;
+
+                        tenth += w * (df10101[moff + m] + df10011[moff + m]+  df01101[moff + m] + df0111[moff + m] ) * grad_dot_rw1rhow2 * xigrad_dot_omega;
+
+                        tenth += w * (df10002[moff + m] + df01002[moff + m] ) * grad_dot_rw1rhow2 * grad_dot_omega;
+ 
+                        double twelthfirst =  xigrad_xxx * xomega * rxw1rxw2[moff + m]
+                                            + xigrad_xxy * xomega * rxw1ryw2[moff + m]
+                                            + xigrad_xxz * xomega * rxw1rzw2[moff + m]
+                                            + xigrad_xxy * xomega * ryw1rxw2[moff + m]
+                                            + xigrad_xyy * xomega * ryw1ryw2[moff + m]
+                                            + xigrad_xyz * xomega * ryw1rzw2[moff + m]
+                                            + xigrad_xxz * xomega * rzw1rxw2[moff + m]
+                                            + xigrad_xyz * xomega * rzw1ryw2[moff + m]
+                                            + xigrad_xzz * xomega * rzw1rzw2[moff + m]
+                                            + xigrad_xxy * yomega * rxw1rxw2[moff + m]
+                                            + xigrad_xyy * yomega * rxw1ryw2[moff + m]
+                                            + xigrad_xyz * yomega * rxw1rzw2[moff + m]
+                                            + xigrad_xyy * yomega * ryw1rxw2[moff + m]
+                                            + xigrad_yyy * yomega * ryw1ryw2[moff + m]
+                                            + xigrad_yyz * yomega * ryw1rzw2[moff + m]
+                                            + xigrad_xyz * yomega * rzw1rxw2[moff + m]
+                                            + xigrad_yyz * yomega * rzw1ryw2[moff + m]
+                                            + xigrad_yzz * yomega * rzw1rzw2[moff + m]
+                                            + xigrad_xxz * zomega * rxw1rxw2[moff + m]
+                                            + xigrad_xyz * zomega * rxw1ryw2[moff + m]
+                                            + xigrad_xzz * zomega * rxw1rzw2[moff + m]
+                                            + xigrad_xyz * zomega * ryw1rxw2[moff + m]
+                                            + xigrad_yyz * zomega * ryw1ryw2[moff + m]
+                                            + xigrad_yzz * zomega * ryw1rzw2[moff + m]
+                                            + xigrad_xzz * zomega * rzw1rxw2[moff + m]
+                                            + xigrad_yzz * zomega * rzw1ryw2[moff + m]
+                                            + xigrad_zzz * zomega * rzw1rzw2[moff + m];
+
+
+                        double twelthsecond = xigrad_xx * xigrad_x * xomega * rxw1rxw2[moff + m]
+                                            + xigrad_xx * xigrad_y * yomega * rxw1rxw2[moff + m]
+                                            + xigrad_xx * xigrad_z * zomega * rxw1rxw2[moff + m]
+                                            + xigrad_xy * xigrad_x * xomega * rxw1ryw2[moff + m]
+                                            + xigrad_xy * xigrad_y * yomega * rxw1ryw2[moff + m]
+                                            + xigrad_xy * xigrad_z * zomega * rxw1ryw2[moff + m]
+                                            + xigrad_xz * xigrad_x * xomega * rxw1rzw2[moff + m]
+                                            + xigrad_xz * xigrad_y * yomega * rxw1rzw2[moff + m]
+                                            + xigrad_xz * xigrad_z * zomega * rxw1rzw2[moff + m]
+                                            + xigrad_xy * xigrad_x * xomega * ryw1rxw2[moff + m]
+                                            + xigrad_xy * xigrad_y * yomega * ryw1rxw2[moff + m]
+                                            + xigrad_xy * xigrad_z * zomega * ryw1rxw2[moff + m]
+                                            + xigrad_yy * xigrad_x * xomega * ryw1ryw2[moff + m]
+                                            + xigrad_yy * xigrad_y * yomega * ryw1ryw2[moff + m]
+                                            + xigrad_yy * xigrad_z * zomega * ryw1ryw2[moff + m]
+                                            + xigrad_yz * xigrad_x * xomega * ryw1rzw2[moff + m]
+                                            + xigrad_yz * xigrad_y * yomega * ryw1rzw2[moff + m]
+                                            + xigrad_yz * xigrad_z * zomega * ryw1rzw2[moff + m]
+                                            + xigrad_xz * xigrad_x * xomega * rzw1rxw2[moff + m]
+                                            + xigrad_xz * xigrad_y * yomega * rzw1rxw2[moff + m]
+                                            + xigrad_xz * xigrad_z * zomega * rzw1rxw2[moff + m]
+                                            + xigrad_yz * xigrad_x * xomega * rzw1ryw2[moff + m]
+                                            + xigrad_yz * xigrad_y * yomega * rzw1ryw2[moff + m]
+                                            + xigrad_yz * xigrad_z * zomega * rzw1ryw2[moff + m]
+                                            + xigrad_zz * xigrad_x * xomega * rzw1rzw2[moff + m]
+                                            + xigrad_zz * xigrad_y * yomega * rzw1rzw2[moff + m]
+                                            + xigrad_zz * xigrad_z * zomega * rzw1rzw2[moff + m];
+
+                        double twelththird   =    xigrad_xx * xigrad_x * xomega * (rxw1rxw2[moff + m] + rxw1rxw2[moff + m])
+                                                + xigrad_xx * xigrad_y * xomega * (ryw1rxw2[moff + m] + rxw1ryw2[moff + m])
+                                                + xigrad_xx * xigrad_z * xomega * (rzw1rxw2[moff + m] + rxw1rzw2[moff + m])
+                                                + xigrad_xy * xigrad_x * xomega * (rxw1ryw2[moff + m] + ryw1rxw2[moff + m])
+                                                + xigrad_xy * xigrad_y * xomega * (ryw1ryw2[moff + m] + ryw1ryw2[moff + m])
+                                                + xigrad_xy * xigrad_z * xomega * (rzw1ryw2[moff + m] + ryw1rzw2[moff + m])
+                                                + xigrad_xz * xigrad_x * xomega * (rxw1rzw2[moff + m] + rzw1rxw2[moff + m])
+                                                + xigrad_xz * xigrad_y * xomega * (ryw1rzw2[moff + m] + rzw1ryw2[moff + m])
+                                                + xigrad_xz * xigrad_z * xomega * (rzw1rzw2[moff + m] + rzw1rzw2[moff + m])
+                                                + xigrad_xy * xigrad_x * yomega * (rxw1rxw2[moff + m] + rxw1rxw2[moff + m])
+                                                + xigrad_xy * xigrad_y * yomega * (ryw1rxw2[moff + m] + rxw1ryw2[moff + m])
+                                                + xigrad_xy * xigrad_z * yomega * (rzw1rxw2[moff + m] + rxw1rzw2[moff + m])
+                                                + xigrad_yy * xigrad_x * yomega * (rxw1ryw2[moff + m] + ryw1rxw2[moff + m])
+                                                + xigrad_yy * xigrad_y * yomega * (ryw1ryw2[moff + m] + ryw1ryw2[moff + m])
+                                                + xigrad_yy * xigrad_z * yomega * (rzw1ryw2[moff + m] + ryw1rzw2[moff + m])
+                                                + xigrad_yz * xigrad_x * yomega * (rxw1rzw2[moff + m] + rzw1rxw2[moff + m])
+                                                + xigrad_yz * xigrad_y * yomega * (ryw1rzw2[moff + m] + rzw1ryw2[moff + m])
+                                                + xigrad_yz * xigrad_z * yomega * (rzw1rzw2[moff + m] + rzw1rzw2[moff + m])
+                                                + xigrad_xz * xigrad_x * zomega * (rxw1rxw2[moff + m] + rxw1rxw2[moff + m])
+                                                + xigrad_xz * xigrad_y * zomega * (ryw1rxw2[moff + m] + rxw1ryw2[moff + m])
+                                                + xigrad_xz * xigrad_z * zomega * (rzw1rxw2[moff + m] + rxw1rzw2[moff + m])
+                                                + xigrad_yz * xigrad_x * zomega * (rxw1ryw2[moff + m] + ryw1rxw2[moff + m])
+                                                + xigrad_yz * xigrad_y * zomega * (ryw1ryw2[moff + m] + ryw1ryw2[moff + m])
+                                                + xigrad_yz * xigrad_z * zomega * (rzw1ryw2[moff + m] + ryw1rzw2[moff + m])
+                                                + xigrad_zz * xigrad_x * zomega * (rxw1rzw2[moff + m] + rzw1rxw2[moff + m])
+                                                + xigrad_zz * xigrad_y * zomega * (ryw1rzw2[moff + m] + rzw1ryw2[moff + m])
+                                                + xigrad_zz * xigrad_z * zomega * (rzw1rzw2[moff + m] + rzw1rzw2[moff + m]);
+
+                        double twelthfourth_gam =       xigrad_x * xomega * rxw1rxw2[moff + m]
+                                                    +   xigrad_x * yomega * rxw1ryw2[moff + m]
+                                                    +   xigrad_x * zomega * rxw1rzw2[moff + m]
+                                                    +   xigrad_y * xomega * ryw1rxw2[moff + m]
+                                                    +   xigrad_y * yomega * ryw1ryw2[moff + m]
+                                                    +   xigrad_y * zomega * ryw1rzw2[moff + m]
+                                                    +   xigrad_z * xomega * rzw1rxw2[moff + m]
+                                                    +   xigrad_z * yomega * rzw1ryw2[moff + m]
+                                                    +   xigrad_z * zomega * rzw1rzw2[moff + m];
+
+                        double twelthfifth_gam =    (xigrad_x * grada_x[moff + m] + grada_x[moff +m] * xigrad_x) * rxw1rxw2[moff +m]
+                                                +   (xigrad_x * grada_y[moff + m] + grada_x[moff +m] * xigrad_y) * rxw1ryw2[moff +m]
+                                                +   (xigrad_x * grada_z[moff + m] + grada_x[moff +m] * xigrad_z) * rxw1rzw2[moff +m]
+                                                +   (xigrad_y * grada_x[moff + m] + grada_y[moff +m] * xigrad_x) * rxw1rxw2[moff +m]
+                                                +   (xigrad_y * grada_y[moff + m] + grada_y[moff +m] * xigrad_y) * rxw1ryw2[moff +m]
+                                                +   (xigrad_y * grada_z[moff + m] + grada_y[moff +m] * xigrad_z) * rxw1rzw2[moff +m]
+                                                +   (xigrad_z * grada_x[moff + m] + grada_z[moff +m] * xigrad_x) * rxw1rxw2[moff +m]
+                                                +   (xigrad_z * grada_y[moff + m] + grada_z[moff +m] * xigrad_y) * rxw1ryw2[moff +m]
+                                                +   (xigrad_z * grada_z[moff + m] + grada_z[moff +m] * xigrad_z) * rxw1rzw2[moff +m];
+
+
+                        double twelfth = w * df0010[moff + m] * twelthfirst;
+
+                        twelfth += w * (df0020[moff + m] +  df0011[moff + m]) * (twelththird + twelthsecond);
+
+                        twelfth += w * (df0030[moff + m] + 2.0 * df0021[moff + m] + df0012[moff + m]) * xigrad_dot_rw1_xigrad_dot_rw2 * xigrad_dot_omega;
+
+                        // second-term mixed density gradient
+
+                        twelfth += w * (df00101[moff + m] + df00011[moff +m]) * ngrada[moff + m] * twelthsecond;
+
+                        twelfth += w * (df00101[moff + m] + df00011[moff +m]) * xigrad_dot_omega * rw1_dot_rw2;
+
+                        twelfth += w * df00002[moff + m] * grad_dot_omega * rw1_dot_rw2;
+
+                        // third-term mixed denisty gradient
+
+
+                        twelfth += w *  (df00101[moff + m] + df00011[moff +m]) * twelthfourth_gam;
+
+
+                        twelfth += w * df00101[moff + m] * ngrada[moff + m] * twelththird;
+
+                        twelfth += w * df00002[moff +m] * ngrada[moff + m] * twelthfourth_gam;
+                        
+                        // Fourth terms 
+
+                        twelfth += w * (df00201[moff + m] + df00111[moff + m]) * twelthfifth_gam * xigrad_dot_omega;
+
+                        twelfth += w * df00102[moff + m] * xigrad_dot_rw1_xigrad_dot_rw2 * xigrad_dot_omega;
+                        
+                        twelfth += w * (df00201[moff + m] + 2 * df00111[moff + m] + df00021[moff + m]) * xigrad_dot_rw1_xigrad_dot_rw2 * grad_dot_omega;
+
+                        twelfth += w * (df00102[moff + m] + df00011[moff + m]) * ngrada[moff + m] * xigrad_dot_rw1_xigrad_dot_rw2 * grad_dot_omega;
+
+                        twelfth += w * df00003[moff + m] * ngrada[moff + m] * ngrada[moff +m] * grad_dot_omega;
+                                     
+                        fvxc += first;
+                        fvxc += second;
+                        fvxc += third;
+                        fvxc += fourth;
+                        fvxc += fifth;
+                        fvxc += seventh;
+                        fvxc += eighth ;
+                        fvxc += ninth;
+                        fvxc += tenth;
+                        fvxc += twelfth;
+                    }
+                    
+                    xcBuffer.at(idx) = fvxc;
+                    
+                    idx++;
+                }
+            }
+            
+            // distribute block of Kohn-Sham matrix elements
+            
+            #pragma omp critical
+            {
+                idx = 0;
+                
+                for (int32_t k = curao; k < (curao + bufdim); k++)
+                {
+                    for (int32_t l = k; l < naos; l++)
+                    {
+                        auto fvxc = (k == l) ? 0.5 * xcBuffer.at(idx) : xcBuffer.at(idx);
+                        
+                        ksmat[k * naos + l] += fvxc;
+                        
+                        idx++;
+                    }
+                }
+            }
+            
+            // update AOs counter
+            
+            curao += bufdim;
+        }
+        
+        // loop over last block
+        
+        if (naos % bufdim != 0)
+        {
+            // compute last block of Kohn-Sham matrix elements
+            
+            int32_t idx = 0;
+            
+            for (int32_t j = curao; j < naos; j++)
+            {
+                auto bgaos = gtoValues.data(j);
+                
+                auto bgaox = gtoValuesX.data(j);
+                
+                auto bgaoy = gtoValuesY.data(j);
+                
+                auto bgaoz = gtoValuesZ.data(j);
+                
+                for (int32_t k = j; k < naos; k++)
+                {
+                    auto kgaos = gtoValues.data(k);
+                    
+                    auto kgaox = gtoValuesX.data(k);
+                    
+                    auto kgaoy = gtoValuesY.data(k);
+                    
+                    auto kgaoz = gtoValuesZ.data(k);
+                    
+                    double fvxc = 0.0;
+                    
+                    auto loff = gridOffset + gridBlockPosition;
+                    
+                    for (int32_t l = 0; l < nGridPoints; l++)
+                    {
+                        double w = gridWeights[loff + l];
+                        
+                        auto omega = bgaos[l] * kgaos[l];
+                        
+                        auto xomega = bgaox[l] * kgaos[l] + bgaos[l] * kgaox[l];
+                        
+                        auto yomega = bgaoy[l] * kgaos[l] + bgaos[l] * kgaoy[l];
+                        
+                        auto zomega = bgaoz[l] * kgaos[l] + bgaos[l] * kgaoz[l];
+
+                        double znva =  1.0 / ngrada[loff + l];
+
+                        double znva3 = 1.0 / std::pow(ngrada[loff + l],3.0);
+
+                        double znva5 = 1.0 / std::pow(ngrada[loff + l],5.0);
+                                                
+                        double xigrad_x = znva * grada_x[loff + l];
+                        
+                        double xigrad_y = znva * grada_y[loff + l];
+                        
+                        double xigrad_z = znva * grada_z[loff + l];
+
+                        double rxw12a = gradw12a_x[loff + l];
+                        
+                        double ryw12a = gradw12a_y[loff + l];
+                        
+                        double rzw12a = gradw12a_z[loff + l];
+
+                        double xigrad_xx = (znva - grada_x[loff + l] * grada_x[loff + l] * znva3);
+
+                        double xigrad_yy = (znva - grada_y[loff + l] * grada_y[loff + l] * znva3);
+
+                        double xigrad_zz = (znva - grada_z[loff + l] * grada_z[loff + l] * znva3);
+
+                        double xigrad_xy =  - grada_x[loff + l] * grada_y[loff + l] * znva3;
+
+                        double xigrad_xz =  - grada_x[loff + l] * grada_z[loff + l] * znva3;
+
+                        double xigrad_yz =  - grada_y[loff + l] * grada_z[loff + l] * znva3;
+                        
+                        double xigrad_dot_rw12a = (xigrad_x * rxw12a + xigrad_y * ryw12a + xigrad_z * rzw12a);
+
+                        double xigrad_dot_omega = (xigrad_x * xomega + xigrad_y * yomega + xigrad_z * zomega );
+
+                        double xigrad_dot_rw1rw2 = xigrad_x * rxw1rhow2[loff + l] + xigrad_y * ryw1rhow2[loff + l] + xigrad_z * rzw1rhow2[loff + l];
+                        
+                        double rw1_dot_rw2 = rxw1rxw2[loff + l] + ryw1ryw2[loff + l] + rzw1rzw2[loff + l]; 
+
+                        double xigrad_dot_rw1rhow2 = xigrad_x * rxw1rhow2[loff + l] + xigrad_y * ryw1rhow2[loff + l] + xigrad_z * rzw1rhow2[loff + l];
+
+                        double grad_dot_rw12 = grada_x[loff + l] * rxw12a + grada_y[loff + l] * ryw12a + grada_z[loff + l] * rzw12a;
+
+                        double grad_dot_omega = grada_x[loff + l] * xomega + grada_y[loff + l] * yomega + grada_z[loff + l] * zomega;
+
+                        double grad_dot_rw1rw2 = grada_x[loff + l] * rxw1rhow2[loff + l] + grada_y[loff + l] * ryw1rhow2[loff + l] + grada_z[loff + l] * rzw1rhow2[loff + l];
+
+                        double omega_dot_rw1rhow2 = xomega * rxw1rhow2[loff + l] + yomega * ryw1rhow2[loff + l] + zomega  * rzw1rhow2[loff + l];
+
+                        double grad_dot_rw1rhow2 = grada_x[loff + l] * rxw1rhow2[loff + l] + grada_y[loff + l] * ryw1rhow2[loff + l] + grada_z[loff + l] * rzw1rhow2[loff + l];
+
+                        double xigrad_dot_rw1_xigrad_dot_rw2  = xigrad_x * xigrad_x * rxw1rxw2[loff + l]
+                                                              + xigrad_x * xigrad_y * rxw1ryw2[loff + l]
+                                                              + xigrad_x * xigrad_z * rxw1rzw2[loff + l]
+                                                              + xigrad_y * xigrad_x * ryw1rxw2[loff + l]
+                                                              + xigrad_y * xigrad_y * ryw1ryw2[loff + l]
+                                                              + xigrad_y * xigrad_z * ryw1rzw2[loff + l]
+                                                              + xigrad_z * xigrad_x * rzw1rxw2[loff + l]
+                                                              + xigrad_z * xigrad_y * rzw1ryw2[loff + l]
+                                                              + xigrad_z * xigrad_z * rzw1rzw2[loff + l];
+
+                        double first = w * (df2000[loff + l] * rhow12a[loff + l] + df1100[loff + l] * rhow12a[loff + l]) * omega;
+
+                        double second = w * (df1010[loff + l] + df1001[loff + l])  * xigrad_dot_rw12a * omega;
+
+                        second += w * df10001[loff + l] * 2.0 * grad_dot_rw12 * omega;  
+                        
+                        double third = w * (df1010[loff + l] + df0110[loff + l] ) * xigrad_dot_omega * rhow12a[loff + l];
+
+                        third += w * (df10001[loff + l ] + df01001[loff + l]) * grad_dot_omega * rhow12a[loff + l];
+
+                        double fourth = w * df0010[loff + l] * ( (xigrad_xx  * xomega + xigrad_xy  * yomega +  xigrad_xz  * zomega )* rxw12a
+
+                                                     +  (xigrad_xy  * xomega + xigrad_yy  * yomega +  xigrad_yz  * zomega ) * ryw12a
+
+                                                     +  (xigrad_xz  * xomega + xigrad_yz  * yomega +  xigrad_zz  * zomega ) * rzw12a 
+                                                                                                                                
+                                                                                                                                );
+
+                        fourth += w * df00001[loff + l] * ( xomega * rxw12a + yomega * ryw12a + zomega * rzw12a );
+
+                        fourth += w * df00101[loff + l ] * xigrad_dot_omega * (2.0 * grad_dot_rw12 ) ;
+
+                        fourth += w * (df00101[loff + l ] * xigrad_dot_rw12a   + df00011[loff + l ] * xigrad_dot_rw12a) * grad_dot_omega; 
+
+                        fourth += w * df00002[loff + l ] * grad_dot_omega * (2.0 * grad_dot_rw12);
+
+                        fourth += w * (df0020[loff + l] + df0011[loff + l])* xigrad_dot_omega * xigrad_dot_rw12a;
+                        
+                        double fifth = w * (df3000[loff + l] + 2.0 * df2100[loff + l] + df1200[loff + l]) * rhow1rhow2[loff + l] * omega;
+
+                        double seventh = w * (df2010[loff + l] + df2001[loff + l] ) * xigrad_dot_rw1rw2 * omega; 
+
+                        seventh += w * (df1110[loff + l] + df1101[loff + l] ) * xigrad_dot_rw1rw2 * omega;     
+
+                        seventh += w * 2.0 * (df20001[loff + l] + df11001[loff + l] ) * grad_dot_rw1rw2 * omega;
+
+                        double eighth  = w * (df1020[loff + l] + 2.0 * df1011[loff + l] + df1002[loff + l] ) * xigrad_dot_rw1_xigrad_dot_rw2 * omega;
+
+                        eighth  += w * (df1010[loff + l] + df1001[loff + l]  ) * (xigrad_xx *  rxw1rxw2[loff + l] +   xigrad_xy *  rxw1ryw2[loff + l] + xigrad_xz *  rxw1rzw2[loff + l] 
+
+                                                   + xigrad_xy *  ryw1rxw2[loff + l] + xigrad_yy *  ryw1ryw2[loff + l] + xigrad_yz *  ryw1rzw2[loff + l]
+
+                                                  + xigrad_xz *  rzw1rxw2[loff + l] + xigrad_yz *  rzw1ryw2[loff + l]  + xigrad_zz *  rzw1rzw2[loff + l]) * omega;
+
+
+                        eighth += w * 2.0 * (df10101[loff + l] + df10101[loff + l]) * ngrada[loff + l] * xigrad_dot_rw1_xigrad_dot_rw2 *omega;
+                        
+
+                        eighth += w * 4.0 * df10002[loff + l]  * ngrada[loff + l] * ngrada[loff + l]*  xigrad_dot_rw1_xigrad_dot_rw2 *omega;
+                        
+                        eighth += w * 2.0 * df10001[loff + l] * rw1_dot_rw2 * omega;
+
+                        double ninth = w * (df2010[loff + l] + 2.0 * df1110[loff + l] + df0210[loff + l] ) * rhow1rhow2[loff + l] * xigrad_dot_omega;
+
+                        ninth += w * (df20001[loff + l] + 2.0 * df11001[loff + l] + df02001[loff + l]) *  grad_dot_omega * rhow1rhow2[loff + l];
+
+                        double tenth = w * (df1010[loff + l] + df0110[loff + l] ) * 
+                        
+                                                ( (xigrad_xx  * rxw1rhow2[loff + l] + xigrad_xy  * ryw1rhow2[loff + l] +  xigrad_xz  * rzw1rhow2[loff + l] )* xomega
+
+                                              +  (xigrad_xy  * rxw1rhow2[loff + l] + xigrad_yy  * ryw1rhow2[loff + l] +  xigrad_yz  * rzw1rhow2[loff + l] ) * yomega
+
+                                              +  (xigrad_xz  * rxw1rhow2[loff + l] + xigrad_yz  * ryw1rhow2[loff + l] +  xigrad_zz  * rzw1rhow2[loff + l] ) * zomega 
+                                                                                                                                
+                                                                                                                                );
+
+                        tenth += w * (df1020[loff + l ] + df1011[loff + l ] + df0120[loff + l ] + df0111[loff + l ] ) * xigrad_dot_rw1rhow2 * xigrad_dot_omega;
+
+                        tenth += w * (df10001[loff + l] + df01001[loff + l]) * omega_dot_rw1rhow2;
+
+                        tenth += w * (df10101[loff + l] + df10011[loff + l]+  df01101[loff + l] + df0111[loff + l] +  df01011[loff + l] )* xigrad_dot_rw1rhow2 * grad_dot_omega;
+
+                        tenth += w * (df10101[loff + l] + df10011[loff + l]+  df01101[loff + l] + df0111[loff + l] ) * grad_dot_rw1rhow2 * xigrad_dot_omega;
+
+                        tenth += w * (df10002[loff + l] + df01002[loff + l] ) * grad_dot_rw1rhow2 * grad_dot_omega;
+
+                        double xigrad_xxy =   3.0  * grada_x[loff + l] * grada_x[loff + l] * grada_y[loff + l] * znva5 - grada_y[loff + l] * znva3;
+
+                        double xigrad_xxz =   3.0  * grada_x[loff + l] * grada_x[loff + l] * grada_z[loff + l] * znva5 - grada_z[loff + l] * znva3;
+
+                        double xigrad_xyy =   3.0  * grada_x[loff + l] * grada_y[loff + l] * grada_y[loff + l] * znva5 - grada_x[loff + l] * znva3;
+
+                        double xigrad_xzz =   3.0  * grada_x[loff + l] * grada_z[loff + l] * grada_z[loff + l] * znva5 - grada_x[loff + l] * znva3;
+                        
+                        double xigrad_yzz =   3.0  * grada_y[loff + l] * grada_z[loff + l] * grada_z[loff + l] * znva5 - grada_y[loff + l] * znva3;
+
+                        double xigrad_yyz =   3.0  * grada_y[loff + l] * grada_y[loff + l] * grada_z[loff + l] * znva5 - grada_z[loff + l] * znva3;
+
+                        double xigrad_xyz =   3.0  * grada_x[loff + l] * grada_y[loff + l] * grada_z[loff + l] * znva5;
+
+                        double xigrad_xxx =  3.0 * grada_x[loff + l] * grada_x[loff + l] * grada_x[loff + l] * znva5 - 3.0  * grada_x[loff + l] * znva3;
+
+                        double xigrad_yyy =  3.0 * grada_y[loff + l] * grada_y[loff + l] * grada_y[loff + l] * znva5 - 3.0  * grada_y[loff + l] * znva3;
+
+                        double xigrad_zzz =  3.0 * grada_z[loff + l] * grada_z[loff + l] * grada_z[loff + l] * znva5 - 3.0  * grada_z[loff + l] * znva3;
+
+                        double twelthfirst =  xigrad_xxx * xomega * rxw1rxw2[loff + l]
+                                            + xigrad_xxy * xomega * rxw1ryw2[loff + l]
+                                            + xigrad_xxz * xomega * rxw1rzw2[loff + l]
+                                            + xigrad_xxy * xomega * ryw1rxw2[loff + l]
+                                            + xigrad_xyy * xomega * ryw1ryw2[loff + l]
+                                            + xigrad_xyz * xomega * ryw1rzw2[loff + l]
+                                            + xigrad_xxz * xomega * rzw1rxw2[loff + l]
+                                            + xigrad_xyz * xomega * rzw1ryw2[loff + l]
+                                            + xigrad_xzz * xomega * rzw1rzw2[loff + l]
+                                            + xigrad_xxy * yomega * rxw1rxw2[loff + l]
+                                            + xigrad_xyy * yomega * rxw1ryw2[loff + l]
+                                            + xigrad_xyz * yomega * rxw1rzw2[loff + l]
+                                            + xigrad_xyy * yomega * ryw1rxw2[loff + l]
+                                            + xigrad_yyy * yomega * ryw1ryw2[loff + l]
+                                            + xigrad_yyz * yomega * ryw1rzw2[loff + l]
+                                            + xigrad_xyz * yomega * rzw1rxw2[loff + l]
+                                            + xigrad_yyz * yomega * rzw1ryw2[loff + l]
+                                            + xigrad_yzz * yomega * rzw1rzw2[loff + l]
+                                            + xigrad_xxz * zomega * rxw1rxw2[loff + l]
+                                            + xigrad_xyz * zomega * rxw1ryw2[loff + l]
+                                            + xigrad_xzz * zomega * rxw1rzw2[loff + l]
+                                            + xigrad_xyz * zomega * ryw1rxw2[loff + l]
+                                            + xigrad_yyz * zomega * ryw1ryw2[loff + l]
+                                            + xigrad_yzz * zomega * ryw1rzw2[loff + l]
+                                            + xigrad_xzz * zomega * rzw1rxw2[loff + l]
+                                            + xigrad_yzz * zomega * rzw1ryw2[loff + l]
+                                            + xigrad_zzz * zomega * rzw1rzw2[loff + l];
+
+                        double twelthsecond  = xigrad_xx * xigrad_x * xomega * rxw1rxw2[loff + l]
+                                            + xigrad_xx * xigrad_y * yomega * rxw1rxw2[loff + l]
+                                            + xigrad_xx * xigrad_z * zomega * rxw1rxw2[loff + l]
+                                            + xigrad_xy * xigrad_x * xomega * rxw1ryw2[loff + l]
+                                            + xigrad_xy * xigrad_y * yomega * rxw1ryw2[loff + l]
+                                            + xigrad_xy * xigrad_z * zomega * rxw1ryw2[loff + l]
+                                            + xigrad_xz * xigrad_x * xomega * rxw1rzw2[loff + l]
+                                            + xigrad_xz * xigrad_y * yomega * rxw1rzw2[loff + l]
+                                            + xigrad_xz * xigrad_z * zomega * rxw1rzw2[loff + l]
+                                            + xigrad_xy * xigrad_x * xomega * ryw1rxw2[loff + l]
+                                            + xigrad_xy * xigrad_y * yomega * ryw1rxw2[loff + l]
+                                            + xigrad_xy * xigrad_z * zomega * ryw1rxw2[loff + l]
+                                            + xigrad_yy * xigrad_x * xomega * ryw1ryw2[loff + l]
+                                            + xigrad_yy * xigrad_y * yomega * ryw1ryw2[loff + l]
+                                            + xigrad_yy * xigrad_z * zomega * ryw1ryw2[loff + l]
+                                            + xigrad_yz * xigrad_x * xomega * ryw1rzw2[loff + l]
+                                            + xigrad_yz * xigrad_y * yomega * ryw1rzw2[loff + l]
+                                            + xigrad_yz * xigrad_z * zomega * ryw1rzw2[loff + l]
+                                            + xigrad_xz * xigrad_x * xomega * rzw1rxw2[loff + l]
+                                            + xigrad_xz * xigrad_y * yomega * rzw1rxw2[loff + l]
+                                            + xigrad_xz * xigrad_z * zomega * rzw1rxw2[loff + l]
+                                            + xigrad_yz * xigrad_x * xomega * rzw1ryw2[loff + l]
+                                            + xigrad_yz * xigrad_y * yomega * rzw1ryw2[loff + l]
+                                            + xigrad_yz * xigrad_z * zomega * rzw1ryw2[loff + l]
+                                            + xigrad_zz * xigrad_x * xomega * rzw1rzw2[loff + l]
+                                            + xigrad_zz * xigrad_y * yomega * rzw1rzw2[loff + l]
+                                            + xigrad_zz * xigrad_z * zomega * rzw1rzw2[loff + l];
+
+                        double twelththird   =    xigrad_xx * xigrad_x * xomega * (rxw1rxw2[loff + l] + rxw1rxw2[loff + l])
+                                                + xigrad_xx * xigrad_y * xomega * (ryw1rxw2[loff + l] + rxw1ryw2[loff + l])
+                                                + xigrad_xx * xigrad_z * xomega * (rzw1rxw2[loff + l] + rxw1rzw2[loff + l])
+                                                + xigrad_xy * xigrad_x * xomega * (rxw1ryw2[loff + l] + ryw1rxw2[loff + l])
+                                                + xigrad_xy * xigrad_y * xomega * (ryw1ryw2[loff + l] + ryw1ryw2[loff + l])
+                                                + xigrad_xy * xigrad_z * xomega * (rzw1ryw2[loff + l] + ryw1rzw2[loff + l])
+                                                + xigrad_xz * xigrad_x * xomega * (rxw1rzw2[loff + l] + rzw1rxw2[loff + l])
+                                                + xigrad_xz * xigrad_y * xomega * (ryw1rzw2[loff + l] + rzw1ryw2[loff + l])
+                                                + xigrad_xz * xigrad_z * xomega * (rzw1rzw2[loff + l] + rzw1rzw2[loff + l])
+                                                + xigrad_xy * xigrad_x * yomega * (rxw1rxw2[loff + l] + rxw1rxw2[loff + l])
+                                                + xigrad_xy * xigrad_y * yomega * (ryw1rxw2[loff + l] + rxw1ryw2[loff + l])
+                                                + xigrad_xy * xigrad_z * yomega * (rzw1rxw2[loff + l] + rxw1rzw2[loff + l])
+                                                + xigrad_yy * xigrad_x * yomega * (rxw1ryw2[loff + l] + ryw1rxw2[loff + l])
+                                                + xigrad_yy * xigrad_y * yomega * (ryw1ryw2[loff + l] + ryw1ryw2[loff + l])
+                                                + xigrad_yy * xigrad_z * yomega * (rzw1ryw2[loff + l] + ryw1rzw2[loff + l])
+                                                + xigrad_yz * xigrad_x * yomega * (rxw1rzw2[loff + l] + rzw1rxw2[loff + l])
+                                                + xigrad_yz * xigrad_y * yomega * (ryw1rzw2[loff + l] + rzw1ryw2[loff + l])
+                                                + xigrad_yz * xigrad_z * yomega * (rzw1rzw2[loff + l] + rzw1rzw2[loff + l])
+                                                + xigrad_xz * xigrad_x * zomega * (rxw1rxw2[loff + l] + rxw1rxw2[loff + l])
+                                                + xigrad_xz * xigrad_y * zomega * (ryw1rxw2[loff + l] + rxw1ryw2[loff + l])
+                                                + xigrad_xz * xigrad_z * zomega * (rzw1rxw2[loff + l] + rxw1rzw2[loff + l])
+                                                + xigrad_yz * xigrad_x * zomega * (rxw1ryw2[loff + l] + ryw1rxw2[loff + l])
+                                                + xigrad_yz * xigrad_y * zomega * (ryw1ryw2[loff + l] + ryw1ryw2[loff + l])
+                                                + xigrad_yz * xigrad_z * zomega * (rzw1ryw2[loff + l] + ryw1rzw2[loff + l])
+                                                + xigrad_zz * xigrad_x * zomega * (rxw1rzw2[loff + l] + rzw1rxw2[loff + l])
+                                                + xigrad_zz * xigrad_y * zomega * (ryw1rzw2[loff + l] + rzw1ryw2[loff + l])
+                                                + xigrad_zz * xigrad_z * zomega * (rzw1rzw2[loff + l] + rzw1rzw2[loff + l]);
+                        
+
+                        double twelthfourth_gam =       xigrad_x * xomega * rxw1rxw2[loff + l]
+                                                    +   xigrad_x * yomega * rxw1ryw2[loff + l]
+                                                    +   xigrad_x * zomega * rxw1rzw2[loff + l]
+                                                    +   xigrad_y * xomega * ryw1rxw2[loff + l]
+                                                    +   xigrad_y * yomega * ryw1ryw2[loff + l]
+                                                    +   xigrad_y * zomega * ryw1rzw2[loff + l]
+                                                    +   xigrad_z * xomega * rzw1rxw2[loff + l]
+                                                    +   xigrad_z * yomega * rzw1ryw2[loff + l]
+                                                    +   xigrad_z * zomega * rzw1rzw2[loff + l];
+
+                        double twelthfifth_gam =    (xigrad_x * grada_x[loff + l] + grada_x[loff + l] * xigrad_x) * rxw1rxw2[loff + l]
+                                                +   (xigrad_x * grada_y[loff + l] + grada_x[loff + l] * xigrad_y) * rxw1ryw2[loff + l]
+                                                +   (xigrad_x * grada_z[loff + l] + grada_x[loff + l] * xigrad_z) * rxw1rzw2[loff + l]
+                                                +   (xigrad_y * grada_x[loff + l] + grada_y[loff + l] * xigrad_x) * rxw1rxw2[loff + l]
+                                                +   (xigrad_y * grada_y[loff + l] + grada_y[loff + l] * xigrad_y) * rxw1ryw2[loff + l]
+                                                +   (xigrad_y * grada_z[loff + l] + grada_y[loff + l] * xigrad_z) * rxw1rzw2[loff + l]
+                                                +   (xigrad_z * grada_x[loff + l] + grada_z[loff + l] * xigrad_x) * rxw1rxw2[loff + l]
+                                                +   (xigrad_z * grada_y[loff + l] + grada_z[loff + l] * xigrad_y) * rxw1ryw2[loff + l]
+                                                +   (xigrad_z * grada_z[loff + l] + grada_z[loff + l] * xigrad_z) * rxw1rzw2[loff + l];
+
+
+                        double twelfth = w * df0010[loff + l] * twelthfirst;
+
+                        twelfth += w * (df0020[loff + l] +  df0011[loff + l]) * (twelththird + twelthsecond);
+
+                        twelfth += w * (df0030[loff + l] + 2.0 * df0021[loff + l] + df0012[loff + l]) * xigrad_dot_rw1_xigrad_dot_rw2 * xigrad_dot_omega;
+
+                        twelfth += w * (df00101[loff + l] + df00011[loff + l]) * ngrada[loff + l] * twelthsecond;
+
+                        twelfth += w * (df00101[loff + l] + df00011[loff + l]) * xigrad_dot_omega * rw1_dot_rw2;
+
+                        twelfth += w * df00002[loff + l] * grad_dot_omega * rw1_dot_rw2;
+
+                        twelfth += w *  (df00101[loff + l] + df00011[loff + l]) * twelthfourth_gam;
+
+                        twelfth += w * df00101[loff + l] * ngrada[loff + l] * twelththird;
+
+                        twelfth += w * df00002[loff + l] * ngrada[loff + l] * twelthfourth_gam;
+                        
+                        twelfth += w * (df00201[loff + l] + df00111[loff + l]) * twelthfifth_gam * xigrad_dot_omega;
+
+                        twelfth += w * df00102[loff + l] * xigrad_dot_rw1_xigrad_dot_rw2 * xigrad_dot_omega;
+                        
+                        twelfth += w * (df00201[loff + l] + 2 * df00111[loff + l] + df00021[loff + l]) * xigrad_dot_rw1_xigrad_dot_rw2 * grad_dot_omega;
+
+                        twelfth += w * (df00102[loff + l] + df00011[loff + l]) * ngrada[loff + l] * xigrad_dot_rw1_xigrad_dot_rw2 * grad_dot_omega;
+
+                        twelfth += w * df00003[loff + l] * ngrada[loff + l] * ngrada[loff + l] * grad_dot_omega;
+
+                        fvxc += first;
+                        fvxc += second;
+                        fvxc += third;
+                        fvxc += fourth;
+                        fvxc += fifth;
+                        fvxc += seventh;
+                        fvxc += eighth ;
+                        fvxc += ninth;
+                        fvxc += tenth;
+                        fvxc += twelfth;
                     }
                     
                     xcBuffer.at(idx) = fvxc;

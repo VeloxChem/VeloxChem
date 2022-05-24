@@ -82,10 +82,10 @@ class TestCheckpoint:
         solver = LinearSolver(comm, ostream)
 
         labels = ['bger', 'bung', 'e2bger', 'e2bung']
-        solver.dist_bger = DistributedArray(np.random.rand(10, 7), comm)
-        solver.dist_bung = DistributedArray(np.random.rand(10, 7), comm)
-        solver.dist_e2bger = DistributedArray(np.random.rand(10, 7), comm)
-        solver.dist_e2bung = DistributedArray(np.random.rand(10, 7), comm)
+        solver.dist_bger = DistributedArray(np.random.rand(100, 7), comm)
+        solver.dist_bung = DistributedArray(np.random.rand(100, 7), comm)
+        solver.dist_e2bger = DistributedArray(np.random.rand(100, 7), comm)
+        solver.dist_e2bung = DistributedArray(np.random.rand(100, 7), comm)
         solver.nonlinear = False
 
         backup_data = {
@@ -103,7 +103,7 @@ class TestCheckpoint:
             solver.checkpoint_file = fname
             solver.write_checkpoint(mol, bas, dft_dict, pe_dict, labels)
 
-            solver.read_vectors(labels)
+            solver.read_checkpoint(labels)
             assert np.max(
                 np.abs(backup_data['bger'] - solver.dist_bger.data)) < 1.0e-12
             assert np.max(

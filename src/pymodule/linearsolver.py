@@ -23,6 +23,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from pathlib import Path
+from datetime import datetime
 import numpy as np
 import time as tm
 import sys
@@ -35,7 +37,6 @@ from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver
-from .veloxchemlib import XCFunctional
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
@@ -48,7 +49,7 @@ from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
+from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .checkpoint import write_rsp_hdf5
@@ -91,12 +92,11 @@ class LinearSolver:
         - ostream: The output stream.
         - restart: The flag for restarting from checkpoint file.
         - checkpoint_file: The name of checkpoint file.
-        - program_start_time: The start time of the program.
-        - maximum_hours: The timelimit in hours.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation.
+        - program_end_time: The end time of the program.
         - filename: The filename.
         - dist_bger: The distributed gerade trial vectors.
         - dist_bung: The distributed ungerade trial vectors.
@@ -120,7 +120,7 @@ class LinearSolver:
         # dft
         self.dft = False
         self.grid_level = 4
-        self.xcfun = XCFunctional()
+        self.xcfun = None
 
         # polarizable embedding
         self.pe = False
@@ -153,34 +153,69 @@ class LinearSolver:
         self.restart = True
         self.checkpoint_file = None
 
-        # information for graceful exit
-        self.program_start_time = None
-        self.maximum_hours = None
-
         # timing and profiling
         self.timing = False
         self.profiling = False
         self.memory_profiling = False
         self.memory_tracing = False
 
-        # filename
-        self.filename = None
+        # program end time for graceful exit
+        self.program_end_time = None
 
+        # filename
+        self.filename = f'veloxchem_rsp_{get_datetime_string()}'
+
+        # distributed arrays
         self.dist_bger = None
         self.dist_bung = None
         self.dist_e2bger = None
         self.dist_e2bung = None
 
+        # nonlinear flag and distributed Fock matrices
         self.nonlinear = False
         self.dist_fock_ger = None
         self.dist_fock_ung = None
+
+        # input keywords
+        self.input_keywords = {
+            'response': {
+                'eri_thresh': ('float', 'ERI screening threshold'),
+                'qq_type': ('str_upper', 'ERI screening scheme'),
+                'batch_size': ('int', 'batch size for Fock build'),
+                'conv_thresh': ('float', 'convergence threshold'),
+                'max_iter': ('int', 'maximum number of iterations'),
+                'lindep_thresh': ('float', 'threshold for linear dependence'),
+                'restart': ('bool', 'restart from checkpoint file'),
+                'checkpoint_file': ('str', 'name of checkpoint file'),
+                'timing': ('bool', 'print timing information'),
+                'profiling': ('bool', 'print profiling information'),
+                'memory_profiling': ('bool', 'print memory usage'),
+                'memory_tracing': ('bool', 'trace memory allocation'),
+            },
+            'method_settings': {
+                'dft': ('bool', 'use DFT'),
+                'xcfun': ('str_upper', 'exchange-correlation functional'),
+                'grid_level': ('int', 'accuracy level of DFT grid'),
+                'pe': ('bool', 'use polarizable embedding'),
+                'potfile': ('str', 'potential file for polarizable embedding'),
+                'electric_field': ('seq_fixed', 'static electric field'),
+                'use_split_comm': ('bool', 'use split communicators'),
+            },
+        }
+
+    def print_keywords(self):
+        """
+        Prints input keywords in linear solver.
+        """
+
+        print_keywords(self.input_keywords, self.ostream)
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in linear solver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -189,35 +224,21 @@ class LinearSolver:
             method_dict = {}
 
         rsp_keywords = {
-            'eri_thresh': 'float',
-            'qq_type': 'str_upper',
-            'batch_size': 'int',
-            'conv_thresh': 'float',
-            'max_iter': 'int',
-            'lindep_thresh': 'float',
-            'restart': 'bool',
-            'checkpoint_file': 'str',
-            'timing': 'bool',
-            'profiling': 'bool',
-            'memory_profiling': 'bool',
-            'memory_tracing': 'bool',
+            key: val[0] for key, val in self.input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
 
-        if 'program_start_time' in rsp_dict:
-            self.program_start_time = rsp_dict['program_start_time']
-        if 'maximum_hours' in rsp_dict:
-            self.maximum_hours = rsp_dict['maximum_hours']
+        if 'program_end_time' in rsp_dict:
+            self.program_end_time = rsp_dict['program_end_time']
         if 'filename' in rsp_dict:
             self.filename = rsp_dict['filename']
+            if 'checkpoint_file' not in rsp_dict:
+                self.checkpoint_file = f'{self.filename}.rsp.h5'
 
         method_keywords = {
-            'dft': 'bool',
-            'grid_level': 'int',
-            'pe': 'bool',
-            'electric_field': 'seq_fixed',
-            'use_split_comm': 'bool',
+            key: val[0]
+            for key, val in self.input_keywords['method_settings'].items()
         }
 
         parse_input(self, method_keywords, method_dict)
@@ -227,7 +248,7 @@ class LinearSolver:
                 self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Linear solver: Undefined XC functional')
+                                'LinearSolver: Undefined XC functional')
 
         if 'pe_options' not in method_dict:
             method_dict['pe_options'] = {}
@@ -243,12 +264,15 @@ class LinearSolver:
                     'potfile' not in method_dict['pe_options']):
                 method_dict['pe_options']['potfile'] = method_dict['potfile']
             assert_msg_critical('potfile' in method_dict['pe_options'],
-                                'SCF driver: No potential file defined')
+                                'LinearSolver: No potential file defined')
             self.pe_options = dict(method_dict['pe_options'])
 
             cppe_potfile = None
             if self.rank == mpi_master():
                 potfile = self.pe_options['potfile']
+                if not Path(potfile).is_file():
+                    potfile = str(
+                        Path(self.filename).parent / Path(potfile).name)
                 cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
             cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
             self.pe_options['potfile'] = cppe_potfile
@@ -256,10 +280,10 @@ class LinearSolver:
         if self.electric_field is not None:
             assert_msg_critical(
                 len(self.electric_field) == 3,
-                'Linear solver: Expecting 3 values in \'electric field\' input')
+                'LinearSolver: Expecting 3 values in \'electric field\' input')
             assert_msg_critical(
                 not self.pe,
-                'Linear solver: \'electric field\' input is incompatible ' +
+                'LinearSolver: \'electric field\' input is incompatible ' +
                 'with polarizable embedding')
             # disable restart of calculation with static electric field since
             # checkpoint file does not contain information about the electric
@@ -314,8 +338,16 @@ class LinearSolver:
             The dictionary of DFT information.
         """
 
-        # generate integration grid
         if self.dft:
+            # check dft setup
+            assert_msg_critical(self.xcfun is not None,
+                                'LinearSolver: Undefined XC functional')
+            if isinstance(self.xcfun, str):
+                self.xcfun = parse_xc_func(self.xcfun.upper())
+                assert_msg_critical(not self.xcfun.is_undefined(),
+                                    'LinearSolver: Undefined XC functional')
+
+            # generate integration grid
             grid_drv = GridDriver(self.comm)
             grid_drv.set_level(self.grid_level)
 
@@ -389,9 +421,9 @@ class LinearSolver:
             'potfile_text': potfile_text,
         }
 
-    def read_vectors(self, rsp_vector_labels):
+    def read_checkpoint(self, rsp_vector_labels):
         """
-        Reads vectors from checkpoint file.
+        Reads distributed arrays from checkpoint file.
 
         :param rsp_vector_labels:
             The list of labels of vectors.
@@ -487,7 +519,7 @@ class LinearSolver:
         else:
             self.dist_fock_ung.append(fock_ung, axis=1)
 
-    def compute(self, molecule, basis, scf_tensors, v1=None):
+    def compute(self, molecule, basis, scf_tensors, v_grad=None):
         """
         Solves for the linear equations.
 
@@ -497,9 +529,9 @@ class LinearSolver:
             The AO basis.
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
-        :param v1:
-            The gradients on the right-hand side. If not provided, v1 will be
-            computed for the B operator.
+        :param v_grad:
+            The gradients on the right-hand side. If not provided, v_grad will
+            be computed for the B operator.
 
         :return:
             A dictionary containing response functions, solutions, etc.
@@ -507,8 +539,16 @@ class LinearSolver:
 
         return None
 
-    def e2n_half_size(self, vecs_ger, vecs_ung, molecule, basis, scf_tensors,
-                      eri_dict, dft_dict, pe_dict, timing_dict):
+    def e2n_half_size(self,
+                      vecs_ger,
+                      vecs_ung,
+                      molecule,
+                      basis,
+                      scf_tensors,
+                      eri_dict,
+                      dft_dict,
+                      pe_dict,
+                      profiler=None):
         """
         Computes the E2 b matrix vector product.
 
@@ -528,8 +568,8 @@ class LinearSolver:
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
-        :param timing_dict:
-            The dictionary containing timing information.
+        :param profiler:
+            The profiler.
 
         :return:
             The gerade and ungerade E2 b matrix vector product in half-size.
@@ -544,12 +584,12 @@ class LinearSolver:
         if self.rank == mpi_master():
             assert_msg_critical(
                 vecs_ger.data.ndim == 2 and vecs_ung.data.ndim == 2,
-                'LinearResponse.e2n_half_size: '
+                'LinearSolver.e2n_half_size: '
                 'invalid shape of trial vectors')
 
             assert_msg_critical(
                 vecs_ger.shape(0) == vecs_ung.shape(0),
-                'LinearResponse.e2n_half_size: '
+                'LinearSolver.e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
             mo = scf_tensors['C_alpha']
@@ -627,7 +667,7 @@ class LinearSolver:
             fock = AOFockMatrix(dens)
 
             self.comp_lr_fock(fock, dens, molecule, basis, eri_dict, dft_dict,
-                              pe_dict, timing_dict)
+                              pe_dict, profiler)
 
             e2_ger = None
             e2_ung = None
@@ -700,8 +740,15 @@ class LinearSolver:
 
         self.ostream.print_blank()
 
-    def comp_lr_fock(self, fock, dens, molecule, basis, eri_dict, dft_dict,
-                     pe_dict, timing_dict):
+    def comp_lr_fock(self,
+                     fock,
+                     dens,
+                     molecule,
+                     basis,
+                     eri_dict,
+                     dft_dict,
+                     pe_dict,
+                     profiler=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -719,8 +766,8 @@ class LinearSolver:
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
-        :param timing_dict:
-            The dictionary containing timing information.
+        :param profiler:
+            The profiler.
         """
 
         screening = eri_dict['screening']
@@ -755,8 +802,8 @@ class LinearSolver:
             t0 = tm.time()
             eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
             eri_drv.compute(fock, dens, molecule, basis, screening)
-            if timing_dict is not None:
-                timing_dict['ERI'] = tm.time() - t0
+            if profiler is not None:
+                profiler.add_timing_info('ERI', tm.time() - t0)
 
             if self.dft:
                 t0 = tm.time()
@@ -767,8 +814,8 @@ class LinearSolver:
                 molgrid.distribute(self.rank, self.nodes, self.comm)
                 xc_drv.integrate(fock, dens, gs_density, molecule, basis,
                                  molgrid, self.xcfun.get_func_label())
-                if timing_dict is not None:
-                    timing_dict['DFT'] = tm.time() - t0
+                if profiler is not None:
+                    profiler.add_timing_info('DFT', tm.time() - t0)
 
             if self.pe:
                 t0 = tm.time()
@@ -778,8 +825,8 @@ class LinearSolver:
                     e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
                     if self.rank == mpi_master():
                         fock.add_matrix(DenseMatrix(V_pe), ifock)
-                if timing_dict is not None:
-                    timing_dict['PE'] = tm.time() - t0
+                if profiler is not None:
+                    profiler.add_timing_info('PE', tm.time() - t0)
 
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
@@ -1004,9 +1051,9 @@ class LinearSolver:
             True if a graceful exit is needed, False otherwise.
         """
 
-        if self.maximum_hours is not None:
-            remaining_hours = (self.maximum_hours -
-                               (tm.time() - self.program_start_time) / 3600)
+        if self.program_end_time is not None:
+            remaining_hours = (self.program_end_time -
+                               datetime.now()).total_seconds() / 3600
             # exit gracefully when the remaining time is not sufficient to
             # complete the next iteration (plus 25% to be on the safe side).
             if remaining_hours < next_iter_in_hours * 1.25:
@@ -1128,10 +1175,12 @@ class LinearSolver:
             A tuple containing gerade and ungerade parts of gradient.
         """
 
-        assert_msg_critical(grad.ndim == 1, 'decomp_grad: Expecting a 1D array')
+        assert_msg_critical(grad.ndim == 1,
+                            'LinearSolver.decomp_grad: Expecting a 1D array')
 
-        assert_msg_critical(grad.shape[0] % 2 == 0,
-                            'decomp_grad: size of array should be even')
+        assert_msg_critical(
+            grad.shape[0] % 2 == 0,
+            'LinearSolver.decomp_grad: size of array should be even')
 
         half_size = grad.shape[0] // 2
 
@@ -1260,7 +1309,7 @@ class LinearSolver:
                 'dipole', 'electric dipole', 'electric_dipole',
                 'linear_momentum', 'linear momentum', 'angular_momentum',
                 'angular momentum', 'magnetic dipole', 'magnetic_dipole'
-            ], 'get_prop_grad: unsupported operator {}'.format(operator))
+            ], f'LinearSolver.get_prop_grad: unsupported operator {operator}')
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
@@ -1357,7 +1406,8 @@ class LinearSolver:
                 'linear_momentum', 'linear momentum', 'angular_momentum',
                 'angular momentum', 'magnetic dipole', 'magnetic_dipole'
             ],
-            'get_complex_prop_grad: unsupported operator {}'.format(operator))
+            f'LinearSolver.get_complex_prop_grad: unsupported operator {operator}'
+        )
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
@@ -1397,9 +1447,9 @@ class LinearSolver:
             angmom_mats = angmom_drv.compute(molecule, basis)
 
             if self.rank == mpi_master():
-                integrals = (-0.5j * angmom_mats.x_to_numpy(),
-                             -0.5j * angmom_mats.y_to_numpy(),
-                             -0.5j * angmom_mats.z_to_numpy())
+                integrals = (0.5j * angmom_mats.x_to_numpy(),
+                             0.5j * angmom_mats.y_to_numpy(),
+                             0.5j * angmom_mats.z_to_numpy())
             else:
                 integrals = tuple()
 
@@ -1666,7 +1716,7 @@ class LinearSolver:
             The MO coefficients of virtual orbitals.
 
         :return:
-            The lambda values (1D array) and the NTO coefficients (2D array).
+            The NTOs as a MolecularOrbitals object.
         """
 
         # SVD
@@ -1680,17 +1730,24 @@ class LinearSolver:
 
         # NTOs including holes and particles
         nto_orbs = np.concatenate((nto_occ, nto_vir), axis=1)
-        nto_ener = np.zeros(nto_orbs.shape[1])
-        nto_mo = MolecularOrbitals([nto_orbs], [nto_ener], molorb.rest)
 
-        return lam_diag, nto_mo
+        nto_lam = np.zeros(nto_orbs.shape[1])
+        nocc = nto_occ.shape[1]
+        for i_nto in range(lam_diag.size):
+            nto_lam[nocc - 1 - i_nto] = -lam_diag[i_nto]
+            nto_lam[nocc + i_nto] = lam_diag[i_nto]
+
+        nto_ener = np.zeros(nto_orbs.shape[1])
+        nto_mo = MolecularOrbitals([nto_orbs], [nto_ener], [nto_lam],
+                                   molorb.rest)
+
+        return nto_mo
 
     def write_nto_cubes(self,
                         cubic_grid,
                         molecule,
                         basis,
                         root,
-                        lam_diag,
                         nto_mo,
                         nto_pairs=None,
                         nto_thresh=0.1):
@@ -1705,8 +1762,6 @@ class LinearSolver:
             The AO basis set.
         :param root:
             The index of the root (0-based).
-        :param lam_diag:
-            The lambda values (1D array).
         :param nto_mo:
             The NTO coefficients (2D array).
         :param nto_pairs:
@@ -1715,7 +1770,7 @@ class LinearSolver:
             The threshold for writing NTO to cube file.
 
         :return:
-            The list containing the names of the cube files.
+            Values of lambda and names of cube files.
         """
 
         filenames = []
@@ -1723,6 +1778,8 @@ class LinearSolver:
         vis_drv = VisualizationDriver(self.comm)
 
         nocc = molecule.number_of_alpha_electrons()
+        nvir = nto_mo.number_mos() - nocc
+        lam_diag = nto_mo.occa_to_numpy()[nocc:nocc + min(nocc, nvir)]
 
         for i_nto in range(lam_diag.size):
             if lam_diag[i_nto] < nto_thresh:
@@ -1767,7 +1824,7 @@ class LinearSolver:
 
         self.ostream.print_blank()
 
-        return filenames
+        return lam_diag, filenames
 
     def get_detach_attach_densities(self, z_mat, y_mat, mo_occ, mo_vir):
         """

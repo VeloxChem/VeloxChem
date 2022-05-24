@@ -48,7 +48,6 @@ from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
 from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, create_hdf5,
                          write_rsp_solution)
 
@@ -102,13 +101,25 @@ class TDAExciDriver(LinearSolver):
         self.cube_stepsize = None
         self.cube_points = [80, 80, 80]
 
+        self.input_keywords['response'].update({
+            'nstates': ('int', 'number of excited states'),
+            'nto': ('bool', 'analyze natural transition orbitals'),
+            'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
+            'detach_attach': ('bool', 'analyze detachment/attachment density'),
+            'cube_origin': ('seq_fixed', 'origin of cubic grid points'),
+            'cube_stepsize': ('seq_fixed', 'step size of cubic grid points'),
+            'cube_points': ('seq_fixed_int', 'number of cubic grid points'),
+        })
+
+        self.input_keywords['response'].pop('lindep_thresh', None)
+
     def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates response and method settings in TDA excited states computation
         driver.
 
         :param rsp_dict:
-            The dictionary of response dict.
+            The dictionary of response input.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -117,18 +128,6 @@ class TDAExciDriver(LinearSolver):
             method_dict = {}
 
         super().update_settings(rsp_dict, method_dict)
-
-        rsp_keywords = {
-            'nstates': 'int',
-            'nto': 'bool',
-            'nto_pairs': 'int',
-            'detach_attach': 'bool',
-            'cube_origin': 'seq_fixed',
-            'cube_stepsize': 'seq_fixed',
-            'cube_points': 'seq_fixed_int',
-        }
-
-        parse_input(self, rsp_keywords, rsp_dict)
 
         if self.cube_origin is not None:
             assert_msg_critical(
@@ -183,8 +182,12 @@ class TDAExciDriver(LinearSolver):
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
+            n_ao = scf_tensors['C_alpha'].shape[0]
+            # recreate an aufbau since occupation is not stored in scf_tensors
+            occ_alpha = molecule.get_aufbau_occupation(n_ao, 'restricted')
             mol_orbs = MolecularOrbitals([scf_tensors['C_alpha']],
-                                         [scf_tensors['E_alpha']], molorb.rest)
+                                         [scf_tensors['E_alpha']], [occ_alpha],
+                                         molorb.rest)
         else:
             mol_orbs = MolecularOrbitals()
 
@@ -202,8 +205,6 @@ class TDAExciDriver(LinearSolver):
 
         # PE information
         pe_dict = self.init_pe(molecule, basis)
-
-        timing_dict = {}
 
         # set up trial excitation vectors on master node
 
@@ -240,7 +241,9 @@ class TDAExciDriver(LinearSolver):
 
         for i in range(self.max_iter):
 
-            profiler.start_timer(i, 'FockBuild')
+            profiler.set_timing_key(f'Iteration {i+1}')
+
+            profiler.start_timer('FockBuild')
 
             # perform linear transformation of trial vectors
 
@@ -249,10 +252,10 @@ class TDAExciDriver(LinearSolver):
                     trial_mat, scf_tensors, molecule)
 
                 self.comp_lr_fock(fock, tdens, molecule, basis, eri_dict,
-                                  dft_dict, pe_dict, timing_dict)
+                                  dft_dict, pe_dict, profiler)
 
-            profiler.stop_timer(i, 'FockBuild')
-            profiler.start_timer(i, 'ReducedSpace')
+            profiler.stop_timer('FockBuild')
+            profiler.start_timer('ReducedSpace')
 
             # solve eigenvalues problem on master node
 
@@ -275,11 +278,9 @@ class TDAExciDriver(LinearSolver):
 
                 self.print_iter_data(i)
 
-            profiler.stop_timer(i, 'ReducedSpace')
-            if self.dft or self.pe:
-                profiler.update_timer(i, timing_dict)
+            profiler.stop_timer('ReducedSpace')
 
-            profiler.check_memory_usage('Iteration {:d}'.format(i + 1))
+            profiler.check_memory_usage(f'Iteration {i+1}')
 
             profiler.print_memory_tracing(self.ostream)
 
@@ -318,7 +319,6 @@ class TDAExciDriver(LinearSolver):
         # print converged excited states
 
         if self.rank == mpi_master() and self.is_converged:
-            nocc = molecule.number_of_alpha_electrons()
             mo_occ = scf_tensors['C_alpha'][:, :nocc].copy()
             mo_vir = scf_tensors['C_alpha'][:, nocc:].copy()
 
@@ -360,16 +360,13 @@ class TDAExciDriver(LinearSolver):
                 self.ostream.flush()
 
                 if self.rank == mpi_master():
-                    lam_diag, nto_mo = self.get_nto(t_mat, mo_occ, mo_vir)
+                    nto_mo = self.get_nto(t_mat, mo_occ, mo_vir)
                 else:
-                    lam_diag = None
                     nto_mo = MolecularOrbitals()
-                lam_diag = self.comm.bcast(lam_diag, root=mpi_master())
                 nto_mo.broadcast(self.rank, self.comm)
 
-                nto_cube_fnames = self.write_nto_cubes(cubic_grid, molecule,
-                                                       basis, s, lam_diag,
-                                                       nto_mo, self.nto_pairs)
+                lam_diag, nto_cube_fnames = self.write_nto_cubes(
+                    cubic_grid, molecule, basis, s, nto_mo, self.nto_pairs)
 
                 if self.rank == mpi_master():
                     nto_lambdas.append(lam_diag)
@@ -727,11 +724,11 @@ class TDAExciDriver(LinearSolver):
             The TDA eigenvectors (in columns).
         """
 
-        if self.checkpoint_file is not None:
-            final_h5_fname = str(
-                Path(self.checkpoint_file).with_suffix('.solutions.h5'))
-        else:
-            final_h5_fname = 'rsp.solutions.h5'
+        if self.checkpoint_file is None:
+            return
+
+        final_h5_fname = str(
+            Path(self.checkpoint_file).with_suffix('.solutions.h5'))
 
         create_hdf5(final_h5_fname, molecule, basis, dft_func_label,
                     potfile_text)

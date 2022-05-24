@@ -40,16 +40,17 @@ from .optimizationengine import OptimizationEngine
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .veloxchemlib import CommonNeighbors
+from .inputparser import print_keywords, get_datetime_string
 
 
 class OptimizationDriver:
     """
     Implements optimization driver.
 
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
+    :param grad_drv:
+        The gradient driver.
+    :param flag:
+        The flag ("SCF" or "XTB").
 
     Instance variables
         - rank: The rank of MPI process.
@@ -67,7 +68,7 @@ class OptimizationDriver:
           CNA analysis.
     """
 
-    def __init__(self, filename, grad_drv, flag):
+    def __init__(self, grad_drv, flag):
         """
         Initializes optimization driver.
         """
@@ -89,7 +90,7 @@ class OptimizationDriver:
 
         self.ref_xyz = None
 
-        self.filename = filename
+        self.filename = f'veloxchem_opt_{get_datetime_string()}'
         self.grad_drv = grad_drv
         self.flag = flag
         
@@ -98,15 +99,35 @@ class OptimizationDriver:
         self.cna_rcut = None
         
 
+        # input keywords
+        self.input_keywords = {
+            'optimize': {
+                'coordsys': ('str_lower', 'coordinate system'),
+                'constraints': ('list', 'constraints'),
+                'check_interval':
+                    ('int', 'interval for checking coordinate system'),
+                'max_iter': ('int', 'maximum number of optimization steps'),
+                'ref_xyz': ('str', 'reference geometry'),
+            },
+        }
+
+    def print_keywords(self):
+        """
+        Prints input keywords in optimization driver.
+        """
+
+        print_keywords(self.input_keywords, self.ostream)
+
     def update_settings(self, opt_dict):
         """
         Updates settings in optimization driver.
 
         :param opt_dict:
-            The input dictionary of optimize group.
+            The dictionary of optimize input.
         """
 
         opt_keywords = {
+<<<<<<< HEAD
             'coordsys': 'str_lower',
             'constraints': 'list',
             'check_interval': 'int',
@@ -120,6 +141,9 @@ class OptimizationDriver:
             'cna': 'bool',
             'cna_bond': 'float',
             'cna_rcut': 'float',
+=======
+            key: val[0] for key, val in self.input_keywords['optimize'].items()
+>>>>>>> b1869c9deb16f4b75433cf30baab84be41b6d8f5
         }
 
         parse_input(self, opt_keywords, opt_dict)
@@ -135,6 +159,9 @@ class OptimizationDriver:
             self.cna_rcut = 4.5
         else:
             self.cna_rcut /= bohr_in_angstroms() 
+
+        if 'filename' in opt_dict:
+            self.filename = opt_dict['filename']
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
@@ -201,7 +228,7 @@ class OptimizationDriver:
                         maxiter=self.max_iter,
                         converge=self.conv_flags(), 
                         constraints=constr_filename,
-                        input=filename,
+                        input=filename + '.optinp',
                         logIni=str(log_ini))
 
         coords = m.xyzs[-1] / geometric.nifty.bohr2ang
