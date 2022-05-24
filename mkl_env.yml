@@ -18,6 +18,8 @@ dependencies:
   - openmm
   - scipy
   - gtest
+  - gmock
+  - cmake
   - cppe
   - xtb
   - veloxchem::geometric
