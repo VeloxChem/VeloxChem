@@ -767,7 +767,6 @@ CVisualizationDriver::getDensity(const std::vector<std::vector<double>>& coords,
                                  const CMolecule&                        molecule,
                                  const CMolecularBasis&                  basis,
                                  const CAODensityMatrix&                 density,
-                                 const int32_t                           denidx,
                                  const std::string&                      denspin) const
 {
     if (_locRank == mpi::master())
@@ -782,11 +781,13 @@ CVisualizationDriver::getDensity(const std::vector<std::vector<double>>& coords,
 
         errors::assertMsgCritical(alphaspin || betaspin, errspin);
 
-        std::string erridx("VisualizationDriver.get_density: invalid index for density matrix");
+        std::string erridx("VisualizationDriver.get_density: multiple density matrices not supported");
 
         auto numdens = density.getNumberOfDensityMatrices();
 
-        errors::assertMsgCritical(0 <= denidx && denidx < numdens, erridx);
+        errors::assertMsgCritical(numdens == 1, erridx);
+
+        const int32_t denidx = 0;
 
         // compute density
 
@@ -823,7 +824,6 @@ CVisualizationDriver::getOneParticleDensity(const std::vector<std::vector<double
                                             const CMolecule&                        molecule,
                                             const CMolecularBasis&                  basis,
                                             const CAODensityMatrix&                 density,
-                                            const int32_t                           denidx,
                                             const std::string&                      spin_1,
                                             const std::string&                      spin_2) const
 {
@@ -835,6 +835,12 @@ CVisualizationDriver::getOneParticleDensity(const std::vector<std::vector<double
         }
 
         bool alphaspin = (fstr::upcase(spin_1) == std::string("ALPHA"));
+
+        // Note: getOneParticleDensity is only called by getTwoParticleDensity
+        // which guarantees that density.getNumberOfDensityMatrices() == 1 and
+        // we therefore use denidx == 0
+
+        const int32_t denidx = 0;
 
         // compute density
 
@@ -873,7 +879,6 @@ CVisualizationDriver::getTwoParticleDensity(const std::vector<std::vector<double
                                             const CMolecule&                        molecule,
                                             const CMolecularBasis&                  basis,
                                             const CAODensityMatrix&                 density,
-                                            const int32_t                           denidx,
                                             const std::string&                      spin_1,
                                             const std::string&                      spin_2) const
 {
@@ -895,21 +900,21 @@ CVisualizationDriver::getTwoParticleDensity(const std::vector<std::vector<double
 
         errors::assertMsgCritical(alphaspin_2 || betaspin_2, errspin);
 
-        std::string erridx("VisualizationDriver.get_two_particle_density: invalid index for density matrix");
+        std::string erridx("VisualizationDriver.get_two_particle_density: multiple density matrices not supported");
 
         auto numdens = density.getNumberOfDensityMatrices();
 
-        errors::assertMsgCritical(0 <= denidx && denidx < numdens, erridx);
+        errors::assertMsgCritical(numdens == 1, erridx);
 
         // compute density
 
-        auto g_11 = getOneParticleDensity(coords_1, coords_1, molecule, basis, density, denidx, spin_1, spin_1);
+        auto g_11 = getOneParticleDensity(coords_1, coords_1, molecule, basis, density, spin_1, spin_1);
 
-        auto g_22 = getOneParticleDensity(coords_2, coords_2, molecule, basis, density, denidx, spin_2, spin_2);
+        auto g_22 = getOneParticleDensity(coords_2, coords_2, molecule, basis, density, spin_2, spin_2);
 
-        auto g_12 = getOneParticleDensity(coords_1, coords_2, molecule, basis, density, denidx, spin_1, spin_2);
+        auto g_12 = getOneParticleDensity(coords_1, coords_2, molecule, basis, density, spin_1, spin_2);
 
-        auto g_21 = getOneParticleDensity(coords_2, coords_1, molecule, basis, density, denidx, spin_2, spin_1);
+        auto g_21 = getOneParticleDensity(coords_2, coords_1, molecule, basis, density, spin_2, spin_1);
 
         auto npoints = static_cast<int32_t>(coords_1.size());
 

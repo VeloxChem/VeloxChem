@@ -233,14 +233,12 @@ class CVisualizationDriver
      @param molecule the molecule.
      @param basis the basis set for the molecule.
      @param density the density matrix of the molecule.
-     @param denidx the index of the density matrix (0-based).
      @param denspin the spin of the density matrix ('alpha' or 'beta').
      */
     std::vector<double> getDensity(const std::vector<std::vector<double>>& coords,
                                    const CMolecule&                        molecule,
                                    const CMolecularBasis&                  basis,
                                    const CAODensityMatrix&                 density,
-                                   const int32_t                           denidx,
                                    const std::string&                      denspin) const;
 
     /**
@@ -251,7 +249,6 @@ class CVisualizationDriver
      @param molecule the molecule.
      @param basis the basis set for the molecule.
      @param density the density matrix of the molecule.
-     @param denidx the index of the density matrix (0-based).
      @param spin_1 the spin of x1 ('alpha' or 'beta').
      @param spin_2 the spin of x2 ('alpha' or 'beta').
      */
@@ -260,7 +257,6 @@ class CVisualizationDriver
                                               const CMolecule&                        molecule,
                                               const CMolecularBasis&                  basis,
                                               const CAODensityMatrix&                 density,
-                                              const int32_t                           denidx,
                                               const std::string&                      spin_1,
                                               const std::string&                      spin_2) const;
 
@@ -272,7 +268,6 @@ class CVisualizationDriver
      @param molecule the molecule.
      @param basis the basis set for the molecule.
      @param density the density matrix of the molecule.
-     @param denidx the index of the density matrix (0-based).
      @param spin_1 the spin of x1 ('alpha' or 'beta').
      @param spin_2 the spin of x2 ('alpha' or 'beta').
      */
@@ -281,7 +276,6 @@ class CVisualizationDriver
                                               const CMolecule&                        molecule,
                                               const CMolecularBasis&                  basis,
                                               const CAODensityMatrix&                 density,
-                                              const int32_t                           denidx,
                                               const std::string&                      spin_1,
                                               const std::string&                      spin_2) const;
 };
