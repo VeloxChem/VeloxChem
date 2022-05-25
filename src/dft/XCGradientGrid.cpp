@@ -185,7 +185,6 @@ CXCGradientGrid::xcGradientValues(const xcvars gradientType) const
     if (gradientType == xcvars::gradb)
     {
         return _xcValues.data(4);
-
     }
     
     if (gradientType == xcvars::gradab)
@@ -206,12 +205,12 @@ CXCGradientGrid::xcGradientValues(const xcvars gradientType)
     
     if (gradientType == xcvars::rhob)
     {
-         return _xcValues.data(2);
+        return _xcValues.data(2);
     }
     
     if (gradientType == xcvars::grada)
     {
-         return _xcValues.data(3);
+        return _xcValues.data(3);
     }
     
     if (gradientType == xcvars::gradb)
