@@ -41,6 +41,7 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import TwoIndexes
 from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import ExcitationVector
+from .veloxchemlib import XCIntegrator
 
 # C++ functions
 from .veloxchemlib import available_functionals
@@ -58,6 +59,7 @@ from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import extinction_coefficient_from_beta
 from .veloxchemlib import fine_structure_constant
 from .veloxchemlib import mathconst_pi
+from .veloxchemlib import parse_xc_func
 
 # C++ enums
 from .veloxchemlib import denmat

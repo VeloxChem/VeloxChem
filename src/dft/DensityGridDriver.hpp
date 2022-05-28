@@ -376,6 +376,39 @@ class CDensityGridDriver
                           const CMolecularBasis&  basis,
                           const CMolecularGrid&   molecularGrid,
                           const xcfun             xcFunctional);
+
+
+    CDensityGrid pdft(const CAODensityMatrix& aoDensityMatrix,
+                         double* twoDM,
+                         double* activeMOs,
+                         int nActive,
+                             const CMolecule&        molecule,
+                             const CMolecularBasis&  basis,
+                             const CMolecularGrid&   molecularGrid,
+                             const xcfun             xcFunctional);
+
+    void _PDFT_Lda(      CDensityGrid*     densityGrid,
+                         const CAODensityMatrix* aoDensityMatrix,
+                         double* twoDM,
+                         double* activeMOs,
+                         int nActive,
+                         const CGtoContainer*    gtoContainer,
+                         const double*           gridCoordinatesX,
+                         const double*           gridCoordinatesY,
+                         const double*           gridCoordinatesZ,
+                         const int32_t           gridOffset,
+                         const int32_t           nGridPoints) const;
+
+    void _distPDFT_LDA(      CDensityGrid*        densityGrid,
+                                        double* twoDM,
+                                        double* activeMOs,
+                                        int nActive,
+                                        int nAOs,
+                                        const CMemBlock2D<double>& gtoValues,
+                                        const int32_t              gridOffset,
+                                        const int32_t              gridBlockPosition,
+                                        const int32_t              nGridPoints) const;
+
 };
 
 #endif /* DensityGridDriver_hpp */

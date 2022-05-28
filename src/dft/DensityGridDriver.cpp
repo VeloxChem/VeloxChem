@@ -961,3 +961,258 @@ CDensityGridDriver::_getSizeOfBlock() const
 {
     return 500; 
 }
+
+
+CDensityGrid
+CDensityGridDriver::pdft(const CAODensityMatrix& aoDensityMatrix,
+                         double* twoDM,
+                         double* activeMOs,
+                         int nActive,
+                             const CMolecule&        molecule,
+                             const CMolecularBasis&  basis,
+                             const CMolecularGrid&   molecularGrid,
+                             const xcfun             xcFunctional)
+{
+    // initialize density grid
+
+    CDensityGrid densityGrid(molecularGrid.getNumberOfGridPoints(), aoDensityMatrix.getNumberOfDensityMatrices(),
+                       xcFunctional, dengrid::ab);
+
+    densityGrid.zero();
+
+    // set up OMP tasks
+
+    COMPTasks omptaks(5);
+
+    omptaks.set(molecularGrid.getNumberOfGridPoints());
+
+    auto ntasks = omptaks.getNumberOfTasks();
+
+    auto tbsizes = omptaks.getTaskSizes();
+
+    auto tbpositions = omptaks.getTaskPositions();
+
+    // create GTOs container
+
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+
+    // set up molecular grid data
+
+    auto mgx = molecularGrid.getCoordinatesX();
+
+    auto mgy = molecularGrid.getCoordinatesY();
+   
+    auto mgz = molecularGrid.getCoordinatesZ();
+   
+    // set up pointer to density matrix
+   
+    auto denptr = &aoDensityMatrix;
+   
+    // set up poinet to density grid
+   
+    auto dgridptr = &densityGrid;
+   
+    // generate density on grid points
+   
+    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
+    {
+        #pragma omp single nowait
+        {
+            for (int32_t i = 0; i < ntasks; i++)
+            {
+                // set up task parameters
+
+                auto tbsize = tbsizes[i];
+
+                auto tbposition = tbpositions[i];
+
+                // generate task
+
+                if (xcFunctional == xcfun::lda)
+                {
+                    #pragma omp task firstprivate(tbsize, tbposition)
+                    {
+                        _PDFT_Lda(dgridptr, denptr, twoDM, activeMOs, nActive, gtovec, mgx, mgy, mgz, tbposition, tbsize);
+                    }
+                }
+/*
+                else if (xcFunctional == xcfun::gga)
+                {
+                    #pragma omp task firstprivate(tbsize, tbposition)
+                    {
+                        _PDFT_Gga(dgridptr, denptr, twoDM, activeMOs, nActive, gtovec, mgx, mgy, mgz, tbposition, tbsize);
+                    }
+                }
+*/
+                
+            }
+        }
+    }
+   
+    //Why only GGA?
+    if (xcFunctional == xcfun::gga)
+    {
+        // finalize density grid
+
+        densityGrid.computeDensityNorms();
+    }
+
+    // destroy GTOs container
+
+    delete gtovec;
+
+    return densityGrid;
+}
+
+void
+CDensityGridDriver::_PDFT_Lda(      CDensityGrid*     densityGrid,
+                                    const CAODensityMatrix* aoDensityMatrix,
+                                    double* twoDM,
+                                    double* activeMOs,
+                                    int nActive,
+                                    const CGtoContainer*    gtoContainer,
+                                    const double*           gridCoordinatesX,
+                                    const double*           gridCoordinatesY,
+                                    const double*           gridCoordinatesZ,
+                                    const int32_t           gridOffset,
+                                    const int32_t           nGridPoints) const
+{
+    // set up number of AOs
+
+    auto naos = gtoContainer->getNumberOfAtomicOrbitals();
+
+    // determine number of grid blocks
+
+    auto blockdim = _getSizeOfBlock();
+
+    auto nblocks = nGridPoints / blockdim;
+
+    // set up current grid point
+
+    int32_t igpnt = 0;
+
+    // loop over grid points blocks
+
+    if (nblocks > 0)
+    {
+        CMemBlock2D<double> gaos(blockdim, naos);
+
+        for (int32_t i = 0; i < nblocks; i++)
+        {
+            gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, igpnt, blockdim);
+
+            _distRestrictedDensityValuesForLda(densityGrid, aoDensityMatrix, gaos, gridOffset, igpnt, blockdim);
+
+            _distPDFT_LDA(densityGrid,twoDM, activeMOs, nActive, naos, gaos, gridOffset, igpnt, blockdim);
+
+            igpnt += blockdim;
+        }
+    }
+    // compute remaining grid points block
+
+    blockdim = nGridPoints % blockdim;
+
+    if (blockdim > 0)
+    {
+        CMemBlock2D<double> gaos(blockdim, naos);
+
+        gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, igpnt, blockdim);
+
+        _distRestrictedDensityValuesForLda(densityGrid, aoDensityMatrix, gaos, gridOffset, igpnt, blockdim);
+        _distPDFT_LDA(densityGrid,twoDM, activeMOs, nActive, naos, gaos, gridOffset, igpnt, blockdim);
+    }
+}
+
+void
+CDensityGridDriver::_distPDFT_LDA(      CDensityGrid*        densityGrid,
+                                        double* twoDM,
+                                        double* activeMOs,
+                                        int nActive,
+                                        int nAOs,
+                                        const CMemBlock2D<double>& gtoValues,
+                                        const int32_t              gridOffset,
+                                        const int32_t              gridBlockPosition,
+                                        const int32_t              nGridPoints) const
+{
+    int ndmat=1;
+
+    for (int32_t i = 0; i < ndmat; i++)
+    {   
+        // set up pointer to density grid data
+        
+        auto rhoa = densityGrid->alphaDensity(i);
+
+        auto rhob = densityGrid->betaDensity(i);
+
+        // Compute MOs on grid
+
+        double** ActMOs=new double*[nActive];
+
+        for (int32_t iAct = 0; iAct < nActive; iAct++)
+        {
+            ActMOs[iAct] = new double[nGridPoints];
+            #pragma omp simd 
+            for (int32_t l = 0; l < nGridPoints; l++)
+            {
+                ActMOs[iAct][l] = 0.0;
+            }
+
+            auto MO = &activeMOs[iAct*nAOs];
+            for (int32_t j = 0; j < nAOs; j++)
+            {
+                auto bgaos = gtoValues.data(j);
+                #pragma omp simd 
+                for (int32_t l = 0; l < nGridPoints; l++)
+                {
+                    ActMOs[iAct][l]+= bgaos[l] * MO[j];
+                }
+            }
+        }
+
+        // Compute on-top pair density on grid
+        for (int32_t iAct = 0; iAct < nActive; iAct++)
+        {
+            auto iMO = ActMOs[iAct];
+            for (int32_t jAct = 0; jAct < nActive; jAct++)
+            {
+                int ioff=iAct*nActive+jAct;
+                auto jMO = ActMOs[jAct];
+                for (int32_t kAct = 0; kAct < nActive; kAct++)
+                {
+                    int joff=ioff*nActive+kAct;
+                    auto kMO = ActMOs[kAct];
+                    for (int32_t lAct = 0; lAct < nActive; lAct++)
+                    {
+                        auto lMO = ActMOs[lAct];
+                        double dval_b = twoDM[joff*nActive+lAct];
+                        #pragma omp simd 
+                        for (int32_t l = 0; l < nGridPoints; l++)
+                        {
+                            double fact=iMO[l] * jMO[l] * kMO[l] * lMO[l];
+                            rhob[gridOffset + gridBlockPosition + l] += dval_b * fact;
+                        }
+                    }
+                }
+            }
+        }
+        // Compute the "effective" alpha and beta densities
+        for (int32_t l = 0; l < nGridPoints; l++)
+        {
+            auto da = rhoa[gridOffset + gridBlockPosition + l];
+            auto db = rhob[gridOffset + gridBlockPosition + l];
+
+            auto delta=-db;
+            if (delta>0)
+            {
+                delta=sqrt(2.0*delta);
+            }
+            else
+            {
+                delta=0.0;
+            }
+            rhoa[gridOffset + gridBlockPosition + l]=0.5*(da+delta);
+            rhob[gridOffset + gridBlockPosition + l]=0.5*(da-delta);
+        }
+    }
+}
+

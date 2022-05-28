@@ -1382,6 +1382,16 @@ public:
                    const CMolecularGrid&   molecularGrid,
                    const std::string&      xcFuncLabel,
                    const std::string&      quadMode) const;
+
+    double pdft(const CAODensityMatrix& aoDensityMatrix,
+                double*                 twoDM,
+                double*                 activeMOs,
+                int                     nActive,
+                const CMolecule&        molecule,
+                const CMolecularBasis&  basis,
+                const CMolecularGrid&   molecularGrid,
+                const std::string&      xcFuncLabel) const;
+
 };
 
 #endif /* XCIntegrator_hpp */

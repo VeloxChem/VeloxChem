@@ -48,6 +48,41 @@ using namespace py::literals;
 
 namespace vlx_dft {  // vlx_dft namespace
 
+double pdft_from_numpy(const CXCIntegrator& self,
+                       const CAODensityMatrix& aoDensityMatrix,
+                       py::array_t<double> Active2DM,
+                       py::array_t<double> ActiveMOs,
+                       const CMolecule&        molecule,
+                       const CMolecularBasis&  basis,
+                       const CMolecularGrid&   molecularGrid,
+                       const std::string&      xcFuncLabel)
+{
+  py::buffer_info info = Active2DM.request();
+  int ndim=info.ndim;
+  std::vector<ssize_t> shape=info.shape;
+  int size=1;
+  for (int i = 0; i < ndim ; i++)
+  {
+    size*=(int) shape[i];
+  }
+  double* CActive2DM = new double[size];
+  std::memcpy(CActive2DM, info.ptr, size * sizeof(double));
+
+  int nActive=shape[0];
+
+  info = ActiveMOs.request();
+  ndim=info.ndim;
+  shape=info.shape;
+  size=1;
+  for (int i = 0; i < ndim ; i++)
+  {
+    size*=(int) shape[i];
+  }
+  double* CActiveMOs = new double[size];
+  std::memcpy(CActiveMOs, info.ptr, size * sizeof(double));
+
+  return self.pdft(aoDensityMatrix, CActive2DM, CActiveMOs, nActive, molecule, basis, molecularGrid, xcFuncLabel);
+}
 // Exports classes/functions in src/dft to python
 
 void
@@ -244,7 +279,8 @@ export_dft(py::module& m)
              "basis"_a,
              "molecularGrid"_a,
              "xcFuncLabel"_a,
-             "quadMode"_a);
+             "quadMode"_a)
+        .def("pdft", &pdft_from_numpy);
 
     // CDensityGrid class
 
