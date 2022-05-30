@@ -504,3 +504,18 @@ TEST_F(CDiagEriRecFactsTest, CompHostDistancesPT)
     
     EXPECT_EQ(pt_1, pt);
 }
+
+TEST_F(CDiagEriRecFactsTest, SelectHostMaxValues)
+{
+    auto mvals = BufferHostX<double>::Zero(5);
+
+    const BufferHostMY<double, 3> tints(4, { 1.0, 2.0, 2.0, 3.0,
+                                             2.0, 1.0, 4.0, 2.0,
+                                             7.0, 1.5, 1.0, 3.1,});
+    
+    derirec::selectHostMaxValues<double, 3>(mvals.data(), tints, 1, 4);
+    
+    const BufferHostX<double> rints(5, {0.0, 7.0, 2.0, 4.0, 3.1,});
+    
+    EXPECT_EQ(mvals, rints);
+}

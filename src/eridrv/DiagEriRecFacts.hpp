@@ -520,6 +520,35 @@ compHostDistancesPT(      BufferHostMY<T, 3>&                rDistancesPT,
     }
 }
 
+/**
+Select maximum values from integrals buffer and stores into given array.
+
+@param maxValues The array of maximum values.
+@param intsBuffer The integrals buffer.
+@param bPosition The start position of contracted GTOs batch.
+@param nBatchPairs The number of pairs in batch.
+*/
+template <typename T, int32_t N>
+auto
+selectHostMaxValues(      T*                  maxValues,
+                    const BufferHostMY<T, N>& intsBuffer,
+                    const int32_t             bPosition,
+                    const int32_t             nBatchPairs) -> void
+{
+    for (int32_t i = 0; i < N; i++)
+    {
+        auto tints = intsBuffer.data(i);
+        
+        for (int32_t j = 0; j < nBatchPairs; j++)
+        {
+            if (tints[j] > maxValues[bPosition + j])
+            {
+                maxValues[bPosition + j] = tints[j];
+            }
+        }
+    }
+}
+    
 }  // derirec  namespace
 
 #endif /* DiagEriRecFacts_hpp */
