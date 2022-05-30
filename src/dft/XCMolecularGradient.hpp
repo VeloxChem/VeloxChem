@@ -26,25 +26,25 @@
 #ifndef XCMolecularGradient_hpp
 #define XCMolecularGradient_hpp
 
+#include <mpi.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
 
-#include <mpi.h>
-
 #include "AODensityMatrix.hpp"
-#include "Molecule.hpp"
-#include "MolecularBasis.hpp"
-#include "MolecularGrid.hpp"
-#include "XCGradientGrid.hpp"
+#include "DenseMatrix.hpp"
 #include "DensityGrid.hpp"
 #include "GtoContainer.hpp"
-#include "DenseMatrix.hpp"
+#include "MolecularBasis.hpp"
+#include "MolecularGrid.hpp"
+#include "Molecule.hpp"
+#include "XCGradientGrid.hpp"
 
 /**
  Class CXCMolecularGradient implements integration of exchange-correlation contribution to molecular
  gradient.
- 
+
  @author Z. Rinkevicius
  */
 class CXCMolecularGradient
@@ -53,36 +53,35 @@ class CXCMolecularGradient
      The rank of associated local MPI process.
      */
     int32_t _locRank;
-    
+
     /**
      The total number of local MPI processes.
      */
     int32_t _locNodes;
-    
+
     /**
      The MPI communicator.
      */
     MPI_Comm _locComm;
-    
+
     /**
      The threshold of density screening.
      */
     double _thresholdOfDensity;
-   
-public:
-    
+
+   public:
     /**
      Creates a XC molecular gradient integrator object using MPI info.
-     
+
      @param comm the MPI communicator.
      */
     CXCMolecularGradient(MPI_Comm comm);
-    
+
     /**
      Destroys a XC molecular gradient integrator object.
      */
     ~CXCMolecularGradient();
-    
+
     /**
      Integrates exchnage-correlation functional contribution to molecular gradient.
 
