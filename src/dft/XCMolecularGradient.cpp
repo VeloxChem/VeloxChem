@@ -135,12 +135,14 @@ CXCMolecularGradient::integrate(const std::vector<int32_t>& idsAtomic,
                 
                 gatmz += gw[j] * grhoa[j] * gdenz[j];
             }
+
+            // factor of 2 from sum of alpha and beta contributions
             
-            mgradx[i] = gatmx;
+            mgradx[i] = 2.0 * gatmx;
             
-            mgrady[i] = gatmy;
+            mgrady[i] = 2.0 * gatmy;
             
-            mgradz[i] = gatmz;
+            mgradz[i] = 2.0 * gatmz;
         }
     }
     else
