@@ -399,12 +399,37 @@ class CDensityGridDriver
                          const int32_t           gridOffset,
                          const int32_t           nGridPoints) const;
 
+    void _PDFT_Gga(      CDensityGrid*     densityGrid,
+                         const CAODensityMatrix* aoDensityMatrix,
+                         double* twoDM,
+                         double* activeMOs,
+                         int nActive,
+                         const CGtoContainer*    gtoContainer,
+                         const double*           gridCoordinatesX,
+                         const double*           gridCoordinatesY,
+                         const double*           gridCoordinatesZ,
+                         const int32_t           gridOffset,
+                         const int32_t           nGridPoints) const;
+
     void _distPDFT_LDA(      CDensityGrid*        densityGrid,
                                         double* twoDM,
                                         double* activeMOs,
                                         int nActive,
                                         int nAOs,
                                         const CMemBlock2D<double>& gtoValues,
+                                        const int32_t              gridOffset,
+                                        const int32_t              gridBlockPosition,
+                                        const int32_t              nGridPoints) const;
+
+    void _distPDFT_GGA(      CDensityGrid*        densityGrid,
+                                        double* twoDM,
+                                        double* activeMOs,
+                                        int nActive,
+                                        int nAOs,
+                                        const CMemBlock2D<double>& gtoValues,
+                                        const CMemBlock2D<double>& gtoValuesX,
+                                        const CMemBlock2D<double>& gtoValuesY,
+                                        const CMemBlock2D<double>& gtoValuesZ,
                                         const int32_t              gridOffset,
                                         const int32_t              gridBlockPosition,
                                         const int32_t              nGridPoints) const;

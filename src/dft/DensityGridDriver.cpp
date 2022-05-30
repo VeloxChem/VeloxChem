@@ -1035,7 +1035,6 @@ CDensityGridDriver::pdft(const CAODensityMatrix& aoDensityMatrix,
                         _PDFT_Lda(dgridptr, denptr, twoDM, activeMOs, nActive, gtovec, mgx, mgy, mgz, tbposition, tbsize);
                     }
                 }
-/*
                 else if (xcFunctional == xcfun::gga)
                 {
                     #pragma omp task firstprivate(tbsize, tbposition)
@@ -1043,7 +1042,6 @@ CDensityGridDriver::pdft(const CAODensityMatrix& aoDensityMatrix,
                         _PDFT_Gga(dgridptr, denptr, twoDM, activeMOs, nActive, gtovec, mgx, mgy, mgz, tbposition, tbsize);
                     }
                 }
-*/
                 
             }
         }
@@ -1216,3 +1214,283 @@ CDensityGridDriver::_distPDFT_LDA(      CDensityGrid*        densityGrid,
     }
 }
 
+void
+CDensityGridDriver::_PDFT_Gga(      CDensityGrid*     densityGrid,
+                                    const CAODensityMatrix* aoDensityMatrix,
+                                    double* twoDM,
+                                    double* activeMOs,
+                                    int nActive,
+                                    const CGtoContainer*    gtoContainer,
+                                    const double*           gridCoordinatesX,
+                                    const double*           gridCoordinatesY,
+                                    const double*           gridCoordinatesZ,
+                                    const int32_t           gridOffset,
+                                    const int32_t           nGridPoints) const
+{
+    // set up number of AOs
+
+    auto naos = gtoContainer->getNumberOfAtomicOrbitals();
+
+    // determine number of grid blocks
+
+    auto blockdim = _getSizeOfBlock();
+
+    auto nblocks = nGridPoints / blockdim;
+
+    // set up current grid point
+
+    int32_t igpnt = 0;
+
+    // loop over grid points blocks
+
+    if (nblocks > 0)
+    {
+        CMemBlock2D<double> gaos(blockdim, naos);
+
+        CMemBlock2D<double> gaox(blockdim, naos);
+
+        CMemBlock2D<double> gaoy(blockdim, naos);
+
+        CMemBlock2D<double> gaoz(blockdim, naos);
+
+        for (int32_t i = 0; i < nblocks; i++)
+        {
+            gtorec::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz,  gtoContainer, gridCoordinatesX, gridCoordinatesY,
+                                             gridCoordinatesZ, gridOffset, igpnt, blockdim);
+
+            _distRestrictedDensityValuesForGga(densityGrid, aoDensityMatrix, gaos, gaox, gaoy, gaoz,
+                                               gridOffset, igpnt, blockdim);
+            _distPDFT_GGA(densityGrid,twoDM, activeMOs, nActive, naos, gaos, gaox, gaoy, gaoz, 
+                                               gridOffset, igpnt, blockdim);
+
+            igpnt += blockdim;
+        }
+    }
+    // compute remaining grid points block
+
+    blockdim = nGridPoints % blockdim;
+
+    if (blockdim > 0)
+    {
+        CMemBlock2D<double> gaos(blockdim, naos);
+
+        CMemBlock2D<double> gaox(blockdim, naos);
+
+        CMemBlock2D<double> gaoy(blockdim, naos);
+
+        CMemBlock2D<double> gaoz(blockdim, naos);
+
+        gtorec::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY,
+                                        gridCoordinatesZ, gridOffset, igpnt, blockdim);
+
+        _distRestrictedDensityValuesForGga(densityGrid, aoDensityMatrix, gaos, gaox, gaoy, gaoz,
+                                           gridOffset, igpnt, blockdim);
+
+        _distPDFT_GGA(densityGrid,twoDM, activeMOs, nActive, naos, gaos, gaox, gaoy, gaoz,
+                                           gridOffset, igpnt, blockdim);
+    }
+}
+
+void
+CDensityGridDriver::_distPDFT_GGA(      CDensityGrid*        densityGrid,
+                                        double* twoDM,
+                                        double* activeMOs,
+                                        int nActive,
+                                        int nAOs,
+                                        const CMemBlock2D<double>& gtoValues,
+                                        const CMemBlock2D<double>& gtoValuesX,
+                                        const CMemBlock2D<double>& gtoValuesY,
+                                        const CMemBlock2D<double>& gtoValuesZ,
+                                        const int32_t              gridOffset,
+                                        const int32_t              gridBlockPosition,
+                                        const int32_t              nGridPoints) const
+{
+    int ndmat=1;
+//#define FullTranslation
+
+    for (int32_t i = 0; i < ndmat; i++)
+    {   
+        // set up pointer to density grid data
+        
+        auto rhoa = densityGrid->alphaDensity(i);
+
+        auto gradax = densityGrid->alphaDensityGradientX(i);
+
+        auto graday = densityGrid->alphaDensityGradientY(i);
+
+        auto gradaz = densityGrid->alphaDensityGradientZ(i);
+
+        auto rhob = densityGrid->betaDensity(i);
+
+        auto gradbx = densityGrid->betaDensityGradientX(i);
+
+        auto gradby = densityGrid->betaDensityGradientY(i);
+
+        auto gradbz = densityGrid->betaDensityGradientZ(i);
+
+        // Compute MOs on grid
+
+        double** ActMOs=new double*[nActive];
+#ifdef FullTranslation
+        double** ActMOs_x=new double*[nActive];
+        double** ActMOs_y=new double*[nActive];
+        double** ActMOs_z=new double*[nActive];
+#endif
+
+        for (int32_t iAct = 0; iAct < nActive; iAct++)
+        {
+            ActMOs[iAct] = new double[nGridPoints];
+#ifdef FullTranslation
+            ActMOs_x[iAct] = new double[nGridPoints];
+            ActMOs_y[iAct] = new double[nGridPoints];
+            ActMOs_z[iAct] = new double[nGridPoints];
+#endif
+            #pragma omp simd 
+            for (int32_t l = 0; l < nGridPoints; l++)
+            {
+                ActMOs[iAct][l] = 0.0;
+#ifdef FullTranslation
+                ActMOs_x[iAct][l] = 0.0;
+                ActMOs_y[iAct][l] = 0.0;
+                ActMOs_z[iAct][l] = 0.0;
+#endif
+            }
+
+            auto MO = &activeMOs[iAct*nAOs];
+            for (int32_t j = 0; j < nAOs; j++)
+            {
+                auto bgaos = gtoValues.data(j);
+#ifdef FullTranslation
+                auto bgaox = gtoValuesX.data(j);
+                auto bgaoy = gtoValuesY.data(j);
+                auto bgaoz = gtoValuesZ.data(j);
+#endif
+                #pragma omp simd 
+                for (int32_t l = 0; l < nGridPoints; l++)
+                {
+                    ActMOs[iAct][l]+= bgaos[l] * MO[j];
+#ifdef FullTranslation
+                    ActMOs_x[iAct][l]+= bgaox[l] * MO[j];
+                    ActMOs_y[iAct][l]+= bgaoy[l] * MO[j];
+                    ActMOs_z[iAct][l]+= bgaoz[l] * MO[j];
+#endif
+                }
+            }
+        }
+
+        // Compute on-top pair density on grid
+        for (int32_t iAct = 0; iAct < nActive; iAct++)
+        {
+            auto iMO = ActMOs[iAct];
+#ifdef FullTranslation
+            auto iMO_x = ActMOs_x[iAct];
+            auto iMO_y = ActMOs_y[iAct];
+            auto iMO_z = ActMOs_z[iAct];
+#endif
+            for (int32_t jAct = 0; jAct < nActive; jAct++)
+            {
+                int ioff=iAct*nActive+jAct;
+                auto jMO = ActMOs[jAct];
+#ifdef FullTranslation
+                auto jMO_x = ActMOs_x[jAct];
+                auto jMO_y = ActMOs_y[jAct];
+                auto jMO_z = ActMOs_z[jAct];
+#endif
+                for (int32_t kAct = 0; kAct < nActive; kAct++)
+                {
+                    int joff=ioff*nActive+kAct;
+                    auto kMO = ActMOs[kAct];
+#ifdef FullTranslation
+                    auto kMO_x = ActMOs_x[kAct];
+                    auto kMO_y = ActMOs_y[kAct];
+                    auto kMO_z = ActMOs_z[kAct];
+#endif
+                    for (int32_t lAct = 0; lAct < nActive; lAct++)
+                    {
+                        auto lMO = ActMOs[lAct];
+#ifdef FullTranslation
+                        auto lMO_x = ActMOs_x[lAct];
+                        auto lMO_y = ActMOs_y[lAct];
+                        auto lMO_z = ActMOs_z[lAct];
+#endif
+                        double dval_b = twoDM[joff*nActive+lAct];
+                        #pragma omp simd 
+                        for (int32_t l = 0; l < nGridPoints; l++)
+                        {
+                            double fact=iMO[l] * jMO[l] * kMO[l] * lMO[l];
+                            rhob[gridOffset + gridBlockPosition + l] += dval_b * fact;
+#ifdef FullTranslation
+                            double fgx= iMO_x[l] * jMO[l] * kMO[l] * lMO[l]
+                                       +iMO[l] * jMO_x[l] * kMO[l] * lMO[l]
+                                       +iMO[l] * jMO[l] * kMO_x[l] * lMO[l]
+                                       +iMO[l] * jMO[l] * kMO[l] * lMO_x[l];
+                            double fgy= iMO_y[l] * jMO[l] * kMO[l] * lMO[l]
+                                       +iMO[l] * jMO_y[l] * kMO[l] * lMO[l]
+                                       +iMO[l] * jMO[l] * kMO_y[l] * lMO[l]
+                                       +iMO[l] * jMO[l] * kMO[l] * lMO_y[l];
+                            double fgz= iMO_z[l] * jMO[l] * kMO[l] * lMO[l]
+                                       +iMO[l] * jMO_z[l] * kMO[l] * lMO[l]
+                                       +iMO[l] * jMO[l] * kMO_z[l] * lMO[l]
+                                       +iMO[l] * jMO[l] * kMO[l] * lMO_z[l];
+                            gradbx[gridOffset + gridBlockPosition + l] += dval_b * fgx;
+                            gradby[gridOffset + gridBlockPosition + l] += dval_b * fgy;
+                            gradbz[gridOffset + gridBlockPosition + l] += dval_b * fgz;
+#endif
+                        }
+                    }
+                }
+            }
+        }
+        // Compute the "effective" alpha and beta densities
+        for (int32_t l = 0; l < nGridPoints; l++)
+        {
+            auto da  = rhoa  [gridOffset + gridBlockPosition + l];
+            auto dax = gradax[gridOffset + gridBlockPosition + l];
+            auto day = graday[gridOffset + gridBlockPosition + l];
+            auto daz = gradaz[gridOffset + gridBlockPosition + l];
+            auto db = rhob   [gridOffset + gridBlockPosition + l];
+#ifdef FullTranslation
+            auto dbx = gradbx[gridOffset + gridBlockPosition + l];
+            auto dby = gradby[gridOffset + gridBlockPosition + l];
+            auto dbz = gradbz[gridOffset + gridBlockPosition + l];
+#endif
+
+            double delta=0.0;
+            if (db<0)
+            {
+                delta=sqrt(-2.0*db);
+            }
+            rhoa[gridOffset + gridBlockPosition + l]=0.5*(da+delta);
+            rhob[gridOffset + gridBlockPosition + l]=0.5*(da-delta);
+            if (delta>1.0e-8)
+            {
+#ifdef FullTranslation
+//Correct formulas
+                gradax[gridOffset + gridBlockPosition + l]=0.5*(dax+dbx/delta);
+                graday[gridOffset + gridBlockPosition + l]=0.5*(day+dby/delta);
+                gradaz[gridOffset + gridBlockPosition + l]=0.5*(daz+dbz/delta);
+                gradbx[gridOffset + gridBlockPosition + l]=0.5*(dax-dbx/delta);
+                gradby[gridOffset + gridBlockPosition + l]=0.5*(day-dby/delta);
+                gradbz[gridOffset + gridBlockPosition + l]=0.5*(daz-dbz/delta);
+#else
+//"translated" formulas from Li Manni 2014
+                gradax[gridOffset + gridBlockPosition + l]=0.5*(dax+delta*dax/da);
+                graday[gridOffset + gridBlockPosition + l]=0.5*(day+delta*day/da);
+                gradaz[gridOffset + gridBlockPosition + l]=0.5*(daz+delta*daz/da);
+                gradbx[gridOffset + gridBlockPosition + l]=0.5*(dax-delta*dax/da);
+                gradby[gridOffset + gridBlockPosition + l]=0.5*(day-delta*day/da);
+                gradbz[gridOffset + gridBlockPosition + l]=0.5*(daz-delta*daz/da);
+#endif
+            }
+            else
+            {
+                gradax[gridOffset + gridBlockPosition + l]=0.5*dax;
+                graday[gridOffset + gridBlockPosition + l]=0.5*day;
+                gradaz[gridOffset + gridBlockPosition + l]=0.5*daz;
+                gradbx[gridOffset + gridBlockPosition + l]=0.5*dax;
+                gradby[gridOffset + gridBlockPosition + l]=0.5*day;
+                gradbz[gridOffset + gridBlockPosition + l]=0.5*daz;
+            }
+        }
+    }
+}
