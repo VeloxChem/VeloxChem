@@ -1462,26 +1462,29 @@ CDensityGridDriver::_distPDFT_GGA(      CDensityGrid*        densityGrid,
             }
             rhoa[gridOffset + gridBlockPosition + l]=0.5*(da+delta);
             rhob[gridOffset + gridBlockPosition + l]=0.5*(da-delta);
+#ifdef FullTranslation
+//Correct formulas (except for potential bug)
             if (delta>1.0e-8)
             {
-#ifdef FullTranslation
-//Correct formulas
                 gradax[gridOffset + gridBlockPosition + l]=0.5*(dax+dbx/delta);
                 graday[gridOffset + gridBlockPosition + l]=0.5*(day+dby/delta);
                 gradaz[gridOffset + gridBlockPosition + l]=0.5*(daz+dbz/delta);
                 gradbx[gridOffset + gridBlockPosition + l]=0.5*(dax-dbx/delta);
                 gradby[gridOffset + gridBlockPosition + l]=0.5*(day-dby/delta);
                 gradbz[gridOffset + gridBlockPosition + l]=0.5*(daz-dbz/delta);
+            }
 #else
 //"translated" formulas from Li Manni 2014
+            if (da>1.0e-8)
+            {
                 gradax[gridOffset + gridBlockPosition + l]=0.5*(dax+delta*dax/da);
                 graday[gridOffset + gridBlockPosition + l]=0.5*(day+delta*day/da);
                 gradaz[gridOffset + gridBlockPosition + l]=0.5*(daz+delta*daz/da);
                 gradbx[gridOffset + gridBlockPosition + l]=0.5*(dax-delta*dax/da);
                 gradby[gridOffset + gridBlockPosition + l]=0.5*(day-delta*day/da);
                 gradbz[gridOffset + gridBlockPosition + l]=0.5*(daz-delta*daz/da);
-#endif
             }
+#endif
             else
             {
                 gradax[gridOffset + gridBlockPosition + l]=0.5*dax;
