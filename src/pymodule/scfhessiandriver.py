@@ -1074,7 +1074,10 @@ class ScfHessianDriver(HessianDriver):
         dipole_gradient[1] = np.vstack((natm_zeros, nuclear_charges, natm_zeros)).T
         dipole_gradient[2] = np.vstack((natm_zeros, natm_zeros, nuclear_charges)).T
 
-        # TODO: replace once analytical integral derivatives are available
+        # TODO: replace once veloxchem analytical integral derivatives are available
+        # TODO: replace the full array of dipole integrals derivatives with
+        # the derivative with respect to each atom and contract with the densities
+        # in the same way as done for the energy gradient.
         dipole_integrals_deriv = self.compute_dipole_integral_derivatives(molecule, ao_basis)
 
         # Add the electronic contributions
@@ -1087,7 +1090,7 @@ class ScfHessianDriver(HessianDriver):
 
     def compute_dipole_integral_derivatives(self, molecule, ao_basis):
         """
-        Computes numerical derivatives of dipole integrals.
+        Imports the analytical derivatives of dipole integrals.
 
         :param molecule:
             The molecule.

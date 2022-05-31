@@ -131,6 +131,7 @@ class XTBHessianDriver(HessianDriver):
             The minimal AO basis set.
         """
 
+        # TODO: remove grad_dict?
         # settings dictionary for gradient driver
         grad_dict = dict(self.freq_dict)
 

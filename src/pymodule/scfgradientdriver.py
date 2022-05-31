@@ -74,9 +74,6 @@ class ScfGradientDriver(GradientDriver):
         self.scf_drv = scf_drv
         self.delta_h = 0.001
 
-        # Flag for numerical derivative of dipole moment
-        # self.dipole_deriv = False
-        # self.dipole_gradient = None
 
     def update_settings(self, grad_dict, method_dict):
         """
