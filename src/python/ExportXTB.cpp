@@ -71,7 +71,7 @@ export_xtb(py::module& m)
             "get_dipole",
             [](const CXTBDriver& self) -> py::array_t<double> {
                 auto dipole = self.getDipole();
-                return vlx_general::pointer_to_numpy(dipole.data(), dipole.size() );
+                return vlx_general::pointer_to_numpy(dipole.data(), dipole.size());
             },
             "Gets molecular dipole moment as numpy array.")
         // prefixed by an underscore because it will be decorated in xtbdriver.py

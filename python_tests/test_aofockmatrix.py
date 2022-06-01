@@ -47,3 +47,7 @@ class TestAOFockMatrix:
             f_unrest.write_hdf5(h5file)
             dummy = AOFockMatrix.read_hdf5(h5file)
             assert f_unrest == dummy
+
+            h5file = Path(h5file)
+            if h5file.is_file():
+                h5file.unlink()

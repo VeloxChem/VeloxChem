@@ -77,12 +77,44 @@ getHartreeValueInWavenumbers()
 }
 
 double
+getElectronMassInAtomicMassUnit()
+{
+    // electron mass in u: 5.485 799 090 65 e-4
+
+    return 5.48579909065e-4;
+}
+
+double
 getAtomicMassUnitInElectronMasses()
 {
     // electron mass in u: 5.485 799 090 65 e-4
     // u in electron masses: 1.0 / 5.485 799 090 65 e-4
 
-    return 1822.888486209;
+    return 1.0 / getElectronMassInAtomicMassUnit();
+}
+
+double
+getAtomicMassUnitInKg()
+{
+    // atomic mass constant 1.660 539 066 60 e-27 kg
+
+    return 1.66053906660e-27;
+}
+
+double
+getSpeedOfLightInVacuumInSI()
+{
+    // speed of light in vacuum: 299 792 458 [m s^-1]
+
+    return 299792458.0;
+}
+
+double
+getAvogadroConstant()
+{
+    // Avogadro constant: N_A = 6.022 140 76 e23 [mol^-1]
+
+    return 6.02214076e+23;
 }
 
 double

@@ -138,7 +138,7 @@ class FirstOrderProperties:
 
         return self.properties[key]
 
-    def print_properties(self, molecule, title):
+    def print_properties(self, molecule, title=None):
         """
         Prints first-order properties.
 
@@ -149,6 +149,8 @@ class FirstOrderProperties:
             relaxed/unrelaxed density, which excited state.
         """
 
+        if title is None:
+            title = "SCF Ground-State Dipole Moment"
         self.ostream.print_blank()
 
         self.ostream.print_header(title)

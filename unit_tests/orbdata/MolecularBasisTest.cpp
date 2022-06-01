@@ -189,6 +189,31 @@ TEST_F(CMolecularBasisTest, GetNumberOfBasisFunctionsWithMolecule)
     ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 2));
 }
 
+TEST_F(CMolecularBasisTest, GetNumberOfBasisFunctionsWithMoleculeAndPrimitives)
+{
+    const CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();
+
+    const auto lih = vlxmol::getMoleculeLiH();
+
+    ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 0, 7));
+    
+    ASSERT_EQ(1, ambas.getNumberOfBasisFunctions(lih, 0, 5));
+    
+    ASSERT_EQ(1, ambas.getNumberOfBasisFunctions(lih, 0, 3));
+    
+    ASSERT_EQ(3, ambas.getNumberOfBasisFunctions(lih, 0, 1));
+    
+    ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 1, 5));
+
+    ASSERT_EQ(1, ambas.getNumberOfBasisFunctions(lih, 1, 2));
+    
+    ASSERT_EQ(2, ambas.getNumberOfBasisFunctions(lih, 1, 1));
+
+    ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 2, 1));
+    
+    ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 2, 3));
+}
+
 TEST_F(CMolecularBasisTest, GetNumberOfBasisFunctionsWithMoleculeAndAtomsList)
 {
     CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();
@@ -212,6 +237,49 @@ TEST_F(CMolecularBasisTest, GetNumberOfBasisFunctionsWithMoleculeAndAtomsList)
     ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 1, 1, 2));
 
     ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 0, 2, 2));
+}
+
+TEST_F(CMolecularBasisTest, GetNumberOfBasisFunctionsWithMoleculeAndAtomsListAndPrimitives)
+{
+    const CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();
+
+    const auto lih = vlxmol::getMoleculeLiH();
+
+    ASSERT_EQ(1, ambas.getNumberOfBasisFunctions(lih, 0, 1, 0, 5));
+    
+    ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 0, 1, 0, 3));
+    
+    ASSERT_EQ(2, ambas.getNumberOfBasisFunctions(lih, 0, 1, 0, 1));
+
+    ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 1, 1, 0, 5));
+    
+    ASSERT_EQ(1, ambas.getNumberOfBasisFunctions(lih, 1, 1, 0, 3));
+    
+    ASSERT_EQ(1, ambas.getNumberOfBasisFunctions(lih, 1, 1, 0, 1));
+
+    ASSERT_EQ(1, ambas.getNumberOfBasisFunctions(lih, 0, 2, 0, 5));
+    
+    ASSERT_EQ(1, ambas.getNumberOfBasisFunctions(lih, 0, 2, 0, 3));
+    
+    ASSERT_EQ(3, ambas.getNumberOfBasisFunctions(lih, 0, 2, 0, 1));
+
+    ASSERT_EQ(1, ambas.getNumberOfBasisFunctions(lih, 0, 1, 1, 2));
+    
+    ASSERT_EQ(1, ambas.getNumberOfBasisFunctions(lih, 0, 1, 1, 1));
+
+    ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 1, 1, 1, 2));
+    
+    ASSERT_EQ(1, ambas.getNumberOfBasisFunctions(lih, 1, 1, 1, 1));
+
+    ASSERT_EQ(1, ambas.getNumberOfBasisFunctions(lih, 0, 2, 1, 2));
+    
+    ASSERT_EQ(2, ambas.getNumberOfBasisFunctions(lih, 0, 2, 1, 1));
+
+    ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 0, 1, 2, 1));
+
+    ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 1, 1, 2, 1));
+
+    ASSERT_EQ(0, ambas.getNumberOfBasisFunctions(lih, 0, 2, 2, 1));
 }
 
 TEST_F(CMolecularBasisTest, GetNumberOfPrimitiveBasisFunctionsWithMolecule)
@@ -283,6 +351,17 @@ TEST_F(CMolecularBasisTest, GetDimensionsOfPrimitiveBasis)
     auto lih = vlxmol::getMoleculeLiH();
 
     ASSERT_EQ(23, ambas.getDimensionsOfPrimitiveBasis(lih));
+}
+
+TEST_F(CMolecularBasisTest, GetContractionDepths)
+{
+    const CMolecularBasis ambas = vlxbas::getMolecularBasisForLiH();
+
+    ASSERT_EQ(ambas.getContractionDepths(0), std::set<int32_t>({1, 3, 5}));
+    
+    ASSERT_EQ(ambas.getContractionDepths(1), std::set<int32_t>({1, 2}));
+    
+    ASSERT_EQ(ambas.getContractionDepths(2), std::set<int32_t>({}));
 }
 
 TEST_F(CMolecularBasisTest, GetAtomBasis)
@@ -420,8 +499,6 @@ TEST_F(CMolecularBasisTest, GetIndexMapForDalton)
     vlxtest::compare({0, 1, 2, 11, 5, 8, 12, 6, 9, 3, 4, 13, 7, 10}, idsmap.data(0));
     
     vlxtest::compare({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}, idsmap.data(1));
-
- 
 }
 
 TEST_F(CMolecularBasisTest, GetIndexMap)

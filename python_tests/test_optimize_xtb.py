@@ -10,6 +10,8 @@ from veloxchem.xtbgradientdriver import XTBGradientDriver
 from veloxchem.optimizationdriver import OptimizationDriver
 
 
+@pytest.mark.filterwarnings(
+    'ignore:.*tostring.*tobytes:DeprecationWarning:geometric')
 class TestOptimizeXTB:
 
     def run_opt(self, inpfile, xtb_method, ref_coords):
@@ -26,7 +28,7 @@ class TestOptimizeXTB:
             'coordsys': 'tric',
             'filename': task.input_dict['filename'],
         })
-        opt_mol = opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        opt_mol = opt_drv.compute(task.molecule)
 
         if is_mpi_master(task.mpi_comm):
             opt_coords = opt_mol.get_coordinates()

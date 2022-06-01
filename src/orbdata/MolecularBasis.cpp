@@ -207,7 +207,8 @@ CMolecularBasis::getLabel() const
 }
 
 int32_t
-CMolecularBasis::getNumberOfBasisFunctions(const int32_t idElemental, const int32_t angularMomentum) const
+CMolecularBasis::getNumberOfBasisFunctions(const int32_t idElemental,
+                                           const int32_t angularMomentum) const
 {
     for (size_t i = 0; i < _atomicBasisSets.size(); i++)
     {
@@ -221,13 +222,17 @@ CMolecularBasis::getNumberOfBasisFunctions(const int32_t idElemental, const int3
 }
 
 int32_t
-CMolecularBasis::getNumberOfBasisFunctions(const CMolecule& molecule, const int32_t angularMomentum) const
+CMolecularBasis::getNumberOfBasisFunctions(const CMolecule& molecule,
+                                           const int32_t    angularMomentum) const
 {
     return getNumberOfBasisFunctions(molecule, 0, molecule.getNumberOfAtoms(), angularMomentum);
 }
 
 int32_t
-CMolecularBasis::getNumberOfBasisFunctions(const CMolecule& molecule, const int32_t iAtom, const int32_t nAtoms, const int32_t angularMomentum) const
+CMolecularBasis::getNumberOfBasisFunctions(const CMolecule& molecule,
+                                           const int32_t    iAtom,
+                                           const int32_t    nAtoms,
+                                           const int32_t    angularMomentum) const
 {
     int32_t nbfuncs = 0;
 
@@ -242,7 +247,35 @@ CMolecularBasis::getNumberOfBasisFunctions(const CMolecule& molecule, const int3
 }
 
 int32_t
-CMolecularBasis::getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule, const int32_t angularMomentum) const
+CMolecularBasis::getNumberOfBasisFunctions(const CMolecule& molecule,
+                                           const int32_t    angularMomentum,
+                                           const int32_t    nPrimitiveGtos) const
+{
+    return getNumberOfBasisFunctions(molecule, 0, molecule.getNumberOfAtoms(), angularMomentum, nPrimitiveGtos);
+}
+
+int32_t
+CMolecularBasis::getNumberOfBasisFunctions(const CMolecule& molecule,
+                                           const int32_t    iAtom,
+                                           const int32_t    nAtoms,
+                                           const int32_t    angularMomentum,
+                                           const int32_t    nPrimitiveGtos) const
+{
+    int32_t nbfuncs = 0;
+
+    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
+    {
+        nbfuncs += molecule.getNumberOfAtoms(iAtom, nAtoms, _atomicBasisSets[i].getIdElemental())
+
+                 * _atomicBasisSets[i].getNumberOfBasisFunctions(angularMomentum, nPrimitiveGtos);
+    }
+
+    return nbfuncs;
+}
+
+int32_t
+CMolecularBasis::getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule,
+                                                    const int32_t    angularMomentum) const
 {
     return getNumberOfPrimitiveBasisFunctions(molecule, 0, molecule.getNumberOfAtoms(), angularMomentum);
 }
@@ -290,7 +323,8 @@ CMolecularBasis::getDimensionsOfBasis(const CMolecule& molecule) const
 }
 
 int32_t
-CMolecularBasis::getPartialDimensionsOfBasis(const CMolecule& molecule, const int32_t angularMomentum) const
+CMolecularBasis::getPartialDimensionsOfBasis(const CMolecule& molecule,
+                                             const int32_t    angularMomentum) const
 {
     int32_t ndim = 0;
 
@@ -335,6 +369,21 @@ CMolecularBasis::getDimensionsOfPrimitiveBasis(const CMolecule& molecule) const
     return ndim;
 }
 
+std::set<int32_t>
+CMolecularBasis::getContractionDepths(const int32_t angularMomentum) const
+{
+    std::set<int32_t> cnums;
+    
+    for (const auto& abasis : _atomicBasisSets)
+    {
+        const auto anums = abasis.getContractionDepths(angularMomentum);
+        
+        cnums.insert(anums.begin(), anums.end());
+    }
+    
+    return cnums;
+}
+
 CAtomBasis
 CMolecularBasis::getAtomBasis(const int32_t idElemental) const
 {
@@ -350,7 +399,8 @@ CMolecularBasis::getAtomBasis(const int32_t idElemental) const
 }
 
 std::vector<CBasisFunction>
-CMolecularBasis::getBasisFunctions(const int32_t idElemental, const int32_t angularMomentum) const
+CMolecularBasis::getBasisFunctions(const int32_t idElemental,
+                                   const int32_t angularMomentum) const
 {
     for (size_t i = 0; i < _atomicBasisSets.size(); i++)
     {
@@ -523,7 +573,8 @@ CMolecularBasis::getPositionInAngularBlock(const CMolecule& molecule,
 }
 
 std::string
-CMolecularBasis::printBasis(const std::string& title, const CMolecule& molecule) const
+CMolecularBasis::printBasis(const std::string& title,
+                            const CMolecule&   molecule) const
 {
     std::string str = "Molecular Basis (" + title + ")";
 
@@ -647,7 +698,8 @@ CMolecularBasis::repr() const
 }
 
 std::ostream&
-operator<<(std::ostream& output, const CMolecularBasis& source)
+operator<<(      std::ostream&    output,
+           const CMolecularBasis& source)
 {
     return (output << source.repr());
 }

@@ -130,7 +130,7 @@ class ScfHessianDriver(HessianDriver):
         # check if Raman intensities are to be calculated (numerically)
         if 'do_raman' in freq_dict:
             key = freq_dict['do_raman'].lower()
-            self.do_raman = True if key in ['yes', 'y'] else False
+            self.do_raman = (key in ['yes', 'y'])
 
         # The electronic energy
         self.elec_energy = self.scf_drv.get_scf_energy()
@@ -159,7 +159,7 @@ class ScfHessianDriver(HessianDriver):
         })
 
         if self.numerical:
-            self.compute_numerical(molecule, ao_basis, min_basis, profiler)
+            self.compute_numerical(molecule, ao_basis, min_basis)
         else:
             self.compute_analytical(molecule, ao_basis, min_basis, profiler)
 
@@ -175,6 +175,160 @@ class ScfHessianDriver(HessianDriver):
         self.ostream.print_blank()
         self.ostream.print_blank()
         self.ostream.flush()
+
+
+    def compute_numerical(self, molecule, ao_basis, min_basis):
+        """
+        Performs the calculation of a numerical Hessian based only
+        on the energy.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param min_basis:
+            The minimal AO basis set.
+        """
+
+        scf_ostream_state = self.scf_drv.ostream.state
+        self.scf_drv.ostream.state = False
+
+        # atom labels
+        labels = molecule.get_labels()
+
+        # number of atoms
+        natm = molecule.number_of_atoms()
+
+        # atom coordinates (nx3)
+        coords = molecule.get_coordinates()
+
+        # Hessian
+        hessian = np.zeros((natm, 3, natm, 3))
+
+        # First-order properties for gradient of dipole moment
+        prop = FirstOrderProperties(self.comm, self.ostream)
+        # numerical gradient (3 dipole components, no. atoms x 3 atom coords)
+        if self.rank == mpi_master():
+            self.dipole_gradient = np.zeros((3, 3 * natm))
+
+        # If Raman intensities are calculated,
+        # set up LR solver and member variable
+        if self.do_raman:
+            # linear response driver for polarizability calculation
+            lr_drv = LinearResponseSolver(self.comm, self.scf_drv.ostream)
+            # polarizability: 3 coordinates x 3 coordinates
+            # (ignoring frequencies)
+            # polarizability gradient: dictionary goes through
+            # 3 coordinates x 3 coordinates
+            # each entry having values for no. atoms x 3 coordinates
+            if self.rank == mpi_master():
+                self.polarizability_gradient = np.zeros((3, 3, 3 * natm))
+
+        self.scf_drv.compute(molecule, ao_basis, min_basis)
+        energy_0 = self.scf_drv.get_scf_energy()
+
+        for i in range(natm):
+            for x in range(3):
+                # Plus x
+                coords[i, x] += self.delta_h
+                new_mol = Molecule(labels, coords, units='au')
+                self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                energy_ixp = self.scf_drv.get_scf_energy()
+
+                prop.compute_scf_prop(new_mol, ao_basis,
+                                      self.scf_drv.scf_tensors)
+                if self.rank == mpi_master():
+                    mu_plus = prop.get_property('dipole moment')
+
+                if self.do_raman:
+                    lr_drv.is_converged = False
+                    lr_results_p = lr_drv.compute(new_mol, ao_basis,
+                                                  self.scf_drv.scf_tensors)
+
+                # Minus x
+                coords[i, x] -= 2.0 * self.delta_h
+                new_mol = Molecule(labels, coords, units='au')
+                self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                energy_ixm = self.scf_drv.get_scf_energy()
+
+                prop.compute_scf_prop(new_mol, ao_basis,
+                                      self.scf_drv.scf_tensors)
+                if self.rank == mpi_master():
+                    mu_minus = prop.get_property('dipole moment')
+
+                if self.do_raman:
+                    lr_drv.is_converged = False
+                    lr_results_m = lr_drv.compute(new_mol, ao_basis,
+                                                  self.scf_drv.scf_tensors)
+                    if self.rank == mpi_master():
+                        for ind_aop, aop in enumerate('xyz'):
+                            for ind_bop, bop in enumerate('xyz'):
+                                # TODO: here the freq. is hard-coded to 0.0!
+                                comp_plus = (
+                                    lr_results_p['response_functions'][aop, bop,
+                                                                       0.0])
+                                comp_minus = (
+                                    lr_results_m['response_functions'][aop, bop,
+                                                                       0.0])
+                                self.polarizability_gradient[
+                                    ind_aop, ind_bop,
+                                    3 * i + x] = ((comp_plus - comp_minus) /
+                                                  (2.0 * self.delta_h))
+
+                if self.rank == mpi_master():
+                    for c in range(3):
+                        self.dipole_gradient[c, 3 * i +
+                                             x] = ((mu_plus[c] - mu_minus[c]) /
+                                                   (2.0 * self.delta_h))
+
+                hessian[i, x, i,
+                        x] = ((energy_ixp - 2 * energy_0 + energy_ixm) /
+                              self.delta_h**2)
+                coords[i, x] += self.delta_h
+
+                for j in range(i, natm):
+                    for y in range(3):
+                        if (j == i and x != y) or (j != i):
+                            # Plus y
+                            coords[j, y] += self.delta_h
+                            new_mol = Molecule(labels, coords, units='au')
+                            self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                            energy_jyp = self.scf_drv.get_scf_energy()
+
+                            # Plus x, plus y
+                            coords[i, x] += self.delta_h
+                            new_mol = Molecule(labels, coords, units='au')
+                            self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                            energy_ixp_jyp = self.scf_drv.get_scf_energy()
+                            coords[i, x] -= self.delta_h
+
+                            # Minus y
+                            coords[j, y] -= 2.0 * self.delta_h
+                            new_mol = Molecule(labels, coords, units='au')
+                            self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                            energy_jym = self.scf_drv.get_scf_energy()
+
+                            # Minus x, minus y:
+                            coords[i, x] -= self.delta_h
+                            new_mol = Molecule(labels, coords, units='au')
+                            self.scf_drv.compute(new_mol, ao_basis, min_basis)
+                            energy_ixm_jym = self.scf_drv.get_scf_energy()
+
+                            coords[i, x] += self.delta_h
+                            coords[j, y] += self.delta_h
+
+                            hessian[i, x, j, y] = (
+                                (energy_ixp_jyp - energy_ixp - energy_jyp +
+                                 2 * energy_0 - energy_ixm - energy_jym +
+                                 energy_ixm_jym) / (2 * self.delta_h**2))
+                            hessian[j, y, i, x] = hessian[i, x, j, y]
+        # reshaped Hessian as member variable
+        self.hessian = hessian.reshape(3 * natm, 3 * natm)
+
+        # restore scf_drv to initial state
+        self.scf_drv.compute(molecule, ao_basis, min_basis)
+        self.scf_drv.ostream.state = scf_ostream_state
+
 
     def compute_analytical(self, molecule, ao_basis, min_basis, profiler):
         """
@@ -519,328 +673,9 @@ class ScfHessianDriver(HessianDriver):
                          + hessian_eri_overlap)
 
 
-#    def compute_cphf(self, molecule, ao_basis, profiler):
-#        """
-#        Computes the coupled-perturbed Hartree-Fock (CPHF) coefficients.
-#
-#        :param molecule:
-#            The molecule.
-#        :param ao_basis:
-#            The AO basis set.
-#        :param profiler:
-#            The profiler.
-#
-#        :return:
-#            A dictionary containing the RHS and solution (ov block)
-#            of the CPHF equations, the derivative of the AO Fock matrix,
-#            partial derivative of the overlap matrix (oo block),
-#            and an auxiliary Fock matrix (oo block of the CPHF coefficients
-#            contracted with the two-electron integrals).
-#        """
-#
-#        # TODO: remove; add profiler
-#        profiler.start_timer(0, 'ComputeCPHF CG algorithm')
-#        start = tm.time()
-#
-#        density = self.scf_drv.scf_tensors['D_alpha']
-#        #overlap = self.scf_drv.scf_tensors['S']
-#        natm = molecule.number_of_atoms()
-#        mo = self.scf_drv.scf_tensors['C_alpha']
-#        nao = mo.shape[0]
-#        nocc = molecule.number_of_alpha_electrons()
-#        nvir = nao - nocc
-#        mo_occ = mo[:, :nocc]
-#        mo_vir = mo[:, nocc:]
-#        mo_energies = self.scf_drv.scf_tensors['E']
-#        eocc = mo_energies[:nocc]
-#        eoo = eocc.reshape(-1, 1) + eocc #ei+ej
-#        omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
-#        evir = mo_energies[nocc:]
-#        eov = eocc.reshape(-1, 1) - evir
-#
-#
-#        # preparing the CPHF RHS
-#
-#        ovlp_deriv_ao = np.zeros((natm, 3, nao, nao))
-#        fock_deriv_ao = np.zeros((natm, 3, nao, nao))
-#
-#        # import the integral derivatives
-#        for i in range(natm):
-#            ovlp_deriv_ao[i] = overlap_deriv(molecule, ao_basis, i)
-#            fock_deriv_ao[i] = fock_deriv(molecule, ao_basis, density, i)
-#
-#        # transform integral derivatives to MO basis
-#        ovlp_deriv_ov = np.einsum('mi,xymn,na->xyia', mo_occ, ovlp_deriv_ao, mo_vir)
-#        ovlp_deriv_oo = np.einsum('mi,xymn,nj->xyij', mo_occ, ovlp_deriv_ao, mo_occ)
-#        fock_deriv_ov = np.einsum('mi,xymn,na->xyia', mo_occ, fock_deriv_ao, mo_vir)
-#        orben_ovlp_deriv_ov = np.einsum('i,xyia->xyia', eocc, ovlp_deriv_ov)
-#
-#        # the oo part of the CPHF coefficients in AO basis,
-#        # transforming the oo overlap derivative back to AO basis (not equal to the initial one)
-#        uij_ao = np.einsum('mi,axij,nj->axmn', mo_occ, -0.5 * ovlp_deriv_oo, mo_occ).reshape((3*natm, nao, nao))
-#        uij_ao_list = list([uij_ao[x] for x in range(natm * 3)])
-#
-#        # create AODensity and Fock matrix objects, contract with ERI
-#        ao_density_uij = AODensityMatrix(uij_ao_list, denmat.rest)
-#        fock_uij = AOFockMatrix(ao_density_uij)
-#        #fock_flag = fockmat.rgenjk
-#        #fock_uij.set_fock_type(fock_flag, 1)
-#        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-#        screening = eri_drv.compute(get_qq_scheme(self.scf_drv.qq_type),
-#                                    self.scf_drv.eri_thresh, molecule, ao_basis)
-#        eri_drv.compute(fock_uij, ao_density_uij, molecule, ao_basis, screening)
-#
-#        # TODO: how can this be done better?
-#        fock_uij_numpy = np.zeros((natm,3,nao,nao))
-#        for i in range(natm):
-#            for x in range(3):
-#                fock_uij_numpy[i,x] = fock_uij.to_numpy(3*i + x)
-#
-#        # transform to MO basis
-#        fock_uij_mo = np.einsum('mi,axmn,nb->axib', mo_occ, fock_uij_numpy, mo_vir)
-#
-#        # sum up the terms of the RHS
-#        cphf_rhs = fock_deriv_ov - orben_ovlp_deriv_ov + 2 * fock_uij_mo
-#
-#        # Create an OrbitalResponse object
-#        # TODO: not needed anymore, but copy cphf_dict
-#        orbrsp_drv = OrbitalResponse(self.comm, self.ostream)
-#        orbrsp_drv.update_settings(orbrsp_dict=self.cphf_dict, method_dict=self.method_dict)
-#        dft_dict = orbrsp_drv.init_dft(molecule, self.scf_drv.scf_tensors)
-#
-#        cphf_ov = np.zeros((natm, 3, nocc, nvir))
-#
-#        # Solve the CPHF equations
-#        cphf_ov = self.solve_cphf(molecule, ao_basis, self.scf_drv.scf_tensors,
-#                                  cphf_rhs.reshape(3*natm, nocc, nvir), # TODO: possibly change the shape
-#                                  dft_dict, profiler)
-#        ###for i in range(natm):
-#        ###    for x in range(3):
-#        ###        # Call compute_lambda for all atoms and coordinates
-#        ###        cphf_ov[i,x] = orbrsp_drv.compute_lambda(molecule, ao_basis,
-#        ###                                                 self.scf_drv.scf_tensors,
-#        ###                                                 cphf_rhs[i,x], dft_dict, self.profiler)
-#
-#
-#        profiler.stop_timer(0, 'ComputeCPHF CG algorithm')
-#        if self.rank == mpi_master():
-#            self.print_convergence(start,
-#              'Coupled-Perturbed Hartree-Fock: CG algorithm')
-#
-#        return {
-#            'cphf_ov': cphf_ov,
-#            'cphf_rhs': cphf_rhs,
-#            'ovlp_deriv_oo': ovlp_deriv_oo,
-#            'fock_deriv_ao': fock_deriv_ao,
-#            'fock_uij': fock_uij_numpy,
-#        }
-#
-#    def print_convergence(self, start_time, title):
-#        """
-#        Prints information after convergence.
-#
-#        :param start_time:
-#            The start time.
-#        :param title:
-#            The name of the solver.
-#        """
-#
-#        width = 92
-#        output_conv = '*** '
-#        if self.is_converged:
-#            output_conv += '{:s} converged'.format(title)
-#        else:
-#            output_conv += '{:s} NOT converged'.format(title)
-#        output_conv += ' in {:d} iterations. '.format(self.iter_count + 1)
-#        output_conv += 'Time: {:.2f} sec'.format(tm.time() - start_time)
-#        self.ostream.print_header(output_conv.ljust(width))
-#        self.ostream.print_blank()
-#        self.ostream.print_blank()
-#        self.ostream.flush()
-#
-#    def solve_cphf(self, molecule, ao_basis, scf_tensors, cphf_rhs, dft_dict, profiler):
-#        """
-#        Solves the CPHF equations for all atomic coordinates to obtain the ov block
-#        of the CPHF coefficients.
-#
-#        :param molecule:
-#            The molecule.
-#        :param ao_basis:
-#            The AO basis set.
-#        :param scf_tensors:
-#            The tensors from the converged SCF calculation.
-#        :param cphf_rhs:
-#            The right-hand side of the CPHF equations for all atomic coordinates.
-#        :param dft_dict:
-#            The dictionary of DFT settings.
-#        :param profiler:
-#            The profiler.
-#
-#        :returns:
-#            The ov block of the CPHF coefficients.
-#        """
-#
-#        # count variable for conjugate gradient iterations
-#        self.iter_count = 0
-#
-#        nocc = molecule.number_of_alpha_electrons()
-#        natm = molecule.number_of_atoms()
-#
-#        if self.rank == mpi_master():
-#            mo = scf_tensors['C']
-#            nao = mo.shape[0]
-#            mo_energies = scf_tensors['E']
-#
-#            mo_occ = mo[:, :nocc].copy()
-#            mo_vir = mo[:, nocc:].copy()
-#            nvir = mo_vir.shape[1]
-#
-#            eocc = mo_energies[:nocc]
-#            evir = mo_energies[nocc:]
-#            eov = eocc.reshape(-1, 1) - evir
-#        else:
-#            nvir = None
-#            eov = None
-#        nvir = self.comm.bcast(nvir, root=mpi_master())
-#        eov = self.comm.bcast(eov, root=mpi_master())
-#
-#        # Calculate the initial guess for the CPHF coefficients given by
-#        # the RHS divided by orbital-energy differences
-#        cphf_guess = cphf_rhs / eov
-#
-#        if self.rank == mpi_master():
-#            # Create AODensityMatrix object from CPHF guess in AO
-#            cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ, cphf_guess, mo_vir)
-#            cphf_ao_list = list([cphf_ao[x] for x in range(3*natm)])
-#            # create AODensityMatrix object
-#            ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
-#        else:
-#            ao_density_cphf = AODensityMatrix()
-#        ao_density_cphf.broadcast(self.rank, self.comm)
-#
-#        # ERI driver
-#        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-#        screening = eri_drv.compute(get_qq_scheme(self.scf_drv.qq_type),
-#                                    self.scf_drv.eri_thresh, molecule, ao_basis)
-#
-#        molgrid = dft_dict['molgrid']
-#        gs_density = dft_dict['gs_density']
-#
-#        # Create a Fock Matrix Object (initialized with zeros)
-#        fock_cphf = AOFockMatrix(ao_density_cphf)
-#        fock_flag = fockmat.rgenjk
-#
-#        # TODO: can this be done more efficiently, Zilvinas? (C layer)
-#        for i in range(3*natm):
-#            if self.dft:
-#                if self.xcfun.is_hybrid():
-#                    fock_flag = fockmat.rgenjkx
-#                    fact_xc = self.xcfun.get_frac_exact_exchange()
-#                    fock_cphf.set_scale_factor(fact_xc, i)
-#                else:
-#                    fock_flag = fockmat.rgenj
-#
-#            fock_cphf.set_fock_type(fock_flag, i)
-#
-#        # Matrix-vector product of orbital Hessian with trial vector
-#        def cphf_matvec(v):
-#            """
-#            Function to carry out matrix multiplication of CPHF coefficient
-#            vector with orbital Hessian matrix.
-#            """
-#
-#            profiler.start_timer(self.iter_count, 'CG')
-#
-#            # Create AODensityMatrix object from lambda in AO
-#            if self.rank == mpi_master():
-#                cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ, v.reshape(3*natm, nocc, nvir), mo_vir)
-#                cphf_ao_list = list([cphf_ao[x] for x in range(3*natm)])
-#                ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
-#            else:
-#                ao_density_cphf = AODensityMatrix()
-#            ao_density_cphf.broadcast(self.rank, self.comm)
-#
-#            eri_drv.compute(fock_cphf, ao_density_cphf, molecule, ao_basis,
-#                            screening)
-#            if self.dft:
-#                #t0 = tm.time()
-#                if not self.xcfun.is_hybrid():
-#                    for i in range(3*natm):
-#                        fock_cphf.scale(2.0, i)
-#                xc_drv = XCIntegrator(self.comm)
-#                molgrid.distribute(self.rank, self.nodes, self.comm)
-#                xc_drv.integrate(fock_cphf, ao_density_cphf, gs_density,
-#                                 molecule, ao_basis, molgrid,
-#                                 self.xcfun.get_func_label())
-#                #if timing_dict is not None:
-#                #    timing_dict['DFT'] = tm.time() - t0
-#
-#            fock_cphf.reduce_sum(self.rank, self.nodes, self.comm)
-#
-#            # Transform to MO basis (symmetrized w.r.t. occ. and virt.)
-#            # and add diagonal part
-#            if self.rank == mpi_master():
-#                fock_cphf_numpy = np.zeros((3*natm,nao,nao))
-#                for i in range(3*natm):
-#                    fock_cphf_numpy[i] = fock_cphf.to_numpy(i)
-#
-#                cphf_mo = (-np.einsum('mi,xmn,na->xia', mo_occ, fock_cphf_numpy, mo_vir)
-#                          - np.einsum('ma,xmn,ni->xia', mo_vir, fock_cphf_numpy, mo_occ)
-#                          + v.reshape(3*natm, nocc, nvir) * eov)
-#            else:
-#                cphf_mo = None
-#
-#            cphf_mo = self.comm.bcast(cphf_mo, root=mpi_master())
-#
-#            profiler.stop_timer(self.iter_count, 'CG')
-#
-#            profiler.check_memory_usage(
-#                'CG Iteration {:d}'.format(self.iter_count + 1))
-#
-#            profiler.print_memory_tracing(self.ostream)
-#
-#            # increase iteration counter every time this function is called
-#            self.iter_count += 1
-#
-#            return cphf_mo.reshape(3 * natm * nocc * nvir)
-#
-#        # Matrix-vector product for preconditioner using the
-#        # inverse of the diagonal (i.e. eocc - evir)
-#        def precond_matvec(v):
-#            """
-#            Function that defines the matrix-vector product
-#            required by the pre-conditioner for the conjugate gradient.
-#            It is an approximation for the inverse of matrix A in Ax = b.
-#            """
-#            current_v = v.reshape(3*natm, nocc, nvir)
-#            M_dot_v = current_v / eov
-#
-#            return M_dot_v.reshape(3 * natm * nocc * nvir)
-#
-#        # 5) Define the linear operators and run conjugate gradient
-#        LinOp = linalg.LinearOperator((3*natm * nocc * nvir, 3*natm * nocc * nvir),
-#                                      matvec=cphf_matvec)
-#        PrecondOp = linalg.LinearOperator((3*natm * nocc * nvir, 3*natm * nocc * nvir),
-#                                          matvec=precond_matvec)
-#
-#        b = cphf_rhs.reshape(3*natm * nocc * nvir)
-#        x0 = cphf_guess.reshape(3*natm * nocc * nvir)
-#
-#        cphf_coefficients_ov, cg_conv = linalg.cg(A=LinOp,
-#                                                b=b,
-#                                                x0=x0,
-#                                                M=PrecondOp,
-#                                                tol=self.conv_thresh,
-#                                                atol=0,
-#                                                maxiter=self.max_iter)
-#
-#        self.is_converged = (cg_conv == 0)
-#
-#        return cphf_coefficients_ov.reshape(natm, 3, nocc, nvir)
+    # TODO: make this option available
+    def compute_numerical_with_analytical_gradient(self, molecule, ao_basis, min_basis, profiler):
 
-
-
-    def compute_numerical(self, molecule, ao_basis, min_basis, profiler):
         """
         Performs calculation of numerical Hessian.
 
@@ -1116,5 +951,4 @@ class ScfHessianDriver(HessianDriver):
                                 )
 
         return dipole_integrals_gradient
-
 

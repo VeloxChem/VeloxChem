@@ -23,27 +23,31 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-import numpy as np
 import time as tm
-import sys
 from mpi4py import MPI
+import numpy as np
+import sys
 
+from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import denmat
-from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
 from .molecule import Molecule
+from .outputstream import OutputStream
+
 
 class GradientDriver:
     """
     Implements gradient driver.
 
+    :param energy_drv:
+        The energy driver.
     :param comm:
         The MPI communicator.
     :param ostream:
@@ -60,18 +64,26 @@ class GradientDriver:
 
     """
 
-    def __init__(self, comm=None, ostream=None):
+    def __init__(self, energy_drv, comm=None, ostream=None):
         """
         Initializes gradient driver.
         """
 
         if comm is None:
-            comm = MPI.COMM_WORLD
+            if hasattr(energy_drv, 'comm'):
+                comm = energy_drv.comm
+            else:
+                comm = MPI.COMM_WORLD
 
         if ostream is None:
-            ostream = OutputStream(sys.stdout)
+            if hasattr(energy_drv, 'ostream'):
+                ostream = energy_drv.ostream
+            else:
+                if comm.Get_rank() == mpi_master():
+                    ostream = OutputStream(sys.stdout)
+                else:
+                    ostream = OutputStream(None)
 
-        # MPI information
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
@@ -154,16 +166,14 @@ class GradientDriver:
 
 
 
-    def compute(self, molecule, ao_basis=None, min_basis=None):
+    def compute(self, molecule, *args):
         """
         Performs calculation of numerical gradient.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
+        :param args:
+            The arguments.
         """
 
         return
@@ -177,8 +187,6 @@ class GradientDriver:
         :param args:
             The same arguments as the "compute" function.
         """
-
-        ostream_state = self.init_drivers()
 
         # atom labels
         labels = molecule.get_labels()
@@ -207,25 +215,19 @@ class GradientDriver:
                     new_mol = Molecule(labels, coords, units='au')
                     e_plus2 = self.compute_energy(new_mol, *args)
                     coords[i, d] -= 2.0 * self.delta_h
-                    self.gradient[i, d] = (e_minus2 - 8 * e_minus + 8 * e_plus - e_plus2) / (12.0 * self.delta_h)
+                    self.gradient[i, d] = ( (e_minus2 - 8 * e_minus 
+                                           + 8 * e_plus - e_plus2) 
+                                           / (12.0 * self.delta_h) )
                 else:
                     coords[i, d] += self.delta_h
                     self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
                     
-        self.restore_drivers(molecule, ostream_state, *args)
-        self.ostream.print_blank()
-
-    def init_drivers(self):
-        """
-        Silence the energy drivers and save the current ostream state.
-
-        :return:
-            The ostream state(s).
-        """
+        # restore energy driver
+        self.compute_energy(molecule, *args)
 
     def compute_energy(self, molecule, *args):
         """
-        Compute the energy at current position
+        Computes the energy at current geometry.
 
         :param molecule:
             The molecule.
@@ -236,18 +238,7 @@ class GradientDriver:
             The energy.
         """
 
-    def restore_drivers(self, molecule, ostream_state, *args):
-        """
-        Restore the energy drivers to their initial states.
-
-        :param molecule:
-            The molecule.
-        :param ostream_state:
-            The previous ostream_state of the driver.
-        :param args:
-            The same arguments as the "compute" function.
-
-        """
+        return
 
     def init_dft(self, molecule, scf_tensors):
         """

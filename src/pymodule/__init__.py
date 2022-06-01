@@ -123,6 +123,9 @@ from .cphfsolver import CphfSolver
 from .tdhfhessiandriver import TdhfHessianDriver
 from .polarizabilitygradient import PolOrbitalResponse
 from .polarizabilitygradient import PolarizabilityGradient
+from .forcefieldgenerator import ForceFieldGenerator
+from .openmmdriver import OpenMMDriver
+from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
 from .numerovdriver import NumerovDriver
 
@@ -134,10 +137,12 @@ from .import_from_pyscf import overlap_deriv
 from .import_from_pyscf import fock_deriv
 from .import_from_pyscf import eri_deriv
 
-# Environment variable: basis set path and number of OpenMP threads
-from .environ import set_vlxbasispath, set_omp_num_threads, get_basis_path
+# Environment variable: basis set path, number of OpenMP threads, MKL linking
+from .environ import set_vlxbasispath, set_omp_num_threads, get_basis_path, configure_mkl_rt
 
 set_vlxbasispath()
 set_omp_num_threads()
+configure_mkl_rt()
+
 
 __version__ = "1.0rc2"

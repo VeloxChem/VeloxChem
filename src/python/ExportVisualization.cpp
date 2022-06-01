@@ -111,7 +111,6 @@ export_visualization(py::module& m)
              "molecule"_a,
              "basis"_a,
              "density"_a,
-             "denidx"_a,
              "denspin"_a)
         .def("get_two_particle_density",
              &CVisualizationDriver::getTwoParticleDensity,
@@ -121,7 +120,6 @@ export_visualization(py::module& m)
              "molecule"_a,
              "basis"_a,
              "density"_a,
-             "denidx"_a,
              "spin_1"_a,
              "spin_2"_a);
 }

@@ -23,12 +23,16 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from contextlib import redirect_stderr
+from io import StringIO
 import numpy as np
 import time as tm
-import geometric
 
 from .veloxchemlib import mpi_master
 from .molecule import Molecule
+
+with redirect_stderr(StringIO()) as fg_err:
+    import geometric
 
 
 class OptimizationEngine(geometric.engine.Engine):
@@ -97,14 +101,14 @@ class OptimizationEngine(geometric.engine.Engine):
         self.grad_drv.ostream.print_info('Computing energy and gradient...')
         self.grad_drv.ostream.flush()
 
-        ostream_state = self.grad_drv.ostream.state
+        grad_ostream_state = self.grad_drv.ostream.state
         self.grad_drv.ostream.state = False
 
-        energy = self.grad_drv.compute_energy(new_mol,*self.args)
+        energy = self.grad_drv.compute_energy(new_mol, *self.args)
         self.grad_drv.compute(new_mol, *self.args)
         gradient = self.grad_drv.get_gradient()
 
-        self.grad_drv.ostream.state = ostream_state
+        self.grad_drv.ostream.state = grad_ostream_state
 
         energy = self.comm.bcast(energy, root=mpi_master())
         gradient = self.comm.bcast(gradient, root=mpi_master())

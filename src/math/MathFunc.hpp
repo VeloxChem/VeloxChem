@@ -254,7 +254,7 @@ int32_t maxTensorComponents(const int32_t order);
 
 /** Fill raw array with random numbers in interval.
  *
- * @tparam scalar type of raw array.
+ * @tparam T scalar type of raw array.
  * @param[in,out] dst raw array.
  * @param[in] lower lower bound of interval.
  * @param[in] upper upper bound of interval.

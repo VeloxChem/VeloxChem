@@ -387,7 +387,6 @@ namespace vxcfuncs {  // vxcfuncs namespace
         double BETA2 = BETA*BETA;
 
         #pragma omp simd aligned(rhoa, grada, df2010, df1020,df3000,df0030: VLX_ALIGN)
-
         for (int32_t i = 0; i < ngpoints; i++)
         {
 

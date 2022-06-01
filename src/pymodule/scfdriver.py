@@ -104,7 +104,6 @@ class ScfDriver:
           file.
         - scf_type: The type of SCF calculation (restricted, unrestricted, or
           restricted open-shell).
-        - dispersion: The flag for calculating D4 dispersion correction.
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.

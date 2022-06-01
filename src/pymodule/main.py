@@ -25,6 +25,7 @@
 
 from mpi4py import MPI
 from datetime import datetime, timedelta
+import time as tm
 
 from .veloxchemlib import mpi_initialized, mpi_master
 from .mpitask import MpiTask
@@ -32,6 +33,7 @@ from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .firstorderprop import FirstOrderProperties
+from .forcefieldgenerator import ForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
 from .excitondriver import ExcitonModelDriver
 from .numerovdriver import NumerovDriver
@@ -56,10 +58,11 @@ from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XTBDriver
 from .xtbgradientdriver import XTBGradientDriver
+from .xtbhessiandriver import XTBHessianDriver
+from .veloxchemlib import DiagEriDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_end_time
-
 
 def select_scf_driver(task, scf_type):
     """
@@ -255,6 +258,21 @@ def main():
         exciton_drv.update_settings(exciton_dict, method_dict)
         exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+    # Force field generator
+
+    if task_type == 'force field':
+        force_field_dict = (task.input_dict['force_field']
+                            if 'force_field' in task.input_dict else {})
+        resp_dict = (task.input_dict['resp_charges']
+                     if 'resp_charges' in task.input_dict else {})
+
+        force_field_dict['filename'] = task.input_dict['filename']
+        resp_dict['filename'] = task.input_dict['filename']
+
+        force_field_drv = ForceFieldGenerator(task.mpi_comm, task.ostream)
+        force_field_drv.update_settings(force_field_dict, resp_dict)
+        force_field_drv.compute(task.molecule, task.ao_basis)
+
     # Spectrum from trajectory
 
     if task_type == 'trajectory':
@@ -289,8 +307,8 @@ def main():
 
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
-        'wave function', 'mp2', 'gradient', 'optimize', 'response', 'pulses',
-        'visualization', 'loprop', 'frequencies', 'freq', 'cphf'
+        'wave function', 'mp2', 'gradient', 'hessian', 'optimize', 'response',
+        'pulses', 'visualization', 'loprop', 'frequencies', 'freq', 'cphf'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -336,7 +354,7 @@ def main():
             scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
             scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_tensors)
             if task.mpi_rank == mpi_master():
-                scf_prop.print_properties(task.molecule, 'SCF Ground-State Dipole Moment')
+                scf_prop.print_properties(task.molecule)
 
             if (scf_drv.electric_field is not None and
                     task.molecule.get_charge() != 0):
@@ -358,6 +376,24 @@ def main():
             grad_drv.update_settings(grad_dict, method_dict)
             grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+    # Hessian
+
+    if task_type == 'hessian':
+        hessian_dict = (task.input_dict['hessian']
+                        if 'hessian' in task.input_dict else {})
+        if use_xtb:
+            hessian_drv = XTBHessianDriver(xtb_drv, task.mpi_comm, task.ostream)
+            hessian_drv.update_settings(method_dict, hessian_dict)
+            hessian_drv.compute(task.molecule)
+
+        elif scf_drv.scf_type == 'restricted':
+            hessian_drv = ScfHessianDriver(scf_drv, task.mpi_comm, task.ostream)
+            hessian_drv.update_settings(method_dict, hessian_dict)
+            hessian_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        if task.mpi_rank == mpi_master():
+            hessian_drv.vibrational_analysis(task.molecule)
+
     # Geometry optimization
 
     if task_type == 'optimize':
@@ -374,13 +410,15 @@ def main():
 
         if use_xtb:
             grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
-            opt_drv = OptimizationDriver(grad_drv, 'XTB')
+            opt_drv = OptimizationDriver(grad_drv)
+            opt_drv.update_settings(opt_dict)
+            opt_drv.compute(task.molecule)
+
         elif scf_drv.scf_type == 'restricted':
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
-            opt_drv = OptimizationDriver(grad_drv, 'SCF')
-
-        opt_drv.update_settings(opt_dict)
-        opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+            opt_drv = OptimizationDriver(grad_drv)
+            opt_drv.update_settings(opt_dict)
+            opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Ground state Hessian / Vibrational analysis
 
@@ -544,6 +582,15 @@ def main():
             chg_drv.compute(task.molecule, task.ao_basis, 'resp')
         elif task_type == 'esp charges':
             chg_drv.compute(task.molecule, task.ao_basis, 'esp')
+            
+    # Test of electron repulstion integrals
+    
+    if task_type == 'eritest':
+        print('*** Testing Two Electron Implementation ***')
+        tm0 = tm.time()
+        eri_driver = DiagEriDriver()
+        pgblock = eri_driver.compute(task.molecule, task.ao_basis)
+        print('Diagonal Eri Driver: ', tm.time() - tm0, ' sec.')
 
     # All done
 

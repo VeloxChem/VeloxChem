@@ -23,10 +23,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from mpi4py import MPI
-import numpy as np
 import time as tm
-import sys
+import numpy as np
 
 from .molecule import Molecule
 from .gradientdriver import GradientDriver
@@ -62,13 +60,7 @@ class ScfGradientDriver(GradientDriver):
         Initializes gradient driver.
         """
 
-        if comm is None:
-            comm = MPI.COMM_WORLD
-
-        if ostream is None:
-            ostream = OutputStream(sys.stdout)
-
-        super().__init__(comm, ostream)
+        super().__init__(scf_drv, comm, ostream)
 
         self.flag = 'SCF Gradient Driver'
         self.scf_drv = scf_drv
@@ -106,7 +98,11 @@ class ScfGradientDriver(GradientDriver):
         start_time = tm.time()
 
         if self.numerical:
+            scf_ostream_state = self.scf_drv.ostream.state
+            self.scf_drv.ostream.state = False
             self.compute_numerical(molecule, ao_basis, min_basis)
+            self.scf_drv.ostream.state = scf_ostream_state
+
         else:
             self.compute_analytical(molecule, ao_basis)
 
@@ -315,36 +311,20 @@ class ScfGradientDriver(GradientDriver):
 #        self.scf_drv.compute(molecule, ao_basis, min_basis)
 #        self.scf_drv.ostream.state = scf_ostream_state
 
-
-    def init_drivers(self):
-        """
-        Silence the energy drivers and save the current ostream state.
-
-        :return:
-            The ostream state(s).
-        """
-
-        scf_ostream_state = self.scf_drv.ostream.state
-        self.scf_drv.ostream.state = False
-        return scf_ostream_state
-
     def compute_energy(self, molecule, ao_basis, min_basis=None):
         """
-        Compute the energy at current position
+        Computes the energy at current geometry.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param min_basis:
+            The minimal AO basis set.
 
         :return:
             The energy.
         """
-        self.scf_drv.compute(molecule, ao_basis, min_basis)
 
+        self.scf_drv.compute(molecule, ao_basis, min_basis)
         return self.scf_drv.get_scf_energy()
-
-    def restore_drivers(self, molecule, ostream_state, ao_basis, min_basis=None):
-        """
-        Restore the energy drivers to their initial states.
-
-        """
-
-        self.scf_drv.compute(molecule, ao_basis, min_basis)
-        self.scf_drv.ostream.state = ostream_state
-

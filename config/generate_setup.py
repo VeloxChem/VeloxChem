@@ -81,9 +81,12 @@ def get_command_output(command):
 
 
 def check_cray():
-    if "CRAYPE_VERSION" in os.environ and "CRAYPE_DIR" in os.environ:
-        return True
-    return False
+    return "CRAYPE_VERSION" in os.environ and "CRAYPE_DIR" in os.environ
+
+
+def check_apple_clang(cxx):
+    cxxversion = get_command_output([cxx, "--version"])
+    return cxxversion.startswith("Apple clang")
 
 
 def check_dir(dir_path, label):
@@ -188,8 +191,17 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
         cxx_flags = "-fopenmp"
         omp_flag = "-lgomp"
     elif use_clang:
-        cxx_flags = "-Xclang -fopenmp"
+        if check_apple_clang(cxx):
+            cxx_flags = "-Xclang -fopenmp"
+        else:
+            cxx_flags = "-fopenmp"
         omp_flag = "-lomp"
+        # for custom OpenMP installation on mac
+        if "OMPROOT" in os.environ:
+            omp_inc = str(Path(os.environ["OMPROOT"], "include"))
+            omp_dir = str(Path(os.environ["OMPROOT"], "lib"))
+            cxx_flags += f" -I{omp_inc}"
+            omp_flag = f" -L{omp_dir} " + omp_flag
 
     # ==> math library <==
 
@@ -231,6 +243,35 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
         print("***        from https://github.com/xianyi/OpenBLAS")
         sys.exit(1)
 
+    # produce the mklconf.py file
+    conf = {}
+    if is_linux and not use_intel:
+        conf = {
+            "@_mkl_interface_layer_@": "GNU,LP64",
+            "@_mkl_threading_layer_@": "GNU",
+        }
+    elif use_intel:
+        conf = {
+            "@_mkl_interface_layer_@": "LP64",
+            "@_mkl_threading_layer_@": "INTEL",
+        }
+    elif use_clang:
+        conf = {
+            "@_mkl_interface_layer_@": "LP64",
+            "@_mkl_threading_layer_@": "INTEL",
+        }
+    replacer = SearchReplace(conf)
+
+    # read in src/pymodule/mklconf.py.in
+    conf_mkl_in = Path("src", "pymodule", "mklconf.py.in")
+    conf_mkl = Path("src", "pymodule", "mklconf.py")
+
+    with conf_mkl_in.open("r") as f:
+        contents = "".join(f.readlines())
+
+    with conf_mkl.open("w") as f:
+        f.write(replacer.replace(contents))
+
     # ==> mkl flags <==
 
     if use_mkl:
@@ -251,33 +292,6 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
         else:
             math_lib += "\nMATH_LIB += -lmkl_rt -Wl,--no-as-needed"
         math_lib += " -lpthread -lm -ldl"
-
-        if is_linux and not use_intel:
-            conf = {
-                "@_mkl_interface_layer_@": "MKL_INTERFACE_LP64+MKL_INTERFACE_GNU",
-                "@_mkl_threading_layer_@": "MKL_THREADING_GNU",
-            }
-        elif use_intel:
-            conf = {
-                "@_mkl_interface_layer_@": "MKL_INTERFACE_LP64",
-                "@_mkl_threading_layer_@": "MKL_THREADING_INTEL",
-            }
-        elif use_clang:
-            conf = {
-                "@_mkl_interface_layer_@": "MKL_INTERFACE_LP64",
-                "@_mkl_threading_layer_@": "MKL_THREADING_INTEL",
-            }
-        replacer = SearchReplace(conf)
-
-        # read in src/general/ConfigMKL.hpp.in
-        conf_mkl_in = Path("src", "general", "ConfigMKL.hpp.in")
-        conf_mkl = Path("src", "general", "ConfigMKL.hpp")
-
-        with conf_mkl_in.open("r") as f:
-            contents = "".join(f.readlines())
-
-        with conf_mkl.open("w") as f:
-            f.write(replacer.replace(contents))
 
     # ==> openblas flags <==
 
@@ -328,12 +342,15 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
 
     # ==> xtb package <==
 
+    if is_conda and ("XTBHOME" not in os.environ):
+        os.environ["XTBHOME"] = sys.prefix
+
     xtb_root = os.getenv("XTBHOME", sys.prefix)
 
     # xtb include
-    xtb_inc = Path(xtb_root, "include")
+    xtb_inc = Path(xtb_root, "include", "xtb")
     if not xtb_inc.is_dir():
-        xtb_inc = Path(xtb_root, "include", "xtb")
+        xtb_inc = Path(xtb_root, "include")
     has_xtb_header = (xtb_inc / "xtb.h").is_file()
 
     # xtb library
@@ -360,25 +377,32 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
 
     # ==> google test <==
 
-    # use GTESTROOT for local from-source installations
-    # this env-var takes priority!
-    gtest_root = os.getenv("GTESTROOT", None)
-    # use GTESTLIB for system-package (APT) installations
-    gtest_lib = os.getenv("GTESTLIB", None)
+    if is_conda and ("GTESTROOT" not in os.environ):
+        os.environ["GTESTROOT"] = sys.prefix
 
-    gtest_incdir = ""
-    gtest_libdir = ""
-    if gtest_root is not None:
-        if Path(gtest_root, "include").is_dir():
-            gtest_incdir = Path(gtest_root, "include")
-        if Path(gtest_root, "lib").is_dir():
-            gtest_libdir = Path(gtest_root, "lib")
+    gtest_root = os.getenv("GTESTROOT", sys.prefix)
+
+    # gtest include
+    gtest_inc = Path(gtest_root, "include")
+    has_gtest_header = (gtest_inc / "gtest" / "gtest.h").is_file()
+
+    # gtest library
+    gtest_dir = Path(gtest_root, "lib")
+    has_gtest_lib = ((gtest_dir / "libgtest.so").is_file() or
+                     (gtest_dir / "libgtest.dylib").is_file())
+
+    use_gtest = (has_gtest_header and has_gtest_lib)
+    if use_gtest:
+        gtest_lib = f"GST_INC := {gtest_inc}"
+        gtest_lib += f"\nGST_LIB := -L{gtest_dir}"
+        gtest_lib += f"\nGST_LIB += -Wl,-rpath,{gtest_dir} -lgtest"
+        print(f"*** Checking GoogleTest... {gtest_root}")
     else:
-        if gtest_lib is not None:
-            gtest_libdir = gtest_lib
-
-    print(f"*** Checking GoogleTest... {gtest_incdir} {gtest_libdir}")
-
+        gtest_dir = os.getenv("GTESTLIB", "")
+        if gtest_dir:
+            use_gtest = True
+            gtest_lib = f"GST_LIB := -L{gtest_dir} -lgtest"
+            print(f"*** Checking GoogleTest... {gtest_dir}")
 
     # ==> write Makefile.setup <==
 
@@ -437,10 +461,8 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
                 if use_xtb:
                     print(xtb_lib, file=f_mkfile)
                     print("", file=f_mkfile)
-                if gtest_incdir:
-                    print(f"GST_INC := {gtest_incdir}", file=f_mkfile)
-                if gtest_libdir:
-                    print(f"GST_LIB := -L{gtest_libdir} -lgtest", file=f_mkfile)
+                if use_gtest:
+                    print(gtest_lib, file=f_mkfile)
                     print("", file=f_mkfile)
 
                 print("# Generic settings", file=f_mkfile)

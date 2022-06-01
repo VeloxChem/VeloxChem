@@ -23,17 +23,14 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from mpi4py import MPI
 import numpy as np
 import time as tm
-import sys
 
+from .veloxchemlib import mpi_master
 from .molecule import Molecule
-from .gradientdriver import GradientDriver
 from .hessiandriver import HessianDriver
-from .xtbgradientdriver import XTBGradientDriver
 from .xtbdriver import XTBDriver
-from .outputstream import OutputStream
+
 
 class XTBHessianDriver(HessianDriver):
     """
@@ -47,9 +44,7 @@ class XTBHessianDriver(HessianDriver):
         The output stream.
 
     Instance variables
-        - xtb_drv: The SCF driver.
-        - do_raman: Additionally calculate Raman intensities
-                (at significantly higher computational cost).
+        - xtb_drv: The XTB driver.
     """
 
     def __init__(self, xtb_drv, comm=None, ostream=None):
@@ -61,8 +56,6 @@ class XTBHessianDriver(HessianDriver):
 
         self.flag = 'XTB Hessian Driver'
         self.xtb_drv = xtb_drv
-        self.do_raman = False
-
 
     def update_settings(self, method_dict, freq_dict=None):
         """
@@ -79,31 +72,21 @@ class XTBHessianDriver(HessianDriver):
         if freq_dict is None:
             freq_dict = {}
 
-        # check if Raman intensities are to be calculated (numerically)
-        if 'do_raman' in freq_dict:
-            key = freq_dict['do_raman'].lower()
-            self.do_raman = True if key in ['yes', 'y'] else False
-
-        # The electronic energy 
+        # The electronic energy
         self.elec_energy = self.xtb_drv.get_energy()
 
-
-    def compute(self, molecule, ao_basis, min_basis=None):
+    def compute(self, molecule):
         """
         Computes the numerical nuclear Hessian.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
         """
         self.print_header()
 
         start_time = tm.time()
 
-        self.compute_numerical(molecule, ao_basis, min_basis)
+        self.compute_numerical(molecule)
 
         # print Hessian
         if self.do_print_hessian is True:
@@ -118,24 +101,14 @@ class XTBHessianDriver(HessianDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-
-    def compute_numerical(self, molecule, ao_basis, min_basis=None):
+    def compute_numerical(self, molecule):
         """
         Performs calculation of numerical Hessian.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
         """
 
-        # TODO: remove grad_dict?
-        # settings dictionary for gradient driver
-        grad_dict = dict(self.freq_dict)
-
-        #TODO -- check if working
         xtb_ostream_state = self.ostream.state
         self.ostream.state = False
 
@@ -148,11 +121,13 @@ class XTBHessianDriver(HessianDriver):
         # atom coordinates (nx3)
         coords = molecule.get_coordinates()
 
-        # Hessian
-        hessian = np.zeros((natm, 3, natm, 3))
+        if self.rank == mpi_master():
+            # Hessian
+            hessian = np.zeros((natm, 3, natm, 3))
 
-        # numerical dipole gradient (3 dipole components, no. atoms x 3 atom coords)
-        self.dipole_gradient = np.zeros((3, 3 * natm))
+            # numerical dipole gradient (3 dipole components,
+            # no. atoms x 3 atom coords)
+            self.dipole_gradient = np.zeros((3, 3 * natm))
 
         if not self.do_four_point:
             for i in range(natm):
@@ -177,11 +152,16 @@ class XTBHessianDriver(HessianDriver):
 
                     mu_minus = xtb_drv.get_dipole()
 
-                    for c in range(3):
-                        self.dipole_gradient[c, 3*i + d] = (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
                     coords[i, d] += self.delta_h
-                    hessian[i, d, :, :] = (grad_plus - grad_minus) / (2.0 * self.delta_h)
 
+                    if self.rank == mpi_master():
+                        for c in range(3):
+                            self.dipole_gradient[c, 3 * i + d] = (
+                                mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
+
+                        hessian[i,
+                                d, :, :] = (grad_plus -
+                                            grad_minus) / (2.0 * self.delta_h)
 
         else:
             # Four-point numerical derivative approximation
@@ -210,7 +190,7 @@ class XTBHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     xtb_drv = XTBDriver(self.comm)
                     xtb_drv.compute(new_mol, self.ostream)
- 
+
                     grad_minus1 = xtb_drv.get_gradient()
 
                     mu_minus1 = xtb_drv.get_dipole()
@@ -224,17 +204,27 @@ class XTBHessianDriver(HessianDriver):
 
                     mu_minus2 = xtb_drv.get_dipole()
 
-                    for c in range(3):
-                        self.dipole_gradient[c, 3*i + d] = (mu_minus2[c] - 8.0 * mu_minus1[c]
-                                                         + 8.0 * mu_plus1[c] - mu_plus2[c]) / (12.0 * self.delta_h)
-
                     coords[i, d] += 2.0 * self.delta_h
-                    # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
-                    hessian[i, d] = (grad_minus2 - 8.0 * grad_minus1
-                                           + 8.0 * grad_plus1 - grad_plus2) / (12.0 * self.delta_h)
+
+                    if self.rank == mpi_master():
+                        for c in range(3):
+                            self.dipole_gradient[
+                                c, 3 * i +
+                                d] = (mu_minus2[c] - 8.0 * mu_minus1[c] +
+                                      8.0 * mu_plus1[c] -
+                                      mu_plus2[c]) / (12.0 * self.delta_h)
+
+                        # f'(x) ~ [ f(x - 2h) - 8 f(x - h)
+                        # + 8 f(x + h) - f(x + 2h) ] / ( 12h )
+                        hessian[i,
+                                d, :, :] = (grad_minus2 - 8.0 * grad_minus1 +
+                                            8.0 * grad_plus1 -
+                                            grad_plus2) / (12.0 * self.delta_h)
 
         # reshaped Hessian as member variable
-        self.hessian = hessian.reshape(3*natm, 3*natm)
+        if self.rank == mpi_master():
+            self.hessian = hessian.reshape(3 * natm, 3 * natm)
+        else:
+            self.hessian = None
 
         self.ostream.state = xtb_ostream_state
-

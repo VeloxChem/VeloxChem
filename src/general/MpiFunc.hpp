@@ -38,7 +38,7 @@
 
 namespace mpi {
 template <typename T>
-inline constexpr MPI_Datatype type_v = metautils::type_to_mpi_datatype<T>::value;
+inline MPI_Datatype type_v = metautils::type_to_mpi_datatype<T>::value;
 
 template <typename T>
 inline std::string
@@ -140,7 +140,7 @@ bool compare(MPI_Comm comm1, MPI_Comm comm2);
 /**
  * Broadcasts a scalar value within MPI communicator.
  *
- * @taparam T type of value.
+ * @tparam T type of value.
  * @param value the value.
  * @param comm the MPI communicator.
  */
@@ -168,7 +168,7 @@ void bcast(std::string& str, int32_t rank, MPI_Comm comm);
 /**
  * Broadcasts vector within domain of MPI communicator.
  *
- * @taparam T type of underlying scalar.
+ * @tparam T type of underlying scalar.
  * @param vector the vector.
  * @param comm the MPI communicator.
  */
@@ -280,17 +280,17 @@ int32_t batch_offset(const int32_t nElements, const int32_t rank, const int32_t 
 void batches_pattern(int32_t* pattern, const int32_t nElements, const int32_t nodes);
 
 /**
- * Gathers vector of integers on master MPI process by taking single integer from
+ * Gathers vector of arithmetic scalars on master MPI process by taking single scalar from
  * all MPI processes within domain of MPI communicator.
  *
+ * @tparam T type of scalar value.
  * @param vector the vector of integers.
  * @param value the integer value.
- * @param rank the rank of MPI process.
  * @param comm the MPI communicator.
  */
 template <typename T>
 auto
-gather(T* vector, T value, int32_t rank, MPI_Comm comm) -> decltype((void)(std::is_arithmetic_v<T>), void())
+gather(T* vector, T value, MPI_Comm comm) -> decltype((void)(std::is_arithmetic_v<T>), void())
 {
     if constexpr (ENABLE_MPI)
     {

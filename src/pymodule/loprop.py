@@ -53,8 +53,12 @@ class LoPropDriver:
 
         if comm is None:
             comm = MPI.COMM_WORLD
+
         if ostream is None:
-            ostream = OutputStream(sys.stdout)
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
 
         self.comm = comm
         self.rank = self.comm.Get_rank()
@@ -329,7 +333,7 @@ class LoPropDriver:
                                                molecule_coord[b][i])
                         dRab[b][a][i] = -dRab[a][b][i]
 
-            # charge transfer from bond polarisability
+            # charge transfer from bond polarizability
             bond_polarizabilities = np.zeros((3, 3, natoms, natoms))
             for i in range(3):
                 for j in range(3):
@@ -542,7 +546,7 @@ class LoPropDriver:
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
-        title = 'Molecular Polarisabilities'
+        title = 'Molecular Polarizabilities'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * len(title))
 

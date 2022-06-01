@@ -141,6 +141,10 @@ class TestOrbData:
             assert MolecularOrbitals.match_hdf5(h5file, nuc_chg, 'cc-pvdz',
                                                 'unrestricted')
 
+            h5file = Path(h5file)
+            if h5file.is_file():
+                h5file.unlink()
+
     def test_rest_density(self):
 
         mol = Molecule(['H', 'H'], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])

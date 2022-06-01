@@ -85,6 +85,7 @@ class InputParser:
                 # remove comment and extra space
                 line = line.strip()
                 line = re.sub(r'!.*', '', line)
+                line = re.sub(r'#.*', '', line)
                 line = ' '.join(line.split())
 
                 # skip empty line
@@ -203,6 +204,8 @@ def parse_seq_fixed(input_seq, flag='float'):
             return tuple([float(x) for x in seq_str.split()])
         elif flag == 'int':
             return tuple([int(x) for x in seq_str.split()])
+        elif flag == 'str':
+            return tuple(seq_str.split())
         else:
             assert_msg_critical(False,
                                 f'parse_seq_fixed: invalid flag \'{flag}\'')
@@ -340,6 +343,8 @@ def parse_input(obj, keyword_types, input_dictionary):
         - 'float' for floating-point input, such as 'eri_thresh: 1.0e-12'
         - 'bool' for floating-point input, such as 'restart: no'
         - 'list' for multi-line input, such as 'constraints'
+        - 'seq_fixed_str' for fixed-length string sequence, such as
+          'atom_types: c3,c3,hc'
         - 'seq_fixed_int' for fixed-length integer sequence, such as
           'cube_points: 80,80,80'
         - 'seq_fixed' for fixed-length sequence, such as 'cube_origin: 0.0,0.0,0.0'
@@ -381,6 +386,9 @@ def parse_input(obj, keyword_types, input_dictionary):
 
         elif keyword_types[key] == 'list':
             setattr(obj, key, parse_list(val))
+
+        elif keyword_types[key] == 'seq_fixed_str':
+            setattr(obj, key, parse_seq_fixed(val, 'str'))
 
         elif keyword_types[key] == 'seq_fixed_int':
             setattr(obj, key, parse_seq_fixed(val, 'int'))
@@ -424,7 +432,8 @@ def get_keyword_type(keyword_type):
         - 'float' -> 'float'
         - 'bool' -> 'boolean'
         - 'list' -> 'multi-line'
-        - 'seq_fixed_int', 'seq_fixed', 'seq_range' -> 'sequence'
+        - 'seq_fixed_str', 'seq_fixed_int', 'seq_fixed' -> 'sequence'
+        - 'seq_range' -> 'sequence'
 
     :return:
         The keyword type for printing.
@@ -438,6 +447,7 @@ def get_keyword_type(keyword_type):
         'float': 'float',
         'bool': 'boolean',
         'list': 'multi-line',
+        'seq_fixed_str': 'sequence',
         'seq_fixed_int': 'sequence',
         'seq_fixed': 'sequence',
         'seq_range': 'sequence',

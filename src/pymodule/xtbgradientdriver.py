@@ -23,12 +23,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from mpi4py import MPI
-import sys
-
 from .veloxchemlib import mpi_master
 from .gradientdriver import GradientDriver
-from .outputstream import OutputStream
 
 
 class XTBGradientDriver(GradientDriver):
@@ -51,15 +47,7 @@ class XTBGradientDriver(GradientDriver):
         Initializes XTB gradient driver.
         """
 
-        if comm is None:
-            comm = MPI.COMM_WORLD
-
-        if ostream is None:
-            ostream = OutputStream(sys.stdout)
-
-        self.ostream=ostream
-
-        super().__init__(comm, ostream)
+        super().__init__(xtb_drv, comm, ostream)
 
         self.flag = 'XTB Gradient Driver'
         self.xtb_drv = xtb_drv
@@ -91,5 +79,5 @@ class XTBGradientDriver(GradientDriver):
             The molecule.
         """
 
-        self.xtb_drv = compute(molecule, self.ostream)
+        self.xtb_drv.compute(molecule, self.ostream)
         return self.xtb_drv.get_energy()

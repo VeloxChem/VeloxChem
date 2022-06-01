@@ -26,11 +26,17 @@ namespace lang {
 namespace detail {
 
 template <typename T>
-struct range_iter_base : std::iterator<std::input_iterator_tag, T>
+struct range_iter_base
 {
+    using iterator_category = std::input_iterator_tag;
+    using value_type        = T;
+    using difference_type   = T;
+    using pointer           = T*;
+    using reference         = T&;
+
     __host__ __device__
-    range_iter_base(T current)
-        : current(current)
+    range_iter_base(T curr)
+        : current(curr)
     {
     }
 
@@ -367,7 +373,8 @@ indices(C const& cont) -> range_proxy<decltype(cont.size())>
 }
 
 template <typename T, std::size_t N>
-__host__ __device__ range_proxy<std::size_t> indices(T (&)[N])
+__host__ __device__ range_proxy<std::size_t>
+                    indices(T (&)[N])
 {
     return {0, N};
 }
