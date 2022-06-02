@@ -28,6 +28,7 @@
 #include "AngularMomentum.hpp"
 #include "GtoFuncForGGA.hpp"
 #include "GtoFuncForLDA.hpp"
+#include "GtoFuncForMGGA.hpp"
 #include "OMPTasks.hpp"
 
 namespace gtorec {  // gtorec namespace
@@ -96,6 +97,7 @@ namespace gtorec {  // gtorec namespace
             }
         }
     }
+
 
     void
     computeGtosValuesForGGA(CMemBlock2D<double>& gtoValues,
@@ -186,6 +188,138 @@ namespace gtorec {  // gtorec namespace
     }
 
     void
+    computeGtosValuesForGGA2(CMemBlock2D<double>& gtoValues,
+                             CMemBlock2D<double>& gtoValuesX,
+                             CMemBlock2D<double>& gtoValuesY,
+                             CMemBlock2D<double>& gtoValuesZ,
+                             CMemBlock2D<double>& gtoValuesXX,
+                             CMemBlock2D<double>& gtoValuesXY,
+                             CMemBlock2D<double>& gtoValuesXZ,
+                             CMemBlock2D<double>& gtoValuesYY,
+                             CMemBlock2D<double>& gtoValuesYZ,
+                             CMemBlock2D<double>& gtoValuesZZ,
+                             const CGtoContainer* gtoContainer,
+                             const double*        gridCoordinatesX,
+                             const double*        gridCoordinatesY,
+                             const double*        gridCoordinatesZ,
+                             const int32_t        gridOffset,
+                             const int32_t        gridBlockPosition,
+                             const int32_t        nGridPoints)
+    {
+        // local copy of GTOs containers
+
+        auto gtovec = CGtoContainer(*gtoContainer);
+
+        // loop over GTOs container data
+
+        for (int32_t i = 0; i < gtovec.getNumberOfGtoBlocks(); i++)
+        {
+            auto bgtos = gtovec.getGtoBlock(i);
+
+            // angular momentum data for bra and ket
+
+            auto bang = bgtos.getAngularMomentum();
+
+            // set up Cartesian GTOs buffer
+
+            //auto nvcomp = xcfun_components(xcfun::mgga);
+            //TODO: update xcfun_components for mgga
+            auto nvcomp = 10;
+
+            auto bncart = angmom::to_CartesianComponents(bang);
+
+            auto bcartbuff = (bang > 0) ? CMemBlock2D<double>(nGridPoints, nvcomp * bncart) : CMemBlock2D<double>();
+
+            // set up spherical GTOs buffer
+
+            auto bnspher = angmom::to_SphericalComponents(bang);
+
+            CMemBlock2D<double> bspherbuff(nGridPoints, nvcomp * bnspher);
+
+            // loop over contracted GTOs
+
+            for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++)
+            {
+                // compute j-th GTO values on batch of grid points
+
+                gtorec::computeGtoValuesOnGrid(
+                    bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridBlockPosition + gridOffset, bgtos, j, xcfun::mgga);
+
+                // distribute j-th GTO values into grid values matrix
+
+                for (int32_t k = 0; k < bnspher; k++)
+                {
+                    auto bgaos = bspherbuff.data(nvcomp * k);
+
+                    auto bgaox = bspherbuff.data(nvcomp * k + 1);
+
+                    auto bgaoy = bspherbuff.data(nvcomp * k + 2);
+
+                    auto bgaoz = bspherbuff.data(nvcomp * k + 3);
+
+                    auto bgaoxx = bspherbuff.data(nvcomp * k + 4);
+
+                    auto bgaoxy = bspherbuff.data(nvcomp * k + 5);
+
+                    auto bgaoxz = bspherbuff.data(nvcomp * k + 6);
+
+                    auto bgaoyy = bspherbuff.data(nvcomp * k + 7);
+
+                    auto bgaoyz = bspherbuff.data(nvcomp * k + 8);
+
+                    auto bgaozz = bspherbuff.data(nvcomp * k + 9);
+
+                    auto idx = (bgtos.getIdentifiers(k))[j];
+
+                    auto gvals = gtoValues.data(idx);
+
+                    auto gvalx = gtoValuesX.data(idx);
+
+                    auto gvaly = gtoValuesY.data(idx);
+
+                    auto gvalz = gtoValuesZ.data(idx);
+
+                    auto gvalxx = gtoValuesXX.data(idx);
+
+                    auto gvalxy = gtoValuesXY.data(idx);
+
+                    auto gvalxz = gtoValuesXZ.data(idx);
+
+                    auto gvalyy = gtoValuesYY.data(idx);
+
+                    auto gvalyz = gtoValuesYZ.data(idx);
+
+                    auto gvalzz = gtoValuesZZ.data(idx);
+
+                    #pragma omp simd aligned(bgaos, bgaox, bgaoy, bgaoz, bgaoxx, bgaoxy, bgaoxz, bgaoyy, bgaoyz, bgaozz, gvals, gvalx, gvaly, gvalz, gvalxx, gvalxy, gvalxz, gvalyy, gvalyz, gvalzz : VLX_ALIGN)
+                    for (int32_t l = 0; l < nGridPoints; l++)
+                    {
+                        gvals[l] = bgaos[l];
+
+                        gvalx[l] = bgaox[l];
+
+                        gvaly[l] = bgaoy[l];
+
+                        gvalz[l] = bgaoz[l];
+
+                        gvalxx[l] = bgaoxx[l];
+
+                        gvalxy[l] = bgaoxy[l];
+
+                        gvalxz[l] = bgaoxz[l];
+
+                        gvalyy[l] = bgaoyy[l];
+
+                        gvalyz[l] = bgaoyz[l];
+
+                        gvalzz[l] = bgaozz[l];
+                    }
+                }
+            }
+        }
+    }
+
+    void
     computeGtosValuesForMGGA(CMemBlock2D<double>& gtoValues,
                              CMemBlock2D<double>& gtoValuesX,
                              CMemBlock2D<double>& gtoValuesY,
@@ -233,7 +367,7 @@ namespace gtorec {  // gtorec namespace
                 // compute j-th GTO values on batch of grid points
 
                 gtorec::computeGtoValuesOnGrid(
-                    bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridBlockPosition + gridOffset, bgtos, j, xcfun::mgga);
+                    bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridBlockPosition + gridOffset, bgtos, j, xcfun::gga);
 
                 // distribute j-th GTO values into grid values matrix
 
@@ -315,7 +449,7 @@ namespace gtorec {  // gtorec namespace
             // compute i-th GTO values on batch of grid points
 
             gtorec::computeGtoValuesOnGrid(
-                bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridBlockPosition + gridOffset, gtoBlock, i, xcfun::mgga);
+                bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridBlockPosition + gridOffset, gtoBlock, i, xcfun::gga);
 
             // distribute i-th GTO values on batch of grid points
 
@@ -763,7 +897,7 @@ namespace gtorec {  // gtorec namespace
                 // compute j-th GTO values on batch of grid points
 
                 gtorec::computeGtoValuesOnGrid(
-                    bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridBlockPosition + gridOffset, bgtos, j, xcfun::mgga);
+                    bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridBlockPosition + gridOffset, bgtos, j, xcfun::gga);
 
                 // distribute j-th GTO values into grid values matrix
 
@@ -898,14 +1032,14 @@ namespace gtorec {  // gtorec namespace
                     // s-type GTOs on grid
 
                 case 0:
-                    ggarec::compGtoValuesForS(spherGtoGridBuffer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, gtoBlock, iContrGto);
+                    mggarec::compGtoValuesForS(spherGtoGridBuffer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, gtoBlock, iContrGto);
 
                     break;
 
                     // p-type GTOs on grid
 
                 case 1:
-                    ggarec::compGtoValuesForP(
+                    mggarec::compGtoValuesForP(
                         spherGtoGridBuffer, cartGtoGridBuffer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, gtoBlock, iContrGto);
 
                     break;
@@ -913,7 +1047,7 @@ namespace gtorec {  // gtorec namespace
                     // d-type GTOs on grid
 
                 case 2:
-                    ggarec::compGtoValuesForD(
+                    mggarec::compGtoValuesForD(
                         spherGtoGridBuffer, cartGtoGridBuffer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, gtoBlock, iContrGto);
 
                     break;

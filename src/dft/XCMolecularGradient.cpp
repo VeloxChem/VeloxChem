@@ -104,13 +104,25 @@ CXCMolecularGradient::integrate(const std::vector<int32_t>& idsAtomic,
 
         auto grhoa = vxcgrid.xcGradientValues(xcvars::rhoa);
 
+        auto ggrada = vxcgrid.xcGradientValues(xcvars::grada);
+
+        auto ggradab = vxcgrid.xcGradientValues(xcvars::gradab);
+
+        auto ngrada = dgrid.alphaDensityGradient(0);
+
+        auto gradax = dgrid.alphaDensityGradientX(0);
+
+        auto graday = dgrid.alphaDensityGradientY(0);
+
+        auto gradaz = dgrid.alphaDensityGradientZ(0);
+
         // set up density gradient grid driver
 
         CDensityGradientGridDriver graddrv(_locComm);
 
         for (int32_t i = 0; i < natoms; i++)
         {
-            auto gradgrid = graddrv.generate(aoDensityMatrix, molecule, basis, mgrid, idsAtomic[i]);
+            auto gradgrid = graddrv.generate(aoDensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType(), idsAtomic[i]);
 
             // set up pointers to density gradient grid
 
@@ -120,7 +132,7 @@ CXCMolecularGradient::integrate(const std::vector<int32_t>& idsAtomic,
 
             const auto gdenz = gradgrid.getComponent(2);
 
-            // compute molecular gradient for LDA
+            // compute LDA contribution to molecular gradient
 
             double gatmx = 0.0;
 
@@ -135,6 +147,40 @@ CXCMolecularGradient::integrate(const std::vector<int32_t>& idsAtomic,
                 gatmy += gw[j] * grhoa[j] * gdeny[j];
 
                 gatmz += gw[j] * grhoa[j] * gdenz[j];
+            }
+
+            // compute LDA contribution to molecular gradient
+
+            if (fvxc.getFunctionalType() == xcfun::gga)
+            {
+                const auto gdenxx = gradgrid.getComponent(3);
+
+                const auto gdenxy = gradgrid.getComponent(4);
+
+                const auto gdenxz = gradgrid.getComponent(5);
+
+                const auto gdenyx = gradgrid.getComponent(6);
+
+                const auto gdenyy = gradgrid.getComponent(7);
+
+                const auto gdenyz = gradgrid.getComponent(8);
+
+                const auto gdenzx = gradgrid.getComponent(9);
+
+                const auto gdenzy = gradgrid.getComponent(10);
+
+                const auto gdenzz = gradgrid.getComponent(11);
+
+                for (int32_t j = 0; j < gpoints; j++)
+                {
+                    double fgrd = gw[j] * (ggrada[j] / ngrada[j] + ggradab[j]);
+
+                    gatmx += fgrd * (gradax[j] * gdenxx[j] + graday[j] * gdenxy[j] + gradaz[j] * gdenxz[j]);
+
+                    gatmy += fgrd * (gradax[j] * gdenyx[j] + graday[j] * gdenyy[j] + gradaz[j] * gdenyz[j]);
+
+                    gatmz += fgrd * (gradax[j] * gdenzx[j] + graday[j] * gdenzy[j] + gradaz[j] * gdenzz[j]);
+                }
             }
 
             // factor of 2 from sum of alpha and beta contributions
