@@ -65,6 +65,7 @@ class ScfGradientDriver(GradientDriver):
         self.flag = 'SCF Gradient Driver'
         self.scf_drv = scf_drv
         self.delta_h = 0.001
+        self.add_xc_grad = True
 
 
     def update_settings(self, grad_dict, method_dict):
@@ -79,6 +80,10 @@ class ScfGradientDriver(GradientDriver):
 
         # update settings in parent class
         super().update_settings(grad_dict, method_dict)
+        if 'add_xc_grad' in grad_dict:
+            key = grad_dict['add_xc_grad']
+            if key in ['n', 'no']:
+                self.add_xc_grad = False
 
 
     def compute(self, molecule, ao_basis, min_basis=None):
@@ -153,7 +158,8 @@ class ScfGradientDriver(GradientDriver):
                                 )
                 if self.dft:
                     d_vxc = vxc_deriv(molecule, ao_basis, one_pdm_ao,
-                                      self.xcfun.get_func_label(), i)
+                                      self.xcfun.get_func_label(), i,
+                                      self.grid_level)
                     if self.xcfun.is_hybrid():
                         fact_xc = self.xcfun.get_frac_exact_exchange()
                     else:
@@ -162,7 +168,8 @@ class ScfGradientDriver(GradientDriver):
                                 + 2.0 * np.einsum('mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
                                 - fact_xc * np.einsum('mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
                                 )
-                    self.gradient[i] += 2.0 * np.einsum('mn,xmn->x', one_pdm_ao, d_vxc)
+                    if self.add_xc_grad:
+                        self.gradient[i] += 2.0 * np.einsum('mn,xmn->x', one_pdm_ao, d_vxc)
                 else:
                     self.gradient[i] += (
                                 + 2.0 * np.einsum('mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)

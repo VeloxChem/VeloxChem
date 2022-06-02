@@ -1956,7 +1956,7 @@ def fock_deriv(molecule, basis, density, i=0, unit="au"):
     return vlx_fock_deriv_atom_i
 
 
-def vxc_deriv(molecule, basis, density, xcfun, i=0, unit="au"):
+def vxc_deriv(molecule, basis, density, xcfun, i=0, grid_level=4, unit="au"):
     """
     Imports the derivatives of the Vxc matrix
     from pyscf and converts it to veloxchem format
@@ -1969,6 +1969,8 @@ def vxc_deriv(molecule, basis, density, xcfun, i=0, unit="au"):
         the SCF density matrix (alpha part) in AO basis
     :param xcfun:
         the label of the exchange-correlation functional
+    :param grid_level:
+        the grid level for numerical integration of xc kernel
     :param i:
         the index of the atom for which the derivatives
         are computed.
@@ -2014,6 +2016,7 @@ def vxc_deriv(molecule, basis, density, xcfun, i=0, unit="au"):
     if pyscf_grids.coords is None:
         pyscf_grids.build(with_non0tab=True)
 
+    pyscf_grids.level = grid_level
     pyscf_exc, pyscf_vxc_deriv = pyscf_rks_grad.get_vxc(pyscf_ni,
                                              pyscf_molecule,
                                              pyscf_grids, pyscf_mf.xc,
