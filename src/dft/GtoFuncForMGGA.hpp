@@ -32,10 +32,10 @@
 #include "MemBlock2D.hpp"
 
 namespace mggarec {  // mggarec namespace
-    
+
     /**
      Computes S-type GTOs values on given grid.
-     
+
      @param spherGtoGridBuffer the buffer for storing contracted spherical GTOs values on the grid.
      @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
      @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
@@ -44,18 +44,17 @@ namespace mggarec {  // mggarec namespace
      @param gtoBlock the GTOs block.
      @param iContrGto the index of contracted GTO is GTOs block.
      */
-    void compGtoValuesForS(      CMemBlock2D<double>& spherGtoGridBuffer,
-                           const double*              gridCoordinatesX,
-                           const double*              gridCoordinatesY,
-                           const double*              gridCoordinatesZ,
-                           const int32_t              gridOffset,
-                           const CGtoBlock&           gtoBlock,
-                           const int32_t              iContrGto);
-    
-    
+    void compGtoValuesForS(CMemBlock2D<double>& spherGtoGridBuffer,
+                           const double*        gridCoordinatesX,
+                           const double*        gridCoordinatesY,
+                           const double*        gridCoordinatesZ,
+                           const int32_t        gridOffset,
+                           const CGtoBlock&     gtoBlock,
+                           const int32_t        iContrGto);
+
     /**
      Computes P-type GTOs values on given grid.
-     
+
      @param spherGtoGridBuffer the buffer for storing contracted spherical GTOs values on the grid.
      @param cartGtoGridBuffer the buffer for storing primitive Cartesian GTOs values on the grid.
      @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
@@ -65,18 +64,18 @@ namespace mggarec {  // mggarec namespace
      @param gtoBlock the GTOs block.
      @param iContrGto the index of contracted GTO is GTOs block.
      */
-    void compGtoValuesForP(      CMemBlock2D<double>& spherGtoGridBuffer,
-                                 CMemBlock2D<double>& cartGtoGridBuffer,
-                           const double*              gridCoordinatesX,
-                           const double*              gridCoordinatesY,
-                           const double*              gridCoordinatesZ,
-                           const int32_t              gridOffset,
-                           const CGtoBlock&           gtoBlock,
-                           const int32_t              iContrGto);
-    
+    void compGtoValuesForP(CMemBlock2D<double>& spherGtoGridBuffer,
+                           CMemBlock2D<double>& cartGtoGridBuffer,
+                           const double*        gridCoordinatesX,
+                           const double*        gridCoordinatesY,
+                           const double*        gridCoordinatesZ,
+                           const int32_t        gridOffset,
+                           const CGtoBlock&     gtoBlock,
+                           const int32_t        iContrGto);
+
     /**
      Computes D-type GTOs values on given grid.
-     
+
      @param spherGtoGridBuffer the buffer for storing contracted spherical GTOs values on the grid.
      @param cartGtoGridBuffer the buffer for storing primitive Cartesian GTOs values on the grid.
      @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
@@ -86,15 +85,15 @@ namespace mggarec {  // mggarec namespace
      @param gtoBlock the GTOs block.
      @param iContrGto the index of contracted GTO is GTOs block.
      */
-    void compGtoValuesForD(      CMemBlock2D<double>& spherGtoGridBuffer,
-                                 CMemBlock2D<double>& cartGtoGridBuffer,
-                           const double*              gridCoordinatesX,
-                           const double*              gridCoordinatesY,
-                           const double*              gridCoordinatesZ,
-                           const int32_t              gridOffset,
-                           const CGtoBlock&           gtoBlock,
-                           const int32_t              iContrGto);
-    
+    void compGtoValuesForD(CMemBlock2D<double>& spherGtoGridBuffer,
+                           CMemBlock2D<double>& cartGtoGridBuffer,
+                           const double*        gridCoordinatesX,
+                           const double*        gridCoordinatesY,
+                           const double*        gridCoordinatesZ,
+                           const int32_t        gridOffset,
+                           const CGtoBlock&     gtoBlock,
+                           const int32_t        iContrGto);
+
 }  // namespace mggarec
 
 #endif /* GtoFuncForMGGA_hpp */
