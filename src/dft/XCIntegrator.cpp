@@ -206,11 +206,20 @@ CXCIntegrator::integrate(const CAODensityMatrix& aoDensityMatrix,
                 ksmat.setNumberOfElectrons(std::get<1>(xcdata) + std::get<1>(xcdatb) + std::get<1>(xcdatab));
             }
 
+            if (fvxc.getFunctionalType() == xcfun::mgga)
+            {
+                // not implemented
+
+                std::string errmgga("XCIntegrator.integrate (Kohn-Sham): Not implemented for meta-GGA in open-shell system");
+
+                errors::assertMsgCritical(false, errmgga);
+            }
+
             // symmetrize Kohn-Sham matrix
 
             ksmat.symmetrize();
         }
-        
+
         // delete GTOs container
 
         delete gtovec;
@@ -288,6 +297,15 @@ CXCIntegrator::integrate(CAOFockMatrix&          aoFockMatrix,
             _compRestrictedContributionForGga(ksmat, gtovec, vxcgrid, vxc2grid, gsdengrid, rwdengrid, mgrid);
         }
 
+        if (fvxc.getFunctionalType() == xcfun::mgga)
+        {
+            // not implemented
+
+            std::string errmgga("XCIntegrator.integrate (1st-order Fock): Not implemented for meta-GGA");
+
+            errors::assertMsgCritical(false, errmgga);
+        }
+
         // symmetrize Kohn-Sham matrix
 
         ksmat.symmetrize();
@@ -304,6 +322,12 @@ CXCIntegrator::integrate(CAOFockMatrix&          aoFockMatrix,
         // perform integration for spin unrestricted densities
 
         // FIX ME: implement partitioning and screening for density grid
+
+        // not implemented
+
+        std::string erropenshell("XCIntegrator.integrate (1st-order Fock): Not implemented for open-shell system");
+
+        errors::assertMsgCritical(false, erropenshell);
     }
 }
 
@@ -387,6 +411,15 @@ CXCIntegrator::integrate(CAOFockMatrix&          aoFockMatrix,
     if (fvxc.getFunctionalType() == xcfun::gga)
     {
         _compRestrictedContributionForGga(ksmat, gtovec, vxcgrid, vxc2grid, vxc3grid, gsdengrid, rwdengridc, rw2dengrid, mgrid);
+    }
+
+    if (fvxc.getFunctionalType() == xcfun::mgga)
+    {
+        // not implemented
+
+        std::string errmgga("XCIntegrator.integrate (2nd-order Fock): Not implemented for meta-GGA");
+
+        errors::assertMsgCritical(false, errmgga);
     }
 
     // symmetrize Kohn-Sham matrix

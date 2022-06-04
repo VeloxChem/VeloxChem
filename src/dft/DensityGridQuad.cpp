@@ -574,7 +574,6 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
         if (fstr::upcase(quadMode) == "SHG")
         {
             for (int32_t j = 0; j < numdens / 12; j++)
-
             {
                 // Density products to be stored
 
@@ -1545,7 +1544,6 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
         if (fstr::upcase(quadMode) == "SHG_RED")
         {
             for (int32_t j = 0; j < numdens / 6; j++)
-
             {
                 // Density products to be stored
 
