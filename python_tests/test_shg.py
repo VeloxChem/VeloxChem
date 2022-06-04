@@ -19,13 +19,16 @@ class TestSHG:
 
         return scf_drv.scf_tensors
 
-    def run_shg(self, inpfile, xcfun_label, ref_result):
+    def run_shg(self, inpfile, xcfun_label, shg_type, ref_result):
 
         task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
 
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
+
+        if shg_type is not None:
+            task.input_dict['response']['shg_type'] = shg_type
 
         scf_tensors = self.run_scf(task)
 
@@ -55,6 +58,7 @@ class TestSHG:
         inpfile = str(here / 'inputs' / 'methanol_shg.inp')
 
         xcfun_label = None
+        shg_type = 'full'
 
         ref_result = {
             'x': -40.52766331 - 11.31636048j,
@@ -63,7 +67,7 @@ class TestSHG:
             'beta_bar': -39.79479881 - 11.62336253j,
         }
 
-        self.run_shg(inpfile, xcfun_label, ref_result)
+        self.run_shg(inpfile, xcfun_label, shg_type, ref_result)
 
     def test_shg_b3lyp(self):
 
@@ -71,6 +75,7 @@ class TestSHG:
         inpfile = str(here / 'inputs' / 'methanol_shg.inp')
 
         xcfun_label = 'b3lyp'
+        shg_type = 'full'
 
         ref_result = {
             'x': -48.55306041 - 20.31300835j,
@@ -79,4 +84,38 @@ class TestSHG:
             'beta_bar': -47.13851686 - 21.37968687j,
         }
 
-        self.run_shg(inpfile, xcfun_label, ref_result)
+        self.run_shg(inpfile, xcfun_label, shg_type, ref_result)
+
+    def test_shg_reduced_hf(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'methanol_shg.inp')
+
+        xcfun_label = None
+        shg_type = 'reduced'
+
+        ref_result = {
+            'x': -40.53256501 - 11.43101669j,
+            'y': -0.11772170 - 0.02074979j,
+            'z': 24.95878533 + 7.63353776j,
+            'beta_bar': -39.80239953 - 11.76359430j,
+        }
+
+        self.run_shg(inpfile, xcfun_label, shg_type, ref_result)
+
+    def test_shg_reduced_b3lyp(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'methanol_shg.inp')
+
+        xcfun_label = 'b3lyp'
+        shg_type = 'reduced'
+
+        ref_result = {
+            'x': -48.45569661 - 20.92675811j,
+            'y': -0.09582173 - 0.00353080j,
+            'z': 32.02927840 + 15.65488519j,
+            'beta_bar': -47.04057086 - 22.02140860j,
+        }
+
+        self.run_shg(inpfile, xcfun_label, shg_type, ref_result)

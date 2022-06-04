@@ -101,6 +101,8 @@ class SHGDriver(NonLinearSolver):
         self.a_components = 'xyz'
         self.b_components = 'xyz'
 
+        self.shg_type = 'full'
+
         # input keywords
         self.input_keywords['response'].update({
             'frequencies': ('seq_range', 'frequencies'),
@@ -108,6 +110,7 @@ class SHGDriver(NonLinearSolver):
             'a_operator': ('str_lower', 'A operator'),
             'b_operator': ('str_lower', 'B operator'),
             'c_operator': ('str_lower', 'C operator'),
+            'shg_type': ('str_lower', 'full or reduced SHG calculation'),
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -303,12 +306,6 @@ class SHGDriver(NonLinearSolver):
             self.ostream.print_header(w_str.ljust(width))
             self.ostream.print_blank()
             w_str = 'beta = sum_{i=x,y,z}(beta(vec)_i * mu_i / |mu|)'
-            self.ostream.print_header(w_str.ljust(width))
-            self.ostream.print_blank()
-
-            w_str = 'Note: beta(vec)_i is the i-component of the projection of the '
-            self.ostream.print_header(w_str.ljust(width))
-            w_str = 'first hyperpolarizability tensor along the dipole moment.'
             self.ostream.print_header(w_str.ljust(width))
             self.ostream.print_blank()
 
@@ -554,18 +551,26 @@ class SHGDriver(NonLinearSolver):
             first_order_dens.append(D_z.real)
             first_order_dens.append(D_z.imag)
 
-            second_order_dens.append(D_sig_x.real)
-            second_order_dens.append(D_sig_x.imag)
-            second_order_dens.append(D_sig_y.real)
-            second_order_dens.append(D_sig_y.imag)
-            second_order_dens.append(D_sig_z.real)
-            second_order_dens.append(D_sig_z.imag)
-            second_order_dens.append(D_lam_xy.real)
-            second_order_dens.append(D_lam_xy.imag)
-            second_order_dens.append(D_lam_xz.real)
-            second_order_dens.append(D_lam_xz.imag)
-            second_order_dens.append(D_lam_yz.real)
-            second_order_dens.append(D_lam_yz.imag)
+            if self.shg_type == 'reduced':
+                second_order_dens.append(D_sig_x.real)
+                second_order_dens.append(D_sig_y.real)
+                second_order_dens.append(D_sig_z.real)
+                second_order_dens.append(D_lam_xy.real)
+                second_order_dens.append(D_lam_xz.real)
+                second_order_dens.append(D_lam_yz.real)
+            elif self.shg_type == 'full':
+                second_order_dens.append(D_sig_x.real)
+                second_order_dens.append(D_sig_x.imag)
+                second_order_dens.append(D_sig_y.real)
+                second_order_dens.append(D_sig_y.imag)
+                second_order_dens.append(D_sig_z.real)
+                second_order_dens.append(D_sig_z.imag)
+                second_order_dens.append(D_lam_xy.real)
+                second_order_dens.append(D_lam_xy.imag)
+                second_order_dens.append(D_lam_xz.real)
+                second_order_dens.append(D_lam_xz.imag)
+                second_order_dens.append(D_lam_yz.real)
+                second_order_dens.append(D_lam_yz.imag)
 
         return first_order_dens, second_order_dens
 
@@ -632,9 +637,17 @@ class SHGDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                        dft_dict, first_order_dens,
-                                        second_order_dens, 'shg')
+
+        if self.shg_type == 'reduced':
+            dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real',
+                                            dft_dict, first_order_dens,
+                                            second_order_dens, 'shg_red')
+        elif self.shg_type == 'full':
+            dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis,
+                                            'real_and_imag', dft_dict,
+                                            first_order_dens, second_order_dens,
+                                            'shg')
+
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -772,7 +785,10 @@ class SHGDriver(NonLinearSolver):
 
         self.ostream.print_blank()
 
-        title = 'SHG Driver Setup'
+        if self.shg_type == 'reduced':
+            title = 'SHG Driver (Reduced) Setup'
+        elif self.shg_type == 'full':
+            title = 'SHG Driver Setup'
         self.ostream.print_header(title)
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
