@@ -23,8 +23,8 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef DiagEriRecForSSSS_hpp
-#define DiagEriRecForSSSS_hpp
+#ifndef DiagEriRecForSPSP_hpp
+#define DiagEriRecForSPSP_hpp
 
 #include <cstdint>
 
@@ -36,7 +36,7 @@
 namespace derirec { // derirec  namespace
 
 /**
-Computes diagonal (SS|SS) integrals batch and distributes them into given
+Computes diagonal (SP|SP) integrals batch and distributes them into given
 integrals buffer.
 
 @param intsBuffer The integrals buffer.
@@ -46,7 +46,7 @@ integrals buffer.
 */
 template <typename T>
 auto
-compHostSSSS(      T*                                 intsBuffer,
+compHostSPSP(      T*                                 intsBuffer,
              const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
              const int32_t                            bPosition,
              const int32_t                            ePosition) -> void
@@ -61,30 +61,52 @@ compHostSSSS(      T*                                 intsBuffer,
     
     BufferHostMY<T, 3> rpq(ncpairs);
     
-    BufferHostMY<T, 2> osfacts(ncpairs);
+    BufferHostMY<T, 3> osfacts(ncpairs);
+    
+    BufferHostMY<T, 3> rpb(ncpairs);
+    
+    BufferHostMY<T, 3> rqd(ncpairs);
+    
+    BufferHostMY<T, 3> rw(ncpairs);
+    
+    BufferHostMY<T, 3> rwp(ncpairs);
+    
+    BufferHostMY<T, 3> rwq(ncpairs);
     
     // allocate Boys function data
     
     BufferHostX<T> bargs(ncpairs);
     
-    BufferHostXY<T> bvals(1, ncpairs);
+    BufferHostXY<T> bvals(3, ncpairs);
     
-    CBoysFunc<T, 0> bftable;
+    CBoysFunc<T, 2> bftable;
     
-    // set up scaling factor
-        
-    const auto fpi = static_cast<T>(4.0) / static_cast<T>(mathconst::getPiValue());
-        
+    // allocate contracted integral buffers
+    
+    auto t_spsp = BufferHostMY<T, 3>::Zero(ncpairs);
+
+    // allocate primitive integral buffers
+    
+    BufferHostMY<T, 3> t0_sssp(ncpairs);
+    
+    BufferHostMY<T, 3> t1_sssp(ncpairs);
+    
+    BufferHostXY<T> t_ssss(3, ncpairs);
+    
     // set up pointers to Obara-Saika factors
         
     auto frho = osfacts.data(0);
         
     auto fnorm = osfacts.data(1);
+    
+    auto fzeta = osfacts.data(2);
         
     // loop over primitive integrals
     
     for (int32_t i = 0; i < nppairs; i++)
     {
+        derirec::compHostDistancesPT(rpb, gtoPairBlock, bPosition, ePosition, i);
+        
         for (int j = i; j < nppairs; j++)
         {
             // compute recursion data
@@ -98,67 +120,41 @@ compHostSSSS(      T*                                 intsBuffer,
             derirec::compHostFactorNorm(fnorm, gtoPairBlock,
                                         bPosition, ePosition, i, j);
             
+            derirec::compHostFactorZeta(fzeta, gtoPairBlock,
+                                        bPosition, ePosition, i, j);
+            
+            derirec::compHostDistancesPT(rqd, gtoPairBlock, bPosition, ePosition, j);
+            
+            derirec::compHostCoordinatesW(rw, gtoPairBlock, bPosition, ePosition, i, j);
+            
+            if (i == j)
+            {
+                rwp.setZero();
+                
+                rwq.setZero();
+            }
+            else
+            {
+                derirec::compHostDistancesWT(rwp, rw, gtoPairBlock, bPosition, ePosition, i);
+                
+                derirec::compHostDistancesWT(rwq, rw, gtoPairBlock, bPosition, ePosition, j);
+            }
+            
             // compute Boys function values
             
             derirec::compHostBoysArguments(bargs, rpq, frho, ncpairs);
             
             bftable.compute(bvals, bargs);
             
-            // set up pointers to Boys function values
+            // compute vertical recursion data
             
-            auto bf0 = bvals.data();
-            
-            // compute (ss|ss) integrals
-            
-            #pragma omp simd aligned(frho, fnorm, bf0: VLX_ALIGN)
-            for (int32_t k = 0; k < ncpairs; k++)
-            {
-                intsBuffer[bPosition + k] += std::sqrt(fpi * frho[k]) * bf0[k] * fnorm[k];
-            }
+            // accumulate integrals
         }
     }
-}
-
-/**
-Computes vertical diagonal [SS|SS]^(m) integrals batch and distributes them into given
-integrals buffer.
-
-@param intsBuffer The integrals buffer.
-@param bfValues The Boys function values buffer.
-@param osFactorRho The Obara-Saika factor rho = xi * eta / (xi + eta).
-@param osFactorNorm The Obara-Saika normalization factors.
-@param nBatchPairs The number of pairs in batch.
-*/
-template <typename T>
-auto
-compHostVRRForSSSS(      BufferHostXY<T>& intsBuffer,
-                   const BufferHostXY<T>& bfValues,
-                   const T*               osFactorRho,
-                   const T*               osFactorNorm,
-                   const int32_t          nBatchPairs) -> void
-{
-    // set up scaling factor
-        
-    const auto fpi = static_cast<T>(4.0) / static_cast<T>(mathconst::getPiValue());
     
-    // compute [SS|SS]^(m) integrals
-    
-    for (size_t i = 0; i < intsBuffer.nRows(); i++)
-    {
-        // set up pointers to data
-        
-        auto bfvals = bfValues.data(i);
-        
-        auto ssints = intsBuffer.data(i);
-        
-        #pragma omp simd aligned(ssints, bfvals, osFactorRho, osFactorNorm: VLX_ALIGN)
-        for (int32_t j = 0; j < nBatchPairs; j++)
-        {
-            ssints[j] = std::sqrt(fpi * osFactorRho[j]) * bfvals[j] * osFactorNorm[j];
-        }
-    }
+    derirec::selectHostMaxValues<T, 3>(intsBuffer, t_spsp, bPosition, ncpairs); 
 }
 
 } // derirec  namespace
 
-#endif /* DiagEriRecForSSSS_hpp */
+#endif /* DiagEriRecForSPSP_hpp */

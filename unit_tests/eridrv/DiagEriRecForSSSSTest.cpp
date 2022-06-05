@@ -43,7 +43,7 @@ TEST_F(CDiagEriRecForSSSSTest, CompBatchPrimIntsForSSSS)
     
     // [ss|ss] integrals
     
-    BufferHostX<double> s11ints(3);
+    auto s11ints = BufferHostX<double>::Zero(3);
     
     derirec::compHostSSSS(s11ints.data(), &s11pairs, 0, 3);
     
@@ -66,7 +66,7 @@ TEST_F(CDiagEriRecForSSSSTest, CompBatchContrIntsForSSSS)
     
     // (ss|ss) integrals
     
-    BufferHostX<double> s22ints(3);
+    auto s22ints = BufferHostX<double>::Zero(3);
     
     derirec::compHostSSSS(s22ints.data(), &s22pairs, 0, 3);
 
