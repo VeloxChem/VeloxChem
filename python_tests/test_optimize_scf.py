@@ -39,7 +39,7 @@ class TestOptimizeSCF:
             'coordsys': 'tric',
             'filename': task.input_dict['filename'],
         })
-        opt_mol, opt_ene = opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        opt_mol = opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         if is_mpi_master(task.mpi_comm):
             opt_coords = opt_mol.get_coordinates()

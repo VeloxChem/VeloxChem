@@ -28,7 +28,7 @@ class TestOptimizeXTB:
             'coordsys': 'tric',
             'filename': task.input_dict['filename'],
         })
-        opt_mol, opt_ene = opt_drv.compute(task.molecule)
+        opt_mol = opt_drv.compute(task.molecule)
 
         if is_mpi_master(task.mpi_comm):
             opt_coords = opt_mol.get_coordinates()

@@ -1114,7 +1114,7 @@ class ForceFieldGenerator:
             'constraints': constraints,
             'filename': str(Path(top_file).parent / Path(top_file).stem),
         })
-        final_mol, final_ene = opt_drv.compute(molecule)
+        final_mol = opt_drv.compute(molecule)
 
         openmm_drv.compute(final_mol)
 

@@ -40,8 +40,6 @@ from .numerovdriver import NumerovDriver
 from .mp2driver import Mp2Driver
 from .cnadriver import CnaAnalysisDriver
 from .gopdriver import GlobalOptimizationDriver
-from .mpitask import MpiTask
-from .optimizationdriver import OptimizationDriver
 from .loprop import LoPropDriver
 from .trajectorydriver import TrajectoryDriver
 from .scfgradientdriver import ScfGradientDriver
@@ -64,6 +62,7 @@ from .veloxchemlib import DiagEriDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
 from .slurminfo import get_slurm_end_time
+
 
 def select_scf_driver(task, scf_type):
     """
@@ -502,9 +501,9 @@ def main():
             chg_drv.compute(task.molecule, task.ao_basis, 'resp')
         elif task_type == 'esp charges':
             chg_drv.compute(task.molecule, task.ao_basis, 'esp')
-            
+
     # Test of electron repulstion integrals
-    
+
     if task_type == 'eritest':
         print('*** Testing Two Electron Implementation ***')
         tm0 = tm.time()
@@ -519,19 +518,19 @@ def main():
             cna_dict = task.input_dict['cna']
         else:
             cna_dict = {}
-            
+
         cna_drv = CnaAnalysisDriver(task.mpi_comm, task.ostream)
         cna_drv.update_settings(cna_dict)
         cna_drv.compute()
-        
+
     # Global optimization with tree-growth scheme
-    
+
     if task_type == 'gop':
         if 'gop' in task.input_dict:
             gop_dict = task.input_dict['gop']
         else:
             gop_dict = {}
-            
+
         gop_drv = GlobalOptimizationDriver(task.mpi_comm, task.ostream)
         gop_drv.update_settings(gop_dict)
         gop_drv.compute(task.input_dict['filename'], task.molecule)
