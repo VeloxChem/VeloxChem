@@ -36,7 +36,27 @@ class TestXCMolGrad:
         if scf_drv.rank == mpi_master():
             assert np.max(np.abs(mol_grad - ref_grad)) < 1.0e-4
 
-    def test_xc_mol_grad(self):
+    def test_xc_mol_grad_slater(self):
+
+        mol_str = """
+            O  0.0000000000   0.0000000000  -0.0254395383
+            H  0.0000000000   0.7695699584   0.5948147012
+            H  0.0000000000  -0.7695699584   0.5948147012
+        """
+
+        molecule = Molecule.read_str(mol_str, units='angstrom')
+        basis = MolecularBasis.read(molecule, 'def2-svp')
+        xcfun = 'slater'
+
+        ref_grad = np.array([
+            [0., 0., -0.4075910],
+            [-0., 0.2540621, 0.2037956],
+            [0., -0.2540621, 0.2037956],
+        ])
+
+        self.run_xc_mol_grad(molecule, basis, xcfun, ref_grad)
+
+    def test_xc_mol_grad_blyp(self):
 
         mol_str = """
             O  0.0000000000   0.0000000000  -0.0254395383
