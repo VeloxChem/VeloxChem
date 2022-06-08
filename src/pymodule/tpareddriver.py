@@ -83,41 +83,34 @@ class TPAReducedDriver(TPADriver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def get_densities(self, wi, kX, d0_shape, mo,nocc):
+    def get_densities(self, wi, kX, mo, nocc):
         """
         Computes the compounded densities needed for the compounded Fock
         matrices F^{σ} used for the reduced iostropic cubic response function
-
 
         :param wi:
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
-        :param S:
-            The overlap matrix
-        :param D0:
-            The SCF density matrix in AO basis
         :param mo:
             A matrix containing the MO coefficents
+        :param nocc:
+            Number of alpha electrons
 
         :return:
             A list of tranformed compounded densities
         """
 
         density_list = []
-        D_mo = np.zeros((d0_shape,d0_shape))
-        for i in range(nocc):
-            D_mo[i,i] = 1
+
+        D_mo = np.zeros((mo.shape[1], mo.shape[1]))
+        D_mo[:nocc, :nocc] = np.eye(nocc)
 
         for w in wi:
 
             kx = kX['Nb'][('x', w)]
             ky = kX['Nb'][('y', w)]
             kz = kX['Nb'][('z', w)]
-
-            kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
-            ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
-            kz_ = -kz.conj().T  # self.mo2ao(mo, kX['Nc'][('z', -w)]).T
 
             # create the first order single indexed densiteies #
 
@@ -137,12 +130,9 @@ class TPAReducedDriver(TPADriver):
             D_sig_yy = 2 * (Dxx + 3 * Dyy + Dzz)
             D_sig_zz = 2 * (Dxx + Dyy + 3 * Dzz)
 
-            D_sig_xy = 2 * (self.commut(ky, Dx) +
-                            self.commut(kx, Dy))
-            D_sig_xz = 2 * (self.commut(kx, Dz) +
-                            self.commut(kz, Dx))
-            D_sig_yz = 2 * (self.commut(ky, Dz) +
-                            self.commut(kz, Dy))
+            D_sig_xy = 2 * (self.commut(ky, Dx) + self.commut(kx, Dy))
+            D_sig_xz = 2 * (self.commut(kx, Dz) + self.commut(kz, Dx))
+            D_sig_yz = 2 * (self.commut(ky, Dz) + self.commut(kz, Dy))
 
             D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx, mo.T])
             D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy, mo.T])
@@ -418,7 +408,7 @@ class TPAReducedDriver(TPADriver):
 
         return xy_dict
 
-    def get_densities_II(self, wi, kX, kXY, d0_shape, mo,nocc):
+    def get_densities_II(self, wi, kX, kXY, mo, nocc):
         """
         Computes the compounded densities needed for the compounded
         second-order Fock matrices used for the reduced isotropic cubic response
@@ -431,22 +421,19 @@ class TPAReducedDriver(TPADriver):
             A dictonary with all the first-order response matrices
         :param kXY:
             A dict of the two index response matrices
-        :param S:
-            The overlap matrix
-        :param D0:
-            The SCF density matrix in AO basis
         :param mo:
             A matrix containing the MO coefficents
+        :param nocc:
+            Number of alpha electrons
 
         :return:
             A list of tranformed compounded densities
         """
 
         density_list = []
-        density_list = []
-        D_mo = np.zeros((d0_shape,d0_shape))
-        for i in range(nocc):
-            D_mo[i,i] = 1
+
+        D_mo = np.zeros((mo.shape[1], mo.shape[1]))
+        D_mo[:nocc, :nocc] = np.eye(nocc)
 
         for w in wi:
             k_sig_xx = kXY[(('N_sig_xx', w), 2 * w)]
@@ -461,9 +448,9 @@ class TPAReducedDriver(TPADriver):
             ky = kX['Nb'][('y', w)]
             kz = kX['Nb'][('z', w)]
 
-            kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
-            ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
-            kz_ = -kz.conj().T  # self.mo2ao(mo, kX['Nc'][('z', -w)]).T
+            kx_ = -kx.conj().T  # kX['Nc'][('x', -w)].T
+            ky_ = -ky.conj().T  # kX['Nc'][('y', -w)].T
+            kz_ = -kz.conj().T  # kX['Nc'][('z', -w)].T
 
             # SIGMA contributiatons #
             Dc_x_ = self.commut(kx_, D_mo)
@@ -478,7 +465,6 @@ class TPAReducedDriver(TPADriver):
             D_sig_xz = self.commut(k_sig_xz, D_mo)
             D_sig_yz = self.commut(k_sig_yz, D_mo)
 
-
             # x #
             Dx = self.commut(kx_, D_sig_xx)
             Dx += self.commut(k_sig_xx, Dc_x_)
@@ -487,7 +473,6 @@ class TPAReducedDriver(TPADriver):
 
             Dx += self.commut(kz_, D_sig_xz)
             Dx += self.commut(k_sig_xz, Dc_z_)
-
 
             # y #
             Dy = self.commut(kx_, D_sig_xy)

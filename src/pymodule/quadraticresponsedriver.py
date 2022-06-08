@@ -156,8 +156,8 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         if self.rank == mpi_master():
             S = scf_tensors['S']
-            da = scf_tensors['D'][0]
-            mo = scf_tensors['C']
+            da = scf_tensors['D_alpha']
+            mo = scf_tensors['C_alpha']
             d_a_mo = np.linalg.multi_dot([mo.T, S, da, S, mo])
             norb = mo.shape[1]
         else:
@@ -296,14 +296,10 @@ class QuadraticResponseDriver(NonLinearSolver):
         """
 
         if self.rank == mpi_master():
-            S = scf_tensors['S']
-            D0 = scf_tensors['D'][0]
-            mo = scf_tensors['C']
-            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F'][0], mo])
+            mo = scf_tensors['C_alpha']
+            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F_alpha'], mo])
             norb = mo.shape[1]
         else:
-            S = None
-            D0 = None
             mo = None
             F0 = None
             norb = None
@@ -317,7 +313,7 @@ class QuadraticResponseDriver(NonLinearSolver):
         # computing all compounded first-order densities
         if self.rank == mpi_master():
             first_order_dens, second_order_dens = self.get_densities(
-                freqpairs, kX, np.shape(D0)[0], mo,nocc)
+                freqpairs, kX, mo, nocc)
         else:
             first_order_dens = None
             second_order_dens = None
@@ -393,16 +389,14 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         return result
 
-    def get_densities(self, freqpairs, kX, d0_shape, mo,nocc):
+    def get_densities(self, freqpairs, kX, mo, nocc):
         """
-        Computes the  densities needed for the perturbed Fock matrices.
+        Computes the densities needed for the perturbed Fock matrices.
 
-        :param wi:
+        :param freqpairs:
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
-        :param d0_shape:
-            The size of D0
         :param mo:
             A matrix containing the MO coefficents
         :param nocc:
@@ -412,16 +406,15 @@ class QuadraticResponseDriver(NonLinearSolver):
             first_order_dens:
              A list of first-order one-time tranformed compounded densities
             second_order_dens:
-             A list of first-order two-time tranformed compounded densities        
+             A list of first-order two-time tranformed compounded densities
         """
 
         first_order_dens = []
         second_order_dens = []
 
         # MO alpha density matrix
-        D_mo = np.zeros((d0_shape,d0_shape))
-        for i in range(nocc):
-            D_mo[i,i] = 1
+        D_mo = np.zeros((mo.shape[1], mo.shape[1]))
+        D_mo[:nocc, :nocc] = np.eye(nocc)
 
         for (wb, wc) in freqpairs:
 
@@ -437,7 +430,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
             Dbc = self.commut(kb, Dc) + self.commut(kc, Db)
 
-            # Tranform from MO to AO basis 
+            # Tranform from MO to AO basis
             Db = np.linalg.multi_dot([mo, Db, mo.T])
             Dc = np.linalg.multi_dot([mo, Dc, mo.T])
             Dbc = np.linalg.multi_dot([mo, Dbc, mo.T])

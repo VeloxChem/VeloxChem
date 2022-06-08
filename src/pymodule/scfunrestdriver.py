@@ -328,8 +328,8 @@ class ScfUnrestrictedDriver(ScfDriver):
         D_total = self.scf_tensors['D_alpha'] + self.scf_tensors['D_beta']
 
         # Get some MO coefficients and create C^-1
-        C = self.scf_tensors["C_alpha"]
-        S = self.scf_tensors["S"]
+        C = self.scf_tensors['C_alpha']
+        S = self.scf_tensors['S']
         C_inv = np.matmul(S, C)
 
         # Transform total density to MO basis

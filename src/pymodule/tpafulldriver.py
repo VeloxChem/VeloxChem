@@ -83,7 +83,7 @@ class TPAFullDriver(TPADriver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def get_densities(self, wi, kX, d0_shape, mo, nocc):
+    def get_densities(self, wi, kX, mo, nocc):
         """
         Computes the compounded densities needed for the compounded Fock
         matrices F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
@@ -94,21 +94,19 @@ class TPAFullDriver(TPADriver):
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
-        :param S:
-            The overlap matrix
-        :param D0:
-            The SCF density matrix in AO basis
         :param mo:
             A matrix containing the MO coefficents
+        :param nocc:
+            Number of alpha electrons
 
         :return:
             A list of tranformed compounded densities
         """
 
         density_list = []
-        D_mo = np.zeros((d0_shape,d0_shape))
-        for i in range(nocc):
-            D_mo[i,i] = 1
+
+        D_mo = np.zeros((mo.shape[1], mo.shape[1]))
+        D_mo[:nocc, :nocc] = np.eye(nocc)
 
         for w in wi:
 
@@ -116,9 +114,9 @@ class TPAFullDriver(TPADriver):
             ky = kX['Nb'][('y', w)]
             kz = kX['Nb'][('z', w)]
 
-            kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
-            ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
-            kz_ = -kz.conj().T  # self.mo2ao(mo, kX['Nc'][('z', -w)]).T
+            kx_ = -kx.conj().T  # kX['Nc'][('x', -w)].T
+            ky_ = -ky.conj().T  # kX['Nc'][('y', -w)].T
+            kz_ = -kz.conj().T  # kX['Nc'][('z', -w)].T
 
             # create the first order single indexed densiteies #
 
@@ -142,40 +140,28 @@ class TPAFullDriver(TPADriver):
             D_sig_yy = 2 * (Dxx + 3 * Dyy + Dzz)
             D_sig_zz = 2 * (Dxx + Dyy + 3 * Dzz)
 
-            D_sig_xy = 2 * (self.commut(ky, Dx) +
-                            self.commut(kx, Dy))
-            D_sig_xz = 2 * (self.commut(kx, Dz) +
-                            self.commut(kz, Dx))
-            D_sig_yz = 2 * (self.commut(ky, Dz) +
-                            self.commut(kz, Dy))
+            D_sig_xy = 2 * (self.commut(ky, Dx) + self.commut(kx, Dy))
+            D_sig_xz = 2 * (self.commut(kx, Dz) + self.commut(kz, Dx))
+            D_sig_yz = 2 * (self.commut(ky, Dz) + self.commut(kz, Dy))
 
             # λ+τ terms #
 
-            Dxx = (self.commut(kx_, Dx) +
-                   self.commut(kx, Dx_))
-            Dyy = (self.commut(ky_, Dy) +
-                   self.commut(ky, Dy_))
-            Dzz = (self.commut(kz_, Dz) +
-                   self.commut(kz, Dz_))
+            Dxx = self.commut(kx_, Dx) + self.commut(kx, Dx_)
+            Dyy = self.commut(ky_, Dy) + self.commut(ky, Dy_)
+            Dzz = self.commut(kz_, Dz) + self.commut(kz, Dz_)
 
             D_lamtau_xx = 2 * (3 * Dxx + Dyy + Dzz)
             D_lamtau_yy = 2 * (Dxx + 3 * Dyy + Dzz)
             D_lamtau_zz = 2 * (Dxx + Dyy + 3 * Dzz)
 
-            D_lamtau_xy = 2 * (self.commut(ky_, Dx) +
-                               self.commut(kx_, Dy))
-            D_lamtau_xy += 2 * (self.commut(ky, Dx_) +
-                                self.commut(kx, Dy_))
+            D_lamtau_xy = 2 * (self.commut(ky_, Dx) + self.commut(kx_, Dy))
+            D_lamtau_xy += 2 * (self.commut(ky, Dx_) + self.commut(kx, Dy_))
 
-            D_lamtau_xz = 2 * (self.commut(kx_, Dz) +
-                               self.commut(kz_, Dx))
-            D_lamtau_xz += 2 * (self.commut(kx, Dz_) +
-                                self.commut(kz, Dx_))
+            D_lamtau_xz = 2 * (self.commut(kx_, Dz) + self.commut(kz_, Dx))
+            D_lamtau_xz += 2 * (self.commut(kx, Dz_) + self.commut(kz, Dx_))
 
-            D_lamtau_yz = 2 * (self.commut(ky_, Dz) +
-                               self.commut(kz_, Dy))
-            D_lamtau_yz += 2 * (self.commut(ky, Dz_) +
-                                self.commut(kz, Dy_))
+            D_lamtau_yz = 2 * (self.commut(ky_, Dz) + self.commut(kz_, Dy))
+            D_lamtau_yz += 2 * (self.commut(ky, Dz_) + self.commut(kz, Dy_))
 
             # Create first order three indexed Densities #
 
@@ -200,7 +186,6 @@ class TPAFullDriver(TPADriver):
                                 self.commut(ky, D_lamtau_yz) +
                                 self.commut(kz, D_lamtau_zz))
 
-
             D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx, mo.T])
             D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy, mo.T])
             D_sig_zz = np.linalg.multi_dot([mo, D_sig_zz, mo.T])
@@ -208,7 +193,6 @@ class TPAFullDriver(TPADriver):
             D_sig_xy = np.linalg.multi_dot([mo, D_sig_xy, mo.T])
             D_sig_xz = np.linalg.multi_dot([mo, D_sig_xz, mo.T])
             D_sig_yz = np.linalg.multi_dot([mo, D_sig_yz, mo.T])
-
 
             D_lamtau_xx = np.linalg.multi_dot([mo, D_lamtau_xx, mo.T])
             D_lamtau_yy = np.linalg.multi_dot([mo, D_lamtau_yy, mo.T])
@@ -776,7 +760,7 @@ class TPAFullDriver(TPADriver):
 
         return xy_dict
 
-    def get_densities_II(self, wi, kX, kXY, d0_shape, mo, nocc):
+    def get_densities_II(self, wi, kX, kXY, mo, nocc):
         """
         Computes the compounded densities needed for the compounded
         second-order Fock matrices used for the isotropic cubic response
@@ -788,21 +772,19 @@ class TPAFullDriver(TPADriver):
             A dictonary with all the first-order response matrices
         :param kXY:
             A dict of the two index response matrices
-        :param S:
-            The overlap matrix
-        :param D0:
-            The SCF density matrix in AO basis
         :param mo:
             A matrix containing the MO coefficents
+        :param nocc:
+            Number of alpha electrons
 
         :return:
             A list of tranformed compounded densities
         """
 
         density_list = []
-        D_mo = np.zeros((d0_shape,d0_shape))
-        for i in range(nocc):
-            D_mo[i,i] = 1
+
+        D_mo = np.zeros((mo.shape[1], mo.shape[1]))
+        D_mo[:nocc, :nocc] = np.eye(nocc)
 
         for w in wi:
             k_sig_xx = kXY[(('N_sig_xx', w), 2 * w)]
@@ -825,9 +807,9 @@ class TPAFullDriver(TPADriver):
             ky = kX['Nb'][('y', w)]
             kz = kX['Nb'][('z', w)]
 
-            kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
-            ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
-            kz_ = -kz.conj().T  # self.mo2ao(mo, kX['Nc'][('z', -w)]).T
+            kx_ = -kx.conj().T  # kX['Nc'][('x', -w)].T
+            ky_ = -ky.conj().T  # kX['Nc'][('y', -w)].T
+            kz_ = -kz.conj().T  # kX['Nc'][('z', -w)].T
 
             # SIGMA contributiatons #
             Dc_x_ = self.commut(kx_, D_mo)

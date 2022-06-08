@@ -165,8 +165,8 @@ class SHGDriver(NonLinearSolver):
 
         if self.rank == mpi_master():
             S = scf_tensors['S']
-            da = scf_tensors['D'][0]
-            mo = scf_tensors['C']
+            da = scf_tensors['D_alpha']
+            mo = scf_tensors['C_alpha']
             d_a_mo = np.linalg.multi_dot([mo.T, S, da, S, mo])
             norb = mo.shape[1]
         else:
@@ -374,14 +374,10 @@ class SHGDriver(NonLinearSolver):
         """
 
         if self.rank == mpi_master():
-            S = scf_tensors['S']
-            D0 = scf_tensors['D'][0]
-            mo = scf_tensors['C']
-            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F'][0], mo])
+            mo = scf_tensors['C_alpha']
+            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F_alpha'], mo])
             norb = mo.shape[1]
         else:
-            S = None
-            D0 = None
             mo = None
             F0 = None
             norb = None
@@ -395,7 +391,7 @@ class SHGDriver(NonLinearSolver):
         # computing all compounded first-order densities
         if self.rank == mpi_master():
             first_order_dens, second_order_dens = self.get_densities(
-                freqpairs, kX, np.shape(D0)[0], mo,nocc)
+                freqpairs, kX, mo, nocc)
         else:
             first_order_dens = None
             second_order_dens = None
@@ -482,15 +478,14 @@ class SHGDriver(NonLinearSolver):
 
         return beta
 
-    def get_densities(self, freqpairs, kX, d0_shape, mo,nocc):
+    def get_densities(self, freqpairs, kX, mo, nocc):
         """
+        Computes the densities needed for the perturbed Fock matrices.
 
         :param freqpairs:
-            A list of the frequencies
+            A list of the frequency pairs
         :param kX:
             A dictonary with all the first-order response matrices
-        :param d0_shape:
-            The size of D0
         :param mo:
             A matrix containing the MO coefficents
         :param nocc:
@@ -505,9 +500,9 @@ class SHGDriver(NonLinearSolver):
 
         first_order_dens = []
         second_order_dens = []
-        D_mo = np.zeros((d0_shape,d0_shape))
-        for i in range(nocc):
-            D_mo[i,i] = 1
+
+        D_mo = np.zeros((mo.shape[1], mo.shape[1]))
+        D_mo[:nocc, :nocc] = np.eye(nocc)
 
         for (wb, wc) in freqpairs:
 
@@ -524,29 +519,22 @@ class SHGDriver(NonLinearSolver):
             # create the first order two indexed densities #
 
             D_sig_x = 4 * self.commut(k_x, D_x)
-            D_sig_x += 2 * (self.commut(k_x, D_x) +
-                            self.commut(k_y, D_y) +
+            D_sig_x += 2 * (self.commut(k_x, D_x) + self.commut(k_y, D_y) +
                             self.commut(k_z, D_z))
 
             D_sig_y = 4 * self.commut(k_y, D_y)
-            D_sig_y += 2 * (self.commut(k_x, D_x) +
-                            self.commut(k_y, D_y) +
+            D_sig_y += 2 * (self.commut(k_x, D_x) + self.commut(k_y, D_y) +
                             self.commut(k_z, D_z))
 
             D_sig_z = 4 * self.commut(k_z, D_z)
-            D_sig_z += 2 * (self.commut(k_x, D_x) +
-                            self.commut(k_y, D_y) +
+            D_sig_z += 2 * (self.commut(k_x, D_x) + self.commut(k_y, D_y) +
                             self.commut(k_z, D_z))
 
-            D_lam_xy = (self.commut(k_x, D_y) +
-                        self.commut(k_y, D_x))
-            D_lam_xz = (self.commut(k_x, D_z) +
-                        self.commut(k_z, D_x))
-            D_lam_yz = (self.commut(k_y, D_z) +
-                        self.commut(k_z, D_y))
+            D_lam_xy = self.commut(k_x, D_y) + self.commut(k_y, D_x)
+            D_lam_xz = self.commut(k_x, D_z) + self.commut(k_z, D_x)
+            D_lam_yz = self.commut(k_y, D_z) + self.commut(k_z, D_y)
 
-
-            # Tranform from MO to AO basis 
+            # Tranform from MO to AO basis
             D_x = np.linalg.multi_dot([mo, D_x, mo.T])
             D_y = np.linalg.multi_dot([mo, D_y, mo.T])
             D_z = np.linalg.multi_dot([mo, D_z, mo.T])
@@ -558,7 +546,6 @@ class SHGDriver(NonLinearSolver):
             D_lam_xy = np.linalg.multi_dot([mo, D_lam_xy, mo.T])
             D_lam_xz = np.linalg.multi_dot([mo, D_lam_xz, mo.T])
             D_lam_yz = np.linalg.multi_dot([mo, D_lam_yz, mo.T])
-
 
             first_order_dens.append(D_x.real)
             first_order_dens.append(D_x.imag)

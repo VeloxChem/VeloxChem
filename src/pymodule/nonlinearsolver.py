@@ -778,22 +778,6 @@ class NonLinearSolver:
 
         return recvbuf
 
-
-    def mo2ao(self, mo, A):
-        """
-        Transform a matrix to atomic basis
-
-        :param mo:
-            molecular orbital coefficent matrix
-        :param A:
-            The matrix in MO basis that is the converted to AO basis
-
-        :return:
-            The matrix in AO basis
-        """
-
-        return np.linalg.multi_dot([mo, A, mo.T])
-
     def ao2mo(self, mo, A):
         """
         Transform a matrix to molecular basis
