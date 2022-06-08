@@ -23,22 +23,23 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from mpi4py import MPI
-import numpy as np
 from pathlib import Path
+
+import numpy as np
+from mpi4py import MPI
+
 try:
     import cppe
 except ImportError:
     raise ImportError('Unable to import cppe. Please install cppe via ' +
                       '\'python3 -m pip install cppe\'')
 
-from .veloxchemlib import NuclearPotentialIntegralsDriver
-from .veloxchemlib import ElectricFieldIntegralsDriver
-from .veloxchemlib import bohr_in_angstroms
-from .veloxchemlib import mpi_master
+from .errorhandler import assert_msg_critical
 from .inputparser import InputParser
 from .subcommunicators import SubCommunicators
-from .errorhandler import assert_msg_critical
+from .veloxchemlib import (ElectricFieldIntegralsDriver,
+                           NuclearPotentialIntegralsDriver, bohr_in_angstroms,
+                           mpi_master)
 
 
 class PolEmbed:
