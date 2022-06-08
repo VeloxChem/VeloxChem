@@ -26,7 +26,6 @@
 stages:
   - build
   - test
-  - pipinstall
   - deploy
 
 .monkey:setup:
@@ -50,7 +49,10 @@ stages:
     - mpiicpc --version
     - python -m venv --clear venv
     - source venv/bin/activate
-    - python -m pip install --upgrade pip
+    - python -m pip install --upgrade
+        pip
+        setuptools
+        wheel
 
 monkey:build:
   extends: .monkey:setup
@@ -81,7 +83,7 @@ monkey:unit_tests:
 
 monkey:python_tests:
   extends: .monkey:setup
-  stage: pipinstall
+  stage: build
   script:
     - CC=icc MPICC=mpiicc python -m pip install mpi4py --no-binary=mpi4py
     #- CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
