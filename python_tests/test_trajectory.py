@@ -1,18 +1,10 @@
 from pathlib import Path
-import pytest
-import sys
-try:
-    import MDAnalysis
-except ImportError:
-    pass
-try:
-    import cppe
-except ImportError:
-    pass
 
 from veloxchem.mpitask import MpiTask
 from veloxchem.trajectorydriver import TrajectoryDriver
 from veloxchem.veloxchemlib import is_mpi_master
+
+from .addons import using_cppe, using_mdanalysis
 
 
 @pytest.mark.filterwarnings(
@@ -21,7 +13,7 @@ from veloxchem.veloxchemlib import is_mpi_master
     'ignore:Using the last letter of the segid:DeprecationWarning:MDAnalysis')
 @pytest.mark.filterwarnings(
     'ignore:TPR files index residues from 0:DeprecationWarning:MDAnalysis')
-@pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+@using_cppe
 class TestTrajectoryDriver:
 
     def run_trajectory(self, filename, ref_exc_energies, ref_osc_strengths):
@@ -72,8 +64,7 @@ class TestTrajectoryDriver:
                 assert abs(e - ref_e) < 1.0e-6
                 assert abs(f - ref_f) < 1.0e-4
 
-    @pytest.mark.skipif('MDAnalysis' not in sys.modules,
-                        reason='MDAnalysis not available')
+    @using_mdanalysis
     def test_trajectory_bithio(self):
 
         here = Path(__file__).parent
