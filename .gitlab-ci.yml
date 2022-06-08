@@ -26,6 +26,7 @@
 stages:
   - build
   - test
+  - pipinstall
   - deploy
 
 .monkey:setup:
@@ -34,6 +35,7 @@ stages:
   image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-f51f706
   variables:
     OMP_NUM_THREADS: "6"
+    VLX_NUM_BUILD_JOBS: "6"
   rules:
     - if: $CI_PIPELINE_SOURCE != "schedule"
   before_script:
@@ -48,18 +50,23 @@ stages:
     - mpiicpc --version
     - python -m venv --clear venv
     - source venv/bin/activate
-    - python -m pip install --upgrade pip setuptools wheel
+    - python -m pip install --upgrade pip
 
 monkey:build:
   extends: .monkey:setup
   stage: build
-  variables:
-    GTESTLIB: "/usr/lib/x86_64-linux-gnu"
   script:
-    - python -m pip install numpy pybind11 mpi4py --no-binary=mpi4py
-    - python config/generate_setup.py
-    - make -j 6 -C src release
-    - make -j 6 -C unit_tests release
+    - python -m pip install
+        numpy
+        pybind11[global]
+        mpi4py --no-binary=mpi4py
+    - cmake
+        -S.
+        -Bbuild
+        -GNinja
+        -DCMAKE_CXX_COMPILER=mpiicpc
+        -DVLX_LA_VENDOR=MKL
+    - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" -- -v -d stats
   artifacts:
     paths:
       - build
@@ -70,17 +77,16 @@ monkey:unit_tests:
   stage: test
   needs: ["monkey:build"]
   script:
-    - ./build/bin/UnitTestVeloxChem.x
+    - ctest --test-dir build --output-on-failure -L unit
 
 monkey:python_tests:
   extends: .monkey:setup
-  stage: test
-  variables:
-    VLX_NUM_BUILD_JOBS: "6"
+  stage: pipinstall
   script:
-    - python -m pip install mpi4py --no-binary=mpi4py
-    - CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
-    - python -m pip install .[test,qmmm]
+    - CC=icc MPICC=mpiicc python -m pip install mpi4py --no-binary=mpi4py
+    #- CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
+    - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpiicpc"
+        python -m pip install .[test,qmmm]
     - python -c "import veloxchem; print(veloxchem.__version__)"
     - mpiexec -n 2 python -m pytest -v --pyargs veloxchem -m "solvers"
     - python -m pytest -v --cov=veloxchem --pyargs veloxchem

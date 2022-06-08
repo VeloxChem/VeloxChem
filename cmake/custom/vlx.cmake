@@ -82,6 +82,9 @@ install(
 
 enable_testing()
 include(CTest)
-# This must come last!!
-add_subdirectory(unit_tests)
+# these two add_subdirectory commands must come last!!
+# do not build unit tests if we are doing a `pip install .`
+if(NOT SKBUILD)
+  add_subdirectory(unit_tests)
+endif()
 add_subdirectory(python_tests)
