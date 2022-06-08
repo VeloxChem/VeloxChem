@@ -13,8 +13,12 @@ file(
     ${CMAKE_CURRENT_LIST_DIR}
   test_*.py
   )
-# append conftest.py to the list
-list(APPEND _vlx_pytests conftest.py)
+# append addons.py and conftest.py to the list
+list(APPEND _vlx_pytests
+  __init__.py
+  addons.py
+  conftest.py
+  )
 
 foreach(_f IN LISTS _vlx_pytests)
   # link the Python files under the build folder
@@ -26,27 +30,25 @@ foreach(_f IN LISTS _vlx_pytests)
     SYMBOLIC
     )
 
-  if(${_f} MATCHES "conftest.py")
-    break()
+  if(${_f} MATCHES "test_*.py")
+    # extract the name and label for the test from the file name
+    # by removing the "test_" prefix and the ".py" suffix
+    string(REGEX REPLACE "test_(.*).py" "\\1" _name ${_f})
+    add_test(
+      NAME
+        ${_name}
+      COMMAND
+        ${Python_EXECUTABLE} -m pytest -v -s --pyargs veloxchem -k test_${_name}
+      WORKING_DIRECTORY
+        ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/..
+      )
+
+    set_tests_properties(${_name}
+      PROPERTIES
+        LABELS
+          "integration;${_name}"
+      )
   endif()
-
-  # extract the name and label for the test from the file name
-  # by removing the "test_" prefix and the ".py" suffix
-  string(REGEX REPLACE "test_(.*).py" "\\1" _name ${_f})
-  add_test(
-    NAME
-      ${_name}
-    COMMAND
-      ${Python_EXECUTABLE} -m pytest -v -s --pyargs veloxchem -k test_${_name}
-    WORKING_DIRECTORY
-      ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/..
-    )
-
-  set_tests_properties(${_name}
-    PROPERTIES
-      LABELS
-        "integration;${_name}"
-    )
 endforeach()
 
 # handle folder with reference input files
