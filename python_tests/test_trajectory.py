@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from veloxchem.mpitask import MpiTask
 from veloxchem.trajectorydriver import TrajectoryDriver
 from veloxchem.veloxchemlib import is_mpi_master

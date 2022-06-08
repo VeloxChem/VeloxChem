@@ -25,7 +25,7 @@ using_cppe = pytest.mark.skipif(
 )
 
 using_xtb = pytest.mark.skipif(
-    not XTBDriver.isAvailable(),
+    not XTBDriver.is_available(),
     reason="Not detecting xTB. Install package if necessary",
 )
 

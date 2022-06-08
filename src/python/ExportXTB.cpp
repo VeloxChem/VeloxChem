@@ -51,7 +51,7 @@ export_xtb(py::module& m)
 
     PyClass<CXTBDriver>(m, "XTBDriver")
         .def(py::init(&vlx_general::create<CXTBDriver>), "comm"_a = py::none())
-        .def("is_available", &CXTBDriver::isAvailable, "Checks if XTB package is available.")
+        .def_static("is_available", &CXTBDriver::isAvailable, "Checks if XTB package is available.")
         .def("is_master_node", &CXTBDriver::isMasterNode, "Checks if XTB driver is running on master node.")
         .def("set_max_iter", &CXTBDriver::setMaxIterations, "Sets maximum number of SCF iterations.", "maxIterations"_a)
         .def("set_elec_temp", &CXTBDriver::setElectronicTemp, "Sets electronic temperature for electron smearing.", "electronicTemp"_a)
