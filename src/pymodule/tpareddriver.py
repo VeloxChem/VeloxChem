@@ -83,7 +83,7 @@ class TPAReducedDriver(TPADriver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def get_densities(self, wi, kX, S, D0, mo):
+    def get_densities(self, wi, kX, d0_shape, mo,nocc):
         """
         Computes the compounded densities needed for the compounded Fock
         matrices F^{σ} used for the reduced iostropic cubic response function
@@ -105,38 +105,52 @@ class TPAReducedDriver(TPADriver):
         """
 
         density_list = []
+        D_mo = np.zeros((d0_shape,d0_shape))
+        for i in range(nocc):
+            D_mo[i,i] = 1
 
         for w in wi:
-            # convert response matrix to ao basis #
-            kx = self.mo2ao(mo, kX['Nb'][('x', w)])
-            ky = self.mo2ao(mo, kX['Nb'][('y', w)])
-            kz = self.mo2ao(mo, kX['Nb'][('z', w)])
+
+            kx = kX['Nb'][('x', w)]
+            ky = kX['Nb'][('y', w)]
+            kz = kX['Nb'][('z', w)]
+
+            kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
+            ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
+            kz_ = -kz.conj().T  # self.mo2ao(mo, kX['Nc'][('z', -w)]).T
 
             # create the first order single indexed densiteies #
-            Dx = self.transform_dens(kx, D0, S)
-            Dy = self.transform_dens(ky, D0, S)
-            Dz = self.transform_dens(kz, D0, S)
+
+            Dx = self.commut(kx, D_mo)
+            Dy = self.commut(ky, D_mo)
+            Dz = self.commut(kz, D_mo)
 
             # create the first order two indexed densities #
+
             # σ terms #
-            D_sig_xx = 2 * (3 * self.transform_dens(kx, Dx, S) +
-                            self.transform_dens(ky, Dy, S) +
-                            self.transform_dens(kz, Dz, S))
-            D_sig_yy = 2 * (self.transform_dens(kx, Dx, S) +
-                            3 * self.transform_dens(ky, Dy, S) +
-                            self.transform_dens(kz, Dz, S))
-            D_sig_zz = 2 * (self.transform_dens(kx, Dx, S) +
-                            self.transform_dens(ky, Dy, S) +
-                            3 * self.transform_dens(kz, Dz, S))
 
-            D_sig_xy = 2 * (self.transform_dens(ky, Dx, S) +
-                            self.transform_dens(kx, Dy, S))
-            D_sig_xz = 2 * (self.transform_dens(kx, Dz, S) +
-                            self.transform_dens(kz, Dx, S))
-            D_sig_yz = 2 * (self.transform_dens(ky, Dz, S) +
-                            self.transform_dens(kz, Dy, S))
+            Dxx = self.commut(kx, Dx)
+            Dyy = self.commut(ky, Dy)
+            Dzz = self.commut(kz, Dz)
 
-            # Create first order three indexed Densities #
+            D_sig_xx = 2 * (3 * Dxx + Dyy + Dzz)
+            D_sig_yy = 2 * (Dxx + 3 * Dyy + Dzz)
+            D_sig_zz = 2 * (Dxx + Dyy + 3 * Dzz)
+
+            D_sig_xy = 2 * (self.commut(ky, Dx) +
+                            self.commut(kx, Dy))
+            D_sig_xz = 2 * (self.commut(kx, Dz) +
+                            self.commut(kz, Dx))
+            D_sig_yz = 2 * (self.commut(ky, Dz) +
+                            self.commut(kz, Dy))
+
+            D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx, mo.T])
+            D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy, mo.T])
+            D_sig_zz = np.linalg.multi_dot([mo, D_sig_zz, mo.T])
+
+            D_sig_xy = np.linalg.multi_dot([mo, D_sig_xy, mo.T])
+            D_sig_xz = np.linalg.multi_dot([mo, D_sig_xz, mo.T])
+            D_sig_yz = np.linalg.multi_dot([mo, D_sig_yz, mo.T])
 
             density_list.append(D_sig_xx.real)
             density_list.append(D_sig_yy.real)
@@ -404,7 +418,7 @@ class TPAReducedDriver(TPADriver):
 
         return xy_dict
 
-    def get_densities_II(self, wi, kX, kXY, S, D0, mo):
+    def get_densities_II(self, wi, kX, kXY, d0_shape, mo,nocc):
         """
         Computes the compounded densities needed for the compounded
         second-order Fock matrices used for the reduced isotropic cubic response
@@ -429,65 +443,75 @@ class TPAReducedDriver(TPADriver):
         """
 
         density_list = []
+        density_list = []
+        D_mo = np.zeros((d0_shape,d0_shape))
+        for i in range(nocc):
+            D_mo[i,i] = 1
 
         for w in wi:
-            k_sig_xx = self.mo2ao(mo, kXY[(('N_sig_xx', w), 2 * w)])
-            k_sig_yy = self.mo2ao(mo, kXY[(('N_sig_yy', w), 2 * w)])
-            k_sig_zz = self.mo2ao(mo, kXY[(('N_sig_zz', w), 2 * w)])
+            k_sig_xx = kXY[(('N_sig_xx', w), 2 * w)]
+            k_sig_yy = kXY[(('N_sig_yy', w), 2 * w)]
+            k_sig_zz = kXY[(('N_sig_zz', w), 2 * w)]
 
-            k_sig_xy = self.mo2ao(mo, kXY[(('N_sig_xy', w), 2 * w)])
-            k_sig_xz = self.mo2ao(mo, kXY[(('N_sig_xz', w), 2 * w)])
-            k_sig_yz = self.mo2ao(mo, kXY[(('N_sig_yz', w), 2 * w)])
+            k_sig_xy = kXY[(('N_sig_xy', w), 2 * w)]
+            k_sig_xz = kXY[(('N_sig_xz', w), 2 * w)]
+            k_sig_yz = kXY[(('N_sig_yz', w), 2 * w)]
 
-            kx = self.mo2ao(mo, kX['Nb'][('x', w)])
-            ky = self.mo2ao(mo, kX['Nb'][('y', w)])
-            kz = self.mo2ao(mo, kX['Nb'][('z', w)])
+            kx = kX['Nb'][('x', w)]
+            ky = kX['Nb'][('y', w)]
+            kz = kX['Nb'][('z', w)]
 
             kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
             ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
             kz_ = -kz.conj().T  # self.mo2ao(mo, kX['Nc'][('z', -w)]).T
 
             # SIGMA contributiatons #
-            Dc_x_ = self.transform_dens(kx_, D0, S)
-            Dc_y_ = self.transform_dens(ky_, D0, S)
-            Dc_z_ = self.transform_dens(kz_, D0, S)
+            Dc_x_ = self.commut(kx_, D_mo)
+            Dc_y_ = self.commut(ky_, D_mo)
+            Dc_z_ = self.commut(kz_, D_mo)
 
-            D_sig_xx = self.transform_dens(k_sig_xx, D0, S)
-            D_sig_yy = self.transform_dens(k_sig_yy, D0, S)
-            D_sig_zz = self.transform_dens(k_sig_zz, D0, S)
+            D_sig_xx = self.commut(k_sig_xx, D_mo)
+            D_sig_yy = self.commut(k_sig_yy, D_mo)
+            D_sig_zz = self.commut(k_sig_zz, D_mo)
 
-            D_sig_xy = self.transform_dens(k_sig_xy, D0, S)
-            D_sig_xz = self.transform_dens(k_sig_xz, D0, S)
-            D_sig_yz = self.transform_dens(k_sig_yz, D0, S)
+            D_sig_xy = self.commut(k_sig_xy, D_mo)
+            D_sig_xz = self.commut(k_sig_xz, D_mo)
+            D_sig_yz = self.commut(k_sig_yz, D_mo)
+
 
             # x #
-            Dx = self.transform_dens(kx_, D_sig_xx, S)
-            Dx += self.transform_dens(k_sig_xx, Dc_x_, S)
-            Dx += self.transform_dens(ky_, D_sig_xy, S)
-            Dx += self.transform_dens(k_sig_xy, Dc_y_, S)
+            Dx = self.commut(kx_, D_sig_xx)
+            Dx += self.commut(k_sig_xx, Dc_x_)
+            Dx += self.commut(ky_, D_sig_xy)
+            Dx += self.commut(k_sig_xy, Dc_y_)
 
-            Dx += self.transform_dens(kz_, D_sig_xz, S)
-            Dx += self.transform_dens(k_sig_xz, Dc_z_, S)
+            Dx += self.commut(kz_, D_sig_xz)
+            Dx += self.commut(k_sig_xz, Dc_z_)
+
 
             # y #
-            Dy = self.transform_dens(kx_, D_sig_xy, S)
-            Dy += self.transform_dens(k_sig_xy, Dc_x_, S)
+            Dy = self.commut(kx_, D_sig_xy)
+            Dy += self.commut(k_sig_xy, Dc_x_)
 
-            Dy += self.transform_dens(ky_, D_sig_yy, S)
-            Dy += self.transform_dens(k_sig_yy, Dc_y_, S)
+            Dy += self.commut(ky_, D_sig_yy)
+            Dy += self.commut(k_sig_yy, Dc_y_)
 
-            Dy += self.transform_dens(kz_, D_sig_yz, S)
-            Dy += self.transform_dens(k_sig_yz, Dc_z_, S)
+            Dy += self.commut(kz_, D_sig_yz)
+            Dy += self.commut(k_sig_yz, Dc_z_)
 
             # z #
-            Dz = self.transform_dens(kx_, D_sig_xz, S)
-            Dz += self.transform_dens(k_sig_xz, Dc_x_, S)
+            Dz = self.commut(kx_, D_sig_xz)
+            Dz += self.commut(k_sig_xz, Dc_x_)
 
-            Dz += self.transform_dens(ky_, D_sig_yz, S)
-            Dz += self.transform_dens(k_sig_yz, Dc_y_, S)
+            Dz += self.commut(ky_, D_sig_yz)
+            Dz += self.commut(k_sig_yz, Dc_y_)
 
-            Dz += self.transform_dens(kz_, D_sig_zz, S)
-            Dz += self.transform_dens(k_sig_zz, Dc_z_, S)
+            Dz += self.commut(kz_, D_sig_zz)
+            Dz += self.commut(k_sig_zz, Dc_z_)
+
+            Dx = np.linalg.multi_dot([mo, Dx, mo.T])
+            Dy = np.linalg.multi_dot([mo, Dy, mo.T])
+            Dz = np.linalg.multi_dot([mo, Dz, mo.T])
 
             density_list.append(Dx.real)
             density_list.append(Dx.imag)

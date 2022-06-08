@@ -395,7 +395,7 @@ class SHGDriver(NonLinearSolver):
         # computing all compounded first-order densities
         if self.rank == mpi_master():
             first_order_dens, second_order_dens = self.get_densities(
-                freqpairs, kX, S, D0, mo)
+                freqpairs, kX, np.shape(D0)[0], mo,nocc)
         else:
             first_order_dens = None
             second_order_dens = None
@@ -482,19 +482,19 @@ class SHGDriver(NonLinearSolver):
 
         return beta
 
-    def get_densities(self, freqpairs, kX, S, D0, mo):
+    def get_densities(self, freqpairs, kX, d0_shape, mo,nocc):
         """
 
         :param freqpairs:
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
-        :param S:
-            The overlap matrix
-        :param D0:
-            The SCF density matrix in AO basis
+        :param d0_shape:
+            The size of D0
         :param mo:
             A matrix containing the MO coefficents
+        :param nocc:
+            Number of alpha electrons
 
         :return:
             first_order_dens:
@@ -505,44 +505,60 @@ class SHGDriver(NonLinearSolver):
 
         first_order_dens = []
         second_order_dens = []
+        D_mo = np.zeros((d0_shape,d0_shape))
+        for i in range(nocc):
+            D_mo[i,i] = 1
 
         for (wb, wc) in freqpairs:
 
-            # convert response matrix to ao basis #
-
-            k_x = self.mo2ao(mo, kX[('x', wb)])
-            k_y = self.mo2ao(mo, kX[('y', wb)])
-            k_z = self.mo2ao(mo, kX[('z', wb)])
+            k_x = kX[('x', wb)]
+            k_y = kX[('y', wb)]
+            k_z = kX[('z', wb)]
 
             # create the first order single indexed densiteies #
 
-            D_x = self.transform_dens(k_x, D0, S)
-            D_y = self.transform_dens(k_y, D0, S)
-            D_z = self.transform_dens(k_z, D0, S)
+            D_x = self.commut(k_x, D_mo)
+            D_y = self.commut(k_y, D_mo)
+            D_z = self.commut(k_z, D_mo)
 
             # create the first order two indexed densities #
 
-            D_sig_x = 4 * self.transform_dens(k_x, D_x, S)
-            D_sig_x += 2 * (self.transform_dens(k_x, D_x, S) +
-                            self.transform_dens(k_y, D_y, S) +
-                            self.transform_dens(k_z, D_z, S))
+            D_sig_x = 4 * self.commut(k_x, D_x)
+            D_sig_x += 2 * (self.commut(k_x, D_x) +
+                            self.commut(k_y, D_y) +
+                            self.commut(k_z, D_z))
 
-            D_sig_y = 4 * self.transform_dens(k_y, D_y, S)
-            D_sig_y += 2 * (self.transform_dens(k_x, D_x, S) +
-                            self.transform_dens(k_y, D_y, S) +
-                            self.transform_dens(k_z, D_z, S))
+            D_sig_y = 4 * self.commut(k_y, D_y)
+            D_sig_y += 2 * (self.commut(k_x, D_x) +
+                            self.commut(k_y, D_y) +
+                            self.commut(k_z, D_z))
 
-            D_sig_z = 4 * self.transform_dens(k_z, D_z, S)
-            D_sig_z += 2 * (self.transform_dens(k_x, D_x, S) +
-                            self.transform_dens(k_y, D_y, S) +
-                            self.transform_dens(k_z, D_z, S))
+            D_sig_z = 4 * self.commut(k_z, D_z)
+            D_sig_z += 2 * (self.commut(k_x, D_x) +
+                            self.commut(k_y, D_y) +
+                            self.commut(k_z, D_z))
 
-            D_lam_xy = (self.transform_dens(k_x, D_y, S) +
-                        self.transform_dens(k_y, D_x, S))
-            D_lam_xz = (self.transform_dens(k_x, D_z, S) +
-                        self.transform_dens(k_z, D_x, S))
-            D_lam_yz = (self.transform_dens(k_y, D_z, S) +
-                        self.transform_dens(k_z, D_y, S))
+            D_lam_xy = (self.commut(k_x, D_y) +
+                        self.commut(k_y, D_x))
+            D_lam_xz = (self.commut(k_x, D_z) +
+                        self.commut(k_z, D_x))
+            D_lam_yz = (self.commut(k_y, D_z) +
+                        self.commut(k_z, D_y))
+
+
+            # Tranform from MO to AO basis 
+            D_x = np.linalg.multi_dot([mo, D_x, mo.T])
+            D_y = np.linalg.multi_dot([mo, D_y, mo.T])
+            D_z = np.linalg.multi_dot([mo, D_z, mo.T])
+
+            D_sig_x = np.linalg.multi_dot([mo, D_sig_x, mo.T])
+            D_sig_y = np.linalg.multi_dot([mo, D_sig_y, mo.T])
+            D_sig_z = np.linalg.multi_dot([mo, D_sig_z, mo.T])
+
+            D_lam_xy = np.linalg.multi_dot([mo, D_lam_xy, mo.T])
+            D_lam_xz = np.linalg.multi_dot([mo, D_lam_xz, mo.T])
+            D_lam_yz = np.linalg.multi_dot([mo, D_lam_yz, mo.T])
+
 
             first_order_dens.append(D_x.real)
             first_order_dens.append(D_x.imag)
@@ -726,6 +742,8 @@ class SHGDriver(NonLinearSolver):
 
             F0_a = fo['F0']
 
+            print("Fz")
+            print(F_z)
             # Response
 
             k_x = kX[('x', wb)].T

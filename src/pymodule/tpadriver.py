@@ -306,7 +306,7 @@ class TPADriver(NonLinearSolver):
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            density_list = self.get_densities(w, kX, S, D0, mo)
+            density_list = self.get_densities(w, kX, np.shape(D0)[0] , mo,nocc)
         else:
             density_list = None
 
@@ -334,7 +334,7 @@ class TPADriver(NonLinearSolver):
         # computing all second-order compounded densities based on the
         # second-order response vectors
         if self.rank == mpi_master():
-            density_list_two = self.get_densities_II(w, kX, kXY_dict, S, D0, mo)
+            density_list_two = self.get_densities_II(w, kX, kXY_dict, np.shape(D0)[0], mo,nocc)
         else:
             density_list_two = None
 

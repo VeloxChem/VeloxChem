@@ -778,22 +778,6 @@ class NonLinearSolver:
 
         return recvbuf
 
-    def transform_dens(self, k, D, S):
-        """
-        Creates the perturbed density
-
-        :param k:
-            Response vector in matrix form in AO basis
-        :param D:
-            The density that is to be perturbed in AO basis
-        :param S:
-            Overlap matrix
-
-        :return:
-            [k,D]
-        """
-
-        return (np.linalg.multi_dot([k, S, D]) - np.linalg.multi_dot([D, S, k]))
 
     def mo2ao(self, mo, A):
         """

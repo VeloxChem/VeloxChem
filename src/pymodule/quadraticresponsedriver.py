@@ -317,7 +317,7 @@ class QuadraticResponseDriver(NonLinearSolver):
         # computing all compounded first-order densities
         if self.rank == mpi_master():
             first_order_dens, second_order_dens = self.get_densities(
-                freqpairs, kX, S, D0, mo)
+                freqpairs, kX, np.shape(D0)[0], mo,nocc)
         else:
             first_order_dens = None
             second_order_dens = None
@@ -393,7 +393,7 @@ class QuadraticResponseDriver(NonLinearSolver):
 
         return result
 
-    def get_densities(self, freqpairs, kX, S, D0, mo):
+    def get_densities(self, freqpairs, kX, d0_shape, mo,nocc):
         """
         Computes the  densities needed for the perturbed Fock matrices.
 
@@ -401,43 +401,53 @@ class QuadraticResponseDriver(NonLinearSolver):
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
-        :param S:
-            The overlap matrix
-        :param D0:
-            The SCF density matrix in AO basis
+        :param d0_shape:
+            The size of D0
         :param mo:
             A matrix containing the MO coefficents
+        :param nocc:
+            Number of alpha electrons
 
         :return:
-            A list of tranformed densities
+            first_order_dens:
+             A list of first-order one-time tranformed compounded densities
+            second_order_dens:
+             A list of first-order two-time tranformed compounded densities        
         """
 
         first_order_dens = []
         second_order_dens = []
 
+        # MO alpha density matrix
+        D_mo = np.zeros((d0_shape,d0_shape))
+        for i in range(nocc):
+            D_mo[i,i] = 1
+
         for (wb, wc) in freqpairs:
 
-            # convert response matrix to ao basis #
-
-            kb = self.mo2ao(mo, kX[('B', wb)])
-            kc = self.mo2ao(mo, kX[('C', wc)])
+            kb = kX[('B', wb)]
+            kc = kX[('C', wc)]
 
             # create the first order single indexed densiteies #
 
-            Db = self.transform_dens(kb, D0, S)
-            Dc = self.transform_dens(kc, D0, S)
+            Db = self.commut(kb, D_mo)
+            Dc = self.commut(kc, D_mo)
 
             # create the first order two indexed densities #
 
-            Dbc = self.transform_dens(kb, Dc, S)
-            Dcb = self.transform_dens(kc, Db, S)
+            Dbc = self.commut(kb, Dc) + self.commut(kc, Db)
+
+            # Tranform from MO to AO basis 
+            Db = np.linalg.multi_dot([mo, Db, mo.T])
+            Dc = np.linalg.multi_dot([mo, Dc, mo.T])
+            Dbc = np.linalg.multi_dot([mo, Dbc, mo.T])
 
             first_order_dens.append(Db.real)
             first_order_dens.append(Db.imag)
             first_order_dens.append(Dc.real)
             first_order_dens.append(Dc.imag)
-            second_order_dens.append((Dbc + Dcb).real)
-            second_order_dens.append((Dbc + Dcb).imag)
+            second_order_dens.append(Dbc.real)
+            second_order_dens.append(Dbc.imag)
 
         return first_order_dens, second_order_dens
 

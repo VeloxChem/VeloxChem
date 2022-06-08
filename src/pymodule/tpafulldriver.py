@@ -83,7 +83,7 @@ class TPAFullDriver(TPADriver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def get_densities(self, wi, kX, S, D0, mo):
+    def get_densities(self, wi, kX, d0_shape, mo, nocc):
         """
         Computes the compounded densities needed for the compounded Fock
         matrices F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
@@ -106,14 +106,15 @@ class TPAFullDriver(TPADriver):
         """
 
         density_list = []
+        D_mo = np.zeros((d0_shape,d0_shape))
+        for i in range(nocc):
+            D_mo[i,i] = 1
 
         for w in wi:
 
-            # convert response matrix to ao basis #
-
-            kx = self.mo2ao(mo, kX['Nb'][('x', w)])
-            ky = self.mo2ao(mo, kX['Nb'][('y', w)])
-            kz = self.mo2ao(mo, kX['Nb'][('z', w)])
+            kx = kX['Nb'][('x', w)]
+            ky = kX['Nb'][('y', w)]
+            kz = kX['Nb'][('z', w)]
 
             kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
             ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
@@ -121,83 +122,105 @@ class TPAFullDriver(TPADriver):
 
             # create the first order single indexed densiteies #
 
-            Dx = self.transform_dens(kx, D0, S)
-            Dy = self.transform_dens(ky, D0, S)
-            Dz = self.transform_dens(kz, D0, S)
+            Dx = self.commut(kx, D_mo)
+            Dy = self.commut(ky, D_mo)
+            Dz = self.commut(kz, D_mo)
 
-            Dx_ = self.transform_dens(kx_, D0, S)
-            Dy_ = self.transform_dens(ky_, D0, S)
-            Dz_ = self.transform_dens(kz_, D0, S)
+            Dx_ = self.commut(kx_, D_mo)
+            Dy_ = self.commut(ky_, D_mo)
+            Dz_ = self.commut(kz_, D_mo)
 
             # create the first order two indexed densities #
 
             # σ terms #
 
-            Dxx = self.transform_dens(kx, Dx, S)
-            Dyy = self.transform_dens(ky, Dy, S)
-            Dzz = self.transform_dens(kz, Dz, S)
+            Dxx = self.commut(kx, Dx)
+            Dyy = self.commut(ky, Dy)
+            Dzz = self.commut(kz, Dz)
 
             D_sig_xx = 2 * (3 * Dxx + Dyy + Dzz)
             D_sig_yy = 2 * (Dxx + 3 * Dyy + Dzz)
             D_sig_zz = 2 * (Dxx + Dyy + 3 * Dzz)
 
-            D_sig_xy = 2 * (self.transform_dens(ky, Dx, S) +
-                            self.transform_dens(kx, Dy, S))
-            D_sig_xz = 2 * (self.transform_dens(kx, Dz, S) +
-                            self.transform_dens(kz, Dx, S))
-            D_sig_yz = 2 * (self.transform_dens(ky, Dz, S) +
-                            self.transform_dens(kz, Dy, S))
+            D_sig_xy = 2 * (self.commut(ky, Dx) +
+                            self.commut(kx, Dy))
+            D_sig_xz = 2 * (self.commut(kx, Dz) +
+                            self.commut(kz, Dx))
+            D_sig_yz = 2 * (self.commut(ky, Dz) +
+                            self.commut(kz, Dy))
 
             # λ+τ terms #
 
-            Dxx = (self.transform_dens(kx_, Dx, S) +
-                   self.transform_dens(kx, Dx_, S))
-            Dyy = (self.transform_dens(ky_, Dy, S) +
-                   self.transform_dens(ky, Dy_, S))
-            Dzz = (self.transform_dens(kz_, Dz, S) +
-                   self.transform_dens(kz, Dz_, S))
+            Dxx = (self.commut(kx_, Dx) +
+                   self.commut(kx, Dx_))
+            Dyy = (self.commut(ky_, Dy) +
+                   self.commut(ky, Dy_))
+            Dzz = (self.commut(kz_, Dz) +
+                   self.commut(kz, Dz_))
 
             D_lamtau_xx = 2 * (3 * Dxx + Dyy + Dzz)
             D_lamtau_yy = 2 * (Dxx + 3 * Dyy + Dzz)
             D_lamtau_zz = 2 * (Dxx + Dyy + 3 * Dzz)
 
-            D_lamtau_xy = 2 * (self.transform_dens(ky_, Dx, S) +
-                               self.transform_dens(kx_, Dy, S))
-            D_lamtau_xy += 2 * (self.transform_dens(ky, Dx_, S) +
-                                self.transform_dens(kx, Dy_, S))
+            D_lamtau_xy = 2 * (self.commut(ky_, Dx) +
+                               self.commut(kx_, Dy))
+            D_lamtau_xy += 2 * (self.commut(ky, Dx_) +
+                                self.commut(kx, Dy_))
 
-            D_lamtau_xz = 2 * (self.transform_dens(kx_, Dz, S) +
-                               self.transform_dens(kz_, Dx, S))
-            D_lamtau_xz += 2 * (self.transform_dens(kx, Dz_, S) +
-                                self.transform_dens(kz, Dx_, S))
+            D_lamtau_xz = 2 * (self.commut(kx_, Dz) +
+                               self.commut(kz_, Dx))
+            D_lamtau_xz += 2 * (self.commut(kx, Dz_) +
+                                self.commut(kz, Dx_))
 
-            D_lamtau_yz = 2 * (self.transform_dens(ky_, Dz, S) +
-                               self.transform_dens(kz_, Dy, S))
-            D_lamtau_yz += 2 * (self.transform_dens(ky, Dz_, S) +
-                                self.transform_dens(kz, Dy_, S))
+            D_lamtau_yz = 2 * (self.commut(ky_, Dz) +
+                               self.commut(kz_, Dy))
+            D_lamtau_yz += 2 * (self.commut(ky, Dz_) +
+                                self.commut(kz, Dy_))
 
             # Create first order three indexed Densities #
 
-            D_lam_sig_tau_x = (self.transform_dens(kx_, D_sig_xx, S) +
-                               self.transform_dens(ky_, D_sig_xy, S) +
-                               self.transform_dens(kz_, D_sig_xz, S))
-            D_lam_sig_tau_x += (self.transform_dens(kx, D_lamtau_xx, S) +
-                                self.transform_dens(ky, D_lamtau_xy, S) +
-                                self.transform_dens(kz, D_lamtau_xz, S))
+            D_lam_sig_tau_x = (self.commut(kx_, D_sig_xx) +
+                               self.commut(ky_, D_sig_xy) +
+                               self.commut(kz_, D_sig_xz))
+            D_lam_sig_tau_x += (self.commut(kx, D_lamtau_xx) +
+                                self.commut(ky, D_lamtau_xy) +
+                                self.commut(kz, D_lamtau_xz))
 
-            D_lam_sig_tau_y = (self.transform_dens(kx_, D_sig_xy, S) +
-                               self.transform_dens(ky_, D_sig_yy, S) +
-                               self.transform_dens(kz_, D_sig_yz, S))
-            D_lam_sig_tau_y += (self.transform_dens(kx, D_lamtau_xy, S) +
-                                self.transform_dens(ky, D_lamtau_yy, S) +
-                                self.transform_dens(kz, D_lamtau_yz, S))
+            D_lam_sig_tau_y = (self.commut(kx_, D_sig_xy) +
+                               self.commut(ky_, D_sig_yy) +
+                               self.commut(kz_, D_sig_yz))
+            D_lam_sig_tau_y += (self.commut(kx, D_lamtau_xy) +
+                                self.commut(ky, D_lamtau_yy) +
+                                self.commut(kz, D_lamtau_yz))
 
-            D_lam_sig_tau_z = (self.transform_dens(kx_, D_sig_xz, S) +
-                               self.transform_dens(ky_, D_sig_yz, S) +
-                               self.transform_dens(kz_, D_sig_zz, S))
-            D_lam_sig_tau_z += (self.transform_dens(kx, D_lamtau_xz, S) +
-                                self.transform_dens(ky, D_lamtau_yz, S) +
-                                self.transform_dens(kz, D_lamtau_zz, S))
+            D_lam_sig_tau_z = (self.commut(kx_, D_sig_xz) +
+                               self.commut(ky_, D_sig_yz) +
+                               self.commut(kz_, D_sig_zz))
+            D_lam_sig_tau_z += (self.commut(kx, D_lamtau_xz) +
+                                self.commut(ky, D_lamtau_yz) +
+                                self.commut(kz, D_lamtau_zz))
+
+
+            D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx, mo.T])
+            D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy, mo.T])
+            D_sig_zz = np.linalg.multi_dot([mo, D_sig_zz, mo.T])
+
+            D_sig_xy = np.linalg.multi_dot([mo, D_sig_xy, mo.T])
+            D_sig_xz = np.linalg.multi_dot([mo, D_sig_xz, mo.T])
+            D_sig_yz = np.linalg.multi_dot([mo, D_sig_yz, mo.T])
+
+
+            D_lamtau_xx = np.linalg.multi_dot([mo, D_lamtau_xx, mo.T])
+            D_lamtau_yy = np.linalg.multi_dot([mo, D_lamtau_yy, mo.T])
+            D_lamtau_zz = np.linalg.multi_dot([mo, D_lamtau_zz, mo.T])
+
+            D_lamtau_xy = np.linalg.multi_dot([mo, D_lamtau_xy, mo.T])
+            D_lamtau_xz = np.linalg.multi_dot([mo, D_lamtau_xz, mo.T])
+            D_lamtau_yz = np.linalg.multi_dot([mo, D_lamtau_yz, mo.T])
+
+            D_lam_sig_tau_x = np.linalg.multi_dot([mo, D_lam_sig_tau_x, mo.T])
+            D_lam_sig_tau_y = np.linalg.multi_dot([mo, D_lam_sig_tau_y, mo.T])
+            D_lam_sig_tau_z = np.linalg.multi_dot([mo, D_lam_sig_tau_z, mo.T])
 
             density_list.append(D_sig_xx.real)
             density_list.append(D_sig_xx.imag)
@@ -753,7 +776,7 @@ class TPAFullDriver(TPADriver):
 
         return xy_dict
 
-    def get_densities_II(self, wi, kX, kXY, S, D0, mo):
+    def get_densities_II(self, wi, kX, kXY, d0_shape, mo, nocc):
         """
         Computes the compounded densities needed for the compounded
         second-order Fock matrices used for the isotropic cubic response
@@ -777,113 +800,120 @@ class TPAFullDriver(TPADriver):
         """
 
         density_list = []
+        D_mo = np.zeros((d0_shape,d0_shape))
+        for i in range(nocc):
+            D_mo[i,i] = 1
 
         for w in wi:
-            k_sig_xx = self.mo2ao(mo, kXY[(('N_sig_xx', w), 2 * w)])
-            k_sig_yy = self.mo2ao(mo, kXY[(('N_sig_yy', w), 2 * w)])
-            k_sig_zz = self.mo2ao(mo, kXY[(('N_sig_zz', w), 2 * w)])
+            k_sig_xx = kXY[(('N_sig_xx', w), 2 * w)]
+            k_sig_yy = kXY[(('N_sig_yy', w), 2 * w)]
+            k_sig_zz = kXY[(('N_sig_zz', w), 2 * w)]
 
-            k_sig_xy = self.mo2ao(mo, kXY[(('N_sig_xy', w), 2 * w)])
-            k_sig_xz = self.mo2ao(mo, kXY[(('N_sig_xz', w), 2 * w)])
-            k_sig_yz = self.mo2ao(mo, kXY[(('N_sig_yz', w), 2 * w)])
+            k_sig_xy = kXY[(('N_sig_xy', w), 2 * w)]
+            k_sig_xz = kXY[(('N_sig_xz', w), 2 * w)]
+            k_sig_yz = kXY[(('N_sig_yz', w), 2 * w)]
 
-            k_lamtau_xx = self.mo2ao(mo, kXY[(('N_lamtau_xx', w), 0)])
-            k_lamtau_yy = self.mo2ao(mo, kXY[(('N_lamtau_yy', w), 0)])
-            k_lamtau_zz = self.mo2ao(mo, kXY[(('N_lamtau_zz', w), 0)])
+            k_lamtau_xx = kXY[(('N_lamtau_xx', w), 0)]
+            k_lamtau_yy = kXY[(('N_lamtau_yy', w), 0)]
+            k_lamtau_zz = kXY[(('N_lamtau_zz', w), 0)]
 
-            k_lamtau_xy = self.mo2ao(mo, kXY[(('N_lamtau_xy', w), 0)])
-            k_lamtau_xz = self.mo2ao(mo, kXY[(('N_lamtau_xz', w), 0)])
-            k_lamtau_yz = self.mo2ao(mo, kXY[(('N_lamtau_yz', w), 0)])
+            k_lamtau_xy = kXY[(('N_lamtau_xy', w), 0)]
+            k_lamtau_xz = kXY[(('N_lamtau_xz', w), 0)]
+            k_lamtau_yz = kXY[(('N_lamtau_yz', w), 0)]
 
-            kx = self.mo2ao(mo, kX['Nb'][('x', w)])
-            ky = self.mo2ao(mo, kX['Nb'][('y', w)])
-            kz = self.mo2ao(mo, kX['Nb'][('z', w)])
+            kx = kX['Nb'][('x', w)]
+            ky = kX['Nb'][('y', w)]
+            kz = kX['Nb'][('z', w)]
 
             kx_ = -kx.conj().T  # self.mo2ao(mo, kX['Nc'][('x', -w)]).T
             ky_ = -ky.conj().T  # self.mo2ao(mo, kX['Nc'][('y', -w)]).T
             kz_ = -kz.conj().T  # self.mo2ao(mo, kX['Nc'][('z', -w)]).T
 
             # SIGMA contributiatons #
-            Dc_x_ = self.transform_dens(kx_, D0, S)
-            Dc_y_ = self.transform_dens(ky_, D0, S)
-            Dc_z_ = self.transform_dens(kz_, D0, S)
+            Dc_x_ = self.commut(kx_, D_mo)
+            Dc_y_ = self.commut(ky_, D_mo)
+            Dc_z_ = self.commut(kz_, D_mo)
 
-            D_sig_xx = self.transform_dens(k_sig_xx, D0, S)
-            D_sig_yy = self.transform_dens(k_sig_yy, D0, S)
-            D_sig_zz = self.transform_dens(k_sig_zz, D0, S)
+            D_sig_xx = self.commut(k_sig_xx, D_mo)
+            D_sig_yy = self.commut(k_sig_yy, D_mo)
+            D_sig_zz = self.commut(k_sig_zz, D_mo)
 
-            D_sig_xy = self.transform_dens(k_sig_xy, D0, S)
-            D_sig_xz = self.transform_dens(k_sig_xz, D0, S)
-            D_sig_yz = self.transform_dens(k_sig_yz, D0, S)
+            D_sig_xy = self.commut(k_sig_xy, D_mo)
+            D_sig_xz = self.commut(k_sig_xz, D_mo)
+            D_sig_yz = self.commut(k_sig_yz, D_mo)
 
             # LAM + TAU contributiatons #
-            Dc_x = self.transform_dens(kx, D0, S)
-            Dc_y = self.transform_dens(ky, D0, S)
-            Dc_z = self.transform_dens(kz, D0, S)
+            Dc_x = self.commut(kx, D_mo)
+            Dc_y = self.commut(ky, D_mo)
+            Dc_z = self.commut(kz, D_mo)
 
-            D_lamtau_xx = self.transform_dens(k_lamtau_xx, D0, S)
-            D_lamtau_yy = self.transform_dens(k_lamtau_yy, D0, S)
-            D_lamtau_zz = self.transform_dens(k_lamtau_zz, D0, S)
+            D_lamtau_xx = self.commut(k_lamtau_xx, D_mo)
+            D_lamtau_yy = self.commut(k_lamtau_yy, D_mo)
+            D_lamtau_zz = self.commut(k_lamtau_zz, D_mo)
 
-            D_lamtau_xy = self.transform_dens(k_lamtau_xy, D0, S)
-            D_lamtau_xz = self.transform_dens(k_lamtau_xz, D0, S)
-            D_lamtau_yz = self.transform_dens(k_lamtau_yz, D0, S)
+            D_lamtau_xy = self.commut(k_lamtau_xy, D_mo)
+            D_lamtau_xz = self.commut(k_lamtau_xz, D_mo)
+            D_lamtau_yz = self.commut(k_lamtau_yz, D_mo)
 
             # x #
-            Dx = self.transform_dens(kx_, D_sig_xx, S)
-            Dx += self.transform_dens(k_sig_xx, Dc_x_, S)
-            Dx += self.transform_dens(ky_, D_sig_xy, S)
-            Dx += self.transform_dens(k_sig_xy, Dc_y_, S)
+            Dx = self.commut(kx_, D_sig_xx)
+            Dx += self.commut(k_sig_xx, Dc_x_)
+            Dx += self.commut(ky_, D_sig_xy)
+            Dx += self.commut(k_sig_xy, Dc_y_)
 
-            Dx += self.transform_dens(kz_, D_sig_xz, S)
-            Dx += self.transform_dens(k_sig_xz, Dc_z_, S)
+            Dx += self.commut(kz_, D_sig_xz)
+            Dx += self.commut(k_sig_xz, Dc_z_)
 
-            Dx += self.transform_dens(kx, D_lamtau_xx, S)
-            Dx += self.transform_dens(k_lamtau_xx, Dc_x, S)
+            Dx += self.commut(kx, D_lamtau_xx)
+            Dx += self.commut(k_lamtau_xx, Dc_x)
 
-            Dx += self.transform_dens(ky, D_lamtau_xy, S)
-            Dx += self.transform_dens(k_lamtau_xy, Dc_y, S)
+            Dx += self.commut(ky, D_lamtau_xy)
+            Dx += self.commut(k_lamtau_xy, Dc_y)
 
-            Dx += self.transform_dens(kz, D_lamtau_xz, S)
-            Dx += self.transform_dens(k_lamtau_xz, Dc_z, S)
+            Dx += self.commut(kz, D_lamtau_xz)
+            Dx += self.commut(k_lamtau_xz, Dc_z)
 
             # y #
-            Dy = self.transform_dens(kx_, D_sig_xy, S)
-            Dy += self.transform_dens(k_sig_xy, Dc_x_, S)
+            Dy = self.commut(kx_, D_sig_xy)
+            Dy += self.commut(k_sig_xy, Dc_x_)
 
-            Dy += self.transform_dens(ky_, D_sig_yy, S)
-            Dy += self.transform_dens(k_sig_yy, Dc_y_, S)
+            Dy += self.commut(ky_, D_sig_yy)
+            Dy += self.commut(k_sig_yy, Dc_y_)
 
-            Dy += self.transform_dens(kz_, D_sig_yz, S)
-            Dy += self.transform_dens(k_sig_yz, Dc_z_, S)
+            Dy += self.commut(kz_, D_sig_yz)
+            Dy += self.commut(k_sig_yz, Dc_z_)
 
-            Dy += self.transform_dens(kx, D_lamtau_xy, S)
-            Dy += self.transform_dens(k_lamtau_xy, Dc_x, S)
+            Dy += self.commut(kx, D_lamtau_xy)
+            Dy += self.commut(k_lamtau_xy, Dc_x)
 
-            Dy += self.transform_dens(ky, D_lamtau_yy, S)
-            Dy += self.transform_dens(k_lamtau_yy, Dc_y, S)
+            Dy += self.commut(ky, D_lamtau_yy)
+            Dy += self.commut(k_lamtau_yy, Dc_y)
 
-            Dy += self.transform_dens(kz, D_lamtau_yz, S)
-            Dy += self.transform_dens(k_lamtau_yz, Dc_z, S)
+            Dy += self.commut(kz, D_lamtau_yz)
+            Dy += self.commut(k_lamtau_yz, Dc_z)
 
             # z #
-            Dz = self.transform_dens(kx_, D_sig_xz, S)
-            Dz += self.transform_dens(k_sig_xz, Dc_x_, S)
+            Dz = self.commut(kx_, D_sig_xz)
+            Dz += self.commut(k_sig_xz, Dc_x_)
 
-            Dz += self.transform_dens(ky_, D_sig_yz, S)
-            Dz += self.transform_dens(k_sig_yz, Dc_y_, S)
+            Dz += self.commut(ky_, D_sig_yz)
+            Dz += self.commut(k_sig_yz, Dc_y_)
 
-            Dz += self.transform_dens(kz_, D_sig_zz, S)
-            Dz += self.transform_dens(k_sig_zz, Dc_z_, S)
+            Dz += self.commut(kz_, D_sig_zz)
+            Dz += self.commut(k_sig_zz, Dc_z_)
 
-            Dz += self.transform_dens(kx, D_lamtau_xz, S)
-            Dz += self.transform_dens(k_lamtau_xz, Dc_x, S)
+            Dz += self.commut(kx, D_lamtau_xz)
+            Dz += self.commut(k_lamtau_xz, Dc_x)
 
-            Dz += self.transform_dens(ky, D_lamtau_yz, S)
-            Dz += self.transform_dens(k_lamtau_yz, Dc_y, S)
+            Dz += self.commut(ky, D_lamtau_yz)
+            Dz += self.commut(k_lamtau_yz, Dc_y)
 
-            Dz += self.transform_dens(kz, D_lamtau_zz, S)
-            Dz += self.transform_dens(k_lamtau_zz, Dc_z, S)
+            Dz += self.commut(kz, D_lamtau_zz)
+            Dz += self.commut(k_lamtau_zz, Dc_z)
+
+            Dx = np.linalg.multi_dot([mo, Dx, mo.T])
+            Dy = np.linalg.multi_dot([mo, Dy, mo.T])
+            Dz = np.linalg.multi_dot([mo, Dz, mo.T])
 
             density_list.append(Dx.real)
             density_list.append(Dx.imag)
