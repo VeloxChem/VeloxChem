@@ -95,6 +95,7 @@ monkey:pip_install:
   stage: build
   script:
     - CC=icc MPICC=mpiicc python -m pip install mpi4py --no-binary=mpi4py
+    - CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
     - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpiicpc"
         python -m pip install .[test,qmmm]
   artifacts:
