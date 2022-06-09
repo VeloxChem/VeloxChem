@@ -628,7 +628,7 @@ class LinearSolver:
 
             if self.rank == mpi_master():
                 dks = []
-                kNs = []
+                kns = []
 
             for col in range(batch_start, batch_end):
                 if col < n_ger:
@@ -645,13 +645,13 @@ class LinearSolver:
                 if self.rank == mpi_master():
                     half_size = vec.shape[0] // 2
 
-                    kN = self.lrvec2mat(vec, nocc, norb).T
+                    kn = self.lrvec2mat(vec, nocc, norb)
 
-                    dak = self.commut_mo_density(kN.T, nocc)
+                    dak = self.commut_mo_density(kn, nocc)
                     dak = np.linalg.multi_dot([mo, dak, mo.T])
 
                     dks.append(dak)
-                    kNs.append(kN)
+                    kns.append(kn)
 
             if self.rank == mpi_master():
                 dens = AODensityMatrix(dks, denmat.rest)
@@ -689,18 +689,16 @@ class LinearSolver:
                     fock_ung = np.zeros((norb**2, batch_ung))
 
                 for ifock in range(batch_ger + batch_ung):
-                    fak = fock.alpha_to_numpy(ifock).T
-                    # fbk = fock.beta_to_numpy(ifock).T
+                    fak = fock.alpha_to_numpy(ifock)
+                    # fbk = fock.beta_to_numpy(ifock)
 
                     fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
-
-                    kN = kNs[ifock]
-                    kfa_mo = self.commut(kN, fa_mo)
+                    kfa_mo = self.commut(fa_mo.T, kns[ifock])
 
                     fat_mo = fak_mo + kfa_mo
                     # fbt_mo = fbk_mo + kfb_mo
 
-                    gmo = -self.commut_mo_density(fat_mo.T, nocc)
+                    gmo = -self.commut_mo_density(fat_mo, nocc)
 
                     # gmo_a = -self.commut_mo_density(fat_mo.T, nocc)
                     # gmo_b = -self.commut_mo_density(fbt_mo.T, nocc)
@@ -709,17 +707,17 @@ class LinearSolver:
                     gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
                                                       norb)[:half_size]
 
-                    fak_T_mo_vec = np.linalg.multi_dot([mo.T, fak.T,
-                                                        mo]).reshape(norb**2)
+                    fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
+                                                      mo]).reshape(norb**2)
 
                     if ifock < batch_ger:
                         e2_ger[:, ifock] = -gmo_vec_halfsize
                         if self.nonlinear:
-                            fock_ger[:, ifock] = fak_T_mo_vec
+                            fock_ger[:, ifock] = fak_mo_vec
                     else:
                         e2_ung[:, ifock - batch_ger] = -gmo_vec_halfsize
                         if self.nonlinear:
-                            fock_ung[:, ifock - batch_ger] = fak_T_mo_vec
+                            fock_ung[:, ifock - batch_ger] = fak_mo_vec
 
             vecs_e2_ger = DistributedArray(e2_ger, self.comm)
             vecs_e2_ung = DistributedArray(e2_ung, self.comm)
