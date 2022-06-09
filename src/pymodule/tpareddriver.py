@@ -95,7 +95,7 @@ class TPAReducedDriver(TPADriver):
         :param mo:
             A matrix containing the MO coefficents
         :param nocc:
-            Number of alpha electrons
+            Number of occupied orbitals
 
         :return:
             A list of tranformed compounded densities
@@ -423,7 +423,7 @@ class TPAReducedDriver(TPADriver):
         :param mo:
             A matrix containing the MO coefficents
         :param nocc:
-            Number of alpha electrons
+            Number of occupied orbitals
 
         :return:
             A list of tranformed compounded densities

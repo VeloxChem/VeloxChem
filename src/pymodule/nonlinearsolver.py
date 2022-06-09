@@ -799,6 +799,8 @@ class NonLinearSolver:
 
         :param A:
             Matrix A.
+        :param nocc:
+            Number of occupied orbitals.
 
         :return:
             A D_mo - D_mo A

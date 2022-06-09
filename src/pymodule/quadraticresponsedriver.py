@@ -400,7 +400,7 @@ class QuadraticResponseDriver(NonLinearSolver):
         :param mo:
             A matrix containing the MO coefficents
         :param nocc:
-            Number of alpha electrons
+            Number of occupied orbitals
 
         :return:
             first_order_dens:
