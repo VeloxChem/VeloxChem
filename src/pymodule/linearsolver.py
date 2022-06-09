@@ -593,11 +593,10 @@ class LinearSolver:
                 'inconsistent shape of trial vectors')
 
             mo = scf_tensors['C_alpha']
-            S = scf_tensors['S']
-            da = scf_tensors['D_alpha']
-            db = scf_tensors['D_beta']
             fa = scf_tensors['F_alpha']
             # fb = scf_tensors['F_beta']
+
+            fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
@@ -629,7 +628,7 @@ class LinearSolver:
 
             if self.rank == mpi_master():
                 dks = []
-                kns = []
+                kNs = []
 
             for col in range(batch_start, batch_end):
                 if col < n_ger:
@@ -647,14 +646,12 @@ class LinearSolver:
                     half_size = vec.shape[0] // 2
 
                     kN = self.lrvec2mat(vec, nocc, norb).T
-                    kn = np.linalg.multi_dot([mo, kN, mo.T])
 
-                    dak = np.linalg.multi_dot([kn.T, S, da])
-                    dak -= np.linalg.multi_dot([da, S, kn.T])
-                    # dbk = kn.T @ S @ db - db @ S @ kn.T
+                    dak = self.commut_mo_density(kN.T, nocc)
+                    dak = np.linalg.multi_dot([mo, dak, mo.T])
 
                     dks.append(dak)
-                    kns.append(kn)
+                    kNs.append(kN)
 
             if self.rank == mpi_master():
                 dens = AODensityMatrix(dks, denmat.rest)
@@ -695,26 +692,23 @@ class LinearSolver:
                     fak = fock.alpha_to_numpy(ifock).T
                     # fbk = fock.beta_to_numpy(ifock).T
 
-                    kn = kns[ifock]
+                    fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
 
-                    kfa = (np.linalg.multi_dot([S, kn, fa]) -
-                           np.linalg.multi_dot([fa, kn, S]))
-                    # kfb = S @ kn @ fb - fb @ kn @ S
+                    kN = kNs[ifock]
+                    kfa_mo = self.commut(kN, fa_mo)
 
-                    fat = fak + kfa
-                    fbt = fat
-                    # fbt = fbk + kfb
+                    fat_mo = fak_mo + kfa_mo
+                    # fbt_mo = fbk_mo + kfb_mo
 
-                    gao = np.matmul(S,
-                                    np.matmul(da, fat.T) + np.matmul(db, fbt.T))
-                    gao -= np.matmul(
-                        np.matmul(fat.T, da) + np.matmul(fbt.T, db), S)
-                    gao *= 0.5
+                    gmo = -self.commut_mo_density(fat_mo.T, nocc)
 
-                    gmo = np.linalg.multi_dot([mo.T, gao, mo])
+                    # gmo_a = -self.commut_mo_density(fat_mo.T, nocc)
+                    # gmo_b = -self.commut_mo_density(fbt_mo.T, nocc)
+                    # gmo = 0.5 * (gmo_a + gmo_b)
 
                     gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
                                                       norb)[:half_size]
+
                     fak_T_mo_vec = np.linalg.multi_dot([mo.T, fak.T,
                                                         mo]).reshape(norb**2)
 
@@ -1478,6 +1472,41 @@ class LinearSolver:
 
         else:
             return tuple()
+
+    def commut_mo_density(self, A, nocc):
+        """
+        Commutes matrix A and MO density
+
+        :param A:
+            Matrix A.
+
+        :return:
+            A D_mo - D_mo A
+        """
+
+        # | 0    -A_ov |
+        # | A_vo  0    |
+
+        mat = np.zeros(A.shape, dtype=A.dtype)
+        mat[:nocc, nocc:] = -A[:nocc, nocc:]
+        mat[nocc:, :nocc] = A[nocc:, :nocc]
+
+        return mat
+
+    def commut(self, A, B):
+        """
+        Commutes two matricies A and B
+
+        :param A:
+            Matrix A.
+        :param B:
+            Matrix B.
+
+        :return:
+            AB - BA
+        """
+
+        return np.matmul(A, B) - np.matmul(B, A)
 
     @staticmethod
     def lrvec2mat(vec, nocc, norb):
