@@ -103,9 +103,6 @@ class TPAReducedDriver(TPADriver):
 
         density_list = []
 
-        D_mo = np.zeros((mo.shape[1], mo.shape[1]))
-        D_mo[:nocc, :nocc] = np.eye(nocc)
-
         for w in wi:
 
             kx = kX['Nb'][('x', w)]
@@ -114,9 +111,9 @@ class TPAReducedDriver(TPADriver):
 
             # create the first order single indexed densiteies #
 
-            Dx = self.commut(kx, D_mo)
-            Dy = self.commut(ky, D_mo)
-            Dz = self.commut(kz, D_mo)
+            Dx = self.commut_mo_density(kx, nocc)
+            Dy = self.commut_mo_density(ky, nocc)
+            Dz = self.commut_mo_density(kz, nocc)
 
             # create the first order two indexed densities #
 
@@ -434,9 +431,6 @@ class TPAReducedDriver(TPADriver):
 
         density_list = []
 
-        D_mo = np.zeros((mo.shape[1], mo.shape[1]))
-        D_mo[:nocc, :nocc] = np.eye(nocc)
-
         for w in wi:
             k_sig_xx = kXY[(('N_sig_xx', w), 2 * w)]
             k_sig_yy = kXY[(('N_sig_yy', w), 2 * w)]
@@ -455,17 +449,17 @@ class TPAReducedDriver(TPADriver):
             kz_ = -kz.conj().T  # kX['Nc'][('z', -w)].T
 
             # SIGMA contributiatons #
-            Dc_x_ = self.commut(kx_, D_mo)
-            Dc_y_ = self.commut(ky_, D_mo)
-            Dc_z_ = self.commut(kz_, D_mo)
+            Dc_x_ = self.commut_mo_density(kx_, nocc)
+            Dc_y_ = self.commut_mo_density(ky_, nocc)
+            Dc_z_ = self.commut_mo_density(kz_, nocc)
 
-            D_sig_xx = self.commut(k_sig_xx, D_mo)
-            D_sig_yy = self.commut(k_sig_yy, D_mo)
-            D_sig_zz = self.commut(k_sig_zz, D_mo)
+            D_sig_xx = self.commut_mo_density(k_sig_xx, nocc)
+            D_sig_yy = self.commut_mo_density(k_sig_yy, nocc)
+            D_sig_zz = self.commut_mo_density(k_sig_zz, nocc)
 
-            D_sig_xy = self.commut(k_sig_xy, D_mo)
-            D_sig_xz = self.commut(k_sig_xz, D_mo)
-            D_sig_yz = self.commut(k_sig_yz, D_mo)
+            D_sig_xy = self.commut_mo_density(k_sig_xy, nocc)
+            D_sig_xz = self.commut_mo_density(k_sig_xz, nocc)
+            D_sig_yz = self.commut_mo_density(k_sig_yz, nocc)
 
             # x #
             Dx = self.commut(kx_, D_sig_xx)

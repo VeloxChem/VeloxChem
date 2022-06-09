@@ -651,9 +651,6 @@ class CubicResponseDriver(NonLinearSolver):
 
         density_list = []
 
-        D_mo = np.zeros((mo.shape[1], mo.shape[1]))
-        D_mo[:nocc, :nocc] = np.eye(nocc)
-
         for (wb, wc, wd) in freqtriples:
 
             # convert response matrix to ao basis #
@@ -664,9 +661,9 @@ class CubicResponseDriver(NonLinearSolver):
 
             # create the first order single indexed densiteies #
 
-            Db = self.commut(kb, D_mo)
-            Dc = self.commut(kc, D_mo)
-            Dd = self.commut(kd, D_mo)
+            Db = self.commut_mo_density(kb, nocc)
+            Dc = self.commut_mo_density(kc, nocc)
+            Dd = self.commut_mo_density(kd, nocc)
 
             # create the first order two indexed densities #
 
@@ -753,9 +750,6 @@ class CubicResponseDriver(NonLinearSolver):
 
         density_list = []
 
-        D_mo = np.zeros((mo.shape[1], mo.shape[1]))
-        D_mo[:nocc, :nocc] = np.eye(nocc)
-
         for (wb, wc, wd) in freqtriples:
 
             # convert response matrix to ao basis #
@@ -770,15 +764,15 @@ class CubicResponseDriver(NonLinearSolver):
 
             # create the first order single indexed densiteies #
 
-            Db = self.commut(kb, D_mo)
-            Dc = self.commut(kc, D_mo)
-            Dd = self.commut(kd, D_mo)
+            Db = self.commut_mo_density(kb, nocc)
+            Dc = self.commut_mo_density(kc, nocc)
+            Dd = self.commut_mo_density(kd, nocc)
 
             # create the second-order two indexed densities #
 
-            Dbc = self.commut(kbc, D_mo)
-            Dbd = self.commut(kbd, D_mo)
-            Dcd = self.commut(kcd, D_mo)
+            Dbc = self.commut_mo_density(kbc, nocc)
+            Dbd = self.commut_mo_density(kbd, nocc)
+            Dcd = self.commut_mo_density(kcd, nocc)
 
             # create the second-order three indexed densities #
 

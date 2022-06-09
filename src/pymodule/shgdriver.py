@@ -501,9 +501,6 @@ class SHGDriver(NonLinearSolver):
         first_order_dens = []
         second_order_dens = []
 
-        D_mo = np.zeros((mo.shape[1], mo.shape[1]))
-        D_mo[:nocc, :nocc] = np.eye(nocc)
-
         for (wb, wc) in freqpairs:
 
             k_x = kX[('x', wb)]
@@ -512,9 +509,9 @@ class SHGDriver(NonLinearSolver):
 
             # create the first order single indexed densiteies #
 
-            D_x = self.commut(k_x, D_mo)
-            D_y = self.commut(k_y, D_mo)
-            D_z = self.commut(k_z, D_mo)
+            D_x = self.commut_mo_density(k_x, nocc)
+            D_y = self.commut_mo_density(k_y, nocc)
+            D_z = self.commut_mo_density(k_z, nocc)
 
             # create the first order two indexed densities #
 

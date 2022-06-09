@@ -793,6 +793,26 @@ class NonLinearSolver:
 
         return np.linalg.multi_dot([mo.T, A, mo])
 
+    def commut_mo_density(self, A, nocc):
+        """
+        Commutes matrix A and MO density
+
+        :param A:
+            Matrix A.
+
+        :return:
+            A D_mo - D_mo A
+        """
+
+        # | 0    -A_ov |
+        # | A_vo  0    |
+
+        mat = np.zeros(A.shape, dtype=A.dtype)
+        mat[:nocc, nocc:] = -A[:nocc, nocc:]
+        mat[nocc:, :nocc] = A[nocc:, :nocc]
+
+        return mat
+
     def commut(self, A, B):
         """
         Commutes two matricies A and B

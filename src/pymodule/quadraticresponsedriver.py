@@ -412,10 +412,6 @@ class QuadraticResponseDriver(NonLinearSolver):
         first_order_dens = []
         second_order_dens = []
 
-        # MO alpha density matrix
-        D_mo = np.zeros((mo.shape[1], mo.shape[1]))
-        D_mo[:nocc, :nocc] = np.eye(nocc)
-
         for (wb, wc) in freqpairs:
 
             kb = kX[('B', wb)]
@@ -423,8 +419,8 @@ class QuadraticResponseDriver(NonLinearSolver):
 
             # create the first order single indexed densiteies #
 
-            Db = self.commut(kb, D_mo)
-            Dc = self.commut(kc, D_mo)
+            Db = self.commut_mo_density(kb, nocc)
+            Dc = self.commut_mo_density(kc, nocc)
 
             # create the first order two indexed densities #
 
