@@ -44,6 +44,8 @@
 #include "Molecule.hpp"
 #include "PartialCharges.hpp"
 #include "StringFormat.hpp"
+#include "CommonNeighbors.hpp"
+#include "AtomicRadii.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -221,6 +223,7 @@ export_moldata(py::module& m)
         .def("check_multiplicity", &CMolecule_check_multiplicity, "Checks multiplicity of molecule.")
         .def("check_proximity", &CMolecule_check_proximity, "Checks proximity of atoms.", "minDistance"_a)
         .def("get_elemental_composition", &CMolecule::getElementalComposition, "Gets set of unique chemical elements in molecule.")
+        .def("get_atom_coordinates", &CMolecule::getAtomCoordinates, "Gets coordinates (x,y,z) of atom.", "iAtom"_a)
         .def("nuclear_repulsion_energy",
              &CMolecule::getNuclearRepulsionEnergy,
              "Gets nuclear repulsion energy for molecule assuming point charge model for nucleus.")
@@ -241,6 +244,15 @@ export_moldata(py::module& m)
              "nAtoms"_a,
              "idElemental"_a)
         .def("number_of_electrons", &CMolecule::getNumberOfElectrons, "Gets a number of electrons in molecule.")
+        .def("check_proximity", &CMolecule_check_proximity, "Checks proximity of atoms.", "minDistance"_a)
+        .def("atom_indexes", &CMolecule::getAtomIndexes, "Gets indexes of atoms with requested atomic label", "atomLabel"_a)
+        .def("add_atom", &CMolecule::addAtom, "Adds atom to molecule", "atomLabel"_a, "atomCoordinateX"_a, "atomCoordinateY"_a,
+             "atomCoordinateZ"_a)
+        .def("min_distance", &CMolecule::getMinDistance, "Get minimal distance from external point to closest atom in molecule.",
+             "coordinateX"_a, "coordinateY"_a, "coordinateZ"_a)
+        .def("index_of_nearest_atom", &CMolecule::getIndexOfNearestAtom, "Gets index of nearest atom with specific label to given atom.",
+             "iAtom"_a)
+        .def("coordination_number", &CMolecule::getCoordinationNummber, "Gets coordination number of specific atom.", "iAtom"_a, "radius"_a)
         .def(
             "number_of_alpha_electrons",
             [](const CMolecule& self) -> int32_t {
@@ -353,6 +365,15 @@ export_moldata(py::module& m)
              "xcLabel"_a)
         .def("get_energy", &CDispersionModel::getEnergy, "Gets dispersion energy.")
         .def("get_gradient", &CDispersionModel::getGradient, "Gets dispersion gradient.");
+    
+    // CCommonNeighbors class
+
+    PyClass<CCommonNeighbors>(m, "CommonNeighbors")
+        .def(py::init<>())
+        .def(py::init<const CMolecule&, const double>())
+        .def("generate", &CCommonNeighbors::generate)
+        .def("comp_cna", &CCommonNeighbors::compJaccardIndex)
+        .def("__repr__", &CCommonNeighbors::getSignaturesRepr);
 }
 
 }  // namespace vlx_moldata

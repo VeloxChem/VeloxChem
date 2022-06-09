@@ -43,7 +43,8 @@ class TestScfRestricted:
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
-        scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_drv.scf_tensors)
+        scf_prop.compute_scf_prop(task.molecule, task.ao_basis,
+                                  scf_drv.scf_tensors)
 
         if is_mpi_master(task.mpi_comm):
             e_scf = scf_drv.get_scf_energy()
@@ -94,6 +95,21 @@ class TestScfRestricted:
 
         ref_e_scf = -76.443545741524
         ref_dip = np.array([0.000000, 0.000000, 0.731257])
+
+        self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
+                     ref_dip)
+
+    def test_scf_pkzb(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water.inp')
+        potfile = None
+
+        xcfun_label = 'pkzb'
+        electric_field = None
+
+        ref_e_scf = -75.961205966185
+        ref_dip = np.array([0.000000, 0.000000, 0.691948])
 
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)
