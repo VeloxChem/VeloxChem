@@ -207,7 +207,7 @@ class CnaAnalysisDriver:
         """
         
         cnums = np.array([molecule.coordination_number(i, self.cna_bond) for i in molecule.atom_indexes('TI')])
-        print(cnums)
+        # print(cnums)
         return (np.amax(cnums),np.amin(cnums),np.mean(cnums))
         
     def comp_cnums_data(self, mol_files):
@@ -221,7 +221,7 @@ class CnaAnalysisDriver:
         molecules = [Molecule.read_xyz(finp) for finp in mol_files]
         for mol in molecules:
             cdata = self.get_coord_numbers(mol)
-            print('@Coordination Data: ', cdata[0], ' ', cdata[1], ' ', cdata[2])
+            # print('@Coordination Data: ', cdata[0], ' ', cdata[1], ' ', cdata[2])
         
     def print_header(self):
         """

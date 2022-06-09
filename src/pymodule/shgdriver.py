@@ -729,8 +729,6 @@ class SHGDriver(NonLinearSolver):
 
             F0_a = fo['F0']
 
-            print("Fz")
-            print(F_z)
             # Response
 
             k_x = kX[('x', wb)].T
