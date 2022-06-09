@@ -84,6 +84,20 @@ set_target_properties(veloxchemlib
     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}
   )
 
+# when running through scikit-build, we symlink the DSO into `pymodule`
+# this will allow editable installations to work
+if(SKBUILD)
+  add_custom_command(
+    TARGET
+      veloxchemlib
+    POST_BUILD
+    COMMAND
+      ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:veloxchemlib> ${PROJECT_SOURCE_DIR}/src/pymodule/$<TARGET_FILE_NAME:veloxchemlib>
+    COMMENT
+      "Symlink VeloxChem Python extension into src/pymodule"
+    )
+endif()
+
 install(
   TARGETS
     veloxchemlib

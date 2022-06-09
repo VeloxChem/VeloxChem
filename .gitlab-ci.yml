@@ -23,20 +23,22 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+default:
+  tags:
+    - vlx-docker
+  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-f51f706
+  interruptible: true
+
 stages:
   - build
   - test
   - deploy
 
-.monkey:setup:
-  tags:
-    - vlx-docker
-  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-f51f706
-  variables:
-    OMP_NUM_THREADS: "6"
-    VLX_NUM_BUILD_JOBS: "6"
+.monkey:conf:
   rules:
     - if: $CI_PIPELINE_SOURCE != "schedule"
+  variables:
+    VLX_NUM_BUILD_JOBS: "6"
   before_script:
     - uname -a
     - free -m
@@ -47,6 +49,12 @@ stages:
     - python -V
     - mpiicc --version
     - mpiicpc --version
+
+.monkey:setup:
+  extends:
+    - .monkey:conf
+  before_script:
+    - !reference [ .monkey:conf, before_script]
     - python -m venv --clear venv
     - source venv/bin/activate
     - python -m pip install --upgrade
@@ -54,8 +62,9 @@ stages:
         setuptools
         wheel
 
-monkey:build:
-  extends: .monkey:setup
+monkey:cmake_build:
+  extends:
+    - .monkey:setup
   stage: build
   script:
     - python -m pip install
@@ -72,23 +81,35 @@ monkey:build:
   artifacts:
     paths:
       - build
-    expire_in: 2 hours
+    expire_in: 12 hours
 
 monkey:unit_tests:
   extends: .monkey:setup
   stage: test
-  needs: ["monkey:build"]
+  needs: ["monkey:cmake_build"]
   script:
     - ctest --test-dir build --output-on-failure -L unit
 
-monkey:python_tests:
+monkey:pip_install:
   extends: .monkey:setup
   stage: build
   script:
     - CC=icc MPICC=mpiicc python -m pip install mpi4py --no-binary=mpi4py
-    #- CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
     - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpiicpc"
         python -m pip install .[test,qmmm]
+  artifacts:
+    paths:
+      - venv
+    expire_in: 12 hours
+
+monkey:python_tests:
+  extends: .monkey:conf
+  stage: test
+  needs: ["monkey:pip_install"]
+  variables:
+    OMP_NUM_THREADS: "6"
+  script:
+    - source venv/bin/activate
     - python -c "import veloxchem; print(veloxchem.__version__)"
     - mpiexec -n 2 python -m pytest -v --pyargs veloxchem -m "solvers"
     - python -m pytest -v --cov=veloxchem --pyargs veloxchem
