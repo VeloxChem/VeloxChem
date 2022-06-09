@@ -11,12 +11,22 @@
 #   Check if libraries are available for the given vendor.
 #   The list of valid vendors in this module is the same as for the
 #   official ``FindBLAS.cmake`` module, plus ``Cray``.
-#   Note that this module reimplements the detection of ``FLAME`` to be able to
-#   also discover the multithreaded versions of both the BLIS and FLAME
-#   libraries.
-#   Defaults to ``Generic``.
-#   Note that ``Generic`` is essentially meant to be used for building the Conda
-#   package.
+#
+# Notes
+# ^^^^^
+#
+# We offer configuration shortcuts for MKL and OpenBLAS. Setting the ``MKLROOT``
+# and ``OPENBLASROOT`` environment variables will be enough to configure the
+# code to link against and use MKL and OpenBLAS, respectively.
+#
+# This module reimplements the detection of ``FLAME`` to be able to also
+# discover the multithreaded versions of both the BLIS and FLAME libraries.
+#
+# The ``Generic`` option is available to link against the reference Netlib
+# implementation of BLAS and LAPACK.
+# Essentially, it is meant to be used for building the Conda package and switch
+# the BLAS/LAPACK implementation to use at **installation time**.  It should
+# **never** be used in production!
 #
 # Imported targets
 # ^^^^^^^^^^^^^^^^
@@ -25,9 +35,23 @@
 #
 # ``Math::LA``
 #   The libraries to use as linear algebra backend (BLAS and LAPACK), if found.
-#
 
-option_with_default(VLX_LA_VENDOR "Linear algebra library vendor" "Generic")
+if(NOT DEFINED VLX_LA_VENDOR OR "${VLX_LA_VENDOR}" STREQUAL "")
+  if(DEFINED ENV{MKLROOT})
+    set(VLX_LA_VENDOR "MKL")
+    file(TO_CMAKE_PATH "$ENV{MKLROOT}" _root)
+    set(LAPACK_ROOT ${_root})
+  elseif(DEFINED ENV{OPENBLASROOT})
+    set(VLX_LA_VENDOR "OpenBLAS")
+    file(TO_CMAKE_PATH "$ENV{OPENBLASROOT}" _root)
+    set(LAPACK_ROOT ${_root})
+  else()
+    message(FATAL_ERROR "VLX_LA_VENDOR undefined! Please, let me know with linear algebra backend you'd like to use.")
+  endif()
+endif()
+
+print_option(VLX_LA_VENDOR "${VLX_LA_VENDOR}")
+set(VLX_LA_VENDOR "${VLX_LA_VENDOR}" CACHE STRING "Linear algebra library vendor" FORCE)
 
 # we use the standard CMake FindLapack module
 # it will search for BLAS too
