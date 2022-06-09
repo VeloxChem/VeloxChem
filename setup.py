@@ -51,6 +51,6 @@ setup(
         "-DCMAKE_JOB_POOL_COMPILE:STRING=compile",
         "-DCMAKE_JOB_POOL_LINK:STRING=link",
         # always use 2 cores for linking
-        f"-DCMAKE_JOB_POOLS:STRING=compile={compile_jobs};link=2",
+        f"-DCMAKE_JOB_POOLS:STRING=compile={compile_jobs:d};link=2",
     ],
 )

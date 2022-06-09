@@ -23,9 +23,9 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-import time as tm
-import sys
 import os
+import sys
+import time as tm
 from pathlib import Path
 
 from .errorhandler import assert_msg_critical
@@ -59,7 +59,7 @@ class OutputStream:
             self.stream = None
             self.state = False
 
-        elif stream is sys.stdout:
+        elif (stream == sys.stdout):
             self.stream = sys.stdout
             self.state = True
 
@@ -70,12 +70,12 @@ class OutputStream:
                 self.state = True
             except OSError:
                 self.state = False
-            errio = 'OutputStream: cannot open output file {}'.format(fname)
+            errio = f'OutputStream: cannot open output file {fname}'
             assert_msg_critical(self.state, errio)
 
         else:
             self.state = False
-            errio = 'OutputStream: invalid argument {}'.format(stream)
+            errio = f'OutputStream: invalid argument {stream}'
             assert_msg_critical(self.state, errio)
 
     def __del__(self):

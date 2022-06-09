@@ -26,19 +26,19 @@ endif()
 # figure out where to put the Python module
 if(NOT DEFINED PYMOD_INSTALL_FULLDIR)
   if(NOT WIN32)
-    # install Python module under CMAKE_INSTALL_LIBDIR
-    # if that is "lib64", the use just "lib"
-    set(_lib "${CMAKE_INSTALL_LIBDIR}")
-    if(CMAKE_INSTALL_LIBDIR STREQUAL "lib64")
-      set(_lib "lib")
-    endif()
     set(PYMOD_INSTALL_FULLDIR
-          "${_lib}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/veloxchem"
-        CACHE STRING "Location under CMAKE_INSTALL_PREFIX to which Python modules are installed" FORCE)
+          "lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/veloxchem"
+        CACHE STRING
+          "Location under CMAKE_INSTALL_PREFIX to which Python modules are installed"
+        FORCE
+      )
   else()
     set(PYMOD_INSTALL_FULLDIR
           "Lib/site-packages/veloxchem"
-        CACHE STRING "Location under CMAKE_INSTALL_PREFIX to which Python modules are installed" FORCE)
+        CACHE STRING
+          "Location under CMAKE_INSTALL_PREFIX to which Python modules are installed"
+        FORCE
+      )
   endif()
 endif()
 message(STATUS "Setting PYMOD_INSTALL_FULLDIR: ${PYMOD_INSTALL_FULLDIR}")
