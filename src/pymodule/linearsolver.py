@@ -594,8 +594,6 @@ class LinearSolver:
 
             mo = scf_tensors['C_alpha']
             fa = scf_tensors['F_alpha']
-            # fb = scf_tensors['F_beta']
-
             fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
             nocc = molecule.number_of_alpha_electrons()
@@ -646,7 +644,6 @@ class LinearSolver:
                     half_size = vec.shape[0] // 2
 
                     kn = self.lrvec2mat(vec, nocc, norb)
-
                     dak = self.commut_mo_density(kn, nocc)
                     dak = np.linalg.multi_dot([mo, dak, mo.T])
 
@@ -690,20 +687,13 @@ class LinearSolver:
 
                 for ifock in range(batch_ger + batch_ung):
                     fak = fock.alpha_to_numpy(ifock)
-                    # fbk = fock.beta_to_numpy(ifock)
 
                     fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
                     kfa_mo = self.commut(fa_mo.T, kns[ifock])
 
                     fat_mo = fak_mo + kfa_mo
-                    # fbt_mo = fbk_mo + kfb_mo
 
                     gmo = -self.commut_mo_density(fat_mo, nocc)
-
-                    # gmo_a = -self.commut_mo_density(fat_mo.T, nocc)
-                    # gmo_b = -self.commut_mo_density(fbt_mo.T, nocc)
-                    # gmo = 0.5 * (gmo_a + gmo_b)
-
                     gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
                                                       norb)[:half_size]
 
@@ -1351,18 +1341,15 @@ class LinearSolver:
             integral_comps = [integrals[indices[p]] for p in components]
 
             mo = scf_tensors['C_alpha']
-            S = scf_tensors['S']
-            D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
-
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            factor = 0.5 * np.sqrt(2.0)
-            matrices = tuple(factor * np.linalg.multi_dot([
-                mo.T,
-                (np.linalg.multi_dot([S, D, P.T]) -
-                 np.linalg.multi_dot([P.T, D, S])), mo
-            ]) for P in integral_comps)
+            factor = np.sqrt(2.0)
+            matrices = [
+                factor * (-1.0) * self.commut_mo_density(
+                    np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
+                for P in integral_comps
+            ]
 
             gradients = tuple(self.lrmat2vec(m, nocc, norb) for m in matrices)
             return gradients
@@ -1452,18 +1439,15 @@ class LinearSolver:
             integral_comps = [integrals[indices[p]] for p in components]
 
             mo = scf_tensors['C_alpha']
-            S = scf_tensors['S']
-            D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
-
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            factor = 0.5 * np.sqrt(2.0)
-            matrices = tuple(factor * np.linalg.multi_dot([
-                mo.T,
-                (np.linalg.multi_dot([S, D, P.conj().T]) -
-                 np.linalg.multi_dot([P.conj().T, D, S])), mo
-            ]) for P in integral_comps)
+            factor = np.sqrt(2.0)
+            matrices = [
+                factor * (-1.0) * self.commut_mo_density(
+                    np.linalg.multi_dot([mo.T, P.conj().T, mo]), nocc)
+                for P in integral_comps
+            ]
 
             gradients = tuple(self.lrmat2vec(m, nocc, norb) for m in matrices)
             return gradients
