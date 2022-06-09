@@ -534,7 +534,8 @@ class SHGDriver(NonLinearSolver):
             D_lam_xz = self.commut(k_x, D_z) + self.commut(k_z, D_x)
             D_lam_yz = self.commut(k_y, D_z) + self.commut(k_z, D_y)
 
-            # Tranform from MO to AO basis
+            # density transformation from MO to AO basis
+
             D_x = np.linalg.multi_dot([mo, D_x, mo.T])
             D_y = np.linalg.multi_dot([mo, D_y, mo.T])
             D_z = np.linalg.multi_dot([mo, D_z, mo.T])

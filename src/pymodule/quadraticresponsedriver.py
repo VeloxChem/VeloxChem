@@ -430,7 +430,8 @@ class QuadraticResponseDriver(NonLinearSolver):
 
             Dbc = self.commut(kb, Dc) + self.commut(kc, Db)
 
-            # Tranform from MO to AO basis
+            # density transformation from MO to AO basis
+
             Db = np.linalg.multi_dot([mo, Db, mo.T])
             Dc = np.linalg.multi_dot([mo, Dc, mo.T])
             Dbc = np.linalg.multi_dot([mo, Dbc, mo.T])

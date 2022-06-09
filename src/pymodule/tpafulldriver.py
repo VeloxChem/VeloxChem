@@ -186,6 +186,8 @@ class TPAFullDriver(TPADriver):
                                 self.commut(ky, D_lamtau_yz) +
                                 self.commut(kz, D_lamtau_zz))
 
+            # density transformation from MO to AO basis
+
             D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx, mo.T])
             D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy, mo.T])
             D_sig_zz = np.linalg.multi_dot([mo, D_sig_zz, mo.T])
@@ -892,6 +894,8 @@ class TPAFullDriver(TPADriver):
 
             Dz += self.commut(kz, D_lamtau_zz)
             Dz += self.commut(k_lamtau_zz, Dc_z)
+
+            # density transformation from MO to AO basis
 
             Dx = np.linalg.multi_dot([mo, Dx, mo.T])
             Dy = np.linalg.multi_dot([mo, Dy, mo.T])

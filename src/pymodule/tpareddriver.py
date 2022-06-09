@@ -134,6 +134,8 @@ class TPAReducedDriver(TPADriver):
             D_sig_xz = 2 * (self.commut(kx, Dz) + self.commut(kz, Dx))
             D_sig_yz = 2 * (self.commut(ky, Dz) + self.commut(kz, Dy))
 
+            # density transformation from MO to AO basis
+
             D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx, mo.T])
             D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy, mo.T])
             D_sig_zz = np.linalg.multi_dot([mo, D_sig_zz, mo.T])
@@ -493,6 +495,8 @@ class TPAReducedDriver(TPADriver):
 
             Dz += self.commut(kz_, D_sig_zz)
             Dz += self.commut(k_sig_zz, Dc_z_)
+
+            # density transformation from MO to AO basis
 
             Dx = np.linalg.multi_dot([mo, Dx, mo.T])
             Dy = np.linalg.multi_dot([mo, Dy, mo.T])

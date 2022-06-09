@@ -219,7 +219,7 @@ class CubicResponseDriver(NonLinearSolver):
             )
         ]
 
-        freqpairs = [
+        freqtriples = [
             wl for wl in zip(
                 self.b_frequencies,
                 self.c_frequencies,
@@ -275,9 +275,10 @@ class CubicResponseDriver(NonLinearSolver):
 
         profiler.check_memory_usage('1st CPP')
 
-        cubic_dict = self.compute_cubic_components(Focks, freqpairs, X, d_a_mo,
-                                                   kX, self.comp, scf_tensors,
-                                                   molecule, ao_basis, profiler)
+        cubic_dict = self.compute_cubic_components(Focks, freqtriples, X,
+                                                   d_a_mo, kX, self.comp,
+                                                   scf_tensors, molecule,
+                                                   ao_basis, profiler)
 
         valstr = '*** Time spent in cubic response calculation: '
         valstr += '{:.2f} sec ***'.format(time.time() - start_time)
@@ -291,7 +292,7 @@ class CubicResponseDriver(NonLinearSolver):
 
         return cubic_dict
 
-    def compute_cubic_components(self, Focks, freqpairs, X, d_a_mo, kX, track,
+    def compute_cubic_components(self, Focks, freqtriples, X, d_a_mo, kX, track,
                                  scf_tensors, molecule, ao_basis, profiler):
         """
         Computes all the relevent terms to compute a general cubic response function
@@ -333,42 +334,42 @@ class CubicResponseDriver(NonLinearSolver):
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            density_list = self.get_densities(freqpairs, kX, mo, nocc)
+            density_list = self.get_densities(freqtriples, kX, mo, nocc)
         else:
             density_list = None
 
         profiler.check_memory_usage('1st densities')
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(freqpairs, density_list, F0, mo,
+        fock_dict = self.get_fock_dict(freqtriples, density_list, F0, mo,
                                        molecule, ao_basis)
 
         profiler.check_memory_usage('1st Focks')
 
-        e4_dict, s4_dict, r4_dict = self.get_esr4(freqpairs, kX, fock_dict,
+        e4_dict, s4_dict, r4_dict = self.get_esr4(freqtriples, kX, fock_dict,
                                                   Focks, nocc, norb, d_a_mo)
 
         profiler.check_memory_usage('E[4]')
 
-        k_xy, f_xy = self.get_nxy(freqpairs, kX, fock_dict, Focks, nocc, norb,
+        k_xy, f_xy = self.get_nxy(freqtriples, kX, fock_dict, Focks, nocc, norb,
                                   d_a_mo, X, molecule, ao_basis, scf_tensors)
 
         profiler.check_memory_usage('2nd CPP')
 
         if self.rank == mpi_master():
-            density_list_two = self.get_densities_II(freqpairs, kX, k_xy, mo,
+            density_list_two = self.get_densities_II(freqtriples, kX, k_xy, mo,
                                                      nocc)
         else:
             density_list_two = None
 
         profiler.check_memory_usage('2nd densities')
 
-        fock_dict_two = self.get_fock_dict_II(freqpairs, density_list_two, F0,
+        fock_dict_two = self.get_fock_dict_II(freqtriples, density_list_two, F0,
                                               mo, molecule, ao_basis)
 
         profiler.check_memory_usage('2nd Focks')
 
-        e3_dict = self.get_e3(freqpairs, kX, k_xy, Focks, fock_dict_two, f_xy,
+        e3_dict = self.get_e3(freqtriples, kX, k_xy, Focks, fock_dict_two, f_xy,
                               nocc, norb)
 
         profiler.check_memory_usage('E[3]')
@@ -382,7 +383,7 @@ class CubicResponseDriver(NonLinearSolver):
             C = X[self.c_components]
             D = X[self.d_components]
 
-            for (wb, wc, wd) in freqpairs:
+            for (wb, wc, wd) in freqtriples:
 
                 Na = self.complex_lrmat2vec(kX[('A', wb + wc + wd)], nocc, norb)
                 Nb = self.complex_lrmat2vec(kX[('B', wb)], nocc, norb)
@@ -631,12 +632,12 @@ class CubicResponseDriver(NonLinearSolver):
 
         return e3vec
 
-    def get_densities(self, freqpairs, kX, mo, nocc):
+    def get_densities(self, freqtriples, kX, mo, nocc):
         """
         Computes the  densities needed for the Fock matrices.
 
-        :param freqpairs:
-            A list of the frequency pairs
+        :param freqtriples:
+            A list of the frequency triples
         :param kX:
             A dictonary with all the first-order response matrices
         :param mo:
@@ -653,7 +654,7 @@ class CubicResponseDriver(NonLinearSolver):
         D_mo = np.zeros((mo.shape[1], mo.shape[1]))
         D_mo[:nocc, :nocc] = np.eye(nocc)
 
-        for (wb, wc, wd) in freqpairs:
+        for (wb, wc, wd) in freqtriples:
 
             # convert response matrix to ao basis #
 
@@ -688,6 +689,8 @@ class CubicResponseDriver(NonLinearSolver):
 
             Ddbc = self.commut(kd, Dbc)
             Ddcb = self.commut(kd, Dcb)
+
+            # density transformation from MO to AO basis
 
             Dbc = np.linalg.multi_dot([mo, Dbc, mo.T])
             Dcb = np.linalg.multi_dot([mo, Dcb, mo.T])
@@ -729,12 +732,12 @@ class CubicResponseDriver(NonLinearSolver):
 
         return density_list
 
-    def get_densities_II(self, freqpairs, kX, k_xy, mo, nocc):
+    def get_densities_II(self, freqtriples, kX, k_xy, mo, nocc):
         """
         Computes the  densities needed for the Fock matrices.
 
-        :param freqpairs:
-            A list of the frequency pairs
+        :param freqtriples:
+            A list of the frequency triples
         :param kX:
             A dictonary with all the first-order response matrices
         :param k_xy:
@@ -753,7 +756,7 @@ class CubicResponseDriver(NonLinearSolver):
         D_mo = np.zeros((mo.shape[1], mo.shape[1]))
         D_mo[:nocc, :nocc] = np.eye(nocc)
 
-        for (wb, wc, wd) in freqpairs:
+        for (wb, wc, wd) in freqtriples:
 
             # convert response matrix to ao basis #
 
@@ -787,6 +790,8 @@ class CubicResponseDriver(NonLinearSolver):
 
             Dd_bc = self.commut(kd, Dbc)
             Dbc_d = self.commut(kbc, Dd)
+
+            # density transformation from MO to AO basis
 
             Db_cd = np.linalg.multi_dot([mo, Db_cd, mo.T])
             Dcd_b = np.linalg.multi_dot([mo, Dcd_b, mo.T])
