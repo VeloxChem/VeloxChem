@@ -715,8 +715,7 @@ class ExcitonModelDriver:
                                                 self.magn_trans_dipoles)
 
             for s in range(adia_velo_trans_dipoles.shape[0]):
-                adia_velo_trans_dipoles[s, :] /= -eigvals[s]
-                adia_magn_trans_dipoles[s, :] *= -0.5
+                adia_velo_trans_dipoles[s, :] /= eigvals[s]
 
             valstr = 'Adiabatic excited states:'
             self.ostream.print_header(valstr.ljust(80))
@@ -730,8 +729,8 @@ class ExcitonModelDriver:
                 f = (2.0 / 3.0) * dip_strength * e
                 osc_str.append(f)
 
-                R = (-1.0) * np.vdot(adia_velo_trans_dipoles[i, :],
-                                     adia_magn_trans_dipoles[i, :])
+                R = np.vdot(adia_velo_trans_dipoles[i, :],
+                            adia_magn_trans_dipoles[i, :])
                 R *= rotatory_strength_in_cgs()
                 rot_str.append(R)
 
@@ -990,9 +989,12 @@ class ExcitonModelDriver:
             elec_trans_dipoles.append(
                 np.array([np.sum(tdens * dipole_ints[d].T) for d in range(3)]))
             velo_trans_dipoles.append(
-                np.array([np.sum(tdens * linmom_ints[d].T) for d in range(3)]))
+                np.array([
+                    np.sum(-1.0 * tdens * linmom_ints[d].T) for d in range(3)
+                ]))
             magn_trans_dipoles.append(
-                np.array([np.sum(tdens * angmom_ints[d].T) for d in range(3)]))
+                np.array(
+                    [np.sum(0.5 * tdens * angmom_ints[d].T) for d in range(3)]))
 
         return {
             'electric': elec_trans_dipoles,
@@ -1498,9 +1500,12 @@ class ExcitonModelDriver:
             elec_trans_dipoles.append(
                 np.array([np.sum(tdens * dipole_ints[d].T) for d in range(3)]))
             velo_trans_dipoles.append(
-                np.array([np.sum(tdens * linmom_ints[d].T) for d in range(3)]))
+                np.array([
+                    np.sum(-1.0 * tdens * linmom_ints[d].T) for d in range(3)
+                ]))
             magn_trans_dipoles.append(
-                np.array([np.sum(tdens * angmom_ints[d].T) for d in range(3)]))
+                np.array(
+                    [np.sum(0.5 * tdens * angmom_ints[d].T) for d in range(3)]))
 
         return {
             'electric': elec_trans_dipoles,

@@ -1308,8 +1308,9 @@ class LinearSolver:
             linmom_mats = linmom_drv.compute(molecule, basis)
 
             if self.rank == mpi_master():
-                integrals = (linmom_mats.x_to_numpy(), linmom_mats.y_to_numpy(),
-                             linmom_mats.z_to_numpy())
+                integrals = (-1.0 * linmom_mats.x_to_numpy(),
+                             -1.0 * linmom_mats.y_to_numpy(),
+                             -1.0 * linmom_mats.z_to_numpy())
             else:
                 integrals = tuple()
 
@@ -1318,8 +1319,9 @@ class LinearSolver:
             angmom_mats = angmom_drv.compute(molecule, basis)
 
             if self.rank == mpi_master():
-                integrals = (angmom_mats.x_to_numpy(), angmom_mats.y_to_numpy(),
-                             angmom_mats.z_to_numpy())
+                integrals = (-1.0 * angmom_mats.x_to_numpy(),
+                             -1.0 * angmom_mats.y_to_numpy(),
+                             -1.0 * angmom_mats.z_to_numpy())
             else:
                 integrals = tuple()
 
@@ -1328,9 +1330,9 @@ class LinearSolver:
             angmom_mats = angmom_drv.compute(molecule, basis)
 
             if self.rank == mpi_master():
-                integrals = (-0.5 * angmom_mats.x_to_numpy(),
-                             -0.5 * angmom_mats.y_to_numpy(),
-                             -0.5 * angmom_mats.z_to_numpy())
+                integrals = (0.5 * angmom_mats.x_to_numpy(),
+                             0.5 * angmom_mats.y_to_numpy(),
+                             0.5 * angmom_mats.z_to_numpy())
             else:
                 integrals = tuple()
 
