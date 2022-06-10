@@ -394,6 +394,108 @@ class CDensityGridDriver
                                               const int32_t              nGridPoints) const;
 
     /**
+     Creates density grid for pair-density LDA case.
+
+     @param densityGrid the density grid object.
+     @param aoDensityMatrix the AO density matrices.
+     @param twoDM the "active" MO two-body density matrix.
+     @param activeMOs the active MO coefficients.
+     @param nActive the number of active orbitals.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the distributed molecular grid.
+     */
+    void _PDFT_Lda(      CDensityGrid*     densityGrid,
+                         const CAODensityMatrix* aoDensityMatrix,
+                         double* twoDM,
+                         double* activeMOs,
+                         int nActive,
+                         const CGtoContainer*    gtoContainer,
+                         const double*           gridCoordinatesX,
+                         const double*           gridCoordinatesY,
+                         const double*           gridCoordinatesZ,
+                         const int32_t           gridOffset,
+                         const int32_t           nGridPoints) const;
+
+    /**
+     Creates density grid for pair-density GGA case.
+
+     @param densityGrid the density grid object.
+     @param aoDensityMatrix the AO density matrices.
+     @param twoDM the "active" MO two-body density matrix.
+     @param activeMOs the active MO coefficients.
+     @param nActive the number of active orbitals.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the distributed molecular grid.
+     */
+
+    void _PDFT_Gga(      CDensityGrid*     densityGrid,
+                         const CAODensityMatrix* aoDensityMatrix,
+                         double* twoDM,
+                         double* activeMOs,
+                         int nActive,
+                         const CGtoContainer*    gtoContainer,
+                         const double*           gridCoordinatesX,
+                         const double*           gridCoordinatesY,
+                         const double*           gridCoordinatesZ,
+                         const int32_t           gridOffset,
+                         const int32_t           nGridPoints) const;
+
+    /**
+     Distributes density and pair-density values into density grid
+     or translate them into artificial alpha and beta densities.
+
+     @param densityGrid the pointer to density grid object.
+     @param twoDM the "active" MO two-body density matrix.
+     @param activeMOs the active MO coefficients.
+     @param nActive the number of active orbitals.
+     @param gtoValues the GTOs values buffer.
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param gridBlockPosition the position of grid block in GTOs values grid.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
+
+    void _distPDFT_LDA(      CDensityGrid*        densityGrid,
+                                        double* twoDM,
+                                        double* activeMOs,
+                                        int nActive,
+                                        int nAOs,
+                                        const CMemBlock2D<double>& gtoValues,
+                                        const int32_t              gridOffset,
+                                        const int32_t              gridBlockPosition,
+                                        const int32_t              nGridPoints) const;
+
+    /**
+     Distributes density and pair-density values into density grid
+     or translate them into artificial alpha and beta densities.
+
+     @param densityGrid the pointer to density grid object.
+     @param twoDM the "active" MO two-body density matrix.
+     @param activeMOs the active MO coefficients.
+     @param nActive the number of active orbitals.
+     @param gtoValues the GTOs values buffer.
+     @param gtoValuesX the GTOs gradient along X axis values buffer.
+     @param gtoValuesY the GTOs gradient along Y axis values buffer.
+     @param gtoValuesZ the GTOs gradient along Z axis values buffer.
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param gridBlockPosition the position of grid block in GTOs values grid.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
+
+    void _distPDFT_GGA(      CDensityGrid*        densityGrid,
+                                        double* twoDM,
+                                        double* activeMOs,
+                                        int nActive,
+                                        int nAOs,
+                                        const CMemBlock2D<double>& gtoValues,
+                                        const CMemBlock2D<double>& gtoValuesX,
+                                        const CMemBlock2D<double>& gtoValuesY,
+                                        const CMemBlock2D<double>& gtoValuesZ,
+                                        const int32_t              gridOffset,
+                                        const int32_t              gridBlockPosition,
+                                        const int32_t              nGridPoints) const;
+    /**
      Gets size of block in grid batch.
 
      @return the size of block in grid batch.
@@ -432,6 +534,21 @@ class CDensityGridDriver
                           const xcfun             xcFunctional);
 
 
+    /**
+     Generates partitioned density and on-top-pair density grid for given molecule
+     and type of exchange-correlation functional. Density grid generation is distributed
+     within domain of MPI communicator.
+
+     @param aoDensityMatrix the AO density matrix.
+     @param twoDM the "active" MO two-body density matrix.
+     @param activeMOs the active MO coefficients.
+     @param nActive the number of active orbitals.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the type of exchange-correlation functional.
+     @return the density grid object.
+     */
     CDensityGrid pdft(const CAODensityMatrix& aoDensityMatrix,
                          double* twoDM,
                          double* activeMOs,
@@ -441,52 +558,6 @@ class CDensityGridDriver
                              const CMolecularGrid&   molecularGrid,
                              const xcfun             xcFunctional);
 
-    void _PDFT_Lda(      CDensityGrid*     densityGrid,
-                         const CAODensityMatrix* aoDensityMatrix,
-                         double* twoDM,
-                         double* activeMOs,
-                         int nActive,
-                         const CGtoContainer*    gtoContainer,
-                         const double*           gridCoordinatesX,
-                         const double*           gridCoordinatesY,
-                         const double*           gridCoordinatesZ,
-                         const int32_t           gridOffset,
-                         const int32_t           nGridPoints) const;
-
-    void _PDFT_Gga(      CDensityGrid*     densityGrid,
-                         const CAODensityMatrix* aoDensityMatrix,
-                         double* twoDM,
-                         double* activeMOs,
-                         int nActive,
-                         const CGtoContainer*    gtoContainer,
-                         const double*           gridCoordinatesX,
-                         const double*           gridCoordinatesY,
-                         const double*           gridCoordinatesZ,
-                         const int32_t           gridOffset,
-                         const int32_t           nGridPoints) const;
-
-    void _distPDFT_LDA(      CDensityGrid*        densityGrid,
-                                        double* twoDM,
-                                        double* activeMOs,
-                                        int nActive,
-                                        int nAOs,
-                                        const CMemBlock2D<double>& gtoValues,
-                                        const int32_t              gridOffset,
-                                        const int32_t              gridBlockPosition,
-                                        const int32_t              nGridPoints) const;
-
-    void _distPDFT_GGA(      CDensityGrid*        densityGrid,
-                                        double* twoDM,
-                                        double* activeMOs,
-                                        int nActive,
-                                        int nAOs,
-                                        const CMemBlock2D<double>& gtoValues,
-                                        const CMemBlock2D<double>& gtoValuesX,
-                                        const CMemBlock2D<double>& gtoValuesY,
-                                        const CMemBlock2D<double>& gtoValuesZ,
-                                        const int32_t              gridOffset,
-                                        const int32_t              gridBlockPosition,
-                                        const int32_t              nGridPoints) const;
 
 };
 
