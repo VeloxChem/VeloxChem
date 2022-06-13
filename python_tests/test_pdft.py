@@ -13,7 +13,7 @@ from veloxchem.veloxchemlib import denmat
 
 class TestPDFT:
 
-    def test_O2_ROHF(self):
+    def run_RODFT(self,func):
 
         O2_xyz= """
 O 0.0 0.0 -0.6
@@ -31,7 +31,7 @@ O 0.0 0.0  0.6
         grid_drv = GridDriver()
         molgrid = grid_drv.generate(molecule)
 
-        xcfun = parse_xc_func("SLDA")
+        xcfun = parse_xc_func(func)
         xc_drv = XCIntegrator()
         vxc_mat = xc_drv.integrate(scfdrv.density, molecule,basis, molgrid, xcfun.get_func_label())
 
@@ -53,4 +53,12 @@ O 0.0 0.0  0.6
         mo_act = comm.bcast(mo_act, root=0)
 
         pdft_ene = xc_drv.pdft( den_mat, np.array(D2act), np.array(mo_act.transpose()), molecule, basis, molgrid, xcfun.get_func_label())
-        assert abs(pdft_ene - vxc_mat.get_energy()) < 1.0e-6
+        return vxc_mat.get_energy(), pdft_ene
+
+    def test_O2_ROLDA(self):
+        ksdft, pdft = self.run_RODFT("SLDA")
+        assert abs(ksdft- pdft) < 1.0e-6
+
+    def test_O2_ROGGA(self):
+        ksdft, pdft = self.run_RODFT("BLYP")
+        assert abs(ksdft- pdft) < 1.0e-6
