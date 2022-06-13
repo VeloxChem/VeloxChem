@@ -507,9 +507,16 @@ class PolOrbitalResponse(CphfSolver):
             # Contract with vectors to get dipole contribution to the RHS
             rhs_dipole_contrib = 0.5 * ( np.einsum('xja,yji->xyia', xmy, dipole_ints_oo)
                                         +np.einsum('yja,xji->xyia', xmy, dipole_ints_oo)
-                                        -np.einsum('xib,yab->xyia', xmy, dipole_ints_vv)
-                                        -np.einsum('yib,xab->xyia', xmy, dipole_ints_vv)
                                        ).reshape(dof**2, nocc, nvir)
+            # TODO: remove print
+            print("Dipole contribution from oo integrals to orbital response RHS:\n", rhs_dipole_contrib, "\n\n")
+
+            rhs_dipole_contrib += 0.5 * (-np.einsum('xib,yab->xyia', xmy, dipole_ints_vv)
+                                         -np.einsum('yib,xab->xyia', xmy, dipole_ints_vv)
+                                        ).reshape(dof**2, nocc, nvir)
+
+            # TODO: remove print
+            print("Dipole contribution to RHS of orbital response:\n", rhs_dipole_contrib, "\n\n")
 
             rhs_mo = fock_mo_rhs_1dm + fock_mo_rhs_2dm + rhs_dipole_contrib
 
@@ -660,6 +667,11 @@ class PolOrbitalResponse(CphfSolver):
                                                  dipole_ints_contrib_vv, mo_vir)
                                      )
 
+            # TODO: remove prints
+            print("Dipole contribution from ov integrals to omega oo block:\n", dipole_ints_contrib_oo, "\n\n")
+            print("Dipole contribution from oo integrals to omega ov block:\n", dipole_ints_contrib_ov, "\n\n")
+            print("Dipole contribution from ov integrals to omega vv block:\n", dipole_ints_contrib_vv, "\n\n")
+
             # TODO: remove commented out code
             #xpy_ao = np.linalg.multi_dot([mo_occ, xpy, mo_vir.T])
             #xmy_ao = np.linalg.multi_dot([mo_occ, xmy, mo_vir.T])
@@ -773,7 +785,7 @@ class PolOrbitalResponse(CphfSolver):
 
                 omega_epsilon_dm[m,n] = -2.0 * epsilon_dm_ao
                 omega_pdms[m,n] = - 2.0 * omega_1pdm_2pdm_contribs
-                omega[m*dof+n] = - 1.0 * epsilon_dm_ao - 1.0 * omega_1pdm_2pdm_contribs + 1.0 * dipole_ints_contrib_ao[m,n]
+                omega[m*dof+n] = - 2.0 * epsilon_dm_ao - 2.0 * omega_1pdm_2pdm_contribs - 1.0 * dipole_ints_contrib_ao[m,n]
 
         self.cphf_results['omega_epsilon_dm'] = omega_epsilon_dm
         self.cphf_results['omega_pdms'] = omega_pdms

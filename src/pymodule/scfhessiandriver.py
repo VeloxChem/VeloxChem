@@ -674,7 +674,7 @@ class ScfHessianDriver(HessianDriver):
 
 
     # TODO: make this option available
-    def compute_numerical_with_analytical_gradient(self, molecule, ao_basis, min_basis, profiler):
+    def compute_numerical_with_analytical_gradient(self, molecule, ao_basis, min_basis=None, profiler=None):
 
         """
         Performs calculation of numerical Hessian.
@@ -688,6 +688,15 @@ class ScfHessianDriver(HessianDriver):
         :param profiler:
             The profiler.
         """
+
+        if profiler is None:
+            profiler = Profiler({
+                'timing': self.timing,
+                'profiling': self.profiling,
+                'memory_profiling': self.memory_profiling,
+                'memory_tracing': self.memory_tracing,
+            })
+
 
         # settings dictionary for gradient driver
         grad_dict = dict(self.freq_dict)
@@ -739,7 +748,7 @@ class ScfHessianDriver(HessianDriver):
             # polarizability: 3 coordinates x 3 coordinates (ignoring frequencies)
             # polarizability gradient: dictionary goes through 3 coordinates x 3 coordinates
             # each entry having values for no. atoms x 3 coordinates
-            self.pol_gradient = np.zeros((3, 3, 3 * natm))
+            self.polarizability_gradient = np.zeros((3, 3, 3 * natm))
             # dictionary to translate from numbers to operator components 'xyz'
             component_dict = {0: 'x', 1: 'y', 2: 'z'}
 
@@ -778,7 +787,7 @@ class ScfHessianDriver(HessianDriver):
                         for aop in range(3):
                             #for bop in lr_drv.b_components:
                             for bop in range(3):
-                                self.pol_gradient[aop, bop, 3*i + d] = (
+                                self.polarizability_gradient[aop, bop, 3*i + d] = (
                                     # TODO: careful with the hard-coded frequency!!
                                     ( lr_results_p['response_functions'][component_dict[aop], component_dict[bop], 0.0]
                                     - lr_results_m['response_functions'][component_dict[aop], component_dict[bop], 0.0] ) /
@@ -853,7 +862,7 @@ class ScfHessianDriver(HessianDriver):
 
                         for aop in range(3):
                             for bop in range(3):
-                                self.pol_gradient[aop, bop, 3*i + d] = (
+                                self.polarizability_gradient[aop, bop, 3*i + d] = (
                                     ( lr_results_m2['response_functions'][component_dict[aop], component_dict[bop], 0.0]
                                     - 8 * lr_results_m1['response_functions'][component_dict[aop], component_dict[bop], 0.0]
                                     + 8 * lr_results_p1['response_functions'][component_dict[aop], component_dict[bop], 0.0]
