@@ -145,7 +145,7 @@ class ScfGradientDriver(GradientDriver):
 
             # analytical gradient
             self.gradient = np.zeros((natm, 3))
-            # exc_gradient = np.zeros((natm, 3))
+            exc_gradient = np.zeros((natm, 3))
 
             for i in range(natm):
                 d_ovlp = overlap_deriv(molecule, ao_basis, i)
@@ -157,9 +157,10 @@ class ScfGradientDriver(GradientDriver):
                                 + 2.0 * np.einsum('mn,xmn->x', epsilon_dm_ao, d_ovlp)
                                 )
                 if self.dft:
-                    d_vxc = vxc_deriv(molecule, ao_basis, one_pdm_ao,
-                                      self.xcfun.get_func_label(), i,
-                                      self.grid_level)
+                    # TODO: remove commented out code (import of xc deriv from pyscf)
+                    #d_vxc = vxc_deriv(molecule, ao_basis, one_pdm_ao,
+                    #                  self.xcfun.get_func_label(), i,
+                    #                  self.grid_level)
                     if self.xcfun.is_hybrid():
                         fact_xc = self.xcfun.get_frac_exact_exchange()
                     else:
@@ -168,15 +169,27 @@ class ScfGradientDriver(GradientDriver):
                                 + 2.0 * np.einsum('mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
                                 - fact_xc * np.einsum('mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
                                 )
-                    if self.add_xc_grad:
-                        self.gradient[i] += 2.0 * np.einsum('mn,xmn->x', one_pdm_ao, d_vxc)
+                    # TODO: remove commented out code and delete member variable add_xc_grad
+                    # (this was required to estimate the xc contribution as difference between
+                    # numerical grad and analytical HF components)
+                    #if self.add_xc_grad:
+                    #    self.gradient[i] += 2.0 * np.einsum('mn,xmn->x', one_pdm_ao, d_vxc)
                 else:
                     self.gradient[i] += (
                                 + 2.0 * np.einsum('mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
                                 - 1.0 * np.einsum('mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
                                 )
 
+            # Add the xc contribution
+            if self.dft:
+                density = self.scf_drv.density
+                xcfun_label = self.scf_drv.xcfun.get_func_label()
+                xc_contrib = self.grad_xc_contrib(molecule, ao_basis, density, xcfun_label)
+                self.gradient += xc_contrib
+
+            # Add the nuclear contribution
             self.gradient += self.grad_nuc_contrib(molecule)
+
             self.omega_ao = epsilon_dm_ao #TODO remove again
 
 # TODO: delete commented out code; numerical gradient is now included

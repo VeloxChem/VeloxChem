@@ -32,6 +32,8 @@ from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import XCIntegrator
+from veloxchem.veloxchemlib import GridDriver
+from veloxchem.veloxchemlib import XCMolecularGradient
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import denmat
@@ -356,39 +358,34 @@ class GradientDriver:
             return xc_gradient
 
 
-    def grad_xc_contrib(self, molecule, ao_basis=None, min_basis=None):
+    def grad_xc_contrib(self, molecule, ao_basis, density, xcfun_label):
         """
-        Calculates the contribution of the exchange-correlation energy
-        to the analytical gradient.
+        Calculates the ground-state contribution of the exchange-correlation
+        energy to the analytical gradient.
 
         :param molecule:
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
+        :param density:
+            The ground state density.
+        :param xcfun_label:
+            The label of the xc functional.
 
         :return:
-            The exchange-correlation contribution to the gradient.
+            The ground-state exchange-correlation contribution to the gradient.
         """
-        # number of atoms
-        natm = molecule.number_of_atoms()
 
-        # exchange-correlation energy contribution to nuclear gradient
-        xc_contrib = np.zeros((natm, 3))
+        grid_drv = GridDriver(self.comm)
+        grid_drv.set_level(self.grid_level)
+        mol_grid = grid_drv.generate(molecule)
+        mol_grid.distribute(self.rank, self.nodes, self.comm)
 
-        for i in range(natm):
-            # Only restricted SCF possible for the moment.
-            density_matrix =  AODensityMatrix([self.scf_drv.scf_tensors['D'][0]], denmat.rest)
-            # density_grad_i = AODensityMatrix... #
-            # set to right type, 3 Matrices - x, y, z coords. of atom i
-            # compute density gradient for atom i
-            # ...
-            # create integrator object
-            xc_integrator = XCIntegrator(self.comm)
-            #xc_grad_i = xc_integrator.integrate_gradient(density_grad_i, molecule, ao_basis, min_basis)
-            xc_grad_i = xc_integrator.integrate_gradient(density_matrix, i, molecule, ao_basis, min_basis)
-            xc_contrib[i] = xc_grad_i.get_gradient()
+        xc_grad_drv = XCMolecularGradient(self.comm)
+        atom_ids = list(range(molecule.number_of_atoms()))
+        xc_contrib = xc_grad_drv.integrate(atom_ids, density, molecule, ao_basis,
+                                           mol_grid, xcfun_label)
+        xc_contrib = self.comm.reduce(xc_contrib, root=mpi_master())
 
         return xc_contrib
 
