@@ -288,14 +288,10 @@ class TPADriver(NonLinearSolver):
         """
 
         if self.rank == mpi_master():
-            S = scf_tensors['S']
-            D0 = scf_tensors['D_alpha']
             mo = scf_tensors['C_alpha']
             F0 = np.linalg.multi_dot([mo.T, scf_tensors['F_alpha'], mo])
             norb = mo.shape[1]
         else:
-            S = None
-            D0 = None
             mo = None
             F0 = None
             norb = None
@@ -306,7 +302,7 @@ class TPADriver(NonLinearSolver):
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            density_list = self.get_densities(w, kX, S, D0, mo)
+            density_list = self.get_densities(w, kX, mo, nocc)
         else:
             density_list = None
 
@@ -334,7 +330,7 @@ class TPADriver(NonLinearSolver):
         # computing all second-order compounded densities based on the
         # second-order response vectors
         if self.rank == mpi_master():
-            density_list_two = self.get_densities_II(w, kX, kXY_dict, S, D0, mo)
+            density_list_two = self.get_densities_II(w, kX, kXY_dict, mo, nocc)
         else:
             density_list_two = None
 
@@ -405,7 +401,7 @@ class TPADriver(NonLinearSolver):
 
         return result
 
-    def get_densities(self, wi, kX, S, D0, mo):
+    def get_densities(self, wi, kX, mo, nocc):
         """
         Computes the compounded densities needed for the compounded Fock
         matrices F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
@@ -415,12 +411,10 @@ class TPADriver(NonLinearSolver):
             A list of the frequencies
         :param kX:
             A dictonary with all the first-order response matrices
-        :param S:
-            The overlap matrix
-        :param D0:
-            The SCF density matrix in AO basis
         :param mo:
             A matrix containing the MO coefficents
+        :param nocc:
+            Number of alpha electrons
 
         :return:
             A list of tranformed compounded densities
@@ -510,7 +504,7 @@ class TPADriver(NonLinearSolver):
 
         return None
 
-    def get_densities_II(self, wi, kX, kXY, S, D0, mo):
+    def get_densities_II(self, wi, kX, kXY, mo, nocc):
         """
         Computes the compounded densities needed for the compounded
         second-order Fock matrices used for the isotropic cubic response
@@ -522,12 +516,10 @@ class TPADriver(NonLinearSolver):
             A dictonary with all the first-order response matrices
         :param kXY:
             A dict of the two index response matrices
-        :param S:
-            The overlap matrix
-        :param D0:
-            The SCF density matrix in AO basis
         :param mo:
             A matrix containing the MO coefficents
+        :param nocc:
+            Number of alpha electrons
 
         :return:
             A list of tranformed compounded densities

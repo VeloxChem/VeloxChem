@@ -29,6 +29,7 @@
 
 #include "Becke88Functional.hpp"
 #include "LYPFunctional.hpp"
+#include "PkzbFunctional.hpp"
 #include "SlaterFunctional.hpp"
 #include "StringFormat.hpp"
 #include "VWN3Functional.hpp"
@@ -38,7 +39,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
 std::vector<std::string>
 getAvailableFunctionals()
 {
-    return std::vector<std::string>({"SLATER", "VWN3", "BECKE88", "LYP", "SLDA", "B88X", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP"});
+    return std::vector<std::string>({"SLATER", "VWN3", "BECKE88", "LYP", "SLDA", "B88X", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP", "PKZB"});
 }
 
 CXCFunctional
@@ -118,6 +119,10 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
                                  {setPrimitiveSlaterFunctional(), setPrimitiveBecke88Functional(), setPrimitiveLYPFunctional()},
                                  {0.5, 0.5, 1.0});
         }
+
+        // PKZB exchange functional
+
+        if (fstr::upcase(xcLabel) == "PKZB") return vxcfuncs::setPkzbFunctional();
 
         // FIX ME: add other functionals here...
     }

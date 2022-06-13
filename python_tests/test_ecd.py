@@ -37,7 +37,7 @@ class TestECD:
             mdip = np.array(rsp_results['magnetic_transition_dipoles'])
             osc = rsp_results['oscillator_strengths']
             rot = rsp_results['rotatory_strengths'] / rotatory_strength_in_cgs()
-            rot_len = (-1.0) * np.sum(edip * mdip, axis=1)
+            rot_len = np.sum(edip * mdip, axis=1)
 
             for i in range(edip.shape[0]):
                 if np.vdot(edip[i, :], ref['edip'][i, :]) < 0.0:
@@ -58,12 +58,12 @@ class TestECD:
         eigvals = np.array(eigvals)
 
         edip = np.array(edip).reshape(-1, 3)
-        vdip = np.array(vdip).reshape(-1, 3) / (-np.array([eigvals] * 3).T)
-        mdip = np.array(mdip).reshape(-1, 3) * (-0.5)
+        vdip = -1.0 * np.array(vdip).reshape(-1, 3) / np.array([eigvals] * 3).T
+        mdip = 0.5 * np.array(mdip).reshape(-1, 3)
 
         osc = (2.0 / 3.0) * np.sum(edip**2, axis=1) * eigvals
-        rot = (-1.0) * np.sum(vdip * mdip, axis=1)
-        rot_len = (-1.0) * np.sum(edip * mdip, axis=1)
+        rot = np.sum(vdip * mdip, axis=1)
+        rot_len = np.sum(edip * mdip, axis=1)
 
         return {
             'eig': eigvals,

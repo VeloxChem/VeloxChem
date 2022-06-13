@@ -453,7 +453,14 @@ class NonLinearSolver:
                     # 12 second-order densities
                     # see get_densities in shgdriver
                     size_1, size_2 = 6, 12
-                else:
+
+                elif mode.lower() == 'shg_red':
+                    # 6 first-order densities
+                    # 6 second-order densities
+                    # see get_densities in shgdriver
+                    size_1, size_2 = 6, 6
+
+                elif mode.lower() == 'qrf':
                     # 4 first-order densities
                     # 2 second-order densities
                     # see get_densities in quadraticresponsedriver
@@ -461,7 +468,9 @@ class NonLinearSolver:
 
                 condition = ((num_1 % size_1 == 0) and (num_2 % size_2 == 0) and
                              (num_1 // size_1 == num_2 // size_2))
+
                 batch_size = max((batch_size // size_2) * size_2, size_2)
+
                 batch_size_first_order = (batch_size // size_2) * size_1
 
                 errmsg = 'NonLinearSolver.comp_nlr_fock: '
@@ -769,38 +778,6 @@ class NonLinearSolver:
 
         return recvbuf
 
-    def transform_dens(self, k, D, S):
-        """
-        Creates the perturbed density
-
-        :param k:
-            Response vector in matrix form in AO basis
-        :param D:
-            The density that is to be perturbed in AO basis
-        :param S:
-            Overlap matrix
-
-        :return:
-            [k,D]
-        """
-
-        return (np.linalg.multi_dot([k, S, D]) - np.linalg.multi_dot([D, S, k]))
-
-    def mo2ao(self, mo, A):
-        """
-        Transform a matrix to atomic basis
-
-        :param mo:
-            molecular orbital coefficent matrix
-        :param A:
-            The matrix in MO basis that is the converted to AO basis
-
-        :return:
-            The matrix in AO basis
-        """
-
-        return np.linalg.multi_dot([mo, A, mo.T])
-
     def ao2mo(self, mo, A):
         """
         Transform a matrix to molecular basis
@@ -815,6 +792,28 @@ class NonLinearSolver:
         """
 
         return np.linalg.multi_dot([mo.T, A, mo])
+
+    def commut_mo_density(self, A, nocc):
+        """
+        Commutes matrix A and MO density
+
+        :param A:
+            Matrix A.
+        :param nocc:
+            Number of occupied orbitals.
+
+        :return:
+            A D_mo - D_mo A
+        """
+
+        # | 0    -A_ov |
+        # | A_vo  0    |
+
+        mat = np.zeros(A.shape, dtype=A.dtype)
+        mat[:nocc, nocc:] = -A[:nocc, nocc:]
+        mat[nocc:, :nocc] = A[nocc:, :nocc]
+
+        return mat
 
     def commut(self, A, B):
         """

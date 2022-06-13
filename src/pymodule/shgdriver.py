@@ -107,6 +107,8 @@ class SHGDriver(NonLinearSolver):
         self.a_components = 'xyz'
         self.b_components = 'xyz'
 
+        self.shg_type = 'full'
+
         # input keywords
         self.input_keywords['response'].update({
             'frequencies': ('seq_range', 'frequencies'),
@@ -114,6 +116,7 @@ class SHGDriver(NonLinearSolver):
             'a_operator': ('str_lower', 'A operator'),
             'b_operator': ('str_lower', 'B operator'),
             'c_operator': ('str_lower', 'C operator'),
+            'shg_type': ('str_lower', 'full or reduced SHG calculation'),
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -168,8 +171,8 @@ class SHGDriver(NonLinearSolver):
 
         if self.rank == mpi_master():
             S = scf_tensors['S']
-            da = scf_tensors['D'][0]
-            mo = scf_tensors['C']
+            da = scf_tensors['D_alpha']
+            mo = scf_tensors['C_alpha']
             d_a_mo = np.linalg.multi_dot([mo.T, S, da, S, mo])
             norb = mo.shape[1]
         else:
@@ -312,12 +315,6 @@ class SHGDriver(NonLinearSolver):
             self.ostream.print_header(w_str.ljust(width))
             self.ostream.print_blank()
 
-            w_str = 'Note: beta(vec)_i is the i-component of the projection of the '
-            self.ostream.print_header(w_str.ljust(width))
-            w_str = 'first hyperpolarizability tensor along the dipole moment.'
-            self.ostream.print_header(w_str.ljust(width))
-            self.ostream.print_blank()
-
             beta_bar = {}
             for freq in beta:
                 beta_bar[freq] = 0.0
@@ -383,14 +380,10 @@ class SHGDriver(NonLinearSolver):
         """
 
         if self.rank == mpi_master():
-            S = scf_tensors['S']
-            D0 = scf_tensors['D'][0]
-            mo = scf_tensors['C']
-            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F'][0], mo])
+            mo = scf_tensors['C_alpha']
+            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F_alpha'], mo])
             norb = mo.shape[1]
         else:
-            S = None
-            D0 = None
             mo = None
             F0 = None
             norb = None
@@ -404,7 +397,7 @@ class SHGDriver(NonLinearSolver):
         # computing all compounded first-order densities
         if self.rank == mpi_master():
             first_order_dens, second_order_dens = self.get_densities(
-                freqpairs, kX, S, D0, mo)
+                freqpairs, kX, mo, nocc)
         else:
             first_order_dens = None
             second_order_dens = None
@@ -491,19 +484,18 @@ class SHGDriver(NonLinearSolver):
 
         return beta
 
-    def get_densities(self, freqpairs, kX, S, D0, mo):
+    def get_densities(self, freqpairs, kX, mo, nocc):
         """
+        Computes the densities needed for the perturbed Fock matrices.
 
         :param freqpairs:
-            A list of the frequencies
+            A list of the frequency pairs
         :param kX:
             A dictonary with all the first-order response matrices
-        :param S:
-            The overlap matrix
-        :param D0:
-            The SCF density matrix in AO basis
         :param mo:
             A matrix containing the MO coefficents
+        :param nocc:
+            Number of occupied orbitals
 
         :return:
             first_order_dens:
@@ -517,41 +509,47 @@ class SHGDriver(NonLinearSolver):
 
         for (wb, wc) in freqpairs:
 
-            # convert response matrix to ao basis #
-
-            k_x = self.mo2ao(mo, kX[('x', wb)])
-            k_y = self.mo2ao(mo, kX[('y', wb)])
-            k_z = self.mo2ao(mo, kX[('z', wb)])
+            k_x = kX[('x', wb)]
+            k_y = kX[('y', wb)]
+            k_z = kX[('z', wb)]
 
             # create the first order single indexed densiteies #
 
-            D_x = self.transform_dens(k_x, D0, S)
-            D_y = self.transform_dens(k_y, D0, S)
-            D_z = self.transform_dens(k_z, D0, S)
+            D_x = self.commut_mo_density(k_x, nocc)
+            D_y = self.commut_mo_density(k_y, nocc)
+            D_z = self.commut_mo_density(k_z, nocc)
 
             # create the first order two indexed densities #
 
-            D_sig_x = 4 * self.transform_dens(k_x, D_x, S)
-            D_sig_x += 2 * (self.transform_dens(k_x, D_x, S) +
-                            self.transform_dens(k_y, D_y, S) +
-                            self.transform_dens(k_z, D_z, S))
+            D_sig_x = 4 * self.commut(k_x, D_x)
+            D_sig_x += 2 * (self.commut(k_x, D_x) + self.commut(k_y, D_y) +
+                            self.commut(k_z, D_z))
 
-            D_sig_y = 4 * self.transform_dens(k_y, D_y, S)
-            D_sig_y += 2 * (self.transform_dens(k_x, D_x, S) +
-                            self.transform_dens(k_y, D_y, S) +
-                            self.transform_dens(k_z, D_z, S))
+            D_sig_y = 4 * self.commut(k_y, D_y)
+            D_sig_y += 2 * (self.commut(k_x, D_x) + self.commut(k_y, D_y) +
+                            self.commut(k_z, D_z))
 
-            D_sig_z = 4 * self.transform_dens(k_z, D_z, S)
-            D_sig_z += 2 * (self.transform_dens(k_x, D_x, S) +
-                            self.transform_dens(k_y, D_y, S) +
-                            self.transform_dens(k_z, D_z, S))
+            D_sig_z = 4 * self.commut(k_z, D_z)
+            D_sig_z += 2 * (self.commut(k_x, D_x) + self.commut(k_y, D_y) +
+                            self.commut(k_z, D_z))
 
-            D_lam_xy = (self.transform_dens(k_x, D_y, S) +
-                        self.transform_dens(k_y, D_x, S))
-            D_lam_xz = (self.transform_dens(k_x, D_z, S) +
-                        self.transform_dens(k_z, D_x, S))
-            D_lam_yz = (self.transform_dens(k_y, D_z, S) +
-                        self.transform_dens(k_z, D_y, S))
+            D_lam_xy = self.commut(k_x, D_y) + self.commut(k_y, D_x)
+            D_lam_xz = self.commut(k_x, D_z) + self.commut(k_z, D_x)
+            D_lam_yz = self.commut(k_y, D_z) + self.commut(k_z, D_y)
+
+            # density transformation from MO to AO basis
+
+            D_x = np.linalg.multi_dot([mo, D_x, mo.T])
+            D_y = np.linalg.multi_dot([mo, D_y, mo.T])
+            D_z = np.linalg.multi_dot([mo, D_z, mo.T])
+
+            D_sig_x = np.linalg.multi_dot([mo, D_sig_x, mo.T])
+            D_sig_y = np.linalg.multi_dot([mo, D_sig_y, mo.T])
+            D_sig_z = np.linalg.multi_dot([mo, D_sig_z, mo.T])
+
+            D_lam_xy = np.linalg.multi_dot([mo, D_lam_xy, mo.T])
+            D_lam_xz = np.linalg.multi_dot([mo, D_lam_xz, mo.T])
+            D_lam_yz = np.linalg.multi_dot([mo, D_lam_yz, mo.T])
 
             first_order_dens.append(D_x.real)
             first_order_dens.append(D_x.imag)
@@ -560,18 +558,26 @@ class SHGDriver(NonLinearSolver):
             first_order_dens.append(D_z.real)
             first_order_dens.append(D_z.imag)
 
-            second_order_dens.append(D_sig_x.real)
-            second_order_dens.append(D_sig_x.imag)
-            second_order_dens.append(D_sig_y.real)
-            second_order_dens.append(D_sig_y.imag)
-            second_order_dens.append(D_sig_z.real)
-            second_order_dens.append(D_sig_z.imag)
-            second_order_dens.append(D_lam_xy.real)
-            second_order_dens.append(D_lam_xy.imag)
-            second_order_dens.append(D_lam_xz.real)
-            second_order_dens.append(D_lam_xz.imag)
-            second_order_dens.append(D_lam_yz.real)
-            second_order_dens.append(D_lam_yz.imag)
+            if self.shg_type == 'reduced':
+                second_order_dens.append(D_sig_x.real)
+                second_order_dens.append(D_sig_y.real)
+                second_order_dens.append(D_sig_z.real)
+                second_order_dens.append(D_lam_xy.real)
+                second_order_dens.append(D_lam_xz.real)
+                second_order_dens.append(D_lam_yz.real)
+            elif self.shg_type == 'full':
+                second_order_dens.append(D_sig_x.real)
+                second_order_dens.append(D_sig_x.imag)
+                second_order_dens.append(D_sig_y.real)
+                second_order_dens.append(D_sig_y.imag)
+                second_order_dens.append(D_sig_z.real)
+                second_order_dens.append(D_sig_z.imag)
+                second_order_dens.append(D_lam_xy.real)
+                second_order_dens.append(D_lam_xy.imag)
+                second_order_dens.append(D_lam_xz.real)
+                second_order_dens.append(D_lam_xz.imag)
+                second_order_dens.append(D_lam_yz.real)
+                second_order_dens.append(D_lam_yz.imag)
 
         return first_order_dens, second_order_dens
 
@@ -638,9 +644,17 @@ class SHGDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                        dft_dict, first_order_dens,
-                                        second_order_dens, 'shg')
+
+        if self.shg_type == 'reduced':
+            dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real',
+                                            dft_dict, first_order_dens,
+                                            second_order_dens, 'shg_red')
+        elif self.shg_type == 'full':
+            dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis,
+                                            'real_and_imag', dft_dict,
+                                            first_order_dens, second_order_dens,
+                                            'shg')
+
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -778,7 +792,10 @@ class SHGDriver(NonLinearSolver):
 
         self.ostream.print_blank()
 
-        title = 'SHG Driver Setup'
+        if self.shg_type == 'reduced':
+            title = 'SHG Driver (Reduced) Setup'
+        elif self.shg_type == 'full':
+            title = 'SHG Driver Setup'
         self.ostream.print_header(title)
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()

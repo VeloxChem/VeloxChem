@@ -334,7 +334,7 @@ class TDAExciDriver(LinearSolver):
             oscillator_strengths = (2.0 / 3.0) * np.sum(
                 trans_dipoles['electric']**2, axis=1) * eigvals
 
-            rotatory_strengths = (-1.0) * np.sum(
+            rotatory_strengths = np.sum(
                 trans_dipoles['velocity'] * trans_dipoles['magnetic'],
                 axis=1) * rotatory_strength_in_cgs()
 
@@ -668,12 +668,12 @@ class TDAExciDriver(LinearSolver):
             ])
 
             transition_dipoles['velocity'][s, :] = np.array([
-                np.vdot(trans_dens, integrals['linear momentum'][d].T) /
-                (-eigvals[s]) for d in range(3)
+                np.vdot(trans_dens, -1.0 * integrals['linear momentum'][d].T) /
+                eigvals[s] for d in range(3)
             ])
 
             transition_dipoles['magnetic'][s, :] = np.array([
-                np.vdot(trans_dens, integrals['angular momentum'][d].T) * (-0.5)
+                np.vdot(trans_dens, 0.5 * integrals['angular momentum'][d].T)
                 for d in range(3)
             ])
 

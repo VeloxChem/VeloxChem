@@ -1,6 +1,7 @@
 target_sources(vlxobjs
   PRIVATE
     AOKohnShamMatrix.cpp
+    DensityGradientGridDriver.cpp
     DensityGrid.cpp
     DensityGridDriver.cpp
     DensityGridQuad.cpp
@@ -8,6 +9,7 @@ target_sources(vlxobjs
     GtoFunc.cpp
     GtoFuncForGGA.cpp
     GtoFuncForLDA.cpp
+    GtoFuncForMGGA.cpp
     LebedevLaikovQuadrature.cpp
     Log3Quadrature.cpp
     MolecularGrid.cpp
@@ -18,6 +20,7 @@ target_sources(vlxobjs
     XCGradientGrid.cpp
     XCHessianGrid.cpp
     XCIntegrator.cpp
+    XCMolecularGradient.cpp
   )
 
 target_include_directories(vlxobjs
