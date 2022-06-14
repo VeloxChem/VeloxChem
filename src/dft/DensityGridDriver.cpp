@@ -1523,7 +1523,7 @@ CDensityGridDriver::_distPDFT_GGA(      CDensityGrid*        densityGrid,
 {
     int ndmat=1;
 
-#define FullTranslation
+//#define FullTranslation
     for (int32_t i = 0; i < ndmat; i++)
     {   
         // set up pointer to density grid data
@@ -1681,7 +1681,7 @@ CDensityGridDriver::_distPDFT_GGA(      CDensityGrid*        densityGrid,
             rhoa[gridOffset + gridBlockPosition + l]=0.5*(da+delta);
             rhob[gridOffset + gridBlockPosition + l]=0.5*(da-delta);
 #ifdef FullTranslation
-//Correct formulas (except for potential bug)
+//Correct formulas, but give bad results without extra care on the db>0 case
             if (delta>1.0e-8)
             {
                 gradax[gridOffset + gridBlockPosition + l]=0.5*(dax-dbx/delta);

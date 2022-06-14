@@ -61,4 +61,5 @@ O 0.0 0.0  0.6
 
     def test_O2_ROGGA(self):
         ksdft, pdft = self.run_RODFT("BLYP")
-        assert abs(ksdft- pdft) < 1.0e-6
+        # do not match in GGA case when using Li-Manni's formulation
+        assert abs(-17.006969151998145 - pdft) < 1.0e-6
