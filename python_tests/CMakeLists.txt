@@ -30,10 +30,10 @@ foreach(_f IN LISTS _vlx_pytests)
     SYMBOLIC
     )
 
-  if(${_f} MATCHES "test_*.py")
+  if(_f MATCHES "^test_.*.py$")
     # extract the name and label for the test from the file name
     # by removing the "test_" prefix and the ".py" suffix
-    string(REGEX REPLACE "test_(.*).py" "\\1" _name ${_f})
+    string(REGEX REPLACE "^test_(.*).py$" "\\1" _name ${_f})
     add_test(
       NAME
         ${_name}
