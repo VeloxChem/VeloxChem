@@ -56,7 +56,7 @@ class TdhfGradientDriver(GradientDriver):
         if ostream is None:
             ostream = OutputStream(sys.stdout)
 
-		# TODO: is it Ok to pass scf_drv here for energy_drv in parent class?
+        # TODO: is it Ok to pass scf_drv here for energy_drv in parent class?
         super().__init__(scf_drv, comm, ostream)
         self.rank = self.comm.Get_rank()
 
@@ -193,6 +193,9 @@ class TdhfGradientDriver(GradientDriver):
                                    self.method_dict)
         orbrsp_results = orbrsp_drv.compute(molecule, basis, scf_tensors,
                                             rsp_results)
+
+        # TODO: remove this member variable after TDDFT gradient is correct.
+        self.orbrsp_results = orbrsp_results
 
         if self.rank == mpi_master():
             natm = molecule.number_of_atoms()

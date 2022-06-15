@@ -185,7 +185,7 @@ class RpaOrbitalResponse(OrbitalResponse):
             # Quadratic response routine for TDDFT E[3] term g^xc
             xc_drv.integrate(fock_gxc_ao, perturbed_dm_ao, zero_dm_ao,
                              gs_density, molecule, basis, molgrid,
-                             self.xcfun.get_func_label(), "quadratic")
+                             self.xcfun.get_func_label(), "qrf")#"quadratic")
 
             fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
 
