@@ -26,8 +26,13 @@
 default:
   tags:
     - vlx-docker
-  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-f51f706
+  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-c3af469
   interruptible: true
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
 stages:
   - build

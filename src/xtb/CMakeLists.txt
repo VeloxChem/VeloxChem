@@ -16,6 +16,8 @@ if(PKG_CONFIG_FOUND)
       PUBLIC
         PkgConfig::xTB
       )
+  else()
+    message(STATUS "Could not find xTB!")
   endif()
 else()
    message(STATUS "Missing pkg-config: cannot attempt finding xTB!")
