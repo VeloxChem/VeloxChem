@@ -290,75 +290,7 @@ class GradientDriver:
             'dft_func_label': dft_func_label,
         }
 
-    def grad_xc_contrib_distributed(self, molecule, ao_basis=None,
-                                    min_basis=None):
-        """
-        Calculates the contribution of the exchange-correlation energy
-        to the analytical gradient (MPI-parallel code)
-
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
-
-        :return:
-            The exchange-correlation contribution to the gradient.
-        """
-
-        if self.rank == mpi_master():
-            natm = molecule.number_of_atoms()
-            xc_gradient = np.zeros((natm, 3))
-            # Select atoms for the gradient (consider constraints, user input)
-            atom_array = np.arange(natm)
-        else:
-            xc_gradient = None
-            atom_array = None
-
-        # Prepare the grid and ground-state AO density matrix
-        dft_dict = self.init_dft(molecule, self.scf_drv.scf_tensors)
-        molgrid = dft_dict['molgrid']
-        gs_density = dft_dict['gs_density']
-        dft_func_label = dft_dict['dft_func_label']
-
-        # Create a distributed array of atom indices:
-        # TODO: enable constraints / user inputs
-        atom_index = DistributedArray(atom_array, self.comm, distribute=True)
-
-        # Prepare xc_driver
-        # TODO New C++ Class to do the gradient integration
-        xc_grad_drv = XCGradientIntegrator(self.comm, molgrid, atom_index)
-
-        # Create a local variable to hold the derivative of the xc energy
-        # with respect to the atomic coords. of atoms in atom_indices:
-        # Should this be in the C layer??
-        local_xc_grad = np.zeros((atom_index.shape(0), 3))
-
-        #for i in range(atom_index.shape(0)):
-        # This object could be of AODensityMatrix type with 3 components
-        # for x, y, and z derivatives, respectively.
-        # Not completely sure how/where this should be calculated...
-        #density_grad_i = xc_drv.compute_density_deriv(molecule,
-        #                            ao_basis, min_basis, molgrid,
-        #                            dft_func_label, atom_index)
-
-        # compute the xc energy deriv wrt coordinates of atom i
-        local_xc_grad = xc_grad_drv.integrate_gradient(gs_density,
-                                    density_grad_i, molecule, ao_basis,
-                                    min_basis, dft_func_label)
-
-        # This code works only if natm is divisible by the size of the
-        # MPI batch is; Not sure how to change the code to make this general...
-        # Should xc_gradient be part of a C object similary to the XCEnergy?
-
-        self.comm.Gatherv(local_xc_grad, xc_gradient, root=mpi_master())
-
-        if self.rank == mpi_master():
-            return xc_gradient
-
-
-    def grad_xc_contrib(self, molecule, ao_basis, density, xcfun_label):
+    def grad_vxc_contrib(self, molecule, ao_basis, rhow_density, gs_density, xcfun_label):
         """
         Calculates the ground-state contribution of the exchange-correlation
         energy to the analytical gradient.
@@ -367,7 +299,9 @@ class GradientDriver:
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param density:
+        :param rhow_density:
+            The perturbed density.
+        :param gs_density:
             The ground state density.
         :param xcfun_label:
             The label of the xc functional.
@@ -381,15 +315,14 @@ class GradientDriver:
         mol_grid = grid_drv.generate(molecule)
         mol_grid.distribute(self.rank, self.nodes, self.comm)
 
-        xc_grad_drv = XCMolecularGradient(self.comm)
+        xc_molgrad_drv = XCMolecularGradient(self.comm)
         atom_ids = list(range(molecule.number_of_atoms()))
-        xc_contrib = xc_grad_drv.integrate(atom_ids, density, molecule, ao_basis,
-                                           mol_grid, xcfun_label)
-        xc_contrib = self.comm.reduce(xc_contrib, root=mpi_master())
+        vxc_contrib = xc_molgrad_drv.integrate_vxc_gradient(
+            atom_ids, rhow_density, gs_density, molecule, ao_basis, mol_grid,
+            xcfun_label)
+        vxc_contrib = self.comm.reduce(vxc_contrib, root=mpi_master())
 
-        return xc_contrib
-
-
+        return vxc_contrib
 
     def grad_nuc_contrib(self, molecule):
         """

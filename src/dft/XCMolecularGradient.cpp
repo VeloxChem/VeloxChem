@@ -51,12 +51,24 @@ CXCMolecularGradient::~CXCMolecularGradient()
 }
 
 CDenseMatrix
-CXCMolecularGradient::integrate(const std::vector<int32_t>& idsAtomic,
-                                const CAODensityMatrix&     aoDensityMatrix,
-                                const CMolecule&            molecule,
-                                const CMolecularBasis&      basis,
-                                const CMolecularGrid&       molecularGrid,
-                                const std::string&          xcFuncLabel) const
+CXCMolecularGradient::integrateVxcGradient(const std::vector<int32_t>& idsAtomic,
+                                           const CAODensityMatrix&     aoDensityMatrix,
+                                           const CMolecule&            molecule,
+                                           const CMolecularBasis&      basis,
+                                           const CMolecularGrid&       molecularGrid,
+                                           const std::string&          xcFuncLabel) const
+{
+    return integrateVxcGradient(idsAtomic, aoDensityMatrix, aoDensityMatrix, molecule, basis, molecularGrid, xcFuncLabel);
+}
+
+CDenseMatrix
+CXCMolecularGradient::integrateVxcGradient(const std::vector<int32_t>& idsAtomic,
+                                           const CAODensityMatrix&     rwDensityMatrix,
+                                           const CAODensityMatrix&     gsDensityMatrix,
+                                           const CMolecule&            molecule,
+                                           const CMolecularBasis&      basis,
+                                           const CMolecularGrid&       molecularGrid,
+                                           const std::string&          xcFuncLabel) const
 {
     // parse exchange-correlation functional data
 
@@ -66,7 +78,7 @@ CXCMolecularGradient::integrate(const std::vector<int32_t>& idsAtomic,
 
     CDensityGridDriver dgdrv(_locComm);
 
-    auto refdengrid = dgdrv.generate(aoDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
+    auto refdengrid = dgdrv.generate(gsDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
 
     // create molecular gradient
 
@@ -80,7 +92,7 @@ CXCMolecularGradient::integrate(const std::vector<int32_t>& idsAtomic,
 
     auto mgradz = molgrad.row(2);
 
-    if (aoDensityMatrix.isClosedShell())
+    if (rwDensityMatrix.isClosedShell())
     {
         // generate screened molecular and density grids
 
@@ -122,7 +134,7 @@ CXCMolecularGradient::integrate(const std::vector<int32_t>& idsAtomic,
 
         for (int32_t i = 0; i < natoms; i++)
         {
-            auto gradgrid = graddrv.generate(aoDensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType(), idsAtomic[i]);
+            auto gradgrid = graddrv.generate(rwDensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType(), idsAtomic[i]);
 
             // set up pointers to density gradient grid
 

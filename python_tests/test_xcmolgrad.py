@@ -29,8 +29,8 @@ class TestXCMolGrad:
 
         grad_drv = XCMolecularGradient(scf_drv.comm)
         atom_ids = list(range(molecule.number_of_atoms()))
-        mol_grad = grad_drv.integrate(atom_ids, density, molecule, basis,
-                                      mol_grid, xcfun)
+        mol_grad = grad_drv.integrate_vxc_gradient(atom_ids, density, molecule,
+                                                   basis, mol_grid, xcfun)
         mol_grad = scf_drv.comm.reduce(mol_grad, root=mpi_master())
 
         if scf_drv.rank == mpi_master():

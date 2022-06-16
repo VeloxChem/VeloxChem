@@ -180,14 +180,16 @@ class ScfGradientDriver(GradientDriver):
                                 - 1.0 * np.einsum('mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
                                 )
 
-            # Add the xc contribution
-            if self.dft:
-                density = self.scf_drv.density
-                xcfun_label = self.scf_drv.xcfun.get_func_label()
-                xc_contrib = self.grad_xc_contrib(molecule, ao_basis, density, xcfun_label)
-                self.gradient += xc_contrib
+        # Add the xc contribution
+        if self.dft:
+            density = self.scf_drv.density
+            xcfun_label = self.scf_drv.xcfun.get_func_label()
+            vxc_contrib = self.grad_vxc_contrib(molecule, ao_basis, density, density, xcfun_label)
+            if self.rank == mpi_master():
+                self.gradient += vxc_contrib
 
-            # Add the nuclear contribution
+        # Add the nuclear contribution
+        if self.rank == mpi_master():
             self.gradient += self.grad_nuc_contrib(molecule)
 
             self.omega_ao = epsilon_dm_ao #TODO remove again
