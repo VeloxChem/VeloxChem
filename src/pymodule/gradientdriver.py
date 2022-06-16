@@ -23,25 +23,19 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-import time as tm
 from mpi4py import MPI
 import numpy as np
+import time as tm
 import sys
 
-from .veloxchemlib import mpi_master
-from .outputstream import OutputStream
-from .veloxchemlib import XCFunctional
-from .veloxchemlib import XCIntegrator
-from veloxchem.veloxchemlib import GridDriver
-from veloxchem.veloxchemlib import XCMolecularGradient
-from .veloxchemlib import MolecularGrid
-from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import denmat
+from .veloxchemlib import (XCFunctional, XCIntegrator, GridDriver,
+                           XCMolecularGradient ,MolecularGrid)
+from .veloxchemlib import mpi_master, denmat
 from .veloxchemlib import parse_xc_func
-from .distributedarray import DistributedArray
-from .errorhandler import assert_msg_critical
-from .molecule import Molecule
+from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
+from .molecule import Molecule
+from .errorhandler import assert_msg_critical
 
 
 class GradientDriver:
@@ -94,6 +88,7 @@ class GradientDriver:
 
         self.gradient = None
         self.flag = None
+
         self.numerical = False
         # flag for two-point or four-point approximation
         self.do_four_point = False
@@ -112,7 +107,6 @@ class GradientDriver:
         :param method_dict:
             The input dicitonary of method settings group.
         """
-
 
         # if this is True, numerical must also be True
         if 'do_four_point' in grad_dict:
@@ -140,16 +134,6 @@ class GradientDriver:
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Gradient driver: Undefined XC functional')
 
-        # TODO: Analytical DFT gradient is not implemented yet
-        #if self.dft and not self.numerical:
-        #    self.numerical = True
-        #    warn_msg = '*** Warning: Analytical DFT gradient is not yet implemented.'
-        #    self.ostream.print_blank()
-        #    self.ostream.print_header(warn_msg.ljust(56))
-        #    warn_msg = '              Gradient will be calculated numerically instead.'
-        #    self.ostream.print_header(warn_msg.ljust(56))
-        #    self.ostream.flush()
-
         # step size for finite differences
         if 'delta_h' in grad_dict:
             self.delta_h = float(grad_dict['delta_h'])
@@ -165,8 +149,6 @@ class GradientDriver:
                 warn_msg = '             Gradient will be calculated numerically.'
                 self.ostream.print_header(warn_msg.ljust(56))
                 self.numerical = True
-
-
 
     def compute(self, molecule, *args):
         """
@@ -213,9 +195,11 @@ class GradientDriver:
                     coords[i, d] -= self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     e_minus2 = self.compute_energy(new_mol, *args)
+
                     coords[i, d] += 4.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     e_plus2 = self.compute_energy(new_mol, *args)
+
                     coords[i, d] -= 2.0 * self.delta_h
                     self.gradient[i, d] = ( (e_minus2 - 8 * e_minus 
                                            + 8 * e_plus - e_plus2) 
@@ -276,7 +260,9 @@ class GradientDriver:
             else:
                 gs_density = AODensityMatrix()
             gs_density.broadcast(self.rank, self.comm)
-            molgrid.broadcast(self.rank, self.comm) # TODO duble check
+
+            # TODO double check
+            # molgrid.broadcast(self.rank, self.comm)
 
             dft_func_label = self.xcfun.get_func_label().upper()
         else:
@@ -362,7 +348,6 @@ class GradientDriver:
 
         return nuc_contrib
 
-
     def get_gradient(self):
         """
         Gets the gradient.
@@ -382,7 +367,6 @@ class GradientDriver:
         """
 
         self.ostream.print_block(molecule.get_string())
-
 
     def print_gradient(self, molecule):
         """
@@ -420,7 +404,6 @@ class GradientDriver:
 
         self.ostream.print_blank()
         self.ostream.flush()
-
 
     def print_header(self, state_deriv_index=None):
         """
@@ -464,4 +447,3 @@ class GradientDriver:
 
         self.ostream.print_blank()
         self.ostream.flush()
-
