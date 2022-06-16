@@ -322,4 +322,8 @@ class RpaOrbitalResponse(OrbitalResponse):
 
         omega = -epsilon_dm_ao - omega_1pdm_2pdm_contribs
 
+        if fock_gxc_ao is not None:
+            factor = -0.25 
+            omega += factor * np.linalg.multi_dot([D_occ, fock_gxc_ao.alpha_to_numpy(0), D_occ])
+
         return omega

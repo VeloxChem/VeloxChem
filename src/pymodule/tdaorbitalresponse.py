@@ -201,13 +201,6 @@ class TdaOrbitalResponse(OrbitalResponse):
             if self.dft:
                 gxc_ao = fock_gxc_ao.alpha_to_numpy(0)
                 gxc_mo = np.linalg.multi_dot([mo_occ.T, gxc_ao, mo_vir])
-                # TODO: remove printout statements
-                #print("\n...adding gxc to the RHS:\n")
-                #print(fock_gxc_ao)
-                #print()
-                #print("\ngxc in MO:\n")
-                #print(gxc_mo)
-                #print()
                 rhs_mo += 0.25 * gxc_mo
 
 
@@ -289,11 +282,7 @@ class TdaOrbitalResponse(OrbitalResponse):
         omega = -epsilon_dm_ao - omega_1pdm_2pdm_contribs
 
         if fock_gxc_ao is not None:
-            # TODO: remove printout statements
-            #print("...adding gxc!\n")
-            #print(fock_gxc_ao)
-            #print()
-            factor = -0.25 #-0.25
+            factor = -0.25 
             omega += factor * np.linalg.multi_dot([D_occ, fock_gxc_ao.alpha_to_numpy(0), D_occ])
 
         return omega
