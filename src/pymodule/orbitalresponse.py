@@ -313,14 +313,21 @@ class OrbitalResponse:
             eo_diag = np.diag(eocc)
             ev_diag = np.diag(evir)
 
+            # OO block including the GS contribution:
+            #epsilon_dm_ao = np.linalg.multi_dot(
+            #    [mo_occ,
+            #     np.matmul(eo_diag, 0.5 * dm_oo) + eo_diag, mo_occ.T])
+
+            # OO block without the GS contribution
             epsilon_dm_ao = np.linalg.multi_dot(
                 [mo_occ,
-                 np.matmul(eo_diag, 0.5 * dm_oo) + eo_diag, mo_occ.T])
+                 np.matmul(eo_diag, 0.5 * dm_oo), mo_occ.T])
+
             epsilon_dm_ao += np.linalg.multi_dot(
                 [mo_vir, np.matmul(ev_diag, 0.5 * dm_vv), mo_vir.T])
 
             # TODO: assign different variable to this expression, then add it
-			#	and its	transpose to epsilon_dm_ao
+            #   and its transpose to epsilon_dm_ao
             epsilon_dm_ao += np.linalg.multi_dot(
                 [mo_occ,
                  np.matmul(eo_diag, lambda_multipliers), mo_vir.T])

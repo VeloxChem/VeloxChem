@@ -5,6 +5,7 @@ import sys
 
 from .molecule import Molecule
 from .gradientdriver import GradientDriver
+from .scfgradientdriver import ScfGradientDriver
 from .outputstream import OutputStream
 from .tdaorbitalresponse import TdaOrbitalResponse
 from .rpaorbitalresponse import RpaOrbitalResponse
@@ -18,6 +19,7 @@ from .lrsolver import LinearResponseSolver
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
 from .import_from_pyscf import fock_deriv
+from .import_from_pyscf import hcore_deriv
 from .import_from_pyscf import eri_deriv
 
 
@@ -119,6 +121,7 @@ class TdhfGradientDriver(GradientDriver):
             self.state_deriv_index = int(grad_dict['state_deriv_index']) - 1
             orbrsp_dict['state_deriv_index'] = grad_dict['state_deriv_index']
 
+        self.grad_dict = dict(grad_dict)
         self.rsp_dict = dict(rsp_dict)
         self.method_dict = dict(method_dict)
         self.orbrsp_dict = dict(orbrsp_dict)
@@ -208,26 +211,59 @@ class TdhfGradientDriver(GradientDriver):
             xmy = orbrsp_results['x_minus_y_ao']
             rel_dm_ao = orbrsp_results['relaxed_density_ao']
 
-            # analytical gradient
-            self.gradient = np.zeros((natm, 3))
-            self.gradient = self.grad_nuc_contrib(molecule)
 
+            # TODO: delete commented out code
+            # analytical gradient
+            #self.gradient = np.zeros((natm, 3))
+            #self.gradient = self.grad_nuc_contrib(molecule)
+
+            # ground state gradient
+            gs_grad_drv = ScfGradientDriver(self.scf_drv)
+            gs_grad_drv.update_settings(self.grad_dict, self.method_dict)
+            gs_grad_drv.compute(molecule, basis)
+            gs_gradient = gs_grad_drv.get_gradient()
+
+            # TODO: should these be fully separated?
+            self.gradient = gs_gradient
+            
             # loop over atoms and contract integral derivatives with density matrices
             # add the corresponding contribution to the gradient
             for i in range(natm):
                 # taking integral derivatives from pyscf
                 d_ovlp = overlap_deriv(molecule, basis, i)
-                d_fock = fock_deriv(molecule, basis, gs_dm, i)
+                #d_fock = fock_deriv(molecule, basis, gs_dm, i)
+                d_hcore = hcore_deriv(molecule, basis, i)
                 d_eri = eri_deriv(molecule, basis, i)
 
-                self.gradient[i] += ( np.einsum('mn,xmn->x', 2.0 * gs_dm + rel_dm_ao, d_fock)
+                # TODO: delete commented out code, related to gradient using fock matrix derivative
+                self.gradient[i] += ( #np.einsum('mn,xmn->x', 2.0 * gs_dm + rel_dm_ao, d_fock)
+                                 ##+1.0 * np.einsum('mn,xmn->x', 2.0 * gs_dm + rel_dm_ao, d_hcore)
+                                 +1.0 * np.einsum('mn,xmn->x', rel_dm_ao, d_hcore)
                                  +1.0 * np.einsum('mn,xmn->x', 2.0 * omega_ao, d_ovlp)
-                                 -2.0 * np.einsum('mt,np,xmtnp->x', gs_dm, gs_dm, d_eri)
-                                 +1.0 * np.einsum('mt,np,xmnpt->x', gs_dm, gs_dm, d_eri)
+                                     )
+
+                if self.dft:
+                    if self.xcfun.is_hybrid():
+                        fact_exact_exchange = self.xcfun.get_frac_exact_exchange()
+                    else:
+                        fact_exact_exchange = 0
+                else:
+                    fact_exact_exchange = 1.0
+
+                self.gradient[i] += (
+                                 # GS gradient calculated before using ScfGradientDriver
+                                 # TODO: remove commented out code or go back to explicitly 
+                                 # including GS here, after TDDFT gradient is correct.
+                                 #+2.0 * np.einsum('mt,np,xmtnp->x', gs_dm, gs_dm, d_eri)
+                                 #-1.0 * fact_exact_exchange * np.einsum('mt,np,xmnpt->x', gs_dm, gs_dm, d_eri)
+                                 +2.0 * np.einsum('mt,np,xmtnp->x', gs_dm, rel_dm_ao, d_eri)
+                                 -1.0 * fact_exact_exchange * np.einsum('mt,np,xmnpt->x', gs_dm, rel_dm_ao, d_eri)
+                                 #-2.0 * np.einsum('mt,np,xmtnp->x', gs_dm, gs_dm, d_eri)
+                                 #+1.0 * np.einsum('mt,np,xmnpt->x', gs_dm, gs_dm, d_eri)
                                  +1.0 * np.einsum('mn,pt,xtpmn->x', xpy, xpy - xpy.T, d_eri)
-                                 -0.5 * np.einsum('mn,pt,xtnmp->x', xpy, xpy - xpy.T, d_eri)
+                                 -0.5 * fact_exact_exchange * np.einsum('mn,pt,xtnmp->x', xpy, xpy - xpy.T, d_eri)
                                  +1.0 * np.einsum('mn,pt,xtpmn->x', xmy, xmy + xmy.T, d_eri)
-                                 -0.5 * np.einsum('mn,pt,xtnmp->x', xmy, xmy + xmy.T, d_eri)
+                                 -0.5 * fact_exact_exchange * np.einsum('mn,pt,xtnmp->x', xmy, xmy + xmy.T, d_eri)
                                 )
 
 
@@ -255,13 +291,6 @@ class TdhfGradientDriver(GradientDriver):
                 self.relaxed_dipole_moment = firstorderprop.get_property('dipole moment')
 
             if self.rank == mpi_master():
-                # TODO: Remove warning once TDDFT orbital response is fully implemented
-                if 'xcfun' in self.method_dict and self.method_dict['xcfun'] is not None:
-                    warn_msg = '*** Warning: Orbital response for TDDFT is not yet fully'
-                    self.ostream.print_header(warn_msg.ljust(56))
-                    warn_msg = '    implemented. Relaxed dipole moment will be wrong.'
-                    self.ostream.print_header(warn_msg.ljust(56))
-
                 if self.do_first_order_prop:
                     title = method + ' Relaxed Dipole Moment for Excited State ' + str(self.state_deriv_index + 1)
                     firstorderprop.print_properties(molecule, title)
