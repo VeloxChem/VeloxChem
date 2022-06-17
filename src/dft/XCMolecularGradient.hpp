@@ -141,6 +141,29 @@ class CXCMolecularGradient
                                       const CMolecularBasis&      basis,
                                       const CMolecularGrid&       molecularGrid,
                                       const std::string&          xcFuncLabel) const;
+
+    /**
+     Integrates exchnage-correlation functional contribution to molecular gradient.
+
+     @param idsAtomic  the atomic indexes.
+     @param rwDensityMatrix the perturbed AO density matrix object.
+     @param rw2DensityMatrix the two-time transformed densities evaluated on the grid.
+     @param gsDensityMatrix the ground state AO density matrix object.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @return the molecular gradient.
+     */
+    CDenseMatrix
+    integrateGxcGradient(const std::vector<int32_t>& idsAtomic,
+                         const CAODensityMatrix&     rwDensityMatrix,
+                         const CAODensityMatrix&     rw2DensityMatrix,
+                         const CAODensityMatrix&     gsDensityMatrix,
+                         const CMolecule&            molecule,
+                         const CMolecularBasis&      basis,
+                         const CMolecularGrid&       molecularGrid,
+                         const std::string&          xcFuncLabel) const;
 };
 
 #endif /* XCMolecularGradient_hpp */

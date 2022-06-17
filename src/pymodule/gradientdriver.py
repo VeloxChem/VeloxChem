@@ -337,12 +337,46 @@ class GradientDriver:
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
         atom_ids = list(range(molecule.number_of_atoms()))
-        vxc_contrib = xc_molgrad_drv.integrate_fxc_gradient(
+        fxc_contrib = xc_molgrad_drv.integrate_fxc_gradient(
             atom_ids, rhow_density_1, rhow_density_2, gs_density, molecule,
             ao_basis, mol_grid, xcfun_label)
-        vxc_contrib = self.comm.reduce(vxc_contrib, root=mpi_master())
+        fxc_contrib = self.comm.reduce(fxc_contrib, root=mpi_master())
 
-        return vxc_contrib
+        return fxc_contrib
+
+    def grad_gxc_contrib(self, molecule, ao_basis, rhow_density, rhow2_density, gs_density, xcfun_label):
+        """
+        Calculates the ground-state contribution of the exchange-correlation
+        energy to the analytical gradient.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param rhow_density:
+            The perturbed density.
+        :param gs_density:
+            The ground state density.
+        :param xcfun_label:
+            The label of the xc functional.
+
+        :return:
+            The ground-state exchange-correlation contribution to the gradient.
+        """
+
+        grid_drv = GridDriver(self.comm)
+        grid_drv.set_level(self.grid_level)
+        mol_grid = grid_drv.generate(molecule)
+        mol_grid.distribute(self.rank, self.nodes, self.comm)
+
+        xc_molgrad_drv = XCMolecularGradient(self.comm)
+        atom_ids = list(range(molecule.number_of_atoms()))
+        gxc_contrib = xc_molgrad_drv.integrate_gxc_gradient(
+            atom_ids, rhow_density, rhow2_density, gs_density, molecule,
+            ao_basis, mol_grid, xcfun_label)
+        gxc_contrib = self.comm.reduce(gxc_contrib, root=mpi_master())
+
+        return gxc_contrib
 
     def grad_nuc_contrib(self, molecule):
         """

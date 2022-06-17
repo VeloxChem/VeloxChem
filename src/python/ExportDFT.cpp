@@ -314,6 +314,29 @@ export_dft(py::module& m)
             "molecule"_a,
             "basis"_a,
             "molecularGrid"_a,
+            "xcFuncLabel"_a)
+        .def(
+            "integrate_gxc_gradient",
+            [](CXCMolecularGradient&       self,
+               const std::vector<int32_t>& idsAtomic,
+               const CAODensityMatrix&     rwDensityMatrix,
+               const CAODensityMatrix&     rw2DensityMatrix,
+               const CAODensityMatrix&     gsDensityMatrix,
+               const CMolecule&            molecule,
+               const CMolecularBasis&      basis,
+               const CMolecularGrid&       molecularGrid,
+               const std::string&          xcFuncLabel) -> py::array_t<double> {
+                auto molgrad = self.integrateGxcGradient(idsAtomic, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecule, basis, molecularGrid, xcFuncLabel);
+                return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
+            },
+            "Integrates exchange-correlation contribution to molecular gradient.",
+            "idsAtomic"_a,
+            "rwDensityMatrix"_a,
+            "rw2DensityMatrix"_a,
+            "gsDensityMatrix"_a,
+            "molecule"_a,
+            "basis"_a,
+            "molecularGrid"_a,
             "xcFuncLabel"_a);
 
     // CDensityGrid class
