@@ -259,8 +259,13 @@ class TdhfGradientDriver(GradientDriver):
             xcfun_label = self.scf_drv.xcfun.get_func_label()
             vxc_contrib = self.grad_vxc_contrib(molecule, basis, rhow_density, gs_density, xcfun_label)
 
+            xpy_den_1 = AODensityMatrix([xpy], denmat.rest)
+            xpy_den_2 = AODensityMatrix([xpy.T], denmat.rest)
+            fxc_contrib = self.grad_fxc_contrib(molecule, basis, xpy_den_1, xpy_den_2, gs_density, xcfun_label)
+
             if self.rank == mpi_master():
                 self.gradient += vxc_contrib
+                self.gradient += fxc_contrib
 
         # Calculate the relaxed and unrelaxed excited-state dipole moment
         firstorderprop = FirstOrderProperties(self.comm, self.ostream)
