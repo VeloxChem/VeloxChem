@@ -278,22 +278,21 @@ class GradientDriver:
 
     def grad_vxc_contrib(self, molecule, ao_basis, rhow_density, gs_density, xcfun_label):
         """
-        Calculates the ground-state contribution of the exchange-correlation
-        energy to the analytical gradient.
+        Calculates the vxc exchange-correlation contribution to the gradient.
 
         :param molecule:
             The molecule.
         :param ao_basis:
             The AO basis set.
         :param rhow_density:
-            The perturbed density.
+            The perturbed density (to be contracted with GTO gradient).
         :param gs_density:
-            The ground state density.
+            The ground state density (to generate functional derivative).
         :param xcfun_label:
             The label of the xc functional.
 
         :return:
-            The ground-state exchange-correlation contribution to the gradient.
+            The vxc exchange-correlation contribution to the gradient.
         """
 
         grid_drv = GridDriver(self.comm)
@@ -310,24 +309,25 @@ class GradientDriver:
 
         return vxc_contrib
 
-    def grad_fxc_contrib(self, molecule, ao_basis, rhow_density_1, rhow_density_2, gs_density, xcfun_label):
+    def grad_fxc_contrib(self, molecule, ao_basis, rhow_den_1, rhow_den_2, gs_density, xcfun_label):
         """
-        Calculates the ground-state contribution of the exchange-correlation
-        energy to the analytical gradient.
+        Calculates the fxc exchange-correlation contribution to the gradient.
 
         :param molecule:
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param rhow_density:
+        :param rhow_den_1:
             The perturbed density.
+        :param rhow_den_2:
+            The perturbed density (to be contracted with GTO gradient).
         :param gs_density:
-            The ground state density.
+            The ground state density (to generate functional derivative).
         :param xcfun_label:
             The label of the xc functional.
 
         :return:
-            The ground-state exchange-correlation contribution to the gradient.
+            The fxc exchange-correlation contribution to the gradient.
         """
 
         grid_drv = GridDriver(self.comm)
@@ -338,30 +338,32 @@ class GradientDriver:
         xc_molgrad_drv = XCMolecularGradient(self.comm)
         atom_ids = list(range(molecule.number_of_atoms()))
         fxc_contrib = xc_molgrad_drv.integrate_fxc_gradient(
-            atom_ids, rhow_density_1, rhow_density_2, gs_density, molecule,
+            atom_ids, rhow_den_1, rhow_den_2, gs_density, molecule,
             ao_basis, mol_grid, xcfun_label)
         fxc_contrib = self.comm.reduce(fxc_contrib, root=mpi_master())
 
         return fxc_contrib
 
-    def grad_gxc_contrib(self, molecule, ao_basis, rhow_density, rhow2_density, gs_density, xcfun_label):
+    def grad_gxc_contrib(self, molecule, ao_basis, rhow_den_1, rhow_den_2, gs_density, xcfun_label):
         """
-        Calculates the ground-state contribution of the exchange-correlation
-        energy to the analytical gradient.
+        Calculates the gxc exchange-correlation contribution to the gradient.
 
         :param molecule:
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param rhow_density:
+        :param rhow_den_1:
+            The perturbed density.
+        :param rhow_den_2:
             The perturbed density.
         :param gs_density:
-            The ground state density.
+            The ground state density (to generate functional derivative and
+            to be contracted with GTO gradient).
         :param xcfun_label:
             The label of the xc functional.
 
         :return:
-            The ground-state exchange-correlation contribution to the gradient.
+            The gxc exchange-correlation contribution to the gradient.
         """
 
         grid_drv = GridDriver(self.comm)
@@ -369,10 +371,15 @@ class GradientDriver:
         mol_grid = grid_drv.generate(molecule)
         mol_grid.distribute(self.rank, self.nodes, self.comm)
 
+        zero_1 = np.zeros(rhow_den_1.shape)
+        zero_2 = np.zeros(rhow_den_2.shape)
+        perturbed_dm_ao = AODensityMatrix([rhow_den_1, zero_1, rhow_den_2, zero_2], denmat.rest)
+        zero_dm_ao = AODensityMatrix([zero_1, zero_2], denmat.rest)
+
         xc_molgrad_drv = XCMolecularGradient(self.comm)
         atom_ids = list(range(molecule.number_of_atoms()))
-        gxc_contrib = xc_molgrad_drv.integrate_gxc_gradient(
-            atom_ids, rhow_density, rhow2_density, gs_density, molecule,
+        gxc_contrib = 0.25 * xc_molgrad_drv.integrate_gxc_gradient(
+            atom_ids, perturbed_dm_ao, zero_dm_ao, gs_density, molecule,
             ao_basis, mol_grid, xcfun_label)
         gxc_contrib = self.comm.reduce(gxc_contrib, root=mpi_master())
 
