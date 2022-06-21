@@ -226,56 +226,6 @@ class GradientDriver:
 
         return
 
-    def init_dft(self, molecule, scf_tensors):
-        """
-        Initializes DFT.
-
-        :param molecule:
-            The molecule.
-        :param scf_tensors:
-            The dictionary of tensors from converged SCF wavefunction.
-
-        :return:
-            The dictionary of DFT information.
-        """
-
-        # generate integration grid
-        if self.dft:
-            grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(self.grid_level)
-
-            grid_t0 = tm.time()
-            molgrid = grid_drv.generate(molecule)
-
-            n_grid_points = molgrid.number_of_points()
-            self.ostream.print_info(
-                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
-                format(n_grid_points,
-                       tm.time() - grid_t0))
-            self.ostream.print_blank()
-
-            if self.rank == mpi_master():
-                gs_density = AODensityMatrix([scf_tensors['D_alpha']],
-                                             denmat.rest)
-            else:
-                gs_density = AODensityMatrix()
-            gs_density.broadcast(self.rank, self.comm)
-
-            # TODO double check
-            # molgrid.broadcast(self.rank, self.comm)
-
-            dft_func_label = self.xcfun.get_func_label().upper()
-        else:
-            molgrid = MolecularGrid()
-            gs_density = AODensityMatrix()
-            dft_func_label = 'HF'
-
-        return {
-            'molgrid': molgrid,
-            'gs_density': gs_density,
-            'dft_func_label': dft_func_label,
-        }
-
     def grad_vxc_contrib(self, molecule, ao_basis, rhow_density, gs_density, xcfun_label):
         """
         Calculates the vxc exchange-correlation contribution to the gradient.
