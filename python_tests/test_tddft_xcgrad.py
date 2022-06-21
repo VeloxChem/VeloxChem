@@ -132,3 +132,25 @@ class TestOrbitalResponse:
              [-2.69921252e-16, 5.77605000e-02, -5.44620872e-02]])
 
         self.run_tddft_xcgrad(xcfun_label, tamm_dancoff, ref_xcgrad)
+
+    def test_tda_xcgrad_blyp(self):
+
+        xcfun_label = 'blyp'
+        tamm_dancoff = True
+        ref_xcgrad = np.array(
+            [[-1.48234494e-16, 2.59450523e-14, 1.11233752e-01],
+             [-1.60015912e-16, -5.75591566e-02, -5.56168761e-02],
+             [2.13936447e-16, 5.75591566e-02, -5.56168761e-02]])
+
+        self.run_tddft_xcgrad(xcfun_label, tamm_dancoff, ref_xcgrad)
+
+    def test_rpa_xcgrad_blyp(self):
+
+        xcfun_label = 'blyp'
+        tamm_dancoff = False
+        ref_xcgrad = np.array(
+            [[-1.27004678e-16, 1.68531512e-14, 1.09730988e-01],
+             [-1.45607378e-16, -5.74167800e-02, -5.48654938e-02],
+             [2.04927911e-16, 5.74167800e-02, -5.48654938e-02]])
+
+        self.run_tddft_xcgrad(xcfun_label, tamm_dancoff, ref_xcgrad)
