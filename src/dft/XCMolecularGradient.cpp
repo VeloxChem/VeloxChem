@@ -162,7 +162,7 @@ CXCMolecularGradient::integrateVxcGradient(const std::vector<int32_t>& idsAtomic
                 gatmz += gw[j] * grhoa[j] * gdenz[j];
             }
 
-            // compute LDA contribution to molecular gradient
+            // compute GGA contribution to molecular gradient
 
             if (fvxc.getFunctionalType() == xcfun::gga)
             {
@@ -209,7 +209,7 @@ CXCMolecularGradient::integrateVxcGradient(const std::vector<int32_t>& idsAtomic
     {
         // not implemented
 
-        std::string erropenshell("XCMolecularGradient.integrate: Not implemented for open-shell");
+        std::string erropenshell("XCMolecularGradient.integrateVxcGradient: Not implemented for open-shell");
 
         errors::assertMsgCritical(false, erropenshell);
     }
@@ -397,7 +397,7 @@ CXCMolecularGradient::integrateFxcGradient(const std::vector<int32_t>& idsAtomic
     {
         // not implemented
 
-        std::string erropenshell("XCMolecularGradient.integrate: Not implemented for open-shell");
+        std::string erropenshell("XCMolecularGradient.integrateFxcGradient: Not implemented for open-shell");
 
         errors::assertMsgCritical(false, erropenshell);
     }
@@ -496,9 +496,9 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
 
         // auto ggradab = vxcgrid.xcGradientValues(xcvars::gradab);
 
-        auto grho_aa = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::rhoa);
+        // auto grho_aa = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::rhoa);
 
-        auto grho_ab = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::rhob);
+        // auto grho_ab = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::rhob);
 
         auto grho_aaa = vxc3grid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::rhoa);
 
@@ -514,9 +514,9 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
 
         // auto gradaz = gsdengrid.alphaDensityGradientZ(0);
 
-        auto rhowa = rwdengrid.alphaDensity(0);
+        // auto rhowa = rwdengrid.alphaDensity(0);
 
-        auto rhowb = rwdengrid.betaDensity(0);
+        // auto rhowb = rwdengrid.betaDensity(0);
 
         auto rhow1a = rwdengridc.rhow1rhow2(0);
 
@@ -606,7 +606,7 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
     {
         // not implemented
 
-        std::string erropenshell("XCMolecularGradient.integrate: Not implemented for open-shell");
+        std::string erropenshell("XCMolecularGradient.integrateGxcGradient: Not implemented for open-shell");
 
         errors::assertMsgCritical(false, erropenshell);
     }
