@@ -119,12 +119,12 @@ class RpaOrbitalResponse(OrbitalResponse):
                 # 3) Construct density matrices for E[3] term:
                 # XCIntegrator expects a DM with real and imaginary part,
                 # so we set the imaginary part to zero.
-                perturbed_dm_ao = AODensityMatrix([xmy_ao, 0*xpy_ao, xmy_ao, 0*xmy_ao],
+                perturbed_dm_ao = AODensityMatrix([xmy_ao, 0*xmy_ao, xmy_ao, 0*xmy_ao],
                                                    denmat.rest)
 
                 # corresponds to rho^{omega_b,omega_c} in quadratic response,
                 # which is zero for TDDFT orbital response
-                zero_dm_ao = AODensityMatrix([0*xpy_ao, 0*xpy_ao],
+                zero_dm_ao = AODensityMatrix([0*xmy_ao, 0*xmy_ao],
                                               denmat.rest)
         else:
             dm_ao_rhs = AODensityMatrix()

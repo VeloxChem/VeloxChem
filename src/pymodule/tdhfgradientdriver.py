@@ -262,11 +262,11 @@ class TdhfGradientDriver(GradientDriver):
             vxc_contrib = self.grad_vxc_contrib(molecule, basis, rhow_den_sym, gs_density, xcfun_label)
             vxc_contrib_2 = self.grad_fxc_contrib(molecule, basis, rhow_den_sym, gs_density, gs_density, xcfun_label)
 
-            xpy_sym = 0.5 * (xpy + xpy.T)
-            xpy_den_sym = AODensityMatrix([xpy_sym], denmat.rest)
+            xmy_sym = 0.5 * (xmy + xmy.T)
+            xmy_den_sym = AODensityMatrix([xmy_sym], denmat.rest)
 
-            fxc_contrib = self.grad_fxc_contrib(molecule, basis, xpy_den_sym, xpy_den_sym, gs_density, xcfun_label)
-            fxc_contrib_2 = self.grad_gxc_contrib(molecule, basis, xpy, xpy, gs_density, xcfun_label)
+            fxc_contrib = self.grad_fxc_contrib(molecule, basis, xmy_den_sym, xmy_den_sym, gs_density, xcfun_label)
+            fxc_contrib_2 = self.grad_gxc_contrib(molecule, basis, xmy, xmy, gs_density, xcfun_label)
 
             if self.rank == mpi_master():
                 self.gradient += vxc_contrib
