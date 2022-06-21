@@ -201,11 +201,16 @@ class TdhfGradientDriver(GradientDriver):
             xpy = orbrsp_results['x_plus_y_ao']
             xmy = orbrsp_results['x_minus_y_ao']
             rel_dm_ao = orbrsp_results['relaxed_density_ao']
+        else:
+            xmy = None
+        xmy = self.comm.bcast(xmy, root=mpi_master())
 
-            # ground state gradient
-            gs_grad_drv = ScfGradientDriver(self.scf_drv)
-            gs_grad_drv.update_settings(self.grad_dict, self.method_dict)
-            gs_grad_drv.compute(molecule, basis)
+        # ground state gradient
+        gs_grad_drv = ScfGradientDriver(self.scf_drv)
+        gs_grad_drv.update_settings(self.grad_dict, self.method_dict)
+        gs_grad_drv.compute(molecule, basis)
+
+        if self.rank == mpi_master():
             gs_gradient = gs_grad_drv.get_gradient()
 
             self.gradient = gs_gradient.copy()
@@ -252,18 +257,30 @@ class TdhfGradientDriver(GradientDriver):
         if self.dft:
             xcfun_label = self.scf_drv.xcfun.get_func_label()
 
-            gs_dm = self.scf_drv.scf_tensors['D_alpha']
-            gs_density = AODensityMatrix([gs_dm], denmat.rest)
+            if self.rank == mpi_master():
+                gs_dm = self.scf_drv.scf_tensors['D_alpha']
+                gs_density = AODensityMatrix([gs_dm], denmat.rest)
+            else:
+                gs_density = AODensityMatrix()
+            gs_density.broadcast(self.rank, self.comm)
 
-            rhow_dm = 0.5 * orbrsp_results['relaxed_density_ao']
-            rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
-            rhow_den_sym = AODensityMatrix([rhow_dm_sym], denmat.rest)
+            if self.rank == mpi_master():
+                rhow_dm = 0.5 * orbrsp_results['relaxed_density_ao']
+                rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
+                rhow_den_sym = AODensityMatrix([rhow_dm_sym], denmat.rest)
+            else:
+                rhow_den_sym = AODensityMatrix()
+            rhow_den_sym.broadcast(self.rank, self.comm)
 
             vxc_contrib = self.grad_vxc_contrib(molecule, basis, rhow_den_sym, gs_density, xcfun_label)
             vxc_contrib_2 = self.grad_fxc_contrib(molecule, basis, rhow_den_sym, gs_density, gs_density, xcfun_label)
 
-            xmy_sym = 0.5 * (xmy + xmy.T)
-            xmy_den_sym = AODensityMatrix([xmy_sym], denmat.rest)
+            if self.rank == mpi_master():
+                xmy_sym = 0.5 * (xmy + xmy.T)
+                xmy_den_sym = AODensityMatrix([xmy_sym], denmat.rest)
+            else:
+                xmy_den_sym = AODensityMatrix()
+            xmy_den_sym.broadcast(self.rank, self.comm)
 
             fxc_contrib = self.grad_fxc_contrib(molecule, basis, xmy_den_sym, xmy_den_sym, gs_density, xcfun_label)
             fxc_contrib_2 = self.grad_gxc_contrib(molecule, basis, xmy, xmy, gs_density, xcfun_label)
