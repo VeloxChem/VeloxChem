@@ -75,6 +75,7 @@ class FirstOrderProperties:
         :param scf_tensors:
             The SCF tensors.
         """
+
         if self.rank == mpi_master():
             total_density = scf_tensors['D_alpha'] + scf_tensors['D_beta']
         else:
@@ -121,9 +122,8 @@ class FirstOrderProperties:
             nuclear_dipole = np.sum((coords - origin).T * nuclear_charges,
                                     axis=1)
 
-            self.properties['dipole moment'] = (nuclear_dipole
-                                                + electronic_dipole
-                                               )
+            self.properties['dipole moment'] = (nuclear_dipole +
+                                                electronic_dipole)
 
     def get_property(self, key):
         """

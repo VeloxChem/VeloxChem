@@ -152,18 +152,16 @@ class ScfGradientDriver(GradientDriver):
 
                 if self.dft:
                     if self.xcfun.is_hybrid():
-                        fact_xc = self.xcfun.get_frac_exact_exchange()
+                        frac_K = self.xcfun.get_frac_exact_exchange()
                     else:
-                        fact_xc = 0
-                    self.gradient[i] += 2.0 * np.einsum(
-                        'mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
-                    self.gradient[i] -= fact_xc * np.einsum(
-                        'mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
+                        frac_K = 0.0
                 else:
-                    self.gradient[i] += 2.0 * np.einsum(
-                        'mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
-                    self.gradient[i] -= 1.0 * np.einsum(
-                        'mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
+                    frac_K = 1.0
+
+                self.gradient[i] += 2.0 * np.einsum(
+                    'mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
+                self.gradient[i] -= frac_K * np.einsum(
+                    'mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
 
         # Add the xc contribution
         if self.dft:
