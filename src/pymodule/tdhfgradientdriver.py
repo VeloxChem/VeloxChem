@@ -201,9 +201,6 @@ class TdhfGradientDriver(GradientDriver):
             xpy = orbrsp_results['x_plus_y_ao']
             xmy = orbrsp_results['x_minus_y_ao']
             rel_dm_ao = orbrsp_results['relaxed_density_ao']
-        else:
-            xmy = None
-        xmy = self.comm.bcast(xmy, root=mpi_master())
 
         # ground state gradient
         gs_grad_drv = ScfGradientDriver(self.scf_drv)
@@ -283,7 +280,7 @@ class TdhfGradientDriver(GradientDriver):
             xmy_den_sym.broadcast(self.rank, self.comm)
 
             fxc_contrib = self.grad_fxc_contrib(molecule, basis, xmy_den_sym, xmy_den_sym, gs_density, xcfun_label)
-            fxc_contrib_2 = self.grad_gxc_contrib(molecule, basis, xmy, xmy, gs_density, xcfun_label)
+            fxc_contrib_2 = self.grad_gxc_contrib(molecule, basis, xmy_den_sym, xmy_den_sym, gs_density, xcfun_label)
 
             if self.rank == mpi_master():
                 self.gradient += vxc_contrib

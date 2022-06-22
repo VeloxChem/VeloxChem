@@ -27,9 +27,12 @@
 
 #include <string>
 
+#include "AODensityMatrix.hpp"
+#include "DenseMatrix.hpp"
 #include "DensityGradientGridDriver.hpp"
 #include "DensityGridDriver.hpp"
 #include "DensityGridQuad.hpp"
+#include "DensityMatrixType.hpp"
 #include "ErrorHandler.hpp"
 #include "FunctionalParser.hpp"
 #include "GtoFunc.hpp"
@@ -235,8 +238,8 @@ CXCMolecularGradient::integrateVxcGradient(const std::vector<int32_t>& idsAtomic
 
 CDenseMatrix
 CXCMolecularGradient::integrateFxcGradient(const std::vector<int32_t>& idsAtomic,
-                                           const CAODensityMatrix&     rwDensityMatrix1,
-                                           const CAODensityMatrix&     rwDensityMatrix2,
+                                           const CAODensityMatrix&     rwDensityMatrixOne,
+                                           const CAODensityMatrix&     rwDensityMatrixTwo,
                                            const CAODensityMatrix&     gsDensityMatrix,
                                            const CMolecule&            molecule,
                                            const CMolecularBasis&      basis,
@@ -265,7 +268,7 @@ CXCMolecularGradient::integrateFxcGradient(const std::vector<int32_t>& idsAtomic
 
     auto mgradz = molgrad.row(2);
 
-    if (rwDensityMatrix1.isClosedShell())
+    if (rwDensityMatrixOne.isClosedShell())
     {
         // generate screened molecular and density grids
 
@@ -339,7 +342,7 @@ CXCMolecularGradient::integrateFxcGradient(const std::vector<int32_t>& idsAtomic
 
         // set up pointers to perturbed density gradient norms
 
-        auto rwdengrid = dgdrv.generate(rwDensityMatrix1, molecule, basis, mgrid, fvxc.getFunctionalType());
+        auto rwdengrid = dgdrv.generate(rwDensityMatrixOne, molecule, basis, mgrid, fvxc.getFunctionalType());
 
         auto rhowa = rwdengrid.alphaDensity(0);
 
@@ -363,7 +366,7 @@ CXCMolecularGradient::integrateFxcGradient(const std::vector<int32_t>& idsAtomic
 
         for (int32_t i = 0; i < natoms; i++)
         {
-            auto gradgrid = graddrv.generate(rwDensityMatrix2, molecule, basis, mgrid, fvxc.getFunctionalType(), idsAtomic[i]);
+            auto gradgrid = graddrv.generate(rwDensityMatrixTwo, molecule, basis, mgrid, fvxc.getFunctionalType(), idsAtomic[i]);
 
             double gatmx = 0.0;
 
@@ -579,8 +582,8 @@ CXCMolecularGradient::integrateFxcGradient(const std::vector<int32_t>& idsAtomic
 
 CDenseMatrix
 CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic,
-                                           const CAODensityMatrix&     rwDensityMatrix,
-                                           const CAODensityMatrix&     rw2DensityMatrix,
+                                           const CAODensityMatrix&     rwDensityMatrixOne,
+                                           const CAODensityMatrix&     rwDensityMatrixTwo,
                                            const CAODensityMatrix&     gsDensityMatrix,
                                            const CMolecule&            molecule,
                                            const CMolecularBasis&      basis,
@@ -609,8 +612,24 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
 
     auto mgradz = molgrad.row(2);
 
-    if (rwDensityMatrix.isClosedShell())
+    if (rwDensityMatrixOne.isClosedShell())
     {
+        // prepare rwDensityMatrix for quadratic response
+
+        auto rwdenmat1 = rwDensityMatrixOne.getReferenceToDensity(0);
+
+        auto rwdenmat2 = rwDensityMatrixTwo.getReferenceToDensity(0);
+
+        CDenseMatrix zerodenmat1(rwdenmat1);
+
+        CDenseMatrix zerodenmat2(rwdenmat2);
+
+        zerodenmat1.zero();
+
+        zerodenmat2.zero();
+
+        CAODensityMatrix rwDensityMatrix(std::vector<CDenseMatrix>({rwdenmat1, zerodenmat1, rwdenmat2, zerodenmat2}), denmat::rest);
+
         // generate screened molecular and density grids
 
         CMolecularGrid mgrid(molecularGrid);
@@ -643,11 +662,11 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
 
         auto df0010 = vxcgrid.xcGradientValues(xcvars::grada);
 
-        auto df00001 = vxcgrid.xcGradientValues(xcvars::gradab);
+        // auto df00001 = vxcgrid.xcGradientValues(xcvars::gradab);
 
-        auto df2000 = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::rhoa);
+        // auto df2000 = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::rhoa);
 
-        auto df1100 = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::rhob);
+        // auto df1100 = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::rhob);
 
         auto df1010 = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::grada);
 

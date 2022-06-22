@@ -321,15 +321,10 @@ class GradientDriver:
         mol_grid = grid_drv.generate(molecule)
         mol_grid.distribute(self.rank, self.nodes, self.comm)
 
-        zero_1 = np.zeros(rhow_den_1.shape)
-        zero_2 = np.zeros(rhow_den_2.shape)
-        perturbed_dm_ao = AODensityMatrix([rhow_den_1, zero_1, rhow_den_2, zero_2], denmat.rest)
-        zero_dm_ao = AODensityMatrix([zero_1, zero_2], denmat.rest)
-
         xc_molgrad_drv = XCMolecularGradient(self.comm)
         atom_ids = list(range(molecule.number_of_atoms()))
         gxc_contrib = 0.25 * xc_molgrad_drv.integrate_gxc_gradient(
-            atom_ids, perturbed_dm_ao, zero_dm_ao, gs_density, molecule,
+            atom_ids, rhow_den_1, rhow_den_2, gs_density, molecule,
             ao_basis, mol_grid, xcfun_label)
         gxc_contrib = self.comm.reduce(gxc_contrib, root=mpi_master())
 

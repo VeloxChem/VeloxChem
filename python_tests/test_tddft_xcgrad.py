@@ -1,7 +1,7 @@
 import numpy as np
 
 from veloxchem.veloxchemlib import denmat
-from veloxchem.veloxchemlib import is_mpi_master, mpi_master
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.aodensitymatrix import AODensityMatrix
@@ -92,17 +92,16 @@ class TestOrbitalResponse:
             xmy_sym = 0.5 * (xmy + xmy.T)
             xmy_den_sym = AODensityMatrix([xmy_sym], denmat.rest)
         else:
-            xmy = None
             xmy_den_sym = AODensityMatrix()
 
-        xmy = grad_drv.comm.bcast(xmy, root=mpi_master())
         xmy_den_sym.broadcast(grad_drv.rank, grad_drv.comm)
 
         fxc_contrib = grad_drv.grad_fxc_contrib(molecule, basis, xmy_den_sym,
                                                 xmy_den_sym, gs_density,
                                                 xcfun_label)
-        fxc_contrib_2 = grad_drv.grad_gxc_contrib(molecule, basis, xmy, xmy,
-                                                  gs_density, xcfun_label)
+        fxc_contrib_2 = grad_drv.grad_gxc_contrib(molecule, basis, xmy_den_sym,
+                                                  xmy_den_sym, gs_density,
+                                                  xcfun_label)
 
         if is_mpi_master():
             xcgrad = vxc_contrib

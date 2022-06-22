@@ -124,8 +124,8 @@ class CXCMolecularGradient
      Integrates exchnage-correlation functional contribution to molecular gradient.
 
      @param idsAtomic  the atomic indexes.
-     @param rwDensityMatrix the perturbed AO density matrix object.
-     @param rwDensityMatrix the perturbed AO density matrix object.
+     @param rwDensityMatrixOne the perturbed AO density matrix object.
+     @param rwDensityMatrixTwo the perturbed AO density matrix object.
      @param gsDensityMatrix the ground state AO density matrix object.
      @param molecule the molecule.
      @param basis the molecular basis.
@@ -134,8 +134,8 @@ class CXCMolecularGradient
      @return the molecular gradient.
      */
     CDenseMatrix integrateFxcGradient(const std::vector<int32_t>& idsAtomic,
-                                      const CAODensityMatrix&     rwDensityMatrix1,
-                                      const CAODensityMatrix&     rwDensityMatrix2,
+                                      const CAODensityMatrix&     rwDensityMatrixOne,
+                                      const CAODensityMatrix&     rwDensityMatrixTwo,
                                       const CAODensityMatrix&     gsDensityMatrix,
                                       const CMolecule&            molecule,
                                       const CMolecularBasis&      basis,
@@ -146,8 +146,8 @@ class CXCMolecularGradient
      Integrates exchnage-correlation functional contribution to molecular gradient.
 
      @param idsAtomic  the atomic indexes.
-     @param rwDensityMatrix the perturbed AO density matrix object.
-     @param rw2DensityMatrix the two-time transformed densities evaluated on the grid.
+     @param rwDensityMatrixOne the perturbed AO density matrix object.
+     @param rwDensityMatrixTwo the perturbed AO density matrix object.
      @param gsDensityMatrix the ground state AO density matrix object.
      @param molecule the molecule.
      @param basis the molecular basis.
@@ -157,8 +157,8 @@ class CXCMolecularGradient
      */
     CDenseMatrix
     integrateGxcGradient(const std::vector<int32_t>& idsAtomic,
-                         const CAODensityMatrix&     rwDensityMatrix,
-                         const CAODensityMatrix&     rw2DensityMatrix,
+                         const CAODensityMatrix&     rwDensityMatrixOne,
+                         const CAODensityMatrix&     rwDensityMatrixTwo,
                          const CAODensityMatrix&     gsDensityMatrix,
                          const CMolecule&            molecule,
                          const CMolecularBasis&      basis,
