@@ -406,27 +406,27 @@ CXCMolecularGradient::integrateFxcGradient(const std::vector<int32_t>& idsAtomic
 
             double gatmz = 0.0;
 
-            // set up pointers to density gradient grid
-
-            const auto gdenx = gradgrid.getComponent(0);
-
-            const auto gdeny = gradgrid.getComponent(1);
-
-            const auto gdenz = gradgrid.getComponent(2);
-
             // compute LDA contribution to molecular gradient
 
             if (fvxc.getFunctionalType() == xcfun::lda)
             {
+                // set up pointers to density gradient grid
+
+                const auto gdenx = gradgrid.getComponent(0);
+
+                const auto gdeny = gradgrid.getComponent(1);
+
+                const auto gdenz = gradgrid.getComponent(2);
+
                 for (int32_t j = 0; j < gpoints; j++)
                 {
-                    double gwlda = gw[j] * (grho_aa[j] * rhowa[j] + grho_ab[j] * rhowb[j]);
+                    double prefac = gw[j] * (grho_aa[j] * rhowa[j] + grho_ab[j] * rhowb[j]);
 
-                    gatmx += gwlda * gdenx[j];
+                    gatmx += prefac * gdenx[j];
 
-                    gatmy += gwlda * gdeny[j];
+                    gatmy += prefac * gdeny[j];
 
-                    gatmz += gwlda * gdenz[j];
+                    gatmz += prefac * gdenz[j];
                 }
             }
 
@@ -435,6 +435,12 @@ CXCMolecularGradient::integrateFxcGradient(const std::vector<int32_t>& idsAtomic
             if (fvxc.getFunctionalType() == xcfun::gga)
             {
                 // set up pointers to density gradient grid
+
+                const auto gdenx = gradgrid.getComponent(0);
+
+                const auto gdeny = gradgrid.getComponent(1);
+
+                const auto gdenz = gradgrid.getComponent(2);
 
                 const auto gdenxx = gradgrid.getComponent(3);
 
@@ -504,6 +510,8 @@ CXCMolecularGradient::integrateFxcGradient(const std::vector<int32_t>& idsAtomic
 
                                    + gradb_y[j] * rywa + gradb_z[j] * rzwa;
 
+                    // contribution from \nabla_A (\phi_mu \phi_nu)
+
                     // first contribution
 
                     double fac0 = gmix_aa[j] * zetaa + gmix_ab[j] * zetab
@@ -522,6 +530,14 @@ CXCMolecularGradient::integrateFxcGradient(const std::vector<int32_t>& idsAtomic
 
                     gatmz += prefac * gdenz[j];
 
+                    // contribution from \nabla_A (\nabla (\phi_mu \phi_nu))
+
+                    double xcomp = 0.0;
+
+                    double ycomp = 0.0;
+
+                    double zcomp = 0.0;
+
                     // second contribution
 
                     double facr = gmix_aa[j] * rhowa[j] + gmix_ab[j] * rhowb[j]
@@ -532,11 +548,11 @@ CXCMolecularGradient::integrateFxcGradient(const std::vector<int32_t>& idsAtomic
 
                     prefac = w * facr;
 
-                    gatmx += prefac * (rxa * gdenxx[j] + rya * gdenxy[j] + rza * gdenxz[j]);
+                    xcomp += prefac * rxa;
 
-                    gatmy += prefac * (rxa * gdenyx[j] + rya * gdenyy[j] + rza * gdenyz[j]);
+                    ycomp += prefac * rya;
 
-                    gatmz += prefac * (rxa * gdenzx[j] + rya * gdenzy[j] + rza * gdenzz[j]);
+                    zcomp += prefac * rza;
 
                     // third contribution
 
@@ -548,11 +564,11 @@ CXCMolecularGradient::integrateFxcGradient(const std::vector<int32_t>& idsAtomic
 
                     prefac = w * facz;
 
-                    gatmx += prefac * (grada_x[j] * gdenxx[j] + grada_y[j] * gdenxy[j] + grada_z[j] * gdenxz[j]);
+                    xcomp += prefac * grada_x[j];
 
-                    gatmy += prefac * (grada_x[j] * gdenyx[j] + grada_y[j] * gdenyy[j] + grada_z[j] * gdenyz[j]);
+                    ycomp += prefac * grada_y[j];
 
-                    gatmz += prefac * (grada_x[j] * gdenzx[j] + grada_y[j] * gdenzy[j] + grada_z[j] * gdenzz[j]);
+                    zcomp += prefac * grada_z[j];
 
                     // fourth contribution
 
@@ -562,17 +578,11 @@ CXCMolecularGradient::integrateFxcGradient(const std::vector<int32_t>& idsAtomic
 
                     prefac = w * znva * ggrad_a[j];
 
-                    double xcomp = rxwa - rxa * zetaa;
+                    xcomp += prefac * (rxwa - rxa * zetaa);
 
-                    double ycomp = rywa - rya * zetaa;
+                    ycomp += prefac * (rywa - rya * zetaa);
 
-                    double zcomp = rzwa - rza * zetaa;
-
-                    gatmx += prefac * (xcomp * gdenxx[j] + ycomp * gdenxy[j] + zcomp * gdenxz[j]);
-
-                    gatmy += prefac * (xcomp * gdenyx[j] + ycomp * gdenyy[j] + zcomp * gdenyz[j]);
-
-                    gatmz += prefac * (xcomp * gdenzx[j] + ycomp * gdenzy[j] + zcomp * gdenzz[j]);
+                    zcomp += prefac * (rzwa - rza * zetaa);
 
                     // fifth contribution
 
@@ -581,12 +591,27 @@ CXCMolecularGradient::integrateFxcGradient(const std::vector<int32_t>& idsAtomic
 
                     prefac = w * ggrad_c[j];
 
-                    gatmx += prefac * (rxwa * gdenxx[j] + rywa * gdenxy[j] + rzwa * gdenxz[j]);
+                    xcomp += prefac * rxwa;
 
-                    gatmy += prefac * (rxwa * gdenyx[j] + rywa * gdenyy[j] + rzwa * gdenyz[j]);
+                    ycomp += prefac * rywa;
 
-                    gatmz += prefac * (rxwa * gdenzx[j] + rywa * gdenzy[j] + rzwa * gdenzz[j]);
+                    zcomp += prefac * rzwa;
+
+                    gatmx += (xcomp * gdenxx[j] + ycomp * gdenxy[j] + zcomp * gdenxz[j]);
+
+                    gatmy += (xcomp * gdenyx[j] + ycomp * gdenyy[j] + zcomp * gdenyz[j]);
+
+                    gatmz += (xcomp * gdenzx[j] + ycomp * gdenzy[j] + zcomp * gdenzz[j]);
                 }
+            }
+
+            if (fvxc.getFunctionalType() == xcfun::mgga)
+            {
+                // not implemented
+
+                std::string errmgga("XCMolecularGradient.integrateFxcGradient: Not implemented for meta-GGA");
+
+                errors::assertMsgCritical(false, errmgga);
             }
 
             // factor of 2 from sum of alpha and beta contributions
@@ -864,14 +889,6 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
         {
             auto gradgrid = graddrv.generate(gsDensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType(), idsAtomic[i]);
 
-            // set up pointers to density gradient grid
-
-            const auto gdenx = gradgrid.getComponent(0);
-
-            const auto gdeny = gradgrid.getComponent(1);
-
-            const auto gdenz = gradgrid.getComponent(2);
-
             double gatmx = 0.0;
 
             double gatmy = 0.0;
@@ -882,15 +899,23 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
 
             if (fvxc.getFunctionalType() == xcfun::lda)
             {
+                // set up pointers to density gradient grid
+
+                const auto gdenx = gradgrid.getComponent(0);
+
+                const auto gdeny = gradgrid.getComponent(1);
+
+                const auto gdenz = gradgrid.getComponent(2);
+
                 for (int32_t j = 0; j < gpoints; j++)
                 {
-                    double gwlda = gw[j] * (grho_aaa[j] + grho_aab[j] + grho_aab[j] + grho_abb[j]) * rhow1a[j];
+                    double prefac = gw[j] * (grho_aaa[j] + grho_aab[j] + grho_aab[j] + grho_abb[j]) * rhow1a[j];
 
-                    gatmx += gwlda * gdenx[j];
+                    gatmx += prefac * gdenx[j];
 
-                    gatmy += gwlda * gdeny[j];
+                    gatmy += prefac * gdeny[j];
 
-                    gatmz += gwlda * gdenz[j];
+                    gatmz += prefac * gdenz[j];
                 }
             }
 
@@ -898,6 +923,14 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
 
             if (fvxc.getFunctionalType() == xcfun::gga)
             {
+                // set up pointers to density gradient grid
+
+                const auto gdenx = gradgrid.getComponent(0);
+
+                const auto gdeny = gradgrid.getComponent(1);
+
+                const auto gdenz = gradgrid.getComponent(2);
+
                 const auto gdenxx = gradgrid.getComponent(3);
 
                 const auto gdenxy = gradgrid.getComponent(4);
@@ -1015,7 +1048,7 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
                                              (xigrad_z * grada_y[j] + grada_z[j] * xigrad_y) * rxw1ryw2[j] +
                                              (xigrad_z * grada_z[j] + grada_z[j] * xigrad_z) * rxw1rzw2[j];
 
-                    // contributions
+                    // contribution from \nabla_A (\phi_mu \phi_nu)
 
                     double prefac;
 
@@ -1063,6 +1096,14 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
 
                     gatmz += prefac * gdenz[j];
 
+                    // contribution from \nabla_A (\nabla (\phi_mu \phi_nu))
+
+                    double xcomp = 0.0;
+
+                    double ycomp = 0.0;
+
+                    double zcomp = 0.0;
+
                     // ninth = w * (df2010[j] + 2.0 * df1110[j] + df0210[j]) * rhow1rhow2[j] * xigrad_dot_omega;
 
                     // tenth += w * (df1020[j] + df1011[j] + df0120[j] + df0111[j]) * xigrad_dot_rw1rhow2 * xigrad_dot_omega;
@@ -1089,11 +1130,11 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
 
                            + w * df00102[j] * xigrad_dot_rw1_xigrad_dot_rw2;
 
-                    gatmx += prefac * (xigrad_x * gdenxx[j] + xigrad_y * gdenxy[j] + xigrad_z * gdenxz[j]);
+                    xcomp += prefac * xigrad_x;
 
-                    gatmy += prefac * (xigrad_x * gdenyx[j] + xigrad_y * gdenyy[j] + xigrad_z * gdenyz[j]);
+                    ycomp += prefac * xigrad_y;
 
-                    gatmz += prefac * (xigrad_x * gdenzx[j] + xigrad_y * gdenzy[j] + xigrad_z * gdenzz[j]);
+                    zcomp += prefac * xigrad_z;
 
                     // ninth += w * (df20001[j] + 2.0 * df11001[j] + df02001[j]) * grad_dot_omega * rhow1rhow2[j];
 
@@ -1121,11 +1162,11 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
 
                            + w * df00003[j] * ngrada[j] * ngrada[j];
 
-                    gatmx += prefac * (grada_x[j] * gdenxx[j] + grada_y[j] * gdenxy[j] + grada_z[j] * gdenxz[j]);
+                    xcomp += prefac * grada_x[j];
 
-                    gatmy += prefac * (grada_x[j] * gdenyx[j] + grada_y[j] * gdenyy[j] + grada_z[j] * gdenyz[j]);
+                    ycomp += prefac * grada_y[j];
 
-                    gatmz += prefac * (grada_x[j] * gdenzx[j] + grada_y[j] * gdenzy[j] + grada_z[j] * gdenzz[j]);
+                    zcomp += prefac * grada_z[j];
 
                     // tenth += w * (df10001[j] + df01001[j]) * omega_dot_rw1rhow2;
 
@@ -1133,11 +1174,11 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
 
                     prefac = w * (df10001[j] + df01001[j]);
 
-                    gatmx += prefac * (rxw1rhow2[j] * gdenxx[j] + ryw1rhow2[j] * gdenxy[j] + rzw1rhow2[j] * gdenxz[j]);
+                    xcomp += prefac * rxw1rhow2[j];
 
-                    gatmy += prefac * (rxw1rhow2[j] * gdenyx[j] + ryw1rhow2[j] * gdenyy[j] + rzw1rhow2[j] * gdenyz[j]);
+                    ycomp += prefac * ryw1rhow2[j];
 
-                    gatmz += prefac * (rxw1rhow2[j] * gdenzx[j] + ryw1rhow2[j] * gdenzy[j] + rzw1rhow2[j] * gdenzz[j]);
+                    zcomp += prefac * rzw1rhow2[j];
 
                     // tenth = w * (df1010[j] + df0110[j]) *
                     //          ((xigrad_xx * rxw1rhow2[j] + xigrad_xy * ryw1rhow2[j] + xigrad_xz * rzw1rhow2[j]) * xomega
@@ -1146,20 +1187,11 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
 
                     prefac = w * (df1010[j] + df0110[j]);
 
-                    gatmx += prefac * (
-                            (xigrad_xx * rxw1rhow2[j] + xigrad_xy * ryw1rhow2[j] + xigrad_xz * rzw1rhow2[j]) * gdenxx[j]
-                          + (xigrad_xy * rxw1rhow2[j] + xigrad_yy * ryw1rhow2[j] + xigrad_yz * rzw1rhow2[j]) * gdenxy[j]
-                          + (xigrad_xz * rxw1rhow2[j] + xigrad_yz * ryw1rhow2[j] + xigrad_zz * rzw1rhow2[j]) * gdenxz[j]);
+                    xcomp += prefac * (xigrad_xx * rxw1rhow2[j] + xigrad_xy * ryw1rhow2[j] + xigrad_xz * rzw1rhow2[j]);
 
-                    gatmy += prefac * (
-                            (xigrad_xx * rxw1rhow2[j] + xigrad_xy * ryw1rhow2[j] + xigrad_xz * rzw1rhow2[j]) * gdenyx[j]
-                          + (xigrad_xy * rxw1rhow2[j] + xigrad_yy * ryw1rhow2[j] + xigrad_yz * rzw1rhow2[j]) * gdenyy[j]
-                          + (xigrad_xz * rxw1rhow2[j] + xigrad_yz * ryw1rhow2[j] + xigrad_zz * rzw1rhow2[j]) * gdenyz[j]);
+                    ycomp += prefac * (xigrad_xy * rxw1rhow2[j] + xigrad_yy * ryw1rhow2[j] + xigrad_yz * rzw1rhow2[j]);
 
-                    gatmz += prefac * (
-                            (xigrad_xx * rxw1rhow2[j] + xigrad_xy * ryw1rhow2[j] + xigrad_xz * rzw1rhow2[j]) * gdenzx[j]
-                          + (xigrad_xy * rxw1rhow2[j] + xigrad_yy * ryw1rhow2[j] + xigrad_yz * rzw1rhow2[j]) * gdenzy[j]
-                          + (xigrad_xz * rxw1rhow2[j] + xigrad_yz * ryw1rhow2[j] + xigrad_zz * rzw1rhow2[j]) * gdenzz[j]);
+                    zcomp += prefac * (xigrad_xz * rxw1rhow2[j] + xigrad_yz * ryw1rhow2[j] + xigrad_zz * rzw1rhow2[j]);
 
                     // twelfth = w * df0010[j] * twelthfirst;
                     // twelthfirst = xigrad_xxx * xomega * rxw1rxw2[j] + xigrad_xxy * xomega * rxw1ryw2[j] +
@@ -1179,21 +1211,23 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
 
                     prefac = w * df0010[j];
 
-                    double xcomp = xigrad_xxx * rxw1rxw2[j] + xigrad_xxy * rxw1ryw2[j] + xigrad_xxz * rxw1rzw2[j]
-                                 + xigrad_xxy * ryw1rxw2[j] + xigrad_xyy * ryw1ryw2[j] + xigrad_xyz * ryw1rzw2[j]
-                                 + xigrad_xxz * rzw1rxw2[j] + xigrad_xyz * rzw1ryw2[j] + xigrad_xzz * rzw1rzw2[j];
+                    xcomp += prefac * (xigrad_xxx * rxw1rxw2[j] + xigrad_xxy * rxw1ryw2[j] + xigrad_xxz * rxw1rzw2[j]
 
-                    double ycomp = xigrad_xxy * rxw1rxw2[j] + xigrad_xyy * rxw1ryw2[j] + xigrad_xyz * rxw1rzw2[j]
-                                 + xigrad_xyy * ryw1rxw2[j] + xigrad_yyy * ryw1ryw2[j] + xigrad_yyz * ryw1rzw2[j]
-                                 + xigrad_xyz * rzw1rxw2[j] + xigrad_yyz * rzw1ryw2[j] + xigrad_yzz * rzw1rzw2[j];
+                                     + xigrad_xxy * ryw1rxw2[j] + xigrad_xyy * ryw1ryw2[j] + xigrad_xyz * ryw1rzw2[j]
 
-                    double zcomp = xigrad_xxz * rxw1rxw2[j] + xigrad_xyz * rxw1ryw2[j] + xigrad_xzz * rxw1rzw2[j]
-                                 + xigrad_xyz * ryw1rxw2[j] + xigrad_yyz * ryw1ryw2[j] + xigrad_yzz * ryw1rzw2[j]
-                                 + xigrad_xzz * rzw1rxw2[j] + xigrad_yzz * rzw1ryw2[j] + xigrad_zzz * rzw1rzw2[j];
+                                     + xigrad_xxz * rzw1rxw2[j] + xigrad_xyz * rzw1ryw2[j] + xigrad_xzz * rzw1rzw2[j]);
 
-                    gatmx += prefac * (xcomp * gdenxx[j] + ycomp * gdenxy[j] + zcomp * gdenxz[j]);
-                    gatmy += prefac * (xcomp * gdenyx[j] + ycomp * gdenyy[j] + zcomp * gdenyz[j]);
-                    gatmz += prefac * (xcomp * gdenzx[j] + ycomp * gdenzy[j] + zcomp * gdenzz[j]);
+                    ycomp += prefac * (xigrad_xxy * rxw1rxw2[j] + xigrad_xyy * rxw1ryw2[j] + xigrad_xyz * rxw1rzw2[j]
+
+                                     + xigrad_xyy * ryw1rxw2[j] + xigrad_yyy * ryw1ryw2[j] + xigrad_yyz * ryw1rzw2[j]
+
+                                     + xigrad_xyz * rzw1rxw2[j] + xigrad_yyz * rzw1ryw2[j] + xigrad_yzz * rzw1rzw2[j]);
+
+                    zcomp += prefac * (xigrad_xxz * rxw1rxw2[j] + xigrad_xyz * rxw1ryw2[j] + xigrad_xzz * rxw1rzw2[j]
+
+                                     + xigrad_xyz * ryw1rxw2[j] + xigrad_yyz * ryw1ryw2[j] + xigrad_yzz * ryw1rzw2[j]
+
+                                     + xigrad_xzz * rzw1rxw2[j] + xigrad_yzz * rzw1ryw2[j] + xigrad_zzz * rzw1rzw2[j]);
 
                     // twelfth += w * (df0020[j] + df0011[j]) * twelthsecond;
                     // twelfth += w * (df00101[j] + df00011[j]) * ngrada[j] * twelthsecond;
@@ -1227,41 +1261,62 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
                     //              + xigrad_zz * xigrad_z * zomega * rzw1rzw2[j];
 
                     prefac = w * (df0020[j] + df0011[j])
+
                            + w * (df00101[j] + df00011[j]) * ngrada[j];
 
-                    xcomp = xigrad_xx * xigrad_x * rxw1rxw2[j]
-                          + xigrad_xy * xigrad_x * rxw1ryw2[j]
-                          + xigrad_xz * xigrad_x * rxw1rzw2[j]
-                          + xigrad_xy * xigrad_x * ryw1rxw2[j]
-                          + xigrad_yy * xigrad_x * ryw1ryw2[j]
-                          + xigrad_yz * xigrad_x * ryw1rzw2[j]
-                          + xigrad_xz * xigrad_x * rzw1rxw2[j]
-                          + xigrad_yz * xigrad_x * rzw1ryw2[j]
-                          + xigrad_zz * xigrad_x * rzw1rzw2[j];
+                    xcomp += prefac * (xigrad_xx * xigrad_x * rxw1rxw2[j]
 
-                    ycomp = xigrad_xx * xigrad_y * rxw1rxw2[j]
-                          + xigrad_xy * xigrad_y * rxw1ryw2[j]
-                          + xigrad_xz * xigrad_y * rxw1rzw2[j]
-                          + xigrad_xy * xigrad_y * ryw1rxw2[j]
-                          + xigrad_yy * xigrad_y * ryw1ryw2[j]
-                          + xigrad_yz * xigrad_y * ryw1rzw2[j]
-                          + xigrad_xz * xigrad_y * rzw1rxw2[j]
-                          + xigrad_yz * xigrad_y * rzw1ryw2[j]
-                          + xigrad_zz * xigrad_y * rzw1rzw2[j];
+                                     + xigrad_xy * xigrad_x * rxw1ryw2[j]
 
-                    zcomp = xigrad_xx * xigrad_z * rxw1rxw2[j]
-                          + xigrad_xy * xigrad_z * rxw1ryw2[j]
-                          + xigrad_xz * xigrad_z * rxw1rzw2[j]
-                          + xigrad_xy * xigrad_z * ryw1rxw2[j]
-                          + xigrad_yy * xigrad_z * ryw1ryw2[j]
-                          + xigrad_yz * xigrad_z * ryw1rzw2[j]
-                          + xigrad_xz * xigrad_z * rzw1rxw2[j]
-                          + xigrad_yz * xigrad_z * rzw1ryw2[j]
-                          + xigrad_zz * xigrad_z * rzw1rzw2[j];
+                                     + xigrad_xz * xigrad_x * rxw1rzw2[j]
 
-                    gatmx += prefac * (xcomp * gdenxx[j] + ycomp * gdenxy[j] + zcomp * gdenxz[j]);
-                    gatmy += prefac * (xcomp * gdenyx[j] + ycomp * gdenyy[j] + zcomp * gdenyz[j]);
-                    gatmz += prefac * (xcomp * gdenzx[j] + ycomp * gdenzy[j] + zcomp * gdenzz[j]);
+                                     + xigrad_xy * xigrad_x * ryw1rxw2[j]
+
+                                     + xigrad_yy * xigrad_x * ryw1ryw2[j]
+
+                                     + xigrad_yz * xigrad_x * ryw1rzw2[j]
+
+                                     + xigrad_xz * xigrad_x * rzw1rxw2[j]
+
+                                     + xigrad_yz * xigrad_x * rzw1ryw2[j]
+
+                                     + xigrad_zz * xigrad_x * rzw1rzw2[j]);
+
+                    ycomp += prefac * (xigrad_xx * xigrad_y * rxw1rxw2[j]
+
+                                     + xigrad_xy * xigrad_y * rxw1ryw2[j]
+
+                                     + xigrad_xz * xigrad_y * rxw1rzw2[j]
+
+                                     + xigrad_xy * xigrad_y * ryw1rxw2[j]
+
+                                     + xigrad_yy * xigrad_y * ryw1ryw2[j]
+
+                                     + xigrad_yz * xigrad_y * ryw1rzw2[j]
+
+                                     + xigrad_xz * xigrad_y * rzw1rxw2[j]
+
+                                     + xigrad_yz * xigrad_y * rzw1ryw2[j]
+
+                                     + xigrad_zz * xigrad_y * rzw1rzw2[j]);
+
+                    zcomp += prefac * (xigrad_xx * xigrad_z * rxw1rxw2[j]
+
+                                     + xigrad_xy * xigrad_z * rxw1ryw2[j]
+
+                                     + xigrad_xz * xigrad_z * rxw1rzw2[j]
+
+                                     + xigrad_xy * xigrad_z * ryw1rxw2[j]
+
+                                     + xigrad_yy * xigrad_z * ryw1ryw2[j]
+
+                                     + xigrad_yz * xigrad_z * ryw1rzw2[j]
+
+                                     + xigrad_xz * xigrad_z * rzw1rxw2[j]
+
+                                     + xigrad_yz * xigrad_z * rzw1ryw2[j]
+
+                                     + xigrad_zz * xigrad_z * rzw1rzw2[j]);
 
                     // twelfth += w * (df0020[j] + df0011[j]) * twelththird;
                     // twelfth += w * df00101[j] * ngrada[j] * twelththird;
@@ -1295,41 +1350,62 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
                     //               xigrad_zz * xigrad_z * zomega * (rzw1rzw2[j] + rzw1rzw2[j]);
 
                     prefac = w * (df0020[j] + df0011[j])
+
                            + w * df00101[j] * ngrada[j];
 
-                    xcomp = xigrad_xx * xigrad_x * (rxw1rxw2[j] + rxw1rxw2[j])
-                          + xigrad_xx * xigrad_y * (ryw1rxw2[j] + rxw1ryw2[j])
-                          + xigrad_xx * xigrad_z * (rzw1rxw2[j] + rxw1rzw2[j])
-                          + xigrad_xy * xigrad_x * (rxw1ryw2[j] + ryw1rxw2[j])
-                          + xigrad_xy * xigrad_y * (ryw1ryw2[j] + ryw1ryw2[j])
-                          + xigrad_xy * xigrad_z * (rzw1ryw2[j] + ryw1rzw2[j])
-                          + xigrad_xz * xigrad_x * (rxw1rzw2[j] + rzw1rxw2[j])
-                          + xigrad_xz * xigrad_y * (ryw1rzw2[j] + rzw1ryw2[j])
-                          + xigrad_xz * xigrad_z * (rzw1rzw2[j] + rzw1rzw2[j]);
+                    xcomp += prefac * (xigrad_xx * xigrad_x * (rxw1rxw2[j] + rxw1rxw2[j])
 
-                    ycomp = xigrad_xy * xigrad_x * (rxw1rxw2[j] + rxw1rxw2[j])
-                          + xigrad_xy * xigrad_y * (ryw1rxw2[j] + rxw1ryw2[j])
-                          + xigrad_xy * xigrad_z * (rzw1rxw2[j] + rxw1rzw2[j])
-                          + xigrad_yy * xigrad_x * (rxw1ryw2[j] + ryw1rxw2[j])
-                          + xigrad_yy * xigrad_y * (ryw1ryw2[j] + ryw1ryw2[j])
-                          + xigrad_yy * xigrad_z * (rzw1ryw2[j] + ryw1rzw2[j])
-                          + xigrad_yz * xigrad_x * (rxw1rzw2[j] + rzw1rxw2[j])
-                          + xigrad_yz * xigrad_y * (ryw1rzw2[j] + rzw1ryw2[j])
-                          + xigrad_yz * xigrad_z * (rzw1rzw2[j] + rzw1rzw2[j]);
+                                     + xigrad_xx * xigrad_y * (ryw1rxw2[j] + rxw1ryw2[j])
 
-                    zcomp = xigrad_xz * xigrad_x * (rxw1rxw2[j] + rxw1rxw2[j])
-                          + xigrad_xz * xigrad_y * (ryw1rxw2[j] + rxw1ryw2[j])
-                          + xigrad_xz * xigrad_z * (rzw1rxw2[j] + rxw1rzw2[j])
-                          + xigrad_yz * xigrad_x * (rxw1ryw2[j] + ryw1rxw2[j])
-                          + xigrad_yz * xigrad_y * (ryw1ryw2[j] + ryw1ryw2[j])
-                          + xigrad_yz * xigrad_z * (rzw1ryw2[j] + ryw1rzw2[j])
-                          + xigrad_zz * xigrad_x * (rxw1rzw2[j] + rzw1rxw2[j])
-                          + xigrad_zz * xigrad_y * (ryw1rzw2[j] + rzw1ryw2[j])
-                          + xigrad_zz * xigrad_z * (rzw1rzw2[j] + rzw1rzw2[j]);
+                                     + xigrad_xx * xigrad_z * (rzw1rxw2[j] + rxw1rzw2[j])
 
-                    gatmx += prefac * (xcomp * gdenxx[j] + ycomp * gdenxy[j] + zcomp * gdenxz[j]);
-                    gatmy += prefac * (xcomp * gdenyx[j] + ycomp * gdenyy[j] + zcomp * gdenyz[j]);
-                    gatmz += prefac * (xcomp * gdenzx[j] + ycomp * gdenzy[j] + zcomp * gdenzz[j]);
+                                     + xigrad_xy * xigrad_x * (rxw1ryw2[j] + ryw1rxw2[j])
+
+                                     + xigrad_xy * xigrad_y * (ryw1ryw2[j] + ryw1ryw2[j])
+
+                                     + xigrad_xy * xigrad_z * (rzw1ryw2[j] + ryw1rzw2[j])
+
+                                     + xigrad_xz * xigrad_x * (rxw1rzw2[j] + rzw1rxw2[j])
+
+                                     + xigrad_xz * xigrad_y * (ryw1rzw2[j] + rzw1ryw2[j])
+
+                                     + xigrad_xz * xigrad_z * (rzw1rzw2[j] + rzw1rzw2[j]));
+
+                    ycomp += prefac * (xigrad_xy * xigrad_x * (rxw1rxw2[j] + rxw1rxw2[j])
+
+                                     + xigrad_xy * xigrad_y * (ryw1rxw2[j] + rxw1ryw2[j])
+
+                                     + xigrad_xy * xigrad_z * (rzw1rxw2[j] + rxw1rzw2[j])
+
+                                     + xigrad_yy * xigrad_x * (rxw1ryw2[j] + ryw1rxw2[j])
+
+                                     + xigrad_yy * xigrad_y * (ryw1ryw2[j] + ryw1ryw2[j])
+
+                                     + xigrad_yy * xigrad_z * (rzw1ryw2[j] + ryw1rzw2[j])
+
+                                     + xigrad_yz * xigrad_x * (rxw1rzw2[j] + rzw1rxw2[j])
+
+                                     + xigrad_yz * xigrad_y * (ryw1rzw2[j] + rzw1ryw2[j])
+
+                                     + xigrad_yz * xigrad_z * (rzw1rzw2[j] + rzw1rzw2[j]));
+
+                    zcomp += prefac * (xigrad_xz * xigrad_x * (rxw1rxw2[j] + rxw1rxw2[j])
+
+                                     + xigrad_xz * xigrad_y * (ryw1rxw2[j] + rxw1ryw2[j])
+
+                                     + xigrad_xz * xigrad_z * (rzw1rxw2[j] + rxw1rzw2[j])
+
+                                     + xigrad_yz * xigrad_x * (rxw1ryw2[j] + ryw1rxw2[j])
+
+                                     + xigrad_yz * xigrad_y * (ryw1ryw2[j] + ryw1ryw2[j])
+
+                                     + xigrad_yz * xigrad_z * (rzw1ryw2[j] + ryw1rzw2[j])
+
+                                     + xigrad_zz * xigrad_x * (rxw1rzw2[j] + rzw1rxw2[j])
+
+                                     + xigrad_zz * xigrad_y * (ryw1rzw2[j] + rzw1ryw2[j])
+
+                                     + xigrad_zz * xigrad_z * (rzw1rzw2[j] + rzw1rzw2[j]));
 
                     // twelfth += w * (df00101[j] + df00011[j]) * twelthfourth_gam;
                     // twelfth += w * df00002[j] * ngrada[j] * twelthfourth_gam;
@@ -1339,23 +1415,32 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
                     //   xigrad_z * xomega * rzw1rxw2[j] + xigrad_z * yomega * rzw1ryw2[j] + xigrad_z * zomega * rzw1rzw2[j];
 
                     prefac = w * (df00101[j] + df00011[j])
+
                            + w * df00002[j] * ngrada[j];
 
-                    xcomp = xigrad_x * rxw1rxw2[j]
-                          + xigrad_y * ryw1rxw2[j]
-                          + xigrad_z * rzw1rxw2[j];
+                    xcomp += prefac * (xigrad_x * rxw1rxw2[j]
 
-                    ycomp = xigrad_x * rxw1ryw2[j]
-                          + xigrad_y * ryw1ryw2[j]
-                          + xigrad_z * rzw1ryw2[j];
+                                     + xigrad_y * ryw1rxw2[j]
 
-                    zcomp = xigrad_x * rxw1rzw2[j]
-                          + xigrad_y * ryw1rzw2[j]
-                          + xigrad_z * rzw1rzw2[j];
+                                     + xigrad_z * rzw1rxw2[j]);
 
-                    gatmx += prefac * (xcomp * gdenxx[j] + ycomp * gdenxy[j] + zcomp * gdenxz[j]);
-                    gatmy += prefac * (xcomp * gdenyx[j] + ycomp * gdenyy[j] + zcomp * gdenyz[j]);
-                    gatmz += prefac * (xcomp * gdenzx[j] + ycomp * gdenzy[j] + zcomp * gdenzz[j]);
+                    ycomp += prefac * (xigrad_x * rxw1ryw2[j]
+
+                                     + xigrad_y * ryw1ryw2[j]
+
+                                     + xigrad_z * rzw1ryw2[j]);
+
+                    zcomp += prefac * (xigrad_x * rxw1rzw2[j]
+
+                                     + xigrad_y * ryw1rzw2[j]
+
+                                     + xigrad_z * rzw1rzw2[j]);
+
+                    gatmx += (xcomp * gdenxx[j] + ycomp * gdenxy[j] + zcomp * gdenxz[j]);
+
+                    gatmy += (xcomp * gdenyx[j] + ycomp * gdenyy[j] + zcomp * gdenyz[j]);
+
+                    gatmz += (xcomp * gdenzx[j] + ycomp * gdenzy[j] + zcomp * gdenzz[j]);
                 }
             }
 
