@@ -15,6 +15,7 @@ try:
     from pyscf import grad
     from pyscf import hessian
     from pyscf.grad import rks as pyscf_rks_grad
+    from pyscf.grad import tdrks
 except ImportError:
     errtxt = "Please install pyscf.\n"
     errtxt += "$pip3 install pyscf"
@@ -1423,6 +1424,99 @@ def import_2e_second_order_integral_derivative(molecule, basis, int_type,
     else:
         return vlx_int_deriv
 
+def import_xc_contrib_tddft(molecule, basis, scfdrv, xmy_ao, rel_dm_ao,
+                            tda=False, unit="au"):
+    """
+    Imports the xc contribution to the TDDFT gradient from pyscf.
+
+    :param molecule:
+        the vlx molecule object.
+    :param basis:
+        the vlx basis set object.
+    :param scfdrv:
+        the vlx SCF driver.
+    :param xmy_ao:
+        the perturbed density matrix in AO basis.
+    :param rel_dm_ao:
+        the relaxed one-particle density matrix in AO basis.
+    :param tda:
+        flag to use the Tamm-Dancoff approximation or not.
+    """
+    # create pyscf objects: molecule, scf_driver, 
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+
+    pyscf_scf = pyscf.scf.RKS(pyscf_molecule)
+
+    # set functional, convergence threshold and grid level 
+    pyscf_scf.xc = translate_to_pyscf(scfdrv.xcfun.get_func_label())
+    pyscf_scf.conv_tol = scfdrv.conv_thresh
+    if scfdrv.grid_level == 6:
+        pyscf_scf.grids.level = 9
+    else:
+        pyscf_scf.grids.level = scfdrv.grid_level
+
+    pyscf_scf.kernel()
+
+    # create a TDDFT_Gradient object in pyscf
+    if tda:
+        pyscf_tddft = pyscf_scf.TDA()
+    else:
+        pyscf_tddft = pyscf_scf.TDDFT()
+
+    pyscf_tddft_grad = pyscf_tddft.Gradients()
+    mf = pyscf_tddft_grad.base._scf
+
+    gs_dm = 2*scfdrv.scf_tensors['D_alpha']
+
+    # transform densities to pyscf format:
+    pyscf_xmy = ao_matrix_to_dalton(DenseMatrix(xmy_ao),
+                                    basis, molecule).to_numpy()
+    pyscf_rel_dm = ao_matrix_to_dalton(DenseMatrix(rel_dm_ao),
+                                    basis, molecule).to_numpy()
+    pyscf_gs_dm = ao_matrix_to_dalton(DenseMatrix(gs_dm),
+                                    basis, molecule).to_numpy()
+
+    # calculate xc derivatives:
+    fxc_xmy, fxc_rel, vxc, gxc = (
+            tdrks._contract_xc_kernel(pyscf_tddft_grad, mf.xc, pyscf_xmy,
+                                   pyscf_rel_dm, True, True, True, 2000) )
+
+    # contract to get the final xc gradient contributions
+    natm = molecule.number_of_atoms()
+    vxc_contrib = np.zeros((natm, 3))
+    vxc_contrib_2 = np.zeros((natm, 3))
+    fxc_contrib = np.zeros((natm, 3))
+    fxc_contrib_2 = np.zeros((natm, 3))
+
+    atmlst = range(natm)
+    offsetdic = pyscf_molecule.offset_nr_by_atom()
+
+    nao = scfdrv.scf_tensors['C_alpha'].shape[0]
+    
+    for k, ia in enumerate(atmlst):
+        shl0, shl1, p0, p1 = offsetdic[ia]
+
+        veff = np.zeros((3, nao, nao))
+        veff[:,p0:p1] = vxc[1:,p0:p1]
+        veff[:,:,p0:p1] += vxc[1:,p0:p1].transpose(0,2,1)
+
+        vxc_contrib[k] = np.einsum('xpq,pq->x', veff, pyscf_rel_dm)
+
+        vxc_contrib_2[k] = np.einsum('xij,ij->x', fxc_rel[1:,p0:p1],
+                                      pyscf_gs_dm[p0:p1])
+        fxc_contrib[k] = ( 2.0 * np.einsum('xij,ij->x', fxc_xmy[1:,p0:p1], 
+                                            pyscf_xmy[p0:p1,:])
+                          + 2.0 * np.einsum('xji,ij->x', fxc_xmy[1:,p0:p1], 
+                                            pyscf_xmy[:,p0:p1])
+                          )
+        fxc_contrib_2[k] = np.einsum('xij,ij->x', gxc[1:,p0:p1],
+                                     pyscf_gs_dm[p0:p1])
+
+    return vxc_contrib, vxc_contrib_2, fxc_contrib, fxc_contrib_2 
 
 def overlap_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
                   chk_file=None):
