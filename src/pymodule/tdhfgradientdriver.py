@@ -287,6 +287,11 @@ class TdhfGradientDriver(GradientDriver):
                 self.gradient += vxc_contrib_2
                 self.gradient += fxc_contrib
                 self.gradient += fxc_contrib_2
+                # TODO: remove these variables once GGA TDDFT gradient works
+                self.vxc_contrib = vxc_contrib
+                self.vxc_contrib_2 = vxc_contrib_2
+                self.fxc_contrib = fxc_contrib
+                self.fxc_contrib_2 = fxc_contrib_2
 
         # Calculate the relaxed and unrelaxed excited-state dipole moment
         firstorderprop = FirstOrderProperties(self.comm, self.ostream)
