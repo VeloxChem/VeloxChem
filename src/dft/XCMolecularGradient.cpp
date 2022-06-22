@@ -988,9 +988,13 @@ CXCMolecularGradient::integrateGxcGradient(const std::vector<int32_t>& idsAtomic
                     gatmy += prefac * (xigrad_xx * gdenyx[j] + xigrad_xy * gdenyy[j] + xigrad_xz * gdenyz[j]);
                     gatmz += prefac * (xigrad_xx * gdenzx[j] + xigrad_xy * gdenzy[j] + xigrad_xz * gdenzz[j]);
 
+                    prefac = w * df0010[j] * ryw12a;
+
                     gatmx += prefac * (xigrad_xy * gdenxx[j] + xigrad_yy * gdenxy[j] + xigrad_yz * gdenxz[j]);
                     gatmy += prefac * (xigrad_xy * gdenyx[j] + xigrad_yy * gdenyy[j] + xigrad_yz * gdenyz[j]);
                     gatmz += prefac * (xigrad_xy * gdenzx[j] + xigrad_yy * gdenzy[j] + xigrad_yz * gdenzz[j]);
+
+                    prefac = w * df0010[j] * rzw12a;
 
                     gatmx += prefac * (xigrad_xz * gdenxx[j] + xigrad_yz * gdenxy[j] + xigrad_zz * gdenxz[j]);
                     gatmy += prefac * (xigrad_xz * gdenyx[j] + xigrad_yz * gdenyy[j] + xigrad_zz * gdenyz[j]);
