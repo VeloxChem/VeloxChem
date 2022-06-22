@@ -144,35 +144,46 @@ CXCMolecularGradient::integrateVxcGradient(const std::vector<int32_t>& idsAtomic
         {
             auto gradgrid = graddrv.generate(rwDensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType(), idsAtomic[i]);
 
-            // set up pointers to density gradient grid
-
-            const auto gdenx = gradgrid.getComponent(0);
-
-            const auto gdeny = gradgrid.getComponent(1);
-
-            const auto gdenz = gradgrid.getComponent(2);
-
-            // compute LDA and GGA contribution to molecular gradient
-
             double gatmx = 0.0;
 
             double gatmy = 0.0;
 
             double gatmz = 0.0;
 
-            for (int32_t j = 0; j < gpoints; j++)
+            // compute LDA contribution to molecular gradient
+
+            if (fvxc.getFunctionalType() == xcfun::lda)
             {
-                gatmx += gw[j] * grhoa[j] * gdenx[j];
+                // set up pointers to density gradient grid
 
-                gatmy += gw[j] * grhoa[j] * gdeny[j];
+                const auto gdenx = gradgrid.getComponent(0);
 
-                gatmz += gw[j] * grhoa[j] * gdenz[j];
+                const auto gdeny = gradgrid.getComponent(1);
+
+                const auto gdenz = gradgrid.getComponent(2);
+
+                for (int32_t j = 0; j < gpoints; j++)
+                {
+                    gatmx += gw[j] * grhoa[j] * gdenx[j];
+
+                    gatmy += gw[j] * grhoa[j] * gdeny[j];
+
+                    gatmz += gw[j] * grhoa[j] * gdenz[j];
+                }
             }
 
             // compute GGA contribution to molecular gradient
 
             if (fvxc.getFunctionalType() == xcfun::gga)
             {
+                // set up pointers to density gradient grid
+
+                const auto gdenx = gradgrid.getComponent(0);
+
+                const auto gdeny = gradgrid.getComponent(1);
+
+                const auto gdenz = gradgrid.getComponent(2);
+
                 const auto gdenxx = gradgrid.getComponent(3);
 
                 const auto gdenxy = gradgrid.getComponent(4);
@@ -193,14 +204,35 @@ CXCMolecularGradient::integrateVxcGradient(const std::vector<int32_t>& idsAtomic
 
                 for (int32_t j = 0; j < gpoints; j++)
                 {
-                    double fgrd = gw[j] * (ggrada[j] / ngrada[j] + ggradab[j]);
+                    // contribution from \nabla_A (\phi_mu \phi_nu)
 
-                    gatmx += fgrd * (gradax[j] * gdenxx[j] + graday[j] * gdenxy[j] + gradaz[j] * gdenxz[j]);
+                    double prefac = gw[j] * grhoa[j];
 
-                    gatmy += fgrd * (gradax[j] * gdenyx[j] + graday[j] * gdenyy[j] + gradaz[j] * gdenyz[j]);
+                    gatmx += prefac * gdenx[j];
 
-                    gatmz += fgrd * (gradax[j] * gdenzx[j] + graday[j] * gdenzy[j] + gradaz[j] * gdenzz[j]);
+                    gatmy += prefac * gdeny[j];
+
+                    gatmz += prefac * gdenz[j];
+
+                    // contribution from \nabla_A (\nabla (\phi_mu \phi_nu))
+
+                    prefac = gw[j] * (ggrada[j] / ngrada[j] + ggradab[j]);
+
+                    gatmx += prefac * (gradax[j] * gdenxx[j] + graday[j] * gdenxy[j] + gradaz[j] * gdenxz[j]);
+
+                    gatmy += prefac * (gradax[j] * gdenyx[j] + graday[j] * gdenyy[j] + gradaz[j] * gdenyz[j]);
+
+                    gatmz += prefac * (gradax[j] * gdenzx[j] + graday[j] * gdenzy[j] + gradaz[j] * gdenzz[j]);
                 }
+            }
+
+            if (fvxc.getFunctionalType() == xcfun::mgga)
+            {
+                // not implemented
+
+                std::string errmgga("XCMolecularGradient.integrateVxcGradient: Not implemented for meta-GGA");
+
+                errors::assertMsgCritical(false, errmgga);
             }
 
             // factor of 2 from sum of alpha and beta contributions

@@ -27,17 +27,12 @@ import numpy as np
 import time as tm
 
 from .veloxchemlib import mpi_master
-from .molecule import Molecule
-from .outputstream import OutputStream
 from .gradientdriver import GradientDriver
-from .firstorderprop import FirstOrderProperties
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
-from .import_from_pyscf import fock_deriv
 from .import_from_pyscf import eri_deriv
 from .import_from_pyscf import hcore_deriv
-from .import_from_pyscf import vxc_deriv
 
 
 class ScfGradientDriver(GradientDriver):
@@ -66,6 +61,8 @@ class ScfGradientDriver(GradientDriver):
         self.flag = 'SCF Gradient Driver'
         self.scf_drv = scf_drv
         self.delta_h = 0.001
+
+        self.gradient = None
 
     def update_settings(self, grad_dict, method_dict):
         """
@@ -96,6 +93,8 @@ class ScfGradientDriver(GradientDriver):
 
         start_time = tm.time()
 
+        # compute gradient
+
         if self.numerical:
             scf_ostream_state = self.scf_drv.ostream.state
             self.scf_drv.ostream.state = False
@@ -104,8 +103,9 @@ class ScfGradientDriver(GradientDriver):
         else:
             self.compute_analytical(molecule, ao_basis)
 
+        # print gradient
+
         if self.rank == mpi_master():
-            # print gradient
             self.print_geometry(molecule)
             self.print_gradient(molecule)
 
@@ -125,58 +125,60 @@ class ScfGradientDriver(GradientDriver):
         :param ao_basis:
             The AO basis set.
         """
+
+        natm = molecule.number_of_atoms()
+
+        self.gradient = np.zeros((natm, 3))
+
         if self.rank == mpi_master():
-            natm = molecule.number_of_atoms()
             nocc = molecule.number_of_alpha_electrons()
+
             mo = self.scf_drv.scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc].copy()
-            one_pdm_ao = self.scf_drv.scf_tensors['D_alpha']
-            mo_energies = self.scf_drv.scf_tensors['E_alpha']
-            eocc = mo_energies[:nocc]
-            eo_diag = np.diag(eocc)
-            epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
 
-            # analytical gradient
-            self.gradient = np.zeros((natm, 3))
-            exc_gradient = np.zeros((natm, 3))
+            one_pdm_ao = self.scf_drv.scf_tensors['D_alpha']
+
+            eo_diag = np.diag(self.scf_drv.scf_tensors['E_alpha'][:nocc])
+            epsilon_dm_ao = -np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
 
             for i in range(natm):
                 d_ovlp = overlap_deriv(molecule, ao_basis, i)
                 d_hcore = hcore_deriv(molecule, ao_basis, i)
                 d_eri = eri_deriv(molecule, ao_basis, i)
 
-                self.gradient[i] = ( 2.0 * np.einsum('mn,xmn->x', one_pdm_ao, d_hcore)
-                                   + 2.0 * np.einsum('mn,xmn->x', epsilon_dm_ao, d_ovlp)
-                                   )
+                self.gradient[i] = (
+                    2.0 * np.einsum('mn,xmn->x', one_pdm_ao, d_hcore) +
+                    2.0 * np.einsum('mn,xmn->x', epsilon_dm_ao, d_ovlp))
 
                 if self.dft:
                     if self.xcfun.is_hybrid():
                         fact_xc = self.xcfun.get_frac_exact_exchange()
                     else:
                         fact_xc = 0
-                    self.gradient[i] += (
-                                + 2.0 * np.einsum('mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
-                                - fact_xc * np.einsum('mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
-                                )
+                    self.gradient[i] += 2.0 * np.einsum(
+                        'mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
+                    self.gradient[i] -= fact_xc * np.einsum(
+                        'mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
                 else:
-                    self.gradient[i] += (
-                                + 2.0 * np.einsum('mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
-                                - 1.0 * np.einsum('mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
-                                )
+                    self.gradient[i] += 2.0 * np.einsum(
+                        'mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
+                    self.gradient[i] -= 1.0 * np.einsum(
+                        'mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
 
         # Add the xc contribution
         if self.dft:
             density = self.scf_drv.density
             xcfun_label = self.scf_drv.xcfun.get_func_label()
-            vxc_contrib = self.grad_vxc_contrib(molecule, ao_basis, density, density, xcfun_label)
+
+            vxc_contrib = self.grad_vxc_contrib(molecule, ao_basis, density,
+                                                density, xcfun_label)
+
             if self.rank == mpi_master():
                 self.gradient += vxc_contrib
 
         # Add the nuclear contribution
         if self.rank == mpi_master():
             self.gradient += self.grad_nuc_contrib(molecule)
-
-            self.omega_ao = epsilon_dm_ao #TODO remove again
 
     def compute_energy(self, molecule, ao_basis, min_basis=None):
         """
