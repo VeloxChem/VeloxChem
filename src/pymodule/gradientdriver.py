@@ -267,10 +267,9 @@ class GradientDriver:
         mol_grid.distribute(self.rank, self.nodes, self.comm)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
-        atom_ids = list(range(molecule.number_of_atoms()))
         fxc_contrib = xc_molgrad_drv.integrate_fxc_gradient(
-            atom_ids, rhow_den_1, rhow_den_2, gs_density, molecule, ao_basis,
-            mol_grid, xcfun_label)
+            rhow_den_1, rhow_den_2, gs_density, molecule, ao_basis, mol_grid,
+            xcfun_label)
         fxc_contrib = self.comm.reduce(fxc_contrib, root=mpi_master())
 
         return fxc_contrib
@@ -304,10 +303,9 @@ class GradientDriver:
         mol_grid.distribute(self.rank, self.nodes, self.comm)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
-        atom_ids = list(range(molecule.number_of_atoms()))
         gxc_contrib = 0.25 * xc_molgrad_drv.integrate_gxc_gradient(
-            atom_ids, rhow_den_1, rhow_den_2, gs_density, molecule, ao_basis,
-            mol_grid, xcfun_label)
+            rhow_den_1, rhow_den_2, gs_density, molecule, ao_basis, mol_grid,
+            xcfun_label)
         gxc_contrib = self.comm.reduce(gxc_contrib, root=mpi_master())
 
         return gxc_contrib
