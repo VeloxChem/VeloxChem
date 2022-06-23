@@ -35,11 +35,14 @@
 #include "AODensityMatrix.hpp"
 #include "DenseMatrix.hpp"
 #include "DensityGrid.hpp"
+#include "DensityGridQuad.hpp"
 #include "GtoContainer.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
+#include "XCCubicHessianGrid.hpp"
 #include "XCGradientGrid.hpp"
+#include "XCHessianGrid.hpp"
 
 /**
  Class CXCMolecularGradient implements integration of exchange-correlation contribution to molecular
@@ -68,6 +71,18 @@ class CXCMolecularGradient
      The threshold of density screening.
      */
     double _thresholdOfDensity;
+
+    void _compGxcContrib(CDenseMatrix&              molecularGradient,
+                         const CMolecule&           molecule,
+                         const CMolecularBasis&     basis,
+                         const xcfun                xcFunctional,
+                         const CAODensityMatrix&    gsDensityMatrix,
+                         const CMolecularGrid&      molecularGrid,
+                         const CDensityGrid&        gsDensityGrid,
+                         const CDensityGridQuad&    rwDensityGridQuad,
+                         const CXCGradientGrid&     xcGradientGrid,
+                         const CXCHessianGrid&      xcHessianGrid,
+                         const CXCCubicHessianGrid& xcCubicHessianGrid) const;
 
    public:
     /**
@@ -155,15 +170,14 @@ class CXCMolecularGradient
      @param xcFuncLabel the label of exchange-correlation functional.
      @return the molecular gradient.
      */
-    CDenseMatrix
-    integrateGxcGradient(const std::vector<int32_t>& idsAtomic,
-                         const CAODensityMatrix&     rwDensityMatrixOne,
-                         const CAODensityMatrix&     rwDensityMatrixTwo,
-                         const CAODensityMatrix&     gsDensityMatrix,
-                         const CMolecule&            molecule,
-                         const CMolecularBasis&      basis,
-                         const CMolecularGrid&       molecularGrid,
-                         const std::string&          xcFuncLabel) const;
+    CDenseMatrix integrateGxcGradient(const std::vector<int32_t>& idsAtomic,
+                                      const CAODensityMatrix&     rwDensityMatrixOne,
+                                      const CAODensityMatrix&     rwDensityMatrixTwo,
+                                      const CAODensityMatrix&     gsDensityMatrix,
+                                      const CMolecule&            molecule,
+                                      const CMolecularBasis&      basis,
+                                      const CMolecularGrid&       molecularGrid,
+                                      const std::string&          xcFuncLabel) const;
 };
 
 #endif /* XCMolecularGradient_hpp */
