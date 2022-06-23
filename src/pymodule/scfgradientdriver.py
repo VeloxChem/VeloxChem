@@ -70,9 +70,6 @@ class ScfGradientDriver(GradientDriver):
         start_time = tm.time()
         self.print_header()
 
-        # atom labels
-        labels = molecule.get_labels()
-
         scf_ostream_state = self.scf_drv.ostream.state
         self.scf_drv.ostream.state = False
 
@@ -83,7 +80,7 @@ class ScfGradientDriver(GradientDriver):
 
         # print gradient
         self.print_geometry(molecule)
-        self.print_gradient(molecule, labels)
+        self.print_gradient(molecule)
 
         valstr = '*** Time spent in gradient calculation: '
         valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
