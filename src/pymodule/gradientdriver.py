@@ -231,10 +231,8 @@ class GradientDriver:
         mol_grid.distribute(self.rank, self.nodes, self.comm)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
-        atom_ids = list(range(molecule.number_of_atoms()))
         vxc_contrib = xc_molgrad_drv.integrate_vxc_gradient(
-            atom_ids, rhow_density, gs_density, molecule, ao_basis, mol_grid,
-            xcfun_label)
+            rhow_density, gs_density, molecule, ao_basis, mol_grid, xcfun_label)
         vxc_contrib = self.comm.reduce(vxc_contrib, root=mpi_master())
 
         return vxc_contrib

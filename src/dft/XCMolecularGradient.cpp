@@ -55,24 +55,22 @@ CXCMolecularGradient::~CXCMolecularGradient()
 }
 
 CDenseMatrix
-CXCMolecularGradient::integrateVxcGradient(const std::vector<int32_t>& idsAtomic,
-                                           const CAODensityMatrix&     aoDensityMatrix,
-                                           const CMolecule&            molecule,
-                                           const CMolecularBasis&      basis,
-                                           const CMolecularGrid&       molecularGrid,
-                                           const std::string&          xcFuncLabel) const
+CXCMolecularGradient::integrateVxcGradient(const CAODensityMatrix& aoDensityMatrix,
+                                           const CMolecule&        molecule,
+                                           const CMolecularBasis&  basis,
+                                           const CMolecularGrid&   molecularGrid,
+                                           const std::string&      xcFuncLabel) const
 {
-    return integrateVxcGradient(idsAtomic, aoDensityMatrix, aoDensityMatrix, molecule, basis, molecularGrid, xcFuncLabel);
+    return integrateVxcGradient(aoDensityMatrix, aoDensityMatrix, molecule, basis, molecularGrid, xcFuncLabel);
 }
 
 CDenseMatrix
-CXCMolecularGradient::integrateVxcGradient(const std::vector<int32_t>& idsAtomic,
-                                           const CAODensityMatrix&     rwDensityMatrix,
-                                           const CAODensityMatrix&     gsDensityMatrix,
-                                           const CMolecule&            molecule,
-                                           const CMolecularBasis&      basis,
-                                           const CMolecularGrid&       molecularGrid,
-                                           const std::string&          xcFuncLabel) const
+CXCMolecularGradient::integrateVxcGradient(const CAODensityMatrix& rwDensityMatrix,
+                                           const CAODensityMatrix& gsDensityMatrix,
+                                           const CMolecule&        molecule,
+                                           const CMolecularBasis&  basis,
+                                           const CMolecularGrid&   molecularGrid,
+                                           const std::string&      xcFuncLabel) const
 {
     // parse exchange-correlation functional data
 
@@ -86,15 +84,11 @@ CXCMolecularGradient::integrateVxcGradient(const std::vector<int32_t>& idsAtomic
 
     // create molecular gradient
 
-    const auto natoms = static_cast<int32_t>(idsAtomic.size());
+    const auto natoms = molecule.getNumberOfAtoms();
 
     CDenseMatrix molgrad(3, natoms);
 
-    auto mgradx = molgrad.row(0);
-
-    auto mgrady = molgrad.row(1);
-
-    auto mgradz = molgrad.row(2);
+    molgrad.zero();
 
     if (rwDensityMatrix.isClosedShell())
     {
@@ -102,147 +96,19 @@ CXCMolecularGradient::integrateVxcGradient(const std::vector<int32_t>& idsAtomic
 
         CMolecularGrid mgrid(molecularGrid);
 
-        CDensityGrid dgrid;
+        CDensityGrid gsdengrid;
 
-        refdengrid.getScreenedGridsPair(dgrid, mgrid, 0, _thresholdOfDensity, fvxc.getFunctionalType());
-
-        auto gw = mgrid.getWeights();
-
-        const auto gpoints = mgrid.getNumberOfGridPoints();
+        refdengrid.getScreenedGridsPair(gsdengrid, mgrid, 0, _thresholdOfDensity, fvxc.getFunctionalType());
 
         // allocate XC gradient grid
 
-        CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), dgrid.getDensityGridType(), fvxc.getFunctionalType());
+        CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
 
         // compute exchange-correlation functional derivative
 
-        fvxc.compute(vxcgrid, dgrid);
+        fvxc.compute(vxcgrid, gsdengrid);
 
-        // set up pointers to exchange-correlation functional derivatives
-
-        auto grhoa = vxcgrid.xcGradientValues(xcvars::rhoa);
-
-        auto ggrada = vxcgrid.xcGradientValues(xcvars::grada);
-
-        auto ggradab = vxcgrid.xcGradientValues(xcvars::gradab);
-
-        // set up pointers to density gradient norms
-
-        auto ngrada = dgrid.alphaDensityGradient(0);
-
-        auto gradax = dgrid.alphaDensityGradientX(0);
-
-        auto graday = dgrid.alphaDensityGradientY(0);
-
-        auto gradaz = dgrid.alphaDensityGradientZ(0);
-
-        // set up density gradient grid driver
-
-        CDensityGradientGridDriver graddrv(_locComm);
-
-        for (int32_t i = 0; i < natoms; i++)
-        {
-            auto gradgrid = graddrv.generate(rwDensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType(), idsAtomic[i]);
-
-            double gatmx = 0.0;
-
-            double gatmy = 0.0;
-
-            double gatmz = 0.0;
-
-            // compute LDA contribution to molecular gradient
-
-            if (fvxc.getFunctionalType() == xcfun::lda)
-            {
-                // set up pointers to density gradient grid
-
-                const auto gdenx = gradgrid.getComponent(0);
-
-                const auto gdeny = gradgrid.getComponent(1);
-
-                const auto gdenz = gradgrid.getComponent(2);
-
-                for (int32_t j = 0; j < gpoints; j++)
-                {
-                    gatmx += gw[j] * grhoa[j] * gdenx[j];
-
-                    gatmy += gw[j] * grhoa[j] * gdeny[j];
-
-                    gatmz += gw[j] * grhoa[j] * gdenz[j];
-                }
-            }
-
-            // compute GGA contribution to molecular gradient
-
-            if (fvxc.getFunctionalType() == xcfun::gga)
-            {
-                // set up pointers to density gradient grid
-
-                const auto gdenx = gradgrid.getComponent(0);
-
-                const auto gdeny = gradgrid.getComponent(1);
-
-                const auto gdenz = gradgrid.getComponent(2);
-
-                const auto gdenxx = gradgrid.getComponent(3);
-
-                const auto gdenxy = gradgrid.getComponent(4);
-
-                const auto gdenxz = gradgrid.getComponent(5);
-
-                const auto gdenyx = gradgrid.getComponent(6);
-
-                const auto gdenyy = gradgrid.getComponent(7);
-
-                const auto gdenyz = gradgrid.getComponent(8);
-
-                const auto gdenzx = gradgrid.getComponent(9);
-
-                const auto gdenzy = gradgrid.getComponent(10);
-
-                const auto gdenzz = gradgrid.getComponent(11);
-
-                for (int32_t j = 0; j < gpoints; j++)
-                {
-                    // contribution from \nabla_A (\phi_mu \phi_nu)
-
-                    double prefac = gw[j] * grhoa[j];
-
-                    gatmx += prefac * gdenx[j];
-
-                    gatmy += prefac * gdeny[j];
-
-                    gatmz += prefac * gdenz[j];
-
-                    // contribution from \nabla_A (\nabla (\phi_mu \phi_nu))
-
-                    prefac = gw[j] * (ggrada[j] / ngrada[j] + ggradab[j]);
-
-                    gatmx += prefac * (gradax[j] * gdenxx[j] + graday[j] * gdenxy[j] + gradaz[j] * gdenxz[j]);
-
-                    gatmy += prefac * (gradax[j] * gdenyx[j] + graday[j] * gdenyy[j] + gradaz[j] * gdenyz[j]);
-
-                    gatmz += prefac * (gradax[j] * gdenzx[j] + graday[j] * gdenzy[j] + gradaz[j] * gdenzz[j]);
-                }
-            }
-
-            if (fvxc.getFunctionalType() == xcfun::mgga)
-            {
-                // not implemented
-
-                std::string errmgga("XCMolecularGradient.integrateVxcGradient: Not implemented for meta-GGA");
-
-                errors::assertMsgCritical(false, errmgga);
-            }
-
-            // factor of 2 from sum of alpha and beta contributions
-
-            mgradx[i] = 2.0 * gatmx;
-
-            mgrady[i] = 2.0 * gatmy;
-
-            mgradz[i] = 2.0 * gatmz;
-        }
+        _compVxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrix, mgrid, gsdengrid, vxcgrid);
     }
     else
     {
@@ -448,6 +314,157 @@ CXCMolecularGradient::integrateGxcGradient(const CAODensityMatrix& rwDensityMatr
 }
 
 void
+CXCMolecularGradient::_compVxcContrib(CDenseMatrix&           molecularGradient,
+                                      const CMolecule&        molecule,
+                                      const CMolecularBasis&  basis,
+                                      const xcfun             xcFuncType,
+                                      const CAODensityMatrix& densityMatrix,
+                                      const CMolecularGrid&   molecularGrid,
+                                      const CDensityGrid&     gsDensityGrid,
+                                      const CXCGradientGrid&  xcGradientGrid) const
+{
+    auto gw = molecularGrid.getWeights();
+
+    const auto gpoints = molecularGrid.getNumberOfGridPoints();
+
+    const auto natoms = molecule.getNumberOfAtoms();
+
+    // set up pointers to Cartesian components of molecular gradient
+
+    auto mgradx = molecularGradient.row(0);
+
+    auto mgrady = molecularGradient.row(1);
+
+    auto mgradz = molecularGradient.row(2);
+
+    // set up pointers to exchange-correlation functional derivatives
+
+    auto grhoa = xcGradientGrid.xcGradientValues(xcvars::rhoa);
+
+    auto ggrada = xcGradientGrid.xcGradientValues(xcvars::grada);
+
+    auto ggradab = xcGradientGrid.xcGradientValues(xcvars::gradab);
+
+    // set up pointers to density gradient norms
+
+    auto ngrada = gsDensityGrid.alphaDensityGradient(0);
+
+    auto gradax = gsDensityGrid.alphaDensityGradientX(0);
+
+    auto graday = gsDensityGrid.alphaDensityGradientY(0);
+
+    auto gradaz = gsDensityGrid.alphaDensityGradientZ(0);
+
+    // set up density gradient grid driver
+
+    CDensityGradientGridDriver graddrv(_locComm);
+
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        auto gradgrid = graddrv.generate(densityMatrix, molecule, basis, molecularGrid, xcFuncType, i);
+
+        double gatmx = 0.0;
+
+        double gatmy = 0.0;
+
+        double gatmz = 0.0;
+
+        // compute LDA contribution to molecular gradient
+
+        if (xcFuncType == xcfun::lda)
+        {
+            // set up pointers to density gradient grid
+
+            const auto gdenx = gradgrid.getComponent(0);
+
+            const auto gdeny = gradgrid.getComponent(1);
+
+            const auto gdenz = gradgrid.getComponent(2);
+
+            for (int32_t j = 0; j < gpoints; j++)
+            {
+                gatmx += gw[j] * grhoa[j] * gdenx[j];
+
+                gatmy += gw[j] * grhoa[j] * gdeny[j];
+
+                gatmz += gw[j] * grhoa[j] * gdenz[j];
+            }
+        }
+
+        // compute GGA contribution to molecular gradient
+
+        if (xcFuncType == xcfun::gga)
+        {
+            // set up pointers to density gradient grid
+
+            const auto gdenx = gradgrid.getComponent(0);
+
+            const auto gdeny = gradgrid.getComponent(1);
+
+            const auto gdenz = gradgrid.getComponent(2);
+
+            const auto gdenxx = gradgrid.getComponent(3);
+
+            const auto gdenxy = gradgrid.getComponent(4);
+
+            const auto gdenxz = gradgrid.getComponent(5);
+
+            const auto gdenyx = gradgrid.getComponent(6);
+
+            const auto gdenyy = gradgrid.getComponent(7);
+
+            const auto gdenyz = gradgrid.getComponent(8);
+
+            const auto gdenzx = gradgrid.getComponent(9);
+
+            const auto gdenzy = gradgrid.getComponent(10);
+
+            const auto gdenzz = gradgrid.getComponent(11);
+
+            for (int32_t j = 0; j < gpoints; j++)
+            {
+                // contribution from \nabla_A (\phi_mu \phi_nu)
+
+                double prefac = gw[j] * grhoa[j];
+
+                gatmx += prefac * gdenx[j];
+
+                gatmy += prefac * gdeny[j];
+
+                gatmz += prefac * gdenz[j];
+
+                // contribution from \nabla_A (\nabla (\phi_mu \phi_nu))
+
+                prefac = gw[j] * (ggrada[j] / ngrada[j] + ggradab[j]);
+
+                gatmx += prefac * (gradax[j] * gdenxx[j] + graday[j] * gdenxy[j] + gradaz[j] * gdenxz[j]);
+
+                gatmy += prefac * (gradax[j] * gdenyx[j] + graday[j] * gdenyy[j] + gradaz[j] * gdenyz[j]);
+
+                gatmz += prefac * (gradax[j] * gdenzx[j] + graday[j] * gdenzy[j] + gradaz[j] * gdenzz[j]);
+            }
+        }
+
+        if (xcFuncType == xcfun::mgga)
+        {
+            // not implemented
+
+            std::string errmgga("XCMolecularGradient.integrateVxcGradient: Not implemented for meta-GGA");
+
+            errors::assertMsgCritical(false, errmgga);
+        }
+
+        // factor of 2 from sum of alpha and beta contributions
+
+        mgradx[i] = 2.0 * gatmx;
+
+        mgrady[i] = 2.0 * gatmy;
+
+        mgradz[i] = 2.0 * gatmz;
+    }
+}
+
+void
 CXCMolecularGradient::_compFxcContrib(CDenseMatrix&           molecularGradient,
                                       const CMolecule&        molecule,
                                       const CMolecularBasis&  basis,
@@ -459,11 +476,11 @@ CXCMolecularGradient::_compFxcContrib(CDenseMatrix&           molecularGradient,
                                       const CXCGradientGrid&  xcGradientGrid,
                                       const CXCHessianGrid&   xcHessianGrid) const
 {
-    auto gridWeights = molecularGrid.getWeights();
+    auto gw = molecularGrid.getWeights();
 
-    const auto nGridPoints = molecularGrid.getNumberOfGridPoints();
+    const auto gpoints = molecularGrid.getNumberOfGridPoints();
 
-    const auto nAtoms = molecule.getNumberOfAtoms();
+    const auto natoms = molecule.getNumberOfAtoms();
 
     // set up pointers to Cartesian components of molecular gradient
 
@@ -541,7 +558,7 @@ CXCMolecularGradient::_compFxcContrib(CDenseMatrix&           molecularGradient,
 
     CDensityGradientGridDriver graddrv(_locComm);
 
-    for (int32_t i = 0; i < nAtoms; i++)
+    for (int32_t i = 0; i < natoms; i++)
     {
         auto gradgrid = graddrv.generate(densityMatrix, molecule, basis, molecularGrid, xcFuncType, i);
 
@@ -563,9 +580,9 @@ CXCMolecularGradient::_compFxcContrib(CDenseMatrix&           molecularGradient,
 
             const auto gdenz = gradgrid.getComponent(2);
 
-            for (int32_t j = 0; j < nGridPoints; j++)
+            for (int32_t j = 0; j < gpoints; j++)
             {
-                double prefac = gridWeights[j] * (grho_aa[j] * rhowa[j] + grho_ab[j] * rhowb[j]);
+                double prefac = gw[j] * (grho_aa[j] * rhowa[j] + grho_ab[j] * rhowb[j]);
 
                 gatmx += prefac * gdenx[j];
 
@@ -605,9 +622,9 @@ CXCMolecularGradient::_compFxcContrib(CDenseMatrix&           molecularGradient,
 
             const auto gdenzz = gradgrid.getComponent(11);
 
-            for (int32_t j = 0; j < nGridPoints; j++)
+            for (int32_t j = 0; j < gpoints; j++)
             {
-                double w = gridWeights[j];
+                double w = gw[j];
 
                 double znva = 1.0 / ngrada[j];
 
@@ -782,11 +799,11 @@ CXCMolecularGradient::_compGxcContrib(CDenseMatrix&              molecularGradie
                                       const CXCHessianGrid&      xcHessianGrid,
                                       const CXCCubicHessianGrid& xcCubicHessianGrid) const
 {
-    auto gridWeights = molecularGrid.getWeights();
+    auto gw = molecularGrid.getWeights();
 
-    const auto nGridPoints = molecularGrid.getNumberOfGridPoints();
+    const auto gpoints = molecularGrid.getNumberOfGridPoints();
 
-    const auto nAtoms = molecule.getNumberOfAtoms();
+    const auto natoms = molecule.getNumberOfAtoms();
 
     // set up pointers to Cartesian components of molecular gradient
 
@@ -924,7 +941,7 @@ CXCMolecularGradient::_compGxcContrib(CDenseMatrix&              molecularGradie
 
     CDensityGradientGridDriver graddrv(_locComm);
 
-    for (int32_t i = 0; i < nAtoms; i++)
+    for (int32_t i = 0; i < natoms; i++)
     {
         auto gradgrid = graddrv.generate(densityMatrix, molecule, basis, molecularGrid, xcFuncType, i);
 
@@ -946,9 +963,9 @@ CXCMolecularGradient::_compGxcContrib(CDenseMatrix&              molecularGradie
 
             const auto gdenz = gradgrid.getComponent(2);
 
-            for (int32_t j = 0; j < nGridPoints; j++)
+            for (int32_t j = 0; j < gpoints; j++)
             {
-                double prefac = gridWeights[j] * (df3000[j] + df2100[j] + df2100[j] + df1200[j]) * rhow1a[j];
+                double prefac = gw[j] * (df3000[j] + df2100[j] + df2100[j] + df1200[j]) * rhow1a[j];
 
                 gatmx += prefac * gdenx[j];
 
@@ -988,14 +1005,14 @@ CXCMolecularGradient::_compGxcContrib(CDenseMatrix&              molecularGradie
 
             const auto gdenzz = gradgrid.getComponent(11);
 
-            for (int32_t j = 0; j < nGridPoints; j++)
+            for (int32_t j = 0; j < gpoints; j++)
             {
                 // auto omega = bgaos[m] * kgaos[m];
                 // auto xomega = bgaox[m] * kgaos[m] + bgaos[m] * kgaox[m];
                 // auto yomega = bgaoy[m] * kgaos[m] + bgaos[m] * kgaoy[m];
                 // auto zomega = bgaoz[m] * kgaos[m] + bgaos[m] * kgaoz[m];
 
-                double w = gridWeights[j];
+                double w = gw[j];
 
                 double znva = 1.0 / ngrada[j];
 

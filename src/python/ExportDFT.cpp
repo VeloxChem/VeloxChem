@@ -254,18 +254,16 @@ export_dft(py::module& m)
         .def(py::init(&vlx_general::create<CXCMolecularGradient>), "comm"_a = py::none())
         .def(
             "integrate_vxc_gradient",
-            [](CXCMolecularGradient&       self,
-               const std::vector<int32_t>& idsAtomic,
-               const CAODensityMatrix&     aoDensityMatrix,
-               const CMolecule&            molecule,
-               const CMolecularBasis&      basis,
-               const CMolecularGrid&       molecularGrid,
-               const std::string&          xcFuncLabel) -> py::array_t<double> {
-                auto molgrad = self.integrateVxcGradient(idsAtomic, aoDensityMatrix, molecule, basis, molecularGrid, xcFuncLabel);
+            [](CXCMolecularGradient&   self,
+               const CAODensityMatrix& aoDensityMatrix,
+               const CMolecule&        molecule,
+               const CMolecularBasis&  basis,
+               const CMolecularGrid&   molecularGrid,
+               const std::string&      xcFuncLabel) -> py::array_t<double> {
+                auto molgrad = self.integrateVxcGradient(aoDensityMatrix, molecule, basis, molecularGrid, xcFuncLabel);
                 return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
             },
             "Integrates exchange-correlation contribution to molecular gradient.",
-            "idsAtomic"_a,
             "aoDensityMatrix"_a,
             "molecule"_a,
             "basis"_a,
@@ -274,18 +272,16 @@ export_dft(py::module& m)
         .def(
             "integrate_vxc_gradient",
             [](CXCMolecularGradient&       self,
-               const std::vector<int32_t>& idsAtomic,
                const CAODensityMatrix&     rwDensityMatrix,
                const CAODensityMatrix&     gsDensityMatrix,
                const CMolecule&            molecule,
                const CMolecularBasis&      basis,
                const CMolecularGrid&       molecularGrid,
                const std::string&          xcFuncLabel) -> py::array_t<double> {
-                auto molgrad = self.integrateVxcGradient(idsAtomic, rwDensityMatrix, gsDensityMatrix, molecule, basis, molecularGrid, xcFuncLabel);
+                auto molgrad = self.integrateVxcGradient(rwDensityMatrix, gsDensityMatrix, molecule, basis, molecularGrid, xcFuncLabel);
                 return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
             },
             "Integrates exchange-correlation contribution to molecular gradient.",
-            "idsAtomic"_a,
             "rwDensityMatrix"_a,
             "gsDensityMatrix"_a,
             "molecule"_a,
