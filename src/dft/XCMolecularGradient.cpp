@@ -565,7 +565,7 @@ CXCMolecularGradient::_compVxcContrib(CDenseMatrix&           molecularGradient,
         {
             // not implemented
 
-            std::string errmgga("XCMolecularGradient.integrateVxcGradient: Not implemented for meta-GGA");
+            std::string errmgga("XCMolecularGradient._compVxcContrib: Not implemented for meta-GGA");
 
             errors::assertMsgCritical(false, errmgga);
         }
@@ -1620,6 +1620,7 @@ CXCMolecularGradient::_compGxcContrib(CDenseMatrix&              molecularGradie
         }
 
         // factor of 2 from sum of alpha and beta contributions
+        // factor of 0.25 from quadratic response
 
         mgradx[i] += 0.25 * (2.0 * gatmx);
 
