@@ -51,7 +51,5 @@ TEST_F(CXCMolecularGradientTest, Integrate)
     
     CXCMolecularGradient graddrv(MPI_COMM_WORLD);
     
-    auto mgrad = graddrv.integrateVxcGradient({1, 2}, dmat, mh2o, mbas, mgrid, std::string("SLATER"));
-    
-    std::cout << mgrad.getString(); 
+    auto mgrad = graddrv.integrateVxcGradient(dmat, mh2o, mbas, mgrid, std::string("SLATER"));
 }

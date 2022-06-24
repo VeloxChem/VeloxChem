@@ -301,12 +301,47 @@ class GradientDriver:
         mol_grid.distribute(self.rank, self.nodes, self.comm)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
-        gxc_contrib = 0.25 * xc_molgrad_drv.integrate_gxc_gradient(
+        gxc_contrib = xc_molgrad_drv.integrate_gxc_gradient(
             rhow_den_1, rhow_den_2, gs_density, molecule, ao_basis, mol_grid,
             xcfun_label)
         gxc_contrib = self.comm.reduce(gxc_contrib, root=mpi_master())
 
         return gxc_contrib
+
+    def grad_tddft_contrib(self, molecule, ao_basis, rhow_den, xmy_den,
+                           gs_density, xcfun_label):
+        """
+        Calculates exchange-correlation contribution to tddft gradient.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param rhow_den:
+            The perturbed density.
+        :param xmy_den:
+            The X-Y density.
+        :param gs_density:
+            The ground state density.
+        :param xcfun_label:
+            The label of the xc functional.
+
+        :return:
+            The exchange-correlation contribution to tddft gradient.
+        """
+
+        grid_drv = GridDriver(self.comm)
+        grid_drv.set_level(self.grid_level)
+        mol_grid = grid_drv.generate(molecule)
+        mol_grid.distribute(self.rank, self.nodes, self.comm)
+
+        xcgrad_drv = XCMolecularGradient(self.comm)
+        tddft_xcgrad = xcgrad_drv.integrate_tddft_gradient(
+            rhow_den, xmy_den, gs_density, molecule, ao_basis, mol_grid,
+            xcfun_label)
+        tddft_xcgrad = self.comm.reduce(tddft_xcgrad, root=mpi_master())
+
+        return tddft_xcgrad
 
     def grad_nuc_contrib(self, molecule):
         """

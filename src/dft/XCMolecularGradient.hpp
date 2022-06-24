@@ -238,6 +238,14 @@ class CXCMolecularGradient
                                       const CMolecularBasis&  basis,
                                       const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
+
+    CDenseMatrix integrateTddftGradient(const CAODensityMatrix& rwDensityMatrix,
+                                        const CAODensityMatrix& xyDensityMatrix,
+                                        const CAODensityMatrix& gsDensityMatrix,
+                                        const CMolecule&        molecule,
+                                        const CMolecularBasis&  basis,
+                                        const CMolecularGrid&   molecularGrid,
+                                        const std::string&      xcFuncLabel) const;
 };
 
 #endif /* XCMolecularGradient_hpp */

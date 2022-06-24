@@ -58,12 +58,6 @@ class TestTddftXCgrad:
         gs_density.broadcast(grad_drv.rank, grad_drv.comm)
         rhow_den_sym.broadcast(grad_drv.rank, grad_drv.comm)
 
-        vxc_contrib = grad_drv.grad_vxc_contrib(molecule, basis, rhow_den_sym,
-                                                gs_density, xcfun_label)
-        vxc_contrib_2 = grad_drv.grad_fxc_contrib(molecule, basis, rhow_den_sym,
-                                                  gs_density, gs_density,
-                                                  xcfun_label)
-
         if is_mpi_master():
             xmy_den_sym = AODensityMatrix([xmy_sym], denmat.rest)
         else:
@@ -71,18 +65,11 @@ class TestTddftXCgrad:
 
         xmy_den_sym.broadcast(grad_drv.rank, grad_drv.comm)
 
-        fxc_contrib = grad_drv.grad_fxc_contrib(molecule, basis, xmy_den_sym,
-                                                xmy_den_sym, gs_density,
-                                                xcfun_label)
-        fxc_contrib_2 = grad_drv.grad_gxc_contrib(molecule, basis, xmy_den_sym,
-                                                  xmy_den_sym, gs_density,
-                                                  xcfun_label)
+        xcgrad = grad_drv.grad_tddft_contrib(molecule, basis, rhow_den_sym,
+                                             xmy_den_sym, gs_density,
+                                             xcfun_label)
 
         if is_mpi_master():
-            xcgrad = vxc_contrib
-            xcgrad += vxc_contrib_2
-            xcgrad += fxc_contrib
-            xcgrad += fxc_contrib_2
             assert np.max(np.abs(xcgrad - ref_xcgrad)) < 1.0e-5
 
     def test_tda_xcgrad_slater(self):

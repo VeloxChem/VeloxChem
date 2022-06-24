@@ -108,6 +108,8 @@ CXCMolecularGradient::integrateVxcGradient(const CAODensityMatrix& rwDensityMatr
 
         fvxc.compute(vxcgrid, gsdengrid);
 
+        // compute Vxc contribution to molecular gradient
+
         _compVxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrix, mgrid, gsdengrid, vxcgrid);
     }
     else
@@ -313,6 +315,124 @@ CXCMolecularGradient::integrateGxcGradient(const CAODensityMatrix& rwDensityMatr
     return molgrad.transpose();
 }
 
+CDenseMatrix
+CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMatrix,
+                                             const CAODensityMatrix& xyDensityMatrix,
+                                             const CAODensityMatrix& gsDensityMatrix,
+                                             const CMolecule&        molecule,
+                                             const CMolecularBasis&  basis,
+                                             const CMolecularGrid&   molecularGrid,
+                                             const std::string&      xcFuncLabel) const
+{
+    // parse exchange-correlation functional data
+
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    // generate reference density grid
+
+    CDensityGridDriver dgdrv(_locComm);
+
+    auto refdengrid = dgdrv.generate(gsDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
+
+    // create molecular gradient
+
+    const auto natoms = molecule.getNumberOfAtoms();
+
+    CDenseMatrix molgrad(3, natoms);
+
+    molgrad.zero();
+
+    if (rwDensityMatrix.isClosedShell() && xyDensityMatrix.isClosedShell())
+    {
+        // generate screened molecular and density grids
+
+        CMolecularGrid mgrid(molecularGrid);
+
+        CDensityGrid gsdengrid;
+
+        refdengrid.getScreenedGridsPair(gsdengrid, mgrid, 0, _thresholdOfDensity, fvxc.getFunctionalType());
+
+        // allocate XC gradient/hessian grids
+
+        CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
+
+        CXCHessianGrid vxc2grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
+
+        CXCCubicHessianGrid vxc3grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
+
+        // compute exchange-correlation functional derivatives
+
+        fvxc.compute(vxcgrid, gsdengrid);
+
+        fvxc.compute(vxc2grid, gsdengrid);
+
+        fvxc.compute(vxc3grid, gsdengrid);
+
+        // compute first Vxc contribution
+
+        _compVxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrix, mgrid, gsdengrid, vxcgrid);
+
+        // compute second Vxc contribution (using Fxc)
+
+        auto rwdengrid = dgdrv.generate(rwDensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType());
+
+        _compFxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, rwdengrid, vxcgrid, vxc2grid);
+
+        // compute first Fxc contribution
+
+        auto xydengrid = dgdrv.generate(xyDensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType());
+
+        _compFxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), xyDensityMatrix, mgrid, gsdengrid, xydengrid, vxcgrid, vxc2grid);
+
+        // compute second Fxc contribution (using Gxc)
+
+        auto xydenmat = xyDensityMatrix.getReferenceToDensity(0);
+
+        CDenseMatrix xydenmat2(xydenmat);
+
+        CDenseMatrix zerodenmat(xydenmat);
+
+        zerodenmat.zero();
+
+        CDenseMatrix zerodenmat2(zerodenmat);
+
+        CAODensityMatrix xyDensityMatrix(std::vector<CDenseMatrix>({xydenmat, zerodenmat, xydenmat2, zerodenmat2}), denmat::rest);
+
+        // Note: We use quadratic response (quadMode == "QRF") to calculate
+        // third-order functional derivative contribution. The rw2DensityMatrix
+        // contains zero matrices and is therefore removed from the following code.
+        // Same for rw2dengrid.
+
+        // For "QRF" we have rwDensityMatrix.getNumberOfDensityMatrices() ==
+        // 2 * rw2DensityMatrix.getNumberOfDensityMatrices()
+
+        std::string quadMode("QRF");
+
+        int32_t xy2NumberOfDensityMatrices = xyDensityMatrix.getNumberOfDensityMatrices() / 2;
+
+        auto xydengrid2 = dgdrv.generate(xyDensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType());
+
+        auto xydengridc = CDensityGridQuad(mgrid.getNumberOfGridPoints(), xy2NumberOfDensityMatrices, fvxc.getFunctionalType(), dengrid::ab);
+
+        xydengridc.DensityProd(xydengridc, mgrid, xydengrid2, fvxc.getFunctionalType(), xy2NumberOfDensityMatrices, quadMode);
+
+        _compGxcContrib(
+            molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, xydengridc, vxcgrid, vxc2grid, vxc3grid);
+    }
+    else
+    {
+        // not implemented
+
+        std::string erropenshell("XCMolecularGradient.integrateTddftVxcGradient: Not implemented for open-shell");
+
+        errors::assertMsgCritical(false, erropenshell);
+    }
+
+    // done with molecular gradient
+
+    return molgrad.transpose();
+}
+
 void
 CXCMolecularGradient::_compVxcContrib(CDenseMatrix&           molecularGradient,
                                       const CMolecule&        molecule,
@@ -456,11 +576,11 @@ CXCMolecularGradient::_compVxcContrib(CDenseMatrix&           molecularGradient,
 
         // factor of 2 from sum of alpha and beta contributions
 
-        mgradx[i] = 2.0 * gatmx;
+        mgradx[i] += 2.0 * gatmx;
 
-        mgrady[i] = 2.0 * gatmy;
+        mgrady[i] += 2.0 * gatmy;
 
-        mgradz[i] = 2.0 * gatmz;
+        mgradz[i] += 2.0 * gatmz;
     }
 }
 
@@ -778,11 +898,11 @@ CXCMolecularGradient::_compFxcContrib(CDenseMatrix&           molecularGradient,
 
         // factor of 2 from sum of alpha and beta contributions
 
-        mgradx[i] = 2.0 * gatmx;
+        mgradx[i] += 2.0 * gatmx;
 
-        mgrady[i] = 2.0 * gatmy;
+        mgrady[i] += 2.0 * gatmy;
 
-        mgradz[i] = 2.0 * gatmz;
+        mgradz[i] += 2.0 * gatmz;
     }
 }
 
@@ -1505,10 +1625,10 @@ CXCMolecularGradient::_compGxcContrib(CDenseMatrix&              molecularGradie
 
         // factor of 2 from sum of alpha and beta contributions
 
-        mgradx[i] = 2.0 * gatmx;
+        mgradx[i] += 0.25 * (2.0 * gatmx);
 
-        mgrady[i] = 2.0 * gatmy;
+        mgrady[i] += 0.25 * (2.0 * gatmy);
 
-        mgradz[i] = 2.0 * gatmz;
+        mgradz[i] += 0.25 * (2.0 * gatmz);
     }
 }
