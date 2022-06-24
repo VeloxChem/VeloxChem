@@ -316,8 +316,8 @@ CXCMolecularGradient::integrateGxcGradient(const CAODensityMatrix& rwDensityMatr
 }
 
 CDenseMatrix
-CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMatrix,
-                                             const CAODensityMatrix& xyDensityMatrix,
+CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMatrixOne,
+                                             const CAODensityMatrix& rwDensityMatrixTwo,
                                              const CAODensityMatrix& gsDensityMatrix,
                                              const CMolecule&        molecule,
                                              const CMolecularBasis&  basis,
@@ -342,7 +342,7 @@ CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMa
 
     molgrad.zero();
 
-    if (rwDensityMatrix.isClosedShell() && xyDensityMatrix.isClosedShell())
+    if (rwDensityMatrixOne.isClosedShell() && rwDensityMatrixTwo.isClosedShell())
     {
         // generate screened molecular and density grids
 
@@ -370,33 +370,29 @@ CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMa
 
         // compute first Vxc contribution
 
-        _compVxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrix, mgrid, gsdengrid, vxcgrid);
+        _compVxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrixOne, mgrid, gsdengrid, vxcgrid);
 
         // compute second Vxc contribution (using Fxc)
 
-        auto rwdengrid = dgdrv.generate(rwDensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType());
+        auto rwdengrid = dgdrv.generate(rwDensityMatrixOne, molecule, basis, mgrid, fvxc.getFunctionalType());
 
         _compFxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, rwdengrid, vxcgrid, vxc2grid);
 
         // compute first Fxc contribution
 
-        auto xydengrid = dgdrv.generate(xyDensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType());
+        auto rwdengrid2 = dgdrv.generate(rwDensityMatrixTwo, molecule, basis, mgrid, fvxc.getFunctionalType());
 
-        _compFxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), xyDensityMatrix, mgrid, gsdengrid, xydengrid, vxcgrid, vxc2grid);
+        _compFxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrixTwo, mgrid, gsdengrid, rwdengrid2, vxcgrid, vxc2grid);
 
         // compute second Fxc contribution (using Gxc)
 
-        auto xydenmat = xyDensityMatrix.getReferenceToDensity(0);
+        auto rwdenmat2 = rwDensityMatrixTwo.getReferenceToDensity(0);
 
-        CDenseMatrix xydenmat2(xydenmat);
+        CDenseMatrix zerodenmat2(rwdenmat2);
 
-        CDenseMatrix zerodenmat(xydenmat);
+        zerodenmat2.zero();
 
-        zerodenmat.zero();
-
-        CDenseMatrix zerodenmat2(zerodenmat);
-
-        CAODensityMatrix xyDensityMatrix(std::vector<CDenseMatrix>({xydenmat, zerodenmat, xydenmat2, zerodenmat2}), denmat::rest);
+        CAODensityMatrix rwDensityMatrixThree(std::vector<CDenseMatrix>({rwdenmat2, zerodenmat2, rwdenmat2, zerodenmat2}), denmat::rest);
 
         // Note: We use quadratic response (quadMode == "QRF") to calculate
         // third-order functional derivative contribution. The rw2DensityMatrix
@@ -408,16 +404,16 @@ CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMa
 
         std::string quadMode("QRF");
 
-        int32_t xy2NumberOfDensityMatrices = xyDensityMatrix.getNumberOfDensityMatrices() / 2;
+        int32_t qrfNumDensityMatrices = rwDensityMatrixThree.getNumberOfDensityMatrices() / 2;
 
-        auto xydengrid2 = dgdrv.generate(xyDensityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType());
+        auto rwdengrid3 = dgdrv.generate(rwDensityMatrixThree, molecule, basis, mgrid, fvxc.getFunctionalType());
 
-        auto xydengridc = CDensityGridQuad(mgrid.getNumberOfGridPoints(), xy2NumberOfDensityMatrices, fvxc.getFunctionalType(), dengrid::ab);
+        auto rwdengridc = CDensityGridQuad(mgrid.getNumberOfGridPoints(), qrfNumDensityMatrices, fvxc.getFunctionalType(), dengrid::ab);
 
-        xydengridc.DensityProd(xydengrid2, fvxc.getFunctionalType(), xy2NumberOfDensityMatrices, quadMode);
+        rwdengridc.DensityProd(rwdengrid3, fvxc.getFunctionalType(), qrfNumDensityMatrices, quadMode);
 
         _compGxcContrib(
-            molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, xydengridc, vxcgrid, vxc2grid, vxc3grid);
+            molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, rwdengridc, vxcgrid, vxc2grid, vxc3grid);
     }
     else
     {

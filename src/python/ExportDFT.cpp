@@ -335,19 +335,20 @@ export_dft(py::module& m)
         .def(
             "integrate_tddft_gradient",
             [](CXCMolecularGradient&   self,
-               const CAODensityMatrix& rwDensityMatrix,
-               const CAODensityMatrix& xyDensityMatrix,
+               const CAODensityMatrix& rwDensityMatrixOne,
+               const CAODensityMatrix& rwDensityMatrixTwo,
                const CAODensityMatrix& gsDensityMatrix,
                const CMolecule&        molecule,
                const CMolecularBasis&  basis,
                const CMolecularGrid&   molecularGrid,
                const std::string&      xcFuncLabel) -> py::array_t<double> {
-                auto molgrad = self.integrateTddftGradient(rwDensityMatrix, xyDensityMatrix, gsDensityMatrix, molecule, basis, molecularGrid, xcFuncLabel);
+                auto molgrad =
+                    self.integrateTddftGradient(rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecule, basis, molecularGrid, xcFuncLabel);
                 return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
             },
             "Integrates exchange-correlation contribution to molecular gradient.",
-            "rwDensityMatrix"_a,
-            "xyDensityMatrix"_a,
+            "rwDensityMatrixOne"_a,
+            "rwDensityMatrixTwo"_a,
             "gsDensityMatrix"_a,
             "molecule"_a,
             "basis"_a,

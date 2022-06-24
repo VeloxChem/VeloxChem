@@ -239,8 +239,20 @@ class CXCMolecularGradient
                                       const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 
-    CDenseMatrix integrateTddftGradient(const CAODensityMatrix& rwDensityMatrix,
-                                        const CAODensityMatrix& xyDensityMatrix,
+    /**
+     Integrates exchnage-correlation functional contribution to molecular gradient.
+
+     @param rwDensityMatrixOne the perturbed AO density matrix object (relaxed_dens).
+     @param rwDensityMatrixTwo the perturbed AO density matrix object (x_minus_y_ao).
+     @param gsDensityMatrix the ground state AO density matrix object.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @return the molecular gradient.
+     */
+    CDenseMatrix integrateTddftGradient(const CAODensityMatrix& rwDensityMatrixOne,
+                                        const CAODensityMatrix& rwDensityMatrixTwo,
                                         const CAODensityMatrix& gsDensityMatrix,
                                         const CMolecule&        molecule,
                                         const CMolecularBasis&  basis,
