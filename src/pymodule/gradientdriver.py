@@ -308,8 +308,8 @@ class GradientDriver:
 
         return gxc_contrib
 
-    def grad_tddft_contrib(self, molecule, ao_basis, rhow_den, xmy_den,
-                           gs_density, xcfun_label):
+    def grad_tddft_xc_contrib(self, molecule, ao_basis, rhow_den, xmy_den,
+                              gs_density, xcfun_label):
         """
         Calculates exchange-correlation contribution to tddft gradient.
 

@@ -51,26 +51,37 @@ class TestTddftXCgrad:
         if is_mpi_master():
             gs_density = AODensityMatrix([gs_dm], denmat.rest)
             rhow_den_sym = AODensityMatrix([rhow_dm_sym], denmat.rest)
+            xmy_den_sym = AODensityMatrix([xmy_sym], denmat.rest)
         else:
             gs_density = AODensityMatrix()
             rhow_den_sym = AODensityMatrix()
+            xmy_den_sym = AODensityMatrix()
 
         gs_density.broadcast(grad_drv.rank, grad_drv.comm)
         rhow_den_sym.broadcast(grad_drv.rank, grad_drv.comm)
-
-        if is_mpi_master():
-            xmy_den_sym = AODensityMatrix([xmy_sym], denmat.rest)
-        else:
-            xmy_den_sym = AODensityMatrix()
-
         xmy_den_sym.broadcast(grad_drv.rank, grad_drv.comm)
 
-        xcgrad = grad_drv.grad_tddft_contrib(molecule, basis, rhow_den_sym,
-                                             xmy_den_sym, gs_density,
-                                             xcfun_label)
+        vxc_contrib = grad_drv.grad_vxc_contrib(molecule, basis, rhow_den_sym,
+                                                gs_density, xcfun_label)
+        vxc_contrib_2 = grad_drv.grad_fxc_contrib(molecule, basis, rhow_den_sym,
+                                                  gs_density, gs_density,
+                                                  xcfun_label)
+
+        fxc_contrib = grad_drv.grad_fxc_contrib(molecule, basis, xmy_den_sym,
+                                                xmy_den_sym, gs_density,
+                                                xcfun_label)
+        fxc_contrib_2 = grad_drv.grad_gxc_contrib(molecule, basis, xmy_den_sym,
+                                                  xmy_den_sym, gs_density,
+                                                  xcfun_label)
+
+        xcgrad = grad_drv.grad_tddft_xc_contrib(molecule, basis, rhow_den_sym,
+                                                xmy_den_sym, gs_density,
+                                                xcfun_label)
 
         if is_mpi_master():
             assert np.max(np.abs(xcgrad - ref_xcgrad)) < 1.0e-5
+            xcgrad2 = vxc_contrib + vxc_contrib_2 + fxc_contrib + fxc_contrib_2
+            assert np.max(np.abs(xcgrad2 - ref_xcgrad)) < 1.0e-5
 
     def test_tda_xcgrad_slater(self):
 

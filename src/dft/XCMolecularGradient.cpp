@@ -294,7 +294,7 @@ CXCMolecularGradient::integrateGxcGradient(const CAODensityMatrix& rwDensityMatr
 
         auto rwdengridc = CDensityGridQuad(mgrid.getNumberOfGridPoints(), rw2NumberOfDensityMatrices, fvxc.getFunctionalType(), dengrid::ab);
 
-        rwdengridc.DensityProd(rwdengridc, mgrid, rwdengrid, fvxc.getFunctionalType(), rw2NumberOfDensityMatrices, quadMode);
+        rwdengridc.DensityProd(rwdengrid, fvxc.getFunctionalType(), rw2NumberOfDensityMatrices, quadMode);
 
         // compute Gxc contribution to molecular gradient
 
@@ -414,7 +414,7 @@ CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMa
 
         auto xydengridc = CDensityGridQuad(mgrid.getNumberOfGridPoints(), xy2NumberOfDensityMatrices, fvxc.getFunctionalType(), dengrid::ab);
 
-        xydengridc.DensityProd(xydengridc, mgrid, xydengrid2, fvxc.getFunctionalType(), xy2NumberOfDensityMatrices, quadMode);
+        xydengridc.DensityProd(xydengrid2, fvxc.getFunctionalType(), xy2NumberOfDensityMatrices, quadMode);
 
         _compGxcContrib(
             molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, xydengridc, vxcgrid, vxc2grid, vxc3grid);
@@ -423,7 +423,7 @@ CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMa
     {
         // not implemented
 
-        std::string erropenshell("XCMolecularGradient.integrateTddftVxcGradient: Not implemented for open-shell");
+        std::string erropenshell("XCMolecularGradient.integrateTddftGradient: Not implemented for open-shell");
 
         errors::assertMsgCritical(false, erropenshell);
     }
