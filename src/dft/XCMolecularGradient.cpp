@@ -25,6 +25,8 @@
 
 #include "XCMolecularGradient.hpp"
 
+#include <chrono>
+#include <iostream>
 #include <string>
 
 #include "AODensityMatrix.hpp"
@@ -324,6 +326,10 @@ CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMa
                                              const CMolecularGrid&   molecularGrid,
                                              const std::string&      xcFuncLabel) const
 {
+    auto t00 = std::chrono::system_clock::now();
+
+    auto t0 = std::chrono::system_clock::now();
+
     // parse exchange-correlation functional data
 
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
@@ -333,6 +339,10 @@ CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMa
     CDensityGridDriver dgdrv(_locComm);
 
     auto refdengrid = dgdrv.generate(gsDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
+
+    auto t1 = std::chrono::system_clock::now();
+
+    std::cout << "ref den grid: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
 
     // create molecular gradient
 
@@ -344,6 +354,8 @@ CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMa
 
     if (rwDensityMatrixOne.isClosedShell() && rwDensityMatrixTwo.isClosedShell())
     {
+        t0 = std::chrono::system_clock::now();
+
         // generate screened molecular and density grids
 
         CMolecularGrid mgrid(molecularGrid);
@@ -351,6 +363,10 @@ CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMa
         CDensityGrid gsdengrid;
 
         refdengrid.getScreenedGridsPair(gsdengrid, mgrid, 0, _thresholdOfDensity, fvxc.getFunctionalType());
+
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "screen grids pair: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
 
         // allocate XC gradient/hessian grids
 
@@ -362,27 +378,71 @@ CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMa
 
         // compute exchange-correlation functional derivatives
 
+        t0 = std::chrono::system_clock::now();
+
         fvxc.compute(vxcgrid, gsdengrid);
+
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "xc func deriv 1: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+
+        t0 = std::chrono::system_clock::now();
 
         fvxc.compute(vxc2grid, gsdengrid);
 
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "xc func deriv 2: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+
+        t0 = std::chrono::system_clock::now();
+
         fvxc.compute(vxc3grid, gsdengrid);
+
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "xc func deriv 3: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+
+        t0 = std::chrono::system_clock::now();
 
         // compute first Vxc contribution
 
         _compVxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrixOne, mgrid, gsdengrid, vxcgrid);
 
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "vxc 1st term: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+
+        t0 = std::chrono::system_clock::now();
+
         // compute second Vxc contribution (using Fxc)
 
         auto rwdengrid = dgdrv.generate(rwDensityMatrixOne, molecule, basis, mgrid, fvxc.getFunctionalType());
 
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "vxc 2nd term prep: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+
+        t0 = std::chrono::system_clock::now();
+
         _compFxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, rwdengrid, vxcgrid, vxc2grid);
+
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "vxc 2nd term comp: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+
+        t0 = std::chrono::system_clock::now();
 
         // compute first Fxc contribution
 
         auto rwdengrid2 = dgdrv.generate(rwDensityMatrixTwo, molecule, basis, mgrid, fvxc.getFunctionalType());
 
         _compFxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrixTwo, mgrid, gsdengrid, rwdengrid2, vxcgrid, vxc2grid);
+
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "fxc 1st term: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+
+        t0 = std::chrono::system_clock::now();
 
         // compute second Fxc contribution (using Gxc)
 
@@ -412,8 +472,18 @@ CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMa
 
         rwdengridc.DensityProd(rwdengrid3, fvxc.getFunctionalType(), qrfNumDensityMatrices, quadMode);
 
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "fxc 2nd term prep: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+
+        t0 = std::chrono::system_clock::now();
+
         _compGxcContrib(
             molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, rwdengridc, vxcgrid, vxc2grid, vxc3grid);
+
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "fxc 2nd term comp: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
     }
     else
     {
@@ -423,6 +493,10 @@ CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMa
 
         errors::assertMsgCritical(false, erropenshell);
     }
+
+    auto t11 = std::chrono::system_clock::now();
+
+    std::cout << "total time in tddft xcgrad: " << std::chrono::duration_cast<std::chrono::milliseconds>(t11 - t00).count() << " ms" << std::endl;
 
     // done with molecular gradient
 
@@ -475,9 +549,19 @@ CXCMolecularGradient::_compVxcContrib(CDenseMatrix&           molecularGradient,
 
     CDensityGradientGridDriver graddrv(_locComm);
 
+    auto t00 = std::chrono::system_clock::now();
+
     for (int32_t i = 0; i < natoms; i++)
     {
+        auto t0 = std::chrono::system_clock::now();
+
         auto gradgrid = graddrv.generate(densityMatrix, molecule, basis, molecularGrid, xcFuncType, i);
+
+        auto t1 = std::chrono::system_clock::now();
+
+        auto t_graddrv = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
+
+        std::cout << "    graddrv in vxc: " << t_graddrv << " ms" << std::endl;
 
         double gatmx = 0.0;
 
@@ -578,6 +662,12 @@ CXCMolecularGradient::_compVxcContrib(CDenseMatrix&           molecularGradient,
 
         mgradz[i] += 2.0 * gatmz;
     }
+
+    auto t11 = std::chrono::system_clock::now();
+
+    auto t_graddrv = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(t11 - t00).count());
+
+    std::cout << "  total graddrv in vxc: " << t_graddrv << " ms" << std::endl;
 }
 
 void
@@ -676,7 +766,15 @@ CXCMolecularGradient::_compFxcContrib(CDenseMatrix&           molecularGradient,
 
     for (int32_t i = 0; i < natoms; i++)
     {
+        auto t0 = std::chrono::system_clock::now();
+
         auto gradgrid = graddrv.generate(densityMatrix, molecule, basis, molecularGrid, xcFuncType, i);
+
+        auto t1 = std::chrono::system_clock::now();
+
+        auto t_graddrv = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
+
+        std::cout << "    graddrv in fxc: " << t_graddrv << " ms" << std::endl;
 
         double gatmx = 0.0;
 
@@ -1059,7 +1157,15 @@ CXCMolecularGradient::_compGxcContrib(CDenseMatrix&              molecularGradie
 
     for (int32_t i = 0; i < natoms; i++)
     {
+        auto t0 = std::chrono::system_clock::now();
+
         auto gradgrid = graddrv.generate(densityMatrix, molecule, basis, molecularGrid, xcFuncType, i);
+
+        auto t1 = std::chrono::system_clock::now();
+
+        auto t_graddrv = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
+
+        std::cout << "    graddrv in gxc: " << t_graddrv << " ms" << std::endl;
 
         double gatmx = 0.0;
 

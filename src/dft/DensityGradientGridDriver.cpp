@@ -184,6 +184,8 @@ CDensityGradientGridDriver::_genBatchOfRestrictedDensityGridPointsForLda(CDensit
 
     auto naos = gtoContainer->getNumberOfAtomicOrbitals();
 
+    auto atmnaos = atmGtoContainer->getNumberOfAtomicOrbitals();
+
     // determine number of grid blocks
 
     auto blockdim = _getSizeOfBlock();
@@ -200,13 +202,15 @@ CDensityGradientGridDriver::_genBatchOfRestrictedDensityGridPointsForLda(CDensit
     {
         CMemBlock2D<double> gaos(blockdim, naos);
 
-        CMemBlock2D<double> xgaos(blockdim, naos);
+        CMemBlock2D<double> xgaos(blockdim, atmnaos);
 
-        CMemBlock2D<double> xgaox(blockdim, naos);
+        CMemBlock2D<double> xgaox(blockdim, atmnaos);
 
-        CMemBlock2D<double> xgaoy(blockdim, naos);
+        CMemBlock2D<double> xgaoy(blockdim, atmnaos);
 
-        CMemBlock2D<double> xgaoz(blockdim, naos);
+        CMemBlock2D<double> xgaoz(blockdim, atmnaos);
+
+        CMemBlock<int32_t> aoidx(atmnaos);
 
         for (int32_t i = 0; i < nblocks; i++)
         {
@@ -222,10 +226,10 @@ CDensityGradientGridDriver::_genBatchOfRestrictedDensityGridPointsForLda(CDensit
 
             gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, igpnt, blockdim);
 
-            gtorec::computeGtosValuesForGGA(
-                xgaos, xgaox, xgaoy, xgaoz, atmGtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, igpnt, blockdim);
+            gtorec::computeGtosValuesForLDA2(
+                aoidx, xgaos, xgaox, xgaoy, xgaoz, atmGtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, igpnt, blockdim);
 
-            _distRestrictedDensityValuesForLda(densityGrid, aoDensityMatrix, gaos, xgaox, xgaoy, xgaoz, gridOffset, igpnt, blockdim);
+            _distRestrictedDensityValuesForLda(densityGrid, aoDensityMatrix, gaos, aoidx, xgaox, xgaoy, xgaoz, gridOffset, igpnt, blockdim);
 
             igpnt += blockdim;
         }
@@ -239,13 +243,15 @@ CDensityGradientGridDriver::_genBatchOfRestrictedDensityGridPointsForLda(CDensit
     {
         CMemBlock2D<double> gaos(blockdim, naos);
 
-        CMemBlock2D<double> xgaos(blockdim, naos);
+        CMemBlock2D<double> xgaos(blockdim, atmnaos);
 
-        CMemBlock2D<double> xgaox(blockdim, naos);
+        CMemBlock2D<double> xgaox(blockdim, atmnaos);
 
-        CMemBlock2D<double> xgaoy(blockdim, naos);
+        CMemBlock2D<double> xgaoy(blockdim, atmnaos);
 
-        CMemBlock2D<double> xgaoz(blockdim, naos);
+        CMemBlock2D<double> xgaoz(blockdim, atmnaos);
+
+        CMemBlock<int32_t> aoidx(atmnaos);
 
         gaos.zero();
 
@@ -259,10 +265,10 @@ CDensityGradientGridDriver::_genBatchOfRestrictedDensityGridPointsForLda(CDensit
 
         gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, igpnt, blockdim);
 
-        gtorec::computeGtosValuesForGGA(
-            xgaos, xgaox, xgaoy, xgaoz, atmGtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, igpnt, blockdim);
+        gtorec::computeGtosValuesForLDA2(
+            aoidx, xgaos, xgaox, xgaoy, xgaoz, atmGtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, igpnt, blockdim);
 
-        _distRestrictedDensityValuesForLda(densityGrid, aoDensityMatrix, gaos, xgaox, xgaoy, xgaoz, gridOffset, igpnt, blockdim);
+        _distRestrictedDensityValuesForLda(densityGrid, aoDensityMatrix, gaos, aoidx, xgaox, xgaoy, xgaoz, gridOffset, igpnt, blockdim);
     }
 }
 
@@ -270,6 +276,7 @@ void
 CDensityGradientGridDriver::_distRestrictedDensityValuesForLda(CDensityGrid*              densityGrid,
                                                                const CAODensityMatrix*    aoDensityMatrix,
                                                                const CMemBlock2D<double>& braGtoValues,
+                                                               const CMemBlock<int32_t>&  aoIdentifiers,
                                                                const CMemBlock2D<double>& ketGtoValuesX,
                                                                const CMemBlock2D<double>& ketGtoValuesY,
                                                                const CMemBlock2D<double>& ketGtoValuesZ,
@@ -293,13 +300,15 @@ CDensityGradientGridDriver::_distRestrictedDensityValuesForLda(CDensityGrid*    
 
         auto naos = aoDensityMatrix->getNumberOfRows(0);
 
+        auto atmnaos = aoIdentifiers.size();
+
         // loop over density matrix
 
         for (int32_t i = 0; i < naos; i++)
         {
             auto bgaos = braGtoValues.data(i);
 
-            for (int32_t j = 0; j < naos; j++)
+            for (int32_t j = 0; j < atmnaos; j++)
             {
                 auto kgaox = ketGtoValuesX.data(j);
 
@@ -307,7 +316,7 @@ CDensityGradientGridDriver::_distRestrictedDensityValuesForLda(CDensityGrid*    
 
                 auto kgaoz = ketGtoValuesZ.data(j);
 
-                const auto dval = 2.0 * denmat[i * naos + j];
+                const auto dval = 2.0 * denmat[i * naos + aoIdentifiers.at(j)];
 
                 #pragma omp simd
                 for (int32_t k = 0; k < nGridPoints; k++)
@@ -415,6 +424,8 @@ CDensityGradientGridDriver::_genBatchOfRestrictedDensityGridPointsForGga(CDensit
 
     auto naos = gtoContainer->getNumberOfAtomicOrbitals();
 
+    auto atmnaos = atmGtoContainer->getNumberOfAtomicOrbitals();
+
     // determine number of grid blocks
 
     auto blockdim = _getSizeOfBlock();
@@ -457,6 +468,8 @@ CDensityGradientGridDriver::_genBatchOfRestrictedDensityGridPointsForGga(CDensit
 
         CMemBlock2D<double> kgaozz(blockdim, naos);
 
+        CMemBlock<int32_t> aoidx(atmnaos);
+
         for (int32_t i = 0; i < nblocks; i++)
         {
             bgaos.zero();
@@ -490,7 +503,8 @@ CDensityGradientGridDriver::_genBatchOfRestrictedDensityGridPointsForGga(CDensit
             gtorec::computeGtosValuesForGGA(
                 bgaos, bgaox, bgaoy, bgaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, igpnt, blockdim);
 
-            gtorec::computeGtosValuesForGGA2(kgaos,
+            gtorec::computeGtosValuesForGGA2(aoidx,
+                                             kgaos,
                                              kgaox,
                                              kgaoy,
                                              kgaoz,
@@ -509,7 +523,7 @@ CDensityGradientGridDriver::_genBatchOfRestrictedDensityGridPointsForGga(CDensit
                                              blockdim);
 
             _distRestrictedDensityValuesForGga(
-                densityGrid, aoDensityMatrix, bgaos, bgaox, bgaoy, bgaoz, kgaox, kgaoy, kgaoz, kgaoxx, kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz, gridOffset, igpnt, blockdim);
+                densityGrid, aoDensityMatrix, bgaos, bgaox, bgaoy, bgaoz, aoidx, kgaox, kgaoy, kgaoz, kgaoxx, kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz, gridOffset, igpnt, blockdim);
 
             igpnt += blockdim;
         }
@@ -549,6 +563,8 @@ CDensityGradientGridDriver::_genBatchOfRestrictedDensityGridPointsForGga(CDensit
 
         CMemBlock2D<double> kgaozz(blockdim, naos);
 
+        CMemBlock<int32_t> aoidx(atmnaos);
+
         bgaos.zero();
 
         bgaox.zero();
@@ -581,11 +597,11 @@ CDensityGradientGridDriver::_genBatchOfRestrictedDensityGridPointsForGga(CDensit
             bgaos, bgaox, bgaoy, bgaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, igpnt, blockdim);
 
         gtorec::computeGtosValuesForGGA2(
-            kgaos, kgaox, kgaoy, kgaoz, kgaoxx, kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz,
+            aoidx, kgaos, kgaox, kgaoy, kgaoz, kgaoxx, kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz,
             atmGtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, igpnt, blockdim);
 
         _distRestrictedDensityValuesForGga(
-            densityGrid, aoDensityMatrix, bgaos, bgaox, bgaoy, bgaoz, kgaox, kgaoy, kgaoz, kgaoxx, kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz, gridOffset, igpnt, blockdim);
+            densityGrid, aoDensityMatrix, bgaos, bgaox, bgaoy, bgaoz, aoidx, kgaox, kgaoy, kgaoz, kgaoxx, kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz, gridOffset, igpnt, blockdim);
     }
 }
 
@@ -596,6 +612,7 @@ CDensityGradientGridDriver::_distRestrictedDensityValuesForGga(CDensityGrid*    
                                                                const CMemBlock2D<double>& braGtoValuesX,
                                                                const CMemBlock2D<double>& braGtoValuesY,
                                                                const CMemBlock2D<double>& braGtoValuesZ,
+                                                               const CMemBlock<int32_t>&  aoIdentifiers,
                                                                const CMemBlock2D<double>& ketGtoValuesX,
                                                                const CMemBlock2D<double>& ketGtoValuesY,
                                                                const CMemBlock2D<double>& ketGtoValuesZ,
@@ -643,6 +660,8 @@ CDensityGradientGridDriver::_distRestrictedDensityValuesForGga(CDensityGrid*    
 
         auto naos = aoDensityMatrix->getNumberOfRows(0);
 
+        auto atmnaos = aoIdentifiers.size();
+
         // loop over density matrix
 
         for (int32_t i = 0; i < naos; i++)
@@ -655,7 +674,7 @@ CDensityGradientGridDriver::_distRestrictedDensityValuesForGga(CDensityGrid*    
 
             auto bgaoz = braGtoValuesZ.data(i);
 
-            for (int32_t j = 0; j < naos; j++)
+            for (int32_t j = 0; j < atmnaos; j++)
             {
                 auto kgaox = ketGtoValuesX.data(j);
 
@@ -675,7 +694,7 @@ CDensityGradientGridDriver::_distRestrictedDensityValuesForGga(CDensityGrid*    
 
                 auto kgaozz = ketGtoValuesZZ.data(j);
 
-                const auto dval = 2.0 * denmat[i * naos + j];
+                const auto dval = 2.0 * denmat[i * naos + aoIdentifiers.at(j)];
 
                 #pragma omp simd
                 for (int32_t k = 0; k < nGridPoints; k++)

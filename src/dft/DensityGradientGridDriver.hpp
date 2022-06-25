@@ -110,6 +110,7 @@ class CDensityGradientGridDriver
      @param densityGrid the pointer to density grid object.
      @param aoDensityMatrix the AO density matrix.
      @param braGtoValues the GTOs values buffer on bra side.
+     @param aoIdentifiers the identifiers of AOs.
      @param ketGtoValuesX the GTOs gradient along X axis values buffer on ket side.
      @param ketGtoValuesY the GTOs gradient along Y axis values buffer on ket side.
      @param ketGtoValuesZ the GTOs gradient along Z axis values buffer on ket side.
@@ -120,6 +121,7 @@ class CDensityGradientGridDriver
     void _distRestrictedDensityValuesForLda(CDensityGrid*              densityGrid,
                                             const CAODensityMatrix*    aoDensityMatrix,
                                             const CMemBlock2D<double>& braGtoValues,
+                                            const CMemBlock<int32_t>&  aoIdentifiers,
                                             const CMemBlock2D<double>& ketGtoValuesX,
                                             const CMemBlock2D<double>& ketGtoValuesY,
                                             const CMemBlock2D<double>& ketGtoValuesZ,
@@ -180,6 +182,7 @@ class CDensityGradientGridDriver
      @param braGtoValuesX the GTOs gradient along X axis values buffer on bra side.
      @param braGtoValuesY the GTOs gradient along Y axis values buffer on bra side.
      @param braGtoValuesZ the GTOs gradient along Z axis values buffer on bra side.
+     @param aoIdentifiers the identifiers of AOs.
      @param ketGtoValuesX the GTOs gradient along X axis values buffer on ket side.
      @param ketGtoValuesY the GTOs gradient along Y axis values buffer on ket side.
      @param ketGtoValuesZ the GTOs gradient along Z axis values buffer on ket side.
@@ -194,6 +197,7 @@ class CDensityGradientGridDriver
                                             const CMemBlock2D<double>& braGtoValuesX,
                                             const CMemBlock2D<double>& braGtoValuesY,
                                             const CMemBlock2D<double>& braGtoValuesZ,
+                                            const CMemBlock<int32_t>&  aoIdentifiers,
                                             const CMemBlock2D<double>& ketGtoValuesX,
                                             const CMemBlock2D<double>& ketGtoValuesY,
                                             const CMemBlock2D<double>& ketGtoValuesZ,
