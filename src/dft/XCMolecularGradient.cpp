@@ -503,26 +503,6 @@ CXCMolecularGradient::_compVxcContrib(CDenseMatrix&           molecularGradient,
                                       const CDensityGrid&     gsDensityGrid,
                                       const CXCGradientGrid&  xcGradientGrid) const
 {
-    // set up pointers to exchange-correlation functional derivatives
-
-    // auto grhoa = xcGradientGrid.xcGradientValues(xcvars::rhoa);
-
-    // auto ggrada = xcGradientGrid.xcGradientValues(xcvars::grada);
-
-    // auto ggradab = xcGradientGrid.xcGradientValues(xcvars::gradab);
-
-    // set up pointers to density gradient norms
-
-    // auto ngrada = gsDensityGrid.alphaDensityGradient(0);
-
-    // auto gradax = gsDensityGrid.alphaDensityGradientX(0);
-
-    // auto graday = gsDensityGrid.alphaDensityGradientY(0);
-
-    // auto gradaz = gsDensityGrid.alphaDensityGradientZ(0);
-
-    // compute molecular gradient
-
     if (xcFuncType == xcfun::lda)
     {
         _compVxcContribForLDA(molecularGradient, densityMatrix, molecule, basis, molecularGrid, gsDensityGrid, xcGradientGrid);
@@ -554,7 +534,7 @@ CXCMolecularGradient::_compVxcContribForLDA(CDenseMatrix&           molecularGra
 {
     // set up OMP tasks
 
-    COMPTasks omptaks(1);
+    COMPTasks omptaks(5);
 
     omptaks.set(molecularGrid.getNumberOfGridPoints());
 
@@ -579,11 +559,9 @@ CXCMolecularGradient::_compVxcContribForLDA(CDenseMatrix&           molecularGra
         tbmolgrads.push_back(molgrad);
     }
 
-    auto molgrad = &molecularGradient;
-
-    //#pragma omp parallel shared(tbmolgrads, tbsizes, tbpositions, ntasks, molgrad)
+    #pragma omp parallel shared(tbmolgrads, tbsizes, tbpositions, ntasks)
     {
-        //#pragma omp single nowait
+        #pragma omp single nowait
         {
             for (int32_t i = 0; i < ntasks; i++)
             {
@@ -593,13 +571,13 @@ CXCMolecularGradient::_compVxcContribForLDA(CDenseMatrix&           molecularGra
 
                 auto tbposition = tbpositions[i];
 
-                //auto tbmolgrad = &(tbmolgrads[i]);
+                auto tbmolgrad = &(tbmolgrads[i]);
 
                 // generate task
 
-                //#pragma omp task firstprivate(tbsize, tbposition)
+                #pragma omp task firstprivate(tbsize, tbposition)
                 {
-                    _compVxcBatchForLDA(molgrad, densityMatrix, molecule, basis, molecularGrid, gsDensityGrid, xcGradientGrid, tbposition, tbsize);
+                    _compVxcBatchForLDA(tbmolgrad, densityMatrix, molecule, basis, molecularGrid, gsDensityGrid, xcGradientGrid, tbposition, tbsize);
                 }
             }
         }
@@ -768,7 +746,7 @@ CXCMolecularGradient::_distGradientDensityValuesForLda(CDensityGrid&            
 
                 const auto dval = 2.0 * denmat[i * naos + aoIdentifiers.at(j)];
 
-                //#pragma omp simd aligned(rhoax, rhoay, rhoaz, bgaos, kgaox, kgaoy, kgaoz : VLX_ALIGN)
+                #pragma omp simd aligned(rhoax, rhoay, rhoaz, bgaos, kgaox, kgaoy, kgaoz : VLX_ALIGN)
                 for (int32_t k = 0; k < nGridPoints; k++)
                 {
                     rhoax[k] -= dval * bgaos[k] * kgaox[k];
@@ -817,15 +795,13 @@ CXCMolecularGradient::_accumulateVxcContribForLDA(CDenseMatrix*           molecu
 
     for (int32_t j = 0; j < nGridPoints; j++)
     {
-        gatmx += gw[gridOffset +gridBlockPosition+ j] * grhoa[gridOffset +gridBlockPosition+ j] * gdenx[j];
+        gatmx += gw[gridOffset + gridBlockPosition + j] * grhoa[gridOffset + gridBlockPosition + j] * gdenx[j];
 
-        gatmy += gw[gridOffset +gridBlockPosition+ j] * grhoa[gridOffset +gridBlockPosition+ j] * gdeny[j];
+        gatmy += gw[gridOffset + gridBlockPosition + j] * grhoa[gridOffset + gridBlockPosition + j] * gdeny[j];
 
-        gatmz += gw[gridOffset +gridBlockPosition+ j] * grhoa[gridOffset +gridBlockPosition+ j] * gdenz[j];
+        gatmz += gw[gridOffset + gridBlockPosition + j] * grhoa[gridOffset + gridBlockPosition + j] * gdenz[j];
     }
 
-    std::cout << "gatm: " << gatmx << " " << gatmy << " " << gatmz << std::endl;
-    
     auto mgradx = molecularGradient->row(0);
 
     auto mgrady = molecularGradient->row(1);
