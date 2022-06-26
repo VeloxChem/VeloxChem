@@ -304,6 +304,7 @@ class CXCMolecularGradient
                                                   const CDensityGrid&     gsDensityGrid,
                                                   const CXCGradientGrid&  xcGradientGrid,
                                                   const int32_t           gridOffset,
+                                                  const int32_t           gridBlockPosition,
                                                   const int32_t           nGridPoints) const;
 
     int32_t _getSizeOfBlock() const;

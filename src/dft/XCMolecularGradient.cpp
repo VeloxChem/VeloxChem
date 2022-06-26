@@ -554,7 +554,7 @@ CXCMolecularGradient::_compVxcContribForLDA(CDenseMatrix&           molecularGra
 {
     // set up OMP tasks
 
-    COMPTasks omptaks(5);
+    COMPTasks omptaks(1);
 
     omptaks.set(molecularGrid.getNumberOfGridPoints());
 
@@ -656,27 +656,31 @@ CXCMolecularGradient::_compVxcBatchForLDA(CDenseMatrix*           molecularGradi
 
     auto natoms = molecule.getNumberOfAtoms();
 
-    for (int32_t iatom = 0; iatom < natoms ; iatom++)
+    // set up current grid point
+
+    int32_t igpnt = 0;
+
+    // loop over grid points blocks
+
+    for (int32_t i = 0; i < nblocks + 1; i++)
     {
-        CGtoContainer* atmgtovec = new CGtoContainer(molecule, basis, iatom, 1);
+        if (i == nblocks) blockdim = nGridPoints - blockdim * nblocks;
 
-        auto atmnaos = atmgtovec->getNumberOfAtomicOrbitals();
+        if (blockdim == 0) continue;
 
-        // initialize gradient density grid
+        CMemBlock2D<double> gaos(blockdim, naos);
 
-        CDensityGrid gradgrid(nGridPoints, densityMatrix.getNumberOfDensityMatrices(), 3, dengrid::ab);
+        gaos.zero();
 
-        gradgrid.zero();
+        gtorec::computeGtosValuesForLDA(gaos, gtovec, mgx, mgy, mgz, gridOffset, igpnt, blockdim);
 
-        // set up current grid point
-
-        int32_t igpnt = 0;
-
-        // loop over grid points blocks
-
-        if (nblocks > 0)
+        for (int32_t iatom = 0; iatom < natoms ; iatom++)
         {
-            CMemBlock2D<double> gaos(blockdim, naos);
+            CGtoContainer* atmgtovec = new CGtoContainer(molecule, basis, iatom, 1);
+
+            auto atmnaos = atmgtovec->getNumberOfAtomicOrbitals();
+
+            CMemBlock<int32_t> aoidx(atmnaos);
 
             CMemBlock2D<double> xgaos(blockdim, atmnaos);
 
@@ -685,51 +689,6 @@ CXCMolecularGradient::_compVxcBatchForLDA(CDenseMatrix*           molecularGradi
             CMemBlock2D<double> xgaoy(blockdim, atmnaos);
 
             CMemBlock2D<double> xgaoz(blockdim, atmnaos);
-
-            CMemBlock<int32_t> aoidx(atmnaos);
-
-            for (int32_t i = 0; i < nblocks; i++)
-            {
-                gaos.zero();
-
-                xgaos.zero();
-
-                xgaox.zero();
-
-                xgaoy.zero();
-
-                xgaoz.zero();
-
-                gtorec::computeGtosValuesForLDA(gaos, gtovec, mgx, mgy, mgz, gridOffset, igpnt, blockdim);
-
-                gtorec::computeGtosValuesForLDA2(
-                    aoidx, xgaos, xgaox, xgaoy, xgaoz, atmgtovec, mgx, mgy, mgz, gridOffset, igpnt, blockdim);
-
-                _distGradientDensityValuesForLda(gradgrid, densityMatrix, aoidx, gaos, xgaox, xgaoy, xgaoz, blockdim);
-
-                igpnt += blockdim;
-            }
-        }
-
-        // comopute remaining grid points block
-
-        blockdim = nGridPoints % blockdim;
-
-        if (blockdim > 0)
-        {
-            CMemBlock2D<double> gaos(blockdim, naos);
-
-            CMemBlock2D<double> xgaos(blockdim, atmnaos);
-
-            CMemBlock2D<double> xgaox(blockdim, atmnaos);
-
-            CMemBlock2D<double> xgaoy(blockdim, atmnaos);
-
-            CMemBlock2D<double> xgaoz(blockdim, atmnaos);
-
-            CMemBlock<int32_t> aoidx(atmnaos);
-
-            gaos.zero();
 
             xgaos.zero();
 
@@ -739,23 +698,25 @@ CXCMolecularGradient::_compVxcBatchForLDA(CDenseMatrix*           molecularGradi
 
             xgaoz.zero();
 
-            gtorec::computeGtosValuesForLDA(gaos, gtovec, mgx, mgy, mgz, gridOffset, igpnt, blockdim);
-
             gtorec::computeGtosValuesForLDA2(
                 aoidx, xgaos, xgaox, xgaoy, xgaoz, atmgtovec, mgx, mgy, mgz, gridOffset, igpnt, blockdim);
 
+            CDensityGrid gradgrid(blockdim, densityMatrix.getNumberOfDensityMatrices(), 3, dengrid::ab);
+
+            gradgrid.zero();
+
             _distGradientDensityValuesForLda(gradgrid, densityMatrix, aoidx, gaos, xgaox, xgaoy, xgaoz, blockdim);
+
+            gradgrid.updateBetaDensities();
+
+            // accumulate to molecular gradient
+
+            _accumulateVxcContribForLDA(molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, xcGradientGrid, gridOffset, igpnt, blockdim);
+
+            delete atmgtovec;
         }
 
-        // finalize density grid
-
-        gradgrid.updateBetaDensities();
-
-        // accumulate to molecular gradient
-
-        _accumulateVxcContribForLDA(molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, xcGradientGrid, gridOffset, nGridPoints);
-
-        delete atmgtovec;
+        igpnt += blockdim;
     }
 
     // destroy GTOs container
@@ -829,6 +790,7 @@ CXCMolecularGradient::_accumulateVxcContribForLDA(CDenseMatrix*           molecu
                                                   const CDensityGrid&     gsDensityGrid,
                                                   const CXCGradientGrid&  xcGradientGrid,
                                                   const int32_t           gridOffset,
+                                                  const int32_t           gridBlockPosition,
                                                   const int32_t           nGridPoints) const
 {
     double gatmx = 0.0;
@@ -855,11 +817,11 @@ CXCMolecularGradient::_accumulateVxcContribForLDA(CDenseMatrix*           molecu
 
     for (int32_t j = 0; j < nGridPoints; j++)
     {
-        gatmx += gw[gridOffset + j] * grhoa[gridOffset + j] * gdenx[j];
+        gatmx += gw[gridOffset +gridBlockPosition+ j] * grhoa[gridOffset +gridBlockPosition+ j] * gdenx[j];
 
-        gatmy += gw[gridOffset + j] * grhoa[gridOffset + j] * gdeny[j];
+        gatmy += gw[gridOffset +gridBlockPosition+ j] * grhoa[gridOffset +gridBlockPosition+ j] * gdeny[j];
 
-        gatmz += gw[gridOffset + j] * grhoa[gridOffset + j] * gdenz[j];
+        gatmz += gw[gridOffset +gridBlockPosition+ j] * grhoa[gridOffset +gridBlockPosition+ j] * gdenz[j];
     }
 
     std::cout << "gatm: " << gatmx << " " << gatmy << " " << gatmz << std::endl;
@@ -1948,5 +1910,5 @@ CXCMolecularGradient::_compGxcContrib(CDenseMatrix&              molecularGradie
 int32_t
 CXCMolecularGradient::_getSizeOfBlock() const
 {
-    return 200;
+    return 500;
 }
