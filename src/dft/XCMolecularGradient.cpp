@@ -510,7 +510,7 @@ CXCMolecularGradient::_compVxcContrib(CDenseMatrix&           molecularGradient,
 
     if (xcFuncType == xcfun::gga)
     {
-        //_compVxcContribForGGA(aoDensityMatrix, molecule, basis, molecularGrid);
+        _compVxcContribForGGA(molecularGradient, densityMatrix, molecule, basis, molecularGrid, gsDensityGrid, xcGradientGrid);
     }
 
     if (xcFuncType == xcfun::mgga)
@@ -544,7 +544,7 @@ CXCMolecularGradient::_compVxcContribForLDA(CDenseMatrix&           molecularGra
 
     auto tbpositions = omptaks.getTaskPositions();
 
-    // compute molecular gradient
+    // set up molecular gradient
 
     std::vector<CDenseMatrix> tbmolgrads(ntasks);
 
@@ -574,7 +574,7 @@ CXCMolecularGradient::_compVxcContribForLDA(CDenseMatrix&           molecularGra
         }
     }
 
-    // sum tbmolgrad into molgrad
+    // update molecular gradient
 
     for (int32_t i = 0; i < ntasks; i++)
     {
@@ -631,13 +631,18 @@ CXCMolecularGradient::_compVxcBatchForLDA(CDenseMatrix&           molecularGradi
 
     // loop over grid points blocks
 
+    CMemBlock2D<double> gaos(blockdim, naos);
+
     for (int32_t i = 0; i < nblocks + 1; i++)
     {
-        if (i == nblocks) blockdim = nGridPoints - blockdim * nblocks;
+        if (i == nblocks)
+        {
+            blockdim = nGridPoints - blockdim * nblocks;
 
-        if (blockdim == 0) continue;
+            if (blockdim == 0) continue;
 
-        CMemBlock2D<double> gaos(blockdim, naos);
+            gaos = CMemBlock2D<double>(blockdim, naos);
+        }
 
         gaos.zero();
 
@@ -673,7 +678,7 @@ CXCMolecularGradient::_compVxcBatchForLDA(CDenseMatrix&           molecularGradi
 
             gradgrid.zero();
 
-            _distGradientDensityValuesForLda(gradgrid, densityMatrix, aoidx, gaos, xgaox, xgaoy, xgaoz, blockdim);
+            _distGradientDensityValuesForLDA(gradgrid, densityMatrix, aoidx, gaos, xgaox, xgaoy, xgaoz, blockdim);
 
             gradgrid.updateBetaDensities();
 
@@ -694,7 +699,7 @@ CXCMolecularGradient::_compVxcBatchForLDA(CDenseMatrix&           molecularGradi
 }
 
 void
-CXCMolecularGradient::_distGradientDensityValuesForLda(CDensityGrid&              densityGrid,
+CXCMolecularGradient::_distGradientDensityValuesForLDA(CDensityGrid&              densityGrid,
                                                        const CAODensityMatrix&    densityMatrix,
                                                        const CMemBlock<int32_t>&  aoIdentifiers,
                                                        const CMemBlock2D<double>& braGtoValues,
@@ -791,6 +796,449 @@ CXCMolecularGradient::_accumulateVxcContribForLDA(CDenseMatrix&          molecul
         gatmy += gw[gridOffset + gridBlockPosition + j] * grhoa[gridOffset + gridBlockPosition + j] * gdeny[j];
 
         gatmz += gw[gridOffset + gridBlockPosition + j] * grhoa[gridOffset + gridBlockPosition + j] * gdenz[j];
+    }
+
+    auto mgradx = molecularGradient.row(0);
+
+    auto mgrady = molecularGradient.row(1);
+
+    auto mgradz = molecularGradient.row(2);
+
+    // factor of 2 from sum of alpha and beta contributions
+
+    mgradx[iAtom] += 2.0 * gatmx;
+
+    mgrady[iAtom] += 2.0 * gatmy;
+
+    mgradz[iAtom] += 2.0 * gatmz;
+}
+
+void
+CXCMolecularGradient::_compVxcContribForGGA(CDenseMatrix&           molecularGradient,
+                                            const CAODensityMatrix& densityMatrix,
+                                            const CMolecule&        molecule,
+                                            const CMolecularBasis&  basis,
+                                            const CMolecularGrid&   molecularGrid,
+                                            const CDensityGrid&     gsDensityGrid,
+                                            const CXCGradientGrid&  xcGradientGrid) const
+{
+    // set up OMP tasks
+
+    COMPTasks omptaks(5);
+
+    omptaks.set(molecularGrid.getNumberOfGridPoints());
+
+    auto ntasks = omptaks.getNumberOfTasks();
+
+    auto tbsizes = omptaks.getTaskSizes();
+
+    auto tbpositions = omptaks.getTaskPositions();
+
+    // set up molecular gradient
+
+    std::vector<CDenseMatrix> tbmolgrads(ntasks);
+
+    #pragma omp parallel shared(tbmolgrads, tbsizes, tbpositions, ntasks)
+    {
+        #pragma omp single nowait
+        {
+            for (int32_t i = 0; i < ntasks; i++)
+            {
+                // set up task parameters
+
+                auto tbsize = tbsizes[i];
+
+                auto tbposition = tbpositions[i];
+
+                // generate task
+
+                #pragma omp task firstprivate(tbsize, tbposition)
+                {
+                    CDenseMatrix molgrad(molecularGradient);
+
+                    _compVxcBatchForGGA(molgrad, densityMatrix, molecule, basis, molecularGrid, gsDensityGrid, xcGradientGrid, tbposition, tbsize);
+
+                    tbmolgrads[i] = molgrad;
+                }
+            }
+        }
+    }
+
+    // update molecular gradient
+
+    for (int32_t i = 0; i < ntasks; i++)
+    {
+        for (int32_t j = 0; j < molecularGradient.getNumberOfRows(); j++)
+        {
+            for (int32_t k = 0; k < molecularGradient.getNumberOfColumns(); k++)
+            {
+                molecularGradient.row(j)[k] += tbmolgrads[i].row(j)[k];
+            }
+        }
+    }
+}
+
+void
+CXCMolecularGradient::_compVxcBatchForGGA(CDenseMatrix&           molecularGradient,
+                                          const CAODensityMatrix& densityMatrix,
+                                          const CMolecule&        molecule,
+                                          const CMolecularBasis&  basis,
+                                          const CMolecularGrid&   molecularGrid,
+                                          const CDensityGrid&     gsDensityGrid,
+                                          const CXCGradientGrid&  xcGradientGrid,
+                                          const int32_t           gridOffset,
+                                          const int32_t           nGridPoints) const
+{
+    // create GTOs container
+
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+
+    // set up number of AOs
+
+    auto naos = gtovec->getNumberOfAtomicOrbitals();
+
+    // determine number of grid blocks
+
+    auto blockdim = _getSizeOfBlock();
+
+    auto nblocks = nGridPoints / blockdim;
+
+    // set up molecular grid data
+
+    auto mgx = molecularGrid.getCoordinatesX();
+
+    auto mgy = molecularGrid.getCoordinatesY();
+
+    auto mgz = molecularGrid.getCoordinatesZ();
+
+    // loop over atoms
+
+    auto natoms = molecule.getNumberOfAtoms();
+
+    // set up current grid point
+
+    int32_t igpnt = 0;
+
+    // loop over grid points blocks
+
+    CMemBlock2D<double> bgaos(blockdim, naos);
+
+    CMemBlock2D<double> bgaox(blockdim, naos);
+
+    CMemBlock2D<double> bgaoy(blockdim, naos);
+
+    CMemBlock2D<double> bgaoz(blockdim, naos);
+
+    for (int32_t i = 0; i < nblocks + 1; i++)
+    {
+        if (i == nblocks)
+        {
+            blockdim = nGridPoints - blockdim * nblocks;
+
+            if (blockdim == 0) continue;
+
+            bgaos = CMemBlock2D<double>(blockdim, naos);
+
+            bgaox = CMemBlock2D<double>(blockdim, naos);
+
+            bgaoy = CMemBlock2D<double>(blockdim, naos);
+
+            bgaoz = CMemBlock2D<double>(blockdim, naos);
+        }
+
+        bgaos.zero();
+
+        bgaox.zero();
+
+        bgaoy.zero();
+
+        bgaoz.zero();
+
+        gtorec::computeGtosValuesForGGA(bgaos, bgaox, bgaoy, bgaoz, gtovec, mgx, mgy, mgz, gridOffset, igpnt, blockdim);
+
+        for (int32_t iatom = 0; iatom < natoms; iatom++)
+        {
+            CGtoContainer* atmgtovec = new CGtoContainer(molecule, basis, iatom, 1);
+
+            auto atmnaos = atmgtovec->getNumberOfAtomicOrbitals();
+
+            CMemBlock<int32_t> aoidx(atmnaos);
+
+            CMemBlock2D<double> kgaos(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaox(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaoy(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaoz(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaoxx(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaoxy(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaoxz(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaoyy(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaoyz(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaozz(blockdim, atmnaos);
+
+            kgaos.zero();
+
+            kgaox.zero();
+
+            kgaoy.zero();
+
+            kgaoz.zero();
+
+            kgaoxx.zero();
+
+            kgaoxy.zero();
+
+            kgaoxz.zero();
+
+            kgaoyy.zero();
+
+            kgaoyz.zero();
+
+            kgaozz.zero();
+
+            gtorec::computeGtosValuesForGGA2(aoidx, kgaos, kgaox, kgaoy, kgaoz, kgaoxx, kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz, atmgtovec, mgx, mgy, mgz, gridOffset, igpnt, blockdim);
+
+            CDensityGrid gradgrid(blockdim, densityMatrix.getNumberOfDensityMatrices(), 12, dengrid::ab);
+
+            gradgrid.zero();
+
+            _distGradientDensityValuesForGGA(gradgrid, densityMatrix, aoidx, bgaos, bgaox, bgaoy, bgaoz, kgaox, kgaoy, kgaoz, kgaoxx, kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz, blockdim);
+
+            gradgrid.updateBetaDensities();
+
+            // accumulate to molecular gradient
+
+            _accumulateVxcContribForGGA(
+                molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, xcGradientGrid, gridOffset, igpnt, blockdim);
+
+            delete atmgtovec;
+        }
+
+        igpnt += blockdim;
+    }
+
+    // destroy GTOs container
+
+    delete gtovec;
+}
+
+void
+CXCMolecularGradient::_distGradientDensityValuesForGGA(CDensityGrid&              densityGrid,
+                                                       const CAODensityMatrix&    densityMatrix,
+                                                       const CMemBlock<int32_t>&  aoIdentifiers,
+                                                       const CMemBlock2D<double>& braGtoValues,
+                                                       const CMemBlock2D<double>& braGtoValuesX,
+                                                       const CMemBlock2D<double>& braGtoValuesY,
+                                                       const CMemBlock2D<double>& braGtoValuesZ,
+                                                       const CMemBlock2D<double>& ketGtoValuesX,
+                                                       const CMemBlock2D<double>& ketGtoValuesY,
+                                                       const CMemBlock2D<double>& ketGtoValuesZ,
+                                                       const CMemBlock2D<double>& ketGtoValuesXX,
+                                                       const CMemBlock2D<double>& ketGtoValuesXY,
+                                                       const CMemBlock2D<double>& ketGtoValuesXZ,
+                                                       const CMemBlock2D<double>& ketGtoValuesYY,
+                                                       const CMemBlock2D<double>& ketGtoValuesYZ,
+                                                       const CMemBlock2D<double>& ketGtoValuesZZ,
+                                                       const int32_t              nGridPoints) const
+{
+    if (densityMatrix.getNumberOfDensityMatrices() == 1)
+    {
+        // set up pointer to density grid data
+
+        auto rhoax = densityGrid.getComponent(0);
+
+        auto rhoay = densityGrid.getComponent(1);
+
+        auto rhoaz = densityGrid.getComponent(2);
+
+        auto rhoaxx = densityGrid.getComponent(3);
+
+        auto rhoaxy = densityGrid.getComponent(4);
+
+        auto rhoaxz = densityGrid.getComponent(5);
+
+        auto rhoayx = densityGrid.getComponent(6);
+
+        auto rhoayy = densityGrid.getComponent(7);
+
+        auto rhoayz = densityGrid.getComponent(8);
+
+        auto rhoazx = densityGrid.getComponent(9);
+
+        auto rhoazy = densityGrid.getComponent(10);
+
+        auto rhoazz = densityGrid.getComponent(11);
+
+        // set up pointer to density matrix data
+
+        auto denmat = densityMatrix.alphaDensity(0);
+
+        auto naos = densityMatrix.getNumberOfRows(0);
+
+        auto atmnaos = aoIdentifiers.size();
+
+        // loop over density matrix
+
+        for (int32_t i = 0; i < naos; i++)
+        {
+            auto bgaos = braGtoValues.data(i);
+
+            auto bgaox = braGtoValuesX.data(i);
+
+            auto bgaoy = braGtoValuesY.data(i);
+
+            auto bgaoz = braGtoValuesZ.data(i);
+
+            for (int32_t j = 0; j < atmnaos; j++)
+            {
+                auto kgaox = ketGtoValuesX.data(j);
+
+                auto kgaoy = ketGtoValuesY.data(j);
+
+                auto kgaoz = ketGtoValuesZ.data(j);
+
+                auto kgaoxx = ketGtoValuesXX.data(j);
+
+                auto kgaoxy = ketGtoValuesXY.data(j);
+
+                auto kgaoxz = ketGtoValuesXZ.data(j);
+
+                auto kgaoyy = ketGtoValuesYY.data(j);
+
+                auto kgaoyz = ketGtoValuesYZ.data(j);
+
+                auto kgaozz = ketGtoValuesZZ.data(j);
+
+                const auto dval = 2.0 * denmat[i * naos + aoIdentifiers.at(j)];
+
+                #pragma omp simd aligned(rhoax, rhoay, rhoaz, rhoaxx, rhoaxy, rhoaxz, rhoayx, rhoayy, rhoayz, rhoazx, rhoazy, rhoazz, bgaos, bgaox, bgaoy, bgaoz, kgaox, kgaoy, kgaoz, kgaoxx, kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz : VLX_ALIGN)
+                for (int32_t k = 0; k < nGridPoints; k++)
+                {
+                    rhoax[k] -= dval * bgaos[k] * kgaox[k];
+
+                    rhoay[k] -= dval * bgaos[k] * kgaoy[k];
+
+                    rhoaz[k] -= dval * bgaos[k] * kgaoz[k];
+
+                    rhoaxx[k] -= dval * (bgaos[k] * kgaoxx[k] + bgaox[k] * kgaox[k]);
+
+                    rhoaxy[k] -= dval * (bgaos[k] * kgaoxy[k] + bgaoy[k] * kgaox[k]);
+
+                    rhoaxz[k] -= dval * (bgaos[k] * kgaoxz[k] + bgaoz[k] * kgaox[k]);
+
+                    rhoayx[k] -= dval * (bgaos[k] * kgaoxy[k] + bgaox[k] * kgaoy[k]);
+
+                    rhoayy[k] -= dval * (bgaos[k] * kgaoyy[k] + bgaoy[k] * kgaoy[k]);
+
+                    rhoayz[k] -= dval * (bgaos[k] * kgaoyz[k] + bgaoz[k] * kgaoy[k]);
+
+                    rhoazx[k] -= dval * (bgaos[k] * kgaoxz[k] + bgaox[k] * kgaoz[k]);
+
+                    rhoazy[k] -= dval * (bgaos[k] * kgaoyz[k] + bgaoy[k] * kgaoz[k]);
+
+                    rhoazz[k] -= dval * (bgaos[k] * kgaozz[k] + bgaoz[k] * kgaoz[k]);
+                }
+            }
+        }
+    }
+}
+
+void
+CXCMolecularGradient::_accumulateVxcContribForGGA(CDenseMatrix&          molecularGradient,
+                                                  const int32_t          iAtom,
+                                                  const CDensityGrid&    gradientDensityGrid,
+                                                  const CMolecularGrid&  molecularGrid,
+                                                  const CDensityGrid&    gsDensityGrid,
+                                                  const CXCGradientGrid& xcGradientGrid,
+                                                  const int32_t          gridOffset,
+                                                  const int32_t          gridBlockPosition,
+                                                  const int32_t          nGridPoints) const
+{
+    double gatmx = 0.0;
+
+    double gatmy = 0.0;
+
+    double gatmz = 0.0;
+
+    auto gw = molecularGrid.getWeights();
+
+    // set up pointers to exchange-correlation functional derrivatives
+
+    auto grhoa = xcGradientGrid.xcGradientValues(xcvars::rhoa);
+
+    auto ggrada = xcGradientGrid.xcGradientValues(xcvars::grada);
+
+    auto ggradab = xcGradientGrid.xcGradientValues(xcvars::gradab);
+
+    // set up pointers to density gradient norms
+
+    auto ngrada = gsDensityGrid.alphaDensityGradient(0);
+
+    auto gradax = gsDensityGrid.alphaDensityGradientX(0);
+
+    auto graday = gsDensityGrid.alphaDensityGradientY(0);
+
+    auto gradaz = gsDensityGrid.alphaDensityGradientZ(0);
+
+    // set up pointers to density gradient grid
+
+    const auto gdenx = gradientDensityGrid.getComponent(0);
+
+    const auto gdeny = gradientDensityGrid.getComponent(1);
+
+    const auto gdenz = gradientDensityGrid.getComponent(2);
+
+    const auto gdenxx = gradientDensityGrid.getComponent(3);
+
+    const auto gdenxy = gradientDensityGrid.getComponent(4);
+
+    const auto gdenxz = gradientDensityGrid.getComponent(5);
+
+    const auto gdenyx = gradientDensityGrid.getComponent(6);
+
+    const auto gdenyy = gradientDensityGrid.getComponent(7);
+
+    const auto gdenyz = gradientDensityGrid.getComponent(8);
+
+    const auto gdenzx = gradientDensityGrid.getComponent(9);
+
+    const auto gdenzy = gradientDensityGrid.getComponent(10);
+
+    const auto gdenzz = gradientDensityGrid.getComponent(11);
+
+    // compute GGA contribution to molecular gradient
+
+    for (int32_t k = 0; k < nGridPoints; k++)
+    {
+        int32_t j = gridOffset + gridBlockPosition + k;
+
+        // contribution from \nabla_A (\phi_mu \phi_nu)
+
+        double prefac = gw[j] * grhoa[j];
+
+        gatmx += prefac * gdenx[k];
+
+        gatmy += prefac * gdeny[k];
+
+        gatmz += prefac * gdenz[k];
+
+        // contribution from \nabla_A (\nabla (\phi_mu \phi_nu))
+
+        prefac = gw[j] * (ggrada[j] / ngrada[j] + ggradab[j]);
+
+        gatmx += prefac * (gradax[j] * gdenxx[k] + graday[j] * gdenxy[k] + gradaz[j] * gdenxz[k]);
+
+        gatmy += prefac * (gradax[j] * gdenyx[k] + graday[j] * gdenyy[k] + gradaz[j] * gdenyz[k]);
+
+        gatmz += prefac * (gradax[j] * gdenzx[k] + graday[j] * gdenzy[k] + gradaz[j] * gdenzz[k]);
     }
 
     auto mgradx = molecularGradient.row(0);
@@ -1877,5 +2325,5 @@ CXCMolecularGradient::_compGxcContrib(CDenseMatrix&              molecularGradie
 int32_t
 CXCMolecularGradient::_getSizeOfBlock() const
 {
-    return 500;
+    return 200;
 }
