@@ -546,18 +546,7 @@ CXCMolecularGradient::_compVxcContribForLDA(CDenseMatrix&           molecularGra
 
     // compute molecular gradient
 
-    std::vector<CDenseMatrix> tbmolgrads;
-
-    const auto natoms = molecule.getNumberOfAtoms();
-
-    for (int32_t i = 0; i < ntasks; i++)
-    {
-        CDenseMatrix molgrad(3, natoms);
-
-        molgrad.zero();
-
-        tbmolgrads.push_back(molgrad);
-    }
+    std::vector<CDenseMatrix> tbmolgrads(ntasks);
 
     #pragma omp parallel shared(tbmolgrads, tbsizes, tbpositions, ntasks)
     {
@@ -571,13 +560,15 @@ CXCMolecularGradient::_compVxcContribForLDA(CDenseMatrix&           molecularGra
 
                 auto tbposition = tbpositions[i];
 
-                auto tbmolgrad = &(tbmolgrads[i]);
-
                 // generate task
 
                 #pragma omp task firstprivate(tbsize, tbposition)
                 {
-                    _compVxcBatchForLDA(tbmolgrad, densityMatrix, molecule, basis, molecularGrid, gsDensityGrid, xcGradientGrid, tbposition, tbsize);
+                    CDenseMatrix molgrad(molecularGradient);
+
+                    _compVxcBatchForLDA(molgrad, densityMatrix, molecule, basis, molecularGrid, gsDensityGrid, xcGradientGrid, tbposition, tbsize);
+
+                    tbmolgrads[i] = molgrad;
                 }
             }
         }
@@ -587,18 +578,18 @@ CXCMolecularGradient::_compVxcContribForLDA(CDenseMatrix&           molecularGra
 
     for (int32_t i = 0; i < ntasks; i++)
     {
-        for (int32_t cart = 0; cart < 3; cart++)
+        for (int32_t j = 0; j < molecularGradient.getNumberOfRows(); j++)
         {
-            for (int32_t iatom = 0; iatom < natoms; iatom++)
+            for (int32_t k = 0; k < molecularGradient.getNumberOfColumns(); k++)
             {
-                molecularGradient.row(cart)[iatom] += tbmolgrads[i].row(cart)[iatom];
+                molecularGradient.row(j)[k] += tbmolgrads[i].row(j)[k];
             }
         }
     }
 }
 
 void
-CXCMolecularGradient::_compVxcBatchForLDA(CDenseMatrix*           molecularGradient,
+CXCMolecularGradient::_compVxcBatchForLDA(CDenseMatrix&           molecularGradient,
                                           const CAODensityMatrix& densityMatrix,
                                           const CMolecule&        molecule,
                                           const CMolecularBasis&  basis,
@@ -652,7 +643,7 @@ CXCMolecularGradient::_compVxcBatchForLDA(CDenseMatrix*           molecularGradi
 
         gtorec::computeGtosValuesForLDA(gaos, gtovec, mgx, mgy, mgz, gridOffset, igpnt, blockdim);
 
-        for (int32_t iatom = 0; iatom < natoms ; iatom++)
+        for (int32_t iatom = 0; iatom < natoms; iatom++)
         {
             CGtoContainer* atmgtovec = new CGtoContainer(molecule, basis, iatom, 1);
 
@@ -676,8 +667,7 @@ CXCMolecularGradient::_compVxcBatchForLDA(CDenseMatrix*           molecularGradi
 
             xgaoz.zero();
 
-            gtorec::computeGtosValuesForLDA2(
-                aoidx, xgaos, xgaox, xgaoy, xgaoz, atmgtovec, mgx, mgy, mgz, gridOffset, igpnt, blockdim);
+            gtorec::computeGtosValuesForLDA2(aoidx, xgaos, xgaox, xgaoy, xgaoz, atmgtovec, mgx, mgy, mgz, gridOffset, igpnt, blockdim);
 
             CDensityGrid gradgrid(blockdim, densityMatrix.getNumberOfDensityMatrices(), 3, dengrid::ab);
 
@@ -689,7 +679,8 @@ CXCMolecularGradient::_compVxcBatchForLDA(CDenseMatrix*           molecularGradi
 
             // accumulate to molecular gradient
 
-            _accumulateVxcContribForLDA(molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, xcGradientGrid, gridOffset, igpnt, blockdim);
+            _accumulateVxcContribForLDA(
+                molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, xcGradientGrid, gridOffset, igpnt, blockdim);
 
             delete atmgtovec;
         }
@@ -761,15 +752,15 @@ CXCMolecularGradient::_distGradientDensityValuesForLda(CDensityGrid&            
 }
 
 void
-CXCMolecularGradient::_accumulateVxcContribForLDA(CDenseMatrix*           molecularGradient,
-                                                  const int32_t           iAtom,
-                                                  const CDensityGrid&     gradientDensityGrid,
-                                                  const CMolecularGrid&   molecularGrid,
-                                                  const CDensityGrid&     gsDensityGrid,
-                                                  const CXCGradientGrid&  xcGradientGrid,
-                                                  const int32_t           gridOffset,
-                                                  const int32_t           gridBlockPosition,
-                                                  const int32_t           nGridPoints) const
+CXCMolecularGradient::_accumulateVxcContribForLDA(CDenseMatrix&          molecularGradient,
+                                                  const int32_t          iAtom,
+                                                  const CDensityGrid&    gradientDensityGrid,
+                                                  const CMolecularGrid&  molecularGrid,
+                                                  const CDensityGrid&    gsDensityGrid,
+                                                  const CXCGradientGrid& xcGradientGrid,
+                                                  const int32_t          gridOffset,
+                                                  const int32_t          gridBlockPosition,
+                                                  const int32_t          nGridPoints) const
 {
     double gatmx = 0.0;
 
@@ -802,11 +793,11 @@ CXCMolecularGradient::_accumulateVxcContribForLDA(CDenseMatrix*           molecu
         gatmz += gw[gridOffset + gridBlockPosition + j] * grhoa[gridOffset + gridBlockPosition + j] * gdenz[j];
     }
 
-    auto mgradx = molecularGradient->row(0);
+    auto mgradx = molecularGradient.row(0);
 
-    auto mgrady = molecularGradient->row(1);
+    auto mgrady = molecularGradient.row(1);
 
-    auto mgradz = molecularGradient->row(2);
+    auto mgradz = molecularGradient.row(2);
 
     // factor of 2 from sum of alpha and beta contributions
 

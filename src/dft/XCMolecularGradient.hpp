@@ -95,6 +95,45 @@ class CXCMolecularGradient
                          const CDensityGrid&     gsDensityGrid,
                          const CXCGradientGrid&  xcGradientGrid) const;
 
+    void _compVxcContribForLDA(CDenseMatrix&           molecularGradient,
+                               const CAODensityMatrix& densityMatrix,
+                               const CMolecule&        molecule,
+                               const CMolecularBasis&  basis,
+                               const CMolecularGrid&   molecularGrid,
+                               const CDensityGrid&     gsDensityGrid,
+                               const CXCGradientGrid&  xcGradientGrid) const;
+
+    void _compVxcBatchForLDA(CDenseMatrix&           molecularGradient,
+                             const CAODensityMatrix& densityMatrix,
+                             const CMolecule&        molecule,
+                             const CMolecularBasis&  basis,
+                             const CMolecularGrid&   molecularGrid,
+                             const CDensityGrid&     gsDensityGrid,
+                             const CXCGradientGrid&  xcGradientGrid,
+                             const int32_t           gridOffset,
+                             const int32_t           nGridPoints) const;
+
+    void _distGradientDensityValuesForLda(CDensityGrid&              densityGrid,
+                                          const CAODensityMatrix&    densityMatrix,
+                                          const CMemBlock<int32_t>&  aoIdentifiers,
+                                          const CMemBlock2D<double>& braGtoValues,
+                                          const CMemBlock2D<double>& ketGtoValuesX,
+                                          const CMemBlock2D<double>& ketGtoValuesY,
+                                          const CMemBlock2D<double>& ketGtoValuesZ,
+                                          const int32_t              nGridPoints) const;
+
+    void _accumulateVxcContribForLDA(CDenseMatrix&          molecularGradient,
+                                     const int32_t          iAtom,
+                                     const CDensityGrid&    gradientDensityGrid,
+                                     const CMolecularGrid&  molecularGrid,
+                                     const CDensityGrid&    gsDensityGrid,
+                                     const CXCGradientGrid& xcGradientGrid,
+                                     const int32_t          gridOffset,
+                                     const int32_t          gridBlockPosition,
+                                     const int32_t          nGridPoints) const;
+
+    int32_t _getSizeOfBlock() const;
+
     /**
      Integrates second-order exchnage-correlation functional contribution to
      molecular gradient.
@@ -258,56 +297,6 @@ class CXCMolecularGradient
                                         const CMolecularBasis&  basis,
                                         const CMolecularGrid&   molecularGrid,
                                         const std::string&      xcFuncLabel) const;
-
-    /*
-    void _compVxcContrib(CDenseMatrix&           molecularGradient,
-                                      const CMolecule&        molecule,
-                                      const CMolecularBasis&  basis,
-                                      const xcfun             xcFuncType,
-                                      const CAODensityMatrix& densityMatrix,
-                                      const CMolecularGrid&   molecularGrid,
-                                      const CDensityGrid&     gsDensityGrid,
-                                      const CXCGradientGrid&  xcGradientGrid) const;
-    */
-
-    void _compVxcContribForLDA(CDenseMatrix&           molecularGradient,
-                                            const CAODensityMatrix& densityMatrix,
-                                            const CMolecule&        molecule,
-                                            const CMolecularBasis&  basis,
-                                            const CMolecularGrid&   molecularGrid,
-                                            const CDensityGrid&     gsDensityGrid,
-                                            const CXCGradientGrid&  xcGradientGrid) const;
-
-    void _compVxcBatchForLDA(CDenseMatrix*           molecularGradient,
-                                          const CAODensityMatrix& densityMatrix,
-                                          const CMolecule&        molecule,
-                                          const CMolecularBasis&  basis,
-                                          const CMolecularGrid&   molecularGrid,
-                                          const CDensityGrid&     gsDensityGrid,
-                                          const CXCGradientGrid&  xcGradientGrid,
-                                          const int32_t           gridOffset,
-                                          const int32_t           nGridPoints) const;
-
-    void _distGradientDensityValuesForLda(CDensityGrid&              densityGrid,
-                                                       const CAODensityMatrix&    densityMatrix,
-                                                       const CMemBlock<int32_t>&  aoIdentifiers,
-                                                       const CMemBlock2D<double>& braGtoValues,
-                                                       const CMemBlock2D<double>& ketGtoValuesX,
-                                                       const CMemBlock2D<double>& ketGtoValuesY,
-                                                       const CMemBlock2D<double>& ketGtoValuesZ,
-                                                       const int32_t              nGridPoints) const;
-
-    void _accumulateVxcContribForLDA(CDenseMatrix*           molecularGradient,
-                                                  const int32_t           iAtom,
-                                                  const CDensityGrid&     gradientDensityGrid,
-                                                  const CMolecularGrid&   molecularGrid,
-                                                  const CDensityGrid&     gsDensityGrid,
-                                                  const CXCGradientGrid&  xcGradientGrid,
-                                                  const int32_t           gridOffset,
-                                                  const int32_t           gridBlockPosition,
-                                                  const int32_t           nGridPoints) const;
-
-    int32_t _getSizeOfBlock() const;
 };
 
 #endif /* XCMolecularGradient_hpp */
