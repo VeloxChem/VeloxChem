@@ -789,13 +789,16 @@ CXCMolecularGradient::_accumulateVxcContribForLDA(CDenseMatrix&          molecul
 
     // compute LDA contribution to molecular gradient
 
-    for (int32_t j = 0; j < nGridPoints; j++)
+    auto offset = gridOffset + gridBlockPosition;
+
+    #pragma omp simd reduction(+ : gatmx, gatmy, gatmz) aligned(gw, grhoa, gdenx, gdeny, gdenz : VLX_ALIGN)
+    for (int32_t j = offset; j < offset + nGridPoints; j++)
     {
-        gatmx += gw[gridOffset + gridBlockPosition + j] * grhoa[gridOffset + gridBlockPosition + j] * gdenx[j];
+        gatmx += gw[j] * grhoa[j] * gdenx[j - offset];
 
-        gatmy += gw[gridOffset + gridBlockPosition + j] * grhoa[gridOffset + gridBlockPosition + j] * gdeny[j];
+        gatmy += gw[j] * grhoa[j] * gdeny[j - offset];
 
-        gatmz += gw[gridOffset + gridBlockPosition + j] * grhoa[gridOffset + gridBlockPosition + j] * gdenz[j];
+        gatmz += gw[j] * grhoa[j] * gdenz[j - offset];
     }
 
     auto mgradx = molecularGradient.row(0);
@@ -1004,13 +1007,46 @@ CXCMolecularGradient::_compVxcBatchForGGA(CDenseMatrix&           molecularGradi
 
             kgaozz.zero();
 
-            gtorec::computeGtosValuesForGGA2(aoidx, kgaos, kgaox, kgaoy, kgaoz, kgaoxx, kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz, atmgtovec, mgx, mgy, mgz, gridOffset, igpnt, blockdim);
+            gtorec::computeGtosValuesForGGA2(aoidx,
+                                             kgaos,
+                                             kgaox,
+                                             kgaoy,
+                                             kgaoz,
+                                             kgaoxx,
+                                             kgaoxy,
+                                             kgaoxz,
+                                             kgaoyy,
+                                             kgaoyz,
+                                             kgaozz,
+                                             atmgtovec,
+                                             mgx,
+                                             mgy,
+                                             mgz,
+                                             gridOffset,
+                                             igpnt,
+                                             blockdim);
 
             CDensityGrid gradgrid(blockdim, densityMatrix.getNumberOfDensityMatrices(), 12, dengrid::ab);
 
             gradgrid.zero();
 
-            _distGradientDensityValuesForGGA(gradgrid, densityMatrix, aoidx, bgaos, bgaox, bgaoy, bgaoz, kgaox, kgaoy, kgaoz, kgaoxx, kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz, blockdim);
+            _distGradientDensityValuesForGGA(gradgrid,
+                                             densityMatrix,
+                                             aoidx,
+                                             bgaos,
+                                             bgaox,
+                                             bgaoy,
+                                             bgaoz,
+                                             kgaox,
+                                             kgaoy,
+                                             kgaoz,
+                                             kgaoxx,
+                                             kgaoxy,
+                                             kgaoxz,
+                                             kgaoyy,
+                                             kgaoyz,
+                                             kgaozz,
+                                             blockdim);
 
             gradgrid.updateBetaDensities();
 
@@ -1216,29 +1252,30 @@ CXCMolecularGradient::_accumulateVxcContribForGGA(CDenseMatrix&          molecul
 
     // compute GGA contribution to molecular gradient
 
-    for (int32_t k = 0; k < nGridPoints; k++)
-    {
-        int32_t j = gridOffset + gridBlockPosition + k;
+    auto offset = gridOffset + gridBlockPosition;
 
+    #pragma omp simd reduction(+ : gatmx, gatmy, gatmz) aligned(gw, grhoa, ggrada, ngrada, ggradab, gdenx, gdeny, gdenz, gdenxx, gdenxy, gdenxz, gdenyy, gdenyz, gdenzz : VLX_ALIGN)
+    for (int32_t j = offset; j < offset + nGridPoints; j++)
+    {
         // contribution from \nabla_A (\phi_mu \phi_nu)
 
         double prefac = gw[j] * grhoa[j];
 
-        gatmx += prefac * gdenx[k];
+        gatmx += prefac * gdenx[j - offset];
 
-        gatmy += prefac * gdeny[k];
+        gatmy += prefac * gdeny[j - offset];
 
-        gatmz += prefac * gdenz[k];
+        gatmz += prefac * gdenz[j - offset];
 
         // contribution from \nabla_A (\nabla (\phi_mu \phi_nu))
 
         prefac = gw[j] * (ggrada[j] / ngrada[j] + ggradab[j]);
 
-        gatmx += prefac * (gradax[j] * gdenxx[k] + graday[j] * gdenxy[k] + gradaz[j] * gdenxz[k]);
+        gatmx += prefac * (gradax[j] * gdenxx[j - offset] + graday[j] * gdenxy[j - offset] + gradaz[j] * gdenxz[j - offset]);
 
-        gatmy += prefac * (gradax[j] * gdenyx[k] + graday[j] * gdenyy[k] + gradaz[j] * gdenyz[k]);
+        gatmy += prefac * (gradax[j] * gdenyx[j - offset] + graday[j] * gdenyy[j - offset] + gradaz[j] * gdenyz[j - offset]);
 
-        gatmz += prefac * (gradax[j] * gdenzx[k] + graday[j] * gdenzy[k] + gradaz[j] * gdenzz[k]);
+        gatmz += prefac * (gradax[j] * gdenzx[j - offset] + graday[j] * gdenzy[j - offset] + gradaz[j] * gdenzz[j - offset]);
     }
 
     auto mgradx = molecularGradient.row(0);
