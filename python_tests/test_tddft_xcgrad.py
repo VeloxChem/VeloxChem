@@ -74,12 +74,7 @@ class TestTddftXCgrad:
                                                   xmy_den_sym, gs_density,
                                                   xcfun_label)
 
-        xcgrad = grad_drv.grad_tddft_xc_contrib(molecule, basis, rhow_den_sym,
-                                                xmy_den_sym, gs_density,
-                                                xcfun_label)
-
         if is_mpi_master():
-            assert np.max(np.abs(xcgrad - ref_xcgrad)) < 1.0e-5
             xcgrad2 = vxc_contrib + vxc_contrib_2 + fxc_contrib + fxc_contrib_2
             assert np.max(np.abs(xcgrad2 - ref_xcgrad)) < 1.0e-5
 

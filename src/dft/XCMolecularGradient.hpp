@@ -142,6 +142,30 @@ class CXCMolecularGradient
                              const int32_t           gridOffset,
                              const int32_t           nGridPoints) const;
 
+    void _compFxcBatchForLDA(CDenseMatrix&           molecularGradient,
+                             const CAODensityMatrix& densityMatrix,
+                             const CMolecule&        molecule,
+                             const CMolecularBasis&  basis,
+                             const CMolecularGrid&   molecularGrid,
+                             const CDensityGrid&     gsDensityGrid,
+                             const CDensityGrid&     rwDensityGrid,
+                             const CXCGradientGrid&  xcGradientGrid,
+                             const CXCHessianGrid&   xcHessianGrid,
+                             const int32_t           gridOffset,
+                             const int32_t           nGridPoints) const;
+
+    void _compFxcBatchForGGA(CDenseMatrix&           molecularGradient,
+                             const CAODensityMatrix& densityMatrix,
+                             const CMolecule&        molecule,
+                             const CMolecularBasis&  basis,
+                             const CMolecularGrid&   molecularGrid,
+                             const CDensityGrid&     gsDensityGrid,
+                             const CDensityGrid&     rwDensityGrid,
+                             const CXCGradientGrid&  xcGradientGrid,
+                             const CXCHessianGrid&   xcHessianGrid,
+                             const int32_t           gridOffset,
+                             const int32_t           nGridPoints) const;
+
     void _distGradientDensityValuesForLDA(CDensityGrid&              densityGrid,
                                           const CAODensityMatrix&    densityMatrix,
                                           const CMemBlock<int32_t>&  aoIdentifiers,
@@ -185,6 +209,30 @@ class CXCMolecularGradient
                                      const CMolecularGrid&  molecularGrid,
                                      const CDensityGrid&    gsDensityGrid,
                                      const CXCGradientGrid& xcGradientGrid,
+                                     const int32_t          gridOffset,
+                                     const int32_t          gridBlockPosition,
+                                     const int32_t          nGridPoints) const;
+
+    void _accumulateFxcContribForLDA(CDenseMatrix&          molecularGradient,
+                                     const int32_t          iAtom,
+                                     const CDensityGrid&    gradientDensityGrid,
+                                     const CMolecularGrid&  molecularGrid,
+                                     const CDensityGrid&    gsDensityGrid,
+                                     const CDensityGrid&    rwDensityGrid,
+                                     const CXCGradientGrid& xcGradientGrid,
+                                     const CXCHessianGrid&  xcHessianGrid,
+                                     const int32_t          gridOffset,
+                                     const int32_t          gridBlockPosition,
+                                     const int32_t          nGridPoints) const;
+
+    void _accumulateFxcContribForGGA(CDenseMatrix&          molecularGradient,
+                                     const int32_t          iAtom,
+                                     const CDensityGrid&    gradientDensityGrid,
+                                     const CMolecularGrid&  molecularGrid,
+                                     const CDensityGrid&    gsDensityGrid,
+                                     const CDensityGrid&    rwDensityGrid,
+                                     const CXCGradientGrid& xcGradientGrid,
+                                     const CXCHessianGrid&  xcHessianGrid,
                                      const int32_t          gridOffset,
                                      const int32_t          gridBlockPosition,
                                      const int32_t          nGridPoints) const;
@@ -307,26 +355,6 @@ class CXCMolecularGradient
                                       const CMolecularBasis&  basis,
                                       const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
-
-    /**
-     Integrates exchnage-correlation functional contribution to molecular gradient.
-
-     @param rwDensityMatrixOne the perturbed AO density matrix object (relaxed_dens).
-     @param rwDensityMatrixTwo the perturbed AO density matrix object (x_minus_y_ao).
-     @param gsDensityMatrix the ground state AO density matrix object.
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @param molecularGrid the molecular grid.
-     @param xcFuncLabel the label of exchange-correlation functional.
-     @return the molecular gradient.
-     */
-    CDenseMatrix integrateTddftGradient(const CAODensityMatrix& rwDensityMatrixOne,
-                                        const CAODensityMatrix& rwDensityMatrixTwo,
-                                        const CAODensityMatrix& gsDensityMatrix,
-                                        const CMolecule&        molecule,
-                                        const CMolecularBasis&  basis,
-                                        const CMolecularGrid&   molecularGrid,
-                                        const std::string&      xcFuncLabel) const;
 };
 
 #endif /* XCMolecularGradient_hpp */
