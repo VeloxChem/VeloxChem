@@ -593,11 +593,8 @@ class LinearSolver:
                 'inconsistent shape of trial vectors')
 
             mo = scf_tensors['C_alpha']
-            S = scf_tensors['S']
-            da = scf_tensors['D_alpha']
-            db = scf_tensors['D_beta']
             fa = scf_tensors['F_alpha']
-            # fb = scf_tensors['F_beta']
+            fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
@@ -646,12 +643,9 @@ class LinearSolver:
                 if self.rank == mpi_master():
                     half_size = vec.shape[0] // 2
 
-                    kN = self.lrvec2mat(vec, nocc, norb).T
-                    kn = np.linalg.multi_dot([mo, kN, mo.T])
-
-                    dak = np.linalg.multi_dot([kn.T, S, da])
-                    dak -= np.linalg.multi_dot([da, S, kn.T])
-                    # dbk = kn.T @ S @ db - db @ S @ kn.T
+                    kn = self.lrvec2mat(vec, nocc, norb)
+                    dak = self.commut_mo_density(kn, nocc)
+                    dak = np.linalg.multi_dot([mo, dak, mo.T])
 
                     dks.append(dak)
                     kns.append(kn)
@@ -692,40 +686,28 @@ class LinearSolver:
                     fock_ung = np.zeros((norb**2, batch_ung))
 
                 for ifock in range(batch_ger + batch_ung):
-                    fak = fock.alpha_to_numpy(ifock).T
-                    # fbk = fock.beta_to_numpy(ifock).T
+                    fak = fock.alpha_to_numpy(ifock)
 
-                    kn = kns[ifock]
+                    fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
+                    kfa_mo = self.commut(fa_mo.T, kns[ifock])
 
-                    kfa = (np.linalg.multi_dot([S, kn, fa]) -
-                           np.linalg.multi_dot([fa, kn, S]))
-                    # kfb = S @ kn @ fb - fb @ kn @ S
+                    fat_mo = fak_mo + kfa_mo
 
-                    fat = fak + kfa
-                    fbt = fat
-                    # fbt = fbk + kfb
-
-                    gao = np.matmul(S,
-                                    np.matmul(da, fat.T) + np.matmul(db, fbt.T))
-                    gao -= np.matmul(
-                        np.matmul(fat.T, da) + np.matmul(fbt.T, db), S)
-                    gao *= 0.5
-
-                    gmo = np.linalg.multi_dot([mo.T, gao, mo])
-
+                    gmo = -self.commut_mo_density(fat_mo, nocc)
                     gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
                                                       norb)[:half_size]
-                    fak_T_mo_vec = np.linalg.multi_dot([mo.T, fak.T,
-                                                        mo]).reshape(norb**2)
+
+                    fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
+                                                      mo]).reshape(norb**2)
 
                     if ifock < batch_ger:
                         e2_ger[:, ifock] = -gmo_vec_halfsize
                         if self.nonlinear:
-                            fock_ger[:, ifock] = fak_T_mo_vec
+                            fock_ger[:, ifock] = fak_mo_vec
                     else:
                         e2_ung[:, ifock - batch_ger] = -gmo_vec_halfsize
                         if self.nonlinear:
-                            fock_ung[:, ifock - batch_ger] = fak_T_mo_vec
+                            fock_ung[:, ifock - batch_ger] = fak_mo_vec
 
             vecs_e2_ger = DistributedArray(e2_ger, self.comm)
             vecs_e2_ung = DistributedArray(e2_ung, self.comm)
@@ -1326,8 +1308,9 @@ class LinearSolver:
             linmom_mats = linmom_drv.compute(molecule, basis)
 
             if self.rank == mpi_master():
-                integrals = (linmom_mats.x_to_numpy(), linmom_mats.y_to_numpy(),
-                             linmom_mats.z_to_numpy())
+                integrals = (-1.0 * linmom_mats.x_to_numpy(),
+                             -1.0 * linmom_mats.y_to_numpy(),
+                             -1.0 * linmom_mats.z_to_numpy())
             else:
                 integrals = tuple()
 
@@ -1336,8 +1319,9 @@ class LinearSolver:
             angmom_mats = angmom_drv.compute(molecule, basis)
 
             if self.rank == mpi_master():
-                integrals = (angmom_mats.x_to_numpy(), angmom_mats.y_to_numpy(),
-                             angmom_mats.z_to_numpy())
+                integrals = (-1.0 * angmom_mats.x_to_numpy(),
+                             -1.0 * angmom_mats.y_to_numpy(),
+                             -1.0 * angmom_mats.z_to_numpy())
             else:
                 integrals = tuple()
 
@@ -1346,9 +1330,9 @@ class LinearSolver:
             angmom_mats = angmom_drv.compute(molecule, basis)
 
             if self.rank == mpi_master():
-                integrals = (-0.5 * angmom_mats.x_to_numpy(),
-                             -0.5 * angmom_mats.y_to_numpy(),
-                             -0.5 * angmom_mats.z_to_numpy())
+                integrals = (0.5 * angmom_mats.x_to_numpy(),
+                             0.5 * angmom_mats.y_to_numpy(),
+                             0.5 * angmom_mats.z_to_numpy())
             else:
                 integrals = tuple()
 
@@ -1359,18 +1343,15 @@ class LinearSolver:
             integral_comps = [integrals[indices[p]] for p in components]
 
             mo = scf_tensors['C_alpha']
-            S = scf_tensors['S']
-            D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
-
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            factor = 0.5 * np.sqrt(2.0)
-            matrices = tuple(factor * np.linalg.multi_dot([
-                mo.T,
-                (np.linalg.multi_dot([S, D, P.T]) -
-                 np.linalg.multi_dot([P.T, D, S])), mo
-            ]) for P in integral_comps)
+            factor = np.sqrt(2.0)
+            matrices = [
+                factor * (-1.0) * self.commut_mo_density(
+                    np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
+                for P in integral_comps
+            ]
 
             gradients = tuple(self.lrmat2vec(m, nocc, norb) for m in matrices)
             return gradients
@@ -1460,24 +1441,58 @@ class LinearSolver:
             integral_comps = [integrals[indices[p]] for p in components]
 
             mo = scf_tensors['C_alpha']
-            S = scf_tensors['S']
-            D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
-
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            factor = 0.5 * np.sqrt(2.0)
-            matrices = tuple(factor * np.linalg.multi_dot([
-                mo.T,
-                (np.linalg.multi_dot([S, D, P.conj().T]) -
-                 np.linalg.multi_dot([P.conj().T, D, S])), mo
-            ]) for P in integral_comps)
+            factor = np.sqrt(2.0)
+            matrices = [
+                factor * (-1.0) * self.commut_mo_density(
+                    np.linalg.multi_dot([mo.T, P.conj().T, mo]), nocc)
+                for P in integral_comps
+            ]
 
             gradients = tuple(self.lrmat2vec(m, nocc, norb) for m in matrices)
             return gradients
 
         else:
             return tuple()
+
+    def commut_mo_density(self, A, nocc):
+        """
+        Commutes matrix A and MO density
+
+        :param A:
+            Matrix A.
+        :param nocc:
+            Number of occupied orbitals.
+
+        :return:
+            A D_mo - D_mo A
+        """
+
+        # | 0    -A_ov |
+        # | A_vo  0    |
+
+        mat = np.zeros(A.shape, dtype=A.dtype)
+        mat[:nocc, nocc:] = -A[:nocc, nocc:]
+        mat[nocc:, :nocc] = A[nocc:, :nocc]
+
+        return mat
+
+    def commut(self, A, B):
+        """
+        Commutes two matricies A and B
+
+        :param A:
+            Matrix A.
+        :param B:
+            Matrix B.
+
+        :return:
+            AB - BA
+        """
+
+        return np.matmul(A, B) - np.matmul(B, A)
 
     @staticmethod
     def lrvec2mat(vec, nocc, norb):

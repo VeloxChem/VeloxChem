@@ -3,6 +3,7 @@ target_sources(vlxobjs
     Becke88Functional.cpp
     FunctionalParser.cpp
     LYPFunctional.cpp
+    PkzbFunctional.cpp
     SlaterFunctional.cpp
     VWN3Functional.cpp
   )

@@ -520,7 +520,7 @@ class LinearResponseEigenSolver(LinearSolver):
                         elec_trans_dipoles[s, ind] = np.vdot(
                             edip_grad[ind], eigvec)
                         velo_trans_dipoles[s, ind] = np.vdot(
-                            lmom_grad[ind], eigvec) / (-eigvals[s])
+                            lmom_grad[ind], eigvec) / eigvals[s]
                         magn_trans_dipoles[s, ind] = np.vdot(
                             mdip_grad[ind], eigvec)
 
@@ -538,9 +538,8 @@ class LinearResponseEigenSolver(LinearSolver):
             if self.rank == mpi_master():
                 osc = (2.0 / 3.0) * np.sum(elec_trans_dipoles**2,
                                            axis=1) * eigvals
-                rot_vel = (-1.0) * np.sum(
-                    velo_trans_dipoles * magn_trans_dipoles,
-                    axis=1) * rotatory_strength_in_cgs()
+                rot_vel = np.sum(velo_trans_dipoles * magn_trans_dipoles,
+                                 axis=1) * rotatory_strength_in_cgs()
 
                 ret_dict = {
                     'eigenvalues': eigvals,
