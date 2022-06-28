@@ -306,6 +306,171 @@ CXCMolecularGradient::integrateGxcGradient(const CAODensityMatrix& rwDensityMatr
     return molgrad.transpose();
 }
 
+CDenseMatrix
+CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMatrixOne,
+                                             const CAODensityMatrix& rwDensityMatrixTwo,
+                                             const CAODensityMatrix& gsDensityMatrix,
+                                             const CMolecule&        molecule,
+                                             const CMolecularBasis&  basis,
+                                             const CMolecularGrid&   molecularGrid,
+                                             const std::string&      xcFuncLabel) const
+{
+    auto t00 = std::chrono::system_clock::now();
+
+    auto t0 = std::chrono::system_clock::now();
+
+    // parse exchange-correlation functional data
+
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    // generate reference density grid
+
+    CDensityGridDriver dgdrv(_locComm);
+
+    auto refdengrid = dgdrv.generate(gsDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
+
+    auto t1 = std::chrono::system_clock::now();
+
+    std::cout << "ref den grid: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+
+    // create molecular gradient
+
+    const auto natoms = molecule.getNumberOfAtoms();
+
+    CDenseMatrix molgrad(3, natoms);
+
+    molgrad.zero();
+
+    if (rwDensityMatrixOne.isClosedShell() && rwDensityMatrixTwo.isClosedShell())
+    {
+        t0 = std::chrono::system_clock::now();
+
+        // generate screened molecular and density grids
+
+        CMolecularGrid mgrid(molecularGrid);
+
+        CDensityGrid gsdengrid;
+
+        refdengrid.getScreenedGridsPair(gsdengrid, mgrid, 0, _thresholdOfDensity, fvxc.getFunctionalType());
+
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "screen grids pair: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+
+        // allocate XC gradient/hessian grids
+
+        CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
+
+        CXCHessianGrid vxc2grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
+
+        CXCCubicHessianGrid vxc3grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
+
+        // compute exchange-correlation functional derivatives
+
+        t0 = std::chrono::system_clock::now();
+
+        fvxc.compute(vxcgrid, gsdengrid);
+
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "xc func deriv 1: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+
+        t0 = std::chrono::system_clock::now();
+
+        fvxc.compute(vxc2grid, gsdengrid);
+
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "xc func deriv 2: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+
+        t0 = std::chrono::system_clock::now();
+
+        fvxc.compute(vxc3grid, gsdengrid);
+
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "xc func deriv 3: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+
+        t0 = std::chrono::system_clock::now();
+
+        // prepare perturbed density grids
+
+        auto rwdengrid = dgdrv.generate(rwDensityMatrixOne, molecule, basis, mgrid, fvxc.getFunctionalType());
+
+        auto rwdengrid2 = dgdrv.generate(rwDensityMatrixTwo, molecule, basis, mgrid, fvxc.getFunctionalType());
+
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "rw den grids: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+
+        t0 = std::chrono::system_clock::now();
+
+        // prepare density grid for QRF
+
+        auto rwdenmat2 = rwDensityMatrixTwo.getReferenceToDensity(0);
+
+        CDenseMatrix zerodenmat2(rwdenmat2);
+
+        zerodenmat2.zero();
+
+        CAODensityMatrix rwDensityMatrixThree(std::vector<CDenseMatrix>({rwdenmat2, zerodenmat2, rwdenmat2, zerodenmat2}), denmat::rest);
+
+        // Note: We use quadratic response (quadMode == "QRF") to calculate
+        // third-order functional derivative contribution. The rw2DensityMatrix
+        // contains zero matrices and is therefore removed from the following code.
+        // Same for rw2dengrid.
+
+        // For "QRF" we have rwDensityMatrix.getNumberOfDensityMatrices() ==
+        // 2 * rw2DensityMatrix.getNumberOfDensityMatrices()
+
+        std::string quadMode("QRF");
+
+        int32_t qrfNumDensityMatrices = rwDensityMatrixThree.getNumberOfDensityMatrices() / 2;
+
+        auto rwdengrid3 = dgdrv.generate(rwDensityMatrixThree, molecule, basis, mgrid, fvxc.getFunctionalType());
+
+        auto rwdengridc = CDensityGridQuad(mgrid.getNumberOfGridPoints(), qrfNumDensityMatrices, fvxc.getFunctionalType(), dengrid::ab);
+
+        rwdengridc.DensityProd(rwdengrid3, fvxc.getFunctionalType(), qrfNumDensityMatrices, quadMode);
+
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "rw den grid quad: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+
+        t0 = std::chrono::system_clock::now();
+
+        // Individual terms
+        // _compVxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrixOne, mgrid, gsdengrid, vxcgrid);
+        // _compFxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, rwdengrid, vxcgrid, vxc2grid);
+        // _compFxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrixTwo, mgrid, gsdengrid, rwdengrid2, vxcgrid, vxc2grid);
+        // _compGxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, rwdengridc, vxcgrid, vxc2grid, vxc3grid);
+
+        // Tddft contribution:
+
+        _compTddftContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, rwDensityMatrixOne, rwDensityMatrixTwo, mgrid, gsdengrid, rwdengrid, rwdengrid2, rwdengridc, vxcgrid, vxc2grid, vxc3grid);
+
+        t1 = std::chrono::system_clock::now();
+
+        std::cout << "tddft contrib: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+    }
+    else
+    {
+        // not implemented
+
+        std::string erropenshell("XCMolecularGradient.integrateTddftGradient: Not implemented for open-shell");
+
+        errors::assertMsgCritical(false, erropenshell);
+    }
+
+    auto t11 = std::chrono::system_clock::now();
+
+    std::cout << "total time in tddft xcgrad: " << std::chrono::duration_cast<std::chrono::milliseconds>(t11 - t00).count() << " ms" << std::endl;
+
+    // done with molecular gradient
+
+    return molgrad.transpose();
+}
+
 void
 CXCMolecularGradient::_compVxcContrib(CDenseMatrix&           molecularGradient,
                                       const CMolecule&        molecule,
@@ -585,6 +750,115 @@ CXCMolecularGradient::_compGxcContrib(CDenseMatrix&              molecularGradie
                                 basis, molecularGrid, gsDensityGrid, rwDensityGridQuad,
                                 xcGradientGrid, xcHessianGrid, xcCubicHessianGrid,
                                 tbposition, tbsize);
+                    }
+
+                    tbmolgrads[i] = molgrad;
+                }
+            }
+        }
+    }
+
+    // update molecular gradient
+
+    for (int32_t i = 0; i < ntasks; i++)
+    {
+        for (int32_t j = 0; j < molecularGradient.getNumberOfRows(); j++)
+        {
+            for (int32_t k = 0; k < molecularGradient.getNumberOfColumns(); k++)
+            {
+                molecularGradient.row(j)[k] += tbmolgrads[i].row(j)[k];
+            }
+        }
+    }
+}
+
+void
+CXCMolecularGradient::_compTddftContrib(CDenseMatrix&              molecularGradient,
+                                        const CMolecule&           molecule,
+                                        const CMolecularBasis&     basis,
+                                        const xcfun                xcFuncType,
+                                        const CAODensityMatrix&    gsDensityMatrix,
+                                        const CAODensityMatrix&    rwDensityMatrixOne,
+                                        const CAODensityMatrix&    rwDensityMatrixTwo,
+                                        const CMolecularGrid&      molecularGrid,
+                                        const CDensityGrid&        gsDensityGrid,
+                                        const CDensityGrid&        rwDensityGridOne,
+                                        const CDensityGrid&        rwDensityGridTwo,
+                                        const CDensityGridQuad&    rwDensityGridQuad,
+                                        const CXCGradientGrid&     xcGradientGrid,
+                                        const CXCHessianGrid&      xcHessianGrid,
+                                        const CXCCubicHessianGrid& xcCubicHessianGrid) const
+{
+    // sanity check
+
+    if ((xcFuncType != xcfun::lda) && (xcFuncType != xcfun::gga) && (xcFuncType != xcfun::mgga))
+    {
+        std::string errxcfunctype("CXCMolecularGradient._compTddftContrib: Invalid XC functional type");
+
+        errors::assertMsgCritical(false, errxcfunctype);
+    }
+
+    if (xcFuncType == xcfun::mgga)
+    {
+        // not implemented
+
+        std::string errmgga("CXCMolecularGradient._compTddftContrib: Not implemented for meta-GGA");
+
+        errors::assertMsgCritical(false, errmgga);
+    }
+
+    // set up OMP tasks
+
+    COMPTasks omptaks(5);
+
+    omptaks.set(molecularGrid.getNumberOfGridPoints());
+
+    auto ntasks = omptaks.getNumberOfTasks();
+
+    auto tbsizes = omptaks.getTaskSizes();
+
+    auto tbpositions = omptaks.getTaskPositions();
+
+    // set up molecular gradient
+
+    std::vector<CDenseMatrix> tbmolgrads(ntasks);
+
+    #pragma omp parallel shared(tbmolgrads, tbsizes, tbpositions, ntasks)
+    {
+        #pragma omp single nowait
+        {
+            for (int32_t i = 0; i < ntasks; i++)
+            {
+                // set up task parameters
+
+                auto tbsize = tbsizes[i];
+
+                auto tbposition = tbpositions[i];
+
+                // generate task
+
+                #pragma omp task firstprivate(tbsize, tbposition)
+                {
+                    CDenseMatrix molgrad(molecularGradient);
+
+                    molgrad.zero();
+
+                    if (xcFuncType == xcfun::lda)
+                    {
+                        _compTddftBatchForLDA(molgrad, gsDensityMatrix, rwDensityMatrixOne,
+                                rwDensityMatrixTwo, molecule, basis, molecularGrid,
+                                gsDensityGrid, rwDensityGridOne, rwDensityGridTwo,
+                                rwDensityGridQuad, xcGradientGrid, xcHessianGrid,
+                                xcCubicHessianGrid, tbposition, tbsize);
+                    }
+
+                    if (xcFuncType == xcfun::gga)
+                    {
+                        _compTddftBatchForGGA(molgrad, gsDensityMatrix, rwDensityMatrixOne,
+                                rwDensityMatrixTwo, molecule, basis, molecularGrid,
+                                gsDensityGrid, rwDensityGridOne, rwDensityGridTwo,
+                                rwDensityGridQuad, xcGradientGrid, xcHessianGrid,
+                                xcCubicHessianGrid, tbposition, tbsize);
                     }
 
                     tbmolgrads[i] = molgrad;
@@ -1412,6 +1686,344 @@ CXCMolecularGradient::_compGxcBatchForGGA(CDenseMatrix&              molecularGr
             gradgrid.updateBetaDensities();
 
             // accumulate to molecular gradient
+
+            _accumulateGxcContribForGGA(
+                molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGridQuad, xcGradientGrid, xcHessianGrid, xcCubicHessianGrid, gridOffset, igpnt, blockdim);
+
+            delete atmgtovec;
+        }
+
+        igpnt += blockdim;
+    }
+
+    // destroy GTOs container
+
+    delete gtovec;
+}
+
+void
+CXCMolecularGradient::_compTddftBatchForLDA(CDenseMatrix&              molecularGradient,
+                                            const CAODensityMatrix&    gsDensityMatrix,
+                                            const CAODensityMatrix&    rwDensityMatrixOne,
+                                            const CAODensityMatrix&    rwDensityMatrixTwo,
+                                            const CMolecule&           molecule,
+                                            const CMolecularBasis&     basis,
+                                            const CMolecularGrid&      molecularGrid,
+                                            const CDensityGrid&        gsDensityGrid,
+                                            const CDensityGrid&        rwDensityGridOne,
+                                            const CDensityGrid&        rwDensityGridTwo,
+                                            const CDensityGridQuad&    rwDensityGridQuad,
+                                            const CXCGradientGrid&     xcGradientGrid,
+                                            const CXCHessianGrid&      xcHessianGrid,
+                                            const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                            const int32_t              gridOffset,
+                                            const int32_t              nGridPoints) const
+{
+    // create GTOs container
+
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+
+    // set up number of AOs
+
+    auto naos = gtovec->getNumberOfAtomicOrbitals();
+
+    // determine number of grid blocks
+
+    auto blockdim = _getSizeOfBlock();
+
+    auto nblocks = nGridPoints / blockdim;
+
+    // set up molecular grid data
+
+    auto mgx = molecularGrid.getCoordinatesX();
+
+    auto mgy = molecularGrid.getCoordinatesY();
+
+    auto mgz = molecularGrid.getCoordinatesZ();
+
+    // loop over atoms
+
+    auto natoms = molecule.getNumberOfAtoms();
+
+    // set up current grid point
+
+    int32_t igpnt = 0;
+
+    // loop over grid points blocks
+
+    CMemBlock2D<double> gaos(blockdim, naos);
+
+    CDensityGrid gradgrid(blockdim, gsDensityMatrix.getNumberOfDensityMatrices(), 3, dengrid::ab);
+
+    for (int32_t i = 0; i < nblocks + 1; i++)
+    {
+        if (i == nblocks)
+        {
+            blockdim = nGridPoints - blockdim * nblocks;
+
+            if (blockdim == 0) continue;
+
+            gaos = CMemBlock2D<double>(blockdim, naos);
+
+            gradgrid = CDensityGrid(blockdim, gsDensityMatrix.getNumberOfDensityMatrices(), 3, dengrid::ab);
+        }
+
+        gaos.zero();
+
+        gtorec::computeGtosValuesForLDA(gaos, gtovec, mgx, mgy, mgz, gridOffset, igpnt, blockdim);
+
+        for (int32_t iatom = 0; iatom < natoms; iatom++)
+        {
+            CGtoContainer* atmgtovec = new CGtoContainer(molecule, basis, iatom, 1);
+
+            auto atmnaos = atmgtovec->getNumberOfAtomicOrbitals();
+
+            CMemBlock<int32_t> aoidx(atmnaos);
+
+            CMemBlock2D<double> xgaos(blockdim, atmnaos);
+
+            CMemBlock2D<double> xgaox(blockdim, atmnaos);
+
+            CMemBlock2D<double> xgaoy(blockdim, atmnaos);
+
+            CMemBlock2D<double> xgaoz(blockdim, atmnaos);
+
+            xgaos.zero();
+
+            xgaox.zero();
+
+            xgaoy.zero();
+
+            xgaoz.zero();
+
+            gtorec::computeGtosValuesForLDA2(aoidx, xgaos, xgaox, xgaoy, xgaoz, atmgtovec, mgx, mgy, mgz, gridOffset, igpnt, blockdim);
+
+            // accumulate Vxc 1st term
+
+            gradgrid.zero();
+
+            _distGradientDensityValuesForLDA(gradgrid, rwDensityMatrixOne, aoidx, gaos, xgaox, xgaoy, xgaoz, blockdim);
+
+            gradgrid.updateBetaDensities();
+
+            _accumulateVxcContribForLDA(
+                molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, xcGradientGrid, gridOffset, igpnt, blockdim);
+
+            // accumulate Fxc 1st term
+
+            gradgrid.zero();
+
+            _distGradientDensityValuesForLDA(gradgrid, rwDensityMatrixTwo, aoidx, gaos, xgaox, xgaoy, xgaoz, blockdim);
+
+            gradgrid.updateBetaDensities();
+
+            _accumulateFxcContribForLDA(
+                molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGridTwo, xcGradientGrid, xcHessianGrid, gridOffset, igpnt, blockdim);
+
+            // accumulate Vxc and Fxc 2nd terms (using Fxc and Gxc)
+
+            gradgrid.zero();
+
+            _distGradientDensityValuesForLDA(gradgrid, gsDensityMatrix, aoidx, gaos, xgaox, xgaoy, xgaoz, blockdim);
+
+            gradgrid.updateBetaDensities();
+
+            _accumulateFxcContribForLDA(
+                molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGridOne, xcGradientGrid, xcHessianGrid, gridOffset, igpnt, blockdim);
+
+            _accumulateGxcContribForLDA(
+                molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGridQuad, xcGradientGrid, xcHessianGrid, xcCubicHessianGrid, gridOffset, igpnt, blockdim);
+
+            delete atmgtovec;
+        }
+
+        igpnt += blockdim;
+    }
+
+    // destroy GTOs container
+
+    delete gtovec;
+}
+
+void
+CXCMolecularGradient::_compTddftBatchForGGA(CDenseMatrix&              molecularGradient,
+                                            const CAODensityMatrix&    gsDensityMatrix,
+                                            const CAODensityMatrix&    rwDensityMatrixOne,
+                                            const CAODensityMatrix&    rwDensityMatrixTwo,
+                                            const CMolecule&           molecule,
+                                            const CMolecularBasis&     basis,
+                                            const CMolecularGrid&      molecularGrid,
+                                            const CDensityGrid&        gsDensityGrid,
+                                            const CDensityGrid&        rwDensityGridOne,
+                                            const CDensityGrid&        rwDensityGridTwo,
+                                            const CDensityGridQuad&    rwDensityGridQuad,
+                                            const CXCGradientGrid&     xcGradientGrid,
+                                            const CXCHessianGrid&      xcHessianGrid,
+                                            const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                            const int32_t              gridOffset,
+                                            const int32_t              nGridPoints) const
+{
+    // create GTOs container
+
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+
+    // set up number of AOs
+
+    auto naos = gtovec->getNumberOfAtomicOrbitals();
+
+    // determine number of grid blocks
+
+    auto blockdim = _getSizeOfBlock();
+
+    auto nblocks = nGridPoints / blockdim;
+
+    // set up molecular grid data
+
+    auto mgx = molecularGrid.getCoordinatesX();
+
+    auto mgy = molecularGrid.getCoordinatesY();
+
+    auto mgz = molecularGrid.getCoordinatesZ();
+
+    // loop over atoms
+
+    auto natoms = molecule.getNumberOfAtoms();
+
+    // set up current grid point
+
+    int32_t igpnt = 0;
+
+    // loop over grid points blocks
+
+    CMemBlock2D<double> bgaos(blockdim, naos);
+
+    CMemBlock2D<double> bgaox(blockdim, naos);
+
+    CMemBlock2D<double> bgaoy(blockdim, naos);
+
+    CMemBlock2D<double> bgaoz(blockdim, naos);
+
+    CDensityGrid gradgrid(blockdim, gsDensityMatrix.getNumberOfDensityMatrices(), 12, dengrid::ab);
+
+    for (int32_t i = 0; i < nblocks + 1; i++)
+    {
+        if (i == nblocks)
+        {
+            blockdim = nGridPoints - blockdim * nblocks;
+
+            if (blockdim == 0) continue;
+
+            bgaos = CMemBlock2D<double>(blockdim, naos);
+
+            bgaox = CMemBlock2D<double>(blockdim, naos);
+
+            bgaoy = CMemBlock2D<double>(blockdim, naos);
+
+            bgaoz = CMemBlock2D<double>(blockdim, naos);
+
+            gradgrid = CDensityGrid(blockdim, gsDensityMatrix.getNumberOfDensityMatrices(), 12, dengrid::ab);
+        }
+
+        bgaos.zero();
+
+        bgaox.zero();
+
+        bgaoy.zero();
+
+        bgaoz.zero();
+
+        gtorec::computeGtosValuesForGGA(bgaos, bgaox, bgaoy, bgaoz, gtovec, mgx, mgy, mgz, gridOffset, igpnt, blockdim);
+
+        for (int32_t iatom = 0; iatom < natoms; iatom++)
+        {
+            CGtoContainer* atmgtovec = new CGtoContainer(molecule, basis, iatom, 1);
+
+            auto atmnaos = atmgtovec->getNumberOfAtomicOrbitals();
+
+            CMemBlock<int32_t> aoidx(atmnaos);
+
+            CMemBlock2D<double> kgaos(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaox(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaoy(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaoz(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaoxx(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaoxy(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaoxz(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaoyy(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaoyz(blockdim, atmnaos);
+
+            CMemBlock2D<double> kgaozz(blockdim, atmnaos);
+
+            kgaos.zero();
+
+            kgaox.zero();
+
+            kgaoy.zero();
+
+            kgaoz.zero();
+
+            kgaoxx.zero();
+
+            kgaoxy.zero();
+
+            kgaoxz.zero();
+
+            kgaoyy.zero();
+
+            kgaoyz.zero();
+
+            kgaozz.zero();
+
+            gtorec::computeGtosValuesForGGA2(aoidx, kgaos, kgaox, kgaoy, kgaoz,
+                    kgaoxx, kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz, atmgtovec,
+                    mgx, mgy, mgz, gridOffset, igpnt, blockdim);
+
+            // accumulate Vxc 1st term
+
+            gradgrid.zero();
+
+            _distGradientDensityValuesForGGA(gradgrid, rwDensityMatrixOne, aoidx,
+                    bgaos, bgaox, bgaoy, bgaoz, kgaox, kgaoy, kgaoz, kgaoxx,
+                    kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz, blockdim);
+
+            gradgrid.updateBetaDensities();
+
+            _accumulateVxcContribForGGA(
+                molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, xcGradientGrid, gridOffset, igpnt, blockdim);
+
+            // accumulate Fxc 1st term
+
+            gradgrid.zero();
+
+            _distGradientDensityValuesForGGA(gradgrid, rwDensityMatrixTwo, aoidx,
+                    bgaos, bgaox, bgaoy, bgaoz, kgaox, kgaoy, kgaoz, kgaoxx,
+                    kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz, blockdim);
+
+            gradgrid.updateBetaDensities();
+
+            _accumulateFxcContribForGGA(
+                molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGridTwo, xcGradientGrid, xcHessianGrid, gridOffset, igpnt, blockdim);
+
+            // accumulate Vxc and Fxc 2nd terms (using Fxc and Gxc)
+
+            gradgrid.zero();
+
+            _distGradientDensityValuesForGGA(gradgrid, gsDensityMatrix, aoidx,
+                    bgaos, bgaox, bgaoy, bgaoz, kgaox, kgaoy, kgaoz, kgaoxx,
+                    kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz, blockdim);
+
+            gradgrid.updateBetaDensities();
+
+            _accumulateFxcContribForGGA(
+                molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGridOne, xcGradientGrid, xcHessianGrid, gridOffset, igpnt, blockdim);
 
             _accumulateGxcContribForGGA(
                 molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGridQuad, xcGradientGrid, xcHessianGrid, xcCubicHessianGrid, gridOffset, igpnt, blockdim);
@@ -2889,189 +3501,4 @@ int32_t
 CXCMolecularGradient::_getSizeOfBlock() const
 {
     return 200;
-}
-
-CDenseMatrix
-CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMatrixOne,
-                                             const CAODensityMatrix& rwDensityMatrixTwo,
-                                             const CAODensityMatrix& gsDensityMatrix,
-                                             const CMolecule&        molecule,
-                                             const CMolecularBasis&  basis,
-                                             const CMolecularGrid&   molecularGrid,
-                                             const std::string&      xcFuncLabel) const
-{
-    auto t00 = std::chrono::system_clock::now();
-
-    auto t0 = std::chrono::system_clock::now();
-
-    // parse exchange-correlation functional data
-
-    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
-
-    // generate reference density grid
-
-    CDensityGridDriver dgdrv(_locComm);
-
-    auto refdengrid = dgdrv.generate(gsDensityMatrix, molecule, basis, molecularGrid, fvxc.getFunctionalType());
-
-    auto t1 = std::chrono::system_clock::now();
-
-    std::cout << "ref den grid: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
-
-    // create molecular gradient
-
-    const auto natoms = molecule.getNumberOfAtoms();
-
-    CDenseMatrix molgrad(3, natoms);
-
-    molgrad.zero();
-
-    if (rwDensityMatrixOne.isClosedShell() && rwDensityMatrixTwo.isClosedShell())
-    {
-        t0 = std::chrono::system_clock::now();
-
-        // generate screened molecular and density grids
-
-        CMolecularGrid mgrid(molecularGrid);
-
-        CDensityGrid gsdengrid;
-
-        refdengrid.getScreenedGridsPair(gsdengrid, mgrid, 0, _thresholdOfDensity, fvxc.getFunctionalType());
-
-        t1 = std::chrono::system_clock::now();
-
-        std::cout << "screen grids pair: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
-
-        // allocate XC gradient/hessian grids
-
-        CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
-
-        CXCHessianGrid vxc2grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
-
-        CXCCubicHessianGrid vxc3grid(mgrid.getNumberOfGridPoints(), gsdengrid.getDensityGridType(), fvxc.getFunctionalType());
-
-        // compute exchange-correlation functional derivatives
-
-        t0 = std::chrono::system_clock::now();
-
-        fvxc.compute(vxcgrid, gsdengrid);
-
-        t1 = std::chrono::system_clock::now();
-
-        std::cout << "xc func deriv 1: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
-
-        t0 = std::chrono::system_clock::now();
-
-        fvxc.compute(vxc2grid, gsdengrid);
-
-        t1 = std::chrono::system_clock::now();
-
-        std::cout << "xc func deriv 2: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
-
-        t0 = std::chrono::system_clock::now();
-
-        fvxc.compute(vxc3grid, gsdengrid);
-
-        t1 = std::chrono::system_clock::now();
-
-        std::cout << "xc func deriv 3: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
-
-        t0 = std::chrono::system_clock::now();
-
-        // compute first Vxc contribution
-
-        _compVxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrixOne, mgrid, gsdengrid, vxcgrid);
-
-        t1 = std::chrono::system_clock::now();
-
-        std::cout << "vxc 1st term: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
-
-        t0 = std::chrono::system_clock::now();
-
-        // compute second Vxc contribution (using Fxc)
-
-        auto rwdengrid = dgdrv.generate(rwDensityMatrixOne, molecule, basis, mgrid, fvxc.getFunctionalType());
-
-        t1 = std::chrono::system_clock::now();
-
-        std::cout << "vxc 2nd term prep: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
-
-        t0 = std::chrono::system_clock::now();
-
-        _compFxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, rwdengrid, vxcgrid, vxc2grid);
-
-        t1 = std::chrono::system_clock::now();
-
-        std::cout << "vxc 2nd term comp: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
-
-        t0 = std::chrono::system_clock::now();
-
-        // compute first Fxc contribution
-
-        auto rwdengrid2 = dgdrv.generate(rwDensityMatrixTwo, molecule, basis, mgrid, fvxc.getFunctionalType());
-
-        _compFxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrixTwo, mgrid, gsdengrid, rwdengrid2, vxcgrid, vxc2grid);
-
-        t1 = std::chrono::system_clock::now();
-
-        std::cout << "fxc 1st term: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
-
-        t0 = std::chrono::system_clock::now();
-
-        // compute second Fxc contribution (using Gxc)
-
-        auto rwdenmat2 = rwDensityMatrixTwo.getReferenceToDensity(0);
-
-        CDenseMatrix zerodenmat2(rwdenmat2);
-
-        zerodenmat2.zero();
-
-        CAODensityMatrix rwDensityMatrixThree(std::vector<CDenseMatrix>({rwdenmat2, zerodenmat2, rwdenmat2, zerodenmat2}), denmat::rest);
-
-        // Note: We use quadratic response (quadMode == "QRF") to calculate
-        // third-order functional derivative contribution. The rw2DensityMatrix
-        // contains zero matrices and is therefore removed from the following code.
-        // Same for rw2dengrid.
-
-        // For "QRF" we have rwDensityMatrix.getNumberOfDensityMatrices() ==
-        // 2 * rw2DensityMatrix.getNumberOfDensityMatrices()
-
-        std::string quadMode("QRF");
-
-        int32_t qrfNumDensityMatrices = rwDensityMatrixThree.getNumberOfDensityMatrices() / 2;
-
-        auto rwdengrid3 = dgdrv.generate(rwDensityMatrixThree, molecule, basis, mgrid, fvxc.getFunctionalType());
-
-        auto rwdengridc = CDensityGridQuad(mgrid.getNumberOfGridPoints(), qrfNumDensityMatrices, fvxc.getFunctionalType(), dengrid::ab);
-
-        rwdengridc.DensityProd(rwdengrid3, fvxc.getFunctionalType(), qrfNumDensityMatrices, quadMode);
-
-        t1 = std::chrono::system_clock::now();
-
-        std::cout << "fxc 2nd term prep: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
-
-        t0 = std::chrono::system_clock::now();
-
-        _compGxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, rwdengridc, vxcgrid, vxc2grid, vxc3grid);
-
-        t1 = std::chrono::system_clock::now();
-
-        std::cout << "fxc 2nd term comp: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
-    }
-    else
-    {
-        // not implemented
-
-        std::string erropenshell("XCMolecularGradient.integrateTddftGradient: Not implemented for open-shell");
-
-        errors::assertMsgCritical(false, erropenshell);
-    }
-
-    auto t11 = std::chrono::system_clock::now();
-
-    std::cout << "total time in tddft xcgrad: " << std::chrono::duration_cast<std::chrono::milliseconds>(t11 - t00).count() << " ms" << std::endl;
-
-    // done with molecular gradient
-
-    return molgrad.transpose();
 }

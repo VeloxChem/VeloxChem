@@ -152,6 +152,22 @@ class CXCMolecularGradient
                          const CXCHessianGrid&      xcHessianGrid,
                          const CXCCubicHessianGrid& xcCubicHessianGrid) const;
 
+    void _compTddftContrib(CDenseMatrix&              molecularGradient,
+                           const CMolecule&           molecule,
+                           const CMolecularBasis&     basis,
+                           const xcfun                xcFuncType,
+                           const CAODensityMatrix&    gsDensityMatrix,
+                           const CAODensityMatrix&    rwdensityMatrixOne,
+                           const CAODensityMatrix&    rwdensityMatrixTwo,
+                           const CMolecularGrid&      molecularGrid,
+                           const CDensityGrid&        gsDensityGrid,
+                           const CDensityGrid&        rwDensityGridOne,
+                           const CDensityGrid&        rwDensityGridTwo,
+                           const CDensityGridQuad&    rwDensityGridQuad,
+                           const CXCGradientGrid&     xcGradientGrid,
+                           const CXCHessianGrid&      xcHessianGrid,
+                           const CXCCubicHessianGrid& xcCubicHessianGrid) const;
+
     void _compVxcBatchForLDA(CDenseMatrix&           molecularGradient,
                              const CAODensityMatrix& densityMatrix,
                              const CMolecule&        molecule,
@@ -221,6 +237,40 @@ class CXCMolecularGradient
                              const CXCCubicHessianGrid& xcCubicHessianGrid,
                              const int32_t              gridOffset,
                              const int32_t              nGridPoints) const;
+
+    void _compTddftBatchForLDA(CDenseMatrix&              molecularGradient,
+                               const CAODensityMatrix&    gsDensityMatrix,
+                               const CAODensityMatrix&    rwDensityMatrixOne,
+                               const CAODensityMatrix&    rwDensityMatrixTwo,
+                               const CMolecule&           molecule,
+                               const CMolecularBasis&     basis,
+                               const CMolecularGrid&      molecularGrid,
+                               const CDensityGrid&        gsDensityGrid,
+                               const CDensityGrid&        rwDensityGridOne,
+                               const CDensityGrid&        rwDensityGridTwo,
+                               const CDensityGridQuad&    rwDensityGridQuad,
+                               const CXCGradientGrid&     xcGradientGrid,
+                               const CXCHessianGrid&      xcHessianGrid,
+                               const CXCCubicHessianGrid& xcCubicHessianGrid,
+                               const int32_t              gridOffset,
+                               const int32_t              nGridPoints) const;
+
+    void _compTddftBatchForGGA(CDenseMatrix&              molecularGradient,
+                               const CAODensityMatrix&    gsDensityMatrix,
+                               const CAODensityMatrix&    rwDensityMatrixOne,
+                               const CAODensityMatrix&    rwDensityMatrixTwo,
+                               const CMolecule&           molecule,
+                               const CMolecularBasis&     basis,
+                               const CMolecularGrid&      molecularGrid,
+                               const CDensityGrid&        gsDensityGrid,
+                               const CDensityGrid&        rwDensityGridOne,
+                               const CDensityGrid&        rwDensityGridTwo,
+                               const CDensityGridQuad&    rwDensityGridQuad,
+                               const CXCGradientGrid&     xcGradientGrid,
+                               const CXCHessianGrid&      xcHessianGrid,
+                               const CXCCubicHessianGrid& xcCubicHessianGrid,
+                               const int32_t              gridOffset,
+                               const int32_t              nGridPoints) const;
 
     void _distGradientDensityValuesForLDA(CDensityGrid&              densityGrid,
                                           const CAODensityMatrix&    densityMatrix,
