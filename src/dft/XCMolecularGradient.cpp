@@ -31,7 +31,6 @@
 
 #include "AODensityMatrix.hpp"
 #include "DenseMatrix.hpp"
-#include "DensityGradientGridDriver.hpp"
 #include "DensityGridDriver.hpp"
 #include "DensityGridQuad.hpp"
 #include "DensityMatrixType.hpp"

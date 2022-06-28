@@ -1,7 +1,6 @@
 target_sources(vlxobjs
   PRIVATE
     AOKohnShamMatrix.cpp
-    DensityGradientGridDriver.cpp
     DensityGrid.cpp
     DensityGridDriver.cpp
     DensityGridQuad.cpp
