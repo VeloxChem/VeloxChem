@@ -56,13 +56,13 @@ CXCMolecularGradient::~CXCMolecularGradient()
 }
 
 CDenseMatrix
-CXCMolecularGradient::integrateVxcGradient(const CAODensityMatrix& aoDensityMatrix,
+CXCMolecularGradient::integrateVxcGradient(const CAODensityMatrix& gsDensityMatrix,
                                            const CMolecule&        molecule,
                                            const CMolecularBasis&  basis,
                                            const CMolecularGrid&   molecularGrid,
                                            const std::string&      xcFuncLabel) const
 {
-    return integrateVxcGradient(aoDensityMatrix, aoDensityMatrix, molecule, basis, molecularGrid, xcFuncLabel);
+    return integrateVxcGradient(gsDensityMatrix, gsDensityMatrix, molecule, basis, molecularGrid, xcFuncLabel);
 }
 
 CDenseMatrix

@@ -152,6 +152,27 @@ class CXCMolecularGradient
                          const CXCHessianGrid&      xcHessianGrid,
                          const CXCCubicHessianGrid& xcCubicHessianGrid) const;
 
+    /**
+     Integrates TDDFT exchnage-correlation functional contribution to molecular
+     gradient.
+
+     @param molecularGradient the molecular gradient object.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param xcFuncType the type of exchange-correlation functional.
+     @param gsDensityMatrix the ground state AO density matrix.
+     @param rwDensityMatrixOne the perturbed AO density matrix (relaxed_density_ao).
+     @param rwDensityMatrixTwo the perturbed AO density matrix (x_minus_y_ao).
+     @param molecularGrid the molecular grid.
+     @param gsDenistyGrid the ground state density grid.
+     @param rwDenistyGridOne the perturbed density grid from rwDensityMatrixOne.
+     @param rwDenistyGridTwo the perturbed density grid from rwDensityMatrixTwo.
+     @param rwDenistyGridQuad the perturbed density grid for quadratic
+            response (QRF).
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param xcCubicHessianGrid the exchange-correlation cubic hessian grid.
+     */
     void _compTddftContrib(CDenseMatrix&              molecularGradient,
                            const CMolecule&           molecule,
                            const CMolecularBasis&     basis,
@@ -168,6 +189,21 @@ class CXCMolecularGradient
                            const CXCHessianGrid&      xcHessianGrid,
                            const CXCCubicHessianGrid& xcCubicHessianGrid) const;
 
+    /**
+     Integrates batch of grid points for LDA first-order exchnage-correlation
+     functional contribution to molecular gradient.
+
+     @param molecularGradient the molecular gradient object.
+     @param densityMatrix the AO density matrix (to be contracted with GTO
+            gradient).
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @param gsDenistyGrid the ground state density grid.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param gridOffset the batch offset in vector grid points.
+     @param nGridPoints the number of grid points in batch.
+     */
     void _compVxcBatchForLDA(CDenseMatrix&           molecularGradient,
                              const CAODensityMatrix& densityMatrix,
                              const CMolecule&        molecule,
@@ -178,6 +214,21 @@ class CXCMolecularGradient
                              const int32_t           gridOffset,
                              const int32_t           nGridPoints) const;
 
+    /**
+     Integrates batch of grid points for GGA first-order exchnage-correlation
+     functional contribution to molecular gradient.
+
+     @param molecularGradient the molecular gradient object.
+     @param densityMatrix the AO density matrix (to be contracted with GTO
+            gradient).
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @param gsDenistyGrid the ground state density grid.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param gridOffset the batch offset in vector grid points.
+     @param nGridPoints the number of grid points in batch.
+     */
     void _compVxcBatchForGGA(CDenseMatrix&           molecularGradient,
                              const CAODensityMatrix& densityMatrix,
                              const CMolecule&        molecule,
@@ -188,6 +239,23 @@ class CXCMolecularGradient
                              const int32_t           gridOffset,
                              const int32_t           nGridPoints) const;
 
+    /**
+     Integrates batch of grid points for LDA second-order exchnage-correlation
+     functional contribution to molecular gradient.
+
+     @param molecularGradient the molecular gradient object.
+     @param densityMatrix the AO density matrix (to be contracted with GTO
+            gradient).
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @param gsDenistyGrid the ground state density grid.
+     @param rwDenistyGrid the perturbed density grid.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param gridOffset the batch offset in vector grid points.
+     @param nGridPoints the number of grid points in batch.
+     */
     void _compFxcBatchForLDA(CDenseMatrix&           molecularGradient,
                              const CAODensityMatrix& densityMatrix,
                              const CMolecule&        molecule,
@@ -200,6 +268,23 @@ class CXCMolecularGradient
                              const int32_t           gridOffset,
                              const int32_t           nGridPoints) const;
 
+    /**
+     Integrates batch of grid points for GGA second-order exchnage-correlation
+     functional contribution to molecular gradient.
+
+     @param molecularGradient the molecular gradient object.
+     @param densityMatrix the AO density matrix (to be contracted with GTO
+            gradient).
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @param gsDenistyGrid the ground state density grid.
+     @param rwDenistyGrid the perturbed density grid.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param gridOffset the batch offset in vector grid points.
+     @param nGridPoints the number of grid points in batch.
+     */
     void _compFxcBatchForGGA(CDenseMatrix&           molecularGradient,
                              const CAODensityMatrix& densityMatrix,
                              const CMolecule&        molecule,
@@ -212,6 +297,25 @@ class CXCMolecularGradient
                              const int32_t           gridOffset,
                              const int32_t           nGridPoints) const;
 
+    /**
+     Integrates batch of grid points for LDA third-order exchnage-correlation
+     functional contribution to molecular gradient.
+
+     @param molecularGradient the molecular gradient object.
+     @param densityMatrix the AO density matrix (to be contracted with GTO
+            gradient).
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @param gsDenistyGrid the ground state density grid.
+     @param rwDenistyGridQuad the perturbed density grid for quadratic
+            response.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param xcCubicHessianGrid the exchange-correlation cubic hessian grid.
+     @param gridOffset the batch offset in vector grid points.
+     @param nGridPoints the number of grid points in batch.
+     */
     void _compGxcBatchForLDA(CDenseMatrix&              molecularGradient,
                              const CAODensityMatrix&    densityMatrix,
                              const CMolecule&           molecule,
@@ -225,6 +329,25 @@ class CXCMolecularGradient
                              const int32_t              gridOffset,
                              const int32_t              nGridPoints) const;
 
+    /**
+     Integrates batch of grid points for GGA third-order exchnage-correlation
+     functional contribution to molecular gradient.
+
+     @param molecularGradient the molecular gradient object.
+     @param densityMatrix the AO density matrix (to be contracted with GTO
+            gradient).
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @param gsDenistyGrid the ground state density grid.
+     @param rwDenistyGridQuad the perturbed density grid for quadratic
+            response.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param xcCubicHessianGrid the exchange-correlation cubic hessian grid.
+     @param gridOffset the batch offset in vector grid points.
+     @param nGridPoints the number of grid points in batch.
+     */
     void _compGxcBatchForGGA(CDenseMatrix&              molecularGradient,
                              const CAODensityMatrix&    densityMatrix,
                              const CMolecule&           molecule,
@@ -238,6 +361,28 @@ class CXCMolecularGradient
                              const int32_t              gridOffset,
                              const int32_t              nGridPoints) const;
 
+    /**
+     Integrates batch of grid points for LDA TDDFT exchnage-correlation
+     functional contribution to molecular gradient.
+
+     @param molecularGradient the molecular gradient object.
+     @param gsdensityMatrix the ground state AO density matrix.
+     @param rwDensityMatrixOne the perturbed AO density matrix (relaxed_density_ao).
+     @param rwDensityMatrixTwo the perturbed AO density matrix (x_minus_y_ao).
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @param gsDenistyGrid the ground state density grid.
+     @param rwDenistyGridOne the perturbed density grid from rwDensityMatrixOne.
+     @param rwDenistyGridTwo the perturbed density grid from rwDensityMatrixTwo.
+     @param rwDenistyGridQuad the perturbed density grid for quadratic
+            response (QRF).
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param xcCubicHessianGrid the exchange-correlation cubic hessian grid.
+     @param gridOffset the batch offset in vector grid points.
+     @param nGridPoints the number of grid points in batch.
+     */
     void _compTddftBatchForLDA(CDenseMatrix&              molecularGradient,
                                const CAODensityMatrix&    gsDensityMatrix,
                                const CAODensityMatrix&    rwDensityMatrixOne,
@@ -255,6 +400,28 @@ class CXCMolecularGradient
                                const int32_t              gridOffset,
                                const int32_t              nGridPoints) const;
 
+    /**
+     Integrates batch of grid points for GGA TDDFT exchnage-correlation
+     functional contribution to molecular gradient.
+
+     @param molecularGradient the molecular gradient object.
+     @param gsdensityMatrix the ground state AO density matrix.
+     @param rwDensityMatrixOne the perturbed AO density matrix (relaxed_density_ao).
+     @param rwDensityMatrixTwo the perturbed AO density matrix (x_minus_y_ao).
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @param gsDenistyGrid the ground state density grid.
+     @param rwDenistyGridOne the perturbed density grid from rwDensityMatrixOne.
+     @param rwDenistyGridTwo the perturbed density grid from rwDensityMatrixTwo.
+     @param rwDenistyGridQuad the perturbed density grid for quadratic
+            response (QRF).
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param xcCubicHessianGrid the exchange-correlation cubic hessian grid.
+     @param gridOffset the batch offset in vector grid points.
+     @param nGridPoints the number of grid points in batch.
+     */
     void _compTddftBatchForGGA(CDenseMatrix&              molecularGradient,
                                const CAODensityMatrix&    gsDensityMatrix,
                                const CAODensityMatrix&    rwDensityMatrixOne,
@@ -272,6 +439,18 @@ class CXCMolecularGradient
                                const int32_t              gridOffset,
                                const int32_t              nGridPoints) const;
 
+    /**
+     Distributes density values into density grid for LDA.
+
+     @param densityGrid the pointer to density grid object.
+     @param densityMatrix the AO density matrix.
+     @param aoIdentifiers the identifiers of AOs.
+     @param braGtoValues the GTOs values buffer on bra side.
+     @param ketGtoValuesX the GTOs gradient X values buffer on ket side.
+     @param ketGtoValuesY the GTOs gradient Y values buffer on ket side.
+     @param ketGtoValuesZ the GTOs gradient Z values buffer on ket side.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
     void _distGradientDensityValuesForLDA(CDensityGrid&              densityGrid,
                                           const CAODensityMatrix&    densityMatrix,
                                           const CMemBlock<int32_t>&  aoIdentifiers,
@@ -281,6 +460,27 @@ class CXCMolecularGradient
                                           const CMemBlock2D<double>& ketGtoValuesZ,
                                           const int32_t              nGridPoints) const;
 
+    /**
+     Distributes density values into density grid for GGA.
+
+     @param densityGrid the pointer to density grid object.
+     @param densityMatrix the AO density matrix.
+     @param aoIdentifiers the identifiers of AOs.
+     @param braGtoValues the GTOs values buffer on bra side.
+     @param braGtoValuesX the GTOs gradient X values buffer on bra side.
+     @param braGtoValuesY the GTOs gradient Y values buffer on bra side.
+     @param braGtoValuesZ the GTOs gradient Z values buffer on bra side.
+     @param ketGtoValuesX the GTOs gradient X values buffer on ket side.
+     @param ketGtoValuesY the GTOs gradient Y values buffer on ket side.
+     @param ketGtoValuesZ the GTOs gradient Z values buffer on ket side.
+     @param ketGtoValuesXX the GTOs hessian XX values buffer on ket side.
+     @param ketGtoValuesXY the GTOs hessian XY values buffer on ket side.
+     @param ketGtoValuesXZ the GTOs hessian XZ values buffer on ket side.
+     @param ketGtoValuesYY the GTOs hessian YY values buffer on ket side.
+     @param ketGtoValuesYZ the GTOs hessian YZ values buffer on ket side.
+     @param ketGtoValuesZZ the GTOs hessian ZZ values buffer on ket side.
+     @param nGridPoints the number of grid points in grid points batch.
+     */
     void _distGradientDensityValuesForGGA(CDensityGrid&              densityGrid,
                                           const CAODensityMatrix&    densityMatrix,
                                           const CMemBlock<int32_t>&  aoIdentifiers,
@@ -299,6 +499,20 @@ class CXCMolecularGradient
                                           const CMemBlock2D<double>& ketGtoValuesZZ,
                                           const int32_t              nGridPoints) const;
 
+    /**
+     Accumulates LDA first-order exchnage-correlation functional contribution
+     to molecular gradient of an atom.
+
+     @param molecularGradient the molecular gradient object.
+     @param iAtom the index of the atom.
+     @param gradientDensityGrid the nuclear gradient grid.
+     @param molecularGrid the molecular grid.
+     @param gsDenistyGrid the ground state density grid.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param gridOffset the batch offset in vector grid points.
+     @param gridBlockPosition the position of grid block.
+     @param nGridPoints the number of grid points in batch.
+     */
     void _accumulateVxcContribForLDA(CDenseMatrix&          molecularGradient,
                                      const int32_t          iAtom,
                                      const CDensityGrid&    gradientDensityGrid,
@@ -309,6 +523,20 @@ class CXCMolecularGradient
                                      const int32_t          gridBlockPosition,
                                      const int32_t          nGridPoints) const;
 
+    /**
+     Accumulates GGA first-order exchnage-correlation functional contribution
+     to molecular gradient of an atom.
+
+     @param molecularGradient the molecular gradient object.
+     @param iAtom the index of the atom.
+     @param gradientDensityGrid the nuclear gradient grid.
+     @param molecularGrid the molecular grid.
+     @param gsDenistyGrid the ground state density grid.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param gridOffset the batch offset in vector grid points.
+     @param gridBlockPosition the position of grid block.
+     @param nGridPoints the number of grid points in batch.
+     */
     void _accumulateVxcContribForGGA(CDenseMatrix&          molecularGradient,
                                      const int32_t          iAtom,
                                      const CDensityGrid&    gradientDensityGrid,
@@ -319,6 +547,22 @@ class CXCMolecularGradient
                                      const int32_t          gridBlockPosition,
                                      const int32_t          nGridPoints) const;
 
+    /**
+     Accumulates LDA second-order exchnage-correlation functional contribution
+     to molecular gradient of an atom.
+
+     @param molecularGradient the molecular gradient object.
+     @param iAtom the index of the atom.
+     @param gradientDensityGrid the nuclear gradient grid.
+     @param molecularGrid the molecular grid.
+     @param gsDenistyGrid the ground state density grid.
+     @param rwDenistyGrid the perturbed density grid.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param gridOffset the batch offset in vector grid points.
+     @param gridBlockPosition the position of grid block.
+     @param nGridPoints the number of grid points in batch.
+     */
     void _accumulateFxcContribForLDA(CDenseMatrix&          molecularGradient,
                                      const int32_t          iAtom,
                                      const CDensityGrid&    gradientDensityGrid,
@@ -331,6 +575,22 @@ class CXCMolecularGradient
                                      const int32_t          gridBlockPosition,
                                      const int32_t          nGridPoints) const;
 
+    /**
+     Accumulates GGA second-order exchnage-correlation functional contribution
+     to molecular gradient of an atom.
+
+     @param molecularGradient the molecular gradient object.
+     @param iAtom the index of the atom.
+     @param gradientDensityGrid the nuclear gradient grid.
+     @param molecularGrid the molecular grid.
+     @param gsDenistyGrid the ground state density grid.
+     @param rwDenistyGrid the perturbed density grid.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param gridOffset the batch offset in vector grid points.
+     @param gridBlockPosition the position of grid block.
+     @param nGridPoints the number of grid points in batch.
+     */
     void _accumulateFxcContribForGGA(CDenseMatrix&          molecularGradient,
                                      const int32_t          iAtom,
                                      const CDensityGrid&    gradientDensityGrid,
@@ -343,6 +603,24 @@ class CXCMolecularGradient
                                      const int32_t          gridBlockPosition,
                                      const int32_t          nGridPoints) const;
 
+    /**
+     Accumulates LDA third-order exchnage-correlation functional contribution
+     to molecular gradient of an atom.
+
+     @param molecularGradient the molecular gradient object.
+     @param iAtom the index of the atom.
+     @param gradientDensityGrid the nuclear gradient grid.
+     @param molecularGrid the molecular grid.
+     @param gsDenistyGrid the ground state density grid.
+     @param rwDenistyGridQuad the perturbed density grid for quadratic
+            response.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param xcCubicHessianGrid the exchange-correlation cubic hessian grid.
+     @param gridOffset the batch offset in vector grid points.
+     @param gridBlockPosition the position of grid block.
+     @param nGridPoints the number of grid points in batch.
+     */
     void _accumulateGxcContribForLDA(CDenseMatrix&              molecularGradient,
                                      const int32_t              iAtom,
                                      const CDensityGrid&        gradientDensityGrid,
@@ -356,6 +634,24 @@ class CXCMolecularGradient
                                      const int32_t              gridBlockPosition,
                                      const int32_t              nGridPoints) const;
 
+    /**
+     Accumulates GGA third-order exchnage-correlation functional contribution
+     to molecular gradient of an atom.
+
+     @param molecularGradient the molecular gradient object.
+     @param iAtom the index of the atom.
+     @param gradientDensityGrid the nuclear gradient grid.
+     @param molecularGrid the molecular grid.
+     @param gsDenistyGrid the ground state density grid.
+     @param rwDenistyGridQuad the perturbed density grid for quadratic
+            response.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param xcCubicHessianGrid the exchange-correlation cubic hessian grid.
+     @param gridOffset the batch offset in vector grid points.
+     @param gridBlockPosition the position of grid block.
+     @param nGridPoints the number of grid points in batch.
+     */
     void _accumulateGxcContribForGGA(CDenseMatrix&              molecularGradient,
                                      const int32_t              iAtom,
                                      const CDensityGrid&        gradientDensityGrid,
@@ -369,6 +665,11 @@ class CXCMolecularGradient
                                      const int32_t              gridBlockPosition,
                                      const int32_t              nGridPoints) const;
 
+    /**
+     Gets size of block in grid batch.
+
+     @return the size of block in grid batch.
+     */
     int32_t _getSizeOfBlock() const;
 
    public:
@@ -385,25 +686,28 @@ class CXCMolecularGradient
     ~CXCMolecularGradient();
 
     /**
-     Integrates exchnage-correlation functional contribution to molecular gradient.
+     Integrates 1st-order exchnage-correlation functional contribution to
+     molecular gradient.
 
-     @param aoDensityMatrix the AO density matrix object.
+     @param gsDensityMatrix the ground state AO density matrix object.
      @param molecule the molecule.
      @param basis the molecular basis.
      @param molecularGrid the molecular grid.
      @param xcFuncLabel the label of exchange-correlation functional.
      @return the molecular gradient.
      */
-    CDenseMatrix integrateVxcGradient(const CAODensityMatrix& aoDensityMatrix,
+    CDenseMatrix integrateVxcGradient(const CAODensityMatrix& gsDensityMatrix,
                                       const CMolecule&        molecule,
                                       const CMolecularBasis&  basis,
                                       const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 
     /**
-     Integrates exchnage-correlation functional contribution to molecular gradient.
+     Integrates 1st-order exchnage-correlation functional contribution to
+     molecular gradient.
 
-     @param rwDensityMatrix the perturbed AO density matrix object.
+     @param rwDensityMatrix the perturbed AO density matrix object (to be
+            contracted with GTO gradient).
      @param gsDensityMatrix the ground state AO density matrix object.
      @param molecule the molecule.
      @param basis the molecular basis.
@@ -419,10 +723,12 @@ class CXCMolecularGradient
                                       const std::string&      xcFuncLabel) const;
 
     /**
-     Integrates exchnage-correlation functional contribution to molecular gradient.
+     Integrates 2nd-order exchnage-correlation functional contribution to
+     molecular gradient.
 
      @param rwDensityMatrixOne the perturbed AO density matrix object.
-     @param rwDensityMatrixTwo the perturbed AO density matrix object.
+     @param rwDensityMatrixTwo the perturbed AO density matrix object (to be
+            contracted with GTO gradient).
      @param gsDensityMatrix the ground state AO density matrix object.
      @param molecule the molecule.
      @param basis the molecular basis.
@@ -439,11 +745,13 @@ class CXCMolecularGradient
                                       const std::string&      xcFuncLabel) const;
 
     /**
-     Integrates exchnage-correlation functional contribution to molecular gradient.
+     Integrates 3rd-order exchnage-correlation functional contribution to
+     molecular gradient.
 
      @param rwDensityMatrixOne the perturbed AO density matrix object.
      @param rwDensityMatrixTwo the perturbed AO density matrix object.
-     @param gsDensityMatrix the ground state AO density matrix object.
+     @param gsDensityMatrix the ground state AO density matrix object (to be
+            contracted with GTO gradient).
      @param molecule the molecule.
      @param basis the molecular basis.
      @param molecularGrid the molecular grid.
@@ -458,6 +766,19 @@ class CXCMolecularGradient
                                       const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 
+    /**
+     Integrates TDDFT exchnage-correlation functional contribution to molecular
+     gradient.
+
+     @param rwDensityMatrixOne the perturbed AO density matrix (relaxed_density_ao).
+     @param rwDensityMatrixTwo the perturbed AO density matrix (x_minus_y_ao).
+     @param gsDensityMatrix the ground state AO density matrix.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @return the molecular gradient.
+     */
     CDenseMatrix integrateTddftGradient(const CAODensityMatrix& rwDensityMatrixOne,
                                         const CAODensityMatrix& rwDensityMatrixTwo,
                                         const CAODensityMatrix& gsDensityMatrix,
