@@ -128,13 +128,13 @@ CXCMolecularGradient::integrateVxcGradient(const CAODensityMatrix& rwDensityMatr
 }
 
 CDenseMatrix
-CXCMolecularGradient::integrateFxcGradient(const CAODensityMatrix& rwDensityMatrixOne,
-                                           const CAODensityMatrix& rwDensityMatrixTwo,
-                                           const CAODensityMatrix& gsDensityMatrix,
-                                           const CMolecule&        molecule,
-                                           const CMolecularBasis&  basis,
-                                           const CMolecularGrid&   molecularGrid,
-                                           const std::string&      xcFuncLabel) const
+CXCMolecularGradient::integrateVxc2ndOrderGradient(const CAODensityMatrix& rwDensityMatrixOne,
+                                                   const CAODensityMatrix& rwDensityMatrixTwo,
+                                                   const CAODensityMatrix& gsDensityMatrix,
+                                                   const CMolecule&        molecule,
+                                                   const CMolecularBasis&  basis,
+                                                   const CMolecularGrid&   molecularGrid,
+                                                   const std::string&      xcFuncLabel) const
 {
     // parse exchange-correlation functional data
 
@@ -180,15 +180,15 @@ CXCMolecularGradient::integrateFxcGradient(const CAODensityMatrix& rwDensityMatr
 
         auto rwdengrid = dgdrv.generate(rwDensityMatrixOne, molecule, basis, mgrid, fvxc.getFunctionalType());
 
-        // compute Fxc contribution to molecular gradient
+        // compute Vxc 2nd-order contribution to molecular gradient
 
-        _compFxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrixTwo, mgrid, gsdengrid, rwdengrid, vxcgrid, vxc2grid);
+        _compVxc2ndOrderContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrixTwo, mgrid, gsdengrid, rwdengrid, vxcgrid, vxc2grid);
     }
     else
     {
         // not implemented
 
-        std::string erropenshell("XCMolecularGradient.integrateFxcGradient: Not implemented for open-shell");
+        std::string erropenshell("XCMolecularGradient.integrateVxc2ndOrderGradient: Not implemented for open-shell");
 
         errors::assertMsgCritical(false, erropenshell);
     }
@@ -199,13 +199,13 @@ CXCMolecularGradient::integrateFxcGradient(const CAODensityMatrix& rwDensityMatr
 }
 
 CDenseMatrix
-CXCMolecularGradient::integrateGxcGradient(const CAODensityMatrix& rwDensityMatrixOne,
-                                           const CAODensityMatrix& rwDensityMatrixTwo,
-                                           const CAODensityMatrix& gsDensityMatrix,
-                                           const CMolecule&        molecule,
-                                           const CMolecularBasis&  basis,
-                                           const CMolecularGrid&   molecularGrid,
-                                           const std::string&      xcFuncLabel) const
+CXCMolecularGradient::integrateVxc3rdOrderGradient(const CAODensityMatrix& rwDensityMatrixOne,
+                                                   const CAODensityMatrix& rwDensityMatrixTwo,
+                                                   const CAODensityMatrix& gsDensityMatrix,
+                                                   const CMolecule&        molecule,
+                                                   const CMolecularBasis&  basis,
+                                                   const CMolecularGrid&   molecularGrid,
+                                                   const std::string&      xcFuncLabel) const
 {
     // parse exchange-correlation functional data
 
@@ -287,16 +287,16 @@ CXCMolecularGradient::integrateGxcGradient(const CAODensityMatrix& rwDensityMatr
 
         rwdengridc.DensityProd(rwdengrid, fvxc.getFunctionalType(), rw2NumberOfDensityMatrices, quadMode);
 
-        // compute Gxc contribution to molecular gradient
+        // compute Vxc 3rd-order contribution to molecular gradient
 
-        _compGxcContrib(
+        _compVxc3rdOrderContrib(
             molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, rwdengridc, vxcgrid, vxc2grid, vxc3grid);
     }
     else
     {
         // not implemented
 
-        std::string erropenshell("XCMolecularGradient.integrateGxcGradient: Not implemented for open-shell");
+        std::string erropenshell("XCMolecularGradient.integrateVxc3rdOrderGradient: Not implemented for open-shell");
 
         errors::assertMsgCritical(false, erropenshell);
     }
@@ -441,9 +441,9 @@ CXCMolecularGradient::integrateTddftGradient(const CAODensityMatrix& rwDensityMa
 
         // Individual terms
         // _compVxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrixOne, mgrid, gsdengrid, vxcgrid);
-        // _compFxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, rwdengrid, vxcgrid, vxc2grid);
-        // _compFxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrixTwo, mgrid, gsdengrid, rwdengrid2, vxcgrid, vxc2grid);
-        // _compGxcContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, rwdengridc, vxcgrid, vxc2grid, vxc3grid);
+        // _compVxc2ndOrderContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, rwdengrid, vxcgrid, vxc2grid);
+        // _compVxc2ndOrderContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), rwDensityMatrixTwo, mgrid, gsdengrid, rwdengrid2, vxcgrid, vxc2grid);
+        // _compVxc3rdOrderContrib(molgrad, molecule, basis, fvxc.getFunctionalType(), gsDensityMatrix, mgrid, gsdengrid, rwdengridc, vxcgrid, vxc2grid, vxc3grid);
 
         // Tddft contribution:
 
@@ -570,22 +570,22 @@ CXCMolecularGradient::_compVxcContrib(CDenseMatrix&           molecularGradient,
 }
 
 void
-CXCMolecularGradient::_compFxcContrib(CDenseMatrix&           molecularGradient,
-                                      const CMolecule&        molecule,
-                                      const CMolecularBasis&  basis,
-                                      const xcfun             xcFuncType,
-                                      const CAODensityMatrix& densityMatrix,
-                                      const CMolecularGrid&   molecularGrid,
-                                      const CDensityGrid&     gsDensityGrid,
-                                      const CDensityGrid&     rwDensityGrid,
-                                      const CXCGradientGrid&  xcGradientGrid,
-                                      const CXCHessianGrid&   xcHessianGrid) const
+CXCMolecularGradient::_compVxc2ndOrderContrib(CDenseMatrix&           molecularGradient,
+                                              const CMolecule&        molecule,
+                                              const CMolecularBasis&  basis,
+                                              const xcfun             xcFuncType,
+                                              const CAODensityMatrix& densityMatrix,
+                                              const CMolecularGrid&   molecularGrid,
+                                              const CDensityGrid&     gsDensityGrid,
+                                              const CDensityGrid&     rwDensityGrid,
+                                              const CXCGradientGrid&  xcGradientGrid,
+                                              const CXCHessianGrid&   xcHessianGrid) const
 {
     // sanity check
 
     if ((xcFuncType != xcfun::lda) && (xcFuncType != xcfun::gga) && (xcFuncType != xcfun::mgga))
     {
-        std::string errxcfunctype("CXCMolecularGradient._compFxcContrib: Invalid XC functional type");
+        std::string errxcfunctype("CXCMolecularGradient._compVxc2ndOrderContrib: Invalid XC functional type");
 
         errors::assertMsgCritical(false, errxcfunctype);
     }
@@ -594,7 +594,7 @@ CXCMolecularGradient::_compFxcContrib(CDenseMatrix&           molecularGradient,
     {
         // not implemented
 
-        std::string errmgga("CXCMolecularGradient._compFxcContrib: Not implemented for meta-GGA");
+        std::string errmgga("CXCMolecularGradient._compVxc2ndOrderContrib: Not implemented for meta-GGA");
 
         errors::assertMsgCritical(false, errmgga);
     }
@@ -637,14 +637,14 @@ CXCMolecularGradient::_compFxcContrib(CDenseMatrix&           molecularGradient,
 
                     if (xcFuncType == xcfun::lda)
                     {
-                        _compFxcBatchForLDA(molgrad, densityMatrix, molecule,
+                        _compVxc2ndOrderBatchForLDA(molgrad, densityMatrix, molecule,
                                 basis, molecularGrid, gsDensityGrid, rwDensityGrid,
                                 xcGradientGrid, xcHessianGrid, tbposition, tbsize);
                     }
 
                     if (xcFuncType == xcfun::gga)
                     {
-                        _compFxcBatchForGGA(molgrad, densityMatrix, molecule,
+                        _compVxc2ndOrderBatchForGGA(molgrad, densityMatrix, molecule,
                                 basis, molecularGrid, gsDensityGrid, rwDensityGrid,
                                 xcGradientGrid, xcHessianGrid, tbposition, tbsize);
                     }
@@ -670,23 +670,23 @@ CXCMolecularGradient::_compFxcContrib(CDenseMatrix&           molecularGradient,
 }
 
 void
-CXCMolecularGradient::_compGxcContrib(CDenseMatrix&              molecularGradient,
-                                      const CMolecule&           molecule,
-                                      const CMolecularBasis&     basis,
-                                      const xcfun                xcFuncType,
-                                      const CAODensityMatrix&    densityMatrix,
-                                      const CMolecularGrid&      molecularGrid,
-                                      const CDensityGrid&        gsDensityGrid,
-                                      const CDensityGridQuad&    rwDensityGridQuad,
-                                      const CXCGradientGrid&     xcGradientGrid,
-                                      const CXCHessianGrid&      xcHessianGrid,
-                                      const CXCCubicHessianGrid& xcCubicHessianGrid) const
+CXCMolecularGradient::_compVxc3rdOrderContrib(CDenseMatrix&              molecularGradient,
+                                              const CMolecule&           molecule,
+                                              const CMolecularBasis&     basis,
+                                              const xcfun                xcFuncType,
+                                              const CAODensityMatrix&    densityMatrix,
+                                              const CMolecularGrid&      molecularGrid,
+                                              const CDensityGrid&        gsDensityGrid,
+                                              const CDensityGridQuad&    rwDensityGridQuad,
+                                              const CXCGradientGrid&     xcGradientGrid,
+                                              const CXCHessianGrid&      xcHessianGrid,
+                                              const CXCCubicHessianGrid& xcCubicHessianGrid) const
 {
     // sanity check
 
     if ((xcFuncType != xcfun::lda) && (xcFuncType != xcfun::gga) && (xcFuncType != xcfun::mgga))
     {
-        std::string errxcfunctype("CXCMolecularGradient._compGxcContrib: Invalid XC functional type");
+        std::string errxcfunctype("CXCMolecularGradient._compVxc3rdOrderContrib: Invalid XC functional type");
 
         errors::assertMsgCritical(false, errxcfunctype);
     }
@@ -695,7 +695,7 @@ CXCMolecularGradient::_compGxcContrib(CDenseMatrix&              molecularGradie
     {
         // not implemented
 
-        std::string errmgga("CXCMolecularGradient._compGxcContrib: Not implemented for meta-GGA");
+        std::string errmgga("CXCMolecularGradient._compVxc3rdOrderContrib: Not implemented for meta-GGA");
 
         errors::assertMsgCritical(false, errmgga);
     }
@@ -738,7 +738,7 @@ CXCMolecularGradient::_compGxcContrib(CDenseMatrix&              molecularGradie
 
                     if (xcFuncType == xcfun::lda)
                     {
-                        _compGxcBatchForLDA(molgrad, densityMatrix, molecule,
+                        _compVxc3rdOrderBatchForLDA(molgrad, densityMatrix, molecule,
                                 basis, molecularGrid, gsDensityGrid, rwDensityGridQuad,
                                 xcGradientGrid, xcHessianGrid, xcCubicHessianGrid,
                                 tbposition, tbsize);
@@ -746,7 +746,7 @@ CXCMolecularGradient::_compGxcContrib(CDenseMatrix&              molecularGradie
 
                     if (xcFuncType == xcfun::gga)
                     {
-                        _compGxcBatchForGGA(molgrad, densityMatrix, molecule,
+                        _compVxc3rdOrderBatchForGGA(molgrad, densityMatrix, molecule,
                                 basis, molecularGrid, gsDensityGrid, rwDensityGridQuad,
                                 xcGradientGrid, xcHessianGrid, xcCubicHessianGrid,
                                 tbposition, tbsize);
@@ -1152,17 +1152,17 @@ CXCMolecularGradient::_compVxcBatchForGGA(CDenseMatrix&           molecularGradi
 }
 
 void
-CXCMolecularGradient::_compFxcBatchForLDA(CDenseMatrix&           molecularGradient,
-                                          const CAODensityMatrix& densityMatrix,
-                                          const CMolecule&        molecule,
-                                          const CMolecularBasis&  basis,
-                                          const CMolecularGrid&   molecularGrid,
-                                          const CDensityGrid&     gsDensityGrid,
-                                          const CDensityGrid&     rwDensityGrid,
-                                          const CXCGradientGrid&  xcGradientGrid,
-                                          const CXCHessianGrid&   xcHessianGrid,
-                                          const int32_t           gridOffset,
-                                          const int32_t           nGridPoints) const
+CXCMolecularGradient::_compVxc2ndOrderBatchForLDA(CDenseMatrix&           molecularGradient,
+                                                  const CAODensityMatrix& densityMatrix,
+                                                  const CMolecule&        molecule,
+                                                  const CMolecularBasis&  basis,
+                                                  const CMolecularGrid&   molecularGrid,
+                                                  const CDensityGrid&     gsDensityGrid,
+                                                  const CDensityGrid&     rwDensityGrid,
+                                                  const CXCGradientGrid&  xcGradientGrid,
+                                                  const CXCHessianGrid&   xcHessianGrid,
+                                                  const int32_t           gridOffset,
+                                                  const int32_t           nGridPoints) const
 {
     // create GTOs container
 
@@ -1251,7 +1251,7 @@ CXCMolecularGradient::_compFxcBatchForLDA(CDenseMatrix&           molecularGradi
 
             // accumulate to molecular gradient
 
-            _accumulateFxcContribForLDA(
+            _accumulateVxc2ndOrderContribForLDA(
                 molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGrid, xcGradientGrid, xcHessianGrid, gridOffset, igpnt, blockdim);
 
             delete atmgtovec;
@@ -1266,17 +1266,17 @@ CXCMolecularGradient::_compFxcBatchForLDA(CDenseMatrix&           molecularGradi
 }
 
 void
-CXCMolecularGradient::_compFxcBatchForGGA(CDenseMatrix&           molecularGradient,
-                                          const CAODensityMatrix& densityMatrix,
-                                          const CMolecule&        molecule,
-                                          const CMolecularBasis&  basis,
-                                          const CMolecularGrid&   molecularGrid,
-                                          const CDensityGrid&     gsDensityGrid,
-                                          const CDensityGrid&     rwDensityGrid,
-                                          const CXCGradientGrid&  xcGradientGrid,
-                                          const CXCHessianGrid&   xcHessianGrid,
-                                          const int32_t           gridOffset,
-                                          const int32_t           nGridPoints) const
+CXCMolecularGradient::_compVxc2ndOrderBatchForGGA(CDenseMatrix&           molecularGradient,
+                                                  const CAODensityMatrix& densityMatrix,
+                                                  const CMolecule&        molecule,
+                                                  const CMolecularBasis&  basis,
+                                                  const CMolecularGrid&   molecularGrid,
+                                                  const CDensityGrid&     gsDensityGrid,
+                                                  const CDensityGrid&     rwDensityGrid,
+                                                  const CXCGradientGrid&  xcGradientGrid,
+                                                  const CXCHessianGrid&   xcHessianGrid,
+                                                  const int32_t           gridOffset,
+                                                  const int32_t           nGridPoints) const
 {
     // create GTOs container
 
@@ -1411,7 +1411,7 @@ CXCMolecularGradient::_compFxcBatchForGGA(CDenseMatrix&           molecularGradi
 
             // accumulate to molecular gradient
 
-            _accumulateFxcContribForGGA(
+            _accumulateVxc2ndOrderContribForGGA(
                 molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGrid, xcGradientGrid, xcHessianGrid, gridOffset, igpnt, blockdim);
 
             delete atmgtovec;
@@ -1426,18 +1426,18 @@ CXCMolecularGradient::_compFxcBatchForGGA(CDenseMatrix&           molecularGradi
 }
 
 void
-CXCMolecularGradient::_compGxcBatchForLDA(CDenseMatrix&              molecularGradient,
-                                          const CAODensityMatrix&    densityMatrix,
-                                          const CMolecule&           molecule,
-                                          const CMolecularBasis&     basis,
-                                          const CMolecularGrid&      molecularGrid,
-                                          const CDensityGrid&        gsDensityGrid,
-                                          const CDensityGridQuad&    rwDensityGridQuad,
-                                          const CXCGradientGrid&     xcGradientGrid,
-                                          const CXCHessianGrid&      xcHessianGrid,
-                                          const CXCCubicHessianGrid& xcCubicHessianGrid,
-                                          const int32_t              gridOffset,
-                                          const int32_t              nGridPoints) const
+CXCMolecularGradient::_compVxc3rdOrderBatchForLDA(CDenseMatrix&              molecularGradient,
+                                             const CAODensityMatrix&    densityMatrix,
+                                             const CMolecule&           molecule,
+                                             const CMolecularBasis&     basis,
+                                             const CMolecularGrid&      molecularGrid,
+                                             const CDensityGrid&        gsDensityGrid,
+                                             const CDensityGridQuad&    rwDensityGridQuad,
+                                             const CXCGradientGrid&     xcGradientGrid,
+                                             const CXCHessianGrid&      xcHessianGrid,
+                                             const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                             const int32_t              gridOffset,
+                                             const int32_t              nGridPoints) const
 {
     // create GTOs container
 
@@ -1526,7 +1526,7 @@ CXCMolecularGradient::_compGxcBatchForLDA(CDenseMatrix&              molecularGr
 
             // accumulate to molecular gradient
 
-            _accumulateGxcContribForLDA(
+            _accumulateVxc3rdOrderContribForLDA(
                 molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGridQuad, xcGradientGrid, xcHessianGrid, xcCubicHessianGrid, gridOffset, igpnt, blockdim);
 
             delete atmgtovec;
@@ -1541,18 +1541,18 @@ CXCMolecularGradient::_compGxcBatchForLDA(CDenseMatrix&              molecularGr
 }
 
 void
-CXCMolecularGradient::_compGxcBatchForGGA(CDenseMatrix&              molecularGradient,
-                                          const CAODensityMatrix&    densityMatrix,
-                                          const CMolecule&           molecule,
-                                          const CMolecularBasis&     basis,
-                                          const CMolecularGrid&      molecularGrid,
-                                          const CDensityGrid&        gsDensityGrid,
-                                          const CDensityGridQuad&    rwDensityGridQuad,
-                                          const CXCGradientGrid&     xcGradientGrid,
-                                          const CXCHessianGrid&      xcHessianGrid,
-                                          const CXCCubicHessianGrid& xcCubicHessianGrid,
-                                          const int32_t              gridOffset,
-                                          const int32_t              nGridPoints) const
+CXCMolecularGradient::_compVxc3rdOrderBatchForGGA(CDenseMatrix&              molecularGradient,
+                                                  const CAODensityMatrix&    densityMatrix,
+                                                  const CMolecule&           molecule,
+                                                  const CMolecularBasis&     basis,
+                                                  const CMolecularGrid&      molecularGrid,
+                                                  const CDensityGrid&        gsDensityGrid,
+                                                  const CDensityGridQuad&    rwDensityGridQuad,
+                                                  const CXCGradientGrid&     xcGradientGrid,
+                                                  const CXCHessianGrid&      xcHessianGrid,
+                                                  const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                                  const int32_t              gridOffset,
+                                                  const int32_t              nGridPoints) const
 {
     // create GTOs container
 
@@ -1687,7 +1687,7 @@ CXCMolecularGradient::_compGxcBatchForGGA(CDenseMatrix&              molecularGr
 
             // accumulate to molecular gradient
 
-            _accumulateGxcContribForGGA(
+            _accumulateVxc3rdOrderContribForGGA(
                 molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGridQuad, xcGradientGrid, xcHessianGrid, xcCubicHessianGrid, gridOffset, igpnt, blockdim);
 
             delete atmgtovec;
@@ -1798,7 +1798,7 @@ CXCMolecularGradient::_compTddftBatchForLDA(CDenseMatrix&              molecular
 
             gtorec::computeGtosValuesForLDA2(aoidx, xgaos, xgaox, xgaoy, xgaoz, atmgtovec, mgx, mgy, mgz, gridOffset, igpnt, blockdim);
 
-            // accumulate Vxc 1st term
+            // accumulate Vxc first term
 
             gradgrid.zero();
 
@@ -1809,7 +1809,7 @@ CXCMolecularGradient::_compTddftBatchForLDA(CDenseMatrix&              molecular
             _accumulateVxcContribForLDA(
                 molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, xcGradientGrid, gridOffset, igpnt, blockdim);
 
-            // accumulate Fxc 1st term
+            // accumulate Vxc 2nd-order first term
 
             gradgrid.zero();
 
@@ -1817,10 +1817,10 @@ CXCMolecularGradient::_compTddftBatchForLDA(CDenseMatrix&              molecular
 
             gradgrid.updateBetaDensities();
 
-            _accumulateFxcContribForLDA(
+            _accumulateVxc2ndOrderContribForLDA(
                 molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGridTwo, xcGradientGrid, xcHessianGrid, gridOffset, igpnt, blockdim);
 
-            // accumulate Vxc and Fxc 2nd terms (using Fxc and Gxc)
+            // accumulate Vxc 1st- and 2nd-order second terms (using Vxc 2nd- and 3rd-order)
 
             gradgrid.zero();
 
@@ -1828,10 +1828,10 @@ CXCMolecularGradient::_compTddftBatchForLDA(CDenseMatrix&              molecular
 
             gradgrid.updateBetaDensities();
 
-            _accumulateFxcContribForLDA(
+            _accumulateVxc2ndOrderContribForLDA(
                 molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGridOne, xcGradientGrid, xcHessianGrid, gridOffset, igpnt, blockdim);
 
-            _accumulateGxcContribForLDA(
+            _accumulateVxc3rdOrderContribForLDA(
                 molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGridQuad, xcGradientGrid, xcHessianGrid, xcCubicHessianGrid, gridOffset, igpnt, blockdim);
 
             delete atmgtovec;
@@ -1986,7 +1986,7 @@ CXCMolecularGradient::_compTddftBatchForGGA(CDenseMatrix&              molecular
                     kgaoxx, kgaoxy, kgaoxz, kgaoyy, kgaoyz, kgaozz, atmgtovec,
                     mgx, mgy, mgz, gridOffset, igpnt, blockdim);
 
-            // accumulate Vxc 1st term
+            // accumulate Vxc first term
 
             gradgrid.zero();
 
@@ -1999,7 +1999,7 @@ CXCMolecularGradient::_compTddftBatchForGGA(CDenseMatrix&              molecular
             _accumulateVxcContribForGGA(
                 molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, xcGradientGrid, gridOffset, igpnt, blockdim);
 
-            // accumulate Fxc 1st term
+            // accumulate Vxc 2nd-order first term
 
             gradgrid.zero();
 
@@ -2009,10 +2009,10 @@ CXCMolecularGradient::_compTddftBatchForGGA(CDenseMatrix&              molecular
 
             gradgrid.updateBetaDensities();
 
-            _accumulateFxcContribForGGA(
+            _accumulateVxc2ndOrderContribForGGA(
                 molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGridTwo, xcGradientGrid, xcHessianGrid, gridOffset, igpnt, blockdim);
 
-            // accumulate Vxc and Fxc 2nd terms (using Fxc and Gxc)
+            // accumulate Vxc 1st- and 2nd-order second terms (using Vxc 2nd- and 3rd-order)
 
             gradgrid.zero();
 
@@ -2022,10 +2022,10 @@ CXCMolecularGradient::_compTddftBatchForGGA(CDenseMatrix&              molecular
 
             gradgrid.updateBetaDensities();
 
-            _accumulateFxcContribForGGA(
+            _accumulateVxc2ndOrderContribForGGA(
                 molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGridOne, xcGradientGrid, xcHessianGrid, gridOffset, igpnt, blockdim);
 
-            _accumulateGxcContribForGGA(
+            _accumulateVxc3rdOrderContribForGGA(
                 molecularGradient, iatom, gradgrid, molecularGrid, gsDensityGrid, rwDensityGridQuad, xcGradientGrid, xcHessianGrid, xcCubicHessianGrid, gridOffset, igpnt, blockdim);
 
             delete atmgtovec;
@@ -2385,17 +2385,17 @@ CXCMolecularGradient::_accumulateVxcContribForGGA(CDenseMatrix&          molecul
 }
 
 void
-CXCMolecularGradient::_accumulateFxcContribForLDA(CDenseMatrix&          molecularGradient,
-                                                  const int32_t          iAtom,
-                                                  const CDensityGrid&    gradientDensityGrid,
-                                                  const CMolecularGrid&  molecularGrid,
-                                                  const CDensityGrid&    gsDensityGrid,
-                                                  const CDensityGrid&    rwDensityGrid,
-                                                  const CXCGradientGrid& xcGradientGrid,
-                                                  const CXCHessianGrid&  xcHessianGrid,
-                                                  const int32_t          gridOffset,
-                                                  const int32_t          gridBlockPosition,
-                                                  const int32_t          nGridPoints) const
+CXCMolecularGradient::_accumulateVxc2ndOrderContribForLDA(CDenseMatrix&          molecularGradient,
+                                                          const int32_t          iAtom,
+                                                          const CDensityGrid&    gradientDensityGrid,
+                                                          const CMolecularGrid&  molecularGrid,
+                                                          const CDensityGrid&    gsDensityGrid,
+                                                          const CDensityGrid&    rwDensityGrid,
+                                                          const CXCGradientGrid& xcGradientGrid,
+                                                          const CXCHessianGrid&  xcHessianGrid,
+                                                          const int32_t          gridOffset,
+                                                          const int32_t          gridBlockPosition,
+                                                          const int32_t          nGridPoints) const
 {
     double gatmx = 0.0;
 
@@ -2457,17 +2457,17 @@ CXCMolecularGradient::_accumulateFxcContribForLDA(CDenseMatrix&          molecul
 }
 
 void
-CXCMolecularGradient::_accumulateFxcContribForGGA(CDenseMatrix&          molecularGradient,
-                                                  const int32_t          iAtom,
-                                                  const CDensityGrid&    gradientDensityGrid,
-                                                  const CMolecularGrid&  molecularGrid,
-                                                  const CDensityGrid&    gsDensityGrid,
-                                                  const CDensityGrid&    rwDensityGrid,
-                                                  const CXCGradientGrid& xcGradientGrid,
-                                                  const CXCHessianGrid&  xcHessianGrid,
-                                                  const int32_t          gridOffset,
-                                                  const int32_t          gridBlockPosition,
-                                                  const int32_t          nGridPoints) const
+CXCMolecularGradient::_accumulateVxc2ndOrderContribForGGA(CDenseMatrix&          molecularGradient,
+                                                          const int32_t          iAtom,
+                                                          const CDensityGrid&    gradientDensityGrid,
+                                                          const CMolecularGrid&  molecularGrid,
+                                                          const CDensityGrid&    gsDensityGrid,
+                                                          const CDensityGrid&    rwDensityGrid,
+                                                          const CXCGradientGrid& xcGradientGrid,
+                                                          const CXCHessianGrid&  xcHessianGrid,
+                                                          const int32_t          gridOffset,
+                                                          const int32_t          gridBlockPosition,
+                                                          const int32_t          nGridPoints) const
 {
     double gatmx = 0.0;
 
@@ -2736,18 +2736,18 @@ CXCMolecularGradient::_accumulateFxcContribForGGA(CDenseMatrix&          molecul
 }
 
 void
-CXCMolecularGradient::_accumulateGxcContribForLDA(CDenseMatrix&              molecularGradient,
-                                                  const int32_t              iAtom,
-                                                  const CDensityGrid&        gradientDensityGrid,
-                                                  const CMolecularGrid&      molecularGrid,
-                                                  const CDensityGrid&        gsDensityGrid,
-                                                  const CDensityGridQuad&    rwDensityGridQuad,
-                                                  const CXCGradientGrid&     xcGradientGrid,
-                                                  const CXCHessianGrid&      xcHessianGrid,
-                                                  const CXCCubicHessianGrid& xcCubicHessianGrid,
-                                                  const int32_t              gridOffset,
-                                                  const int32_t              gridBlockPosition,
-                                                  const int32_t              nGridPoints) const
+CXCMolecularGradient::_accumulateVxc3rdOrderContribForLDA(CDenseMatrix&              molecularGradient,
+                                                          const int32_t              iAtom,
+                                                          const CDensityGrid&        gradientDensityGrid,
+                                                          const CMolecularGrid&      molecularGrid,
+                                                          const CDensityGrid&        gsDensityGrid,
+                                                          const CDensityGridQuad&    rwDensityGridQuad,
+                                                          const CXCGradientGrid&     xcGradientGrid,
+                                                          const CXCHessianGrid&      xcHessianGrid,
+                                                          const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                                          const int32_t              gridOffset,
+                                                          const int32_t              gridBlockPosition,
+                                                          const int32_t              nGridPoints) const
 {
     double gatmx = 0.0;
 
@@ -2810,18 +2810,18 @@ CXCMolecularGradient::_accumulateGxcContribForLDA(CDenseMatrix&              mol
 }
 
 void
-CXCMolecularGradient::_accumulateGxcContribForGGA(CDenseMatrix&              molecularGradient,
-                                                  const int32_t              iAtom,
-                                                  const CDensityGrid&        gradientDensityGrid,
-                                                  const CMolecularGrid&      molecularGrid,
-                                                  const CDensityGrid&        gsDensityGrid,
-                                                  const CDensityGridQuad&    rwDensityGridQuad,
-                                                  const CXCGradientGrid&     xcGradientGrid,
-                                                  const CXCHessianGrid&      xcHessianGrid,
-                                                  const CXCCubicHessianGrid& xcCubicHessianGrid,
-                                                  const int32_t              gridOffset,
-                                                  const int32_t              gridBlockPosition,
-                                                  const int32_t              nGridPoints) const
+CXCMolecularGradient::_accumulateVxc3rdOrderContribForGGA(CDenseMatrix&              molecularGradient,
+                                                          const int32_t              iAtom,
+                                                          const CDensityGrid&        gradientDensityGrid,
+                                                          const CMolecularGrid&      molecularGrid,
+                                                          const CDensityGrid&        gsDensityGrid,
+                                                          const CDensityGridQuad&    rwDensityGridQuad,
+                                                          const CXCGradientGrid&     xcGradientGrid,
+                                                          const CXCHessianGrid&      xcHessianGrid,
+                                                          const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                                          const int32_t              gridOffset,
+                                                          const int32_t              gridBlockPosition,
+                                                          const int32_t              nGridPoints) const
 {
     double gatmx = 0.0;
 

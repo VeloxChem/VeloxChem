@@ -237,10 +237,10 @@ class GradientDriver:
 
         return vxc_contrib
 
-    def grad_fxc_contrib(self, molecule, ao_basis, rhow_den_1, rhow_den_2,
-                         gs_density, xcfun_label):
+    def grad_vxc2_contrib(self, molecule, ao_basis, rhow_den_1, rhow_den_2,
+                          gs_density, xcfun_label):
         """
-        Calculates the fxc exchange-correlation contribution to the gradient.
+        Calculates the 2nd-order exchange-correlation contribution to the gradient.
 
         :param molecule:
             The molecule.
@@ -256,7 +256,7 @@ class GradientDriver:
             The label of the xc functional.
 
         :return:
-            The fxc exchange-correlation contribution to the gradient.
+            The 2nd-order exchange-correlation contribution to the gradient.
         """
 
         grid_drv = GridDriver(self.comm)
@@ -265,17 +265,18 @@ class GradientDriver:
         mol_grid.distribute(self.rank, self.nodes, self.comm)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
-        fxc_contrib = xc_molgrad_drv.integrate_fxc_gradient(
+        vxc2_contrib = xc_molgrad_drv.integrate_vxc2_gradient(
             rhow_den_1, rhow_den_2, gs_density, molecule, ao_basis, mol_grid,
             xcfun_label)
-        fxc_contrib = self.comm.reduce(fxc_contrib, root=mpi_master())
+        vxc2_contrib = self.comm.reduce(vxc2_contrib, root=mpi_master())
 
-        return fxc_contrib
+        return vxc2_contrib
 
-    def grad_gxc_contrib(self, molecule, ao_basis, rhow_den_1, rhow_den_2,
-                         gs_density, xcfun_label):
+    def grad_vxc3_contrib(self, molecule, ao_basis, rhow_den_1, rhow_den_2,
+                          gs_density, xcfun_label):
         """
-        Calculates the gxc exchange-correlation contribution to the gradient.
+        Calculates the 3rd-order exchange-correlation contribution to the
+        gradient.
 
         :param molecule:
             The molecule.
@@ -292,7 +293,7 @@ class GradientDriver:
             The label of the xc functional.
 
         :return:
-            The gxc exchange-correlation contribution to the gradient.
+            The 3rd-order exchange-correlation contribution to the gradient.
         """
 
         grid_drv = GridDriver(self.comm)
@@ -301,12 +302,12 @@ class GradientDriver:
         mol_grid.distribute(self.rank, self.nodes, self.comm)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
-        gxc_contrib = xc_molgrad_drv.integrate_gxc_gradient(
+        vxc3_contrib = xc_molgrad_drv.integrate_vxc3_gradient(
             rhow_den_1, rhow_den_2, gs_density, molecule, ao_basis, mol_grid,
             xcfun_label)
-        gxc_contrib = self.comm.reduce(gxc_contrib, root=mpi_master())
+        vxc3_contrib = self.comm.reduce(vxc3_contrib, root=mpi_master())
 
-        return gxc_contrib
+        return vxc3_contrib
 
     def grad_tddft_xc_contrib(self, molecule, ao_basis, rhow_den, xmy_den,
                               gs_density, xcfun_label):

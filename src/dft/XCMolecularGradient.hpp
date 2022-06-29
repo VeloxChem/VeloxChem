@@ -111,16 +111,16 @@ class CXCMolecularGradient
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param xcHessianGrid the exchange-correlation hessian grid.
      */
-    void _compFxcContrib(CDenseMatrix&           molecularGradient,
-                         const CMolecule&        molecule,
-                         const CMolecularBasis&  basis,
-                         const xcfun             xcFuncType,
-                         const CAODensityMatrix& densityMatrix,
-                         const CMolecularGrid&   molecularGrid,
-                         const CDensityGrid&     gsDensityGrid,
-                         const CDensityGrid&     rwDensityGrid,
-                         const CXCGradientGrid&  xcGradientGrid,
-                         const CXCHessianGrid&   xcHessianGrid) const;
+    void _compVxc2ndOrderContrib(CDenseMatrix&           molecularGradient,
+                                 const CMolecule&        molecule,
+                                 const CMolecularBasis&  basis,
+                                 const xcfun             xcFuncType,
+                                 const CAODensityMatrix& densityMatrix,
+                                 const CMolecularGrid&   molecularGrid,
+                                 const CDensityGrid&     gsDensityGrid,
+                                 const CDensityGrid&     rwDensityGrid,
+                                 const CXCGradientGrid&  xcGradientGrid,
+                                 const CXCHessianGrid&   xcHessianGrid) const;
 
     /**
      Integrates third-order exchnage-correlation functional contribution to
@@ -140,17 +140,17 @@ class CXCMolecularGradient
      @param xcHessianGrid the exchange-correlation hessian grid.
      @param xcCubicHessianGrid the exchange-correlation cubic hessian grid.
      */
-    void _compGxcContrib(CDenseMatrix&              molecularGradient,
-                         const CMolecule&           molecule,
-                         const CMolecularBasis&     basis,
-                         const xcfun                xcFuncType,
-                         const CAODensityMatrix&    densityMatrix,
-                         const CMolecularGrid&      molecularGrid,
-                         const CDensityGrid&        gsDensityGrid,
-                         const CDensityGridQuad&    rwDensityGridQuad,
-                         const CXCGradientGrid&     xcGradientGrid,
-                         const CXCHessianGrid&      xcHessianGrid,
-                         const CXCCubicHessianGrid& xcCubicHessianGrid) const;
+    void _compVxc3rdOrderContrib(CDenseMatrix&              molecularGradient,
+                                 const CMolecule&           molecule,
+                                 const CMolecularBasis&     basis,
+                                 const xcfun                xcFuncType,
+                                 const CAODensityMatrix&    densityMatrix,
+                                 const CMolecularGrid&      molecularGrid,
+                                 const CDensityGrid&        gsDensityGrid,
+                                 const CDensityGridQuad&    rwDensityGridQuad,
+                                 const CXCGradientGrid&     xcGradientGrid,
+                                 const CXCHessianGrid&      xcHessianGrid,
+                                 const CXCCubicHessianGrid& xcCubicHessianGrid) const;
 
     /**
      Integrates TDDFT exchnage-correlation functional contribution to molecular
@@ -256,17 +256,17 @@ class CXCMolecularGradient
      @param gridOffset the batch offset in vector grid points.
      @param nGridPoints the number of grid points in batch.
      */
-    void _compFxcBatchForLDA(CDenseMatrix&           molecularGradient,
-                             const CAODensityMatrix& densityMatrix,
-                             const CMolecule&        molecule,
-                             const CMolecularBasis&  basis,
-                             const CMolecularGrid&   molecularGrid,
-                             const CDensityGrid&     gsDensityGrid,
-                             const CDensityGrid&     rwDensityGrid,
-                             const CXCGradientGrid&  xcGradientGrid,
-                             const CXCHessianGrid&   xcHessianGrid,
-                             const int32_t           gridOffset,
-                             const int32_t           nGridPoints) const;
+    void _compVxc2ndOrderBatchForLDA(CDenseMatrix&           molecularGradient,
+                                     const CAODensityMatrix& densityMatrix,
+                                     const CMolecule&        molecule,
+                                     const CMolecularBasis&  basis,
+                                     const CMolecularGrid&   molecularGrid,
+                                     const CDensityGrid&     gsDensityGrid,
+                                     const CDensityGrid&     rwDensityGrid,
+                                     const CXCGradientGrid&  xcGradientGrid,
+                                     const CXCHessianGrid&   xcHessianGrid,
+                                     const int32_t           gridOffset,
+                                     const int32_t           nGridPoints) const;
 
     /**
      Integrates batch of grid points for GGA second-order exchnage-correlation
@@ -285,17 +285,17 @@ class CXCMolecularGradient
      @param gridOffset the batch offset in vector grid points.
      @param nGridPoints the number of grid points in batch.
      */
-    void _compFxcBatchForGGA(CDenseMatrix&           molecularGradient,
-                             const CAODensityMatrix& densityMatrix,
-                             const CMolecule&        molecule,
-                             const CMolecularBasis&  basis,
-                             const CMolecularGrid&   molecularGrid,
-                             const CDensityGrid&     gsDensityGrid,
-                             const CDensityGrid&     rwDensityGrid,
-                             const CXCGradientGrid&  xcGradientGrid,
-                             const CXCHessianGrid&   xcHessianGrid,
-                             const int32_t           gridOffset,
-                             const int32_t           nGridPoints) const;
+    void _compVxc2ndOrderBatchForGGA(CDenseMatrix&           molecularGradient,
+                                     const CAODensityMatrix& densityMatrix,
+                                     const CMolecule&        molecule,
+                                     const CMolecularBasis&  basis,
+                                     const CMolecularGrid&   molecularGrid,
+                                     const CDensityGrid&     gsDensityGrid,
+                                     const CDensityGrid&     rwDensityGrid,
+                                     const CXCGradientGrid&  xcGradientGrid,
+                                     const CXCHessianGrid&   xcHessianGrid,
+                                     const int32_t           gridOffset,
+                                     const int32_t           nGridPoints) const;
 
     /**
      Integrates batch of grid points for LDA third-order exchnage-correlation
@@ -316,18 +316,18 @@ class CXCMolecularGradient
      @param gridOffset the batch offset in vector grid points.
      @param nGridPoints the number of grid points in batch.
      */
-    void _compGxcBatchForLDA(CDenseMatrix&              molecularGradient,
-                             const CAODensityMatrix&    densityMatrix,
-                             const CMolecule&           molecule,
-                             const CMolecularBasis&     basis,
-                             const CMolecularGrid&      molecularGrid,
-                             const CDensityGrid&        gsDensityGrid,
-                             const CDensityGridQuad&    rwDensityGridQuad,
-                             const CXCGradientGrid&     xcGradientGrid,
-                             const CXCHessianGrid&      xcHessianGrid,
-                             const CXCCubicHessianGrid& xcCubicHessianGrid,
-                             const int32_t              gridOffset,
-                             const int32_t              nGridPoints) const;
+    void _compVxc3rdOrderBatchForLDA(CDenseMatrix&              molecularGradient,
+                                     const CAODensityMatrix&    densityMatrix,
+                                     const CMolecule&           molecule,
+                                     const CMolecularBasis&     basis,
+                                     const CMolecularGrid&      molecularGrid,
+                                     const CDensityGrid&        gsDensityGrid,
+                                     const CDensityGridQuad&    rwDensityGridQuad,
+                                     const CXCGradientGrid&     xcGradientGrid,
+                                     const CXCHessianGrid&      xcHessianGrid,
+                                     const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                     const int32_t              gridOffset,
+                                     const int32_t              nGridPoints) const;
 
     /**
      Integrates batch of grid points for GGA third-order exchnage-correlation
@@ -348,18 +348,18 @@ class CXCMolecularGradient
      @param gridOffset the batch offset in vector grid points.
      @param nGridPoints the number of grid points in batch.
      */
-    void _compGxcBatchForGGA(CDenseMatrix&              molecularGradient,
-                             const CAODensityMatrix&    densityMatrix,
-                             const CMolecule&           molecule,
-                             const CMolecularBasis&     basis,
-                             const CMolecularGrid&      molecularGrid,
-                             const CDensityGrid&        gsDensityGrid,
-                             const CDensityGridQuad&    rwDensityGridQuad,
-                             const CXCGradientGrid&     xcGradientGrid,
-                             const CXCHessianGrid&      xcHessianGrid,
-                             const CXCCubicHessianGrid& xcCubicHessianGrid,
-                             const int32_t              gridOffset,
-                             const int32_t              nGridPoints) const;
+    void _compVxc3rdOrderBatchForGGA(CDenseMatrix&              molecularGradient,
+                                     const CAODensityMatrix&    densityMatrix,
+                                     const CMolecule&           molecule,
+                                     const CMolecularBasis&     basis,
+                                     const CMolecularGrid&      molecularGrid,
+                                     const CDensityGrid&        gsDensityGrid,
+                                     const CDensityGridQuad&    rwDensityGridQuad,
+                                     const CXCGradientGrid&     xcGradientGrid,
+                                     const CXCHessianGrid&      xcHessianGrid,
+                                     const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                     const int32_t              gridOffset,
+                                     const int32_t              nGridPoints) const;
 
     /**
      Integrates batch of grid points for LDA TDDFT exchnage-correlation
@@ -563,17 +563,17 @@ class CXCMolecularGradient
      @param gridBlockPosition the position of grid block.
      @param nGridPoints the number of grid points in batch.
      */
-    void _accumulateFxcContribForLDA(CDenseMatrix&          molecularGradient,
-                                     const int32_t          iAtom,
-                                     const CDensityGrid&    gradientDensityGrid,
-                                     const CMolecularGrid&  molecularGrid,
-                                     const CDensityGrid&    gsDensityGrid,
-                                     const CDensityGrid&    rwDensityGrid,
-                                     const CXCGradientGrid& xcGradientGrid,
-                                     const CXCHessianGrid&  xcHessianGrid,
-                                     const int32_t          gridOffset,
-                                     const int32_t          gridBlockPosition,
-                                     const int32_t          nGridPoints) const;
+    void _accumulateVxc2ndOrderContribForLDA(CDenseMatrix&          molecularGradient,
+                                             const int32_t          iAtom,
+                                             const CDensityGrid&    gradientDensityGrid,
+                                             const CMolecularGrid&  molecularGrid,
+                                             const CDensityGrid&    gsDensityGrid,
+                                             const CDensityGrid&    rwDensityGrid,
+                                             const CXCGradientGrid& xcGradientGrid,
+                                             const CXCHessianGrid&  xcHessianGrid,
+                                             const int32_t          gridOffset,
+                                             const int32_t          gridBlockPosition,
+                                             const int32_t          nGridPoints) const;
 
     /**
      Accumulates GGA second-order exchnage-correlation functional contribution
@@ -591,17 +591,17 @@ class CXCMolecularGradient
      @param gridBlockPosition the position of grid block.
      @param nGridPoints the number of grid points in batch.
      */
-    void _accumulateFxcContribForGGA(CDenseMatrix&          molecularGradient,
-                                     const int32_t          iAtom,
-                                     const CDensityGrid&    gradientDensityGrid,
-                                     const CMolecularGrid&  molecularGrid,
-                                     const CDensityGrid&    gsDensityGrid,
-                                     const CDensityGrid&    rwDensityGrid,
-                                     const CXCGradientGrid& xcGradientGrid,
-                                     const CXCHessianGrid&  xcHessianGrid,
-                                     const int32_t          gridOffset,
-                                     const int32_t          gridBlockPosition,
-                                     const int32_t          nGridPoints) const;
+    void _accumulateVxc2ndOrderContribForGGA(CDenseMatrix&          molecularGradient,
+                                             const int32_t          iAtom,
+                                             const CDensityGrid&    gradientDensityGrid,
+                                             const CMolecularGrid&  molecularGrid,
+                                             const CDensityGrid&    gsDensityGrid,
+                                             const CDensityGrid&    rwDensityGrid,
+                                             const CXCGradientGrid& xcGradientGrid,
+                                             const CXCHessianGrid&  xcHessianGrid,
+                                             const int32_t          gridOffset,
+                                             const int32_t          gridBlockPosition,
+                                             const int32_t          nGridPoints) const;
 
     /**
      Accumulates LDA third-order exchnage-correlation functional contribution
@@ -621,18 +621,18 @@ class CXCMolecularGradient
      @param gridBlockPosition the position of grid block.
      @param nGridPoints the number of grid points in batch.
      */
-    void _accumulateGxcContribForLDA(CDenseMatrix&              molecularGradient,
-                                     const int32_t              iAtom,
-                                     const CDensityGrid&        gradientDensityGrid,
-                                     const CMolecularGrid&      molecularGrid,
-                                     const CDensityGrid&        gsDensityGrid,
-                                     const CDensityGridQuad&    rwDensityGridQuad,
-                                     const CXCGradientGrid&     xcGradientGrid,
-                                     const CXCHessianGrid&      xcHessianGrid,
-                                     const CXCCubicHessianGrid& xcCubicHessianGrid,
-                                     const int32_t              gridOffset,
-                                     const int32_t              gridBlockPosition,
-                                     const int32_t              nGridPoints) const;
+    void _accumulateVxc3rdOrderContribForLDA(CDenseMatrix&              molecularGradient,
+                                             const int32_t              iAtom,
+                                             const CDensityGrid&        gradientDensityGrid,
+                                             const CMolecularGrid&      molecularGrid,
+                                             const CDensityGrid&        gsDensityGrid,
+                                             const CDensityGridQuad&    rwDensityGridQuad,
+                                             const CXCGradientGrid&     xcGradientGrid,
+                                             const CXCHessianGrid&      xcHessianGrid,
+                                             const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                             const int32_t              gridOffset,
+                                             const int32_t              gridBlockPosition,
+                                             const int32_t              nGridPoints) const;
 
     /**
      Accumulates GGA third-order exchnage-correlation functional contribution
@@ -652,18 +652,18 @@ class CXCMolecularGradient
      @param gridBlockPosition the position of grid block.
      @param nGridPoints the number of grid points in batch.
      */
-    void _accumulateGxcContribForGGA(CDenseMatrix&              molecularGradient,
-                                     const int32_t              iAtom,
-                                     const CDensityGrid&        gradientDensityGrid,
-                                     const CMolecularGrid&      molecularGrid,
-                                     const CDensityGrid&        gsDensityGrid,
-                                     const CDensityGridQuad&    rwDensityGridQuad,
-                                     const CXCGradientGrid&     xcGradientGrid,
-                                     const CXCHessianGrid&      xcHessianGrid,
-                                     const CXCCubicHessianGrid& xcCubicHessianGrid,
-                                     const int32_t              gridOffset,
-                                     const int32_t              gridBlockPosition,
-                                     const int32_t              nGridPoints) const;
+    void _accumulateVxc3rdOrderContribForGGA(CDenseMatrix&              molecularGradient,
+                                             const int32_t              iAtom,
+                                             const CDensityGrid&        gradientDensityGrid,
+                                             const CMolecularGrid&      molecularGrid,
+                                             const CDensityGrid&        gsDensityGrid,
+                                             const CDensityGridQuad&    rwDensityGridQuad,
+                                             const CXCGradientGrid&     xcGradientGrid,
+                                             const CXCHessianGrid&      xcHessianGrid,
+                                             const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                             const int32_t              gridOffset,
+                                             const int32_t              gridBlockPosition,
+                                             const int32_t              nGridPoints) const;
 
     /**
      Gets size of block in grid batch.
@@ -736,13 +736,13 @@ class CXCMolecularGradient
      @param xcFuncLabel the label of exchange-correlation functional.
      @return the molecular gradient.
      */
-    CDenseMatrix integrateFxcGradient(const CAODensityMatrix& rwDensityMatrixOne,
-                                      const CAODensityMatrix& rwDensityMatrixTwo,
-                                      const CAODensityMatrix& gsDensityMatrix,
-                                      const CMolecule&        molecule,
-                                      const CMolecularBasis&  basis,
-                                      const CMolecularGrid&   molecularGrid,
-                                      const std::string&      xcFuncLabel) const;
+    CDenseMatrix integrateVxc2ndOrderGradient(const CAODensityMatrix& rwDensityMatrixOne,
+                                              const CAODensityMatrix& rwDensityMatrixTwo,
+                                              const CAODensityMatrix& gsDensityMatrix,
+                                              const CMolecule&        molecule,
+                                              const CMolecularBasis&  basis,
+                                              const CMolecularGrid&   molecularGrid,
+                                              const std::string&      xcFuncLabel) const;
 
     /**
      Integrates 3rd-order exchnage-correlation functional contribution to
@@ -758,13 +758,13 @@ class CXCMolecularGradient
      @param xcFuncLabel the label of exchange-correlation functional.
      @return the molecular gradient.
      */
-    CDenseMatrix integrateGxcGradient(const CAODensityMatrix& rwDensityMatrixOne,
-                                      const CAODensityMatrix& rwDensityMatrixTwo,
-                                      const CAODensityMatrix& gsDensityMatrix,
-                                      const CMolecule&        molecule,
-                                      const CMolecularBasis&  basis,
-                                      const CMolecularGrid&   molecularGrid,
-                                      const std::string&      xcFuncLabel) const;
+    CDenseMatrix integrateVxc3rdOrderGradient(const CAODensityMatrix& rwDensityMatrixOne,
+                                              const CAODensityMatrix& rwDensityMatrixTwo,
+                                              const CAODensityMatrix& gsDensityMatrix,
+                                              const CMolecule&        molecule,
+                                              const CMolecularBasis&  basis,
+                                              const CMolecularGrid&   molecularGrid,
+                                              const std::string&      xcFuncLabel) const;
 
     /**
      Integrates TDDFT exchnage-correlation functional contribution to molecular
