@@ -372,13 +372,7 @@ CDensityGridQuad::rzw1rzw2(const int32_t iDensityMatrix)
 }
 
 void
-CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
-                              CMolecularGrid&     molecularGridab,
-                              const CDensityGrid& rwDensityGrid,
-                              const xcfun         xcFuncType,
-                              int32_t             numdens,
-                              const std::string&  quadMode) const
-
+CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid, const xcfun xcFuncType, const int32_t numDens, const std::string& quadMode)
 {
     if (_gridType != dengrid::ab) return;
 
@@ -386,55 +380,51 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
 
     auto npoints = getNumberOfGridPoints();
 
-    // set up pointers to source density
-
-    auto rwdenptr = &rwDensityGrid;
-
     // set up pointers to destination density
 
     if (xcFuncType == xcfun::lda)
     {
         if (fstr::upcase(quadMode) == "SHG")
         {
-            for (int32_t j = 0; j < numdens / 12; j++)
+            for (int32_t j = 0; j < numDens / 12; j++)
             {
                 // Density products to be stored
 
-                auto rho_sig_x_r = densityGridAB.rhow1rhow2(12 * j);
+                auto rho_sig_x_r = rhow1rhow2(12 * j);
 
-                auto rho_sig_x_i = densityGridAB.rhow1rhow2(12 * j + 1);
+                auto rho_sig_x_i = rhow1rhow2(12 * j + 1);
 
-                auto rho_sig_y_r = densityGridAB.rhow1rhow2(12 * j + 2);
+                auto rho_sig_y_r = rhow1rhow2(12 * j + 2);
 
-                auto rho_sig_y_i = densityGridAB.rhow1rhow2(12 * j + 3);
+                auto rho_sig_y_i = rhow1rhow2(12 * j + 3);
 
-                auto rho_sig_z_r = densityGridAB.rhow1rhow2(12 * j + 4);
+                auto rho_sig_z_r = rhow1rhow2(12 * j + 4);
 
-                auto rho_sig_z_i = densityGridAB.rhow1rhow2(12 * j + 5);
+                auto rho_sig_z_i = rhow1rhow2(12 * j + 5);
 
-                auto rho_lam_xy_r = densityGridAB.rhow1rhow2(12 * j + 6);
+                auto rho_lam_xy_r = rhow1rhow2(12 * j + 6);
 
-                auto rho_lam_xy_i = densityGridAB.rhow1rhow2(12 * j + 7);
+                auto rho_lam_xy_i = rhow1rhow2(12 * j + 7);
 
-                auto rho_lam_xz_r = densityGridAB.rhow1rhow2(12 * j + 8);
+                auto rho_lam_xz_r = rhow1rhow2(12 * j + 8);
 
-                auto rho_lam_xz_i = densityGridAB.rhow1rhow2(12 * j + 9);
+                auto rho_lam_xz_i = rhow1rhow2(12 * j + 9);
 
-                auto rho_lam_yz_r = densityGridAB.rhow1rhow2(12 * j + 10);
+                auto rho_lam_yz_r = rhow1rhow2(12 * j + 10);
 
-                auto rho_lam_yz_i = densityGridAB.rhow1rhow2(12 * j + 11);
+                auto rho_lam_yz_i = rhow1rhow2(12 * j + 11);
 
-                auto rhow_kx_r = rwdenptr->alphaDensity(6 * j);
+                auto rhow_kx_r = rwDensityGrid.alphaDensity(6 * j);
 
-                auto rhow_kx_i = rwdenptr->alphaDensity(6 * j + 1);
+                auto rhow_kx_i = rwDensityGrid.alphaDensity(6 * j + 1);
 
-                auto rhow_ky_r = rwdenptr->alphaDensity(6 * j + 2);
+                auto rhow_ky_r = rwDensityGrid.alphaDensity(6 * j + 2);
 
-                auto rhow_ky_i = rwdenptr->alphaDensity(6 * j + 3);
+                auto rhow_ky_i = rwDensityGrid.alphaDensity(6 * j + 3);
 
-                auto rhow_kz_r = rwdenptr->alphaDensity(6 * j + 4);
+                auto rhow_kz_r = rwDensityGrid.alphaDensity(6 * j + 4);
 
-                auto rhow_kz_i = rwdenptr->alphaDensity(6 * j + 5);
+                auto rhow_kz_i = rwDensityGrid.alphaDensity(6 * j + 5);
 
                 for (int32_t i = 0; i < npoints; i++)
                 {
@@ -486,33 +476,33 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
         }
         if (fstr::upcase(quadMode) == "SHG_RED")
         {
-            for (int32_t j = 0; j < numdens / 6; j++)
+            for (int32_t j = 0; j < numDens / 6; j++)
             {
                 // Density products to be stored
 
-                auto rho_sig_x_r = densityGridAB.rhow1rhow2(6 * j);
+                auto rho_sig_x_r = rhow1rhow2(6 * j);
 
-                auto rho_sig_y_r = densityGridAB.rhow1rhow2(6 * j + 1);
+                auto rho_sig_y_r = rhow1rhow2(6 * j + 1);
 
-                auto rho_sig_z_r = densityGridAB.rhow1rhow2(6 * j + 2);
+                auto rho_sig_z_r = rhow1rhow2(6 * j + 2);
 
-                auto rho_lam_xy_r = densityGridAB.rhow1rhow2(6 * j + 3);
+                auto rho_lam_xy_r = rhow1rhow2(6 * j + 3);
 
-                auto rho_lam_xz_r = densityGridAB.rhow1rhow2(6 * j + 4);
+                auto rho_lam_xz_r = rhow1rhow2(6 * j + 4);
 
-                auto rho_lam_yz_r = densityGridAB.rhow1rhow2(6 * j + 5);
+                auto rho_lam_yz_r = rhow1rhow2(6 * j + 5);
 
-                auto rhow_kx_r = rwdenptr->alphaDensity(6 * j);
+                auto rhow_kx_r = rwDensityGrid.alphaDensity(6 * j);
 
-                auto rhow_kx_i = rwdenptr->alphaDensity(6 * j + 1);
+                auto rhow_kx_i = rwDensityGrid.alphaDensity(6 * j + 1);
 
-                auto rhow_ky_r = rwdenptr->alphaDensity(6 * j + 2);
+                auto rhow_ky_r = rwDensityGrid.alphaDensity(6 * j + 2);
 
-                auto rhow_ky_i = rwdenptr->alphaDensity(6 * j + 3);
+                auto rhow_ky_i = rwDensityGrid.alphaDensity(6 * j + 3);
 
-                auto rhow_kz_r = rwdenptr->alphaDensity(6 * j + 4);
+                auto rhow_kz_r = rwDensityGrid.alphaDensity(6 * j + 4);
 
-                auto rhow_kz_i = rwdenptr->alphaDensity(6 * j + 5);
+                auto rhow_kz_i = rwDensityGrid.alphaDensity(6 * j + 5);
 
                 for (int32_t i = 0; i < npoints; i++)
                 {
@@ -542,11 +532,11 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
         }
         if (fstr::upcase(quadMode) == "QRF")
         {
-            for (int32_t j = 0; j < numdens / 2; j++)
+            for (int32_t j = 0; j < numDens / 2; j++)
             {
-                auto rhorho_r = densityGridAB.rhow1rhow2(2 * j);
+                auto rhorho_r = rhow1rhow2(2 * j);
 
-                auto rhorho_i = densityGridAB.rhow1rhow2(2 * j + 1);
+                auto rhorho_i = rhow1rhow2(2 * j + 1);
 
                 auto rhow1a_r = rwDensityGrid.alphaDensity(4 * j);
 
@@ -573,363 +563,363 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
     {
         if (fstr::upcase(quadMode) == "SHG")
         {
-            for (int32_t j = 0; j < numdens / 12; j++)
+            for (int32_t j = 0; j < numDens / 12; j++)
             {
                 // Density products to be stored
 
                 // RhoRho part
 
-                auto rho_sig_x_r = densityGridAB.rhow1rhow2(12 * j);
+                auto rho_sig_x_r = rhow1rhow2(12 * j);
 
-                auto rho_sig_x_i = densityGridAB.rhow1rhow2(12 * j + 1);
+                auto rho_sig_x_i = rhow1rhow2(12 * j + 1);
 
-                auto rho_sig_y_r = densityGridAB.rhow1rhow2(12 * j + 2);
+                auto rho_sig_y_r = rhow1rhow2(12 * j + 2);
 
-                auto rho_sig_y_i = densityGridAB.rhow1rhow2(12 * j + 3);
+                auto rho_sig_y_i = rhow1rhow2(12 * j + 3);
 
-                auto rho_sig_z_r = densityGridAB.rhow1rhow2(12 * j + 4);
+                auto rho_sig_z_r = rhow1rhow2(12 * j + 4);
 
-                auto rho_sig_z_i = densityGridAB.rhow1rhow2(12 * j + 5);
+                auto rho_sig_z_i = rhow1rhow2(12 * j + 5);
 
-                auto rho_lam_xy_r = densityGridAB.rhow1rhow2(12 * j + 6);
+                auto rho_lam_xy_r = rhow1rhow2(12 * j + 6);
 
-                auto rho_lam_xy_i = densityGridAB.rhow1rhow2(12 * j + 7);
+                auto rho_lam_xy_i = rhow1rhow2(12 * j + 7);
 
-                auto rho_lam_xz_r = densityGridAB.rhow1rhow2(12 * j + 8);
+                auto rho_lam_xz_r = rhow1rhow2(12 * j + 8);
 
-                auto rho_lam_xz_i = densityGridAB.rhow1rhow2(12 * j + 9);
+                auto rho_lam_xz_i = rhow1rhow2(12 * j + 9);
 
-                auto rho_lam_yz_r = densityGridAB.rhow1rhow2(12 * j + 10);
+                auto rho_lam_yz_r = rhow1rhow2(12 * j + 10);
 
-                auto rho_lam_yz_i = densityGridAB.rhow1rhow2(12 * j + 11);
+                auto rho_lam_yz_i = rhow1rhow2(12 * j + 11);
 
                 // rxw1rhow part
 
-                auto rxw1rhow2_sig_x_r = densityGridAB.rxw1rhow2(12 * j);
+                auto rxw1rhow2_sig_x_r = rxw1rhow2(12 * j);
 
-                auto rxw1rhow2_sig_x_i = densityGridAB.rxw1rhow2(12 * j + 1);
+                auto rxw1rhow2_sig_x_i = rxw1rhow2(12 * j + 1);
 
-                auto rxw1rhow2_sig_y_r = densityGridAB.rxw1rhow2(12 * j + 2);
+                auto rxw1rhow2_sig_y_r = rxw1rhow2(12 * j + 2);
 
-                auto rxw1rhow2_sig_y_i = densityGridAB.rxw1rhow2(12 * j + 3);
+                auto rxw1rhow2_sig_y_i = rxw1rhow2(12 * j + 3);
 
-                auto rxw1rhow2_sig_z_r = densityGridAB.rxw1rhow2(12 * j + 4);
+                auto rxw1rhow2_sig_z_r = rxw1rhow2(12 * j + 4);
 
-                auto rxw1rhow2_sig_z_i = densityGridAB.rxw1rhow2(12 * j + 5);
+                auto rxw1rhow2_sig_z_i = rxw1rhow2(12 * j + 5);
 
-                auto rxw1rhow2_lam_xy_r = densityGridAB.rxw1rhow2(12 * j + 6);
+                auto rxw1rhow2_lam_xy_r = rxw1rhow2(12 * j + 6);
 
-                auto rxw1rhow2_lam_xy_i = densityGridAB.rxw1rhow2(12 * j + 7);
+                auto rxw1rhow2_lam_xy_i = rxw1rhow2(12 * j + 7);
 
-                auto rxw1rhow2_lam_xz_r = densityGridAB.rxw1rhow2(12 * j + 8);
+                auto rxw1rhow2_lam_xz_r = rxw1rhow2(12 * j + 8);
 
-                auto rxw1rhow2_lam_xz_i = densityGridAB.rxw1rhow2(12 * j + 9);
+                auto rxw1rhow2_lam_xz_i = rxw1rhow2(12 * j + 9);
 
-                auto rxw1rhow2_lam_yz_r = densityGridAB.rxw1rhow2(12 * j + 10);
+                auto rxw1rhow2_lam_yz_r = rxw1rhow2(12 * j + 10);
 
-                auto rxw1rhow2_lam_yz_i = densityGridAB.rxw1rhow2(12 * j + 11);
+                auto rxw1rhow2_lam_yz_i = rxw1rhow2(12 * j + 11);
 
                 // ryw1rhow part
 
-                auto ryw1rhow2_sig_x_r = densityGridAB.ryw1rhow2(12 * j);
+                auto ryw1rhow2_sig_x_r = ryw1rhow2(12 * j);
 
-                auto ryw1rhow2_sig_x_i = densityGridAB.ryw1rhow2(12 * j + 1);
+                auto ryw1rhow2_sig_x_i = ryw1rhow2(12 * j + 1);
 
-                auto ryw1rhow2_sig_y_r = densityGridAB.ryw1rhow2(12 * j + 2);
+                auto ryw1rhow2_sig_y_r = ryw1rhow2(12 * j + 2);
 
-                auto ryw1rhow2_sig_y_i = densityGridAB.ryw1rhow2(12 * j + 3);
+                auto ryw1rhow2_sig_y_i = ryw1rhow2(12 * j + 3);
 
-                auto ryw1rhow2_sig_z_r = densityGridAB.ryw1rhow2(12 * j + 4);
+                auto ryw1rhow2_sig_z_r = ryw1rhow2(12 * j + 4);
 
-                auto ryw1rhow2_sig_z_i = densityGridAB.ryw1rhow2(12 * j + 5);
+                auto ryw1rhow2_sig_z_i = ryw1rhow2(12 * j + 5);
 
-                auto ryw1rhow2_lam_xy_r = densityGridAB.ryw1rhow2(12 * j + 6);
+                auto ryw1rhow2_lam_xy_r = ryw1rhow2(12 * j + 6);
 
-                auto ryw1rhow2_lam_xy_i = densityGridAB.ryw1rhow2(12 * j + 7);
+                auto ryw1rhow2_lam_xy_i = ryw1rhow2(12 * j + 7);
 
-                auto ryw1rhow2_lam_xz_r = densityGridAB.ryw1rhow2(12 * j + 8);
+                auto ryw1rhow2_lam_xz_r = ryw1rhow2(12 * j + 8);
 
-                auto ryw1rhow2_lam_xz_i = densityGridAB.ryw1rhow2(12 * j + 9);
+                auto ryw1rhow2_lam_xz_i = ryw1rhow2(12 * j + 9);
 
-                auto ryw1rhow2_lam_yz_r = densityGridAB.ryw1rhow2(12 * j + 10);
+                auto ryw1rhow2_lam_yz_r = ryw1rhow2(12 * j + 10);
 
-                auto ryw1rhow2_lam_yz_i = densityGridAB.ryw1rhow2(12 * j + 11);
+                auto ryw1rhow2_lam_yz_i = ryw1rhow2(12 * j + 11);
 
                 // rzw1rhow part
 
-                auto rzw1rhow2_sig_x_r = densityGridAB.rzw1rhow2(12 * j);
+                auto rzw1rhow2_sig_x_r = rzw1rhow2(12 * j);
 
-                auto rzw1rhow2_sig_x_i = densityGridAB.rzw1rhow2(12 * j + 1);
+                auto rzw1rhow2_sig_x_i = rzw1rhow2(12 * j + 1);
 
-                auto rzw1rhow2_sig_y_r = densityGridAB.rzw1rhow2(12 * j + 2);
+                auto rzw1rhow2_sig_y_r = rzw1rhow2(12 * j + 2);
 
-                auto rzw1rhow2_sig_y_i = densityGridAB.rzw1rhow2(12 * j + 3);
+                auto rzw1rhow2_sig_y_i = rzw1rhow2(12 * j + 3);
 
-                auto rzw1rhow2_sig_z_r = densityGridAB.rzw1rhow2(12 * j + 4);
+                auto rzw1rhow2_sig_z_r = rzw1rhow2(12 * j + 4);
 
-                auto rzw1rhow2_sig_z_i = densityGridAB.rzw1rhow2(12 * j + 5);
+                auto rzw1rhow2_sig_z_i = rzw1rhow2(12 * j + 5);
 
-                auto rzw1rhow2_lam_xy_r = densityGridAB.rzw1rhow2(12 * j + 6);
+                auto rzw1rhow2_lam_xy_r = rzw1rhow2(12 * j + 6);
 
-                auto rzw1rhow2_lam_xy_i = densityGridAB.rzw1rhow2(12 * j + 7);
+                auto rzw1rhow2_lam_xy_i = rzw1rhow2(12 * j + 7);
 
-                auto rzw1rhow2_lam_xz_r = densityGridAB.rzw1rhow2(12 * j + 8);
+                auto rzw1rhow2_lam_xz_r = rzw1rhow2(12 * j + 8);
 
-                auto rzw1rhow2_lam_xz_i = densityGridAB.rzw1rhow2(12 * j + 9);
+                auto rzw1rhow2_lam_xz_i = rzw1rhow2(12 * j + 9);
 
-                auto rzw1rhow2_lam_yz_r = densityGridAB.rzw1rhow2(12 * j + 10);
+                auto rzw1rhow2_lam_yz_r = rzw1rhow2(12 * j + 10);
 
-                auto rzw1rhow2_lam_yz_i = densityGridAB.rzw1rhow2(12 * j + 11);
+                auto rzw1rhow2_lam_yz_i = rzw1rhow2(12 * j + 11);
 
                 // rxw1rxw2 part
 
-                auto rxw1rxw2_sig_x_r = densityGridAB.rxw1rxw2(12 * j);
+                auto rxw1rxw2_sig_x_r = rxw1rxw2(12 * j);
 
-                auto rxw1rxw2_sig_x_i = densityGridAB.rxw1rxw2(12 * j + 1);
+                auto rxw1rxw2_sig_x_i = rxw1rxw2(12 * j + 1);
 
-                auto rxw1rxw2_sig_y_r = densityGridAB.rxw1rxw2(12 * j + 2);
+                auto rxw1rxw2_sig_y_r = rxw1rxw2(12 * j + 2);
 
-                auto rxw1rxw2_sig_y_i = densityGridAB.rxw1rxw2(12 * j + 3);
+                auto rxw1rxw2_sig_y_i = rxw1rxw2(12 * j + 3);
 
-                auto rxw1rxw2_sig_z_r = densityGridAB.rxw1rxw2(12 * j + 4);
+                auto rxw1rxw2_sig_z_r = rxw1rxw2(12 * j + 4);
 
-                auto rxw1rxw2_sig_z_i = densityGridAB.rxw1rxw2(12 * j + 5);
+                auto rxw1rxw2_sig_z_i = rxw1rxw2(12 * j + 5);
 
-                auto rxw1rxw2_lam_xy_r = densityGridAB.rxw1rxw2(12 * j + 6);
+                auto rxw1rxw2_lam_xy_r = rxw1rxw2(12 * j + 6);
 
-                auto rxw1rxw2_lam_xy_i = densityGridAB.rxw1rxw2(12 * j + 7);
+                auto rxw1rxw2_lam_xy_i = rxw1rxw2(12 * j + 7);
 
-                auto rxw1rxw2_lam_xz_r = densityGridAB.rxw1rxw2(12 * j + 8);
+                auto rxw1rxw2_lam_xz_r = rxw1rxw2(12 * j + 8);
 
-                auto rxw1rxw2_lam_xz_i = densityGridAB.rxw1rxw2(12 * j + 9);
+                auto rxw1rxw2_lam_xz_i = rxw1rxw2(12 * j + 9);
 
-                auto rxw1rxw2_lam_yz_r = densityGridAB.rxw1rxw2(12 * j + 10);
+                auto rxw1rxw2_lam_yz_r = rxw1rxw2(12 * j + 10);
 
-                auto rxw1rxw2_lam_yz_i = densityGridAB.rxw1rxw2(12 * j + 11);
+                auto rxw1rxw2_lam_yz_i = rxw1rxw2(12 * j + 11);
 
                 // rxw1ryw2 part
 
-                auto rxw1ryw2_sig_x_r = densityGridAB.rxw1ryw2(12 * j);
+                auto rxw1ryw2_sig_x_r = rxw1ryw2(12 * j);
 
-                auto rxw1ryw2_sig_x_i = densityGridAB.rxw1ryw2(12 * j + 1);
+                auto rxw1ryw2_sig_x_i = rxw1ryw2(12 * j + 1);
 
-                auto rxw1ryw2_sig_y_r = densityGridAB.rxw1ryw2(12 * j + 2);
+                auto rxw1ryw2_sig_y_r = rxw1ryw2(12 * j + 2);
 
-                auto rxw1ryw2_sig_y_i = densityGridAB.rxw1ryw2(12 * j + 3);
+                auto rxw1ryw2_sig_y_i = rxw1ryw2(12 * j + 3);
 
-                auto rxw1ryw2_sig_z_r = densityGridAB.rxw1ryw2(12 * j + 4);
+                auto rxw1ryw2_sig_z_r = rxw1ryw2(12 * j + 4);
 
-                auto rxw1ryw2_sig_z_i = densityGridAB.rxw1ryw2(12 * j + 5);
+                auto rxw1ryw2_sig_z_i = rxw1ryw2(12 * j + 5);
 
-                auto rxw1ryw2_lam_xy_r = densityGridAB.rxw1ryw2(12 * j + 6);
+                auto rxw1ryw2_lam_xy_r = rxw1ryw2(12 * j + 6);
 
-                auto rxw1ryw2_lam_xy_i = densityGridAB.rxw1ryw2(12 * j + 7);
+                auto rxw1ryw2_lam_xy_i = rxw1ryw2(12 * j + 7);
 
-                auto rxw1ryw2_lam_xz_r = densityGridAB.rxw1ryw2(12 * j + 8);
+                auto rxw1ryw2_lam_xz_r = rxw1ryw2(12 * j + 8);
 
-                auto rxw1ryw2_lam_xz_i = densityGridAB.rxw1ryw2(12 * j + 9);
+                auto rxw1ryw2_lam_xz_i = rxw1ryw2(12 * j + 9);
 
-                auto rxw1ryw2_lam_yz_r = densityGridAB.rxw1ryw2(12 * j + 10);
+                auto rxw1ryw2_lam_yz_r = rxw1ryw2(12 * j + 10);
 
-                auto rxw1ryw2_lam_yz_i = densityGridAB.rxw1ryw2(12 * j + 11);
+                auto rxw1ryw2_lam_yz_i = rxw1ryw2(12 * j + 11);
 
                 // rxw1rzw2 part
 
-                auto rxw1rzw2_sig_x_r = densityGridAB.rxw1rzw2(12 * j);
+                auto rxw1rzw2_sig_x_r = rxw1rzw2(12 * j);
 
-                auto rxw1rzw2_sig_x_i = densityGridAB.rxw1rzw2(12 * j + 1);
+                auto rxw1rzw2_sig_x_i = rxw1rzw2(12 * j + 1);
 
-                auto rxw1rzw2_sig_y_r = densityGridAB.rxw1rzw2(12 * j + 2);
+                auto rxw1rzw2_sig_y_r = rxw1rzw2(12 * j + 2);
 
-                auto rxw1rzw2_sig_y_i = densityGridAB.rxw1rzw2(12 * j + 3);
+                auto rxw1rzw2_sig_y_i = rxw1rzw2(12 * j + 3);
 
-                auto rxw1rzw2_sig_z_r = densityGridAB.rxw1rzw2(12 * j + 4);
+                auto rxw1rzw2_sig_z_r = rxw1rzw2(12 * j + 4);
 
-                auto rxw1rzw2_sig_z_i = densityGridAB.rxw1rzw2(12 * j + 5);
+                auto rxw1rzw2_sig_z_i = rxw1rzw2(12 * j + 5);
 
-                auto rxw1rzw2_lam_xy_r = densityGridAB.rxw1rzw2(12 * j + 6);
+                auto rxw1rzw2_lam_xy_r = rxw1rzw2(12 * j + 6);
 
-                auto rxw1rzw2_lam_xy_i = densityGridAB.rxw1rzw2(12 * j + 7);
+                auto rxw1rzw2_lam_xy_i = rxw1rzw2(12 * j + 7);
 
-                auto rxw1rzw2_lam_xz_r = densityGridAB.rxw1rzw2(12 * j + 8);
+                auto rxw1rzw2_lam_xz_r = rxw1rzw2(12 * j + 8);
 
-                auto rxw1rzw2_lam_xz_i = densityGridAB.rxw1rzw2(12 * j + 9);
+                auto rxw1rzw2_lam_xz_i = rxw1rzw2(12 * j + 9);
 
-                auto rxw1rzw2_lam_yz_r = densityGridAB.rxw1rzw2(12 * j + 10);
+                auto rxw1rzw2_lam_yz_r = rxw1rzw2(12 * j + 10);
 
-                auto rxw1rzw2_lam_yz_i = densityGridAB.rxw1rzw2(12 * j + 11);
+                auto rxw1rzw2_lam_yz_i = rxw1rzw2(12 * j + 11);
 
                 // ryw1rxw2 part
 
-                auto ryw1rxw2_sig_x_r = densityGridAB.ryw1rxw2(12 * j);
+                auto ryw1rxw2_sig_x_r = ryw1rxw2(12 * j);
 
-                auto ryw1rxw2_sig_x_i = densityGridAB.ryw1rxw2(12 * j + 1);
+                auto ryw1rxw2_sig_x_i = ryw1rxw2(12 * j + 1);
 
-                auto ryw1rxw2_sig_y_r = densityGridAB.ryw1rxw2(12 * j + 2);
+                auto ryw1rxw2_sig_y_r = ryw1rxw2(12 * j + 2);
 
-                auto ryw1rxw2_sig_y_i = densityGridAB.ryw1rxw2(12 * j + 3);
+                auto ryw1rxw2_sig_y_i = ryw1rxw2(12 * j + 3);
 
-                auto ryw1rxw2_sig_z_r = densityGridAB.ryw1rxw2(12 * j + 4);
+                auto ryw1rxw2_sig_z_r = ryw1rxw2(12 * j + 4);
 
-                auto ryw1rxw2_sig_z_i = densityGridAB.ryw1rxw2(12 * j + 5);
+                auto ryw1rxw2_sig_z_i = ryw1rxw2(12 * j + 5);
 
-                auto ryw1rxw2_lam_xy_r = densityGridAB.ryw1rxw2(12 * j + 6);
+                auto ryw1rxw2_lam_xy_r = ryw1rxw2(12 * j + 6);
 
-                auto ryw1rxw2_lam_xy_i = densityGridAB.ryw1rxw2(12 * j + 7);
+                auto ryw1rxw2_lam_xy_i = ryw1rxw2(12 * j + 7);
 
-                auto ryw1rxw2_lam_xz_r = densityGridAB.ryw1rxw2(12 * j + 8);
+                auto ryw1rxw2_lam_xz_r = ryw1rxw2(12 * j + 8);
 
-                auto ryw1rxw2_lam_xz_i = densityGridAB.ryw1rxw2(12 * j + 9);
+                auto ryw1rxw2_lam_xz_i = ryw1rxw2(12 * j + 9);
 
-                auto ryw1rxw2_lam_yz_r = densityGridAB.ryw1rxw2(12 * j + 10);
+                auto ryw1rxw2_lam_yz_r = ryw1rxw2(12 * j + 10);
 
-                auto ryw1rxw2_lam_yz_i = densityGridAB.ryw1rxw2(12 * j + 11);
+                auto ryw1rxw2_lam_yz_i = ryw1rxw2(12 * j + 11);
 
                 // ryw1ryw2 part
 
-                auto ryw1ryw2_sig_x_r = densityGridAB.ryw1ryw2(12 * j);
+                auto ryw1ryw2_sig_x_r = ryw1ryw2(12 * j);
 
-                auto ryw1ryw2_sig_x_i = densityGridAB.ryw1ryw2(12 * j + 1);
+                auto ryw1ryw2_sig_x_i = ryw1ryw2(12 * j + 1);
 
-                auto ryw1ryw2_sig_y_r = densityGridAB.ryw1ryw2(12 * j + 2);
+                auto ryw1ryw2_sig_y_r = ryw1ryw2(12 * j + 2);
 
-                auto ryw1ryw2_sig_y_i = densityGridAB.ryw1ryw2(12 * j + 3);
+                auto ryw1ryw2_sig_y_i = ryw1ryw2(12 * j + 3);
 
-                auto ryw1ryw2_sig_z_r = densityGridAB.ryw1ryw2(12 * j + 4);
+                auto ryw1ryw2_sig_z_r = ryw1ryw2(12 * j + 4);
 
-                auto ryw1ryw2_sig_z_i = densityGridAB.ryw1ryw2(12 * j + 5);
+                auto ryw1ryw2_sig_z_i = ryw1ryw2(12 * j + 5);
 
-                auto ryw1ryw2_lam_xy_r = densityGridAB.ryw1ryw2(12 * j + 6);
+                auto ryw1ryw2_lam_xy_r = ryw1ryw2(12 * j + 6);
 
-                auto ryw1ryw2_lam_xy_i = densityGridAB.ryw1ryw2(12 * j + 7);
+                auto ryw1ryw2_lam_xy_i = ryw1ryw2(12 * j + 7);
 
-                auto ryw1ryw2_lam_xz_r = densityGridAB.ryw1ryw2(12 * j + 8);
+                auto ryw1ryw2_lam_xz_r = ryw1ryw2(12 * j + 8);
 
-                auto ryw1ryw2_lam_xz_i = densityGridAB.ryw1ryw2(12 * j + 9);
+                auto ryw1ryw2_lam_xz_i = ryw1ryw2(12 * j + 9);
 
-                auto ryw1ryw2_lam_yz_r = densityGridAB.ryw1ryw2(12 * j + 10);
+                auto ryw1ryw2_lam_yz_r = ryw1ryw2(12 * j + 10);
 
-                auto ryw1ryw2_lam_yz_i = densityGridAB.ryw1ryw2(12 * j + 11);
+                auto ryw1ryw2_lam_yz_i = ryw1ryw2(12 * j + 11);
 
                 // ryw1rzw2 part
 
-                auto ryw1rzw2_sig_x_r = densityGridAB.ryw1rzw2(12 * j);
+                auto ryw1rzw2_sig_x_r = ryw1rzw2(12 * j);
 
-                auto ryw1rzw2_sig_x_i = densityGridAB.ryw1rzw2(12 * j + 1);
+                auto ryw1rzw2_sig_x_i = ryw1rzw2(12 * j + 1);
 
-                auto ryw1rzw2_sig_y_r = densityGridAB.ryw1rzw2(12 * j + 2);
+                auto ryw1rzw2_sig_y_r = ryw1rzw2(12 * j + 2);
 
-                auto ryw1rzw2_sig_y_i = densityGridAB.ryw1rzw2(12 * j + 3);
+                auto ryw1rzw2_sig_y_i = ryw1rzw2(12 * j + 3);
 
-                auto ryw1rzw2_sig_z_r = densityGridAB.ryw1rzw2(12 * j + 4);
+                auto ryw1rzw2_sig_z_r = ryw1rzw2(12 * j + 4);
 
-                auto ryw1rzw2_sig_z_i = densityGridAB.ryw1rzw2(12 * j + 5);
+                auto ryw1rzw2_sig_z_i = ryw1rzw2(12 * j + 5);
 
-                auto ryw1rzw2_lam_xy_r = densityGridAB.ryw1rzw2(12 * j + 6);
+                auto ryw1rzw2_lam_xy_r = ryw1rzw2(12 * j + 6);
 
-                auto ryw1rzw2_lam_xy_i = densityGridAB.ryw1rzw2(12 * j + 7);
+                auto ryw1rzw2_lam_xy_i = ryw1rzw2(12 * j + 7);
 
-                auto ryw1rzw2_lam_xz_r = densityGridAB.ryw1rzw2(12 * j + 8);
+                auto ryw1rzw2_lam_xz_r = ryw1rzw2(12 * j + 8);
 
-                auto ryw1rzw2_lam_xz_i = densityGridAB.ryw1rzw2(12 * j + 9);
+                auto ryw1rzw2_lam_xz_i = ryw1rzw2(12 * j + 9);
 
-                auto ryw1rzw2_lam_yz_r = densityGridAB.ryw1rzw2(12 * j + 10);
+                auto ryw1rzw2_lam_yz_r = ryw1rzw2(12 * j + 10);
 
-                auto ryw1rzw2_lam_yz_i = densityGridAB.ryw1rzw2(12 * j + 11);
+                auto ryw1rzw2_lam_yz_i = ryw1rzw2(12 * j + 11);
 
                 // rzw1rxw2 part
 
-                auto rzw1rxw2_sig_x_r = densityGridAB.rzw1rxw2(12 * j);
+                auto rzw1rxw2_sig_x_r = rzw1rxw2(12 * j);
 
-                auto rzw1rxw2_sig_x_i = densityGridAB.rzw1rxw2(12 * j + 1);
+                auto rzw1rxw2_sig_x_i = rzw1rxw2(12 * j + 1);
 
-                auto rzw1rxw2_sig_y_r = densityGridAB.rzw1rxw2(12 * j + 2);
+                auto rzw1rxw2_sig_y_r = rzw1rxw2(12 * j + 2);
 
-                auto rzw1rxw2_sig_y_i = densityGridAB.rzw1rxw2(12 * j + 3);
+                auto rzw1rxw2_sig_y_i = rzw1rxw2(12 * j + 3);
 
-                auto rzw1rxw2_sig_z_r = densityGridAB.rzw1rxw2(12 * j + 4);
+                auto rzw1rxw2_sig_z_r = rzw1rxw2(12 * j + 4);
 
-                auto rzw1rxw2_sig_z_i = densityGridAB.rzw1rxw2(12 * j + 5);
+                auto rzw1rxw2_sig_z_i = rzw1rxw2(12 * j + 5);
 
-                auto rzw1rxw2_lam_xy_r = densityGridAB.rzw1rxw2(12 * j + 6);
+                auto rzw1rxw2_lam_xy_r = rzw1rxw2(12 * j + 6);
 
-                auto rzw1rxw2_lam_xy_i = densityGridAB.rzw1rxw2(12 * j + 7);
+                auto rzw1rxw2_lam_xy_i = rzw1rxw2(12 * j + 7);
 
-                auto rzw1rxw2_lam_xz_r = densityGridAB.rzw1rxw2(12 * j + 8);
+                auto rzw1rxw2_lam_xz_r = rzw1rxw2(12 * j + 8);
 
-                auto rzw1rxw2_lam_xz_i = densityGridAB.rzw1rxw2(12 * j + 9);
+                auto rzw1rxw2_lam_xz_i = rzw1rxw2(12 * j + 9);
 
-                auto rzw1rxw2_lam_yz_r = densityGridAB.rzw1rxw2(12 * j + 10);
+                auto rzw1rxw2_lam_yz_r = rzw1rxw2(12 * j + 10);
 
-                auto rzw1rxw2_lam_yz_i = densityGridAB.rzw1rxw2(12 * j + 11);
+                auto rzw1rxw2_lam_yz_i = rzw1rxw2(12 * j + 11);
 
                 // rzw1ryw2 part
 
-                auto rzw1ryw2_sig_x_r = densityGridAB.rzw1ryw2(12 * j);
+                auto rzw1ryw2_sig_x_r = rzw1ryw2(12 * j);
 
-                auto rzw1ryw2_sig_x_i = densityGridAB.rzw1ryw2(12 * j + 1);
+                auto rzw1ryw2_sig_x_i = rzw1ryw2(12 * j + 1);
 
-                auto rzw1ryw2_sig_y_r = densityGridAB.rzw1ryw2(12 * j + 2);
+                auto rzw1ryw2_sig_y_r = rzw1ryw2(12 * j + 2);
 
-                auto rzw1ryw2_sig_y_i = densityGridAB.rzw1ryw2(12 * j + 3);
+                auto rzw1ryw2_sig_y_i = rzw1ryw2(12 * j + 3);
 
-                auto rzw1ryw2_sig_z_r = densityGridAB.rzw1ryw2(12 * j + 4);
+                auto rzw1ryw2_sig_z_r = rzw1ryw2(12 * j + 4);
 
-                auto rzw1ryw2_sig_z_i = densityGridAB.rzw1ryw2(12 * j + 5);
+                auto rzw1ryw2_sig_z_i = rzw1ryw2(12 * j + 5);
 
-                auto rzw1ryw2_lam_xy_r = densityGridAB.rzw1ryw2(12 * j + 6);
+                auto rzw1ryw2_lam_xy_r = rzw1ryw2(12 * j + 6);
 
-                auto rzw1ryw2_lam_xy_i = densityGridAB.rzw1ryw2(12 * j + 7);
+                auto rzw1ryw2_lam_xy_i = rzw1ryw2(12 * j + 7);
 
-                auto rzw1ryw2_lam_xz_r = densityGridAB.rzw1ryw2(12 * j + 8);
+                auto rzw1ryw2_lam_xz_r = rzw1ryw2(12 * j + 8);
 
-                auto rzw1ryw2_lam_xz_i = densityGridAB.rzw1ryw2(12 * j + 9);
+                auto rzw1ryw2_lam_xz_i = rzw1ryw2(12 * j + 9);
 
-                auto rzw1ryw2_lam_yz_r = densityGridAB.rzw1ryw2(12 * j + 10);
+                auto rzw1ryw2_lam_yz_r = rzw1ryw2(12 * j + 10);
 
-                auto rzw1ryw2_lam_yz_i = densityGridAB.rzw1ryw2(12 * j + 11);
+                auto rzw1ryw2_lam_yz_i = rzw1ryw2(12 * j + 11);
 
                 // rzw1rzw2 part
 
-                auto rzw1rzw2_sig_x_r = densityGridAB.rzw1rzw2(12 * j);
+                auto rzw1rzw2_sig_x_r = rzw1rzw2(12 * j);
 
-                auto rzw1rzw2_sig_x_i = densityGridAB.rzw1rzw2(12 * j + 1);
+                auto rzw1rzw2_sig_x_i = rzw1rzw2(12 * j + 1);
 
-                auto rzw1rzw2_sig_y_r = densityGridAB.rzw1rzw2(12 * j + 2);
+                auto rzw1rzw2_sig_y_r = rzw1rzw2(12 * j + 2);
 
-                auto rzw1rzw2_sig_y_i = densityGridAB.rzw1rzw2(12 * j + 3);
+                auto rzw1rzw2_sig_y_i = rzw1rzw2(12 * j + 3);
 
-                auto rzw1rzw2_sig_z_r = densityGridAB.rzw1rzw2(12 * j + 4);
+                auto rzw1rzw2_sig_z_r = rzw1rzw2(12 * j + 4);
 
-                auto rzw1rzw2_sig_z_i = densityGridAB.rzw1rzw2(12 * j + 5);
+                auto rzw1rzw2_sig_z_i = rzw1rzw2(12 * j + 5);
 
-                auto rzw1rzw2_lam_xy_r = densityGridAB.rzw1rzw2(12 * j + 6);
+                auto rzw1rzw2_lam_xy_r = rzw1rzw2(12 * j + 6);
 
-                auto rzw1rzw2_lam_xy_i = densityGridAB.rzw1rzw2(12 * j + 7);
+                auto rzw1rzw2_lam_xy_i = rzw1rzw2(12 * j + 7);
 
-                auto rzw1rzw2_lam_xz_r = densityGridAB.rzw1rzw2(12 * j + 8);
+                auto rzw1rzw2_lam_xz_r = rzw1rzw2(12 * j + 8);
 
-                auto rzw1rzw2_lam_xz_i = densityGridAB.rzw1rzw2(12 * j + 9);
+                auto rzw1rzw2_lam_xz_i = rzw1rzw2(12 * j + 9);
 
-                auto rzw1rzw2_lam_yz_r = densityGridAB.rzw1rzw2(12 * j + 10);
+                auto rzw1rzw2_lam_yz_r = rzw1rzw2(12 * j + 10);
 
-                auto rzw1rzw2_lam_yz_i = densityGridAB.rzw1rzw2(12 * j + 11);
+                auto rzw1rzw2_lam_yz_i = rzw1rzw2(12 * j + 11);
 
                 // First-order densities
 
                 // Rho terms
 
-                auto rhow_kx_r = rwdenptr->alphaDensity(6 * j);
+                auto rhow_kx_r = rwDensityGrid.alphaDensity(6 * j);
 
-                auto rhow_kx_i = rwdenptr->alphaDensity(6 * j + 1);
+                auto rhow_kx_i = rwDensityGrid.alphaDensity(6 * j + 1);
 
-                auto rhow_ky_r = rwdenptr->alphaDensity(6 * j + 2);
+                auto rhow_ky_r = rwDensityGrid.alphaDensity(6 * j + 2);
 
-                auto rhow_ky_i = rwdenptr->alphaDensity(6 * j + 3);
+                auto rhow_ky_i = rwDensityGrid.alphaDensity(6 * j + 3);
 
-                auto rhow_kz_r = rwdenptr->alphaDensity(6 * j + 4);
+                auto rhow_kz_r = rwDensityGrid.alphaDensity(6 * j + 4);
 
-                auto rhow_kz_i = rwdenptr->alphaDensity(6 * j + 5);
+                auto rhow_kz_i = rwDensityGrid.alphaDensity(6 * j + 5);
 
                 // Gradx terms
 
@@ -1543,207 +1533,207 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
         }
         if (fstr::upcase(quadMode) == "SHG_RED")
         {
-            for (int32_t j = 0; j < numdens / 6; j++)
+            for (int32_t j = 0; j < numDens / 6; j++)
             {
                 // Density products to be stored
 
                 // RhoRho part
 
-                auto rho_sig_x_r = densityGridAB.rhow1rhow2(6 * j);
+                auto rho_sig_x_r = rhow1rhow2(6 * j);
 
-                auto rho_sig_y_r = densityGridAB.rhow1rhow2(6 * j + 1);
+                auto rho_sig_y_r = rhow1rhow2(6 * j + 1);
 
-                auto rho_sig_z_r = densityGridAB.rhow1rhow2(6 * j + 2);
+                auto rho_sig_z_r = rhow1rhow2(6 * j + 2);
 
-                auto rho_lam_xy_r = densityGridAB.rhow1rhow2(6 * j + 3);
+                auto rho_lam_xy_r = rhow1rhow2(6 * j + 3);
 
-                auto rho_lam_xz_r = densityGridAB.rhow1rhow2(6 * j + 4);
+                auto rho_lam_xz_r = rhow1rhow2(6 * j + 4);
 
-                auto rho_lam_yz_r = densityGridAB.rhow1rhow2(6 * j + 5);
+                auto rho_lam_yz_r = rhow1rhow2(6 * j + 5);
 
                 // rxw1rhow part
 
-                auto rxw1rhow2_sig_x_r = densityGridAB.rxw1rhow2(6 * j);
+                auto rxw1rhow2_sig_x_r = rxw1rhow2(6 * j);
 
-                auto rxw1rhow2_sig_y_r = densityGridAB.rxw1rhow2(6 * j + 1);
+                auto rxw1rhow2_sig_y_r = rxw1rhow2(6 * j + 1);
 
-                auto rxw1rhow2_sig_z_r = densityGridAB.rxw1rhow2(6 * j + 2);
+                auto rxw1rhow2_sig_z_r = rxw1rhow2(6 * j + 2);
 
-                auto rxw1rhow2_lam_xy_r = densityGridAB.rxw1rhow2(6 * j + 3);
+                auto rxw1rhow2_lam_xy_r = rxw1rhow2(6 * j + 3);
 
-                auto rxw1rhow2_lam_xz_r = densityGridAB.rxw1rhow2(6 * j + 4);
+                auto rxw1rhow2_lam_xz_r = rxw1rhow2(6 * j + 4);
 
-                auto rxw1rhow2_lam_yz_r = densityGridAB.rxw1rhow2(6 * j + 5);
+                auto rxw1rhow2_lam_yz_r = rxw1rhow2(6 * j + 5);
 
                 // ryw1rhow part
 
-                auto ryw1rhow2_sig_x_r = densityGridAB.ryw1rhow2(6 * j);
+                auto ryw1rhow2_sig_x_r = ryw1rhow2(6 * j);
 
-                auto ryw1rhow2_sig_y_r = densityGridAB.ryw1rhow2(6 * j + 1);
+                auto ryw1rhow2_sig_y_r = ryw1rhow2(6 * j + 1);
 
-                auto ryw1rhow2_sig_z_r = densityGridAB.ryw1rhow2(6 * j + 2);
+                auto ryw1rhow2_sig_z_r = ryw1rhow2(6 * j + 2);
 
-                auto ryw1rhow2_lam_xy_r = densityGridAB.ryw1rhow2(6 * j + 3);
+                auto ryw1rhow2_lam_xy_r = ryw1rhow2(6 * j + 3);
 
-                auto ryw1rhow2_lam_xz_r = densityGridAB.ryw1rhow2(6 * j + 4);
+                auto ryw1rhow2_lam_xz_r = ryw1rhow2(6 * j + 4);
 
-                auto ryw1rhow2_lam_yz_r = densityGridAB.ryw1rhow2(6 * j + 5);
+                auto ryw1rhow2_lam_yz_r = ryw1rhow2(6 * j + 5);
 
                 // rzw1rhow part
 
-                auto rzw1rhow2_sig_x_r = densityGridAB.rzw1rhow2(6 * j);
+                auto rzw1rhow2_sig_x_r = rzw1rhow2(6 * j);
 
-                auto rzw1rhow2_sig_y_r = densityGridAB.rzw1rhow2(6 * j + 1);
+                auto rzw1rhow2_sig_y_r = rzw1rhow2(6 * j + 1);
 
-                auto rzw1rhow2_sig_z_r = densityGridAB.rzw1rhow2(6 * j + 2);
+                auto rzw1rhow2_sig_z_r = rzw1rhow2(6 * j + 2);
 
-                auto rzw1rhow2_lam_xy_r = densityGridAB.rzw1rhow2(6 * j + 3);
+                auto rzw1rhow2_lam_xy_r = rzw1rhow2(6 * j + 3);
 
-                auto rzw1rhow2_lam_xz_r = densityGridAB.rzw1rhow2(6 * j + 4);
+                auto rzw1rhow2_lam_xz_r = rzw1rhow2(6 * j + 4);
 
-                auto rzw1rhow2_lam_yz_r = densityGridAB.rzw1rhow2(6 * j + 5);
+                auto rzw1rhow2_lam_yz_r = rzw1rhow2(6 * j + 5);
 
                 // rxw1rxw2 part
 
-                auto rxw1rxw2_sig_x_r = densityGridAB.rxw1rxw2(6 * j);
+                auto rxw1rxw2_sig_x_r = rxw1rxw2(6 * j);
 
-                auto rxw1rxw2_sig_y_r = densityGridAB.rxw1rxw2(6 * j + 1);
+                auto rxw1rxw2_sig_y_r = rxw1rxw2(6 * j + 1);
 
-                auto rxw1rxw2_sig_z_r = densityGridAB.rxw1rxw2(6 * j + 2);
+                auto rxw1rxw2_sig_z_r = rxw1rxw2(6 * j + 2);
 
-                auto rxw1rxw2_lam_xy_r = densityGridAB.rxw1rxw2(6 * j + 3);
+                auto rxw1rxw2_lam_xy_r = rxw1rxw2(6 * j + 3);
 
-                auto rxw1rxw2_lam_xz_r = densityGridAB.rxw1rxw2(6 * j + 4);
+                auto rxw1rxw2_lam_xz_r = rxw1rxw2(6 * j + 4);
 
-                auto rxw1rxw2_lam_yz_r = densityGridAB.rxw1rxw2(6 * j + 5);
+                auto rxw1rxw2_lam_yz_r = rxw1rxw2(6 * j + 5);
 
                 // rxw1ryw2 part
 
-                auto rxw1ryw2_sig_x_r = densityGridAB.rxw1ryw2(6 * j);
+                auto rxw1ryw2_sig_x_r = rxw1ryw2(6 * j);
 
-                auto rxw1ryw2_sig_y_r = densityGridAB.rxw1ryw2(6 * j + 1);
+                auto rxw1ryw2_sig_y_r = rxw1ryw2(6 * j + 1);
 
-                auto rxw1ryw2_sig_z_r = densityGridAB.rxw1ryw2(6 * j + 2);
+                auto rxw1ryw2_sig_z_r = rxw1ryw2(6 * j + 2);
 
-                auto rxw1ryw2_lam_xy_r = densityGridAB.rxw1ryw2(6 * j + 3);
+                auto rxw1ryw2_lam_xy_r = rxw1ryw2(6 * j + 3);
 
-                auto rxw1ryw2_lam_xz_r = densityGridAB.rxw1ryw2(6 * j + 4);
+                auto rxw1ryw2_lam_xz_r = rxw1ryw2(6 * j + 4);
 
-                auto rxw1ryw2_lam_yz_r = densityGridAB.rxw1ryw2(6 * j + 5);
+                auto rxw1ryw2_lam_yz_r = rxw1ryw2(6 * j + 5);
 
                 // rxw1rzw2 part
 
-                auto rxw1rzw2_sig_x_r = densityGridAB.rxw1rzw2(6 * j);
+                auto rxw1rzw2_sig_x_r = rxw1rzw2(6 * j);
 
-                auto rxw1rzw2_sig_y_r = densityGridAB.rxw1rzw2(6 * j + 1);
+                auto rxw1rzw2_sig_y_r = rxw1rzw2(6 * j + 1);
 
-                auto rxw1rzw2_sig_z_r = densityGridAB.rxw1rzw2(6 * j + 2);
+                auto rxw1rzw2_sig_z_r = rxw1rzw2(6 * j + 2);
 
-                auto rxw1rzw2_lam_xy_r = densityGridAB.rxw1rzw2(6 * j + 3);
+                auto rxw1rzw2_lam_xy_r = rxw1rzw2(6 * j + 3);
 
-                auto rxw1rzw2_lam_xz_r = densityGridAB.rxw1rzw2(6 * j + 4);
+                auto rxw1rzw2_lam_xz_r = rxw1rzw2(6 * j + 4);
 
-                auto rxw1rzw2_lam_yz_r = densityGridAB.rxw1rzw2(6 * j + 5);
+                auto rxw1rzw2_lam_yz_r = rxw1rzw2(6 * j + 5);
 
                 // ryw1rxw2 part
 
-                auto ryw1rxw2_sig_x_r = densityGridAB.ryw1rxw2(6 * j);
+                auto ryw1rxw2_sig_x_r = ryw1rxw2(6 * j);
 
-                auto ryw1rxw2_sig_y_r = densityGridAB.ryw1rxw2(6 * j + 1);
+                auto ryw1rxw2_sig_y_r = ryw1rxw2(6 * j + 1);
 
-                auto ryw1rxw2_sig_z_r = densityGridAB.ryw1rxw2(6 * j + 2);
+                auto ryw1rxw2_sig_z_r = ryw1rxw2(6 * j + 2);
 
-                auto ryw1rxw2_lam_xy_r = densityGridAB.ryw1rxw2(6 * j + 3);
+                auto ryw1rxw2_lam_xy_r = ryw1rxw2(6 * j + 3);
 
-                auto ryw1rxw2_lam_xz_r = densityGridAB.ryw1rxw2(6 * j + 4);
+                auto ryw1rxw2_lam_xz_r = ryw1rxw2(6 * j + 4);
 
-                auto ryw1rxw2_lam_yz_r = densityGridAB.ryw1rxw2(6 * j + 5);
+                auto ryw1rxw2_lam_yz_r = ryw1rxw2(6 * j + 5);
 
                 // ryw1ryw2 part
 
-                auto ryw1ryw2_sig_x_r = densityGridAB.ryw1ryw2(6 * j);
+                auto ryw1ryw2_sig_x_r = ryw1ryw2(6 * j);
 
-                auto ryw1ryw2_sig_y_r = densityGridAB.ryw1ryw2(6 * j + 1);
+                auto ryw1ryw2_sig_y_r = ryw1ryw2(6 * j + 1);
 
-                auto ryw1ryw2_sig_z_r = densityGridAB.ryw1ryw2(6 * j + 2);
+                auto ryw1ryw2_sig_z_r = ryw1ryw2(6 * j + 2);
 
-                auto ryw1ryw2_lam_xy_r = densityGridAB.ryw1ryw2(6 * j + 3);
+                auto ryw1ryw2_lam_xy_r = ryw1ryw2(6 * j + 3);
 
-                auto ryw1ryw2_lam_xz_r = densityGridAB.ryw1ryw2(6 * j + 4);
+                auto ryw1ryw2_lam_xz_r = ryw1ryw2(6 * j + 4);
 
-                auto ryw1ryw2_lam_yz_r = densityGridAB.ryw1ryw2(6 * j + 5);
+                auto ryw1ryw2_lam_yz_r = ryw1ryw2(6 * j + 5);
 
                 // ryw1rzw2 part
 
-                auto ryw1rzw2_sig_x_r = densityGridAB.ryw1rzw2(6 * j);
+                auto ryw1rzw2_sig_x_r = ryw1rzw2(6 * j);
 
-                auto ryw1rzw2_sig_y_r = densityGridAB.ryw1rzw2(6 * j + 1);
+                auto ryw1rzw2_sig_y_r = ryw1rzw2(6 * j + 1);
 
-                auto ryw1rzw2_sig_z_r = densityGridAB.ryw1rzw2(6 * j + 2);
+                auto ryw1rzw2_sig_z_r = ryw1rzw2(6 * j + 2);
 
-                auto ryw1rzw2_lam_xy_r = densityGridAB.ryw1rzw2(6 * j + 3);
+                auto ryw1rzw2_lam_xy_r = ryw1rzw2(6 * j + 3);
 
-                auto ryw1rzw2_lam_xz_r = densityGridAB.ryw1rzw2(6 * j + 4);
+                auto ryw1rzw2_lam_xz_r = ryw1rzw2(6 * j + 4);
 
-                auto ryw1rzw2_lam_yz_r = densityGridAB.ryw1rzw2(6 * j + 5);
+                auto ryw1rzw2_lam_yz_r = ryw1rzw2(6 * j + 5);
 
                 // rzw1rxw2 part
 
-                auto rzw1rxw2_sig_x_r = densityGridAB.rzw1rxw2(6 * j);
+                auto rzw1rxw2_sig_x_r = rzw1rxw2(6 * j);
 
-                auto rzw1rxw2_sig_y_r = densityGridAB.rzw1rxw2(6 * j + 1);
+                auto rzw1rxw2_sig_y_r = rzw1rxw2(6 * j + 1);
 
-                auto rzw1rxw2_sig_z_r = densityGridAB.rzw1rxw2(6 * j + 2);
+                auto rzw1rxw2_sig_z_r = rzw1rxw2(6 * j + 2);
 
-                auto rzw1rxw2_lam_xy_r = densityGridAB.rzw1rxw2(6 * j + 3);
+                auto rzw1rxw2_lam_xy_r = rzw1rxw2(6 * j + 3);
 
-                auto rzw1rxw2_lam_xz_r = densityGridAB.rzw1rxw2(6 * j + 4);
+                auto rzw1rxw2_lam_xz_r = rzw1rxw2(6 * j + 4);
 
-                auto rzw1rxw2_lam_yz_r = densityGridAB.rzw1rxw2(6 * j + 5);
+                auto rzw1rxw2_lam_yz_r = rzw1rxw2(6 * j + 5);
 
                 // rzw1ryw2 part
 
-                auto rzw1ryw2_sig_x_r = densityGridAB.rzw1ryw2(6 * j);
+                auto rzw1ryw2_sig_x_r = rzw1ryw2(6 * j);
 
-                auto rzw1ryw2_sig_y_r = densityGridAB.rzw1ryw2(6 * j + 1);
+                auto rzw1ryw2_sig_y_r = rzw1ryw2(6 * j + 1);
 
-                auto rzw1ryw2_sig_z_r = densityGridAB.rzw1ryw2(6 * j + 2);
+                auto rzw1ryw2_sig_z_r = rzw1ryw2(6 * j + 2);
 
-                auto rzw1ryw2_lam_xy_r = densityGridAB.rzw1ryw2(6 * j + 3);
+                auto rzw1ryw2_lam_xy_r = rzw1ryw2(6 * j + 3);
 
-                auto rzw1ryw2_lam_xz_r = densityGridAB.rzw1ryw2(6 * j + 4);
+                auto rzw1ryw2_lam_xz_r = rzw1ryw2(6 * j + 4);
 
-                auto rzw1ryw2_lam_yz_r = densityGridAB.rzw1ryw2(6 * j + 5);
+                auto rzw1ryw2_lam_yz_r = rzw1ryw2(6 * j + 5);
 
                 // rzw1rzw2 part
 
-                auto rzw1rzw2_sig_x_r = densityGridAB.rzw1rzw2(6 * j);
+                auto rzw1rzw2_sig_x_r = rzw1rzw2(6 * j);
 
-                auto rzw1rzw2_sig_y_r = densityGridAB.rzw1rzw2(6 * j + 1);
+                auto rzw1rzw2_sig_y_r = rzw1rzw2(6 * j + 1);
 
-                auto rzw1rzw2_sig_z_r = densityGridAB.rzw1rzw2(6 * j + 2);
+                auto rzw1rzw2_sig_z_r = rzw1rzw2(6 * j + 2);
 
-                auto rzw1rzw2_lam_xy_r = densityGridAB.rzw1rzw2(6 * j + 3);
+                auto rzw1rzw2_lam_xy_r = rzw1rzw2(6 * j + 3);
 
-                auto rzw1rzw2_lam_xz_r = densityGridAB.rzw1rzw2(6 * j + 4);
+                auto rzw1rzw2_lam_xz_r = rzw1rzw2(6 * j + 4);
 
-                auto rzw1rzw2_lam_yz_r = densityGridAB.rzw1rzw2(6 * j + 5);
+                auto rzw1rzw2_lam_yz_r = rzw1rzw2(6 * j + 5);
 
                 // First-order densities
 
                 // Rho terms
 
-                auto rhow_kx_r = rwdenptr->alphaDensity(6 * j);
+                auto rhow_kx_r = rwDensityGrid.alphaDensity(6 * j);
 
-                auto rhow_kx_i = rwdenptr->alphaDensity(6 * j + 1);
+                auto rhow_kx_i = rwDensityGrid.alphaDensity(6 * j + 1);
 
-                auto rhow_ky_r = rwdenptr->alphaDensity(6 * j + 2);
+                auto rhow_ky_r = rwDensityGrid.alphaDensity(6 * j + 2);
 
-                auto rhow_ky_i = rwdenptr->alphaDensity(6 * j + 3);
+                auto rhow_ky_i = rwDensityGrid.alphaDensity(6 * j + 3);
 
-                auto rhow_kz_r = rwdenptr->alphaDensity(6 * j + 4);
+                auto rhow_kz_r = rwDensityGrid.alphaDensity(6 * j + 4);
 
-                auto rhow_kz_i = rwdenptr->alphaDensity(6 * j + 5);
+                auto rhow_kz_i = rwDensityGrid.alphaDensity(6 * j + 5);
 
                 // Gradx terms
 
@@ -2101,7 +2091,7 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
         }
         if (fstr::upcase(quadMode) == "QRF")
         {
-            for (int32_t j = 0; j < numdens / 2; j++)
+            for (int32_t j = 0; j < numDens / 2; j++)
             {
                 // Perturbed densities
 
@@ -2139,65 +2129,65 @@ CDensityGridQuad::DensityProd(CDensityGridQuad&   densityGridAB,
 
                 // Perturbed density products to be stored
 
-                auto rhow1rhow2_r = densityGridAB.rhow1rhow2(2 * j);
+                auto rhow1rhow2_r = rhow1rhow2(2 * j);
 
-                auto rhow1rhow2_i = densityGridAB.rhow1rhow2(2 * j + 1);
+                auto rhow1rhow2_i = rhow1rhow2(2 * j + 1);
 
                 // rxw1rhow2
 
-                auto rxw1rhow2_r = densityGridAB.rxw1rhow2(2 * j);
+                auto rxw1rhow2_r = rxw1rhow2(2 * j);
 
-                auto rxw1rhow2_i = densityGridAB.rxw1rhow2(2 * j + 1);
+                auto rxw1rhow2_i = rxw1rhow2(2 * j + 1);
 
                 // ryw1rhow2
 
-                auto ryw1rhow2_r = densityGridAB.ryw1rhow2(2 * j);
+                auto ryw1rhow2_r = ryw1rhow2(2 * j);
 
-                auto ryw1rhow2_i = densityGridAB.ryw1rhow2(2 * j + 1);
+                auto ryw1rhow2_i = ryw1rhow2(2 * j + 1);
 
                 // rzw1rhow2
 
-                auto rzw1rhow2_r = densityGridAB.rzw1rhow2(2 * j);
+                auto rzw1rhow2_r = rzw1rhow2(2 * j);
 
-                auto rzw1rhow2_i = densityGridAB.rzw1rhow2(2 * j + 1);
+                auto rzw1rhow2_i = rzw1rhow2(2 * j + 1);
 
                 // rAw1rBw2
 
-                auto rxw1rxw2_r = densityGridAB.rxw1rxw2(2 * j);
+                auto rxw1rxw2_r = rxw1rxw2(2 * j);
 
-                auto rxw1rxw2_i = densityGridAB.rxw1rxw2(2 * j + 1);
+                auto rxw1rxw2_i = rxw1rxw2(2 * j + 1);
 
-                auto rxw1ryw2_r = densityGridAB.rxw1ryw2(2 * j);
+                auto rxw1ryw2_r = rxw1ryw2(2 * j);
 
-                auto rxw1ryw2_i = densityGridAB.rxw1ryw2(2 * j + 1);
+                auto rxw1ryw2_i = rxw1ryw2(2 * j + 1);
 
-                auto rxw1rzw2_r = densityGridAB.rxw1rzw2(2 * j);
+                auto rxw1rzw2_r = rxw1rzw2(2 * j);
 
-                auto rxw1rzw2_i = densityGridAB.rxw1rzw2(2 * j + 1);
+                auto rxw1rzw2_i = rxw1rzw2(2 * j + 1);
 
-                auto ryw1rxw2_r = densityGridAB.ryw1rxw2(2 * j);
+                auto ryw1rxw2_r = ryw1rxw2(2 * j);
 
-                auto ryw1rxw2_i = densityGridAB.ryw1rxw2(2 * j + 1);
+                auto ryw1rxw2_i = ryw1rxw2(2 * j + 1);
 
-                auto ryw1ryw2_r = densityGridAB.ryw1ryw2(2 * j);
+                auto ryw1ryw2_r = ryw1ryw2(2 * j);
 
-                auto ryw1ryw2_i = densityGridAB.ryw1ryw2(2 * j + 1);
+                auto ryw1ryw2_i = ryw1ryw2(2 * j + 1);
 
-                auto ryw1rzw2_r = densityGridAB.ryw1rzw2(2 * j);
+                auto ryw1rzw2_r = ryw1rzw2(2 * j);
 
-                auto ryw1rzw2_i = densityGridAB.ryw1rzw2(2 * j + 1);
+                auto ryw1rzw2_i = ryw1rzw2(2 * j + 1);
 
-                auto rzw1rxw2_r = densityGridAB.rzw1rxw2(2 * j);
+                auto rzw1rxw2_r = rzw1rxw2(2 * j);
 
-                auto rzw1rxw2_i = densityGridAB.rzw1rxw2(2 * j + 1);
+                auto rzw1rxw2_i = rzw1rxw2(2 * j + 1);
 
-                auto rzw1ryw2_r = densityGridAB.rzw1ryw2(2 * j);
+                auto rzw1ryw2_r = rzw1ryw2(2 * j);
 
-                auto rzw1ryw2_i = densityGridAB.rzw1ryw2(2 * j + 1);
+                auto rzw1ryw2_i = rzw1ryw2(2 * j + 1);
 
-                auto rzw1rzw2_r = densityGridAB.rzw1rzw2(2 * j);
+                auto rzw1rzw2_r = rzw1rzw2(2 * j);
 
-                auto rzw1rzw2_i = densityGridAB.rzw1rzw2(2 * j + 1);
+                auto rzw1rzw2_i = rzw1rzw2(2 * j + 1);
 
                 for (int32_t i = 0; i < npoints; i++)
                 {

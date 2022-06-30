@@ -25,14 +25,11 @@
 
 from mpi4py import MPI
 import numpy as np
-import time as tm
 import sys
 
-from .veloxchemlib import (XCFunctional, XCIntegrator, GridDriver,
-                           XCMolecularGradient ,MolecularGrid)
-from .veloxchemlib import mpi_master, denmat
+from .veloxchemlib import GridDriver, XCMolecularGradient
+from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
-from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .errorhandler import assert_msg_critical
@@ -53,11 +50,11 @@ class GradientDriver:
         - gradient: The gradient.
         - flag: The type of gradient driver.
         - numerical: Perform numerical gradient calculation.
-        - do_four_point: Perform numerical gradient calculation using the five-point stencil method?
+        - do_four_point: Perform numerical gradient calculation using the
+          five-point stencil method?
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.
-
     """
 
     def __init__(self, energy_drv, comm=None, ostream=None):
@@ -90,13 +87,11 @@ class GradientDriver:
         self.flag = None
 
         self.numerical = False
-        # flag for two-point or four-point approximation
         self.do_four_point = False
 
-        # DFT information
         self.dft = False
         self.grid_level = 4
-        self.xcfun = XCFunctional()
+        self.xcfun = None
 
     def update_settings(self, grad_dict, method_dict):
         """
@@ -108,23 +103,19 @@ class GradientDriver:
             The input dicitonary of method settings group.
         """
 
-        # if this is True, numerical must also be True
         if 'do_four_point' in grad_dict:
             key = grad_dict['do_four_point'].lower()
-            self.do_four_point = True if key in ['yes', 'y'] else False
-            # if four-point is desired, numerical is also set to True
+            self.do_four_point = (key in ['yes', 'y'])
             if self.do_four_point:
                 self.numerical = True
 
-        # Numerical gradient?
         if 'numerical' in grad_dict:
             key = grad_dict['numerical'].lower()
-            self.numerical = True if key in ['yes', 'y'] else False
+            self.numerical = (key in ['yes', 'y'])
 
-        # DFT
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
-            self.dft = True if key in ['yes', 'y'] else False
+            self.dft = (key in ['yes', 'y'])
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
@@ -134,21 +125,8 @@ class GradientDriver:
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Gradient driver: Undefined XC functional')
 
-        # step size for finite differences
         if 'delta_h' in grad_dict:
             self.delta_h = float(grad_dict['delta_h'])
-
-        # Numerical derivative of dipole moment
-        if 'dipole_deriv' in grad_dict:
-            key = grad_dict['dipole_deriv'].lower()
-            self.dipole_deriv = True if key in ['yes', 'y'] else False
-            if self.dipole_deriv and not self.numerical:
-                self.ostream.print_blank()
-                warn_msg = '*** Warning: Dipole moment derivatives requested.'
-                self.ostream.print_header(warn_msg.ljust(56))
-                warn_msg = '             Gradient will be calculated numerically.'
-                self.ostream.print_header(warn_msg.ljust(56))
-                self.numerical = True
 
     def compute(self, molecule, *args):
         """
@@ -201,13 +179,14 @@ class GradientDriver:
                     e_plus2 = self.compute_energy(new_mol, *args)
 
                     coords[i, d] -= 2.0 * self.delta_h
-                    self.gradient[i, d] = ( (e_minus2 - 8 * e_minus 
-                                           + 8 * e_plus - e_plus2) 
-                                           / (12.0 * self.delta_h) )
+                    self.gradient[i, d] = (
+                        (e_minus2 - 8 * e_minus + 8 * e_plus - e_plus2) /
+                        (12.0 * self.delta_h))
                 else:
                     coords[i, d] += self.delta_h
-                    self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
-                    
+                    self.gradient[i, d] = ((e_plus - e_minus) /
+                                           (2.0 * self.delta_h))
+
         # restore energy driver
         self.compute_energy(molecule, *args)
 
@@ -226,7 +205,8 @@ class GradientDriver:
 
         return
 
-    def grad_vxc_contrib(self, molecule, ao_basis, rhow_density, gs_density, xcfun_label):
+    def grad_vxc_contrib(self, molecule, ao_basis, rhow_density, gs_density,
+                         xcfun_label):
         """
         Calculates the vxc exchange-correlation contribution to the gradient.
 
@@ -251,17 +231,16 @@ class GradientDriver:
         mol_grid.distribute(self.rank, self.nodes, self.comm)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
-        atom_ids = list(range(molecule.number_of_atoms()))
         vxc_contrib = xc_molgrad_drv.integrate_vxc_gradient(
-            atom_ids, rhow_density, gs_density, molecule, ao_basis, mol_grid,
-            xcfun_label)
+            rhow_density, gs_density, molecule, ao_basis, mol_grid, xcfun_label)
         vxc_contrib = self.comm.reduce(vxc_contrib, root=mpi_master())
 
         return vxc_contrib
 
-    def grad_fxc_contrib(self, molecule, ao_basis, rhow_den_1, rhow_den_2, gs_density, xcfun_label):
+    def grad_vxc2_contrib(self, molecule, ao_basis, rhow_den_1, rhow_den_2,
+                          gs_density, xcfun_label):
         """
-        Calculates the fxc exchange-correlation contribution to the gradient.
+        Calculates the 2nd-order exchange-correlation contribution to the gradient.
 
         :param molecule:
             The molecule.
@@ -277,7 +256,7 @@ class GradientDriver:
             The label of the xc functional.
 
         :return:
-            The fxc exchange-correlation contribution to the gradient.
+            The 2nd-order exchange-correlation contribution to the gradient.
         """
 
         grid_drv = GridDriver(self.comm)
@@ -286,17 +265,18 @@ class GradientDriver:
         mol_grid.distribute(self.rank, self.nodes, self.comm)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
-        atom_ids = list(range(molecule.number_of_atoms()))
-        fxc_contrib = xc_molgrad_drv.integrate_fxc_gradient(
-            atom_ids, rhow_den_1, rhow_den_2, gs_density, molecule,
-            ao_basis, mol_grid, xcfun_label)
-        fxc_contrib = self.comm.reduce(fxc_contrib, root=mpi_master())
+        vxc2_contrib = xc_molgrad_drv.integrate_vxc2_gradient(
+            rhow_den_1, rhow_den_2, gs_density, molecule, ao_basis, mol_grid,
+            xcfun_label)
+        vxc2_contrib = self.comm.reduce(vxc2_contrib, root=mpi_master())
 
-        return fxc_contrib
+        return vxc2_contrib
 
-    def grad_gxc_contrib(self, molecule, ao_basis, rhow_den_1, rhow_den_2, gs_density, xcfun_label):
+    def grad_vxc3_contrib(self, molecule, ao_basis, rhow_den_1, rhow_den_2,
+                          gs_density, xcfun_label):
         """
-        Calculates the gxc exchange-correlation contribution to the gradient.
+        Calculates the 3rd-order exchange-correlation contribution to the
+        gradient.
 
         :param molecule:
             The molecule.
@@ -313,7 +293,7 @@ class GradientDriver:
             The label of the xc functional.
 
         :return:
-            The gxc exchange-correlation contribution to the gradient.
+            The 3rd-order exchange-correlation contribution to the gradient.
         """
 
         grid_drv = GridDriver(self.comm)
@@ -322,13 +302,47 @@ class GradientDriver:
         mol_grid.distribute(self.rank, self.nodes, self.comm)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
-        atom_ids = list(range(molecule.number_of_atoms()))
-        gxc_contrib = 0.25 * xc_molgrad_drv.integrate_gxc_gradient(
-            atom_ids, rhow_den_1, rhow_den_2, gs_density, molecule,
-            ao_basis, mol_grid, xcfun_label)
-        gxc_contrib = self.comm.reduce(gxc_contrib, root=mpi_master())
+        vxc3_contrib = xc_molgrad_drv.integrate_vxc3_gradient(
+            rhow_den_1, rhow_den_2, gs_density, molecule, ao_basis, mol_grid,
+            xcfun_label)
+        vxc3_contrib = self.comm.reduce(vxc3_contrib, root=mpi_master())
 
-        return gxc_contrib
+        return vxc3_contrib
+
+    def grad_tddft_xc_contrib(self, molecule, ao_basis, rhow_den, xmy_den,
+                              gs_density, xcfun_label):
+        """
+        Calculates exchange-correlation contribution to tddft gradient.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param rhow_den:
+            The perturbed density.
+        :param xmy_den:
+            The X-Y density.
+        :param gs_density:
+            The ground state density.
+        :param xcfun_label:
+            The label of the xc functional.
+
+        :return:
+            The exchange-correlation contribution to tddft gradient.
+        """
+
+        grid_drv = GridDriver(self.comm)
+        grid_drv.set_level(self.grid_level)
+        mol_grid = grid_drv.generate(molecule)
+        mol_grid.distribute(self.rank, self.nodes, self.comm)
+
+        xcgrad_drv = XCMolecularGradient(self.comm)
+        tddft_xcgrad = xcgrad_drv.integrate_tddft_gradient(
+            rhow_den, xmy_den, gs_density, molecule, ao_basis, mol_grid,
+            xcfun_label)
+        tddft_xcgrad = self.comm.reduce(tddft_xcgrad, root=mpi_master())
+
+        return tddft_xcgrad
 
     def grad_nuc_contrib(self, molecule):
         """
@@ -358,13 +372,13 @@ class GradientDriver:
         for i in range(natm):
             z_a = nuclear_charges[i]
             r_a = coords[i]
-            for j in range(i+1, natm):
+            for j in range(i + 1, natm):
                 z_b = nuclear_charges[j]
                 r_b = coords[j]
                 r = np.sqrt(np.dot(r_a - r_b, r_a - r_b))
                 f_ij = z_a * z_b * (r_b - r_a) / r**3
                 nuc_contrib[i] += f_ij
-                nuc_contrib[j] -= f_ij #z_a * z_b * (r_a - r_b) / r**3
+                nuc_contrib[j] -= f_ij
 
         return nuc_contrib
 
@@ -396,7 +410,6 @@ class GradientDriver:
             The molecule.
         """
 
-        # atom labels
         labels = molecule.get_labels()
 
         if self.numerical:
@@ -458,11 +471,9 @@ class GradientDriver:
             self.ostream.print_header(cur_str2.ljust(str_width))
             self.ostream.print_header(cur_str3.ljust(str_width))
 
-        # print solver-specific info
-
         if state_deriv_index is not None:
             cur_str = 'Excited State of Interest   : ' + str(state_deriv_index +
-                                                                 1)
+                                                             1)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
