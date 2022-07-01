@@ -6,14 +6,14 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.gradientdriver import GradientDriver
 from veloxchem.tdaexcidriver import TDAExciDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.tdaorbitalresponse import TdaOrbitalResponse
 from veloxchem.rpaorbitalresponse import RpaOrbitalResponse
+from veloxchem.gradientdriver import GradientDriver
 
 
-class TestOrbitalResponse:
+class TestTddftXCgrad:
 
     def run_tddft_xcgrad(self, xcfun_label, tamm_dancoff, ref_xcgrad):
 
@@ -74,41 +74,42 @@ class TestOrbitalResponse:
             rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
             rhow_den_sym = AODensityMatrix([rhow_dm_sym], denmat.rest)
 
-        else:
-            gs_density = AODensityMatrix()
-            rhow_den_sym = AODensityMatrix()
-
-        gs_density.broadcast(grad_drv.rank, grad_drv.comm)
-        rhow_den_sym.broadcast(grad_drv.rank, grad_drv.comm)
-
-        vxc_contrib = grad_drv.grad_vxc_contrib(molecule, basis, rhow_den_sym,
-                                                gs_density, xcfun_label)
-        vxc_contrib_2 = grad_drv.grad_fxc_contrib(molecule, basis, rhow_den_sym,
-                                                  gs_density, gs_density,
-                                                  xcfun_label)
-
-        if is_mpi_master():
             xmy = orbrsp_results['x_minus_y_ao']
             xmy_sym = 0.5 * (xmy + xmy.T)
             xmy_den_sym = AODensityMatrix([xmy_sym], denmat.rest)
+
         else:
+            gs_density = AODensityMatrix()
+            rhow_den_sym = AODensityMatrix()
             xmy_den_sym = AODensityMatrix()
 
+        gs_density.broadcast(grad_drv.rank, grad_drv.comm)
+        rhow_den_sym.broadcast(grad_drv.rank, grad_drv.comm)
         xmy_den_sym.broadcast(grad_drv.rank, grad_drv.comm)
 
-        fxc_contrib = grad_drv.grad_fxc_contrib(molecule, basis, xmy_den_sym,
-                                                xmy_den_sym, gs_density,
-                                                xcfun_label)
-        fxc_contrib_2 = grad_drv.grad_gxc_contrib(molecule, basis, xmy_den_sym,
+        vxc_contrib = grad_drv.grad_vxc_contrib(molecule, basis, rhow_den_sym,
+                                                gs_density, xcfun_label)
+
+        vxc_contrib_2 = grad_drv.grad_vxc2_contrib(molecule, basis,
+                                                   rhow_den_sym, gs_density,
+                                                   gs_density, xcfun_label)
+
+        vxc2_contrib = grad_drv.grad_vxc2_contrib(molecule, basis, xmy_den_sym,
                                                   xmy_den_sym, gs_density,
                                                   xcfun_label)
 
+        vxc2_contrib_2 = grad_drv.grad_vxc3_contrib(molecule, basis,
+                                                    xmy_den_sym, xmy_den_sym,
+                                                    gs_density, xcfun_label)
+
+        xcgrad = grad_drv.grad_tddft_xc_contrib(molecule, basis, rhow_den_sym,
+                                                xmy_den_sym, gs_density,
+                                                xcfun_label)
+
         if is_mpi_master():
-            xcgrad = vxc_contrib
-            xcgrad += vxc_contrib_2
-            xcgrad += fxc_contrib
-            xcgrad += fxc_contrib_2
             assert np.max(np.abs(xcgrad - ref_xcgrad)) < 1.0e-5
+            xcgrad2 = vxc_contrib + vxc_contrib_2 + vxc2_contrib + vxc2_contrib_2
+            assert np.max(np.abs(xcgrad2 - ref_xcgrad)) < 1.0e-5
 
     def test_tda_xcgrad_slater(self):
 

@@ -96,9 +96,9 @@ compHostDistancesPQ(      BufferHostMY<T, 3>&                rDistancesPQ,
 }
 
 /**
-Computes rho = xi * eta / (xi + eta) factor for contracted GTOs batch.
+Computes rho = xi * eta / (xi + eta) factors for contracted GTOs batch.
 
-@param osFactorRho The Obara-Saika factor rho = xi * eta / (xi + eta).
+@param osFactorsRho The Obara-Saika factors rho = xi * eta / (xi + eta).
 @param gtoPairBlock The pointer to GTOs pairs block.
 @param bPosition The start position of contracted GTOs batch.
 @param ePosition The endposition of contracted GTOs batch.
@@ -107,12 +107,12 @@ Computes rho = xi * eta / (xi + eta) factor for contracted GTOs batch.
 */
 template <typename T>
 auto
-compHostFactorRho(      T*                                 osFactorRho,
-                  const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
-                  const int32_t                            bPosition,
-                  const int32_t                            ePosition,
-                  const int32_t                            braPrimGto,
-                  const int32_t                            ketPrimGto) -> void
+compHostFactorsRho(      T*                                 osFactorsRho,
+                   const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
+                   const int32_t                            bPosition,
+                   const int32_t                            ePosition,
+                   const int32_t                            braPrimGto,
+                   const int32_t                            ketPrimGto) -> void
 {
     // set up dimentsions
     
@@ -134,7 +134,7 @@ compHostFactorRho(      T*                                 osFactorRho,
         {
             const auto ioff = (bPosition + i) * nppairs + braPrimGto;
 
-            osFactorRho[i] = fact * fxi[ioff];
+            osFactorsRho[i] = fact * fxi[ioff];
         }
     }
     else
@@ -147,7 +147,7 @@ compHostFactorRho(      T*                                 osFactorRho,
             
             const auto kxi = fxi[ioff + ketPrimGto];
             
-            osFactorRho[i] = bxi * kxi / (bxi + kxi);
+            osFactorsRho[i] = bxi * kxi / (bxi + kxi);
         }
     }
 }
@@ -155,7 +155,7 @@ compHostFactorRho(      T*                                 osFactorRho,
 /**
 Computes normalization factors for contracted GTOs batch.
 
-@param osFactorNorm The Obara-Saika normalization factors.
+@param osFactorsNorm The Obara-Saika normalization factors.
 @param gtoPairBlock The pointer to GTOs pairs block.
 @param bPosition The start position of contracted GTOs batch.
 @param ePosition The endposition of contracted GTOs batch.
@@ -164,12 +164,12 @@ Computes normalization factors for contracted GTOs batch.
 */
 template <typename T>
 auto
-compHostFactorNorm(      T*                                 osFactorNorm,
-                   const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
-                   const int32_t                            bPosition,
-                   const int32_t                            ePosition,
-                   const int32_t                            braPrimGto,
-                   const int32_t                            ketPrimGto) -> void
+compHostFactorsNorm(      T*                                 osFactorsNorm,
+                    const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
+                    const int32_t                            bPosition,
+                    const int32_t                            ePosition,
+                    const int32_t                            braPrimGto,
+                    const int32_t                            ketPrimGto) -> void
 {
     // set up dimentsions
     
@@ -189,7 +189,7 @@ compHostFactorNorm(      T*                                 osFactorNorm,
     {
         const auto ioff = (bPosition + i) * nppairs;
         
-        osFactorNorm[i] = fact * fovl[ioff + braPrimGto] * fovl[ioff + ketPrimGto];
+        osFactorsNorm[i] = fact * fovl[ioff + braPrimGto] * fovl[ioff + ketPrimGto];
     }
 }
 
@@ -228,9 +228,9 @@ compHostBoysArguments(      BufferHostX<T>&     bfArguments,
 }
 
 /**
-Computes zeta = 1.0 / (xi + eta) factor for contracted GTOs batch.
+Computes zeta = 1.0 / (xi + eta) factors for contracted GTOs batch.
 
-@param osFactorZeta The Obara-Saika factor zeta = 1.0 / (xi + eta).
+@param osFactorsZeta The Obara-Saika factors zeta = 1.0 / (xi + eta).
 @param gtoPairBlock The pointer to GTOs pairs block.
 @param bPosition The start position of contracted GTOs batch.
 @param ePosition The endposition of contracted GTOs batch.
@@ -239,7 +239,7 @@ Computes zeta = 1.0 / (xi + eta) factor for contracted GTOs batch.
 */
 template <typename T>
 auto
-compHostFactorZeta(      T*                                 osFactorZeta,
+compHostFactorsZeta(     T*                                 osFactorsZeta,
                    const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
                    const int32_t                            bPosition,
                    const int32_t                            ePosition,
@@ -266,7 +266,7 @@ compHostFactorZeta(      T*                                 osFactorZeta,
         {
             const auto ioff = (bPosition + i) * nppairs + braPrimGto;
             
-            osFactorZeta[i] = fact / fxi[ioff];
+            osFactorsZeta[i] = fact / fxi[ioff];
         }
     }
     else
@@ -277,15 +277,15 @@ compHostFactorZeta(      T*                                 osFactorZeta,
         {
             const auto ioff = (bPosition + i) * nppairs;
             
-            osFactorZeta[i] = fact / (fxi[ioff + braPrimGto] + fxi[ioff + ketPrimGto]);
+            osFactorsZeta[i] = fact / (fxi[ioff + braPrimGto] + fxi[ioff + ketPrimGto]);
         }
     }
 }
 
 /**
-Computes partial zeta = 1.0 / xi factor for contracted GTOs batch.
+Computes partial zeta = 1.0 / xi factors for contracted GTOs batch.
 
-@param osFactorPartZeta The Obara-Saika factor partial zeta = 1.0 / xi.
+@param osFactorsPartZeta The Obara-Saika factors partial zeta = 1.0 / xi.
 @param gtoPairBlock The pointer to GTOs pairs block.
 @param bPosition The start position of contracted GTOs batch.
 @param ePosition The endposition of contracted GTOs batch.
@@ -293,11 +293,11 @@ Computes partial zeta = 1.0 / xi factor for contracted GTOs batch.
 */
 template <typename T>
 auto
-compHostFactorPartialZeta(      T*                                 osFactorPartZeta,
-                          const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
-                          const int32_t                            bPosition,
-                          const int32_t                            ePosition,
-                          const int32_t                            partPrimGto) -> void
+compHostFactorsPartialZeta(      T*                                 osFactorsPartZeta,
+                           const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
+                           const int32_t                            bPosition,
+                           const int32_t                            ePosition,
+                           const int32_t                            partPrimGto) -> void
 {
     // set up dimentsions
     
@@ -317,7 +317,7 @@ compHostFactorPartialZeta(      T*                                 osFactorPartZ
     {
         const auto ioff = (bPosition + i) * nppairs;
         
-        osFactorPartZeta[i] = fact / fxi[ioff + partPrimGto];
+        osFactorsPartZeta[i] = fact / fxi[ioff + partPrimGto];
     }
 }
 
