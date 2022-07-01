@@ -247,9 +247,8 @@ class ScfDriver:
             },
             'method_settings': {
                 'dispersion': ('bool', 'use D4 dispersion correction'),
-                'dft': ('bool', 'use DFT'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
-                'grid_level': ('int', 'accuracy level of DFT grid'),
+                'grid_level': ('int', 'accuracy level of DFT grid (1-6)'),
                 'pe': ('bool', 'use polarizable embedding'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
                 'electric_field': ('seq_fixed', 'static electric field'),
@@ -297,13 +296,6 @@ class ScfDriver:
 
         parse_input(self, method_keywords, method_dict)
 
-        if 'xcfun' in method_dict:
-            if 'dft' not in method_dict:
-                self.dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'SCF driver: Undefined XC functional')
-
         if 'pe_options' not in method_dict:
             method_dict['pe_options'] = {}
 
@@ -344,6 +336,29 @@ class ScfDriver:
             # field
             self.restart = False
 
+    def dft_sanity_check(self):
+        """
+        Checks DFT settings and updates relevant attributes.
+        """
+
+        # check xc functional
+        if self.xcfun is not None:
+            if isinstance(self.xcfun, str):
+                self.xcfun = parse_xc_func(self.xcfun.upper())
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'SCF driver: Undefined XC functional')
+            self.dft = True
+
+        # check grid level
+        if self.dft and (self.grid_level < 1 or self.grid_level > 6):
+            warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
+            warn_msg += ' Using default value. ***'
+            self.ostream.print_blank()
+            self.ostream.print_header(warn_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
+            self.grid_level = 4
+
     def compute(self, molecule, ao_basis, min_basis=None):
         """
         Performs SCF calculation using molecular data.
@@ -366,13 +381,7 @@ class ScfDriver:
             min_basis.broadcast(self.rank, self.comm)
 
         # check dft setup
-        if self.dft:
-            assert_msg_critical(self.xcfun is not None,
-                                'SCF driver: Undefined XC functional')
-            if isinstance(self.xcfun, str):
-                self.xcfun = parse_xc_func(self.xcfun.upper())
-                assert_msg_critical(not self.xcfun.is_undefined(),
-                                    'SCF driver: Undefined XC functional')
+        self.dft_sanity_check()
 
         # initial guess
         if self.restart:
