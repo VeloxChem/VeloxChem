@@ -375,8 +375,8 @@ class PolOrbitalResponse(CphfSolver):
                 zero_dm_ao_list = []
                 for x in range(dof):
                     for y in range(dof): # TODO: only upper triangular matrix and transpose?
-                        perturbed_dm_ao_list.extend([xmy_ao[x], 0*xpy_ao[x], xmy_ao[y], 0*xpy_ao[y]])
-                        zero_dm_ao_list.extend([0*xpy_ao[x], 0*xpy_ao[y]])
+                        perturbed_dm_ao_list.extend([xmy_ao[x], 0*xmy_ao[x], xmy_ao[y], 0*xmy_ao[y]])
+                        zero_dm_ao_list.extend([0*xmy_ao[x], 0*xmy_ao[y]])
 
                 perturbed_dm_ao = AODensityMatrix(perturbed_dm_ao_list, denmat.rest)
 
@@ -444,7 +444,7 @@ class PolOrbitalResponse(CphfSolver):
             # Quadratic response routine for TDDFT E[3] term g^xc
             xc_drv.integrate(fock_gxc_ao, perturbed_dm_ao, zero_dm_ao,
                              gs_density, molecule, basis, molgrid,
-                             self.xcfun.get_func_label(), "quadratic")
+                             self.xcfun.get_func_label(), "qrf")
 
             fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
 

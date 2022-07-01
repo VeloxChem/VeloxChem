@@ -154,7 +154,7 @@ class HessianDriver:
         if freq_dict is None:
             freq_dict = {}
 
-        # check if Hessianis to be calculated numerically
+        # check if Hessian is to be calculated numerically
         if 'numerical' in freq_dict:
             key = freq_dict['numerical'].lower()
             self.numerical = (key in ['yes', 'y'])
@@ -180,22 +180,18 @@ class HessianDriver:
         # Analytical DFT gradient/Hessian is not implemented yet
         if 'xcfun' in method_dict:
             if method_dict['xcfun'] is not None:
-                self.numerical = True
-                self.numerical_grad = True
+                #self.numerical = True
                 self.dft = True
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
             self.dft = True if key in ['yes', 'y'] else False
-            if key in ['yes', 'y']:
-                self.numerical = True
-                self.numerical_grad = True
+            #if key in ['yes', 'y']:
+                #self.numerical = True
 
         if self.dft:
             self.ostream.print_blank()
             warn_msg = '*** Warning: Analytical Hessian is '
-            warn_msg += 'not yet implemented for DFT methods.'
-            self.ostream.print_header(warn_msg.ljust(56))
-            warn_msg = '    Hessian will be calculated numerically instead.'
+            warn_msg += 'not yet fully implemented for DFT methods.'
             self.ostream.print_header(warn_msg.ljust(56))
             self.ostream.flush()
 

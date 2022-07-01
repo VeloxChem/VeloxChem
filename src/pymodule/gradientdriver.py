@@ -152,7 +152,7 @@ class GradientDriver:
 
     def compute(self, molecule, *args):
         """
-        Performs calculation of numerical gradient.
+        Performs calculation of nuclear gradient.
 
         :param molecule:
             The molecule.
@@ -201,13 +201,13 @@ class GradientDriver:
                     e_plus2 = self.compute_energy(new_mol, *args)
 
                     coords[i, d] -= 2.0 * self.delta_h
-                    self.gradient[i, d] = ( (e_minus2 - 8 * e_minus 
-                                           + 8 * e_plus - e_plus2) 
+                    self.gradient[i, d] = ( (e_minus2 - 8 * e_minus
+                                           + 8 * e_plus - e_plus2)
                                            / (12.0 * self.delta_h) )
                 else:
                     coords[i, d] += self.delta_h
                     self.gradient[i, d] = (e_plus - e_minus) / (2.0 * self.delta_h)
-                    
+
         # restore energy driver
         self.compute_energy(molecule, *args)
 
@@ -228,7 +228,7 @@ class GradientDriver:
 
     def grad_vxc_contrib(self, molecule, ao_basis, rhow_density, gs_density, xcfun_label):
         """
-        Calculates the vxc exchange-correlation contribution to the gradient.
+        Calculates the vxc = (d exc / d rho) exchange-correlation contribution to the gradient.
 
         :param molecule:
             The molecule.
@@ -261,7 +261,7 @@ class GradientDriver:
 
     def grad_fxc_contrib(self, molecule, ao_basis, rhow_den_1, rhow_den_2, gs_density, xcfun_label):
         """
-        Calculates the fxc exchange-correlation contribution to the gradient.
+        Calculates the fxc = (d^2 exc / d rho^2) exchange-correlation contribution to the gradient.
 
         :param molecule:
             The molecule.
@@ -296,7 +296,7 @@ class GradientDriver:
 
     def grad_gxc_contrib(self, molecule, ao_basis, rhow_den_1, rhow_den_2, gs_density, xcfun_label):
         """
-        Calculates the gxc exchange-correlation contribution to the gradient.
+        Calculates the gxc = (d^3 exc / d rho^3) exchange-correlation contribution to the gradient.
 
         :param molecule:
             The molecule.

@@ -361,11 +361,12 @@ class ScfHessianDriver(HessianDriver):
 
 
         # Set up a CPHF solver
-        cphf_solver = CphfSolver(self.comm, self.ostream)
+        cphf_solver = CphfSolver(self.comm, self.ostream, self.scf_drv) # TODO: remove scf_drv
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
         # Solve the CPHF equations
-        cphf_solution_dict = cphf_solver.compute(molecule, ao_basis, scf_tensors)
+        cphf_solver.compute(molecule, ao_basis, scf_tensors)
+        cphf_solution_dict = cphf_solver.cphf_results
         cphf_ov = cphf_solution_dict['cphf_ov'].reshape(natm, 3, nocc, nvir)
         ovlp_deriv_oo = cphf_solution_dict['ovlp_deriv_oo']
 

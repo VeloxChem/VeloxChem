@@ -23,8 +23,7 @@ class TdhfGradientDriver(GradientDriver):
     """
     Implements the analytic gradient driver for excited states at the
     Tamm-Dancoff approximation (TDA) and random phase approximation (RPA)
-    level based on a Hartree-Fock ground state.
-    DFT references will be implemented in the future.
+    level based on a Hartree-Fock or Kohn-Sham DFT ground state.
 
     :param comm:
         The MPI communicator.
@@ -147,8 +146,11 @@ class TdhfGradientDriver(GradientDriver):
         # compute gradient
 
         if self.numerical:
+            scf_ostream_state = self.scf_drv.ostream.state
+            self.scf_drv.ostream.state = False
             self.compute_numerical(molecule, basis, rsp_drv, rsp_results,
                                    min_basis)
+            self.scf_drv.ostream.state = scf_ostream_state
         else:
             self.compute_analytical(molecule, basis, rsp_results)
 
