@@ -130,7 +130,7 @@ class GradientDriver:
 
     def compute(self, molecule, *args):
         """
-        Performs calculation of numerical gradient.
+        Performs calculation of nuclear gradient.
 
         :param molecule:
             The molecule.
@@ -208,7 +208,7 @@ class GradientDriver:
     def grad_vxc_contrib(self, molecule, ao_basis, rhow_density, gs_density,
                          xcfun_label):
         """
-        Calculates the vxc exchange-correlation contribution to the gradient.
+        Calculates the vxc = (d exc / d rho) exchange-correlation contribution to the gradient.
 
         :param molecule:
             The molecule.

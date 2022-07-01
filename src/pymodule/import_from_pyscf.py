@@ -1425,7 +1425,7 @@ def import_2e_second_order_integral_derivative(molecule, basis, int_type,
         return vlx_int_deriv
 
 def import_xc_contrib_tddft(molecule, basis, scfdrv, xmy_ao, rel_dm_ao,
-                            tda=False, unit="au"):
+                            tda=False, vxc_deriv_only=False, unit="au"):
     """
     Imports the xc contribution to the TDDFT gradient from pyscf.
 
@@ -1441,6 +1441,8 @@ def import_xc_contrib_tddft(molecule, basis, scfdrv, xmy_ao, rel_dm_ao,
         the relaxed one-particle density matrix in AO basis.
     :param tda:
         flag to use the Tamm-Dancoff approximation or not.
+    :param vxc_deriv_only:
+        Return only the vxc derivative
     """
     # create pyscf objects: molecule, scf_driver, 
     molecule_string = get_molecule_string(molecule)
@@ -1484,6 +1486,10 @@ def import_xc_contrib_tddft(molecule, basis, scfdrv, xmy_ao, rel_dm_ao,
     fxc_xmy, fxc_rel, vxc, gxc = (
             tdrks._contract_xc_kernel(pyscf_tddft_grad, mf.xc, pyscf_xmy,
                                    pyscf_rel_dm, True, True, True, 2000) )
+
+    # return vxc derivatives in pyscf orbital order
+    if vxc_deriv_only:
+        return vxc
 
     # contract to get the final xc gradient contributions
     natm = molecule.number_of_atoms()
@@ -1959,7 +1965,7 @@ def hcore_deriv(molecule, basis, i=0, unit="au"):
     return vlx_hcore_deriv_atom_i
 
 
-def fock_deriv(molecule, basis, density, i=0, unit="au"):
+def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
     """
     Imports the derivatives of the Fock matrix
     from pyscf and converts it to veloxchem format
@@ -1976,6 +1982,8 @@ def fock_deriv(molecule, basis, density, i=0, unit="au"):
     :param unit:
         the units to be used for the molecular geometry;
         possible values: "au" (default), "Angstrom"
+    :param scfdrv:
+        The SCF driver (needed for xc derivatives in DFT)
 
     :return:
         a numpy array of shape 3 x nao x nao
@@ -2021,10 +2029,31 @@ def fock_deriv(molecule, basis, density, i=0, unit="au"):
                          + eri_deriv_atom_i.transpose(0,3,4,1,2)
                          + eri_deriv_atom_i.transpose(0,4,3,2,1) )
 
-    fock_deriv_atom_i = (  hcore_generator(i)
-                         + 2 * np.einsum('xmntf,tf->xmn',
+    fock_deriv_atom_i = hcore_generator(i)
+
+    # fraction of exact exchange
+    x_frac = 1.0
+
+    if scfdrv is not None:
+        if scfdrv.dft:
+            # import vxc derivative for partial derivative of Kohn-Sham matrix
+            vxc_deriv = import_xc_contrib_tddft(molecule, basis, scfdrv, density, density,
+                                                vxc_deriv_only=True)
+            vxc_deriv_atom_i = np.zeros((3, nao, nao))
+            vxc_deriv_atom_i[:, ki:kf] = vxc_deriv[1:, ki:kf] # 0 would not be derivative
+            vxc_deriv_atom_i += vxc_deriv_atom_i.transpose(0, 2, 1)
+            fock_deriv_atom_i += vxc_deriv_atom_i
+
+            # check fraction of exact exchange
+            if scfdrv.xcfun.is_hybrid():
+                x_frac = scfdrv.xcfun.get_frac_exact_exchange()
+            else:
+                x_frac = 0.0
+            
+
+    fock_deriv_atom_i += ( 2 * np.einsum('xmntf,tf->xmn',
                                           eri_deriv_atom_i, gs_dm)
-                         - np.einsum('xmtnf,tf->xmn',
+                         - x_frac * np.einsum('xmtnf,tf->xmn',
                                       eri_deriv_atom_i, gs_dm)
                         )
 

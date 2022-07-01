@@ -1,4 +1,4 @@
-#
+
 #                           VELOXCHEM 1.0-RC2
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
@@ -65,13 +65,14 @@ class CphfSolver(LinearSolver):
     Instance variables
         - use_subspace_solver: flag to use subspace solver
           instead of conjugate gradient.
-    ##    - a_operator: The A operator.
-    ##    - frequencies: The frequencies.
     """
 
-    def __init__(self, comm=None, ostream=None):
+    def __init__(self, comm=None, ostream=None, scfdrv=None):
         """
         Initializes CPHF solver to default setup.
+
+        TODO: scfdrv should be removed as an argument
+              once vxc derivative elements are working in vlx.
         """
 
         if comm is None:
@@ -79,6 +80,9 @@ class CphfSolver(LinearSolver):
 
         if ostream is None:
             ostream = OutputStream(sys.stdout)
+
+        # TODO: to be removed again
+        self.scfdrv = scfdrv
 
         super().__init__(comm, ostream)
 
@@ -116,16 +120,6 @@ class CphfSolver(LinearSolver):
             'memory_profiling': self.memory_profiling,
             'memory_tracing': self.memory_tracing,
         })
-
-##        rsp_keywords = {
-##            'a_operator': 'str_lower',
-##            'a_components': 'str_lower',
-##            'b_operator': 'str_lower',
-##            'b_components': 'str_lower',
-##            'frequencies': 'seq_range',
-##        }
-##
-##        parse_input(self, rsp_keywords, rsp_dict)
 
 
     def compute(self, molecule, basis, scf_tensors, *args):
@@ -919,7 +913,7 @@ class CphfSolver(LinearSolver):
             self.profiler.start_timer('derivs')
             for i in range(natm):
                 ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
-                fock_deriv_ao[i] = fock_deriv(molecule, basis, density, i)
+                fock_deriv_ao[i] = fock_deriv(molecule, basis, density, i, self.scfdrv)
             self.profiler.stop_timer('derivs')
 
             # transform integral derivatives to MO basis
