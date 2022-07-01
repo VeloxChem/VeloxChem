@@ -343,7 +343,7 @@ def main():
             scf_drv.update_settings(scf_dict, method_dict)
             scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-            mol_orbs = scf_drv.mol_orbs
+            mol_orbs = scf_drv.molecular_orbitals
             density = scf_drv.density
             scf_tensors = scf_drv.scf_tensors
 

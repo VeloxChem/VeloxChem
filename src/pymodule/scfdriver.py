@@ -171,7 +171,7 @@ class ScfDriver:
         self.density = AODensityMatrix()
 
         # molecular orbitals
-        self.mol_orbs = MolecularOrbitals()
+        self.molecular_orbitals = MolecularOrbitals()
 
         # nuclear repulsion energy
         self.nuc_energy = 0.0
@@ -296,6 +296,8 @@ class ScfDriver:
 
         parse_input(self, method_keywords, method_dict)
 
+        self._dft_sanity_check()
+
         if 'pe_options' not in method_dict:
             method_dict['pe_options'] = {}
 
@@ -336,7 +338,7 @@ class ScfDriver:
             # field
             self.restart = False
 
-    def dft_sanity_check(self):
+    def _dft_sanity_check(self):
         """
         Checks DFT settings and updates relevant attributes.
         """
@@ -381,7 +383,7 @@ class ScfDriver:
             min_basis.broadcast(self.rank, self.comm)
 
         # check dft setup
-        self.dft_sanity_check()
+        self._dft_sanity_check()
 
         # initial guess
         if self.restart:
@@ -395,7 +397,7 @@ class ScfDriver:
             if self.rank == mpi_master():
                 self.ref_mol_orbs = MolecularOrbitals.read_hdf5(
                     self.checkpoint_file)
-                self.mol_orbs = MolecularOrbitals(self.ref_mol_orbs)
+                self.molecular_orbitals = MolecularOrbitals(self.ref_mol_orbs)
         else:
             self.den_guess = DensityGuess("SAD")
 
@@ -501,10 +503,11 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self.print_scf_energy()
-            s2 = self.compute_s2(molecule, self.scf_tensors['S'], self.mol_orbs)
+            s2 = self.compute_s2(molecule, self.scf_tensors['S'],
+                                 self.molecular_orbitals)
             self.print_ground_state(molecule, s2)
-            self.mol_orbs.print_orbitals(molecule, ao_basis, False,
-                                         self.ostream)
+            self.molecular_orbitals.print_orbitals(molecule, ao_basis, False,
+                                                   self.ostream)
             self.ostream.flush()
 
     def set_start_orbitals(self, molecule, basis, array):
@@ -541,8 +544,10 @@ class ScfDriver:
                 assert_msg_critical(n_ao == C_alpha.shape[0], err_ao)
                 E_alpha = np.zeros(C_alpha.shape[1])
                 occ_alpha = molecule.get_aufbau_occupation(n_ao, 'restricted')
-                self.mol_orbs = MolecularOrbitals([C_alpha], [E_alpha],
-                                                  [occ_alpha], molorb.rest)
+                self.molecular_orbitals = MolecularOrbitals([C_alpha],
+                                                            [E_alpha],
+                                                            [occ_alpha],
+                                                            molorb.rest)
             else:
                 assert_msg_critical(
                     isinstance(C_alpha, np.ndarray) and
@@ -556,12 +561,11 @@ class ScfDriver:
                 occ_alpha, occ_beta = molecule.get_aufbau_occupation(
                     n_ao, 'unrestricted')
 
-                self.mol_orbs = MolecularOrbitals([C_alpha, C_beta],
-                                                  [E_alpha, E_beta],
-                                                  [occ_alpha, occ_beta],
-                                                  molorb.unrest)
+                self.molecular_orbitals = MolecularOrbitals(
+                    [C_alpha, C_beta], [E_alpha, E_beta], [occ_alpha, occ_beta],
+                    molorb.unrest)
         else:
-            self.mol_orbs = MolecularOrbitals()
+            self.molecular_orbitals = MolecularOrbitals()
 
         # write checkpoint file and sychronize MPI processes
 
@@ -583,8 +587,8 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             if self.checkpoint_file and isinstance(self.checkpoint_file, str):
-                self.mol_orbs.write_hdf5(self.checkpoint_file, nuclear_charges,
-                                         basis_set)
+                self.molecular_orbitals.write_hdf5(self.checkpoint_file,
+                                                   nuclear_charges, basis_set)
                 self.ostream.print_blank()
                 checkpoint_text = "Checkpoint written to file: "
                 checkpoint_text += self.checkpoint_file
@@ -796,8 +800,8 @@ class ScfDriver:
 
             eff_fock_mat = self.get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
-            self.mol_orbs = self.gen_molecular_orbitals(molecule, eff_fock_mat,
-                                                        oao_mat)
+            self.molecular_orbitals = self.gen_molecular_orbitals(
+                molecule, eff_fock_mat, oao_mat)
 
             self.update_mol_orbs_phase()
 
@@ -824,11 +828,11 @@ class ScfDriver:
         if self.rank == mpi_master() and not self.first_step:
             S = ovl_mat.to_numpy()
 
-            C_alpha = self.mol_orbs.alpha_to_numpy()
-            C_beta = self.mol_orbs.beta_to_numpy()
+            C_alpha = self.molecular_orbitals.alpha_to_numpy()
+            C_beta = self.molecular_orbitals.beta_to_numpy()
 
-            E_alpha = self.mol_orbs.ea_to_numpy()
-            E_beta = self.mol_orbs.eb_to_numpy()
+            E_alpha = self.molecular_orbitals.ea_to_numpy()
+            E_beta = self.molecular_orbitals.eb_to_numpy()
 
             D_alpha = self.density.alpha_to_numpy(0)
             D_beta = self.density.beta_to_numpy(0)
@@ -837,10 +841,6 @@ class ScfDriver:
             F_beta = fock_mat.beta_to_numpy(0)
 
             self.scf_tensors = {
-                'C': C_alpha,
-                'E': E_alpha,
-                'D': (D_alpha, D_beta),
-                'F': (F_alpha, F_beta),
                 'S': S,
                 'C_alpha': C_alpha,
                 'C_beta': C_beta,
@@ -850,6 +850,11 @@ class ScfDriver:
                 'D_beta': D_beta,
                 'F_alpha': F_alpha,
                 'F_beta': F_beta,
+                # for backward compatibility
+                'C': C_alpha,
+                'E': E_alpha,
+                'D': (D_alpha, D_beta),
+                'F': (F_alpha, F_beta),
             }
 
             if self.is_converged:
@@ -857,6 +862,9 @@ class ScfDriver:
 
         else:
             self.scf_tensors = None
+
+        # for backward compatibility
+        self.mol_orbs = self.molecular_orbitals
 
         if self.rank == mpi_master():
             self.print_scf_finish(diis_start_time)
@@ -1057,7 +1065,8 @@ class ScfDriver:
 
             if self.rank == mpi_master():
                 return self.den_guess.prcmo_density(molecule, ao_basis,
-                                                    min_basis, self.mol_orbs,
+                                                    min_basis,
+                                                    self.molecular_orbitals,
                                                     self.scf_type)
             else:
                 return AODensityMatrix()
@@ -1510,30 +1519,32 @@ class ScfDriver:
                 return
 
             ref_mo = self.ref_mol_orbs.alpha_to_numpy()
-            mo = self.mol_orbs.alpha_to_numpy()
-            ea = self.mol_orbs.ea_to_numpy()
-            occa = self.mol_orbs.occa_to_numpy()
+            mo = self.molecular_orbitals.alpha_to_numpy()
+            ea = self.molecular_orbitals.ea_to_numpy()
+            occa = self.molecular_orbitals.occa_to_numpy()
 
             for col in range(mo.shape[1]):
                 if np.dot(mo[:, col], ref_mo[:, col]) < 0.0:
                     mo[:, col] *= -1.0
 
-            if self.mol_orbs.get_orbitals_type() == molorb.rest:
-                self.mol_orbs = MolecularOrbitals([mo], [ea], [occa],
-                                                  molorb.rest)
+            if self.molecular_orbitals.get_orbitals_type() == molorb.rest:
+                self.molecular_orbitals = MolecularOrbitals([mo], [ea], [occa],
+                                                            molorb.rest)
 
-            elif self.mol_orbs.get_orbitals_type() == molorb.unrest:
+            elif self.molecular_orbitals.get_orbitals_type() == molorb.unrest:
                 ref_mo_b = self.ref_mol_orbs.beta_to_numpy()
-                mo_b = self.mol_orbs.beta_to_numpy()
-                eb = self.mol_orbs.eb_to_numpy()
-                occb = self.mol_orbs.occb_to_numpy()
+                mo_b = self.molecular_orbitals.beta_to_numpy()
+                eb = self.molecular_orbitals.eb_to_numpy()
+                occb = self.molecular_orbitals.occb_to_numpy()
 
                 for col in range(mo_b.shape[1]):
                     if np.dot(mo_b[:, col], ref_mo_b[:, col]) < 0.0:
                         mo_b[:, col] *= -1.0
 
-                self.mol_orbs = MolecularOrbitals([mo, mo_b], [ea, eb],
-                                                  [occa, occb], molorb.unrest)
+                self.molecular_orbitals = MolecularOrbitals([mo, mo_b],
+                                                            [ea, eb],
+                                                            [occa, occb],
+                                                            molorb.unrest)
 
     def gen_new_density(self, molecule, scf_type):
         """
@@ -1550,7 +1561,7 @@ class ScfDriver:
         """
 
         if self.rank == mpi_master():
-            return self.mol_orbs.get_density(molecule, scf_type)
+            return self.molecular_orbitals.get_density(molecule, scf_type)
 
         return AODensityMatrix()
 
