@@ -257,43 +257,29 @@ class TdhfGradientDriver(GradientDriver):
             if self.rank == mpi_master():
                 gs_dm = self.scf_drv.scf_tensors['D_alpha']
                 gs_density = AODensityMatrix([gs_dm], denmat.rest)
-            else:
-                gs_density = AODensityMatrix()
-            gs_density.broadcast(self.rank, self.comm)
 
-            if self.rank == mpi_master():
                 rhow_dm = 0.5 * orbrsp_results['relaxed_density_ao']
                 rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
                 rhow_den_sym = AODensityMatrix([rhow_dm_sym], denmat.rest)
-            else:
-                rhow_den_sym = AODensityMatrix()
-            rhow_den_sym.broadcast(self.rank, self.comm)
 
-            vxc_contrib = self.grad_vxc_contrib(molecule, basis, rhow_den_sym,
-                                                gs_density, xcfun_label)
-            vxc_contrib_2 = self.grad_fxc_contrib(molecule, basis, rhow_den_sym,
-                                                  gs_density, gs_density,
-                                                  xcfun_label)
-
-            if self.rank == mpi_master():
                 xmy_sym = 0.5 * (xmy + xmy.T)
                 xmy_den_sym = AODensityMatrix([xmy_sym], denmat.rest)
+
             else:
+                gs_density = AODensityMatrix()
+                rhow_den_sym = AODensityMatrix()
                 xmy_den_sym = AODensityMatrix()
+
+            gs_density.broadcast(self.rank, self.comm)
+            rhow_den_sym.broadcast(self.rank, self.comm)
             xmy_den_sym.broadcast(self.rank, self.comm)
 
-            fxc_contrib = self.grad_fxc_contrib(molecule, basis, xmy_den_sym,
-                                                xmy_den_sym, gs_density,
-                                                xcfun_label)
-            fxc_contrib_2 = self.grad_gxc_contrib(molecule, basis, xmy_den_sym,
-                                                  xmy_den_sym, gs_density,
-                                                  xcfun_label)
+            tddft_xcgrad = self.grad_tddft_xc_contrib(molecule, basis,
+                                                      rhow_den_sym, xmy_den_sym,
+                                                      gs_density, xcfun_label)
 
             if self.rank == mpi_master():
-                self.gradient += vxc_contrib
-                self.gradient += vxc_contrib_2
-                self.gradient += fxc_contrib
-                self.gradient += fxc_contrib_2
+                self.gradient += tddft_xcgrad
 
         # Calculate the relaxed and unrelaxed excited-state dipole moment
         if self.do_first_order_prop:
