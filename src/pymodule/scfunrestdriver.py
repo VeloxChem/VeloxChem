@@ -67,7 +67,7 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         self._scf_type = 'unrestricted'
 
-    def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
+    def _comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """
         Computes spin unrestricted open shell electronic gradient using
         Fock/Kohn-Sham matrix. Overloaded base class method.
@@ -112,7 +112,7 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         return e_grad, max_grad
 
-    def comp_density_change(self, den_mat, old_den_mat):
+    def _comp_density_change(self, den_mat, old_den_mat):
         """
         Computes norm of spin unrestricted open shell density change between
         two density matrices. Overloaded base class method.
@@ -142,7 +142,7 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         return diff_den
 
-    def store_diis_data(self, i, fock_mat, den_mat):
+    def _store_diis_data(self, i, fock_mat, den_mat):
         """
         Stores spin unrestricted open shell Fock/Kohn-Sham and density matrices
         for current iteration. Overloaded base class method.
@@ -173,7 +173,7 @@ class ScfUnrestrictedDriver(ScfDriver):
                 self._fock_matrices_beta.append(fock_mat.beta_to_numpy(0))
                 self._den_matrices_beta.append(den_mat.beta_to_numpy(0))
 
-    def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
+    def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
         Computes effective spin unrestricted open shell Fock/Kohn-Sham matrix
         in OAO basis by applying Lowdin or canonical orthogonalization to AO
@@ -208,13 +208,13 @@ class ScfUnrestrictedDriver(ScfDriver):
 
                 weights = acc_diis.compute_weights()
 
-                return self.get_scaled_fock(weights)
+                return self._get_scaled_fock(weights)
 
             return fock_mat.alpha_to_numpy(0), fock_mat.beta_to_numpy(0)
 
         return None, None
 
-    def get_scaled_fock(self, weights):
+    def _get_scaled_fock(self, weights):
         """
         Computes effective spin unrestricted open shell Fock/Kohn-Sham matrix
         by summing Fock/Kohn-Sham matrices scalwd with weigths.
@@ -237,7 +237,7 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         return effmat_a, effmat_b
 
-    def gen_molecular_orbitals(self, molecule, fock_mat, oao_mat):
+    def _gen_molecular_orbitals(self, molecule, fock_mat, oao_mat):
         """
         Generates spin unrestricted molecular orbital by diagonalizing
         spin unrestricted open shell Fock/Kohn-Sham matrix. Overloaded base
@@ -267,8 +267,8 @@ class ScfUnrestrictedDriver(ScfDriver):
             orb_coefs_a = np.matmul(tmat, evecs_a)
             orb_coefs_b = np.matmul(tmat, evecs_b)
 
-            orb_coefs_a, eigs_a = self.delete_mos(orb_coefs_a, eigs_a)
-            orb_coefs_b, eigs_b = self.delete_mos(orb_coefs_b, eigs_b)
+            orb_coefs_a, eigs_a = self._delete_mos(orb_coefs_a, eigs_a)
+            orb_coefs_b, eigs_b = self._delete_mos(orb_coefs_b, eigs_b)
 
             occa, occb = molecule.get_aufbau_occupation(eigs_a.size,
                                                         'unrestricted')
@@ -295,7 +295,7 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         return "Spin-Unrestricted Hartree-Fock" + pe_type
 
-    def update_fock_type(self, fock_mat):
+    def _update_fock_type(self, fock_mat):
         """
         Updates Fock matrix to fit selected functional in Kohn-Sham
         calculations.

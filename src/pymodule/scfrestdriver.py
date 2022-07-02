@@ -67,7 +67,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         self._scf_type = 'restricted'
 
-    def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
+    def _comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """
         Computes spin restricted closed shell electronic gradient using
         Fock/Kohn-Sham matrix. Overloaded base class method.
@@ -106,7 +106,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         return e_grad, max_grad
 
-    def comp_density_change(self, den_mat, old_den_mat):
+    def _comp_density_change(self, den_mat, old_den_mat):
         """
         Computes norm of spin restricted closed shell density change between
         two density matrices. Overloaded base class method.
@@ -132,7 +132,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         return diff_den
 
-    def store_diis_data(self, i, fock_mat, den_mat):
+    def _store_diis_data(self, i, fock_mat, den_mat):
         """
         Stores spin restricted closed shell Fock/Kohn-Sham and density matrices
         for current iteration. Overloaded base class method.
@@ -157,7 +157,7 @@ class ScfRestrictedDriver(ScfDriver):
                 self._fock_matrices.append(fock_mat.alpha_to_numpy(0))
                 self._den_matrices.append(den_mat.alpha_to_numpy(0))
 
-    def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
+    def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
         Computes effective spin restricted closed shell Fock/Kohn-Sham matrix
         in OAO basis by applying Lowdin or canonical orthogonalization to AO
@@ -186,13 +186,13 @@ class ScfRestrictedDriver(ScfDriver):
                                                oao_mat)
                 weights = acc_diis.compute_weights()
 
-                return self.get_scaled_fock(weights)
+                return self._get_scaled_fock(weights)
 
             return fock_mat.alpha_to_numpy(0)
 
         return None
 
-    def get_scaled_fock(self, weights):
+    def _get_scaled_fock(self, weights):
         """
         Computes effective spin restricted closed shell Fock/Kohn-Sham matrix
         by summing Fock/Kohn-Sham matrices scalwd with weigths.
@@ -211,7 +211,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         return effmat
 
-    def gen_molecular_orbitals(self, molecule, fock_mat, oao_mat):
+    def _gen_molecular_orbitals(self, molecule, fock_mat, oao_mat):
         """
         Generates spin restricted molecular orbital by diagonalizing
         spin restricted closed shell Fock/Kohn-Sham matrix. Overloaded base
@@ -234,7 +234,7 @@ class ScfRestrictedDriver(ScfDriver):
 
             eigs, evecs = np.linalg.eigh(fmo)
             orb_coefs = np.matmul(tmat, evecs)
-            orb_coefs, eigs = self.delete_mos(orb_coefs, eigs)
+            orb_coefs, eigs = self._delete_mos(orb_coefs, eigs)
 
             occa = molecule.get_aufbau_occupation(eigs.size, 'restricted')
 
@@ -258,7 +258,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         return "Spin-Restricted Hartree-Fock" + pe_type
 
-    def update_fock_type(self, fock_mat):
+    def _update_fock_type(self, fock_mat):
         """
         Updates Fock matrix to fit selected functional in Kohn-Sham
         calculations.

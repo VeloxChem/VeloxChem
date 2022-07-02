@@ -194,7 +194,7 @@ class TestScfRestricted:
         screening = eri_drv.compute(get_qq_scheme('QQ_DEN'), 1.0e-12, mol, bas)
 
         solver = ScfDriver(task.mpi_comm, task.ostream)
-        solver.comp_2e_fock_split_comm(fock, dens, mol, bas, screening)
+        solver._comp_2e_fock_split_comm(fock, dens, mol, bas, screening)
 
         assert fock.alpha_to_numpy(0).shape == dmat.shape
 
