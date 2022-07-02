@@ -151,7 +151,7 @@ class PolEmbed:
                 self.options[key] = int(pe_dict[key])
             elif keytypes[key] == 'bool':
                 boolstr = pe_dict[key].lower()
-                self.options[key] = True if boolstr in ['yes', 'y'] else False
+                self.options[key] = (boolstr in ['yes', 'y'])
 
     def print_callback(self, output):
         """

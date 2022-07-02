@@ -65,7 +65,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         super().__init__(comm, ostream)
 
-        self.scf_type = 'restricted'
+        self._scf_type = 'restricted'
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """
@@ -147,15 +147,15 @@ class ScfRestrictedDriver(ScfDriver):
 
         if self.rank == mpi_master():
 
-            if not self.skip_iter:
+            if not self._skip_iter:
 
-                if len(self.fock_matrices) == self.max_err_vecs:
+                if len(self._fock_matrices) == self.max_err_vecs:
 
-                    self.fock_matrices.popleft()
-                    self.den_matrices.popleft()
+                    self._fock_matrices.popleft()
+                    self._den_matrices.popleft()
 
-                self.fock_matrices.append(fock_mat.alpha_to_numpy(0))
-                self.den_matrices.append(den_mat.alpha_to_numpy(0))
+                self._fock_matrices.append(fock_mat.alpha_to_numpy(0))
+                self._den_matrices.append(den_mat.alpha_to_numpy(0))
 
     def get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
@@ -176,13 +176,13 @@ class ScfRestrictedDriver(ScfDriver):
 
         if self.rank == mpi_master():
 
-            if len(self.fock_matrices) == 1:
-                return np.copy(self.fock_matrices[0])
+            if len(self._fock_matrices) == 1:
+                return np.copy(self._fock_matrices[0])
 
-            if len(self.fock_matrices) > 1:
+            if len(self._fock_matrices) > 1:
                 acc_diis = CTwoDiis()
-                acc_diis.compute_error_vectors(self.fock_matrices,
-                                               self.den_matrices, ovl_mat,
+                acc_diis.compute_error_vectors(self._fock_matrices,
+                                               self._den_matrices, ovl_mat,
                                                oao_mat)
                 weights = acc_diis.compute_weights()
 
@@ -204,9 +204,9 @@ class ScfRestrictedDriver(ScfDriver):
             The scaled Fock/Kohn-Sham matrix.
         """
 
-        effmat = np.zeros(self.fock_matrices[0].shape, dtype=float)
+        effmat = np.zeros(self._fock_matrices[0].shape, dtype=float)
 
-        for w, fmat in zip(weights, self.fock_matrices):
+        for w, fmat in zip(weights, self._fock_matrices):
             effmat = effmat + w * fmat
 
         return effmat
@@ -251,9 +251,9 @@ class ScfRestrictedDriver(ScfDriver):
             The string for spin restricted closed shell SCF calculation.
         """
 
-        pe_type = " with PE" if self.pe else ""
+        pe_type = " with PE" if self._pe else ""
 
-        if self.dft:
+        if self._dft:
             return "Spin-Restricted Kohn-Sham" + pe_type
 
         return "Spin-Restricted Hartree-Fock" + pe_type

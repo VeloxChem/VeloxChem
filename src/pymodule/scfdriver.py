@@ -138,7 +138,7 @@ class ScfDriver:
         self.acc_type = "L2_DIIS"
         self.max_err_vecs = 10
         self.max_iter = 50
-        self.first_step = False
+        self._first_step = False
 
         # screening scheme
         self.qq_type = "QQ_DEN"
@@ -152,29 +152,26 @@ class ScfDriver:
         self.eri_thresh_tight = 1.0e-15
 
         # iterations data
-        self.iter_data = []
+        self._iter_data = []
         self.is_converged = False
-        self.skip_iter = False
-        self.old_energy = 0.0
-        self.num_iter = 0
+        self._skip_iter = False
+        self._old_energy = 0.0
+        self._num_iter = 0
 
-        # DIIS data lists
-        self.fock_matrices = deque()
-        self.den_matrices = deque()
+        # DIIS data
+        self._fock_matrices = deque()
+        self._fock_matrices_beta = deque()
+        self._fock_matrices_proj = deque()
 
-        self.fock_matrices_beta = deque()
-        self.den_matrices_beta = deque()
+        self._den_matrices = deque()
+        self._den_matrices_beta = deque()
 
-        self.fock_matrices_proj = deque()
-
-        # density matrix
+        # density matrix and molecular orbitals
         self.density = AODensityMatrix()
-
-        # molecular orbitals
         self.molecular_orbitals = MolecularOrbitals()
 
         # nuclear repulsion energy
-        self.nuc_energy = 0.0
+        self._nuc_energy = 0.0
 
         # mpi information
         self.comm = comm
@@ -187,35 +184,36 @@ class ScfDriver:
         # restart information
         self.restart = True
         self.checkpoint_file = None
-        self.ref_mol_orbs = None
+        self._ref_mol_orbs = None
 
         # closed shell?
-        self.scf_type = 'restricted'
+        self._scf_type = 'restricted'
 
         # D4 dispersion correction
         self.dispersion = False
-        self.d4_energy = 0.0
+        self._d4_energy = 0.0
 
         # dft
-        self.dft = False
-        self.grid_level = 4
         self.xcfun = None
-        self.molgrid = None
+        self.grid_level = 4
+        self._dft = False
+        self._mol_grid = None
 
         # polarizable embedding
-        self.pe = False
-        self.V_es = None
+        self.potfile = None
         self.pe_options = {}
-        self.pe_summary = ''
+        self._pe = False
+        self._V_es = None
+        self._pe_summary = ''
 
         # split communicators
         self.use_split_comm = False
-        self.split_comm_ratio = None
+        self._split_comm_ratio = None
 
         # static electric field
         self.electric_field = None
-        self.ef_nuc_energy = 0.0
-        self.dipole_origin = None
+        self._ef_nuc_energy = 0.0
+        self._dipole_origin = None
 
         # timing and profiling
         self.timing = False
@@ -224,13 +222,13 @@ class ScfDriver:
         self.memory_tracing = False
 
         # program end time for graceful exit
-        self.program_end_time = None
+        self._program_end_time = None
 
         # filename
-        self.filename = f'veloxchem_scf_{get_datetime_string()}'
+        self._filename = f'veloxchem_scf_{get_datetime_string()}'
 
         # input keywords
-        self.input_keywords = {
+        self._input_keywords = {
             'scf': {
                 'acc_type':
                     ('str_upper', 'type of SCF convergence accelerator'),
@@ -249,7 +247,6 @@ class ScfDriver:
                 'dispersion': ('bool', 'use D4 dispersion correction'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-6)'),
-                'pe': ('bool', 'use polarizable embedding'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
                 'electric_field': ('seq_fixed', 'static electric field'),
                 'use_split_comm': ('bool', 'use split communicators'),
@@ -261,7 +258,7 @@ class ScfDriver:
         Prints input keywords in SCF driver.
         """
 
-        print_keywords(self.input_keywords, self.ostream)
+        print_keywords(self._input_keywords, self.ostream)
 
     def update_settings(self, scf_dict, method_dict=None):
         """
@@ -277,60 +274,35 @@ class ScfDriver:
             method_dict = {}
 
         scf_keywords = {
-            key: val[0] for key, val in self.input_keywords['scf'].items()
+            key: val[0] for key, val in self._input_keywords['scf'].items()
         }
 
         parse_input(self, scf_keywords, scf_dict)
 
         if 'program_end_time' in scf_dict:
-            self.program_end_time = scf_dict['program_end_time']
+            self._program_end_time = scf_dict['program_end_time']
         if 'filename' in scf_dict:
-            self.filename = scf_dict['filename']
+            self._filename = scf_dict['filename']
             if 'checkpoint_file' not in scf_dict:
-                self.checkpoint_file = f'{self.filename}.scf.h5'
+                self.checkpoint_file = f'{self._filename}.scf.h5'
 
         method_keywords = {
             key: val[0]
-            for key, val in self.input_keywords['method_settings'].items()
+            for key, val in self._input_keywords['method_settings'].items()
         }
 
         parse_input(self, method_keywords, method_dict)
 
         self._dft_sanity_check()
 
-        if 'pe_options' not in method_dict:
-            method_dict['pe_options'] = {}
-
-        if ('potfile' in method_dict) or method_dict['pe_options']:
-            if 'pe' not in method_dict:
-                self.pe = True
-
-        if self.pe:
-            from .polembed import PolEmbed
-
-            if ('potfile' in method_dict and
-                    'potfile' not in method_dict['pe_options']):
-                method_dict['pe_options']['potfile'] = method_dict['potfile']
-            assert_msg_critical('potfile' in method_dict['pe_options'],
-                                'SCF driver: No potential file defined')
-            self.pe_options = dict(method_dict['pe_options'])
-
-            cppe_potfile = None
-            if self.rank == mpi_master():
-                potfile = self.pe_options['potfile']
-                if not Path(potfile).is_file():
-                    potfile = str(
-                        Path(self.filename).parent / Path(potfile).name)
-                cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
-            cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
-            self.pe_options['potfile'] = cppe_potfile
+        self._pe_sanity_check(method_dict)
 
         if self.electric_field is not None:
             assert_msg_critical(
                 len(self.electric_field) == 3,
                 'SCF driver: Expecting 3 values in \'electric field\' input')
             assert_msg_critical(
-                not self.pe,
+                not self._pe,
                 'SCF driver: \'electric field\' input is incompatible with ' +
                 'polarizable embedding')
             # disable restart of calculation with static electric field since
@@ -349,10 +321,10 @@ class ScfDriver:
                 self.xcfun = parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'SCF driver: Undefined XC functional')
-            self.dft = True
+        self._dft = (self.xcfun is not None)
 
         # check grid level
-        if self.dft and (self.grid_level < 1 or self.grid_level > 6):
+        if self._dft and (self.grid_level < 1 or self.grid_level > 6):
             warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
             warn_msg += ' Using default value. ***'
             self.ostream.print_blank()
@@ -360,6 +332,38 @@ class ScfDriver:
             self.ostream.print_blank()
             self.ostream.flush()
             self.grid_level = 4
+
+    def _pe_sanity_check(self, method_dict=None):
+        """
+        Checks PE settings and updates relevant attributes.
+
+        :param method_dict:
+            The dicitonary of method settings.
+        """
+
+        if method_dict:
+            if 'pe_options' in method_dict:
+                self.pe_options = dict(method_dict['pe_options'])
+            else:
+                self.pe_options = {}
+
+        if self.potfile:
+            self.pe_options['potfile'] = self.potfile
+
+        self._pe = ('potfile' in self.pe_options)
+
+        if self._pe:
+            from .polembed import PolEmbed
+
+            cppe_potfile = None
+            if self.rank == mpi_master():
+                potfile = self.pe_options['potfile']
+                if not Path(potfile).is_file():
+                    potfile = str(
+                        Path(self._filename).parent / Path(potfile).name)
+                cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
+            cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
+            self.pe_options['potfile'] = cppe_potfile
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
@@ -385,29 +389,32 @@ class ScfDriver:
         # check dft setup
         self._dft_sanity_check()
 
+        # check pe setup
+        self._pe_sanity_check()
+
         # initial guess
         if self.restart:
-            self.den_guess = DensityGuess("RESTART", self.checkpoint_file)
-            self.restart = self.den_guess.validate_checkpoint(
+            self._den_guess = DensityGuess("RESTART", self.checkpoint_file)
+            self.restart = self._den_guess.validate_checkpoint(
                 self.rank, self.comm, molecule.elem_ids_to_numpy(),
-                ao_basis.get_label(), self.scf_type)
+                ao_basis.get_label(), self._scf_type)
 
         if self.restart:
             self.acc_type = "DIIS"
             if self.rank == mpi_master():
-                self.ref_mol_orbs = MolecularOrbitals.read_hdf5(
+                self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
                     self.checkpoint_file)
-                self.molecular_orbitals = MolecularOrbitals(self.ref_mol_orbs)
+                self.molecular_orbitals = MolecularOrbitals(self._ref_mol_orbs)
         else:
-            self.den_guess = DensityGuess("SAD")
+            self._den_guess = DensityGuess("SAD")
 
         # nuclear repulsion energy
-        self.nuc_energy = molecule.nuclear_repulsion_energy()
+        self._nuc_energy = molecule.nuclear_repulsion_energy()
 
         if self.rank == mpi_master():
             self.print_header()
             valstr = "Nuclear repulsion energy: {:.10f} a.u.".format(
-                self.nuc_energy)
+                self._nuc_energy)
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
 
@@ -415,23 +422,24 @@ class ScfDriver:
         if self.dispersion:
             if self.rank == mpi_master():
                 disp = DispersionModel()
-                xc_label = self.xcfun.get_func_label() if self.dft else 'HF'
+                xc_label = self.xcfun.get_func_label() if self._dft else 'HF'
                 disp.compute(molecule, xc_label)
-                self.d4_energy = disp.get_energy()
+                self._d4_energy = disp.get_energy()
             else:
-                self.d4_energy = 0.0
-            self.d4_energy = self.comm.bcast(self.d4_energy, root=mpi_master())
+                self._d4_energy = 0.0
+            self._d4_energy = self.comm.bcast(self._d4_energy,
+                                              root=mpi_master())
         else:
-            self.d4_energy = 0.0
+            self._d4_energy = 0.0
 
         # generate integration grid
-        if self.dft:
+        if self._dft:
             grid_drv = GridDriver(self.comm)
             grid_drv.set_level(self.grid_level)
 
             grid_t0 = tm.time()
-            self.molgrid = grid_drv.generate(molecule)
-            n_grid_points = self.molgrid.number_of_points()
+            self._mol_grid = grid_drv.generate(molecule)
+            n_grid_points = self._mol_grid.number_of_points()
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
                 format(n_grid_points,
@@ -439,14 +447,14 @@ class ScfDriver:
             self.ostream.print_blank()
 
         # set up polarizable embedding
-        if self.pe:
+        if self._pe:
             from .polembed import PolEmbed
-            self.pe_drv = PolEmbed(molecule, ao_basis, self.pe_options,
-                                   self.comm)
-            self.V_es = self.pe_drv.compute_multipole_potential_integrals()
+            self._pe_drv = PolEmbed(molecule, ao_basis, self.pe_options,
+                                    self.comm)
+            self._V_es = self._pe_drv.compute_multipole_potential_integrals()
 
             cppe_info = 'Using CPPE {} for polarizable embedding.'.format(
-                self.pe_drv.get_cppe_version())
+                self._pe_drv.get_cppe_version())
             self.ostream.print_info(cppe_info)
             self.ostream.print_blank()
 
@@ -463,7 +471,7 @@ class ScfDriver:
         if self.acc_type == 'L2_DIIS':
 
             # first step
-            self.first_step = True
+            self._first_step = True
 
             old_thresh = self.conv_thresh
             self.conv_thresh = 1.0e-3
@@ -475,22 +483,22 @@ class ScfDriver:
             self.comp_diis(molecule, val_basis, min_basis, profiler)
 
             # second step
-            self.first_step = False
+            self._first_step = False
 
             self.diis_thresh = 1000.0
             self.conv_thresh = old_thresh
             self.max_iter = old_max_iter
-            self.den_guess.guess_type = 'PRCMO'
+            self._den_guess.guess_type = 'PRCMO'
 
             self.comp_diis(molecule, ao_basis, val_basis, profiler)
 
-        self.fock_matrices.clear()
-        self.den_matrices.clear()
+        self._fock_matrices.clear()
+        self._den_matrices.clear()
 
-        self.fock_matrices_beta.clear()
-        self.den_matrices_beta.clear()
+        self._fock_matrices_beta.clear()
+        self._den_matrices_beta.clear()
 
-        self.fock_matrices_proj.clear()
+        self._fock_matrices_proj.clear()
 
         profiler.end(self.ostream, scf_flag=True)
 
@@ -571,7 +579,7 @@ class ScfDriver:
 
         self.restart = True
         if self.checkpoint_file is None:
-            self.checkpoint_file = f'{self.filename}.scf.h5'
+            self.checkpoint_file = f'{self._filename}.scf.h5'
         self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
         self.comm.barrier()
 
@@ -608,7 +616,7 @@ class ScfDriver:
             The profiler.
         """
 
-        if not self.first_step:
+        if not self._first_step:
             profiler.begin({
                 'timing': self.timing,
                 'profiling': self.profiling,
@@ -618,13 +626,13 @@ class ScfDriver:
 
         diis_start_time = tm.time()
 
-        self.fock_matrices.clear()
-        self.den_matrices.clear()
+        self._fock_matrices.clear()
+        self._den_matrices.clear()
 
-        self.fock_matrices_beta.clear()
-        self.den_matrices_beta.clear()
+        self._fock_matrices_beta.clear()
+        self._den_matrices_beta.clear()
 
-        self.fock_matrices_proj.clear()
+        self._fock_matrices_proj.clear()
 
         ovl_mat, kin_mat, npot_mat, dipole_mats = self.comp_one_ints(
             molecule, ao_basis)
@@ -679,19 +687,19 @@ class ScfDriver:
 
         fock_mat = AOFockMatrix(den_mat)
 
-        if self.dft and not self.first_step:
+        if self._dft and not self._first_step:
             self.update_fock_type(fock_mat)
 
         if self.use_split_comm:
-            self.use_split_comm = ((self.dft or self.pe) and self.nodes >= 8)
+            self.use_split_comm = ((self._dft or self._pe) and self.nodes >= 8)
 
-        if self.use_split_comm and not self.first_step:
+        if self.use_split_comm and not self._first_step:
             qq_data = None
-            if not self.first_step:
+            if not self._first_step:
                 valstr = 'ERI'
-                if self.dft:
+                if self._dft:
                     valstr += '/DFT'
-                if self.pe:
+                if self._pe:
                     valstr += '/PE'
                 self.ostream.print_info(
                     'Using sub-communicators for {}.'.format(valstr))
@@ -702,14 +710,14 @@ class ScfDriver:
 
         profiler.check_memory_usage('Initial guess')
 
-        self.split_comm_ratio = None
+        self._split_comm_ratio = None
 
         e_grad = None
 
         if self.rank == mpi_master():
             self.print_scf_title()
 
-        if not self.first_step:
+        if not self._first_step:
             signal_handler = SignalHandler()
             signal_handler.add_sigterm_function(self.graceful_exit, molecule,
                                                 ao_basis)
@@ -719,11 +727,11 @@ class ScfDriver:
             # set the current number of SCF iterations
             # (note the extra SCF cycle when starting from scratch)
             if self.restart:
-                self.num_iter = i + 1
+                self._num_iter = i + 1
             else:
-                self.num_iter = i
+                self._num_iter = i
 
-            profiler.set_timing_key(f'Iteration {self.num_iter:d}')
+            profiler.set_timing_key(f'Iteration {self._num_iter:d}')
 
             iter_start_time = tm.time()
 
@@ -747,7 +755,7 @@ class ScfDriver:
                     for ef, mat in zip(self.electric_field, dipole_ints)
                 ])
 
-                if self.scf_type == 'restricted':
+                if self._scf_type == 'restricted':
                     e_el += 2.0 * np.trace(
                         np.matmul(efpot, den_mat.alpha_to_numpy(0)))
                     fock_mat.add_matrix(DenseMatrix(efpot), 0)
@@ -758,12 +766,12 @@ class ScfDriver:
                     fock_mat.add_matrix(DenseMatrix(efpot), 0, 'alpha')
                     fock_mat.add_matrix(DenseMatrix(efpot), 0, 'beta')
 
-                self.ef_nuc_energy = 0.0
+                self._ef_nuc_energy = 0.0
                 coords = molecule.get_coordinates()
                 elem_ids = molecule.elem_ids_to_numpy()
                 for i in range(molecule.number_of_atoms()):
-                    self.ef_nuc_energy -= np.dot(
-                        elem_ids[i] * (coords[i] - self.dipole_origin),
+                    self._ef_nuc_energy -= np.dot(
+                        elem_ids[i] * (coords[i] - self._dipole_origin),
                         self.electric_field)
 
             e_grad, max_grad = self.comp_gradient(fock_mat, ovl_mat, den_mat,
@@ -776,8 +784,8 @@ class ScfDriver:
             self.density = AODensityMatrix(den_mat)
 
             self.add_iter_data({
-                'energy': (e_el + self.nuc_energy + self.d4_energy +
-                           self.ef_nuc_energy),
+                'energy': (e_el + self._nuc_energy + self._d4_energy +
+                           self._ef_nuc_energy),
                 'gradient_norm': e_grad,
                 'max_gradient': max_grad,
                 'diff_density': diff_den,
@@ -785,7 +793,7 @@ class ScfDriver:
 
             profiler.stop_timer('CompEnergy')
             profiler.check_memory_usage('Iteration {:d} Fock build'.format(
-                self.num_iter))
+                self._num_iter))
 
             self.print_iter_data(i)
 
@@ -805,27 +813,27 @@ class ScfDriver:
 
             self.update_mol_orbs_phase()
 
-            den_mat = self.gen_new_density(molecule, self.scf_type)
+            den_mat = self.gen_new_density(molecule, self._scf_type)
 
             den_mat.broadcast(self.rank, self.comm)
 
             profiler.stop_timer('FockDiag')
 
             profiler.check_memory_usage('Iteration {:d} Fock diag.'.format(
-                self.num_iter))
+                self._num_iter))
 
-            if not self.first_step:
+            if not self._first_step:
                 iter_in_hours = (tm.time() - iter_start_time) / 3600
                 if self.need_graceful_exit(iter_in_hours):
                     self.graceful_exit(molecule, ao_basis)
 
-        if not self.first_step:
+        if not self._first_step:
             signal_handler.remove_sigterm_function()
 
             self.write_checkpoint(molecule.elem_ids_to_numpy(),
                                   ao_basis.get_label())
 
-        if self.rank == mpi_master() and not self.first_step:
+        if self.rank == mpi_master() and not self._first_step:
             S = ovl_mat.to_numpy()
 
             C_alpha = self.molecular_orbitals.alpha_to_numpy()
@@ -882,8 +890,8 @@ class ScfDriver:
             True if a graceful exit is needed, False otherwise.
         """
 
-        if self.program_end_time is not None:
-            remaining_hours = (self.program_end_time -
+        if self._program_end_time is not None:
+            remaining_hours = (self._program_end_time -
                                datetime.now()).total_seconds() / 3600
             # exit gracefully when the remaining time is not sufficient to
             # complete the next iteration (plus 25% to be on the safe side).
@@ -957,12 +965,12 @@ class ScfDriver:
             if molecule.get_charge() != 0:
                 coords = molecule.get_coordinates()
                 nuclear_charges = molecule.elem_ids_to_numpy()
-                self.dipole_origin = np.sum(coords.T * nuclear_charges,
-                                            axis=1) / np.sum(nuclear_charges)
+                self._dipole_origin = np.sum(coords.T * nuclear_charges,
+                                             axis=1) / np.sum(nuclear_charges)
             else:
-                self.dipole_origin = np.zeros(3)
+                self._dipole_origin = np.zeros(3)
             dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-            dipole_drv.origin = tuple(self.dipole_origin)
+            dipole_drv.origin = tuple(self._dipole_origin)
             dipole_mats = dipole_drv.compute(molecule, basis)
         else:
             dipole_mats = None
@@ -1048,26 +1056,26 @@ class ScfDriver:
         """
 
         # guess: read from checkpoint file
-        if self.den_guess.guess_type == "RESTART":
+        if self._den_guess.guess_type == "RESTART":
 
-            return self.den_guess.restart_density(molecule, self.rank,
-                                                  self.ostream, self.scf_type)
+            return self._den_guess.restart_density(molecule, self.rank,
+                                                   self.ostream, self._scf_type)
 
         # guess: superposition of atomic densities
-        if self.den_guess.guess_type == "SAD":
+        if self._den_guess.guess_type == "SAD":
 
-            return self.den_guess.sad_density(molecule, ao_basis, min_basis,
-                                              self.scf_type, self.comm,
-                                              self.ostream)
+            return self._den_guess.sad_density(molecule, ao_basis, min_basis,
+                                               self._scf_type, self.comm,
+                                               self.ostream)
 
         # guess: projection of molecular orbitals from reduced basis
-        if self.den_guess.guess_type == "PRCMO":
+        if self._den_guess.guess_type == "PRCMO":
 
             if self.rank == mpi_master():
-                return self.den_guess.prcmo_density(molecule, ao_basis,
-                                                    min_basis,
-                                                    self.molecular_orbitals,
-                                                    self.scf_type)
+                return self._den_guess.prcmo_density(molecule, ao_basis,
+                                                     min_basis,
+                                                     self.molecular_orbitals,
+                                                     self._scf_type)
             else:
                 return AODensityMatrix()
 
@@ -1082,9 +1090,9 @@ class ScfDriver:
         """
 
         if e_grad < self.diis_thresh:
-            self.skip_iter = False
+            self._skip_iter = False
         else:
-            self.skip_iter = True
+            self._skip_iter = True
 
     def comp_2e_fock(self,
                      fock_mat,
@@ -1116,7 +1124,7 @@ class ScfDriver:
             The AO Kohn-Sham (Vxc) matrix.
         """
 
-        if self.use_split_comm and not self.first_step:
+        if self.use_split_comm and not self._first_step:
             vxc_mat, e_pe, V_pe = self.comp_2e_fock_split_comm(
                 fock_mat, den_mat, molecule, basis, screening, e_grad)
 
@@ -1171,31 +1179,31 @@ class ScfDriver:
             profiler.add_timing_info('ERI', tm.time() - eri_t0)
         vxc_t0 = tm.time()
 
-        if self.dft and not self.first_step:
+        if self._dft and not self._first_step:
             if not self.xcfun.is_hybrid():
-                if self.scf_type == 'restricted':
+                if self._scf_type == 'restricted':
                     fock_mat.scale(2.0, 0)
 
-            self.molgrid.distribute(self.rank, self.nodes, self.comm)
-            vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self.molgrid,
+            self._mol_grid.distribute(self.rank, self.nodes, self.comm)
+            vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self._mol_grid,
                                        self.xcfun.get_func_label())
             vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
         else:
             vxc_mat = None
 
-        if self.timing and self.dft:
+        if self.timing and self._dft:
             profiler.add_timing_info('DFT', tm.time() - vxc_t0)
         pe_t0 = tm.time()
 
-        if self.pe and not self.first_step:
-            self.pe_drv.V_es = self.V_es.copy()
+        if self._pe and not self._first_step:
+            self._pe_drv.V_es = self._V_es.copy()
             dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
-            e_pe, V_pe = self.pe_drv.get_pe_contribution(dm)
-            self.pe_summary = self.pe_drv.cppe_state.summary_string
+            e_pe, V_pe = self._pe_drv.get_pe_contribution(dm)
+            self._pe_summary = self._pe_drv.cppe_state.summary_string
         else:
             e_pe, V_pe = 0.0, None
 
-        if self.timing and self.pe:
+        if self.timing and self._pe:
             profiler.add_timing_info('PE', tm.time() - pe_t0)
 
         return vxc_mat, e_pe, V_pe
@@ -1227,24 +1235,24 @@ class ScfDriver:
             The AO Kohn-Sham (Vxc) matrix.
         """
 
-        if self.split_comm_ratio is None:
-            if self.dft and self.pe:
-                self.split_comm_ratio = [0.34, 0.33, 0.33]
-            elif self.dft:
-                self.split_comm_ratio = [0.5, 0.5, 0.0]
-            elif self.pe:
-                self.split_comm_ratio = [0.5, 0.0, 0.5]
+        if self._split_comm_ratio is None:
+            if self._dft and self._pe:
+                self._split_comm_ratio = [0.34, 0.33, 0.33]
+            elif self._dft:
+                self._split_comm_ratio = [0.5, 0.5, 0.0]
+            elif self._pe:
+                self._split_comm_ratio = [0.5, 0.0, 0.5]
             else:
-                self.split_comm_ratio = [1.0, 0.0, 0.0]
+                self._split_comm_ratio = [1.0, 0.0, 0.0]
 
-        if self.dft:
-            dft_nodes = int(float(self.nodes) * self.split_comm_ratio[1] + 0.5)
+        if self._dft:
+            dft_nodes = int(float(self.nodes) * self._split_comm_ratio[1] + 0.5)
             dft_nodes = max(1, dft_nodes)
         else:
             dft_nodes = 0
 
-        if self.pe:
-            pe_nodes = int(float(self.nodes) * self.split_comm_ratio[2] + 0.5)
+        if self._pe:
+            pe_nodes = int(float(self.nodes) * self._split_comm_ratio[2] + 0.5)
             pe_nodes = max(1, pe_nodes)
         else:
             pe_nodes = 0
@@ -1269,14 +1277,14 @@ class ScfDriver:
 
         # reset molecular grid for DFT and V_es for PE
         if self.rank != mpi_master():
-            self.molgrid = MolecularGrid()
-            self.V_es = np.zeros(0)
-        if self.dft:
+            self._mol_grid = MolecularGrid()
+            self._V_es = np.zeros(0)
+        if self._dft:
             if local_comm.Get_rank() == mpi_master():
-                self.molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
-        if self.pe:
+                self._mol_grid.broadcast(cross_comm.Get_rank(), cross_comm)
+        if self._pe:
             if local_comm.Get_rank() == mpi_master():
-                self.V_es = cross_comm.bcast(self.V_es, root=mpi_master())
+                self._V_es = cross_comm.bcast(self._V_es, root=mpi_master())
 
         t0 = tm.time()
 
@@ -1290,16 +1298,16 @@ class ScfDriver:
             eri_drv.compute(fock_mat, den_mat, molecule, basis, local_screening)
             fock_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
                                 local_comm)
-            if self.dft and (not self.xcfun.is_hybrid()):
-                if self.scf_type == 'restricted':
+            if self._dft and (not self.xcfun.is_hybrid()):
+                if self._scf_type == 'restricted':
                     fock_mat.scale(2.0, 0)
 
         # calculate Vxc on DFT nodes
         if dft_comm:
             xc_drv = XCIntegrator(local_comm)
-            self.molgrid.distribute(local_comm.Get_rank(),
-                                    local_comm.Get_size(), local_comm)
-            vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self.molgrid,
+            self._mol_grid.distribute(local_comm.Get_rank(),
+                                      local_comm.Get_size(), local_comm)
+            vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self._mol_grid,
                                        self.xcfun.get_func_label())
             vxc_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
                                local_comm)
@@ -1309,31 +1317,32 @@ class ScfDriver:
         # calculate e_pe and V_pe on PE nodes
         if pe_comm:
             from .polembed import PolEmbed
-            self.pe_drv = PolEmbed(molecule, basis, self.pe_options, local_comm)
-            self.pe_drv.V_es = self.V_es.copy()
+            self._pe_drv = PolEmbed(molecule, basis, self.pe_options,
+                                    local_comm)
+            self._pe_drv.V_es = self._V_es.copy()
             dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
-            e_pe, V_pe = self.pe_drv.get_pe_contribution(dm)
-            self.pe_summary = self.pe_drv.cppe_state.summary_string
+            e_pe, V_pe = self._pe_drv.get_pe_contribution(dm)
+            self._pe_summary = self._pe_drv.cppe_state.summary_string
         else:
             e_pe, V_pe = 0.0, None
-            self.pe_summary = ''
+            self._pe_summary = ''
 
         dt = tm.time() - t0
 
         # collect Vxc to master node
-        if self.dft:
+        if self._dft:
             if local_comm.Get_rank() == mpi_master():
                 vxc_mat.collect(cross_comm.Get_rank(), cross_comm.Get_size(),
                                 cross_comm, 1)
 
         # collect PE results to master node
-        if self.pe:
-            pe_root = 2 if self.dft else 1
+        if self._pe:
+            pe_root = 2 if self._dft else 1
             if local_comm.Get_rank() == mpi_master():
                 e_pe = cross_comm.bcast(e_pe, root=pe_root)
                 V_pe = cross_comm.bcast(V_pe, root=pe_root)
-                self.pe_summary = cross_comm.bcast(self.pe_summary,
-                                                   root=pe_root)
+                self._pe_summary = cross_comm.bcast(self._pe_summary,
+                                                    root=pe_root)
 
         if local_comm.Get_rank() == mpi_master():
             dt = cross_comm.gather(dt, root=mpi_master())
@@ -1341,20 +1350,20 @@ class ScfDriver:
         if self.rank == mpi_master():
             time_eri = dt[0] * eri_nodes
             time_dft = 0.0
-            if self.dft:
+            if self._dft:
                 time_dft = dt[1] * dft_nodes
             time_pe = 0.0
-            if self.pe:
-                pe_root = 2 if self.dft else 1
+            if self._pe:
+                pe_root = 2 if self._dft else 1
                 time_pe = dt[pe_root] * pe_nodes
             time_sum = time_eri + time_dft + time_pe
-            self.split_comm_ratio = [
+            self._split_comm_ratio = [
                 time_eri / time_sum,
                 time_dft / time_sum,
                 time_pe / time_sum,
             ]
-        self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
-                                                root=mpi_master())
+        self._split_comm_ratio = self.comm.bcast(self._split_comm_ratio,
+                                                 root=mpi_master())
 
         return vxc_mat, e_pe, V_pe
 
@@ -1386,9 +1395,9 @@ class ScfDriver:
             e_ee = fock_mat.get_energy(0, den_mat, 0)
             e_kin = 2.0 * kin_mat.get_energy(den_mat, 0)
             e_en = -2.0 * npot_mat.get_energy(den_mat, 0)
-            if self.dft and not self.first_step:
+            if self._dft and not self._first_step:
                 e_ee += vxc_mat.get_energy()
-            if self.pe and not self.first_step:
+            if self._pe and not self._first_step:
                 e_ee += e_pe
             e_sum = e_ee + e_kin + e_en
         else:
@@ -1418,12 +1427,12 @@ class ScfDriver:
         if self.rank == mpi_master():
             fock_mat.add_hcore(kin_mat, npot_mat, 0)
 
-            if self.dft and not self.first_step:
+            if self._dft and not self._first_step:
                 fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
-                if self.scf_type in ['unrestricted', 'restricted_openshell']:
+                if self._scf_type in ['unrestricted', 'restricted_openshell']:
                     fock_mat.add_matrix(vxc_mat.get_matrix(True), 0, 'beta')
 
-            if self.pe and not self.first_step:
+            if self._pe and not self._first_step:
                 fock_mat.add_matrix(DenseMatrix(pe_mat), 0)
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
@@ -1515,10 +1524,10 @@ class ScfDriver:
         """
 
         if self.rank == mpi_master():
-            if self.ref_mol_orbs is None:
+            if self._ref_mol_orbs is None:
                 return
 
-            ref_mo = self.ref_mol_orbs.alpha_to_numpy()
+            ref_mo = self._ref_mol_orbs.alpha_to_numpy()
             mo = self.molecular_orbitals.alpha_to_numpy()
             ea = self.molecular_orbitals.ea_to_numpy()
             occa = self.molecular_orbitals.occa_to_numpy()
@@ -1532,7 +1541,7 @@ class ScfDriver:
                                                             molorb.rest)
 
             elif self.molecular_orbitals.get_orbitals_type() == molorb.unrest:
-                ref_mo_b = self.ref_mol_orbs.beta_to_numpy()
+                ref_mo_b = self._ref_mol_orbs.beta_to_numpy()
                 mo_b = self.molecular_orbitals.beta_to_numpy()
                 eb = self.molecular_orbitals.eb_to_numpy()
                 occb = self.molecular_orbitals.occb_to_numpy()
@@ -1603,11 +1612,11 @@ class ScfDriver:
 
         e_dict = dict(d)
 
-        e_dict['diff_energy'] = e_dict['energy'] - self.old_energy
+        e_dict['diff_energy'] = e_dict['energy'] - self._old_energy
 
-        self.iter_data.append(e_dict)
+        self._iter_data.append(e_dict)
 
-        self.old_energy = e_dict['energy']
+        self._old_energy = e_dict['energy']
 
     def check_convergence(self):
         """
@@ -1617,9 +1626,9 @@ class ScfDriver:
 
         self.is_converged = False
 
-        if self.num_iter > 0:
+        if self._num_iter > 0:
 
-            e_grad = self.iter_data[-1]['gradient_norm']
+            e_grad = self._iter_data[-1]['gradient_norm']
 
             if e_grad < self.conv_thresh:
                 self.is_converged = True
@@ -1649,9 +1658,9 @@ class ScfDriver:
         self.ostream.print_header(('-' * len(valstr)).ljust(92))
         self.print_energy_components()
 
-        if self.pe:
+        if self._pe:
             self.ostream.print_blank()
-            for line in self.pe_summary.splitlines():
+            for line in self._pe_summary.splitlines():
                 self.ostream.print_header(line.ljust(92))
             self.ostream.flush()
 
@@ -1693,7 +1702,7 @@ class ScfDriver:
             self.ovl_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        if self.dft:
+        if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
@@ -1713,12 +1722,12 @@ class ScfDriver:
         Prints SCF cycles header to output stream.
         """
 
-        if self.first_step:
+        if self._first_step:
             self.ostream.print_info('Starting Reduced Basis SCF calculation...')
 
         else:
             self.ostream.print_blank()
-            if self.dft:
+            if self._dft:
                 valstr = '{} | {} | {} | {} | {} | {}'.format(
                     'Iter.', '   Kohn-Sham Energy', 'Energy Change',
                     'Gradient Norm', 'Max. Gradient', 'Density Change')
@@ -1738,9 +1747,9 @@ class ScfDriver:
             The start time of SCF calculation.
         """
 
-        if self.first_step:
+        if self._first_step:
             valstr = "...done. SCF energy in reduced basis set: "
-            valstr += "{:.12f}".format(self.old_energy)
+            valstr += "{:.12f}".format(self._old_energy)
             valstr += " a.u. Time: "
             valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
             self.ostream.print_info(valstr)
@@ -1752,7 +1761,7 @@ class ScfDriver:
                 valstr += "converged in "
             else:
                 valstr += "NOT converged in "
-            valstr += str(self.num_iter)
+            valstr += str(self._num_iter)
             valstr += " iterations. Time: "
             valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
             self.ostream.print_blank()
@@ -1771,25 +1780,25 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             # no output for first step in two level DIIS
-            if self.first_step:
+            if self._first_step:
                 return
 
             # DIIS or second step in two level DIIS
-            if self.num_iter > 0:
+            if self._num_iter > 0:
 
-                if self.iter_data:
-                    te = self.iter_data[-1]['energy']
-                    diff_te = self.iter_data[-1]['diff_energy']
-                    e_grad = self.iter_data[-1]['gradient_norm']
-                    max_grad = self.iter_data[-1]['max_gradient']
-                    diff_den = self.iter_data[-1]['diff_density']
+                if self._iter_data:
+                    te = self._iter_data[-1]['energy']
+                    diff_te = self._iter_data[-1]['diff_energy']
+                    e_grad = self._iter_data[-1]['gradient_norm']
+                    max_grad = self._iter_data[-1]['max_gradient']
+                    diff_den = self._iter_data[-1]['diff_density']
 
-                if self.num_iter == 1:
+                if self._num_iter == 1:
                     diff_te = 0.0
                     diff_den = 0.0
 
                 valstr = ' {:3d}   {:20.12f} {:15.10f} '.format(
-                    self.num_iter, te, diff_te)
+                    self._num_iter, te, diff_te)
                 valstr += '{:15.8f} {:15.8f} {:15.8f} '.format(
                     e_grad, max_grad, diff_den)
 
@@ -1804,7 +1813,7 @@ class ScfDriver:
             The SCF energy.
         """
 
-        return self.old_energy
+        return self._old_energy
 
     def get_scf_type(self):
         """
@@ -1825,10 +1834,10 @@ class ScfDriver:
             The string with type of initial guess.
         """
 
-        if self.den_guess.guess_type == "SAD":
+        if self._den_guess.guess_type == "SAD":
             return "Superposition of Atomic Densities"
 
-        if self.den_guess.guess_type == "RESTART":
+        if self._den_guess.guess_type == "RESTART":
             return "Restart from Checkpoint"
 
         return "Undefined"
@@ -1950,7 +1959,7 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         mult = molecule.get_multiplicity()
-        if self.scf_type == 'restricted':
+        if self._scf_type == 'restricted':
             valstr = "Multiplicity (2S+1)           :{:5.1f}".format(mult)
             self.ostream.print_header(valstr.ljust(92))
 
@@ -1958,7 +1967,7 @@ class ScfDriver:
         valstr = "Magnetic Quantum Number (M_S) :{:5.1f}".format(sz)
         self.ostream.print_header(valstr.ljust(92))
 
-        if self.scf_type in ['unrestricted', 'restricted_openshell']:
+        if self._scf_type in ['unrestricted', 'restricted_openshell']:
             valstr = "Expectation value of S**2     :{:8.4f}".format(s2)
             self.ostream.print_header(valstr.ljust(92))
 
@@ -1969,13 +1978,13 @@ class ScfDriver:
         Prints SCF energy components to output stream.
         """
 
-        enuc = self.nuc_energy
+        enuc = self._nuc_energy
 
-        e_d4 = self.d4_energy
+        e_d4 = self._d4_energy
 
-        e_ef_nuc = self.ef_nuc_energy
+        e_ef_nuc = self._ef_nuc_energy
 
-        etot = self.iter_data[-1]['energy']
+        etot = self._iter_data[-1]['energy']
 
         e_el = etot - enuc - e_d4 - e_ef_nuc
 
@@ -1999,7 +2008,7 @@ class ScfDriver:
         self.ostream.print_header(
             '------------------------------------'.ljust(92))
 
-        grad = self.iter_data[-1]['gradient_norm']
+        grad = self._iter_data[-1]['gradient_norm']
         valstr = 'Gradient Norm                      :{:20.10f} a.u.'.format(
             grad)
         self.ostream.print_header(valstr.ljust(92))
@@ -2031,12 +2040,12 @@ class ScfDriver:
         final_h5_fname = str(
             Path(self.checkpoint_file).with_suffix('.tensors.h5'))
 
-        if self.dft:
+        if self._dft:
             xc_label = self.xcfun.get_func_label()
         else:
             xc_label = 'HF'
 
-        if self.pe:
+        if self._pe:
             with open(str(self.pe_options['potfile']), 'r') as f_pot:
                 potfile_text = '\n'.join(f_pot.readlines())
         else:

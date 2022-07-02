@@ -65,7 +65,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
         super().__init__(comm, ostream)
 
-        self.scf_type = 'restricted_openshell'
+        self._scf_type = 'restricted_openshell'
 
     def comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """
@@ -160,25 +160,25 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
         if self.rank == mpi_master():
 
-            if not self.skip_iter:
+            if not self._skip_iter:
 
-                if len(self.fock_matrices) == self.max_err_vecs:
+                if len(self._fock_matrices) == self.max_err_vecs:
 
-                    self.fock_matrices.popleft()
-                    self.den_matrices.popleft()
+                    self._fock_matrices.popleft()
+                    self._den_matrices.popleft()
 
-                    self.fock_matrices_beta.popleft()
-                    self.den_matrices_beta.popleft()
+                    self._fock_matrices_beta.popleft()
+                    self._den_matrices_beta.popleft()
 
-                    self.fock_matrices_proj.popleft()
+                    self._fock_matrices_proj.popleft()
 
-                self.fock_matrices.append(fock_mat.alpha_to_numpy(0))
-                self.den_matrices.append(den_mat.alpha_to_numpy(0))
+                self._fock_matrices.append(fock_mat.alpha_to_numpy(0))
+                self._den_matrices.append(den_mat.alpha_to_numpy(0))
 
-                self.fock_matrices_beta.append(fock_mat.beta_to_numpy(0))
-                self.den_matrices_beta.append(den_mat.beta_to_numpy(0))
+                self._fock_matrices_beta.append(fock_mat.beta_to_numpy(0))
+                self._den_matrices_beta.append(den_mat.beta_to_numpy(0))
 
-                self.fock_matrices_proj.append(
+                self._fock_matrices_proj.append(
                     self.get_projected_fock(
                         fock_mat.alpha_to_numpy(0),
                         fock_mat.beta_to_numpy(0),
@@ -206,16 +206,17 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
         if self.rank == mpi_master():
 
-            if len(self.fock_matrices) == 1:
-                return self.fock_matrices_proj[0]
+            if len(self._fock_matrices) == 1:
+                return self._fock_matrices_proj[0]
 
-            if len(self.fock_matrices) > 1:
+            if len(self._fock_matrices) > 1:
 
                 acc_diis = CTwoDiis()
 
                 acc_diis.compute_restricted_open_error_vectors(
-                    self.fock_matrices, self.fock_matrices_beta,
-                    self.den_matrices, self.den_matrices_beta, ovl_mat, oao_mat)
+                    self._fock_matrices, self._fock_matrices_beta,
+                    self._den_matrices, self._den_matrices_beta, ovl_mat,
+                    oao_mat)
 
                 weights = acc_diis.compute_weights()
 
@@ -235,9 +236,9 @@ class ScfRestrictedOpenDriver(ScfDriver):
             The scaled Fock/Kohn-Sham matrix.
         """
 
-        effmat = np.zeros(self.fock_matrices_proj[0].shape, dtype=float)
+        effmat = np.zeros(self._fock_matrices_proj[0].shape, dtype=float)
 
-        for w, fmat in zip(weights, self.fock_matrices_proj):
+        for w, fmat in zip(weights, self._fock_matrices_proj):
             effmat = effmat + w * fmat
 
         return effmat
@@ -324,9 +325,9 @@ class ScfRestrictedOpenDriver(ScfDriver):
             The string for spin unrestricted open shell SCF calculation.
         """
 
-        pe_type = " with PE" if self.pe else ""
+        pe_type = " with PE" if self._pe else ""
 
-        if self.dft:
+        if self._dft:
             return "Spin-Restricted Open-Shell Kohn-Sham" + pe_type
 
         return "Spin-Restricted Open-Shell Hartree-Fock" + pe_type
