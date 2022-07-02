@@ -424,6 +424,23 @@ def print_keywords(input_keywords, ostream):
     ostream.flush()
 
 
+def print_attributes(input_keywords, ostream):
+    """
+    Prints attributes to output stream.
+    """
+
+    width = 80
+    ostream.print_header('=' * width)
+    for group in input_keywords:
+        for key, val in input_keywords[group].items():
+            text = f'  {key}'.ljust(20)
+            text += f'  {get_keyword_type(val[0])}'.ljust(15)
+            text += f'  {val[1]}'.ljust(width - 35)
+            ostream.print_header(text)
+    ostream.print_header('=' * width)
+    ostream.flush()
+
+
 def get_keyword_type(keyword_type):
     """
     Gets keyword type for printing.

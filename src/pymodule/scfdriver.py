@@ -53,7 +53,8 @@ from .molecularorbitals import MolecularOrbitals
 from .subcommunicators import SubCommunicators
 from .signalhandler import SignalHandler
 from .denguess import DensityGuess
-from .inputparser import parse_input, print_keywords, get_datetime_string
+from .inputparser import (parse_input, print_keywords, print_attributes,
+                          get_datetime_string)
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
@@ -259,6 +260,13 @@ class ScfDriver:
         """
 
         print_keywords(self._input_keywords, self.ostream)
+
+    def print_attributes(self):
+        """
+        Prints attributes in SCF driver.
+        """
+
+        print_attributes(self._input_keywords, self.ostream)
 
     def update_settings(self, scf_dict, method_dict=None):
         """
