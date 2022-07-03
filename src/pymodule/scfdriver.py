@@ -222,6 +222,9 @@ class ScfDriver:
         self.memory_profiling = False
         self.memory_tracing = False
 
+        # verbosity of output (1-3)
+        self.print_level = 2
+
         # program end time for graceful exit
         self._program_end_time = None
 
@@ -243,6 +246,7 @@ class ScfDriver:
                 'profiling': ('bool', 'print profiling information'),
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
+                'print_level': ('int', 'verbosity of output (1-3)'),
             },
             'method_settings': {
                 'dispersion': ('bool', 'use D4 dispersion correction'),
@@ -408,6 +412,12 @@ class ScfDriver:
         # check pe setup
         self._pe_sanity_check()
 
+        # check print level (verbosity of output)
+        if self.print_level < 2:
+            self.print_level = 1
+        if self.print_level > 2:
+            self.print_level = 3
+
         # initial guess
         if self.restart:
             self._den_guess = DensityGuess("RESTART", self.checkpoint_file)
@@ -529,8 +539,12 @@ class ScfDriver:
             self._print_scf_energy()
             s2 = self.compute_s2(molecule, self.scf_tensors)
             self._print_ground_state(molecule, s2)
-            self.molecular_orbitals.print_orbitals(molecule, ao_basis, False,
-                                                   self.ostream)
+            if self.print_level == 2:
+                self.molecular_orbitals.print_orbitals(molecule, ao_basis,
+                                                       False, self.ostream)
+            if self.print_level == 3:
+                self.molecular_orbitals.print_orbitals(molecule, ao_basis, True,
+                                                       self.ostream)
             self.ostream.flush()
 
     def set_start_orbitals(self, molecule, basis, array):
@@ -992,7 +1006,7 @@ class ScfDriver:
 
         t4 = tm.time()
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and self.print_level > 1:
 
             self.ostream.print_info("Overlap matrix computed in" +
                                     " {:.2f} sec.".format(t1 - t0))
