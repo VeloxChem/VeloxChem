@@ -839,7 +839,8 @@ class NumerovDriver:
         cur_str = 'Number of Geometries          : '
         cur_str += str(len(self.pec_displacements))
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Wave Function Model           : ' + scf_drv.get_scf_type()
+        cur_str = 'Wave Function Model           : '
+        cur_str += scf_drv.get_scf_type_str()
         self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = 'SCF Convergece Threshold      : {:.1e}'.format(
             scf_drv.conv_thresh)

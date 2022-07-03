@@ -279,7 +279,7 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         return MolecularOrbitals()
 
-    def get_scf_type(self):
+    def get_scf_type_str(self):
         """
         Gets string for spin unrestricted open shell SCF calculation.
         Overloaded base class method.

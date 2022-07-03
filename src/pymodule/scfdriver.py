@@ -428,7 +428,7 @@ class ScfDriver:
         self._nuc_energy = molecule.nuclear_repulsion_energy()
 
         if self.rank == mpi_master():
-            self.print_header()
+            self._print_header()
             valstr = "Nuclear repulsion energy: {:.10f} a.u.".format(
                 self._nuc_energy)
             self.ostream.print_info(valstr)
@@ -527,9 +527,8 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self._print_scf_energy()
-            s2 = self.compute_s2(molecule, self.scf_tensors['S'],
-                                 self.molecular_orbitals)
-            self.print_ground_state(molecule, s2)
+            s2 = self.compute_s2(molecule, self.scf_tensors)
+            self._print_ground_state(molecule, s2)
             self.molecular_orbitals.print_orbitals(molecule, ao_basis, False,
                                                    self.ostream)
             self.ostream.flush()
@@ -1669,10 +1668,10 @@ class ScfDriver:
         Prints SCF energy information to output stream.
         """
 
-        valstr = self.get_scf_type() + ':'
+        valstr = self.get_scf_type_str() + ':'
         self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_header(('-' * len(valstr)).ljust(92))
-        self.print_energy_components()
+        self._print_energy_components()
 
         if self._pe:
             self.ostream.print_blank()
@@ -1680,7 +1679,7 @@ class ScfDriver:
                 self.ostream.print_header(line.ljust(92))
             self.ostream.flush()
 
-    def print_header(self):
+    def _print_header(self):
         """
         Prints SCF calculation setup details to output stream,
         """
@@ -1691,7 +1690,7 @@ class ScfDriver:
         self.ostream.print_blank()
 
         str_width = 84
-        cur_str = 'Wave Function Model             : ' + self.get_scf_type()
+        cur_str = 'Wave Function Model             : ' + self.get_scf_type_str()
         self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = 'Initial Guess Model             : ' + self._get_guess_type()
         self.ostream.print_header(cur_str.ljust(str_width))
@@ -1831,7 +1830,7 @@ class ScfDriver:
 
         return self._old_energy
 
-    def get_scf_type(self):
+    def get_scf_type_str(self):
         """
         Gets string with type of SCF calculation (defined in derrived classes).
 
@@ -1926,16 +1925,14 @@ class ScfDriver:
 
         return (mol_orbs[:, molist], mol_eigs[molist])
 
-    def compute_s2(self, molecule, smat, mol_orbs):
+    def compute_s2(self, molecule, scf_tensors):
         """
         Computes expectation value of the S**2 operator.
 
         :param molecule:
             The molecule.
-        :param smat:
-            The overlap matrix (numpy array).
-        :param mol_orbs:
-            The molecular orbitals.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
 
         :return:
             Expectation value <S**2>.
@@ -1944,18 +1941,19 @@ class ScfDriver:
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
 
+        smat = scf_tensors['S']
+        Cocc_a = scf_tensors['C_alpha'][:, :nalpha]
+        Cocc_b = scf_tensors['C_beta'][:, :nbeta]
+
         a_b = float(nalpha - nbeta) / 2.0
         s2_exact = a_b * (a_b + 1.0)
-
-        Cocc_a = mol_orbs.alpha_to_numpy()[:, :nalpha].copy()
-        Cocc_b = mol_orbs.beta_to_numpy()[:, :nbeta].copy()
 
         ovl_a_b = np.matmul(Cocc_a.T, np.matmul(smat, Cocc_b))
         s2 = s2_exact + nbeta - np.sum(ovl_a_b**2)
 
         return s2
 
-    def print_ground_state(self, molecule, s2):
+    def _print_ground_state(self, molecule, s2):
         """
         Prints ground state information to output stream.
 
@@ -1989,7 +1987,7 @@ class ScfDriver:
 
         self.ostream.print_blank()
 
-    def print_energy_components(self):
+    def _print_energy_components(self):
         """
         Prints SCF energy components to output stream.
         """

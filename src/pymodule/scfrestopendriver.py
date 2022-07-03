@@ -316,7 +316,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
         return f0 + fcorr
 
-    def get_scf_type(self):
+    def get_scf_type_str(self):
         """
         Gets string for spin restricted open shell SCF calculation.
         Overloaded base class method.
