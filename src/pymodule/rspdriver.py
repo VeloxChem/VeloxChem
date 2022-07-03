@@ -115,7 +115,7 @@ class ResponseDriver:
                 self.solver = TDAExciDriver(self.comm, self.ostream)
             else:
                 self.solver = LinearResponseEigenSolver(self.comm, self.ostream)
-            self.solver.input_keywords['response'].update({
+            self.solver._input_keywords['response'].update({
                 'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),
             })
 

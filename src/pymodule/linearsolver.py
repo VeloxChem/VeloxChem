@@ -49,7 +49,8 @@ from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input, print_keywords, get_datetime_string
+from .inputparser import (parse_input, print_keywords, print_attributes,
+                          get_datetime_string)
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .checkpoint import write_rsp_hdf5
@@ -118,13 +119,14 @@ class LinearSolver:
         self.batch_size = None
 
         # dft
-        self.dft = False
-        self.grid_level = 4
         self.xcfun = None
+        self.grid_level = 4
+        self._dft = False
 
         # polarizable embedding
-        self.pe = False
+        self.potfile = None
         self.pe_options = {}
+        self._pe = False
 
         # split communicators
         self.use_split_comm = False
@@ -139,7 +141,7 @@ class LinearSolver:
         self.cur_iter = 0
         self.small_thresh = 1.0e-10
         self.lindep_thresh = 1.0e-6
-        self.is_converged = False
+        self._is_converged = False
 
         # mpi information
         self.comm = comm
@@ -159,6 +161,9 @@ class LinearSolver:
         self.memory_profiling = False
         self.memory_tracing = False
 
+        # verbosity of output (1-3)
+        self.print_level = 2
+
         # program end time for graceful exit
         self.program_end_time = None
 
@@ -177,7 +182,7 @@ class LinearSolver:
         self.dist_fock_ung = None
 
         # input keywords
-        self.input_keywords = {
+        self._input_keywords = {
             'response': {
                 'eri_thresh': ('float', 'ERI screening threshold'),
                 'qq_type': ('str_upper', 'ERI screening scheme'),
@@ -203,12 +208,27 @@ class LinearSolver:
             },
         }
 
+    @property
+    def is_converged(self):
+        """
+        Returns whether linear solver is converged.
+        """
+
+        return self._is_converged
+
     def print_keywords(self):
         """
         Prints input keywords in linear solver.
         """
 
-        print_keywords(self.input_keywords, self.ostream)
+        print_keywords(self._input_keywords, self.ostream)
+
+    def print_attributes(self):
+        """
+        Prints attributes in linear solver.
+        """
+
+        print_attributes(self._input_keywords, self.ostream)
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -224,7 +244,8 @@ class LinearSolver:
             method_dict = {}
 
         rsp_keywords = {
-            key: val[0] for key, val in self.input_keywords['response'].items()
+            key: val[0]
+            for key, val in self._input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -238,57 +259,82 @@ class LinearSolver:
 
         method_keywords = {
             key: val[0]
-            for key, val in self.input_keywords['method_settings'].items()
+            for key, val in self._input_keywords['method_settings'].items()
         }
 
         parse_input(self, method_keywords, method_dict)
 
-        if 'xcfun' in method_dict:
-            if 'dft' not in method_dict:
-                self.dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'LinearSolver: Undefined XC functional')
+        self._dft_sanity_check()
 
-        if 'pe_options' not in method_dict:
-            method_dict['pe_options'] = {}
-
-        if ('potfile' in method_dict) or method_dict['pe_options']:
-            if 'pe' not in method_dict:
-                self.pe = True
-
-        if self.pe:
-            from .polembed import PolEmbed
-
-            if ('potfile' in method_dict and
-                    'potfile' not in method_dict['pe_options']):
-                method_dict['pe_options']['potfile'] = method_dict['potfile']
-            assert_msg_critical('potfile' in method_dict['pe_options'],
-                                'LinearSolver: No potential file defined')
-            self.pe_options = dict(method_dict['pe_options'])
-
-            cppe_potfile = None
-            if self.rank == mpi_master():
-                potfile = self.pe_options['potfile']
-                if not Path(potfile).is_file():
-                    potfile = str(
-                        Path(self.filename).parent / Path(potfile).name)
-                cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
-            cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
-            self.pe_options['potfile'] = cppe_potfile
+        self._pe_sanity_check(method_dict)
 
         if self.electric_field is not None:
             assert_msg_critical(
                 len(self.electric_field) == 3,
                 'LinearSolver: Expecting 3 values in \'electric field\' input')
             assert_msg_critical(
-                not self.pe,
+                not self._pe,
                 'LinearSolver: \'electric field\' input is incompatible ' +
                 'with polarizable embedding')
             # disable restart of calculation with static electric field since
             # checkpoint file does not contain information about the electric
             # field
             self.restart = False
+
+    def _dft_sanity_check(self):
+        """
+        Checks DFT settings and updates relevant attributes.
+        """
+
+        # check xc functional
+        if self.xcfun is not None:
+            if isinstance(self.xcfun, str):
+                self.xcfun = parse_xc_func(self.xcfun.upper())
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'SCF driver: Undefined XC functional')
+        self._dft = (self.xcfun is not None)
+
+        # check grid level
+        if self._dft and (self.grid_level < 1 or self.grid_level > 6):
+            warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
+            warn_msg += ' Using default value. ***'
+            self.ostream.print_blank()
+            self.ostream.print_header(warn_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
+            self.grid_level = 4
+
+    def _pe_sanity_check(self, method_dict=None):
+        """
+        Checks PE settings and updates relevant attributes.
+
+        :param method_dict:
+            The dicitonary of method settings.
+        """
+
+        if method_dict:
+            if 'pe_options' in method_dict:
+                self.pe_options = dict(method_dict['pe_options'])
+            else:
+                self.pe_options = {}
+
+        if self.potfile:
+            self.pe_options['potfile'] = self.potfile
+
+        self._pe = ('potfile' in self.pe_options)
+
+        if self._pe:
+            from .polembed import PolEmbed
+
+            cppe_potfile = None
+            if self.rank == mpi_master():
+                potfile = self.pe_options['potfile']
+                if not Path(potfile).is_file():
+                    potfile = str(
+                        Path(self._filename).parent / Path(potfile).name)
+                cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
+            cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
+            self.pe_options['potfile'] = cppe_potfile
 
     def init_eri(self, molecule, basis):
         """
@@ -304,14 +350,14 @@ class LinearSolver:
         """
 
         if self.use_split_comm:
-            self.use_split_comm = ((self.dft or self.pe) and self.nodes >= 8)
+            self.use_split_comm = ((self._dft or self._pe) and self.nodes >= 8)
 
         if self.use_split_comm:
             screening = None
             valstr = 'ERI'
-            if self.dft:
+            if self._dft:
                 valstr += '/DFT'
-            if self.pe:
+            if self._pe:
                 valstr += '/PE'
             self.ostream.print_info(
                 'Using sub-communicators for {}.'.format(valstr))
@@ -338,7 +384,7 @@ class LinearSolver:
             The dictionary of DFT information.
         """
 
-        if self.dft:
+        if self._dft:
             # check dft setup
             assert_msg_critical(self.xcfun is not None,
                                 'LinearSolver: Undefined XC functional')
@@ -393,7 +439,7 @@ class LinearSolver:
         """
 
         # set up polarizable embedding
-        if self.pe:
+        if self._pe:
             from .polembed import PolEmbed
             pe_drv = PolEmbed(molecule, basis, self.pe_options, self.comm)
             V_es = pe_drv.compute_multipole_potential_integrals()
@@ -763,7 +809,7 @@ class LinearSolver:
         # set flags for Fock matrices
 
         fock_flag = fockmat.rgenjk
-        if self.dft:
+        if self._dft:
             if self.xcfun.is_hybrid():
                 fock_flag = fockmat.rgenjkx
                 fact_xc = self.xcfun.get_frac_exact_exchange()
@@ -787,7 +833,7 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('ERI', tm.time() - t0)
 
-            if self.dft:
+            if self._dft:
                 t0 = tm.time()
                 if not self.xcfun.is_hybrid():
                     for ifock in range(fock.number_of_fock_matrices()):
@@ -799,7 +845,7 @@ class LinearSolver:
                 if profiler is not None:
                     profiler.add_timing_info('DFT', tm.time() - t0)
 
-            if self.pe:
+            if self._pe:
                 t0 = tm.time()
                 pe_drv.V_es = V_es.copy()
                 for ifock in range(fock.number_of_fock_matrices()):
@@ -840,22 +886,22 @@ class LinearSolver:
         pe_drv = pe_dict['pe_drv']
 
         if self.split_comm_ratio is None:
-            if self.dft and self.pe:
+            if self._dft and self._pe:
                 self.split_comm_ratio = [0.34, 0.33, 0.33]
-            elif self.dft:
+            elif self._dft:
                 self.split_comm_ratio = [0.5, 0.5, 0.0]
-            elif self.pe:
+            elif self._pe:
                 self.split_comm_ratio = [0.5, 0.0, 0.5]
             else:
                 self.split_comm_ratio = [1.0, 0.0, 0.0]
 
-        if self.dft:
+        if self._dft:
             dft_nodes = int(float(self.nodes) * self.split_comm_ratio[1] + 0.5)
             dft_nodes = max(1, dft_nodes)
         else:
             dft_nodes = 0
 
-        if self.pe:
+        if self._pe:
             pe_nodes = int(float(self.nodes) * self.split_comm_ratio[2] + 0.5)
             pe_nodes = max(1, pe_nodes)
         else:
@@ -883,10 +929,10 @@ class LinearSolver:
         if self.rank != mpi_master():
             molgrid = MolecularGrid()
             V_es = np.zeros(0)
-        if self.dft:
+        if self._dft:
             if local_comm.Get_rank() == mpi_master():
                 molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
-        if self.pe:
+        if self._pe:
             if local_comm.Get_rank() == mpi_master():
                 V_es = cross_comm.bcast(V_es, root=mpi_master())
 
@@ -898,7 +944,7 @@ class LinearSolver:
             local_screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                               self.eri_thresh, molecule, basis)
             eri_drv.compute(fock, dens, molecule, basis, local_screening)
-            if self.dft and not self.xcfun.is_hybrid():
+            if self._dft and not self.xcfun.is_hybrid():
                 for ifock in range(fock.number_of_fock_matrices()):
                     fock.scale(2.0, ifock)
 
@@ -932,11 +978,11 @@ class LinearSolver:
         if self.rank == mpi_master():
             time_eri = dt[0] * eri_nodes
             time_dft = 0.0
-            if self.dft:
+            if self._dft:
                 time_dft = dt[1] * dft_nodes
             time_pe = 0.0
-            if self.pe:
-                pe_root = 2 if self.dft else 1
+            if self._pe:
+                pe_root = 2 if self._dft else 1
                 time_pe = dt[pe_root] * pe_nodes
             time_sum = time_eri + time_dft + time_pe
             self.split_comm_ratio = [
@@ -1094,7 +1140,7 @@ class LinearSolver:
                 self.batch_size)
             self.ostream.print_header(cur_str.ljust(str_width))
 
-        if self.dft:
+        if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
@@ -1119,7 +1165,7 @@ class LinearSolver:
 
         width = 92
         output_conv = '*** '
-        if self.is_converged:
+        if self._is_converged:
             output_conv += '{:s} converged'.format(title)
         else:
             output_conv += '{:s} NOT converged'.format(title)
@@ -1138,13 +1184,15 @@ class LinearSolver:
             Relative residual norms.
         """
 
+        self._is_converged = False
+
         if self.rank == mpi_master():
             max_residual = max(relative_residual_norm.values())
             if max_residual < self.conv_thresh:
-                self.is_converged = True
+                self._is_converged = True
 
-        self.is_converged = self.comm.bcast(self.is_converged,
-                                            root=mpi_master())
+        self._is_converged = self.comm.bcast(self._is_converged,
+                                             root=mpi_master())
 
     def decomp_grad(self, grad):
         """

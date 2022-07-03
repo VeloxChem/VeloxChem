@@ -154,7 +154,7 @@ class ScfDriver:
 
         # iterations data
         self._iter_data = []
-        self.is_converged = False
+        self._is_converged = False
         self._skip_iter = False
         self._old_energy = 0.0
         self._num_iter = 0
@@ -265,6 +265,14 @@ class ScfDriver:
         """
 
         return self._scf_type
+
+    @property
+    def is_converged(self):
+        """
+        Returns whether SCF is converged.
+        """
+
+        return self._is_converged
 
     def print_keywords(self):
         """
@@ -528,7 +536,7 @@ class ScfDriver:
 
         profiler.end(self.ostream, scf_flag=True)
 
-        if not self.is_converged:
+        if not self._is_converged:
             self.ostream.print_header(
                 '*** Warning: SCF is not converged!'.ljust(92))
             self.ostream.print_blank()
@@ -828,7 +836,7 @@ class ScfDriver:
 
             self._check_convergence()
 
-            if self.is_converged:
+            if self._is_converged:
                 break
 
             profiler.start_timer('FockDiag')
@@ -894,7 +902,7 @@ class ScfDriver:
                 'F': (F_alpha, F_beta),
             }
 
-            if self.is_converged:
+            if self._is_converged:
                 self._write_final_hdf5(molecule, ao_basis)
 
         else:
@@ -1653,14 +1661,14 @@ class ScfDriver:
         electronic gradient is fullfiled.
         """
 
-        self.is_converged = False
+        self._is_converged = False
 
         if self._num_iter > 0:
 
             e_grad = self._iter_data[-1]['gradient_norm']
 
             if e_grad < self.conv_thresh:
-                self.is_converged = True
+                self._is_converged = True
 
     def _get_scf_range(self):
         """
@@ -1786,7 +1794,7 @@ class ScfDriver:
 
         else:
             valstr = "*** SCF "
-            if self.is_converged:
+            if self._is_converged:
                 valstr += "converged in "
             else:
                 valstr += "NOT converged in "

@@ -84,7 +84,7 @@ class C6Solver(LinearSolver):
         self.conv_thresh = 1.0e-3
         self.lindep_thresh = 1.0e-10
 
-        self.input_keywords['response'].update({
+        self._input_keywords['response'].update({
             'a_operator': ('str_lower', 'A operator'),
             'a_components': ('str_lower', 'Cartesian components of A operator'),
             'b_operator': ('str_lower', 'B operator'),
@@ -236,6 +236,19 @@ class C6Solver(LinearSolver):
         self.dist_e2bger = None
         self.dist_e2bung = None
 
+        # check dft setup
+        self._dft_sanity_check()
+
+        # check pe setup
+        self._pe_sanity_check()
+
+        # check print level (verbosity of output)
+        if self.print_level < 2:
+            self.print_level = 1
+        if self.print_level > 2:
+            self.print_level = 3
+
+        # initialize profiler
         profiler = Profiler({
             'timing': self.timing,
             'profiling': self.profiling,

@@ -104,7 +104,7 @@ class TDAExciDriver(LinearSolver):
         self.cube_stepsize = None
         self.cube_points = [80, 80, 80]
 
-        self.input_keywords['response'].update({
+        self._input_keywords['response'].update({
             'nstates': ('int', 'number of excited states'),
             'nto': ('bool', 'analyze natural transition orbitals'),
             'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
@@ -114,7 +114,7 @@ class TDAExciDriver(LinearSolver):
             'cube_points': ('seq_fixed_int', 'number of cubic grid points'),
         })
 
-        self.input_keywords['response'].pop('lindep_thresh', None)
+        self._input_keywords['response'].pop('lindep_thresh', None)
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -160,6 +160,19 @@ class TDAExciDriver(LinearSolver):
             dipole moments, oscillator strengths and rotatory strengths.
         """
 
+        # check dft setup
+        self._dft_sanity_check()
+
+        # check pe setup
+        self._pe_sanity_check()
+
+        # check print level (verbosity of output)
+        if self.print_level < 2:
+            self.print_level = 1
+        if self.print_level > 2:
+            self.print_level = 3
+
+        # initialize profiler
         profiler = Profiler({
             'timing': self.timing,
             'profiling': self.profiling,
@@ -287,9 +300,11 @@ class TDAExciDriver(LinearSolver):
 
             profiler.print_memory_tracing(self.ostream)
 
+            self.cur_iter = i
+
             # check convergence
 
-            self.check_convergence(i)
+            self.check_convergence()
 
             # write checkpoint file
 
@@ -302,7 +317,7 @@ class TDAExciDriver(LinearSolver):
 
             # finish TDA after convergence
 
-            if self.is_converged:
+            if self._is_converged:
                 break
 
         # converged?
@@ -321,7 +336,7 @@ class TDAExciDriver(LinearSolver):
 
         # print converged excited states
 
-        if self.rank == mpi_master() and self.is_converged:
+        if self.rank == mpi_master() and self._is_converged:
             mo_occ = scf_tensors['C_alpha'][:, :nocc].copy()
             mo_vir = scf_tensors['C_alpha'][:, nocc:].copy()
 
@@ -357,7 +372,7 @@ class TDAExciDriver(LinearSolver):
                     cubic_grid = CubicGrid(self.cube_origin, self.cube_stepsize,
                                            self.cube_points)
 
-            if self.nto and self.is_converged:
+            if self.nto and self._is_converged:
                 self.ostream.print_info(
                     'Running NTO analysis for S{:d}...'.format(s + 1))
                 self.ostream.flush()
@@ -375,7 +390,7 @@ class TDAExciDriver(LinearSolver):
                     nto_lambdas.append(lam_diag)
                     nto_cube_files.append(nto_cube_fnames)
 
-            if self.detach_attach and self.is_converged:
+            if self.detach_attach and self._is_converged:
                 self.ostream.print_info(
                     'Running detachment/attachment analysis for S{:d}...'.
                     format(s + 1))
@@ -395,13 +410,13 @@ class TDAExciDriver(LinearSolver):
                 if self.rank == mpi_master():
                     dens_cube_files.append(dens_cube_fnames)
 
-        if (self.nto or self.detach_attach) and self.is_converged:
+        if (self.nto or self.detach_attach) and self._is_converged:
             self.ostream.print_blank()
             self.ostream.flush()
 
         # results
 
-        if self.rank == mpi_master() and self.is_converged:
+        if self.rank == mpi_master() and self._is_converged:
             ret_dict = {
                 'eigenvalues': eigvals,
                 'eigenvectors': eigvecs,
@@ -467,7 +482,7 @@ class TDAExciDriver(LinearSolver):
 
         return None, None
 
-    def check_convergence(self, iteration):
+    def check_convergence(self):
         """
         Checks convergence of excitation energies and set convergence flag on
         all processes within MPI communicator.
@@ -476,15 +491,13 @@ class TDAExciDriver(LinearSolver):
             The current excited states solver iteration.
         """
 
-        self.cur_iter = iteration
+        self._is_converged = False
 
         if self.rank == mpi_master():
-            self.is_converged = self.solver.check_convergence(self.conv_thresh)
-        else:
-            self.is_converged = False
+            self._is_converged = self.solver.check_convergence(self.conv_thresh)
 
-        self.is_converged = self.comm.bcast(self.is_converged,
-                                            root=mpi_master())
+        self._is_converged = self.comm.bcast(self._is_converged,
+                                             root=mpi_master())
 
     def get_densities(self, trial_mat, tensors, molecule):
         """
@@ -525,7 +538,7 @@ class TDAExciDriver(LinearSolver):
 
         fock = AOFockMatrix(tdens)
 
-        if self.dft:
+        if self._dft:
             if self.xcfun.is_hybrid():
                 fock_flag = fockmat.rgenjkx
                 fact_xc = self.xcfun.get_frac_exact_exchange()
@@ -541,7 +554,7 @@ class TDAExciDriver(LinearSolver):
 
         # broadcast ground state density
 
-        if self.dft:
+        if self._dft:
             if self.rank == mpi_master():
                 gsdens = AODensityMatrix([tensors['D_alpha']], denmat.rest)
             else:

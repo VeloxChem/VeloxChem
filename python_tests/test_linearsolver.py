@@ -31,7 +31,6 @@ class TestLinearSolver:
         }
 
         method_dict = {
-            'dft': True,
             'grid_level': 5,
             'electric_field': (0, -0.002, 0.001),
             'use_split_comm': True,
