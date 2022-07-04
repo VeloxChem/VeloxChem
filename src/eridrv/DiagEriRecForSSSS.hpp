@@ -92,11 +92,11 @@ compHostSSSS(      T*                                 intsBuffer,
             derirec::compHostDistancesPQ(rpq, gtoPairBlock,
                                          bPosition, ePosition, i, j);
             
-            derirec::compHostFactorRho(frho, gtoPairBlock,
-                                       bPosition, ePosition, i, j);
-            
-            derirec::compHostFactorNorm(fnorm, gtoPairBlock,
+            derirec::compHostFactorsRho(frho, gtoPairBlock,
                                         bPosition, ePosition, i, j);
+            
+            derirec::compHostFactorsNorm(fnorm, gtoPairBlock,
+                                         bPosition, ePosition, i, j);
             
             // compute Boys function values
             

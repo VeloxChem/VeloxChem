@@ -16,7 +16,6 @@ class TestXCMolGrad:
 
         scf_drv.dft = True
         scf_drv.xcfun = xcfun
-        scf_drv.grid_level = 5
         scf_drv.conv_thresh = 1.0e-8
 
         scf_drv.compute(molecule, basis)
@@ -28,9 +27,8 @@ class TestXCMolGrad:
         mol_grid.distribute(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
         grad_drv = XCMolecularGradient(scf_drv.comm)
-        atom_ids = list(range(molecule.number_of_atoms()))
-        mol_grad = grad_drv.integrate(atom_ids, density, molecule, basis,
-                                      mol_grid, xcfun)
+        mol_grad = grad_drv.integrate_vxc_gradient(density, molecule, basis,
+                                                   mol_grid, xcfun)
         mol_grad = scf_drv.comm.reduce(mol_grad, root=mpi_master())
 
         if scf_drv.rank == mpi_master():
@@ -49,7 +47,7 @@ class TestXCMolGrad:
         xcfun = 'slater'
 
         ref_grad = np.array([
-            [0., 0., -0.4075910],
+            [0., 0., -0.4075911],
             [-0., 0.2540621, 0.2037956],
             [0., -0.2540621, 0.2037956],
         ])
@@ -69,9 +67,9 @@ class TestXCMolGrad:
         xcfun = 'blyp'
 
         ref_grad = np.array([
-            [-0., 0.0000000, -0.4453755],
-            [0., 0.2801308, 0.2226875],
-            [0., -0.2801308, 0.2226875],
+            [-0., 0.0000000, -0.4453751],
+            [0., 0.2801306, 0.2226875],
+            [0., -0.2801306, 0.2226875],
         ])
 
         self.run_xc_mol_grad(molecule, basis, xcfun, ref_grad)

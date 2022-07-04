@@ -96,7 +96,7 @@ TEST_F(CDiagEriRecFactsTest, CompHostFactorRho)
     
     BufferHostX<double> frho(4);
     
-    derirec::compHostFactorRho(frho.data(), &s21pairs, 0, 4, 0, 0);
+    derirec::compHostFactorsRho(frho.data(), &s21pairs, 0, 4, 0, 0);
     
     const auto frho_00 = BufferHostX<double>(4, {2.00000000000000000000,
                                                  1.80000000000000000000,
@@ -105,7 +105,7 @@ TEST_F(CDiagEriRecFactsTest, CompHostFactorRho)
 
     EXPECT_EQ(frho_00, frho);
     
-    derirec::compHostFactorRho(frho.data(), &s21pairs, 0, 4, 0, 1);
+    derirec::compHostFactorsRho(frho.data(), &s21pairs, 0, 4, 0, 1);
     
     const auto frho_01 = BufferHostX<double>(4, {1.61194029850746268656,
                                                  1.40338983050847457627,
@@ -114,7 +114,7 @@ TEST_F(CDiagEriRecFactsTest, CompHostFactorRho)
 
     EXPECT_EQ(frho_01, frho);
     
-    derirec::compHostFactorRho(frho.data(), &s21pairs, 0, 4, 1, 1);
+    derirec::compHostFactorsRho(frho.data(), &s21pairs, 0, 4, 1, 1);
     
     const auto frho_11 = BufferHostX<double>(4, {1.35000000000000000000,
                                                  1.15000000000000000000,
@@ -142,7 +142,7 @@ TEST_F(CDiagEriRecFactsTest, CompHostFactorNorm)
     
     BufferHostX<double> fnorm(4);
     
-    derirec::compHostFactorNorm(fnorm.data(), &s21pairs, 0, 4, 0, 0);
+    derirec::compHostFactorsNorm(fnorm.data(), &s21pairs, 0, 4, 0, 0);
     
     const auto fnorm_00 = BufferHostX<double>(4, {0.19938331312932041708,
                                                   0.01729165758259379585,
@@ -151,7 +151,7 @@ TEST_F(CDiagEriRecFactsTest, CompHostFactorNorm)
 
     EXPECT_EQ(fnorm_00, fnorm);
     
-    derirec::compHostFactorNorm(fnorm.data(), &s21pairs, 0, 4, 0, 1);
+    derirec::compHostFactorsNorm(fnorm.data(), &s21pairs, 0, 4, 0, 1);
     
     const auto fnorm_01 = BufferHostX<double>(4, {0.45025968744901134950,
                                                   0.05045735105393916422,
@@ -160,7 +160,7 @@ TEST_F(CDiagEriRecFactsTest, CompHostFactorNorm)
 
     EXPECT_EQ(fnorm_01, fnorm);
     
-    derirec::compHostFactorNorm(fnorm.data(), &s21pairs, 0, 4, 1, 1);
+    derirec::compHostFactorsNorm(fnorm.data(), &s21pairs, 0, 4, 1, 1);
     
     const auto fnorm_11 = BufferHostX<double>(4, {0.25420104491165196955,
                                                   0.03680885223437551286,
@@ -192,7 +192,7 @@ TEST_F(CDiagEriRecFactsTest, CompHostBoysArguments)
     
     BufferHostX<double> frho(4);
     
-    derirec::compHostFactorRho(frho.data(), &s21pairs, 0, 4, 0, 0);
+    derirec::compHostFactorsRho(frho.data(), &s21pairs, 0, 4, 0, 0);
     
     BufferHostX<double> fargs(4);
     
@@ -204,7 +204,7 @@ TEST_F(CDiagEriRecFactsTest, CompHostBoysArguments)
     
     derirec::compHostDistancesPQ(rpq, &s21pairs, 0, 4, 1, 1);
     
-    derirec::compHostFactorRho(frho.data(), &s21pairs, 0, 4, 1, 1);
+    derirec::compHostFactorsRho(frho.data(), &s21pairs, 0, 4, 1, 1);
     
     derirec::compHostBoysArguments(fargs, rpq, frho.data(), 4);
     
@@ -212,7 +212,7 @@ TEST_F(CDiagEriRecFactsTest, CompHostBoysArguments)
     
     derirec::compHostDistancesPQ(rpq, &s21pairs, 0, 4, 0, 1);
     
-    derirec::compHostFactorRho(frho.data(), &s21pairs, 0, 4, 0, 1);
+    derirec::compHostFactorsRho(frho.data(), &s21pairs, 0, 4, 0, 1);
     
     derirec::compHostBoysArguments(fargs, rpq, frho.data(), 4);
     
@@ -242,7 +242,7 @@ TEST_F(CDiagEriRecFactsTest, CompHostFactorZeta)
     
     BufferHostX<double> fzeta(4);
     
-    derirec::compHostFactorZeta(fzeta.data(), &s21pairs, 0, 4, 0, 0);
+    derirec::compHostFactorsZeta(fzeta.data(), &s21pairs, 0, 4, 0, 0);
     
   
     const auto fzeta_00 = BufferHostX<double>(4, {0.12500000000000000000,
@@ -252,7 +252,7 @@ TEST_F(CDiagEriRecFactsTest, CompHostFactorZeta)
 
     EXPECT_EQ(fzeta_00, fzeta);
     
-    derirec::compHostFactorZeta(fzeta.data(), &s21pairs, 0, 4, 0, 1);
+    derirec::compHostFactorsZeta(fzeta.data(), &s21pairs, 0, 4, 0, 1);
     
     const auto fzeta_01 = BufferHostX<double>(4, {0.14925373134328358208,
                                                   0.16949152542372881355,
@@ -261,7 +261,7 @@ TEST_F(CDiagEriRecFactsTest, CompHostFactorZeta)
 
     EXPECT_EQ(fzeta_01, fzeta);
     
-    derirec::compHostFactorZeta(fzeta.data(), &s21pairs, 0, 4, 1, 1);
+    derirec::compHostFactorsZeta(fzeta.data(), &s21pairs, 0, 4, 1, 1);
     
     const auto fzeta_11 = BufferHostX<double>(4, {0.18518518518518518518,
                                                   0.21739130434782608695,
@@ -289,7 +289,7 @@ TEST_F(CDiagEriRecFactsTest, CompHostFactorPartialZeta)
     
     BufferHostX<double> fzeta(4);
     
-    derirec::compHostFactorPartialZeta(fzeta.data(), &s21pairs, 0, 4, 0);
+    derirec::compHostFactorsPartialZeta(fzeta.data(), &s21pairs, 0, 4, 0);
     
   
     const auto fzeta_0 = BufferHostX<double>(4, {0.25000000000000000000,
@@ -299,7 +299,7 @@ TEST_F(CDiagEriRecFactsTest, CompHostFactorPartialZeta)
 
     EXPECT_EQ(fzeta_0, fzeta);
   
-    derirec::compHostFactorPartialZeta(fzeta.data(), &s21pairs, 0, 4, 1);
+    derirec::compHostFactorsPartialZeta(fzeta.data(), &s21pairs, 0, 4, 1);
     
     const auto fzeta_1 = BufferHostX<double>(4, {0.37037037037037037037,
                                                  0.43478260869565217391,

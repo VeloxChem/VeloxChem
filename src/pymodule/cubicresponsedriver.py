@@ -157,8 +157,8 @@ class CubicResponseDriver(NonLinearSolver):
 
         if self.rank == mpi_master():
             S = scf_tensors['S']
-            da = scf_tensors['D'][0]
-            mo = scf_tensors['C']
+            da = scf_tensors['D_alpha']
+            mo = scf_tensors['C_alpha']
             d_a_mo = np.linalg.multi_dot([mo.T, S, da, S, mo])
             norb = mo.shape[1]
         else:
@@ -219,7 +219,7 @@ class CubicResponseDriver(NonLinearSolver):
             )
         ]
 
-        freqpairs = [
+        freqtriples = [
             wl for wl in zip(
                 self.b_frequencies,
                 self.c_frequencies,
@@ -275,9 +275,10 @@ class CubicResponseDriver(NonLinearSolver):
 
         profiler.check_memory_usage('1st CPP')
 
-        cubic_dict = self.compute_cubic_components(Focks, freqpairs, X, d_a_mo,
-                                                   kX, self.comp, scf_tensors,
-                                                   molecule, ao_basis, profiler)
+        cubic_dict = self.compute_cubic_components(Focks, freqtriples, X,
+                                                   d_a_mo, kX, self.comp,
+                                                   scf_tensors, molecule,
+                                                   ao_basis, profiler)
 
         valstr = '*** Time spent in cubic response calculation: '
         valstr += '{:.2f} sec ***'.format(time.time() - start_time)
@@ -291,7 +292,7 @@ class CubicResponseDriver(NonLinearSolver):
 
         return cubic_dict
 
-    def compute_cubic_components(self, Focks, freqpairs, X, d_a_mo, kX, track,
+    def compute_cubic_components(self, Focks, freqtriples, X, d_a_mo, kX, track,
                                  scf_tensors, molecule, ao_basis, profiler):
         """
         Computes all the relevent terms to compute a general cubic response function
@@ -318,14 +319,10 @@ class CubicResponseDriver(NonLinearSolver):
         """
 
         if self.rank == mpi_master():
-            S = scf_tensors['S']
-            D0 = scf_tensors['D'][0]
-            mo = scf_tensors['C']
-            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F'][0], mo])
+            mo = scf_tensors['C_alpha']
+            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F_alpha'], mo])
             norb = mo.shape[1]
         else:
-            S = None
-            D0 = None
             mo = None
             F0 = None
             norb = None
@@ -337,42 +334,42 @@ class CubicResponseDriver(NonLinearSolver):
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            density_list = self.get_densities(freqpairs, kX, S, D0, mo)
+            density_list = self.get_densities(freqtriples, kX, mo, nocc)
         else:
             density_list = None
 
         profiler.check_memory_usage('1st densities')
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(freqpairs, density_list, F0, mo,
+        fock_dict = self.get_fock_dict(freqtriples, density_list, F0, mo,
                                        molecule, ao_basis)
 
         profiler.check_memory_usage('1st Focks')
 
-        e4_dict, s4_dict, r4_dict = self.get_esr4(freqpairs, kX, fock_dict,
+        e4_dict, s4_dict, r4_dict = self.get_esr4(freqtriples, kX, fock_dict,
                                                   Focks, nocc, norb, d_a_mo)
 
         profiler.check_memory_usage('E[4]')
 
-        k_xy, f_xy = self.get_nxy(freqpairs, kX, fock_dict, Focks, nocc, norb,
+        k_xy, f_xy = self.get_nxy(freqtriples, kX, fock_dict, Focks, nocc, norb,
                                   d_a_mo, X, molecule, ao_basis, scf_tensors)
 
         profiler.check_memory_usage('2nd CPP')
 
         if self.rank == mpi_master():
-            density_list_two = self.get_densities_II(freqpairs, kX, k_xy, S, D0,
-                                                     mo)
+            density_list_two = self.get_densities_II(freqtriples, kX, k_xy, mo,
+                                                     nocc)
         else:
             density_list_two = None
 
         profiler.check_memory_usage('2nd densities')
 
-        fock_dict_two = self.get_fock_dict_II(freqpairs, density_list_two, F0,
+        fock_dict_two = self.get_fock_dict_II(freqtriples, density_list_two, F0,
                                               mo, molecule, ao_basis)
 
         profiler.check_memory_usage('2nd Focks')
 
-        e3_dict = self.get_e3(freqpairs, kX, k_xy, Focks, fock_dict_two, f_xy,
+        e3_dict = self.get_e3(freqtriples, kX, k_xy, Focks, fock_dict_two, f_xy,
                               nocc, norb)
 
         profiler.check_memory_usage('E[3]')
@@ -386,7 +383,7 @@ class CubicResponseDriver(NonLinearSolver):
             C = X[self.c_components]
             D = X[self.d_components]
 
-            for (wb, wc, wd) in freqpairs:
+            for (wb, wc, wd) in freqtriples:
 
                 Na = self.complex_lrmat2vec(kX[('A', wb + wc + wd)], nocc, norb)
                 Nb = self.complex_lrmat2vec(kX[('B', wb)], nocc, norb)
@@ -635,20 +632,18 @@ class CubicResponseDriver(NonLinearSolver):
 
         return e3vec
 
-    def get_densities(self, freqpairs, kX, S, D0, mo):
+    def get_densities(self, freqtriples, kX, mo, nocc):
         """
         Computes the  densities needed for the Fock matrices.
 
-        :param wi:
-            A list of the frequencies
+        :param freqtriples:
+            A list of the frequency triples
         :param kX:
             A dictonary with all the first-order response matrices
-        :param S:
-            The overlap matrix
-        :param D0:
-            The SCF density matrix in AO basis
         :param mo:
             A matrix containing the MO coefficents
+        :param nocc:
+            Number of occupied orbitals
 
         :return:
             A list of tranformed compounded densities
@@ -656,41 +651,56 @@ class CubicResponseDriver(NonLinearSolver):
 
         density_list = []
 
-        for (wb, wc, wd) in freqpairs:
+        for (wb, wc, wd) in freqtriples:
 
             # convert response matrix to ao basis #
 
-            kb = self.mo2ao(mo, kX[('B', wb)])
-            kc = self.mo2ao(mo, kX[('C', wc)])
-            kd = self.mo2ao(mo, kX[('D', wd)])
+            kb = kX[('B', wb)]
+            kc = kX[('C', wc)]
+            kd = kX[('D', wd)]
 
             # create the first order single indexed densiteies #
 
-            Db = self.transform_dens(kb, D0, S)
-            Dc = self.transform_dens(kc, D0, S)
-            Dd = self.transform_dens(kd, D0, S)
+            Db = self.commut_mo_density(kb, nocc)
+            Dc = self.commut_mo_density(kc, nocc)
+            Dd = self.commut_mo_density(kd, nocc)
 
             # create the first order two indexed densities #
 
-            Dbc = self.transform_dens(kb, Dc, S)
-            Dcb = self.transform_dens(kc, Db, S)
+            Dbc = self.commut(kb, Dc)
+            Dcb = self.commut(kc, Db)
 
-            Dbd = self.transform_dens(kb, Dd, S)
-            Ddb = self.transform_dens(kd, Db, S)
+            Dbd = self.commut(kb, Dd)
+            Ddb = self.commut(kd, Db)
 
-            Ddc = self.transform_dens(kd, Dc, S)
-            Dcd = self.transform_dens(kc, Dd, S)
+            Ddc = self.commut(kd, Dc)
+            Dcd = self.commut(kc, Dd)
 
             # create the first order three indexed densities #
 
-            Dbcd = self.transform_dens(kb, Dcd, S)
-            Dbdc = self.transform_dens(kb, Ddc, S)
+            Dbcd = self.commut(kb, Dcd)
+            Dbdc = self.commut(kb, Ddc)
 
-            Dcbd = self.transform_dens(kc, Dbd, S)
-            Dcdb = self.transform_dens(kc, Ddb, S)
+            Dcbd = self.commut(kc, Dbd)
+            Dcdb = self.commut(kc, Ddb)
 
-            Ddbc = self.transform_dens(kd, Dbc, S)
-            Ddcb = self.transform_dens(kd, Dcb, S)
+            Ddbc = self.commut(kd, Dbc)
+            Ddcb = self.commut(kd, Dcb)
+
+            # density transformation from MO to AO basis
+
+            Dbc = np.linalg.multi_dot([mo, Dbc, mo.T])
+            Dcb = np.linalg.multi_dot([mo, Dcb, mo.T])
+            Dbd = np.linalg.multi_dot([mo, Dbd, mo.T])
+            Ddb = np.linalg.multi_dot([mo, Ddb, mo.T])
+            Ddc = np.linalg.multi_dot([mo, Ddc, mo.T])
+            Dcd = np.linalg.multi_dot([mo, Dcd, mo.T])
+            Dbcd = np.linalg.multi_dot([mo, Dbcd, mo.T])
+            Dbdc = np.linalg.multi_dot([mo, Dbdc, mo.T])
+            Dcbd = np.linalg.multi_dot([mo, Dcbd, mo.T])
+            Dcdb = np.linalg.multi_dot([mo, Dcdb, mo.T])
+            Ddbc = np.linalg.multi_dot([mo, Ddbc, mo.T])
+            Ddcb = np.linalg.multi_dot([mo, Ddcb, mo.T])
 
             density_list.append(Dbc.real)
             density_list.append(Dbc.imag)
@@ -719,20 +729,20 @@ class CubicResponseDriver(NonLinearSolver):
 
         return density_list
 
-    def get_densities_II(self, freqpairs, kX, k_xy, S, D0, mo):
+    def get_densities_II(self, freqtriples, kX, k_xy, mo, nocc):
         """
         Computes the  densities needed for the Fock matrices.
 
-        :param wi:
-            A list of the frequencies
+        :param freqtriples:
+            A list of the frequency triples
         :param kX:
             A dictonary with all the first-order response matrices
-        :param S:
-            The overlap matrix
-        :param D0:
-            The SCF density matrix in AO basis
+        :param k_xy:
+            A dict of the two index response matrices
         :param mo:
             A matrix containing the MO coefficents
+        :param nocc:
+            Number of occupied orbitals
 
         :return:
             A list of tranformed compounded densities
@@ -740,40 +750,49 @@ class CubicResponseDriver(NonLinearSolver):
 
         density_list = []
 
-        for (wb, wc, wd) in freqpairs:
+        for (wb, wc, wd) in freqtriples:
 
             # convert response matrix to ao basis #
 
-            kb = self.mo2ao(mo, kX[('B', wb)])
-            kc = self.mo2ao(mo, kX[('C', wc)])
-            kd = self.mo2ao(mo, kX[('D', wd)])
+            kb = kX[('B', wb)]
+            kc = kX[('C', wc)]
+            kd = kX[('D', wd)]
 
-            kbc = self.mo2ao(mo, k_xy[(('BC', wb, wc), wb + wc)])
-            kbd = self.mo2ao(mo, k_xy[(('BD', wb, wd), wb + wd)])
-            kcd = self.mo2ao(mo, k_xy[(('CD', wc, wd), wc + wd)])
+            kbc = k_xy[(('BC', wb, wc), wb + wc)]
+            kbd = k_xy[(('BD', wb, wd), wb + wd)]
+            kcd = k_xy[(('CD', wc, wd), wc + wd)]
 
             # create the first order single indexed densiteies #
 
-            Db = self.transform_dens(kb, D0, S)
-            Dc = self.transform_dens(kc, D0, S)
-            Dd = self.transform_dens(kd, D0, S)
+            Db = self.commut_mo_density(kb, nocc)
+            Dc = self.commut_mo_density(kc, nocc)
+            Dd = self.commut_mo_density(kd, nocc)
 
             # create the second-order two indexed densities #
 
-            Dbc = self.transform_dens(kbc, D0, S)
-            Dbd = self.transform_dens(kbd, D0, S)
-            Dcd = self.transform_dens(kcd, D0, S)
+            Dbc = self.commut_mo_density(kbc, nocc)
+            Dbd = self.commut_mo_density(kbd, nocc)
+            Dcd = self.commut_mo_density(kcd, nocc)
 
             # create the second-order three indexed densities #
 
-            Db_cd = self.transform_dens(kb, Dcd, S)
-            Dcd_b = self.transform_dens(kcd, Db, S)
+            Db_cd = self.commut(kb, Dcd)
+            Dcd_b = self.commut(kcd, Db)
 
-            Dc_bd = self.transform_dens(kc, Dbd, S)
-            Dbd_c = self.transform_dens(kbd, Dc, S)
+            Dc_bd = self.commut(kc, Dbd)
+            Dbd_c = self.commut(kbd, Dc)
 
-            Dd_bc = self.transform_dens(kd, Dbc, S)
-            Dbc_d = self.transform_dens(kbc, Dd, S)
+            Dd_bc = self.commut(kd, Dbc)
+            Dbc_d = self.commut(kbc, Dd)
+
+            # density transformation from MO to AO basis
+
+            Db_cd = np.linalg.multi_dot([mo, Db_cd, mo.T])
+            Dcd_b = np.linalg.multi_dot([mo, Dcd_b, mo.T])
+            Dc_bd = np.linalg.multi_dot([mo, Dc_bd, mo.T])
+            Dbd_c = np.linalg.multi_dot([mo, Dbd_c, mo.T])
+            Dd_bc = np.linalg.multi_dot([mo, Dd_bc, mo.T])
+            Dbc_d = np.linalg.multi_dot([mo, Dbc_d, mo.T])
 
             density_list.append(Db_cd.real)
             density_list.append(Db_cd.imag)

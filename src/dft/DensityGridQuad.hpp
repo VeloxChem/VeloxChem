@@ -368,18 +368,12 @@ class CDensityGridQuad
     /**
      Generates products of one-time transformed densities to be used for quadratic response.
 
-     @param densityGridAB the screened density grid.
-     @param molecularGridab the screened molecular grid.
-     @param rwDensityGrid  one-time transformed densities evaluated on the grid
-     @param numdens the number of densities.
+     @param rwDensityGrid one-time transformed densities evaluated on the grid
+     @param xcFuncType the type of exchange-correlation functional.
+     @param numDens the number of densities.
      @param quadMode a string that specifies which densities should be combined.
      */
-    void DensityProd(CDensityGridQuad&   densityGridAB,
-                     CMolecularGrid&     molecularGridab,
-                     const CDensityGrid& rwDensityGrid,
-                     const xcfun         xcFuncType,
-                     int32_t             numdens,
-                     const std::string&  quadMode) const;
+    void DensityProd(const CDensityGrid& rwDensityGrid, const xcfun xcFuncType, const int32_t numDens, const std::string& quadMode);
 
     /**
      Converts density grid object to text and insert it into output text
