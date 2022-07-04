@@ -101,9 +101,9 @@ class TestCheckpoint:
             fname = str(Path(temp_dir, 'rsp.h5'))
 
             solver.checkpoint_file = fname
-            solver.write_checkpoint(mol, bas, dft_dict, pe_dict, labels)
+            solver._write_checkpoint(mol, bas, dft_dict, pe_dict, labels)
 
-            solver.read_checkpoint(labels)
+            solver._read_checkpoint(labels)
             assert np.max(
                 np.abs(backup_data['bger'] - solver.dist_bger.data)) < 1.0e-12
             assert np.max(

@@ -169,8 +169,8 @@ class LinearResponseEigenSolver(LinearSolver):
         })
 
         if self.rank == mpi_master():
-            self.print_header('Linear Response EigenSolver',
-                              nstates=self.nstates)
+            self._print_header('Linear Response EigenSolver',
+                               nstates=self.nstates)
 
         self.start_time = tm.time()
 
@@ -195,13 +195,13 @@ class LinearResponseEigenSolver(LinearSolver):
                 'LinearResponseEigenSolver: too many excited states')
 
         # ERI information
-        eri_dict = self.init_eri(molecule, basis)
+        eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self.init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors)
 
         # PE information
-        pe_dict = self.init_pe(molecule, basis)
+        pe_dict = self._init_pe(molecule, basis)
 
         rsp_vector_labels = [
             'LR_eigen_bger_half_size',
@@ -220,15 +220,15 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # read initial guess from restart file
         if self.restart:
-            self.read_checkpoint(rsp_vector_labels)
+            self._read_checkpoint(rsp_vector_labels)
 
         # generate initial guess from scratch
         else:
             igs = self.initial_excitations(self.nstates, orb_ene, nocc, norb)
-            bger, bung = self.setup_trials(igs, None)
+            bger, bung = self._setup_trials(igs, None)
 
-            self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                               eri_dict, dft_dict, pe_dict)
+            self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
+                                eri_dict, dft_dict, pe_dict)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -237,8 +237,8 @@ class LinearResponseEigenSolver(LinearSolver):
         relative_residual_norm = {}
 
         signal_handler = SignalHandler()
-        signal_handler.add_sigterm_function(self.graceful_exit, molecule, basis,
-                                            dft_dict, pe_dict,
+        signal_handler.add_sigterm_function(self._graceful_exit, molecule,
+                                            basis, dft_dict, pe_dict,
                                             rsp_vector_labels)
 
         iter_per_trial_in_hours = None
@@ -372,12 +372,12 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 profiler.print_memory_tracing(self.ostream)
 
-                self.print_iteration(relative_residual_norm, wn)
+                self._print_iteration(relative_residual_norm, wn)
 
             profiler.stop_timer('ReducedSpace')
 
             # check convergence
-            self.check_convergence(relative_residual_norm)
+            self._check_convergence(relative_residual_norm)
 
             if self.is_converged:
                 break
@@ -386,11 +386,11 @@ class LinearResponseEigenSolver(LinearSolver):
 
             # update trial vectors
             precond = {
-                k: self.get_precond(orb_ene, nocc, norb, w)
+                k: self._get_precond(orb_ene, nocc, norb, w)
                 for k, w in enumerate(list(wn))
             }
 
-            new_trials_ger, new_trials_ung = self.setup_trials(
+            new_trials_ger, new_trials_ung = self._setup_trials(
                 exresiduals, precond, self.dist_bger, self.dist_bung)
 
             exresiduals.clear()
@@ -405,15 +405,15 @@ class LinearResponseEigenSolver(LinearSolver):
 
             if iter_per_trial_in_hours is not None:
                 next_iter_in_hours = iter_per_trial_in_hours * n_new_trials
-                if self.need_graceful_exit(next_iter_in_hours):
-                    self.graceful_exit(molecule, basis, dft_dict, pe_dict,
-                                       rsp_vector_labels)
+                if self._need_graceful_exit(next_iter_in_hours):
+                    self._graceful_exit(molecule, basis, dft_dict, pe_dict,
+                                        rsp_vector_labels)
 
             profiler.start_timer('FockBuild')
 
-            self.e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                               scf_tensors, eri_dict, dft_dict, pe_dict,
-                               profiler)
+            self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
+                                scf_tensors, eri_dict, dft_dict, pe_dict,
+                                profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials
@@ -425,12 +425,12 @@ class LinearResponseEigenSolver(LinearSolver):
 
         signal_handler.remove_sigterm_function()
 
-        self.write_checkpoint(molecule, basis, dft_dict, pe_dict,
-                              rsp_vector_labels)
+        self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
+                               rsp_vector_labels)
 
         # converged?
         if self.rank == mpi_master():
-            self.print_convergence('Linear response')
+            self._print_convergence('Linear response')
 
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
@@ -681,7 +681,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         return final
 
-    def precond_trials(self, excitations, precond):
+    def _precond_trials(self, excitations, precond):
         """
         Applies preconditioner to distributed trial vectors.
 
@@ -699,7 +699,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         for k, (w, X) in excitations.items():
             if precond is not None:
-                v = self.preconditioning(precond[k], X)
+                v = self._preconditioning(precond[k], X)
             else:
                 v = X
             norms_2 = 2.0 * v.squared_norm(axis=0)
@@ -722,7 +722,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         return dist_new_ger, dist_new_ung
 
-    def get_precond(self, orb_ene, nocc, norb, w):
+    def _get_precond(self, orb_ene, nocc, norb, w):
         """
         Constructs the preconditioners.
 
@@ -741,7 +741,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # spawning needed components
 
-        ediag, sdiag = self.construct_ed_sd_half(orb_ene, nocc, norb)
+        ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
 
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2
@@ -759,7 +759,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         return DistributedArray(p_mat, self.comm)
 
-    def preconditioning(self, precond, v_in):
+    def _preconditioning(self, precond, v_in):
         """
         Applies preconditioner to a tuple of distributed trial vectors.
 
@@ -824,13 +824,13 @@ class LinearResponseEigenSolver(LinearSolver):
         nocc = molecule.number_of_alpha_electrons()
 
         # ERI information
-        eri_dict = self.init_eri(molecule, basis)
+        eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self.init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors)
 
         # PE information
-        pe_dict = self.init_pe(molecule, basis)
+        pe_dict = self._init_pe(molecule, basis)
 
         # generate initial guess from scratch
 
@@ -855,10 +855,10 @@ class LinearResponseEigenSolver(LinearSolver):
 
             igs[i] = (1.0, DistributedArray(X, self.comm))
 
-        bger, bung = self.setup_trials(igs, precond=None, renormalize=False)
+        bger, bung = self._setup_trials(igs, precond=None, renormalize=False)
 
-        self.e2n_half_size(bger, bung, molecule, basis, scf_tensors, eri_dict,
-                           dft_dict, pe_dict)
+        self._e2n_half_size(bger, bung, molecule, basis, scf_tensors, eri_dict,
+                            dft_dict, pe_dict)
 
         if self.rank == mpi_master():
             E2 = np.zeros((2 * n_exc, 2 * n_exc))

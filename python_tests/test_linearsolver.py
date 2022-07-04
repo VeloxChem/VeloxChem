@@ -79,8 +79,8 @@ class TestLinearSolver:
         pe_dict = {'V_es': None, 'pe_drv': None}
 
         solver = LinearSolver(comm, ostream)
-        solver.comp_lr_fock_split_comm(fock, dens, mol, bas, eri_dict, dft_dict,
-                                       pe_dict)
+        solver._comp_lr_fock_split_comm(fock, dens, mol, bas, eri_dict,
+                                        dft_dict, pe_dict)
 
         assert fock.alpha_to_numpy(0).shape == dmat.shape
 
@@ -92,5 +92,5 @@ class TestLinearSolver:
         solver = LinearSolver(comm, ostream)
         solver.program_end_time = datetime.now() + timedelta(hours=1.0)
 
-        assert solver.need_graceful_exit(1.5)
-        assert not solver.need_graceful_exit(0.5)
+        assert solver._need_graceful_exit(1.5)
+        assert not solver._need_graceful_exit(0.5)

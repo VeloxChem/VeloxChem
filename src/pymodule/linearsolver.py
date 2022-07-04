@@ -336,7 +336,7 @@ class LinearSolver:
             cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
             self.pe_options['potfile'] = cppe_potfile
 
-    def init_eri(self, molecule, basis):
+    def _init_eri(self, molecule, basis):
         """
         Initializes ERI.
 
@@ -371,7 +371,7 @@ class LinearSolver:
             'screening': screening,
         }
 
-    def init_dft(self, molecule, scf_tensors):
+    def _init_dft(self, molecule, scf_tensors):
         """
         Initializes DFT.
 
@@ -425,7 +425,7 @@ class LinearSolver:
             'dft_func_label': dft_func_label,
         }
 
-    def init_pe(self, molecule, basis):
+    def _init_pe(self, molecule, basis):
         """
         Initializes polarizable embedding.
 
@@ -467,7 +467,7 @@ class LinearSolver:
             'potfile_text': potfile_text,
         }
 
-    def read_checkpoint(self, rsp_vector_labels):
+    def _read_checkpoint(self, rsp_vector_labels):
         """
         Reads distributed arrays from checkpoint file.
 
@@ -493,7 +493,7 @@ class LinearSolver:
         self.ostream.print_info(checkpoint_text)
         self.ostream.print_blank()
 
-    def append_trial_vectors(self, bger, bung):
+    def _append_trial_vectors(self, bger, bung):
         """
         Appends distributed trial vectors.
 
@@ -517,7 +517,7 @@ class LinearSolver:
         else:
             self.dist_bung.append(bung, axis=1)
 
-    def append_sigma_vectors(self, e2bger, e2bung):
+    def _append_sigma_vectors(self, e2bger, e2bung):
         """
         Appends distributed sigma (E2 b) vectors.
 
@@ -541,7 +541,7 @@ class LinearSolver:
         else:
             self.dist_e2bung.append(e2bung, axis=1)
 
-    def append_fock_matrices(self, fock_ger, fock_ung):
+    def _append_fock_matrices(self, fock_ger, fock_ung):
         """
         Appends distributed Fock matrices in MO.
 
@@ -585,16 +585,16 @@ class LinearSolver:
 
         return None
 
-    def e2n_half_size(self,
-                      vecs_ger,
-                      vecs_ung,
-                      molecule,
-                      basis,
-                      scf_tensors,
-                      eri_dict,
-                      dft_dict,
-                      pe_dict,
-                      profiler=None):
+    def _e2n_half_size(self,
+                       vecs_ger,
+                       vecs_ung,
+                       molecule,
+                       basis,
+                       scf_tensors,
+                       eri_dict,
+                       dft_dict,
+                       pe_dict,
+                       profiler=None):
         """
         Computes the E2 b matrix vector product.
 
@@ -630,12 +630,12 @@ class LinearSolver:
         if self.rank == mpi_master():
             assert_msg_critical(
                 vecs_ger.data.ndim == 2 and vecs_ung.data.ndim == 2,
-                'LinearSolver.e2n_half_size: '
+                'LinearSolver._e2n_half_size: '
                 'invalid shape of trial vectors')
 
             assert_msg_critical(
                 vecs_ger.shape(0) == vecs_ung.shape(0),
-                'LinearSolver.e2n_half_size: '
+                'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
             mo = scf_tensors['C_alpha']
@@ -690,7 +690,7 @@ class LinearSolver:
                     half_size = vec.shape[0] // 2
 
                     kn = self.lrvec2mat(vec, nocc, norb)
-                    dak = self.commut_mo_density(kn, nocc)
+                    dak = self._commut_mo_density(kn, nocc)
                     dak = np.linalg.multi_dot([mo, dak, mo.T])
 
                     dks.append(dak)
@@ -706,8 +706,8 @@ class LinearSolver:
 
             fock = AOFockMatrix(dens)
 
-            self.comp_lr_fock(fock, dens, molecule, basis, eri_dict, dft_dict,
-                              pe_dict, profiler)
+            self._comp_lr_fock(fock, dens, molecule, basis, eri_dict, dft_dict,
+                               pe_dict, profiler)
 
             e2_ger = None
             e2_ung = None
@@ -735,11 +735,11 @@ class LinearSolver:
                     fak = fock.alpha_to_numpy(ifock)
 
                     fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
-                    kfa_mo = self.commut(fa_mo.T, kns[ifock])
+                    kfa_mo = self._commut(fa_mo.T, kns[ifock])
 
                     fat_mo = fak_mo + kfa_mo
 
-                    gmo = -self.commut_mo_density(fat_mo, nocc)
+                    gmo = -self._commut_mo_density(fat_mo, nocc)
                     gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
                                                       norb)[:half_size]
 
@@ -757,26 +757,26 @@ class LinearSolver:
 
             vecs_e2_ger = DistributedArray(e2_ger, self.comm)
             vecs_e2_ung = DistributedArray(e2_ung, self.comm)
-            self.append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+            self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
 
             if self.nonlinear:
                 dist_fock_ger = DistributedArray(fock_ger, self.comm)
                 dist_fock_ung = DistributedArray(fock_ung, self.comm)
-                self.append_fock_matrices(dist_fock_ger, dist_fock_ung)
+                self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
 
-        self.append_trial_vectors(vecs_ger, vecs_ung)
+        self._append_trial_vectors(vecs_ger, vecs_ung)
 
         self.ostream.print_blank()
 
-    def comp_lr_fock(self,
-                     fock,
-                     dens,
-                     molecule,
-                     basis,
-                     eri_dict,
-                     dft_dict,
-                     pe_dict,
-                     profiler=None):
+    def _comp_lr_fock(self,
+                      fock,
+                      dens,
+                      molecule,
+                      basis,
+                      eri_dict,
+                      dft_dict,
+                      pe_dict,
+                      profiler=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -823,8 +823,8 @@ class LinearSolver:
         # calculate Fock on subcommunicators
 
         if self.use_split_comm:
-            self.comp_lr_fock_split_comm(fock, dens, molecule, basis, eri_dict,
-                                         dft_dict, pe_dict)
+            self._comp_lr_fock_split_comm(fock, dens, molecule, basis, eri_dict,
+                                          dft_dict, pe_dict)
 
         else:
             t0 = tm.time()
@@ -858,8 +858,8 @@ class LinearSolver:
 
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
-    def comp_lr_fock_split_comm(self, fock, dens, molecule, basis, eri_dict,
-                                dft_dict, pe_dict):
+    def _comp_lr_fock_split_comm(self, fock, dens, molecule, basis, eri_dict,
+                                 dft_dict, pe_dict):
         """
         Computes linear response Fock/Fxc matrix on split communicators.
 
@@ -993,7 +993,7 @@ class LinearSolver:
         self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
                                                 root=mpi_master())
 
-    def write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
+    def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
         Writes checkpoint file.
 
@@ -1034,7 +1034,7 @@ class LinearSolver:
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
 
-    def graceful_exit(self, molecule, basis, dft_dict, pe_dict, labels):
+    def _graceful_exit(self, molecule, basis, dft_dict, pe_dict, labels):
         """
         Gracefully exits the program.
 
@@ -1058,7 +1058,7 @@ class LinearSolver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        self.write_checkpoint(molecule, basis, dft_dict, pe_dict, labels)
+        self._write_checkpoint(molecule, basis, dft_dict, pe_dict, labels)
 
         self.ostream.print_info('...done.')
         self.ostream.print_blank()
@@ -1068,7 +1068,7 @@ class LinearSolver:
 
         sys.exit(0)
 
-    def need_graceful_exit(self, next_iter_in_hours):
+    def _need_graceful_exit(self, next_iter_in_hours):
         """
         Checks if a graceful exit is needed.
 
@@ -1088,7 +1088,7 @@ class LinearSolver:
                 return True
         return False
 
-    def print_header(self, title, nstates=None, n_freqs=None, n_points=None):
+    def _print_header(self, title, nstates=None, n_freqs=None, n_points=None):
         """
         Prints linear response solver setup header to output stream.
 
@@ -1151,11 +1151,11 @@ class LinearSolver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def print_iteration(self, relative_residual_norm, xvs):
+    def _print_iteration(self, relative_residual_norm, xvs):
 
         return
 
-    def print_convergence(self, title):
+    def _print_convergence(self, title):
         """
         Prints information after convergence.
 
@@ -1176,7 +1176,7 @@ class LinearSolver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def check_convergence(self, relative_residual_norm):
+    def _check_convergence(self, relative_residual_norm):
         """
         Checks convergence.
 
@@ -1194,7 +1194,7 @@ class LinearSolver:
         self._is_converged = self.comm.bcast(self._is_converged,
                                              root=mpi_master())
 
-    def decomp_grad(self, grad):
+    def _decomp_grad(self, grad):
         """
         Decomposes gradient into gerade and ungerade parts.
 
@@ -1224,15 +1224,15 @@ class LinearSolver:
 
         return ger.T, ung.T
 
-    def get_precond(self, orb_ene, nocc, norb, w):
+    def _get_precond(self, orb_ene, nocc, norb, w):
 
         return None
 
-    def preconditioning(self, precond, v_in):
+    def _preconditioning(self, precond, v_in):
 
         return None
 
-    def precond_trials(self, vectors, precond):
+    def _precond_trials(self, vectors, precond):
         """
         Applies preconditioner to trial vectors.
 
@@ -1247,12 +1247,12 @@ class LinearSolver:
 
         return None, None
 
-    def setup_trials(self,
-                     vectors,
-                     precond,
-                     dist_bger=None,
-                     dist_bung=None,
-                     renormalize=True):
+    def _setup_trials(self,
+                      vectors,
+                      precond,
+                      dist_bger=None,
+                      dist_bung=None,
+                      renormalize=True):
         """
         Computes orthonormalized trial vectors.
 
@@ -1271,7 +1271,7 @@ class LinearSolver:
             The orthonormalized gerade and ungerade trial vectors.
         """
 
-        dist_new_ger, dist_new_ung = self.precond_trials(vectors, precond)
+        dist_new_ger, dist_new_ung = self._precond_trials(vectors, precond)
 
         if dist_new_ger.data.size == 0:
             dist_new_ger.data = np.zeros((dist_new_ung.shape(0), 0))
@@ -1293,18 +1293,18 @@ class LinearSolver:
 
         if renormalize:
             if dist_new_ger.data.ndim > 0 and dist_new_ger.shape(0) > 0:
-                dist_new_ger = self.remove_linear_dependence_half_distributed(
+                dist_new_ger = self._remove_linear_dependence_half_size(
                     dist_new_ger, self.lindep_thresh)
-                dist_new_ger = self.orthogonalize_gram_schmidt_half_distributed(
+                dist_new_ger = self._orthogonalize_gram_schmidt_half_size(
                     dist_new_ger)
-                dist_new_ger = self.normalize_half_distributed(dist_new_ger)
+                dist_new_ger = self._normalize_half_size(dist_new_ger)
 
             if dist_new_ung.data.ndim > 0 and dist_new_ung.shape(0) > 0:
-                dist_new_ung = self.remove_linear_dependence_half_distributed(
+                dist_new_ung = self._remove_linear_dependence_half_size(
                     dist_new_ung, self.lindep_thresh)
-                dist_new_ung = self.orthogonalize_gram_schmidt_half_distributed(
+                dist_new_ung = self._orthogonalize_gram_schmidt_half_size(
                     dist_new_ung)
-                dist_new_ung = self.normalize_half_distributed(dist_new_ung)
+                dist_new_ung = self._normalize_half_size(dist_new_ung)
 
         if self.rank == mpi_master():
             assert_msg_critical(
@@ -1396,7 +1396,7 @@ class LinearSolver:
 
             factor = np.sqrt(2.0)
             matrices = [
-                factor * (-1.0) * self.commut_mo_density(
+                factor * (-1.0) * self._commut_mo_density(
                     np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
                 for P in integral_comps
             ]
@@ -1494,7 +1494,7 @@ class LinearSolver:
 
             factor = np.sqrt(2.0)
             matrices = [
-                factor * (-1.0) * self.commut_mo_density(
+                factor * (-1.0) * self._commut_mo_density(
                     np.linalg.multi_dot([mo.T, P.conj().T, mo]), nocc)
                 for P in integral_comps
             ]
@@ -1505,7 +1505,7 @@ class LinearSolver:
         else:
             return tuple()
 
-    def commut_mo_density(self, A, nocc):
+    def _commut_mo_density(self, A, nocc):
         """
         Commutes matrix A and MO density
 
@@ -1527,7 +1527,7 @@ class LinearSolver:
 
         return mat
 
-    def commut(self, A, B):
+    def _commut(self, A, B):
         """
         Commutes two matricies A and B
 
@@ -1614,7 +1614,7 @@ class LinearSolver:
         mask = l > b_norm * threshold
         return np.matmul(basis, T[:, mask])
 
-    def remove_linear_dependence_half_distributed(self, basis, threshold):
+    def _remove_linear_dependence_half_size(self, basis, threshold):
         """
         Removes linear dependence in a set of symmetrized vectors.
 
@@ -1668,7 +1668,7 @@ class LinearSolver:
 
         return tvecs
 
-    def orthogonalize_gram_schmidt_half_distributed(self, tvecs):
+    def _orthogonalize_gram_schmidt_half_size(self, tvecs):
         """
         Applies modified Gram Schmidt orthogonalization to trial vectors.
 
@@ -1721,7 +1721,7 @@ class LinearSolver:
 
         return vecs
 
-    def normalize_half_distributed(self, vecs):
+    def _normalize_half_size(self, vecs):
         """
         Normalizes half-sized vectors by dividing by vector norm.
 
@@ -1741,7 +1741,7 @@ class LinearSolver:
         return vecs
 
     @staticmethod
-    def construct_ed_sd_half(orb_ene, nocc, norb):
+    def construct_ediag_sdiag_half(orb_ene, nocc, norb):
         """
         Gets the upper half of E0 and S0 diagonal elements as arrays.
 

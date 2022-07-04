@@ -105,7 +105,7 @@ class ComplexResponse(LinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def get_precond(self, orb_ene, nocc, norb, w, d):
+    def _get_precond(self, orb_ene, nocc, norb, w, d):
         """
         Constructs the preconditioners.
 
@@ -126,7 +126,7 @@ class ComplexResponse(LinearSolver):
 
         # spawning needed components
 
-        ediag, sdiag = self.construct_ed_sd_half(orb_ene, nocc, norb)
+        ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2
         sdiag_fp = sdiag**4
@@ -156,7 +156,7 @@ class ComplexResponse(LinearSolver):
 
         return DistributedArray(p_mat, self.comm)
 
-    def preconditioning(self, precond, v_in):
+    def _preconditioning(self, precond, v_in):
         """
         Applies preconditioner to a tuple of distributed trial vectors.
 
@@ -193,7 +193,7 @@ class ComplexResponse(LinearSolver):
 
         return DistributedArray(v_mat, self.comm, distribute=False)
 
-    def precond_trials(self, vectors, precond):
+    def _precond_trials(self, vectors, precond):
         """
         Applies preconditioner to distributed trial vectors.
 
@@ -210,7 +210,7 @@ class ComplexResponse(LinearSolver):
         trials_ung = []
 
         for (op, w), vec in vectors.items():
-            v = self.preconditioning(precond[w], vec)
+            v = self._preconditioning(precond[w], vec)
             norms_2 = 2.0 * v.squared_norm(axis=0)
             vn = np.sqrt(np.sum(norms_2))
 
@@ -288,8 +288,8 @@ class ComplexResponse(LinearSolver):
         })
 
         if self.rank == mpi_master():
-            self.print_header('Complex Response Solver',
-                              n_freqs=len(self.frequencies))
+            self._print_header('Complex Response Solver',
+                               n_freqs=len(self.frequencies))
 
         self.start_time = tm.time()
 
@@ -309,13 +309,13 @@ class ComplexResponse(LinearSolver):
         nocc = molecule.number_of_alpha_electrons()
 
         # ERI information
-        eri_dict = self.init_eri(molecule, basis)
+        eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self.init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors)
 
         # PE information
-        pe_dict = self.init_pe(molecule, basis)
+        pe_dict = self._init_pe(molecule, basis)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():
@@ -340,7 +340,7 @@ class ComplexResponse(LinearSolver):
         d = self.damping
         freqs = set([w for (op, w) in op_freq_keys])
         precond = {
-            w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs
+            w: self._get_precond(orb_ene, nocc, norb, w, d) for w in freqs
         }
 
         # distribute the gradient and right-hand side:
@@ -351,7 +351,7 @@ class ComplexResponse(LinearSolver):
         dist_rhs = {}
         for key in op_freq_keys:
             if self.rank == mpi_master():
-                gradger, gradung = self.decomp_grad(v_grad[key])
+                gradger, gradung = self._decomp_grad(v_grad[key])
                 grad_mat = np.hstack((
                     gradger.real.reshape(-1, 1),
                     gradung.real.reshape(-1, 1),
@@ -392,14 +392,14 @@ class ComplexResponse(LinearSolver):
 
         # read initial guess from restart file
         if self.restart:
-            self.read_checkpoint(rsp_vector_labels)
+            self._read_checkpoint(rsp_vector_labels)
 
         # generate initial guess from scratch
         else:
-            bger, bung = self.setup_trials(dist_rhs, precond)
+            bger, bung = self._setup_trials(dist_rhs, precond)
 
-            self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                               eri_dict, dft_dict, pe_dict)
+            self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
+                                eri_dict, dft_dict, pe_dict)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -409,8 +409,8 @@ class ComplexResponse(LinearSolver):
         relative_residual_norm = {}
 
         signal_handler = SignalHandler()
-        signal_handler.add_sigterm_function(self.graceful_exit, molecule, basis,
-                                            dft_dict, pe_dict,
+        signal_handler.add_sigterm_function(self._graceful_exit, molecule,
+                                            basis, dft_dict, pe_dict,
                                             rsp_vector_labels)
 
         iter_per_trial_in_hours = None
@@ -636,13 +636,13 @@ class ComplexResponse(LinearSolver):
 
                 profiler.print_memory_tracing(self.ostream)
 
-                self.print_iteration(relative_residual_norm, xvs)
+                self._print_iteration(relative_residual_norm, xvs)
 
             profiler.stop_timer('ReducedSpace')
 
             # check convergence
 
-            self.check_convergence(relative_residual_norm)
+            self._check_convergence(relative_residual_norm)
 
             if self.is_converged:
                 break
@@ -651,7 +651,7 @@ class ComplexResponse(LinearSolver):
 
             # spawning new trial vectors from residuals
 
-            new_trials_ger, new_trials_ung = self.setup_trials(
+            new_trials_ger, new_trials_ung = self._setup_trials(
                 residuals, precond, self.dist_bger, self.dist_bung)
 
             residuals.clear()
@@ -666,17 +666,17 @@ class ComplexResponse(LinearSolver):
 
             if iter_per_trial_in_hours is not None:
                 next_iter_in_hours = iter_per_trial_in_hours * n_new_trials
-                if self.need_graceful_exit(next_iter_in_hours):
-                    self.graceful_exit(molecule, basis, dft_dict, pe_dict,
-                                       rsp_vector_labels)
+                if self._need_graceful_exit(next_iter_in_hours):
+                    self._graceful_exit(molecule, basis, dft_dict, pe_dict,
+                                        rsp_vector_labels)
 
             profiler.start_timer('FockBuild')
 
             # creating new sigma and rho linear transformations
 
-            self.e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                               scf_tensors, eri_dict, dft_dict, pe_dict,
-                               profiler)
+            self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
+                                scf_tensors, eri_dict, dft_dict, pe_dict,
+                                profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials
@@ -688,12 +688,12 @@ class ComplexResponse(LinearSolver):
 
         signal_handler.remove_sigterm_function()
 
-        self.write_checkpoint(molecule, basis, dft_dict, pe_dict,
-                              rsp_vector_labels)
+        self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
+                               rsp_vector_labels)
 
         # converged?
         if self.rank == mpi_master():
-            self.print_convergence('Complex response')
+            self._print_convergence('Complex response')
 
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)

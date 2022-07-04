@@ -181,7 +181,7 @@ class TDAExciDriver(LinearSolver):
         })
 
         if self.rank == mpi_master():
-            self.print_header('TDA Driver', nstates=self.nstates)
+            self._print_header('TDA Driver', nstates=self.nstates)
 
         # set start time
 
@@ -214,17 +214,17 @@ class TDAExciDriver(LinearSolver):
                                 'TDAExciDriver: too many excited states')
 
         # ERI information
-        eri_dict = self.init_eri(molecule, basis)
+        eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self.init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors)
 
         # PE information
-        pe_dict = self.init_pe(molecule, basis)
+        pe_dict = self._init_pe(molecule, basis)
 
         # set up trial excitation vectors on master node
 
-        diag_mat, trial_mat = self.gen_trial_vectors(mol_orbs, molecule)
+        diag_mat, trial_mat = self._gen_trial_vectors(mol_orbs, molecule)
 
         # block Davidson algorithm setup
 
@@ -264,11 +264,11 @@ class TDAExciDriver(LinearSolver):
             # perform linear transformation of trial vectors
 
             if i >= n_restart_iterations:
-                fock, tdens, gsdens = self.get_densities(
+                fock, tdens, gsdens = self._get_densities(
                     trial_mat, scf_tensors, molecule)
 
-                self.comp_lr_fock(fock, tdens, molecule, basis, eri_dict,
-                                  dft_dict, pe_dict, profiler)
+                self._comp_lr_fock(fock, tdens, molecule, basis, eri_dict,
+                                   dft_dict, pe_dict, profiler)
 
             profiler.stop_timer('FockBuild')
             profiler.start_timer('ReducedSpace')
@@ -278,8 +278,8 @@ class TDAExciDriver(LinearSolver):
             if self.rank == mpi_master():
 
                 if i >= n_restart_iterations:
-                    sig_mat = self.get_sigmas(fock, scf_tensors, molecule,
-                                              trial_mat)
+                    sig_mat = self._get_sigmas(fock, scf_tensors, molecule,
+                                               trial_mat)
                 else:
                     istart = i * self.nstates
                     iend = (i + 1) * self.nstates
@@ -292,7 +292,7 @@ class TDAExciDriver(LinearSolver):
 
                 trial_mat = self.solver.compute(diag_mat)
 
-                self.print_iter_data(i)
+                self._print_iter_data(i)
 
             profiler.stop_timer('ReducedSpace')
 
@@ -304,7 +304,7 @@ class TDAExciDriver(LinearSolver):
 
             # check convergence
 
-            self.check_convergence()
+            self._check_convergence()
 
             # write checkpoint file
 
@@ -322,7 +322,7 @@ class TDAExciDriver(LinearSolver):
 
         # converged?
         if self.rank == mpi_master():
-            self.print_convergence('{:d} excited states'.format(self.nstates))
+            self._print_convergence('{:d} excited states'.format(self.nstates))
 
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
@@ -332,7 +332,7 @@ class TDAExciDriver(LinearSolver):
 
         # compute 1e dipole integrals
 
-        integrals = self.comp_onee_integrals(molecule, basis)
+        integrals = self._comp_onee_integrals(molecule, basis)
 
         # print converged excited states
 
@@ -343,8 +343,8 @@ class TDAExciDriver(LinearSolver):
             eigvals, rnorms = self.solver.get_eigenvalues()
             eigvecs = self.solver.ritz_vectors
 
-            trans_dipoles = self.comp_trans_dipoles(integrals, eigvals, eigvecs,
-                                                    mo_occ, mo_vir)
+            trans_dipoles = self._comp_trans_dipoles(integrals, eigvals,
+                                                     eigvecs, mo_occ, mo_vir)
 
             oscillator_strengths = (2.0 / 3.0) * np.sum(
                 trans_dipoles['electric']**2, axis=1) * eigvals
@@ -434,14 +434,14 @@ class TDAExciDriver(LinearSolver):
             if self.detach_attach:
                 ret_dict['density_cubes'] = dens_cube_files
 
-            self.write_final_hdf5(molecule, basis, dft_dict['dft_func_label'],
-                                  pe_dict['potfile_text'], eigvecs)
+            self._write_final_hdf5(molecule, basis, dft_dict['dft_func_label'],
+                                   pe_dict['potfile_text'], eigvecs)
 
             return ret_dict
         else:
             return None
 
-    def gen_trial_vectors(self, mol_orbs, molecule):
+    def _gen_trial_vectors(self, mol_orbs, molecule):
         """
         Generates set of TDA trial vectors for given number of excited states
         by selecting primitive excitations wirh lowest approximate energies
@@ -482,7 +482,7 @@ class TDAExciDriver(LinearSolver):
 
         return None, None
 
-    def check_convergence(self):
+    def _check_convergence(self):
         """
         Checks convergence of excitation energies and set convergence flag on
         all processes within MPI communicator.
@@ -499,7 +499,7 @@ class TDAExciDriver(LinearSolver):
         self._is_converged = self.comm.bcast(self._is_converged,
                                              root=mpi_master())
 
-    def get_densities(self, trial_mat, tensors, molecule):
+    def _get_densities(self, trial_mat, tensors, molecule):
         """
         Computes the ground-state and transition densities, and initializes the
         Fock matrix.
@@ -565,7 +565,7 @@ class TDAExciDriver(LinearSolver):
 
         return fock, tdens, gsdens
 
-    def get_sigmas(self, fock, tensors, molecule, trial_mat):
+    def _get_sigmas(self, fock, tensors, molecule, trial_mat):
         """
         Computes the sigma vectors.
 
@@ -606,7 +606,7 @@ class TDAExciDriver(LinearSolver):
 
         return sigma_mat
 
-    def comp_onee_integrals(self, molecule, basis):
+    def _comp_onee_integrals(self, molecule, basis):
         """
         Computes one-electron integrals.
 
@@ -643,7 +643,7 @@ class TDAExciDriver(LinearSolver):
 
         return integrals
 
-    def comp_trans_dipoles(self, integrals, eigvals, eigvecs, mo_occ, mo_vir):
+    def _comp_trans_dipoles(self, integrals, eigvals, eigvecs, mo_occ, mo_vir):
         """
         Computes transition dipole moments.
 
@@ -692,7 +692,7 @@ class TDAExciDriver(LinearSolver):
 
         return transition_dipoles
 
-    def print_iter_data(self, iteration):
+    def _print_iter_data(self, iteration):
         """
         Prints excited states solver iteration data to output stream.
 
@@ -723,8 +723,8 @@ class TDAExciDriver(LinearSolver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def write_final_hdf5(self, molecule, basis, dft_func_label, potfile_text,
-                         eigvecs):
+    def _write_final_hdf5(self, molecule, basis, dft_func_label, potfile_text,
+                          eigvecs):
         """
         Writes final HDF5 that contains TDA solution vectors.
 
