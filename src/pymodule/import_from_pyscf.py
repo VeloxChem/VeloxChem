@@ -12,10 +12,13 @@ import h5py
 
 try:
     import pyscf
+    # TODO: rename grad to pyscf_grad, hessian, etc.
     from pyscf import grad
     from pyscf import hessian
     from pyscf.grad import rks as pyscf_rks_grad
+    # TODO: rename tdrks to pyscf_tdrks
     from pyscf.grad import tdrks
+    from pyscf.hessian import rks as pyscf_rks_hessian
 except ImportError:
     errtxt = "Please install pyscf.\n"
     errtxt += "$pip3 install pyscf"
@@ -1996,7 +1999,25 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
                                  basis=pyscf_basis, unit=unit)
-    pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
+
+    if scfdrv is not None:
+        if scfdrv.dft:
+            pyscf_scf = pyscf.scf.RKS(pyscf_molecule)
+            # set functional, convergence threshold and grid level 
+            pyscf_scf.xc = translate_to_pyscf(scfdrv.xcfun.get_func_label())
+            pyscf_scf.conv_tol = scfdrv.conv_thresh
+            if scfdrv.grid_level == 6:
+                pyscf_scf.grids.level = 9
+            else:
+                pyscf_scf.grids.level = scfdrv.grid_level
+
+            pyscf_scf.kernel()
+
+            pyscf_hessian = pyscf.hessian.rks.Hessian(pyscf_scf)
+        else:
+            pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
+    else:
+        pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
     #pyscf_scf.kernel()
     #nocc = pyscf_molecule.nelec[0]
     gs_dm = ao_matrix_to_dalton(DenseMatrix(density), basis, molecule).to_numpy()
@@ -2036,12 +2057,28 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
 
     if scfdrv is not None:
         if scfdrv.dft:
-            # import vxc derivative for partial derivative of Kohn-Sham matrix
-            vxc_deriv = import_xc_contrib_tddft(molecule, basis, scfdrv, density, density,
-                                                vxc_deriv_only=True)
-            vxc_deriv_atom_i = np.zeros((3, nao, nao))
-            vxc_deriv_atom_i[:, ki:kf] = vxc_deriv[1:, ki:kf] # 0 would not be derivative
-            vxc_deriv_atom_i += vxc_deriv_atom_i.transpose(0, 2, 1)
+            ## import vxc derivative for partial derivative of Kohn-Sham matrix
+            #vxc_deriv = import_xc_contrib_tddft(molecule, basis, scfdrv,
+            #                                    density, density,
+            #                                    vxc_deriv_only=True)
+            #vxc_deriv_atom_i = np.zeros((3, nao, nao))
+            #vxc_deriv_atom_i[:, ki:kf] = vxc_deriv[1:, ki:kf] # 0 would not be derivative
+            #vxc_deriv_atom_i += vxc_deriv_atom_i.transpose(0, 2, 1)
+
+            #print("\n\nvlx vxc deriv atom %d " % i)
+            #print(vxc_deriv_atom_i)
+
+            pyscf_mo_coeff = pyscf_scf.mo_coeff
+            pyscf_mo_occ = pyscf_scf.mo_occ
+            max_memory = 2000
+            vxc_deriv = pyscf_rks_hessian._get_vxc_deriv1(pyscf_hessian,
+                                                          pyscf_mo_coeff,
+                                                          pyscf_mo_occ,
+                                                          max_memory)
+ 
+
+            # select derivatives wrt. atom i
+            vxc_deriv_atom_i = vxc_deriv[i]
             fock_deriv_atom_i += vxc_deriv_atom_i
 
             # check fraction of exact exchange
