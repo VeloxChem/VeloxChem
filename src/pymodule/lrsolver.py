@@ -119,10 +119,10 @@ class LinearResponseSolver(LinearSolver):
             a non-linear response module.
         """
 
-        self.dist_bger = None
-        self.dist_bung = None
-        self.dist_e2bger = None
-        self.dist_e2bung = None
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
 
         # check dft setup
         self._dft_sanity_check()
@@ -254,15 +254,15 @@ class LinearResponseSolver(LinearSolver):
 
             profiler.start_timer('ReducedSpace')
 
-            n_ger = self.dist_bger.shape(1)
-            n_ung = self.dist_bung.shape(1)
+            n_ger = self._dist_bger.shape(1)
+            n_ung = self._dist_bung.shape(1)
 
-            e2gg = self.dist_bger.matmul_AtB(self.dist_e2bger, 2.0)
-            e2uu = self.dist_bung.matmul_AtB(self.dist_e2bung, 2.0)
-            s2ug = self.dist_bung.matmul_AtB(self.dist_bger, 2.0)
+            e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger, 2.0)
+            e2uu = self._dist_bung.matmul_AtB(self._dist_e2bung, 2.0)
+            s2ug = self._dist_bung.matmul_AtB(self._dist_bger, 2.0)
 
             xvs = []
-            self.cur_iter = iteration
+            self._cur_iter = iteration
 
             for op, freq in op_freq_keys:
                 if (iteration > 0 and
@@ -272,8 +272,8 @@ class LinearResponseSolver(LinearSolver):
                 gradger = dist_grad[(op, freq)].get_column(0)
                 gradung = dist_grad[(op, freq)].get_column(1)
 
-                g_ger = self.dist_bger.matmul_AtB(gradger, 2.0)
-                g_ung = self.dist_bung.matmul_AtB(gradung, 2.0)
+                g_ger = self._dist_bger.matmul_AtB(gradger, 2.0)
+                g_ung = self._dist_bung.matmul_AtB(gradung, 2.0)
 
                 if self.rank == mpi_master():
                     mat = np.zeros((n_ger + n_ung, n_ger + n_ung))
@@ -294,11 +294,11 @@ class LinearResponseSolver(LinearSolver):
                 c_ger = c[:n_ger]
                 c_ung = c[n_ger:]
 
-                x_ger = self.dist_bger.matmul_AB_no_gather(c_ger)
-                x_ung = self.dist_bung.matmul_AB_no_gather(c_ung)
+                x_ger = self._dist_bger.matmul_AB_no_gather(c_ger)
+                x_ung = self._dist_bung.matmul_AB_no_gather(c_ung)
 
-                e2x_ger = self.dist_e2bger.matmul_AB_no_gather(c_ger)
-                e2x_ung = self.dist_e2bung.matmul_AB_no_gather(c_ung)
+                e2x_ger = self._dist_e2bger.matmul_AB_no_gather(c_ger)
+                e2x_ung = self._dist_e2bung.matmul_AB_no_gather(c_ung)
 
                 s2x_ger = x_ger.data
                 s2x_ung = x_ung.data
@@ -320,7 +320,7 @@ class LinearResponseSolver(LinearSolver):
 
                 x = DistributedArray(x_data, self.comm, distribute=False)
 
-                x_full = self.get_full_solution_vector(x)
+                x_full = self._get_full_solution_vector(x)
 
                 if self.rank == mpi_master():
                     xv = np.dot(x_full, v_grad[(op, freq)])
@@ -353,10 +353,10 @@ class LinearResponseSolver(LinearSolver):
 
                 profiler.print_memory_subspace(
                     {
-                        'dist_bger': self.dist_bger,
-                        'dist_bung': self.dist_bung,
-                        'dist_e2bger': self.dist_e2bger,
-                        'dist_e2bung': self.dist_e2bung,
+                        'dist_bger': self._dist_bger,
+                        'dist_bung': self._dist_bung,
+                        'dist_e2bger': self._dist_e2bger,
+                        'dist_e2bung': self._dist_e2bung,
                         'precond': precond,
                         'solutions': solutions,
                         'residuals': residuals,
@@ -381,7 +381,7 @@ class LinearResponseSolver(LinearSolver):
 
             # update trial vectors
             new_trials_ger, new_trials_ung = self._setup_trials(
-                residuals, precond, self.dist_bger, self.dist_bung)
+                residuals, precond, self._dist_bger, self._dist_bung)
 
             residuals.clear()
 
@@ -447,7 +447,7 @@ class LinearResponseSolver(LinearSolver):
                                 pe_dict['potfile_text'])
 
             for bop, w in solutions:
-                x = self.get_full_solution_vector(solutions[(bop, w)])
+                x = self._get_full_solution_vector(solutions[(bop, w)])
 
                 if self.rank == mpi_master():
                     for aop in self.a_components:
@@ -475,7 +475,7 @@ class LinearResponseSolver(LinearSolver):
 
         return None
 
-    def get_full_solution_vector(self, solution):
+    def _get_full_solution_vector(self, solution):
         """
         Gets a full solution vector from the distributed solution.
 
@@ -496,7 +496,7 @@ class LinearResponseSolver(LinearSolver):
         else:
             return None
 
-    def print_iteration(self, relative_residual_norm, xvs):
+    def _print_iteration(self, relative_residual_norm, xvs):
         """
         Prints information of the iteration.
 
@@ -508,7 +508,7 @@ class LinearResponseSolver(LinearSolver):
         """
 
         width = 92
-        output_header = '*** Iteration:   {} '.format(self.cur_iter + 1)
+        output_header = '*** Iteration:   {} '.format(self._cur_iter + 1)
         output_header += '* Residuals (Max,Min): '
         output_header += '{:.2e} and {:.2e}'.format(
             max(relative_residual_norm.values()),
@@ -611,13 +611,13 @@ class LinearResponseSolver(LinearSolver):
             norms_2 = 2.0 * v.squared_norm(axis=0)
             vn = np.sqrt(np.sum(norms_2))
 
-            if vn > self.small_thresh:
+            if vn > self._small_thresh:
                 norms = np.sqrt(norms_2)
                 # gerade
-                if norms[0] > self.small_thresh:
+                if norms[0] > self._small_thresh:
                     trials_ger.append(v.data[:, 0])
                 # ungerade
-                if norms[1] > self.small_thresh:
+                if norms[1] > self._small_thresh:
                     trials_ung.append(v.data[:, 1])
 
         new_ger = np.array(trials_ger).T

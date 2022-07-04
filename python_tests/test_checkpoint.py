@@ -82,17 +82,17 @@ class TestCheckpoint:
         solver = LinearSolver(comm, ostream)
 
         labels = ['bger', 'bung', 'e2bger', 'e2bung']
-        solver.dist_bger = DistributedArray(np.random.rand(100, 7), comm)
-        solver.dist_bung = DistributedArray(np.random.rand(100, 7), comm)
-        solver.dist_e2bger = DistributedArray(np.random.rand(100, 7), comm)
-        solver.dist_e2bung = DistributedArray(np.random.rand(100, 7), comm)
+        solver._dist_bger = DistributedArray(np.random.rand(100, 7), comm)
+        solver._dist_bung = DistributedArray(np.random.rand(100, 7), comm)
+        solver._dist_e2bger = DistributedArray(np.random.rand(100, 7), comm)
+        solver._dist_e2bung = DistributedArray(np.random.rand(100, 7), comm)
         solver.nonlinear = False
 
         backup_data = {
-            'bger': solver.dist_bger.data.copy(),
-            'bung': solver.dist_bung.data.copy(),
-            'e2bger': solver.dist_e2bger.data.copy(),
-            'e2bung': solver.dist_e2bung.data.copy(),
+            'bger': solver._dist_bger.data.copy(),
+            'bung': solver._dist_bung.data.copy(),
+            'e2bger': solver._dist_e2bger.data.copy(),
+            'e2bung': solver._dist_e2bung.data.copy(),
         }
 
         mol, bas = self.get_molecule_and_basis()
@@ -105,15 +105,15 @@ class TestCheckpoint:
 
             solver._read_checkpoint(labels)
             assert np.max(
-                np.abs(backup_data['bger'] - solver.dist_bger.data)) < 1.0e-12
+                np.abs(backup_data['bger'] - solver._dist_bger.data)) < 1.0e-12
             assert np.max(
-                np.abs(backup_data['bung'] - solver.dist_bung.data)) < 1.0e-12
+                np.abs(backup_data['bung'] - solver._dist_bung.data)) < 1.0e-12
             assert np.max(
                 np.abs(backup_data['e2bger'] -
-                       solver.dist_e2bger.data)) < 1.0e-12
+                       solver._dist_e2bger.data)) < 1.0e-12
             assert np.max(
                 np.abs(backup_data['e2bung'] -
-                       solver.dist_e2bung.data)) < 1.0e-12
+                       solver._dist_e2bung.data)) < 1.0e-12
 
     def test_fock_checkpoint(self):
 

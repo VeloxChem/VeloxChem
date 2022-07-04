@@ -300,7 +300,7 @@ class TDAExciDriver(LinearSolver):
 
             profiler.print_memory_tracing(self.ostream)
 
-            self.cur_iter = i
+            self._cur_iter = i
 
             # check convergence
 

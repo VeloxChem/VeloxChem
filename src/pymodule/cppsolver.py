@@ -214,19 +214,19 @@ class ComplexResponse(LinearSolver):
             norms_2 = 2.0 * v.squared_norm(axis=0)
             vn = np.sqrt(np.sum(norms_2))
 
-            if vn > self.small_thresh:
+            if vn > self._small_thresh:
                 norms = np.sqrt(norms_2)
                 # real gerade
-                if norms[0] > self.small_thresh:
+                if norms[0] > self._small_thresh:
                     trials_ger.append(v.data[:, 0])
                 # real ungerade
-                if norms[1] > self.small_thresh:
+                if norms[1] > self._small_thresh:
                     trials_ung.append(v.data[:, 1])
                 # imaginary ungerade
-                if norms[2] > self.small_thresh:
+                if norms[2] > self._small_thresh:
                     trials_ung.append(v.data[:, 2])
                 # imaginary gerade
-                if norms[3] > self.small_thresh:
+                if norms[3] > self._small_thresh:
                     trials_ger.append(v.data[:, 3])
 
         new_ger = np.array(trials_ger).T
@@ -258,14 +258,14 @@ class ComplexResponse(LinearSolver):
             a non-linear response module.
         """
 
-        self.dist_bger = None
-        self.dist_bung = None
-        self.dist_e2bger = None
-        self.dist_e2bung = None
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
 
         self.nonlinear = False
-        self.dist_fock_ger = None
-        self.dist_fock_ung = None
+        self._dist_fock_ger = None
+        self._dist_fock_ung = None
 
         # check dft setup
         self._dft_sanity_check()
@@ -425,14 +425,14 @@ class ComplexResponse(LinearSolver):
             profiler.start_timer('ReducedSpace')
 
             xvs = []
-            self.cur_iter = iteration
+            self._cur_iter = iteration
 
-            n_ger = self.dist_bger.shape(1)
-            n_ung = self.dist_bung.shape(1)
+            n_ger = self._dist_bger.shape(1)
+            n_ung = self._dist_bung.shape(1)
 
-            e2gg = self.dist_bger.matmul_AtB(self.dist_e2bger, 2.0)
-            e2uu = self.dist_bung.matmul_AtB(self.dist_e2bung, 2.0)
-            s2ug = self.dist_bung.matmul_AtB(self.dist_bger, 2.0)
+            e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger, 2.0)
+            e2uu = self._dist_bung.matmul_AtB(self._dist_e2bung, 2.0)
+            s2ug = self._dist_bung.matmul_AtB(self._dist_bger, 2.0)
 
             for op, w in op_freq_keys:
                 if (iteration == 0 or
@@ -445,10 +445,10 @@ class ComplexResponse(LinearSolver):
 
                     # projections onto gerade and ungerade subspaces:
 
-                    g_realger = self.dist_bger.matmul_AtB(grad_rg, 2.0)
-                    g_imagger = self.dist_bger.matmul_AtB(grad_ig, 2.0)
-                    g_realung = self.dist_bung.matmul_AtB(grad_ru, 2.0)
-                    g_imagung = self.dist_bung.matmul_AtB(grad_iu, 2.0)
+                    g_realger = self._dist_bger.matmul_AtB(grad_rg, 2.0)
+                    g_imagger = self._dist_bger.matmul_AtB(grad_ig, 2.0)
+                    g_realung = self._dist_bung.matmul_AtB(grad_ru, 2.0)
+                    g_imagung = self._dist_bung.matmul_AtB(grad_iu, 2.0)
 
                     # creating gradient and matrix for linear equation
 
@@ -522,26 +522,26 @@ class ComplexResponse(LinearSolver):
 
                     # ...and projecting them onto respective subspace
 
-                    x_realger = self.dist_bger.matmul_AB_no_gather(c_realger)
-                    x_realung = self.dist_bung.matmul_AB_no_gather(c_realung)
-                    x_imagung = self.dist_bung.matmul_AB_no_gather(c_imagung)
-                    x_imagger = self.dist_bger.matmul_AB_no_gather(c_imagger)
+                    x_realger = self._dist_bger.matmul_AB_no_gather(c_realger)
+                    x_realung = self._dist_bung.matmul_AB_no_gather(c_realung)
+                    x_imagung = self._dist_bung.matmul_AB_no_gather(c_imagung)
+                    x_imagger = self._dist_bger.matmul_AB_no_gather(c_imagger)
 
                     # composing E2 matrices projected onto solution subspace
 
-                    e2realger = self.dist_e2bger.matmul_AB_no_gather(c_realger)
-                    e2imagger = self.dist_e2bger.matmul_AB_no_gather(c_imagger)
-                    e2realung = self.dist_e2bung.matmul_AB_no_gather(c_realung)
-                    e2imagung = self.dist_e2bung.matmul_AB_no_gather(c_imagung)
+                    e2realger = self._dist_e2bger.matmul_AB_no_gather(c_realger)
+                    e2imagger = self._dist_e2bger.matmul_AB_no_gather(c_imagger)
+                    e2realung = self._dist_e2bung.matmul_AB_no_gather(c_realung)
+                    e2imagung = self._dist_e2bung.matmul_AB_no_gather(c_imagung)
 
                     if self.nonlinear:
-                        fock_realger = self.dist_fock_ger.matmul_AB_no_gather(
+                        fock_realger = self._dist_fock_ger.matmul_AB_no_gather(
                             c_realger)
-                        fock_imagger = self.dist_fock_ger.matmul_AB_no_gather(
+                        fock_imagger = self._dist_fock_ger.matmul_AB_no_gather(
                             c_imagger)
-                        fock_realung = self.dist_fock_ung.matmul_AB_no_gather(
+                        fock_realung = self._dist_fock_ung.matmul_AB_no_gather(
                             c_realung)
-                        fock_imagung = self.dist_fock_ung.matmul_AB_no_gather(
+                        fock_imagung = self._dist_fock_ung.matmul_AB_no_gather(
                             c_imagung)
 
                         fock_full_data = (
@@ -589,7 +589,7 @@ class ComplexResponse(LinearSolver):
 
                     x = DistributedArray(x_data, self.comm, distribute=False)
 
-                    x_full = self.get_full_solution_vector(x)
+                    x_full = self._get_full_solution_vector(x)
                     if self.rank == mpi_master():
                         xv = np.dot(x_full, v_grad[(op, w)])
                         xvs.append((op, w, xv))
@@ -622,10 +622,10 @@ class ComplexResponse(LinearSolver):
 
                 profiler.print_memory_subspace(
                     {
-                        'dist_bger': self.dist_bger,
-                        'dist_bung': self.dist_bung,
-                        'dist_e2bger': self.dist_e2bger,
-                        'dist_e2bung': self.dist_e2bung,
+                        'dist_bger': self._dist_bger,
+                        'dist_bung': self._dist_bung,
+                        'dist_e2bger': self._dist_e2bger,
+                        'dist_e2bung': self._dist_e2bung,
                         'precond': precond,
                         'solutions': solutions,
                         'residuals': residuals,
@@ -652,7 +652,7 @@ class ComplexResponse(LinearSolver):
             # spawning new trial vectors from residuals
 
             new_trials_ger, new_trials_ung = self._setup_trials(
-                residuals, precond, self.dist_bger, self.dist_bung)
+                residuals, precond, self._dist_bger, self._dist_bung)
 
             residuals.clear()
 
@@ -723,7 +723,7 @@ class ComplexResponse(LinearSolver):
                                     pe_dict['potfile_text'])
 
                 for bop, w in solutions:
-                    x = self.get_full_solution_vector(solutions[(bop, w)])
+                    x = self._get_full_solution_vector(solutions[(bop, w)])
 
                     if self.rank == mpi_master():
                         for aop in self.a_components:
@@ -754,7 +754,7 @@ class ComplexResponse(LinearSolver):
                 kappas = {}
 
                 for op, w in solutions:
-                    x = self.get_full_solution_vector(solutions[(op, w)])
+                    x = self._get_full_solution_vector(solutions[(op, w)])
                     x = self.comm.bcast(x, root=mpi_master())
                     kappas[(op, w)] = (self.lrvec2mat(x.real, nocc, norb) +
                                        1j * self.lrvec2mat(x.imag, nocc, norb))
@@ -763,7 +763,7 @@ class ComplexResponse(LinearSolver):
 
         return None
 
-    def get_full_solution_vector(self, solution):
+    def _get_full_solution_vector(self, solution):
         """
         Gets a full solution vector from the distributed solution.
 
@@ -788,7 +788,7 @@ class ComplexResponse(LinearSolver):
         else:
             return None
 
-    def print_iteration(self, relative_residual_norm, xvs):
+    def _print_iteration(self, relative_residual_norm, xvs):
         """
         Prints information of the iteration.
 
@@ -801,7 +801,7 @@ class ComplexResponse(LinearSolver):
 
         width = 92
 
-        output_header = '*** Iteration:   {} '.format(self.cur_iter + 1)
+        output_header = '*** Iteration:   {} '.format(self._cur_iter + 1)
         output_header += '* Residuals (Max,Min): '
         output_header += '{:.2e} and {:.2e}'.format(
             max(relative_residual_norm.values()),

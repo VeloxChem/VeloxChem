@@ -143,10 +143,10 @@ class LinearResponseEigenSolver(LinearSolver):
             dipole moments, oscillator strengths and rotatory strengths.
         """
 
-        self.dist_bger = None
-        self.dist_bung = None
-        self.dist_e2bger = None
-        self.dist_e2bung = None
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
 
         # check dft setup
         self._dft_sanity_check()
@@ -224,7 +224,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # generate initial guess from scratch
         else:
-            igs = self.initial_excitations(self.nstates, orb_ene, nocc, norb)
+            igs = self._initial_excitations(self.nstates, orb_ene, nocc, norb)
             bger, bung = self._setup_trials(igs, None)
 
             self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
@@ -252,11 +252,11 @@ class LinearResponseEigenSolver(LinearSolver):
 
             profiler.start_timer('ReducedSpace')
 
-            self.cur_iter = iteration
+            self._cur_iter = iteration
 
-            e2gg = self.dist_bger.matmul_AtB(self.dist_e2bger, 2.0)
-            e2uu = self.dist_bung.matmul_AtB(self.dist_e2bung, 2.0)
-            s2ug = self.dist_bung.matmul_AtB(self.dist_bger, 2.0)
+            e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger, 2.0)
+            e2uu = self._dist_bung.matmul_AtB(self._dist_e2bung, 2.0)
+            s2ug = self._dist_bung.matmul_AtB(self._dist_bger, 2.0)
 
             if self.rank == mpi_master():
 
@@ -305,11 +305,11 @@ class LinearResponseEigenSolver(LinearSolver):
             for k in range(self.nstates):
                 w = wn[k]
 
-                x_ger = self.dist_bger.matmul_AB_no_gather(c_ger[:, k])
-                x_ung = self.dist_bung.matmul_AB_no_gather(c_ung[:, k])
+                x_ger = self._dist_bger.matmul_AB_no_gather(c_ger[:, k])
+                x_ung = self._dist_bung.matmul_AB_no_gather(c_ung[:, k])
 
-                e2x_ger = self.dist_e2bger.matmul_AB_no_gather(c_ger[:, k])
-                e2x_ung = self.dist_e2bung.matmul_AB_no_gather(c_ung[:, k])
+                e2x_ger = self._dist_e2bger.matmul_AB_no_gather(c_ger[:, k])
+                e2x_ung = self._dist_e2bung.matmul_AB_no_gather(c_ung[:, k])
 
                 s2x_ger = x_ger.data
                 s2x_ung = x_ung.data
@@ -351,18 +351,18 @@ class LinearResponseEigenSolver(LinearSolver):
             if self.rank == mpi_master():
                 self.ostream.print_info(
                     '{:d} gerade trial vectors in reduced space'.format(
-                        self.dist_bger.shape(1)))
+                        self._dist_bger.shape(1)))
                 self.ostream.print_info(
                     '{:d} ungerade trial vectors in reduced space'.format(
-                        self.dist_bung.shape(1)))
+                        self._dist_bung.shape(1)))
                 self.ostream.print_blank()
 
                 profiler.print_memory_subspace(
                     {
-                        'dist_bger': self.dist_bger,
-                        'dist_bung': self.dist_bung,
-                        'dist_e2bger': self.dist_e2bger,
-                        'dist_e2bung': self.dist_e2bung,
+                        'dist_bger': self._dist_bger,
+                        'dist_bung': self._dist_bung,
+                        'dist_e2bger': self._dist_e2bger,
+                        'dist_e2bung': self._dist_e2bung,
                         'exsolutions': excitations,
                         'exresiduals': exresiduals,
                     }, self.ostream)
@@ -391,7 +391,7 @@ class LinearResponseEigenSolver(LinearSolver):
             }
 
             new_trials_ger, new_trials_ung = self._setup_trials(
-                exresiduals, precond, self.dist_bger, self.dist_bung)
+                exresiduals, precond, self._dist_bger, self._dist_bung)
 
             exresiduals.clear()
 
@@ -454,7 +454,7 @@ class LinearResponseEigenSolver(LinearSolver):
             magn_trans_dipoles = np.zeros((self.nstates, 3))
 
             key_0 = list(excitations.keys())[0]
-            x_0 = self.get_full_solution_vector(excitations[key_0][1])
+            x_0 = self._get_full_solution_vector(excitations[key_0][1])
 
             if self.rank == mpi_master():
                 eigvecs = np.zeros((x_0.size, self.nstates))
@@ -472,7 +472,7 @@ class LinearResponseEigenSolver(LinearSolver):
             dens_cube_files = []
 
             for s in range(self.nstates):
-                eigvec = self.get_full_solution_vector(excitations[s][1])
+                eigvec = self._get_full_solution_vector(excitations[s][1])
 
                 if self.rank == mpi_master():
                     mo_occ = scf_tensors['C_alpha'][:, :nocc]
@@ -581,7 +581,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         return None
 
-    def get_full_solution_vector(self, solution):
+    def _get_full_solution_vector(self, solution):
         """
         Gets a full solution vector from the distributed solution.
 
@@ -602,7 +602,7 @@ class LinearResponseEigenSolver(LinearSolver):
         else:
             return None
 
-    def print_iteration(self, relative_residual_norm, ws):
+    def _print_iteration(self, relative_residual_norm, ws):
         """
         Prints information of the iteration.
 
@@ -613,7 +613,7 @@ class LinearResponseEigenSolver(LinearSolver):
         """
 
         width = 92
-        output_header = '*** Iteration:   {} '.format(self.cur_iter + 1)
+        output_header = '*** Iteration:   {} '.format(self._cur_iter + 1)
         output_header += '* Residuals (Max,Min): '
         output_header += '{:.2e} and {:.2e}'.format(
             max(relative_residual_norm.values()),
@@ -631,7 +631,7 @@ class LinearResponseEigenSolver(LinearSolver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def initial_excitations(self, nstates, ea, nocc, norb):
+    def _initial_excitations(self, nstates, ea, nocc, norb):
         """
         Gets initial guess for excitations.
 
@@ -705,13 +705,13 @@ class LinearResponseEigenSolver(LinearSolver):
             norms_2 = 2.0 * v.squared_norm(axis=0)
             vn = np.sqrt(np.sum(norms_2))
 
-            if vn > self.small_thresh:
+            if vn > self._small_thresh:
                 norms = np.sqrt(norms_2)
                 # gerade
-                if norms[0] > self.small_thresh:
+                if norms[0] > self._small_thresh:
                     trials_ger.append(v.data[:, 0])
                 # ungerade
-                if norms[1] > self.small_thresh:
+                if norms[1] > self._small_thresh:
                     trials_ung.append(v.data[:, 1])
 
         new_ger = np.array(trials_ger).T
@@ -803,10 +803,10 @@ class LinearResponseEigenSolver(LinearSolver):
             The E[2] matrix as numpy array.
         """
 
-        self.dist_bger = None
-        self.dist_bung = None
-        self.dist_e2bger = None
-        self.dist_e2bung = None
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
 
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
@@ -865,13 +865,13 @@ class LinearResponseEigenSolver(LinearSolver):
 
         for i in range(2 * n_exc):
             e2b_data = np.hstack((
-                self.dist_e2bger.data[:, i:i + 1],
-                self.dist_e2bung.data[:, i:i + 1],
+                self._dist_e2bger.data[:, i:i + 1],
+                self._dist_e2bung.data[:, i:i + 1],
             ))
 
             e2b = DistributedArray(e2b_data, self.comm, distribute=False)
 
-            sigma = self.get_full_solution_vector(e2b)
+            sigma = self._get_full_solution_vector(e2b)
 
             if self.rank == mpi_master():
                 E2[:, i] = sigma[:]

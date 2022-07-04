@@ -130,7 +130,7 @@ class LinearSolver:
 
         # split communicators
         self.use_split_comm = False
-        self.split_comm_ratio = None
+        self._split_comm_ratio = None
 
         # static electric field
         self.electric_field = None
@@ -138,9 +138,9 @@ class LinearSolver:
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 150
-        self.cur_iter = 0
-        self.small_thresh = 1.0e-10
         self.lindep_thresh = 1.0e-6
+        self._small_thresh = 1.0e-10
+        self._cur_iter = 0
         self._is_converged = False
 
         # mpi information
@@ -165,21 +165,21 @@ class LinearSolver:
         self.print_level = 2
 
         # program end time for graceful exit
-        self.program_end_time = None
+        self._program_end_time = None
 
         # filename
-        self.filename = f'veloxchem_rsp_{get_datetime_string()}'
+        self._filename = f'veloxchem_rsp_{get_datetime_string()}'
 
         # distributed arrays
-        self.dist_bger = None
-        self.dist_bung = None
-        self.dist_e2bger = None
-        self.dist_e2bung = None
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
 
         # nonlinear flag and distributed Fock matrices
         self.nonlinear = False
-        self.dist_fock_ger = None
-        self.dist_fock_ung = None
+        self._dist_fock_ger = None
+        self._dist_fock_ung = None
 
         # input keywords
         self._input_keywords = {
@@ -251,11 +251,11 @@ class LinearSolver:
         parse_input(self, rsp_keywords, rsp_dict)
 
         if 'program_end_time' in rsp_dict:
-            self.program_end_time = rsp_dict['program_end_time']
+            self._program_end_time = rsp_dict['program_end_time']
         if 'filename' in rsp_dict:
-            self.filename = rsp_dict['filename']
+            self._filename = rsp_dict['filename']
             if 'checkpoint_file' not in rsp_dict:
-                self.checkpoint_file = f'{self.filename}.rsp.h5'
+                self.checkpoint_file = f'{self._filename}.rsp.h5'
 
         method_keywords = {
             key: val[0]
@@ -482,11 +482,12 @@ class LinearSolver:
         ]
 
         if self.nonlinear:
-            (self.dist_bger, self.dist_bung, self.dist_e2bger, self.dist_e2bung,
-             self.dist_fock_ger, self.dist_fock_ung) = dist_arrays
+            (self._dist_bger, self._dist_bung, self._dist_e2bger,
+             self._dist_e2bung, self._dist_fock_ger,
+             self._dist_fock_ung) = dist_arrays
         else:
-            (self.dist_bger, self.dist_bung, self.dist_e2bger,
-             self.dist_e2bung) = dist_arrays
+            (self._dist_bger, self._dist_bung, self._dist_e2bger,
+             self._dist_e2bung) = dist_arrays
 
         checkpoint_text = 'Restarting from checkpoint file: '
         checkpoint_text += self.checkpoint_file
@@ -503,19 +504,19 @@ class LinearSolver:
             The distributed ungerade trial vectors.
         """
 
-        if self.dist_bger is None:
-            self.dist_bger = DistributedArray(bger.data,
-                                              self.comm,
-                                              distribute=False)
+        if self._dist_bger is None:
+            self._dist_bger = DistributedArray(bger.data,
+                                               self.comm,
+                                               distribute=False)
         else:
-            self.dist_bger.append(bger, axis=1)
+            self._dist_bger.append(bger, axis=1)
 
-        if self.dist_bung is None:
-            self.dist_bung = DistributedArray(bung.data,
-                                              self.comm,
-                                              distribute=False)
+        if self._dist_bung is None:
+            self._dist_bung = DistributedArray(bung.data,
+                                               self.comm,
+                                               distribute=False)
         else:
-            self.dist_bung.append(bung, axis=1)
+            self._dist_bung.append(bung, axis=1)
 
     def _append_sigma_vectors(self, e2bger, e2bung):
         """
@@ -527,19 +528,19 @@ class LinearSolver:
             The distributed ungerade sigma vectors.
         """
 
-        if self.dist_e2bger is None:
-            self.dist_e2bger = DistributedArray(e2bger.data,
-                                                self.comm,
-                                                distribute=False)
+        if self._dist_e2bger is None:
+            self._dist_e2bger = DistributedArray(e2bger.data,
+                                                 self.comm,
+                                                 distribute=False)
         else:
-            self.dist_e2bger.append(e2bger, axis=1)
+            self._dist_e2bger.append(e2bger, axis=1)
 
-        if self.dist_e2bung is None:
-            self.dist_e2bung = DistributedArray(e2bung.data,
-                                                self.comm,
-                                                distribute=False)
+        if self._dist_e2bung is None:
+            self._dist_e2bung = DistributedArray(e2bung.data,
+                                                 self.comm,
+                                                 distribute=False)
         else:
-            self.dist_e2bung.append(e2bung, axis=1)
+            self._dist_e2bung.append(e2bung, axis=1)
 
     def _append_fock_matrices(self, fock_ger, fock_ung):
         """
@@ -551,19 +552,19 @@ class LinearSolver:
             The distributed ungerade Fock matrices in MO.
         """
 
-        if self.dist_fock_ger is None:
-            self.dist_fock_ger = DistributedArray(fock_ger.data,
-                                                  self.comm,
-                                                  distribute=False)
+        if self._dist_fock_ger is None:
+            self._dist_fock_ger = DistributedArray(fock_ger.data,
+                                                   self.comm,
+                                                   distribute=False)
         else:
-            self.dist_fock_ger.append(fock_ger, axis=1)
+            self._dist_fock_ger.append(fock_ger, axis=1)
 
-        if self.dist_fock_ung is None:
-            self.dist_fock_ung = DistributedArray(fock_ung.data,
-                                                  self.comm,
-                                                  distribute=False)
+        if self._dist_fock_ung is None:
+            self._dist_fock_ung = DistributedArray(fock_ung.data,
+                                                   self.comm,
+                                                   distribute=False)
         else:
-            self.dist_fock_ung.append(fock_ung, axis=1)
+            self._dist_fock_ung.append(fock_ung, axis=1)
 
     def compute(self, molecule, basis, scf_tensors, v_grad=None):
         """
@@ -885,24 +886,24 @@ class LinearSolver:
         V_es = pe_dict['V_es']
         pe_drv = pe_dict['pe_drv']
 
-        if self.split_comm_ratio is None:
+        if self._split_comm_ratio is None:
             if self._dft and self._pe:
-                self.split_comm_ratio = [0.34, 0.33, 0.33]
+                self._split_comm_ratio = [0.34, 0.33, 0.33]
             elif self._dft:
-                self.split_comm_ratio = [0.5, 0.5, 0.0]
+                self._split_comm_ratio = [0.5, 0.5, 0.0]
             elif self._pe:
-                self.split_comm_ratio = [0.5, 0.0, 0.5]
+                self._split_comm_ratio = [0.5, 0.0, 0.5]
             else:
-                self.split_comm_ratio = [1.0, 0.0, 0.0]
+                self._split_comm_ratio = [1.0, 0.0, 0.0]
 
         if self._dft:
-            dft_nodes = int(float(self.nodes) * self.split_comm_ratio[1] + 0.5)
+            dft_nodes = int(float(self.nodes) * self._split_comm_ratio[1] + 0.5)
             dft_nodes = max(1, dft_nodes)
         else:
             dft_nodes = 0
 
         if self._pe:
-            pe_nodes = int(float(self.nodes) * self.split_comm_ratio[2] + 0.5)
+            pe_nodes = int(float(self.nodes) * self._split_comm_ratio[2] + 0.5)
             pe_nodes = max(1, pe_nodes)
         else:
             pe_nodes = 0
@@ -985,13 +986,13 @@ class LinearSolver:
                 pe_root = 2 if self._dft else 1
                 time_pe = dt[pe_root] * pe_nodes
             time_sum = time_eri + time_dft + time_pe
-            self.split_comm_ratio = [
+            self._split_comm_ratio = [
                 time_eri / time_sum,
                 time_dft / time_sum,
                 time_pe / time_sum,
             ]
-        self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
-                                                root=mpi_master())
+        self._split_comm_ratio = self.comm.bcast(self._split_comm_ratio,
+                                                 root=mpi_master())
 
     def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
@@ -1022,13 +1023,13 @@ class LinearSolver:
         if success:
             if self.nonlinear:
                 dist_arrays = [
-                    self.dist_bger, self.dist_bung, self.dist_e2bger,
-                    self.dist_e2bung, self.dist_fock_ger, self.dist_fock_ung
+                    self._dist_bger, self._dist_bung, self._dist_e2bger,
+                    self._dist_e2bung, self._dist_fock_ger, self._dist_fock_ung
                 ]
             else:
                 dist_arrays = [
-                    self.dist_bger, self.dist_bung, self.dist_e2bger,
-                    self.dist_e2bung
+                    self._dist_bger, self._dist_bung, self._dist_e2bger,
+                    self._dist_e2bung
                 ]
 
             for dist_array, label in zip(dist_arrays, labels):
@@ -1079,8 +1080,8 @@ class LinearSolver:
             True if a graceful exit is needed, False otherwise.
         """
 
-        if self.program_end_time is not None:
-            remaining_hours = (self.program_end_time -
+        if self._program_end_time is not None:
+            remaining_hours = (self._program_end_time -
                                datetime.now()).total_seconds() / 3600
             # exit gracefully when the remaining time is not sufficient to
             # complete the next iteration (plus 25% to be on the safe side).
@@ -1169,7 +1170,7 @@ class LinearSolver:
             output_conv += '{:s} converged'.format(title)
         else:
             output_conv += '{:s} NOT converged'.format(title)
-        output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
+        output_conv += ' in {:d} iterations. '.format(self._cur_iter + 1)
         output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
         self.ostream.print_header(output_conv.ljust(width))
         self.ostream.print_blank()
@@ -1860,7 +1861,7 @@ class LinearSolver:
 
             if self.rank == mpi_master():
                 occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(
-                    self.filename, root + 1, i_nto + 1)
+                    self._filename, root + 1, i_nto + 1)
                 vis_drv.write_data(occ_cube_name, cubic_grid, molecule, 'nto',
                                    ind_occ, 'alpha')
                 filenames.append(occ_cube_name)
@@ -1876,7 +1877,7 @@ class LinearSolver:
 
             if self.rank == mpi_master():
                 vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(
-                    self.filename, root + 1, i_nto + 1)
+                    self._filename, root + 1, i_nto + 1)
                 vis_drv.write_data(vir_cube_name, cubic_grid, molecule, 'nto',
                                    ind_vir, 'alpha')
                 filenames.append(vir_cube_name)
@@ -1944,7 +1945,7 @@ class LinearSolver:
 
         if self.rank == mpi_master():
             detach_cube_name = '{:s}_S{:d}_detach.cube'.format(
-                self.filename, root + 1)
+                self._filename, root + 1)
             vis_drv.write_data(detach_cube_name, cubic_grid, molecule,
                                'detachment', 0, 'alpha')
             filenames.append(detach_cube_name)
@@ -1957,7 +1958,7 @@ class LinearSolver:
 
         if self.rank == mpi_master():
             attach_cube_name = '{:s}_S{:d}_attach.cube'.format(
-                self.filename, root + 1)
+                self._filename, root + 1)
             vis_drv.write_data(attach_cube_name, cubic_grid, molecule,
                                'attachment', 1, 'alpha')
             filenames.append(attach_cube_name)
