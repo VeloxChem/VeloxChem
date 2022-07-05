@@ -216,6 +216,9 @@ class ScfDriver:
         self._ef_nuc_energy = 0.0
         self._dipole_origin = None
 
+        # scf tensors
+        self._scf_tensors = None
+
         # timing and profiling
         self.timing = False
         self.profiling = False
@@ -273,6 +276,14 @@ class ScfDriver:
         """
 
         return self._is_converged
+
+    @property
+    def scf_tensors(self):
+        """
+        Returns the scf tensors.
+        """
+
+        return self._scf_tensors
 
     def print_keywords(self):
         """
@@ -545,7 +556,7 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self._print_scf_energy()
-            s2 = self.compute_s2(molecule, self.scf_tensors)
+            s2 = self.compute_s2(molecule, self._scf_tensors)
             self._print_ground_state(molecule, s2)
             if self.print_level == 2:
                 self.molecular_orbitals.print_orbitals(molecule, ao_basis,
@@ -684,7 +695,7 @@ class ScfDriver:
             t0 = tm.time()
 
             oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh)
-            self.scf_tensors = {'S': ovl_mat.to_numpy()}
+            self._scf_tensors = {'S': ovl_mat.to_numpy()}
 
             self.ostream.print_info("Orthogonalization matrix computed in" +
                                     " {:.2f} sec.".format(tm.time() - t0))
@@ -885,7 +896,7 @@ class ScfDriver:
             F_alpha = fock_mat.alpha_to_numpy(0)
             F_beta = fock_mat.beta_to_numpy(0)
 
-            self.scf_tensors = {
+            self._scf_tensors = {
                 'S': S,
                 'C_alpha': C_alpha,
                 'C_beta': C_beta,
@@ -906,7 +917,7 @@ class ScfDriver:
                 self._write_final_hdf5(molecule, ao_basis)
 
         else:
-            self.scf_tensors = None
+            self._scf_tensors = None
 
         # for backward compatibility
         self.mol_orbs = self.molecular_orbitals
@@ -2088,7 +2099,7 @@ class ScfDriver:
             potfile_text = ''
 
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
-        write_scf_tensors(final_h5_fname, self.scf_tensors)
+        write_scf_tensors(final_h5_fname, self._scf_tensors)
 
         self.ostream.print_blank()
         checkpoint_text = 'SCF tensors written to file: '
