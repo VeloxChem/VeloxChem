@@ -1492,7 +1492,7 @@ def import_xc_contrib_tddft(molecule, basis, scfdrv, xmy_ao, rel_dm_ao,
 
     # return vxc derivatives in pyscf orbital order
     if vxc_deriv_only:
-        return vxc
+        return vxc, fxc_rel
 
     # contract to get the final xc gradient contributions
     natm = molecule.number_of_atoms()
@@ -2058,16 +2058,26 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
     if scfdrv is not None:
         if scfdrv.dft:
             ## import vxc derivative for partial derivative of Kohn-Sham matrix
-            #vxc_deriv = import_xc_contrib_tddft(molecule, basis, scfdrv,
-            #                                    density, density,
+            ## This version does not work!
+            ## vxc_deriv_2 corresponds to:
+            ## fxc * rho * ao_deriv * ao
+            ## and not to the term which is needed for the Hessian:
+            ## fxc * rho_deriv * ao * ao.
+            #vxc_deriv_1, vxc_deriv_2 = import_xc_contrib_tddft(molecule, basis,
+            #                                    scfdrv, density, density,
             #                                    vxc_deriv_only=True)
             #vxc_deriv_atom_i = np.zeros((3, nao, nao))
-            #vxc_deriv_atom_i[:, ki:kf] = vxc_deriv[1:, ki:kf] # 0 would not be derivative
+            #vxc_deriv_atom_i[:, ki:kf] = vxc_deriv_1[1:, ki:kf] # 0 would not be derivative
+            ##vxc_deriv_atom_i[:,ki:kf] += vxc_deriv_2[1:, ki:kf] # 0 would not bederivative
+
             #vxc_deriv_atom_i += vxc_deriv_atom_i.transpose(0, 2, 1)
+            #vxc_deriv_atom_i[:,ki:kf] += vxc_deriv_2[1:, ki:kf] # 0 would not bederivative
+            
 
             #print("\n\nvlx vxc deriv atom %d " % i)
             #print(vxc_deriv_atom_i)
 
+            # This one works!
             pyscf_mo_coeff = pyscf_scf.mo_coeff
             pyscf_mo_occ = pyscf_scf.mo_occ
             max_memory = 2000
@@ -2476,6 +2486,84 @@ def hcore_second_deriv(molecule, basis, i=0, j=0, unit="au"):
                                         )
 
     return vlx_hcore_deriv_atoms_ij
+
+
+def dft_xc_second_deriv(molecule, basis, scf_drv, unit="au"):
+    """
+    Imports the second derivatives of the exchange and correlation
+    energy from pyscf.
+
+    :param molecule:
+        the vlx molecule object
+    :param basis:
+        the vlx basis object
+    :param scf_drv:
+        the vlx Scf Driver.
+    :param unit:
+        the units to be used for the molecular geometry;
+        possible values: "au" (default), "Angstrom"
+
+    :return:
+        a numpy array of shape (natm, natm, 3, 3) corresponding to the
+        partial derivative of Exc with respect to the x, y and z coords.
+        of all atoms.
+    """
+    molecule_string = get_molecule_string(molecule)
+    basis_set_label = basis.get_label()
+    pyscf_basis = translate_to_pyscf(basis_set_label)
+    pyscf_molecule = pyscf.gto.M(atom=molecule_string,
+                                 basis=pyscf_basis, unit=unit)
+
+    pyscf_scf = pyscf.scf.RKS(pyscf_molecule)
+    # set functional, convergence threshold and grid level 
+    pyscf_scf.xc = translate_to_pyscf(scf_drv.xcfun.get_func_label())
+    pyscf_scf.conv_tol = scf_drv.conv_thresh
+    if scf_drv.grid_level == 6:
+        pyscf_scf.grids.level = 9
+    else:
+        pyscf_scf.grids.level = scf_drv.grid_level
+
+    pyscf_scf.kernel()
+
+    pyscf_hessian = pyscf.hessian.rks.Hessian(pyscf_scf)
+
+    pyscf_mo_coeff = pyscf_scf.mo_coeff
+    pyscf_mo_occ = pyscf_scf.mo_occ
+    max_memory = 2000
+    pyscf_vxc_deriv2 = pyscf_rks_hessian._get_vxc_deriv2(pyscf_hessian,
+                                                pyscf_mo_coeff,
+                                                pyscf_mo_occ, max_memory)
+    pyscf_vxc_diag = pyscf_rks_hessian._get_vxc_diag(pyscf_hessian,
+                                                pyscf_mo_coeff,
+                                                pyscf_mo_occ, max_memory)
+
+    natm = pyscf_molecule.natm
+    exc_hessian_contrib = np.zeros((natm, natm, 3, 3))
+    ao_slices = pyscf_molecule.aoslice_by_atom()
+
+    density = 2 * scf_drv.scf_tensors['D_alpha']
+    gs_dm = ao_matrix_to_dalton(DenseMatrix(density),
+                                basis, molecule).to_numpy()
+
+    #print("Shape of vxc_deriv2: ", pyscf_vxc_deriv2.shape)
+    for i in range(natm):
+        # Get the AO indeces corresponding to atoms i and j
+        ki, kf = ao_slices[i, 2:]
+
+        exc_hessian_contrib[i, i] += 2 * np.einsum('xypq,pq->xy',
+                                        pyscf_vxc_diag[:,:,ki:kf],
+                                        gs_dm[ki:kf])
+
+        for j in range(i+1):
+            li, lf = ao_slices[j, 2:]
+            exc_hessian_contrib[i, j] += 2 * np.einsum('xypq,pq->xy',
+                                        pyscf_vxc_deriv2[i,:,:,li:lf],
+                                        gs_dm[li:lf])
+
+        for j in range(i):
+            exc_hessian_contrib[j, i] = exc_hessian_contrib[i, j].T
+
+    return exc_hessian_contrib 
 
 
 def eri_second_deriv(molecule, basis, i=0, j=0, unit="au"):

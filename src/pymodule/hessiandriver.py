@@ -177,7 +177,7 @@ class HessianDriver:
         if self.numerical_grad:
             self.numerical = True
 
-        # Analytical DFT gradient/Hessian is not implemented yet
+        # Analytical DFT Hessian is not implemented yet
         if 'xcfun' in method_dict:
             if method_dict['xcfun'] is not None:
                 #self.numerical = True

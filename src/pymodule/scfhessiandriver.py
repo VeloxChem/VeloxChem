@@ -55,6 +55,7 @@ from .import_from_pyscf import overlap_second_deriv
 from .import_from_pyscf import hcore_second_deriv
 from .import_from_pyscf import eri_second_deriv
 from .import_from_pyscf import dipole_deriv
+from .import_from_pyscf import dft_xc_second_deriv
 
 
 class ScfHessianDriver(HessianDriver):
@@ -397,6 +398,19 @@ class ScfHessianDriver(HessianDriver):
                                                          cphf_rhs, -0.5 * ovlp_deriv_oo, cphf_ov,
                                                          profiler)
 
+        # amount of exact exchange
+        frac_K = 1.0
+
+        # DFT:
+        if self.dft:
+            if self.scf_drv.xcfun.is_hybrid():
+                frac_K = self.scf_drv.xcfun.get_frac_exact_exchange()
+            else:
+                frac_K = 0.0
+
+            # DFT exchange and correlation contribution
+            hessian_dft_xc = dft_xc_second_deriv(molecule, ao_basis, self.scf_drv)
+
         # Parts related to second-order integral derivatives
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
         for i in range(natm):
@@ -410,10 +424,10 @@ class ScfHessianDriver(HessianDriver):
                     # Add diagonal (same atom) contributions, 2S + 2J - K
                     hessian_2nd_order_derivatives[i,i] += 2*np.einsum('mn,xymn->xy', omega_ao, ovlp_2nd_deriv_ii)
                     hessian_2nd_order_derivatives[i,i] += 2*np.einsum('mn,kl,xymnkl->xy', density, density, eri_2nd_deriv_ii)
-                    hessian_2nd_order_derivatives[i,i] -= np.einsum('mk,nl,xymnkl->xy', density, density, eri_2nd_deriv_ii)
+                    hessian_2nd_order_derivatives[i,i] -= frac_K*np.einsum('mk,nl,xymnkl->xy', density, density, eri_2nd_deriv_ii)
                 # Add non-diagonal contributions, 2S + 2J - K + 2h
                 hessian_2nd_order_derivatives[i,j] += 2*np.einsum('mn,kl,xymnkl->xy', density, density, eri_2nd_deriv_ij)
-                hessian_2nd_order_derivatives[i,j] -= np.einsum('mk,nl,xymnkl->xy', density, density, eri_2nd_deriv_ij)
+                hessian_2nd_order_derivatives[i,j] -= frac_K*np.einsum('mk,nl,xymnkl->xy', density, density, eri_2nd_deriv_ij)
                 hessian_2nd_order_derivatives[i,j] += 2*np.einsum('mn,xymn->xy', omega_ao, ovlp_2nd_deriv_ij)
                 hessian_2nd_order_derivatives[i,j] += 2*np.einsum('mn,xymn->xy', density, hcore_2nd_deriv_ij)
 
