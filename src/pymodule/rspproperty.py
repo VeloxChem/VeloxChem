@@ -110,6 +110,12 @@ class ResponseProperty:
         self.rsp_property = self.rsp_driver.compute(molecule, basis,
                                                     scf_tensors)
 
+        if not self.rsp_driver.is_converged:
+            return
+
+        if self.rsp_driver.rank == mpi_master():
+            self.print_property(self.rsp_driver.ostream)
+
     def converged(self):
         """
         Checks if the response calculation is converged.

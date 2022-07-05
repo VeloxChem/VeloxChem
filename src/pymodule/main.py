@@ -432,9 +432,6 @@ def main():
         if not rsp_prop.converged():
             return
 
-        if task.mpi_rank == mpi_master():
-            rsp_prop.print_property(task.ostream)
-
     # Pulsed Linear Response Theory
 
     if ((task_type == 'pulses' or 'pulses' in task.input_dict) and
