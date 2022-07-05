@@ -44,7 +44,7 @@ class TestC6:
         c6_prop.init_driver(task.mpi_comm, task.ostream)
         c6_prop.compute(task.molecule, task.ao_basis, scf_tensors)
 
-        assert c6_prop.rsp_driver.is_converged
+        assert c6_prop.is_converged
 
         if is_mpi_master(task.mpi_comm):
             self.check_printout(c6_prop)
@@ -71,7 +71,7 @@ class TestC6:
             assert diff_prop < 1.0e-4
 
             points, weights = np.polynomial.legendre.leggauss(ref_n_points)
-            c6_value = C6.integrate(c6_results, freqs, points, weights, 0.3)
+            c6_value = c6_prop.integrate(freqs, points, weights, 0.3)
             assert abs(c6_value - ref_c6_value) < 1.0e-4
 
     @staticmethod

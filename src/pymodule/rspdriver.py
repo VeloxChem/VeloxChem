@@ -67,8 +67,8 @@ class ResponseDriver:
         # default calculation type
         self.prop_type = 'generic'
         self.tamm_dancoff = False
-        self.rsp_dict = {}
-        self.method_dict = {}
+        self._rsp_dict = {}
+        self._method_dict = {}
 
         # mpi information
         self.comm = comm
@@ -79,8 +79,16 @@ class ResponseDriver:
         self.ostream = ostream
 
         # solver and convergence flag
-        self.solver = None
-        self.is_converged = False
+        self._solver = None
+        self._is_converged = False
+
+    @property
+    def is_converged(self):
+        """
+        Returns whether response driver is converged.
+        """
+
+        return self._is_converged
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -93,82 +101,84 @@ class ResponseDriver:
         """
 
         if method_dict is None:
-            self.method_dict = None
+            self._method_dict = None
         else:
-            self.method_dict = dict(method_dict)
+            self._method_dict = dict(method_dict)
 
-        self.rsp_dict = dict(rsp_dict)
-        self.rsp_dict['prop_type'] = self.rsp_dict['property']
+        self._rsp_dict = dict(rsp_dict)
+        self._rsp_dict['prop_type'] = self._rsp_dict['property']
 
         rsp_keywords = {
             'prop_type': 'str_lower',
             'tamm_dancoff': 'bool',
         }
 
-        parse_input(self, rsp_keywords, self.rsp_dict)
+        parse_input(self, rsp_keywords, self._rsp_dict)
 
         # Linear response eigensolver
-        if (self.rsp_dict['order'] == 'linear' and
-                self.rsp_dict['residue'] == 'single' and
-                self.rsp_dict['complex'] == 'no'):
+        if (self._rsp_dict['order'] == 'linear' and
+                self._rsp_dict['residue'] == 'single' and
+                self._rsp_dict['complex'] == 'no'):
             if self.tamm_dancoff:
-                self.solver = TDAExciDriver(self.comm, self.ostream)
+                self._solver = TDAExciDriver(self.comm, self.ostream)
             else:
-                self.solver = LinearResponseEigenSolver(self.comm, self.ostream)
-            self.solver._input_keywords['response'].update({
+                self._solver = LinearResponseEigenSolver(
+                    self.comm, self.ostream)
+            self._solver._input_keywords['response'].update({
                 'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),
             })
 
         # Linear response solver
-        elif (self.rsp_dict['order'] == 'linear' and
-              self.rsp_dict['residue'] == 'none' and
-              self.rsp_dict['complex'] == 'no'):
-            self.solver = LinearResponseSolver(self.comm, self.ostream)
+        elif (self._rsp_dict['order'] == 'linear' and
+              self._rsp_dict['residue'] == 'none' and
+              self._rsp_dict['complex'] == 'no'):
+            self._solver = LinearResponseSolver(self.comm, self.ostream)
 
         # Complex linear response solver
-        elif (self.rsp_dict['order'] == 'linear' and
-              self.rsp_dict['residue'] == 'none' and
-              self.rsp_dict['onlystatic'] == 'no' and
-              self.rsp_dict['complex'] == 'yes'):
-            self.solver = ComplexResponse(self.comm, self.ostream)
+        elif (self._rsp_dict['order'] == 'linear' and
+              self._rsp_dict['residue'] == 'none' and
+              self._rsp_dict['onlystatic'] == 'no' and
+              self._rsp_dict['complex'] == 'yes'):
+            self._solver = ComplexResponse(self.comm, self.ostream)
 
         # C6 linear response solver
-        elif (self.rsp_dict['order'] == 'linear' and
-              self.rsp_dict['residue'] == 'none' and
-              self.rsp_dict['onlystatic'] == 'yes' and
-              self.rsp_dict['complex'] == 'yes'):
-            self.solver = C6Solver(self.comm, self.ostream)
+        elif (self._rsp_dict['order'] == 'linear' and
+              self._rsp_dict['residue'] == 'none' and
+              self._rsp_dict['onlystatic'] == 'yes' and
+              self._rsp_dict['complex'] == 'yes'):
+            self._solver = C6Solver(self.comm, self.ostream)
 
         # SHG
-        if (self.rsp_dict['order'] == 'quadratic' and
-                self.rsp_dict['complex'] == 'yes'):
-            self.solver = SHGDriver(self.comm, self.ostream)
+        if (self._rsp_dict['order'] == 'quadratic' and
+                self._rsp_dict['complex'] == 'yes'):
+            self._solver = SHGDriver(self.comm, self.ostream)
 
         # TPA
-        elif (self.rsp_dict['order'] == 'cubic' and
-              self.rsp_dict['complex'] == 'yes'):
-            if ('tpa_type' not in self.rsp_dict or
-                    self.rsp_dict['tpa_type'].lower() == 'full'):
-                self.solver = TPAFullDriver(self.comm, self.ostream)
-            elif ('tpa_type' in self.rsp_dict and
-                  self.rsp_dict['tpa_type'].lower() == 'reduced'):
-                self.solver = TPAReducedDriver(self.comm, self.ostream)
-            self.solver.input_keywords['response'].update({
+        elif (self._rsp_dict['order'] == 'cubic' and
+              self._rsp_dict['complex'] == 'yes'):
+            if ('tpa_type' not in self._rsp_dict or
+                    self._rsp_dict['tpa_type'].lower() == 'full'):
+                self._solver = TPAFullDriver(self.comm, self.ostream)
+            elif ('tpa_type' in self._rsp_dict and
+                  self._rsp_dict['tpa_type'].lower() == 'reduced'):
+                self._solver = TPAReducedDriver(self.comm, self.ostream)
+            self._solver.input_keywords['response'].update({
                 'tpa_type': ('str_lower', 'full or reduced TPA calculation'),
             })
 
         # Quadratic response driver
         if (self.prop_type == 'custom' and
-                self.rsp_dict['order'] == 'quadratic' and
-                self.rsp_dict['complex'] == 'yes'):
-            self.solver = QuadraticResponseDriver(self.comm, self.ostream)
+                self._rsp_dict['order'] == 'quadratic' and
+                self._rsp_dict['complex'] == 'yes'):
+            self._solver = QuadraticResponseDriver(self.comm, self.ostream)
 
         # Cubic response driver
-        if (self.prop_type == 'custom' and self.rsp_dict['order'] == 'cubic' and
-                self.rsp_dict['complex'] == 'yes'):
-            self.solver = CubicResponseDriver(self.comm, self.ostream)
+        if (self.prop_type == 'custom' and
+                self._rsp_dict['order'] == 'cubic' and
+                self._rsp_dict['complex'] == 'yes'):
+            self._solver = CubicResponseDriver(self.comm, self.ostream)
 
-        self.solver.update_settings(self.rsp_dict, self.method_dict)
+        self._solver.update_settings(self._rsp_dict, self._method_dict)
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
@@ -185,16 +195,16 @@ class ResponseDriver:
             The results from the actual response solver.
         """
 
-        assert_msg_critical(self.solver is not None,
+        assert_msg_critical(self._solver is not None,
                             'ResponseDriver: solver not initialized')
 
-        result = self.solver.compute(molecule, ao_basis, scf_tensors)
+        result = self._solver.compute(molecule, ao_basis, scf_tensors)
 
-        self.is_converged = self.solver.is_converged
+        self._is_converged = self._solver.is_converged
 
         return result
 
-    def prop_str(self):
+    def get_prop_str(self):
         """
         Gets string with type of molecular property calculation (Excited
         states, linear and non-linear spectroscopies).

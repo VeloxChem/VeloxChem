@@ -429,7 +429,8 @@ def main():
         rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
         rsp_prop.init_driver(task.mpi_comm, task.ostream)
         rsp_prop.compute(task.molecule, task.ao_basis, scf_tensors)
-        if not rsp_prop.converged():
+
+        if not rsp_prop.is_converged:
             return
 
     # Pulsed Linear Response Theory

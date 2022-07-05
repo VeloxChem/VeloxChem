@@ -53,10 +53,11 @@ class ResponseProperty:
         Initializes response property/spectroscopy.
         """
 
-        self.rsp_dict = rsp_dict
-        self.method_dict = method_dict
+        self._rsp_dict = rsp_dict
+        self._method_dict = method_dict
 
-        self.rsp_driver = None
+        self._rsp_driver = None
+        self._rsp_property = None
 
     def init_driver(self, comm=None, ostream=None):
         """
@@ -77,8 +78,8 @@ class ResponseProperty:
             else:
                 ostream = OutputStream(None)
 
-        self.rsp_driver = ResponseDriver(comm, ostream)
-        self.rsp_driver.update_settings(self.rsp_dict, self.method_dict)
+        self._rsp_driver = ResponseDriver(comm, ostream)
+        self._rsp_driver.update_settings(self._rsp_dict, self._method_dict)
 
     def print_keywords(self):
         """
@@ -86,14 +87,14 @@ class ResponseProperty:
         """
 
         assert_msg_critical(
-            self.rsp_driver is not None,
+            self._rsp_driver is not None,
             'ResponseProperty: response driver not initialized')
 
         assert_msg_critical(
-            self.rsp_driver.solver is not None,
+            self._rsp_driver.solver is not None,
             'ResponseProperty: response solver not initialized')
 
-        self.rsp_driver.solver.print_keywords()
+        self._rsp_driver.solver.print_keywords()
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -107,24 +108,30 @@ class ResponseProperty:
             The dictionary of tensors from converged SCF wavefunction.
         """
 
-        self.rsp_property = self.rsp_driver.compute(molecule, basis,
-                                                    scf_tensors)
+        self._rsp_property = self._rsp_driver.compute(molecule, basis,
+                                                      scf_tensors)
 
-        if not self.rsp_driver.is_converged:
+        if not self._rsp_driver.is_converged:
             return
 
-        if self.rsp_driver.rank == mpi_master():
-            self.print_property(self.rsp_driver.ostream)
+        if self._rsp_driver.rank == mpi_master():
+            self.print_property(self._rsp_driver.ostream)
 
-    def converged(self):
+    @property
+    def is_converged(self):
         """
-        Checks if the response calculation is converged.
-
-        :return:
-            True if the response calculation is converged, False otherwise.
+        Returns whether the response calculation is converged.
         """
 
-        return self.rsp_driver.is_converged
+        return self._rsp_driver.is_converged
+
+    @property
+    def rsp_property(self):
+        """
+        Returns the response property dictionary.
+        """
+
+        return self._rsp_property
 
     def get_property(self, key):
         """

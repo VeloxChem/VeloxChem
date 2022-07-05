@@ -91,7 +91,7 @@ class CustomProperty(ResponseProperty):
             The response functions or solutions.
         """
 
-        return self.rsp_property[key]
+        return self._rsp_property[key]
 
     def print_property(self, ostream):
         """
@@ -101,12 +101,12 @@ class CustomProperty(ResponseProperty):
             The output stream.
         """
 
-        if self.rsp_dict['order'] != 'linear':
+        if self._rsp_dict['order'] != 'linear':
             return
 
         width = 92
 
-        freqs = parse_seq_range(self.rsp_dict['frequencies'])
+        freqs = parse_seq_range(self._rsp_dict['frequencies'])
 
         for w in freqs:
             w_str = 'Response Function (w={:.4f})'.format(w)
@@ -114,18 +114,18 @@ class CustomProperty(ResponseProperty):
             ostream.print_header(('-' * len(w_str)).ljust(width))
 
             valstr = '{:<5s}'.format('')
-            for b in self.rsp_dict['b_components']:
-                if self.rsp_dict['complex'] == 'no':
+            for b in self._rsp_dict['b_components']:
+                if self._rsp_dict['complex'] == 'no':
                     valstr += '{:>15s}'.format(b.upper())
                 else:
                     valstr += '{:>29s}'.format(b.upper())
             ostream.print_header(valstr.ljust(width))
 
-            for a in self.rsp_dict['a_components']:
+            for a in self._rsp_dict['a_components']:
                 valstr = '{:<5s}'.format(a.upper())
-                for b in self.rsp_dict['b_components']:
-                    prop = -self.rsp_property['response_functions'][(a, b, w)]
-                    if self.rsp_dict['complex'] == 'no':
+                for b in self._rsp_dict['b_components']:
+                    prop = -self._rsp_property['response_functions'][(a, b, w)]
+                    if self._rsp_dict['complex'] == 'no':
                         valstr += '{:15.8f}'.format(prop)
                     else:
                         valstr += '{:29.8f}'.format(prop)
