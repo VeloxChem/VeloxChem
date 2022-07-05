@@ -351,16 +351,17 @@ class LinearResponseSolver(LinearSolver):
                         n_ung))
                 self.ostream.print_blank()
 
-                profiler.print_memory_subspace(
-                    {
-                        'dist_bger': self._dist_bger,
-                        'dist_bung': self._dist_bung,
-                        'dist_e2bger': self._dist_e2bger,
-                        'dist_e2bung': self._dist_e2bung,
-                        'precond': precond,
-                        'solutions': solutions,
-                        'residuals': residuals,
-                    }, self.ostream)
+                if self.print_level > 1:
+                    profiler.print_memory_subspace(
+                        {
+                            'dist_bger': self._dist_bger,
+                            'dist_bung': self._dist_bung,
+                            'dist_e2bger': self._dist_e2bger,
+                            'dist_e2bung': self._dist_e2bung,
+                            'precond': precond,
+                            'solutions': solutions,
+                            'residuals': residuals,
+                        }, self.ostream)
 
                 profiler.check_memory_usage(
                     'Iteration {:d} subspace'.format(iteration + 1))
@@ -515,14 +516,16 @@ class LinearResponseSolver(LinearSolver):
             min(relative_residual_norm.values()))
         self.ostream.print_header(output_header.ljust(width))
         self.ostream.print_blank()
-        for op, freq, xv in xvs:
-            ops_label = '<<{};{}>>_{:.4f}'.format(op, op, freq)
-            rel_res = relative_residual_norm[(op, freq)]
-            output_iter = '{:<15s}: {:15.8f} '.format(ops_label, -xv)
-            output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
-            self.ostream.print_header(output_iter.ljust(width))
-        self.ostream.print_blank()
-        self.ostream.flush()
+
+        if self.print_level > 1:
+            for op, freq, xv in xvs:
+                ops_label = '<<{};{}>>_{:.4f}'.format(op, op, freq)
+                rel_res = relative_residual_norm[(op, freq)]
+                output_iter = '{:<15s}: {:15.8f} '.format(ops_label, -xv)
+                output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
+                self.ostream.print_header(output_iter.ljust(width))
+            self.ostream.print_blank()
+            self.ostream.flush()
 
     def _get_precond(self, orb_ene, nocc, norb, w):
         """

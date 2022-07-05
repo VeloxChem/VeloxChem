@@ -620,16 +620,17 @@ class ComplexResponse(LinearSolver):
                         n_ung))
                 self.ostream.print_blank()
 
-                profiler.print_memory_subspace(
-                    {
-                        'dist_bger': self._dist_bger,
-                        'dist_bung': self._dist_bung,
-                        'dist_e2bger': self._dist_e2bger,
-                        'dist_e2bung': self._dist_e2bung,
-                        'precond': precond,
-                        'solutions': solutions,
-                        'residuals': residuals,
-                    }, self.ostream)
+                if self.print_level > 1:
+                    profiler.print_memory_subspace(
+                        {
+                            'dist_bger': self._dist_bger,
+                            'dist_bung': self._dist_bung,
+                            'dist_e2bger': self._dist_e2bger,
+                            'dist_e2bung': self._dist_e2bung,
+                            'precond': precond,
+                            'solutions': solutions,
+                            'residuals': residuals,
+                        }, self.ostream)
 
                 profiler.check_memory_usage(
                     'Iteration {:d} subspace'.format(iteration + 1))
@@ -809,7 +810,7 @@ class ComplexResponse(LinearSolver):
         self.ostream.print_header(output_header.ljust(width))
         self.ostream.print_blank()
 
-        if not self.nonlinear:
+        if (not self.nonlinear) and (self.print_level > 1):
             output_header = 'Operator:  {} ({})'.format(self.b_operator,
                                                         self.b_components)
             self.ostream.print_header(output_header.ljust(width))

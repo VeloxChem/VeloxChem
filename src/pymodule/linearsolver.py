@@ -196,9 +196,9 @@ class LinearSolver:
                 'profiling': ('bool', 'print profiling information'),
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
+                'print_level': ('int', 'verbosity of output (1-3)'),
             },
             'method_settings': {
-                'dft': ('bool', 'use DFT'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
                 'pe': ('bool', 'use polarizable embedding'),

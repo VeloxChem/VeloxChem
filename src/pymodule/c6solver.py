@@ -505,16 +505,17 @@ class C6Solver(LinearSolver):
                         n_ung))
                 self.ostream.print_blank()
 
-                profiler.print_memory_subspace(
-                    {
-                        'dist_bger': self._dist_bger,
-                        'dist_bung': self._dist_bung,
-                        'dist_e2bger': self._dist_e2bger,
-                        'dist_e2bung': self._dist_e2bung,
-                        'precond': precond,
-                        'solutions': solutions,
-                        'residuals': residuals,
-                    }, self.ostream)
+                if self.print_level > 1:
+                    profiler.print_memory_subspace(
+                        {
+                            'dist_bger': self._dist_bger,
+                            'dist_bung': self._dist_bung,
+                            'dist_e2bger': self._dist_e2bger,
+                            'dist_e2bung': self._dist_e2bung,
+                            'precond': precond,
+                            'solutions': solutions,
+                            'residuals': residuals,
+                        }, self.ostream)
 
                 profiler.check_memory_usage(
                     'Iteration {:d} subspace'.format(iteration + 1))
@@ -675,17 +676,18 @@ class C6Solver(LinearSolver):
         self.ostream.print_header(output_header.ljust(width))
         self.ostream.print_blank()
 
-        output_header = 'Operator:  {} ({})'.format(self.b_operator,
-                                                    self.b_components)
-        self.ostream.print_header(output_header.ljust(width))
-        self.ostream.print_blank()
+        if self.print_level > 1:
+            output_header = 'Operator:  {} ({})'.format(self.b_operator,
+                                                        self.b_components)
+            self.ostream.print_header(output_header.ljust(width))
+            self.ostream.print_blank()
 
-        for op, imagfreq, xv in xvs:
-            ops_label = '<<{};{}>>_{:.4f}j'.format(op, op, imagfreq)
-            rel_res = relative_residual_norm[(op, imagfreq)]
-            output_iter = '{:<17s}: {:15.8f} {:15.8f}j   '.format(
-                ops_label, -xv.real, -xv.imag)
-            output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
-            self.ostream.print_header(output_iter.ljust(width))
-        self.ostream.print_blank()
-        self.ostream.flush()
+            for op, imagfreq, xv in xvs:
+                ops_label = '<<{};{}>>_{:.4f}j'.format(op, op, imagfreq)
+                rel_res = relative_residual_norm[(op, imagfreq)]
+                output_iter = '{:<17s}: {:15.8f} {:15.8f}j   '.format(
+                    ops_label, -xv.real, -xv.imag)
+                output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
+                self.ostream.print_header(output_iter.ljust(width))
+            self.ostream.print_blank()
+            self.ostream.flush()
