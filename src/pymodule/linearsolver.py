@@ -144,12 +144,12 @@ class LinearSolver:
         self._is_converged = False
 
         # mpi information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
+        self._comm = comm
+        self._rank = self._comm.Get_rank()
+        self._nodes = self._comm.Get_size()
 
         # output stream
-        self.ostream = ostream
+        self._ostream = ostream
 
         # restart information
         self.restart = True
@@ -207,6 +207,46 @@ class LinearSolver:
                 'use_split_comm': ('bool', 'use split communicators'),
             },
         }
+
+    @property
+    def comm(self):
+        """
+        Returns the MPI communicator.
+        """
+
+        return self._comm
+
+    @property
+    def rank(self):
+        """
+        Returns the MPI rank.
+        """
+
+        return self._rank
+
+    @property
+    def nodes(self):
+        """
+        Returns the number of MPI processes.
+        """
+
+        return self._nodes
+
+    @property
+    def nnodes(self):
+        """
+        Returns the number of MPI processes.
+        """
+
+        return self._nodes
+
+    @property
+    def ostream(self):
+        """
+        Returns the output stream.
+        """
+
+        return self._ostream
 
     @property
     def is_converged(self):
@@ -291,7 +331,7 @@ class LinearSolver:
             if isinstance(self.xcfun, str):
                 self.xcfun = parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'SCF driver: Undefined XC functional')
+                                'LinearSolver: Undefined XC functional')
         self._dft = (self.xcfun is not None)
 
         # check grid level
@@ -385,15 +425,6 @@ class LinearSolver:
         """
 
         if self._dft:
-            # check dft setup
-            assert_msg_critical(self.xcfun is not None,
-                                'LinearSolver: Undefined XC functional')
-            if isinstance(self.xcfun, str):
-                self.xcfun = parse_xc_func(self.xcfun.upper())
-                assert_msg_critical(not self.xcfun.is_undefined(),
-                                    'LinearSolver: Undefined XC functional')
-
-            # generate integration grid
             grid_drv = GridDriver(self.comm)
             grid_drv.set_level(self.grid_level)
 
@@ -438,7 +469,6 @@ class LinearSolver:
             The dictionary of polarizable embedding information.
         """
 
-        # set up polarizable embedding
         if self._pe:
             from .polembed import PolEmbed
             pe_drv = PolEmbed(molecule, basis, self.pe_options, self.comm)
