@@ -2,6 +2,8 @@ name: vlxenv
 channels:
   - conda-forge
 dependencies:
+  - cmake
+  - ninja
   - cxx-compiler
   - mpich
   - blas=*=*mkl*
