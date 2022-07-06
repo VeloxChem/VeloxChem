@@ -442,6 +442,9 @@ class ScfHessianDriver(HessianDriver):
         self.hessian = ( hessian_first_order_derivatives + hessian_2nd_order_derivatives
                        + hessian_nuclear_nuclear ).transpose(0,2,1,3).reshape(3*natm, 3*natm)
 
+        if self.dft:
+            self.hessian += hessian_dft_xc.transpose(0,2,1,3).reshape(3*natm, 3*natm)
+
         # Calculate the gradient of the dipole moment, needed for IR intensities
         self.compute_dipole_gradient(molecule, ao_basis, perturbed_density)
 
@@ -525,10 +528,25 @@ class ScfHessianDriver(HessianDriver):
         for i in range(natm*3):
             fock_uia.set_fock_type(fock_flag, i)
 
-        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        screening = eri_drv.compute(get_qq_scheme(self.scf_drv.qq_type),
-                                    self.scf_drv.eri_thresh, molecule, ao_basis)
-        eri_drv.compute(fock_uia, ao_density_uia, molecule, ao_basis, screening)
+        # TODO: remove commented out code.
+        #eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        #screening = eri_drv.compute(get_qq_scheme(self.scf_drv.qq_type),
+        #                            self.scf_drv.eri_thresh, molecule, ao_basis)
+        #eri_drv.compute(fock_uia, ao_density_uia, molecule, ao_basis, screening)
+
+        # We use comp_lr_fock from CphfSolver to compute the eri
+        # and xc contributions
+        cphf_solver = CphfSolver(self.comm, self.ostream, self.scf_drv) # TODO: remove scf_drv
+        cphf_solver.update_settings(self.cphf_dict, self.method_dict)
+        # ERI information
+        eri_dict = cphf_solver.init_eri(molecule, ao_basis)
+        # DFT information
+        dft_dict = cphf_solver.init_dft(molecule, self.scf_drv.scf_tensors)
+        # PE information
+        pe_dict = cphf_solver.init_pe(molecule, ao_basis)
+
+        cphf_solver.comp_lr_fock(fock_uia, ao_density_uia, molecule, ao_basis,
+                                 eri_dict, dft_dict, pe_dict, profiler)
 
         # TODO: can this be done in a different way?
         fock_uia_numpy = np.zeros((natm,3,nao,nao))
@@ -562,7 +580,7 @@ class ScfHessianDriver(HessianDriver):
             # upper triangular part
             for j in range(i, natm):
                 # First derivative of the Fock matrix
-                fock_deriv_j = fock_deriv(molecule, ao_basis, density, j)
+                fock_deriv_j = fock_deriv(molecule, ao_basis, density, j, self.scf_drv)
                 # First derivative of overlap matrix
                 ovlp_deriv_j = overlap_deriv(molecule, ao_basis, j)
                 # Add the contribution of the perturbed density matrix
@@ -606,9 +624,22 @@ class ScfHessianDriver(HessianDriver):
         mo_energies = self.scf_drv.scf_tensors['E']
         eocc = mo_energies[:nocc]
         omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
-        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        screening = eri_drv.compute(get_qq_scheme(self.scf_drv.qq_type),
-                                    self.scf_drv.eri_thresh, molecule, ao_basis)
+
+        # TODO: remove commented out code
+        #eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        #screening = eri_drv.compute(get_qq_scheme(self.scf_drv.qq_type),
+        #                            self.scf_drv.eri_thresh, molecule, ao_basis)
+
+        # We use comp_lr_fock from CphfSolver to compute the eri
+        # and xc contributions
+        cphf_solver = CphfSolver(self.comm, self.ostream, self.scf_drv) # TODO: remove scf_drv
+        cphf_solver.update_settings(self.cphf_dict, self.method_dict)
+        # ERI information
+        eri_dict = cphf_solver.init_eri(molecule, ao_basis)
+        # DFT information
+        dft_dict = cphf_solver.init_dft(molecule, self.scf_drv.scf_tensors)
+        # PE information
+        pe_dict = cphf_solver.init_pe(molecule, ao_basis)
 
         # RHS contracted with CPHF coefficients (ov)
         #hessian_cphf_coeff_rhs = np.zeros((natm, natm, 3, 3))
@@ -620,12 +651,12 @@ class ScfHessianDriver(HessianDriver):
         # First integral derivatives: partial Fock and overlap matrix derivatives
         hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
         for i in range(natm):
-            fock_deriv_i = fock_deriv(molecule, ao_basis, density, i)
+            fock_deriv_i = fock_deriv(molecule, ao_basis, density, i, self.scf_drv)
             ovlp_deriv_i = overlap_deriv(molecule, ao_basis, i)
             # upper triangular part
             for j in range(i, natm):
                 ovlp_deriv_j = overlap_deriv(molecule, ao_basis, j)
-                fock_deriv_j = fock_deriv(molecule, ao_basis, density, j)
+                fock_deriv_j = fock_deriv(molecule, ao_basis, density, j, self.scf_drv)
                 Fix_Sjy = np.zeros((3,3))
                 Fjy_Six = np.zeros((3,3))
                 Six_Sjy = np.zeros((3,3))
@@ -670,7 +701,11 @@ class ScfHessianDriver(HessianDriver):
                 P_P_Six_ao_list = list([P_P_Six[x] for x in range(3)])
                 P_P_Six_dm_ao = AODensityMatrix(P_P_Six_ao_list, denmat.rest)
                 P_P_Six_fock_ao = AOFockMatrix(P_P_Six_dm_ao)
-                eri_drv.compute(P_P_Six_fock_ao, P_P_Six_dm_ao, molecule, ao_basis, screening)
+
+                # TODO: remove commented out code
+                #eri_drv.compute(P_P_Six_fock_ao, P_P_Six_dm_ao, molecule, ao_basis, screening)
+                cphf_solver.comp_lr_fock(P_P_Six_fock_ao, P_P_Six_dm_ao, molecule, ao_basis,
+                                         eri_dict, dft_dict, pe_dict, profiler)
 
                 # Convert the auxiliary Fock matrices to numpy arrays for further use
                 np_P_P_Six_fock = np.zeros((3,nao,nao))
