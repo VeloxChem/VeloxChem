@@ -181,9 +181,8 @@ class ScfRestrictedDriver(ScfDriver):
 
             if len(self._fock_matrices) > 1:
                 acc_diis = CTwoDiis()
-                acc_diis.compute_error_vectors(self._fock_matrices,
-                                               self._den_matrices, ovl_mat,
-                                               oao_mat)
+                acc_diis.compute_error_vectors_restricted(
+                    self._fock_matrices, self._den_matrices, ovl_mat, oao_mat)
                 weights = acc_diis.compute_weights()
 
                 return self._get_scaled_fock(weights)

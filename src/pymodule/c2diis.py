@@ -43,8 +43,8 @@ class CTwoDiis:
 
         self.error_vectors = []
 
-    def compute_error_vectors(self, fock_matrices, density_matrices,
-                              overlap_matrix, oao_matrix):
+    def compute_error_vectors_restricted(self, fock_matrices, density_matrices,
+                                         overlap_matrix, oao_matrix):
         """
         Computes error vectors for list of AO Fock matrices using (FDS - SDF)
         in orthogonal AO basis.
@@ -66,17 +66,16 @@ class CTwoDiis:
 
         for fmat, dmat in zip(fock_matrices, density_matrices):
 
-            fa = np.matmul(fmat, np.matmul(dmat, smat))
-            fb = np.matmul(smat, np.matmul(dmat, fmat))
+            fds = np.matmul(fmat, np.matmul(dmat, smat))
 
             self.error_vectors.append(
-                np.matmul(tmat.T, np.matmul(fa - fb, tmat)))
+                np.matmul(tmat.T, np.matmul(fds - fds.T, tmat)))
 
-    def compute_restricted_open_error_vectors(self, fock_matrices,
-                                              fock_matrices_beta,
-                                              density_matrices,
-                                              density_matrices_beta,
-                                              overlap_matrix, oao_matrix):
+    def compute_error_vectors_restricted_openshell(self, fock_matrices,
+                                                   fock_matrices_beta,
+                                                   density_matrices,
+                                                   density_matrices_beta,
+                                                   overlap_matrix, oao_matrix):
         """
         Computes error vectors for list of AO Fock matrices using (FDS - SDF)
         in orthogonal AO basis.
@@ -114,7 +113,7 @@ class CTwoDiis:
             err_tot = err_a + err_b
             self.error_vectors.append(err_tot)
 
-    def compute_unrestricted_error_vectors(self, fock_matrices,
+    def compute_error_vectors_unrestricted(self, fock_matrices,
                                            fock_matrices_beta, density_matrices,
                                            density_matrices_beta,
                                            overlap_matrix, oao_matrix):
@@ -164,15 +163,15 @@ class CTwoDiis:
             The array of C2-DIIS weights with smallest residual error.
         """
 
-        bmat = self.comp_bmatrix()
+        bmat = self._comp_bmatrix()
 
         beigs, bvecs = np.linalg.eigh(bmat)
 
-        weights = self.pick_weights(self.norm_bvectors(bvecs))
+        weights = self._pick_weights(self._norm_bvectors(bvecs))
 
         return weights
 
-    def comp_bmatrix(self):
+    def _comp_bmatrix(self):
         """
         Computes B-matrix of C2-DIIS method using error vectors.
 
@@ -194,7 +193,7 @@ class CTwoDiis:
 
         return bmat
 
-    def norm_bvectors(self, bvectors):
+    def _norm_bvectors(self, bvectors):
         """
         Normalizes B-matrix eigenvectors by rescaling them to 1.0.
 
@@ -215,7 +214,7 @@ class CTwoDiis:
 
         return norm_vecs
 
-    def pick_weights(self, weights):
+    def _pick_weights(self, weights):
         """
         Picks normalize B-matrix eigenvector with smallest residual error by
         computing residual error for all eigenvectors of B_matrix.

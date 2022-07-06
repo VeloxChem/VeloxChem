@@ -184,7 +184,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
                         fock_mat.beta_to_numpy(0),
                         den_mat.alpha_to_numpy(0),
                         den_mat.beta_to_numpy(0),
-                        self._scf_tensors['S'],
+                        self.scf_tensors['S'],
                     ))
 
     def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
@@ -213,7 +213,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
                 acc_diis = CTwoDiis()
 
-                acc_diis.compute_restricted_open_error_vectors(
+                acc_diis.compute_error_vectors_restricted_openshell(
                     self._fock_matrices, self._fock_matrices_beta,
                     self._den_matrices, self._den_matrices_beta, ovl_mat,
                     oao_mat)

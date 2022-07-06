@@ -201,7 +201,7 @@ class ScfUnrestrictedDriver(ScfDriver):
 
                 acc_diis = CTwoDiis()
 
-                acc_diis.compute_unrestricted_error_vectors(
+                acc_diis.compute_error_vectors_unrestricted(
                     self._fock_matrices, self._fock_matrices_beta,
                     self._den_matrices, self._den_matrices_beta, ovl_mat,
                     oao_mat)
@@ -326,11 +326,11 @@ class ScfUnrestrictedDriver(ScfDriver):
         """
 
         # Get total density
-        D_total = self._scf_tensors['D_alpha'] + self._scf_tensors['D_beta']
+        D_total = self.scf_tensors['D_alpha'] + self.scf_tensors['D_beta']
 
         # Get some MO coefficients and create C^-1
-        C = self._scf_tensors['C_alpha']
-        S = self._scf_tensors['S']
+        C = self.scf_tensors['C_alpha']
+        S = self.scf_tensors['S']
         C_inv = np.matmul(S, C)
 
         # Transform total density to MO basis
@@ -344,8 +344,8 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         # Compute the orbital energy as expectation value of the averaged Fock
         # matrix (they are not eigenvalues!)
-        F_alpha = self._scf_tensors['F_alpha']
-        F_beta = self._scf_tensors['F_beta']
+        F_alpha = self.scf_tensors['F_alpha']
+        F_beta = self.scf_tensors['F_beta']
         F_avg = 0.5 * (F_alpha + F_beta)
 
         orbital_energies = np.diag(

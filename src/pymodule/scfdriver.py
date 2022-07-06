@@ -168,19 +168,19 @@ class ScfDriver:
         self._den_matrices_beta = deque()
 
         # density matrix and molecular orbitals
-        self.density = AODensityMatrix()
-        self.molecular_orbitals = MolecularOrbitals()
+        self._density = AODensityMatrix()
+        self._molecular_orbitals = MolecularOrbitals()
 
         # nuclear repulsion energy
         self._nuc_energy = 0.0
 
         # mpi information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
+        self._comm = comm
+        self._rank = self._comm.Get_rank()
+        self._nodes = self._comm.Get_size()
 
         # output stream
-        self.ostream = ostream
+        self._ostream = ostream
 
         # restart information
         self.restart = True
@@ -270,6 +270,46 @@ class ScfDriver:
         return self._scf_type
 
     @property
+    def comm(self):
+        """
+        Returns the MPI communicator.
+        """
+
+        return self._comm
+
+    @property
+    def rank(self):
+        """
+        Returns the MPI rank.
+        """
+
+        return self._rank
+
+    @property
+    def nodes(self):
+        """
+        Returns the number of MPI processes.
+        """
+
+        return self._nodes
+
+    @property
+    def nnodes(self):
+        """
+        Returns the number of MPI processes.
+        """
+
+        return self._nodes
+
+    @property
+    def ostream(self):
+        """
+        Returns the output stream.
+        """
+
+        return self._ostream
+
+    @property
     def is_converged(self):
         """
         Returns whether SCF is converged.
@@ -278,9 +318,33 @@ class ScfDriver:
         return self._is_converged
 
     @property
+    def density(self):
+        """
+        Returns the density matrix.
+        """
+
+        return self._density
+
+    @property
+    def molecular_orbitals(self):
+        """
+        Returns the molecular orbitals.
+        """
+
+        return self._molecular_orbitals
+
+    @property
+    def mol_orbs(self):
+        """
+        Returns the molecular orbitals (for backward compatibility).
+        """
+
+        return self._molecular_orbitals
+
+    @property
     def scf_tensors(self):
         """
-        Returns the scf tensors.
+        Returns the SCF tensors.
         """
 
         return self._scf_tensors
@@ -442,14 +506,14 @@ class ScfDriver:
             self._den_guess = DensityGuess("RESTART", self.checkpoint_file)
             self.restart = self._den_guess.validate_checkpoint(
                 self.rank, self.comm, molecule.elem_ids_to_numpy(),
-                ao_basis.get_label(), self._scf_type)
+                ao_basis.get_label(), self.scf_type)
 
         if self.restart:
             self.acc_type = "DIIS"
             if self.rank == mpi_master():
                 self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
                     self.checkpoint_file)
-                self.molecular_orbitals = MolecularOrbitals(self._ref_mol_orbs)
+                self._molecular_orbitals = MolecularOrbitals(self._ref_mol_orbs)
         else:
             self._den_guess = DensityGuess("SAD")
 
@@ -547,7 +611,7 @@ class ScfDriver:
 
         profiler.end(self.ostream, scf_flag=True)
 
-        if not self._is_converged:
+        if not self.is_converged:
             self.ostream.print_header(
                 '*** Warning: SCF is not converged!'.ljust(92))
             self.ostream.print_blank()
@@ -556,7 +620,7 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self._print_scf_energy()
-            s2 = self.compute_s2(molecule, self._scf_tensors)
+            s2 = self.compute_s2(molecule, self.scf_tensors)
             self._print_ground_state(molecule, s2)
             if self.print_level == 2:
                 self.molecular_orbitals.print_orbitals(molecule, ao_basis,
@@ -600,10 +664,10 @@ class ScfDriver:
                 assert_msg_critical(n_ao == C_alpha.shape[0], err_ao)
                 E_alpha = np.zeros(C_alpha.shape[1])
                 occ_alpha = molecule.get_aufbau_occupation(n_ao, 'restricted')
-                self.molecular_orbitals = MolecularOrbitals([C_alpha],
-                                                            [E_alpha],
-                                                            [occ_alpha],
-                                                            molorb.rest)
+                self._molecular_orbitals = MolecularOrbitals([C_alpha],
+                                                             [E_alpha],
+                                                             [occ_alpha],
+                                                             molorb.rest)
             else:
                 assert_msg_critical(
                     isinstance(C_alpha, np.ndarray) and
@@ -617,11 +681,11 @@ class ScfDriver:
                 occ_alpha, occ_beta = molecule.get_aufbau_occupation(
                     n_ao, 'unrestricted')
 
-                self.molecular_orbitals = MolecularOrbitals(
+                self._molecular_orbitals = MolecularOrbitals(
                     [C_alpha, C_beta], [E_alpha, E_beta], [occ_alpha, occ_beta],
                     molorb.unrest)
         else:
-            self.molecular_orbitals = MolecularOrbitals()
+            self._molecular_orbitals = MolecularOrbitals()
 
         # write checkpoint file and sychronize MPI processes
 
@@ -731,7 +795,7 @@ class ScfDriver:
 
         den_mat.broadcast(self.rank, self.comm)
 
-        self.density = AODensityMatrix(den_mat)
+        self._density = AODensityMatrix(den_mat)
 
         fock_mat = AOFockMatrix(den_mat)
 
@@ -803,7 +867,7 @@ class ScfDriver:
                     for ef, mat in zip(self.electric_field, dipole_ints)
                 ])
 
-                if self._scf_type == 'restricted':
+                if self.scf_type == 'restricted':
                     e_el += 2.0 * np.trace(
                         np.matmul(efpot, den_mat.alpha_to_numpy(0)))
                     fock_mat.add_matrix(DenseMatrix(efpot), 0)
@@ -829,7 +893,7 @@ class ScfDriver:
 
             diff_den = self._comp_density_change(den_mat, self.density)
 
-            self.density = AODensityMatrix(den_mat)
+            self._density = AODensityMatrix(den_mat)
 
             self._add_iter_data({
                 'energy': (e_el + self._nuc_energy + self._d4_energy +
@@ -847,7 +911,7 @@ class ScfDriver:
 
             self._check_convergence()
 
-            if self._is_converged:
+            if self.is_converged:
                 break
 
             profiler.start_timer('FockDiag')
@@ -856,12 +920,12 @@ class ScfDriver:
 
             eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
-            self.molecular_orbitals = self._gen_molecular_orbitals(
+            self._molecular_orbitals = self._gen_molecular_orbitals(
                 molecule, eff_fock_mat, oao_mat)
 
             self._update_mol_orbs_phase()
 
-            den_mat = self._gen_new_density(molecule, self._scf_type)
+            den_mat = self._gen_new_density(molecule, self.scf_type)
 
             den_mat.broadcast(self.rank, self.comm)
 
@@ -913,14 +977,11 @@ class ScfDriver:
                 'F': (F_alpha, F_beta),
             }
 
-            if self._is_converged:
+            if self.is_converged:
                 self._write_final_hdf5(molecule, ao_basis)
 
         else:
             self._scf_tensors = None
-
-        # for backward compatibility
-        self.mol_orbs = self.molecular_orbitals
 
         if self.rank == mpi_master():
             self._print_scf_finish(diis_start_time)
@@ -1107,13 +1168,13 @@ class ScfDriver:
         if self._den_guess.guess_type == "RESTART":
 
             return self._den_guess.restart_density(molecule, self.rank,
-                                                   self.ostream, self._scf_type)
+                                                   self.ostream, self.scf_type)
 
         # guess: superposition of atomic densities
         if self._den_guess.guess_type == "SAD":
 
             return self._den_guess.sad_density(molecule, ao_basis, min_basis,
-                                               self._scf_type, self.comm,
+                                               self.scf_type, self.comm,
                                                self.ostream)
 
         # guess: projection of molecular orbitals from reduced basis
@@ -1123,7 +1184,7 @@ class ScfDriver:
                 return self._den_guess.prcmo_density(molecule, ao_basis,
                                                      min_basis,
                                                      self.molecular_orbitals,
-                                                     self._scf_type)
+                                                     self.scf_type)
             else:
                 return AODensityMatrix()
 
@@ -1229,7 +1290,7 @@ class ScfDriver:
 
         if self._dft and not self._first_step:
             if not self.xcfun.is_hybrid():
-                if self._scf_type == 'restricted':
+                if self.scf_type == 'restricted':
                     fock_mat.scale(2.0, 0)
 
             self._mol_grid.distribute(self.rank, self.nodes, self.comm)
@@ -1347,7 +1408,7 @@ class ScfDriver:
             fock_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
                                 local_comm)
             if self._dft and (not self.xcfun.is_hybrid()):
-                if self._scf_type == 'restricted':
+                if self.scf_type == 'restricted':
                     fock_mat.scale(2.0, 0)
 
         # calculate Vxc on DFT nodes
@@ -1477,7 +1538,7 @@ class ScfDriver:
 
             if self._dft and not self._first_step:
                 fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
-                if self._scf_type in ['unrestricted', 'restricted_openshell']:
+                if self.scf_type in ['unrestricted', 'restricted_openshell']:
                     fock_mat.add_matrix(vxc_mat.get_matrix(True), 0, 'beta')
 
             if self._pe and not self._first_step:
@@ -1805,7 +1866,7 @@ class ScfDriver:
 
         else:
             valstr = "*** SCF "
-            if self._is_converged:
+            if self.is_converged:
                 valstr += "converged in "
             else:
                 valstr += "NOT converged in "
@@ -2006,7 +2067,7 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         mult = molecule.get_multiplicity()
-        if self._scf_type == 'restricted':
+        if self.scf_type == 'restricted':
             valstr = "Multiplicity (2S+1)           :{:5.1f}".format(mult)
             self.ostream.print_header(valstr.ljust(92))
 
@@ -2014,7 +2075,7 @@ class ScfDriver:
         valstr = "Magnetic Quantum Number (M_S) :{:5.1f}".format(sz)
         self.ostream.print_header(valstr.ljust(92))
 
-        if self._scf_type in ['unrestricted', 'restricted_openshell']:
+        if self.scf_type in ['unrestricted', 'restricted_openshell']:
             valstr = "Expectation value of S**2     :{:8.4f}".format(s2)
             self.ostream.print_header(valstr.ljust(92))
 
@@ -2099,7 +2160,7 @@ class ScfDriver:
             potfile_text = ''
 
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
-        write_scf_tensors(final_h5_fname, self._scf_tensors)
+        write_scf_tensors(final_h5_fname, self.scf_tensors)
 
         self.ostream.print_blank()
         checkpoint_text = 'SCF tensors written to file: '
