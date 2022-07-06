@@ -405,7 +405,7 @@ class NumerovDriver:
             scf_prop.compute_scf_prop(geometry, ao_basis, scf_drv.scf_tensors)
 
             # save energies and dipole moments
-            pec_energies['i'].append(scf_drv.get_scf_energy())
+            pec_energies['i'].append(scf_drv.scf_energy)
             if not self.el_transition:
                 if self.rank == mpi_master():
                     dipole_moment = scf_prop.get_property('dipole moment')
@@ -439,7 +439,7 @@ class NumerovDriver:
                     rsp_prop.compute(geometry, ao_basis, scf_drv.scf_tensors)
 
                     total_energy = (rsp_prop.rsp_property['eigenvalues'][-1] +
-                                    scf_drv.iter_data[-1]['energy'])
+                                    scf_drv.scf_energy)
 
                     # detect PEC minimum
                     if prev_energy and not f_minimum_found:

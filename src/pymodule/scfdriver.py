@@ -85,11 +85,10 @@ class ScfDriver:
         - eri_thresh: The electron repulsion integrals screening threshold.
         - ovl_thresh: The atomic orbitals linear dependency threshold.
         - diis_thresh: The C2-DIIS switch on threshold.
-        - iter_data: The list of SCF iteration data (electronic energy,
-          electronic energy change, gradient, density change).
+        - iter_data: The dictionary of SCF iteration data (scf energy, scf
+          energy change, gradient, density change, etc.).
         - is_converged: The flag for SCF convergence.
-        - skip_iter: The flag for SCF iteration data storage.
-        - old_energy: The electronic energy of previous SCF iteration.
+        - scf_energy: The SCF energy.
         - num_iter: The current number of SCF iterations.
         - fock_matrices: The list of stored Fock/Kohn-Sham matrices.
         - den_matrices: The list of stored density matrices.
@@ -136,13 +135,13 @@ class ScfDriver:
         """
 
         # scf accelerator
-        self.acc_type = "L2_DIIS"
+        self.acc_type = 'L2_DIIS'
         self.max_err_vecs = 10
         self.max_iter = 50
         self._first_step = False
 
         # screening scheme
-        self.qq_type = "QQ_DEN"
+        self.qq_type = 'QQ_DEN'
         self.qq_dyn = True
 
         # thresholds
@@ -153,10 +152,9 @@ class ScfDriver:
         self.eri_thresh_tight = 1.0e-15
 
         # iterations data
-        self._iter_data = []
+        self._iter_data = None
         self._is_converged = False
-        self._skip_iter = False
-        self._old_energy = 0.0
+        self._scf_energy = 0.0
         self._num_iter = 0
 
         # DIIS data
@@ -316,6 +314,14 @@ class ScfDriver:
         """
 
         return self._is_converged
+
+    @property
+    def scf_energy(self):
+        """
+        Returns SCF energy.
+        """
+
+        return self._scf_energy
 
     @property
     def density(self):
@@ -503,26 +509,26 @@ class ScfDriver:
 
         # initial guess
         if self.restart:
-            self._den_guess = DensityGuess("RESTART", self.checkpoint_file)
+            self._den_guess = DensityGuess('RESTART', self.checkpoint_file)
             self.restart = self._den_guess.validate_checkpoint(
                 self.rank, self.comm, molecule.elem_ids_to_numpy(),
                 ao_basis.get_label(), self.scf_type)
 
         if self.restart:
-            self.acc_type = "DIIS"
+            self.acc_type = 'DIIS'
             if self.rank == mpi_master():
                 self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
                     self.checkpoint_file)
                 self._molecular_orbitals = MolecularOrbitals(self._ref_mol_orbs)
         else:
-            self._den_guess = DensityGuess("SAD")
+            self._den_guess = DensityGuess('SAD')
 
         # nuclear repulsion energy
         self._nuc_energy = molecule.nuclear_repulsion_energy()
 
         if self.rank == mpi_master():
             self._print_header()
-            valstr = "Nuclear repulsion energy: {:.10f} a.u.".format(
+            valstr = 'Nuclear repulsion energy: {:.10f} a.u.'.format(
                 self._nuc_energy)
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
@@ -710,7 +716,7 @@ class ScfDriver:
                 self.molecular_orbitals.write_hdf5(self.checkpoint_file,
                                                    nuclear_charges, basis_set)
                 self.ostream.print_blank()
-                checkpoint_text = "Checkpoint written to file: "
+                checkpoint_text = 'Checkpoint written to file: '
                 checkpoint_text += self.checkpoint_file
                 self.ostream.print_info(checkpoint_text)
 
@@ -761,8 +767,8 @@ class ScfDriver:
             oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh)
             self._scf_tensors = {'S': ovl_mat.to_numpy()}
 
-            self.ostream.print_info("Orthogonalization matrix computed in" +
-                                    " {:.2f} sec.".format(tm.time() - t0))
+            self.ostream.print_info('Orthogonalization matrix computed in' +
+                                    ' {:.2f} sec.'.format(tm.time() - t0))
             self.ostream.print_blank()
 
             nrow = oao_mat.number_of_rows()
@@ -772,8 +778,8 @@ class ScfDriver:
             if linear_dependency:
                 ndim = nrow - ncol
                 self.ostream.print_info(
-                    "Removed " + str(ndim) + " linearly dependent" +
-                    " vector{:s}.".format('' if ndim == 1 else 's'))
+                    'Removed ' + str(ndim) + ' linearly dependent' +
+                    ' vector{:s}.'.format('' if ndim == 1 else 's'))
                 self.ostream.print_blank()
             self.ostream.flush()
 
@@ -787,8 +793,8 @@ class ScfDriver:
             self.eri_thresh = self.eri_thresh_tight
 
             if self.rank == mpi_master():
-                self.ostream.print_info("ERI screening threshold tightened to" +
-                                        " {:.1e}.".format(self.eri_thresh))
+                self.ostream.print_info('ERI screening threshold tightened to' +
+                                        ' {:.1e}.'.format(self.eri_thresh))
                 self.ostream.print_blank()
 
         den_mat = self._comp_guess_density(molecule, ao_basis, min_basis)
@@ -889,23 +895,34 @@ class ScfDriver:
             e_grad, max_grad = self._comp_gradient(fock_mat, ovl_mat, den_mat,
                                                    oao_mat)
 
-            self._set_skip_iter_flag(e_grad)
+            # compute density change and energy change
 
             diff_den = self._comp_density_change(den_mat, self.density)
 
-            self._density = AODensityMatrix(den_mat)
+            e_scf = (e_el + self._nuc_energy + self._d4_energy +
+                     self._ef_nuc_energy)
 
-            self._add_iter_data({
-                'energy': (e_el + self._nuc_energy + self._d4_energy +
-                           self._ef_nuc_energy),
+            diff_e_scf = e_scf - self.scf_energy
+
+            self._iter_data = {
+                'energy': e_scf,
                 'gradient_norm': e_grad,
                 'max_gradient': max_grad,
                 'diff_density': diff_den,
-            })
+                'diff_energy': diff_e_scf,
+            }
+
+            # update density and energy
+
+            self._density = AODensityMatrix(den_mat)
+
+            self._scf_energy = e_scf
 
             profiler.stop_timer('CompEnergy')
             profiler.check_memory_usage('Iteration {:d} Fock build'.format(
                 self._num_iter))
+
+            # print iteration and check convergence
 
             self._print_iter_data(i)
 
@@ -914,9 +931,11 @@ class ScfDriver:
             if self.is_converged:
                 break
 
+            # compute new Fock matrix, molecular orbitals and density
+
             profiler.start_timer('FockDiag')
 
-            self._store_diis_data(i, fock_mat, den_mat)
+            self._store_diis_data(fock_mat, den_mat, e_grad)
 
             eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
@@ -1088,21 +1107,21 @@ class ScfDriver:
 
         if self.rank == mpi_master() and self.print_level > 1:
 
-            self.ostream.print_info("Overlap matrix computed in" +
-                                    " {:.2f} sec.".format(t1 - t0))
+            self.ostream.print_info('Overlap matrix computed in' +
+                                    ' {:.2f} sec.'.format(t1 - t0))
             self.ostream.print_blank()
 
-            self.ostream.print_info("Kinetic energy matrix computed in" +
-                                    " {:.2f} sec.".format(t2 - t1))
+            self.ostream.print_info('Kinetic energy matrix computed in' +
+                                    ' {:.2f} sec.'.format(t2 - t1))
             self.ostream.print_blank()
 
-            self.ostream.print_info("Nuclear potential matrix computed in" +
-                                    " {:.2f} sec.".format(t3 - t2))
+            self.ostream.print_info('Nuclear potential matrix computed in' +
+                                    ' {:.2f} sec.'.format(t3 - t2))
             self.ostream.print_blank()
 
             if self.electric_field is not None:
-                self.ostream.print_info("Electric dipole matrices computed in" +
-                                        " {:.2f} sec.".format(t4 - t3))
+                self.ostream.print_info('Electric dipole matrices computed in' +
+                                        ' {:.2f} sec.'.format(t4 - t3))
                 self.ostream.print_blank()
 
             self.ostream.flush()
@@ -1165,20 +1184,20 @@ class ScfDriver:
         """
 
         # guess: read from checkpoint file
-        if self._den_guess.guess_type == "RESTART":
+        if self._den_guess.guess_type == 'RESTART':
 
             return self._den_guess.restart_density(molecule, self.rank,
                                                    self.ostream, self.scf_type)
 
         # guess: superposition of atomic densities
-        if self._den_guess.guess_type == "SAD":
+        if self._den_guess.guess_type == 'SAD':
 
             return self._den_guess.sad_density(molecule, ao_basis, min_basis,
                                                self.scf_type, self.comm,
                                                self.ostream)
 
         # guess: projection of molecular orbitals from reduced basis
-        if self._den_guess.guess_type == "PRCMO":
+        if self._den_guess.guess_type == 'PRCMO':
 
             if self.rank == mpi_master():
                 return self._den_guess.prcmo_density(molecule, ao_basis,
@@ -1189,19 +1208,6 @@ class ScfDriver:
                 return AODensityMatrix()
 
         return AODensityMatrix()
-
-    def _set_skip_iter_flag(self, e_grad):
-        """
-        Sets SCF iteration skiping flag based on C2-DIIS switch on threshold.
-
-        :param e_grad:
-            The electronic gradient at current SCF iteration.
-        """
-
-        if e_grad < self.diis_thresh:
-            self._skip_iter = False
-        else:
-            self._skip_iter = True
 
     def _comp_2e_fock(self,
                       fock_mat,
@@ -1578,16 +1584,16 @@ class ScfDriver:
 
         return 0.0
 
-    def _store_diis_data(self, i, fock_mat, den_mat):
+    def _store_diis_data(self, fock_mat, den_mat):
         """
         Stores Fock/Kohn-Sham and density matrices for current iteration.
 
-        :param i:
-            The number of current SCF iteration.
         :param fock_mat:
             The Fock/Kohn-Sham matrix.
         :param den_mat:
             The density matrix.
+        :param e_grad:
+            The electronic gradient.
         """
 
         return
@@ -1710,23 +1716,6 @@ class ScfDriver:
 
         return nteri
 
-    def _add_iter_data(self, d):
-        """
-        Adds SCF iteration data (electronic energy, electronic energy change,
-        electronic gradient, density difference) to SCF iterations list.
-
-        :param d:
-            The dictionary containing SCF iteration data.
-        """
-
-        e_dict = dict(d)
-
-        e_dict['diff_energy'] = e_dict['energy'] - self._old_energy
-
-        self._iter_data.append(e_dict)
-
-        self._old_energy = e_dict['energy']
-
     def _check_convergence(self):
         """
         Sets SCF convergence flag by checking if convergence condition for
@@ -1737,7 +1726,7 @@ class ScfDriver:
 
         if self._num_iter > 0:
 
-            e_grad = self._iter_data[-1]['gradient_norm']
+            e_grad = self._iter_data['gradient_norm']
 
             if e_grad < self.conv_thresh:
                 self._is_converged = True
@@ -1857,22 +1846,22 @@ class ScfDriver:
         """
 
         if self._first_step:
-            valstr = "...done. SCF energy in reduced basis set: "
-            valstr += "{:.12f}".format(self._old_energy)
-            valstr += " a.u. Time: "
-            valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
+            valstr = '...done. SCF energy in reduced basis set: '
+            valstr += '{:.12f}'.format(self._scf_energy)
+            valstr += ' a.u. Time: '
+            valstr += '{:.2f}'.format(tm.time() - start_time) + ' sec.'
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
 
         else:
-            valstr = "*** SCF "
+            valstr = '*** SCF '
             if self.is_converged:
-                valstr += "converged in "
+                valstr += 'converged in '
             else:
-                valstr += "NOT converged in "
+                valstr += 'NOT converged in '
             valstr += str(self._num_iter)
-            valstr += " iterations. Time: "
-            valstr += "{:.2f}".format(tm.time() - start_time) + " sec."
+            valstr += ' iterations. Time: '
+            valstr += '{:.2f}'.format(tm.time() - start_time) + ' sec.'
             self.ostream.print_blank()
             self.ostream.print_header(valstr.ljust(92))
             self.ostream.print_blank()
@@ -1896,11 +1885,11 @@ class ScfDriver:
             if self._num_iter > 0:
 
                 if self._iter_data:
-                    te = self._iter_data[-1]['energy']
-                    diff_te = self._iter_data[-1]['diff_energy']
-                    e_grad = self._iter_data[-1]['gradient_norm']
-                    max_grad = self._iter_data[-1]['max_gradient']
-                    diff_den = self._iter_data[-1]['diff_density']
+                    te = self._iter_data['energy']
+                    diff_te = self._iter_data['diff_energy']
+                    e_grad = self._iter_data['gradient_norm']
+                    max_grad = self._iter_data['max_gradient']
+                    diff_den = self._iter_data['diff_density']
 
                 if self._num_iter == 1:
                     diff_te = 0.0
@@ -1922,7 +1911,7 @@ class ScfDriver:
             The SCF energy.
         """
 
-        return self._old_energy
+        return self._scf_energy
 
     def get_scf_type_str(self):
         """
@@ -1943,13 +1932,13 @@ class ScfDriver:
             The string with type of initial guess.
         """
 
-        if self._den_guess.guess_type == "SAD":
-            return "Superposition of Atomic Densities"
+        if self._den_guess.guess_type == 'SAD':
+            return 'Superposition of Atomic Densities'
 
-        if self._den_guess.guess_type == "RESTART":
-            return "Restart from Checkpoint"
+        if self._den_guess.guess_type == 'RESTART':
+            return 'Restart from Checkpoint'
 
-        return "Undefined"
+        return 'Undefined'
 
     def _get_acc_type(self):
         """
@@ -1960,13 +1949,13 @@ class ScfDriver:
             The string with type of SCF convergence accelerator.
         """
 
-        if self.acc_type == "DIIS":
-            return "Direct Inversion of Iterative Subspace"
+        if self.acc_type == 'DIIS':
+            return 'Direct Inversion of Iterative Subspace'
 
-        if self.acc_type == "L2_DIIS":
-            return "Two Level Direct Inversion of Iterative Subspace"
+        if self.acc_type == 'L2_DIIS':
+            return 'Two Level Direct Inversion of Iterative Subspace'
 
-        return "Undefined"
+        return 'Undefined'
 
     def _get_qq_dyn(self):
         """
@@ -1979,9 +1968,9 @@ class ScfDriver:
         """
 
         if self.qq_dyn:
-            return "Dynamic"
+            return 'Dynamic'
 
-        return "Static"
+        return 'Static'
 
     def _update_fock_type(self, fock_mat):
         """
@@ -2059,24 +2048,24 @@ class ScfDriver:
 
         self.ostream.print_blank()
 
-        self.ostream.print_header("Ground State Information".ljust(92))
-        self.ostream.print_header("------------------------".ljust(92))
+        self.ostream.print_header('Ground State Information'.ljust(92))
+        self.ostream.print_header('------------------------'.ljust(92))
 
         chg = molecule.get_charge()
-        valstr = "Charge of Molecule            :{:5.1f}".format(chg)
+        valstr = 'Charge of Molecule            :{:5.1f}'.format(chg)
         self.ostream.print_header(valstr.ljust(92))
 
         mult = molecule.get_multiplicity()
         if self.scf_type == 'restricted':
-            valstr = "Multiplicity (2S+1)           :{:5.1f}".format(mult)
+            valstr = 'Multiplicity (2S+1)           :{:5.1f}'.format(mult)
             self.ostream.print_header(valstr.ljust(92))
 
         sz = 0.5 * (mult - 1.0)
-        valstr = "Magnetic Quantum Number (M_S) :{:5.1f}".format(sz)
+        valstr = 'Magnetic Quantum Number (M_S) :{:5.1f}'.format(sz)
         self.ostream.print_header(valstr.ljust(92))
 
         if self.scf_type in ['unrestricted', 'restricted_openshell']:
-            valstr = "Expectation value of S**2     :{:8.4f}".format(s2)
+            valstr = 'Expectation value of S**2     :{:8.4f}'.format(s2)
             self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_blank()
@@ -2092,7 +2081,7 @@ class ScfDriver:
 
         e_ef_nuc = self._ef_nuc_energy
 
-        etot = self._iter_data[-1]['energy']
+        etot = self._iter_data['energy']
 
         e_el = etot - enuc - e_d4 - e_ef_nuc
 
@@ -2116,7 +2105,7 @@ class ScfDriver:
         self.ostream.print_header(
             '------------------------------------'.ljust(92))
 
-        grad = self._iter_data[-1]['gradient_norm']
+        grad = self._iter_data['gradient_norm']
         valstr = 'Gradient Norm                      :{:20.10f} a.u.'.format(
             grad)
         self.ostream.print_header(valstr.ljust(92))

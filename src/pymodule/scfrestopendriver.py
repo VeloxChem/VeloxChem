@@ -145,22 +145,22 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
         return diff_den
 
-    def _store_diis_data(self, i, fock_mat, den_mat):
+    def _store_diis_data(self, fock_mat, den_mat, e_grad):
         """
         Stores spin restricted open shell Fock/Kohn-Sham and density matrices
         for current iteration. Overloaded base class method.
 
-        :param i:
-            The number of current SCF iteration.
         :param fock_mat:
             The Fock/Kohn-Sham matrix.
         :param den_mat:
             The density matrix.
+        :param e_grad:
+            The electronic gradient.
         """
 
         if self.rank == mpi_master():
 
-            if not self._skip_iter:
+            if e_grad < self.diis_thresh:
 
                 if len(self._fock_matrices) == self.max_err_vecs:
 
