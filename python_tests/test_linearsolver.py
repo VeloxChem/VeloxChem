@@ -90,7 +90,7 @@ class TestLinearSolver:
         ostream = OutputStream(None)
 
         solver = LinearSolver(comm, ostream)
-        solver._program_end_time = datetime.now() + timedelta(hours=1.0)
+        solver.program_end_time = datetime.now() + timedelta(hours=1.0)
 
         assert solver._need_graceful_exit(1.5)
         assert not solver._need_graceful_exit(0.5)

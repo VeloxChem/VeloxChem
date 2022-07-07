@@ -227,7 +227,7 @@ class ScfDriver:
         self.print_level = 2
 
         # program end time for graceful exit
-        self._program_end_time = None
+        self.program_end_time = None
 
         # filename
         self._filename = f'veloxchem_scf_{get_datetime_string()}'
@@ -389,7 +389,7 @@ class ScfDriver:
         parse_input(self, scf_keywords, scf_dict)
 
         if 'program_end_time' in scf_dict:
-            self._program_end_time = scf_dict['program_end_time']
+            self.program_end_time = scf_dict['program_end_time']
         if 'filename' in scf_dict:
             self._filename = scf_dict['filename']
             if 'checkpoint_file' not in scf_dict:
@@ -1018,8 +1018,8 @@ class ScfDriver:
             True if a graceful exit is needed, False otherwise.
         """
 
-        if self._program_end_time is not None:
-            remaining_hours = (self._program_end_time -
+        if self.program_end_time is not None:
+            remaining_hours = (self.program_end_time -
                                datetime.now()).total_seconds() / 3600
             # exit gracefully when the remaining time is not sufficient to
             # complete the next iteration (plus 25% to be on the safe side).

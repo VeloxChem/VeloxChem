@@ -165,7 +165,7 @@ class LinearSolver:
         self.print_level = 2
 
         # program end time for graceful exit
-        self._program_end_time = None
+        self.program_end_time = None
 
         # filename
         self._filename = f'veloxchem_rsp_{get_datetime_string()}'
@@ -201,7 +201,6 @@ class LinearSolver:
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
-                'pe': ('bool', 'use polarizable embedding'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
                 'electric_field': ('seq_fixed', 'static electric field'),
                 'use_split_comm': ('bool', 'use split communicators'),
@@ -291,7 +290,7 @@ class LinearSolver:
         parse_input(self, rsp_keywords, rsp_dict)
 
         if 'program_end_time' in rsp_dict:
-            self._program_end_time = rsp_dict['program_end_time']
+            self.program_end_time = rsp_dict['program_end_time']
         if 'filename' in rsp_dict:
             self._filename = rsp_dict['filename']
             if 'checkpoint_file' not in rsp_dict:
@@ -721,7 +720,7 @@ class LinearSolver:
                     half_size = vec.shape[0] // 2
 
                     kn = self.lrvec2mat(vec, nocc, norb)
-                    dak = self._commut_mo_density(kn, nocc)
+                    dak = self.commut_mo_density(kn, nocc)
                     dak = np.linalg.multi_dot([mo, dak, mo.T])
 
                     dks.append(dak)
@@ -766,11 +765,11 @@ class LinearSolver:
                     fak = fock.alpha_to_numpy(ifock)
 
                     fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
-                    kfa_mo = self._commut(fa_mo.T, kns[ifock])
+                    kfa_mo = self.commut(fa_mo.T, kns[ifock])
 
                     fat_mo = fak_mo + kfa_mo
 
-                    gmo = -self._commut_mo_density(fat_mo, nocc)
+                    gmo = -self.commut_mo_density(fat_mo, nocc)
                     gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
                                                       norb)[:half_size]
 
@@ -1110,8 +1109,8 @@ class LinearSolver:
             True if a graceful exit is needed, False otherwise.
         """
 
-        if self._program_end_time is not None:
-            remaining_hours = (self._program_end_time -
+        if self.program_end_time is not None:
+            remaining_hours = (self.program_end_time -
                                datetime.now()).total_seconds() / 3600
             # exit gracefully when the remaining time is not sufficient to
             # complete the next iteration (plus 25% to be on the safe side).
@@ -1427,7 +1426,7 @@ class LinearSolver:
 
             factor = np.sqrt(2.0)
             matrices = [
-                factor * (-1.0) * self._commut_mo_density(
+                factor * (-1.0) * self.commut_mo_density(
                     np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
                 for P in integral_comps
             ]
@@ -1525,7 +1524,7 @@ class LinearSolver:
 
             factor = np.sqrt(2.0)
             matrices = [
-                factor * (-1.0) * self._commut_mo_density(
+                factor * (-1.0) * self.commut_mo_density(
                     np.linalg.multi_dot([mo.T, P.conj().T, mo]), nocc)
                 for P in integral_comps
             ]
@@ -1536,7 +1535,8 @@ class LinearSolver:
         else:
             return tuple()
 
-    def _commut_mo_density(self, A, nocc):
+    @staticmethod
+    def commut_mo_density(A, nocc):
         """
         Commutes matrix A and MO density
 
@@ -1558,7 +1558,8 @@ class LinearSolver:
 
         return mat
 
-    def _commut(self, A, B):
+    @staticmethod
+    def commut(A, B):
         """
         Commutes two matricies A and B
 
