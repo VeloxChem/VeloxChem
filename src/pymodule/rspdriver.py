@@ -83,6 +83,14 @@ class ResponseDriver:
         self._is_converged = False
 
     @property
+    def solver(self):
+        """
+        Returns the response solver.
+        """
+
+        return self._solver
+
+    @property
     def is_converged(self):
         """
         Returns whether response driver is converged.
@@ -195,12 +203,12 @@ class ResponseDriver:
             The results from the actual response solver.
         """
 
-        assert_msg_critical(self._solver is not None,
+        assert_msg_critical(self.solver is not None,
                             'ResponseDriver: solver not initialized')
 
-        result = self._solver.compute(molecule, ao_basis, scf_tensors)
+        result = self.solver.compute(molecule, ao_basis, scf_tensors)
 
-        self._is_converged = self._solver.is_converged
+        self._is_converged = self.solver.is_converged
 
         return result
 
