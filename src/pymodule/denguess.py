@@ -171,7 +171,7 @@ class DensityGuess:
             The AO density matrix from SAD initial guess.
         """
 
-        if self._guess_type == 'SAD':
+        if self.guess_type == 'SAD':
 
             t0 = tm.time()
 
@@ -217,7 +217,7 @@ class DensityGuess:
             The AO density matrix from PRCMO.
         """
 
-        if self._guess_type == 'PRCMO':
+        if self.guess_type == 'PRCMO':
 
             proj_orbs = red_orbs.insert(molecule, ao_basis, red_basis)
 

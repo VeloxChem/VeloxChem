@@ -196,7 +196,6 @@ class ForceFieldGenerator:
     def compute(self, molecule, basis):
         """
         Runs force field optimization.
-        Note: Only runs on the master MPI process.
 
         :param molecule:
             The molecule.

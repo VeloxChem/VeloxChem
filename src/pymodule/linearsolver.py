@@ -64,8 +64,8 @@ class LinearSolver:
 
     :param comm:
         The MPI communicator.
-    :param use_split_comm:
-        The flag for using split communicators.
+    :param ostream:
+        The output stream.
 
     Instance variables
         - eri_thresh: The electron repulsion integrals screening threshold.
