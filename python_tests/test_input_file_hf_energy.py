@@ -88,6 +88,8 @@ class TestInputScf:
 
     def test_input_scf(self, capsys):
 
+        # vlxtag: RHF, Energy
+
         scf_type = 'restricted'
 
         ref_data = {
@@ -101,6 +103,8 @@ class TestInputScf:
 
     def test_input_uscf(self, capsys):
 
+        # vlxtag: UHF, Energy
+
         scf_type = 'unrestricted'
 
         ref_data = {
@@ -113,6 +117,8 @@ class TestInputScf:
         self.run_input_scf(capsys, scf_type, ref_data)
 
     def test_input_roscf(self, capsys):
+
+        # vlxtag: ROHF, Energy
 
         scf_type = 'restricted openshell'
 
