@@ -61,6 +61,50 @@ def _print_list_of_features(list_of_features):
         print()
 
 
+def _known_aliases_for_keywords():
+    """
+    Gets the aliased keyword.
+
+    :param keyword:
+        The input keyword.
+
+    :return:
+        The mapped keyword.
+    """
+
+    return {
+        'hf': ('rhf', 'uhf', 'rohf'),
+        'dft': ('rks', 'uks', 'roks'),
+        'td': ('cis', 'tdhf', 'tda', 'tddft'),
+        'absorption': 'uv-vis',
+        'uvvis': 'uv-vis',
+        'spectrum': ('uv-vis',),
+    }
+
+
+def _found_tag_in_keyword(tag, keyword):
+    """
+    Checks if a tag is associated with a keyword.
+    """
+
+    known_aliases = _known_aliases_for_keywords()
+
+    if keyword.lower() in known_aliases:
+        aliased_keywords = known_aliases[keyword.lower()]
+    else:
+        aliased_keywords = keyword
+
+    if (isinstance(aliased_keywords, str) and
+            tag.lower() == aliased_keywords.lower()):
+        return True
+
+    if (isinstance(aliased_keywords, tuple) and
+            tag.lower() in aliased_keywords):
+        return True
+
+    return False
+
+
 def print_features(keyword=None):
     """
     Prints the features related to keyword.
@@ -75,8 +119,11 @@ def print_features(keyword=None):
         available_features = []
 
         for feature in all_features:
-            if keyword.lower() == feature[1].lower():
-                available_features.append(feature)
+            for tag in feature:
+                if (_found_tag_in_keyword(tag, keyword) and
+                        feature not in available_features):
+                    available_features.append(feature)
+                    break
 
         if available_features:
             print(f'Available features for keyword \"{keyword}\":')
