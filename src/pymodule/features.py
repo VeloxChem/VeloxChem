@@ -44,8 +44,9 @@ def _get_list_of_features():
             for line in f_test:
                 if line.strip().startswith('# vlxtag:'):
                     tags = line.strip().split(':')[1]
-                    tags = tags.replace(',', ' ').split()
-                    list_of_features.append(tuple(tags))
+                    tags = tuple(tags.replace(',', ' ').split())
+                    if tags not in list_of_features:
+                        list_of_features.append(tags)
 
     return list_of_features
 

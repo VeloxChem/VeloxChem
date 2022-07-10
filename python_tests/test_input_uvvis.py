@@ -8,7 +8,7 @@ from veloxchem.veloxchemlib import is_mpi_master, mpi_barrier
 from veloxchem.main import main
 
 
-class TestInputHFUVVis:
+class TestInputUVVis:
 
     def create_input_file(self, lines, fname):
 
@@ -19,7 +19,7 @@ class TestInputHFUVVis:
                         f_inp.write(f'{line}\n')
         mpi_barrier()
 
-    def get_input_lines(self, tamm_dancoff):
+    def get_input_lines(self, xcfun, tamm_dancoff):
 
         input_lines = """
             @jobs
@@ -52,17 +52,21 @@ class TestInputHFUVVis:
             @end
         """
 
+        if xcfun is not None:
+            input_lines = input_lines.replace(
+                '@method settings', f'@method settings\nxcfun:{xcfun}')
+
         if tamm_dancoff:
             return input_lines
         else:
             return input_lines.replace('tamm_dancoff: yes', 'tamm_dancoff: no')
 
-    def run_input_hf_uvvis(self, capsys, tamm_dancoff, ref_data):
+    def run_input_uvvis(self, capsys, xcfun, tamm_dancoff, ref_data):
 
         with tempfile.TemporaryDirectory() as temp_dir:
             input_file = Path(temp_dir, 'vlx_uvvis')
 
-            input_lines = self.get_input_lines(tamm_dancoff)
+            input_lines = self.get_input_lines(xcfun, tamm_dancoff)
             self.create_input_file(input_lines, input_file)
 
             with patch.object(sys, 'argv', ['vlx', str(input_file)]):
@@ -117,6 +121,7 @@ class TestInputHFUVVis:
 
         # vlxtag: RHF, UV-Vis, CIS
 
+        xcfun = None
         tamm_dancoff = True
 
         ref_data = {
@@ -131,12 +136,13 @@ class TestInputHFUVVis:
             'osc_str': np.array([0.0530, 0.0000, 0.1070, 0.0045, 0.0248]),
         }
 
-        self.run_input_hf_uvvis(capsys, tamm_dancoff, ref_data)
+        self.run_input_uvvis(capsys, xcfun, tamm_dancoff, ref_data)
 
     def test_input_rhf_uvvis_tdhf(self, capsys):
 
         # vlxtag: RHF, UV-Vis, TDHF
 
+        xcfun = None
         tamm_dancoff = False
 
         ref_data = {
@@ -151,4 +157,46 @@ class TestInputHFUVVis:
             'osc_str': np.array([0.0519, 0.0000, 0.1018, 0.0048, 0.0233]),
         }
 
-        self.run_input_hf_uvvis(capsys, tamm_dancoff, ref_data)
+        self.run_input_uvvis(capsys, xcfun, tamm_dancoff, ref_data)
+
+    def test_input_rks_uvvis_tda(self, capsys):
+
+        # vlxtag: RKS, UV-Vis, TDA
+
+        xcfun = 'b3lyp'
+        tamm_dancoff = True
+
+        ref_data = {
+            'wf_model': 'Spin-Restricted Kohn-Sham',
+            'e_scf': -76.4435551612,
+            'n_scf_iterations': 7,
+            'dipole': 0.731256,
+            'nstates': 5,
+            'n_uvvis_iterations': 6,
+            'exc_ene': np.array(
+                [0.25719730, 0.30975371, 0.33858914, 0.37852621, 0.39052591]),
+            'osc_str': np.array([0.0537, 0.0000, 0.0906, 0.0000, 0.0127]),
+        }
+
+        self.run_input_uvvis(capsys, xcfun, tamm_dancoff, ref_data)
+
+    def test_input_rks_uvvis_tddft(self, capsys):
+
+        # vlxtag: RKS, UV-Vis, TDDFT
+
+        xcfun = 'b3lyp'
+        tamm_dancoff = False
+
+        ref_data = {
+            'wf_model': 'Spin-Restricted Kohn-Sham',
+            'e_scf': -76.4435551612,
+            'n_scf_iterations': 7,
+            'dipole': 0.731256,
+            'nstates': 5,
+            'n_uvvis_iterations': 7,
+            'exc_ene': np.array(
+                [0.25674877, 0.30969350, 0.33793671, 0.37842938, 0.39023439]),
+            'osc_str': np.array([0.0520, 0.0000, 0.0848, 0.0000, 0.0116]),
+        }
+
+        self.run_input_uvvis(capsys, xcfun, tamm_dancoff, ref_data)
