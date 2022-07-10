@@ -1652,8 +1652,8 @@ class ScfDriver:
                     mo[:, col] *= -1.0
 
             if self.molecular_orbitals.get_orbitals_type() == molorb.rest:
-                self.molecular_orbitals = MolecularOrbitals([mo], [ea], [occa],
-                                                            molorb.rest)
+                self._molecular_orbitals = MolecularOrbitals([mo], [ea], [occa],
+                                                             molorb.rest)
 
             elif self.molecular_orbitals.get_orbitals_type() == molorb.unrest:
                 ref_mo_b = self._ref_mol_orbs.beta_to_numpy()
@@ -1665,10 +1665,10 @@ class ScfDriver:
                     if np.dot(mo_b[:, col], ref_mo_b[:, col]) < 0.0:
                         mo_b[:, col] *= -1.0
 
-                self.molecular_orbitals = MolecularOrbitals([mo, mo_b],
-                                                            [ea, eb],
-                                                            [occa, occb],
-                                                            molorb.unrest)
+                self._molecular_orbitals = MolecularOrbitals([mo, mo_b],
+                                                             [ea, eb],
+                                                             [occa, occb],
+                                                             molorb.unrest)
 
     def _gen_new_density(self, molecule, scf_type):
         """

@@ -76,6 +76,7 @@ def _known_aliases_for_keywords():
         'hf': ('rhf', 'uhf', 'rohf'),
         'dft': ('rks', 'uks', 'roks'),
         'td': ('cis', 'tdhf', 'tda', 'tddft'),
+        'rpa': 'tdhf',
         'absorption': 'uv-vis',
         'uvvis': 'uv-vis',
         'spectrum': ('uv-vis',),
