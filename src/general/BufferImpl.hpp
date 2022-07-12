@@ -1110,15 +1110,15 @@ class CBuffer
     struct restrict_accessor
     {
         using element_type = W;
-        using pointer      = W *__restrict;
+        using data_handle_type      = W *__restrict;
         using reference    = W &;
         auto
-        access(pointer p, ptrdiff_t i) const noexcept -> reference
+        access(data_handle_type p, ptrdiff_t i) const noexcept -> reference
         {
             return p[i];
         }
         auto
-        offset(pointer p, ptrdiff_t i) const noexcept -> pointer
+        offset(data_handle_type p, ptrdiff_t i) const noexcept -> data_handle_type
         {
             return p + i;
         }
@@ -1126,19 +1126,19 @@ class CBuffer
 
     using extents_type = metautils::select_t<
         // 1D buffer with run-time number of elements.
-        metautils::condition<(kind == Kind::X), stdex::extents<Dynamic>>,
+        metautils::condition<(kind == Kind::X), stdex::extents<size_type, Dynamic>>,
         // 1D buffer with compile-time number of elements.
-        metautils::condition<(kind == Kind::N), stdex::extents<NCols>>,
+        metautils::condition<(kind == Kind::N), stdex::extents<size_type, NCols>>,
         // 2D buffer with run-time number of rows and columns.
-        metautils::condition<(kind == Kind::XY), stdex::extents<Dynamic, Dynamic>>,
+        metautils::condition<(kind == Kind::XY), stdex::extents<size_type, Dynamic, Dynamic>>,
         // 2D buffer with compile-time number of rows.
-        metautils::condition<(kind == Kind::MY), stdex::extents<NRows, Dynamic>>,
+        metautils::condition<(kind == Kind::MY), stdex::extents<size_type, NRows, Dynamic>>,
         // 2D buffer with compile-time number of columns.
-        metautils::condition<(kind == Kind::XN), stdex::extents<Dynamic, NCols>>,
+        metautils::condition<(kind == Kind::XN), stdex::extents<size_type, Dynamic, NCols>>,
         // 2D buffer with compile-time number of rows and columns.
-        metautils::condition<(kind == Kind::MN), stdex::extents<NRows, NCols>>,
+        metautils::condition<(kind == Kind::MN), stdex::extents<size_type, NRows, NCols>>,
         // fallback type
-        stdex::mdspan<T, stdex::extents<Dynamic, Dynamic>>>;
+        stdex::mdspan<T, stdex::extents<size_type, Dynamic, Dynamic>>>;
 
     using mdspan_type = metautils::select_t<
         // 1D buffer with run-time number of elements.
