@@ -1,6 +1,7 @@
 target_sources(utests
   PRIVATE
     ChemicalElementTest.cpp
+    CommonNeighborsTest.cpp
     MoleculeSetter.cpp
     MoleculeTest.cpp
   )

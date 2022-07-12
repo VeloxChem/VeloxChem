@@ -8,7 +8,7 @@ else()
   FetchContent_Declare(pybind11
     QUIET
     URL
-      https://github.com/pybind/pybind11/archive/v2.8.0.tar.gz
+      https://github.com/pybind/pybind11/archive/v2.9.2.tar.gz
     )
   set(PYBIND11_TEST OFF CACHE BOOL "")
   FetchContent_MakeAvailable(pybind11)

@@ -1,20 +1,16 @@
-from pathlib import Path
-import numpy as np
-import tempfile
 import random
+import tempfile
+from pathlib import Path
+
+import numpy as np
 import pytest
-import sys
-
-try:
-    import cppe
-except ImportError:
-    pass
-
 from veloxchem.mpitask import MpiTask
 from veloxchem.outputstream import OutputStream
 from veloxchem.rsplinabscross import LinearAbsorptionCrossSection
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.veloxchemlib import is_mpi_master
+
+from .addons import using_cppe
 
 
 @pytest.mark.solvers
@@ -231,7 +227,7 @@ class TestCppAbs:
 
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines, ref_spectrum)
 
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    @using_cppe
     def test_cpp_hf_pe(self):
 
         here = Path(__file__).parent
@@ -273,7 +269,7 @@ class TestCppAbs:
 
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines, ref_spectrum)
 
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    @using_cppe
     def test_cpp_dft_pe(self):
 
         here = Path(__file__).parent
