@@ -146,7 +146,7 @@ class SHGDriver(NonLinearSolver):
         self._dft_sanity_check()
 
         profiler = Profiler({
-            'timing': False,
+            'timing': self.timing,
             'profiling': self.profiling,
             'memory_profiling': self.memory_profiling,
             'memory_tracing': self.memory_tracing,
@@ -402,7 +402,7 @@ class SHGDriver(NonLinearSolver):
         #  computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(freqpairs, first_order_dens,
                                        second_order_dens, F0, mo, molecule,
-                                       ao_basis, dft_dict)
+                                       ao_basis, dft_dict, profiler)
 
         profiler.check_memory_usage('Focks')
 
@@ -584,7 +584,8 @@ class SHGDriver(NonLinearSolver):
                       mo,
                       molecule,
                       ao_basis,
-                      dft_dict=None):
+                      dft_dict=None,
+                      profiler=None):
         """
         Computes the compounded Fock matrices used for the
         isotropic quadratic response function used for SHG
@@ -643,12 +644,14 @@ class SHGDriver(NonLinearSolver):
         if self.shg_type == 'reduced':
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
                                              dft_dict, first_order_dens,
-                                             second_order_dens, 'shg_red')
+                                             second_order_dens, 'shg_red',
+                                             profiler)
         elif self.shg_type == 'full':
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                              'real_and_imag', dft_dict,
                                              first_order_dens,
-                                             second_order_dens, 'shg')
+                                             second_order_dens, 'shg',
+                                             profiler)
 
         time_end_fock = time.time()
 

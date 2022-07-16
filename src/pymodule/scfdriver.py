@@ -856,13 +856,10 @@ class ScfDriver:
 
             iter_start_time = tm.time()
 
-            profiler.start_timer('FockBuild')
-
             vxc_mat, e_pe, V_pe = self._comp_2e_fock(fock_mat, den_mat,
                                                      molecule, ao_basis,
                                                      qq_data, e_grad, profiler)
 
-            profiler.stop_timer('FockBuild')
             profiler.start_timer('CompEnergy')
 
             e_el = self._comp_energy(fock_mat, vxc_mat, e_pe, kin_mat, npot_mat,
@@ -1294,7 +1291,7 @@ class ScfDriver:
         fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
         if self.timing:
-            profiler.add_timing_info('ERI', tm.time() - eri_t0)
+            profiler.add_timing_info('FockERI', tm.time() - eri_t0)
         vxc_t0 = tm.time()
 
         if self._dft and not self._first_step:
@@ -1310,7 +1307,7 @@ class ScfDriver:
             vxc_mat = None
 
         if self.timing and self._dft:
-            profiler.add_timing_info('DFT', tm.time() - vxc_t0)
+            profiler.add_timing_info('FockXC', tm.time() - vxc_t0)
         pe_t0 = tm.time()
 
         if self._pe and not self._first_step:
@@ -1322,7 +1319,7 @@ class ScfDriver:
             e_pe, V_pe = 0.0, None
 
         if self.timing and self._pe:
-            profiler.add_timing_info('PE', tm.time() - pe_t0)
+            profiler.add_timing_info('FockPE', tm.time() - pe_t0)
 
         return vxc_mat, e_pe, V_pe
 

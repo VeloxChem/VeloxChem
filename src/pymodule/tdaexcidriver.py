@@ -259,8 +259,6 @@ class TDAExciDriver(LinearSolver):
 
             profiler.set_timing_key(f'Iteration {i+1}')
 
-            profiler.start_timer('FockBuild')
-
             # perform linear transformation of trial vectors
 
             if i >= n_restart_iterations:
@@ -270,7 +268,6 @@ class TDAExciDriver(LinearSolver):
                 self._comp_lr_fock(fock, tdens, molecule, basis, eri_dict,
                                    dft_dict, pe_dict, profiler)
 
-            profiler.stop_timer('FockBuild')
             profiler.start_timer('ReducedSpace')
 
             # solve eigenvalues problem on master node
