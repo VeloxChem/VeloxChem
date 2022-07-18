@@ -28,7 +28,6 @@
 
 #include <array>
 #include <cstddef>
-#include <tuple>
 #include <type_traits>
 #include <vector>
 
@@ -58,6 +57,38 @@ enum class Kind
     MN
 };
 
+template <decltype(Dynamic) NRows, decltype(Dynamic) NCols>
+constexpr auto
+getKind() -> Kind
+{
+    if constexpr (NRows == 1 && NCols == Dynamic)
+    {
+        return Kind::X;
+    }
+    else if constexpr (NRows == 1 && NCols != Dynamic)
+    {
+        return Kind::N;
+    }
+    else if constexpr (NRows == Dynamic && NCols == Dynamic)
+    {
+        return Kind::XY;
+    }
+    else if constexpr (NRows != Dynamic && NCols == Dynamic)
+    {
+        return Kind::MY;
+    }
+    else if constexpr (NRows == Dynamic && NCols != Dynamic)
+    {
+        return Kind::XN;
+    }
+    else
+    {
+        return Kind::MN;
+    }
+    // default case
+    return Kind::XY;
+}
+
 /** Class to manage memory buffer allocation, manipulation, and deallocation.
  *
  * @tparam T scalar type of buffer elements. Must be an arithmetic type.
@@ -77,9 +108,11 @@ class CBuffer
     // Rank-1 objects are all stored and handled as row vectors!
     static_assert(NCols != 1, "CBuffer does not allow for storing column vectors.");
 
-    static constexpr bool Layout1D           = (NRows == 1);
-    static constexpr bool CompileTimeRows    = (NRows != Dynamic);
-    static constexpr bool CompileTimeColumns = (NCols != Dynamic);
+    static constexpr bool Layout1D                  = (NRows == 1);
+    static constexpr bool CompileTimeRows           = (NRows != Dynamic);
+    static constexpr bool CompileTimeColumns        = (NCols != Dynamic);
+    static constexpr bool CompileTimeRowsAndColumns = (CompileTimeRows && CompileTimeColumns);
+    static constexpr auto NResizableExtents         = CompileTimeRowsAndColumns ? 0 : ((CompileTimeRows || CompileTimeColumns) ? 1 : 2);
 
    public:
     using size_type       = std::decay_t<decltype(Dynamic)>;
@@ -105,34 +138,7 @@ class CBuffer
         }
     }();
 
-    static constexpr Kind kind = [] {
-        if constexpr (Layout1D && !CompileTimeColumns)
-        {
-            return Kind::X;
-        }
-        else if constexpr (Layout1D && CompileTimeColumns)
-        {
-            return Kind::N;
-        }
-        else if constexpr (!CompileTimeRows && !CompileTimeColumns)
-        {
-            return Kind::XY;
-        }
-        else if constexpr (CompileTimeRows && !CompileTimeColumns)
-        {
-            return Kind::MY;
-        }
-        else if constexpr (!CompileTimeRows && CompileTimeColumns)
-        {
-            return Kind::XN;
-        }
-        else
-        {
-            return Kind::MN;
-        }
-        // default case
-        return Kind::XY;
-    }();
+    static constexpr Kind kind = getKind<NRows, NCols>();
 
    private:
     /** The number of rows in memory buffer. */
@@ -199,7 +205,9 @@ class CBuffer
         }
     }
 
-    /** TODO Write Doxygen string
+    /** Fill 1-dimensional buffer with given value.
+     *
+     * @param[in] fill_value the filler for the buffer.
      */
     template <auto L_ = Layout1D, std::enable_if_t<L_, bool> = true>
     auto
@@ -256,7 +264,9 @@ class CBuffer
         }
     }
 
-    /** TODO Write Doxygen string
+    /** Fill 2-dimensional buffer with given value.
+     *
+     * @param[in] fill_value the filler for the buffer.
      */
     template <auto L_ = Layout1D, std::enable_if_t<!L_, bool> = true>
     auto
@@ -285,7 +295,15 @@ class CBuffer
         }
     }
 
-    /** TODO Write Doxygen string
+    /** Fill buffer with random values in interval.
+     *
+     * @param[in] lower lower bound of interval.
+     * @param[in] upper upper bound of interval.
+     *
+     * @note The random numbers are generated on the CPU, then copied into the buffer.
+     * This method uses the C++ default random engine with random seeding.
+     * If you need more control, generate the random sequence (as std::vector or
+     * raw array) and then use any of the available constructors.
      */
     auto
     _random_fill(T lower, T upper) -> void
@@ -301,53 +319,63 @@ class CBuffer
         delete[] tmp;
     }
 
-    /** TODO Write Doxygen string
+    /** Allocation function.
+     *
+     * @tparam Extents variadic pack of extents dimensions.
+     *
+     * @param[in] extents dimensions of the extents.
      */
+    template <typename... Extents>
     auto
-    _allocate() -> void
+    _allocate(Extents... extents) -> void
     {
+        static_assert(std::conjunction_v<std::is_integral<Extents>...>, "Extents must be of integral type.");
+
         if (_data)
         {
             errors::msgCritical(std::string(__func__) + ": buffer already allocated!");
         }
 
-        if constexpr (Layout1D)
+        // unpack parameter
+        std::array<size_type, NResizableExtents> tmp{static_cast<size_type>(extents)...};
+
+        if constexpr (kind == Kind::X)
         {
+            _nColumns       = tmp[0];
             _nPaddedColumns = mem::get_pitch<value_type>(Alignment, _nColumns);
             _nElements      = _nRows * _nPaddedColumns;
             _data           = mem::malloc<value_type, backend_type>(_nElements);
         }
-        else
+        else if constexpr (kind == Kind::XY)
         {
+            _nRows                           = tmp[0];
+            _nColumns                        = tmp[1];
             std::tie(_nPaddedColumns, _data) = mem::malloc<value_type, backend_type>(_nRows, _nColumns);
             _nElements                       = _nRows * _nPaddedColumns;
         }
-    }
-
-    /** TODO Write Doxygen string */
-    auto
-    _resize(size_type nRows, size_type nCols) -> void
-    {
-        // deallocate existing _data
-        if (_data)
+        else if constexpr (kind == Kind::XN)
         {
-            mem::free<value_type, backend_type>(_data);
+            _nRows                           = tmp[0];
+            std::tie(_nPaddedColumns, _data) = mem::malloc<value_type, backend_type>(_nRows, _nColumns);
+            _nElements                       = _nRows * _nPaddedColumns;
         }
-
-        // reset number of rows
-        _nRows = nRows;
-
-        // reset number of columns
-        _nColumns = nCols;
-
-        // reallocate
-        _allocate();
+        else if constexpr (kind == Kind::MY)
+        {
+            _nColumns                        = tmp[0];
+            std::tie(_nPaddedColumns, _data) = mem::malloc<value_type, backend_type>(_nRows, _nColumns);
+            _nElements                       = _nRows * _nPaddedColumns;
+        }
+        else
+        {
+            _nElements = _nRows * _nPaddedColumns;
+            _data      = mem::malloc<value_type, backend_type>(_nElements);
+        }
     }
 
    public:
     /** Default CTOR.
      *
-     * @warning These CTORs **only** allocate memory when the sizes of the
+     * @warning This CTOR **only** allocates memory when *all* the extents of the
      * buffer are known at compile-time.  In all other cases, you will have to
      * call `resize` to allocate or, alternatively one of
      * `setConstant`/`setZero`/`setRandom` to allocate *and* initialize.
@@ -356,223 +384,77 @@ class CBuffer
     {
         if constexpr (kind == Kind::N || kind == Kind::MN)
         {
-            _nElements = _nRows * _nPaddedColumns;
-            _data      = mem::malloc<value_type, backend_type>(_nElements);
+            _allocate();
         }
     }
-    /** @} */
 
-    /** @{ CTORs from dimensions.
+    /** CTOR from dimensions.
      *
-     * @note Only defined when some of the buffer dimensions are not known at
+     * @tparam Extents variadic pack of extents dimensions.
+     *
+     * @param[in] extents dimensions of the extents.
+     *
+     * @note Only defined when some of the buffer extents are not known at
      * compile-time.
-     * @note These CTORs **allocate** memory, but leave it uninitialized.
+     * @note These CTOR **allocates** memory, but leaves it uninitialized.
      * You can call one of `setConstant`/`setZero`/`setRandom` to do so.
      */
-    /** CTOR for 1D buffer with run-time number of elements.
-     *
-     * @param[in] nCols number of elements in 1D buffer
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
-    explicit CBuffer(size_type nCols)
-        : _nColumns{nCols}
-        , _nPaddedColumns{mem::get_pitch<value_type>(Alignment, _nColumns)}
-        , _nElements{_nRows * _nPaddedColumns}
-        , _data{mem::malloc<value_type, backend_type>(_nElements)}
+    template <typename... Extents,
+              auto CT_                             = CompileTimeRowsAndColumns,
+              std::enable_if_t<!CT_, bool>         = true,
+              auto AllIntegral_                    = std::conjunction_v<std::is_integral<Extents>...>,
+              std::enable_if_t<AllIntegral_, bool> = true>
+    explicit CBuffer(Extents... extents)
     {
+        _allocate(extents...);
     }
-
-    /** CTOR for 2D buffer with run-time number of rows and columns.
-     *
-     * @param[in] nRows number of rows (height).
-     * @param[in] nCols number of columns (width).
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
-    CBuffer(size_type nRows, size_type nCols) : _nRows{nRows}, _nColumns{nCols}
-    {
-        _allocate();
-    }
-
-    /** CTOR for 2D buffer with compile-time number of rows.
-     *
-     * @param[in] nCols number of columns (width).
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
-    explicit CBuffer(size_type nCols) : _nColumns{nCols}
-    {
-        _allocate();
-    }
-
-    /** CTOR for 2D buffer with compile-time number of columns.
-     *
-     * @param[in] nRows number of rows (height).
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
-    explicit CBuffer(size_type nRows) : _nRows{nRows}
-    {
-        _allocate();
-    }
-    /** @} */
 
     /** @{ CTORs from unaligned data buffers.
      *
      * @note These CTORs **allocate** memory *and* initialize it with the data
      * in the unaligned buffer, _i.e._ a `std::vector` or a raw pointer.
      */
-    /** CTOR for 1D buffer with run-time number of elements.
+    /** CTOR for buffer with run-time number of elements.
      *
-     * @param[in] nCols number of elements in 1D buffer.
+     * @tparam Extents variadic pack of extents dimensions.
+     *
      * @param[in] v raw array of data to copy into 1D buffer.
-     * @warning the input array **must** have at least `nCols` elements!
+     * @param[in] extents dimensions of the extents.
+     *
+     * @warning the input array **must** have at least the same dimensions in each extent!
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
-    CBuffer(size_type nCols, const_pointer v) : CBuffer<value_type, backend_type, 1, Dynamic>{nCols}
+    template <typename... Extents>
+    explicit CBuffer(const_pointer v, Extents... extents) : CBuffer<value_type, backend_type, NRows, NCols>{static_cast<size_type>(extents)...}
     {
         _copy_unaligned(v);
     }
 
-    /** CTOR for 1D buffer with run-time number of elements.
+    /** CTOR for buffer with run-time number of elements.
      *
-     * @param[in] nCols number of elements in 1D buffer.
+     * @tparam Extents variadic pack of extents dimensions.
+     *
      * @param[in] v vector of data to copy into 1D buffer.
-     * @warning the input vector **must** have at least `nCols` elements!
+     * @param[in] extents dimensions of the extents.
+     *
+     * @warning the input array **must** have at least the same dimensions in each extent!
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
-    CBuffer(size_type nCols, const std::vector<value_type> &v) : CBuffer<value_type, backend_type, 1, Dynamic>{nCols, v.data()}
+    template <typename... Extents>
+    explicit CBuffer(const std::vector<value_type> &v, Extents... extents)
+        : CBuffer<value_type, backend_type, NRows, NCols>{v.data(), static_cast<size_type>(extents)...}
     {
-        errors::assertMsgCritical(v.size() <= _nColumns,
+        errors::assertMsgCritical(v.size() >= _nColumns,
                                   std::string(__func__) + ": input vector must have at least " + std::to_string(_nColumns) + " elements");
     }
 
     /** CTOR for 1D buffer with run-time number of elements.
      *
      * @param[in] v vector of data to copy into 1D buffer
+     *
      * @note This CTOR takes the dimension from `std::vector`.
      */
     template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
-    explicit CBuffer(const std::vector<value_type> &v) : CBuffer<value_type, backend_type, 1, Dynamic>{v.size(), v.data()}
+    explicit CBuffer(const std::vector<value_type> &v) : CBuffer<value_type, backend_type, NRows, NCols>{v.data(), v.size()}
     {
-    }
-
-    /** CTORs for 1D buffer with compile-time number of elements.
-     *
-     * @param[in] v raw array of data to copy into 1D buffer.
-     * @warning the input array **must** have at least `NCols` elements!
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::N), bool> = true>
-    explicit CBuffer(const_pointer v) : CBuffer<value_type, backend_type, 1, NCols>{}
-    {
-        _copy_unaligned(v);
-    }
-
-    /** CTORs for 1D buffer with compile-time number of elements.
-     *
-     * @param[in] v vector of data to copy into 1D buffer
-     * @warning the input vector **must** have at least `NCols` elements!
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::N), bool> = true>
-    explicit CBuffer(const std::vector<value_type> &v) : CBuffer<value_type, backend_type, 1, NCols>{v.data()}
-    {
-    }
-
-    /** CTOR for 2D buffer with run-time number of rows and columns.
-     *
-     * @param[in] nRows number of rows (height).
-     * @param[in] nCols number of columns (width).
-     * @param[in] v raw array of data to copy into buffer.
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
-    CBuffer(size_type nRows, size_type nCols, const_pointer v) : CBuffer<value_type, backend_type, Dynamic, Dynamic>{nRows, nCols}
-    {
-        _copy_unaligned(v);
-    }
-
-    /** CTOR for 2D buffer with run-time number of rows and columns.
-     *
-     * @param[in] nRows number of rows (height).
-     * @param[in] nCols number of columns (width).
-     * @param[in] v vector of data to copy into buffer.
-     * @warning the input vector **must** have at least `nRows*nCols` elements!
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
-    CBuffer(size_type nRows, size_type nCols, const std::vector<value_type> &v)
-        : CBuffer<value_type, backend_type, Dynamic, Dynamic>{nRows, nCols, v.data()}
-    {
-        errors::assertMsgCritical(v.size() <= _nRows * _nColumns,
-                                  std::string(__func__) + ": input vector must have at least " + std::to_string(_nRows * _nColumns) + " elements");
-    }
-
-    /** CTOR for 2D buffer with compile-time number of rows.
-     *
-     * @param[in] nCols number of columns (width).
-     * @param[in] v raw array of data to copy into buffer.
-     * @warning the input array **must** have at least `nRows*nCols` elements!
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
-    CBuffer(size_type nCols, const_pointer v) : CBuffer<value_type, backend_type, NRows, Dynamic>{nCols}
-    {
-        _copy_unaligned(v);
-    }
-
-    /** CTOR for 2D buffer with compile-time number of rows.
-     *
-     * @param[in] nCols number of columns (width).
-     * @param[in] v vector of data to copy into buffer.
-     * @warning the input vector **must** have at least `nRows*nCols` elements!
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
-    CBuffer(size_type nCols, const std::vector<value_type> &v) : CBuffer<value_type, backend_type, NRows, Dynamic>{nCols, v.data()}
-    {
-        errors::assertMsgCritical(v.size() <= _nRows * _nColumns,
-                                  std::string(__func__) + ": input vector must have at least " + std::to_string(_nRows * _nColumns) + " elements");
-    }
-
-    /** CTOR for 2D buffer with compile-time number of columns.
-     *
-     * @param[in] nRows number of rows (height).
-     * @param[in] v raw array of data to copy into buffer.
-     * @warning the input array **must** have at least `nRows*nCols` elements!
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
-    CBuffer(size_type nRows, const_pointer v) : CBuffer<value_type, backend_type, Dynamic, NCols>{nRows}
-    {
-        _copy_unaligned(v);
-    }
-
-    /** CTOR for 2D buffer with compile-time number of columns.
-     *
-     * @param[in] nRows number of rows (height).
-     * @param[in] v vector of data to copy into buffer.
-     * @warning the input vector **must** have at least `nRows*nCols` elements!
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
-    CBuffer(size_type nRows, const std::vector<T> &v) : CBuffer<value_type, backend_type, Dynamic, NCols>{nRows, v.data()}
-    {
-        errors::assertMsgCritical(v.size() <= _nRows * _nColumns,
-                                  std::string(__func__) + ": input vector must have at least " + std::to_string(_nRows * _nColumns) + " elements");
-    }
-
-    /** CTOR for 2D buffer with compile-time number of rows and columns.
-     *
-     * @param[in] v raw array of data to copy into buffer.
-     * @warning the input array **must** have at least `_nRows*_nColumns` elements!
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MN), bool> = true>
-    explicit CBuffer(const_pointer v) : CBuffer<value_type, backend_type, NRows, NCols>{}
-    {
-        _copy_unaligned(v);
-    }
-
-    /** CTOR for 2D buffer with compile-time number of rows and columns.
-     *
-     * @param[in] v vector of data to copy into buffer.
-     * @warning the input vector **must** have at least `_nRows*_nColumns` elements!
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MN), bool> = true>
-    explicit CBuffer(const std::vector<T> &v) : CBuffer<value_type, backend_type, NRows, NCols>{v.data()}
-    {
-        errors::assertMsgCritical(v.size() <= _nRows * _nColumns,
-                                  std::string(__func__) + ": input vector must have at least " + std::to_string(_nRows * _nColumns) + " elements");
     }
     /** @} */
 
@@ -712,60 +594,30 @@ class CBuffer
         mem::free<value_type, backend_type>(_data);
     }
 
-    /** @{ Resize functions
+    /** Resize existing buffer.
      *
-     * @note Available when some dimensions are not known at compile-time.
-     * @note If the requested dimensions are equal to the current ones, it is a
-     * no-op.
+     * @tparam Extents variadic pack of extents dimensions.
+     *
+     * @param[in] extents new dimension of the extents.
+     *
+     * @note This is a **no-op** when all dimensions are known at compile-time.
      * @warning Resizing is **always** non-conservative, _i.e._ the current
      * contents of the buffer  will be discarded.
      */
-    /** Resize existing 1-dimensional buffer.
-     *
-     * @param[in] nCols number of elements in 1D buffer.
-     *
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
+    template <typename... Extents>
     auto
-    resize(size_type nCols) -> void
+    resize(Extents... extents) -> void
     {
-        _resize(1, nCols);
-    }
+        static_assert(std::conjunction_v<std::is_integral<Extents>...>, "New extents must be of integral type.");
 
-    /** Resize existing 2-dimensional buffer.
-     *
-     * @param[in] nRows number of rows (height).
-     * @param[in] nCols number of columns (width).
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
-    auto
-    resize(size_type nRows, size_type nCols) -> void
-    {
-        _resize(nRows, nCols);
-    }
+        if constexpr ((sizeof...(extents) == NResizableExtents) && (!CompileTimeRowsAndColumns))
+        {
+            clear();
 
-    /** Resize existing 2-dimensional buffer with compile-time number of rows.
-     *
-     * @param[in] nCols number of columns (width).
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
-    auto
-    resize(size_type nCols) -> void
-    {
-        _resize(_nRows, nCols);
+            // resize and reallocate
+            _allocate(extents...);
+        }
     }
-
-    /** Resize existing 2-dimensional buffer with compile-time number of columns.
-     *
-     * @param[in] nRows number of rows (height).
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
-    auto
-    resize(size_type nRows) -> void
-    {
-        _resize(nRows, _nColumns);
-    }
-    /** @} */
 
     friend class CBuffer<T, mem::Host, NRows, NCols>;
     friend class CBuffer<T, mem::Device, NRows, NCols>;
@@ -1109,9 +961,9 @@ class CBuffer
     template <typename W>
     struct restrict_accessor
     {
-        using element_type = W;
-        using data_handle_type      = W *__restrict;
-        using reference    = W &;
+        using element_type     = W;
+        using data_handle_type = W *__restrict;
+        using reference        = W &;
         auto
         access(data_handle_type p, ptrdiff_t i) const noexcept -> reference
         {
@@ -1274,7 +1126,7 @@ class CBuffer
      * which are, most likely, garbage!
      */
     template <typename Bother>
-    friend inline auto
+    friend auto
     operator==(const CBuffer<T, B, NRows, NCols> &lhs, const CBuffer<T, Bother, NRows, NCols> &rhs) -> bool
     {
         if (lhs._nElements != rhs._nElements)
@@ -1321,239 +1173,89 @@ class CBuffer
      * @param[in] rhs right-hand side of comparison.
      */
     template <typename Bother>
-    friend inline auto
+    friend auto
     operator!=(const CBuffer<T, B, NRows, NCols> &lhs, const CBuffer<T, Bother, NRows, NCols> &rhs) -> bool
     {
         return !(lhs == rhs);
     }
     /**@}*/
 
-    /** @{ Set all elements in buffer to a given value.
+    /** Set all elements in buffer to a given value.
+     *
+     * @tparam Extents variadic pack of extents dimensions.
+     *
+     * @param[in] fill_value value of fill element.
+     * @param[in] extents new dimension of the extents.
      *
      * @note The padding elements are left uninitialized!
      */
-    /** 1D/2D buffer.
-     *
-     * @param fill_value value of fill element.
-     * @note This is always valid when all dimensions are fixed at compile-time.
-     * When one or more dimensions are known at run-time, this method is only
-     * valid after allocation of the buffer, _e.g._ after calling `resize` or by
-     * creating the object with any of the allocating CTORs first.
-     */
+    template <typename... Extents>
     auto
-    setConstant(value_type fill_value) -> void
+    setConstant(value_type fill_value, Extents... extents) -> void
     {
+        resize(extents...);
         _fill(fill_value);
     }
 
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::N || K_ == Kind::MN), bool> = true>
-    inline static auto
-    Constant(value_type fill_value) -> CBuffer<T, B, NRows, NCols>
-    {
-        auto buf = CBuffer<T, B, NRows, NCols>{};
-        buf.setConstant(fill_value);
-        return buf;
-    }
-
-    /** 1D buffer.
+    /** Creates a buffer with all elements equal to a given value.
      *
-     * @param fill_value value of fill element.
-     * @param nCols number of columns.
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
-    auto
-    setConstant(value_type fill_value, size_type nCols) -> void
-    {
-        resize(nCols);
-        _fill(fill_value);
-    }
-
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
-    inline static auto
-    Constant(value_type fill_value, size_type nCols) -> CBuffer<T, B, 1, NCols>
-    {
-        auto buf = CBuffer<T, B, 1, NCols>{nCols};
-        buf.setConstant(fill_value);
-        return buf;
-    }
-
-    /** 2D buffer of XY kind.
+     * @tparam Extents variadic pack of extents dimensions.
      *
-     * @param fill_value value of fill element.
-     * @param nRows number of rows.
-     * @param nCols number of columns.
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
-    auto
-    setConstant(value_type fill_value, size_type nRows, size_type nCols) -> void
-    {
-        resize(nRows, nCols);
-        _fill(fill_value);
-    }
-
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
-    inline static auto
-    Constant(value_type fill_value, size_type nRows, size_type nCols) -> CBuffer<T, B, Dynamic, Dynamic>
-    {
-        auto buf = CBuffer<T, B, Dynamic, Dynamic>{nRows, nCols};
-        buf.setConstant(fill_value);
-        return buf;
-    }
-
-    /** 2D buffer of MY kind.
-     *
-     * @param fill_value value of fill element.
-     * @param nCols number of columns.
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
-    auto
-    setConstant(value_type fill_value, size_type nCols) -> void
-    {
-        resize(nCols);
-        _fill(fill_value);
-    }
-
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
-    inline static auto
-    Constant(value_type fill_value, size_type nCols) -> CBuffer<T, B, NRows, Dynamic>
-    {
-        auto buf = CBuffer<T, B, NRows, Dynamic>{nCols};
-        buf.setConstant(fill_value);
-        return buf;
-    }
-
-    /** 2D buffer of XN kind.
-     *
-     * @param fill_value value of fill element.
-     * @param nRows number of rows.
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
-    auto
-    setConstant(value_type fill_value, size_type nRows) -> void
-    {
-        resize(nRows);
-        _fill(fill_value);
-    }
-
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
-    inline static auto
-    Constant(value_type fill_value, size_type nRows) -> CBuffer<T, B, Dynamic, NCols>
-    {
-        auto buf = CBuffer<T, B, Dynamic, NCols>{nRows};
-        buf.setConstant(fill_value);
-        return buf;
-    }
-    /**@}*/
-
-    /** @{ Set all elements in buffer to zero.
+     * @param[in] fill_value value of fill element.
+     * @param[in] extents new dimension of the extents.
      *
      * @note The padding elements are left uninitialized!
      */
-    /** 1D/2D buffer.
-     *
-     * @note This is always valid when all dimensions are fixed at compile-time.
-     * When one or more dimensions are known at run-time, this method is only
-     * valid after allocation of the buffer, _e.g._ after calling `resize` or by
-     * creating the object with any of the allocating CTORs first.
-     */
-    auto
-    setZero() -> void
+    template <typename... Extents>
+    static auto
+    Constant(value_type fill_value, Extents... extents) -> CBuffer<T, B, NRows, NCols>
     {
-        setConstant(value_type{0});
+        auto buf = CBuffer<T, B, NRows, NCols>{extents...};
+        buf.setConstant(fill_value);
+        return buf;
     }
 
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::N || K_ == Kind::MN), bool> = true>
-    inline static auto
-    Zero() -> CBuffer<T, B, NRows, NCols>
+    /** Set all elements in buffer to zero.
+     *
+     * @tparam Extents variadic pack of extents dimensions.
+     *
+     * @param[in] extents new dimension of the extents.
+     *
+     * @note The padding elements are left uninitialized!
+     */
+    template <typename... Extents>
+    auto
+    setZero(Extents... extents) -> void
     {
-        auto buf = CBuffer<T, B, NRows, NCols>{};
+        resize(extents...);
+        _fill(value_type{0});
+    }
+
+    /** Creates a buffer with zero elements.
+     *
+     * @tparam Extents variadic pack of extents dimensions.
+     *
+     * @param[in] extents new dimension of the extents.
+     *
+     * @note The padding elements are left uninitialized!
+     */
+    template <typename... Extents>
+    static auto
+    Zero(Extents... extents) -> CBuffer<T, B, NRows, NCols>
+    {
+        auto buf = CBuffer<T, B, NRows, NCols>{extents...};
         buf.setZero();
         return buf;
     }
 
-    /** 1D buffer.
+    /** Sets buffer elements to uniform random values in given inteval.
      *
-     * @param nCols number of columns.
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
-    auto
-    setZero(size_type nCols) -> void
-    {
-        setConstant(value_type{0}, nCols);
-    }
-
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
-    inline static auto
-    Zero(size_type nCols) -> CBuffer<T, B, 1, NCols>
-    {
-        auto buf = CBuffer<T, B, 1, NCols>{nCols};
-        buf.setZero();
-        return buf;
-    }
-
-    /** 2D buffer of XY kind.
+     * @tparam Extents variadic pack of extents dimensions.
      *
-     * @param nRows number of rows.
-     * @param nCols number of columns.
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
-    auto
-    setZero(size_type nRows, size_type nCols) -> void
-    {
-        setConstant(value_type{0}, nRows, nCols);
-    }
-
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
-    inline static auto
-    Zero(size_type nRows, size_type nCols) -> CBuffer<T, B, Dynamic, Dynamic>
-    {
-        auto buf = CBuffer<T, B, Dynamic, Dynamic>{nRows, nCols};
-        buf.setZero();
-        return buf;
-    }
-
-    /** 2D buffer of MY kind.
+     * @param[in] lower lower bound of interval.
+     * @param[in] upper upper bound of interval.
+     * @param[in] extents new dimension of the extents.
      *
-     * @param nCols number of columns.
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
-    auto
-    setZero(size_type nCols) -> void
-    {
-        setConstant(value_type{0}, nCols);
-    }
-
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
-    inline static auto
-    Zero(size_type nCols) -> CBuffer<T, B, NRows, Dynamic>
-    {
-        auto buf = CBuffer<T, B, NRows, Dynamic>{nCols};
-        buf.setZero();
-        return buf;
-    }
-
-    /** 2D buffer of XN kind.
-     *
-     * @param nRows number of rows.
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
-    auto
-    setZero(size_type nRows) -> void
-    {
-        setConstant(value_type{0}, nRows);
-    }
-
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
-    inline static auto
-    Zero(size_type nRows) -> CBuffer<T, B, Dynamic, NCols>
-    {
-        auto buf = CBuffer<T, B, Dynamic, NCols>{nRows};
-        buf.setZero();
-        return buf;
-    }
-    /**@}*/
-
-    /** @{ Sets buffer elements to uniform random values in given inteval.
      *
      * @note The padding elements are left uninitialized!
      *
@@ -1562,133 +1264,55 @@ class CBuffer
      * If you need more control, generate the random sequence (as std::vector or
      * raw array) and then use any of the available constructors.
      */
-    /** 1D/2D buffer.
-     *
-     * @param[in] lower lower bound of interval.
-     * @param[in] upper upper bound of interval.
-     * @note This is always valid when all dimensions are fixed at compile-time.
-     * When one or more dimensions are known at run-time, this method is only
-     * valid after allocation of the buffer, _e.g._ after calling `resize` or by
-     * creating the object with any of the allocating CTORs first.
-     */
+    template <typename... Extents>
     auto
-    setRandom(value_type lower, value_type upper) -> void
+    setRandom(value_type lower, value_type upper, Extents... extents) -> void
     {
+        resize(extents...);
         _random_fill(lower, upper);
     }
 
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::N || K_ == Kind::MN), bool> = true>
-    inline static auto
-    Random(value_type upper, value_type lower) -> CBuffer<T, B, NRows, NCols>
+    /** Creates a buffer with uniform random values in given inteval.
+     *
+     * @tparam Extents variadic pack of extents dimensions.
+     *
+     * @param[in] lower lower bound of interval.
+     * @param[in] upper upper bound of interval.
+     * @param[in] extents new dimension of the extents.
+     *
+     * @note The padding elements are left uninitialized!
+     *
+     * The random numbers are generated on the CPU, then copied into the buffer.
+     * This method uses the C++ default random engine with random seeding.
+     * If you need more control, generate the random sequence (as std::vector or
+     * raw array) and then use any of the available constructors.
+     */
+    template <typename... Extents>
+    static auto
+    Random(value_type lower, value_type upper, Extents... extents) -> CBuffer<T, B, NRows, NCols>
     {
-        auto buf = CBuffer<T, B, NRows, NCols>{};
+        auto buf = CBuffer<T, B, NRows, NCols>{extents...};
         buf.setRandom(lower, upper);
         return buf;
     }
 
-    /** 1D buffer
-     *
-     * @param[in] lower lower bound of interval.
-     * @param[in] upper upper bound of interval.
-     * @param nCols number of columns.
+    /** Clears contents of buffer.
      */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
     auto
-    setRandom(value_type lower, value_type upper, size_type nCols) -> void
+    clear() -> void
     {
-        resize(nCols);
-
-        _random_fill(lower, upper);
+        // deallocate existing _data
+        if (_data)
+        {
+            mem::free<value_type, backend_type>(_data);
+        }
     }
-
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::X), bool> = true>
-    inline static auto
-    Random(value_type upper, value_type lower, size_type nCols) -> CBuffer<T, B, 1, NCols>
-    {
-        auto buf = CBuffer<T, B, 1, NCols>{nCols};
-        buf.setRandom(lower, upper);
-        return buf;
-    }
-
-    /** 2D buffer of XY kind.
-     *
-     * @param[in] lower lower bound of interval.
-     * @param[in] upper upper bound of interval.
-     * @param nRows number of rows.
-     * @param nCols number of columns.
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
-    auto
-    setRandom(value_type lower, value_type upper, size_type nRows, size_type nCols) -> void
-    {
-        resize(nRows, nCols);
-
-        _random_fill(lower, upper);
-    }
-
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XY), bool> = true>
-    inline static auto
-    Random(value_type upper, value_type lower, size_type nRows, size_type nCols) -> CBuffer<T, B, Dynamic, Dynamic>
-    {
-        auto buf = CBuffer<T, B, Dynamic, Dynamic>{nRows, nCols};
-        buf.setRandom(lower, upper);
-        return buf;
-    }
-
-    /** 2D buffer of MY kind.
-     *
-     * @param[in] lower lower bound of interval.
-     * @param[in] upper upper bound of interval.
-     * @param nCols number of columns.
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
-    auto
-    setRandom(value_type lower, value_type upper, size_type nCols) -> void
-    {
-        resize(nCols);
-
-        _random_fill(lower, upper);
-    }
-
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::MY), bool> = true>
-    inline static auto
-    Random(value_type upper, value_type lower, size_type nCols) -> CBuffer<T, B, NRows, Dynamic>
-    {
-        auto buf = CBuffer<T, B, NRows, Dynamic>{nCols};
-        buf.setRandom(lower, upper);
-        return buf;
-    }
-
-    /** 2D buffer of XN kind.
-     *
-     * @param[in] lower lower bound of interval.
-     * @param[in] upper upper bound of interval.
-     * @param nRows number of rows.
-     */
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
-    auto
-    setRandom(value_type lower, value_type upper, size_type nRows) -> void
-    {
-        resize(nRows);
-
-        _random_fill(lower, upper);
-    }
-
-    template <auto K_ = kind, std::enable_if_t<(K_ == Kind::XN), bool> = true>
-    inline static auto
-    Random(value_type upper, value_type lower, size_type nRows) -> CBuffer<T, B, Dynamic, NCols>
-    {
-        auto buf = CBuffer<T, B, Dynamic, NCols>{nRows};
-        buf.setRandom(lower, upper);
-        return buf;
-    }
-    /** @} */
 
     /** Checks if buffer is empty.
      *
      * @return True if buffer is empty, false otherwise.
      */
-    [[nodiscard]] inline auto
+    [[nodiscard]] auto
     empty() const -> bool
     {
         return (_nElements == 0);
