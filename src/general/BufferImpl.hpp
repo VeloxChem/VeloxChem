@@ -400,12 +400,13 @@ class CBuffer
      * You can call one of `setConstant`/`setZero`/`setRandom` to do so.
      */
     template <typename... Extents,
-              auto CT_                             = CompileTimeRowsAndColumns,
-              std::enable_if_t<!CT_, bool>         = true,
-              auto AllIntegral_                    = std::conjunction_v<std::is_integral<Extents>...>,
-              std::enable_if_t<AllIntegral_, bool> = true>
+              auto CT_                                                                 = CompileTimeRowsAndColumns,
+              std::enable_if_t<!CT_, bool>                                             = true,
+              std::enable_if_t<std::conjunction_v<std::is_integral<Extents>...>, bool> = true>
     explicit CBuffer(Extents... extents)
     {
+        static_assert(std::conjunction_v<std::is_integral<Extents>...>, "Extents must be of integral type.");
+
         _allocate(extents...);
     }
 
