@@ -28,92 +28,29 @@
 import sys
 from multiprocessing import cpu_count
 from os import environ
-from pathlib import Path
-from subprocess import STDOUT, check_call
 
-from setuptools import Extension, setup
-from setuptools.command.build_ext import build_ext
+try:
+    from skbuild import setup
+except ImportError:
+    print(
+        "Please update pip, you need pip 10 or greater,\n"
+        " or you need to install the PEP 518 requirements in pyproject.toml yourself",
+        file=sys.stderr,
+    )
+    raise
 
-# Newer packaging standards may recommend removing the current dir from the
-# path, add it back if needed.
-if "" not in sys.path:
-    sys.path.insert(0, "")
-from config.generate_setup import generate_setup
+# number of cores to use for compiling
+# if unspecified, use all available cores to compile
+compile_jobs = int(environ.get("VLX_NUM_BUILD_JOBS", default=cpu_count()))
 
-
-def get_version(rel_path):
-    abs_path = Path(__file__).parent / rel_path
-    with abs_path.open("r") as fh:
-        lines = fh.readlines()
-    for line in lines:
-        if line.startswith("__version__"):
-            delim = '"' if '"' in line else "'"
-            return line.split(delim)[1]
-    else:
-        raise RuntimeError("Unable to find version string.")
-
-
-class MakefileExtension(Extension):
-
-    def __init__(self, name, sourcedir=""):
-        Extension.__init__(self, name, sources=[])
-        self.sourcedir = Path(sourcedir).resolve()
-
-
-class MakefileBuild(build_ext):
-
-    def run(self):
-        build_lib = Path(self.build_lib)
-        if not build_lib.exists():
-            build_lib.mkdir(parents=True)
-
-        setup_file = Path("src", "Makefile.setup")
-        template_file = Path("config", "Setup.template")
-        generate_setup(template_file=template_file,
-                       setup_file=setup_file,
-                       build_lib=build_lib)
-
-        for ext in self.extensions:
-            self.build_extension(ext)
-
-    def build_extension(self, ext):
-        if hasattr(self, "parallel") and self.parallel:
-            njobs = self.parallel
-        else:
-            njobs = environ.get("VLX_NUM_BUILD_JOBS", default=cpu_count())
-
-        build_cmd = [
-            "make",
-            "-C",
-            str(ext.sourcedir / "src"),
-            "release",
-            "-s",
-            f"-j{int(njobs):d}",
-        ]
-
-        check_call(
-            build_cmd,
-            cwd=self.build_lib,
-            stdout=sys.stdout,
-            stderr=STDOUT,
-        )
-
-
+# we keep most of the configuration in setup.cfg
+# usage of setup.py is deprecated
+# https://setuptools.pypa.io/en/latest/userguide/quickstart.html#setup-py
 setup(
-    version=get_version(Path("src", "pymodule", "__init__.py")),
-    package_data={
-        # glob and sort
-        "veloxchem": [
-            str(p) for p in sorted(Path("basis").resolve().glob("**"))
-        ],
-    },
-    package_dir={
-        "veloxchem": str(Path("src", "pymodule").resolve()),
-    },
-    ext_modules=[
-        MakefileExtension("src"),
+    cmake_args=[
+        "-DCMAKE_JOB_POOL_COMPILE:STRING=compile",
+        "-DCMAKE_JOB_POOL_LINK:STRING=link",
+        # always use 2 cores for linking
+        f"-DCMAKE_JOB_POOLS:STRING=compile={compile_jobs:d};link=2",
     ],
-    cmdclass={
-        "build_ext": MakefileBuild,
-    },
 )

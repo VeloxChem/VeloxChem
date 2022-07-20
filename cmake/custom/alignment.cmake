@@ -5,12 +5,6 @@
 # Variables modified::
 #
 #   VLX_ALIGN
-#
-# autocmake.yml configuration::
-#
-#   docopt:
-#     - "--align=<VLX_ALIGN> Alignment [default: 64]."
-#   define: "'-DVLX_ALIGN=\"{0}\"'.format(arguments['--align'])"
 
 option_with_default(VLX_ALIGN "Alignment" 64)
 list(APPEND _valid_align 32 64)
