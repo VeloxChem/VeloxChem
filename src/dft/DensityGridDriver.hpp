@@ -405,7 +405,7 @@ class CDensityGridDriver
      @param basis the molecular basis.
      @param molecularGrid the distributed molecular grid.
      */
-    void _PDFT_Lda(      CDensityGrid*     densityGrid,
+    void _genBatchOfPairDensityGridPointsForLda(      CDensityGrid*     densityGrid,
                          const CAODensityMatrix* aoDensityMatrix,
                          double* twoDM,
                          double* activeMOs,
@@ -430,7 +430,7 @@ class CDensityGridDriver
      @param molecularGrid the distributed molecular grid.
      */
 
-    void _PDFT_Gga(      CDensityGrid*     densityGrid,
+    void _genBatchOfPairDensityGridPointsForGga(      CDensityGrid*     densityGrid,
                          const CAODensityMatrix* aoDensityMatrix,
                          double* twoDM,
                          double* activeMOs,
@@ -456,7 +456,7 @@ class CDensityGridDriver
      @param nGridPoints the number of grid points in grid points batch.
      */
 
-    void _distPDFT_LDA(      CDensityGrid*        densityGrid,
+    void _distPairDensityValuesForLda(      CDensityGrid*        densityGrid,
                                         double* twoDM,
                                         double* activeMOs,
                                         int nActive,
@@ -483,7 +483,7 @@ class CDensityGridDriver
      @param nGridPoints the number of grid points in grid points batch.
      */
 
-    void _distPDFT_GGA(      CDensityGrid*        densityGrid,
+    void _distPairDensityValuesForGga(      CDensityGrid*        densityGrid,
                                         double* twoDM,
                                         double* activeMOs,
                                         int nActive,
@@ -549,7 +549,7 @@ class CDensityGridDriver
      @param xcFunctional the type of exchange-correlation functional.
      @return the density grid object.
      */
-    CDensityGrid pdft(const CAODensityMatrix& aoDensityMatrix,
+    CDensityGrid generatePdftGrid(const CAODensityMatrix& aoDensityMatrix,
                          double* twoDM,
                          double* activeMOs,
                          int nActive,

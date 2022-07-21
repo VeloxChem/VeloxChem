@@ -52,7 +52,7 @@ O 0.0 0.0  0.6
             mo_act=scfdrv.mol_orbs.alpha_to_numpy()[:,[7,8]]
         mo_act = comm.bcast(mo_act, root=0)
 
-        pdft_ene = xc_drv.pdft( den_mat, np.array(D2act), np.array(mo_act.transpose()), molecule, basis, molgrid, xcfun.get_func_label())
+        pdft_ene = xc_drv.integrate_pdft( den_mat, np.array(D2act), np.array(mo_act.transpose()), molecule, basis, molgrid, xcfun.get_func_label())
         return vxc_mat.get_energy(), pdft_ene
 
     def test_O2_ROLDA(self):

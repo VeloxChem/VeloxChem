@@ -1537,7 +1537,7 @@ class CXCIntegrator
 
     */
 
-    double pdft(const CAODensityMatrix& aoDensityMatrix,
+    double integratePdft(const CAODensityMatrix& aoDensityMatrix,
                 double*                 twoDM,
                 double*                 activeMOs,
                 int                     nActive,

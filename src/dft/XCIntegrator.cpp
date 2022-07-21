@@ -7446,7 +7446,7 @@ CXCIntegrator::_getReducedRestrictedGradient(const CXCGradientGrid* xcGradientGr
     return ggrid;
 }
 
-double CXCIntegrator::pdft(const CAODensityMatrix& aoDensityMatrix,
+double CXCIntegrator::integratePdft(const CAODensityMatrix& aoDensityMatrix,
                            double*                 twoDM,
                            double*                 activeMOs,
                            int                     nActive,
@@ -7474,7 +7474,7 @@ double CXCIntegrator::pdft(const CAODensityMatrix& aoDensityMatrix,
         
         CDensityGridDriver dgdrv(_locComm);
         
-	auto refdengrid = dgdrv.pdft(aoDensityMatrix, twoDM, activeMOs, nActive, molecule, basis, molecularGrid, fvxc.getFunctionalType());
+	auto refdengrid = dgdrv.generatePdftGrid(aoDensityMatrix, twoDM, activeMOs, nActive, molecule, basis, molecularGrid, fvxc.getFunctionalType());
 
         // generate screened molecular and density grids
 

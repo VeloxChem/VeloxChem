@@ -50,7 +50,7 @@ using namespace py::literals;
 
 namespace vlx_dft {  // vlx_dft namespace
 
-double pdft_from_numpy(const CXCIntegrator& self,
+double integrate_pdft(const CXCIntegrator& self,
                        const CAODensityMatrix& aoDensityMatrix,
                        py::array_t<double> Active2DM,
                        py::array_t<double> ActiveMOs,
@@ -83,7 +83,7 @@ double pdft_from_numpy(const CXCIntegrator& self,
   double* CActiveMOs = new double[size];
   std::memcpy(CActiveMOs, info.ptr, size * sizeof(double));
 
-  return self.pdft(aoDensityMatrix, CActive2DM, CActiveMOs, nActive, molecule, basis, molecularGrid, xcFuncLabel);
+  return self.integratePdft(aoDensityMatrix, CActive2DM, CActiveMOs, nActive, molecule, basis, molecularGrid, xcFuncLabel);
 }
 // Exports classes/functions in src/dft to python
 
@@ -282,7 +282,7 @@ export_dft(py::module& m)
              "molecularGrid"_a,
              "xcFuncLabel"_a,
              "quadMode"_a)
-        .def("pdft", &pdft_from_numpy);
+        .def("integrate_pdft", &integrate_pdft);
     
     // CXCMolecularGradient class
 
