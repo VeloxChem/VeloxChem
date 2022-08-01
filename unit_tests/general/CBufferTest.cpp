@@ -1159,3 +1159,68 @@ TYPED_TEST(CBufferTest, Random)
         ASSERT_PRED1(pred, buf(4));
     }
 }
+
+TYPED_TEST(CBufferTest, Broadcast)
+{
+    using Scalar         = typename TypeParam::value_type;
+    using Backend        = typename TypeParam::backend_type;
+    constexpr auto NRows = TypeParam::NRows;
+    constexpr auto NCols = TypeParam::NCols;
+
+    constexpr auto kind = buffer::getKind<NRows, NCols>();
+
+    if constexpr (kind == buffer::Kind::X)
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        buf.broadcast(0, MPI_COMM_WORLD);
+
+        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+
+        ASSERT_EQ(buf, ref);
+    }
+    else if constexpr (kind == buffer::Kind::MY)
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        buf.broadcast(0, MPI_COMM_WORLD);
+
+        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+
+        ASSERT_EQ(buf, ref);
+    }
+    else if constexpr (kind == buffer::Kind::XN)
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        buf.broadcast(0, MPI_COMM_WORLD);
+
+        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+
+        ASSERT_EQ(buf, ref);
+    }
+    else if constexpr (kind == buffer::Kind::XY)
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
+        buf.broadcast(0, MPI_COMM_WORLD);
+
+        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
+
+        ASSERT_EQ(buf, ref);
+    }
+    else if constexpr (kind == buffer::Kind::MN)
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+        buf.broadcast(0, MPI_COMM_WORLD);
+
+        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+
+        ASSERT_EQ(buf, ref);
+    }
+    else
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+        buf.broadcast(0, MPI_COMM_WORLD);
+
+        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+
+        ASSERT_EQ(buf, ref);
+    }
+}

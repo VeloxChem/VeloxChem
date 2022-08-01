@@ -26,8 +26,11 @@
 #ifndef BufferImpl_hpp
 #define BufferImpl_hpp
 
+#include <mpi.h>
+
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -38,6 +41,7 @@
 #include "MathFunc.hpp"
 #include "MemAlloc.hpp"
 #include "MetaUtils.hpp"
+#include "MpiFunc.hpp"
 #include "mdspan.hpp"
 
 /** Tag for size known at run-time.
@@ -372,6 +376,66 @@ class CBuffer
             _nElements = _nRows * _nPaddedColumns;
             _data      = mem::malloc<value_type, backend_type>(_nElements);
         }
+    }
+
+    /** Reserve space.
+     *
+     * This function allocates space for the data in the buffer.
+     * @warning It assumes that `_nRows` and `_nColumns` have been set: it is to
+     * be used exclusively when performing MPI operations.
+     */
+    auto
+    _reserve() -> void
+    {
+        if constexpr (kind == Kind::X)
+        {
+            _nPaddedColumns = mem::get_pitch<value_type>(Alignment, _nColumns);
+            _nElements      = _nRows * _nPaddedColumns;
+            _data           = mem::malloc<value_type, backend_type>(_nElements);
+        }
+        else if constexpr (kind == Kind::XY)
+        {
+            std::tie(_nPaddedColumns, _data) = mem::malloc<value_type, backend_type>(_nRows, _nColumns);
+            _nElements                       = _nRows * _nPaddedColumns;
+        }
+        else if constexpr (kind == Kind::XN)
+        {
+            std::tie(_nPaddedColumns, _data) = mem::malloc<value_type, backend_type>(_nRows, _nColumns);
+            _nElements                       = _nRows * _nPaddedColumns;
+        }
+        else if constexpr (kind == Kind::MY)
+        {
+            std::tie(_nPaddedColumns, _data) = mem::malloc<value_type, backend_type>(_nRows, _nColumns);
+            _nElements                       = _nRows * _nPaddedColumns;
+        }
+        else
+        {
+            _nElements = _nRows * _nPaddedColumns;
+            _data      = mem::malloc<value_type, backend_type>(_nElements);
+        }
+    }
+
+    /** String representation of this bufffer's type. */
+    auto
+    _type_to_string() const -> std::string
+    {
+        auto dim_str = [](size_type dim) {
+            if (dim == Dynamic)
+            {
+                return std::string{"Dynamic"};
+            }
+            else
+            {
+                return std::to_string(NRows);
+            }
+        };
+
+        std::ostringstream os;
+
+        os << "[CBuffer<" << metautils::type_to_string<value_type>::name << ", " << backend_type::name << ", " << dim_str(NRows) << ", "
+           << dim_str(NCols) << "> (Object): " << this << "]";
+
+        return os.str();
     }
 
    public:
@@ -1324,23 +1388,11 @@ class CBuffer
     [[nodiscard]] auto
     repr() const -> std::string
     {
-        auto dim_str = [](size_type dim) {
-            if (dim == Dynamic)
-            {
-                return std::string{"Dynamic"};
-            }
-            else
-            {
-                return std::to_string(NRows);
-            }
-        };
-
         std::ostringstream os;
 
         os << std::endl;
 
-        os << "[CBuffer<" << metautils::type_to_string<value_type>::name << ", " << backend_type::name << ", " << dim_str(NRows) << ", "
-           << dim_str(NCols) << "> (Object): " << this << "]" << std::endl;
+        os << _type_to_string() << std::endl;
 
         os << "_nRows: " << _nRows << std::endl;
 
@@ -1374,6 +1426,33 @@ class CBuffer
 
         return os.str();
     }
+
+    /** @{ MPI functions */
+    template <typename B_ = B, typename = std::enable_if_t<!mem::is_on_device_v<B_>>>
+    auto
+    broadcast(int32_t rank, MPI_Comm comm) -> void
+    {
+        if constexpr (ENABLE_MPI)
+        {
+            // broadcast _nRows
+            mpi::bcast(_nRows, comm);
+
+            // broadcast _nColumns
+            mpi::bcast(_nColumns, comm);
+
+            // reserve space for _data array
+            if (rank != mpi::master()) _reserve();
+
+            // wait for allocation to finish on all processes
+            MPI_Barrier(comm);
+
+            // broadcast _data
+            auto merror = MPI_Bcast(_data, _nElements, mpi::type_v<T>, mpi::master(), comm);
+
+            if (merror != MPI_SUCCESS) mpi::abort(merror, "broadcast(" + _type_to_string() + ")");
+        }
+    }
+    /**}@*/
 };
 }  // namespace buffer
 
