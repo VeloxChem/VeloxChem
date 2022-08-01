@@ -125,6 +125,12 @@ struct type_to_string<std::size_t>
 };
 
 template <>
+struct type_to_string<float>
+{
+    inline const static std::string name{"float"};
+};
+
+template <>
 struct type_to_string<double>
 {
     inline const static std::string name{"double"};

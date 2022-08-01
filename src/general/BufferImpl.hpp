@@ -28,6 +28,8 @@
 
 #include <array>
 #include <cstddef>
+#include <sstream>
+#include <string>
 #include <type_traits>
 #include <vector>
 
@@ -1318,7 +1320,68 @@ class CBuffer
     {
         return (_nElements == 0);
     }
+    /** Converts buffer object to text output. */
+    [[nodiscard]] auto
+    repr() const -> std::string
+    {
+        auto dim_str = [](size_type dim) {
+            if (dim == Dynamic)
+            {
+                return std::string{"Dynamic"};
+            }
+            else
+            {
+                return std::to_string(NRows);
+            }
+        };
+
+        std::ostringstream os;
+
+        os << std::endl;
+
+        os << "[CBuffer<" << metautils::type_to_string<value_type>::name << ", " << backend_type::name << ", " << dim_str(NRows) << ", "
+           << dim_str(NCols) << "> (Object): " << this << "]" << std::endl;
+
+        os << "_nRows: " << _nRows << std::endl;
+
+        os << "_nColumns: " << _nColumns << std::endl;
+
+        os << "_nPaddedColumns: " << _nPaddedColumns << std::endl;
+
+        os << "_nElements: " << _nElements << std::endl;
+
+        os << "_data (" << &(_data) << "):" << std::endl;
+
+        os << "[";
+        auto first_row = true;
+        for (size_type i = 0; i < _nRows; ++i)
+        {
+            if (!first_row) os << "," << std::endl;
+            os << "[";
+            auto first_element = true;
+            for (size_type j = 0; j < _nColumns; ++j)
+            {
+                if (!first_element) os << ", ";
+                os << _data[i * _nPaddedColumns + j];
+                first_element = false;
+            }
+            os << "]";
+            first_row = false;
+        }
+        os << "]";
+
+        os << std::endl;
+
+        return os.str();
+    }
 };
 }  // namespace buffer
+
+template <typename T, typename B, auto NRows = Dynamic, auto NCols = Dynamic>
+std::ostream &
+operator<<(std::ostream &output, const buffer::CBuffer<T, B, NRows, NCols> &source)
+{
+    return (output << source.repr());
+}
 
 #endif /* BufferImpl_hpp */
