@@ -1428,6 +1428,11 @@ class CBuffer
     }
 
     /** @{ MPI functions */
+    /** Broadcasts buffer within domain of MPI communicator.
+     *
+     * @param[in] rank the rank of MPI process.
+     * @param[in] comm the MPI communicator.
+     */
     template <typename B_ = B, typename = std::enable_if_t<!mem::is_on_device_v<B_>>>
     auto
     broadcast(int32_t rank, MPI_Comm comm) -> void
@@ -1450,6 +1455,35 @@ class CBuffer
             auto merror = MPI_Bcast(_data, _nElements, mpi::type_v<T>, mpi::master(), comm);
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "broadcast(" + _type_to_string() + ")");
+        }
+    }
+
+    /** Sum-Reduce buffers from all MPI process within MPI communicator into buffer on master node.
+     *
+     * @param[in] rank the rank of MPI process.
+     * @param[in] nodes the number of MPI processes in MPI communicator.
+     * @param[in] comm the MPI communicator.
+     */
+    template <typename B_ = B, typename = std::enable_if_t<!mem::is_on_device_v<B_>>>
+    auto
+    reduce_sum(int32_t rank, int32_t nodes, MPI_Comm comm) -> void
+    {
+        if constexpr (ENABLE_MPI)
+        {
+            if (nodes == 1) return;
+
+            value_type *bdata = nullptr;
+
+            if (rank == mpi::master()) bdata = mem::malloc<value_type>(_nElements);
+
+            mpi::reduce_sum(_data, bdata, _nElements, comm);
+
+            if (rank == mpi::master())
+            {
+                mem::free(_data);
+
+                _data = bdata;
+            }
         }
     }
     /**}@*/

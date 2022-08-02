@@ -35,6 +35,7 @@
 
 #include "Buffer.hpp"
 #include "MemAlloc.hpp"
+#include "MpiFunc.hpp"
 
 using namespace buffer;
 
@@ -1222,5 +1223,97 @@ TYPED_TEST(CBufferTest, Broadcast)
         auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
 
         ASSERT_EQ(buf, ref);
+    }
+}
+
+TYPED_TEST(CBufferTest, ReduceSum)
+{
+    using Scalar         = typename TypeParam::value_type;
+    using Backend        = typename TypeParam::backend_type;
+    constexpr auto NRows = TypeParam::NRows;
+    constexpr auto NCols = TypeParam::NCols;
+
+    constexpr auto kind = buffer::getKind<NRows, NCols>();
+
+    auto sz   = mpi::nodes(MPI_COMM_WORLD);
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+
+    if constexpr (kind == buffer::Kind::X)
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+
+        buf.reduce_sum(0, sz, MPI_COMM_WORLD);
+
+        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42}, 10);
+
+        if (rank == mpi::master())
+        {
+            ASSERT_EQ(buf, ref);
+        }
+    }
+    else if constexpr (kind == buffer::Kind::MY)
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+
+        buf.reduce_sum(0, sz, MPI_COMM_WORLD);
+
+        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42}, 10);
+
+        if (rank == mpi::master())
+        {
+            ASSERT_EQ(buf, ref);
+        }
+    }
+    else if constexpr (kind == buffer::Kind::XN)
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+
+        buf.reduce_sum(0, sz, MPI_COMM_WORLD);
+
+        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42}, 10);
+
+        if (rank == mpi::master())
+        {
+            ASSERT_EQ(buf, ref);
+        }
+    }
+    else if constexpr (kind == buffer::Kind::XY)
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
+
+        buf.reduce_sum(0, sz, MPI_COMM_WORLD);
+
+        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42}, 10, 5);
+
+        if (rank == mpi::master())
+        {
+            ASSERT_EQ(buf, ref);
+        }
+    }
+    else if constexpr (kind == buffer::Kind::MN)
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+
+        buf.reduce_sum(0, sz, MPI_COMM_WORLD);
+
+        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42});
+
+        if (rank == mpi::master())
+        {
+            ASSERT_EQ(buf, ref);
+        }
+    }
+    else
+    {
+        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+
+        buf.reduce_sum(0, sz, MPI_COMM_WORLD);
+
+        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42});
+
+        if (rank == mpi::master())
+        {
+            ASSERT_EQ(buf, ref);
+        }
     }
 }
