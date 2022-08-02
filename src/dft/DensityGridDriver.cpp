@@ -1409,6 +1409,12 @@ CDensityGridDriver::_distPairDensityValuesForLda(      CDensityGrid*        dens
                 }
             }
         }
+        // Deallocate MOs
+        for (int32_t iAct = 0; iAct < nActive; iAct++)
+        {
+            delete[] ActMOs[iAct];
+        }
+        delete[] ActMOs;
         // Compute the "effective" alpha and beta densities
         for (int32_t l = 0; l < nGridPoints; l++)
         {
