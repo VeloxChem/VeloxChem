@@ -1178,16 +1178,15 @@ CDensityGridDriver::_getSizeOfBlock() const
     return 500;
 }
 
-
 CDensityGrid
 CDensityGridDriver::generatePdftGrid(const CAODensityMatrix& aoDensityMatrix,
-                         double* twoDM,
-                         double* activeMOs,
-                         int nActive,
-                             const CMolecule&        molecule,
-                             const CMolecularBasis&  basis,
-                             const CMolecularGrid&   molecularGrid,
-                             const xcfun             xcFunctional)
+                                     double*                 twoDM,
+                                     double*                 activeMOs,
+                                     int32_t                 nActive,
+                                     const CMolecule&        molecule,
+                                     const CMolecularBasis&  basis,
+                                     const CMolecularGrid&   molecularGrid,
+                                     const xcfun             xcFunctional)
 {
     // initialize density grid
 
@@ -1263,10 +1262,10 @@ CDensityGridDriver::generatePdftGrid(const CAODensityMatrix& aoDensityMatrix,
         }
     }
    
-    //Why only GGA?
     if (xcFunctional == xcfun::gga)
     {
         // finalize density grid
+        // Note: only for GGA
 
         densityGrid.computeDensityNorms();
     }
@@ -1280,16 +1279,16 @@ CDensityGridDriver::generatePdftGrid(const CAODensityMatrix& aoDensityMatrix,
 
 void
 CDensityGridDriver::_genBatchOfPairDensityGridPointsForLda(      CDensityGrid*     densityGrid,
-                                    const CAODensityMatrix* aoDensityMatrix,
-                                    double* twoDM,
-                                    double* activeMOs,
-                                    int nActive,
-                                    const CGtoContainer*    gtoContainer,
-                                    const double*           gridCoordinatesX,
-                                    const double*           gridCoordinatesY,
-                                    const double*           gridCoordinatesZ,
-                                    const int32_t           gridOffset,
-                                    const int32_t           nGridPoints) const
+                                                           const CAODensityMatrix* aoDensityMatrix,
+                                                           double*                 twoDM,
+                                                           double*                 activeMOs,
+                                                           int32_t                 nActive,
+                                                           const CGtoContainer*    gtoContainer,
+                                                           const double*           gridCoordinatesX,
+                                                           const double*           gridCoordinatesY,
+                                                           const double*           gridCoordinatesZ,
+                                                           const int32_t           gridOffset,
+                                                           const int32_t           nGridPoints) const
 {
     // set up number of AOs
 
@@ -1333,22 +1332,23 @@ CDensityGridDriver::_genBatchOfPairDensityGridPointsForLda(      CDensityGrid*  
         gtorec::computeGtosValuesForLDA(gaos, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, igpnt, blockdim);
 
         _distRestrictedDensityValuesForLda(densityGrid, aoDensityMatrix, gaos, gridOffset, igpnt, blockdim);
+
         _distPairDensityValuesForLda(densityGrid,twoDM, activeMOs, nActive, naos, gaos, gridOffset, igpnt, blockdim);
     }
 }
 
 void
 CDensityGridDriver::_distPairDensityValuesForLda(      CDensityGrid*        densityGrid,
-                                        double* twoDM,
-                                        double* activeMOs,
-                                        int nActive,
-                                        int nAOs,
-                                        const CMemBlock2D<double>& gtoValues,
-                                        const int32_t              gridOffset,
-                                        const int32_t              gridBlockPosition,
-                                        const int32_t              nGridPoints) const
+                                                 double*                    twoDM,
+                                                 double*                    activeMOs,
+                                                 int32_t                    nActive,
+                                                 int32_t                    nAOs,
+                                                 const CMemBlock2D<double>& gtoValues,
+                                                 const int32_t              gridOffset,
+                                                 const int32_t              gridBlockPosition,
+                                                 const int32_t              nGridPoints) const
 {
-    int ndmat=1;
+    int32_t ndmat=1;
 
     for (int32_t i = 0; i < ndmat; i++)
     {   
@@ -1389,11 +1389,11 @@ CDensityGridDriver::_distPairDensityValuesForLda(      CDensityGrid*        dens
             auto iMO = ActMOs[iAct];
             for (int32_t jAct = 0; jAct < nActive; jAct++)
             {
-                int ioff=iAct*nActive+jAct;
+                int32_t ioff=iAct*nActive+jAct;
                 auto jMO = ActMOs[jAct];
                 for (int32_t kAct = 0; kAct < nActive; kAct++)
                 {
-                    int joff=ioff*nActive+kAct;
+                    int32_t joff=ioff*nActive+kAct;
                     auto kMO = ActMOs[kAct];
                     for (int32_t lAct = 0; lAct < nActive; lAct++)
                     {
@@ -1438,16 +1438,16 @@ CDensityGridDriver::_distPairDensityValuesForLda(      CDensityGrid*        dens
 
 void
 CDensityGridDriver::_genBatchOfPairDensityGridPointsForGga(      CDensityGrid*     densityGrid,
-                                    const CAODensityMatrix* aoDensityMatrix,
-                                    double* twoDM,
-                                    double* activeMOs,
-                                    int nActive,
-                                    const CGtoContainer*    gtoContainer,
-                                    const double*           gridCoordinatesX,
-                                    const double*           gridCoordinatesY,
-                                    const double*           gridCoordinatesZ,
-                                    const int32_t           gridOffset,
-                                    const int32_t           nGridPoints) const
+                                                           const CAODensityMatrix* aoDensityMatrix,
+                                                           double*                 twoDM,
+                                                           double*                 activeMOs,
+                                                           int32_t                 nActive,
+                                                           const CGtoContainer*    gtoContainer,
+                                                           const double*           gridCoordinatesX,
+                                                           const double*           gridCoordinatesY,
+                                                           const double*           gridCoordinatesZ,
+                                                           const int32_t           gridOffset,
+                                                           const int32_t           nGridPoints) const
 {
     // set up number of AOs
 
@@ -1515,19 +1515,19 @@ CDensityGridDriver::_genBatchOfPairDensityGridPointsForGga(      CDensityGrid*  
 
 void
 CDensityGridDriver::_distPairDensityValuesForGga(      CDensityGrid*        densityGrid,
-                                        double* twoDM,
-                                        double* activeMOs,
-                                        int nActive,
-                                        int nAOs,
-                                        const CMemBlock2D<double>& gtoValues,
-                                        const CMemBlock2D<double>& gtoValuesX,
-                                        const CMemBlock2D<double>& gtoValuesY,
-                                        const CMemBlock2D<double>& gtoValuesZ,
-                                        const int32_t              gridOffset,
-                                        const int32_t              gridBlockPosition,
-                                        const int32_t              nGridPoints) const
+                                                 double*                    twoDM,
+                                                 double*                    activeMOs,
+                                                 int32_t                    nActive,
+                                                 int32_t                    nAOs,
+                                                 const CMemBlock2D<double>& gtoValues,
+                                                 const CMemBlock2D<double>& gtoValuesX,
+                                                 const CMemBlock2D<double>& gtoValuesY,
+                                                 const CMemBlock2D<double>& gtoValuesZ,
+                                                 const int32_t              gridOffset,
+                                                 const int32_t              gridBlockPosition,
+                                                 const int32_t              nGridPoints) const
 {
-    int ndmat=1;
+    int32_t ndmat=1;
 
     for (int32_t i = 0; i < ndmat; i++)
     {   
@@ -1601,7 +1601,7 @@ CDensityGridDriver::_distPairDensityValuesForGga(      CDensityGrid*        dens
 
             for (int32_t jAct = 0; jAct < nActive; jAct++)
             {
-                int ioff=iAct*nActive+jAct;
+                int32_t ioff=iAct*nActive+jAct;
                 auto jMO = ActMOs[jAct];
                 auto jMO_x = ActMOs_x[jAct];
                 auto jMO_y = ActMOs_y[jAct];
@@ -1609,7 +1609,7 @@ CDensityGridDriver::_distPairDensityValuesForGga(      CDensityGrid*        dens
 
                 for (int32_t kAct = 0; kAct < nActive; kAct++)
                 {
-                    int joff=ioff*nActive+kAct;
+                    int32_t joff=ioff*nActive+kAct;
                     auto kMO = ActMOs[kAct];
                     auto kMO_x = ActMOs_x[kAct];
                     auto kMO_y = ActMOs_y[kAct];
@@ -1683,19 +1683,19 @@ CDensityGridDriver::_distPairDensityValuesForGga(      CDensityGrid*        dens
             }
             rhoa[gridOffset + gridBlockPosition + l]=0.5*(da+delta);
             rhob[gridOffset + gridBlockPosition + l]=0.5*(da-delta);
-//Correct formulas, but give bad results without extra care on the db~=0 case
-/*
-            if (delta>1.0e-8)
-            {
-                gradax[gridOffset + gridBlockPosition + l]=0.5*(dax-dbx/delta);
-                graday[gridOffset + gridBlockPosition + l]=0.5*(day-dby/delta);
-                gradaz[gridOffset + gridBlockPosition + l]=0.5*(daz-dbz/delta);
-                gradbx[gridOffset + gridBlockPosition + l]=0.5*(dax+dbx/delta);
-                gradby[gridOffset + gridBlockPosition + l]=0.5*(day+dby/delta);
-                gradbz[gridOffset + gridBlockPosition + l]=0.5*(daz+dbz/delta);
-            }
-*/
-//"translated" formulas from Li Manni 2014
+
+            //Correct formulas, but give bad results without extra care on the db~=0 case
+            // if (delta>1.0e-8)
+            // {
+            //     gradax[gridOffset + gridBlockPosition + l]=0.5*(dax-dbx/delta);
+            //     graday[gridOffset + gridBlockPosition + l]=0.5*(day-dby/delta);
+            //     gradaz[gridOffset + gridBlockPosition + l]=0.5*(daz-dbz/delta);
+            //     gradbx[gridOffset + gridBlockPosition + l]=0.5*(dax+dbx/delta);
+            //     gradby[gridOffset + gridBlockPosition + l]=0.5*(day+dby/delta);
+            //     gradbz[gridOffset + gridBlockPosition + l]=0.5*(daz+dbz/delta);
+            // }
+
+            //"translated" formulas from Li Manni 2014
             if (da>1.0e-8)
             {
                 gradax[gridOffset + gridBlockPosition + l]=0.5*(dax+delta*dax/da);

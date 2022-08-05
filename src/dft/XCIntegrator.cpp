@@ -7447,19 +7447,20 @@ CXCIntegrator::_getReducedRestrictedGradient(const CXCGradientGrid* xcGradientGr
 }
 
 double CXCIntegrator::integratePdft(const CAODensityMatrix& aoDensityMatrix,
-                           double*                 twoDM,
-                           double*                 activeMOs,
-                           int                     nActive,
-                           const CMolecule&        molecule,
-                           const CMolecularBasis&  basis,
-                           const CMolecularGrid&   molecularGrid,
-                           const std::string&      xcFuncLabel) const
+                                    double*                 twoDM,
+                                    double*                 activeMOs,
+                                    int32_t                 nActive,
+                                    const CMolecule&        molecule,
+                                    const CMolecularBasis&  basis,
+                                    const CMolecularGrid&   molecularGrid,
+                                    const std::string&      xcFuncLabel) const
 {
     CAOKohnShamMatrix ksmat;
 
     // integrator handles single AO density only
 
     double xc_energy=0.0;
+
     if (aoDensityMatrix.getNumberOfDensityMatrices() == 1)
     {   
         // parse exchange-correlation functional data
@@ -7474,7 +7475,7 @@ double CXCIntegrator::integratePdft(const CAODensityMatrix& aoDensityMatrix,
         
         CDensityGridDriver dgdrv(_locComm);
         
-	auto refdengrid = dgdrv.generatePdftGrid(aoDensityMatrix, twoDM, activeMOs, nActive, molecule, basis, molecularGrid, fvxc.getFunctionalType());
+	    auto refdengrid = dgdrv.generatePdftGrid(aoDensityMatrix, twoDM, activeMOs, nActive, molecule, basis, molecularGrid, fvxc.getFunctionalType());
 
         // generate screened molecular and density grids
 
@@ -7519,12 +7520,12 @@ double CXCIntegrator::integratePdft(const CAODensityMatrix& aoDensityMatrix,
 
         auto xcdatab = _compEnergyAndDensityUnrestricted(vxcgridab, dgridab, mgridab);
 
-        xc_energy=std::get<0>(xcdata) + std::get<0>(xcdatb) + std::get<0>(xcdatab);
+        xc_energy = std::get<0>(xcdata) + std::get<0>(xcdatb) + std::get<0>(xcdatab);
 
         // delete GTOs container
         
         delete gtovec;
     }
+
     return xc_energy;
 }
-    

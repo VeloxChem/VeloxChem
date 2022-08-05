@@ -1521,7 +1521,6 @@ class CXCIntegrator
                    const std::string&      xcFuncLabel,
                    const std::string&      quadMode) const;
 
-
     /**
     Integrates exchange-correlation pair-density functional contribution to energy.
 
@@ -1533,19 +1532,16 @@ class CXCIntegrator
     @param basis the molecular basis.
     @param molecularGrid the molecular grid.
     @param xcFuncLabel the label of exchange-correlation functional.
-    @return the AO Kohn-Sham matrix.
-
+    @return the XC energy.
     */
-
     double integratePdft(const CAODensityMatrix& aoDensityMatrix,
-                double*                 twoDM,
-                double*                 activeMOs,
-                int                     nActive,
-                const CMolecule&        molecule,
-                const CMolecularBasis&  basis,
-                const CMolecularGrid&   molecularGrid,
-                const std::string&      xcFuncLabel) const;
-
+                         double*                 twoDM,
+                         double*                 activeMOs,
+                         int32_t                 nActive,
+                         const CMolecule&        molecule,
+                         const CMolecularBasis&  basis,
+                         const CMolecularGrid&   molecularGrid,
+                         const std::string&      xcFuncLabel) const;
 };
 
 #endif /* XCIntegrator_hpp */

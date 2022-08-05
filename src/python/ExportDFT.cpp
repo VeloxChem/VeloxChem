@@ -51,40 +51,59 @@ using namespace py::literals;
 namespace vlx_dft {  // vlx_dft namespace
 
 double integrate_pdft(const CXCIntegrator& self,
-                       const CAODensityMatrix& aoDensityMatrix,
-                       py::array_t<double> Active2DM,
-                       py::array_t<double> ActiveMOs,
-                       const CMolecule&        molecule,
-                       const CMolecularBasis&  basis,
-                       const CMolecularGrid&   molecularGrid,
-                       const std::string&      xcFuncLabel)
+                      const CAODensityMatrix& aoDensityMatrix,
+                      py::array_t<double> Active2DM,
+                      py::array_t<double> ActiveMOs,
+                      const CMolecule&        molecule,
+                      const CMolecularBasis&  basis,
+                      const CMolecularGrid&   molecularGrid,
+                      const std::string&      xcFuncLabel)
 {
-  py::buffer_info info = Active2DM.request();
-  int ndim=info.ndim;
-  std::vector<ssize_t> shape=info.shape;
-  int size=1;
-  for (int i = 0; i < ndim ; i++)
-  {
-    size*=(int) shape[i];
-  }
-  double* CActive2DM = new double[size];
-  std::memcpy(CActive2DM, info.ptr, size * sizeof(double));
+    py::buffer_info info = Active2DM.request();
 
-  int nActive=shape[0];
+    int32_t ndim=info.ndim;
 
-  info = ActiveMOs.request();
-  ndim=info.ndim;
-  shape=info.shape;
-  size=1;
-  for (int i = 0; i < ndim ; i++)
-  {
-    size*=(int) shape[i];
-  }
-  double* CActiveMOs = new double[size];
-  std::memcpy(CActiveMOs, info.ptr, size * sizeof(double));
+    std::vector<ssize_t> shape=info.shape;
 
-  return self.integratePdft(aoDensityMatrix, CActive2DM, CActiveMOs, nActive, molecule, basis, molecularGrid, xcFuncLabel);
+    int32_t size = 1;
+
+    for (int32_t i = 0; i < ndim ; i++)
+    {
+        size *= (int32_t)(shape[i]);
+    }
+
+    double* CActive2DM = new double[size];
+
+    std::memcpy(CActive2DM, info.ptr, size * sizeof(double));
+
+    int32_t nActive=shape[0];
+
+    info = ActiveMOs.request();
+
+    ndim = info.ndim;
+
+    shape = info.shape;
+
+    size = 1;
+
+    for (int32_t i = 0; i < ndim ; i++)
+    {
+        size *= (int32_t)(shape[i]);
+    }
+
+    double* CActiveMOs = new double[size];
+
+    std::memcpy(CActiveMOs, info.ptr, size * sizeof(double));
+
+    auto xcene = self.integratePdft(aoDensityMatrix, CActive2DM, CActiveMOs, nActive, molecule, basis, molecularGrid, xcFuncLabel);
+
+    delete[] CActive2DM;
+
+    delete[] CActiveMOs;
+
+    return xcene;
 }
+
 // Exports classes/functions in src/dft to python
 
 void
