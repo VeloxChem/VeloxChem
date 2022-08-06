@@ -360,7 +360,10 @@ class ScfDriver:
 
         if min_basis is None:
             if self.rank == mpi_master():
-                min_basis = MolecularBasis.read(molecule, 'AO-START-GUESS')
+                min_basis = MolecularBasis.read(molecule,
+                                                'AO-START-GUESS',
+                                                basis_path='.',
+                                                ostream=None)
             else:
                 min_basis = MolecularBasis()
             min_basis.broadcast(self.rank, self.comm)
