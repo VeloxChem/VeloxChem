@@ -314,7 +314,8 @@ def import_1e_integral(molecule, basis, int_type, atom1=1, shell1=None,
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
 
     pyscf_int_type = get_pyscf_integral_type(int_type)
     sign = get_sign(pyscf_int_type)
@@ -444,7 +445,8 @@ def import_2e_integral(molecule, basis, int_type, atom1=1, shell1=None,
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
 
     pyscf_int_type = get_pyscf_integral_type(int_type)
     sign = get_sign(pyscf_int_type)
@@ -604,7 +606,8 @@ def import_1e_integral_derivative(molecule, basis, int_type, atomi=1, atom1=1,
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
 
     # Get the AO indeces corresponding to atom i
     i = atomi - 1 # to use pyscf indexing
@@ -768,7 +771,8 @@ def numerical_electric_dipole_derivatives(molecule, ao_basis, int_type,
     basis_set_label = ao_basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
     nao = pyscf_molecule.nao
 
     # Dipole integrals driver
@@ -906,7 +910,8 @@ def import_1e_second_order_integral_derivative(molecule, basis, int_type,
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
 
     # Get the AO indeces corresponding to atom i
     i = atomi - 1 # to use pyscf indexing
@@ -1088,7 +1093,8 @@ def import_2e_integral_derivative(molecule, basis, int_type, atomi, atom1=1,
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
 
     # Get the AO indeces corresponding to atom i
     i = atomi - 1 # to use pyscf indexing
@@ -1275,7 +1281,8 @@ def import_2e_second_order_integral_derivative(molecule, basis, int_type,
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
 
     # Get the indices corresponding to atom i, j
     i = atomi - 1 # to use pyscf indexing
@@ -1452,7 +1459,8 @@ def import_xc_contrib_tddft(molecule, basis, scfdrv, xmy_ao, rel_dm_ao,
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
 
     pyscf_scf = pyscf.scf.RKS(pyscf_molecule)
 
@@ -1560,7 +1568,8 @@ def overlap_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
 
     # The "-" sign is due to the fact that pyscf computes -(nabla m | n)
     pyscf_ovlp_deriv = - pyscf_molecule.intor('int1e_ipovlp', aosym='s1')
@@ -1646,7 +1655,8 @@ def compute_dipole_integral_derivatives(molecule, ao_basis, i, unit="au",
     basis_set_label = ao_basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
     nao = pyscf_molecule.nao
 
     # Dipole integrals driver
@@ -1722,7 +1732,8 @@ def kinen_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
 
     # TODO:check sign; correct mistakes in comments.
     pyscf_kinen_deriv = -pyscf_molecule.intor('int1e_ipkin', aosym='s1')
@@ -1773,7 +1784,8 @@ def pyscf_hcore_deriv_generator(molecule, basis, i=0, unit="au"):
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
 
     # The atomic charge of atom i -- required for the derivative of 1/RA
     Z = molecule.elem_ids_to_numpy()[i]
@@ -1851,7 +1863,8 @@ def coulomb_attract_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
 
     # The atomic charge of atom i -- required for the derivative of 1/RA
     Z = molecule.elem_ids_to_numpy()[i]
@@ -1931,7 +1944,8 @@ def hcore_deriv(molecule, basis, i=0, unit="au"):
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
     pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
     nao = pyscf_molecule.nao
     pyscf_grad = grad.RHF(pyscf_scf)
@@ -1998,7 +2012,8 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
 
     if scfdrv is not None:
         if scfdrv.dft:
@@ -2158,7 +2173,8 @@ def vxc_deriv(molecule, basis, density, xcfun, i=0, grid_level=4, unit="au"):
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
     pyscf_scf = pyscf.scf.RKS(pyscf_molecule)
 
     # TODO: some functional are parametrized differently in PYSCF
@@ -2261,7 +2277,8 @@ def eri_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
 
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
 
     nao = pyscf_molecule.nao
 
@@ -2328,7 +2345,8 @@ def dipole_deriv(molecule, basis, i=0, unit="au"):
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
     nao = pyscf_molecule.nao
 
 
@@ -2389,7 +2407,8 @@ def overlap_second_deriv(molecule, basis, i=0, j=0, unit="au"):
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
     # number of atomic orbitals
     nao = pyscf_molecule.nao
 
@@ -2461,7 +2480,8 @@ def hcore_second_deriv(molecule, basis, i=0, j=0, unit="au"):
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
     # number of atomic orbitals
     nao = pyscf_molecule.nao
 
@@ -2512,7 +2532,8 @@ def dft_xc_second_deriv(molecule, basis, scf_drv, unit="au"):
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
 
     pyscf_scf = pyscf.scf.RKS(pyscf_molecule)
     # set functional, convergence threshold and grid level 
@@ -2594,7 +2615,8 @@ def eri_second_deriv(molecule, basis, i=0, j=0, unit="au"):
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
-                                 basis=pyscf_basis, unit=unit)
+                                 basis=pyscf_basis, unit=unit,
+                                 charge=molecule.get_charge())
     # number of atomic orbitals
     nao = pyscf_molecule.nao
 

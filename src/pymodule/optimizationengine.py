@@ -73,6 +73,10 @@ class OptimizationEngine(geometric.engine.Engine):
         self.comm = grad_drv.comm
         self.rank = grad_drv.comm.Get_rank()
 
+    def lower(self):
+        """ Required in order to get MECI optimization working in geomeTRIC"""
+        return 'custom engine'
+
     def calc_new(self, coords, dirname):
         """
         Implements calc_new method for the engine.
