@@ -237,6 +237,37 @@ class CBuffer
         }
     }
 
+    /** Generate a linearly-spaced 1-dimensional buffer within interval.
+     *
+     * @param[in] start lower bound of interval.
+     * @param[in] end upper bound of interval.
+     * @note the data is generated in [start, end)
+     */
+    template <auto L_ = Layout1D, std::enable_if_t<L_, bool> = true>
+    auto
+    _linspace(value_type start, value_type end) -> void
+    {
+        auto delta = (end - start) / static_cast<value_type>(_nColumns);
+
+        if constexpr (mem::is_on_host_v<backend_type>)
+        {
+            auto pdata = _data;
+#pragma omp simd aligned(pdata : Alignment)
+            for (size_type i = 0; i < _nColumns; ++i)
+                pdata[i] = start + delta * i;
+        }
+        else
+        {
+#ifdef VLX_USE_DEVICE
+            const auto block = dim3(256);
+            const auto grid  = dim3((_nColumns + block.x - 1) / block.x);
+            // TODO
+            // deviceLaunch((device::full1D<value_type>), grid, block, 0, 0, _data, fill_value, _nColumns);
+            DEVICE_CHECK(deviceStreamSynchronize(0));
+#endif
+        }
+    }
+
     /** Copy 2-dimensional unaligned data to buffer.
      *
      * @param[in] src source memory.
@@ -296,6 +327,42 @@ class CBuffer
             const auto block = dim3(16, 16);
             const auto grid  = dim3((_nRows + block.x - 1) / block.x, (_nColumns + block.y - 1) / block.y);
             deviceLaunch((device::full2D<value_type>), grid, block, 0, 0, _data, fill_value, _nRows, _nColumns, _nPaddedColumns);
+            DEVICE_CHECK(deviceStreamSynchronize(0));
+#endif
+        }
+    }
+
+    /** Generate a linearly-spaced 2-dimensional buffer within interval.
+     *
+     * @param[in] start lower bound of interval.
+     * @param[in] end upper bound of interval.
+     * @note the data is generated in [start, end)
+     */
+    template <auto L_ = Layout1D, std::enable_if_t<!L_, bool> = true>
+    auto
+    _linspace(value_type start, value_type end) -> void
+    {
+        auto delta = (end - start) / static_cast<value_type>(_nRows * _nColumns);
+
+        if constexpr (mem::is_on_host_v<backend_type>)
+        {
+            for (size_type i = 0; i < _nRows; ++i)
+            {
+                auto pdata = _data;
+#pragma omp simd aligned(pdata : Alignment)
+                for (size_type j = 0; j < _nColumns; ++j)
+                {
+                    pdata[i * _nPaddedColumns + j] = start + delta * (i * _nColumns + j);
+                }
+            }
+        }
+        else
+        {
+#ifdef VLX_USE_DEVICE
+            const auto block = dim3(16, 16);
+            const auto grid  = dim3((_nRows + block.x - 1) / block.x, (_nColumns + block.y - 1) / block.y);
+            // TODO
+            // deviceLaunch((device::full2D<value_type>), grid, block, 0, 0, _data, fill_value, _nRows, _nColumns, _nPaddedColumns);
             DEVICE_CHECK(deviceStreamSynchronize(0));
 #endif
         }
@@ -1536,6 +1603,43 @@ class CBuffer
     {
         auto buf = CBuffer<T, B, NRows, NCols>{extents...};
         buf.setRandom(lower, upper);
+        return buf;
+    }
+
+    /** Set all elements in buffer to a given value.
+     *
+     * @tparam Extents variadic pack of extents dimensions.
+     *
+     * @param[in] start lower bound of interval.
+     * @param[in] end upper bound of interval.
+     * @param[in] extents new dimension of the extents.
+     *
+     * @note The data is generated in [start, end)
+     */
+    template <typename... Extents>
+    auto
+    setLinspace(value_type start, value_type end, Extents... extents) -> void
+    {
+        resize(extents...);
+        _linspace(start, end);
+    }
+
+    /** Creates a buffer with all elements equal to a given value.
+     *
+     * @tparam Extents variadic pack of extents dimensions.
+     *
+     * @param[in] start lower bound of interval.
+     * @param[in] end upper bound of interval.
+     * @param[in] extents new dimension of the extents.
+     *
+     * @note The data is generated in [start, end)
+     */
+    template <typename... Extents>
+    [[nodiscard]] static auto
+    Linspace(value_type start, value_type end, Extents... extents) -> CBuffer<T, B, NRows, NCols>
+    {
+        auto buf = CBuffer<T, B, NRows, NCols>{extents...};
+        buf.setLinspace(start, end);
         return buf;
     }
 
