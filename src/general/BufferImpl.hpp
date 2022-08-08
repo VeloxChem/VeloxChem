@@ -1300,7 +1300,7 @@ class CBuffer
      * @note The padding elements are left uninitialized!
      */
     template <typename... Extents>
-    static auto
+    [[nodiscard]] static auto
     Constant(value_type fill_value, Extents... extents) -> CBuffer<T, B, NRows, NCols>
     {
         auto buf = CBuffer<T, B, NRows, NCols>{extents...};
@@ -1333,7 +1333,7 @@ class CBuffer
      * @note The padding elements are left uninitialized!
      */
     template <typename... Extents>
-    static auto
+    [[nodiscard]] static auto
     Zero(Extents... extents) -> CBuffer<T, B, NRows, NCols>
     {
         auto buf = CBuffer<T, B, NRows, NCols>{extents...};
@@ -1381,7 +1381,7 @@ class CBuffer
      * raw array) and then use any of the available constructors.
      */
     template <typename... Extents>
-    static auto
+    [[nodiscard]] static auto
     Random(value_type lower, value_type upper, Extents... extents) -> CBuffer<T, B, NRows, NCols>
     {
         auto buf = CBuffer<T, B, NRows, NCols>{extents...};
