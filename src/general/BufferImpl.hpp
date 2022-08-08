@@ -325,6 +325,74 @@ class CBuffer
         delete[] tmp;
     }
 
+    /** Set buffer dimensions.
+     *
+     * @tparam Extents variadic pack of extents dimensions.
+     *
+     * @param[in] extents dimensions of the extents.
+     */
+    template <typename... Extents>
+    auto
+    _setDimensions(Extents... extents) -> void
+    {
+        static_assert(std::conjunction_v<std::is_integral<Extents>...>, "Extents must be of integral type.");
+
+        auto tup = std::tuple<Extents...>(static_cast<size_type>(extents)...);
+
+        constexpr auto tup_sz = std::tuple_size_v<decltype(tup)>;
+
+        static_assert(tup_sz <= 2, "Dimensioning tuple must be at most of size 2!");
+
+        if constexpr (kind == Kind::XY)
+        {
+            static_assert(tup_sz == 2, "For Kind::XY buffer the dimensioning tuple must be exactly of size 2!");
+            std::tie(_nRows, _nColumns) = tup;
+        }
+        else if constexpr (kind == Kind::X)
+        {
+            static_assert(tup_sz > 0, "For Kind::X buffer the dimensioning tuple must be >0!");
+
+            if constexpr (tup_sz > 1)
+            {
+                std::tie(std::ignore, _nColumns) = tup;
+            }
+            else
+            {
+                std::tie(_nColumns) = tup;
+            }
+        }
+        else if constexpr (kind == Kind::XN)
+        {
+            static_assert(tup_sz > 0, "For Kind::XN buffer the dimensioning tuple must be >0!");
+
+            if constexpr (tup_sz > 1)
+            {
+                std::tie(_nRows, std::ignore) = tup;
+            }
+            else
+            {
+                std::tie(_nRows) = tup;
+            }
+        }
+        else if constexpr (kind == Kind::MY)
+        {
+            static_assert(tup_sz > 0, "For Kind::MY buffer the dimensioning tuple must be >0!");
+
+            if constexpr (tup_sz > 1)
+            {
+                std::tie(std::ignore, _nColumns) = tup;
+            }
+            else
+            {
+                std::tie(_nColumns) = tup;
+            }
+        }
+        else
+        {
+            // for Kind::N and Kind::MN there are no resizable extents: ignore whatever was passed in!
+        }
+    }
+
     /** Allocation function.
      *
      * @tparam Extents variadic pack of extents dimensions.
@@ -342,51 +410,9 @@ class CBuffer
             errors::msgCritical(std::string(__func__) + ": buffer already allocated!");
         }
 
-        // unpack parameter
-        std::array<size_type, NResizableExtents> tmp{static_cast<size_type>(extents)...};
+        // unpack variadic parameter and set dimensions
+        _setDimensions(extents...);
 
-        if constexpr (kind == Kind::X)
-        {
-            _nColumns       = tmp[0];
-            _nPaddedColumns = mem::get_pitch<value_type>(Alignment, _nColumns);
-            _nElements      = _nRows * _nPaddedColumns;
-            _data           = mem::malloc<value_type, backend_type>(_nElements);
-        }
-        else if constexpr (kind == Kind::XY)
-        {
-            _nRows                           = tmp[0];
-            _nColumns                        = tmp[1];
-            std::tie(_nPaddedColumns, _data) = mem::malloc<value_type, backend_type>(_nRows, _nColumns);
-            _nElements                       = _nRows * _nPaddedColumns;
-        }
-        else if constexpr (kind == Kind::XN)
-        {
-            _nRows                           = tmp[0];
-            std::tie(_nPaddedColumns, _data) = mem::malloc<value_type, backend_type>(_nRows, _nColumns);
-            _nElements                       = _nRows * _nPaddedColumns;
-        }
-        else if constexpr (kind == Kind::MY)
-        {
-            _nColumns                        = tmp[0];
-            std::tie(_nPaddedColumns, _data) = mem::malloc<value_type, backend_type>(_nRows, _nColumns);
-            _nElements                       = _nRows * _nPaddedColumns;
-        }
-        else
-        {
-            _nElements = _nRows * _nPaddedColumns;
-            _data      = mem::malloc<value_type, backend_type>(_nElements);
-        }
-    }
-
-    /** Reserve space.
-     *
-     * This function allocates space for the data in the buffer.
-     * @warning It assumes that `_nRows` and `_nColumns` have been set: it is to
-     * be used exclusively when performing MPI operations.
-     */
-    auto
-    _reserve() -> void
-    {
         if constexpr (kind == Kind::X)
         {
             _nPaddedColumns = mem::get_pitch<value_type>(Alignment, _nColumns);
@@ -1445,14 +1471,20 @@ class CBuffer
             // broadcast _nColumns
             mpi::bcast(_nColumns, comm);
 
-            // reserve space for _data array
-            if (rank != mpi::master()) _reserve();
+            // allocate _data array
+            if (rank != mpi::master()) _allocate(_nRows, _nColumns);
 
             // wait for allocation to finish on all processes
             MPI_Barrier(comm);
 
             // broadcast _data
-            auto merror = MPI_Bcast(_data, _nElements, mpi::type_v<T>, mpi::master(), comm);
+            // clang-format off
+            auto merror = MPI_Bcast(_data
+                                  , _nElements
+                                  , mpi::type_v<T>
+                                  , mpi::master()
+                                  , comm);
+            // clang-format on
 
             if (merror != MPI_SUCCESS) mpi::abort(merror, "broadcast(" + _type_to_string() + ")");
         }
