@@ -464,6 +464,156 @@ class CBuffer
         return os.str();
     }
 
+    /** Compute MPI scattering pattern for 1D buffer.
+     *
+     * @param[in] rank the rank of the calling process.
+     * @param[in] nodes number of nodes to scatter to.
+     * @return triple of `recvcount`, `sendcounts`, and `displs`, describing
+     * the buffer on the receiving and sending ends of the scatter operation.
+     *
+     * @note For 1D arrays, we partition the data in the row, excluding the
+     * padding elements.
+     *
+     * For example, a 1D buffer holding 9 `double`s aligned to 64-byte boundary,
+     * will be padded with 7 additional `double`s:
+     *
+     * [ o o o o o o o o | o x x x x x x x ]
+     *
+     * When scattering over 4 processes, each rank will "allocate" a similar
+     * buffer of 9 `double`s aligned to 64-byte boundary. This means 9 columns
+     * plus 7 padding elements.
+     * After scattering, the ranks will contain 3, 2, 2, and 2 elements,
+     * respectively, of the original buffer, **at their head**:
+     *
+     * rank 0: [ o o o * * * * * | x x x x x x x x ]
+     *
+     * rank 1: [ o o * * * * * * | x x x x x x x x ]
+     *
+     * rank 2: [ o o * * * * * * | x x x x x x x x ]
+     *
+     * rank 3: [ o o * * * * * * | x x x x x x x x ]
+     *
+     * Here, the "x" are padding elements, which are inaccessible when accessing
+     * elements of the buffer through `operator[]`, `operator()`, and `at()`.
+     * The "*" are placeholder elements: they are rubbish, but still accessible!
+     */
+    template <auto L_ = Layout1D, std::enable_if_t<L_, bool> = true>
+    [[nodiscard]] auto
+    _scatter_pattern(int32_t rank, int32_t nodes) -> std::tuple<int32_t, int32_t *, int32_t *>
+    {
+        // how many elements should "rank" receive from the root?
+        auto recvcount = mpi::batch_size(_nColumns, rank, nodes);
+
+        // how many elements should the root send to "rank"?
+        int32_t *sendcounts = (rank == mpi::master()) ? mem::malloc<int32_t>(nodes) : nullptr;
+
+        // where to read the elements to send to "rank"?
+        int32_t *displs = (rank == mpi::master()) ? mem::malloc<int32_t>(nodes) : nullptr;
+
+        // fill sendcounts and displs
+        if (rank == mpi::master())
+        {
+            mpi::batches_pattern(sendcounts, _nColumns, nodes);
+
+            mathfunc::indexes(displs, sendcounts, nodes);
+        }
+
+        return {recvcount, sendcounts, displs};
+    }
+
+    /** Compute MPI scattering pattern for 2D buffer.
+     *
+     * @param[in] rank the rank of the calling process.
+     * @param[in] nodes number of nodes to scatter to.
+     * @return triple of `recvcount`, `sendcounts`, and `displs`, describing
+     * the buffer on the receiving and sending ends of the scatter operation.
+     *
+     * @note For 2D arrays, we partition the data by rows.
+     *
+     * For example, a 2D buffer with 3 rows and 9 columns holds 27 `double`s aligned to 64-byte boundary.
+     * Each row will be padded with 7 additional `double`s, for an allocation of 48 `double`-s:
+     *
+     * / o o o o o o o o | o x x x x x x x \
+     * | o o o o o o o o | o x x x x x x x |
+     * \ o o o o o o o o | o x x x x x x x /
+     *
+     * When scattering over 4 processes, each rank will "allocate" a similar
+     * buffer of 3x9 `double`s aligned to 64-byte boundary. This means 3 rows
+     * each with 9 columns plus 7 padding elements.
+     * After scattering, the ranks will contain (or not) complete rows of the
+     * original buffer as **first row**:
+     *
+     * rank 0: / o o o o o o o o | o x x x x x x x \
+     *         | * * * * * * * * | * x x x x x x x |
+     *         \ * * * * * * * * | * x x x x x x x /
+     *
+     * rank 1: / o o o o o o o o | o x x x x x x x \
+     *         | * * * * * * * * | * x x x x x x x |
+     *         \ * * * * * * * * | * x x x x x x x /
+     *
+     * rank 2: / o o o o o o o o | o x x x x x x x \
+     *         | * * * * * * * * | * x x x x x x x |
+     *         \ * * * * * * * * | * x x x x x x x /
+     *
+     * rank 3: / * * * * * * * * | * x x x x x x x \
+     *         | * * * * * * * * | * x x x x x x x |
+     *         \ * * * * * * * * | * x x x x x x x /
+     *
+     * Here, the "x" are padding elements, which are inaccessible when accessing
+     * elements of the buffer through `operator[]`, `operator()`, and `at()`.
+     * The "*" are placeholder elements: they are rubbish, but still accessible!
+     * Note how rank 3 (the 4th process) gets no actual values after the scatter!
+     */
+    template <auto L_ = Layout1D, std::enable_if_t<!L_, bool> = true>
+    [[nodiscard]] auto
+    _scatter_pattern(int32_t rank, int32_t nodes) -> std::tuple<int32_t, int32_t *, int32_t *>
+    {
+        // how many rows should "rank" receive from the root?
+        int32_t *rows_in_batch = mem::malloc<int32_t>(nodes);
+        auto [quot, rem]       = std::ldiv(_nRows, nodes);
+        for (auto i = 0; i < nodes; ++i)
+        {
+            rows_in_batch[i] = ((rem) && (i < rem)) ? quot + 1 : quot;
+        }
+
+        // compute as:
+        // \f[
+        //   R_{i} * N + (R_{i} - 1) * p
+        // \f]
+        // where: \f$R_{i}\f$ is the number of rows in the rank \f$i\f$ batch, \f$N\f$ the number of columns, and \f$p\f$ the number of padding
+        // elements.
+        // Set to zero if there are no rows to send to the given rank!
+        auto recvcount = (rows_in_batch[rank] > 0) ? (rows_in_batch[rank] - 1) * _nPaddedColumns + _nColumns : 0;
+
+        // how many elements should the root send to "rank"?
+        int32_t *sendcounts = (rank == mpi::master()) ? mem::malloc<int32_t>(nodes) : nullptr;
+
+        // where to read the elements to send to "rank"?
+        int32_t *displs = (rank == mpi::master()) ? mem::malloc<int32_t>(nodes) : nullptr;
+
+        // fill sendcounts and displs, taking the padding into account
+        if (rank == mpi::master())
+        {
+            // the sendcount for each rank is the same as its recvcount
+            for (auto i = 0; i < nodes; ++i)
+            {
+                sendcounts[i] = (rows_in_batch[i] > 0) ? (rows_in_batch[i] - 1) * _nPaddedColumns + _nColumns : 0;
+            }
+
+            // the displs for rank i accumulates the sendcount for rank i-1 plus
+            // the padding to the displacement for rank-1
+            displs[0] = 0;
+            for (auto i = 1; i < nodes; ++i)
+            {
+                displs[i] = displs[i - 1] + rows_in_batch[i - 1] * _nPaddedColumns;
+            }
+        }
+
+        mem::free(rows_in_batch);
+
+        return {recvcount, sendcounts, displs};
+    }
+
    public:
     /** Default CTOR.
      *
@@ -1490,6 +1640,54 @@ class CBuffer
         }
     }
 
+    /** Reasigns buffer on all MPI process within MPI communicator by scattering buffer from master MPI process.
+     *
+     * @param[in] rank the rank of MPI process.
+     * @param[in] nodes the number of MPI processes in MPI communicator.
+     * @param[in] comm the MPI communicator.
+     *
+     * Each receiving buffer will have the same dimensionality.
+     */
+    template <typename B_ = B, typename = std::enable_if_t<!mem::is_on_device_v<B_>>>
+    auto
+    scatter(int32_t rank, int32_t nodes, MPI_Comm comm) -> void
+    {
+        if constexpr (ENABLE_MPI)
+        {
+            if (nodes == 1) return;
+
+            // set up scattering pattern
+            auto [recvcount, sendcounts, displs] = _scatter_pattern(rank, nodes);
+
+            // allocate data chunk on the receiving side of the scatter operation
+            auto recvbuf = mem::malloc<value_type>(_nElements);
+
+            // scatter data chunks from master node
+            // clang-format off
+            auto merror = MPI_Scatterv(_data
+                                     , sendcounts
+                                     , displs
+                                     , mpi::type_v<value_type>
+                                     , recvbuf
+                                     , recvcount
+                                     , mpi::type_v<value_type>
+                                     , mpi::master()
+                                     , comm);
+            // clang-format on
+
+            if (merror != MPI_SUCCESS) mpi::abort(merror, "scatter(" + _type_to_string() + ")");
+
+            // deallocate scattering pattern data
+            mem::free(sendcounts);
+
+            mem::free(displs);
+
+            // swap data chunk pointers
+            if (_data) mem::free(_data);
+
+            _data = recvbuf;
+        }
+    }
     /** Sum-Reduce buffers from all MPI process within MPI communicator into buffer on master node.
      *
      * @param[in] rank the rank of MPI process.
@@ -1504,9 +1702,7 @@ class CBuffer
         {
             if (nodes == 1) return;
 
-            value_type *bdata = nullptr;
-
-            if (rank == mpi::master()) bdata = mem::malloc<value_type>(_nElements);
+            value_type *bdata = (rank == mpi::master()) ? mem::malloc<value_type>(_nElements) : nullptr;
 
             mpi::reduce_sum(_data, bdata, _nElements, comm);
 
