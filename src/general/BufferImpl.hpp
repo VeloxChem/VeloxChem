@@ -114,9 +114,13 @@ class CBuffer
     // Rank-1 objects are all stored and handled as row vectors!
     static_assert(NCols != 1, "CBuffer does not allow for storing column vectors.");
 
-    static constexpr bool Layout1D                  = (NRows == 1);
-    static constexpr bool CompileTimeRows           = (NRows != Dynamic);
-    static constexpr bool CompileTimeColumns        = (NCols != Dynamic);
+    static constexpr bool Layout1D           = (NRows == 1);
+    static constexpr bool CompileTimeRows    = (NRows != Dynamic);
+    static constexpr bool CompileTimeColumns = (NCols != Dynamic);
+    /** Whether the buffer has both number of rows and columns known at compile-time.
+     *
+     * @note This is `true` for `Kind::N` and `Kind::MN` buffers.
+     */
     static constexpr bool CompileTimeRowsAndColumns = (CompileTimeRows && CompileTimeColumns);
     static constexpr auto NResizableExtents         = CompileTimeRowsAndColumns ? 0 : ((CompileTimeRows || CompileTimeColumns) ? 1 : 2);
 
@@ -465,6 +469,9 @@ class CBuffer
      * @tparam Extents variadic pack of extents dimensions.
      *
      * @param[in] extents dimensions of the extents.
+     *
+     * @note This function performs a re-allocation if `_data` already points to
+     * some memory, *i.e.* is not `nullptr`.
      */
     template <typename... Extents>
     auto
@@ -474,10 +481,10 @@ class CBuffer
 
         if (_data)
         {
-            errors::msgCritical(std::string(__func__) + ": buffer already allocated!");
+            mem::free<value_type, backend_type>(_data);
         }
 
-        // unpack variadic parameter and set dimensions
+        // unpack variadic parameter and set _nRows and _nColumns
         _setDimensions(extents...);
 
         if constexpr (kind == Kind::X)
@@ -531,12 +538,17 @@ class CBuffer
         return os.str();
     }
 
-    /** Compute MPI scattering pattern for 1D buffer.
+    /** Compute pattern for MPI scattering/gathering of 1D buffer.
      *
      * @param[in] rank the rank of the calling process.
      * @param[in] nodes number of nodes to scatter to.
-     * @return triple of `recvcount`, `sendcounts`, and `displs`, describing
-     * the buffer on the receiving and sending ends of the scatter operation.
+     * @return triple of types `int32_t`, `int32_t*` and `int32_t*`.
+     * - In a **scattering operation**, these correspond to `recvcount`,
+     *   `sendcounts`, and `displs`, respectively, and describe the buffer on
+     *   the receiving and sending ends of the scatter operation.
+     * - In a **gathering operation**, these correspond to `sendcount`,
+     *   `recvcounts`, and `displs`, respectively, and describe the buffer on
+     *   the sending and receiving ends of the gather operation.
      *
      * @note For 1D arrays, we partition the data in the row, excluding the
      * padding elements.
@@ -563,42 +575,64 @@ class CBuffer
      * Here, the "x" are padding elements, which are inaccessible when accessing
      * elements of the buffer through `operator[]`, `operator()`, and `at()`.
      * The "*" are placeholder elements: they are rubbish, but still accessible!
+     *
+     * When gathering over 4 processes, we pick 3, 2, 2, and 2 elements,
+     * respectively, from the **head** of the buffer on each process.
+     * So starting from:
+     *
+     * rank 0: [ o o o * * * * * | x x x x x x x x ]
+     *
+     * rank 1: [ o o * * * * * * | x x x x x x x x ]
+     *
+     * rank 2: [ o o * * * * * * | x x x x x x x x ]
+     *
+     * rank 3: [ o o * * * * * * | x x x x x x x x ]
+     *
+     * we get:
+     *
+     * rank 0: [ o o o o o o o o | o x x x x x x x ]
      */
     template <auto L_ = Layout1D, std::enable_if_t<L_, bool> = true>
     [[nodiscard]] auto
-    _scatter_pattern(int32_t rank, int32_t nodes) -> std::tuple<int32_t, int32_t *, int32_t *>
+    _pattern_scatter_gather(int32_t rank, int32_t nodes) -> std::tuple<int32_t, int32_t *, int32_t *>
     {
-        // how many elements should "rank" receive from the root?
-        auto recvcount = mpi::batch_size(_nColumns, rank, nodes);
+        // how many elements should "rank" receive from/send to the root?
+        auto count = mpi::batch_size(_nColumns, rank, nodes);
 
-        // how many elements should the root send to "rank"?
-        int32_t *sendcounts = (rank == mpi::master()) ? mem::malloc<int32_t>(nodes) : nullptr;
+        // how many elements should the root send to/receive from "rank"?
+        int32_t *counts = (rank == mpi::master()) ? mem::malloc<int32_t>(nodes) : nullptr;
 
-        // where to read the elements to send to "rank"?
+        // where to read the elements sent to/received from "rank"?
         int32_t *displs = (rank == mpi::master()) ? mem::malloc<int32_t>(nodes) : nullptr;
 
-        // fill sendcounts and displs
+        // fill counts and displs
         if (rank == mpi::master())
         {
-            mpi::batches_pattern(sendcounts, _nColumns, nodes);
+            mpi::batches_pattern(counts, _nColumns, nodes);
 
-            mathfunc::indexes(displs, sendcounts, nodes);
+            mathfunc::indexes(displs, counts, nodes);
         }
 
-        return {recvcount, sendcounts, displs};
+        return {count, counts, displs};
     }
 
-    /** Compute MPI scattering pattern for 2D buffer.
+    /** Compute pattern for MPI scattering/gathering of 2D buffer.
      *
      * @param[in] rank the rank of the calling process.
      * @param[in] nodes number of nodes to scatter to.
-     * @return triple of `recvcount`, `sendcounts`, and `displs`, describing
-     * the buffer on the receiving and sending ends of the scatter operation.
+     * @return triple of types `int32_t`, `int32_t*` and `int32_t*`.
+     * - In a **scattering operation**, these correspond to `recvcount`,
+     *   `sendcounts`, and `displs`, respectively, and describe the buffer on
+     *   the receiving and sending ends of the scatter operation.
+     * - In a **gathering operation**, these correspond to `sendcount`,
+     *   `recvcounts`, and `displs`, respectively, and describe the buffer on
+     *   the sending and receiving ends of the gather operation.
      *
      * @note For 2D arrays, we partition the data by rows.
      *
-     * For example, a 2D buffer with 3 rows and 9 columns holds 27 `double`s aligned to 64-byte boundary.
-     * Each row will be padded with 7 additional `double`s, for an allocation of 48 `double`-s:
+     * For example, a 2D buffer with 3 rows and 9 columns holds 27 `double`s
+     * aligned to 64-byte boundary.  Each row will be padded with 7 additional
+     * `double`s, for an allocation of 48 `double`-s:
      *
      * / o o o o o o o o | o x x x x x x x \
      * | o o o o o o o o | o x x x x x x x |
@@ -630,12 +664,38 @@ class CBuffer
      * elements of the buffer through `operator[]`, `operator()`, and `at()`.
      * The "*" are placeholder elements: they are rubbish, but still accessible!
      * Note how rank 3 (the 4th process) gets no actual values after the scatter!
+     *
+     * When gathering over 4 processes, we pick the first 1, 1, 1, and 0 rows,
+     * respectively, from the buffer on each rank.
+     * So starting from:
+     *
+     * rank 0: / o o o o o o o o | o x x x x x x x \
+     *         | * * * * * * * * | * x x x x x x x |
+     *         \ * * * * * * * * | * x x x x x x x /
+     *
+     * rank 1: / o o o o o o o o | o x x x x x x x \
+     *         | * * * * * * * * | * x x x x x x x |
+     *         \ * * * * * * * * | * x x x x x x x /
+     *
+     * rank 2: / o o o o o o o o | o x x x x x x x \
+     *         | * * * * * * * * | * x x x x x x x |
+     *         \ * * * * * * * * | * x x x x x x x /
+     *
+     * rank 3: / * * * * * * * * | * x x x x x x x \
+     *         | * * * * * * * * | * x x x x x x x |
+     *         \ * * * * * * * * | * x x x x x x x /
+     *
+     * we get:
+     *
+     * rank 0: / o o o o o o o o | o x x x x x x x \
+     *         | o o o o o o o o | o x x x x x x x |
+     *         \ o o o o o o o o | o x x x x x x x /
      */
     template <auto L_ = Layout1D, std::enable_if_t<!L_, bool> = true>
     [[nodiscard]] auto
-    _scatter_pattern(int32_t rank, int32_t nodes) -> std::tuple<int32_t, int32_t *, int32_t *>
+    _pattern_scatter_gather(int32_t rank, int32_t nodes) -> std::tuple<int32_t, int32_t *, int32_t *>
     {
-        // how many rows should "rank" receive from the root?
+        // how many rows should "rank" receive from/send to the root?
         int32_t *rows_in_batch = mem::malloc<int32_t>(nodes);
         auto [quot, rem]       = std::ldiv(_nRows, nodes);
         for (auto i = 0; i < nodes; ++i)
@@ -643,6 +703,7 @@ class CBuffer
             rows_in_batch[i] = ((rem) && (i < rem)) ? quot + 1 : quot;
         }
 
+        // how many elements should "rank" receive from/send to the root?
         // compute as:
         // \f[
         //   R_{i} * N + (R_{i} - 1) * p
@@ -650,24 +711,23 @@ class CBuffer
         // where: \f$R_{i}\f$ is the number of rows in the rank \f$i\f$ batch, \f$N\f$ the number of columns, and \f$p\f$ the number of padding
         // elements.
         // Set to zero if there are no rows to send to the given rank!
-        auto recvcount = (rows_in_batch[rank] > 0) ? (rows_in_batch[rank] - 1) * _nPaddedColumns + _nColumns : 0;
+        auto count = (rows_in_batch[rank] > 0) ? (rows_in_batch[rank] - 1) * _nPaddedColumns + _nColumns : 0;
 
-        // how many elements should the root send to "rank"?
-        int32_t *sendcounts = (rank == mpi::master()) ? mem::malloc<int32_t>(nodes) : nullptr;
+        // how many elements should the root send to/receive from "rank"?
+        int32_t *counts = (rank == mpi::master()) ? mem::malloc<int32_t>(nodes) : nullptr;
 
-        // where to read the elements to send to "rank"?
+        // where to read the elements sent to/received from "rank"?
         int32_t *displs = (rank == mpi::master()) ? mem::malloc<int32_t>(nodes) : nullptr;
 
-        // fill sendcounts and displs, taking the padding into account
+        // fill counts and displs, taking the padding into account
         if (rank == mpi::master())
         {
-            // the sendcount for each rank is the same as its recvcount
             for (auto i = 0; i < nodes; ++i)
             {
-                sendcounts[i] = (rows_in_batch[i] > 0) ? (rows_in_batch[i] - 1) * _nPaddedColumns + _nColumns : 0;
+                counts[i] = (rows_in_batch[i] > 0) ? (rows_in_batch[i] - 1) * _nPaddedColumns + _nColumns : 0;
             }
 
-            // the displs for rank i accumulates the sendcount for rank i-1 plus
+            // the displs for rank i accumulates the counts for rank i-1 plus
             // the padding to the displacement for rank-1
             displs[0] = 0;
             for (auto i = 1; i < nodes; ++i)
@@ -678,16 +738,21 @@ class CBuffer
 
         mem::free(rows_in_batch);
 
-        return {recvcount, sendcounts, displs};
+        return {count, counts, displs};
     }
 
    public:
     /** Default CTOR.
      *
      * @warning This CTOR **only** allocates memory when *all* the extents of the
-     * buffer are known at compile-time.  In all other cases, you will have to
-     * call `resize` to allocate or, alternatively one of
-     * `setConstant`/`setZero`/`setRandom` to allocate *and* initialize.
+     * buffer are known at compile-time.
+     * In all other cases, this CTOR is **non-allocating**. Thus you will have
+     * to:
+     *
+     * - Allocate with either `resize` or `reserve`. The former makes sense
+     *   when not all extents are known at compile-time.
+     * - Allocate *and* initialize with one of
+     *   `setConstant`/`setZero`/`setRandom`/`setLinspace`.
      */
     CBuffer()
     {
@@ -705,7 +770,7 @@ class CBuffer
      *
      * @note Only defined when some of the buffer extents are not known at
      * compile-time.
-     * @note These CTOR **allocates** memory, but leaves it uninitialized.
+     * @note This CTOR **allocates** memory, but leaves it uninitialized.
      * You can call one of `setConstant`/`setZero`/`setRandom` to do so.
      */
     template <typename... Extents,
@@ -920,10 +985,8 @@ class CBuffer
     {
         static_assert(std::conjunction_v<std::is_integral<Extents>...>, "New extents must be of integral type.");
 
-        if constexpr ((sizeof...(extents) == NResizableExtents) && (!CompileTimeRowsAndColumns))
+        if constexpr ((sizeof...(extents) == NResizableExtents))
         {
-            clear();
-
             // resize and reallocate
             _allocate(extents...);
         }
@@ -1566,7 +1629,6 @@ class CBuffer
      * @param[in] upper upper bound of interval.
      * @param[in] extents new dimension of the extents.
      *
-     *
      * @note The padding elements are left uninitialized!
      *
      * The random numbers are generated on the CPU, then copied into the buffer.
@@ -1641,18 +1703,6 @@ class CBuffer
         auto buf = CBuffer<T, B, NRows, NCols>{extents...};
         buf.setLinspace(start, end);
         return buf;
-    }
-
-    /** Clears contents of buffer.
-     */
-    auto
-    clear() -> void
-    {
-        // deallocate existing _data
-        if (_data)
-        {
-            mem::free<value_type, backend_type>(_data);
-        }
     }
 
     /** Checks if buffer is empty.
@@ -1761,7 +1811,7 @@ class CBuffer
             if (nodes == 1) return;
 
             // set up scattering pattern
-            auto [recvcount, sendcounts, displs] = _scatter_pattern(rank, nodes);
+            auto [recvcount, sendcounts, displs] = _pattern_scatter_gather(rank, nodes);
 
             // allocate data chunk on the receiving side of the scatter operation
             auto recvbuf = mem::malloc<value_type>(_nElements);
@@ -1792,6 +1842,62 @@ class CBuffer
             _data = recvbuf;
         }
     }
+
+    /** Creates buffer on master MPI process by gathering buffers from all MPI processes within MPI communicator.
+     *
+     * @param[in] rank the rank of MPI process.
+     * @param[in] nodes the number of MPI processes in MPI communicator.
+     * @param[in] comm the MPI communicator.
+     * @return the buffer object:
+     *   - on master node with gathered data;
+     *   - on worker nodes empty.
+     */
+    template <typename B_ = B, typename = std::enable_if_t<!mem::is_on_device_v<B_>>>
+    auto
+    gather(int32_t rank, int32_t nodes, MPI_Comm comm) -> CBuffer
+    {
+        if constexpr (ENABLE_MPI)
+        {
+            if (nodes == 1) return CBuffer(*this);
+
+            // set up gathering pattern
+            auto [sendcount, recvcounts, displs] = _pattern_scatter_gather(rank, nodes);
+
+            // declare buffer for gathered data
+            CBuffer<value_type, backend_type, NRows, NCols> buf;
+
+            if (rank == mpi::master())
+            {
+                // allocate buffer for gathering
+                buf._allocate(_nRows, _nColumns);
+            }
+
+            // gather data chunks to master node
+            // clang-format off
+            auto merror = MPI_Gatherv(_data
+                                    , sendcount
+                                    , mpi::type_v<value_type>
+                                    , buf._data
+                                    , recvcounts
+                                    , displs
+                                    , mpi::type_v<value_type>
+                                    , mpi::master()
+                                    , comm);
+            // clang-format on
+
+            if (merror != MPI_SUCCESS) mpi::abort(merror, "gather(" + _type_to_string() + ")");
+
+            // deallocate gathering pattern data
+            mem::free(recvcounts);
+
+            mem::free(displs);
+
+            return buf;
+        }
+
+        return CBuffer(*this);
+    }
+
     /** Sum-Reduce buffers from all MPI process within MPI communicator into buffer on master node.
      *
      * @param[in] rank the rank of MPI process.

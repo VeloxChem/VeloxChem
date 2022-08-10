@@ -1445,3 +1445,119 @@ TYPED_TEST(CBufferTest, Scatter)
         }
     }
 }
+
+TYPED_TEST(CBufferTest, Gather)
+{
+    using Scalar         = typename TypeParam::value_type;
+    using Backend        = typename TypeParam::backend_type;
+    constexpr auto NRows = TypeParam::NRows;
+    constexpr auto NCols = TypeParam::NCols;
+
+    constexpr auto kind = buffer::getKind<NRows, NCols>();
+
+    auto sz   = mpi::nodes(MPI_COMM_WORLD);
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+
+    if constexpr (kind == buffer::Kind::X)
+    {
+        // on each rank, generate a buffer which contains a chunk_sz part of the data
+        auto                chunk_sz = mpi::batch_size(10, rank, sz);
+        std::vector<Scalar> foo(10);
+        std::fill_n(foo.begin(), chunk_sz, Scalar{42});
+        auto buf_0 = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo);
+
+        // after gathering, we have a buffer with 10 elements equal to 42
+        auto buf_1 = buf_0.gather(rank, sz, MPI_COMM_WORLD);
+
+        if (rank == mpi::master())
+        {
+            auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+            ASSERT_EQ(buf_1, ref);
+        }
+    }
+    else if constexpr (kind == buffer::Kind::MY)
+    {
+        // on each rank, generate a buffer which contains rows_in_chunk rows of the data
+        auto                rows_in_chunk = mpi::batch_size(NRows, rank, sz);
+        std::vector<Scalar> foo(NRows * 10);
+        std::fill_n(foo.begin(), rows_in_chunk * 10, Scalar{42});
+        auto buf_0 = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo, 10);
+
+        // after gathering, we have a buffer with NRows*10 elements equal to 42
+        auto buf_1 = buf_0.gather(rank, sz, MPI_COMM_WORLD);
+
+        if (rank == mpi::master())
+        {
+            auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+            ASSERT_EQ(buf_1, ref);
+        }
+    }
+    else if constexpr (kind == buffer::Kind::XN)
+    {
+        // on each rank, generate a buffer which contains rows_in_chunk rows of the data
+        auto                rows_in_chunk = mpi::batch_size(10, rank, sz);
+        std::vector<Scalar> foo(10 * NCols);
+        std::fill_n(foo.begin(), rows_in_chunk * NCols, Scalar{42});
+        auto buf_0 = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo, 10);
+
+        // after gathering, we have a buffer with 10*NCols elements equal to 42
+        auto buf_1 = buf_0.gather(rank, sz, MPI_COMM_WORLD);
+
+        if (rank == mpi::master())
+        {
+            auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+            ASSERT_EQ(buf_1, ref);
+        }
+    }
+    else if constexpr (kind == buffer::Kind::XY)
+    {
+        // on each rank, generate a buffer which contains rows_in_chunk rows of the data
+        auto                rows_in_chunk = mpi::batch_size(10, rank, sz);
+        std::vector<Scalar> foo(10 * 5);
+        std::fill_n(foo.begin(), rows_in_chunk * 5, Scalar{42});
+        auto buf_0 = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo, 10, 5);
+
+        // after gathering, we have a buffer with 10*5 elements equal to 42
+        auto buf_1 = buf_0.gather(rank, sz, MPI_COMM_WORLD);
+
+        if (rank == mpi::master())
+        {
+            auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
+            ASSERT_EQ(buf_1, ref);
+        }
+    }
+    else if constexpr (kind == buffer::Kind::MN)
+    {
+        // on each rank, generate a buffer which contains rows_in_chunk rows of the data
+        auto                rows_in_chunk = mpi::batch_size(NRows, rank, sz);
+        std::vector<Scalar> foo(NRows * NCols);
+        std::fill_n(foo.begin(), rows_in_chunk * NCols, Scalar{42});
+        auto buf_0 = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo);
+
+        // after gathering, we have a buffer with NRows*NCols elements equal to 42
+        auto buf_1 = buf_0.gather(rank, sz, MPI_COMM_WORLD);
+
+        if (rank == mpi::master())
+        {
+            auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+            ASSERT_EQ(buf_1, ref);
+        }
+    }
+    else
+    {
+        // on each rank, generate a buffer which contains a chunk_sz part of the data
+        auto                chunk_sz = mpi::batch_size(10, rank, sz);
+        std::vector<Scalar> foo(10);
+        std::fill_n(foo.begin(), chunk_sz, Scalar{42});
+        auto buf_0 = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo);
+
+        // after gathering, we have a buffer with 10 elements equal to 42
+        auto buf_1 = buf_0.gather(rank, sz, MPI_COMM_WORLD);
+
+        if (rank == mpi::master())
+        {
+            auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+            ASSERT_EQ(buf_1, ref);
+        }
+    }
+}
