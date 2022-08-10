@@ -1714,6 +1714,50 @@ class CBuffer
     {
         return (_nElements == 0);
     }
+
+    /** Obtain a new 1D buffer as slice of current 1D buffer.
+     *
+     */
+    template <typename RowIndices, typename ColumnIndices, auto L_ = Layout1D, std::enable_if_t<L_, bool> = true>
+    [[nodiscard]] auto
+    slice(const ColumnIndices &cols) const -> CBuffer<value_type, backend_type, 1, Dynamic>
+    {
+        // allocate new buffer of appropriate dimensions
+        auto dst = CBuffer<value_type, backend_type, 1, Dynamic>(cols.size());
+
+        // loop over given row and column indices
+        // and copy elements from `this` buffer to destination
+        for (auto i = 0; i < cols.size(); ++i)
+        {
+            dst(i) = this->operator()(cols[i]);
+        }
+
+        return dst;
+    }
+
+    /** Obtain a new 2D buffer as slice of current 2D buffer.
+     *
+     */
+    template <typename RowIndices, typename ColumnIndices, auto L_ = Layout1D, std::enable_if_t<!L_, bool> = true>
+    [[nodiscard]] auto
+    slice(const RowIndices &rows, const ColumnIndices &cols) const -> CBuffer<value_type, backend_type, Dynamic, Dynamic>
+    {
+        // allocate new buffer of appropriate dimensions
+        auto dst = CBuffer<value_type, backend_type, Dynamic, Dynamic>(rows.size(), cols.size());
+
+        // loop over given row and column indices
+        // and copy elements from `this` buffer to destination
+        for (auto i = 0; i < rows.size(); ++i)
+        {
+            for (auto j = 0; j < cols.size(); ++j)
+            {
+                dst(i, j) = this->operator()(rows[i], cols[j]);
+            }
+        }
+
+        return dst;
+    }
+
     /** Converts buffer object to text output. */
     [[nodiscard]] auto
     repr() const -> std::string
