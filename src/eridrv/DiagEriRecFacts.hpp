@@ -66,6 +66,14 @@ compHostDistancesPQ(      BufferHostMY<T, 3>&                rDistancesPQ,
         
         const auto ncpairs = ePosition - bPosition;
         
+        // set up pointers to R(PQ) = P - Q distances
+               
+        auto pqx = rDistancesPQ.data(0);
+               
+        auto pqy = rDistancesPQ.data(1);
+               
+        auto pqz = rDistancesPQ.data(2);
+        
         // set up pointers to P center coordinates
             
         auto rpx = gtoPairBlock->getCoordinatesPX();
@@ -73,32 +81,24 @@ compHostDistancesPQ(      BufferHostMY<T, 3>&                rDistancesPQ,
         auto rpy = gtoPairBlock->getCoordinatesPY();
             
         auto rpz = gtoPairBlock->getCoordinatesPZ();
-            
-        // set up pointers to R(PQ) = P - Q distances
-               
-        auto rpqx = rDistancesPQ.data(0);
-               
-        auto rpqy = rDistancesPQ.data(1);
-               
-        auto rpqz = rDistancesPQ.data(2);
         
         for (int32_t i = 0; i < ncpairs; i++)
         {
             const auto ioff = (bPosition + i) * nppairs;
             
-            rpqx[i] = rpx[ioff + braPrimGto] - rpx[ioff + ketPrimGto];
+            pqx[i] = rpx[ioff + braPrimGto] - rpx[ioff + ketPrimGto];
                                
-            rpqy[i] = rpy[ioff + braPrimGto] - rpy[ioff + ketPrimGto];
+            pqy[i] = rpy[ioff + braPrimGto] - rpy[ioff + ketPrimGto];
                                
-            rpqz[i] = rpz[ioff + braPrimGto] - rpz[ioff + ketPrimGto];
+            pqz[i] = rpz[ioff + braPrimGto] - rpz[ioff + ketPrimGto];
         }
     }
 }
 
 /**
-Computes rho = xi * eta / (xi + eta) factor for contracted GTOs batch.
+Computes rho = xi * eta / (xi + eta) factors for contracted GTOs batch.
 
-@param osFactorRho The Obara-Saika factor rho = xi * eta / (xi + eta).
+@param osFactorsRho The Obara-Saika factors rho = xi * eta / (xi + eta).
 @param gtoPairBlock The pointer to GTOs pairs block.
 @param bPosition The start position of contracted GTOs batch.
 @param ePosition The endposition of contracted GTOs batch.
@@ -107,50 +107,7 @@ Computes rho = xi * eta / (xi + eta) factor for contracted GTOs batch.
 */
 template <typename T>
 auto
-compHostFactorRho(      T*                                 osFactorRho,
-                  const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
-                  const int32_t                            bPosition,
-                  const int32_t                            ePosition,
-                  const int32_t                            braPrimGto,
-                  const int32_t                            ketPrimGto) -> void
-{
-    // set up dimentsions
-    
-    const auto nppairs = gtoPairBlock->getNumberOfPrimPairs();
-    
-    const auto ncpairs = ePosition - bPosition;
-    
-    // set up pointers to Xi values
-        
-    auto fxi = gtoPairBlock->getFactorsXi();
-    
-    // compute rho factors
-
-    for (int32_t i = 0; i < ncpairs; i++)
-    {
-        const auto ioff = (bPosition + i) * nppairs;
-            
-        const auto bxi = fxi[ioff + braPrimGto];
-        
-        const auto kxi = fxi[ioff + ketPrimGto];
-        
-        osFactorRho[i] = bxi * kxi / (bxi + kxi);
-    }
-}
-
-/**
-Computes normalization factors for contracted GTOs batch.
-
-@param osFactorNorm The Obara-Saika normalization factors.
-@param gtoPairBlock The pointer to GTOs pairs block.
-@param bPosition The start position of contracted GTOs batch.
-@param ePosition The endposition of contracted GTOs batch.
-@param braPrimGto The primitive GTO on bra side.
-@param ketPrimGto The primitive GTO on ket side.
-*/
-template <typename T>
-auto
-compHostFactorNorm(      T*                                 osFactorNorm,
+compHostFactorsRho(      T*                                 osFactorsRho,
                    const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
                    const int32_t                            bPosition,
                    const int32_t                            ePosition,
@@ -165,17 +122,74 @@ compHostFactorNorm(      T*                                 osFactorNorm,
     
     // set up pointers to Xi values
         
+    auto fxi = gtoPairBlock->getFactorsXi();
+    
+    // compute rho factors
+    
+    if (braPrimGto == ketPrimGto)
+    {
+        const auto fact = static_cast<T>(0.5);
+        
+        for (int32_t i = 0; i < ncpairs; i++)
+        {
+            const auto ioff = (bPosition + i) * nppairs + braPrimGto;
+
+            osFactorsRho[i] = fact * fxi[ioff];
+        }
+    }
+    else
+    {
+        for (int32_t i = 0; i < ncpairs; i++)
+        {
+            const auto ioff = (bPosition + i) * nppairs;
+                
+            const auto bxi = fxi[ioff + braPrimGto];
+            
+            const auto kxi = fxi[ioff + ketPrimGto];
+            
+            osFactorsRho[i] = bxi * kxi / (bxi + kxi);
+        }
+    }
+}
+
+/**
+Computes normalization factors for contracted GTOs batch.
+
+@param osFactorsNorm The Obara-Saika normalization factors.
+@param gtoPairBlock The pointer to GTOs pairs block.
+@param bPosition The start position of contracted GTOs batch.
+@param ePosition The endposition of contracted GTOs batch.
+@param braPrimGto The primitive GTO on bra side.
+@param ketPrimGto The primitive GTO on ket side.
+*/
+template <typename T>
+auto
+compHostFactorsNorm(      T*                                 osFactorsNorm,
+                    const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
+                    const int32_t                            bPosition,
+                    const int32_t                            ePosition,
+                    const int32_t                            braPrimGto,
+                    const int32_t                            ketPrimGto) -> void
+{
+    // set up dimentsions
+    
+    const auto nppairs = gtoPairBlock->getNumberOfPrimPairs();
+    
+    const auto ncpairs = ePosition - bPosition;
+    
+    // set up pointers to Xi values
+        
     auto fovl = gtoPairBlock->getOverlaps();
     
     // compute normalization factors
     
-    auto fact = static_cast<T>((braPrimGto == ketPrimGto) ? 1.0 : 2.0);
+    const auto fact = static_cast<T>((braPrimGto == ketPrimGto) ? 1.0 : 2.0);
 
     for (int32_t i = 0; i < ncpairs; i++)
     {
         const auto ioff = (bPosition + i) * nppairs;
         
-        osFactorNorm[i] = fact * fovl[ioff + braPrimGto] * fovl[ioff + ketPrimGto];
+        osFactorsNorm[i] = fact * fovl[ioff + braPrimGto] * fovl[ioff + ketPrimGto];
     }
 }
 
@@ -196,92 +210,41 @@ compHostBoysArguments(      BufferHostX<T>&     bfArguments,
 {
     // set up pointers to R(PQ) = P - Q distances
            
-    auto rpqx = rDistancesPQ.data(0);
+    auto pqx = rDistancesPQ.data(0);
            
-    auto rpqy = rDistancesPQ.data(1);
+    auto pqy = rDistancesPQ.data(1);
            
-    auto rpqz = rDistancesPQ.data(2);
+    auto pqz = rDistancesPQ.data(2);
     
     // compute Boys function arguments
     
     auto bargs = bfArguments.data();
     
-    #pragma omp simd aligned(bargs, osFactorRho, rpqx, rpqy, rpqz: VLX_ALIGN)
+    #pragma omp simd aligned(bargs, osFactorRho, pqx, pqy, pqz: VLX_ALIGN)
     for (int32_t i = 0; i < nBatchPairs; i++)
     {
-        bargs[i] = osFactorRho[i] * (rpqx[i] * rpqx[i] + rpqy[i] * rpqy[i] + rpqz[i] * rpqz[i]);
+        bargs[i] = osFactorRho[i] * (pqx[i] * pqx[i] + pqy[i] * pqy[i] + pqz[i] * pqz[i]);
     }
 }
 
 /**
-Computes R(QD) = Q -D distances for contracted GTOs batch.
+Computes zeta = 1.0 / (xi + eta) factors for contracted GTOs batch.
 
-@param rDistancesQD The R(QD) = Q - D distances.
-@param gtoPairBlock The pointer to GTOs pairs block.
-@param bPosition The start position of contracted GTOs batch.
-@param ePosition The endposition of contracted GTOs batch.
-@param ketPrimGto The primitive GTO on ket side.
-*/
-template <typename T>
-auto
-compHostDistancesQD(      BufferHostMY<T, 3>&                rDistancesQD,
-                    const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
-                    const int32_t                            bPosition,
-                    const int32_t                            ePosition,
-                    const int32_t                            ketPrimGto) -> void
-{
-    // set up dimentsions
-    
-    const auto nppairs = gtoPairBlock->getNumberOfPrimPairs();
-    
-    const auto ncpairs = ePosition - bPosition;
-    
-    // set up pointers to R(PB) distances
-        
-    auto kpbx = gtoPairBlock->getCoordinatesPBX();
-        
-    auto kpby = gtoPairBlock->getCoordinatesPBY();
-        
-    auto kpbz = gtoPairBlock->getCoordinatesPBZ();
-        
-    // set up pointers to R(QD) = Q - D distances
-           
-    auto rqdx = rDistancesQD.data(0);
-           
-    auto rqdy = rDistancesQD.data(1);
-           
-    auto rqdz = rDistancesQD.data(2);
-
-    // compute R(QD) distances
-    
-    for (int32_t i = 0; i < ncpairs; i++)
-    {
-        const auto ioff = (bPosition + i) * nppairs;
-            
-        rqdx[i] = kpbx[ioff + ketPrimGto];
-                               
-        rqdy[i] = kpby[ioff + ketPrimGto];
-                               
-        rqdz[i] = kpbz[ioff + ketPrimGto];
-    }
-}
-
-/**
-Computes R(PB) = P - B distances for contracted GTOs batch.
-
-@param rDistancesPB The R(PB) = P - B distances.
+@param osFactorsZeta The Obara-Saika factors zeta = 1.0 / (xi + eta).
 @param gtoPairBlock The pointer to GTOs pairs block.
 @param bPosition The start position of contracted GTOs batch.
 @param ePosition The endposition of contracted GTOs batch.
 @param braPrimGto The primitive GTO on bra side.
+@param ketPrimGto The primitive GTO on ket side.
 */
 template <typename T>
 auto
-compHostDistancesPB(      BufferHostMY<T, 3>&                rDistancesPB,
-                    const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
-                    const int32_t                            bPosition,
-                    const int32_t                            ePosition,
-                    const int32_t                            braPrimGto) -> void
+compHostFactorsZeta(     T*                                 osFactorsZeta,
+                   const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
+                   const int32_t                            bPosition,
+                   const int32_t                            ePosition,
+                   const int32_t                            braPrimGto,
+                   const int32_t                            ketPrimGto) -> void
 {
     // set up dimentsions
     
@@ -289,40 +252,79 @@ compHostDistancesPB(      BufferHostMY<T, 3>&                rDistancesPB,
     
     const auto ncpairs = ePosition - bPosition;
     
-    // set up pointers to R(PB) distances
+    // set up pointers to Xi values
         
-    auto bpbx = gtoPairBlock->getCoordinatesPBX();
-        
-    auto bpby = gtoPairBlock->getCoordinatesPBY();
-        
-    auto bpbz = gtoPairBlock->getCoordinatesPBZ();
-        
-    // set up pointers to R(PB) = P - B distances
-           
-    auto rpbx = rDistancesPB.data(0);
-           
-    auto rpby = rDistancesPB.data(1);
-           
-    auto rpbz = rDistancesPB.data(2);
-
-    // compute R(PB) distances
+    auto fxi = gtoPairBlock->getFactorsXi();
     
-    for (int32_t i = 0; i < ncpairs; i++)
+    // compute zeta factors
+    
+    if (braPrimGto == ketPrimGto)
     {
-        const auto ioff = (bPosition + i) * nppairs;
+        const auto fact = static_cast<T>(0.5);
+        
+        for (int32_t i = 0; i < ncpairs; i++)
+        {
+            const auto ioff = (bPosition + i) * nppairs + braPrimGto;
             
-        rpbx[i] = bpbx[ioff + braPrimGto];
-                               
-        rpby[i] = bpby[ioff + braPrimGto];
-                               
-        rpbz[i] = bpbz[ioff + braPrimGto];
+            osFactorsZeta[i] = fact / fxi[ioff];
+        }
+    }
+    else
+    {
+        const auto fact = static_cast<T>(1.0);
+        
+        for (int32_t i = 0; i < ncpairs; i++)
+        {
+            const auto ioff = (bPosition + i) * nppairs;
+            
+            osFactorsZeta[i] = fact / (fxi[ioff + braPrimGto] + fxi[ioff + ketPrimGto]);
+        }
     }
 }
 
 /**
-Computes coordinates of W center for contracted GTOs batch.
+Computes partial zeta = 1.0 / xi factors for contracted GTOs batch.
 
-@param rCoordinatesW The W center coordinates.
+@param osFactorsPartZeta The Obara-Saika factors partial zeta = 1.0 / xi.
+@param gtoPairBlock The pointer to GTOs pairs block.
+@param bPosition The start position of contracted GTOs batch.
+@param ePosition The endposition of contracted GTOs batch.
+@param partPrimGto The primitive GTO.
+*/
+template <typename T>
+auto
+compHostFactorsPartialZeta(      T*                                 osFactorsPartZeta,
+                           const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
+                           const int32_t                            bPosition,
+                           const int32_t                            ePosition,
+                           const int32_t                            partPrimGto) -> void
+{
+    // set up dimentsions
+    
+    const auto nppairs = gtoPairBlock->getNumberOfPrimPairs();
+    
+    const auto ncpairs = ePosition - bPosition;
+    
+    // set up pointers to Xi values
+        
+    auto fxi = gtoPairBlock->getFactorsXi();
+    
+    // compute zeta factors
+
+    const auto fact = static_cast<T>(1.0);
+    
+    for (int32_t i = 0; i < ncpairs; i++)
+    {
+        const auto ioff = (bPosition + i) * nppairs;
+        
+        osFactorsPartZeta[i] = fact / fxi[ioff + partPrimGto];
+    }
+}
+
+/**
+Computes W = (P * xi  + Q * eta) / (xi + eta)  coordinates for contracted GTOs batch.
+
+@param rCoordinatesW The W = (P * xi  + Q * eta) / (xi + eta)  coordinates.
 @param gtoPairBlock The pointer to GTOs pairs block.
 @param bPosition The start position of contracted GTOs batch.
 @param ePosition The endposition of contracted GTOs batch.
@@ -351,12 +353,8 @@ compHostCoordinatesW(      BufferHostMY<T, 3>&                rCoordinatesW,
     auto rpy = gtoPairBlock->getCoordinatesPY();
         
     auto rpz = gtoPairBlock->getCoordinatesPZ();
-    
-    // set up pointers to Obara-Saika factors
         
-    auto fxi = gtoPairBlock->getFactorsXi();
-
-    // set up pointers to W center coordinates
+    // set up pointers to W coordinates
            
     auto rwx = rCoordinatesW.data(0);
            
@@ -364,24 +362,28 @@ compHostCoordinatesW(      BufferHostMY<T, 3>&                rCoordinatesW,
            
     auto rwz = rCoordinatesW.data(2);
 
-    // compute center W coordinates
+    // compute W coordinates
     
     if (braPrimGto == ketPrimGto)
     {
         for (int32_t i = 0; i < ncpairs; i++)
         {
-            const auto ioff = (bPosition + i) * nppairs;
-
-            rwx[i] = rpx[ioff + braPrimGto];
-                             
-            rwy[i] = rpy[ioff + braPrimGto];
+            const auto ioff = (bPosition + i) * nppairs + braPrimGto;
+            
+            rwx[i] = rpx[ioff];
                                
-            rwz[i] = rpz[ioff + braPrimGto];
+            rwy[i] = rpy[ioff];
+                               
+            rwz[i] = rpz[ioff];
         }
     }
     else
     {
-        auto fact = static_cast<T>(1.0);
+        // set up pointers to Xi values
+            
+        auto fxi = gtoPairBlock->getFactorsXi();
+        
+        const auto fact = static_cast<T>(1.0);
         
         for (int32_t i = 0; i < ncpairs; i++)
         {
@@ -391,10 +393,10 @@ compHostCoordinatesW(      BufferHostMY<T, 3>&                rCoordinatesW,
             
             const auto kxi = fxi[ioff + ketPrimGto];
             
-            const auto bkxi =  fact / (bxi + kxi);
-
+            const auto bkxi = fact / (bxi + kxi);
+            
             rwx[i] = bkxi * (rpx[ioff + braPrimGto] * bxi + rpx[ioff + ketPrimGto] * kxi);
-                             
+                               
             rwy[i] = bkxi * (rpy[ioff + braPrimGto] * bxi + rpy[ioff + ketPrimGto] * kxi);
                                
             rwz[i] = bkxi * (rpz[ioff + braPrimGto] * bxi + rpz[ioff + ketPrimGto] * kxi);
@@ -403,148 +405,150 @@ compHostCoordinatesW(      BufferHostMY<T, 3>&                rCoordinatesW,
 }
 
 /**
-Computes R(WQ) = W - Q distances for contracted GTOs batch.
+Computes R(WT) = W - T distances for contracted GTOs batch.
 
-@param rDistancesWQ The R(WQ) = W - Q distances.
+@param rDistancesWT The R(WT) = W - T distances.
+@param rCoordinatesW The W coordinates.
 @param gtoPairBlock The pointer to GTOs pairs block.
 @param bPosition The start position of contracted GTOs batch.
 @param ePosition The endposition of contracted GTOs batch.
-@param braPrimGto The primitive GTO on bra side.
-@param ketPrimGto The primitive GTO on ket side.
+@param partPrimGto The primitive GTO.
 */
 template <typename T>
 auto
-compHostDistancesWQ(      BufferHostMY<T, 3>&                rDistancesWQ,
+compHostDistancesWT(      BufferHostMY<T, 3>&                rDistancesWT,
                     const BufferHostMY<T, 3>&                rCoordinatesW,
                     const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
                     const int32_t                            bPosition,
                     const int32_t                            ePosition,
-                    const int32_t                            braPrimGto,
-                    const int32_t                            ketPrimGto) -> void
+                    const int32_t                            partPrimGto) -> void
 {
-    if (braPrimGto == ketPrimGto)
-    {
-        rDistancesWQ.setZero();
-    }
-    else
-    {
-        // set up dimentsions
+    // set up dimentsions
+    
+    const auto nppairs = gtoPairBlock->getNumberOfPrimPairs();
+    
+    const auto ncpairs = ePosition - bPosition;
+    
+    // set up pointers to R(WT) = W - T distances
+           
+    auto wtx = rDistancesWT.data(0);
+           
+    auto wty = rDistancesWT.data(1);
+           
+    auto wtz = rDistancesWT.data(2);
+    
+    // set up pointers to W coordinates
+           
+    auto rwx = rCoordinatesW.data(0);
+           
+    auto rwy = rCoordinatesW.data(1);
+           
+    auto rwz = rCoordinatesW.data(2);
+    
+    // set up pointers to P center coordinates
         
-        const auto nppairs = gtoPairBlock->getNumberOfPrimPairs();
+    auto rpx = gtoPairBlock->getCoordinatesPX();
         
-        const auto ncpairs = ePosition - bPosition;
+    auto rpy = gtoPairBlock->getCoordinatesPY();
         
-        // set up pointers to P center coordinates
-            
-        auto rpx = gtoPairBlock->getCoordinatesPX();
-            
-        auto rpy = gtoPairBlock->getCoordinatesPY();
-            
-        auto rpz = gtoPairBlock->getCoordinatesPZ();
-        
-        // set up pointers to W center coordinates
-               
-        auto rwx = rCoordinatesW.data(0);
-               
-        auto rwy = rCoordinatesW.data(1);
-               
-        auto rwz = rCoordinatesW.data(2);
-            
-        // set up pointers to R(WQ) = W - Q distances
-               
-        auto rwqx = rDistancesWQ.data(0);
-               
-        auto rwqy = rDistancesWQ.data(1);
-               
-        auto rwqz = rDistancesWQ.data(2);
+    auto rpz = gtoPairBlock->getCoordinatesPZ();
 
-        // compute R(WQ) distances
-        
-        for (int32_t i = 0; i < ncpairs; i++)
-        {
-            const auto ioff = (bPosition + i) * nppairs;
-                
-            rwqx[i] = rwx[i] - rpx[ioff + ketPrimGto];
-                                   
-            rwqy[i] = rwy[i] - rpy[ioff + ketPrimGto];
-                                   
-            rwqz[i] = rwz[i] - rpz[ioff + ketPrimGto];
-        }
+    // compute R(WX) = W - T distances
+    
+    for (int32_t i = 0; i < ncpairs; i++)
+    {
+        const auto ioff = (bPosition + i) * nppairs + partPrimGto;
+            
+        wtx[i] = rwx[i] - rpx[ioff];
+                               
+        wty[i] = rwy[i] - rpy[ioff];
+                               
+        wtz[i] = rwz[i] - rpz[ioff];
     }
 }
 
 /**
-Computes R(WP) = W - P distances for contracted GTOs batch.
+Computes R(PT) = P - T distances for contracted GTOs batch.
 
-@param rDistancesWQ The R(WP) = W - P distances.
+@param rDistancesPT The R(PT) = P - T distances.
 @param gtoPairBlock The pointer to GTOs pairs block.
 @param bPosition The start position of contracted GTOs batch.
 @param ePosition The endposition of contracted GTOs batch.
-@param braPrimGto The primitive GTO on bra side.
-@param ketPrimGto The primitive GTO on ket side.
+@param partPrimGto The primitive GTO.
 */
 template <typename T>
 auto
-compHostDistancesWP(      BufferHostMY<T, 3>&                rDistancesWP,
-                    const BufferHostMY<T, 3>&                rCoordinatesW,
+compHostDistancesPT(      BufferHostMY<T, 3>&                rDistancesPT,
                     const CBinnedGtoPairBlock<T, mem::Host>* gtoPairBlock,
                     const int32_t                            bPosition,
                     const int32_t                            ePosition,
-                    const int32_t                            braPrimGto,
-                    const int32_t                            ketPrimGto) -> void
+                    const int32_t                            partPrimGto) -> void
 {
-    if (braPrimGto == ketPrimGto)
-    {
-        rDistancesWQ.setZero();
-    }
-    else
-    {
-        // set up dimentsions
+    // set up dimentsions
+    
+    const auto nppairs = gtoPairBlock->getNumberOfPrimPairs();
+    
+    const auto ncpairs = ePosition - bPosition;
+    
+    // set up pointers to R(PT) = P - T distances
+           
+    auto ptx = rDistancesPT.data(0);
+           
+    auto pty = rDistancesPT.data(1);
+           
+    auto ptz = rDistancesPT.data(2);
+    
+    // set up pointers to R(PB) = P - B distances
         
-        const auto nppairs = gtoPairBlock->getNumberOfPrimPairs();
+    auto pbx = gtoPairBlock->getDistancesPBX();
         
-        const auto ncpairs = ePosition - bPosition;
+    auto pby = gtoPairBlock->getDistancesPBY();
         
-        // set up pointers to P center coordinates
-            
-        auto rpx = gtoPairBlock->getCoordinatesPX();
-            
-        auto rpy = gtoPairBlock->getCoordinatesPY();
-            
-        auto rpz = gtoPairBlock->getCoordinatesPZ();
-        
-        // set up pointers to W center coordinates
-               
-        auto rwx = rCoordinatesW.data(0);
-               
-        auto rwy = rCoordinatesW.data(1);
-               
-        auto rwz = rCoordinatesW.data(2);
-            
-        // set up pointers to R(WP) = W - P distances
-               
-        auto rwpx = rDistancesWP.data(0);
-               
-        auto rwpy = rDistancesWP.data(1);
-               
-        auto rwpz = rDistancesWP.data(2);
+    auto pbz = gtoPairBlock->getDistancesPBZ();
 
-        // compute R(WP) distances
-        
-        for (int32_t i = 0; i < ncpairs; i++)
-        {
-            const auto ioff = (bPosition + i) * nppairs;
-                
-            rwpx[i] = rwx[i] - rpx[ioff + braPrimGto];
-                                   
-            rwpy[i] = rwy[i] - rpy[ioff + braPrimGto];
-                                   
-            rwpz[i] = rwz[i] - rpz[ioff + braPrimGto];
-        }
+    // compute R(PT) = P - T distances
+    
+    for (int32_t i = 0; i < ncpairs; i++)
+    {
+        const auto ioff = (bPosition + i) * nppairs + partPrimGto;
+            
+        ptx[i] = pbx[ioff];
+                               
+        pty[i] = pby[ioff];
+                               
+        ptz[i] = pbz[ioff];
     }
 }
 
+/**
+Select maximum values from integrals buffer and stores into given array.
 
+@param maxValues The array of maximum values.
+@param intsBuffer The integrals buffer.
+@param bPosition The start position of contracted GTOs batch.
+@param nBatchPairs The number of pairs in batch.
+*/
+template <typename T, int32_t N>
+auto
+selectHostMaxValues(      T*                  maxValues,
+                    const BufferHostMY<T, N>& intsBuffer,
+                    const int32_t             bPosition,
+                    const int32_t             nBatchPairs) -> void
+{
+    for (int32_t i = 0; i < N; i++)
+    {
+        auto tints = intsBuffer.data(i);
+        
+        for (int32_t j = 0; j < nBatchPairs; j++)
+        {
+            if (tints[j] > maxValues[bPosition + j])
+            {
+                maxValues[bPosition + j] = tints[j];
+            }
+        }
+    }
+}
+    
 }  // derirec  namespace
 
 #endif /* DiagEriRecFacts_hpp */

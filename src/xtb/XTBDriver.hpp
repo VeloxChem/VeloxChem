@@ -26,11 +26,11 @@
 #ifndef XTBDriver_hpp
 #define XTBDriver_hpp
 
+#include <mpi.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
-
-#include <mpi.h>
 
 #ifdef ENABLE_XTB
 #include <xtb.h>
@@ -163,7 +163,14 @@ class CXTBDriver
 
      @return true if XTB package available, false otherwise.
      */
-    bool isAvailable() const;
+    static constexpr auto
+    isAvailable() -> bool
+    {
+#ifdef ENABLE_XTB
+        return true;
+#endif
+        return false;
+    }
 
     /**
      Checks if XTB driver is running on master node.

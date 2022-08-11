@@ -1,0 +1,10 @@
+target_sources(utests
+  PRIVATE
+    DenseDiagonalizerTest.cpp
+    DenseLinearAlgebraTest.cpp
+    DenseMatrixTest.cpp
+    MathConstTest.cpp
+    MathFuncTest.cpp
+    SparseMatrixTest.cpp
+    SparseVectorTest.cpp
+  )

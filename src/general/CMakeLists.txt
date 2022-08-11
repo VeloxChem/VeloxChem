@@ -1,0 +1,17 @@
+target_sources(vlxobjs
+  PRIVATE
+    Codata.cpp
+    ErrorHandler.cpp
+    FourIndexes.cpp
+    MpiFunc.cpp
+    OMPTasks.cpp
+    StringFormat.cpp
+    ThreeIndexes.cpp
+    TwoIndexes.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+  )

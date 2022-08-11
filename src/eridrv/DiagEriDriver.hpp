@@ -34,6 +34,7 @@
 #include "BinnedGtoContainer.hpp"
 #include "EriBlockDims.hpp"
 #include "DiagEriRecForSSSS.hpp"
+#include "DiagEriRecForSPSP.hpp"
 
 #include <iostream>
 
@@ -101,6 +102,10 @@ public:
         
         if ((bang == 0) && (kang  == 1))
         {
+            if constexpr (std::is_same<B, mem::Host>::value)
+            {
+                derirec::compHostSPSP(intsBuffer, gtoPairBlock, bPosition, ePosition);
+            }
             
             return;
         }

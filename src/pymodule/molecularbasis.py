@@ -107,7 +107,10 @@ def _basis_file_to_name(fname):
 
 
 @staticmethod
-def _MolecularBasis_read(mol, basis_name, basis_path='.', ostream=None):
+def _MolecularBasis_read(mol,
+                         basis_name,
+                         basis_path='.',
+                         ostream=OutputStream()):
     """
     Reads AO basis set from file.
 
@@ -209,6 +212,10 @@ def _MolecularBasis_read(mol, basis_name, basis_path='.', ostream=None):
         mol_basis.add_atom_basis(atom_basis)
 
     mol_basis.set_label(basis_name.upper())
+
+    ostream.print_block(mol_basis.get_string('Atomic Basis', mol))
+
+    ostream.flush()
 
     return mol_basis
 

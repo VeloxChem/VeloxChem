@@ -92,11 +92,11 @@ compHostSSSS(      T*                                 intsBuffer,
             derirec::compHostDistancesPQ(rpq, gtoPairBlock,
                                          bPosition, ePosition, i, j);
             
-            derirec::compHostFactorRho(frho, gtoPairBlock,
-                                       bPosition, ePosition, i, j);
-            
-            derirec::compHostFactorNorm(fnorm, gtoPairBlock,
+            derirec::compHostFactorsRho(frho, gtoPairBlock,
                                         bPosition, ePosition, i, j);
+            
+            derirec::compHostFactorsNorm(fnorm, gtoPairBlock,
+                                         bPosition, ePosition, i, j);
             
             // compute Boys function values
             
@@ -110,26 +110,55 @@ compHostSSSS(      T*                                 intsBuffer,
             
             // compute (ss|ss) integrals
             
-            if ((i + j) == 0)
+            #pragma omp simd aligned(frho, fnorm, bf0: VLX_ALIGN)
+            for (int32_t k = 0; k < ncpairs; k++)
             {
-                #pragma omp simd aligned(frho, fnorm, bf0: VLX_ALIGN)
-                for (int32_t k = 0; k < ncpairs; k++)
-                {
-                    intsBuffer[k] = std::sqrt(fpi * frho[k]) * bf0[k] * fnorm[k];
-                }
-            }
-            else
-            {
-                #pragma omp simd aligned(frho, fnorm, bf0: VLX_ALIGN)
-                for (int32_t k = 0; k < ncpairs; k++)
-                {
-                    intsBuffer[k] += std::sqrt(fpi * frho[k]) * bf0[k] * fnorm[k];
-                }
+                intsBuffer[bPosition + k] += std::sqrt(fpi * frho[k]) * bf0[k] * fnorm[k];
             }
         }
     }
 }
 
-}  // derirec  namespace
+/**
+Computes vertical diagonal [SS|SS]^(m) integrals batch and distributes them into given
+integrals buffer.
+
+@param intsBuffer The integrals buffer.
+@param bfValues The Boys function values buffer.
+@param osFactorRho The Obara-Saika factor rho = xi * eta / (xi + eta).
+@param osFactorNorm The Obara-Saika normalization factors.
+@param nBatchPairs The number of pairs in batch.
+*/
+template <typename T>
+auto
+compHostVRRForSSSS(      BufferHostXY<T>& intsBuffer,
+                   const BufferHostXY<T>& bfValues,
+                   const T*               osFactorRho,
+                   const T*               osFactorNorm,
+                   const int32_t          nBatchPairs) -> void
+{
+    // set up scaling factor
+        
+    const auto fpi = static_cast<T>(4.0) / static_cast<T>(mathconst::getPiValue());
+    
+    // compute [SS|SS]^(m) integrals
+    
+    for (size_t i = 0; i < intsBuffer.nRows(); i++)
+    {
+        // set up pointers to data
+        
+        auto bfvals = bfValues.data(i);
+        
+        auto ssints = intsBuffer.data(i);
+        
+        #pragma omp simd aligned(ssints, bfvals, osFactorRho, osFactorNorm: VLX_ALIGN)
+        for (int32_t j = 0; j < nBatchPairs; j++)
+        {
+            ssints[j] = std::sqrt(fpi * osFactorRho[j]) * bfvals[j] * osFactorNorm[j];
+        }
+    }
+}
+
+} // derirec  namespace
 
 #endif /* DiagEriRecForSSSS_hpp */

@@ -1,0 +1,28 @@
+target_sources(vlxobjs
+  PRIVATE
+    AOKohnShamMatrix.cpp
+    DensityGrid.cpp
+    DensityGridDriver.cpp
+    DensityGridQuad.cpp
+    GridDriver.cpp
+    GtoFunc.cpp
+    GtoFuncForGGA.cpp
+    GtoFuncForLDA.cpp
+    GtoFuncForMGGA.cpp
+    LebedevLaikovQuadrature.cpp
+    Log3Quadrature.cpp
+    MolecularGrid.cpp
+    PartitionFunc.cpp
+    PrimitiveFunctional.cpp
+    XCCubicHessianGrid.cpp
+    XCFunctional.cpp
+    XCGradientGrid.cpp
+    XCHessianGrid.cpp
+    XCIntegrator.cpp
+    XCMolecularGradient.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )

@@ -11,17 +11,33 @@ The source code can be downloaded from the `GitLab repository <https://gitlab.co
 Installing from source
 ^^^^^^^^^^^^^^^^^^^^^^
 
+You can build the code from sources on Linux, macOS, or Windows. On Linux and
+macOS, you can use either `CMake <https://cmake.org/cmake/help/v3.18/>`_ or our
+custom ``Makefile``-based build system.
+For Windows, only the CMake-based build system will work.
+
+
 Build prerequisites
 +++++++++++++++++++
 
-- Build tool providing the ``make`` utility
-- C++ compiler fully compliant with the C++11 standard
-- Linear algebra libraries implementing the BLAS and LAPACK interfaces (e.g. 
+- Build tool: either ``make`` or `Ninja <https://ninja-build.org/>`_.
+- C++ compiler fully compliant with the `C++17 standard <https://en.cppreference.com/w/cpp/17>`_ and with full support for OpenMP >=4.5 [#f1]_
+- Linear algebra libraries implementing the BLAS and LAPACK interfaces (*e.g.* 
   Intel MKL, OpenBLAS or Cray LibSci)
-- MPI library (e.g. MPICH, Intel MPI or Open MPI)
-- Installation of Python >=3.6 that includes the interpreter, the development
+- MPI library (*e.g.* MPICH, Intel MPI or Open MPI)
+- Installation of Python >=3.7 that includes the interpreter, the development
   header files, and the development libraries.
-- The `MPI4Py <https://mpi4py.readthedocs.io/>`_ module for Python
+- The `pybind11 <https://pybind11.readthedocs.io>`_ (>=2.6) header-only library
+- The following Python modules:
+
+  - `h5py <https://www.h5py.org/>`_
+  - `psutil <https://psutil.readthedocs.io/en/latest/>`_
+  - `MPI4Py <https://mpi4py.readthedocs.io/>`_
+  - `NumPy <https://numpy.org>`_
+  - `LoProp <https://pypi.org/project/LoProp/>`_
+  - `geomeTRIC <https://github.com/leeping/geomeTRIC>`_
+
+- If you plan to take advantage of our CMake-based build system, you will need CMake >=3.18
 
 Optional, add-on dependencies:
 
@@ -34,18 +50,36 @@ We recommend to always use a `virtual enviroment
 <https://docs.python.org/3/tutorial/venv.html>`_, in order to avoid clashes
 between dependencies.
 
+CMake build options
++++++++++++++++++++
+
+- You can set the C++ compiler with ``-DCMAKE_CXX_COMPILER=<compiler-command>``.
+- Enable architecture-dependent compiler flags: ``-DENABLE_ARCH_FLAGS=ON``. This
+  will add ``-xHost`` (with Intel compilers) or ``-march=native`` (with
+  GNU/Clang compilers) to the compiler flags.
+- The build system recognizes the ``MKLROOT`` and ``OPENBLASROOT`` environment
+  variables to compile and link against MKL and OpenBLAS, respectively. You can
+  also set the linear algebra backend with the CMake option ``-DVLX_LA_VENDOR``.
+  Valid options are:
+
+  - ``MKL``, which links against the single dynamic library ``mkl_rt``.
+  - ``OpenBLAS``, we recommend to use the OpenMP-threaded variant.
+  - ``Cray``, to link against Cray's ``libsci``.
+  - ``FLAME``, to use BLIS and libflame.
+  - ``Apple``, to link against Apple's native BLAS/LAPACK implementations.
+
+
 With Anaconda
 +++++++++++++
 
 `Anaconda <https://www.anaconda.com/products/individual>`_ and the software
-packaged on the `conda-forge <https://conda-forge.org/>`_ channel provide build isolation and
-greatly simplify the installation of VeloxChem.
+packaged on the `conda-forge <https://conda-forge.org/>`_ channel provide build isolation and greatly simplify the installation of VeloxChem.
 
 - Move to the folder containing the source code::
 
     $ cd veloxchem
 
-- Create and activate the conda environment::
+- Create and activate the Conda environment::
 
     $ conda env create -f <environment_file>
     $ conda activate vlxenv
@@ -61,7 +95,7 @@ greatly simplify the installation of VeloxChem.
   - ``openblas_env.yml`` which installs the OpenBLAS library.
 
   Note that the MPICH library will be installed by the ``yml`` file. If you prefer
-  another MPI library such as Open MPI, you can edit the ``yml`` file and replace
+  another MPI library such as OpenMPI, you can edit the ``yml`` file and replace
   ``mpich`` by ``openmpi``. Read more about the yml file in 
   `this page 
   <https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#create-env-file-manually>`__.
@@ -70,13 +104,21 @@ greatly simplify the installation of VeloxChem.
 
     $ python -m pip install .
 
-  By default, the build process will use *all* available cores to compile the
-  C++ sources in parallel. This behavior can be controlled *via* the
-  ``VLX_NUM_BUILD_JOBS`` environment variable::
+  Configuration and build are driven by `scikit-build
+  <https://scikit-build.readthedocs.io/>`_:
 
-    $ VLX_NUM_BUILD_JOBS=N python -m pip install .
+  - If CMake and Ninja are not available, they will be automatically installed
+    when configuring.
+  - By default, the build process will use *all* available cores to compile the
+    C++ sources in parallel. This behavior can be controlled *via* the
+    ``VLX_NUM_BUILD_JOBS`` environment variable::
 
-  which will install VeloxChem using ``N`` cores.
+      $ VLX_NUM_BUILD_JOBS=N python -m pip install .
+
+    which will install VeloxChem using ``N`` cores.
+  - You can set options for CMake as follows::
+
+      $ SKBUILD_CONFIGURE_OPTIONS="-DCMAKE_CXX_COMPILER=mpicxx" python -m pip install .
 
 - The environment now contains all that is necessary to run VeloxChem. You can deactivate it by
   ::
@@ -116,7 +158,7 @@ Cray platform (x86-64 or ARM processor)
     $ salloc -N 1 ...
     $ CXX=CC VLX_NUM_BUILD_JOBS=N srun -n 1 python3 -m pip install .
 
-  where *N* is the number of cores on the node.
+  where ``N`` is the number of cores on the node.
 
 Debian-based Linux
 ++++++++++++++++++
@@ -224,6 +266,10 @@ Alternatively, you can compile it without using ``pip``:
     # Set up python path
     $ export PYTHONPATH=/path/to/your/cppe/build/stage/lib:$PYTHONPATH
 
+    # Make sure that cppe can be imported
+    $ python3 -c 'import cppe'
+
+
 The XTB package for semiempirical methods
 +++++++++++++++++++++++++++++++++++++++++
 
@@ -239,10 +285,11 @@ Alternatively, you can compile it using ``cmake``:
 
     # Build XTB
     $ git clone -b v6.3.3 https://github.com/grimme-lab/xtb
-    $ cd xtb; mkdir build; cd build
-    $ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=/path/to/your/xtb ..
-    $ make
-    $ make install
+    $ cd xtb
+    $ cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=/path/to/your/xtb
+    $ cmake --build build --target install
 
     # Set XTBHOME prior to installing VeloxChem
     $ export XTBHOME=/path/to/your/xtb
+
+.. [#f1] On Windows, this means using ``clang-cl``: the `Clang compiler front-end for MSVC <https://clang.llvm.org/docs/UsersManual.html#clang-cl>`_

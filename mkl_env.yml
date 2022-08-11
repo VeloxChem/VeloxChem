@@ -2,6 +2,8 @@ name: vlxenv
 channels:
   - conda-forge
 dependencies:
+  - cmake
+  - ninja
   - cxx-compiler
   - mpich
   - blas=*=*mkl*
@@ -11,13 +13,15 @@ dependencies:
   - h5py
   - pip
   - pybind11>=2.6
-  - python>=3.6
+  - python>=3.7
   - psutil
   - pytest
   - mdanalysis
   - openmm
   - scipy
   - gtest
-  - cppe=0.2.1
+  - gmock
+  - cmake
+  - cppe
   - xtb
   - veloxchem::geometric

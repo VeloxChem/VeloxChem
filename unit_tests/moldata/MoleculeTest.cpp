@@ -319,3 +319,106 @@ TEST_F(CMoleculeTest, DispersionModel)
 
     vlxtest::compare(refGradient, g.values());
 }
+
+TEST_F(CMoleculeTest, GetAtomIndexes)
+{
+    CMolecule mol = vlxmol::getMoleculeNH3CH4();
+    
+    std::vector<int32_t> refNidx({0});
+    
+    std::vector<int32_t> refCidx({4});
+    
+    std::vector<int32_t> refHidx({1, 2, 3, 5, 6, 7, 8});
+   
+    ASSERT_EQ(mol.getAtomIndexes({"N"}), refNidx);
+    
+    ASSERT_EQ(mol.getAtomIndexes({"C"}), refCidx);
+    
+    ASSERT_EQ(mol.getAtomIndexes({"H"}), refHidx);
+    
+    ASSERT_EQ(mol.getAtomIndexes({"O"}), std::vector<int32_t>());
+}
+
+TEST_F(CMoleculeTest, GetIndexOfNearestAtom)
+{
+    CMolecule mol = vlxmol::getMoleculeNH3CH4();
+   
+    ASSERT_EQ(mol.getIndexOfNearestAtom(0), 2);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(1), 0);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(2), 0);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(3), 0);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(4), 5);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(5), 4);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(6), 4);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(7), 4);
+    
+    ASSERT_EQ(mol.getIndexOfNearestAtom(8), 4);
+}
+
+TEST_F(CMoleculeTest, AddAtom)
+{
+    CMolecule dimer = vlxmol::getMoleculeH2ODimer();
+
+    CMolecule h2o = dimer.getSubMolecule(0, 3);
+    
+    h2o.addAtom({"O"}, 3.0, 0.0, 0.0);
+    
+    h2o.addAtom({"H"}, 3.0, 1.4, 1.1);
+    
+    h2o.addAtom({"H"}, 3.0, -1.4, 1.1);
+    
+    ASSERT_EQ(h2o, dimer);
+}
+
+TEST_F(CMoleculeTest, GetMinDistance)
+{
+    CMolecule h2o = vlxmol::getMoleculeH2O();
+
+    ASSERT_NEAR(h2o.getMinDistance(0.0, 2.0, 1.0),
+                0.60827625302982196889, 1.0e-15);
+}
+
+TEST_F(CMoleculeTest, GetAtomCoordinates)
+{
+    CMolecule h2o = vlxmol::getMoleculeH2O();
+
+    const std::vector<double> coordsO({0.0, 0.0, 0.0});
+    
+    const std::vector<double> coordsH1({0.0, 1.4, 1.1});
+    
+    const std::vector<double> coordsH2({0.0, -1.4, 1.1});
+    
+    vlxtest::compare(h2o.getAtomCoordinates(0), coordsO.data());
+    
+    vlxtest::compare(h2o.getAtomCoordinates(1), coordsH1.data());
+    
+    vlxtest::compare(h2o.getAtomCoordinates(2), coordsH2.data());
+}
+
+TEST_F(CMoleculeTest, GetCoordinationNummber)
+{
+    CMolecule h2o = vlxmol::getMoleculeH2O();
+
+    ASSERT_EQ(2, h2o.getCoordinationNummber(0, 3.0));
+    
+    ASSERT_EQ(0, h2o.getCoordinationNummber(0, 1.0));
+    
+    ASSERT_EQ(2, h2o.getCoordinationNummber(1, 6.0));
+    
+    ASSERT_EQ(1, h2o.getCoordinationNummber(1, 2.0));
+    
+    ASSERT_EQ(0, h2o.getCoordinationNummber(1, 1.0));
+    
+    ASSERT_EQ(2, h2o.getCoordinationNummber(2, 6.0));
+    
+    ASSERT_EQ(1, h2o.getCoordinationNummber(2, 2.0));
+    
+    ASSERT_EQ(0, h2o.getCoordinationNummber(2, 1.0));
+}

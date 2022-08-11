@@ -30,11 +30,12 @@ import numpy as np
 import time as tm
 import tempfile
 
-from .veloxchemlib import mpi_master, hartree_in_kcalpermol
+from .veloxchemlib import CommonNeighbors
+from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstroms
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
-from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords, get_datetime_string
+from .errorhandler import assert_msg_critical
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -53,11 +54,15 @@ class OptimizationDriver:
         - constraints: The constraints.
         - check_interval: The interval (number of steps) for checking
           coordinate system.
-        - max_iter: The maximum number of optimization steps
-        - transition: The flag for transition state searching.
-        - hessian: The flag for computing Hessian.
+        - max_iter: The maximum number of optimization steps.
         - filename: The filename that will be used by geomeTRIC.
         - grad_drv: The gradient driver.
+        - cna: The flag for computation of Jaccard similarity index.
+        - cna_bond: The cut-off radius for chemical bond in CNA analysis.
+        - cna_rcut: The cut-off radius for chemical bonds environment in
+          CNA analysis.
+        - transition: The flag for transition state searching.
+        - hessian: The flag for computing Hessian.
     """
 
     def __init__(self, grad_drv):
@@ -74,6 +79,12 @@ class OptimizationDriver:
         self.check_interval = 0
         self.max_iter = 300
 
+        self.conv_energy = None
+        self.conv_grms = None
+        self.conv_gmax = None
+        self.conv_drms = None
+        self.conv_dmax = None
+
         self.transition = False
         self.hessian = 'never'
 
@@ -81,6 +92,10 @@ class OptimizationDriver:
 
         self.filename = f'veloxchem_opt_{get_datetime_string()}'
         self.grad_drv = grad_drv
+
+        self.cna = False
+        self.cna_bond = None
+        self.cna_rcut = None
 
         # input keywords
         self.input_keywords = {
@@ -93,6 +108,14 @@ class OptimizationDriver:
                 'transition': ('bool', 'transition state search'),
                 'hessian': ('str_lower', 'hessian flag'),
                 'ref_xyz': ('str', 'reference geometry'),
+                'conv_energy': ('float', ''),
+                'conv_grms': ('float', ''),
+                'conv_gmax': ('float', ''),
+                'conv_drms': ('float', ''),
+                'conv_dmax': ('float', ''),
+                'cna': ('bool', ''),
+                'cna_bond': ('float', ''),
+                'cna_rcut': ('float', ''),
             },
         }
 
@@ -117,6 +140,18 @@ class OptimizationDriver:
 
         parse_input(self, opt_keywords, opt_dict)
 
+        # update CNA bond cut-off radius
+        if self.cna_bond is None:
+            self.cna_bond = 3.0
+        else:
+            self.cna_bond /= bohr_in_angstroms()
+
+        # update CNA bond environment cut-off radius
+        if self.cna_rcut is None:
+            self.cna_rcut = 4.5
+        else:
+            self.cna_rcut /= bohr_in_angstroms()
+
         if 'filename' in opt_dict:
             self.filename = opt_dict['filename']
 
@@ -136,7 +171,7 @@ class OptimizationDriver:
             The same arguments as the "compute" function of the gradient driver.
 
         :return:
-            The molecule with final geometry.
+            The tuple with final geometry, and energy of molecule.
         """
 
         if self.hessian or self.transition:
@@ -186,6 +221,7 @@ class OptimizationDriver:
                         coordsys=self.coordsys,
                         check=self.check_interval,
                         maxiter=self.max_iter,
+                        converge=self.conv_flags(),
                         constraints=constr_filename,
                         transition=self.transition,
                         hessian=self.hessian,
@@ -222,6 +258,9 @@ class OptimizationDriver:
                 else:
                     self.print_ic_rmsd(final_mol, molecule)
 
+            if self.cna:
+                self.cna_analysis(final_mol, molecule, self.ref_xyz)
+
             if self.hessian in ['last', 'first+last', 'each']:
                 self.print_vib_analysis('vdata_last')
 
@@ -232,6 +271,32 @@ class OptimizationDriver:
             self.ostream.flush()
 
         return final_mol
+
+    def conv_flags(self):
+        """
+        Generates convergence keywords for GeomTRIC.
+
+        :return:
+            The convergence keywords for GeomTRIC.
+        """
+
+        opt_flags = []
+        if self.conv_energy is not None:
+            opt_flags.append('energy')
+            opt_flags.append(self.conv_energy)
+        if self.conv_grms is not None:
+            opt_flags.append('grms')
+            opt_flags.append(self.conv_grms)
+        if self.conv_gmax is not None:
+            opt_flags.append('gmax')
+            opt_flags.append(self.conv_gmax)
+        if self.conv_drms is not None:
+            opt_flags.append('drms')
+            opt_flags.append(self.conv_drms)
+        if self.conv_gmax is not None:
+            opt_flags.append('dmax')
+            opt_flags.append(self.conv_dmax)
+        return opt_flags
 
     def clean_up_file(self, *path_list):
         """
@@ -556,3 +621,93 @@ class OptimizationDriver:
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def cna_analysis(self, last_mol, start_mol, ref_mol):
+        """
+        Performs common neighbor analysis between the initial, optimized,
+        and reference geometries.
+
+        :param last_mol:
+            The last i.e. optimized molecule.
+        :param start_mol:
+            The first i.e. initial molecule.
+        :param ref_mol:
+            The reference molecule (or xyz filename).
+        """
+
+        self.ostream.print_blank()
+
+        xyz_filename = ref_mol if isinstance(ref_mol, str) else None
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Summary of Common Neighbor Analysis')
+        self.ostream.print_header('=' * 37)
+        self.ostream.print_blank()
+
+        # compute CNA signatures for first/last molecules
+
+        cna_first = CommonNeighbors(start_mol, self.cna_bond)
+        cna_first.generate(self.cna_rcut)
+
+        cna_last = CommonNeighbors(last_mol, self.cna_bond)
+        cna_last.generate(self.cna_rcut)
+
+        # compute CNA signatures for reference molecule
+
+        cna_ref = None
+        if xyz_filename is not None:
+            if Path(xyz_filename).is_file():
+                ref_mol = Molecule.read_xyz(xyz_filename)
+            else:
+                return '*** Note: invalid reference xyz file!'
+            cna_ref = CommonNeighbors(ref_mol, self.cna_bond)
+            cna_ref.generate(self.cna_rcut)
+
+        # print signatures
+
+        self.print_bonding_pattern(cna_first, 'Initial')
+        self.print_bonding_pattern(cna_last, 'Optimized')
+        if cna_ref is not None:
+            self.print_bonding_pattern(cna_ref, 'Reference')
+
+        # print Jaccard similarity indexes
+
+        self.ostream.print_header('Jaccard Similarity Indexes')
+        self.ostream.print_header('-' * 28)
+        fact = cna_last.comp_cna(cna_first) * 100.0
+        valstr = 'Initial/Optimized   {:3.2f}'.format(fact)
+        self.ostream.print_header(valstr)
+        if cna_ref is not None:
+            fact = cna_ref.comp_cna(cna_first) * 100.0
+            valstr = 'Reference/Initial   {:3.2f}'.format(fact)
+            self.ostream.print_header(valstr)
+            fact = cna_ref.comp_cna(cna_last) * 100.0
+            valstr = 'Reference/Optimized {:3.2f}'.format(fact)
+            self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+
+        # print radius
+        valstr = 'Bond cut-off radius: {:3.1f}'.format(self.cna_bond)
+        self.ostream.print_header(valstr)
+        valstr = 'Environment cut-off radius: {:3.1f}'.format(self.cna_rcut)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+
+    def print_bonding_pattern(self, cna_data, label):
+        """
+        Prints bonding pattern for the given CNA data.
+
+        :param cna_data:
+            The CNA data with bonding pattern information.
+        :param label:
+            The label of bonding patterm header.
+        """
+        valstr = 'Bonding Pattern of ' + label + ' Geometry'
+        self.ostream.print_header(valstr)
+        self.ostream.print_header('-' * 41)
+        valstr = '{:>9s} {:>15s} {:>15s}'.format('Bond Type', 'Signature',
+                                                 'Repetitions')
+        self.ostream.print_header(valstr)
+        self.ostream.print_header(len(valstr) * '-')
+        self.ostream.print_block(str(cna_data))
+        self.ostream.print_blank()

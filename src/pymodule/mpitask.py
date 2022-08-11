@@ -171,12 +171,11 @@ class MpiTask:
                     self.ao_basis = MolecularBasis.read(self.molecule,
                                                         basis_name, basis_path,
                                                         self.ostream)
-                    self.min_basis = MolecularBasis.read(
-                        self.molecule, 'AO-START-GUESS', basis_path)
 
-                    self.ostream.print_block(
-                        self.ao_basis.get_string('Atomic Basis', self.molecule))
-                    self.ostream.flush()
+                    self.min_basis = MolecularBasis.read(self.molecule,
+                                                         'AO-START-GUESS',
+                                                         basis_path,
+                                                         ostream=None)
 
         # broadcast input dictionary
 

@@ -18,6 +18,7 @@ build*
 *~
 dummy.*
 .vscode
+*.DS_Store
 Makefile.setup
 /.ccls-cache/
 .DS_Store
@@ -153,3 +154,6 @@ cython_debug/
 ConfigMKL.hpp
 /.direnv/
 /compile_commands.json
+
+# generated Python sources
+mklconf.py

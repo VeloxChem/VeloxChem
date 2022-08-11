@@ -23,16 +23,27 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+default:
+  tags:
+    - vlx-docker
+  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-33ac6b4
+  interruptible: true
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+    - when: always
+
 stages:
   - build
   - test
+  - deploy
 
-.monkey:setup:
-  tags:
-    - vlx-docker
-  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-4672d65
+.monkey:conf:
   variables:
-    OMP_NUM_THREADS: "6"
+    VLX_NUM_BUILD_JOBS: "6"
   before_script:
     - uname -a
     - free -m
@@ -43,41 +54,73 @@ stages:
     - python -V
     - mpiicc --version
     - mpiicpc --version
+
+.monkey:setup:
+  extends:
+    - .monkey:conf
+  before_script:
+    - !reference [ .monkey:conf, before_script]
     - python -m venv --clear venv
     - source venv/bin/activate
-    - python -m pip install --upgrade pip setuptools wheel
+    - python -m pip install --upgrade
+        pip
+        setuptools
+        wheel
 
-monkey:build:
-  extends: .monkey:setup
+monkey:cmake_build:
+  extends:
+    - .monkey:setup
   stage: build
-  variables:
-    GTESTLIB: "/usr/lib/x86_64-linux-gnu"
   script:
-    - python -m pip install numpy pybind11 mpi4py --no-binary=mpi4py
-    - python config/generate_setup.py
-    - make -j 6 -C src release
-    - make -j 6 -C unit_tests release
+    - python -m pip install
+        numpy
+        pybind11[global]
+        mpi4py --no-binary=mpi4py
+    - cmake
+        -S.
+        -Bbuild
+        -GNinja
+        -DCMAKE_CXX_COMPILER=mpiicpc
+        -DVLX_LA_VENDOR=MKL
+    - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" -- -v -d stats
   artifacts:
     paths:
       - build
-    expire_in: 2 hours
+    expire_in: 12 hours
 
 monkey:unit_tests:
   extends: .monkey:setup
   stage: test
-  needs: ["monkey:build"]
+  needs: ["monkey:cmake_build"]
   script:
-    - ./build/bin/UnitTestVeloxChem.x
+    - ctest --test-dir build --output-on-failure -L unit
+
+monkey:pip_install:
+  extends: .monkey:setup
+  stage: build
+  script:
+    - CC=icc MPICC=mpiicc python -m pip install mpi4py --no-binary=mpi4py
+    - CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
+    - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpiicpc"
+        python -m pip install .[test,qmmm]
+  artifacts:
+    paths:
+      - venv
+    expire_in: 12 hours
 
 monkey:python_tests:
-  extends: .monkey:setup
+  extends: .monkey:conf
   stage: test
+  needs: ["monkey:pip_install"]
   variables:
-    VLX_NUM_BUILD_JOBS: "6"
+    OMP_NUM_THREADS: "6"
   script:
-    - python -m pip install mpi4py --no-binary=mpi4py
-    - CC=gcc CXX=g++ python -m pip install cppe==0.2.1 MDAnalysis
-    - python -m pip install .[test,qmmm]
+    - source venv/bin/activate
     - python -c "import veloxchem; print(veloxchem.__version__)"
-    - mpiexec -n 2 python -m pytest -v --pyargs veloxchem -m "solvers"
-    - python -m pytest -v --cov=veloxchem --pyargs veloxchem
+    - mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO --pyargs veloxchem -m "solvers"
+    - python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO --pyargs veloxchem
+
+include:
+  #- '.gitlab/windows-ci.yml'
+  - '.gitlab/cron-deploy.yml'
+  - '.gitlab/deploy.yml'

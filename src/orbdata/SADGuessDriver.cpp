@@ -527,7 +527,8 @@ CSADGuessDriver::getOccupationNumbersForElement(const int32_t elem_id, const dou
 }
 
 std::vector<std::vector<double>>
-CSADGuessDriver::getOccupationNumbersForMolecule(const CMolecule& molecule, const double nelec) const
+CSADGuessDriver::getOccupationNumbersForMolecule(const CMolecule& molecule,
+                                                 const double     nelec) const
 {
     std::vector<std::vector<double>> occnumbers;
 
@@ -548,7 +549,8 @@ CSADGuessDriver::getOccupationNumbersForMolecule(const CMolecule& molecule, cons
 }
 
 std::vector<std::vector<int32_t>>
-CSADGuessDriver::getAOIndicesOfAtoms(const CMolecule& molecule, const CMolecularBasis& basis) const
+CSADGuessDriver::getAOIndicesOfAtoms(const CMolecule&       molecule,
+                                     const CMolecularBasis& basis) const
 {
     std::vector<std::vector<int32_t>> aoinds_atoms;
 

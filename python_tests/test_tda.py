@@ -1,19 +1,14 @@
-import sys
 from pathlib import Path
 
 import numpy as np
 import pytest
-
-try:
-    import cppe
-except ImportError:
-    pass
 
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaexcidriver import TDAExciDriver
 from veloxchem.veloxchemlib import hartree_in_ev, is_mpi_master
 
+from .addons import using_cppe
 
 @pytest.mark.solvers
 class TestTDA:
@@ -122,7 +117,7 @@ class TestTDA:
 
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    @using_cppe
     def test_tda_hf_pe(self):
 
         here = Path(__file__).parent
@@ -145,7 +140,7 @@ class TestTDA:
 
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    @using_cppe
     def test_tda_dft_pe(self):
 
         here = Path(__file__).parent

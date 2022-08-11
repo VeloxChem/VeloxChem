@@ -28,6 +28,8 @@ from os import environ
 from pathlib import Path
 from sys import stdout
 
+from .mklconf import configure_mkl_rt
+
 
 def get_basis_path():
     """

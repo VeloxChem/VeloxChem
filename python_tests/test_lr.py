@@ -3,11 +3,6 @@ import numpy as np
 import tempfile
 import random
 import pytest
-import sys
-try:
-    import cppe
-except ImportError:
-    pass
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
@@ -15,6 +10,7 @@ from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.rsppolarizability import Polarizability
 
+from .addons import using_cppe
 
 @pytest.mark.solvers
 class TestLR:
@@ -163,7 +159,7 @@ class TestLR:
 
         self.run_lr(inpfile, potfile, xcfun_label, raw_data)
 
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    @using_cppe
     def test_lr_hf_pe(self):
 
         here = Path(__file__).parent
@@ -186,7 +182,7 @@ class TestLR:
 
         self.run_lr(inpfile, potfile, xcfun_label, raw_data)
 
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    @using_cppe
     def test_lr_dft_pe(self):
 
         here = Path(__file__).parent

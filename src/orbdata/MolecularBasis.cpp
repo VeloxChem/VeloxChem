@@ -532,7 +532,6 @@ CMolecularBasis::getIndexMapForDalton(const CMolecule &molecule) const
     return idsmap;
 }
 
-
 std::vector<int32_t>
 CMolecularBasis::getIndexMap(const CMolecule& molecule) const
 {
@@ -548,7 +547,6 @@ CMolecularBasis::getIndexMap(const CMolecule& molecule) const
     
     return indexes;
 }
-
 
 int32_t
 CMolecularBasis::getPositionInAngularBlock(const CMolecule& molecule,

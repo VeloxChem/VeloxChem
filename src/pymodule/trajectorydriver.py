@@ -303,7 +303,10 @@ class TrajectoryDriver:
                 if 'basis_path' in self.method_dict:
                     basis_path = self.method_dict['basis_path']
                 basis_name = self.method_dict['basis'].upper()
-                qm_basis = MolecularBasis.read(qm_mol, basis_name, basis_path)
+                qm_basis = MolecularBasis.read(qm_mol,
+                                               basis_name,
+                                               basis_path,
+                                               ostream=None)
 
             else:
 

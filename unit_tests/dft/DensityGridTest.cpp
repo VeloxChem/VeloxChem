@@ -885,6 +885,46 @@ TEST_F(CDensityGridTest, BetaDensityGradientZ)
     ASSERT_TRUE(dgridlb.betaDensityGradientZ(0) == nullptr);
 }
 
+TEST_F(CDensityGridTest, GetComponent)
+{
+    CMemBlock2D<double> mblockab({1.0, 2.0, 3.0, 6.0, 4.0, 5.0, 7.0, 9.0, 2.0, 4.0}, 2, 5);
+    
+    CDensityGrid dgridab(mblockab, dengrid::ab);
+    
+    auto cgrid0 = dgridab.getComponent(0); cgrid0[0] = 3.0;
+    
+    auto cgrid1 = dgridab.getComponent(1); cgrid1[1] = 9.0;
+    
+    auto cgrid2 = dgridab.getComponent(2); cgrid2[1] = 0.0;
+    
+    auto cgrid3 = dgridab.getComponent(3); cgrid3[0] = 1.0;
+    
+    auto cgrid4 = dgridab.getComponent(4); cgrid4[0] = 3.0;
+    
+    CMemBlock2D<double> rblockab({3.0, 2.0, 3.0, 9.0, 4.0, 0.0, 1.0, 9.0, 3.0, 4.0}, 2, 5);
+    
+    CDensityGrid rgridab(rblockab, dengrid::ab);
+    
+    ASSERT_EQ(dgridab, rgridab);
+}
+
+TEST_F(CDensityGridTest, GetComponentConstant)
+{
+    CMemBlock2D<double> mblockab({1.0, 2.0, 3.0, 6.0, 4.0, 5.0, 7.0, 9.0, 2.0, 4.0}, 2, 5);
+    
+    const CDensityGrid dgridab(mblockab, dengrid::ab);
+    
+    vlxtest::compare({1.0, 2.0}, dgridab.getComponent(0));
+    
+    vlxtest::compare({3.0, 6.0}, dgridab.getComponent(1));
+    
+    vlxtest::compare({4.0, 5.0}, dgridab.getComponent(2));
+    
+    vlxtest::compare({7.0, 9.0}, dgridab.getComponent(3));
+    
+    vlxtest::compare({2.0, 4.0}, dgridab.getComponent(4));
+}
+
 TEST_F(CDensityGridTest, SetScreenedGrids)
 {
     CMemBlock2D<double> dblocka({0.1, 2.0, 0.1,

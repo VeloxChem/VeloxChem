@@ -1,24 +1,19 @@
-from mpi4py import MPI
 from pathlib import Path
-import numpy as np
-import pytest
-import sys
-try:
-    import cppe
-except ImportError:
-    pass
 
-from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver
-from veloxchem.veloxchemlib import is_mpi_master
-from veloxchem.veloxchemlib import denmat
-from veloxchem.outputstream import OutputStream
-from veloxchem.mpitask import MpiTask
+import numpy as np
+from mpi4py import MPI
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.aofockmatrix import AOFockMatrix
+from veloxchem.firstorderprop import FirstOrderProperties
+from veloxchem.mpitask import MpiTask
+from veloxchem.outputstream import OutputStream
+from veloxchem.qqscheme import get_qq_scheme
 from veloxchem.scfdriver import ScfDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.firstorderprop import FirstOrderProperties
-from veloxchem.qqscheme import get_qq_scheme
+from veloxchem.veloxchemlib import (ElectronRepulsionIntegralsDriver, denmat,
+                                    is_mpi_master)
+
+from .addons import using_cppe
 
 
 class TestScfRestricted:
@@ -43,7 +38,8 @@ class TestScfRestricted:
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
-        scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_drv.scf_tensors)
+        scf_prop.compute_scf_prop(task.molecule, task.ao_basis,
+                                  scf_drv.scf_tensors)
 
         if is_mpi_master(task.mpi_comm):
             e_scf = scf_drv.get_scf_energy()
@@ -98,6 +94,21 @@ class TestScfRestricted:
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)
 
+    def test_scf_pkzb(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water.inp')
+        potfile = None
+
+        xcfun_label = 'pkzb'
+        electric_field = None
+
+        ref_e_scf = -75.961205966185
+        ref_dip = np.array([0.000000, 0.000000, 0.691948])
+
+        self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
+                     ref_dip)
+
     def test_scf_dft_slda(self):
 
         here = Path(__file__).parent
@@ -128,7 +139,7 @@ class TestScfRestricted:
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)
 
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    @using_cppe
     def test_scf_hf_pe(self):
 
         here = Path(__file__).parent
@@ -144,7 +155,7 @@ class TestScfRestricted:
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)
 
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    @using_cppe
     def test_scf_dft_pe(self):
 
         here = Path(__file__).parent

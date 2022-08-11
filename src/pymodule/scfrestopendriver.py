@@ -296,20 +296,22 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
         naos = s.shape[0]
 
-        f0 = 0.5 * (fa + fb)
-
-        ga = np.linalg.multi_dot([s, da, fa]) - np.linalg.multi_dot([fa, da, s])
-        gb = np.linalg.multi_dot([s, db, fb]) - np.linalg.multi_dot([fb, db, s])
-        g = ga + gb
-
         inactive = np.matmul(s, db)
         active = np.matmul(s, da - db)
         virtual = np.eye(naos) - np.matmul(s, da)
 
-        fcorr = np.linalg.multi_dot([inactive, g - f0, active.T])
-        fcorr -= np.linalg.multi_dot([active, g + f0, inactive.T])
-        fcorr += np.linalg.multi_dot([active, g - f0, virtual.T])
-        fcorr -= np.linalg.multi_dot([virtual, g + f0, active.T])
+        #       occ   act   vir
+        #     +----------------+
+        # occ | f0    fb    f0 |
+        # act | fb    f0    fa |
+        # vir | f0    fa    f0 |
+        #     +----------------+
+
+        f0 = 0.5 * (fa + fb)
+
+        fcorr = np.linalg.multi_dot([inactive, fb - f0, active.T])
+        fcorr += np.linalg.multi_dot([active, fa - f0, virtual.T])
+        fcorr += fcorr.T
 
         return f0 + fcorr
 

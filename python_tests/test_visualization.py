@@ -59,7 +59,7 @@ class TestVisualization:
         vis_drv.compute(grid, task.molecule, task.ao_basis, density, 0, 'alpha')
 
         den_val = vis_drv.get_density(points, task.molecule, task.ao_basis,
-                                      density, 0, 'alpha')
+                                      density, 'alpha')
 
         if is_mpi_master(task.mpi_comm):
             dens_alpha = grid.values_to_numpy()
@@ -82,12 +82,12 @@ class TestVisualization:
         twoe_val_aa = vis_drv.get_two_particle_density(points, points,
                                                        task.molecule,
                                                        task.ao_basis, density,
-                                                       0, 'alpha', 'alpha')
+                                                       'alpha', 'alpha')
 
         twoe_val_ab = vis_drv.get_two_particle_density(points, points,
                                                        task.molecule,
                                                        task.ao_basis, density,
-                                                       0, 'alpha', 'beta')
+                                                       'alpha', 'beta')
 
         if is_mpi_master(task.mpi_comm):
             twoe_val_aa = np.array(twoe_val_aa).reshape(2, 3, 3)
