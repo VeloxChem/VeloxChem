@@ -1622,18 +1622,22 @@ class CBuffer
             return false;
         }
 
-        auto rhs_padded_cols = rhs.nPaddedColumns();
-        auto rhs_data        = rhs.data();
-        for (size_type i = 0; i < lhs._nRows; ++i)
+        // do element-by-element comparison only if the memory was allocated
+        if (lhs._data && rhs.data())
         {
-            for (size_type j = 0; j < lhs._nColumns; ++j)
+            auto rhs_padded_cols = rhs.nPaddedColumns();
+            auto rhs_data        = rhs.data();
+            for (size_type i = 0; i < lhs._nRows; ++i)
             {
-                auto lhs_v = lhs._data[i * lhs._nPaddedColumns + j];
-                auto rhs_v = rhs_data[i * rhs_padded_cols + j];
-
-                if (std::abs(lhs_v - rhs_v) > 1.0e-13)
+                for (size_type j = 0; j < lhs._nColumns; ++j)
                 {
-                    return false;
+                    auto lhs_v = lhs._data[i * lhs._nPaddedColumns + j];
+                    auto rhs_v = rhs_data[i * rhs_padded_cols + j];
+
+                    if (std::abs(lhs_v - rhs_v) > 1.0e-13)
+                    {
+                        return false;
+                    }
                 }
             }
         }
