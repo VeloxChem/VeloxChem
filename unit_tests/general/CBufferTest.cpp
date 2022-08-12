@@ -1624,3 +1624,66 @@ TYPED_TEST(CBufferTest, Slice)
         ASSERT_EQ(buf.slice(cols), ref);
     }
 }
+
+TYPED_TEST(CBufferTest, SliceReverse)
+{
+    using Scalar         = typename TypeParam::value_type;
+    using Backend        = typename TypeParam::backend_type;
+    constexpr auto NRows = TypeParam::NRows;
+    constexpr auto NCols = TypeParam::NCols;
+
+    constexpr auto kind = getKind<NRows, NCols>();
+
+    // take a slice containing rows {1, 0} and columns {4, 3, 2}
+    auto rows = seqN(0, 2).reverse();
+    auto cols = seqN(2, 3).reverse();
+
+    if constexpr (kind == Kind::X)
+    {
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Linspace(0, 10, 10);
+
+        auto ref = CBuffer<Scalar, Backend, 1, Dynamic>(std::vector<Scalar>{4, 3, 2}, cols.size());
+
+        ASSERT_EQ(buf.slice(cols), ref);
+    }
+    else if constexpr (kind == Kind::MY)
+    {
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Linspace(0, NRows * 5, 5);
+
+        auto ref = CBuffer<Scalar, Backend, Dynamic, Dynamic>(std::vector<Scalar>{9, 8, 7, 4, 3, 2}, rows.size(), cols.size());
+
+        ASSERT_EQ(buf.slice(rows, cols), ref);
+    }
+    else if constexpr (kind == Kind::XN)
+    {
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Linspace(0, 5 * NCols, 5);
+
+        auto ref = CBuffer<Scalar, Backend, Dynamic, Dynamic>(std::vector<Scalar>{14, 13, 12, 4, 3, 2}, rows.size(), cols.size());
+
+        ASSERT_EQ(buf.slice(rows, cols), ref);
+    }
+    else if constexpr (kind == Kind::XY)
+    {
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Linspace(0, 15, 3, 5);
+
+        auto ref = CBuffer<Scalar, Backend, Dynamic, Dynamic>(std::vector<Scalar>{9, 8, 7, 4, 3, 2}, rows.size(), cols.size());
+
+        ASSERT_EQ(buf.slice(rows, cols), ref);
+    }
+    else if constexpr (kind == Kind::MN)
+    {
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Linspace(0, NRows * NCols);
+
+        auto ref = CBuffer<Scalar, Backend, Dynamic, Dynamic>(std::vector<Scalar>{9, 8, 7, 4, 3, 2}, rows.size(), cols.size());
+
+        ASSERT_EQ(buf.slice(rows, cols), ref);
+    }
+    else
+    {
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Linspace(0, NCols);
+
+        auto ref = CBuffer<Scalar, Backend, 1, Dynamic>(std::vector<Scalar>{4, 3, 2}, cols.size());
+
+        ASSERT_EQ(buf.slice(cols), ref);
+    }
+}
